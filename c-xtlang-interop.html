@@ -140,7 +140,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -230,13 +230,13 @@ in the library, and it should all be peaches.</p>
 <p>Let&#8217;s consider a really simple example. Say we have a C library which
 only defines <em>one function</em> called <code class="docutils literal"><span class="pre">foo</span></code>. This library (libfoo) will
 have a header</p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/* libfoo.h */</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/* libfoo.h */</span>
 
 <span class="kt">int</span> <span class="nf">foo</span><span class="p">(</span><span class="kt">int</span> <span class="n">bar</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>and an implementation</p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/* libfoo.c */</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/* libfoo.c */</span>
 
 <span class="kt">int</span> <span class="nf">foo</span><span class="p">(</span><span class="kt">int</span> <span class="n">bar</span><span class="p">){</span>
   <span class="k">return</span> <span class="n">bar</span> <span class="o">+</span> <span class="mi">42</span><span class="p">;</span>
@@ -262,7 +262,7 @@ platforms as well.</p>
 <code class="docutils literal"><span class="pre">.dylib</span></code> extension, but just substitute in the appropriate extension
 for your platform. To build the shared library on OSX, move into
 libfoo&#8217;s directory and build it with the <code class="docutils literal"><span class="pre">-dynamiclib</span></code> flag:</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>clang libfoo.c -dynamiclib -o libfoo.dylib
+<div class="code highlight-python"><div class="highlight"><pre>clang libfoo.c -dynamiclib -o libfoo.dylib
 </pre></div>
 </div>
 <p><code class="docutils literal"><span class="pre">clang</span></code> is a C compiler that&#8217;s part of the LLVM project. I could also
@@ -275,20 +275,20 @@ function <code class="docutils literal"><span class="pre">foo</span></code>). Th
 callable from xtlang code is to tell xtlang compiler about the type
 signature of the functions in the library. To do this, we use
 <code class="docutils literal"><span class="pre">bind-lib</span></code>.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; libfoo.xtm -- an xtm header for libfoo
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; libfoo.xtm -- an xtm header for libfoo</span>
 
-;; load the shared lib
-(bind-dylib libfoo &quot;libfoo.dylib&quot;)
+<span class="c1">;; load the shared lib</span>
+<span class="p">(</span><span class="k">bind-dylib</span> <span class="nf">libfoo</span> <span class="s">&quot;libfoo.dylib&quot;</span><span class="p">)</span>
 
-;; define foo as a function
-(bind-lib libfoo foo [i64,i64]*)
+<span class="c1">;; define foo as a function</span>
+<span class="p">(</span><span class="k">bind-lib</span> <span class="nf">libfoo</span> <span class="nv">foo</span> <span class="kt">[i64,i64]*</span><span class="p">)</span>
 
-;; test that everything worked ok
-(bind-func foo_test
-  (lambda (x)
-    (printf &quot;foo(x) = %lld\n&quot; (foo x))))
+<span class="c1">;; test that everything worked ok</span>
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">foo_test</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">x</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;foo(x) = %lld\n&quot;</span> <span class="p">(</span><span class="nv">foo</span> <span class="nv">x</span><span class="p">))))</span>
 
-(foo_test 6) ;; prints &quot;foo(x) = 48&quot;
+<span class="p">(</span><span class="nv">foo_test</span> <span class="mi">6</span><span class="p">)</span> <span class="c1">;; prints &quot;foo(x) = 48&quot;</span>
 </pre></div>
 </div>
 <p><code class="docutils literal"><span class="pre">bind-dylib</span></code> is the Extempore interface for loading shared
@@ -342,7 +342,7 @@ the FT for the purposes of this example, just know that we want to give
 it a buffer of input values and have it give us back a buffer of
 transformed output values. Looking through the header, it&#8217;s clear that
 the function we call to do this is <code class="docutils literal"><span class="pre">kiss_fft</span></code>.</p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/*</span>
 <span class="cm"> * kiss_fft(cfg,in_out_buf)</span>
 <span class="cm"> *</span>
 <span class="cm"> * Perform an FFT on a complex input buffer.</span>
@@ -391,21 +391,21 @@ this memory in <code class="docutils literal"><span class="pre">fout</span></cod
 <p>So now we can just go ahead and turn the signature of <code class="docutils literal"><span class="pre">kiss_fft</span></code>
 into a <code class="docutils literal"><span class="pre">bind-lib</span></code> and we&#8217;re done, right? Something like (remembering
 that xtlang uses <code class="docutils literal"><span class="pre">i8*</span></code> in place of C&#8217;s <code class="docutils literal"><span class="pre">void</span></code> type)</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define kissfft (bind-dylib &quot;kiss_fft.dylib&quot;))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">kissfft</span> <span class="p">(</span><span class="k">bind-dylib</span> <span class="s">&quot;kiss_fft.dylib&quot;</span><span class="p">))</span>
 
-(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+<span class="p">(</span><span class="k">bind-lib</span> <span class="nf">kissfft</span> <span class="nv">kiss_fft</span> <span class="kt">[i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>But then when we try and evaluate the <code class="docutils literal"><span class="pre">bind-lib</span></code>, the compiler throws
 an error:</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>Compiler Error: cannot find type for &quot;kiss_fft_cfg&quot;
+<div class="code highlight-python"><div class="highlight"><pre>Compiler Error: cannot find type for &quot;kiss_fft_cfg&quot;
 </pre></div>
 </div>
 <p>Ah, Extempore can&#8217;t recognise the type signature for <code class="docutils literal"><span class="pre">kiss_fft</span></code>
 without knowing about all its argument and return types as well. So,
 let&#8217;s dive back into the <code class="docutils literal"><span class="pre">kiss_fft.h</span></code> header file to find the
 declaration of <code class="docutils literal"><span class="pre">kiss_fft_cfg</span></code>.</p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/* in kiss_fft.h */</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/* in kiss_fft.h */</span>
 
 <span class="k">typedef</span> <span class="k">struct</span> <span class="n">kiss_fft_state</span><span class="o">*</span> <span class="n">kiss_fft_cfg</span><span class="p">;</span>
 </pre></div>
@@ -419,7 +419,7 @@ argument. We need to find the definition of <em>this</em> type.</p>
 <p>Hmm, it&#8217;s not in <code class="docutils literal"><span class="pre">kiss_fft.h</span></code>. A look in <em>all</em> the header files in the
 KissFFT source directory (with <code class="docutils literal"><span class="pre">grep</span> <span class="pre">kiss_fft_state</span> <span class="pre">*.h</span></code>) reveals that
 it&#8217;s actually defined in <code class="docutils literal"><span class="pre">_kiss_fft_guts.h</span></code>.</p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/* in _kiss_fft_guts.h */</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/* in _kiss_fft_guts.h */</span>
 
 <span class="k">struct</span> <span class="n">kiss_fft_state</span><span class="p">{</span>
     <span class="kt">int</span> <span class="n">nfft</span><span class="p">;</span>
@@ -442,7 +442,7 @@ it&#8217;s actually defined in <code class="docutils literal"><span class="pre">
 So we need to do that before we can tell the xtlang compiler about the
 <code class="docutils literal"><span class="pre">kiss_fft_state</span></code> struct.</p>
 <p>The <code class="docutils literal"><span class="pre">kiss_fft_cpx</span></code> definition is back in <code class="docutils literal"><span class="pre">kiss_fft.h</span></code></p>
-<div class="highlight-c"><div class="highlight"><pre><span></span><span class="cm">/* in kiss_fft.h */</span>
+<div class="highlight-c"><div class="highlight"><pre><span class="cm">/* in kiss_fft.h */</span>
 
 <span class="cp">#ifdef FIXED_POINT</span>
 <span class="cp">#include</span> <span class="cpf">&lt;sys/types.h&gt;</span><span class="cp"></span>
@@ -480,13 +480,13 @@ complex number. The two <code class="docutils literal"><span class="pre">float</
 imaginary (<code class="docutils literal"><span class="pre">i</span></code>) part of the complex number.</p>
 <p>Now, finally, we know all the types we need to call <code class="docutils literal"><span class="pre">kiss_fft</span></code>. We
 just need to tell the xtlang compiler about them.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; in fft.xtm
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; in fft.xtm</span>
 
-(bind-type kiss_fft_cpx &lt;float,float&gt;)
-(bind-type kiss_fft_state &lt;i32,i32,|64,i32|,|1,kiss_fft_cpx|&gt;)
-(bind-alias kiss_fft_cfg kiss_fft_state*)
+<span class="p">(</span><span class="k">bind-type</span> <span class="nf">kiss_fft_cpx</span> <span class="kt">&lt;float,float&gt;</span><span class="p">)</span>
+<span class="p">(</span><span class="k">bind-type</span> <span class="nf">kiss_fft_state</span> <span class="kt">&lt;i32,i32,|64,i32|,|1,kiss_fft_cpx|&gt;</span><span class="p">)</span>
+<span class="p">(</span><span class="k">bind-alias</span> <span class="nf">kiss_fft_cfg</span> <span class="kt">kiss_fft_state*</span><span class="p">)</span>
 
-(bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
+<span class="p">(</span><span class="k">bind-lib</span> <span class="nf">kissfft</span> <span class="nv">kiss_fft</span> <span class="kt">[i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>See how each struct in C gets bound as a type in xtlang? If you don&#8217;t
@@ -497,7 +497,7 @@ fact we&#8217;ll <em>have to</em> if we want to actually call the functions from
 library.</p>
 <p>So after all this detective work, finding and declaring the appropriate
 type signatures, the above code finally compiles:</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>Bound kiss_fft_cpx &gt;&gt;&gt; &lt;float,float&gt;
+<div class="code highlight-python"><div class="highlight"><pre>Bound kiss_fft_cpx &gt;&gt;&gt; &lt;float,float&gt;
 Bound kiss_fft_state &gt;&gt;&gt; &lt;i32,i32,|64,i32|,|1,kiss_fft_cpx|&gt;
 Aliased kiss_fft_cfg &gt;&gt;&gt; kiss_fft_state*
 Bound kiss_fft &gt;&gt;&gt; [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*

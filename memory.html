@@ -148,7 +148,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -198,9 +198,9 @@ out of scope (that is, there are no longer any references to them) the
 memory is automatically freed up for re-use.</p>
 <p>Let&#8217;s do the most basic memory allocation imaginable: just binding a
 numerical value to a symbol.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define a 5)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">a</span> <span class="mi">5</span><span class="p">)</span>
 
-(println &#39;a &#39;= a)  ;; prints a = 5
+<span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;a</span> <span class="ss">&#39;=</span> <span class="nv">a</span><span class="p">)</span>  <span class="c1">;; prints a = 5</span>
 </pre></div>
 </div>
 <p>The fact that we can use the symbol <code class="docutils literal"><span class="pre">a</span></code> and have it evaluate to
@@ -212,9 +212,9 @@ allocating some memory, storing the value <code class="docutils literal"><span c
 binding a reference to the value in the symbol <code class="docutils literal"><span class="pre">a</span></code>.</p>
 <p>We can redefine the symbol <code class="docutils literal"><span class="pre">a</span></code> to be some other Scheme object, say, a
 list.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define a &#39;(1 2 3))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">a</span> <span class="o">&#39;</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">))</span>
 
-(println &#39;a &#39;= a)  ;; prints a = (1 2 3)
+<span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;a</span> <span class="ss">&#39;=</span> <span class="nv">a</span><span class="p">)</span>  <span class="c1">;; prints a = (1 2 3)</span>
 </pre></div>
 </div>
 <p>The three-element list <code class="docutils literal"><span class="pre">(1</span> <span class="pre">2</span> <span class="pre">3)</span></code> takes up more memory than the number
@@ -323,14 +323,14 @@ closure. Remember that closures are just functions with their
 enclosing scope: think of a function which has packaged up any
 variables it references and carries them around in its saddlebags.</p>
 <p>Well, that&#8217;s as clear as mud. Let&#8217;s have an example.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func simple_stack_alloc
-  (lambda ()
-    (let ((a 2)
-          (b 3.5))
-      (printf &quot;a x b = %f\n&quot;
-              (* (i64tod a) b)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">simple_stack_alloc</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">a</span> <span class="mi">2</span><span class="p">)</span>
+          <span class="p">(</span><span class="nv">b</span> <span class="mf">3.5</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;a x b = %f\n&quot;</span>
+              <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="nf">i64tod</span> <span class="nv">a</span><span class="p">)</span> <span class="nv">b</span><span class="p">)))))</span>
 
-(simple_stack_alloc) ;; prints &quot;a x b = 7.000000&quot;
+<span class="p">(</span><span class="nv">simple_stack_alloc</span><span class="p">)</span> <span class="c1">;; prints &quot;a x b = 7.000000&quot;</span>
 </pre></div>
 </div>
 <p>Even though there was no explicit call to <code class="docutils literal"><span class="pre">salloc</span></code>, the local
@@ -349,17 +349,17 @@ then you can pass it around and dereference it from anywhere.</p>
 <p>This &#8216;implicit stack allocation&#8217; works for int and float literals, but
 how about aggregate and other higher-order types? In those cases, we
 call <code class="docutils literal"><span class="pre">salloc</span></code> explicitly.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple
-  (lambda (a:i64)
-    (let ((tup:&lt;i64,i64&gt;* (salloc)))
-      (printf &quot;input: %lld, &quot; a)
-      (tfill! tup a (* 2 a))
-      (printf &quot;output: &lt;%lld,%lld&gt;\n&quot;
-              (tref tup 0)
-              (tref tup 1))
-      tup)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;*</span> <span class="p">(</span><span class="nf">salloc</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;input: %lld, &quot;</span> <span class="nv">a</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">tfill!</span> <span class="nv">tup</span> <span class="nv">a</span> <span class="p">(</span><span class="nf">*</span> <span class="mi">2</span> <span class="nv">a</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;output: &lt;%lld,%lld&gt;\n&quot;</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">))</span>
+      <span class="nv">tup</span><span class="p">)))</span>
 
-(double_tuple 3) ;; prints &quot;input: 3, output: &lt;3,6&gt;&quot;
+<span class="p">(</span><span class="k">do</span><span class="nv">uble_tuple</span> <span class="mi">3</span><span class="p">)</span> <span class="c1">;; prints &quot;input: 3, output: &lt;3,6&gt;&quot;</span>
 </pre></div>
 </div>
 <p>This <code class="docutils literal"><span class="pre">double_tuple</span></code> closure takes an <code class="docutils literal"><span class="pre">i64</span></code> argument, and creates a
@@ -379,38 +379,38 @@ is obviously working fine. And this pointer is also the return value of
 the closure (so <code class="docutils literal"><span class="pre">double_tuple</span></code> has type signature
 <code class="docutils literal"><span class="pre">[&lt;i64,i64&gt;*,i64]*</span></code>).</p>
 <p>What happens if we try and dereference this returned pointer?</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test
-  (lambda ()
-    (let ((tup (double_tuple 6)))
-      (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
-              (tref tup 0)
-              (tref tup 1)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple_test</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nv">double_tuple</span> <span class="mi">6</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup* = &lt;%lld,%lld&gt;\n&quot;</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">)))))</span>
 
-(double_tuple_test)
+<span class="p">(</span><span class="k">do</span><span class="nv">uble_tuple_test</span><span class="p">)</span>
 
-;; prints:
+<span class="c1">;; prints:</span>
 
-;; input: 6, output: &lt;6,12&gt;
-;; tup* = &lt;6,12&gt;
+<span class="c1">;; input: 6, output: &lt;6,12&gt;</span>
+<span class="c1">;; tup* = &lt;6,12&gt;</span>
 </pre></div>
 </div>
 <p>Well, that seems to work OK. What about if we call <code class="docutils literal"><span class="pre">double_tuple</span></code>
 again in the body of the <code class="docutils literal"><span class="pre">let</span></code>, ignoring its return value?</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test2
-  (lambda ()
-    (let ((tup (double_tuple 6)))
-      (double_tuple 2)
-      (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
-              (tref tup 0)
-              (tref tup 1)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple_test2</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nv">double_tuple</span> <span class="mi">6</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nv">double_tuple</span> <span class="mi">2</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup* = &lt;%lld,%lld&gt;\n&quot;</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">)))))</span>
 
-(double_tuple_test2)
+<span class="p">(</span><span class="k">do</span><span class="nv">uble_tuple_test2</span><span class="p">)</span>
 
-;; prints:
+<span class="c1">;; prints:</span>
 
-;; input: 6, output: &lt;6,12&gt; (in the 1st call to double_tuple)
-;; input: 2, output: &lt;2,4&gt;  (in the 2nd call to double_tuple)
-;; tup* = &lt;2,4&gt;
+<span class="c1">;; input: 6, output: &lt;6,12&gt; (in the 1st call to double_tuple)</span>
+<span class="c1">;; input: 2, output: &lt;2,4&gt;  (in the 2nd call to double_tuple)</span>
+<span class="c1">;; tup* = &lt;2,4&gt;</span>
 </pre></div>
 </div>
 <p>This isn&#8217;t right: <code class="docutils literal"><span class="pre">tup*</span></code> should still be the original tuple
@@ -419,22 +419,22 @@ process of calling <code class="docutils literal"><span class="pre">double_tuple
 <code class="docutils literal"><span class="pre">2</span></code>), the values in our original tuple (which we have a pointer to in
 <code class="docutils literal"><span class="pre">tup</span></code>) have been overwritten.</p>
 <p>Finally, consider this example:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_test3
-  (lambda ()
-    (let ((tup (double_tuple 6))
-          (test_closure
-           (lambda ()
-             (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
-                     (tref tup 0)
-                     (tref tup 1)))))
-      (test_closure))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple_test3</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nv">double_tuple</span> <span class="mi">6</span><span class="p">))</span>
+          <span class="p">(</span><span class="nv">test_closure</span>
+           <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+             <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup* = &lt;%lld,%lld&gt;\n&quot;</span>
+                     <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+                     <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">)))))</span>
+      <span class="p">(</span><span class="nv">test_closure</span><span class="p">))))</span>
 
-(double_tuple_test3)
+<span class="p">(</span><span class="k">do</span><span class="nv">uble_tuple_test3</span><span class="p">)</span>
 
-;; prints:
+<span class="c1">;; prints:</span>
 
-;; input: 6, output: &lt;6,12&gt;
-;; tup* = &lt;0,4508736416&gt;
+<span class="c1">;; input: 6, output: &lt;6,12&gt;</span>
+<span class="c1">;; tup* = &lt;0,4508736416&gt;</span>
 </pre></div>
 </div>
 <p>Wow. That&#8217;s not just wrong, that&#8217;s <em>super wrong</em>. What&#8217;s going on is
@@ -471,18 +471,18 @@ from <code class="docutils literal"><span class="pre">0</span></code> up to the 
 need to allocate the memory for this region, and get a pointer to the
 start of the region. We can do this using <code class="docutils literal"><span class="pre">zalloc</span></code> inside a
 <code class="docutils literal"><span class="pre">memzone</span></code>.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_memzone
-  (lambda ()
-    (memzone 100000  ;; size of memzone (in bytes)
-             (let ((region_length 1000)
-                   (int_buf:i64* (zalloc region_length))
-                   (i:i64 0))
-               (dotimes (i region_length)
-                 (pset! int_buf i i))
-               (printf &quot;int_buf[366] = %lld\n&quot;
-                       (pref int_buf 366))))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">fill_buffer_memzone</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">memzone</span> <span class="mi">100000</span>  <span class="c1">;; size of memzone (in bytes)</span>
+             <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">region_length</span> <span class="mi">1000</span><span class="p">)</span>
+                   <span class="p">(</span><span class="nv">int_buf</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">region_length</span><span class="p">))</span>
+                   <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+               <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">region_length</span><span class="p">)</span>
+                 <span class="p">(</span><span class="nf">pset!</span> <span class="nv">int_buf</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+               <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;int_buf[366] = %lld\n&quot;</span>
+                       <span class="p">(</span><span class="nf">pref</span> <span class="nv">int_buf</span> <span class="mi">366</span><span class="p">))))))</span>
 
-(fill_buffer_memzone) ;; prints &quot;int_buf[366] = 366&quot;
+<span class="p">(</span><span class="nv">fill_buffer_memzone</span><span class="p">)</span> <span class="c1">;; prints &quot;int_buf[366] = 366&quot;</span>
 </pre></div>
 </div>
 <p>The code works as it should: as confirmed by the print statement. Notice
@@ -494,24 +494,24 @@ functions (<code class="docutils literal"><span class="pre">salloc</span></code>
 size argument, and they all default to <code class="docutils literal"><span class="pre">1</span></code> if no argument is passed.</p>
 <p>Let&#8217;s try another version of this code <code class="docutils literal"><span class="pre">fill_buffer_memzone2</span></code>, but
 with a much longer buffer of <code class="docutils literal"><span class="pre">i64</span></code> values.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_memzone2
-  (lambda ()
-    (memzone 100000  ;; size of memzone (in bytes)
-             (let ((region_length 1000000)
-                   (int_buf:i64* (zalloc region_length))
-                   (i:i64 0))
-               (dotimes (i region_length)
-                 (pset! int_buf i i))
-               (printf &quot;int_buf[366] = %lld\n&quot;
-                       (pref int_buf 366))))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">fill_buffer_memzone2</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">memzone</span> <span class="mi">100000</span>  <span class="c1">;; size of memzone (in bytes)</span>
+             <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">region_length</span> <span class="mi">1000000</span><span class="p">)</span>
+                   <span class="p">(</span><span class="nv">int_buf</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">region_length</span><span class="p">))</span>
+                   <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+               <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">region_length</span><span class="p">)</span>
+                 <span class="p">(</span><span class="nf">pset!</span> <span class="nv">int_buf</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+               <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;int_buf[366] = %lld\n&quot;</span>
+                       <span class="p">(</span><span class="nf">pref</span> <span class="nv">int_buf</span> <span class="mi">366</span><span class="p">))))))</span>
 
-(fill_buffer_memzone2) ;; prints &quot;int_buf[366] = 366&quot;
+<span class="p">(</span><span class="nv">fill_buffer_memzone2</span><span class="p">)</span> <span class="c1">;; prints &quot;int_buf[366] = 366&quot;</span>
 </pre></div>
 </div>
 <p>This time, with a region length of one million, the code still works (at
 least, the 367Th element is still correct), but the compiler also prints
 a warning message to the log:</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7ff7ac99a100 size:100000 is full ... leaking 8000000 bytes
+<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7ff7ac99a100 size:100000 is full ... leaking 8000000 bytes
 Leaving a leaky zone can be dangerous ... particularly for concurrency
 </pre></div>
 </div>
@@ -565,37 +565,37 @@ come from whatever the top zone is at the time&#8212;usually the default zone
 (unless you&#8217;re in an enclosing <code class="docutils literal"><span class="pre">memzone</span></code>).</p>
 <p>As an example, let&#8217;s revisit our &#8216;fill buffer&#8217; examples from earlier.
 With a region length of one thousand:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_closure_zone
-  (let ((region_length 1000)
-        (int_buf:i64* (zalloc region_length))
-        (i:i64 0))
-    (lambda ()
-      (dotimes (i region_length)
-        (pset! int_buf i i))
-      (printf &quot;int_buf[366] = %lld\n&quot;
-              (pref int_buf 366)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">fill_buffer_closure_zone</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">region_length</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">int_buf</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">region_length</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+      <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">region_length</span><span class="p">)</span>
+        <span class="p">(</span><span class="nf">pset!</span> <span class="nv">int_buf</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;int_buf[366] = %lld\n&quot;</span>
+              <span class="p">(</span><span class="nf">pref</span> <span class="nv">int_buf</span> <span class="mi">366</span><span class="p">)))))</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal"><span class="pre">let</span></code> where <code class="docutils literal"><span class="pre">int_buf</span></code> is allocated is outside the <code class="docutils literal"><span class="pre">lambda</span></code>
 form, so the memory will be coming from the zone associated with the
 closure <code class="docutils literal"><span class="pre">fill_buffer_closure_zone</span></code>. When we try and compile that, we
 get the warning:</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7fb8b3a4a610 size:8192 is full ... leaking 32 bytes
+<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7fb8b3a4a610 size:8192 is full ... leaking 32 bytes
 Leaving a leaky zone can be dangerous ... particularly for concurrency
 </pre></div>
 </div>
 <p>Let&#8217;s try it again, but with a &#8216;zone size&#8217; argument to <code class="docutils literal"><span class="pre">bind-func</span></code></p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_buffer_closure_zone2 10000 ;; zone size: 10KB
-  (let ((region_length 1000)
-        (int_buf:i64* (zalloc region_length))
-        (i:i64 0))
-    (lambda ()
-      (dotimes (i region_length)
-        (pset! int_buf i i))
-      (printf &quot;int_buf[366] = %lld\n&quot;
-              (pref int_buf 366)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">fill_buffer_closure_zone2</span> <span class="mi">10000</span> <span class="c1">;; zone size: 10KB</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">region_length</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">int_buf</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">region_length</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+      <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">region_length</span><span class="p">)</span>
+        <span class="p">(</span><span class="nf">pset!</span> <span class="nv">int_buf</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;int_buf[366] = %lld\n&quot;</span>
+              <span class="p">(</span><span class="nf">pref</span> <span class="nv">int_buf</span> <span class="mi">366</span><span class="p">)))))</span>
 
-(fill_buffer_closure_zone2) ;; prints &quot;int_buf[366] = 366&quot;
+<span class="p">(</span><span class="nv">fill_buffer_closure_zone2</span><span class="p">)</span> <span class="c1">;; prints &quot;int_buf[366] = 366&quot;</span>
 </pre></div>
 </div>
 <p>Sweet&#8212;no more warnings, and the buffer seems to be getting filled
@@ -619,23 +619,23 @@ and it will give you a pointer to some memory on the heap. So, let&#8217;s
 revisit the <code class="docutils literal"><span class="pre">double_tuple_test3</span></code> example from earlier, which didn&#8217;t
 work because the memory for <code class="docutils literal"><span class="pre">tup</span></code> on the stack went out of scope when
 the closure returned. If we replace the <code class="docutils literal"><span class="pre">salloc</span></code> with a <code class="docutils literal"><span class="pre">halloc</span></code>:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func double_tuple_halloc
-  (lambda (a:i64)
-    (let ((tup:&lt;i64,i64&gt;* (halloc))) ;; halloc instead of salloc
-      (tfill! tup a (* 2 a))
-      tup)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple_halloc</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;*</span> <span class="p">(</span><span class="nf">halloc</span><span class="p">)))</span> <span class="c1">;; halloc instead of salloc</span>
+      <span class="p">(</span><span class="nf">tfill!</span> <span class="nv">tup</span> <span class="nv">a</span> <span class="p">(</span><span class="nf">*</span> <span class="mi">2</span> <span class="nv">a</span><span class="p">))</span>
+      <span class="nv">tup</span><span class="p">)))</span>
 
-(bind-func double_tuple_halloc_test
-  (lambda ()
-    (let ((tup (double_tuple_halloc 4))
-          (test_closure
-           (lambda ()
-             (printf &quot;tup* = &lt;%lld,%lld&gt;\n&quot;
-                     (tref tup 0)
-                     (tref tup 1)))))
-      (test_closure))))
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">double_tuple_halloc_test</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nv">double_tuple_halloc</span> <span class="mi">4</span><span class="p">))</span>
+          <span class="p">(</span><span class="nv">test_closure</span>
+           <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+             <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup* = &lt;%lld,%lld&gt;\n&quot;</span>
+                     <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+                     <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">)))))</span>
+      <span class="p">(</span><span class="nv">test_closure</span><span class="p">))))</span>
 
-(double_tuple_halloc_test) ;; prints &quot;tup* = &lt;4,8&gt;&quot;
+<span class="p">(</span><span class="k">do</span><span class="nv">uble_tuple_halloc_test</span><span class="p">)</span> <span class="c1">;; prints &quot;tup* = &lt;4,8&gt;&quot;</span>
 </pre></div>
 </div>
 <p>Now, the returned tuple pointer <code class="docutils literal"><span class="pre">tup</span></code> is a heap pointer, so we can
@@ -674,22 +674,22 @@ performance of direct memory access, but there are also opportunities to
 really mess things up in a way that&#8217;s trickier to do in higher-level
 languages. Remember that memory is a finite resource. Don&#8217;t try and
 allocate a memory region of 10<sup>15</sup> 8-byte <code class="docutils literal"><span class="pre">i64</span></code>:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func fill_massive_buffer
-  (lambda ()
-    (let ((region_length 1000000000000000)
-          (int_buf:i64* (zalloc region_length))
-          (i:i64 0))
-      (dotimes (i region_length)
-        (pset! int_buf i i))
-      (printf &quot;int_buf[366] = %lld\n&quot;
-              (pref int_buf 366)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">fill_massive_buffer</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">region_length</span> <span class="mi">1000000000000000</span><span class="p">)</span>
+          <span class="p">(</span><span class="nv">int_buf</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">region_length</span><span class="p">))</span>
+          <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+      <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">region_length</span><span class="p">)</span>
+        <span class="p">(</span><span class="nf">pset!</span> <span class="nv">int_buf</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;int_buf[366] = %lld\n&quot;</span>
+              <span class="p">(</span><span class="nf">pref</span> <span class="nv">int_buf</span> <span class="mi">366</span><span class="p">)))))</span>
 
-(fill_massive_buffer)
+<span class="p">(</span><span class="nv">fill_massive_buffer</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>When I call <code class="docutils literal"><span class="pre">(fill_massive_buffer)</span></code> on my computer (with 8GB of RAM),
 disaster strikes.</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>Zone:0x7fc5cbc268c0 size:100000 is full ... leaking 8000000000000000 bytes
+<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7fc5cbc268c0 size:100000 is full ... leaking 8000000000000000 bytes
 Leaving a leaky zone can be dangerous ... particularly for concurrency
 extempore(21386,0x11833d000) malloc: *** mmap(size=8000000000000000) failed (error code=12)
 error: can&#39;t allocate region
@@ -720,13 +720,13 @@ might help to clarify things.</p>
 assigning variables: giving a name to a particular value. If we want to
 keep track of the number of cats you have, then we can create a variable
 <code class="docutils literal"><span class="pre">num_cats</span></code></p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats
-  (lambda ()
-    (let ((num_cats:i64 4))
-      ;; the i64 printf format specifier is %lld
-      (printf &quot;You have %lld cats!\n&quot; num_cats))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">print_num_cats</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_cats</span><span class="kt">:i64</span> <span class="mi">4</span><span class="p">))</span>
+      <span class="c1">;; the i64 printf format specifier is %lld</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;You have %lld cats!\n&quot;</span> <span class="nv">num_cats</span><span class="p">))))</span>
 
-(print_num_cats) ;; prints &quot;You have 4 cats!&quot;
+<span class="p">(</span><span class="nv">print_num_cats</span><span class="p">)</span> <span class="c1">;; prints &quot;You have 4 cats!&quot;</span>
 </pre></div>
 </div>
 <p>What&#8217;s happening here is that the <code class="docutils literal"><span class="pre">let</span></code> assigns the value <code class="docutils literal"><span class="pre">4</span></code> to the
@@ -745,15 +745,15 @@ in. In this case the address of that value is &#8216;memory location 26&#8217;, 
 it could easily be any other location (and indeed will almost certainly
 be different if the closure <code class="docutils literal"><span class="pre">print_num_cats</span></code> is called again).</p>
 <p>Once a variable exists, we can change its value with <code class="docutils literal"><span class="pre">set!</span></code>:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats2
-  (lambda ()
-    (let ((num_cats:i64 4))
-      (printf &quot;You have %lld cats... &quot; num_cats)
-      (set! num_cats 13)
-      (printf &quot;and now you have %lld cats!\n&quot; num_cats))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">print_num_cats2</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_cats</span><span class="kt">:i64</span> <span class="mi">4</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;You have %lld cats... &quot;</span> <span class="nv">num_cats</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">set!</span> <span class="nv">num_cats</span> <span class="mi">13</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;and now you have %lld cats!\n&quot;</span> <span class="nv">num_cats</span><span class="p">))))</span>
 
-(print_num_cats2)
-;; prints &quot;You have 4 cats... and now you have 13 cats!&quot;
+<span class="p">(</span><span class="nv">print_num_cats2</span><span class="p">)</span>
+<span class="c1">;; prints &quot;You have 4 cats... and now you have 13 cats!&quot;</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal"><span class="pre">set!</span></code> function changes the value of <code class="docutils literal"><span class="pre">num_cats</span></code>: it sets a new
@@ -791,12 +791,12 @@ pointer: because it points to (is a reference to) the value.</p>
 to the value, rather than the value itself. Notice how the type of
 <code class="docutils literal"><span class="pre">num_cats_ptr</span></code> is <code class="docutils literal"><span class="pre">i64*</span></code> (a pointer to an <code class="docutils literal"><span class="pre">i64</span></code>) rather than just
 an <code class="docutils literal"><span class="pre">i64</span></code> like it was before.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats3
-  (lambda ()
-    (let ((num_cats_ptr:i64* (zalloc)))
-      (printf &quot;You have %lld cats!\n&quot; num_cats_ptr))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">print_num_cats3</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_cats_ptr</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;You have %lld cats!\n&quot;</span> <span class="nv">num_cats_ptr</span><span class="p">))))</span>
 
-(print_num_cats3) ;; prints &quot;You have 4555984976 cats!&quot;
+<span class="p">(</span><span class="nv">print_num_cats3</span><span class="p">)</span> <span class="c1">;; prints &quot;You have 4555984976 cats!&quot;</span>
 </pre></div>
 </div>
 <p>There are a couple of other changes to the code. Firstly, we no longer
@@ -845,13 +845,13 @@ is zero in this next example, but I&#8217;ll get to what the index means in
 the next section) and a value. The value must be of the right type: e.g.
 if the pointer is a pointer to a double (a <code class="docutils literal"><span class="pre">double*</span></code>) then the value
 must be a <code class="docutils literal"><span class="pre">double</span></code>.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_num_cats4
-  (lambda ()
-    (let ((num_cats_ptr:i64* (zalloc)))
-      (pset! num_cats_ptr 0 5)
-      (printf &quot;You have %lld cats!\n&quot; (pref num_cats_ptr 0)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">print_num_cats4</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_cats_ptr</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nf">pset!</span> <span class="nv">num_cats_ptr</span> <span class="mi">0</span> <span class="mi">5</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;You have %lld cats!\n&quot;</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_cats_ptr</span> <span class="mi">0</span><span class="p">)))))</span>
 
-(print_num_cats4) ;; prints &quot;You have 5 cats!&quot;
+<span class="p">(</span><span class="nv">print_num_cats4</span><span class="p">)</span> <span class="c1">;; prints &quot;You have 5 cats!&quot;</span>
 </pre></div>
 </div>
 <p>Great&#8212;the function now prints the right number of cats (in this case
@@ -880,16 +880,16 @@ couple of examples) seemed to work just fine.</p>
 regions in memory, in which we can store <em>lots</em> of values. Say we want
 to be able to determine the mean (average) of 3 numbers. One way to do
 this is to store each of the different numbers with its own name.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean1
-  (lambda ()
-    (let ((num1:double 4.5)
-          (num2:double 3.3)
-          (num3:double 7.9))
-      (/ (+ num1 num2 num3)
-         3.0))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">mean1</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num1</span><span class="kt">:double</span> <span class="mf">4.5</span><span class="p">)</span>
+          <span class="p">(</span><span class="nv">num2</span><span class="kt">:double</span> <span class="mf">3.3</span><span class="p">)</span>
+          <span class="p">(</span><span class="nv">num3</span><span class="kt">:double</span> <span class="mf">7.9</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">num1</span> <span class="nv">num2</span> <span class="nv">num3</span><span class="p">)</span>
+         <span class="mf">3.0</span><span class="p">))))</span>
 
-;; call the function
-(mean1) ;; returns 5.233333
+<span class="c1">;; call the function</span>
+<span class="p">(</span><span class="nv">mean1</span><span class="p">)</span> <span class="c1">;; returns 5.233333</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal"><span class="pre">let</span></code> form binds the (<code class="docutils literal"><span class="pre">double</span></code>) values <code class="docutils literal"><span class="pre">4.5</span></code>, <code class="docutils literal"><span class="pre">3.3</span></code> and
@@ -901,21 +901,21 @@ to see how things would get out of hand if we wanted to find the mean of
 name to all the values we&#8217;re interested in, rather than having to refer
 to all the values by name individually. And to do that, we can use a
 pointer.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean2
-  (lambda ()
-    (let ((num_ptr:double* (zalloc 3)))
-      ;; set the values into memory
-      (pset! num_ptr 0 4.5)
-      (pset! num_ptr 1 3.3)
-      (pset! num_ptr 2 7.9)
-      ;; read the values back out, add them
-      ;; together, and then divide  by 3
-      (/ (+ (pref num_ptr 0)
-            (pref num_ptr 1)
-            (pref num_ptr 2))
-         3.0))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">mean2</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_ptr</span><span class="kt">:double*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="mi">3</span><span class="p">)))</span>
+      <span class="c1">;; set the values into memory</span>
+      <span class="p">(</span><span class="nf">pset!</span> <span class="nv">num_ptr</span> <span class="mi">0</span> <span class="mf">4.5</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">pset!</span> <span class="nv">num_ptr</span> <span class="mi">1</span> <span class="mf">3.3</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">pset!</span> <span class="nv">num_ptr</span> <span class="mi">2</span> <span class="mf">7.9</span><span class="p">)</span>
+      <span class="c1">;; read the values back out, add them</span>
+      <span class="c1">;; together, and then divide  by 3</span>
+      <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">2</span><span class="p">))</span>
+         <span class="mf">3.0</span><span class="p">))))</span>
 
-(mean2) ;; returns 5.233333
+<span class="p">(</span><span class="nv">mean2</span><span class="p">)</span> <span class="c1">;; returns 5.233333</span>
 </pre></div>
 </div>
 <p>In <code class="docutils literal"><span class="pre">mean2</span></code>, we pass an integer argument (in this case <code class="docutils literal"><span class="pre">3</span></code>) to
@@ -932,35 +932,35 @@ the memory address.</p>
 <p>There is a helpful function called <code class="docutils literal"><span class="pre">pfill!</span></code> for filling multiple
 values into memory (multiple calls to <code class="docutils literal"><span class="pre">pset!</span></code>) as we did in the above
 example. Rewriting <code class="docutils literal"><span class="pre">mean2</span></code> to use <code class="docutils literal"><span class="pre">pfill!</span></code>:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func mean3
-  (lambda ()
-    (let ((num_ptr:double* (zalloc 3)))
-      ;; set the values into memory
-      (pfill! num_ptr 4.5 3.3 7.9)
-      ;; read the values back out, add them
-      ;; together, and then divide  by 3
-      (/ (+ (pref num_ptr 0)
-            (pref num_ptr 1)
-            (pref num_ptr 2))
-         3.0))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">mean3</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_ptr</span><span class="kt">:double*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="mi">3</span><span class="p">)))</span>
+      <span class="c1">;; set the values into memory</span>
+      <span class="p">(</span><span class="nf">pfill!</span> <span class="nv">num_ptr</span> <span class="mf">4.5</span> <span class="mf">3.3</span> <span class="mf">7.9</span><span class="p">)</span>
+      <span class="c1">;; read the values back out, add them</span>
+      <span class="c1">;; together, and then divide  by 3</span>
+      <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">2</span><span class="p">))</span>
+         <span class="mf">3.0</span><span class="p">))))</span>
 
-(mean3) ;; returns 5.233333
+<span class="p">(</span><span class="nv">mean3</span><span class="p">)</span> <span class="c1">;; returns 5.233333</span>
 </pre></div>
 </div>
 <p>Finally, one more useful way to fill values into a chunk of memory is
 using a <code class="docutils literal"><span class="pre">dotimes</span></code> loop. To do this, we need to bind a helper value
 <code class="docutils literal"><span class="pre">i</span></code> to use as an index for the loop. This function allocates enough
 memory for 5 <code class="docutils literal"><span class="pre">i64</span></code> values, and just fills it with ascending numbers:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func ptr_loop
-  (lambda ()
-    (let ((num_ptr:i64* (zalloc 5))
-          (i:i64 0))
-      ;; loop from i = 0 to i = 4
-      (dotimes (i 5)
-        (pset! num_ptr i i))
-     (pref num_ptr 3))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">ptr_loop</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_ptr</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="mi">5</span><span class="p">))</span>
+          <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+      <span class="c1">;; loop from i = 0 to i = 4</span>
+      <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="p">(</span><span class="nf">pset!</span> <span class="nv">num_ptr</span> <span class="nv">i</span> <span class="nv">i</span><span class="p">))</span>
+     <span class="p">(</span><span class="nf">pref</span> <span class="nv">num_ptr</span> <span class="mi">3</span><span class="p">))))</span>
 
-(ptr_loop) ;; returns 3
+<span class="p">(</span><span class="nv">ptr_loop</span><span class="p">)</span> <span class="c1">;; returns 3</span>
 </pre></div>
 </div>
 <p>After the <code class="docutils literal"><span class="pre">dotimes</span></code> the memory will look like this:</p>
@@ -989,26 +989,26 @@ double as the second element would have the type signature
 <code class="docutils literal"><span class="pre">tref</span></code> and <code class="docutils literal"><span class="pre">tset!</span></code> respectively, which both work exactly like
 <code class="docutils literal"><span class="pre">pref=/=pset!</span></code> except the first argument has to be a pointer to a
 tuple.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(bind-func print_tuples
-  (lambda ()
-    ;; step 1: allocate memory for 2 tuples
-    (let ((tup_ptr:&lt;i64,double&gt;* (zalloc 2)))
-      ;; step 2: initialise tuples
-      (tset! (pref-ptr tup_ptr 0) 0 2)         ; tuple 1, element 1
-      (tset! (pref-ptr tup_ptr 0) 1 2.0)       ; tuple 1, element 2
-      (tset! (pref-ptr tup_ptr 1) 0 6)         ; tuple 2, element 1
-      (tset! (pref-ptr tup_ptr 1) 1 6.0)       ; tuple 2, element 2
-      ;; step 3: read &amp; print tuple values
-      (printf &quot;tup_ptr[0] = &lt;%lld,%f&gt;\n&quot;
-              (tref (pref-ptr tup_ptr 0) 0)    ; tuple 1, element 1
-              (tref (pref-ptr tup_ptr 0) 1))   ; tuple 1, element 2
-      (printf &quot;tup_ptr[1] = &lt;%lld,%f&gt;\n&quot;
-              (tref (pref-ptr tup_ptr 1) 0)    ; tuple 2, element 1
-              (tref (pref-ptr tup_ptr 1) 1))))); tuple 2, element 2
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">print_tuples</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="c1">;; step 1: allocate memory for 2 tuples</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup_ptr</span><span class="kt">:&lt;i64,double&gt;*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="mi">2</span><span class="p">)))</span>
+      <span class="c1">;; step 2: initialise tuples</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">0</span><span class="p">)</span> <span class="mi">0</span> <span class="mi">2</span><span class="p">)</span>         <span class="c1">; tuple 1, element 1</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">0</span><span class="p">)</span> <span class="mi">1</span> <span class="mf">2.0</span><span class="p">)</span>       <span class="c1">; tuple 1, element 2</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">1</span><span class="p">)</span> <span class="mi">0</span> <span class="mi">6</span><span class="p">)</span>         <span class="c1">; tuple 2, element 1</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">1</span><span class="p">)</span> <span class="mi">1</span> <span class="mf">6.0</span><span class="p">)</span>       <span class="c1">; tuple 2, element 2</span>
+      <span class="c1">;; step 3: read &amp; print tuple values</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup_ptr[0] = &lt;%lld,%f&gt;\n&quot;</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">0</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>    <span class="c1">; tuple 1, element 1</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">0</span><span class="p">)</span> <span class="mi">1</span><span class="p">))</span>   <span class="c1">; tuple 1, element 2</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;tup_ptr[1] = &lt;%lld,%f&gt;\n&quot;</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">1</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>    <span class="c1">; tuple 2, element 1</span>
+              <span class="p">(</span><span class="nf">tref</span> <span class="p">(</span><span class="nf">pref-ptr</span> <span class="nv">tup_ptr</span> <span class="mi">1</span><span class="p">)</span> <span class="mi">1</span><span class="p">)))))</span><span class="c1">; tuple 2, element 2</span>
 
-(print_tuples) ;; prints
-;; tup_ptr[0] = &lt;2,2.000000&gt;
-;; tup_ptr[1] = &lt;6,6.000000&gt;
+<span class="p">(</span><span class="nv">print_tuples</span><span class="p">)</span> <span class="c1">;; prints</span>
+<span class="c1">;; tup_ptr[0] = &lt;2,2.000000&gt;</span>
+<span class="c1">;; tup_ptr[1] = &lt;6,6.000000&gt;</span>
 </pre></div>
 </div>
 <p>This <code class="docutils literal"><span class="pre">print_tuples</span></code> example works in 3 basic steps:</p>

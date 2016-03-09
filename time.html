@@ -138,7 +138,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -175,7 +175,7 @@ program and then re-run the program, etc…</p>
 environment where programs are modified and extended while they are
 running. As a simple example: type the following code into your editor
 and <a class="reference internal" href="caas.html"><em>evaluate</em></a> it:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(now)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nf">now</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Your editor&#8217;s echo area should display the result of evaluating the
@@ -212,28 +212,28 @@ device on startup&#8212;even if you&#8217;re not producing any audio output.</p>
 code execution) for execution in the future is <em>super handy</em>. As an
 example, let&#8217;s load up the default synth instrument and play three notes
 in sequence (an arpeggiated triad).</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; load the instruments file
-(sys:load &quot;libs/core/instruments.xtm&quot;)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; load the instruments file</span>
+<span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/instruments.xtm&quot;</span><span class="p">)</span>
 
-;; define a synth using the provided components
-;; synth_note_c and synth_fx
-(bind-instrument synth synth_note_c synth_fx)
+<span class="c1">;; define a synth using the provided components</span>
+<span class="c1">;; synth_note_c and synth_fx</span>
+<span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">synth</span> <span class="nv">synth_note_c</span> <span class="nv">synth_fx</span><span class="p">)</span>
 
-;; add the instrument to the DSP output callback
-(bind-func dsp:DSP
-  (lambda (in time chan dat)
-    (synth in time chan dat)))
-(dsp:set! dsp)
+<span class="c1">;; add the instrument to the DSP output callback</span>
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+    <span class="p">(</span><span class="nv">synth</span> <span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)))</span>
+<span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
 
-;; schedule three nodes to play in succession
-(define play-seq
-  (lambda ()
-    (play-note (now) synth 60 80 10000)
-    (play-note (+ (now) 22050) synth 64 80 10000)
-    (play-note (+ (now) 44100) synth 67 80 10000)))
+<span class="c1">;; schedule three nodes to play in succession</span>
+<span class="p">(</span><span class="k">define</span> <span class="nv">play-seq</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="mi">10000</span><span class="p">)</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="mi">22050</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">64</span> <span class="mi">80</span> <span class="mi">10000</span><span class="p">)</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="mi">44100</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">67</span> <span class="mi">80</span> <span class="mi">10000</span><span class="p">)))</span>
 
-;; play
-(play-seq)
+<span class="c1">;; play</span>
+<span class="p">(</span><span class="nv">play-seq</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Extempore uses an asynchronous &#8216;schedule and forget&#8217; style of
@@ -248,7 +248,7 @@ by scheduling tasks to be executed at some time in the future. Once a
 task has been scheduled, thread execution moves immediately onto the
 next expression. A pseudocode example may help to illustrate this
 difference.</p>
-<div class="code highlight-python"><div class="highlight"><pre><span></span>//synchronous timing
+<div class="code highlight-python"><div class="highlight"><pre>//synchronous timing
 play-note(now)
 time = (now) + 44100
 play-note(now)
@@ -278,12 +278,12 @@ as its final action, a temporally recursive callback loop is
 established. Here is an example demonstrating a <code class="docutils literal"><span class="pre">foo</span></code> function that
 will play a note and then schedule itself to be called back in one
 second (this loop will continue indefinitely).</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define foo
-  (lambda ()
-    (play-note (now) synth 60 80 *second*)
-    (callback (+ (now) *second*) &#39;foo)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">foo</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">*second*</span><span class="p">)</span> <span class="ss">&#39;foo</span><span class="p">)))</span>
 
-(foo)
+<span class="p">(</span><span class="nv">foo</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>You can create as many of these temporal recursion loops as you like&#8212;try
@@ -300,19 +300,19 @@ can re-evaluate a function while it is temporally recursing, changing
 its functionality on the fly (provided that the signature of the method
 does not change, i.e. same arguments and same name). Try evaluating the
 code below while the old version of foo is running.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; re-define foo
-(define foo
-  (lambda ()
-    (let ((note-length (random &#39;(0.25 0.5 1.0 2.0))))
-      (play-note (now) synth (random 60 80) 80 (* *second* note-length))
-      (callback (+ (now) (* note-length *second*)) &#39;foo))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; re-define foo</span>
+<span class="p">(</span><span class="k">define</span> <span class="nv">foo</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nf">not</span><span class="nv">e-length</span> <span class="p">(</span><span class="nf">random</span> <span class="o">&#39;</span><span class="p">(</span><span class="mf">0.25</span> <span class="mf">0.5</span> <span class="mf">1.0</span> <span class="mf">2.0</span><span class="p">))))</span>
+      <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="p">(</span><span class="nf">random</span> <span class="mi">60</span> <span class="mi">80</span><span class="p">)</span> <span class="mi">80</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">*second*</span> <span class="nv">note-length</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">note-length</span> <span class="nv">*second*</span><span class="p">))</span> <span class="ss">&#39;foo</span><span class="p">))))</span>
 </pre></div>
 </div>
 <p>One-off anonymous functions can also be scheduled for future evaluation.
 The code example below shows a one off anonymous function scheduled for
 evaluation one minute from <code class="docutils literal"><span class="pre">(now)</span></code>.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(callback (+ (now) *minute*)
-          (lambda () (play-note (now) synth 60 80 *second*)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">*minute*</span><span class="p">)</span>
+          <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span> <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)))</span>
 </pre></div>
 </div>
 <p>There are a couple of gotchas to keep in mind when doing &#8216;schedule and
@@ -321,16 +321,16 @@ thing. In the example below, the two notes <em>may</em> be scheduled to play on
 the same sample, but then again, they may not! <code class="docutils literal"><span class="pre">(now)</span></code> may have moved
 forward in time between the two calls, even if they were evaluated at
 the same time.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(play-note (now) synth 60 80 *second*)
-(play-note (now) synth 72 80 *second*)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)</span>
+<span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">72</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Often this lack of precision is fine (i.e. too small a change to be
 noticeable) but where absolute accuracy is required a time variable
 should be used.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(let ((time (now)))
-  (play-note time synth 60 80 *second*)
-  (play-note time synth 72 80 *second*))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">time</span> <span class="p">(</span><span class="nf">now</span><span class="p">)))</span>
+  <span class="p">(</span><span class="nv">play-note</span> <span class="nv">time</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)</span>
+  <span class="p">(</span><span class="nv">play-note</span> <span class="nv">time</span> <span class="nv">synth</span> <span class="mi">72</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>This inaccuracy becomes more of an issue when amplified over time, such
@@ -338,21 +338,21 @@ as using <code class="docutils literal"><span class="pre">(now)</span></code> in
 problem by precisely incrementing a <code class="docutils literal"><span class="pre">time</span></code> value between each
 recursive callback (note that any arguments required by the function
 being called back must also be passed to <code class="docutils literal"><span class="pre">callback</span></code>).</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; This is bad
-(define loop
-  (lambda ()
-    (play-note (now) synth 60 80 *second*)
-    (callback (+ (now) *second*) &#39;loop)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; This is bad</span>
+<span class="p">(</span><span class="k">define</span> <span class="nv">loop</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span> <span class="nv">*second*</span><span class="p">)</span> <span class="ss">&#39;loop</span><span class="p">)))</span>
 
-(loop)
+<span class="p">(</span><span class="nv">loop</span><span class="p">)</span>
 
-;; This is good (precise time arg is now incremented each recursion)
-(define loop
-  (lambda (time)
-    (play-note time synth 60 80 *second* )
-    (callback (+ time *second*) &#39;loop (+ time *second*))))
+<span class="c1">;; This is good (precise time arg is now incremented each recursion)</span>
+<span class="p">(</span><span class="k">define</span> <span class="nv">loop</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">time</span><span class="p">)</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="nv">time</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="nv">*second*</span> <span class="p">)</span>
+    <span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">time</span> <span class="nv">*second*</span><span class="p">)</span> <span class="ss">&#39;loop</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">time</span> <span class="nv">*second*</span><span class="p">))))</span>
 
-(loop (now))
+<span class="p">(</span><span class="nv">loop</span> <span class="p">(</span><span class="nf">now</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>The second major gotcha in recursive callback loops is that <code class="docutils literal"><span class="pre">(now)</span></code> is
@@ -361,13 +361,13 @@ to evaluate a note <code class="docutils literal"><span class="pre">(now)</span>
 already be late: <code class="docutils literal"><span class="pre">(now)</span></code> will have moved on. You should always try to
 schedule your code execution <em>ahead</em> of the scheduled time of your
 tasks.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; This is best (callback happens 4100 samples earlier than new time)
-(define loop
-  (lambda (time)
-    (play-note time synth 60 80 1.0)
-    (callback (+ time 40000) &#39;loop (+ time 44100))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; This is best (callback happens 4100 samples earlier than new time)</span>
+<span class="p">(</span><span class="k">define</span> <span class="nv">loop</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">time</span><span class="p">)</span>
+    <span class="p">(</span><span class="nv">play-note</span> <span class="nv">time</span> <span class="nv">synth</span> <span class="mi">60</span> <span class="mi">80</span> <span class="mf">1.0</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">callback</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">time</span> <span class="mi">40000</span><span class="p">)</span> <span class="ss">&#39;loop</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">time</span> <span class="mi">44100</span><span class="p">))))</span>
 
-(loop (now))
+<span class="p">(</span><span class="nv">loop</span> <span class="p">(</span><span class="nf">now</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>In the &#8216;good&#8217; version of <code class="docutils literal"><span class="pre">loop</span></code>, the <code class="docutils literal"><span class="pre">time</span></code> passed as an argument to

@@ -139,7 +139,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -188,22 +188,22 @@ through both languages fluidly.</p>
 <div class="section" id="what-s-scheme-and-what-s-xtlang">
 <h2>What&#8217;s scheme, and what&#8217;s xtlang?<a class="headerlink" href="#what-s-scheme-and-what-s-xtlang" title="Permalink to this headline">¶</a></h2>
 <p>This is all a bit abstract, so let&#8217;s look at a couple of examples:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define scheme-closure
-  (lambda (a b)
-    (let ((result (* a b)))
-      (print &quot;result = &quot; result)
-      result)))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">scheme-closure</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span> <span class="nv">b</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">result</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nv">print</span> <span class="s">&quot;result = &quot;</span> <span class="nv">result</span><span class="p">)</span>
+      <span class="nv">result</span><span class="p">)))</span>
 
-(scheme-closure 4 5) ;; prints &quot;result = 20&quot;, returns 20
-(scheme-closure 2.4 2) ;; prints &quot;result = 4.8&quot;, returns 4.8
+<span class="p">(</span><span class="nv">scheme-closure</span> <span class="mi">4</span> <span class="mi">5</span><span class="p">)</span> <span class="c1">;; prints &quot;result = 20&quot;, returns 20</span>
+<span class="p">(</span><span class="nv">scheme-closure</span> <span class="mf">2.4</span> <span class="mi">2</span><span class="p">)</span> <span class="c1">;; prints &quot;result = 4.8&quot;, returns 4.8</span>
 
-(bind-func xtlang_closure
-  (lambda (c:double d:i64)
-    (let ((result (* c (i64tod d))))
-      (printf &quot;result = %f\n&quot; result)
-      result)))
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">xtlang_closure</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">c</span><span class="kt">:double</span> <span class="nv">d</span><span class="kt">:i64</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">result</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">c</span> <span class="p">(</span><span class="nf">i64tod</span> <span class="nv">d</span><span class="p">))))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;result = %f\n&quot;</span> <span class="nv">result</span><span class="p">)</span>
+      <span class="nv">result</span><span class="p">)))</span>
 
-(xtlang_closure 4.5 2) ;; prints &quot;result = 9.000000&quot;, returns 9.0
+<span class="p">(</span><span class="nv">xtlang_closure</span> <span class="mf">4.5</span> <span class="mi">2</span><span class="p">)</span> <span class="c1">;; prints &quot;result = 9.000000&quot;, returns 9.0</span>
 </pre></div>
 </div>
 <p>Here, <code class="docutils literal"><span class="pre">scheme-closure</span></code> is a Scheme <a class="reference external" href="http://en.wikipedia.org/wiki/Closure_(computer_science)">closure</a> (a closure is a function
@@ -243,27 +243,27 @@ other (or design a new language which has aspects of both)? By way of
 explanation, let&#8217;s do a bit of numerical processing. Say we want to
 calculate the highest common factor of two integers <code class="docutils literal"><span class="pre">a</span></code> and <code class="docutils literal"><span class="pre">b</span></code>
 using a brute-force approach:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>(define hcf-scheme
-  (lambda (a b)
-    (letrec ((hcf (lambda (i)
-                    (if (and (= (modulo a i) 0)
-                             (= (modulo b i) 0))
-                        i
-                        (hcf (- i 1))))))
-      (hcf (if (&lt; a b) b a)))))
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">hcf-scheme</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span> <span class="nv">b</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">letrec</span> <span class="p">((</span><span class="nv">hcf</span> <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">i</span><span class="p">)</span>
+                    <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="k">and</span> <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">modulo</span> <span class="nv">a</span> <span class="nv">i</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>
+                             <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">modulo</span> <span class="nv">b</span> <span class="nv">i</span><span class="p">)</span> <span class="mi">0</span><span class="p">))</span>
+                        <span class="nv">i</span>
+                        <span class="p">(</span><span class="nv">hcf</span> <span class="p">(</span><span class="nf">-</span> <span class="nv">i</span> <span class="mi">1</span><span class="p">))))))</span>
+      <span class="p">(</span><span class="nv">hcf</span> <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">&lt;</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)</span> <span class="nv">b</span> <span class="nv">a</span><span class="p">)))))</span>
 
-(hcf-scheme 10 15) ;; returns 5
+<span class="p">(</span><span class="nv">hcf-scheme</span> <span class="mi">10</span> <span class="mi">15</span><span class="p">)</span> <span class="c1">;; returns 5</span>
 
-(bind-func hcf_xtlang
-  (lambda (a:i64 b)
-    (let ((hcf (lambda (i)
-                 (if (and (= (modulo a i) 0)
-                          (= (modulo b i) 0))
-                     i
-                     (hcf (- i 1))))))
-      (hcf (if (&lt; a b) b a)))))
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">hcf_xtlang</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span> <span class="nv">b</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">hcf</span> <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">i</span><span class="p">)</span>
+                 <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="k">and</span> <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">modulo</span> <span class="nv">a</span> <span class="nv">i</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>
+                          <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">modulo</span> <span class="nv">b</span> <span class="nv">i</span><span class="p">)</span> <span class="mi">0</span><span class="p">))</span>
+                     <span class="nv">i</span>
+                     <span class="p">(</span><span class="nv">hcf</span> <span class="p">(</span><span class="nf">-</span> <span class="nv">i</span> <span class="mi">1</span><span class="p">))))))</span>
+      <span class="p">(</span><span class="nv">hcf</span> <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">&lt;</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)</span> <span class="nv">b</span> <span class="nv">a</span><span class="p">)))))</span>
 
-(hcf_xtlang 10 15)  ;; returns 5
+<span class="p">(</span><span class="nv">hcf_xtlang</span> <span class="mi">10</span> <span class="mi">15</span><span class="p">)</span>  <span class="c1">;; returns 5</span>
 </pre></div>
 </div>
 <p>The code for Scheme (<code class="docutils literal"><span class="pre">hcf-scheme</span></code>) and xtlang (<code class="docutils literal"><span class="pre">hcf_xtlang</span></code>) is
@@ -280,26 +280,26 @@ specify the types of the variables, but often just a few type
 annonations can unambiguously determine everything in scope. The
 <a class="reference internal" href="type-system.html"><em>xtlang type reference</em></a> has more info on how
 type inferencing works in the xtlang compiler.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span></span>;; first, figure out two large numbers with a common factor (133)
-(println (map (lambda (x) (* x 133)) &#39;(125219 123711))) ;; prints (16654127 16453563)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; first, figure out two large numbers with a common factor (133)</span>
+<span class="p">(</span><span class="nf">println</span> <span class="p">(</span><span class="k">map</span> <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">x</span><span class="p">)</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">x</span> <span class="mi">133</span><span class="p">))</span> <span class="o">&#39;</span><span class="p">(</span><span class="mi">125219</span> <span class="mi">123711</span><span class="p">)))</span> <span class="c1">;; prints (16654127 16453563)</span>
 
-;; profile the scheme version
-(let ((t (clock:clock)))
-  (println &#39;HCF &#39;= (hcf-scheme 16654127 16453563))
-  (println &#39;elapsed &#39;time &#39;= (- (clock:clock) t) &#39;seconds))
+<span class="c1">;; profile the scheme version</span>
+<span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">t</span> <span class="p">(</span><span class="nv">clock:clock</span><span class="p">)))</span>
+  <span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;HCF</span> <span class="ss">&#39;=</span> <span class="p">(</span><span class="nv">hcf-scheme</span> <span class="mi">16654127</span> <span class="mi">16453563</span><span class="p">))</span>
+  <span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;elapsed</span> <span class="ss">&#39;time</span> <span class="ss">&#39;=</span> <span class="p">(</span><span class="nf">-</span> <span class="p">(</span><span class="nv">clock:clock</span><span class="p">)</span> <span class="nv">t</span><span class="p">)</span> <span class="ss">&#39;seconds</span><span class="p">))</span>
 
-;; --result--
-;; HCF = 133
-;; elapsed time = 82.085036 seconds
+<span class="c1">;; --result--</span>
+<span class="c1">;; HCF = 133</span>
+<span class="c1">;; elapsed time = 82.085036 seconds</span>
 
-;; profile the xtlang version
-(let ((t (clock:clock)))
-  (println &#39;HCF &#39;= (hcf_xtlang 16654127 16453563))
-  (println &#39;elapsed &#39;time &#39;= (- (clock:clock) t) &#39;seconds))
+<span class="c1">;; profile the xtlang version</span>
+<span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">t</span> <span class="p">(</span><span class="nv">clock:clock</span><span class="p">)))</span>
+  <span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;HCF</span> <span class="ss">&#39;=</span> <span class="p">(</span><span class="nv">hcf_xtlang</span> <span class="mi">16654127</span> <span class="mi">16453563</span><span class="p">))</span>
+  <span class="p">(</span><span class="nf">println</span> <span class="ss">&#39;elapsed</span> <span class="ss">&#39;time</span> <span class="ss">&#39;=</span> <span class="p">(</span><span class="nf">-</span> <span class="p">(</span><span class="nv">clock:clock</span><span class="p">)</span> <span class="nv">t</span><span class="p">)</span> <span class="ss">&#39;seconds</span><span class="p">))</span>
 
-;; --result--
-;; HCF = 133
-;; elapsed time = 0.257790 seconds
+<span class="c1">;; --result--</span>
+<span class="c1">;; HCF = 133</span>
+<span class="c1">;; elapsed time = 0.257790 seconds</span>
 </pre></div>
 </div>
 <p>In a direct comparison, here I&#8217;ve calculate the HCF of the integers
