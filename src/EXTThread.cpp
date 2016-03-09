@@ -80,7 +80,7 @@ namespace extemp
 	}
 #endif
 #ifdef _WIN32
-  EXTTHREAD_MAP.erase(this->get_id());  
+  EXTTHREAD_MAP.erase(extemp::EXTThread::getBthread().get_id());
 #else
   EXTTHREAD_MAP.erase(pthread);
 #endif
@@ -96,7 +96,7 @@ namespace extemp
     // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
     std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
     bthread = std::thread(fn);
-    EXTTHREAD_MAP[this->get_id()] = this;
+    EXTTHREAD_MAP[extemp::EXTThread::getBthread().get_id()] = this;
     result = 0;
 #else
     result = pthread_create(&pthread, NULL, start_routine, arg);
