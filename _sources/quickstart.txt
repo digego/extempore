@@ -12,7 +12,7 @@ Installation
           going on) with the steps below then that's a good place to
           look.
 
-.. _INSTALL.md: TODO
+.. _INSTALL.md: https://github.com/digego/extempore/blob/master/INSTALL.md
           
 On **OSX** (with `homebrew`_) you can get the dependencies, build and
 install Extempore and the full standard library with::
@@ -44,9 +44,8 @@ Editor setup
 ------------
 
 To write Extempore code you need a text editor, and there are
-Extempore "plugins" for several popular text editors---Atom, Emacs,
-Sublime Text and Vim. TODO link to the relevant sections of the
-editors page.
+:ref:`Extempore "plugins" for several text editors <editor-support>`
+---Atom, Emacs, Sublime Text and Vim.
 
 If you don't have a favourite text editor, then `Atom`_ is probably a
 good choice---it's free, available on all platforms and doesn't have
