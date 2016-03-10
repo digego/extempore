@@ -35,7 +35,7 @@ this is an attempt to do things right, using Sphinx_.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Extempore programming environment
+   :caption: Key concepts
 
    philosophy
    caas
