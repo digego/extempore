@@ -59,7 +59,10 @@ this is an attempt to do things right, using Sphinx_.
    :maxdepth: 1
    :caption: Tutorials & Guides
 
-   audio
+   audio-signal-processing
+   making-an-instrument
+   note-level-music
+   sampler
    graphics
    impromptu-users
 
