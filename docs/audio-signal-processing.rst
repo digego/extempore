@@ -174,7 +174,7 @@ initialise them programmatically. This brings us to a couple of new
 (compound) types: tuples, and arrays.
 
 Tuples in xtlang
-================
+----------------
 
 As a refresher, :ref:`tuples <tuple-type-doc>` in xtlang are
 heterogeneous groupings of any xtlang types (just like a C struct).
