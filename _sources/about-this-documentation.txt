@@ -16,8 +16,8 @@ on `Ben's blog`_).
 .. _Read the Docs: http://readthedocs.org
 .. _Ben's blog: http://benswift.me/extempore-docs/
 
-Generating the docs
--------------------
+Generating
+----------
 
 To generate these docs, you'll need a few python packages, something
 like::
@@ -33,8 +33,19 @@ got all the Sphinx stuff on your box, just run::
 
 in the ``docs/`` subdirectory.
 
-Contributing to the docs
-------------------------
+To actually build the docs to host somewhere, just::
+
+  make html
+
+in the ``docs/`` subdirectory, then take the generated output from
+``_build/html`` and dump it on a webserver somewhere---it's a
+self-contained static site.
+
+Currently, we're hosting it on GitHub pages through the Extempore
+repo, in a special ``gh-pages`` branch.
+  
+Contributing
+------------
 
 If you find problems, or can think of improvements, `fork away on
 GH`_, edit the documentation source files and submit a pull
