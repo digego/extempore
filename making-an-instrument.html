@@ -1,0 +1,796 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Making an instrument &mdash; Extempore 0.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/>
+        <link rel="next" title="Playing an instrument" href="note-level-music.html"/>
+        <link rel="prev" title="Audio signal processing" href="audio-signal-processing.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Extempore
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="editor-support.html">Text editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Extempore programming environment</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
+<li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="type-system.html">xtlang type reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="memory.html">Memory management in Extempore</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="audio-signal-processing.html">Audio signal processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="audio-signal-processing.html#tuples-in-xtlang">Tuples in xtlang</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Making an instrument</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-hammond-organ">The Hammond organ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#making-a-drone-organ">Making a drone organ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#instruments-and-note-level-control">Instruments and note-level control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-two-the-note-kernel">Step two: the note kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-three-the-effect-kernel">Step three: the effect kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#playing-the-instrument">Playing the instrument</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="note-level-music.html">Playing an instrument</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Loading and using a sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics.html">Graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impromptu-users.html">Extempore for Impromptu users</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Community</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Extempore</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Making an instrument</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/making-an-instrument.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="making-an-instrument">
+<h1>Making an instrument<a class="headerlink" href="#making-an-instrument" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This was once a blog post&#8212;corrections/improvements
+welcome.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">This guide refers to the values in the DSP signal chain
+as <code class="docutils literal"><span class="pre">double</span></code>, whereas they are now <code class="docutils literal"><span class="pre">SAMPLE</span></code>, which is
+aliased to <code class="docutils literal"><span class="pre">float</span></code> by default. I&#8217;ll update it ASAP, but
+for now just keep that in mind</p>
+</div>
+<p>This covers the basics of creating an <em>instrument</em> in Extempore. While
+there are <a class="reference internal" href="audio-signal-processing.html"><em>other docs</em></a> which cover
+audio digital signal processing (DSP) at a lower level&#8212;from the basic
+building blocks of oscillators and filters, this tutorial covers the
+process of building an instrument which can be played using the
+conventional midi parameters of pitch and velocity. There’ll be some
+DSP required to build the instrument, but playing it becomes just like
+playing any other soft synth or sampler plugin. The reason to build
+instruments is so that you don’t <em>have</em> to construct your audio
+synthesis chain from scratch each time, sometimes you just want to
+load a plugin and start playing.</p>
+<p>Like everything in Extempore, though, we’re going to build the
+instrument in xtlang and compile it at run-time. If you want the simple
+‘load up a patch and go’ experience, then just load the xtlang code from
+a file. But if at any stage you want to modify the guts of the
+instrument while you’re using it, then just bring up the code, change it
+around, re-compile it, and you’ll hear the results straight away.</p>
+<p>This is a also a fairly long and detailed post. If you’re interested
+in just <em>playing</em> instruments rather than writing them, you don’t need
+to know all this and can jump ahead to <a class="reference internal" href="note-level-music.html"><em>Playing an instrument</em></a>. If you
+want to come back later to find out in a bit more detail exactly
+what’s going on with Extempore instruments then this is the place to
+find out.</p>
+<div class="section" id="the-hammond-organ">
+<h2>The Hammond organ<a class="headerlink" href="#the-hammond-organ" title="Permalink to this headline">¶</a></h2>
+<p>The instrument we’re going to build in this tutorial is a <a class="reference external" href="http://en.wikipedia.org/wiki/Hammond_organ">hammond
+organ</a>. Firstly, because the Hammond organ is an iconic sound&#8212;widely
+used in many genres of music since its invention in 1934. Any digital
+synthesis environment worth it’s salt has to provide a hammond patch of
+some description :) And secondly, because the hammond organ is actually
+not too tricky to sythesize, at least in a simplified way. The organ’s
+tone is basically the result of the superposition of 9 sinusoids (one
+for each tonewheel), and so it’s a nice way to introduce the basics of
+additive synthesis.</p>
+<p>Any commercial Hammond organ modelling synth will add <em>heaps</em> of other
+stuff to this basic tone, to faithfully recreate the nuances and
+quirks of the real physical instrument, even down to the details of
+the specific model being emulated. We won’t try to do too much of that
+in this tutorial, but again, if you want to hack around add things to
+the instrument then feel free.</p>
+<p>So why do they call them tonewheel organs, anyway? A <a class="reference external" href="http://en.wikipedia.org/wiki/Tonewheel">tonewheel</a> is a
+metal disks (wheel) with a corrugated edge. The disk is mechanically
+rotated on it’s axis near an electrical pickup, which ‘picks up’ the
+changes in the electrical and magnetic fields due to the rotation of the
+wheel (and particularly the bumps on the edge of the wheel). As the
+bumps go past the pickup, they induce a voltage which causes a current,
+which is the audio signal. The frequency (pitch) of the signal can be
+changed by altering the rotation speed of the wheel.</p>
+<p>In general, each tonewheel is set up to generate a sine wave. By having
+multiple tonewheels of different diameters attached to the same axle,
+the organ generates several different sinusoids together, which allows
+it to have a more interesting timbre than just a sine tone.</p>
+<p>The key tone-shaping controls in a Hammond organ are its drawbars, which
+look like this:</p>
+<img alt="_images/drawbars.png" src="_images/drawbars.png" />
+<p>Each drawbar controls the relative amplitude of a given tonewheel. The
+tonewheels are denoted by their ‘pipe length’, which is a carry-over
+from pipe organ design, which Hammond originally developed the tonewheel
+organ to be a cheap replacement for. A longer pipe means a lower pitch,
+so the drawbars are laid out from low harmonics on the left to high
+harmonics on the right. Even though in a tonewheel organ there aren’t
+any pipes (because they’re been replaced by tonewheels!) the drawbars
+are still labelled in this way. And anyway, if we’re modelling the organ
+digitally then there aren’t any real tonewheels either :)</p>
+<p>To change the tone of the organ, the organist can adjust the positions
+of the drawbars. Fully ‘out’ (<em>down</em> in this diagram) means that the
+frequency associated with that tonewheel is at it’s maximum, whereas
+fully ‘in’ (<em>up</em> in this diagram) means that that frequency is silent.
+The colours of the drawbar ends also give information about that
+harmonic: red drawbars for sub-harmonics, grey for even harmonics and
+black for the odd harmonics. Confusingly, by convention the left-most
+drawbar isn’t the fundamental frequency of the note, it’s an octave
+below the fundamental (which is controlled by the <em>third</em> drawbar,
+indicated by the orange box in the diagram). It’s also important to
+remember that the drawbars don’t represent specific pitches, because the
+absolute pitch each drawbar is mapped to depends on the note being
+played (in the original tonewheel design, this is controlled by how fast
+the axle with the tonewheels on it is rotating). The ratios between the
+frequencies are the important part, because they define how the organ
+sounds&#8212;the organ’s <em>timbre</em>.</p>
+<p>Now, this is probably more information than is absolutely necessary to
+construct a simple model of the organ&#8212;at a bare minimum all we really
+needed to know was that the organ tone is a sum of sinusoids and the
+frequency relationships between those sinusoids. Still, a bit more
+context is helpful in understanding <em>why</em> the organ’s tone is produced
+like it is, and helps us think about how to represent and produce the
+tone digitally.</p>
+</div>
+<div class="section" id="making-a-drone-organ">
+<h2>Making a drone organ<a class="headerlink" href="#making-a-drone-organ" title="Permalink to this headline">¶</a></h2>
+<p>The first part of making an instrument is defining its ‘drone’ tone: the
+sound that the instrument makes when it’s being sustained. The kernel is
+just the sound the instrument would make if it were allowed to drone on
+forever without stopping, like if you left a paperweight on one of the
+organ’s keys.</p>
+<p>So, because the basis of the hammond organ tone is the sum of 9
+sinusoids (one for each drawbar), then that’s what we need to generate.
+There are lots of ways to do this, but one nice way is to use oscillator
+closures created by Extempore’s <code class="docutils literal"><span class="pre">osc_c</span></code> function.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/instruments.xtm&quot;</span><span class="p">)</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">organ_drone</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_drawbars</span> <span class="mi">9</span><span class="p">)</span>
+        <span class="c1">;; allocate memory for the oscillators and other bits and pieces</span>
+        <span class="p">(</span><span class="nv">freq_ratio</span><span class="kt">:SAMPLE*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">drawbar_pos</span><span class="kt">:i64*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">tonewheel</span><span class="kt">:[SAMPLE,SAMPLE,SAMPLE]**</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">i</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="c1">;; fill the allocated memory with the right values</span>
+    <span class="c1">;; drawbar frequencies as ratio of fundamental frequency</span>
+    <span class="p">(</span><span class="nf">pfill!</span> <span class="nv">freq_ratio</span> <span class="mf">0.5</span> <span class="mf">1.5</span> <span class="mf">1.0</span> <span class="mf">2.0</span> <span class="mf">3.0</span> <span class="mf">4.0</span> <span class="mf">5.0</span> <span class="mf">6.0</span> <span class="mf">8.0</span><span class="p">)</span>
+    <span class="c1">;; drawbar positions: 0 = min, 8 = max amplitude</span>
+    <span class="p">(</span><span class="nf">pfill!</span> <span class="nv">drawbar_pos</span> <span class="mi">8</span> <span class="mi">8</span> <span class="mi">8</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="c1">;; put an oscilattor into each tonewheel position</span>
+    <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">num_drawbars</span><span class="p">)</span>
+          <span class="p">(</span><span class="nf">pset!</span> <span class="nv">tonewheel</span> <span class="nv">i</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">freq</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sum</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="c1">;; loop over all the drawbars/tonewheels to get the sum</span>
+        <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">num_drawbars</span><span class="p">)</span>
+          <span class="p">(</span><span class="k">set!</span> <span class="nv">sum</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">sum</span> <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="k">convert</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">drawbar_pos</span> <span class="nv">i</span><span class="p">)</span> <span class="nv">SAMPLE</span><span class="p">)</span> <span class="mf">8.0</span><span class="p">)</span>
+                              <span class="p">((</span><span class="nf">pref</span> <span class="nv">tonewheel</span> <span class="nv">i</span><span class="p">)</span> <span class="mf">1.0</span>
+                               <span class="p">(</span><span class="nf">*</span> <span class="nv">freq</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">freq_ratio</span> <span class="nv">i</span><span class="p">)))))))</span>
+        <span class="c1">;; normalise the sum by the number of drawbars</span>
+        <span class="p">(</span><span class="nf">/</span> <span class="nv">sum</span> <span class="p">(</span><span class="k">convert</span> <span class="nv">num_drawbars</span> <span class="nv">SAMPLE</span><span class="p">))))))</span>
+
+<span class="c1">;; send the organ drone to the audio sink</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">or</span><span class="nv">gan_drone</span> <span class="mf">440.0</span><span class="p">)))</span>
+
+<span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Compiling the function <code class="docutils literal"><span class="pre">organ_drone</span></code> does three things:</p>
+<ul>
+<li><dl class="first docutils">
+<dt><strong>allocate memory</strong> to store the data associated with our sine</dt>
+<dd><p class="first last">oscillators. For each oscillator, this is <code class="docutils literal"><span class="pre">freq_ratio</span></code> (the
+frequency relationship to the fundamental), <code class="docutils literal"><span class="pre">drawbar_pos</span></code> (the
+amplitude of the sine tone) and <code class="docutils literal"><span class="pre">tonewheel</span></code> (the oscillator
+closure itself). This data is all stored via <a class="reference internal" href="memory.html"><em>pointers to zone
+memory</em></a> through the calls to <code class="docutils literal"><span class="pre">zalloc</span></code>.</p>
+</dd>
+</dl>
+</li>
+<li><p class="first"><strong>fill memory</strong> with the appropriate values. For <code class="docutils literal"><span class="pre">freq_ratio</span></code> and
+<code class="docutils literal"><span class="pre">drawbar_pos</span></code>, the values are set ‘manually’ using <code class="docutils literal"><span class="pre">pfill!</span></code>,
+while for filling the <code class="docutils literal"><span class="pre">tonewheel</span></code> buffer <code class="docutils literal"><span class="pre">osc_c</span></code> is called in a
+loop (<code class="docutils literal"><span class="pre">dotimes</span></code>).</p>
+</li>
+<li><p class="first"><strong>create &amp; bind a closure</strong> (the <code class="docutils literal"><span class="pre">lambda</span></code> form) which calculates
+the current output value by calling each of the oscillators in the
+<code class="docutils literal"><span class="pre">tonewheel</span></code> closure buffer, summing and returning their
+(normalised) return values. This closure is then callable using its
+name: <code class="docutils literal"><span class="pre">organ-drone</span></code>.</p>
+</li>
+</ul>
+<p>When we call the <code class="docutils literal"><span class="pre">organ_drone</span></code> closure in the <code class="docutils literal"><span class="pre">dsp</span></code> callback, we
+hear a droning organ tone. It should be really obvious at this point
+that the closure <code class="docutils literal"><span class="pre">organ_drone</span></code> doesn’t represent a <em>pure</em> function:
+one that stateless and always returns the same output value for a given
+input value. If it <em>were</em> a pure function, then calling it in the dsp
+callback above with an argument of <code class="docutils literal"><span class="pre">200.0</span></code> would always return the
+same value. This wouldn’t be very interesting in an audio output
+scenario&#8212;audio is only interesting when the waveforms are oscillating,
+and particularly when the oscillations are periodic. That’s basically
+all pitched sounds are: periodic waveforms. So for the <code class="docutils literal"><span class="pre">organ_drone</span></code>
+closure to produce a nice pitched organ tone, there must be some state
+hidden somewhere which is changing and allowing the closure to return a
+periodic waveform.</p>
+<p>If you guessed that the magic happens in the closures returned by
+<code class="docutils literal"><span class="pre">osc_c</span></code> (which are in the memory pointed to by <code class="docutils literal"><span class="pre">tonewheel</span></code>), you’d
+be right. Each closure ‘closes over’ a state variable called <code class="docutils literal"><span class="pre">phase</span></code>,
+which you can see in the source for <code class="docutils literal"><span class="pre">osc_c</span></code> (which is in
+<code class="docutils literal"><span class="pre">libs/core/audio_dsp.xtm</span></code>)</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">phase</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">amp</span> <span class="nv">freq</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">inc</span><span class="kt">:SAMPLE</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">STWOPI</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">freq</span> <span class="nv">SR</span><span class="p">))))</span>
+        <span class="p">(</span><span class="k">set!</span> <span class="nv">phase</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">phase</span> <span class="nv">inc</span><span class="p">))</span>
+        <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">&gt;</span> <span class="nv">phase</span> <span class="nv">SPI</span><span class="p">)</span> <span class="p">(</span><span class="k">set!</span> <span class="nv">phase</span> <span class="p">(</span><span class="nf">-</span> <span class="nv">phase</span> <span class="nv">STWOPI</span><span class="p">)))</span>
+        <span class="p">(</span><span class="nf">*</span> <span class="nv">amp</span> <span class="p">(</span><span class="nv">_sin</span> <span class="nv">phase</span><span class="p">))))))</span>
+</pre></div>
+</div>
+<p>In an xtlang type diagram, <code class="docutils literal"><span class="pre">osc_c</span></code> looks like this</p>
+<img alt="_images/osc_c.png" src="_images/osc_c.png" />
+<p><code class="docutils literal"><span class="pre">osc_c</span></code> is a higher-order closure, because it returns a closure, as
+indicated by the <em>two</em> <code class="docutils literal"><span class="pre">lambda</span></code> forms: the outer one (with one
+<code class="docutils literal"><span class="pre">phase</span></code> argument) defines the <code class="docutils literal"><span class="pre">osc_c</span></code> closure itself, while the
+inner one (with <code class="docutils literal"><span class="pre">amp</span></code> and <code class="docutils literal"><span class="pre">freq</span></code> arguments) creates the closure
+which is returned by <code class="docutils literal"><span class="pre">osc_c</span></code>. <em>That’s</em> the closure that gets stored in
+the <code class="docutils literal"><span class="pre">tonewheel</span></code> array when we perform the loop:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">do</span><span class="nv">times</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">num_drawbars</span><span class="p">)</span>
+          <span class="p">(</span><span class="nv">pset!</span> <span class="nv">tonewheel</span> <span class="nv">i</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+</pre></div>
+</div>
+<p>Looking back up at the <code class="docutils literal"><span class="pre">osc_c</span></code> source code, in the body of the inner
+lambda there’s the line <code class="docutils literal"><span class="pre">(set!</span> <span class="pre">phase</span> <span class="pre">(+</span> <span class="pre">phase</span> <span class="pre">inc))</span></code> which
+increments the value of the <code class="docutils literal"><span class="pre">phase</span></code> variable based on what the
+frequency (<code class="docutils literal"><span class="pre">freq</span></code>) argument to the closure was. Each closure
+returned by <code class="docutils literal"><span class="pre">osc_c</span></code> &#8220;closes over&#8221; its own <code class="docutils literal"><span class="pre">phase</span></code> variable, so
+calling one oscillator (and incrementing its phase) doesn’t affect the
+phase of any other oscillators which might be floating around. This is
+super handy, because it allows each oscillator to do its own
+‘bookkeeping’&#8212;keeping track of where it is in its cycle, while taking
+more meaningful frequency arguments at ‘call-time’, so that they can
+be easily modulated. This is what allows us to create <em>buffers</em> of
+closures which we can access and modify via pointers, which is exactly
+what we’re doing with <code class="docutils literal"><span class="pre">tonewheel</span></code>.</p>
+<p>Going back up to the <code class="docutils literal"><span class="pre">organ_drone</span></code> above, there’s one more point worth
+making about closures and scoping. Notice how there’s a <code class="docutils literal"><span class="pre">let</span></code> outside
+the <code class="docutils literal"><span class="pre">lambda</span></code>, which is where the data buffers (<code class="docutils literal"><span class="pre">freq_ratio</span></code>,
+<code class="docutils literal"><span class="pre">drawbar_pos</span></code> and <code class="docutils literal"><span class="pre">tonewheel</span></code> are all both allocated (with
+<code class="docutils literal"><span class="pre">zalloc</span></code>) and initialised (with <code class="docutils literal"><span class="pre">pfill!</span></code> &amp; <code class="docutils literal"><span class="pre">pset!</span></code>). These data
+buffers are used in the body of the <code class="docutils literal"><span class="pre">lambda</span></code>, so the <code class="docutils literal"><span class="pre">lambda</span></code> closes
+over them.</p>
+<p>What this means is that these buffers are only allocated and initialised
+when the <code class="docutils literal"><span class="pre">organ_drone</span></code> closure is compiled. When it is called, on the
+other hand, the code begins executing from the first line inside the
+<code class="docutils literal"><span class="pre">lambda</span></code> form, which happens to be <code class="docutils literal"><span class="pre">(let</span> <span class="pre">((sum</span> <span class="pre">0.0))</span></code>. The values in
+the <code class="docutils literal"><span class="pre">freq_ratio</span></code>, <code class="docutils literal"><span class="pre">drawbar_pos</span></code> and <code class="docutils literal"><span class="pre">tonewheel</span></code> buffers will be
+either in the state they were in when the closure was compiled, or as
+they were left by the last closure invocation which modified them
+(which, in the case of the <code class="docutils literal"><span class="pre">tonewheel</span></code> buffer, is <em>every</em> invocation,
+because of the call to each oscillator and its subsequent phase
+incrementing).</p>
+<p>The one argument to the <code class="docutils literal"><span class="pre">organ_drone</span></code> closure, <code class="docutils literal"><span class="pre">freq</span></code>, is passed to
+every individual oscillator closure in the body of the inner loop,
+although it is first modified by the appropriate frequency ratio for
+that particular drawbar. The output value of the closure is then
+multiplied by the drawbar position (which is on a scale of 0 to 8,
+because the original Hammond organ drawbars had markings from 0 to 8 on
+each drawbar) to apply the tone-shaping of the drawbars. After summing
+over all the tonewheel oscillators, the (normalised) output value is
+then returned.</p>
+<p>Because each tonewheel oscillator’s frequency is calculated from the
+<code class="docutils literal"><span class="pre">freq</span></code> argument, changing the value of this argument will shift all
+the oscillators, just as it should. The harmonic relationships between
+the different tonewheel oscillators stays constant, even as the pitch
+changes. If you’re playing along at home, change the argument from
+<code class="docutils literal"><span class="pre">440.0</span></code> to some other value, recompile it and listen to the difference
+in the playback pitch of the organ tone.</p>
+</div>
+<div class="section" id="instruments-and-note-level-control">
+<h2>Instruments and note-level control<a class="headerlink" href="#instruments-and-note-level-control" title="Permalink to this headline">¶</a></h2>
+<p><em>You can probably skim over this section if you’re not concerned about
+the low-level details of how Extempore’s instrument infrastructure.
+Still, if you’ve read this far then I can probably assume you have at
+least some interest :)</em></p>
+<p>Making this <code class="docutils literal"><span class="pre">organ_drone</span></code> closure has really just been a prelude to
+the real business of making an <em>instrument</em> in Extempore. An Extempore
+instrument can be played like a midi soft-synth. Individual notes can
+be triggered with an amplitude, a pitch and a duration. Impromptu
+users will be pretty familiar with this&#8212;it’s the same as how you
+would play AU synths in Impromptu. The only difference is that
+the whole signal chain is now written in xtlang and dynamically
+compiled at run-time. You can have a look at it in
+<code class="docutils literal"><span class="pre">libs/core/audio_dsp.xtm</span></code> if you want to see the nuts and bolts of
+how it works.</p>
+<p>This notion of <em>note-level</em> control is the key difference between an
+Extempore <em>instrument</em> and the type of audio DSP covered in
+<a class="reference internal" href="audio-signal-processing.html"><em>Audio signal processing</em></a>, which were just writing audio
+continuously to the sound card through the <code class="docutils literal"><span class="pre">dsp</span></code> callback. An
+instrument still needs to be in the <code class="docutils literal"><span class="pre">dsp</span></code> callback somewhere:
+otherwise it can’t play its audio out through the speakers. But it
+also needs some way of triggering notes and maintaining the state of
+all the notes being played at any given time.</p>
+<p><code class="docutils literal"><span class="pre">bind-instrument</span></code> takes three arguments:</p>
+<ol class="arabic simple">
+<li>a name for the instrument</li>
+<li>a <strong>note kernel</strong> closure, which must have the signature
+<code class="docutils literal"><span class="pre">[[float,i64,i64,float,float]*]*</span></code></li>
+<li>an <strong>effect kernel</strong> closure, which must have the signature
+<code class="docutils literal"><span class="pre">[float,i64,i64,float,float*]*</span></code></li>
+</ol>
+<p>So, when we finally define our hammond organ instrument, the definition
+will look like this</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">organ</span> <span class="nv">organ_note_c</span> <span class="nv">organ_fx</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and in an xtlang type diagram</p>
+<img alt="_images/full-organ-inst.png" src="_images/full-organ-inst.png" />
+<p><code class="docutils literal"><span class="pre">bind-instrument</span></code> is actually a (Scheme) macro, and it takes the two
+kernel closures (<code class="docutils literal"><span class="pre">organ_note_c</span></code> and <code class="docutils literal"><span class="pre">organ_fx</span></code>) and compiles a new
+xtlang closure, and binds it to the name <code class="docutils literal"><span class="pre">organ</span></code>. These are just
+regular xtlang closures, they just have to have a particular type
+signature to allow them to play nicely with the rest of the
+<code class="docutils literal"><span class="pre">bind-instrument</span></code> processing chain. So, let’s have a look at the
+lifecycle of a note played on our <code class="docutils literal"><span class="pre">organ</span></code> with the help of a few
+xtlang type diagrams. I’ll assume at this point that <code class="docutils literal"><span class="pre">organ</span></code> (and
+therefore <code class="docutils literal"><span class="pre">organ_note_c</span></code> and <code class="docutils literal"><span class="pre">organ_fx</span></code>) have been successfully
+compiled, even though they haven’t&#8212;yet. The xtlang source code for
+all the functions I mention are in <code class="docutils literal"><span class="pre">libs/core/instruments.xtm</span></code> if
+you want to see (or redefine) it for yourself.</p>
+<p>The first thing that needs to happen before you can start playing notes
+on an Extempore instrument is that the instrument needs to be called in
+the <code class="docutils literal"><span class="pre">dsp</span></code> callback. If we <em>only</em> want our organ in the audio output,
+then that’s as simple as</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+    <span class="c1">;; call the organ instrument closure</span>
+    <span class="p">(</span><span class="k">or</span><span class="nv">gan</span> <span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)))</span>
+
+<span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Once the DSP closure is set (with <code class="docutils literal"><span class="pre">(dsp:set!</span> <span class="pre">dsp)</span></code>), the <code class="docutils literal"><span class="pre">dsp</span></code>
+closure is called for every audio sample, so in this case the audio
+output is just the return value of the <code class="docutils literal"><span class="pre">organ</span></code> closure. But we <em>don’t</em>
+just want a constant organ drone this time around, we want to be able to
+play notes, and to have silence when notes aren’t being played. But how
+does the <code class="docutils literal"><span class="pre">organ</span></code> closure know what its output should be and which
+notes it should be playing?</p>
+<p>The playing of a note happens through a function called
+<code class="docutils literal"><span class="pre">_play_note</span></code>.</p>
+<img alt="_images/play-note.png" src="_images/play-note.png" />
+<p>which takes four arguments:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">time</span></code>: the time at which to start playing the note (this can
+either be right <code class="docutils literal"><span class="pre">(now)</span></code> or at some point in the future)</li>
+<li><code class="docutils literal"><span class="pre">inst</span></code>: the instrument to play the note on</li>
+<li><code class="docutils literal"><span class="pre">freq</span></code>: the frequency (pitch) of the note</li>
+<li><code class="docutils literal"><span class="pre">amp</span></code>: the volume/loudness of the note</li>
+<li><code class="docutils literal"><span class="pre">dur</span></code>: the duration of the note</li>
+</ul>
+<p>Hopefully you can see how <code class="docutils literal"><span class="pre">_play_note</span></code> provides all the control
+required to <em>schedule</em> (via the <code class="docutils literal"><span class="pre">time</span></code> argument) notes of any pitch,
+loudness and duration. All you need to play the <code class="docutils literal"><span class="pre">organ</span></code> like a MIDI
+soft synth. Actually, you’ll mostly use the Scheme wrapper function
+<code class="docutils literal"><span class="pre">play-note</span></code> (note the lack of a leading underscore) which takes pitch
+and velocity arguments (with ranges from 0 to 127) instead of raw
+frequency and amplitude values. But <code class="docutils literal"><span class="pre">play-note</span></code> just does some simple
+argument transformations and then passes control to <code class="docutils literal"><span class="pre">_play_note</span></code>,
+which does the work, so it’s <code class="docutils literal"><span class="pre">_play_note</span></code> that I’ll explain first.</p>
+<p>So how does it work? When <code class="docutils literal"><span class="pre">_play_note</span></code> is called with <code class="docutils literal"><span class="pre">organ</span></code> as the
+instrument, the note kernel <code class="docutils literal"><span class="pre">organ_note_c</span></code> is called which returns an
+anonymous closure that, when called once per audio sample, will generate
+the basic (drone) tone of the instrument. This closure is then turned
+into <em>another</em> anonymous closure (which additionally applies an <a class="reference external" href="http://en.wikipedia.org/wiki/ADSR_envelope#ADSR_envelope">ADSR
+envelope</a> to the audio output of the note kernel) which is added to
+<code class="docutils literal"><span class="pre">notes</span></code>: a buffer of ‘note closures’ which is <code class="docutils literal"><span class="pre">let</span></code>-bound in the
+top-level of our <code class="docutils literal"><span class="pre">organ</span></code> closure. This is how polyphony is achieved:
+there’s one active note closure in <code class="docutils literal"><span class="pre">notes</span></code> for each note which is
+currently sounding, e.g.if a triad is being played there will be three
+active note closures in <code class="docutils literal"><span class="pre">notes</span></code>.</p>
+<p>That’s all a bit hard to wrap your head when it’s described with words.
+So, here’s the same explanation in (pretty) pictures:</p>
+<img alt="_images/note-lifecycle.png" src="_images/note-lifecycle.png" />
+<p>Don’t be overwhelmed if you don’t understand the whole thing&#8212;you don’t
+need to if you just want to play the instrument like a regular soft
+synth. In fact, you don’t even need to understand it to <em>write</em> an
+instrument, as long as you follow the template and define your note
+kernel and effect kernel with the right type signatures.</p>
+<p>Also the diagrams aren’t <em>complete</em>&#8212;they don’t show all the types and
+code involved in this process, and they contain some (slight)
+simplifications. They’re designed to explain the key aspects of how the
+code works.</p>
+</div>
+<div class="section" id="step-two-the-note-kernel">
+<h2>Step two: the note kernel<a class="headerlink" href="#step-two-the-note-kernel" title="Permalink to this headline">¶</a></h2>
+<p>Back to the task at hand, we need to construct the note and effects
+kernels for our hammond organ instrument. Once we have those,
+<code class="docutils literal"><span class="pre">bind-instrument</span></code> and <code class="docutils literal"><span class="pre">_play_note</span></code> allow us to play the organ like a
+soft synth, which is the goal we’ve been pursuing since the beginning.</p>
+<p>The ‘template’ for the note kernel and effects kernel is something like
+this (this is just a skeleton&#8212;it won’t compile)</p>
+<div class="highlight-extempore"><div class="highlight"><pre>(bind-func organ_note_c
+  (lambda ()
+    (lambda (time:i64 chan:i64 freq:float amp:float)
+      (cond ((= chan 0)
+             ;; left channel output goes here
+             )
+            ((= chan 1)
+             ;; right channel output goes here
+             )
+            (else 0.0)))))
+
+(bind-func organ_fx
+  (lambda (in:float time: chan:i64 dat:float*)
+    (cond ((= chan 0)
+           ;; left channel effects goes here
+           )
+          ((= chan 1)
+           ;; right channel effects output goes here
+           )
+          (else 0.0))))
+</pre></div>
+</div>
+<p>Notice that we’re defining it as a stereo instrument, but that doesn’t
+mean anything fancier than that we handle the left channel (channel
+<code class="docutils literal"><span class="pre">0</span></code>) and the right channel (channel <code class="docutils literal"><span class="pre">1</span></code>) in our <code class="docutils literal"><span class="pre">cond</span></code> statement.
+The generalisation to multi-channel instruments should be obvious&#8212;just
+use a bigger <code class="docutils literal"><span class="pre">cond</span></code> form!</p>
+<p>To make the <code class="docutils literal"><span class="pre">organ_note_c</span></code> kernel, we’ll fill in the template from the
+<code class="docutils literal"><span class="pre">organ_drone</span></code> closure we made earlier.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">organ_note_c</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">num_drawbars</span><span class="kt">:i64</span> <span class="mi">9</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">freq_ratio</span><span class="kt">:SAMPLE*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">drawbar_pos</span><span class="kt">:SAMPLE*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">)))</span>
+    <span class="p">(</span><span class="nf">pfill!</span> <span class="nv">freq_ratio</span> <span class="mf">0.5</span> <span class="mf">1.5</span> <span class="mf">1.0</span> <span class="mf">2.0</span> <span class="mf">3.0</span> <span class="mf">4.0</span> <span class="mf">5.0</span> <span class="mf">6.0</span> <span class="mf">8.0</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">pfill!</span> <span class="nv">drawbar_pos</span> <span class="mi">8</span><span class="nv">.</span> <span class="mi">8</span><span class="nv">.</span> <span class="mi">8</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span> <span class="mi">0</span><span class="nv">.</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">data</span><span class="kt">:NoteInitData*</span> <span class="nv">nargs</span><span class="kt">:i64</span> <span class="nv">dargs</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tonewheel</span><span class="kt">:[SAMPLE,SAMPLE,SAMPLE]**</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="p">(</span><span class="nf">*</span> <span class="mi">2</span> <span class="nv">num_drawbars</span><span class="p">)))</span>
+            <span class="p">(</span><span class="nv">freq_smudge</span><span class="kt">:SAMPLE*</span> <span class="p">(</span><span class="nf">zalloc</span> <span class="nv">num_drawbars</span><span class="p">))</span>
+            <span class="p">(</span><span class="nv">i</span><span class="kt">:i64</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">num_drawbars</span><span class="p">)</span>
+          <span class="p">(</span><span class="nf">pset!</span> <span class="nv">tonewheel</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">i</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>       <span class="c1">;; left</span>
+          <span class="p">(</span><span class="nf">pset!</span> <span class="nv">tonewheel</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">i</span> <span class="mi">2</span><span class="p">)</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span> <span class="c1">;; right</span>
+          <span class="p">(</span><span class="nf">pset!</span> <span class="nv">freq_smudge</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">3.0</span> <span class="p">(</span><span class="nf">random</span><span class="p">))))</span>
+        <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">freq</span><span class="kt">:SAMPLE</span> <span class="nv">amp</span><span class="kt">:SAMPLE</span><span class="p">)</span>
+          <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">&lt;</span> <span class="nv">chan</span> <span class="mi">2</span><span class="p">)</span>
+              <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sum</span> <span class="mf">0.0</span><span class="p">))</span>
+                <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="nv">num_drawbars</span><span class="p">)</span>
+                  <span class="c1">;; (printf &quot;i = %lld&quot; i)</span>
+                  <span class="p">(</span><span class="k">set!</span> <span class="nv">sum</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">sum</span> <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">drawbar_pos</span> <span class="nv">i</span><span class="p">)</span> <span class="mf">8.0</span><span class="p">)</span>
+                                      <span class="p">((</span><span class="nf">pref</span> <span class="nv">tonewheel</span> <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">*</span> <span class="mi">2</span> <span class="nv">i</span><span class="p">)</span> <span class="nv">chan</span><span class="p">))</span>
+                                       <span class="nv">amp</span>
+                                       <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">freq</span> <span class="p">(</span><span class="nf">pref</span> <span class="nv">freq_ratio</span> <span class="nv">i</span><span class="p">))</span>
+                                          <span class="p">(</span><span class="nf">pref</span> <span class="nv">freq_smudge</span> <span class="nv">i</span><span class="p">)))))))</span>
+                <span class="p">(</span><span class="nf">/</span> <span class="nv">sum</span> <span class="p">(</span><span class="k">convert</span> <span class="nv">num_drawbars</span><span class="p">)))</span>
+              <span class="mi">0</span><span class="nv">.</span><span class="p">))))))</span>
+</pre></div>
+</div>
+<p>The general shape of the code is basically the same as in
+<code class="docutils literal"><span class="pre">organ_drone</span></code>. We still allocate a <code class="docutils literal"><span class="pre">tonewheel</span></code> a buffer of closures
+to keep track of our oscillators, and we still sum them all together
+with relative amplitudes based on the drawbar position. There are just
+additions:</p>
+<ul class="simple">
+<li>the instrument is now stereo, so the <code class="docutils literal"><span class="pre">tonewheel</span></code> buffer is now
+twice as big (<code class="docutils literal"><span class="pre">(zalloc</span> <span class="pre">(*</span> <span class="pre">2</span> <span class="pre">num_drawbars))</span></code>). This gives us two
+oscillator closures per tonewheel, one for L and one for R.</li>
+<li>a ‘smudge factor’ (<code class="docutils literal"><span class="pre">freq_smudge</span></code>) has been added to the tonewheel
+frequencies. This is to make it sound a bit more ‘organic’, because
+in a physical instrument the frequency ratios between the tonewheels
+aren’t perfect.</li>
+</ul>
+<p>The other important difference between <code class="docutils literal"><span class="pre">organ_note_c</span></code> and
+<code class="docutils literal"><span class="pre">organ_drone</span></code> is that while <code class="docutils literal"><span class="pre">organ_drone</span></code> returns a double value
+(and so can be called directly for playback in the <code class="docutils literal"><span class="pre">dsp</span></code> closure),
+<code class="docutils literal"><span class="pre">organ_note_c</span></code> returns a <em>closure</em>. A type diagram highlights the
+difference:</p>
+<img alt="_images/organ-drone-vs-note.png" src="_images/organ-drone-vs-note.png" />
+<p>As I described in the previous section, this provides the flexibility
+required to manage note scheduling (via <code class="docutils literal"><span class="pre">_play_note</span></code>) and polyphony.</p>
+</div>
+<div class="section" id="step-three-the-effect-kernel">
+<h2>Step three: the effect kernel<a class="headerlink" href="#step-three-the-effect-kernel" title="Permalink to this headline">¶</a></h2>
+<p>The final piece of the puzzle is the effect kernel <code class="docutils literal"><span class="pre">organ_fx</span></code>. In a
+tonewheel organ, the main effect which we want to model is the <a class="reference external" href="http://en.wikipedia.org/wiki/Leslie_speaker">Leslie
+speaker</a>. The warbling Leslie speaker is key part of the classic
+hammond sound.</p>
+<p>A Leslie speaker worked by having speaker drivers which were motorised
+and would rotate as the sound was being played through them. This
+produced a warbling, doppler-shifting tone colouration. Like with any
+digital modelling of a physical instrument, modelling the speaker’s
+effect really accurately is a difficult task, but there are some simple
+techniques we can use to achieve a serviceable approximation of this
+effect. In particular, our <code class="docutils literal"><span class="pre">organ_fx</span></code> kernel will use a <a class="reference external" href="http://en.wikipedia.org/wiki/Flanging">flanger</a> and
+<a class="reference external" href="http://en.wikipedia.org/wiki/Tremolo">tremolo</a> (with subtly different frequencies between the L and R
+channels) to simulate the sound of a Leslie speaker.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">organ_fx</span> <span class="mi">100000</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">flanl</span> <span class="p">(</span><span class="nv">flanger_c</span> <span class="mf">1.0</span> <span class="mf">0.0</span> <span class="mf">0.6</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">flanr</span> <span class="p">(</span><span class="nv">flanger_c</span> <span class="mf">1.0</span> <span class="mf">0.0</span> <span class="mf">0.6</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">treml</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">tremr</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">trem_amp</span> <span class="mf">0.1</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">wet</span> <span class="mf">0.5</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">fb</span> <span class="mf">0.5</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">trem_freq</span> <span class="nv">.0</span><span class="p">))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span>
+             <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="nv">flanl</span> <span class="nv">in</span> <span class="nv">wet</span> <span class="nv">fb</span><span class="p">)</span>
+                <span class="p">(</span><span class="nf">+</span> <span class="mf">1.0</span> <span class="p">(</span><span class="nv">treml</span> <span class="nv">trem_amp</span> <span class="nv">trem_freq</span><span class="p">))))</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span>
+             <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="nv">flanr</span> <span class="nv">in</span> <span class="nv">wet</span> <span class="nv">fb</span><span class="p">)</span>
+                <span class="p">(</span><span class="nf">+</span> <span class="mf">1.0</span> <span class="p">(</span><span class="nv">tremr</span> <span class="nv">trem_amp</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">1.1</span> <span class="nv">trem_freq</span><span class="p">)))))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>The code is fairly straightforward. The top-level <code class="docutils literal"><span class="pre">let</span></code> binds a pair
+of flanger closures (<code class="docutils literal"><span class="pre">flanl</span></code> and <code class="docutils literal"><span class="pre">flanr</span></code>) and a pair of
+oscillator closures for the tremolo effect (<code class="docutils literal"><span class="pre">treml</span></code> and <code class="docutils literal"><span class="pre">tremr</span></code>).
+In the body of <code class="docutils literal"><span class="pre">lambda</span></code>, the input sample <code class="docutils literal"><span class="pre">in</span></code> is processed with
+the flanger and tremolo for the appropriate channel. The source code
+for <code class="docutils literal"><span class="pre">flanger_c</span></code> can be found in <code class="docutils literal"><span class="pre">libs/core/audio_dsp.xtm</span></code>.</p>
+</div>
+<div class="section" id="playing-the-instrument">
+<h2>Playing the instrument<a class="headerlink" href="#playing-the-instrument" title="Permalink to this headline">¶</a></h2>
+<p>Now, let’s see if our instrument works! Having compiled both
+<code class="docutils literal"><span class="pre">organ_note_c</span></code> and <code class="docutils literal"><span class="pre">organ_fx</span></code>, we’re finally ready to use
+<code class="docutils literal"><span class="pre">bind-instrument</span></code> to make our xtlang hammond organ</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">organ</span> <span class="nv">organ_note_c</span> <span class="nv">organ_fx</span><span class="p">)</span>
+
+<span class="c1">;; Compiled organ &gt;&gt;&gt; [float,float,i64,i64,float*]*</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">or</span><span class="nv">gan</span> <span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)))</span>
+
+<span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>and the moment of truth…</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">play-note</span> <span class="p">(</span><span class="nf">now</span><span class="p">)</span>   <span class="c1">;; time</span>
+           <span class="nv">organ</span>   <span class="c1">;; instrument</span>
+           <span class="mi">60</span>      <span class="c1">;; pitch (midi note number, middle C = 60)</span>
+           <span class="mi">100</span>     <span class="c1">;; velocity (in range [0,127])</span>
+           <span class="mi">44100</span><span class="p">)</span>  <span class="c1">;; duration (in samples, 44100 = 1sec)</span>
+</pre></div>
+</div>
+<p>if everything is hooked up right, when you evaluate (<code class="docutils literal"><span class="pre">C-M-x</span></code> in Emacs)
+the <code class="docutils literal"><span class="pre">play-note</span></code> Scheme call above you should hear a 440Hz (the A below
+middle C) organ note which plays for one second (44100 samples). Try
+changing the frequency, amplitude and loudness values and see how the
+note changes.</p>
+<p><strong>Troubleshooting</strong> if this <em>didn’t</em> work, there are a few possible
+causes:</p>
+<ul class="simple">
+<li>is your audio interface configured properly? Running the
+<code class="docutils literal"><span class="pre">./extempore</span> <span class="pre">--print-deivces</span></code> at the command line will print a list
+of all the audio devices the system knows about. Make sure that
+you’re using the right one&#8212;you can specify which device Extempore
+should use with the <code class="docutils literal"><span class="pre">--device</span></code> argument e.g.
+<code class="docutils literal"><span class="pre">./extempore</span> <span class="pre">--device</span> <span class="pre">2</span></code>, where <code class="docutils literal"><span class="pre">2</span></code> is the index (in the output
+of <code class="docutils literal"><span class="pre">--print-devices</span></code>) of the device you want to use.</li>
+<li>did the <code class="docutils literal"><span class="pre">organ</span></code>, <code class="docutils literal"><span class="pre">organ_note_c</span></code> and <code class="docutils literal"><span class="pre">organ_fx</span></code> closures all
+compile properly? Check the log output to find out. If the compiler
+can’t find the definition of some functions (e.g. <code class="docutils literal"><span class="pre">osc_c</span></code>) then you
+might not have loaded all the libraries that you need.</li>
+<li>is <code class="docutils literal"><span class="pre">organ</span></code> in your <code class="docutils literal"><span class="pre">dsp</span></code> callback? Because you can schedule all
+the notes you like with <code class="docutils literal"><span class="pre">play-note</span></code>, if the return values of
+<code class="docutils literal"><span class="pre">organ</span></code> aren’t getting passed to the audio output then you won’t
+hear anything!</li>
+</ul>
+<p>Stay tuned for the next exciting instalment, where we’ll actually <em>play</em>
+our instrument in some more interesting ways: like <em>actual music</em>. We’ll
+get there, I promise!</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="note-level-music.html" class="btn btn-neutral float-right" title="Playing an instrument" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="audio-signal-processing.html" class="btn btn-neutral" title="Audio signal processing" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Andrew Sorensen.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

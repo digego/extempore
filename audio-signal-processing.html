@@ -1,0 +1,736 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Audio signal processing &mdash; Extempore 0.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/>
+        <link rel="next" title="Making an instrument" href="making-an-instrument.html"/>
+        <link rel="prev" title="Memory management in Extempore" href="memory.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Extempore
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="editor-support.html">Text editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Extempore programming environment</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
+<li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="type-system.html">xtlang type reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="memory.html">Memory management in Extempore</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">Audio signal processing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#abstraction-and-higher-order-functions">Abstraction and higher-order functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#beyond-pure-tones">Beyond pure tones</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#tuples-in-xtlang">Tuples in xtlang</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#arrays-in-dsp-code">Arrays in DSP code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#packaging-noise-into-instruments">Packaging noise into instruments</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#note-kernel">Note kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-fx-to-the-instrument">Adding fx to the instrument</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#putting-it-all-together">Putting it all together</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="making-an-instrument.html">Making an instrument</a></li>
+<li class="toctree-l1"><a class="reference internal" href="note-level-music.html">Playing an instrument</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Loading and using a sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics.html">Graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impromptu-users.html">Extempore for Impromptu users</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Community</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Extempore</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Audio signal processing</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/audio-signal-processing.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="audio-signal-processing">
+<h1>Audio signal processing<a class="headerlink" href="#audio-signal-processing" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This was once a blog post&#8212;corrections/improvements
+welcome.</p>
+</div>
+<p>In Extempore you can write dynamic, hot-swappable DSP code. There is a
+special function in the environment called (funnily enough) <code class="docutils literal"><span class="pre">dsp</span></code>.
+This is as simple as declaring an xltang closure (with a specific type
+signature) to be the audio output &#8216;sink&#8217;. The values returned by this
+function are sent directly to the audio driver and output as sound
+through the computer speakers. Every audio sample (that is, at a rate
+of 44100Hz) this function is called with a few arguments:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">*</span> <span class="nv">.1</span> <span class="p">(</span><span class="nf">sin</span> <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="mf">3.1415</span>               <span class="c1">;; 2pi(ish)</span>
+                     <span class="mf">440.0</span>                    <span class="c1">;; frequency (Hz)</span>
+                     <span class="p">(</span><span class="nf">i64tof</span> <span class="p">(</span><span class="nf">%</span> <span class="nv">time</span> <span class="mi">44100</span><span class="p">)))</span> <span class="c1">;; time mod samplerate</span>
+                  <span class="mf">44100.0</span><span class="p">)))))</span>
+
+<span class="c1">;; to let Extempore know that this function is the one</span>
+<span class="c1">;; it should call to get the output audio samples</span>
+<span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This <code class="docutils literal"><span class="pre">dsp</span></code> function takes as input:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">in</span></code>: the input audio sample, e.g. from the microphone</li>
+<li><code class="docutils literal"><span class="pre">time</span></code>: an <code class="docutils literal"><span class="pre">i64</span></code> representing the time</li>
+<li><code class="docutils literal"><span class="pre">chan</span></code>: another <code class="docutils literal"><span class="pre">i64</span></code> which represents the channel index (<code class="docutils literal"><span class="pre">0</span></code>
+for L, <code class="docutils literal"><span class="pre">1</span></code> for R, etc.). Extempore can handle any number of
+channels.</li>
+<li><code class="docutils literal"><span class="pre">data</span></code>: this is a <em>pointer</em> to a <code class="docutils literal"><span class="pre">SAMPLE</span></code> type (which is
+<code class="docutils literal"><span class="pre">float</span></code> by default), and can be used to pass arbitrary data into
+the <code class="docutils literal"><span class="pre">dsp</span></code> function.</li>
+</ul>
+<p>By default, the type of <code class="docutils literal"><span class="pre">SAMPLE</span></code> is <code class="docutils literal"><span class="pre">float</span></code>, it&#8217;s just a type alias:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">SAMPLE</span> <span class="nv">float</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>but it can also be <code class="docutils literal"><span class="pre">double</span></code> (if <code class="docutils literal"><span class="pre">SAMPLE</span></code> was an alias to <code class="docutils literal"><span class="pre">double</span></code>).</p>
+<p>In the example above, I&#8217;m ignoring all of these arguments except for the
+<code class="docutils literal"><span class="pre">time</span></code> argument, which I&#8217;m using to generate a simple sinusoid at
+440Hz. Note the use of the <code class="docutils literal"><span class="pre">convert</span></code> function, which converts <code class="docutils literal"><span class="pre">time</span></code>
+(which is an <code class="docutils literal"><span class="pre">i64</span></code>) to whatever type <code class="docutils literal"><span class="pre">SAMPLE</span></code> is. But the cool thing
+is that like all functions in Extempore, this <code class="docutils literal"><span class="pre">dsp</span></code> function can be
+redefined on-the-fly, as long as the type signature stays the same. So,
+if I change the <code class="docutils literal"><span class="pre">dsp</span></code> function to</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+    <span class="p">(</span><span class="nf">*</span> <span class="mf">0.1</span> <span class="p">(</span><span class="k">convert</span> <span class="p">(</span><span class="nf">random</span><span class="p">)</span> <span class="nv">SAMPLE</span><span class="p">))))</span>
+</pre></div>
+</div>
+<p>then the output changes to white noise. This is the real power of xtlang
+(and Extempore)&#8212;everything&#8217;s dynamic and modifiable at runtime, but it&#8217;s
+also performant enough to do sample-level manipulation in the same
+language and environment. So instead of the ugens (unit generators, e.g.
+oscillators) being locked up in a different language to the control
+language, it&#8217;s all mixed in together.</p>
+<div class="section" id="abstraction-and-higher-order-functions">
+<h2>Abstraction and higher-order functions<a class="headerlink" href="#abstraction-and-higher-order-functions" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s create some oscillators:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">phase</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">amp</span> <span class="nv">freq</span><span class="kt">:SAMPLE</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">incr</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="mf">3.1415</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">freq</span> <span class="mi">44100</span><span class="nv">.</span><span class="p">))))</span>
+        <span class="p">(</span><span class="k">set!</span> <span class="nv">phase</span> <span class="p">(</span><span class="nf">%</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">phase</span> <span class="nv">incr</span><span class="p">)</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="mf">3.1415</span><span class="p">)))</span>
+        <span class="p">(</span><span class="nf">*</span> <span class="nv">amp</span> <span class="p">(</span><span class="nf">sin</span> <span class="nv">phase</span><span class="p">))))))</span>
+</pre></div>
+</div>
+<p>This <code class="docutils literal"><span class="pre">osc_c</span></code> function doesn&#8217;t return a primitive (int/float) value.
+Rather, it returns a (pointer to a) closure, which is our &#8216;oscillator&#8217;
+and takes an amplitude and a phase argument. This idiom is a useful one,
+and comes up so much in xtlang code that by convention we give any
+closure which returns another closure a <code class="docutils literal"><span class="pre">_c</span></code> suffix.</p>
+<p>The type message printed by the compiler when we evaluate <code class="docutils literal"><span class="pre">osc_c</span></code> is:</p>
+<div class="highlight-python"><div class="highlight"><pre>Compiled osc_c &gt;&gt;&gt; [[float,float,float]*,float]*``
+</pre></div>
+</div>
+<p>See that the return type of the <code class="docutils literal"><span class="pre">osc_c</span></code> function is
+<code class="docutils literal"><span class="pre">[float,float,float]*</span></code>: a pointer to a closure which takes two
+<code class="docutils literal"><span class="pre">float</span></code> arguments and returns a <code class="docutils literal"><span class="pre">float</span></code>. This is our oscillator,
+and we can use our <code class="docutils literal"><span class="pre">osc_c</span></code> function to create as many oscillators as
+we need:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc1</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">osc2</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:float</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">channel</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:float*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="c1">; play a 200Hz tone in the left ear</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">0</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc1</span> <span class="mf">0.25</span> <span class="mf">200.0</span><span class="p">))</span>
+            <span class="c1">; play a 300Hz tone in the right ear</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc2</span> <span class="mf">0.25</span> <span class="mf">300.0</span><span class="p">))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">phase</span></code> variable in each of our oscillator closures is how we
+maintain state between calls to <code class="docutils literal"><span class="pre">osc1</span></code> or <code class="docutils literal"><span class="pre">osc2</span></code>. Each time the
+closure is called, <code class="docutils literal"><span class="pre">phase</span></code> gets incremented (see the definition of
+<code class="docutils literal"><span class="pre">osc_c</span></code> above), and because <code class="docutils literal"><span class="pre">phase</span></code> is bound within a let that is
+local to the returned closure, each osc has its <em>own</em> <code class="docutils literal"><span class="pre">phase</span></code> value,
+so the oscillators created by <code class="docutils literal"><span class="pre">osc_c</span></code> are independent. In the case
+above, they are each called with different frequencies to produce sine
+tones of different pitch for each ear. This is closures in action, and
+it&#8217;s an example of how the &#8216;scheme-like&#8217; aspect of xtlang can simplify
+the job of maintaining state.</p>
+<p>It doesn&#8217;t take much imagination to see that <em>much</em> cooler stuff can
+be done in <code class="docutils literal"><span class="pre">dsp</span></code> than just playing two sine tones. AM synthesis, FM
+synthesis, granular and wavetable synthesis, as well as sampling and
+sample manipulation&#8212;these are all possible. It&#8217;s worth noting that
+there are heaps better/easier ways to achieve a lot of this stuff in
+Extempore: named constants for samplerate &amp; 2pi, syntactic sugar,
+library support etc are provided in the standard library (especially
+in <code class="docutils literal"><span class="pre">libs/core/audio_dsp.xtm</span></code>). Still, it&#8217;s useful to build things up
+from first principles to show how it all works.</p>
+</div>
+<div class="section" id="beyond-pure-tones">
+<h2>Beyond pure tones<a class="headerlink" href="#beyond-pure-tones" title="Permalink to this headline">¶</a></h2>
+<p>Playing a single sine tone is boring. Now, instead of just using the
+<em>one</em> oscillator, let&#8217;s use a few of them to generate a whole bunch of
+sine tones of different frequencies:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span> <span class="c1">; osc_c is the same as last time</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">phase</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">amp</span> <span class="nv">freq</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">inc</span><span class="kt">:SAMPLE</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">3.141592</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">freq</span> <span class="mf">44100.0</span><span class="p">)))))</span>
+        <span class="p">(</span><span class="k">set!</span> <span class="nv">phase</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">phase</span> <span class="nv">inc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nf">*</span> <span class="nv">amp</span> <span class="p">(</span><span class="nf">sin</span> <span class="nv">phase</span><span class="p">))))))</span>
+
+<span class="c1">;; remember that the dsp closure is called for every sample</span>
+<span class="c1">;; also, for convenience, let&#39;s make a type signature for the</span>
+<span class="c1">;; DSP closure</span>
+
+<span class="p">(</span><span class="k">bind-alias</span> <span class="nf">DSP</span> <span class="kt">[SAMPLE,SAMPLE,i64,i64,SAMPLE*]*</span><span class="p">)</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span> <span class="c1">; note the use of the type signature &#39;DSP&#39;</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc1</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">osc2</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">osc3</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">channel</span> <span class="nv">data</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">1</span><span class="p">)</span>
+             <span class="p">(</span><span class="nf">+</span> <span class="p">(</span><span class="nv">osc1</span> <span class="mf">0.5</span> <span class="mf">220.0</span><span class="p">)</span>
+                <span class="p">(</span><span class="nv">osc2</span> <span class="mf">0.5</span> <span class="mf">350.0</span><span class="p">)))</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">0</span><span class="p">)</span>
+             <span class="p">(</span><span class="nv">osc3</span> <span class="mf">0.5</span> <span class="mf">210.0</span><span class="p">))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>See how the <code class="docutils literal"><span class="pre">let</span></code> &#8216;outside&#8217; the <code class="docutils literal"><span class="pre">lambda</span></code> sets up the three
+oscillators, then the <code class="docutils literal"><span class="pre">lambda</span></code> closes over them and so each time the
+oscillator is called increments its <code class="docutils literal"><span class="pre">phase</span></code> value appropriately?</p>
+<p>Any number of oscillators (think of them as unit generators) can be
+bound and added in this way&#8212;this allows us to do additive synthesis.
+Having to define and refer to each osc individually doesn&#8217;t scale up
+very well, though, so it would be great if we could create and
+initialise them programmatically. This brings us to a couple of new
+(compound) types: tuples, and arrays.</p>
+</div>
+</div>
+<div class="section" id="tuples-in-xtlang">
+<h1>Tuples in xtlang<a class="headerlink" href="#tuples-in-xtlang" title="Permalink to this headline">¶</a></h1>
+<p>As a refresher, <a class="reference internal" href="type-system.html#tuple-type-doc"><span>tuples</span></a> in xtlang are
+heterogeneous groupings of any xtlang types (just like a C struct).
+They&#8217;re still statically typed, either explicitly or with the types
+inferred from the types of other variables and literals.
+Syntactically, tuples use angle brackets (<code class="docutils literal"><span class="pre">&lt;&gt;</span></code>).</p>
+<p>When programming in xtlang you don&#8217;t really ever deal with tuples
+directly&#8212;you deal with them by <em>reference</em> through pointers. There are
+no &#8216;literals&#8217; for tuples either&#8212;you can&#8217;t just go</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;</span> <span class="kt">&lt;a,a&gt;</span><span class="p">))</span>
+      <span class="nv">tup</span><span class="p">)))</span>
+
+<span class="c1">;; Compiler Error: unbound symbol: &lt;a,a&gt;</span>
+</pre></div>
+</div>
+<p>Instead, this time in the <code class="docutils literal"><span class="pre">let</span></code> we get a pointer to a tuple through a
+call to <code class="docutils literal"><span class="pre">alloc</span></code>.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">)))</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="nv">tup</span> <span class="mi">0</span> <span class="nv">a</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">tset!</span> <span class="nv">tup</span> <span class="mi">1</span> <span class="nv">a</span><span class="p">)</span>
+      <span class="nv">tup</span><span class="p">)))</span>
+</pre></div>
+</div>
+<p><a class="reference internal" href="memory.html"><em>Memory management in Extempore</em></a> goes into more detail about this stuff, but for now the
+key point is that the call to <code class="docutils literal"><span class="pre">alloc</span></code> returns a <em>pointer</em> to a tuple
+of the specified type.</p>
+<p>Notice the <code class="docutils literal"><span class="pre">tset!</span></code> function, which takes three arguments: a pointer
+to a tuple (in the case above, that&#8217;s <code class="docutils literal"><span class="pre">tup</span></code>), an <code class="docutils literal"><span class="pre">i64</span></code> (0-based)
+index for specifying which &#8216;slot&#8217; in the tuple we&#8217;re setting, and
+finally the value to set it to (which must be of the appropriate type,
+otherwise you&#8217;ll get a type error).</p>
+<p>This new version of <code class="docutils literal"><span class="pre">tuple_maker</span></code> compiles&#8212;hooray! The type signature
+printed by the compiler is <code class="docutils literal"><span class="pre">Compiled</span> <span class="pre">tuple_maker</span> <span class="pre">&gt;&gt;&gt;</span>
+<span class="pre">[&lt;i64,i64&gt;*,i64]*</span></code> and the type of <code class="docutils literal"><span class="pre">tuple_maker</span></code> is a pointer
+(denoted by the <code class="docutils literal"><span class="pre">*</span></code>) to a closure (denoted by the <code class="docutils literal"><span class="pre">[]</span></code>) which takes
+one <code class="docutils literal"><span class="pre">i64</span></code> argument and returns a pointer to a tuple of two <code class="docutils literal"><span class="pre">i64</span></code>
+values.</p>
+<p>Just to check that everything&#8217;s working properly, let&#8217;s write a little
+<code class="docutils literal"><span class="pre">test</span></code> function</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">test</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nf">tuple</span><span class="nv">_maker</span> <span class="nv">a</span><span class="p">)))</span>
+        <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;&lt;%d,%d&gt;\n&quot;</span>
+                <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="p">(</span><span class="nf">tref</span> <span class="nv">tup</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="nv">tup</span><span class="p">)))</span>
+
+<span class="p">(</span><span class="nv">test</span> <span class="mi">4</span><span class="p">)</span> <span class="c1">; prints &lt;4,4&gt; (as it should!)</span>
+</pre></div>
+</div>
+<p>Tuples come in handy in lots of places, for instance we can use them to
+rewrite one of the <code class="docutils literal"><span class="pre">dsp</span></code> functions from earlier (the one with the
+three oscs)</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">osc_t</span> <span class="kt">[SAMPLE,SAMPLE,SAMPLE]*</span><span class="p">)</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_tuple</span><span class="kt">:&lt;osc_t,osc_t,osc_t&gt;*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">)))</span>
+    <span class="p">(</span><span class="nf">tfill!</span> <span class="nv">osc_tuple</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">channel</span> <span class="nv">data</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">1</span><span class="p">)</span>
+             <span class="p">(</span><span class="nf">+</span> <span class="p">((</span><span class="nf">tref</span> <span class="nv">osc_tuple</span> <span class="mi">0</span><span class="p">)</span> <span class="mf">0.5</span> <span class="mf">300.0</span><span class="p">)</span>
+                <span class="p">((</span><span class="nf">tref</span> <span class="nv">osc_tuple</span> <span class="mi">1</span><span class="p">)</span> <span class="mf">0.5</span> <span class="mf">420.0</span><span class="p">)))</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">channel</span> <span class="mi">0</span><span class="p">)</span>
+             <span class="p">((</span><span class="nf">tref</span> <span class="nv">osc_tuple</span> <span class="mi">2</span><span class="p">)</span> <span class="mf">0.5</span> <span class="mf">600.0</span><span class="p">))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>This time, instead of binding each osc to its own symbol (<code class="docutils literal"><span class="pre">osc1</span></code>,
+<code class="docutils literal"><span class="pre">osc2</span></code> and <code class="docutils literal"><span class="pre">osc3</span></code>), we created <code class="docutils literal"><span class="pre">osc_tuple</span></code>, a (pointer to a)
+tuple, which held all the oscs. We filled it with <code class="docutils literal"><span class="pre">tfill!</span></code>, which
+takes as a first argument the pointer to the tuple, and then enough
+additional arguments to fill out the tuple. Equivalently, we could have
+set each element in the tuple manually with <code class="docutils literal"><span class="pre">(tset!</span> <span class="pre">osc_tuple</span> <span class="pre">0</span> <span class="pre">(osc_c</span>
+<span class="pre">0.0))</span></code> etc.</p>
+<p>Also, the use of <code class="docutils literal"><span class="pre">bind-alias</span></code> is helpful here, because it allows us to
+condense the verbose type of the closure oscs
+(<code class="docutils literal"><span class="pre">[SAMPLE,SAMPLE,SAMPLE]*</span></code>) down to the more manageable <code class="docutils literal"><span class="pre">osc_t</span></code>,
+handy when we then need to type the <code class="docutils literal"><span class="pre">osc_tuple</span></code> with three of them.</p>
+<p>There&#8217;s no reason why the types in the tuple have to be the same.
+Indeed, usually they won&#8217;t be&#8212;tuples allow us to define more complex
+data structures which are suitable for the task at hand.</p>
+<div class="section" id="arrays-in-dsp-code">
+<h2>Arrays in DSP code<a class="headerlink" href="#arrays-in-dsp-code" title="Permalink to this headline">¶</a></h2>
+<p>If tuples are xtlang&#8217;s structs, then arrays are (funnily enough)
+xtlang&#8217;s arrays. Unlike tuples, which can be composed of heterogeneous
+xtlang types, arrays are homogeneous (like a C array). The elements of
+the array can be tuples, closures, or any valid xtlang type.
+Syntactically, arrays are marked by pipes (<code class="docutils literal"><span class="pre">|</span></code>). Again, we access and
+manipulate arrays through pointers returned by calls to the various
+memory allocation functions (e.g. <code class="docutils literal"><span class="pre">alloc</span></code>). Instead of <code class="docutils literal"><span class="pre">tref</span></code> and
+<code class="docutils literal"><span class="pre">tset!</span></code> (which we used for tuples), we use <code class="docutils literal"><span class="pre">aref</span></code> and <code class="docutils literal"><span class="pre">aset!</span></code>.</p>
+<p>So, to bring this discussion back to the practical art of noise-making,
+let&#8217;s create a <code class="docutils literal"><span class="pre">dsp</span></code> function which makes use of arrays and tuples to
+do some additive synthesis. We&#8217;ll make an array <code class="docutils literal"><span class="pre">osc_array</span></code>, and then
+two more arrays (<code class="docutils literal"><span class="pre">amp_array</span></code> and <code class="docutils literal"><span class="pre">freq_array</span></code>) to keep track of the
+amplitude and frequency values.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_array</span><span class="kt">:|30,[SAMPLE,SAMPLE,SAMPLE]*|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">amp_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">freq_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">i</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="c1">; initialise the arrays</span>
+    <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">30</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">osc_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">amp_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">+</span> <span class="mf">0.2</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">0.2</span> <span class="p">(</span><span class="nf">random</span><span class="p">))))</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">freq_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">+</span> <span class="mf">110.0</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">1000.0</span> <span class="p">(</span><span class="nf">random</span><span class="p">)))))</span>
+    <span class="c1">; this is the dsp closure</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">data</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span> <span class="c1">; left channel</span>
+             <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">suml</span> <span class="mf">0.0</span><span class="p">))</span>
+               <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">15</span><span class="p">)</span> <span class="c1">; sum over the first 15 oscs</span>
+                 <span class="p">(</span><span class="k">set!</span> <span class="nv">suml</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">suml</span> <span class="p">((</span><span class="nf">aref</span> <span class="nv">osc_array</span> <span class="nv">i</span><span class="p">)</span>
+                                     <span class="p">(</span><span class="nf">aref</span> <span class="nv">amp_array</span> <span class="nv">i</span><span class="p">)</span>
+                                     <span class="p">(</span><span class="nf">aref</span> <span class="nv">freq_array</span> <span class="nv">i</span><span class="p">)))))</span>
+               <span class="p">(</span><span class="nf">/</span> <span class="nv">suml</span> <span class="mf">15.0</span><span class="p">)))</span> <span class="c1">; normalise over all oscs</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span> <span class="c1">; left channel</span>
+             <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sumr</span> <span class="mf">0.0</span><span class="p">))</span>
+               <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">15</span> <span class="mi">15</span><span class="p">)</span> <span class="c1">; sum over the first 15 oscs</span>
+                 <span class="p">(</span><span class="k">set!</span> <span class="nv">sumr</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">sumr</span> <span class="p">((</span><span class="nf">aref</span> <span class="nv">osc_array</span> <span class="nv">i</span><span class="p">)</span>
+                                     <span class="p">(</span><span class="nf">aref</span> <span class="nv">amp_array</span> <span class="nv">i</span><span class="p">)</span>
+                                     <span class="p">(</span><span class="nf">aref</span> <span class="nv">freq_array</span> <span class="nv">i</span><span class="p">)))))</span>
+               <span class="p">(</span><span class="nf">/</span> <span class="nv">sumr</span> <span class="mf">15.0</span><span class="p">)))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span> <span class="c1">; any remaining channels</span>
+</pre></div>
+</div>
+<p>This code is a bit more complex than the previous examples. Initially,
+pointers to the three arrays (for the oscs, the amps and the freqs) are
+set up in the <code class="docutils literal"><span class="pre">let</span></code>, then a <code class="docutils literal"><span class="pre">dotimes</span></code> goes through and sets them up
+with the relevant data. The amplitudes and frequencies are chosen at
+random (within sensible ranges). After the arrays have all been
+initialised in the <code class="docutils literal"><span class="pre">dotimes</span></code>, the dsp <code class="docutils literal"><span class="pre">lambda</span></code> sums the output from
+the oscillators (the first 15 oscs for the left channel and the last 15
+oscs for the right channel). That&#8217;s why the second <code class="docutils literal"><span class="pre">dotimes</span></code> takes an
+extra value in the parens, this is an initial value (which defaults to
+zero) for the loop variable to be bound to.</p>
+<p>Remember that everything can be JIT-compiled whenever you like, so each
+time the <code class="docutils literal"><span class="pre">dsp</span></code> closure is re-evaluated new random values will go into
+the amp and freq arrays, and the additive <code class="docutils literal"><span class="pre">dsp</span></code> function will make a
+different sound which you&#8217;ll hear straight away.</p>
+<p>Now, choosing these values at random doesn&#8217;t necessarily lead to the
+most musical results, so it&#8217;s a good idea to choose them in some sort of
+systematic way. In our last example, we&#8217;ll play only the <em>even</em>
+harmonics of a given base frequency (I&#8217;ve also simplified the output to
+one channel for clarity).</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_array</span><span class="kt">:|30,[SAMPLE,SAMPLE,SAMPLE]*|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">amp_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">freq_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">base_freq</span> <span class="mf">110.0</span><span class="p">)</span>
+        <span class="p">(</span><span class="nv">i</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="c1">; initialise the arrays</span>
+    <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">30</span><span class="p">)</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">osc_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">amp_array</span>
+             <span class="nv">i</span>
+             <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">i</span> <span class="mi">2</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>
+                 <span class="mf">0.3</span>
+                 <span class="mf">0.0</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">aset!</span> <span class="nv">freq_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="k">convert</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">i</span> <span class="mi">1</span><span class="p">)</span> <span class="nv">SAMPLE</span><span class="p">)</span> <span class="nv">base_freq</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">data</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sum</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="k">dotimes</span> <span class="p">(</span><span class="nv">i</span> <span class="mi">30</span><span class="p">)</span>
+          <span class="p">(</span><span class="k">set!</span> <span class="nv">sum</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">sum</span> <span class="p">((</span><span class="nf">aref</span> <span class="nv">osc_array</span> <span class="nv">i</span><span class="p">)</span>
+                            <span class="p">(</span><span class="nf">aref</span> <span class="nv">amp_array</span> <span class="nv">i</span><span class="p">)</span>
+                            <span class="p">(</span><span class="nf">aref</span> <span class="nv">freq_array</span> <span class="nv">i</span><span class="p">)))))</span>
+        <span class="p">(</span><span class="nf">/</span> <span class="nv">sum</span> <span class="mf">30.0</span><span class="p">)))))</span> <span class="c1">; normalise over all oscs</span>
+</pre></div>
+</div>
+<p>See how we&#8217;re using the same arrays as last time (for osc, amp and freq)
+but instead of randomly picking frequencies and amplitudes, we&#8217;re
+generating a harmonic series with a fundamental of 110Hz, and only
+playing the even harmonics (check the equality test in the
+initialisation of <code class="docutils literal"><span class="pre">amp_array</span></code>). For fun, change that equality test to
+an inequality test (<code class="docutils literal"><span class="pre">&lt;&gt;</span></code>) and listen to the result!</p>
+</div>
+<div class="section" id="packaging-noise-into-instruments">
+<span id="saw-synth-doc"></span><h2>Packaging noise into instruments<a class="headerlink" href="#packaging-noise-into-instruments" title="Permalink to this headline">¶</a></h2>
+<p>This is hopefully beginning to flesh out the practice of doing
+real-time DSP in Extempore. It might seem like reinventing the wheel,
+building all the oscillators from scratch, but there are xtlang
+libraries for all of this, so there&#8217;s no need to mess around with the
+low-level synthesis stuff if you don&#8217;t want to. But the point is that
+you <em>can</em>, and it&#8217;s all hot-swappable, and written in the same
+language and environment that you use even if you just want to trigger
+pre-made instruments. These examples show how to do things from first
+principles, but feel free to mess around at whatever level of
+abstraction tickles your creative fancy.</p>
+<p>To finish, we&#8217;ll make a really basic <code class="docutils literal"><span class="pre">saw_synth</span></code> instrument. An
+<em>instrument</em> in Extempore allows you to trigger &#8216;notes&#8217; like a MIDI
+soft synth. <a class="reference internal" href="note-level-music.html"><em>Playing an instrument</em></a> goes into a lot more detail about
+how Extempore&#8217;s instrument infrastructure works, so this is more of a
+&#8216;quick and dirty&#8217; example instrument just to get a feel for things.
+All the instrument code is just regular xtlang, and this instrument
+(and others) can be found in <code class="docutils literal"><span class="pre">libs/core/instruments.xtm</span></code> and
+<code class="docutils literal"><span class="pre">libs/external/instruments_ext.xtm</span></code>.</p>
+<p>An instrument is basically two xtlang closures: a <strong>note kernel
+closure</strong> and an <strong>fx closure</strong>. These closures must have specific type
+signatures to play nice with the instrument signal chain.</p>
+<div class="section" id="note-kernel">
+<h3>Note kernel<a class="headerlink" href="#note-kernel" title="Permalink to this headline">¶</a></h3>
+<p>First, let&#8217;s examine the note kernel closure. This closure takes <em>zero</em>
+arguments, and returns another closure which takes four arguments:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">time</span></code>: the current (sample) time in Extempore</li>
+<li><code class="docutils literal"><span class="pre">chan</span></code>: the channel number</li>
+<li><code class="docutils literal"><span class="pre">freq</span></code>: the frequency (pitch) of the note as type <code class="docutils literal"><span class="pre">SAMPLE</span></code></li>
+<li><code class="docutils literal"><span class="pre">amp</span></code>: the volume/loudness of the note as type <code class="docutils literal"><span class="pre">SAMPLE</span></code></li>
+</ul>
+<p>In Extempore, <code class="docutils literal"><span class="pre">SAMPLE</span></code> is aliased to <code class="docutils literal"><span class="pre">float</span></code> by default, but could
+also be <code class="docutils literal"><span class="pre">double</span></code>.</p>
+<p>The <em>returned</em> closure will be called to provide the basic audio signal
+for the note, so that&#8217;s where we put our code to generate the saw wave</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/instruments.xtm&quot;</span><span class="p">)</span>
+
+<span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_note_c</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">data</span><span class="kt">:NoteInitData*</span> <span class="nv">nargs</span><span class="kt">:i64</span> <span class="nv">dargs</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">saw</span> <span class="p">(</span><span class="nv">saw_c</span> <span class="mi">0</span><span class="nv">.</span><span class="p">)))</span>
+      <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">freq</span><span class="kt">:SAMPLE</span> <span class="nv">amp</span><span class="kt">:SAMPLE</span><span class="p">)</span>
+        <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">(</span><span class="nv">saw</span> <span class="nv">amp</span> <span class="nv">freq</span><span class="p">)</span>
+            <span class="mf">0.0</span><span class="p">)))))</span>
+
+<span class="c1">;; when we evaluate saw_synth_note_c, the compiler prints:</span>
+<span class="c1">;; Compiled:  saw_synth_note_c &gt;&gt;&gt; [[float,i64,i64,float,float]*,NoteInitData*,i64,float*]*</span>
+</pre></div>
+</div>
+<p>Notice that the saw <a class="reference external" href="http://en.wikipedia.org/wiki/Unit_generator">unit-generator</a> (ugen) <code class="docutils literal"><span class="pre">saw</span></code> is bound (by
+calling <code class="docutils literal"><span class="pre">saw_c</span></code>) <em>outside</em> the inner <code class="docutils literal"><span class="pre">lambda</span></code> form. This inner
+<code class="docutils literal"><span class="pre">lambda</span></code> defines the closure which will be <em>returned</em> by
+<code class="docutils literal"><span class="pre">saw_synth_note_c</span></code>. In this returned closure, the ugen <code class="docutils literal"><span class="pre">saw</span></code> (which
+is itself an xtlang closure) is called with the amplitude and frequency
+values which are passed in as arguments to the <code class="docutils literal"><span class="pre">lambda</span></code> form. The
+value returned by the <code class="docutils literal"><span class="pre">saw</span></code> closure (as it is called repeatedly, once
+per audio sample) will trace out a <a class="reference external" href="http://en.wikipedia.org/wiki/Sawtooth_wave">sawtooth wave</a>.</p>
+<p>This is just a mono note kernel at this stage, because <code class="docutils literal"><span class="pre">saw</span></code> is only
+called when <code class="docutils literal"><span class="pre">chan</span></code> is equal to <code class="docutils literal"><span class="pre">0</span></code>. The note kernel closure will
+actually be called one for <em>each</em> output channel, and the <code class="docutils literal"><span class="pre">chan</span></code>
+argument will range from <code class="docutils literal"><span class="pre">0</span></code> for the first output channel to <code class="docutils literal"><span class="pre">n</span> <span class="pre">-</span> <span class="pre">1</span></code>
+for the nth output channel (the number of output channels you have will
+depend on your audio device). It&#8217;s therefore easy to generalise our note
+kernel to multiple channels, so let&#8217;s make it a stereo note kernel</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_note_c</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">data</span><span class="kt">:NoteInitData*</span> <span class="nv">nargs</span><span class="kt">:i64</span> <span class="nv">dargs</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sawl</span> <span class="p">(</span><span class="nv">saw_c</span> <span class="mi">0</span><span class="nv">.</span><span class="p">))</span>
+          <span class="p">(</span><span class="nv">sawr</span> <span class="p">(</span><span class="nv">saw_c</span> <span class="mi">0</span><span class="nv">.</span><span class="p">)))</span>
+      <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">freq</span><span class="kt">:SAMPLE</span> <span class="nv">amp</span><span class="kt">:SAMPLE</span><span class="p">)</span>
+        <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span>
+               <span class="p">(</span><span class="nv">sawl</span> <span class="nv">amp</span> <span class="nv">freq</span><span class="p">))</span>
+              <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span>
+               <span class="p">(</span><span class="nv">sawr</span> <span class="nv">amp</span> <span class="nv">freq</span><span class="p">))</span>
+              <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">))))))</span>
+</pre></div>
+</div>
+<p>Now we make two saw ugens (<code class="docutils literal"><span class="pre">sawl</span></code> and <code class="docutils literal"><span class="pre">sawr</span></code>), and call the
+appropriate one depending on the <code class="docutils literal"><span class="pre">chan</span></code> argument. Our stereo saw note
+kernel is now ready to play!</p>
+</div>
+<div class="section" id="adding-fx-to-the-instrument">
+<h3>Adding fx to the instrument<a class="headerlink" href="#adding-fx-to-the-instrument" title="Permalink to this headline">¶</a></h3>
+<p>Often, you&#8217;ll want to add an audio effect to the instrument&#8217;s
+output&#8212;maybe a delay, a reverb, or some more outlandish audio
+processing. But we don&#8217;t want to apply the fx processing to each note
+individually, but rather to the total audio output of the instrument.
+And that&#8217;s where the <strong>fx closure</strong> comes in.</p>
+<img alt="_images/fx.png" src="_images/fx.png" />
+<p>The most important argument to the fx closure is the <code class="docutils literal"><span class="pre">in</span></code> argument,
+which represents the (dry) input signal that you want to process. It
+<em>is</em> necessary to have an fx closure in your Extempore instrument,
+although it may just pass its input through untouched:</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+    <span class="nv">in</span><span class="p">))</span>
+
+<span class="c1">;; when we evaluate saw_synth_fx, the compiler prints:</span>
+<span class="c1">;; Compiled saw_synth_fx &gt;&gt;&gt; [i64,i64,i64,float,float*]*</span>
+</pre></div>
+</div>
+<p>Let&#8217;s add a stereo delay to make things a bit more interesting</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span> <span class="mi">200000</span> <span class="c1">;; extra memory for the delay lines</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">delayl</span> <span class="p">(</span><span class="nv">delay_c</span> <span class="mi">22050</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">delayr</span> <span class="p">(</span><span class="nv">delay_c</span> <span class="mi">22050</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span>
+             <span class="p">(</span><span class="nv">delayl</span> <span class="nv">in</span> <span class="mf">0.3</span> <span class="mf">0.2</span><span class="p">))</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span>
+             <span class="p">(</span><span class="nv">delayr</span> <span class="nv">in</span> <span class="mf">0.3</span> <span class="mf">0.2</span><span class="p">))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="mf">0.0</span><span class="p">)))))</span>
+</pre></div>
+</div>
+<p>Nice one. Also, remember that you change the fx closure at any time
+(just edit the code and re-evaluate it).</p>
+</div>
+</div>
+<div class="section" id="putting-it-all-together">
+<h2>Putting it all together<a class="headerlink" href="#putting-it-all-together" title="Permalink to this headline">¶</a></h2>
+<p>Finally, to complete the instrument, we use a special
+<code class="docutils literal"><span class="pre">bind-instrument</span></code> macro</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">saw_synth</span> <span class="nv">saw_synth_note_c</span> <span class="nv">saw_synth_fx</span><span class="p">)</span>
+</pre></div>
+</div>
+<img alt="_images/whole-instrument.png" src="_images/whole-instrument.png" />
+<p>As long as your kernel (<code class="docutils literal"><span class="pre">saw_synth_note_c</span></code>) and fx (<code class="docutils literal"><span class="pre">saw_synth_fx</span></code>)
+closures have the right signature, then evaluating the above line should
+print for you</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>Compiled saw_synth &gt;&gt;&gt; [float,float,i64,i64,float*]*
+</pre></div>
+</div>
+<p>and now the instrument is ready to play.</p>
+<p>What&#8212;is that the end? Well, that&#8217;s a bit frustrating: we haven&#8217;t even
+got to <em>play</em> our instrument yet! Don&#8217;t worry, we&#8217;ll use our
+<code class="docutils literal"><span class="pre">saw_synth</span></code> instrument in <a class="reference internal" href="note-level-music.html"><em>Playing an instrument</em></a>.</p>
+<p>There are a couple of things to note which might be helpful for when you
+want to build your <em>own</em> instruments</p>
+<ul class="simple">
+<li>The note kernel closure (in this example <code class="docutils literal"><span class="pre">saw_synth_note_c</span></code>)
+returns a closure for each note: multiple notes may be playing
+simultaneously (polyphony), so you want to make sure that each
+closure keeps track of the state it needs and doesn&#8217;t leak that state
+to any of the other notes which are playing simultaneously.</li>
+<li>Each note kernel returns it&#8217;s output <em>one sample at a time</em>. So it&#8217;s
+up to you to make sure that these samples (when streamed to the audio
+hardware as an audio signal) make the audio waveform you&#8217;re after.</li>
+</ul>
+<p>If you&#8217;re interested in a more in-depth explanation of Extempore&#8217;s
+instrument infrastructure, then you can <a class="reference internal" href="making-an-instrument.html"><em>go and build your own
+tonewheel organ</em></a>.</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="making-an-instrument.html" class="btn btn-neutral float-right" title="Making an instrument" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="memory.html" class="btn btn-neutral" title="Memory management in Extempore" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Andrew Sorensen.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

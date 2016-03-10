@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
@@ -9,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Extempore 0.6.1 documentation</title>
+  <title>Turning the sound off in Extempore &mdash; Extempore 0.6.1 documentation</title>
   
 
   
@@ -137,7 +136,7 @@
         <div class="rst-content">
           
 
-
+ 
 
 
 
@@ -145,9 +144,11 @@
   <ul class="wy-breadcrumbs">
     <li><a href="index.html">Docs</a> &raquo;</li>
       
-    <li></li>
+    <li>Turning the sound off in Extempore</li>
       <li class="wy-breadcrumbs-aside">
         
+          
+            <a href="_sources/turning-the-sound-off-in-extempore.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -157,11 +158,55 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
+  <div class="section" id="turning-the-sound-off-in-extempore">
+<h1>Turning the sound off in Extempore<a class="headerlink" href="#turning-the-sound-off-in-extempore" title="Permalink to this headline">¶</a></h1>
+<p>Once you’ve got sound playing in Extempore, you may well want to turn it
+off. Understanding how to do that is helpful for understanding how the
+audio signal chain works in Extempore, especially since Extempore
+differs from other similar multimedia programming environments.</p>
+<p>In Extempore you don’t need to set up a signal chain with pre-defined
+UGens, to make sound at the most basic level you just need to understand
+one thing:</p>
+<p>The sound that comes out of the speakers is made up of successive return
+values of the <code class="docutils literal"><span class="pre">dsp</span></code> function. This audio ‘sink’ function is a regular
+xtlang function, and once it has been set with <code class="docutils literal"><span class="pre">(dsp:set!</span>
+<span class="pre">function_name)</span></code> Extempore calls this function (in this case
+<code class="docutils literal"><span class="pre">function_name</span></code>, but it can have any name) at the audio sample rate
+(usually 44.1kHz). Whatever signal/sound you want; if it ain’t in the
+dsp callback, you won’t hear it.</p>
+<p>In code:</p>
+<div class="code extempore highlight-python"><div class="highlight"><pre>;; a really simple white noise dsp function
+;; will return (pseudo)random values in [0.0,0.1]
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (random .1)))
 
-<h1 id="index">Index</h1>
+;; need to set the dsp callback to start the sound playing
+(dsp:set! dsp)
 
-<div class="genindex-jumpbox">
- 
+;; and to turn it off
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    0.0))
+</pre></div>
+</div>
+<p>To test your understanding, think about this question: why does the
+second definition of <code class="docutils literal"><span class="pre">dsp</span></code> (at the bottom) turn the sound off?</p>
+<p>That’s really the core concept for audio signal processing in
+Extempore—all the instruments, samplers, and everything else is built on
+top of that ‘call this function once per channel per sample, and send
+the return values to the DAC’ notion <a class="footnote-reference" href="#id2" id="id1">[1]</a>.</p>
+<table class="docutils footnote" frame="void" id="id2" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>There are some exceptions to this—for example Extempore can do
+buffered (rather than sample-by-sample) audio processing. However,
+because of the efficiency of the generated code you’ll be surprised
+at how far you can get without having to go down this route. All my
+livecoding screencasts, for instance, use a sample-by-sample audio
+chain.</td></tr>
+</tbody>
+</table>
 </div>
 
 

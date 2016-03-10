@@ -1,0 +1,399 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Reading &amp; writing audio files in Extempore &mdash; Extempore 0.6.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Extempore
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="editor-support.html">Text editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Extempore programming environment</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
+<li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="type-system.html">xtlang type reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="memory.html">Memory management in Extempore</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="audio-signal-processing.html">Audio signal processing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="audio-signal-processing.html#tuples-in-xtlang">Tuples in xtlang</a></li>
+<li class="toctree-l1"><a class="reference internal" href="making-an-instrument.html">Making an instrument</a></li>
+<li class="toctree-l1"><a class="reference internal" href="note-level-music.html">Playing an instrument</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sampler.html">Loading and using a sampler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics.html">Graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="impromptu-users.html">Extempore for Impromptu users</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Community</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Extempore</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Reading &amp; writing audio files in Extempore</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/audio-file-io.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="reading-writing-audio-files-in-extempore">
+<h1>Reading &amp; writing audio files in Extempore<a class="headerlink" href="#reading-writing-audio-files-in-extempore" title="Permalink to this headline">¶</a></h1>
+<p>Extempore’s <code class="docutils literal"><span class="pre">libsndfile</span></code> bindings <a class="footnote-reference" href="#id4" id="id1">[1]</a> provide functionality for both
+reading and writing audio files. Here’s a short example of how to both
+read and write audio files.</p>
+<p>First, load up the required libraries and create an audio file closure
+with <code class="docutils literal"><span class="pre">audiofile_c</span></code></p>
+<div class="code extempore highlight-python"><div class="highlight"><pre>(sys:load &quot;libs/external/sndfile.xtm&quot;)
+
+(bind-func dsp:DSP 1000000000  ;; allocate memory to store the audio file
+  (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0)))
+    (lambda (in time chan dat)
+      ;; get the output sample
+      (audiofile))))
+
+(dsp:set! dsp)
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">audiofile_c</span></code> takes three arguments:</p>
+<ul class="simple">
+<li>the name of the wav file to load</li>
+<li>the offset into the file to start from (<code class="docutils literal"><span class="pre">0</span></code> for the start of the
+file)</li>
+<li>the number of samples to read (<code class="docutils literal"><span class="pre">0</span></code> for the whole file)</li>
+</ul>
+<p>=audiofile<sub>c</sub>= returns a closure (which is bound to
+<code class="docutils literal"><span class="pre">audiofile</span></code>) which will, when called, return successive samples from
+the audio file in such a way that <code class="docutils literal"><span class="pre">audiofile</span></code> can be called once per
+output sample and will play through the audio file at normal speed. When
+<code class="docutils literal"><span class="pre">dsp</span></code> is compiled, the log view also prints some info about the
+file <a class="footnote-reference" href="#id5" id="id2">[2]</a>:</p>
+<div class="code bash highlight-python"><div class="highlight"><pre>file name:     /Users/ben/Desktop/xtm-assets/peg.wav
+samplerate:    44100
+channels:      2
+samples read:  21202944
+</pre></div>
+</div>
+<p>It’s important to realise that the playhead—the point in the file which
+playback is ‘up to’—is stored internally to the <code class="docutils literal"><span class="pre">audiofile</span></code> closure,
+and if you just call it back with no arguments it will gradually move
+through the whole file (as it is doing in the above code). By default,
+when the playhead gets to the end of the file it wraps to the start, so
+the file playback will loop on forever.</p>
+<p>To mess with this audio stream, let’s add some valve saturation-style
+distortion to both channels:</p>
+<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
+  (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
+        (saturationl (saturation_c))
+        (saturationr (saturation_c)))
+    (lambda (in time chan dat)
+      (* 0.1 ;; to compensate for saturation boost
+         (cond ((= chan 0)
+                (saturationl (audiofile) 1.0 0.9))
+               ((= chan 1)
+                (saturationr (audiofile) 1.0 0.9))
+               (else (convert 0.0 SAMPLE)))))))
+</pre></div>
+</div>
+<p>Sounds saturated and messy—great. <a class="footnote-reference" href="#id6" id="id3">[3]</a> Now, we want to write the
+processed audio back to a wav file. To do this, we need to <a class="reference external" href="2012-08-17-memory-management-in-extempore.org">allocate
+some memory</a> to write the output samples into. Looking at the file info
+which was printed out earlier (in particular <code class="docutils literal"><span class="pre">samples</span> <span class="pre">read:</span>
+<span class="pre">21202944</span></code>), we know that there are <code class="docutils literal"><span class="pre">21202944</span></code> samples in the input
+file, so that’s how big we want our output buffer to be.</p>
+<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
+  (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
+        (saturationl (saturation_c))
+        (saturationr (saturation_c))
+        (filesize 21202944)  ;; number of samples in the input file
+        (out_buffer:double* (halloc filesize)) ;; allocate memory from the heap
+        (index 0))
+    (lambda (in time chan dat)
+      (let ((out_sample
+             (* 0.1 ;; to compensate for saturation boost
+                (cond ((= chan 0.0)
+                       (saturationl (audiofile) 1.0 0.9))
+                      ((= chan 1.0)
+                       (saturationr (audiofile) 1.0 0.9))
+                      (else (convert 0.0 SAMPLE))))))
+        ;; if it&#39;s not full, write the out_sample to the output buffer
+        (if (&lt; index filesize)
+            (pset! out_buffer index out_sample))
+        ;; notify us when it&#39;s done
+        (if (= index filesize)
+            (printf &quot;Audio buffer full.\n&quot;))
+        ;; increment our index
+        (set! index (+ index 1))
+        ;; (optional) return the out sample for playback
+        out_sample))))
+</pre></div>
+</div>
+<p>Once we get the “Audio buffer full” notification, it’s time to write the
+output buffer to a file. To do this, we use the <code class="docutils literal"><span class="pre">write_audio_file</span></code>
+function, which takes four arguments:</p>
+<ul class="simple">
+<li>the filename</li>
+<li>the number of frames (a frame is a full set of samples—one for each
+channel)</li>
+<li>the number of channels</li>
+<li>a pointer to the buffer of audio samples</li>
+</ul>
+<p>Let’s add a function <code class="docutils literal"><span class="pre">write_data</span></code> to write the audio file:</p>
+<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
+  (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
+        (saturationl (saturation_c))
+        (saturationr (saturation_c))
+        (filesize 21202944)  ;; number of samples in the input file
+        (out_buffer:double* (halloc filesize))
+        (index 0)
+        (write_file (lambda (buffer)
+                      (write_audio_data &quot;/Users/ben/Desktop/xtm-assets/peg-processed.wav&quot;
+                                        (/ filesize 2) ;; num frames
+                                        2              ;; num channels
+                                        buffer)))) ;; audio data
+    (lambda (in time chan dat)
+      (let ((out_sample
+             (* 0.1 ;; to compensate for saturation boost
+                (cond ((= chan 0.0)
+                       (saturationl (audiofile) 1.0 0.9))
+                      ((= chan 1.0)
+                       (saturationr (audiofile) 1.0 0.9))
+                      (else (convert 0.0 SAMPLE)))))
+        ;; if it&#39;s not full, write the out_sample to the output buffer
+        (if (&lt; index filesize)
+            (pset! out_buffer index out_sample))
+        ;; notify us when it&#39;s done
+        (if (= index filesize)
+            (begin (printf &quot;Audio buffer full.\n&quot;)
+                   (write_file out_buffer)))
+        ;; increment our index
+        (set! index (+ index 1))
+        ;; (optional) return the out sample for playback
+        out_sample))))
+</pre></div>
+</div>
+<p>After the recording has played through, the index will have counted up
+to <code class="docutils literal"><span class="pre">filesize</span></code>: the number of samples in the file, and the
+<code class="docutils literal"><span class="pre">write_file</span></code> closure will be called with the output data pointer. Sure
+enough, I hear the processed (saturated) output file when I listen to
+the <code class="docutils literal"><span class="pre">peg-processed.wav</span></code> file.</p>
+<p>There are lots of alternate ways to do this.</p>
+<ul class="simple">
+<li>the sound can be processed offline (rather than in real-time inside
+the <code class="docutils literal"><span class="pre">dsp</span></code> callback)</li>
+<li>you can use the similar <code class="docutils literal"><span class="pre">audiofile_ptr_c</span></code> to return pointers into
+the audio file buffer rather than the values themselves</li>
+<li>you can write your own functions to either simplify or make the
+process more flexible.</li>
+</ul>
+<p>You can see the low-level libsndfile functions involved if you look in
+<code class="docutils literal"><span class="pre">libs/external/sndfile.xtm</span></code>.</p>
+<p>But the primary workflow for writing audio files with Extempore is</p>
+<ol class="arabic simple">
+<li>write the audio samples to a buffer</li>
+<li>write that buffer to a file using <code class="docutils literal"><span class="pre">write_audio_data</span></code></li>
+</ol>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>The <code class="docutils literal"><span class="pre">libsndfile</span></code> library can be found at
+<code class="docutils literal"><span class="pre">libs/external/sndfile.xtm</span></code>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>If you’re interested, the file I’m using is ‘Peg’ from <a class="reference external" href="http://www.rollingstone.com/music/lists/500-greatest-albums-of-all-time-20120531/steely-dan-aja-20120524">Steely Dan’s
+Aja</a>. It’s a great album.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>We had to wrap the <code class="docutils literal"><span class="pre">0.0</span></code> value in a <code class="docutils literal"><span class="pre">convert</span></code> call to get the
+types right, as discussed in another <a class="reference external" href="2013-11-15-changing-from-doubles-to-floats-in-audio_dsp.org">post</a>.</td></tr>
+</tbody>
+</table>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Andrew Sorensen.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.6.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
