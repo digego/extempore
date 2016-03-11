@@ -45,7 +45,7 @@
 ;; ;; this reads 5000 frames starting 1000 frames into the file
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
 (bind-func set_sample_data_
-  (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* filename index:i64 offset lgth bank:i32 print_p:i1)
+  (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* filename index:i64 offset lgth bank:i32 print_p:i64)
     (let ((info:SF_INFO* (salloc))
           (audiofile (sf_open filename SFM_READ info))
           (channels:i64 (convert (tref info 2)))
@@ -57,7 +57,7 @@
                 (samples:|20,|128,SAMPLE*||* (inst.samples))
                 (samples_channels:|20,|128,i64||* (inst.samples_channels))
                 (samples_length:|20,|128,i64||* (inst.samples_length))
-                (samples_read (sf_read_file_into_buffer filename adat (* offset channels) num print_p))
+                (samples_read (sf_read_file_into_buffer filename adat (* offset channels) num (i64toi1 print_p)))
                 (olddat (if (<> 0 (aref (aref-ptr samples_length bank) index))
                             (bitcast (aref (aref-ptr samples bank) index) i8*)
                             null)))
