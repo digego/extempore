@@ -116,20 +116,18 @@
   (lambda (arr:i64* size:i64)
     (vsum arr size)))
 
-($ (letz ((size 100000000)
-          (data:i64* (alloc size))
+($ (letz ((s:i64 100000000)
+          (data:i64* (alloc s))
           (i 0)
-          (filthy_inline_init (begin (dotimes (i size) (pset! data i i)) 1))
+          (filthy_inline_init (begin (dotimes (i s) (pset! data i i)) 1))
           (t1 (clock_clock))
-          (l1 (map_test2 data size))
+          (l1 (map_test2 data s))
           (t2 (clock_clock))
-          (l2 (pmap_test2 data size 4))
+          (l2 (pmap_test2 data s 4))
           (t3 (clock_clock)))
      (println)
      (println "serial   sum:" l1 "->" (- t2 t1) "seconds")
      (println "parallel sum:" l2 "->" (- t3 t2) "seconds")
      void))
-
-
 
 
