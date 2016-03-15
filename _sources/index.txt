@@ -42,6 +42,7 @@ this is an attempt to do things right, using Sphinx_.
    time
    c-xtlang-interop
    scheme-xtlang-interop
+   concurrency
 
 .. _xtlang-docs:
 
