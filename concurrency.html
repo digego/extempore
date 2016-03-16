@@ -84,7 +84,6 @@
                 <p class="caption"><span class="caption-text">Getting started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="editor-support.html">Text editors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
 </ul>
@@ -174,22 +173,22 @@ up to date as soon as possible, but if you find anything
 in here which isn&#8217;t clear or doesn&#8217;t work, <a class="reference internal" href="about-this-documentation.html"><em>let us
 know</em></a></p>
 </div>
-<p>Every Extempore <cite>process</cite>&#8212;e.g. the &#8220;primary process&#8221; and &#8220;utility
-process&#8221;&#8212;is a <cite>Scheme process</cite>, which is actually an OS level thread
-running in the main Extempore OS process (i.e. the thing with the PID
-number). Each top level Scheme process runs its own scheme interpreter
-with its own managed memory, own garbage collector etc. Additionally,
-each Scheme process has its own network port. To evaluate a Scheme
-expression you send it to a given scheme process using this network
-port, i.e. over a TCP connection. Extempore provides a nice
-inter-process communication (IPC) layer to make communication between
-Scheme processes reasonably straightforward, regardless of whether
-they are running locally or remotely.</p>
-<p>To summarize, each <cite>Scheme process</cite> is an OS thread, but in reality
+<p>Every Extempore <em>process</em> (e.g. the &#8220;primary process&#8221; or &#8220;utility
+process&#8221;) is a <em>Scheme process</em>, which is actually an operating-system
+(OS) thread running in the main Extempore OS process (i.e. the
+thing with the PID number). Each top level Scheme process runs its own
+scheme interpreter with its own managed memory, own garbage collector
+etc. Additionally, each Scheme process has its own network port. To
+evaluate a Scheme expression you send it to a given scheme process
+using this network port, i.e. over a TCP connection. Extempore
+provides a nice inter-process communication (IPC) layer to make
+communication between Scheme processes reasonably straightforward,
+regardless of whether they are running locally or remotely.</p>
+<p>To summarize, each <em>Scheme process</em> is an OS thread, but in reality
 behaves more like an OS process because it has its own managed memory,
 scheme process control, etc..</p>
 <p>Here is a starting example of a Scheme function that mutates a Scheme
-global variable. The function includes a <cite>blocking</cite> sleep&#8212;it will
+global variable. The function includes a <em>blocking</em> sleep&#8212;it will
 <code class="docutils literal"><span class="pre">println</span></code> then sleep for one second, test conditional and repeat.</p>
 <div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">define</span> <span class="nv">global-val</span> <span class="mi">0</span><span class="p">)</span>
 
@@ -221,7 +220,7 @@ straightforward. Many of Extempore&#8217;s libraries are built around this
 type of cooperative concurrency (i.e. <code class="docutils literal"><span class="pre">sys:sleep</span></code> above, which makes this
 example possible).</p>
 <p>However, one downside to this approach is that it is only able to
-utilizes a single CPU core. So, Extempore also supports <cite>multiple</cite>
+utilizes a single CPU core. So, Extempore also supports <em>multiple</em>
 Scheme processes. There are always two started by default (primary and
 utility), but you can spawn as many as you like at runtime, although
 these are relatively heavy-weight so generally you are not likely to
@@ -235,8 +234,8 @@ want any more processes than your total number of CPU cores.</p>
 <span class="p">(</span><span class="nv">ipc:connect</span> <span class="s">&quot;192.168.1.1&quot;</span> <span class="s">&quot;myproc&quot;</span> <span class="mi">7099</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Either way, <code class="docutils literal"><span class="pre">&quot;myproc&quot;</span></code> is now a local name which defines a process
-running <cite>somewhere</cite>. IPC calls work regardless of whether the process
+<p>Either way, <em>myproc</em> is now a local name which defines a process
+running <em>somewhere</em>. IPC calls work regardless of whether the process
 is local or remote.</p>
 <p>You can explicitly call into <code class="docutils literal"><span class="pre">my-scm-func</span></code> in the primary process like
 so:</p>
@@ -247,25 +246,25 @@ so:</p>
 while <em>connected</em> to the primary process. Being explicit though, means
 that we can make this call into primary no matter what scheme
 process we are currently <em>connected</em> to.</p>
-<p>We can try to run <code class="docutils literal"><span class="pre">my-scm-func</span></code> in the <cite>myproc</cite> process as follows:</p>
+<p>We can try to run <code class="docutils literal"><span class="pre">my-scm-func</span></code> in the <em>myproc</em> process as follows:</p>
 <div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">ipc:call</span> <span class="s">&quot;myproc&quot;</span> <span class="ss">&#39;my-scm-func</span> <span class="ss">&#39;a</span> <span class="mi">5</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>but we will get an error, because <code class="docutils literal"><span class="pre">my-scm-func</span></code> (and <code class="docutils literal"><span class="pre">global-val</span></code>
-for that matter) do not exist in the memory space of myproc. We can
+for that matter) do not exist in the memory space of <em>myproc</em>. We can
 fix that using Extempore&#8217;s IPC infrastructure simply enough by
-defining both <code class="docutils literal"><span class="pre">global-val</span></code> and <code class="docutils literal"><span class="pre">my-scm-func</span></code> in myproc.</p>
+defining both <code class="docutils literal"><span class="pre">global-val</span></code> and <code class="docutils literal"><span class="pre">my-scm-func</span></code> in <em>myproc</em>.</p>
 <div class="highlight-extempore"><div class="highlight"><pre>(ipc:define &quot;myproc&quot; &#39;global-val global-val)
 (ipc:define &quot;myproc &#39;my-scm-func my-scm-func)
 </pre></div>
 </div>
-<p>now the <code class="docutils literal"><span class="pre">ipc:call</span></code> works as expected- i.e. executing <code class="docutils literal"><span class="pre">my-scm-func</span></code>
-in the myproc process.</p>
-<p>Note that we defined <code class="docutils literal"><span class="pre">global-val</span></code> in myproc to be whatever value
+<p>now the <code class="docutils literal"><span class="pre">ipc:call</span></code> works as expected&#8212;i.e. executing
+<code class="docutils literal"><span class="pre">my-scm-func</span></code> in the <em>myproc</em> process.</p>
+<p>Note that we defined <code class="docutils literal"><span class="pre">global-val</span></code> in <em>myproc</em> to be whatever value
 <code class="docutils literal"><span class="pre">global-val</span></code> was currently bound to in our <em>connected</em> process,
 which in this instance was <em>primary</em> but could be whatever process our
 text buffer was connected to. We could just as easily have defined a
-different value into myproc, e.g.</p>
+different value into <em>myproc</em>, e.g.</p>
 <div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">ipc:define</span> <span class="s">&quot;myproc&quot;</span> <span class="ss">&#39;global-val</span> <span class="mi">0</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -323,8 +322,8 @@ cooperative concurrency as before:</p>
 </pre></div>
 </div>
 <p>also using IPC, although we will need to re-define <code class="docutils literal"><span class="pre">my-scm-func</span></code> in
-myproc because we have changed its definition. Also note that we
-need to tell myproc about <code class="docutils literal"><span class="pre">times2</span></code> (note that <code class="docutils literal"><span class="pre">ipc:bind-func</span></code> has a
+<em>myproc</em> because we have changed its definition. Also note that we
+need to tell <em>myproc</em> about <code class="docutils literal"><span class="pre">times2</span></code> (note that <code class="docutils literal"><span class="pre">ipc:bind-func</span></code> has a
 slightly different signature from <code class="docutils literal"><span class="pre">ipc:define</span></code>):</p>
 <div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">ipc:bind-func</span> <span class="s">&quot;myproc&quot;</span> <span class="nv">times2</span><span class="p">)</span>
 <span class="p">(</span><span class="nv">ipc:define</span> <span class="s">&quot;myproc&quot;</span> <span class="ss">&#39;my-scm-func</span> <span class="nv">my-scm-func</span><span class="p">)</span>
@@ -343,7 +342,7 @@ understanding of both Extempore&#8217;s cooperative concurrency and
 Extempore&#8217;s Scheme process architecture. Now things will begin to
 diverge somewhat.</p>
 <p>Firstly, the <code class="docutils literal"><span class="pre">(ipc:bind-func</span> <span class="pre">&quot;myproc&quot;</span> <span class="pre">times2)</span></code> call from above is
-needed to define the &#8220;scheme times2 wrapper&#8221; in &#8220;myproc&#8221;&#8212;<strong>not</strong> the
+needed to define the &#8220;scheme times2 wrapper&#8221; in <em>myproc</em>&#8212;<strong>not</strong> the
 xtlang times2 function itself which is bound globally across the
 entire Extempore OS process and so is automatically available to all
 Scheme processes, and indeed potentially to <em>any</em> other OS thread
@@ -364,7 +363,7 @@ in every Scheme process).</p>
 <span class="p">(</span><span class="nf">println</span> <span class="p">(</span><span class="nv">ipc:call</span> <span class="s">&quot;myproc&quot;</span> <span class="ss">&#39;xtlang_inc</span> <span class="mi">1</span><span class="p">))</span>
 </pre></div>
 </div>
-<p>Note that <code class="docutils literal"><span class="pre">xtlang_inc</span></code> is shared between primary and myproc and
+<p>Note that <code class="docutils literal"><span class="pre">xtlang_inc</span></code> is shared between primary and <em>myproc</em> and
 therefore <code class="docutils literal"><span class="pre">y</span></code> is shared data, and is therefore subject to all of the
 potential pitfalls associated with shared mutable memory (as well as
 all of the potential performance optimizations etc.</p>
@@ -401,12 +400,12 @@ the following three principles:</p>
 <ol class="arabic simple">
 <li>Don&#8217;t access global xtlang variables in your xtlang functions.</li>
 <li>Don&#8217;t close over variables with top-level xtlang functions.</li>
-<li>Don&#8217;t allocate heap memory in xtlang functions (zone and stack
-memory is OK)</li>
+<li>Don&#8217;t allocate heap <a class="reference internal" href="memory.html"><em>memory</em></a> in xtlang functions
+(zone and stack memory is OK)</li>
 </ol>
 <p>If you stick to those three principles then your xtlang code should be
 Scheme process safe, although obviously you also need to be careful
-about what OTHER xtlang and native code that you call into.</p>
+about what <strong>other</strong> xtlang and native code that you call into.</p>
 <p>Having said that, xtlang is there to allow you to break the
 rules&#8212;with great power comes great responsibility, and all that
 rubbish. Indeed xtlang allows you to <em>completely</em> break the rules by
@@ -440,14 +439,14 @@ This call returns a sanitized C wrapper function around our xtlang
 closure <code class="docutils literal"><span class="pre">my_os_thread</span></code>. Like Scheme wrappers, C wrappers are also
 automatically generated for toplevel xtlang closures, and are required
 if you wish to call an xtlang closure from an external C
-library&#8212;xtlang knows how to call C natively but C cannot call an
-xtlang closure without an appropriate C wrapper. C wrappers have the
-same name as the xtlang closure with <code class="docutils literal"><span class="pre">_native</span></code> appended to the end.
-By passing a C wrapper around we can have the OS callback into native
-xtlang code and still enjoy full on-the-fly hot-swappability. In other
-words, once you have passed the C wrapper as a callback you can
-re-compile (change the behaviour) of the original xtlang closure
-on-the-fly, whenever you like!</p>
+library&#8212;<a class="reference internal" href="c-xtlang-interop.html"><em>xtlang knows how to call C natively</em></a> but C cannot call an xtlang closure without an
+appropriate C wrapper. C wrappers have the same name as the xtlang
+closure with <code class="docutils literal"><span class="pre">_native</span></code> appended to the end. By passing a C wrapper
+around we can have the OS callback into native xtlang code and still
+enjoy full on-the-fly hot-swappability. In other words, once you have
+passed the C wrapper as a callback you can re-compile (change the
+behaviour) of the original xtlang closure on-the-fly, whenever you
+like!</p>
 <p>The same principle applies to any other C library code that you may
 pass xtlang closure C wrappers to. These callbacks are then subject to
 whatever threading context that library code implements, although all
