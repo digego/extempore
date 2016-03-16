@@ -27,7 +27,7 @@ this is an attempt to do things right, using Sphinx_.
    :caption: Getting started
 
    quickstart
-   installation
+   install
    editor-support
    about-this-documentation
 
