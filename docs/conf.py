@@ -1,19 +1,8 @@
 # -*- coding: utf-8 -*-
 #
-# This is experimental, don't rely on it yet - it might be wrong, or
-# it might not even build!
-#
-# To make these docs, you'll need a few python packages, something like
-#
-# pip install sphinx sphinx-autobuild sphinx_rtd_theme
-#
-# You can build the documentation locally if you've got all the Sphinx
-# stuff on your box, just run
-
-#   sphinx-autobuild . _build
-
-# in the docs/ subdirectory.
-
+# To build these docs, see the instructions in
+# docs/about-this-documentation.rst
+ 
 import sys
 import os
 
@@ -37,7 +26,6 @@ templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-# source_suffix = ['.rst', '.md']
 source_suffix = '.rst'
 
 # The encoding of source files.
@@ -49,7 +37,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'Extempore'
 copyright = u'2016, Andrew Sorensen'
-author = u'Andrew Sorensen'
+author = u'Andrew Sorensen, Ben Swift'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -132,7 +120,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 #html_title = None
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-#html_short_title = None
+html_short_title = 'Extempore documentation'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -151,7 +139,7 @@ html_static_path = ['_static']
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
-#html_extra_path = []
+html_extra_path = ['.nojekyll']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -209,7 +197,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Extemporedoc'
+htmlhelp_basename = 'extempore-doc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
