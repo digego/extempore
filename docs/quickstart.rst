@@ -42,21 +42,20 @@ Editor setup
 ------------
 
 To write Extempore code you need a text editor, and there are
-:ref:`Extempore "plugins" for several text editors <editor-support>`
+:doc:`Extempore "plugins" for several text editors <editor-support>`
 ---Atom, Emacs, Sublime Text and Vim.
 
 If you don't have a favourite text editor, then `Atom`_ is probably a
 good choice---it's free, available on all platforms and doesn't have
 as steep a learning curve as some other editors. Head over to the
-`Extempore Atom setup`_ docs to find out to download and set it up for
-Extempore. `extempore-and-emacs`_
+:ref:`Extempore Atom setup <atom-editor-setup>` docs to find out to
+download and set it up for Extempore.
 
 If you *do* have a favourite text editor, and it's one of the ones
 mentioned above, then see the :doc:`editor support page <editor-support>` for instructions on
 how to get started hacking Extempore code in your editor of choice.
 
 .. _Atom: https://atom.io/
-.. _Extempore Atom setup: extempore-and-emacs_
 
 "Hello, World!"
 ---------------
