@@ -106,9 +106,10 @@ have to be changed. I know that's a pain---sorry!---but it was an
 inevitable consequence of making things cross-platform. The 'setting
 up the AU graph' section of your code will therefore need to be
 rewritten. You can either use the built-in synths and sampler, or you
-can `build your own instruments`_, or you could even use Extempore's
-MIDI in/out (see ``libs/external/portmidi.xtm``) to play an instrument
-running *outside* of Extempore.
+can :doc:`build your own instruments <making-an-instrument>`, or you
+could even use Extempore's MIDI in/out (see
+``libs/external/portmidi.xtm``) to play an instrument running
+*outside* of Extempore.
 
 The good news is that from ``play-note`` 'up', Extempore's audio
 infrastructure works pretty much exactly the same as Impromptu's. In
