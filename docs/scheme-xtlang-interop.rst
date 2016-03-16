@@ -58,7 +58,7 @@ new closure you must specify the type of the input arguments and the
 return argument. Because closures in xtlang are "first-class
 citizens", the newly created closures `itself` has a type (which is
 basically a closure type with certain input types and return type).
-Again, see :doc:`type-system` for a more detailed discussion.
+Again, see :doc:`types` for a more detailed discussion.
 
 More caveats
 ------------
