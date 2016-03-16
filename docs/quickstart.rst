@@ -60,7 +60,9 @@ how to get started hacking Extempore code in your editor of choice.
 "Hello, World!"
 ---------------
 
-Hello, World! is pretty straightforward in Extempore::
+Hello, World! is pretty straightforward in Extempore
+
+.. code-block:: extempore
 
   (printf "Hello, World!")
 
@@ -68,16 +70,23 @@ Hello, World! is pretty straightforward in Extempore::
 --------------
 
 Since Extempore has multimedia programming as a core part of its DNA,
-here's the "Hello, Sine!"::
+here's "Hello, Sine!"
 
-  Sine!  
+.. code-block:: extempore
+
+  (bind-func sine:DSP
+    (lambda (in time chan dat)
+      (* .1 (cos (* (convert time) .04)))))
+
+  ;; tell Extempore to use `sine` as the audio output sink
+  (dsp:set! sine)
 
 "Hello, Triangle!"
 ------------------
 
-Finally, here's "Hello, Triangle!"::
-
-  Triangle!
+"Hello, Triangle!" is a bit more complicated, since setting up the
+OpenGL state machine requires a bit of boilerplate. See
+``examples/external/shader-tutorials/triangle.xtm`` to get started.
 
 Beyond "Hello..."
 -----------------
