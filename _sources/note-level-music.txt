@@ -897,7 +897,7 @@ Extempore's default time standard---samples per second---to control
 rhythm and duration information. As musicians though, we are more used
 to working with beats and tempo. Here's a simple example working with
 samples. Note that throughout this tutorial I'm using a drum sampler,
-see :doc:`TODO` for details on how to set that up. At the end of this
+see :doc:`sampler` for details on how to set that up. At the end of this
 page you'll find a list of general MIDI drum numbers which I'll be
 using in this tutorial: ``*gm-cowbell*``, etc...
 
