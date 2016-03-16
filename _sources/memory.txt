@@ -6,6 +6,10 @@ Memory management in Extempore
 .. note:: This was once a blog post---corrections/improvements
           welcome.
 
+.. note:: It's not really possible to explain Extempore's memory
+          allocation story without a detour into :doc:`xtlang types
+          <types>`, so we'll cover some of that as well.
+
 The two languages hosted by the Extempore compiler, xtlang and Scheme,
 have different approaches to dealing with memory allocation and
 management. Both languages ultimately share the same memory---the stack
@@ -937,7 +941,7 @@ n)`` for any integer *n*.
 Pointers to higher-order types
 ------------------------------
 
-The :doc:`xtlang type system <type-system>` has both primitive types
+The :doc:`xtlang type system <types>` has both primitive types
 (floats and ints) and higher-order types like tuples, arrays and
 closures. Higher-order in this instance just means that they are made
 up of other types, although these component types may be themselves

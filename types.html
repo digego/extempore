@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>xtlang type reference &mdash; Extempore 0.6.1 documentation</title>
+  <title>xtlang types &mdash; Extempore 0.6.1 documentation</title>
   
 
   
@@ -31,8 +31,8 @@
 
   
     <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/>
-        <link rel="next" title="Generics" href="generics.html"/>
-        <link rel="prev" title="Concurrency" href="concurrency.html"/> 
+        <link rel="next" title="Type inferencing" href="type-inference.html"/>
+        <link rel="prev" title="Memory management in Extempore" href="memory.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -96,31 +96,29 @@
 <li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concurrency.html">Concurrency</a></li>
-</ul>
-<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="">xtlang type reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#primitive-types">Primitive types</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#integers">Integers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#floats">Floats</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#pointer-types">Pointer types</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#aggregate-types">Aggregate types</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#tuples">Tuples</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#arrays">Arrays</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#vectors">Vectors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#closure-type">Closure type</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#strings">Strings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#named-types">Named types</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#type-inferencing-in-the-xtlang-compiler">Type inferencing in the xtlang compiler</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scheme-and-xtlang-types">Scheme and xtlang types</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
 <li class="toctree-l1"><a class="reference internal" href="memory.html">Memory management in Extempore</a></li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">xtlang types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#primitive-types">Primitive types</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#integers">Integers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#floats">Floats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pointer-types">Pointer types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#c-strings">C Strings</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#aggregate-types">Aggregate types</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tuples">Tuples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#arrays">Arrays</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#vectors">Vectors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#closures">Closures</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#named-types">Named types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#generics">Generics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="type-inference.html">Type inferencing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="best-practices.html">Best practices</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
 <ul>
@@ -165,11 +163,11 @@
   <ul class="wy-breadcrumbs">
     <li><a href="index.html">Docs</a> &raquo;</li>
       
-    <li>xtlang type reference</li>
+    <li>xtlang types</li>
       <li class="wy-breadcrumbs-aside">
         
           
-            <a href="_sources/type-system.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/types.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -179,8 +177,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="xtlang-type-reference">
-<h1>xtlang type reference<a class="headerlink" href="#xtlang-type-reference" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="xtlang-types">
+<h1>xtlang types<a class="headerlink" href="#xtlang-types" title="Permalink to this headline">¶</a></h1>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">This was once a blog post&#8212;corrections/improvements
@@ -188,18 +186,17 @@ welcome.</p>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">It&#8217;s not really possible to explain detour into some <a class="reference internal" href="memory.html"><em>memory
-stuff</em></a> as well, so we&#8217;ll cover some of that as well. For
-more info on how xtlang fits into the big picture of
-Extempore, see <a class="reference internal" href="philosophy.html"><em>The Extempore philosophy</em></a>.</p>
+<p class="last">It&#8217;s not really possible to explain Extempore&#8217;s types
+without a detour into some <a class="reference internal" href="memory.html"><em>memory stuff</em></a>, so
+we&#8217;ll cover some of that as well. For more info on how
+xtlang fits into the big picture of Extempore, see
+<a class="reference internal" href="philosophy.html"><em>The Extempore philosophy</em></a>.</p>
 </div>
-<p>xtlang, the &#8216;systems language&#8217; component of Extempore, has a rich
-static type system.</p>
 <p>xtlang code is statically typed&#8212;the types are determined at compile
 time, and the compiler checks that the types of the arguments to a
-function match the type signature of that closure. If they don&#8217;t match,
-you get a compile error, and a (hopefully) helpful message about where
-things are going wrong and what needs to be fixed.</p>
+function match the type signature of that closure. If they don&#8217;t
+match, you get a compile error, and a (hopefully) helpful message
+about where things are going wrong and what needs to be fixed.</p>
 <p>The base types will be familiar to those who are used to working with C,
 although there are a couple of slight differences. Just like C, the
 types are all low level in the sense that they represent a particular
@@ -215,10 +212,11 @@ code.</p>
 clarity&#8212;some of these aren&#8217;t strictly necessary (<em>as I&#8217;ll show
 later</em>) because the type inferencing compiler will figure out the
 types of variables in many cases.</p>
+</div>
 <div class="section" id="primitive-types">
-<h2>Primitive types<a class="headerlink" href="#primitive-types" title="Permalink to this headline">¶</a></h2>
+<h1>Primitive types<a class="headerlink" href="#primitive-types" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="integers">
-<span id="int-type-doc"></span><h3>Integers<a class="headerlink" href="#integers" title="Permalink to this headline">¶</a></h3>
+<span id="int-type-doc"></span><h2>Integers<a class="headerlink" href="#integers" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/int-examples.png" src="_images/int-examples.png" />
 <p>Extempore supports signed integers of various different sizes:</p>
 <ul class="simple">
@@ -238,7 +236,7 @@ null-terminated char arrays/pointers with the signature <code class="docutils li
 </ul>
 </div>
 <div class="section" id="floats">
-<span id="float-type-doc"></span><h3>Floats<a class="headerlink" href="#floats" title="Permalink to this headline">¶</a></h3>
+<span id="float-type-doc"></span><h2>Floats<a class="headerlink" href="#floats" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/float-examples.png" src="_images/float-examples.png" />
 <p>There are two sizes of floating point number:</p>
 <ul class="simple">
@@ -250,7 +248,7 @@ null-terminated char arrays/pointers with the signature <code class="docutils li
 with <code class="docutils literal"><span class="pre">i64</span></code> int literals).</p>
 </div>
 <div class="section" id="pointer-types">
-<span id="pointer-type-doc"></span><h3>Pointer types<a class="headerlink" href="#pointer-types" title="Permalink to this headline">¶</a></h3>
+<span id="pointer-type-doc"></span><h2>Pointer types<a class="headerlink" href="#pointer-types" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/pointer-examples.png" src="_images/pointer-examples.png" />
 <p>xtlang supports <a class="reference external" href="http://en.wikipedia.org/wiki/Pointer_(computer_programming)">pointers</a> to any type, in fact some types (such as
 closures) are almost always handled by reference (that is, through
@@ -296,6 +294,14 @@ the memory address that <code class="docutils literal"><span class="pre">a</span
 <p>Pointers aren&#8217;t very interesting, though, if you can&#8217;t read and write to
 the values they point to. That&#8217;s where the xtlang functions <code class="docutils literal"><span class="pre">pref</span></code>,
 <code class="docutils literal"><span class="pre">pset!</span></code> and <code class="docutils literal"><span class="pre">pref-ptr</span></code> come in.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">the semantics of the <code class="docutils literal"><span class="pre">*ref</span></code> functions are in the
+process of being changed&#8212;see <a class="reference external" href="https://groups.google.com/forum/#!topic/extemporelang/HiYKEstuM_w">this thread</a> on the
+mailing list for more details. We&#8217;ll update these docs as
+soon as things settle down, but for now accept my humble
+apology that some of this stuff is out of date. Sorry!</p>
+</div>
 <p>Unlike in C, <code class="docutils literal"><span class="pre">*</span></code> is not a dereference <em>operator</em>, it&#8217;s just the syntax
 for the specifying pointer types. Instead, there&#8217;s a function <code class="docutils literal"><span class="pre">pref</span></code>
 for <em>dereferencing</em> a pointer (getting the value the pointer &#8216;points&#8217;
@@ -365,21 +371,42 @@ returns a <em>pointer</em> to that value. This also implies that
 <p>One final note for C programmers: there is no <code class="docutils literal"><span class="pre">void*</span></code> in xtlang, use
 an <code class="docutils literal"><span class="pre">i8*</span></code> instead.</p>
 </div>
+<div class="section" id="c-strings">
+<span id="string-type-doc"></span><h2>C Strings<a class="headerlink" href="#c-strings" title="Permalink to this headline">¶</a></h2>
+<p>There&#8217;s also no <code class="docutils literal"><span class="pre">char</span></code> type, just <code class="docutils literal"><span class="pre">i8</span></code>. So string literals in
+xtlang are pointers to null terminated arrays (just like in C) but
+instead have type <code class="docutils literal"><span class="pre">i8*</span></code>.</p>
+<p>The usual <code class="docutils literal"><span class="pre">pref</span></code> and friends for pointers (described above) are
+therefore your friends if you want to slice and dice strings around. A
+few familiar string functions have made their way over from the C
+standard library as well.</p>
+<p>String literals in xtlang are bound globally (allocated on the heap). So
+you can safely set and store pointers to them without worrying about
+then disappearing on you.</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">string_literals</span>
+  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
+    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">str</span> <span class="s">&quot;Vive le tour!&quot;</span><span class="p">))</span>
+      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;%s\n&quot;</span> <span class="nv">str</span><span class="p">))))</span>
+
+<span class="p">(</span><span class="nf">string</span><span class="nv">_literals</span><span class="p">)</span> <span class="c1">;; prints &quot;Vive le tour!&quot;</span>
+</pre></div>
+</div>
+<p>xtlang does have a nicer <code class="docutils literal"><span class="pre">String</span></code> type, defined in
+<code class="docutils literal"><span class="pre">libs/base/base.xtm</span></code> (TODO more docs coming soon!).</p>
+</div>
 </div>
 <div class="section" id="aggregate-types">
-<h2>Aggregate types<a class="headerlink" href="#aggregate-types" title="Permalink to this headline">¶</a></h2>
-<p>After that brief detour into xtlang&#8217;s direct memory access (which is
-kindof inevitable when you&#8217;re dealing with pointer types), let&#8217;s get
-into the aggregate types (types which contain other types). There are
-three base aggregate types in xtlang: tuples, arrays and vectors. In
-each case, these names mean pretty much the same thing they do in other
-languages.</p>
-<p>Normally the best way to work with these types is through pointers (that
-is, by reference). Allocating memory for a tuples, array or vector is
-done through a call to one of the alloc functions, as in the example
-above with pointers to primitive types.</p>
+<h1>Aggregate types<a class="headerlink" href="#aggregate-types" title="Permalink to this headline">¶</a></h1>
+<p>There are three base aggregate types in xtlang: tuples, arrays and
+vectors. In each case, these names mean pretty much the same thing
+they do in other languages.</p>
+<p>Normally the best way to work with these types is by reference (that
+is, through pointers). Allocating memory for a tuples, array or vector
+is done through a call to one of the <em>alloc</em> functions, as in the
+<a class="reference internal" href="#pointer-type-doc"><span>example above</span></a> with pointers to primitive
+types.</p>
 <div class="section" id="tuples">
-<span id="tuple-type-doc"></span><h3>Tuples<a class="headerlink" href="#tuples" title="Permalink to this headline">¶</a></h3>
+<span id="tuple-type-doc"></span><h2>Tuples<a class="headerlink" href="#tuples" title="Permalink to this headline">¶</a></h2>
 <p>An n-tuple is a fixed-length structure with n elements. <em>Different</em>
 tuples can have different lengths (different values of <em>n</em>), but a
 particular tuple always has the same fixed length.</p>
@@ -431,7 +458,7 @@ do get confused and try to <code class="docutils literal"><span class="pre">tset
 catch the error for you.</p>
 </div>
 <div class="section" id="arrays">
-<span id="array-type-doc"></span><h3>Arrays<a class="headerlink" href="#arrays" title="Permalink to this headline">¶</a></h3>
+<span id="array-type-doc"></span><h2>Arrays<a class="headerlink" href="#arrays" title="Permalink to this headline">¶</a></h2>
 <p>An array in xtlang is a fixed length array of elements of a single type
 (like a static C array). The array type signature specifies the length
 of the array, the type of the array elements, and is closed off with the
@@ -456,7 +483,7 @@ into an array (that is, not to the first element but to some element
 further into the array), use <code class="docutils literal"><span class="pre">aref-ptr</span></code>.</p>
 </div>
 <div class="section" id="vectors">
-<span id="vector-type-doc"></span><h3>Vectors<a class="headerlink" href="#vectors" title="Permalink to this headline">¶</a></h3>
+<span id="vector-type-doc"></span><h2>Vectors<a class="headerlink" href="#vectors" title="Permalink to this headline">¶</a></h2>
 <p>The final aggregate data type in xtlang is the vector type. Vectors are
 like arrays in that they are fixed length homogeneous type buffers, but
 operations vector types will use the CPUs SIMD registers and
@@ -482,8 +509,8 @@ code you&#8217;re working on is the performance bottleneck in your system,
 it&#8217;s probably best to start out with arrays, and to change to vectors
 later on if it becomes necessary.</p>
 </div>
-<div class="section" id="closure-type">
-<span id="closure-type-doc"></span><h3>Closure type<a class="headerlink" href="#closure-type" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="closures">
+<span id="closure-type-doc"></span><h2>Closures<a class="headerlink" href="#closures" title="Permalink to this headline">¶</a></h2>
 <p>The final important type in xtlang is the <a class="reference external" href="http://en.wikipedia.org/wiki/Closure_(computer_science)">closure</a> type, and
 understanding closures is crucial to understanding how xtlang works as a
 whole.</p>
@@ -582,30 +609,8 @@ enough you&#8217;ll reach enlightenment. Or something.</p>
 post.</p>
 </div>
 </div>
-<div class="section" id="strings">
-<span id="string-type-doc"></span><h2>Strings<a class="headerlink" href="#strings" title="Permalink to this headline">¶</a></h2>
-<p>One other gotcha for C programmers is that there&#8217;s no <code class="docutils literal"><span class="pre">char</span></code> type, or
-at least it&#8217;s not called <code class="docutils literal"><span class="pre">char</span></code>, it&#8217;s called <code class="docutils literal"><span class="pre">i8</span></code>. So strings in
-xtlang are pointers to null terminated int arrays just like in C but
-instead have type <code class="docutils literal"><span class="pre">i8*</span></code>. String literals in xtlang have this type.</p>
-<p>The usual <code class="docutils literal"><span class="pre">pref</span></code> and friends for pointers (described above) are
-therefore your friends if you want to slice and dice strings around. A
-few familiar string functions have made their way over from the C
-standard library as well.</p>
-<p>String literals in xtlang are bound globally (allocated on the heap). So
-you can safely set and store pointers to them without worrying about
-then disappearing on you.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">string_literals</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
-    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">str</span> <span class="s">&quot;Vive le tour!&quot;</span><span class="p">))</span>
-      <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;%s\n&quot;</span> <span class="nv">str</span><span class="p">))))</span>
-
-<span class="p">(</span><span class="nf">string</span><span class="nv">_literals</span><span class="p">)</span> <span class="c1">;; prints &quot;Vive le tour!&quot;</span>
-</pre></div>
-</div>
-</div>
 <div class="section" id="named-types">
-<span id="named-type-doc"></span><h2>Named types<a class="headerlink" href="#named-types" title="Permalink to this headline">¶</a></h2>
+<span id="named-type-doc"></span><h1>Named types<a class="headerlink" href="#named-types" title="Permalink to this headline">¶</a></h1>
 <p>To round it off, you can also define your own types. This is convenient:
 it&#8217;s easier to type <code class="docutils literal"><span class="pre">my_type</span></code> than
 <code class="docutils literal"><span class="pre">[double*,&lt;i64,i32&gt;,float,float]</span></code>, especially if it&#8217;s a type that
@@ -691,102 +696,21 @@ code as <code class="docutils literal"><span class="pre">bind-type</span></code>
 which would otherwise have been caught by the compiler. So you should
 almost always use <code class="docutils literal"><span class="pre">bind-type</span></code> over <code class="docutils literal"><span class="pre">bind-alias</span></code>.</p>
 </div>
-<div class="section" id="type-inferencing-in-the-xtlang-compiler">
-<h2>Type inferencing in the xtlang compiler<a class="headerlink" href="#type-inferencing-in-the-xtlang-compiler" title="Permalink to this headline">¶</a></h2>
-<p>When looking at the code, one of the first things you&#8217;ll notice as a key
-difference between xtlang and Scheme is the addition of type annotations
-for variables. Type annotations can be attached to the declaration of
-any variable using a colon, e.g.</p>
-<ul class="simple">
-<li><code class="docutils literal"><span class="pre">int_var:i64</span></code> (64-bit integer)</li>
-<li><code class="docutils literal"><span class="pre">double_ptr:double*</span></code> (pointer to a double precision float)</li>
-<li><code class="docutils literal"><span class="pre">closure_ptr:[i64,i32,i32]*</span></code> (pointer to a closure with two
-arguments)</li>
-</ul>
-<p>Now, most of the examples in this file have been fairly explicit about
-the types of the variables. Look at the code for <code class="docutils literal"><span class="pre">xt_add</span></code> above&#8212;in the
-argument list <code class="docutils literal"><span class="pre">(a:i64</span> <span class="pre">b:i64)</span></code> both arguments are identified as
-<code class="docutils literal"><span class="pre">i64</span></code>. What happens, though, if we take out just one of these type
-annotations?</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">xt_add2</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span> <span class="nv">b</span><span class="p">)</span>
-    <span class="p">(</span><span class="nf">+</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)))</span>
-
-<span class="c1">;; log shows &quot;Compiled xt_add2 &gt;&gt;&gt; [i64,i64,i64]*&quot;</span>
-
-<span class="p">(</span><span class="nv">xt_add2</span> <span class="mi">2</span> <span class="mi">4</span><span class="p">)</span> <span class="c1">;; returns 6</span>
-</pre></div>
-</div>
-<p>Even though we didn&#8217;t specify the type of <code class="docutils literal"><span class="pre">b</span></code>, everything still
-compiled fine and the closure returns the correct result. What&#8217;s the go
-with that? Well, it&#8217;s because the xtlang compiler in Extempore is a
-<a class="reference external" href="http://en.wikipedia.org/wiki/Type_inference">type inferencing</a> compiler. The addition function <code class="docutils literal"><span class="pre">+</span></code> in the body of
-<code class="docutils literal"><span class="pre">xt_add2</span></code> can only add values of the <em>same</em> type. Since the compiler
-knows the type of <code class="docutils literal"><span class="pre">a</span></code>, things will only work out if <code class="docutils literal"><span class="pre">b</span></code> is also an
-<code class="docutils literal"><span class="pre">i64</span></code>. And since this guess doesn&#8217;t conflict with any other
-information it has about <code class="docutils literal"><span class="pre">b</span></code> (because there isn&#8217;t any), then the
-compiler can infer that the only acceptable type signature for the
-closure pointer is <code class="docutils literal"><span class="pre">[i64,i64,i64]*</span></code>.</p>
-<p>How about if we try removing <code class="docutils literal"><span class="pre">a</span></code>&#8216;s type annotation as well?</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">xt_add3</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span> <span class="nv">b</span><span class="p">)</span>
-    <span class="p">(</span><span class="nf">+</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)))</span>
-</pre></div>
-</div>
-<p>This time, the compiler prints the message:</p>
-<div class="code highlight-python"><div class="highlight"><pre>Compiler Error: could not resolve (&quot;a&quot; &quot;b&quot; &quot;xt_add3&quot;) you could try
-forcing the type of one or more of these symbols
-</pre></div>
-</div>
-<p>There just isn&#8217;t enough info to unambiguously determine the types of
-<code class="docutils literal"><span class="pre">a</span></code> and <code class="docutils literal"><span class="pre">b</span></code>. They could be both <code class="docutils literal"><span class="pre">i32</span></code>, or both <code class="docutils literal"><span class="pre">floats</span></code>&#8212;the
-compiler can&#8217;t tell. And rather than guess, it throws a compile error.</p>
-<p>It&#8217;s also worth mentioning that we could have specified the closure&#8217;s
-type directly with the definition of the <code class="docutils literal"><span class="pre">xt_add3</span></code> symbol</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">xt_add4</span><span class="kt">:[i64,i64,i64]*</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span> <span class="nv">b</span><span class="p">)</span>
-    <span class="p">(</span><span class="nf">+</span> <span class="nv">a</span> <span class="nv">b</span><span class="p">)))</span>
-
-<span class="p">(</span><span class="nv">xt_add4</span> <span class="mi">2</span> <span class="mi">9</span><span class="p">)</span> <span class="c1">;; returns 11</span>
-</pre></div>
-</div>
-</div>
-<div class="section" id="scheme-and-xtlang-types">
-<h2>Scheme and xtlang types<a class="headerlink" href="#scheme-and-xtlang-types" title="Permalink to this headline">¶</a></h2>
-<p>Extempore can run both Scheme and xtlang code, but Scheme doesn&#8217;t know
-anything about xtlang&#8217;s types&#8212;things like tuples, arrays, vectors,
-closures, and user-defined types through <code class="docutils literal"><span class="pre">bind-type</span></code>. Scheme only
-knows about <a class="reference external" href="https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48">Scheme types</a> like symbols, integers, reals,
-strings, c pointers, etc.</p>
-<p>There is some (approximate) overlap in these type systems, for ints,
-floats, strings and c pointers, although even in these cases there are
-some caveats, e.g. Scheme only supports <em>double precision</em> floats, while
-Extempore can work with both <code class="docutils literal"><span class="pre">floats</span></code> and <code class="docutils literal"><span class="pre">doubles</span></code> natively.
-Similarly, xtlang&#8217;s pointers are typed, but Scheme only supports void
-(opaque) c pointers. Where possible, Extempore will do the work to allow
-xtlang code from Scheme (coercing argument types), but for any composite
-types (e.g. list) you can&#8217;t call xtlang code from Scheme.</p>
-<p>Here&#8217;s an example to make things a bit clearer:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="c1">;; tuple-maker returns a pointer to a tuple and tuple-taker takes</span>
-<span class="c1">;; a pointer to a tuple as an argument.</span>
-
-<span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple-maker</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">()</span>
-    <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">a</span><span class="kt">:&lt;i64,double&gt;*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">)))</span>
-          <span class="p">(</span><span class="nf">tset!</span> <span class="nv">a</span> <span class="mi">0</span> <span class="mi">42</span><span class="p">)</span>
-          <span class="nv">a</span><span class="p">)))</span>
-
-<span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple-taker</span>
-  <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:&lt;i64,double&gt;*</span><span class="p">)</span>
-    <span class="p">(</span><span class="nf">tuple-ref</span> <span class="nv">a</span> <span class="mi">0</span><span class="p">)))</span>
-
-<span class="p">(</span><span class="nv">tuple-maker</span><span class="p">)</span>               <span class="c1">;; Returns a CPTR (to a tuple, but scheme doesn&#39;t know that)</span>
-<span class="p">(</span><span class="nv">tref</span> <span class="p">(</span><span class="nv">tuple-maker</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>      <span class="c1">;; error, scheme doesn&#39;t know about xtlang types</span>
-<span class="p">(</span><span class="nv">tuple-taker</span> <span class="p">(</span><span class="nv">tuple-maker</span><span class="p">))</span> <span class="c1">;; returns 42. scheme can pass *pointers* to tuples around</span>
-                            <span class="c1">;; as void pointers, but you lose the type checking</span>
-</pre></div>
-</div>
-<p>Have a look at <code class="docutils literal"><span class="pre">examples/core/extempore_lang.xtm</span></code> for more examples.</p>
+<div class="section" id="generics">
+<h1>Generics<a class="headerlink" href="#generics" title="Permalink to this headline">¶</a></h1>
+<p>With <a class="reference external" href="https://en.wikipedia.org/wiki/Generic_programming">generics</a>, xtlang provides a way to specify types and closures
+without concrete types. This allows you to write re-usable code and
+algorithms for various different types and functions, and allows the
+compiler to figure out the specific &#8220;concrete&#8221; types later. This is
+all still compiled code, and it&#8217;s all still very efficient (no
+boxing/unboxing going on). It&#8217;s just nice to not have to write a
+separate <code class="docutils literal"><span class="pre">sort</span></code> function for lists of <code class="docutils literal"><span class="pre">i32</span></code> and <code class="docutils literal"><span class="pre">i64</span></code> for
+example.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This section is coming soon, but for now have a look in
+<code class="docutils literal"><span class="pre">libs/core/adt.xtm</span></code> for Extempore&#8217;s <a class="reference external" href="https://en.wikipedia.org/wiki/Abstract_data_type">abstract data type</a>
+(ADT) functionality.</p>
 </div>
 </div>
 
@@ -797,10 +721,10 @@ types (e.g. list) you can&#8217;t call xtlang code from Scheme.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="generics.html" class="btn btn-neutral float-right" title="Generics" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="type-inference.html" class="btn btn-neutral float-right" title="Type inferencing" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="concurrency.html" class="btn btn-neutral" title="Concurrency" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="memory.html" class="btn btn-neutral" title="Memory management in Extempore" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

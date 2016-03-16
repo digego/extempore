@@ -161,7 +161,7 @@ code!
 
 We can write some more code to ``bind-val`` a global variable
 ``myPI``, which is an xtlang global variable of :doc:`type
-<type-system>` ``double``. If you evaluate this with ``Alt+S`` or ``C-M-x`` (or
+<types>` ``double``. If you evaluate this with ``Alt+S`` or ``C-M-x`` (or
 whatever the command is in your editor) then what happens is
 
 .. image:: /images/interacting-with-compiler/xtlang-eval-1.png

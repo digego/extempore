@@ -31,8 +31,8 @@
 
   
     <link rel="top" title="Extempore 0.6.1 documentation" href="index.html"/>
-        <link rel="next" title="Audio signal processing" href="audio-signal-processing.html"/>
-        <link rel="prev" title="Generics" href="generics.html"/> 
+        <link rel="next" title="xtlang types" href="types.html"/>
+        <link rel="prev" title="Concurrency" href="concurrency.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -89,18 +89,13 @@
 <li class="toctree-l1"><a class="reference internal" href="about-this-documentation.html">About this documentation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Key concepts</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
 <li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
 <li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concurrency.html">Concurrency</a></li>
-</ul>
-<p class="caption"><span class="caption-text">xtlang&#8212;the Extempore language</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="type-system.html">xtlang type reference</a></li>
-<li class="toctree-l1"><a class="reference internal" href="generics.html">Generics</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="">Memory management in Extempore</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#automatic-garbage-collection-in-scheme">Automatic garbage collection in Scheme</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#manual-memory-management-in-xtlang">Manual memory management in xtlang</a></li>
@@ -116,6 +111,16 @@
 <li class="toctree-l2"><a class="reference internal" href="#other-benefits-of-using-pointers">Other benefits of using pointers</a></li>
 </ul>
 </li>
+</ul>
+<p class="caption"><span class="caption-text">xtlang</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="types.html">xtlang types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html#primitive-types">Primitive types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html#aggregate-types">Aggregate types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html#named-types">Named types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html#generics">Generics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="type-inference.html">Type inferencing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="best-practices.html">Best practices</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials &amp; Guides</span></p>
 <ul>
@@ -180,6 +185,11 @@
 <p class="first admonition-title">Note</p>
 <p class="last">This was once a blog post&#8212;corrections/improvements
 welcome.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">It&#8217;s not really possible to explain Extempore&#8217;s memory
+allocation story without a detour into <a class="reference internal" href="types.html"><em>xtlang types</em></a>, so we&#8217;ll cover some of that as well.</p>
 </div>
 <p>The two languages hosted by the Extempore compiler, xtlang and Scheme,
 have different approaches to dealing with memory allocation and
@@ -321,7 +331,7 @@ a zone.</p>
 <h2>Stack allocation with salloc<a class="headerlink" href="#stack-allocation-with-salloc" title="Permalink to this headline">¶</a></h2>
 <p>As I mentioned above, the stack is associated with function calls,
 their arguments and local variables. Because xtlang uses (in general)
-<a class="reference internal" href="type-system.html#closure-type-doc"><span>closures</span></a> rather than just plain functions,
+<a class="reference internal" href="types.html#closure-type-doc"><span>closures</span></a> rather than just plain functions,
 stack allocation and <code class="docutils literal"><span class="pre">salloc</span></code> in xtlang is used in the body of a
 closure. Remember that closures are just functions with their
 enclosing scope: think of a function which has packaged up any
@@ -345,7 +355,7 @@ xtlang. String literals are bound globally (more on this shortly), but
 that&#8217;s the exception to the rule&#8212;everything else which is bound in a
 <code class="docutils literal"><span class="pre">let</span></code> inside an xtlang <code class="docutils literal"><span class="pre">lambda</span></code> will be stack allocated, unless you
 explicitly request otherwise with <code class="docutils literal"><span class="pre">halloc</span></code> or <code class="docutils literal"><span class="pre">zalloc</span></code>.</p>
-<p><a class="reference internal" href="type-system.html#string-type-doc"><span>String</span></a> literals are the exception to the &#8220;all
+<p><a class="reference internal" href="types.html#string-type-doc"><span>String</span></a> literals are the exception to the &#8220;all
 literals are on the stack&#8221; rule. String literals are actually stored
 as <code class="docutils literal"><span class="pre">i8*</span></code> on the heap (as though they were <em>halloced</em>). If you
 capture a pointer to one of these strings (e.g. with <code class="docutils literal"><span class="pre">pref-ptr</span></code>),
@@ -980,7 +990,7 @@ value). So, in the example above, <code class="docutils literal"><span class="pr
 </div>
 <div class="section" id="pointers-to-higher-order-types">
 <h2>Pointers to higher-order types<a class="headerlink" href="#pointers-to-higher-order-types" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference internal" href="type-system.html"><em>xtlang type system</em></a> has both primitive types
+<p>The <a class="reference internal" href="types.html"><em>xtlang type system</em></a> has both primitive types
 (floats and ints) and higher-order types like tuples, arrays and
 closures. Higher-order in this instance just means that they are made
 up of other types, although these component types may be themselves
@@ -1120,10 +1130,10 @@ which is something you can&#8217;t to with xtlang&#8217;s array types.</li>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="audio-signal-processing.html" class="btn btn-neutral float-right" title="Audio signal processing" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="types.html" class="btn btn-neutral float-right" title="xtlang types" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="generics.html" class="btn btn-neutral" title="Generics" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="concurrency.html" class="btn btn-neutral" title="Concurrency" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

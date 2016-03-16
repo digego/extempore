@@ -20,7 +20,7 @@ language (xtlang) simultaneously, with tight integration and
 transparency between the two. A running Extempore process will compile
 both valid scheme and xtlang forms. Scheme objects (lists, closures,
 continuations, etc.) coexist with the :doc:`xtlang's types
-<type-system>` and :ref:`pointers <pointer-doc>` to :doc:`allocated
+<types>` and :ref:`pointers <pointer-doc>` to :doc:`allocated
 memory <memory>`, and with a few 'helper functions' data can even flow
 through both languages fluidly.
    
@@ -132,7 +132,7 @@ are all inferred by the compiler from the type of ``a``: the function
 ``i64``. In more complex functions there may be a greater need to
 specify the types of the variables, but often just a few type
 annonations can unambiguously determine everything in scope. The
-:doc:`xtlang type reference <type-system>` has more info on how
+:doc:`xtlang type reference <types>` has more info on how
 type inferencing works in the xtlang compiler.
 
 .. code-block:: extempore
