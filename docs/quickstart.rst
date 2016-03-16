@@ -7,12 +7,10 @@ from zero to running Extempore code.
 Installation
 ------------
 
-.. note:: There are much more detailed instructions in `INSTALL.md`_,
+.. note:: There are much more detailed instructions in :doc:`install`,
           so if you have any problems (or simply want to know what's
           going on) with the steps below then that's a good place to
           look.
-
-.. _INSTALL.md: https://github.com/digego/extempore/blob/master/INSTALL.md
           
 On **OSX** (with `homebrew`_) you can get the dependencies, build and
 install Extempore and the full standard library with::

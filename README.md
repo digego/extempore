@@ -35,7 +35,7 @@ To see Extempore in action, check out these videos:
 
 # Installation
 
-*These are the quick-start options---see* [INSTALL.md](./INSTALL.md)
+*These are the quick-start options---see* [install.rst](./docs/install.rst)
 *for details in how to build from source.*
 
 ## OSX
@@ -54,12 +54,12 @@ instructions, there are more detailed instructions
 
 ## Linux
 
-On Linux, you can you can [build from source](./INSTALL.md)
+On Linux, you can you can [build from source](./docs/install.rst)
 
 ## Windows 7
 
 Windows installation instructions are provided in
-[INSTALL.md](./INSTALL.md) as well.
+[install.rst](./docs/install.rst) as well.
 
 <!-- TODO link to binary -->
 
