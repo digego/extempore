@@ -1,23 +1,20 @@
-xtlang type reference
-=====================
+xtlang types
+============
 
 .. note:: This was once a blog post---corrections/improvements
           welcome.
 
-.. note:: It's not really possible to explain detour into some :doc:`memory
-          stuff <memory>` as well, so we'll cover some of that as well. For
-          more info on how xtlang fits into the big picture of
-          Extempore, see :doc:`philosophy`.
-
-
-xtlang, the 'systems language' component of Extempore, has a rich
-static type system.
+.. note:: It's not really possible to explain Extempore's types
+          without a detour into some :doc:`memory stuff <memory>`, so
+          we'll cover some of that as well. For more info on how
+          xtlang fits into the big picture of Extempore, see
+          :doc:`philosophy`.
 
 xtlang code is statically typed---the types are determined at compile
 time, and the compiler checks that the types of the arguments to a
-function match the type signature of that closure. If they don't match,
-you get a compile error, and a (hopefully) helpful message about where
-things are going wrong and what needs to be fixed.
+function match the type signature of that closure. If they don't
+match, you get a compile error, and a (hopefully) helpful message
+about where things are going wrong and what needs to be fixed.
 
 The base types will be familiar to those who are used to working with C,
 although there are a couple of slight differences. Just like C, the
@@ -38,12 +35,12 @@ later*) because the type inferencing compiler will figure out the
 types of variables in many cases.
 
 Primitive types
----------------
+===============
 
 .. _int-type-doc:
 
 Integers
-^^^^^^^^
+--------
 
 .. image:: /images/int-examples.png
 
@@ -66,7 +63,7 @@ A couple of gotchas:
 .. _float-type-doc:
 
 Floats
-^^^^^^
+------
 
 .. image:: /images/float-examples.png
 
@@ -82,7 +79,7 @@ with ``i64`` int literals).
 .. _pointer-type-doc:
 
 Pointer types
-^^^^^^^^^^^^^
+-------------
 
 .. image:: /images/pointer-examples.png
 
@@ -138,6 +135,14 @@ the memory address that ``a`` points to.
 Pointers aren't very interesting, though, if you can't read and write to
 the values they point to. That's where the xtlang functions ``pref``,
 ``pset!`` and ``pref-ptr`` come in.
+
+.. warning:: the semantics of the ``*ref`` functions are in the
+             process of being changed---see `this thread`_ on the
+             mailing list for more details. We'll update these docs as
+             soon as things settle down, but for now accept my humble
+             apology that some of this stuff is out of date. Sorry!
+
+.. _this thread: https://groups.google.com/forum/#!topic/extemporelang/HiYKEstuM_w
 
 Unlike in C, ``*`` is not a dereference *operator*, it's just the syntax
 for the specifying pointer types. Instead, there's a function ``pref``
@@ -219,25 +224,53 @@ n))`` is the same as ``(pref (pref-ptr a 0) n)`` for any integer *n*.
 One final note for C programmers: there is no ``void*`` in xtlang, use
 an ``i8*`` instead.
 
+.. _string-type-doc:
+
+C Strings
+---------
+
+There's also no ``char`` type, just ``i8``. So string literals in
+xtlang are pointers to null terminated arrays (just like in C) but
+instead have type ``i8*``.
+
+The usual ``pref`` and friends for pointers (described above) are
+therefore your friends if you want to slice and dice strings around. A
+few familiar string functions have made their way over from the C
+standard library as well.
+
+String literals in xtlang are bound globally (allocated on the heap). So
+you can safely set and store pointers to them without worrying about
+then disappearing on you.
+
+.. code-block:: extempore
+
+      (bind-func string_literals
+        (lambda ()
+          (let ((str "Vive le tour!"))
+            (printf "%s\n" str))))
+
+      (string_literals) ;; prints "Vive le tour!"
+
+xtlang does have a nicer ``String`` type, defined in
+``libs/base/base.xtm`` (TODO more docs coming soon!).
+
 Aggregate types
----------------
+===============
 
-After that brief detour into xtlang's direct memory access (which is
-kindof inevitable when you're dealing with pointer types), let's get
-into the aggregate types (types which contain other types). There are
-three base aggregate types in xtlang: tuples, arrays and vectors. In
-each case, these names mean pretty much the same thing they do in other
-languages.
+There are three base aggregate types in xtlang: tuples, arrays and
+vectors. In each case, these names mean pretty much the same thing
+they do in other languages.
 
-Normally the best way to work with these types is through pointers (that
-is, by reference). Allocating memory for a tuples, array or vector is
-done through a call to one of the alloc functions, as in the example
-above with pointers to primitive types.
+Normally the best way to work with these types is by reference (that
+is, through pointers). Allocating memory for a tuples, array or vector
+is done through a call to one of the *alloc* functions, as in the
+:ref:`example above <pointer-type-doc>` with pointers to primitive
+types.
 
 .. _tuple-type-doc:
 
 Tuples
-^^^^^^
+------
 
 An n-tuple is a fixed-length structure with n elements. *Different*
 tuples can have different lengths (different values of *n*), but a
@@ -301,7 +334,7 @@ catch the error for you.
 .. _array-type-doc:
 
 Arrays
-^^^^^^
+------
 
 An array in xtlang is a fixed length array of elements of a single type
 (like a static C array). The array type signature specifies the length
@@ -332,7 +365,7 @@ further into the array), use ``aref-ptr``.
 .. _vector-type-doc:
 
 Vectors
-^^^^^^^
+-------
 
 The final aggregate data type in xtlang is the vector type. Vectors are
 like arrays in that they are fixed length homogeneous type buffers, but
@@ -364,8 +397,8 @@ later on if it becomes necessary.
 
 .. _closure-type-doc:
 
-Closure type
-^^^^^^^^^^^^
+Closures
+--------
 
 The final important type in xtlang is the `closure`_ type, and
 understanding closures is crucial to understanding how xtlang works as a
@@ -483,38 +516,10 @@ enough you'll reach enlightenment. Or something.
 There's lots more to say about closures, but I'll leave that for another
 post.
 
-.. _string-type-doc:
-
-Strings
--------
-
-One other gotcha for C programmers is that there's no ``char`` type, or
-at least it's not called ``char``, it's called ``i8``. So strings in
-xtlang are pointers to null terminated int arrays just like in C but
-instead have type ``i8*``. String literals in xtlang have this type.
-
-The usual ``pref`` and friends for pointers (described above) are
-therefore your friends if you want to slice and dice strings around. A
-few familiar string functions have made their way over from the C
-standard library as well.
-
-String literals in xtlang are bound globally (allocated on the heap). So
-you can safely set and store pointers to them without worrying about
-then disappearing on you.
-
-.. code-block:: extempore
-
-      (bind-func string_literals
-        (lambda ()
-          (let ((str "Vive le tour!"))
-            (printf "%s\n" str))))
-
-      (string_literals) ;; prints "Vive le tour!"
-
 .. _named-type-doc:
 
 Named types
------------
+===========
 
 To round it off, you can also define your own types. This is convenient:
 it's easier to type ``my_type`` than
@@ -616,118 +621,21 @@ code as ``bind-type`` does, which can lead to execution-time problems
 which would otherwise have been caught by the compiler. So you should
 almost always use ``bind-type`` over ``bind-alias``.
 
-Type inferencing in the xtlang compiler
----------------------------------------
+Generics
+========
 
-When looking at the code, one of the first things you'll notice as a key
-difference between xtlang and Scheme is the addition of type annotations
-for variables. Type annotations can be attached to the declaration of
-any variable using a colon, e.g.
+With `generics`_, xtlang provides a way to specify types and closures
+without concrete types. This allows you to write re-usable code and
+algorithms for various different types and functions, and allows the
+compiler to figure out the specific "concrete" types later. This is
+all still compiled code, and it's all still very efficient (no
+boxing/unboxing going on). It's just nice to not have to write a
+separate ``sort`` function for lists of ``i32`` and ``i64`` for
+example.
 
--  ``int_var:i64`` (64-bit integer)
--  ``double_ptr:double*`` (pointer to a double precision float)
--  ``closure_ptr:[i64,i32,i32]*`` (pointer to a closure with two
-   arguments)
+.. note:: This section is coming soon, but for now have a look in
+          ``libs/core/adt.xtm`` for Extempore's `abstract data type`_
+          (ADT) functionality.
 
-Now, most of the examples in this file have been fairly explicit about
-the types of the variables. Look at the code for ``xt_add`` above---in the
-argument list ``(a:i64 b:i64)`` both arguments are identified as
-``i64``. What happens, though, if we take out just one of these type
-annotations?
-
-.. code-block:: extempore
-
-      (bind-func xt_add2
-        (lambda (a:i64 b)
-          (+ a b)))
-
-      ;; log shows "Compiled xt_add2 >>> [i64,i64,i64]*"
-
-      (xt_add2 2 4) ;; returns 6
-
-Even though we didn't specify the type of ``b``, everything still
-compiled fine and the closure returns the correct result. What's the go
-with that? Well, it's because the xtlang compiler in Extempore is a
-`type inferencing`_ compiler. The addition function ``+`` in the body of
-``xt_add2`` can only add values of the *same* type. Since the compiler
-knows the type of ``a``, things will only work out if ``b`` is also an
-``i64``. And since this guess doesn't conflict with any other
-information it has about ``b`` (because there isn't any), then the
-compiler can infer that the only acceptable type signature for the
-closure pointer is ``[i64,i64,i64]*``.
-
-.. _type inferencing: http://en.wikipedia.org/wiki/Type_inference
-
-How about if we try removing ``a``\ 's type annotation as well?
-
-.. code-block:: extempore
-
-      (bind-func xt_add3
-        (lambda (a b)
-          (+ a b)))
-
-This time, the compiler prints the message:
-
-.. code::
-
-    Compiler Error: could not resolve ("a" "b" "xt_add3") you could try
-    forcing the type of one or more of these symbols
-
-There just isn't enough info to unambiguously determine the types of
-``a`` and ``b``. They could be both ``i32``, or both ``floats``---the
-compiler can't tell. And rather than guess, it throws a compile error.
-
-It's also worth mentioning that we could have specified the closure's
-type directly with the definition of the ``xt_add3`` symbol
-
-.. code-block:: extempore
-
-      (bind-func xt_add4:[i64,i64,i64]*
-        (lambda (a b)
-          (+ a b)))
-
-      (xt_add4 2 9) ;; returns 11
-
-Scheme and xtlang types
------------------------
-
-Extempore can run both Scheme and xtlang code, but Scheme doesn't know
-anything about xtlang's types---things like tuples, arrays, vectors,
-closures, and user-defined types through ``bind-type``. Scheme only
-knows about `Scheme types`_ like symbols, integers, reals,
-strings, c pointers, etc.
-
-.. _Scheme types: https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48
-
-There is some (approximate) overlap in these type systems, for ints,
-floats, strings and c pointers, although even in these cases there are
-some caveats, e.g. Scheme only supports *double precision* floats, while
-Extempore can work with both ``floats`` and ``doubles`` natively.
-Similarly, xtlang's pointers are typed, but Scheme only supports void
-(opaque) c pointers. Where possible, Extempore will do the work to allow
-xtlang code from Scheme (coercing argument types), but for any composite
-types (e.g. list) you can't call xtlang code from Scheme.
-
-Here's an example to make things a bit clearer:
-
-.. code-block:: extempore
-
-    ;; tuple-maker returns a pointer to a tuple and tuple-taker takes
-    ;; a pointer to a tuple as an argument.
-
-    (bind-func tuple-maker
-      (lambda ()
-        (let ((a:<i64,double>* (alloc)))
-              (tset! a 0 42)
-              a)))
-
-    (bind-func tuple-taker
-      (lambda (a:<i64,double>*)
-        (tuple-ref a 0)))
-
-    (tuple-maker)               ;; Returns a CPTR (to a tuple, but scheme doesn't know that)
-    (tref (tuple-maker) 0)      ;; error, scheme doesn't know about xtlang types
-    (tuple-taker (tuple-maker)) ;; returns 42. scheme can pass *pointers* to tuples around
-                                ;; as void pointers, but you lose the type checking
-
-Have a look at ``examples/core/extempore_lang.xtm`` for more examples.
+.. _Generics: https://en.wikipedia.org/wiki/Generic_programming
+.. _abstract data type: https://en.wikipedia.org/wiki/Abstract_data_type
