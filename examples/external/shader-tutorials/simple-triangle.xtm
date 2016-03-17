@@ -16,16 +16,11 @@
 
 ;;; Code:
 
-
 (sys:load "libs/external/glfw3.xtm")
 
-(bind-val width i32 800)
-(bind-val height i32 600)
-
 (bind-val window GLFWwindow*
-  (begin
-    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    (glfw_init_and_create_interaction_window width height)))
+  (glfw_init_and_create_interaction_window 800 600))
+($ (glfwShowWindow window))
 
 (sys:load "libs/external/gl.xtm")
 
@@ -39,13 +34,13 @@
 
 ;; init data
 (call-as-xtlang
- (afill! triangle_vert_data
+ (let ((vbo_ptr:i32* (salloc))
+       (vao_ptr:i32* (salloc)))
+   (afill! triangle_vert_data
          ;; pos
          0.0  0.5
          0.5 -0.5
          -0.5 -0.5)
- (let ((vbo_ptr:i32* (salloc))
-       (vao_ptr:i32* (salloc)))
    ;; VBO
    (glGenBuffers 1 vbo_ptr)
    (set! vbo (pref vbo_ptr 0))
@@ -103,11 +98,7 @@ void main () {
     (glDrawArrays GL_TRIANGLES 0 3)
     (glfwPollEvents)
     (glfwSwapBuffers window)
-    (if (= (glfwWindowShouldClose window) 1)
-        (begin (glfwDestroyWindow window)
-               (println "Window closed, stopping draw loop.")
-               #t)
-        (let ((next_time (+ time (convert (* 44100. delta_t)))))
-          (callback next_time gl_draw_loop next_time delta_t)))))
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time gl_draw_loop next_time delta_t))))
 
 (gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
