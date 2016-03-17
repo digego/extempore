@@ -26,12 +26,14 @@ using the ``define`` keyword and a Scheme ``lambda`` expression:
 An xtlang function (for example named ``xtlang_bar``) is created by using
 the ``bind-func`` keyword and an xtlang ``lambda`` expression:
 
-(bind-func xtlang_bar:[type_of_return_value,type_of_argument1,type_of_argument2]*
-  (lambda (argument1:type_of_argument1 argument2:type_of_argument2)
-    ;; do some manipulations of the arguments
-    ...
-    ;; the last calculated expression is the 'return' value for the function xtlang_bar
-    (some_expression)))
+.. code-block:: extempore
+
+  (bind-func xtlang_bar:[type_of_return_value,type_of_argument1,type_of_argument2]*
+    (lambda (argument1:type_of_argument1 argument2:type_of_argument2)
+      ;; do some manipulations of the arguments
+      ...
+      ;; the last calculated expression is the 'return' value for the function xtlang_bar
+      (some_expression)))
 
 So there are already a few potentially confusing things.
 
