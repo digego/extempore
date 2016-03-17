@@ -63,8 +63,9 @@ again, if you want the "extended" libs (e.g. graphics)::
 Build from source (Linux/OSX)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you've got ``git``, ``cmake`` and a C++ compiler toolchain installed,
-then you can build Extempore with::
+If you've got ``git``, ``cmake`` (and :ref:`ALSA
+<linux-alsa-instructions>` on Linux) and a C++ compiler toolchain
+installed, then you can build Extempore with::
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
 
@@ -122,6 +123,8 @@ get a more up-to-date version through a package archive::
 
     sudo apt-get install software-properties-common && sudo add-apt-repository ppa:george-edison55/cmake-3.x && sudo apt-get update && sudo apt-get install cmake
 
+.. _linux-alsa-instructions:
+    
 **ALSA** (Linux only)
 
 To use the `ALSA`_ portaudio backend (which is probably what you want,
