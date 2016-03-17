@@ -767,6 +767,51 @@
       (Str str))))
 
 
+;; fonts
+
+(bind-func nvg_load_opensans_fonts
+  "Load OpenSans .ttf fonts in opensans_dir
+
+If you don't have OpenSans on your system, you can download it for free from http://www.fontsquirrel.com/fonts/open-sans"
+  (lambda (vg opensans_dir:i8*)
+    (let ((path:i8* (zalloc 256))
+          (create_font (lambda (name:i8*)
+                         (sprintf path "%s/OpenSans-%s.ttf" opensans_dir name)
+                         (nvgCreateFont vg name path))))
+      (cond ((< (create_font "Bold") 0)
+             (println "couldn't load font OpenSans-Bold.ttf")
+             0:i1)
+            ((< (create_font "BoldItalic") 0)
+             (println "couldn't load font OpenSans-BoldItalic.ttf")
+             0:i1)
+            ((< (create_font "ExtraBold") 0)
+             (println "couldn't load font OpenSans-ExtraBold.ttf")
+             0:i1)
+            ((< (create_font "ExtraBoldItalic") 0)
+             (println "couldn't load font OpenSans-ExtraBoldItalic.ttf")
+             0:i1)
+            ((< (create_font "Italic") 0)
+             (println "couldn't load font OpenSans-Italic.ttf")
+             0:i1)
+            ((< (create_font "Light") 0)
+             (println "couldn't load font OpenSans-Light.ttf")
+             0:i1)
+            ((< (create_font "LightItalic") 0)
+             (println "couldn't load font OpenSans-LightItalic.ttf")
+             0:i1)
+            ((< (create_font "Regular") 0)
+             (println "couldn't load font OpenSans-Regular.ttf")
+             0:i1)
+            ((< (create_font "Semibold") 0)
+             (println "couldn't load font OpenSans-Semibold.ttf")
+             0:i1)
+            ((< (create_font "SemiboldItalic") 0)
+             (println "couldn't load font OpenSans-SemiboldItalic.ttf")
+             0:i1)
+            (else
+             (println "OpenSans fonts successfully loaded")
+             1:i1)))))
+
 ;; run the init code
 (impc:aot:do-and-emit
  (if (not (impc:aot:currently-compiling?))

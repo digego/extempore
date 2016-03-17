@@ -650,51 +650,6 @@ If parent_widget is null, new_widget becomes the new GUI root node.
 ;; GUI appearance ;;
 ;;;;;;;;;;;;;;;;;;;;
 
-;; fonts
-
-(bind-func gui_load_opensans_fonts
-  "Load OpenSans .ttf fonts in opensans_dir
-
-If you don't have OpenSans on your system, you can download it for free from http://www.fontsquirrel.com/fonts/open-sans"
-  (lambda (opensans_dir:i8*)
-    (let ((path:i8* (zalloc 256))
-          (create_font (lambda (name:i8*)
-                         (sprintf path "%s/OpenSans-%s.ttf" opensans_dir name)
-                         (nvgCreateFont (GUI_context EXTEMPORE_GUI) name path))))
-      (cond ((< (create_font "Bold") 0)
-             (println "couldn't load font OpenSans-Bold.ttf")
-             0:i1)
-            ((< (create_font "BoldItalic") 0)
-             (println "couldn't load font OpenSans-BoldItalic.ttf")
-             0:i1)
-            ((< (create_font "ExtraBold") 0)
-             (println "couldn't load font OpenSans-ExtraBold.ttf")
-             0:i1)
-            ((< (create_font "ExtraBoldItalic") 0)
-             (println "couldn't load font OpenSans-ExtraBoldItalic.ttf")
-             0:i1)
-            ((< (create_font "Italic") 0)
-             (println "couldn't load font OpenSans-Italic.ttf")
-             0:i1)
-            ((< (create_font "Light") 0)
-             (println "couldn't load font OpenSans-Light.ttf")
-             0:i1)
-            ((< (create_font "LightItalic") 0)
-             (println "couldn't load font OpenSans-LightItalic.ttf")
-             0:i1)
-            ((< (create_font "Regular") 0)
-             (println "couldn't load font OpenSans-Regular.ttf")
-             0:i1)
-            ((< (create_font "Semibold") 0)
-             (println "couldn't load font OpenSans-Semibold.ttf")
-             0:i1)
-            ((< (create_font "SemiboldItalic") 0)
-             (println "couldn't load font OpenSans-SemiboldItalic.ttf")
-             0:i1)
-            (else
-             (println "OpenSans fonts successfully loaded")
-             1:i1)))))
-
 ;; Color themes
 
 ;; Primary colors
@@ -783,10 +738,10 @@ several different editors."
     ;; colors
     (gui_set_monokai_color_theme)
     ;; fonts
-    (if (gui_load_opensans_fonts font_path)
-        (let ((vg (GUI_context EXTEMPORE_GUI)))
-          (nvgFontFace vg "Bold")
-          (println "Set GUI theme: Monokai-OpenSans")))
+    (let ((vg (GUI_context EXTEMPORE_GUI)))
+      (if (nvg_load_opensans_fonts vg font_path)
+          (nvgFontFace vg "Bold"))
+      (println "Set GUI theme: Monokai-OpenSans"))
     void))
 
 (bind-func gui_set_default_theme
