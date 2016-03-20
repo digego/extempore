@@ -1996,7 +1996,6 @@
 
       (let ((zone (impc:ir:gname "zone")))
         (impc:ir:gname "ret" (car zone) (cadr zone)))
-      ;; (impc:ir:gname "body" (car e) (cadr e))
       (impc:ir:strip-space os))))
 
 (define impc:ir:compile:push_zone
@@ -2005,12 +2004,10 @@
            (zone-str (impc:ir:compiler (cadr ast) types))
            (zone (impc:ir:gname)))
       (emit zone-str os)
-      (emit "call void @llvm_push_zone_stack(%mzone* " (car (impc:ir:gname)) ")\n" os)
-      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+      (emit "call void @llvm_push_zone_stack(%mzone* " (car zone) ")\n" os)
+      (emit (impc:ir:gname "zone_ptr" "i8*") " = bitcast %mzone* " (car zone) " to i8*\n" os)
       (emit "store i8* " (car (impc:ir:gname "zone_ptr")) ", i8** %_impzPtr\n" os)
-      (let ((zone (impc:ir:gname "zone")))
-        (impc:ir:gname "ret" (car zone) (cadr zone)))
-      ;; (impc:ir:gname "body" (car e) (cadr e))
+      (impc:ir:gname "voidmark" (impc:ir:get-type-str *impc:ir:void*))
       (impc:ir:strip-space os))))
 
 (define impc:ir:compile:create_zone
@@ -2022,7 +2019,7 @@
       (if (<> (impc:ir:get-type-from-str (cadr size)) *impc:ir:si64*)
           (impc:compiler:print-needs-zone-size-error 'create_zone))
       (emit size-str os) ;; write size str
-      (emit (impc:ir:gname "zone" "%mzone*")
+      (emit (impc:ir:gname "ret" "%mzone*")
             " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
       (impc:ir:strip-space os))))
 

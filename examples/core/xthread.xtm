@@ -10,14 +10,14 @@
   (lambda (cnt:i32)
     (spawn (lambda ()
              (printf "cnt:%d thread:%p\n" cnt (thread_self))
-             (thread_sleep 1 0) ;; first arg seconds second nanoseconds 
+             (thread_sleep 1 0) ;; sleep for a second
              (if (> cnt 0)
                  (begin (divide-and-conquer (- cnt 1))
                         (divide-and-conquer (- cnt 1))))
              void))
     void))
 
-(divide-and-conquer 3)
+($ (divide-and-conquer 3))
 
 ;; forka and join
 (bind-func fork-join
@@ -25,10 +25,10 @@
     (letz ((i 0))
       (printout "Finish Order: ")
       (sync
-       (dotimes (i 4)
+       (dotimes (i 10)
          (spawn (let ((jj i)) ;; each closure needs it's own i!
                   (lambda ()
-                    (thread_sleep (dtoi64 (* 10. (random))) 0)
+                    (thread_sleep (dtoi64 (* 5. (random))) 0)
                     (printout jj)))))
        1)
       (println)

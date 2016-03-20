@@ -10,6 +10,15 @@
       (f2)
       (cast null i8*))))
 
+(bind-func thread_native_call_with_zone
+  (lambda (arg:i8*)
+    (let ((t:<[void]*,mzone*>* (cast arg))
+          (f (tref t 0))
+          (z (tref t 1)))
+      (f)
+      (llvm_zone_destroy z)
+      (cast null i8*))))
+
 ;; async returns a 'future'
 ;;
 ;; see examples/core/xthread.xtm for usage
@@ -55,14 +64,21 @@
           r2)))))
 
 
-;;
+;; 
 (bind-macro
   "spawn a new thread"
   (spawn f)
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
-    `(let ((,(string->symbol s) ,f))
-       (thread_fork (get_native_fptr thread_native_call) (cast ,(string->symbol sym) i8*)))))
+    `(let ((z1 (Zone 2048)))
+       (push_zone z1)
+       (let ((,(string->symbol s) ,f)
+             (k2:i8* (zalloc 10))
+             (t:<[void]*,mzone*>* (zalloc)))
+         (tset! t 0 ,(string->symbol sym))
+         (tset! t 1 z1)
+         (pop_zone)
+         (thread_fork (get_native_fptr thread_native_call_with_zone) (cast t i8*))))))
 
 (bind-macro
   "spawn a new thread (sync)"
