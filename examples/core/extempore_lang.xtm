@@ -1022,22 +1022,22 @@
 
 ;; start 5 new processes
 ;; ipc:bind-func work in each
-;; (define procs
-;;   (map (lambda (n p)
-;; 	 (ipc:new n p)
-;; 	 (ipc:bind-func n 'work)
-;; 	 n)
-;;        (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
-;;        (list 7097 7096 7095 7094 7093)))
+(define procs
+  (map (lambda (n p)
+         (ipc:new n p)
+         (ipc:bind-func n 'work)
+         n)
+       (list "proc-a" "proc-b" "proc-c" "proc-d" "proc-e")
+       (list 7097 7096 7095 7094 7093)))
 
 ;; ;; call work using ipc:mapcall
 ;; ;;
 ;; ;; ipc:mapcall calls a given function on 'n'
 ;; ;; number of processes and then blocks waiting
 ;; ;; until it receives 'n' results.
-;; (println 'result:
-;; 	 (ipc:mapcall 'work procs
-;; 		      '(1) '(2) '(3) '(4) '(5)))
+(println 'result:
+	 (ipc:map procs 'work
+		      '(1 2 3 4 5)))
 
 
 
