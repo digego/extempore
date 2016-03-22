@@ -15,7 +15,13 @@
 
 (sys:load "libs/core/adt.xtm")
 
-(bind-dylib giac "libgiac.0.dylib")
+(bind-dylib giac
+  (cond ((string=? (sys:platform) "OSX")
+         "libgiac.0.dylib")
+        ((string=? (sys:platform) "Linux")
+         "libgiac.so.0")
+        ((string=? (sys:platform) "Windows")
+         "libgiac.dll")))
 
 (bind-lib giac caseval [i8*,i8*]*)
 
