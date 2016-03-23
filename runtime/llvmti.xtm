@@ -2762,7 +2762,8 @@
                                                      ((string=? platform "OSX") ".dylib")
                                                      ((string=? platform "Windows") ".dll"))))
              (link-libs (if (string=? platform "Windows")
-                            *impc:aot:win-link-libraries*
+                            (cl:remove-if (lambda (x) (regex:match? x "opengl32"))
+                                          (map sanitize-platform-path *impc:aot:win-link-libraries*))
                             '()))
              (optimize-compiles? #t)
              (llc-command
