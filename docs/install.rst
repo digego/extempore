@@ -240,6 +240,12 @@ additional ``-DEXTENDED_DEPS=ON`` option, and the build process will
 build them all (this will take a while) and put them in the
 ``extempore/libs/platform-shlibs`` directory.
 
+.. note:: Currently, on Windows the ``EXTENDED_DEPS`` option builds
+          the glfw3 library file with the wrong name (``glfw3dll.lib``
+          instead of just ``glfw3.lib``). We'll fix this in the
+          future, but for now you might have to manually rename the
+          lib file in ``libs/platform-shlibs`` on Windows).
+
 AOT-compiling the Extempore standard library
 --------------------------------------------
 
