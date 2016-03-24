@@ -329,9 +329,17 @@ OSX
 Windows
 ^^^^^^^
 
-::
+On Windows it takes a few more steps, since you have to run the
+``aot_extended`` script from the top-level Extempore directory.
 
-    cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. && cmake --build . --config Release --target aot_extended && cmake --build . --config Release --target package
+.. code::
+
+  # build extempore
+  cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/path/to/extempore/boost .. && cmake --build . --config Release --target extempore
+  # aot-compile extended stdlib
+  cmake -P extras/cmake/aot_extended.cmake
+  # package it all up
+  cmake --build . --config Release --target package
 
 Linux
 ^^^^^
