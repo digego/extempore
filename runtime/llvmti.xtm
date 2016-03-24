@@ -10435,10 +10435,15 @@ e.g.
      (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
      (llvm:erase-function ,(string-append (symbol->string symname) "_callback"))
      (llvm:erase-function ,(string-append (symbol->string symname) "_native"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
      (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var_zone"))
      (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))
          (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
+
+(define-macro (unbind-lib-func symname)
+  `(begin
+     ;; (llvm:erase-function ,(symbol->string symname))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_setter"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))))
 
 (define-macro (bind-lib-type library name type docstring)
   (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
