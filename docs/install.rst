@@ -142,11 +142,27 @@ installed, and then to set the ``JACK`` cmake option with ``-DJACK=ON``
 
 .. _Jack: http://www.jackaudio.org/
 
+**ASIO** (Windows only)
+
+If you want to use the ASIO audio backend on Windows (which might give
+you lower-latency audio, but is not essential) you need to download
+the `ASIO SDK`_ from Steinberg. You have to create a `third party
+developer account`_, then you can log in and download the ASIO SDK
+(make sure you get the right SDK). You also need to download and
+install `ASIO4ALL`_ with the 'offline setup panel' option enabled.
+After that, copy the ASIO files into the
+``src/portaudio/src/hostapi/asio``, and use the ``-DASIO=ON`` CMake
+option.
+
+.. _third party developer account: http://www.steinberg.net/nc/en/company/developer/sdk_download_portal/create_3rd_party_developer_account.html
+.. _ASIO SDK: http://www.steinberg.net/nc/en/company/developer/sdk_download_portal.html
+.. _ASIO4ALL: http://www.asio4all.com/
+
 **Boost** (Windows only)
 
-We still need one component of the **Boost** libs on Windows
-(specifically the ASIO component for TCP/UDP handling). If you've got
-the NuGet command line client installed, you can probably do::
+We still need one component of the **Boost** libs on Windows (for
+TCP/UDP handling). If you've got the NuGet command line client
+installed, you can probably do::
 
     nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_regex-vc140 & nuget install boost_date_time-vc140
 
