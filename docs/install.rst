@@ -351,8 +351,8 @@ On Windows it takes a few more steps, since you have to run the
 .. code::
 
   # build extempore
-  cmake -G"Visual Studio 14 2015 Win64" -DPACKAGE=ON -DBOOST_DIR=c:/path/to/extempore/boost .. && cmake --build . --config Release --target extempore
-  # aot-compile extended stdlib
+  cmake -G"Visual Studio 14 2015 Win64" -DASIO=ON -DPACKAGE=ON -DBOOST_DIR=c:/path/to/extempore/boost .. && cmake --build . --config Release --target extempore
+  # aot-compile extended stdlib (call this from the extempore directory)
   cmake -P extras/cmake/aot_extended.cmake
   # package it all up
   cmake --build . --config Release --target package
