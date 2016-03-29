@@ -36,9 +36,10 @@ or, if you want the "extended" libs (e.g. graphics)::
 
     brew install extempore --with-extended
 
-The ``homebrew/versions`` tap is needed for ``glfw3`` (required to build
-the extended stdlib) while the ``benswift/extempore`` tap is contains
-Extempore itself (and a few other deps)
+The ``homebrew/versions`` tap is needed for ``glfw3`` (part of the
+:ref:`extended dependencies <install-extended-doc>`) while the
+``benswift/extempore`` tap contains Extempore itself (and a few other
+deps)
 
 **Caveats**
 
@@ -59,6 +60,8 @@ version of Extempore with::
 again, if you want the "extended" libs (e.g. graphics)::
 
     brew install extempore059 --with-extended
+
+.. _build-from-source-doc:
 
 Build from source (Linux/OSX)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -223,17 +226,30 @@ provide *extended* functionality (e.g. for sound file IO, FFTs,
 graphics) which we use a lot, but which aren't compiled statically
 into the ``extempore`` executable. Instead, we load this code at
 runtime through shared libraries (``.dylib`` on OSX, ``.so`` on Linux
-and ``.dll`` on Windows).
+and ``.dll`` on Windows). This means that you have to have these
+shared libraries on your system somewhere where Extempore can find
+them.
 
-This means that you have to have these shared libraries on your system
-somewhere where Extempore can find them.
+If you :ref:`build Extempore from source using CMake
+<build-from-source-doc>` (or install through homebrew with the
+``--with-extended`` flag) you'll automatically get these
+dependencies---job done.
 
-On **OSX** you can get them through homebrew (assuming you've done a
-``brew tap benswift/extempore``)::
+.. note:: Currently, on Windows the ``EXTENDED_DEPS`` option builds
+          the glfw3 library file with the wrong name (``glfw3dll.lib``
+          instead of just ``glfw3.lib``). We'll fix this in the
+          future, but for now you might have to manually rename the
+          lib file in ``libs/platform-shlibs`` on Windows).
+
+If you want to get them yourself (e.g. through your system's package
+manager) you need to specify an additional ``-DEXTENDED_DEPS=OFF``
+during the :ref:`cmake configure step <install-configure-doc>` option.
+Then, on **OSX** you can get them through homebrew (assuming you've
+done a ``brew tap benswift/extempore``)::
 
     brew install assimp libsndfile portmidi libkiss-fft glfw3 libstb-image libnanovg
 
-On **Debian/Ubuntu** you can use ``apt-get``::
+or on **Debian/Ubuntu** you can use ``apt-get``::
 
     sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 libportmidi-dev
 
@@ -245,22 +261,6 @@ On **Windows**, there isn't a package manager which will do the job so
 you'll need to build from source. Since Windows doesn't have a lib path,
 all the dlls should go in ``c:/path/to/extempore/libs/platform-shlibs``.
 So for all these deps, move the dll in there when it's done.
-
-Build extended dependencies from source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you want to build these extended dependencies from source,
-Extempore can do that automatically as part of the build process. In
-the :ref:`cmake configure step <install-configure-doc>` specify an
-additional ``-DEXTENDED_DEPS=ON`` option, and the build process will
-build them all (this will take a while) and put them in the
-``extempore/libs/platform-shlibs`` directory.
-
-.. note:: Currently, on Windows the ``EXTENDED_DEPS`` option builds
-          the glfw3 library file with the wrong name (``glfw3dll.lib``
-          instead of just ``glfw3.lib``). We'll fix this in the
-          future, but for now you might have to manually rename the
-          lib file in ``libs/platform-shlibs`` on Windows).
 
 AOT-compiling the Extempore standard library
 --------------------------------------------
