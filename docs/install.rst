@@ -253,9 +253,12 @@ or on **Debian/Ubuntu** you can use ``apt-get``::
 
     sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 libportmidi-dev
 
-You'll have to build KissFFT, stb\_image and nanovg yourself, using the
-instructions below, but ``make install`` step means that you won't have
-to move anything into ``libs/platform-shlibs``.
+although you'll have to build `KissFFT`_, `stb\_image`_ and `nanovg`_
+yourself.
+
+.. _KissFFT: https://github.com/extemporelang/kiss_fft
+.. _stb\_image: https://github.com/extemporelang/stb
+.. _nanovg: https://github.com/extemporelang/nanovg
 
 On **Windows**, there isn't a package manager which will do the job so
 you'll need to build from source. Since Windows doesn't have a lib path,
