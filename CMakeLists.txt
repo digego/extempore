@@ -7,7 +7,7 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
 option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
-option(EXTENDED_DEPS "download & build deps for aot_extended" OFF)
+option(EXTENDED_DEPS "download & build deps for aot_extended" ON)
 
 if(PACKAGE)
   # this needs to be set before project() is called
@@ -225,75 +225,62 @@ endif()
 ##############
 
 # if you need to build LLVM by hand, the command will be something like
-# cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0rc2-release
-
-if(PACKAGE)
-  # when packaging, we'll build LLVM a bit differently (see the "deps
-  # for AOT-extended" section further down in this file)
-  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
-  set(DOWNLOAD_LLVM OFF)
-elseif(DEFINED ENV{EXT_LLVM_DIR})
-# if there's an environment variable, use that
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-  set(DOWNLOAD_LLVM OFF)
-else()
-  if(WIN32)
-    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
-  else()
-    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
-  endif()
-endif()
+# cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
 # assume that if we can find llvm-config, we already have a working LLVM install
 find_program(LLVM_CONFIG llvm-config
   ${EXT_LLVM_DIR}/bin
   NO_DEFAULT_PATH)
 
-if(LLVM_CONFIG)
+# logic for deciding whether to download & build LLVM
+if(EXTENDED_DEPS)
+  set(DOWNLOAD_LLVM ON)
+  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  if(WIN32)
+    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
+  else()
+    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
+  endif()
+  if(PACKAGE)
+    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
+    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
+    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
+  endif()
+elseif(LLVM_CONFIG)
+  set(DOWNLOAD_LLVM OFF)
+elseif(DEFINED ENV{EXT_LLVM_DIR})
+  # if there's an environment variable, use that
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
   set(DOWNLOAD_LLVM OFF)
 endif()
 
-# if we're gonna download and build LLVM, do it here
-
 if(DOWNLOAD_LLVM)
   message(STATUS "Downloading and building LLVM (patched for Extempore)")
-
   include(ExternalProject)
+  find_program(PATCH_PROGRAM patch)
 
-  if(WIN32)
-    if(DEFINED PYTHON_EXECUTABLE)
-      message(STATUS "building LLVM using using python at ${PYTHON_EXECUTABLE}")
-      ExternalProject_Add(LLVM
-        PREFIX llvm
-        URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
-        URL_MD5 a2fb39e154f62c1731d32f0c789d8f99
-        CMAKE_ARGS
-        -DLLVM_TARGETS_TO_BUILD=X86
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DLLVM_ENABLE_TERMINFO=OFF
-        -DLLVM_ENABLE_ZLIB=OFF
-        -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR}
-        -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE})
-    else()
-      ExternalProject_Add(LLVM
-        PREFIX llvm
-        URL http://extempore.moso.com.au/extras/extempore-llvm-3.7.0.src.zip
-        URL_MD5 a2fb39e154f62c1731d32f0c789d8f99
-        CMAKE_ARGS
-        CMAKE_ARGS
-        -DLLVM_TARGETS_TO_BUILD=X86
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DLLVM_ENABLE_TERMINFO=OFF
-        -DLLVM_ENABLE_ZLIB=OFF
-        -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
-    endif()
+  if(NOT PATCH_PROGRAM)
+    message(FATAL_ERROR "Cannot find \"patch\", which is required to patch LLVM")
+  endif()
+
+  if(PACKAGE)
+    ExternalProject_Add(LLVM
+      PREFIX llvm
+      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
+      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      CMAKE_ARGS
+      -DCMAKE_OSX_SYSROOT=macosx
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+      -DLLVM_TARGETS_TO_BUILD=X86
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DLLVM_ENABLE_TERMINFO=OFF
+      -DLLVM_ENABLE_ZLIB=OFF
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
   else()
-    find_program(PATCH_PROGRAM patch)
-
-    if(NOT PATCH_PROGRAM)
-      message(FATAL_ERROR "Cannot find \"patch\" to patch LLVM")
-    endif()
-
     ExternalProject_Add(LLVM
       PREFIX llvm
       URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
@@ -566,7 +553,7 @@ else(WIN32)
                         --port=${port}
                         --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
       BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      $<PLATFORM_ID:Windows>:WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}>
+      $<$<PLATFORM_ID:Windows>:WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}>
       VERBATIM)
     add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
@@ -623,7 +610,7 @@ add_custom_target(clean_aot
 #########################
 
 if(EXTENDED_DEPS)
-
+  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
@@ -772,32 +759,12 @@ if(EXTENDED_DEPS)
       BUILD_IN_SOURCE ON)
   endif()
 
-  if(PACKAGE)
-    ExternalProject_Add(LLVM-packaging
-      PREFIX llvm
-      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
-      CMAKE_ARGS
-      -DCMAKE_OSX_SYSROOT=macosx
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
-      -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-      -DLLVM_ENABLE_TERMINFO=OFF
-      -DLLVM_ENABLE_ZLIB=OFF
-      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-    add_dependencies(extempore LLVM-packaging)
-  endif()
-
   # wrap the whole thing in a target
 
   if(APPLE)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libassimp.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libkiss_fft.dylib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/libnanovg.dylib ${EXT_PLATFORM_SHLIBS_DIR}
@@ -809,7 +776,7 @@ if(EXTENDED_DEPS)
   elseif(WIN32)
     add_custom_target(extended_deps
       COMMENT "moving shared libs into libs/platform-shlibs"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM-packaging sndfile apr
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND cmake -E copy ${EXT_DEPS_INSTALL_DIR}/lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
