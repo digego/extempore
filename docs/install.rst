@@ -72,6 +72,12 @@ installed, then you can build Extempore with::
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
 
+.. note:: Depending on which Linux distribution you're on, you might
+          need a couple more packages---GLFW3 in particular will need
+          a couple of OpenGL/X11 deps on Ubuntu::
+
+            sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+
 Windows
 ^^^^^^^
 
