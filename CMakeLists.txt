@@ -235,7 +235,7 @@ find_program(LLVM_CONFIG llvm-config
 # logic for deciding whether to download & build LLVM
 if(EXTENDED_DEPS)
   set(DOWNLOAD_LLVM ON)
-  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
@@ -279,7 +279,7 @@ if(DOWNLOAD_LLVM)
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+      -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   else()
     ExternalProject_Add(LLVM
       PREFIX llvm
@@ -293,7 +293,11 @@ if(DOWNLOAD_LLVM)
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
-endif()
+  add_custom_target(LLVM_install
+    COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
+    DEPENDS LLVM
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
+  endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
 # Check the output of "llvm-config --libnames" to be sure
@@ -351,7 +355,7 @@ endif()
 add_dependencies(extempore pcre portaudio)
 
 if(DOWNLOAD_LLVM)
-  add_dependencies(extempore LLVM)
+  add_dependencies(extempore LLVM LLVM_install)
 endif()
 
 target_include_directories(extempore
@@ -610,7 +614,6 @@ add_custom_target(clean_aot
 #########################
 
 if(EXTENDED_DEPS)
-  set(EXT_LLVM_DIR ${CMAKE_BINARY_DIR}/deps-install)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
