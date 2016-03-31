@@ -241,14 +241,14 @@ If you :ref:`build Extempore from source using CMake
 ``--with-extended`` flag) you'll automatically get these
 dependencies---job done.
 
-.. note:: Currently, on Windows the ``EXTENDED_DEPS`` option builds
+.. note:: Currently, on Windows the ``BUILD_DEPS`` option builds
           the glfw3 library file with the wrong name (``glfw3dll.lib``
           instead of just ``glfw3.lib``). We'll fix this in the
           future, but for now you might have to manually rename the
           lib file in ``libs/platform-shlibs`` on Windows).
 
 If you want to get them yourself (e.g. through your system's package
-manager) you need to specify an additional ``-DEXTENDED_DEPS=OFF``
+manager) you need to specify an additional ``-DBUILD_DEPS=OFF``
 during the :ref:`cmake configure step <install-configure-doc>` option.
 Then, on **OSX** you can get them through homebrew (assuming you've
 done a ``brew tap benswift/extempore``)::

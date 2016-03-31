@@ -5,9 +5,8 @@ option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
-option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
-option(EXTENDED_DEPS "download & build deps for aot_extended" ON)
+option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
 # option wrangling
 
@@ -36,15 +35,14 @@ if(PACKAGE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
   message(STATUS "Building Extempore for binary distribution")
   # need deps if we're packaging
-  set(EXTENDED_DEPS ON CACHE BOOL "" FORCE)
+  set(BUILD_DEPS ON CACHE BOOL "" FORCE)
   if(IN_TREE)
     set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
   endif()
 endif()
 
 # logic for deciding whether to download & build LLVM
-if(EXTENDED_DEPS)
-  set(DOWNLOAD_LLVM ON)
+if(BUILD_DEPS)
   set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
@@ -60,9 +58,8 @@ if(EXTENDED_DEPS)
 elseif(DEFINED ENV{EXT_LLVM_DIR})
   # if there's an EXT_LLVM_DIR environment variable, use that
   set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-  set(DOWNLOAD_LLVM OFF)
 else()
-  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using EXTENDED_DEPS=OFF")
+  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using BUILD_DEPS=OFF")
 endif()
 
 project(Extempore VERSION 0.6.1)
@@ -253,7 +250,7 @@ endif()
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
-if(DOWNLOAD_LLVM)
+if(BUILD_DEPS)
   message(STATUS "Downloading and building LLVM (patched for Extempore)")
   include(ExternalProject)
   find_program(PATCH_PROGRAM patch)
@@ -352,7 +349,7 @@ endif()
 
 add_dependencies(extempore pcre portaudio)
 
-if(DOWNLOAD_LLVM)
+if(BUILD_DEPS)
   add_dependencies(extempore LLVM LLVM_install)
 endif()
 
@@ -611,7 +608,7 @@ add_custom_target(clean_aot
 # deps for AOT-extended #
 #########################
 
-if(EXTENDED_DEPS)
+if(BUILD_DEPS)
 
   include(ExternalProject)
 
@@ -797,7 +794,7 @@ if(EXTENDED_DEPS)
 
   add_dependencies(aot_extended extended_deps)
 
-endif(EXTENDED_DEPS)
+endif(BUILD_DEPS)
 
 #########
 # tests #
