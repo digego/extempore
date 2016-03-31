@@ -9,22 +9,7 @@ option(DOWNLOAD_LLVM "download and build LLVM (patched for Extempore)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(EXTENDED_DEPS "download & build deps for aot_extended" ON)
 
-if(PACKAGE)
-  # this needs to be set before project() is called
-  set(CMAKE_OSX_SYSROOT macosx)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
-  message(STATUS "Building Extempore for binary distribution")
-  # need deps if we're packaging
-  set(EXTENDED_DEPS ON CACHE BOOL "" FORCE)
-  if(IN_TREE)
-    set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
-  endif()
-endif()
-
-project(Extempore VERSION 0.6.1)
-if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
-  message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
-endif()
+# option wrangling
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -43,6 +28,47 @@ else()
     set(EXT_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share/extempore" CACHE PATH
       "path to Extempore's shared runtime files")
   endif()
+endif()
+
+if(PACKAGE)
+  # this needs to be set before project() is called
+  set(CMAKE_OSX_SYSROOT macosx)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
+  message(STATUS "Building Extempore for binary distribution")
+  # need deps if we're packaging
+  set(EXTENDED_DEPS ON CACHE BOOL "" FORCE)
+  if(IN_TREE)
+    set(IN_TREE OFF CACHE BOOL "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" FORCE)
+  endif()
+endif()
+
+# logic for deciding whether to download & build LLVM
+if(EXTENDED_DEPS)
+  set(DOWNLOAD_LLVM ON)
+  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
+  if(WIN32)
+    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
+  else()
+    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
+  endif()
+  if(PACKAGE)
+    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
+    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
+    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
+  endif()
+elseif(DEFINED ENV{EXT_LLVM_DIR})
+  # if there's an EXT_LLVM_DIR environment variable, use that
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
+  set(DOWNLOAD_LLVM OFF)
+else()
+  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using EXTENDED_DEPS=OFF")
+endif()
+
+project(Extempore VERSION 0.6.1)
+
+if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+  message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
 
 # Set a default build type if none was specified
@@ -226,34 +252,6 @@ endif()
 
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
-
-# assume that if we can find llvm-config, we already have a working LLVM install
-find_program(LLVM_CONFIG llvm-config
-  ${EXT_LLVM_DIR}/bin
-  NO_DEFAULT_PATH)
-
-# logic for deciding whether to download & build LLVM
-if(EXTENDED_DEPS)
-  set(DOWNLOAD_LLVM ON)
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
-  set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
-  if(WIN32)
-    set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
-  else()
-    set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
-  endif()
-  if(PACKAGE)
-    set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
-    set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
-    message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
-  endif()
-elseif(DEFINED ENV{EXT_LLVM_DIR} AND LLVM_CONFIG)
-  # if there's an environment variable, use that
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-  set(DOWNLOAD_LLVM OFF)
-else()
-  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using EXTENDED_DEPS=OFF")
-endif()
 
 if(DOWNLOAD_LLVM)
   message(STATUS "Downloading and building LLVM (patched for Extempore)")
