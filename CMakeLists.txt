@@ -752,43 +752,35 @@ if(BUILD_DEPS)
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy
-                                  libassimp${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libglfw.3${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  libapr-1.0${CMAKE_SHARED_LIBRARY_SUFFIX}
-                                  # destination
-                                  ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libglfw.3${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libapr-1.0${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
   elseif(WIN32)
     add_custom_target(extended_deps
-      COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
+      COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy
-                                  bin/assimp.dll
-                                  lib/kiss_fft.dll
-                                  lib/nanovg.dll
-                                  lib/portmidi.dll
-                                  # lib/libsndfile-1.dll
-                                  lib/stb_image.dll
-                                  lib/glfw3.dll
-                                  bin/libapr-1.dll
-                                  #on Windows, move the .lib files as well
-                                  lib/assimp.lib
-                                  lib/kiss_fft.lib
-                                  lib/nanovg.lib
-                                  lib/portmidi.lib
-                                  # lib/libsndfile-1.lib
-                                  lib/stb_image.lib
-                                  lib/glfw3dll.lib
-                                  lib/libapr-1.lib
-                                  # destination
-                                  ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      # glfw3 has different base names for the .dll and .lib, so fix that
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR/}/glfw3.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/libapr-1.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
   endif()
 
