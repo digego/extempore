@@ -146,7 +146,7 @@ namespace extemp
       return 0;
     }
   }
-#endif // END WIN32
+#else // START POSIX
 
 #ifdef EXT_MUTEX_RECURSIVE
   int EXTMutex::unlock()
@@ -170,7 +170,7 @@ namespace extemp
         std::cerr << "Error locking mutex: " << name << " err: " << result << std::endl;
       }
 #endif  // END DEBUG
-    return true;		
+    return true;
   }
 #else 
   int EXTMutex::lock()
@@ -212,5 +212,6 @@ namespace extemp
     }
   }
 
-#endif // END POSIX (not recursive)
+#endif // EXT_MUTEX_RECURSIVE
+#endif // END POSIX
 }

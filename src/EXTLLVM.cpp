@@ -916,7 +916,7 @@ void* mutex_create() {
 
 int mutex_destroy(void* mutex) {
 #ifdef _WIN32
-  delete dynamic_cast<std::mutex*>(mutex);
+  delete static_cast<std::mutex*>(mutex);
   return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -926,7 +926,7 @@ int mutex_destroy(void* mutex) {
 
 int mutex_lock(void* mutex) {
 #ifdef _WIN32
-  dynamic_cast<std::mutex*>(mutex)->unlock();
+  static_cast<std::mutex*>(mutex)->unlock();
   return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -936,7 +936,7 @@ int mutex_lock(void* mutex) {
 
 int mutex_unlock(void* mutex) {
 #ifdef _WIN32
-  dynamic_cast<std::mutex*>(mutex)->unlock();
+  static_cast<std::mutex*>(mutex)->unlock();
   return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
@@ -946,7 +946,7 @@ int mutex_unlock(void* mutex) {
 
 int mutex_trylock(void* mutex) {
 #ifdef _WIN32
-  dynamic_cast<std::mutex*>(mutex)->try_lock();
+  static_cast<std::mutex*>(mutex)->try_lock();
   return 0;  
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;

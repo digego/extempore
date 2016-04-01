@@ -64,7 +64,7 @@ namespace extemp
     }
 
 #ifdef _WIN32  
-	EXTThread::EXTThread(std::thread&& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
+	EXTThread::EXTThread(std::thread::id _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
 	{
 	}
 #else  
@@ -127,12 +127,12 @@ namespace extemp
        // just slightly adhead of EXTTHREAD_MAP being updated
        // so we try again after a *brief* sleep       
        std::this_thread::sleep_for(std::chrono::seconds(0) + std::chrono::nanoseconds(100000));
-       res = EXTThread::EXTTHREAD_MAP[p]; // try again
+       res = EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()]; // try again
        if (res != NULL) return res;
        // finally if there really is no active thread - then make one!
        if (res == NULL) {         
-         res = new EXTThread(p);
-         EXTThread::EXTTHREAD_MAP[p] = res;
+         res = new EXTThread(std::this_thread::get_id());
+         EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()] = res;
        }       
        return res;
 #else
