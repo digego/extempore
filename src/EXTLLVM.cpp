@@ -210,7 +210,7 @@ typedef struct llvm_zone_stack
 } llvm_zone_stack;
 
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 std::map<std::thread::id,llvm_zone_stack*> LLVM_ZONE_STACKS;
 std::map<std::thread::id,uint64_t> LLVM_ZONE_STACKSIZES;
 std::map<std::thread::id,llvm_zone_t*> LLVM_CALLBACK_ZONES;
@@ -228,7 +228,7 @@ int LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN-1;
 llvm_zone_t* llvm_threads_get_callback_zone()
 {
   llvm_zone_t* zone = 0;
-#ifdef EXT_BOOST
+#ifdef _WIN32
   zone = LLVM_CALLBACK_ZONES[std::this_thread::get_id()];
   if(!zone) {
     zone = llvm_zone_create(1024*1024*1); // default callback zone 1M
@@ -257,7 +257,7 @@ llvm_zone_t* llvm_threads_get_callback_zone()
 llvm_zone_stack* llvm_threads_get_zone_stack()
 {
   llvm_zone_stack* stack = 0;
-#ifdef EXT_BOOST
+#ifdef _WIN32
   stack = LLVM_ZONE_STACKS[std::this_thread::get_id()];
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
@@ -274,7 +274,7 @@ llvm_zone_stack* llvm_threads_get_zone_stack()
 // you really need to FIX IT!
 void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   LLVM_ZONE_STACKS[std::this_thread::get_id()] = llvm_zone_stack;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
@@ -288,7 +288,7 @@ void llvm_threads_set_zone_stack(llvm_zone_stack* llvm_zone_stack)
 
 void llvm_threads_inc_zone_stacksize()
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] += 1;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
@@ -302,7 +302,7 @@ void llvm_threads_inc_zone_stacksize()
 
 void llvm_threads_dec_zone_stacksize()
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   LLVM_ZONE_STACKSIZES[std::this_thread::get_id()] -= 1;
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
@@ -317,7 +317,7 @@ void llvm_threads_dec_zone_stacksize()
 uint64_t llvm_threads_get_zone_stacksize()
 {
   uint64_t size = 0;
-#ifdef EXT_BOOST
+#ifdef _WIN32
   size = LLVM_ZONE_STACKSIZES[std::this_thread::get_id()];
 #elif __APPLE__
   mach_port_t tid = pthread_mach_thread_np(pthread_self());
@@ -1056,7 +1056,7 @@ double imp_randd()
 
 float imp_randf()
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return extemp::UNIV::random();
 #else
     return (float)rand()/(float)RAND_MAX;
@@ -1065,7 +1065,7 @@ float imp_randf()
 
 int64_t imp_rand1_i64(int64_t a)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return (int64_t) extemp::UNIV::random()*a;
 #else
   return (int64_t) (((double)rand()/(double)RAND_MAX)*(double)a);
@@ -1074,7 +1074,7 @@ int64_t imp_rand1_i64(int64_t a)
 
 int64_t imp_rand2_i64(int64_t a, int64_t b)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return (int64_t) a+(extemp::UNIV::random()*((double)b-(double)a));
 #else
   return (int64_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
@@ -1083,7 +1083,7 @@ int64_t imp_rand2_i64(int64_t a, int64_t b)
 
 int32_t imp_rand1_i32(int32_t a)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return (int32_t) extemp::UNIV::random()*(double)a;
 #else
   return (int32_t) (((double)rand()/(double)RAND_MAX)*(double)a);
@@ -1092,7 +1092,7 @@ int32_t imp_rand1_i32(int32_t a)
 
 int32_t imp_rand2_i32(int32_t a, int32_t b)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return (int32_t) a+(extemp::UNIV::random()*((double)b-(double)a));
 #else
   return (int32_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
@@ -1101,7 +1101,7 @@ int32_t imp_rand2_i32(int32_t a, int32_t b)
 
 double imp_rand1_d(double a)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return extemp::UNIV::random()*a;
 #else
   return ((double)rand()/(double)RAND_MAX)*a;
@@ -1110,7 +1110,7 @@ double imp_rand1_d(double a)
 
 double imp_rand2_d(double a, double b)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return a+(extemp::UNIV::random()*(b-a));
 #else
   return a+(((double)rand()/(double)RAND_MAX)*(b-a));
@@ -1119,7 +1119,7 @@ double imp_rand2_d(double a, double b)
 
 float imp_rand1_f(float a)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return extemp::UNIV::random()*a;
 #else
   return ((double)rand()/(double)RAND_MAX)*a;
@@ -1128,7 +1128,7 @@ float imp_rand1_f(float a)
 
 float imp_rand2_f(float a, float b)
 {
-#ifdef EXT_BOOST
+#ifdef _WIN32
   return a+((float)extemp::UNIV::random()*(b-a));
 #else
   return a+(((float)rand()/(float)RAND_MAX)*(b-a));
