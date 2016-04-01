@@ -904,7 +904,8 @@ int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
 
 void* mutex_create() {
 #ifdef _WIN32
-  return NULL;
+  std::mutex* mutex = new std::mutex();
+  return mutex;
 #else
   pthread_mutex_t* mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
   int res = pthread_mutex_init(mutex,NULL);
@@ -915,7 +916,8 @@ void* mutex_create() {
 
 int mutex_destroy(void* mutex) {
 #ifdef _WIN32
-  return NULL;
+  delete dynamic_cast<std::mutex*>(mutex);
+  return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
   return pthread_mutex_destroy(m);
@@ -924,7 +926,8 @@ int mutex_destroy(void* mutex) {
 
 int mutex_lock(void* mutex) {
 #ifdef _WIN32
-  return -1;
+  dynamic_cast<std::mutex*>(mutex)->unlock();
+  return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
   return pthread_mutex_lock(m);
@@ -933,7 +936,8 @@ int mutex_lock(void* mutex) {
 
 int mutex_unlock(void* mutex) {
 #ifdef _WIN32
-  return -1;
+  dynamic_cast<std::mutex*>(mutex)->unlock();
+  return 0;
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
   return pthread_mutex_unlock(m);
@@ -942,7 +946,8 @@ int mutex_unlock(void* mutex) {
 
 int mutex_trylock(void* mutex) {
 #ifdef _WIN32
-  return -1;
+  dynamic_cast<std::mutex*>(mutex)->try_lock();
+  return 0;  
 #else
   pthread_mutex_t* m = (pthread_mutex_t*) mutex;
   return pthread_mutex_trylock(m);

@@ -63,8 +63,9 @@ namespace extemp
     protected:
 	bool initialised;
 	std::string name;
-#ifdef EXT_BOOST
+#ifdef _WIN32
 	std::recursive_mutex bmutex;
+  std::thread owner;
 #else
 	pthread_mutex_t pthread_mutex;
 	pthread_t owner;
