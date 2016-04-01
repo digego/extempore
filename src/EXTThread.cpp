@@ -53,20 +53,22 @@
 namespace extemp
 {
 
+#ifdef _WIN32
+  std::map<std::thread::id,EXTThread*> EXTThread::EXTTHREAD_MAP;
+#else
+  std::map<pthread_t,EXTThread*> EXTThread::EXTTHREAD_MAP;
+#endif
+  
   EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
     {       
     }
 
-#ifdef _WIN32
-  std::map<std::thread::id,EXTThread*> EXTThread::EXTTHREAD_MAP;
-  
+#ifdef _WIN32  
 	EXTThread::EXTThread(std::thread&& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
 	{
 	}
-#else
-    std::map<pthread_t,EXTThread*> EXTThread::EXTTHREAD_MAP;
-  
-    EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
+#else  
+  EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
     {
     }
 #endif
@@ -86,46 +88,70 @@ namespace extemp
 #endif
     }
 
-    int EXTThread::create(void *(*start_routine)(void *), void *arg)
-    {
-	int result = 22; //EINVAL;
+  int EXTThread::create(void *(*start_routine)(void *), void *arg)
+  {
+    int result = 22; //EINVAL;
 
-	if (! initialised)
-	{
+    if (! initialised)
+      {
 #ifdef _WIN32
-    // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);
-    std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
-    bthread = std::thread(fn);
-    EXTTHREAD_MAP[extemp::EXTThread::getBthread().get_id()] = this;
-    result = 0;
+        // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);        
+        std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
+        bthread = std::thread(fn);
+        extemp::EXTThread::EXTTHREAD_MAP[bthread.get_id()] = this;
+        result = 0;
 #else
-    result = pthread_create(&pthread, NULL, start_routine, arg);
-    extemp::EXTThread::EXTTHREAD_MAP[pthread] = this;
+        result = pthread_create(&pthread, NULL, start_routine, arg);
+        extemp::EXTThread::EXTTHREAD_MAP[pthread] = this;
 #endif
-	    initialised = ! result;
-	}
+        initialised = ! result;
+      }
 
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error creating thread: " << result << std::endl;
-	}
+    if (result)
+      {
+        std::cerr << "Error creating thread: " << result << std::endl;
+      }
 #endif
 
-	return result;
-    }
+    return result;
+  }
 
   EXTThread* EXTThread::activeThread()
   {
        EXTThread* res = NULL;
 #ifdef _WIN32
-       return EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()];
+       res = EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()];
+       if (res != NULL) return res;
+       // it is possible for a threads execution to start
+       // just slightly adhead of EXTTHREAD_MAP being updated
+       // so we try again after a *brief* sleep       
+       std::this_thread::sleep_for(std::chrono::seconds(0) + std::chrono::nanoseconds(100000));
+       res = EXTThread::EXTTHREAD_MAP[p]; // try again
+       if (res != NULL) return res;
+       // finally if there really is no active thread - then make one!
+       if (res == NULL) {         
+         res = new EXTThread(p);
+         EXTThread::EXTTHREAD_MAP[p] = res;
+       }       
+       return res;
 #else
        pthread_t p = pthread_self();
        res = EXTThread::EXTTHREAD_MAP[p];
+       if (res != NULL) return res;
+       // it is possible for a threads execution to start
+       // just slightly adhead of EXTTHREAD_MAP being updated
+       // so we try again after a *brief* sleep
+       struct timespec a, b;
+       a.tv_sec = 0;
+       a.tv_nsec = 100000;
+       int rval = nanosleep(&a,&b);
+       res = EXTThread::EXTTHREAD_MAP[p]; // try again
+       if (res != NULL) return res;
+       // finally if there really is no active thread - then make one!
        if (res == NULL) {         
          res = new EXTThread(p);
-         EXTTHREAD_MAP[p] = res;
+         EXTThread::EXTTHREAD_MAP[p] = res;
        }
        return res;
 #endif    
