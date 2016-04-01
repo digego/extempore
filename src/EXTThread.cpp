@@ -64,7 +64,7 @@ namespace extemp
     }
 
 #ifdef _WIN32  
-	EXTThread::EXTThread(std::thread::id _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
+	EXTThread::EXTThread(std::thread& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
 	{
 	}
 #else  
@@ -131,7 +131,7 @@ namespace extemp
        if (res != NULL) return res;
        // finally if there really is no active thread - then make one!
        if (res == NULL) {         
-         res = new EXTThread(std::this_thread::get_id());
+         res = new EXTThread();
          EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()] = res;
        }       
        return res;
