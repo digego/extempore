@@ -66,8 +66,13 @@ private:
     std::thread   m_thread;
 #endif
 
+#ifdef _WIN32
+    static __declspec( thread ) EXTThread* sm_current;
+#else
     static __thread EXTThread* sm_current;
- public:
+#endif
+
+public:
     EXTThread(function_type EntryPoint = nullptr, void* Arg = nullptr, const std::string& Name = std::string()): m_function(EntryPoint), m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
     }
     ~EXTThread();
