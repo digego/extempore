@@ -76,7 +76,7 @@ EXTThread::~EXTThread()
       m_arg = Arg;
     }
     int result = 22; //EINVAL;
-    if (!m_initialised) {
+    if (!m_initialised && m_function) {
 #ifdef _WIN32
       std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
       m_thread = std::thread(fn);
