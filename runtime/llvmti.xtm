@@ -7999,23 +7999,25 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:dotimes-check
   (lambda (ast vars kts request?)
-    (let ((a (impc:ti:type-check (cadr (cadr ast)) vars kts
-                                 (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*
-                                                *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))))
+    (let ((a (impc:ti:type-check (car (cadr ast)) vars kts #f))
+          (b (impc:ti:type-check (cadr (cadr ast)) vars kts #f)))
+      (if (and (not (impc:ir:type? b))
+               (= (length b) 1))
+          (set! b (car b)))
       ;; if numeric? and multiple choice - then force a type!
       (if (number? (cadr (cadr ast)))
-          (cond ((equal? (cl:sort a <)
-                         (cl:sort (list *impc:ir:fp64* *impc:ir:fp32* *impc:ir:si64* *impc:ir:si32* *impc:ir:si16* *impc:ir:ui8*) <))
-                 (set! a (list *impc:ir:si64*)))
-                ((equal? (cl:sort a <)
-                         (cl:sort (list *impc:ir:fp64* *impc:ir:fp32*) <))
-                 (set! a (list *impc:ir:fp64*)))
+          (cond ((cl:subset? b (list *impc:ir:fp64* *impc:ir:fp32*
+                                     *impc:ir:si64* *impc:ir:si32* *impc:ir:si16*
+                                     *impc:ir:ui8* *impc:ir:i1*))
+                 (set! b (list *impc:ir:si64*)))
+                ((cl:subset? b (list *impc:ir:fp64* *impc:ir:fp32*))
+                 (set! b (list *impc:ir:fp64*)))
                 (else 'leave-a-alone)))
       ;; (car (cadr ast)) should be a symbol that we want to update with a
       (if (not (symbol? (car (cadr ast))))
           (impc:compiler:print-badly-formed-expression-error 'dotimes ast))
-      (impc:ti:update-var (car (cadr ast)) vars kts a)
-      ;; stretch over body code but don't worry about return types
+      (impc:ti:update-var (car (cadr ast)) vars kts b)
+      ;; check over body code but don't worry about return types
       (impc:ti:type-check (caddr ast) vars kts #f)
       ;; dotimes returns void
       (list *impc:ir:void*))))
