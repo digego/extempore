@@ -1,34 +1,34 @@
 /*
- * Copyright (c) 2011, Andrew Sorensen 
+ * Copyright (c) 2011, Andrew Sorensen
  *
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -49,273 +49,159 @@
 
 #define _EXTTHREAD_DEBUG_
 
-
 namespace extemp
 {
 
 #ifdef _WIN32
-  std::map<std::thread::id,EXTThread*> EXTThread::EXTTHREAD_MAP;
+  __declspec( thread ) EXTThread* EXTThread::sm_current = 0;
 #else
-  std::map<pthread_t,EXTThread*> EXTThread::EXTTHREAD_MAP;
-#endif
-  
-  EXTThread::EXTThread() : initialised(false), detached(false), joined(false)
-    {       
-    }
-
-#ifdef _WIN32  
-	EXTThread::EXTThread(std::thread& _bthread) : initialised(false), detached(false), joined(false), bthread{ std::move(_bthread) }
-	{
-	}
-#else  
-  EXTThread::EXTThread(pthread_t _pthread) : initialised(false), detached(false), joined(false), pthread{ _pthread }
-    {
-    }
+  __thread EXTThread* EXTThread::sm_current = 0;
 #endif
 
-    EXTThread::~EXTThread()
-    {		
+EXTThread::~EXTThread()
+{
 #ifdef _EXTTHREAD_DEBUG_
-	if (initialised && (! (detached || joined)))
-	{
-	    std::cerr << "Resource leak destroying EXTThread: creator has not joined nor detached thread." << std::endl;
-	}
-#endif
-#ifdef _WIN32
-  EXTTHREAD_MAP.erase(extemp::EXTThread::getBthread().get_id());
-#else
-  EXTTHREAD_MAP.erase(pthread);
-#endif
+    if (m_initialised && !m_detached && !m_joined) {
+        printf("Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
     }
+#endif
+}
 
-  int EXTThread::create(void *(*start_routine)(void *), void *arg)
+  int EXTThread::create(function_type EntryPoint, void* Arg)
   {
+    if (EntryPoint) {
+      m_function = EntryPoint;
+    }
+    if (Arg) {
+      m_arg = Arg;
+    }
     int result = 22; //EINVAL;
-
-    if (! initialised)
-      {
+    if (!m_initialised) {
 #ifdef _WIN32
-        // std::function<void*(void*)> fn = static_cast<std::function<void*(void*)> >(start_routine);        
-        std::function<void*()> fn = [start_routine,arg]()->void* { return start_routine(arg); };
-        bthread = std::thread(fn);
-        extemp::EXTThread::EXTTHREAD_MAP[bthread.get_id()] = this;
-        result = 0;
+      std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
+      m_thread = std::thread(fn);
+      result = 0;
 #else
-        result = pthread_create(&pthread, NULL, start_routine, arg);
-        extemp::EXTThread::EXTTHREAD_MAP[pthread] = this;
+      result = pthread_create(&m_thread, NULL, Trampoline, this);
 #endif
-        initialised = ! result;
+#ifdef __linux__
+      if (!result && !m_name.empty()) {
+        pthread_setname_np(m_thread, m_name.c_str());
       }
-
+#endif       
+      m_initialised = !result;
+    }
 #ifdef _EXTTHREAD_DEBUG_
-    if (result)
-      {
-        std::cerr << "Error creating thread: " << result << std::endl;
-      }
+    if (result) {
+      printf("Error creating thread: %d\n", result);
+    }
 #endif
-
     return result;
   }
 
-  EXTThread* EXTThread::activeThread()
-  {
-       EXTThread* res = NULL;
-#ifdef _WIN32
-       res = EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()];
-       if (res != NULL) return res;
-       // it is possible for a threads execution to start
-       // just slightly adhead of EXTTHREAD_MAP being updated
-       // so we try again after a *brief* sleep       
-       std::this_thread::sleep_for(std::chrono::seconds(0) + std::chrono::nanoseconds(100000));
-       res = EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()]; // try again
-       if (res != NULL) return res;
-       // finally if there really is no active thread - then make one!
-       if (res == NULL) {         
-         res = new EXTThread();
-         EXTThread::EXTTHREAD_MAP[std::this_thread::get_id()] = res;
-       }       
-       return res;
-#else
-       pthread_t p = pthread_self();
-       res = EXTThread::EXTTHREAD_MAP[p];
-       if (res != NULL) return res;
-       // it is possible for a threads execution to start
-       // just slightly adhead of EXTTHREAD_MAP being updated
-       // so we try again after a *brief* sleep
-       struct timespec a, b;
-       a.tv_sec = 0;
-       a.tv_nsec = 100000;
-       int rval = nanosleep(&a,&b);
-       res = EXTThread::EXTTHREAD_MAP[p]; // try again
-       if (res != NULL) return res;
-       // finally if there really is no active thread - then make one!
-       if (res == NULL) {         
-         res = new EXTThread(p);
-         EXTThread::EXTTHREAD_MAP[p] = res;
-       }
-       return res;
-#endif    
-  }
-
-	int EXTThread::kill()
-	{
+int EXTThread::kill()
+{
 #ifdef _WIN32
 		return 0;
 #else
-		return pthread_cancel(pthread);
+    return pthread_cancel(m_thread);
 #endif
-	}
+}
 
-
-    int EXTThread::detach()
-    {
+int EXTThread::detach()
+{
 	int result = 22; //EINVAL;
-
-	if (initialised)
-	{
+    if (m_initialised) {
 #ifdef _WIN32
-	    bthread.detach();
+        m_thread.detach();
 	    result = 0;
 #else
-	    result = pthread_detach(pthread);
+        result = pthread_detach(m_thread);
 #endif
-	    detached = ! result;
+        m_detached = !result;
 	}
-
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error detaching thread: " << result << std::endl;
+    if (result) {
+        printf("Error detaching thread: %d\n", result);
 	}
 #endif
-
 	return result;
-    }
+}
 
-    int EXTThread::join()
-    {
+int EXTThread::join()
+{
 	int result = 22; //EINVAL;
-
-	if (initialised)
-	{
+    if (m_initialised) {
 #ifdef _WIN32
-	    bthread.join();
+        m_thread.join();
             result = 0;
 #else
-	    result = pthread_join(pthread, NULL);
+        result = pthread_join(m_thread, NULL);
 #endif
-	    joined = ! result;
+        m_joined = ! result;
 	}
-
 #ifdef _EXTTHREAD_DEBUG_
-	if (result)
-	{
-	    std::cerr << "Error joining thread: " << result << std::endl;
+    if (result) {
+        printf("Error joining thread: %d\n", result);
 	}
 #endif
-
 	return result;
-    }
+}
 
-  int EXTThread::setPriority(int priority, bool realtime)
-  {
+int EXTThread::setPriority(int Priority, bool Realtime)
+{
 #ifdef _WIN32
-    auto thread = bthread.native_handle();
+    auto thread = m_thread.native_handle();
 #else
-	pthread_t thread = pthread;
+    auto thread = m_thread;
 #endif
 #ifdef __linux__
     sched_param param;
     int policy;
-    pthread_getschedparam(thread,&policy,&param);
-    param.sched_priority = priority;
-
-    // for realtime threads, use SCHED_RR policy
-    if(realtime)
+    pthread_getschedparam(m_thread, &policy, &param);
+    param.sched_priority = Priority;
+    if (Realtime) { // for realtime threads, use SCHED_RR policy
       policy = SCHED_RR;
-    
-    int result = pthread_setschedparam(thread,policy,&param);
-    if(result != 0) {
-      fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
-      return 0;
-    }else{
-      return 1;
     }
-#elif __APPLE__    
+    int result = pthread_setschedparam(thread, policy, &param);
+    if (result) {
+      printf("Error: failed to set thread priority: %s\n", strerror(result));
+      return 0;
+    }
+    return 1;
+#elif __APPLE__
     struct thread_time_constraint_policy ttcpolicy;
     int result;
-    
     // OSX magic numbers
-    ttcpolicy.period=(uint32_t)(UNIV::SAMPLERATE/100); // HZ/160
-      ttcpolicy.computation=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/3300;
-    ttcpolicy.constraint=(uint32_t)(UNIV::SAMPLERATE/143); // HZ/2200;
-    ttcpolicy.preemptible=1; // 1 
-
+    ttcpolicy.period = uint32_t(UNIV::SAMPLERATE / 100); // HZ/160
+    ttcpolicy.computation = uint32_t(UNIV::SAMPLERATE / 143); // HZ/3300;
+    ttcpolicy.constraint = uint32_t(UNIV::SAMPLERATE / 143); // HZ/2200;
+    ttcpolicy.preemptible = 1; // 1
     result = thread_policy_set(pthread_mach_thread_np(thread),
                                THREAD_TIME_CONSTRAINT_POLICY,
                                (thread_policy_t)&ttcpolicy,
                                THREAD_TIME_CONSTRAINT_POLICY_COUNT);
-    if (result != KERN_SUCCESS)
-      {
-        fprintf(stderr, "Error: failed to set thread priority: %s\n", strerror(result));
+    if (result != KERN_SUCCESS) {
+        printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
-      }else{
-        return 1;
       }
+    return 1;
 #else
-    fprintf(stderr, "Error: cannot set thread priority on Windows\n");
+    printf("Error: cannot set thread priority on Windows\n");
     return 0;
 #endif
-  }
+}
 
-  int EXTThread::getPriority()
-  {
-#ifdef __linux__ 
+int EXTThread::getPriority() const
+{
+#ifdef __linux__
     int policy;
     sched_param param;
-    pthread_getschedparam(pthread,&policy,&param);
+    pthread_getschedparam(m_thread, &policy, &param);
     return param.sched_priority;
 #endif
-    // fprintf(stderr, "Error: thread priority only available Linux\n");    
+    // fprintf(stderr, "Error: thread priority only available Linux\n");
     return 0;
-  }
-  
-    bool EXTThread::isRunning() 
-    { 
-#ifdef _WIN32
-      return initialised;
-#else
-	return 0 != pthread; 
-#endif
-    }	
-	
-    bool EXTThread::isCurrentThread()
-    {
-#ifdef _WIN32
-      return (bthread.get_id() == std::this_thread::get_id());
-#else
-	return pthread_equal(pthread_self(), pthread);
-#endif
-    }
+}
 
-	bool EXTThread::isEqualTo(EXTThread* other_thread)
-	{
-#ifdef _WIN32
-		return bthread.get_id() == other_thread->getBthread().get_id();		
-#else
-		return pthread_equal(pthread, other_thread->getPthread());
-#endif  
-	}
-
-#ifdef _WIN32
-  std::thread& EXTThread::getBthread()
-    {
-	return bthread;
-    }
-#else
-    pthread_t EXTThread::getPthread()
-    {
-	return pthread;
-    }
-#endif
 }
