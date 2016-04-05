@@ -66,7 +66,9 @@ again, if you want the "extended" libs (e.g. graphics)::
 Build from source (Linux/OSX)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-If you've got ``git``, ``cmake`` (and :ref:`ALSA
+As of March 2016, the CMake-powered build-from-source workflow will
+download and build all the dependencies you need (including LLVM). So,
+if you've got ``git``, ``cmake`` (and :ref:`ALSA
 <linux-alsa-instructions>` on Linux) and a C++ compiler toolchain
 installed, then you can build Extempore with::
 
