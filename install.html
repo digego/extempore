@@ -96,10 +96,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#make-install">Make &amp; Install</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#extended-shared-libs">&#8220;Extended&#8221; shared libs</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#build-extended-dependencies-from-source">Build extended dependencies from source</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#extended-shared-libs">&#8220;Extended&#8221; shared libs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#aot-compiling-the-extempore-standard-library">AOT-compiling the Extempore standard library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#llvm-3-7-0">LLVM 3.7.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#packaging">Packaging</a><ul>
@@ -220,9 +217,10 @@ packages as well.</p>
 <div class="highlight-python"><div class="highlight"><pre>brew install extempore --with-extended
 </pre></div>
 </div>
-<p>The <code class="docutils literal"><span class="pre">homebrew/versions</span></code> tap is needed for <code class="docutils literal"><span class="pre">glfw3</span></code> (required to build
-the extended stdlib) while the <code class="docutils literal"><span class="pre">benswift/extempore</span></code> tap is contains
-Extempore itself (and a few other deps)</p>
+<p>The <code class="docutils literal"><span class="pre">homebrew/versions</span></code> tap is needed for <code class="docutils literal"><span class="pre">glfw3</span></code> (part of the
+<a class="reference internal" href="#install-extended-doc"><span>extended dependencies</span></a>) while the
+<code class="docutils literal"><span class="pre">benswift/extempore</span></code> tap contains Extempore itself (and a few other
+deps)</p>
 <p><strong>Caveats</strong></p>
 <p>If you&#8217;ve installed Extempore through homebrew previously (i.e. if
 <code class="docutils literal"><span class="pre">brew</span> <span class="pre">info</span> <span class="pre">extempore</span></code> shows a version &lt;= 0.59) then you&#8217;ll need to
@@ -244,11 +242,22 @@ brew install extempore059
 </div>
 </div>
 <div class="section" id="build-from-source-linux-osx">
-<h3>Build from source (Linux/OSX)<a class="headerlink" href="#build-from-source-linux-osx" title="Permalink to this headline">¶</a></h3>
-<p>If you&#8217;ve got <code class="docutils literal"><span class="pre">git</span></code>, <code class="docutils literal"><span class="pre">cmake</span></code> (and <a class="reference internal" href="#linux-alsa-instructions"><span>ALSA</span></a> on Linux) and a C++ compiler toolchain
+<span id="build-from-source-doc"></span><h3>Build from source (Linux/OSX)<a class="headerlink" href="#build-from-source-linux-osx" title="Permalink to this headline">¶</a></h3>
+<p>As of March 2016, the CMake-powered build-from-source workflow will
+download and build all the dependencies you need (including LLVM). So,
+if you&#8217;ve got <code class="docutils literal"><span class="pre">git</span></code>, <code class="docutils literal"><span class="pre">cmake</span></code> (and <a class="reference internal" href="#linux-alsa-instructions"><span>ALSA</span></a> on Linux) and a C++ compiler toolchain
 installed, then you can build Extempore with:</p>
 <div class="highlight-python"><div class="highlight"><pre>git clone https://github.com/digego/extempore &amp;&amp; mkdir extempore/cmake-build &amp;&amp; cd extempore/cmake-build &amp;&amp; cmake .. &amp;&amp; make install &amp;&amp; make aot
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Depending on which Linux distribution you&#8217;re on, you might
+need a couple more packages&#8212;GLFW3 in particular will need
+a couple of OpenGL/X11 deps on Ubuntu:</p>
+<div class="last highlight-python"><div class="highlight"><pre>sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="windows">
@@ -307,10 +316,20 @@ libasound package at build-time, e.g. (on Ubuntu):</p>
 <p><strong>Jack</strong> (Linux only)</p>
 <p>To use the <a class="reference external" href="http://www.jackaudio.org/">Jack</a> portaudio backend, you&#8217;ll need to have Jack
 installed, and then to set the <code class="docutils literal"><span class="pre">JACK</span></code> cmake option with <code class="docutils literal"><span class="pre">-DJACK=ON</span></code></p>
+<p><strong>ASIO</strong> (Windows only)</p>
+<p>If you want to use the ASIO audio backend on Windows (which might give
+you lower-latency audio, but is not essential) you need to download
+the <a class="reference external" href="http://www.steinberg.net/nc/en/company/developer/sdk_download_portal.html">ASIO SDK</a> from Steinberg. You have to create a <a class="reference external" href="http://www.steinberg.net/nc/en/company/developer/sdk_download_portal/create_3rd_party_developer_account.html">third party
+developer account</a>, then you can log in and download the ASIO SDK
+(make sure you get the right SDK). You also need to download and
+install <a class="reference external" href="http://www.asio4all.com/">ASIO4ALL</a> with the &#8216;offline setup panel&#8217; option enabled.
+After that, copy the ASIO files into the
+<code class="docutils literal"><span class="pre">src/portaudio/src/hostapi/asio</span></code>, and use the <code class="docutils literal"><span class="pre">-DASIO=ON</span></code> CMake
+option.</p>
 <p><strong>Boost</strong> (Windows only)</p>
-<p>We still need one component of the <strong>Boost</strong> libs on Windows
-(specifically the ASIO component for TCP/UDP handling). If you&#8217;ve got
-the NuGet command line client installed, you can probably do:</p>
+<p>We still need one component of the <strong>Boost</strong> libs on Windows (for
+TCP/UDP handling). If you&#8217;ve got the NuGet command line client
+installed, you can probably do:</p>
 <div class="highlight-python"><div class="highlight"><pre>nuget install boost-vc140 &amp; nuget install boost_system-vc140 &amp; nuget install boost_regex-vc140 &amp; nuget install boost_date_time-vc140
 </pre></div>
 </div>
@@ -363,34 +382,30 @@ provide <em>extended</em> functionality (e.g. for sound file IO, FFTs,
 graphics) which we use a lot, but which aren&#8217;t compiled statically
 into the <code class="docutils literal"><span class="pre">extempore</span></code> executable. Instead, we load this code at
 runtime through shared libraries (<code class="docutils literal"><span class="pre">.dylib</span></code> on OSX, <code class="docutils literal"><span class="pre">.so</span></code> on Linux
-and <code class="docutils literal"><span class="pre">.dll</span></code> on Windows).</p>
-<p>This means that you have to have these shared libraries on your system
-somewhere where Extempore can find them.</p>
-<p>On <strong>OSX</strong> you can get them through homebrew (assuming you&#8217;ve done a
-<code class="docutils literal"><span class="pre">brew</span> <span class="pre">tap</span> <span class="pre">benswift/extempore</span></code>):</p>
+and <code class="docutils literal"><span class="pre">.dll</span></code> on Windows). This means that you have to have these
+shared libraries on your system somewhere where Extempore can find
+them.</p>
+<p>If you <a class="reference internal" href="#build-from-source-doc"><span>build Extempore from source using CMake</span></a> (or install through homebrew with the
+<code class="docutils literal"><span class="pre">--with-extended</span></code> flag) you&#8217;ll automatically get these
+dependencies&#8212;job done.</p>
+<p>If you want to get them yourself (e.g. through your system&#8217;s package
+manager) you need to specify an additional <code class="docutils literal"><span class="pre">-DBUILD_DEPS=OFF</span></code>
+during the <a class="reference internal" href="#install-configure-doc"><span>cmake configure step</span></a> option.
+Then, on <strong>OSX</strong> you can get them through homebrew (assuming you&#8217;ve
+done a <code class="docutils literal"><span class="pre">brew</span> <span class="pre">tap</span> <span class="pre">benswift/extempore</span></code>):</p>
 <div class="highlight-python"><div class="highlight"><pre>brew install assimp libsndfile portmidi libkiss-fft glfw3 libstb-image libnanovg
 </pre></div>
 </div>
-<p>On <strong>Debian/Ubuntu</strong> you can use <code class="docutils literal"><span class="pre">apt-get</span></code>:</p>
+<p>or on <strong>Debian/Ubuntu</strong> you can use <code class="docutils literal"><span class="pre">apt-get</span></code>:</p>
 <div class="highlight-python"><div class="highlight"><pre>sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 libportmidi-dev
 </pre></div>
 </div>
-<p>You&#8217;ll have to build KissFFT, stb_image and nanovg yourself, using the
-instructions below, but <code class="docutils literal"><span class="pre">make</span> <span class="pre">install</span></code> step means that you won&#8217;t have
-to move anything into <code class="docutils literal"><span class="pre">libs/platform-shlibs</span></code>.</p>
+<p>although you&#8217;ll have to build <a class="reference external" href="https://github.com/extemporelang/kiss_fft">KissFFT</a>, <a class="reference external" href="https://github.com/extemporelang/stb">stb_image</a> and <a class="reference external" href="https://github.com/extemporelang/nanovg">nanovg</a>
+yourself.</p>
 <p>On <strong>Windows</strong>, there isn&#8217;t a package manager which will do the job so
 you&#8217;ll need to build from source. Since Windows doesn&#8217;t have a lib path,
 all the dlls should go in <code class="docutils literal"><span class="pre">c:/path/to/extempore/libs/platform-shlibs</span></code>.
 So for all these deps, move the dll in there when it&#8217;s done.</p>
-<div class="section" id="build-extended-dependencies-from-source">
-<h3>Build extended dependencies from source<a class="headerlink" href="#build-extended-dependencies-from-source" title="Permalink to this headline">¶</a></h3>
-<p>If you want to build these extended dependencies from source,
-Extempore can do that automatically as part of the build process. In
-the <a class="reference internal" href="#install-configure-doc"><span>cmake configure step</span></a> specify an
-additional <code class="docutils literal"><span class="pre">-DEXTENDED_DEPS=ON</span></code> option, and the build process will
-build them all (this will take a while) and put them in the
-<code class="docutils literal"><span class="pre">extempore/libs/platform-shlibs</span></code> directory.</p>
-</div>
 </div>
 <div class="section" id="aot-compiling-the-extempore-standard-library">
 <h2>AOT-compiling the Extempore standard library<a class="headerlink" href="#aot-compiling-the-extempore-standard-library" title="Permalink to this headline">¶</a></h2>
@@ -461,7 +476,14 @@ cmake option.</p>
 </div>
 <div class="section" id="id1">
 <h3>Windows<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-python"><div class="highlight"><pre>cmake -G&quot;Visual Studio 14 2015 Win64&quot; -DPACKAGE=ON -DBOOST_DIR=c:/Users/ben/Code/extempore/boost .. &amp;&amp; cmake --build . --config Release --target aot_extended &amp;&amp; cmake --build . --config Release --target package
+<p>On Windows it takes a few more steps, since you have to run the
+<code class="docutils literal"><span class="pre">aot_extended</span></code> script from the top-level Extempore directory.</p>
+<div class="code highlight-python"><div class="highlight"><pre># build extempore
+cmake -G&quot;Visual Studio 14 2015 Win64&quot; -DASIO=ON -DPACKAGE=ON -DBOOST_DIR=c:/path/to/extempore/boost .. &amp;&amp; cmake --build . --config Release --target extempore
+# aot-compile extended stdlib (call this from the extempore directory)
+cmake -P extras/cmake/aot_extended.cmake
+# package it all up
+cmake --build . --config Release --target package
 </pre></div>
 </div>
 </div>
