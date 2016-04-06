@@ -288,11 +288,8 @@ if(BUILD_DEPS)
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
-  add_custom_target(LLVM_install
-    COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
-    DEPENDS LLVM
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
-  endif()
+  ExternalProject_Add_StepTargets(LLVM install)
+endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
 # Check the output of "llvm-config --libnames" to be sure
@@ -351,7 +348,7 @@ endif()
 add_dependencies(extempore pcre portaudio)
 
 if(BUILD_DEPS)
-  add_dependencies(extempore LLVM LLVM_install)
+  add_dependencies(extempore LLVM)
 endif()
 
 target_include_directories(extempore
