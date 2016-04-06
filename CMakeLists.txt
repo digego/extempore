@@ -288,7 +288,12 @@ if(BUILD_DEPS)
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
-  ExternalProject_Add_StepTargets(LLVM install)
+  # these shenanigans are necessary to get CMake to run the LLVM
+  # install step (which moves a bunch of headers around) to run before
+  # the extempore build step
+  add_library(LLVM-install SHARED IMPORTED GLOBAL)
+	set_target_properties(LLVM-install PROPERTIES IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/llvm)
+  add_dependencies(LLVM LLVM-install)
 endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
