@@ -256,7 +256,7 @@ if(BUILD_DEPS)
   find_program(PATCH_PROGRAM patch)
 
   if(NOT PATCH_PROGRAM)
-    message(FATAL_ERROR "Cannot find \"patch\", which is required to patch LLVM")
+    message(WARNING "Cannot find \"patch.exe\", which is required to patch LLVM")
   endif()
 
   if(PACKAGE)
