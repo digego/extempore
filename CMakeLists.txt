@@ -43,7 +43,11 @@ endif()
 
 # logic for deciding whether to download & build LLVM
 if(BUILD_DEPS)
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  if(WIN32)
+    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+  else()
+    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  endif()
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
