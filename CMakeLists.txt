@@ -685,7 +685,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(assimp
     PREFIX assimp
-    URL https://github.com/assimp/assimp/archive/v3.1.1.zip
+    URL https://github.com/assimp/assimp/archive/v3.2.zip
     CMAKE_ARGS
     -DCMAKE_OSX_SYSROOT=macosx
     -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
@@ -693,6 +693,8 @@ if(BUILD_DEPS)
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
+    -DASSIMP_BUILD_SAMPLES=OFF
+    -DASSIMP_BUILD_TESTS=OFF
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(WIN32)
