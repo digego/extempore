@@ -778,18 +778,21 @@ if(BUILD_DEPS)
       COMMAND ${CMAKE_COMMAND} -E copy libapr-1${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
   elseif(WIN32)
+    if(NOT MSVC14)
+      message(WARNING "Assimp 3.2 automatically appends vc130-mt to the dll/lib files, unless you're on an older version of MSVC - if that's the case, just move the files in manually")
+    endif()
     add_custom_target(extended_deps
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile apr
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/libapr-1.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
