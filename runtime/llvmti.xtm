@@ -2701,7 +2701,7 @@
 (define get-llvm-path
   (lambda ()
     (sanitize-platform-path
-     (if (file-exists? (string-append (sys:share-dir) "/llvm"))
+     (if (not (null? (sys:directory-list (string-append (sys:share-dir) "/llvm"))))
          (string-append (sys:share-dir) "/llvm")
          (let ((path_from_env (sys:command-output (unix-or-Windows "echo $EXT_LLVM_DIR" "echo %EXT_LLVM_DIR%"))))
            (if (not (or (string=? path_from_env "") (string=? path_from_env "%EXT_LLVM_DIR%")))
@@ -2751,89 +2751,89 @@
 
 (define impc:aot:compile-module
   (lambda (module-name module exit-afterwards?)
-    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
-      (let* ((platform (sys:platform))
-             (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
-             (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
-             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
-             (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
-             (output-shlib-path (string-append output-dir module-name
-                                               (cond ((string=? platform "Linux") ".so")
-                                                     ((string=? platform "OSX") ".dylib")
-                                                     ((string=? platform "Windows") ".dll"))))
-             (link-libs (if (string=? platform "Windows")
-                            *impc:aot:win-link-libraries*
-                            '()))
-             (optimize-compiles? #t)
-             (llc-command
-              (unix-or-Windows (string-append
-                                llc-path
-                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
-                                " -relocation-model=pic "
-                                (if (and (string=? (sys:platform) "OSX")
-                                         (not (string=? (sys:cmdarg "mcpu") "")))
-                                    (string-append "-mcpu="
-                                                   (sys:cmdarg "mcpu")
-                                                   " ")
-                                    "")
-                                bc-path)
-                               (string-append
-                                llc-path
-                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
-                                " -filetype=obj -mtriple=x86_64-pc-win32 "
-                                bc-path)))
-             (link-command
-              (unix-or-Windows (string-append
-                                (cond ((string=? platform "Linux")
-                                       (string-append "gcc " 
-                                                      (if optimize-compiles? "-O3" "-g -O0")
-                                                      " --shared -fPIC "))
-                                      ((string=? platform "OSX")
-                                       (string-append "clang "
-                                                      (if optimize-compiles? "-O3" "-g -O0")   
-                                                      " -dynamiclib -undefined dynamic_lookup ")))
-                                asm-path
-                                " -o " output-shlib-path)
-                               (string-append
-                                "call " 
-                                (sanitize-platform-path (sys:share-dir))
-                                "\\extras\\ms_build_vars.bat && link"
-                                ;; " /FORCE:UNRESOLVED "
-                                " /MACHINE:x64 /DLL"
-                                " /OUT:" output-shlib-path
-                                " " (string-join link-libs " ")
-                                ;; (string-append tmp-dir module-name ".lib ")
-                                " msvcrt.lib "
-                                asm-path))))
-        (print "Using llc " llc-path "...\n\n")
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc")))
+           (platform (sys:platform))
+           (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
+           (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+           (asm-path (string-append tmp-dir module-name (unix-or-Windows ".s" ".obj")))
+           (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
+           (output-shlib-path (string-append output-dir module-name
+                                             (cond ((string=? platform "Linux") ".so")
+                                                   ((string=? platform "OSX") ".dylib")
+                                                   ((string=? platform "Windows") ".dll"))))
+           (link-libs (if (string=? platform "Windows")
+                          *impc:aot:win-link-libraries*
+                          '()))
+           (optimize-compiles? #t)
+           (llc-command
+            (unix-or-Windows (string-append
+                              llc-path
+                              (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                              " -relocation-model=pic "
+                              (if (and (string=? (sys:platform) "OSX")
+                                       (not (string=? (sys:cmdarg "mcpu") "")))
+                                  (string-append "-mcpu="
+                                                 (sys:cmdarg "mcpu")
+                                                 " ")
+                                  "")
+                              bc-path)
+                             (string-append
+                              llc-path
+                              (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                              " -filetype=obj -mtriple=x86_64-pc-win32 "
+                              bc-path)))
+           (link-command
+            (unix-or-Windows (string-append
+                              (cond ((string=? platform "Linux")
+                                     (string-append "gcc " 
+                                                    (if optimize-compiles? "-O3" "-g -O0")
+                                                    " --shared -fPIC "))
+                                    ((string=? platform "OSX")
+                                     (string-append "clang "
+                                                    (if optimize-compiles? "-O3" "-g -O0")   
+                                                    " -dynamiclib -undefined dynamic_lookup ")))
+                              asm-path
+                              " -o " output-shlib-path)
+                             (string-append
+                              "call " 
+                              (sanitize-platform-path (sys:share-dir))
+                              "\\extras\\ms_build_vars.bat && link"
+                              ;; " /FORCE:UNRESOLVED "
+                              " /MACHINE:x64 /DLL"
+                              " /OUT:" output-shlib-path
+                              " " (string-join link-libs " ")
+                              ;; (string-append tmp-dir module-name ".lib ")
+                              " msvcrt.lib "
+                              asm-path))))
+      (print "Using llc " llc-path "...\n\n")
+      (begin
+        (print-with-colors 'black 'yellow #t (print " Exporting module "))
+        (print "\n  " bc-path "\n\n"))
+      ;; make sure tmp-dir exists
+      (sys:command (string-append (unix-or-Windows "mkdir " "md ") tmp-dir))
+      ;; (sys:command (string-append "rm " bc-path " " asm-path " " output-shlib-path))
+      (llvm:export-module module bc-path)
+      (let ((llc-res 0)
+            (linker-res 0))
         (begin
-          (print-with-colors 'black 'yellow #t (print " Exporting module "))
-          (print "\n  " bc-path "\n\n"))
-        ;; make sure tmp-dir exists
-        (sys:command (string-append (unix-or-Windows "mkdir " "md ") tmp-dir))
-        ;; (sys:command (string-append "rm " bc-path " " asm-path " " output-shlib-path))
-        (llvm:export-module module bc-path)
-        (let ((llc-res 0)
-              (linker-res 0))
-          (begin
-            (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
-            (print "\n  " llc-command "\n\n"))
-          (set! llc-res (sys:command llc-command))
-          (if (<> llc-res 0)
-              (begin (print-with-colors 'red 'default #t
-                                        (print "llc command failed with exit code " llc-res "\n"))
-                     (if exit-afterwards? (quit 1))))
-          (begin
-            (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
-            (print "\n  " link-command "\n\n"))
-          (set! linker-res (sys:command link-command))
-          (if (<> linker-res 0)
-              (begin (print-with-colors 'red 'default #t
-                                        (print "linking failed with exit code " linker-res "\n"))
-                     (if exit-afterwards? (quit 1)))
-              (begin 
-                (print-with-colors 'black 'green #t (print " Succesfully compiled "))
-                (print "\n  " output-shlib-path "\n\n"))))))))
+          (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
+          (print "\n  " llc-command "\n\n"))
+        (set! llc-res (sys:command llc-command))
+        (if (<> llc-res 0)
+            (begin (print-with-colors 'red 'default #t
+                                      (print "llc command failed with exit code " llc-res "\n"))
+                   (if exit-afterwards? (quit 1))))
+        (begin
+          (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
+          (print "\n  " link-command "\n\n"))
+        (set! linker-res (sys:command link-command))
+        (if (<> linker-res 0)
+            (begin (print-with-colors 'red 'default #t
+                                      (print "linking failed with exit code " linker-res "\n"))
+                   (if exit-afterwards? (quit 1)))
+            (begin
+              (print-with-colors 'black 'green #t (print " Succesfully compiled "))
+              (print "\n  " output-shlib-path "\n\n")))))))
 
 (define impc:aot:insert-header
   (lambda (libname)
