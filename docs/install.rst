@@ -78,7 +78,7 @@ installed, then you can build Extempore with::
           need a couple more packages---GLFW3 in particular will need
           a couple of OpenGL/X11 deps on Ubuntu::
 
-            sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+            sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev zlib1g-dev
 
 Windows
 ^^^^^^^
