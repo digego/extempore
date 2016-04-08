@@ -260,7 +260,13 @@ them.
 If you :ref:`build Extempore from source using CMake
 <build-from-source-doc>` (or install through homebrew with the
 ``--with-extended`` flag) you'll automatically get these
-dependencies---job done.
+dependencies---job done. The one caveat to this is on Windows you need
+to download the **libsndfile** ``.lib`` and ``.dll`` yourself from
+here `here`_ and move them into ``libs/platform-shlibs`` (or if anyone
+can figure out how to build a 64-bit libsndfile on Windows in a sane
+way then let me know).
+
+.. _here: http://www.mega-nerd.com/libsndfile/#Download
 
 If you want to get them yourself (e.g. through your system's package
 manager) you need to specify an additional ``-DBUILD_DEPS=OFF``
