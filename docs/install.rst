@@ -195,8 +195,7 @@ Specifically, you'll need these libraries in ``boost/lib/``::
   libboost_system-vc140-mt-1_59.lib
 
 although if you ever want to build with debug symbols then you'll need
-the ``gd`` versions as well, e.g.
-``libboost_system-vc140-mt-gd-1_59.lib``.
+the ``gd`` versions as well, e.g. ``libboost_system-vc140-mt-gd-1_59.lib``.
 
 You'll also need the full header directory, which will probably be in
 ``boost.1.59.0.0/lib/native/include/boost``, copy that whole thing so
