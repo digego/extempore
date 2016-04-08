@@ -464,7 +464,7 @@ if(BOOST)
     message(STATUS "Searching for boost libs in ${CMAKE_SOURCE_DIR}/boost")
     set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
   endif()
-  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
+  target_compile_definitions(extempore PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
   # asio header
   find_path(BOOST_ASIO_INCLUDE_DIR
     NAMES boost/asio.hpp
