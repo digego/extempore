@@ -172,34 +172,15 @@ option.
 **Boost** (Windows only)
 
 We still need a few components of the **Boost** 1.59 libs on Windows
-(for TCP/UDP handling). You can get them however you like, and put
-them in a toplevel ``boost/`` directory with the subdirectories
-``include`` and ``lib``, which should contain the boost header
-directory and the ``libboost*.lib`` files respectively. If you put
-them somewhere else, tell CMake where they are through the
-``BOOST_DIR`` CMake variable.
+(for TCP/UDP handling). You can get them however you like and put them
+in a toplevel ``boost/`` directory (or somewhere else, and tell
+Extempore about it with the ``BOOST_DIR`` CMake variable).
 
 One way to get the Boost dependencies if you've got the NuGet command
 line client installed is to create a ``boost/`` subdirectory, and from
 inside that do::
 
     nuget install -Version 1.59 boost-vc140
-
-Then, you'll still need to rabbit around in the directories which get
-downloaded (make sure you get the ``address-model-64`` ones) and move
-some things to get the files in the right places as described above.
-Specifically, you'll need these libraries in ``boost/lib/``::
-
-  libboost_date_time-vc140-mt-1_59.lib
-  libboost_regex-vc140-mt-1_59.lib
-  libboost_system-vc140-mt-1_59.lib
-
-although if you ever want to build with debug symbols then you'll need
-the ``gd`` versions as well, e.g. ``libboost_system-vc140-mt-gd-1_59.lib``.
-
-You'll also need the full header directory, which will probably be in
-``boost.1.59.0.0/lib/native/include/boost``, copy that whole thing so
-that it's in ``extempore/boost/lib/boost``.
 
 **LLVM 3.7.0**
 
