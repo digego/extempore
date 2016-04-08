@@ -545,11 +545,13 @@ if(WIN32)
 
   add_custom_target(aot
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
-    COMMENT "Ahead-of-time compiling the standard library...")
+    COMMENT "Ahead-of-time compiling the standard library..."
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
   add_custom_target(aot_extended
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
-    COMMENT "Ahead-of-time compiling the standard library...")
+    COMMENT "Ahead-of-time compiling the standard library..."
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 else(WIN32)
 
@@ -566,7 +568,6 @@ else(WIN32)
                         --port=${port}
                         --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
       BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      $<$<PLATFORM_ID:Windows>:WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}>
       VERBATIM)
     add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
