@@ -461,7 +461,8 @@ endif()
 
 if(BOOST)
   if(NOT BOOST_DIR)
-    message(FATAL_ERROR "BOOST_DIR must be defined")
+    message(STATUS "Searching for boost libs in ${CMAKE_SOURCE_DIR}/boost")
+    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
   endif()
   target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   # asio header

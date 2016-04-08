@@ -173,14 +173,15 @@ option.
 
 We still need one component of the **Boost** libs on Windows (for
 TCP/UDP handling). If you've got the NuGet command line client
-installed, you can probably do::
+installed, you can create a ``boost/`` subdirectory and from inside
+that do::
 
     nuget install boost-vc140 & nuget install boost_system-vc140 & nuget install boost_regex-vc140 & nuget install boost_date_time-vc140
 
-It doesn't matter how you get these deps or where you put them, as long
-as you tell Extempore where they are through the ``BOOST_DIR`` cmake
-variable. The ``BOOST_DIR`` should have two subdirectories ``include``
-and ``lib``, which should contain the boost header directory and the
+If you get these deps some other way or in some other place, you can
+tell CMake where they are through the ``BOOST_DIR`` cmake variable.
+The ``BOOST_DIR`` should have two subdirectories ``include`` and
+``lib``, which should contain the boost header directory and the
 ``libboost*.lib`` files respectively.
 
 **LLVM 3.7.0**
