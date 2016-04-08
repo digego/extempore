@@ -73,7 +73,7 @@
 
 #define _SCHEME_SOURCE
 #include "SchemePrivate.h"
-#ifndef WIN32
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #if USE_DL
