@@ -72,7 +72,7 @@ if you've got ``git``, ``cmake`` (and :ref:`ALSA
 <linux-alsa-instructions>` on Linux) and a C++ compiler toolchain
 installed, then you can build Extempore with::
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
 
 .. note:: Depending on which Linux distribution you're on, you might
           need a couple more packages---GLFW3 in particular will need
@@ -199,11 +199,10 @@ Extempore uses CMake for configuration. In your ``extempore`` directory
 
     mkdir cmake-build && cd cmake-build && cmake ..
 
-On **Windows**, you'll need to give CMake a few more details about where
-Boost is::
+On **Windows**, you'll need to specify a 64-bit generator::
 
     md cmake-build && cd cmake-build
-    cmake -G"Visual Studio 14 2015 Win64" -DBOOST_DIR=c:\path\to\extempore\boost ..
+    cmake -G"Visual Studio 14 2015 Win64" ..
 
 Make & Install
 ^^^^^^^^^^^^^^
@@ -220,7 +219,10 @@ with a few useful targets:
    core/extended "standard library"
 
 On **Windows**, CMake will generate a Visual Studio solution (``.sln``)
-in ``cmake-build``. Open it, and build the ``extempore`` target.
+in ``cmake-build``. Open it, and build the ``ALL_BUILD`` target.
+Alternatively, you can do it from the command line with::
+
+  cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --config Release --target ALL_BUILD
 
 .. _install-extended-doc:
 
@@ -361,7 +363,7 @@ On Windows it takes a few more steps, since you have to run the
 .. code::
 
   # build extempore
-  cmake -G"Visual Studio 14 2015 Win64" -DASIO=ON -DPACKAGE=ON .. && cmake --build . --config Release --target aot_extended && cmake --build . --config Release --target package
+  cmake -G"Visual Studio 14 2015 Win64" -DASIO=ON -DPACKAGE=ON .. && cmake --build . --config Release --target package
 
 Linux
 ^^^^^
