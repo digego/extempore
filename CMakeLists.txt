@@ -586,7 +586,7 @@ else(WIN32)
   aotcompile_lib(libs/core/instruments.xtm aot 17093 base math audio_dsp)
 
   # extended
-  add_custom_target(aot_extended)
+  add_custom_target(aot_extended ALL)
   aotcompile_lib(libs/external/fft.xtm aot_extended 17091 base math)
   aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 base)
   aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 base fft sndfile)
