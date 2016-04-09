@@ -861,7 +861,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (ht
 if(APPLE)
   set(CPACK_GENERATOR DragNDrop)
 elseif(UNIX AND NOT APPLE)
-  set(CPACK_GENERATOR TGZ)
+  set(CPACK_GENERATOR "TGZ;DEB")
 elseif(WIN32)
   set(CPACK_GENERATOR ZIP)
   # set(CPACK_GENERATOR NSIS64)
