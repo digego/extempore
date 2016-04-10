@@ -8,7 +8,11 @@ option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
-# option wrangling
+####################
+# option wrangling #
+####################
+
+# share directory
 
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
@@ -29,6 +33,8 @@ else()
   endif()
 endif()
 
+# packaging (binary distribution)
+
 if(PACKAGE)
   # this needs to be set before project() is called
   set(CMAKE_OSX_SYSROOT macosx)
@@ -41,13 +47,23 @@ if(PACKAGE)
   endif()
 endif()
 
-# logic for deciding whether to download & build LLVM
+# LLVM
+
+if(DEFINED ENV{EXT_LLVM_DIR})
+  # if there's an EXT_LLVM_DIR environment variable, use that
+  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
+  set(BUILD_LLVM OFF)
+elseif(WIN32)
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
+  set(BUILD_LLVM ON)
+else()
+  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  set(BUILD_LLVM ON)
+endif()
+
+# building external shared library dependencies
+
 if(BUILD_DEPS)
-  if(WIN32)
-    set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
-  else()
-    set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
-  endif()
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   if(WIN32)
     set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
@@ -59,11 +75,6 @@ if(BUILD_DEPS)
     set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
     message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
   endif()
-elseif(DEFINED ENV{EXT_LLVM_DIR})
-  # if there's an EXT_LLVM_DIR environment variable, use that
-  set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
-else()
-  message(FATAL_ERROR "Environment variable EXT_LLVM_DIR must be set if you're using BUILD_DEPS=OFF")
 endif()
 
 project(Extempore VERSION 0.6.1)
@@ -254,8 +265,7 @@ endif()
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
-if(BUILD_DEPS)
-  message(STATUS "Downloading and building LLVM (patched for Extempore)")
+if(BUILD_LLVM)
   include(ExternalProject)
   find_program(PATCH_PROGRAM patch)
 
