@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 
-option(MCJIT "use LLVM's MCJIT for codegen" ON)
 option(BOOST "use boost library" OFF)
 option(IN_TREE "use the Extempore source dir as EXT_SHARE_DIR - useful for developers" ON)
 option(ASIO "use the ASIO Portaudio backend" OFF)
@@ -389,12 +388,7 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 # compiler options
 
-if(MCJIT)
-  target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-  message(STATUS "Using the new LLVM MCJIT backend...")
-else()
-  message(STATUS "Using the old LLVM JIT backend...")
-endif()
+target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
 
 if(PACKAGE)
   target_compile_definitions(extempore
