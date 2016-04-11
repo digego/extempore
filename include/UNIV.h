@@ -101,7 +101,7 @@ const char* sys_sharedir();
 char* sys_slurp_file(const char* fname);
 
 // clock/time
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <chrono>
 #endif
   double getRealTime();

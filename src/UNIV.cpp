@@ -605,11 +605,16 @@ char* sys_slurp_file(const char* fname)
 
 //////////////////////////////////////////////////////////////////
 //  CLOCK/TIME
-#ifdef EXT_BOOST
+#ifdef _WIN32
 double getRealTime()
 {
-  auto time_in_sec = std::chrono::high_resolution_clock::now().time_since_epoch();
-  return time_in_sec.count();
+  // going to go with system_clock on windows for the moment
+  using namespace std::chrono;
+  time_point<system_clock> time = system_clock::now();
+  system_clock::duration dur = time.time_since_epoch();
+  double units = (double) dur.count();
+  double seconds_per_unit = (double)system_clock::period::num / (double)system_clock::period::den;
+  return units * seconds_per_unit;
 }
 
 #elif __linux__
