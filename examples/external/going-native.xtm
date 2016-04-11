@@ -33,12 +33,20 @@
 (bind-val width float 1024.)
 (bind-val height float 768.)
 
-;; bind window on primary thread
-(bind-val window GLFWwindow*
-  (begin
+(bind-val window GLFWwindow*)
+
+;; make sure this is called by the scheduler!
+(bind-func init_gl
+  (lambda ()
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    ;(glfw_init_and_create_fullscreen_window)))
-    (glfw_init_and_create_interaction_window (convert width) (convert height))))
+    (set! window (glfw_init_and_create_interaction_window (convert width) (convert height)))
+    (println "initiazlied gl!")
+    void))
+
+;; must call init_gl from schedulers thread
+($ (let ((beat:Rational (bs1.beat)))
+     (sched bs1 beat init_gl)
+     (thread_sleep 2 0))) ;; sleep to ensure scheduled call before loading nanovg
 
 ;; can only load nanovg AFTER creating opengl window
 (sys:load "libs/external/nanovg.xtm")
@@ -58,12 +66,19 @@
 (bind-func init_vg
   (lambda (beat:float)
     ;; set THIS thread as opengl thread
-    (glfwMakeContextCurrent	null)
-    (glfwMakeContextCurrent	window)
+    ;;(glfwMakeContextCurrent	null)
+    ;;(glfwMakeContextCurrent	window)
     (glfwSwapInterval 1)
+    (nvg_init)
     (set! vg (nvg_create_context))
     (set! pixel_ratio (glfw_get_pixel_ratio window))
-    (println "initialized vg")))
+    (println "initialized vg")
+    void))
+
+;; must call init_vg from schedulers thread
+($ (let ((beat:Rational (bs1.beat)))
+     (sched bs1 beat init_vg)
+     (thread_sleep 2 0)))
 
 (bind-func draw_frame
   (let ((fill (NVGcolor 1.0 1.0 1.0 0.3))
@@ -104,15 +119,16 @@
   (lambda (beat:Rational)
     (beginz
      (bs1.bpm (trir 150.0 3000.0 1/350))
-     (nvg_clear)
+     (nvg_clear)         
      (draw_frame beat)
+     (glfwSwapBuffers window)         
      (play bs1 fmsynth
            (random (list 36 45 55 60 70 75 80 72 63 67))
            60 1/1
            0.1 (floor (rampr 0.0 5.0 1/291)))
-     (glfwSwapBuffers window)
      (sched bs1 (+ 1/1 beat) beat_loop:[void,Rational]*)
-     void)))
+     void)
+    void))
 
 ;; glfw requires a local event poll
 ;; on the primary process so we
@@ -126,18 +142,10 @@
 ;; start 'event' poll (on primary) for glfw
 (local-poll)
 
-;; before we start the music loop we need to
-;; call init_vg from music thread (i.e. bs1)
-;; as that where gl calls will come from
-;; i.e. GL init must happen on some thread as
-;; gl calls will be made from
-($ (let ((beat:Rational (bs1.beat)))
-     (sched bs1 beat init_vg)))
-
 ;; helper function
 (bind-func floor_rat
   (lambda (a:Rational)
     (- a (% a 1/1))))
 
 ;; start music loop on beat thread (i.e. bs1)
-($ (beat_loop (+ 2/1 (floor_rat (bs1.beat)))))
+($ (sched bs1 (+ 2/1 (floor_rat (bs1.beat))) beat_loop:[void,Rational]*))
