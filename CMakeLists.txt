@@ -564,17 +564,22 @@ else(WIN32)
   function(aotcompile_lib lib group port) # deps are optional, and go at the end
     get_filename_component(basename ${lib} NAME_WE)
     set(targetname aot_${basename})
-    add_custom_target(${targetname}
-      COMMAND extempore --nobase
-                        $<$<NOT:$<PLATFORM_ID:Windows>>:--noaudio>
-                        $<$<AND:$<PLATFORM_ID:Darwin>,$<BOOL:PACKAGE>>:--mcpu=generic>
-                        $<$<BOOL:PACKAGE>:--attr=none>
-                        --port=${port}
-                        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-      BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
-      WORKING_DIRECTORY ${EXT_SHARE_DIR}
-      VERBATIM)
-    add_dependencies(${targetname} extempore)
+    if(PACKAGE)
+      add_custom_target(${targetname}
+        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${port}
+        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        VERBATIM)
+    else(PACKAGE)
+      add_custom_target(${targetname}
+        COMMAND extempore --nobase --noaudio --port=${port}
+        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
+        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        VERBATIM)
+    endif(PACKAGE)
+  add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})

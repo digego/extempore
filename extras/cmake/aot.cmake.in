@@ -1,54 +1,34 @@
 set(PACKAGE @PACKAGE@)
 
-if(UNIX)
+# this is only necessary on Windows, since the aot-compilation runs
+# can't happen in parallel there, and I can't get Visual Studio to
+# deparallelise
 
-  if(NOT EXISTS "@CMAKE_INSTALL_PREFIX@/bin/extempore@CMAKE_EXECUTABLE_SUFFIX@")
-    message(FATAL_ERROR "you must install extempore (e.g. make install) before AOT-compiling the standard library")
-  endif()
+set(AOT_LIBS
+  # core
+  "libs/base/base.xtm"
+  "libs/core/math.xtm"
+  "libs/core/audiobuffer.xtm"
+  "libs/core/audio_dsp.xtm"
+  "libs/core/instruments.xtm")
 
-  set(AOT_LIBS
-    # core
-    "libs/base/base.xtm"
-    "libs/core/math.xtm"
-    "libs/core/audiobuffer.xtm"
-    "libs/core/audio_dsp.xtm"
-    "libs/core/instruments.xtm"
-    )
-
-  foreach(aot-lib ${AOT_LIBS})
-    message(STATUS "AOT-compiling ${aot-lib}")
+foreach(aot-lib ${AOT_LIBS})
+  message(STATUS "AOT-compiling ${aot-lib}")
+  if(PACKAGE)
+    # pass --attr=none when packaging
     execute_process(
-      COMMAND @CMAKE_SOURCE_DIR@/extempore --nobase --noaudio --sharedir @CMAKE_SOURCE_DIR@ $<$<BOOL:PACKAGE>:--attr=none> --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
-      TIMEOUT 900 # 15 minutes
-      RESULT_VARIABLE aot_retval)
-    if(NOT "${aot_retval}" STREQUAL 0)
-      message(FATAL_ERROR "Problem compiling ${aot-lib}")
-    endif()
-  endforeach()
-
-elseif(WIN32)
-
-  set(AOT_LIBS
-    # core
-    "libs/base/base.xtm"
-    "libs/core/math.xtm"
-    "libs/core/audiobuffer.xtm"
-    "libs/core/audio_dsp.xtm"
-    "libs/core/instruments.xtm"
-    )
-
-  foreach(aot-lib ${AOT_LIBS})
-    message(STATUS "AOT-compiling ${aot-lib}")
-    execute_process(
-      COMMAND ./extempore --nobase $<$<BOOL:PACKAGE>:--attr=none> --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
+      COMMAND ./extempore --nobase --attr=none --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
       WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
       TIMEOUT 900 # 15 minutes
       RESULT_VARIABLE aot_retval)
-    if(NOT "${aot_retval}" STREQUAL 0)
-      message(FATAL_ERROR "Problem compiling ${aot-lib}")
-    endif()
-  endforeach()
-
-else()
-  message(STATUS "sorry, cannot AOT compile on this platform")
-endif()
+  else(PACKAGE)
+    execute_process(
+      COMMAND ./extempore --nobase --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\" #t #t)"
+      WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
+      TIMEOUT 900 # 15 minutes
+      RESULT_VARIABLE aot_retval)
+  endif(PACKAGE)
+  if(NOT "${aot_retval}" STREQUAL 0)
+    message(FATAL_ERROR "Problem compiling ${aot-lib}")
+  endif()
+endforeach()
