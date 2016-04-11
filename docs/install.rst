@@ -1,11 +1,46 @@
 Installing Extempore
 ====================
 
-Quick install
--------------
+When we talk about *installing* extempore, there are few steps to it:
 
-OSX (via homebrew)
-^^^^^^^^^^^^^^^^^^
+1. building the ``extempore`` executable and putting it somewhere your
+   system can find it (e.g. on your ``PATH``)
+
+2. getting a bunch of helpful libraries which provide *extended*
+   functionality (e.g. for audiofile I/O, FFTs, graphics)
+
+3. ahead-of-time (AOT) compiling the Extempore standard library, so
+   that things load up much quicker when you start Extempore
+
+In general, it's nice to have all of these things, although
+technically you really only need step 1 to start writing xtlang code.
+Most of these instructions will do all three steps by default, with
+comments about there are ways to tailor your install if you want
+something different.
+
+Download a pre-built binary
+---------------------------
+
+.. note:: Coming real soon!
+
+..
+   Download a `precompiled binary`_, unzip it and run ``extempore.exe``
+   from inside the ``extempore`` folder.
+
+   .. warning:: The Windows binary is currently a little out-of-date, so
+                some of the docs may be wrong. If you've got experience
+                doing packaging/distribution on Windows and want to help
+                out (please!) `get in touch`_.
+
+   .. _precompiled binary: http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip
+   .. _get in touch: mailto:extemporelang@googlegroups.com
+
+Install through homebrew (OSX-only)
+-----------------------------------
+
+.. note:: The CMake "build from source" approach is probably just as
+          quick, especially on OSX/Linux if you're familiar with that
+          sort of thing.
 
 `Homebrew`_ makes the process pretty simple, although since it's
 building everything (including LLVM) from source it may still take up to
@@ -13,33 +48,17 @@ building everything (including LLVM) from source it may still take up to
 
 .. _Homebrew: http://brew.sh/
 
-Extempore has a "core" library, which includes things like the math and
-audio DSP libraries and doesn't depend on any external shared libraries.
-This is the option homebrew will use by default - it's still a
-fully-fledged xtlang compiler and everything else.
-
-However, there are a few external libraries which you might want to use
-to do certain things, like open up OpenGL canvases or load compressed
-audio files. We call this the "extended" library, and there's a
-``--with-extended`` flag to tell homebrew to go and grab those other
-packages as well.
-
 To install Extempore through homebrew, first::
 
     brew tap benswift/extempore && brew tap homebrew/versions
 
 then::
 
-    brew install extempore
-
-or, if you want the "extended" libs (e.g. graphics)::
-
     brew install extempore --with-extended
 
-The ``homebrew/versions`` tap is needed for ``glfw3`` (part of the
-:ref:`extended dependencies <install-extended-doc>`) while the
-``benswift/extempore`` tap contains Extempore itself (and a few other
-deps)
+or, if you want just the core::
+
+    brew install extempore
 
 **Caveats**
 
@@ -55,111 +74,174 @@ moment the easiest way around this is to download the old ``0.5.9``
 version of Extempore with::
 
     brew tap benswift/extempore
-    brew install extempore059
-
-again, if you want the "extended" libs (e.g. graphics)::
-
     brew install extempore059 --with-extended
 
 .. _build-from-source-doc:
 
-Build from source (Linux/OSX)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Build from source (all platforms)
+---------------------------------
 
-As of March 2016, the CMake-powered build-from-source workflow will
-download and build all the dependencies you need (including LLVM). So,
-if you've got ``git``, ``cmake`` (and :ref:`ALSA
-<linux-alsa-instructions>` on Linux) and a C++ compiler toolchain
-installed, then you can build Extempore with::
+The CMake-powered build-from-source workflow will download and build
+all the dependencies you need (including LLVM). So, if you've got a
+C++ compiler, git and CMake (and an :ref:`ALSA backend
+<linux-portaudio-backend-instructions>` on Linux) then here are some
+one-liner build commands.
+
+On Linux/OSX::
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
 
-.. note:: Depending on which Linux distribution you're on, you might
-          need a couple more packages---GLFW3 in particular will need
-          a couple of OpenGL/X11 deps on Ubuntu::
+On **Windows**::
 
-            sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev zlib1g-dev
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target Release
 
-Windows
-^^^^^^^
+Options, Variables and Targets
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Download a `precompiled binary`_, unzip it and run ``extempore.exe``
-from inside the ``extempore`` folder.
+Some info about a few of the more interesting CMake options, variables
+and build targets:
 
-.. warning:: The Windows binary is currently a little out-of-date, so
-             some of the docs may be wrong. If you've got experience
-             doing packaging/distribution on Windows and want to help
-             out (please!) `get in touch`_.
+CMake options
+"""""""""""""
 
-.. _precompiled binary: http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip
-.. _get in touch: mailto:extemporelang@googlegroups.com
+BUILD_DEPS:BOOL (default ON)
+  controls whether or not the build process will also download and
+  build the extended libraries (e.g. glfw, libsndfile). If you want to
+  get those things through another package manager (or not use them at
+  all) then set this to ``OFF``.
 
-Slow install
-------------
+IN_TREE:BOOL (default ON)
+  when true, use the main Extempore source tree for libs/examples -
+  don't move those things into e.g. ``/usr/local``. If you're not
+  going to edit the built-in libraries, this makes no difference, but
+  if you're going to be working on them it avoids the problem that you
+  make a change to e.g. ``libs/core/math.xtm`` in your
+  version-controlled ``extempore`` directory, but ``(sys:load
+  "libs/core/math.xtm)`` in Extempore code loads the ``math.xtm`` in
+  ``/usr/local/share/extempore/libs/core``. This doesn't do anything
+  on Windows.
 
-Here are some more detailed instructions---in case the quick install
-doesn't suit your needs or you just want to have a better idea of
-what's going on.
+PACKAGE:BOOL (default ON)
+  when true, build Extempore (including all extended deps and
+  AOT-compilation) for binary distribution, e.g.::
 
-You'll need
+    cmake -DPACKAGE=ON .. && make package
 
-a **C++ compiler toolchain**, e.g.
+  The main effect of this flag is to disable processor-specific
+  optimisations for all the build commands, which gives you the best
+  chance of producing a portable binary. This option also adds a
+  ``package`` target to the makefile/solution, which can be used to
+  actually generate the zipfile/dmg/deb.
 
--  ``sudo apt-get install g++`` on Ubuntu/Debian
--  ``sudo yum install gcc gcc-c++`` on Fedora/CentOS/RHEL
--  Xcode or the `command line tools`_ on OSX
--  Visual Studio on Windows (the `Community 2015`_ version is now free)
+Variables
+"""""""""
 
-.. _command line tools: https://developer.apple.com/library/ios/technotes/tn2339/_index.html#//apple_ref/doc/uid/DTS40014588-CH1-WHAT_IS_THE_COMMAND_LINE_TOOLS_PACKAGE_   
-.. _Community 2015: https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx
+EXT_SHARE_DIR
+  the location of the Extempore "share directory", which containse a
+  bunch of files Extempore needs at runtime, including ``runtime/``,
+  ``libs/``, ``examples/`` and ``assets/``. When ``IN_TREE`` is on,
+  this will just point to your Extempore source directory, otherwise
+  it defaults to ``/usr/local/share/extempore`` on unix-y platforms.
+  If you want to put that stuff somewhere else, you can specify it
+  with this CMake variable. You can also specify the location of the
+  sharedir at Extempore startup with the ``--sharedir`` command line
+  argument. Does nothing on Windows.
 
-Extempore should build with clang, gcc and MSVC - and possibly other
-compilers (but I haven't tried them).
+EXT_LLVM_DIR (environment variable)
+  in the bad old days, the Extempore build process relied on this
+  (system) environment variable a lot, but currently it's only useful
+  if you want to build LLVM yourself (rather than having it done
+  automatically) - so unless you want to do that you can just ignore
+  it.
 
-**git**
+Targets
+"""""""
 
--  ``sudo apt-get install git`` on Ubuntu/Debian
--  ``sudo yum install git`` on Fedora/CentOS/RHEL
--  ``brew install git`` on OSX with Homebrew
--  ``choco install git`` on Windows with Chocolatey
+The default target will build Extempore, all the dependencies, and
+AOT-compile the standard library. Still, in other situations the
+following targets might come in handy:
 
-**CMake** (version 3.1 or greater)
+install
+  On OSX/Linux, move the extempore executable to ``/usr/local/bin``
+  (or similar) and the rest of the Extempore share directory to
+  ``/usr/local/share/extempore``. Does nothing on Windows.
 
--  ``sudo yum install cmake`` on Fedora/CentOS/RHEL
--  ``brew install cmake`` on OSX with Homebrew
--  ``choco install cmake`` on Windows with Chocolatey
+aot_extended
+  AOT-compile the full standard library
 
-The Ubuntu 15.04 package archive only includes CMake v3.0, but you can
-get a more up-to-date version through a package archive::
+aot
+  AOT-compile just the core standard library - i.e. the pure-xtlang
+  libraries with no external C library dependencies
 
-    sudo apt-get install software-properties-common && sudo add-apt-repository ppa:george-edison55/cmake-3.x && sudo apt-get update && sudo apt-get install cmake
+clean_aot
+  remove all AOT-compiled files
 
-.. _linux-alsa-instructions:
+extempore
+  build just the extempore executable
+
+Platform-specific notes
+^^^^^^^^^^^^^^^^^^^^^^^
+
+OSX
+"""
+
+Extempore should build with clang or gcc, the easiest way to get these
+is through Xcode or the `command line tools`_.
+
+.. _command line tools: https://developer.apple.com/library/ios/technotes/tn2339/_index.html#//apple_ref/doc/uid/DTS40014588-CH1-WHAT_IS_THE_COMMAND_LINE_TOOLS_PACKAGE_
+
+Linux
+"""""
+
+Extempore is most tested on Ubuntu, but is also known to work with
+Debian, Fedora, Arch, and also inside a docker container.
+
+There are a few extra dependencies which you may need to get through
+your package manager. For example, on Ubuntu 16.04 I needed::
+
+  sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev zlib1g-dev
+
+.. _linux-portaudio-backend-instructions:
+
+You'll also need to specify an `ALSA`_ backend for portaudio.
+
+ALSA
+  To use the asound portaudio backend (the default) you'll need the
+  libasound package.
+
+Jack
+  To use the `Jack`_ portaudio backend, you'll need to have Jack
+  installed, and then to set the ``JACK`` CMake option with ``-DJACK=ON``.
     
-**ALSA** (Linux only)
-
-To use the `ALSA`_ portaudio backend (which is probably what you want,
-unless you have a real reason to go with something else) you'll need the
-libasound package at build-time, e.g. (on Ubuntu)::
-
-    sudo apt-get install libasound2-dev
-
 .. _ALSA: http://www.alsa-project.org/
-
-**Jack** (Linux only)
-
-To use the `Jack`_ portaudio backend, you'll need to have Jack
-installed, and then to set the ``JACK`` cmake option with ``-DJACK=ON``
-
 .. _Jack: http://www.jackaudio.org/
 
-**ASIO** (Windows only)
 
-If you want to use the ASIO audio backend on Windows (which might give
-you lower-latency audio, but is not essential) you need to download
-the `ASIO SDK`_ from Steinberg. You have to create a `third party
-developer account`_, then you can log in and download the ASIO SDK
-(make sure you get the right SDK). You also need to download and
+Windows
+"""""""
+
+Extempore has been tested on Windows 7 & Windows 10 with `Visual Studio Community 2015`_
+
+.. _Visual Studio Community 2015: https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx
+
+If you don't want to take the command-line described above, note that
+CMake generates a Visual Studio solution (``.sln``), so just open that
+and build the ``ALL_BUILD`` target.
+
+On Windows, Extempore requires a few components of the **Boost** 1.59
+libs for TCP/UDP handling. These will be automatically downloaded for
+you if you've got the `nuget command line tool`_ installed, or if you
+want to build boost yourself (remember to keep the labyrinthine boost
+directory structure intact) just tell the build process where it is
+using the ``BOOST_DIR`` CMake variable.
+
+.. _nuget command line tool: choco install nuget.commandline
+
+If you want to use the **ASIO** audio backend on Windows (which might
+give you lower-latency audio, but is not essential) you need to
+download the `ASIO SDK`_ from Steinberg. You have to create a `third
+party developer account`_, then you can log in and download the ASIO
+SDK (make sure you get the right SDK). You also need to download and
 install `ASIO4ALL`_ with the 'offline setup panel' option enabled.
 After that, copy the ASIO files into the
 ``src/portaudio/src/hostapi/asio``, and use the ``-DASIO=ON`` CMake
@@ -169,127 +251,56 @@ option.
 .. _ASIO SDK: http://www.steinberg.net/nc/en/company/developer/sdk_download_portal.html
 .. _ASIO4ALL: http://www.asio4all.com/
 
-**Boost** (Windows only)
+The one caveat to the "extempore will download and build all the
+extended dependencies you need" is the **libsndfile** ``.lib`` and
+``.dll``. Currentyl, you need to manually get them from here `here`_
+and move them into ``libs/platform-shlibs`` (or if anyone can figure
+out how to build a 64-bit libsndfile on Windows in a sane way then let
+me know).
 
-We still need a few components of the **Boost** 1.59 libs on Windows
-(for TCP/UDP handling). You can get them however you like and put them
-in a toplevel ``boost/`` directory (or somewhere else, and tell
-Extempore about it with the ``BOOST_DIR`` CMake variable).
-
-One way to get the Boost dependencies if you've got the NuGet command
-line client installed is to create a ``boost/`` subdirectory, and from
-inside that do::
-
-    nuget install -Version 1.59 boost-vc140
-
-**LLVM 3.7.0**
-
-As of ``21e750a``, downloading and building LLVM 3.7 happens
-automatically as part of the Extempore cmake build process. But
-instructions are included at the end of this file in case you want to do
-it yourself.
-
-.. _install-configure-doc:
-
-Configure
-^^^^^^^^^
-
-Extempore uses CMake for configuration. In your ``extempore`` directory
-(i.e. the one this ``INSTALL.md`` file is in)::
-
-    mkdir cmake-build && cd cmake-build && cmake ..
-
-On **Windows**, you'll need to specify a 64-bit generator::
-
-    md cmake-build && cd cmake-build
-    cmake -G"Visual Studio 14 2015 Win64" ..
-
-Make & Install
-^^^^^^^^^^^^^^
-
-On **Linux/OSX** CMake will generate a ``Makefile`` in ``cmake-build``,
-with a few useful targets:
-
--  ``make`` will build Extempore (if you have a multicore machine, you
-   can try e.g. ``make -j4`` to parallelize the ``make`` step,
-   especially since LLVM takes so long to build)
--  ``make install`` will install ``extempore`` into ``/usr/local/bin``
--  ``make uninstall`` will remove the installed files
--  ``make aot``/``make aot_extended`` will ahead-of-time compile the
-   core/extended "standard library"
-
-On **Windows**, CMake will generate a Visual Studio solution (``.sln``)
-in ``cmake-build``. Open it, and build the ``ALL_BUILD`` target.
-Alternatively, you can do it from the command line with::
-
-  cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --config Release --target ALL_BUILD
-
+.. _here: http://www.mega-nerd.com/libsndfile/#Download
 .. _install-extended-doc:
 
 "Extended" shared libs
 ----------------------
 
-Extempore is all about being dynamic and adding functionality
-on-the-fly. As a result, there are a bunch of helpful libraries which
-provide *extended* functionality (e.g. for sound file IO, FFTs,
-graphics) which we use a lot, but which aren't compiled statically
-into the ``extempore`` executable. Instead, we load this code at
-runtime through shared libraries (``.dylib`` on OSX, ``.so`` on Linux
-and ``.dll`` on Windows). This means that you have to have these
-shared libraries on your system somewhere where Extempore can find
-them.
+The full list of external libraries required for the Extempore
+standard library are:
 
-If you :ref:`build Extempore from source using CMake
-<build-from-source-doc>` (or install through homebrew with the
-``--with-extended`` flag) you'll automatically get these
-dependencies---job done. The one caveat to this is on Windows you need
-to download the **libsndfile** ``.lib`` and ``.dll`` yourself from
-here `here`_ and move them into ``libs/platform-shlibs`` (or if anyone
-can figure out how to build a 64-bit libsndfile on Windows in a sane
-way then let me know).
+* apr 1.5.2
+* assimp 3.2
+* expat 2.1.0
+* glfw3 3.1.2
+* kiss_fft 1.3.0
+* nanovg
+* portmidi 217
+* sndfile 1.0.26
+* stb_image
 
-.. _here: http://www.mega-nerd.com/libsndfile/#Download
+For those who are interested, there are a few reasons that Extempore
+builds and maintains its own world of shared libs (``in
+libs/platform-shlibs`` if you're interested)
 
-If you want to get them yourself (e.g. through your system's package
-manager) you need to specify an additional ``-DBUILD_DEPS=OFF``
-during the :ref:`cmake configure step <install-configure-doc>` option.
-Then, on **OSX** you can get them through homebrew (assuming you've
-done a ``brew tap benswift/extempore``)::
+#. Windows - there's no lib path on Windows, so it's up to each
+   program to make sure it ships with the dlls it needs (and knows
+   where to find them)
 
-    brew install assimp libsndfile portmidi libkiss-fft glfw3 libstb-image libnanovg
+#. library versioning is a bit of a mess at the best of times, so by
+   building specific versions of e.g. GLFW or assimp, Extempore can
+   guarantee that the bindings will work - otherwise you'll get weird
+   errors.
 
-or on **Debian/Ubuntu** you can use ``apt-get``::
+#. packaging - for packaging (as described above in the note on the
+   ``PACKAGE`` variable) it's important to turn off all cpu-specific
+   optimisations, and set various compiler flags. Packages installed
+   through a package manager don't do this, and so when building e.g.
+   a dmg for distribution on OSX it's necessary to make sure any
+   compiled objects (including dependencies and Extempore itself) have
+   been compiled with the right flags.
 
-    sudo apt-get install libasound2-dev libgl1-mesa-dev libsndfile1-dev libassimp3 libglfw3 libportmidi-dev
-
-although you'll have to build `KissFFT`_, `stb\_image`_ and `nanovg`_
-yourself.
-
-.. _KissFFT: https://github.com/extemporelang/kiss_fft
-.. _stb\_image: https://github.com/extemporelang/stb
-.. _nanovg: https://github.com/extemporelang/nanovg
-
-On **Windows**, there isn't a package manager which will do the job so
-you'll need to build from source. Since Windows doesn't have a lib path,
-all the dlls should go in ``c:/path/to/extempore/libs/platform-shlibs``.
-So for all these deps, move the dll in there when it's done.
-
-AOT-compiling the Extempore standard library
---------------------------------------------
-
-This step isn't necessary, but it will make some common Extempore
-libraries load up much faster. There are a few ways to do this, but
-the easiest way is to use the ``aot`` target generated by the CMake
-configure process::
-
-    cd extempore/cmake-build # or wherever your Extempore build dir is
-    make aot
-
-If you want the :ref:`extended <install-extended-doc>` Extempore
-standard library, then use the ``make aot_extended`` target instead.
-
-To remove the AOT-compiled files, use the ``clean_aot`` target in the
-makefile or MSVS project.
+Still, if you're keen to get these libraries some other way (e.g.
+through your system-provided package manager) then that's fine - just
+use ``-DBUILD_DEPS=OFF``.
 
 LLVM 3.7.0
 ----------
@@ -337,35 +348,3 @@ If you **do** build your own patched version of LLVM for Extempore,
 then make sure you set the ``EXT_LLVM_DIR`` environment variable to
 point to that directory (where you installed LLVM) so that the
 Extempore build process knows where to find it.
-
-Packaging
----------
-
-*Note: this is still experimental - things may not work, but
-patches/suggestions welcome!*
-
-To build a "package" for binary distribution, use the ``-DPACKAGE=ON``
-cmake option.
-
-OSX
-^^^
-
-::
-
-    cmake -DPACKAGE=ON .. && make -j8 aot_extended && make package
-
-Windows
-^^^^^^^
-
-On Windows it takes a few more steps, since you have to run the
-``aot_extended`` script from the top-level Extempore directory.
-
-.. code::
-
-  # build extempore
-  cmake -G"Visual Studio 14 2015 Win64" -DASIO=ON -DPACKAGE=ON .. && cmake --build . --config Release --target package
-
-Linux
-^^^^^
-
-TODO - investigate the CPack Debian package generator.
