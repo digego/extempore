@@ -68,10 +68,10 @@ remove a couple of things first::
 
     brew rm extempore kissfft libnanovg
 
-If you're on OSX **10.9** or earlier, there's an incompatibility with
-your version of clang and the LLVM 3.7.0 which Extempore uses. For the
-moment the easiest way around this is to download the old ``0.5.9``
-version of Extempore with::
+If you're on OSX 10.9 or earlier, there's an incompatibility with your
+version of clang and the LLVM 3.7.0 which Extempore uses. For the
+moment the easiest way around this is to download the old 0.5.9
+release of Extempore with::
 
     brew tap benswift/extempore
     brew install extempore059 --with-extended
@@ -81,19 +81,22 @@ version of Extempore with::
 Build from source (all platforms)
 ---------------------------------
 
-The CMake-powered build-from-source workflow will download and build
-all the dependencies you need (including LLVM). So, if you've got a
-C++ compiler, git and CMake (and an :ref:`ALSA backend
+The build-from-source workflow will download and build all the
+dependencies you need (including LLVM). So, if you've got a C++
+compiler, git and CMake (and an :ref:`ALSA backend
 <linux-portaudio-backend-instructions>` on Linux) then here are some
-one-liner build commands.
+one-liner build commands:
 
-On Linux/OSX::
+On **Linux/OSX**::
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
 
 On **Windows**::
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target Release
+
+If you have problems, check out the :ref:`platform-specific notes
+below <platform-specific-build-docs>`.
 
 Options, Variables and Targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -179,6 +182,8 @@ clean_aot
 extempore
   build just the extempore executable
 
+.. _platform-specific-build-docs:
+
 Platform-specific notes
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -261,8 +266,8 @@ me know).
 .. _here: http://www.mega-nerd.com/libsndfile/#Download
 .. _install-extended-doc:
 
-"Extended" shared libs
-----------------------
+Shared library dependencies
+---------------------------
 
 The full list of external libraries required for the Extempore
 standard library are:
@@ -278,19 +283,18 @@ standard library are:
 * stb_image
 
 For those who are interested, there are a few reasons that Extempore
-builds and maintains its own world of shared libs (``in
-libs/platform-shlibs`` if you're interested)
+builds and maintains its own "world" of shared lib dependencies:
 
-#. Windows - there's no lib path on Windows, so it's up to each
-   program to make sure it ships with the dlls it needs (and knows
-   where to find them)
+#. there's no lib path on **Windows**, so it's up to each program to
+   make sure it ships with the dlls it needs (and knows where to find
+   them)
 
-#. library versioning is a bit of a mess at the best of times, so by
-   building specific versions of e.g. GLFW or assimp, Extempore can
+#. library **versioning** is a bit of a mess at the best of times, so
+   by building specific versions of e.g. GLFW or assimp, Extempore can
    guarantee that the bindings will work - otherwise you'll get weird
    errors.
 
-#. packaging - for packaging (as described above in the note on the
+#. for **packaging** (as described above in the note on the
    ``PACKAGE`` variable) it's important to turn off all cpu-specific
    optimisations, and set various compiler flags. Packages installed
    through a package manager don't do this, and so when building e.g.
