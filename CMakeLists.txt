@@ -387,7 +387,7 @@ endif()
 
 add_dependencies(extempore pcre portaudio)
 
-if(BUILD_DEPS)
+if(BUILD_LLVM)
   if(WIN32)
     add_dependencies(extempore LLVM_install)
   else()
