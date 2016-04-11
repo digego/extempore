@@ -27,18 +27,22 @@
 ;;
 (bind-func async:[[!a]*,[!a]*]*
   (lambda (f)
-    (let ((res (convert null))
-          (z1 (create_zone 4096))
+    ;; (println "zone in:" (peek_zone))
+    (let ((z1 (push_new_zone 4096))
+          (res (convert null))
           (ff (lambda ()
                 (push_zone z1)
                 (set! res (f))
                 (pop_zone)
                 void))
-          (thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*))))
+          (thread null))
+      (pop_zone)
+      (set! thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*)))
       (lambda ()
         (thread_join thread)
         (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
           (llvm_zone_destroy z1)
+          (thread_destroy thread)
           r2)))))
 
 ;; async returns a 'future'
@@ -49,36 +53,38 @@
 ;;
 (bind-func async:[[!a]*,[!a,!b]*,!b]*
   (lambda (f arg)
-    (let ((res (convert null))
-          (z1 (create_zone 4096))
+    ;; (println "zone in:" (peek_zone))
+    (let ((z1 (push_new_zone 4096))
+          (res (convert null))
           (ff (lambda ()
                 (push_zone z1)
                 (set! res (f arg))
                 (pop_zone)
                 void))
-          (thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*))))
+          (thread null))
+      (pop_zone) ;; pop z1      
+      (set! thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*)))
       (lambda ()
         (thread_join thread)
         (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
           (llvm_zone_destroy z1)
+          (thread_destroy thread)          
           r2)))))
 
 
-;; 
 (bind-macro
   "spawn a new thread"
   (spawn f)
   (let* ((sym (symbol->string (gensym)))
          (s (string-append sym ":[void]*")))
-    `(let ((z1 (Zone 2048)))
-       (push_zone z1)
-       (let ((,(string->symbol s) ,f)
-             (k2:i8* (zalloc 10))
-             (t:<[void]*,mzone*>* (zalloc)))
-         (tset! t 0 ,(string->symbol sym))
-         (tset! t 1 z1)
-         (pop_zone)
-         (thread_fork (get_native_fptr thread_native_call_with_zone) (cast t i8*))))))
+    `(let ((z1 (push_new_zone 2048))
+           (,(string->symbol s) ,f)
+           (k2:i8* (zalloc 10))
+           (t:<[void]*,mzone*>* (zalloc)))
+       (tset! t 0 ,(string->symbol sym))
+       (tset! t 1 z1)
+       (pop_zone)
+       (thread_fork (get_native_fptr thread_native_call_with_zone) (cast t i8*)))))
 
 (bind-macro
   "spawn a new thread (sync)"

@@ -47,27 +47,26 @@
 (bind-func await_futures
   (lambda (num:i64)
     (letz ((future1 (async (lambda () ;; aysnc accepts zero arguments
-                            (println "start async 1")
-                            (let ((res 0))
-                              (thread_sleep 2 0)
-                              (doloop (i num) (set! res (+ res (* i i i))))
-                              (println "done with async 1")
+                            (let ((ress 0))
+                              (thread_sleep (random 0 3) 0)
+                              (doloop (i num) (set! ress (+ ress (* i i i))))
                               5))))
           (future2 (async (lambda (x) ;; async also optionally accepts one argument
-                            (println "start async 2")
-                            (thread_sleep 3 0)
-                            (println "done with async 2")
+                            (thread_sleep (random 0 3) 0)
                             x)
                           10)) ;; must give async the argument to be applied!
-          (res 0))
-      (thread_sleep 0 50000) 
-      (println "Do some other work while we WAIT!")
+          (result 0))
+      (println "\nRandom sleep 0-5 seconds")
+      (thread_sleep (random 0 5) 0)
       ;; add two futures!
-      (set! res (+ (future1) (future2)))
-      (println "(future1) + (future2) =" res)
-      res)))
+      (set! result (+ (future1) (future2)))
+      (println "(future1) + (future2) =" result)
+      result)))
 
-(await_futures 100000)
+($ 
+ (doloop (i 10)
+   (println "\ni:" i)
+   (await_futures 100000)))
 
 ;;
 ;; parallel map
