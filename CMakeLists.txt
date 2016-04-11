@@ -327,6 +327,26 @@ endforeach()
 # *must* have Boost on Windows
 if(WIN32)
   set(BOOST ON)
+  if(NOT BOOST_DIR)
+    # if BOOST_DIR has been set elsewhere, assume it's all present and
+    # correct and go with that. Otherwise, download boost with nuget
+    # commandline tool and stick it in ${CMAKE_SOURCE_DIR}/boost
+    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
+    # check nuget commandline tool is installed
+    find_program(NUGET nuget)
+    if(NOT NUGET)
+      message(FATAL "Cannot find nuget command line tool.\nEither install it with e.g. choco install nuget.commandline, or get boost some other way and set the -DBOOST_DIR variable")
+    else()
+      if(NOT IS_DIRECTORY ${BOOST_DIR})
+        # if directory exists, assume this step has already been done
+        message(STATUS "Downloading boost components into ${CMAKE_SOURCE_DIR}/boost with \"nuget install\"")
+        file(MAKE_DIRECTORY ${BOOST_DIR})
+        execute_process(
+          COMMAND ${NUGET} install -Version 1.59 boost-vc140
+          WORKING_DIRECTORY ${BOOST_DIR})
+      endif()
+    endif()
+  endif()
 endif()
 
 #############
@@ -461,23 +481,11 @@ if(WIN32)
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
 endif()
 
-# boost (messily hardcoded for version 1.59 and Visual Studio 14)
-
 if(BOOST)
-  if(NOT BOOST_DIR)
-    message(STATUS "Searching for boost libs in ${CMAKE_SOURCE_DIR}/boost")
-    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
-  endif()
-  target_compile_definitions(extempore PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
-  # asio header
-  find_path(BOOST_ASIO_INCLUDE_DIR
-    NAMES boost/asio.hpp
-    PATHS ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
-  if(BOOST_ASIO_INCLUDE_DIR)
-    target_include_directories(extempore PRIVATE ${BOOST_ASIO_INCLUDE_DIR})
-  else()
-    message(FATAL_ERROR "Cannot find boost/asio.hpp header")
-  endif()
+  target_include_directories(extempore
+    PRIVATE ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
   target_link_libraries(extempore
     PRIVATE ${BOOST_DIR}/boost_date_time-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
     PRIVATE ${BOOST_DIR}/boost_regex-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
