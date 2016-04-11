@@ -144,6 +144,7 @@ uint64_t string_hash(unsigned char* str);
   int64_t llvm_now();
 
   void* thread_fork(void*(*start_routine)(void*),void* args);
+  void thread_destroy(void* thread);  
   int thread_join(void* thread);
   int thread_kill(void* thread);
   int thread_equal(void* thread1, void* thread2);

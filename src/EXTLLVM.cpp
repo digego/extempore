@@ -861,6 +861,13 @@ void* thread_fork(void*(*start_routine)(void*),void* args) {
 	return static_cast<void*>(thread);
 }
 
+void thread_destroy(void* thread) {
+
+  delete static_cast<extemp::EXTThread*>(thread);
+
+	return;
+}
+
 int thread_join(void* thread) {
 	return static_cast<extemp::EXTThread*>(thread)->join();
 }
@@ -885,7 +892,7 @@ void* thread_self() {
 int64_t thread_sleep(int64_t secs, int64_t nanosecs) {
 #ifdef _WIN32
   std::this_thread::sleep_for(std::chrono::seconds(secs) +
-                              std::chrono::nanoseconds(nanosecs));
+                             std::chrono::nanoseconds(nanosecs));
   return 0;
 #else
   struct timespec a, b;
@@ -1048,7 +1055,7 @@ int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
 double imp_randd()
 {
 #ifdef EXT_BOOST
-  return extemp::UNIV::random();
+    return extemp::UNIV::random();
 #else
     return (double)rand()/(double)RAND_MAX;
 #endif
@@ -1057,7 +1064,7 @@ double imp_randd()
 float imp_randf()
 {
 #ifdef _WIN32
-  return extemp::UNIV::random();
+    return extemp::UNIV::random();
 #else
     return (float)rand()/(float)RAND_MAX;
 #endif
@@ -1066,7 +1073,7 @@ float imp_randf()
 int64_t imp_rand1_i64(int64_t a)
 {
 #ifdef _WIN32
-  return (int64_t) extemp::UNIV::random()*a;
+  return (int64_t) ((double)extemp::UNIV::random()*(double)a);
 #else
   return (int64_t) (((double)rand()/(double)RAND_MAX)*(double)a);
 #endif
@@ -1084,7 +1091,7 @@ int64_t imp_rand2_i64(int64_t a, int64_t b)
 int32_t imp_rand1_i32(int32_t a)
 {
 #ifdef _WIN32
-  return (int32_t) extemp::UNIV::random()*(double)a;
+  return (int32_t) ((double)extemp::UNIV::random()*(double)a);
 #else
   return (int32_t) (((double)rand()/(double)RAND_MAX)*(double)a);
 #endif
@@ -1812,6 +1819,7 @@ namespace extemp {
 	    EE->updateGlobalMapping("free16", (uint64_t)&free16);
 	    EE->updateGlobalMapping("list_ref", (uint64_t)&list_ref);
 	    EE->updateGlobalMapping("thread_fork", (uint64_t)&thread_fork);
+	    EE->updateGlobalMapping("thread_destroy", (uint64_t)&thread_destroy);      
 	    EE->updateGlobalMapping("thread_join", (uint64_t)&thread_join);
 	    EE->updateGlobalMapping("thread_kill", (uint64_t)&thread_kill);
 	    EE->updateGlobalMapping("thread_self", (uint64_t)&thread_self);
