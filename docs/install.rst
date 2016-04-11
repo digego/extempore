@@ -182,6 +182,10 @@ clean_aot
 extempore
   build just the extempore executable
 
+assets
+  download the assets e.g. sound files, 3D model files which are
+  referenced in the examples
+
 .. _platform-specific-build-docs:
 
 Platform-specific notes
