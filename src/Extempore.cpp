@@ -167,10 +167,19 @@ int main(int argc, char** argv)
           initexpr = std::string(args.OptionArg());
           initexpr_on = true;
     break;
-        case OPT_INITFILE:
-          initexpr = std::string("(sys:load \"") + std::string(args.OptionArg()) + std::string("\")");
-          initexpr_on = true;	  
+  case OPT_INITFILE: {
+    size_t start_pos = 0;
+    std::string str(args.OptionArg());
+    std::string from("\\");
+    std::string to("\\\\");
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+         str.replace(start_pos, from.length(), to);
+         start_pos += to.length();
+    }
+    initexpr = std::string("(sys:load \"") + str + std::string("\")");
+    initexpr_on = true;	  
 	  break;
+  }
   case OPT_NOBASE:
     extemp::UNIV::EXT_LOADBASE = 0;
     break;
