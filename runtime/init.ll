@@ -64,6 +64,7 @@ declare i32 @unswap32i(i32)
 ;; thread stuff
 ;;declare i8* @thread_fork(i8*(i8*)*,i8*);
 declare i8* @thread_fork(i8*,i8*);
+declare void @thread_destroy(i8*);
 declare i32 @thread_join(i8*);
 declare i32 @thread_kill(i8*);
 declare i8* @thread_self();
