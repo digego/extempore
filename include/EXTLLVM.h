@@ -201,9 +201,7 @@ namespace llvm {
   class Function;
   class StructType;  
   class ModuleProvider;
-#ifdef EXT_MCJIT
   class SectionMemoryManager;
-#endif
   class ExecutionEngine;  
 
   namespace legacy {
@@ -226,9 +224,7 @@ namespace extemp {
   llvm::GlobalVariable* getGlobalVariable(std::string);
   llvm::StructType* getNamedType(std::string);
   llvm::GlobalValue* getGlobalValue(std::string);
-#ifdef EXT_MCJIT  
   uint64_t getSymbolAddress(std::string);
-#endif
   void addModule(llvm::Module* m) { Ms.push_back(m); }
   std::vector<llvm::Module*>& getModules() { return Ms; }
 	
@@ -241,9 +237,7 @@ namespace extemp {
 	llvm::ModuleProvider* MP;
 	llvm::ExecutionEngine* EE;
   llvm::legacy::PassManager* PM;
-#ifdef EXT_MCJIT
   std::unique_ptr<llvm::SectionMemoryManager> MM;
-#endif  
 
     private:
   std::vector<llvm::Module*> Ms;  

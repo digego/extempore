@@ -1495,9 +1495,7 @@ namespace extemp {
 	M = 0;
 	MP = 0;
 	EE = 0;
-#ifdef EXT_MCJIT
   MM = 0;
-#endif
 	//initLLVM();
     }
 	
@@ -1563,11 +1561,9 @@ namespace extemp {
     return NULL;
   }
 
-#ifdef EXT_MCJIT  
-    uint64_t EXTLLVM::getSymbolAddress(std::string name) {      
-      return MM->getSymbolAddress(name);
-    }
-#endif
+  uint64_t EXTLLVM::getSymbolAddress(std::string name) {
+    return MM->getSymbolAddress(name);
+  }
 
 
 	
@@ -1599,12 +1595,8 @@ namespace extemp {
       factory.setEngineKind(llvm::EngineKind::JIT);
       // factory.setAllocateGVsWithCode(false);
       factory.setTargetOptions(Opts);
-#ifdef EXT_MCJIT
       std::unique_ptr<llvm::SectionMemoryManager> MM = llvm::make_unique<llvm::SectionMemoryManager>();
       factory.setMCJITMemoryManager(std::move(MM));
-#else          
-      factory.setUseMCJIT(false);
-#endif
 #ifdef _WIN32
       if(!extemp::UNIV::ATTRS.empty()) factory.setMAttrs(extemp::UNIV::ATTRS);
       if(!extemp::UNIV::CPU.empty()) factory.setMCPU(extemp::UNIV::CPU.front());
@@ -1680,11 +1672,7 @@ namespace extemp {
       std::cout << "LLVM           : " << std::flush;
       ascii_text_color(1,6,10);
       std::cout << LLVM_VERSION_STRING;
-#ifdef EXT_MCJIT
       std::cout << " MCJIT" << std::endl;
-#else
-      std::cout << " JIT" << std::endl;
-#endif          
       ascii_text_color(0,7,10);
           
 
@@ -1841,9 +1829,7 @@ namespace extemp {
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
       EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
-#ifdef EXT_MCJIT
       extemp::EXTLLVM::I()->EE->finalizeObject();
-#endif
       return;
     }
   }

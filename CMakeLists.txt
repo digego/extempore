@@ -408,8 +408,6 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 
 # compiler options
 
-target_compile_definitions(extempore PRIVATE -DEXT_MCJIT)
-
 if(PACKAGE)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR=".")

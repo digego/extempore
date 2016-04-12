@@ -166,11 +166,7 @@
 (bind-type aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,i32>) ;; good
 ;; mPrimitiveTypes(0),mNumVertices(1),mNumFaces(2),mVertices(3),mNormals(4),mTangents(5),mBitangents(6),mColors(7),mTextureCoords(8),mNumUVComponents(9),mFaces(10),mNumBones(11),mBones(12),mMaterialIndex(13),mName(14),mNumAnimMeshes(15)
 
-;; NOTE! the old JIT got the size of the aiMesh struct wrong - hence
-;; the trailing i64 for padding. This is not necessary under MCJIT
-(if (sys:mcjit-enabled)
-    (bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**>)
-    (bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>)) ;; i64 on end is padding
+(bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>) ;; i64 on end is padding
 
 ;; mTranslation,mScaling,mRotation
 (bind-type aiUVTransform <aiVector2D,aiVector2D,float>) ;; good
