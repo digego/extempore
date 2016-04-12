@@ -26,7 +26,7 @@
 (bind-func dsp:DSP
   (lambda (in time chan dat)
     (cond ((< chan 2)
-	   (sampler in time chan dat))
+           (* 3.0 (sampler in time chan dat)))
 	  (else 0.0))))
 
 (dsp:set! dsp)
@@ -48,113 +48,29 @@
 ;; first let's just read in one sample
 ;; we'll choose an index of 60 - the midi note number for middle C
 ;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "assets/samples/piano/60.wav" 60 0 0 0 1)
+(set-sampler-index sampler "assets/samples/christmas_carol.aif" 60 (* 44100 90) 0 0 1)
 
 ;; playing back at 60 should playback without pitch shift
-(play-note (now) sampler 60 80 100000)
+(play-note (now) sampler 60 120 (* 44100 15))  ;; play 15 seconds
 
 ;; anything else will pitch shift
 ;; floating point is OK
-(play-note (now) sampler 67.25 80 100000)
+(play-note (now) sampler 67.25 120 (* 44100 15)) ;; play 15 seconds
 
 ;; a loop
 (define loop
   (lambda (beat dur)
-    (play sampler (random 48 72) 80 dur)
+    (play sampler (random 48 72) 120 dur)
     (callback (*metro* (+ beat (* .5 dur))) 'loop
               (+ beat dur)
               dur)))
 
 ;; start loop
 ;; uncomment and call this to start loop
-; (loop (*metro* 'get-beat 4) 8)
+;; (loop (*metro* 'get-beat 4) 8)
 
-
-;; Now, let's load a whole 'instrument' worth of samples in to the sampler.
-;; There are lots of sample libraries available on the net these days,
-;; both free ones and ones that cost money.  There are some good free
-;; piano samples avaliable at 
-;; http://theremin.music.uiowa.edu/MISpiano.html
-
-;; Now, you can load the samples for each individual note in manually,
-;; choosing the appropriate index for the differently pitched notes.
-;; However, it's handy to be able to automatically load a whole
-;; directory of different samples into the right slots in the sampler.
-;; This requires some way of determining from the filenames which
-;; index to load the sample into. Luckily, the instruments.xtm library
-;; file we loaded earlier contains a helper macro called
-;; `load-sampler'.
-
-;; The load-sampler macro takes 4 arguments (just like
-;; set-sampler-index):
-;; 1) the sampler instrument to load the audio data into
-;; 2) the (full or relative) path to the directory where the files are
-;; 3) the sample bank index (starting from 0)
-;; 4) the name parser function (see below)
-
-;; So, say the files are stored in a directory like
-;; A0.aiff
-;; A1.aiff
-;; Ab1.aiff
-;; Ab2.aiff
-;; B0.aiff
-;; B1.aiff
-;; etc.
-;; then we need to parse the note names A, Ab (A-flat), B and octaves
-;; (the number after the note name) from the filename and figure out
-;; which sampler index (that is, which midi note number) to put the
-;; audio data into.  Because there are heaps of different naming
-;; conventions which a sample library might use for their files,
-;; `load-sampler' instead asks you to provide a function which it will
-;; apply to the list of filenames, and return a list where each
-;; element has the filename and the appropriate sample index, offset
-;; and length values.  As an example, this
-;; function will work for files named with the A0.aiff convention shown above
-
-(define parse-sample-names-2
-  (lambda (file-list)
-    (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*([ABCDEFG][#b]?[0-9]).*\.(wav|aif|aiff|ogg)$")))
-             (if (null? result)
-                 (begin (println 'Error: 'cannot 'parse 'filename: fname)
-                        #f)
-                 (list fname                                    ; filename                   
-                       (note-name-to-midi-number (cadr result)) ; midi note number           
-                       0                                        ; offset                     
-                       0))))                                    ; length (0 for whole sample)
-         file-list)))
-
-;; if we call `parse-sample-names-2' with a list of files, we get
-
-(println (parse-sample-names-2 '("A1.wav" "B1.wav" "C2.wav")))
-
-;; each element of the returned list contains the filename, the midi
-;; note number, and the offset and length values (which will both be 0
-;; in most cases).  Even if you've got weirdly named samples, as long
-;; as your parser returns the data in this way then the sampler will
-;; know how to load itself up.
-
-;; The MIS piano samples available from
-;; http://theremin.music.uiowa.edu/MISpiano.html use this convention:
-;; Piano.mf.A2.aiff is a medium-loud (mf) sample of the note A2. So,
-;; if we wanted to load all the mf samples in the directory, we could
-;; use:
-
-(define parse-MIS-piano-mf
-  (lambda (file-list)
-    (map (lambda (samp-data)
-           (if (and samp-data
-                    (regex:match? (car samp-data) ".*\.mf\..*"))
-               samp-data
-               #f))
-         (parse-sample-names-2 file-list))))
-
-;; So, to load all the mf samples into sampler bank 1
-
-(load-sampler sampler
-              "assets/piano/"
-              1
-              parse-MIS-piano-mf)
+;; Now let's load a 'whole instrument' from a directory of samples!
+(load-sampler sampler "assets/samples/piano/")
 
 ;; the final two arguments (offset and length) are zero, meaning that
 ;; the samper should use an offset of zero and the full length of the
@@ -185,20 +101,6 @@
                   (random '(0 8))))))
 
 (loop2 (*metro* 'get-beat 4) 4 0)
-
-;; finally, let's load up a piano. There are some piano samples in
-;; assets/samples/piano which are named according to the midi pitch
-;; number they represent (so we'll want to use parse-sample-names-1)
-
-(load-sampler sampler "assets/samples/piano" 2 parse-sample-names-1)
-
-(define chromatic-scale
-  (lambda (beat dur pitch)
-    (play sampler pitch (cosr 50 20 1/4) (* dur 1.4) 2)
-    (callback (*metro* (+ beat (* .5 dur))) 'chromatic-scale (+ beat dur) dur
-              (if (< pitch 108) (+ pitch 1) 24))))
-
-(chromatic-scale (*metro* 'get-beat 4) 1/4 24)
 
 ;; try messing around with the ADSR parameters to see how it affects the sound
 
