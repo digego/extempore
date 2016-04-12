@@ -130,17 +130,15 @@
      void)
     void))
 
-;; glfw requires a local event poll
-;; on the primary process so we
-;; leave this in here as a scheme call
-;; for convenience.
-(define local-poll
-  (lambda ()
-    (glfw_poll_events)
-    (callback (+ (now) 1000) 'local-poll)))
+(bind-func event_poll
+  (lambda (beat)
+    (glfwPollEvents)
+    (sched bs1 (+ 1/16 beat) event_poll:[void,Rational]*)
+    void))
 
-;; start 'event' poll (on primary) for glfw
-(local-poll)
+;; start event poll
+($ (let ((beat:Rational (bs1.beat)))
+     (sched bs1 beat event_poll)))
 
 ;; helper function
 (bind-func floor_rat
@@ -148,4 +146,6 @@
     (- a (% a 1/1))))
 
 ;; start music loop on beat thread (i.e. bs1)
-($ (sched bs1 (+ 2/1 (floor_rat (bs1.beat))) beat_loop:[void,Rational]*))
+($ (let ((beat (+ 2/1 (floor_rat (bs1.beat)))))
+     (sched bs1 beat beat_loop)))
+
