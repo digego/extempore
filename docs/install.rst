@@ -93,7 +93,7 @@ On **Linux/OSX**::
 
 On **Windows**::
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target Release
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
 If you have problems, check out the :ref:`platform-specific notes
 below <platform-specific-build-docs>`.
