@@ -44,6 +44,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <signal.h>
+#else
 #include "llvm/Support/Host.h"
 #endif
 #ifdef __APPLE__
