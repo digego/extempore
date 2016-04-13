@@ -95,10 +95,6 @@ endif()
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
 
-# enable CTest testing for this directory
-include(CTest)
-enable_testing()
-
 ########
 # PCRE #
 ########
@@ -829,6 +825,8 @@ add_dependencies(aot_extended extended_deps)
 #########
 # tests #
 #########
+
+include(CTest)
 
 if(BUILD_TESTING)
   add_test(
