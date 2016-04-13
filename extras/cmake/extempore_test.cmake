@@ -4,7 +4,7 @@ set(CTEST_SITE "http:://extempore.moso.com.au")
 find_program(CTEST_GIT_COMMAND NAMES git)
 
 if(UNIX)
-  set(CTEST_BASE_DIRECTORY "$ENV{TMPDIR}/extempore-ctest/")
+  set(CTEST_BASE_DIRECTORY "/tmp/extempore-ctest/")
 elseif(WIN32)
   set(CTEST_BASE_DIRECTORY "$ENV{TEMP}/extempore-ctest/")
 endif()
