@@ -1,5 +1,3 @@
-include(CTest)
-
 set(CTEST_PROJECT_NAME Extempore)
 set(CTEST_SITE "http:://extempore.moso.com.au")
 
@@ -44,7 +42,7 @@ set(CTEST_DROP_LOCATION "/submit.php?project=Extempore")
 set(CTEST_DROP_SITE_CDASH TRUE)
 
 # do all the things
-ctest_start("Nightly")
+ctest_start(Nightly)
 ctest_update()
 ctest_configure()
 ctest_build()
