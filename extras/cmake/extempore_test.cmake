@@ -36,8 +36,7 @@ set(CTEST_CONFIGURE_COMMAND "${CMAKE_COMMAND} \"-G${CTEST_CMAKE_GENERATOR}\" -DC
 
 # Open CDash config
 
-set(CTEST_NIGHTLY_START_TIME "00:00:00 EST")
-
+set(CTEST_NIGHTLY_START_TIME "00:00:00 AEST")
 set(CTEST_DROP_METHOD "http")
 set(CTEST_DROP_SITE "my.cdash.org")
 set(CTEST_DROP_LOCATION "/submit.php?project=Extempore")
