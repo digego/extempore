@@ -1,5 +1,5 @@
 set(CTEST_PROJECT_NAME Extempore)
-set(CTEST_SITE "http:://extempore.moso.com.au")
+set(CTEST_SITE "Extempore")
 
 find_program(CTEST_GIT_COMMAND NAMES git)
 
