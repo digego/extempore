@@ -829,9 +829,8 @@ add_dependencies(aot_extended extended_deps)
 # tests #
 #########
 
-include(CTest)
-
 if(BUILD_TESTING)
+  include(CTest)
   add_test(
     NAME core
     COMMAND extempore --noaudio --port=17097 --run tests/all-core.xtm)

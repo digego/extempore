@@ -1,3 +1,5 @@
+include(CTest)
+
 set(CTEST_PROJECT_NAME Extempore)
 
 find_program(CTEST_GIT_COMMAND NAMES git)
