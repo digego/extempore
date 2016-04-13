@@ -1,6 +1,7 @@
 include(CTest)
 
 set(CTEST_PROJECT_NAME Extempore)
+set(CTEST_SITE "http:://extempore.moso.com.au")
 
 find_program(CTEST_GIT_COMMAND NAMES git)
 
