@@ -138,34 +138,38 @@
 
 (define xtmtest-run-tests
   (lambda (test-files print? quit-on-exit?)
-    (sys:load "libs/core/test.xtm" 'quiet)
-    (xtmtest-reset-results)
-    (if (string? test-files)
-        (set! test-files (list test-files)))
-    (let ((start (now)))
-      (for-each (lambda (tf)
-                  (sys:load tf))
-                test-files)
-      (if print? (xtmtest-print-results))
-      (print "\nCompleted ")
-      (print-with-colors 'blue 'default #t
-                         (print (apply + (map (lambda (lab) (- (length lab) 1))
-                                              *xtmtest-results*))))
-      (print " tests in ")
-      (let ((dur-sec (/ (- (now) start) *au:samplerate* 1.0)))
-        (print-with-colors 'yellow 'default #t
-                           (print (if (> dur-sec 60) (/ dur-sec 60) dur-sec)))
-        (print (if (> dur-sec 60)
-                   " minutes.\n\n"
-                   " seconds.\n\n"))))
-    (if quit-on-exit?
-        (quit (if (cl:some (lambda (label-list)
-                             (and (not (equal? (car label-list) 'correct))
-                                  (> (length label-list) 1)))
-                           *xtmtest-results*)
-                  (begin (print-with-colors 'red 'default #t
-                                            (print "Some tests failed :(\n"))
-                         1)
-                  (begin (print-with-colors 'green 'default #t
-                                            (print "All tests passed :)\n"))
-                         0))))))
+    (let ((timeout (sys:get-default-timeout)))
+      (sys:set-default-timeout (* 60 44100 60)) ;; 1 hour timeout
+      (sys:load "libs/core/test.xtm" 'quiet)
+      (xtmtest-reset-results)
+      (if (string? test-files)
+          (set! test-files (list test-files)))
+      (let ((start (now)))
+        (for-each (lambda (tf)
+                    (sys:load tf))
+                  test-files)
+        (if print? (xtmtest-print-results))
+        (print "\nCompleted ")
+        (print-with-colors 'blue 'default #t
+                           (print (apply + (map (lambda (lab) (- (length lab) 1))
+                                                *xtmtest-results*))))
+        (print " tests in ")
+        (let ((dur-sec (/ (- (now) start) *au:samplerate* 1.0)))
+          (print-with-colors 'yellow 'default #t
+                             (print (if (> dur-sec 60) (/ dur-sec 60) dur-sec)))
+          (print (if (> dur-sec 60)
+                     " minutes.\n\n"
+                     " seconds.\n\n"))))
+      (if quit-on-exit?
+          (quit (if (cl:some (lambda (label-list)
+                               (and (not (equal? (car label-list) 'correct))
+                                    (> (length label-list) 1)))
+                             *xtmtest-results*)
+                    (begin (print-with-colors 'red 'default #t
+                                              (print "Some tests failed :(\n"))
+                           1)
+                    (begin (print-with-colors 'green 'default #t
+                                              (print "All tests passed :)\n"))
+                           0)))
+          ;; if not quitting, set the timeout back
+          (sys:set-default-timeout timeout)))))
