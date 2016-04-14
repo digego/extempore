@@ -7442,11 +7442,14 @@ xtlang's `let' syntax is the same as Scheme"
             (set! a (impc:ti:type-check (cadr ast) vars kts
                                         (map (lambda (k) (impc:ir:pointer++ k))
                                              (cl:remove-if-not impc:ir:type? c))))))
-      (if (not (null? a))
-          (if (not (impc:ir:pointer? (if (impc:ir:type? a) a
-                                         (if (list? a) (car a) a))))
-              (impc:compiler:print-bad-type-error a "trying to pset! into a value")))
 
+      (if (not (null? a))
+          (if (and (not (impc:ir:pointer? (if (impc:ir:type? a) a
+                                             (if (list? a) (car a) a))))
+                   (not (symbol? (if (impc:ir:type? a) a
+                                     (if (list? a) (car a) a)))))
+              (impc:compiler:print-bad-type-error a "trying to pset! into a value")))
+      
       (if (and (list? c) (= 1 (length c))) (set! c (car c)))
 
       (if (and (symbol? (cadr ast))
@@ -7504,7 +7507,8 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:heap-alloc-check
   (lambda (ast vars kts request?)
     (if (and request?
-             (not (impc:ir:pointer? request?)))
+             (not (impc:ir:pointer? request?))
+             (not (symbol? request?)))
         (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
     (if (= (length ast) 2)
         (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
@@ -7520,7 +7524,8 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:zone-alloc-check
   (lambda (ast vars kts request?)
     (if (and request?
-             (not (impc:ir:pointer? request?)))        
+             (not (impc:ir:pointer? request?))
+             (not (symbol? request?)))
         (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
     (if (= (length ast) 2)
         (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
@@ -7537,7 +7542,8 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:stack-alloc-check
   (lambda (ast vars kts request?)
     (if (and request?
-             (not (impc:ir:pointer? request?)))
+             (not (impc:ir:pointer? request?))
+             (not (symbol? request?)))
         (impc:compiler:print-compiler-error "Allocation must return pointer type" ast))
     (if (= (length ast) 2)
         (let ((a (impc:ti:type-check (cadr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*))))    
@@ -10097,7 +10103,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                    (impc:ir:get-type-str typelist)))
                    (begin (impc:ti:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
                           (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
-                   (impc:compiler:print-compiler-error "could not compile IR for type" type)))))
+                   (impc:compiler:print-compiler-error "could not compile IR for type" ',type)))))
        ;; the next line is to help specialize any element types that may not already be specialized!
        (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
        (set! *impc:ir:get-type-callback-off* #f)
