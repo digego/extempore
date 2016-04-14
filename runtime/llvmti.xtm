@@ -977,7 +977,7 @@
   (lambda (typealias-name type docstring)
     ;; (println 'typealias-name: typealias-name 'type: type 'docstring: docstring)
     (if (impc:ti:typealias-exists? typealias-name)
-        (impc:compiler:print-already-bound-error typealias-name (impc:ir:pretty-print-type type))
+        (impc:compiler:print-already-bound-error typealias-name (impc:ti:get-typealias-type-pretty typealias-name))
         ;; check arg types
         (if (not (and (or (string? typealias-name) (begin (println 'bad 'typealias-name: typealias-name) #f))
                       (or (list? type)
@@ -2506,7 +2506,7 @@
 (define impc:ti:register-new-globalvar
   (lambda (globalvar-name type docstring)
     (if (impc:ti:globalvar-exists? globalvar-name)
-        (impc:compiler:print-already-bound-error (string->symbol globalvar-name) (impc:ir:pretty-print-type type))
+        (impc:compiler:print-already-bound-error (string->symbol globalvar-name) (impc:ir:pretty-print-type (impc:ir:pointer-- (impc:ti:get-globalvar-type globalvar-name))))
         ;; check arg types
         (if (not (and (or (string? globalvar-name) (begin (println 'bad 'globalvar-name: globalvar-name) #f))
                       (or (list? type)
