@@ -873,12 +873,68 @@ add_dependencies(aot_extended extended_deps)
 include(CTest)
 
 if(BUILD_TESTING)
-  add_test(
-    NAME core
-    COMMAND extempore --noaudio --port=17097 --run tests/all-core.xtm)
-  add_test(
-    NAME extended
-    COMMAND extempore --noaudio --port=17097 --run tests/all-external.xtm)
+
+  # tests - core
+  add_test(NAME system
+    COMMAND extempore --noaudio --port=17099 --eval "(xtmtest-run-tests \"tests/core/system.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME adt
+    COMMAND extempore --noaudio --port=17097 --eval "(xtmtest-run-tests \"tests/core/adt.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME math
+    COMMAND extempore --noaudio --port=17095 --eval "(xtmtest-run-tests \"tests/core/math.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME std
+    COMMAND extempore --noaudio --port=17093 --eval "(xtmtest-run-tests \"tests/core/std.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xtlang
+    COMMAND extempore --noaudio --port=17091 --eval "(xtmtest-run-tests \"tests/core/xtlang.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME generics
+    COMMAND extempore --noaudio --port=17089 --eval "(xtmtest-run-tests \"tests/core/generics.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # tests - external
+  add_test(NAME fft
+    COMMAND extempore --noaudio --port=17087 --eval "(xtmtest-run-tests \"tests/external/fft.xtm\" #t #t)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # examples - core
+  add_test(NAME fmsynth
+    COMMAND extempore --port=17085 --eval "(sys:load-then-quit \"examples/core/fmsynth.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xthread
+    COMMAND extempore --port=17083 --eval "(sys:load-then-quit \"examples/core/xthread.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME scheduler
+    COMMAND extempore --port=17081 --eval "(sys:load-then-quit \"examples/core/scheduler.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME nbody_lang_shootout
+    COMMAND extempore --port=17079 --eval "(sys:load-then-quit \"examples/core/nbody_lang_shootout.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+
+  # examples - external
+  add_test(NAME electrofunk
+    COMMAND extempore --port=17077 --eval "(sys:load-then-quit \"examples/external/electrofunk.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME triangle
+    COMMAND extempore --port=17069 --eval "(sys:load-then-quit \"examples/external/shader-tutorials/triangle.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME raymarcher
+    COMMAND extempore --port=17075 --eval "(sys:load-then-quit \"examples/external/raymarcher.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME spectrogram
+    COMMAND extempore --port=17073 --eval "(sys:load-then-quit \"examples/external/spectrogram.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME gl-compatibility
+    COMMAND extempore --port=17067 --eval "(sys:load-then-quit \"examples/external/gl-compatibility.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME xtmrender3
+    COMMAND extempore --port=17071 --eval "(sys:load-then-quit \"examples/external/xtmrender3.xtm\" 10)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
+  add_test(NAME going-native
+    COMMAND extempore --port=17065 --eval "(sys:load-then-quit \"examples/external/going-native.xtm\" 60)"
+    WORKING_DIRECTORY ${EXT_SHARE_DIR})
 endif()
 
 ##########
