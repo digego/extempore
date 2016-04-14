@@ -7834,6 +7834,12 @@ xtlang's `let' syntax is the same as Scheme"
     ;; run body for type coverage
     ;; grab the last result as return type
     (let ((res (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)))
+      ;; if no valid return type rerun type-check for a second time
+      (if (not (or (impc:ir:type? res)
+                   (and (list? res)
+                        (= (length res) 1)
+                        (impc:ir:type? (car res)))))
+          (set! res (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)))
       ;; (println 'bbbb: res '-> request? request?) ;  '-> (caddr ast))
       ;; if we have a choice between numeric options we force one!
       (if (and (not (impc:ti:complex-type? res))
