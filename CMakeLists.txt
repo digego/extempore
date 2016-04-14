@@ -8,45 +8,6 @@ option(PACKAGE "set up install targets for packaging" OFF)
 option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
 ####################
-# platform/version #
-####################
-
-# this stuff is handy to make sure that the packages/test platforms
-# get sensible names
-
-if(UNIX)
-  find_program(UNAME_PROGRAM uname)
-  execute_process(COMMAND ${UNAME_PROGRAM} -m
-    OUTPUT_VARIABLE UNAME_MACHINE_NAME
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${UNAME_PROGRAM} -r
-    OUTPUT_VARIABLE UNAME_OS_RELEASE
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND ${UNAME_PROGRAM} -s
-    OUTPUT_VARIABLE UNAME_OS_NAME
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif(UNIX)
-
-if(APPLE)
-  set(EXTEMPORE_SYSTEM_NAME "OSX")
-  execute_process(COMMAND sw_vers -productVersion
-    OUTPUT_VARIABLE EXTEMPORE_SYSTEM_VERSION
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REGEX MATCH "^10.[0-9]+" EXTEMPORE_SYSTEM_VERSION ${EXTEMPORE_SYSTEM_VERSION})
-  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
-elseif(UNIX)
-  set(EXTEMPORE_SYSTEM_NAME ${UNAME_OS_NAME})
-  set(EXTEMPORE_SYSTEM_VERSION ${UNAME_OS_RELEASE})
-  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
-elseif(WIN32)
-  set(EXTEMPORE_SYSTEM_NAME "Windows")
-  string(REGEX MATCH "^[0-9]+" EXTEMPORE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
-  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
-else()
-  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - OSX, Linux & Windows only.")
-endif()
-
-####################
 # option wrangling #
 ####################
 
@@ -133,6 +94,45 @@ endif()
 # # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
+
+####################
+# platform/version #
+####################
+
+# this stuff is handy to make sure that the packages/test platforms
+# get sensible names
+
+if(UNIX)
+  find_program(UNAME_PROGRAM uname)
+  execute_process(COMMAND ${UNAME_PROGRAM} -m
+    OUTPUT_VARIABLE UNAME_MACHINE_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${UNAME_PROGRAM} -r
+    OUTPUT_VARIABLE UNAME_OS_RELEASE
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${UNAME_PROGRAM} -s
+    OUTPUT_VARIABLE UNAME_OS_NAME
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif(UNIX)
+
+if(APPLE)
+  set(EXTEMPORE_SYSTEM_NAME "OSX")
+  execute_process(COMMAND sw_vers -productVersion
+    OUTPUT_VARIABLE EXTEMPORE_SYSTEM_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  string(REGEX MATCH "^10.[0-9]+" EXTEMPORE_SYSTEM_VERSION ${EXTEMPORE_SYSTEM_VERSION})
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
+elseif(UNIX)
+  set(EXTEMPORE_SYSTEM_NAME ${UNAME_OS_NAME})
+  set(EXTEMPORE_SYSTEM_VERSION ${UNAME_OS_RELEASE})
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${UNAME_MACHINE_NAME})
+elseif(WIN32)
+  set(EXTEMPORE_SYSTEM_NAME "Windows")
+  string(REGEX MATCH "^[0-9]+" EXTEMPORE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
+  set(EXTEMPORE_SYSTEM_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
+else()
+  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - OSX, Linux & Windows only.")
+endif()
 
 ########
 # PCRE #
