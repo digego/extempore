@@ -618,62 +618,64 @@ else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but allows us to do AOT compilation in parallell
 
-  function(aotcompile_lib lib group port) # deps are optional, and go at the end
-    get_filename_component(basename ${lib} NAME_WE)
+  set(EXTEMPORE_AOT_COMPILE_PORT 17099)
+
+  macro(aotcompile_lib libfile group) # deps are optional, and go at the end
+    get_filename_component(basename ${libfile} NAME_WE)
     set(targetname aot_${basename})
     if(PACKAGE)
       add_custom_target(${targetname}
-        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${port}
-        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
         WORKING_DIRECTORY ${EXT_SHARE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
-        COMMAND extempore --nobase --noaudio --port=${port}
-        --eval "(impc:aot:compile-xtm-file \"${lib}\" #t #t)"
-        BYPRODUCTS libs/aot-cache/xtm${basename}${CMAKE_SHARED_LIBRARY_SUFFIX}
+        COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
         WORKING_DIRECTORY ${EXT_SHARE_DIR}
         VERBATIM)
     endif(PACKAGE)
-  add_dependencies(${targetname} extempore)
+    add_dependencies(${targetname} extempore)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
     endforeach()
-  endfunction(aotcompile_lib)
+    # decrement port number by 2
+    math(EXPR EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT} - 2")
+  endmacro(aotcompile_lib)
 
   # core
   add_custom_target(aot)
-  aotcompile_lib(libs/base/base.xtm aot 17099) # no lib dependency for base.xtm
-  aotcompile_lib(libs/core/math.xtm aot 17097 base)
-  aotcompile_lib(libs/core/audiobuffer.xtm aot 17087 base)
-  aotcompile_lib(libs/core/audio_dsp.xtm aot 17095 base math audiobuffer)
-  aotcompile_lib(libs/core/instruments.xtm aot 17093 base math audio_dsp)
+  aotcompile_lib(libs/base/base.xtm aot) # no lib dependency for base.xtm
+  aotcompile_lib(libs/core/math.xtm aot base)
+  aotcompile_lib(libs/core/audiobuffer.xtm aot base)
+  aotcompile_lib(libs/core/audio_dsp.xtm aot base math audiobuffer)
+  aotcompile_lib(libs/core/instruments.xtm aot base math audio_dsp)
 
   # extended
   add_custom_target(aot_extended ALL)
-  aotcompile_lib(libs/external/fft.xtm aot_extended 17091 base math)
-  aotcompile_lib(libs/external/sndfile.xtm aot_extended 17089 base)
-  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended 17085 base fft sndfile)
-  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended 17083 base sndfile instruments)
-  aotcompile_lib(libs/external/portmidi.xtm aot_extended 17081 base)
-  aotcompile_lib(libs/external/stb_image.xtm aot_extended 17077 base)
-  aotcompile_lib(libs/external/glfw3.xtm aot_extended 17075 base)
+  aotcompile_lib(libs/external/fft.xtm aot_extended base math)
+  aotcompile_lib(libs/external/sndfile.xtm aot_extended base)
+  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended base fft sndfile)
+  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended base sndfile instruments)
+  aotcompile_lib(libs/external/portmidi.xtm aot_extended base)
+  aotcompile_lib(libs/external/stb_image.xtm aot_extended base)
+  aotcompile_lib(libs/external/glfw3.xtm aot_extended base)
   if(WIN32)
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
   endif()
-  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended 17073 base)
-  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended 17071 base glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/nanovg.xtm aot_extended 17069 base glcore-${GL_BIND_METHOD})
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended 17067 base)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended 17065 base glcompat-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended base)
+  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended base glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/nanovg.xtm aot_extended base glcore-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended base)
+  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended base glcompat-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
-    # aotcompile_lib(libs/external/glib.xtm aot_extended 17079 base)
-    aotcompile_lib(libs/external/assimp.xtm aot_extended 17063 base stb_image graphics-pipeline)
+    # aotcompile_lib(libs/external/glib.xtm aot_extended base)
+    aotcompile_lib(libs/external/assimp.xtm aot_extended base stb_image graphics-pipeline)
   endif()
 
 endif(WIN32)
