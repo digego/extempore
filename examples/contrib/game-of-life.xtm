@@ -33,21 +33,17 @@
     (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
     (gl_print_error "in world_texture_setup")))
 
-(bind-func create_gol_shader
-  (lambda (vsource:i8* fsource:i8*)
-    (set! sp (ShaderProgram_create vsource fsource))))
-
-(create_gol_shader (sys:slurp-file "examples/external/game-of-life.vert")
-                   (sys:slurp-file "examples/external/game-of-life.frag"))
-
 ;; init
 (call-as-xtlang
+ (set! sp (ShaderProgram_create
+           (sys_slurp_file "examples/contrib/game-of-life.vert")
+           (sys_slurp_file "examples/contrib/game-of-life.frag")))
  (pfill! fullscreen_quad_verts
          ;; pos       texcoord
          -1.0  1.0    0.0 0.0
-          1.0  1.0    1.0 0.0
+         1.0  1.0    1.0 0.0
          -1.0 -1.0    0.0 1.0
-          1.0 -1.0    1.0 1.0)
+         1.0 -1.0    1.0 1.0)
  (set! world (world_create 64 64))
  ;; (world_set_to_checkerboard world)
  (world_init world .5)
