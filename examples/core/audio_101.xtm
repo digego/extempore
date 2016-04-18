@@ -17,37 +17,6 @@
 
 ;;; Code:
 
-;; first, we'll bind some global audio constants. these are already
-;; bound for you if you load libs/core/audio_dsp.xtm (or any library
-;; which loads that lib, which is any lib which does any audio stuff)
-(bind-val SPI SAMPLE 3.1415926535897932384626433832795028841971693993751058209749)
-(bind-val STWOPI SAMPLE 6.2831853071795864769252867665590057683943387987502116419498)
-(bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669)
-
-(bind-val SR SAMPLE 44100.0)
-(bind-val CHANNELS i64 2)
-(bind-val IN_CHANNELS i64 0)
-(bind-val FRAMES i64 128)
-
-(bind-func init_rates
-  (lambda (samps chans inchans blocks)
-    (set! SR samps)
-    (set! CHANNELS chans)
-    (set! IN_CHANNELS inchans)
-    (set! FRAMES blocks)
-    void))
-
-(init_rates (integer->real *au:samplerate*) *au:channels* *au:in-channels* *au:block-size*)
-
-(bind-func print_audio_state
-  (lambda ()
-    (printf "    FRAMES: %lld\n" FRAMES)
-    (printf " OUT CHANS: %lld\n" CHANNELS)
-    (printf "  IN CHANS: %lld\n" IN_CHANNELS)
-    (printf "SAMPLERATE: %f\n" (ftod (convert SR)))))
-
-(print_audio_state)
-
 ;; compile sample by sample dsp code
 (bind-func dsp:DSP
   (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
@@ -59,15 +28,14 @@
 ;; in other words you should only need to call dsp:set! once.
 (dsp:set! dsp)
 
-
 ;; recompile dsp to produce two sine wave in left and right using the
 ;; (input) time:i64 argument
 (bind-func dsp
   (lambda (in:SAMPLE time:i64 channel:i64	data:SAMPLE*)
     (cond ((= channel 0)
-           (* 0.5 (sin (* STWOPI 200.0 (/ (i64tof (modulo time (convert SR))) SR)))))
+           (* 0.5 (sin (* STWOPI 200.0 (/ (i64tof time) SRf)))))
           ((= channel 1)
-           (* 0.5 (sin (* STWOPI 210.0 (/ (i64tof (modulo time (convert SR))) SR)))))
+           (* 0.5 (sin (* STWOPI 210.0 (/ (i64tof time) SRf)))))
           (else	0.0))))
 
 
@@ -77,7 +45,7 @@
 (bind-func osc_c
   (lambda (phase)
     (lambda (amp freq)
-      (let ((inc (* STWOPI (/ freq SR))))
+      (let ((inc (* STWOPI (/ freq SRf))))
         (set! phase (+ phase inc))
         (if (> phase SPI) (set! phase (- phase STWOPI)))
         (* amp (sin phase))))))
