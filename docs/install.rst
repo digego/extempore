@@ -21,65 +21,15 @@ something different.
 Download a pre-built binary
 ---------------------------
 
-.. note:: Coming real soon!
+Download a `binary release`_, unzip it and run ``extempore.exe``
+from inside the ``extempore`` folder.
 
-..
-   Download a `precompiled binary`_, unzip it and run ``extempore.exe``
-   from inside the ``extempore`` folder.
-
-   .. warning:: The Windows binary is currently a little out-of-date, so
-                some of the docs may be wrong. If you've got experience
-                doing packaging/distribution on Windows and want to help
-                out (please!) `get in touch`_.
-
-   .. _precompiled binary: http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip
-   .. _get in touch: mailto:extemporelang@googlegroups.com
-
-Install through homebrew (OSX-only)
------------------------------------
-
-.. note:: The CMake "build from source" approach is probably just as
-          quick, especially on OSX/Linux if you're familiar with that
-          sort of thing.
-
-`Homebrew`_ makes the process pretty simple, although since it's
-building everything (including LLVM) from source it may still take up to
-15mins depending on your machine.
-
-.. _Homebrew: http://brew.sh/
-
-To install Extempore through homebrew, first::
-
-    brew tap benswift/extempore && brew tap homebrew/versions
-
-then::
-
-    brew install extempore --with-extended
-
-or, if you want just the core::
-
-    brew install extempore
-
-**Caveats**
-
-If you've installed Extempore through homebrew previously (i.e. if
-``brew info extempore`` shows a version <= 0.59) then you'll need to
-remove a couple of things first::
-
-    brew rm extempore kissfft libnanovg
-
-If you're on OSX 10.9 or earlier, there's an incompatibility with your
-version of clang and the LLVM 3.7.0 which Extempore uses. For the
-moment the easiest way around this is to download the old 0.5.9
-release of Extempore with::
-
-    brew tap benswift/extempore
-    brew install extempore059 --with-extended
+.. _binary release: https://github.com/digego/extempore/releases
 
 .. _build-from-source-doc:
 
-Build from source (all platforms)
----------------------------------
+Build from source
+-----------------
 
 The build-from-source workflow will download and build all the
 dependencies you need (including LLVM). So, if you've got a C++
@@ -356,3 +306,46 @@ If you **do** build your own patched version of LLVM for Extempore,
 then make sure you set the ``EXT_LLVM_DIR`` environment variable to
 point to that directory (where you installed LLVM) so that the
 Extempore build process knows where to find it.
+
+Install through homebrew (OSX-only)
+-----------------------------------
+
+.. note:: As of v0.7.0, the homebrew install process is
+          deprecated---since it's caught in a weird no-man's land
+          between the easy "binary download" and the flexible "build
+          from source" approach. Still, the formula is currently still
+          in my tap, so these instructions are here for the moment.
+
+`Homebrew`_ makes the process pretty simple, although since it's
+building everything (including LLVM) from source it may still take up to
+15mins depending on your machine.
+
+.. _Homebrew: http://brew.sh/
+
+To install Extempore through homebrew, first::
+
+    brew tap benswift/extempore && brew tap homebrew/versions
+
+then::
+
+    brew install extempore --with-extended
+
+or, if you want just the core::
+
+    brew install extempore
+
+**Caveats**
+
+If you've installed Extempore through homebrew previously (i.e. if
+``brew info extempore`` shows a version <= 0.59) then you'll need to
+remove a couple of things first::
+
+    brew rm extempore kissfft libnanovg
+
+If you're on OSX 10.9 or earlier, there's an incompatibility with your
+version of clang and the LLVM 3.7.0 which Extempore uses. For the
+moment the easiest way around this is to download the old 0.5.9
+release of Extempore with::
+
+    brew tap benswift/extempore
+    brew install extempore059 --with-extended

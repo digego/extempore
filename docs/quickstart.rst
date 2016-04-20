@@ -12,31 +12,14 @@ Installation
           going on) with the steps below then that's a good place to
           look.
           
-On **OSX** (with `homebrew`_) you can get the dependencies, build and
-install Extempore and the full standard library with::
+The quickest way to get started is to download a `binary release`_,
+unzip it and run ``extempore.exe`` from inside the ``extempore``
+folder.
 
-  brew tap benswift/extempore && brew tap homebrew/versions && brew install extempore --with-extended
+.. _binary release: https://github.com/digego/extempore/releases
 
-.. _homebrew: http://brew.sh/
-
-
-On **Linux** if you've got git, cmake and a c++ compiler, then you can
-build Extempore and the full standard library with::
-
-  git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install && make aot
-
-On **Windows**, download a `precompiled binary`_, unzip it and run
-``extempore.exe`` from inside the ``extempore`` folder.
-
-.. _precompiled binary: http://extempore.moso.com.au/extras/Extempore-0.6.0-win64.zip
-
-.. note:: **March 2016** this Windows binary is currently a fair bit
-          behind git HEAD, so some of this documentation will be wrong
-          as well. We're hoping to have a new Windows binary release
-          real soon---if you have any expertise in this area then
-          `get in touch`_.
-
-.. _get in touch: mailto:extemporelang@googlegroups.com
+If you're more of a build-from-source type, then :ref:`that's pretty
+easy as well <build-from-source-doc>`.
 
 Editor setup
 ------------
