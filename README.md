@@ -34,8 +34,9 @@ Check out these videos:
 - [The Concert Programmer](https://www.youtube.com/watch?v=yY1FSsUV-8c)
 - [Interactive, distributed, physics simulation](https://vimeo.com/126577281)
 - [Programming in Time](https://www.youtube.com/watch?v=Sg2BjFQnr9s)
-- [The Physics Playroom](https://vimeo.com/58239256)
+- [The Physics Playroom - interactive installation](https://vimeo.com/58239256)
 - [An *old* Graphics Demo](https://vimeo.com/37293927)
+- [A Programmer's Guide to Western Music](https://www.youtube.com/watch?v=xpSYWd_aIiI)
 
 # Docs & Community
 
