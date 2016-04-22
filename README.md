@@ -31,12 +31,11 @@ On **Windows**:
 
 Check out these videos:
 
-- Andrew Sorensen: [The Concert Programmer](https://www.youtube.com/watch?v=yY1FSsUV-8c)
-- Supercomputing '15 tutorial:
-  [interactive, distributed, physics simulation](https://vimeo.com/126577281)
-- Andrew Sorensen: [Coding Music](https://www.youtube.com/watch?v=5DuVuoe-_UQ)
-- Andrew Sorensen: [Live Coding the World](https://www.youtube.com/watch?v=eoLLF2pGY8k)
-- Andrew Sorensen: [Programmer, Program, Machine and Environment](https://www.youtube.com/watch?v=A-eU_Nj2MVk)
+- [The Concert Programmer](https://www.youtube.com/watch?v=yY1FSsUV-8c)
+- [Interactive, distributed, physics simulation](https://vimeo.com/126577281)
+- [Programming in Time](https://www.youtube.com/watch?v=Sg2BjFQnr9s)
+- [The Physics Playroom](https://vimeo.com/58239256)
+- [An *old* Graphics Demo](https://vimeo.com/37293927)
 
 # Docs & Community
 
@@ -49,7 +48,7 @@ You can also join the Extempore community:
 
 # Licence
 
-Copyright (c) 2011-2015, Andrew Sorensen
+Copyright (c) 2011-2016, Andrew Sorensen
 
 All rights reserved.
 
