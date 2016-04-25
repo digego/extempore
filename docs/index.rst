@@ -1,10 +1,6 @@
 The Extempore programming environment
 =====================================
 
-.. note:: This documentation is not yet ready for prime time, so
-          don't rely on it yet. See :doc:`about-this-documentation`
-          for more info.
-
 Welcome to Extempore's documentation site. It's a work in
 progress---up till now things have been hosted on `Ben's blog`_ but
 this is an attempt to do things right, using Sphinx_.
