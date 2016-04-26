@@ -696,12 +696,17 @@ if(BUILD_DEPS)
 
   include(ExternalProject)
 
+  if(PACKAGE)
+    set(OSX_PACKAGE_CMAKE_DEFINITIONS "-DCMAKE_OSX_SYSROOT=macosx -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9")
+  else()
+    set(OSX_PACKAGE_CMAKE_DEFINITIONS "")
+  endif()
+
   ExternalProject_Add(portmidi
     PREFIX portmidi
     URL https://github.com/extemporelang/portmidi/archive/217.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -711,8 +716,7 @@ if(BUILD_DEPS)
     PREFIX nanovg
     URL https://github.com/extemporelang/nanovg/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -722,8 +726,7 @@ if(BUILD_DEPS)
     PREFIX kiss_fft
     URL https://github.com/extemporelang/kiss_fft/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -733,8 +736,7 @@ if(BUILD_DEPS)
     PREFIX stb_image
     URL https://github.com/extemporelang/stb/archive/master.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -744,8 +746,7 @@ if(BUILD_DEPS)
     PREFIX glfw3
     URL https://github.com/glfw/glfw/archive/3.1.2.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -758,8 +759,7 @@ if(BUILD_DEPS)
     PREFIX assimp
     URL https://github.com/assimp/assimp/archive/v3.2.zip
     CMAKE_ARGS
-    -DCMAKE_OSX_SYSROOT=macosx
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -777,8 +777,6 @@ if(BUILD_DEPS)
       -DBUILD_tools=OFF
       -DBUILD_examples=OFF
       -DBUILD_tests=OFF
-      -DCMAKE_OSX_SYSROOT=macosx
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -792,8 +790,6 @@ if(BUILD_DEPS)
       CMAKE_ARGS
       -DAPR_HAVE_ODBC=OFF
       -DINSTALL_PDB=OFF
-      -DCMAKE_OSX_SYSROOT=macosx
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -809,8 +805,6 @@ if(BUILD_DEPS)
     #   URL https://github.com/erikd/libsndfile/archive/master.zip
     #   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
     #   CMAKE_ARGS
-    #   -DCMAKE_OSX_SYSROOT=macosx
-    #   -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
     #   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     #   -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
   else()
