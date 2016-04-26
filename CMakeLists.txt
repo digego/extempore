@@ -609,7 +609,7 @@ if(WIN32)
     COMMENT "Ahead-of-time compiling the standard library..."
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-  add_custom_target(aot_extended ALL
+  add_custom_target(aot_extended
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
     COMMENT "Ahead-of-time compiling the standard library..."
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
