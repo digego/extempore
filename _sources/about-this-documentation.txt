@@ -1,14 +1,11 @@
 About this documentation
 ========================
 
-This documentation is generated using Sphinx_, using the rtd_
-theme. Eventually we might even host it at `Read the Docs`_, but
-currently the plan is for someone (probably Ben) to generate the
-(static) HTML, and then host it on GH pages or something.
-Still, since it's really all just plain (well, reStructured_) text
-files in the ``docs/`` subdirectory it should be easy for other folks
-to contribute---or at least easier than the current setup (with docs
-on `Ben's blog`_).
+This documentation is generated using Sphinx_, using the rtd_ theme.
+Eventually we might even host it at `Read the Docs`_, but currently
+someone (usually Ben) generates the static HTML, and then we host it
+on GH pages. Since it's all just reStructured_ text files in the
+``docs/`` subdirectory, it's easy for others to contribute.
 
 .. _Sphinx: http://www.sphinx-doc.org/
 .. _rtd: https://github.com/snide/sphinx_rtd_theme
