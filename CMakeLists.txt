@@ -545,12 +545,8 @@ else()
   install(DIRECTORY assets runtime libs examples tests
     DESTINATION extempore
     PATTERN ".DS_Store" EXCLUDE)
-  install(DIRECTORY extras
-    DESTINATION extempore
-    FILES_MATCHING
-    PATTERN "extras/.emacs"
-    PATTERN "extras/extempore.el"
-    PATTERN "extras/extempore.vim")
+  install(FILES extras/.emacs extras/extempore.el extras/extempore.vim
+    DESTINATION extempore/extras)
 endif()
 
 ###################
@@ -661,17 +657,10 @@ if(BUILD_DEPS)
 
   include(ExternalProject)
 
-  if(PACKAGE)
-    set(OSX_PACKAGE_CMAKE_DEFINITIONS "-DCMAKE_OSX_SYSROOT=macosx -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9")
-  else()
-    set(OSX_PACKAGE_CMAKE_DEFINITIONS "")
-  endif()
-
   ExternalProject_Add(portmidi
     PREFIX portmidi
     URL https://github.com/extemporelang/portmidi/archive/217.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -681,7 +670,6 @@ if(BUILD_DEPS)
     PREFIX nanovg
     URL https://github.com/extemporelang/nanovg/archive/master.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -691,7 +679,6 @@ if(BUILD_DEPS)
     PREFIX kiss_fft
     URL https://github.com/extemporelang/kiss_fft/archive/master.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -701,7 +688,6 @@ if(BUILD_DEPS)
     PREFIX stb_image
     URL https://github.com/extemporelang/stb/archive/master.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -711,7 +697,6 @@ if(BUILD_DEPS)
     PREFIX glfw3
     URL https://github.com/glfw/glfw/archive/3.1.2.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -724,7 +709,6 @@ if(BUILD_DEPS)
     PREFIX assimp
     URL https://github.com/assimp/assimp/archive/v3.2.zip
     CMAKE_ARGS
-    ${OSX_PACKAGE_CMAKE_DEFINITIONS}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
