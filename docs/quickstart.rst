@@ -1,4 +1,4 @@
-Quickstart
+quickstart
 ==========
 
 I get it, you're impatient---here's the bare minimum required to get
@@ -76,5 +76,5 @@ Beyond "Hello..."
 
 These simple snippets gloss over some subtleties of what's going on.
 But hey, if you've started quickly(ish), then this page has done its
-job. Explaining those subtleties is what the rest of the documentation
-is for.
+job. To understand the subtleties, read the rest of the documentation
+:)
