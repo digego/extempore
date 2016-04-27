@@ -48,6 +48,11 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#if __APPLE__
+#include <CoreAudio/HostTime.h>
+#include <CoreFoundation/CFDate.h>
+#endif
+
 #if _WIN32 || _WIN64
 #if _WIN64
 #define TARGET_64BIT
@@ -90,8 +95,10 @@ char* cname_encode(char *data,size_t input_length,size_t *output_length);
 char* cname_decode(char *data,size_t input_length,size_t *output_length);
 const char* sys_sharedir();
 char* sys_slurp_file(const char* fname);
-int register_for_window_events();
-
+  int register_for_window_events();
+  double clock_clock();
+  double audio_clock_base();
+  double audio_clock_now();
 }
 
 namespace extemp
@@ -156,8 +163,6 @@ inline double getRealTime()
 
 #elif __APPLE__
 
-#include <CoreAudio/HostTime.h>
-
 inline double getRealTime()
 {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
@@ -165,20 +170,6 @@ inline double getRealTime()
 
 #endif
 
-inline double clock_clock()
-{
-    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
-}
-
-inline double audio_clock_base()
-{
-    return extemp::UNIV::AUDIO_CLOCK_BASE;
-}
-
-inline double audio_clock_now()
-{
-    return extemp::UNIV::AUDIO_CLOCK_NOW;
-}
 }
 
 } //End Namespace

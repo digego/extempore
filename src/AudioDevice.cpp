@@ -57,6 +57,7 @@
 #include <sys/sysctl.h>
 #include <time.h>
 #include <libkern/OSAtomic.h>
+#include <xmmintrin.h>
 #endif
 
 #include <stdlib.h>

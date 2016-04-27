@@ -94,7 +94,12 @@ public:
 #endif
 
     static void* Trampoline(void* Arg) {
-        auto thread(reinterpret_cast<EXTThread*>(Arg));
+      auto thread(reinterpret_cast<EXTThread*>(Arg));
+#ifdef __APPLE__ // unforunately apple requires pthread_setname_np in current thread
+        if (!thread->m_name.empty()) {
+            pthread_setname_np(thread->m_name.c_str());
+        }
+#endif
         sm_current = thread;
         return thread->m_function(thread->m_arg);
     }

@@ -270,6 +270,21 @@ unsigned char* base64_decode(const char *data,
     return decoded_data;
 }
 
+double clock_clock()
+{
+  return extemp::getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
+double audio_clock_base()
+{
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+}
+
+double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+}
+
 
 bool rmatch(char* regex, const char* str)
 {

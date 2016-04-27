@@ -81,6 +81,8 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
         m_thread = std::thread(fn);
         result = 0;
+#elif __APPLE__
+        result = pthread_create(&m_thread, NULL, Trampoline, this);
 #else
         result = pthread_create(&m_thread, NULL, Trampoline, this);
         if (!result && !m_name.empty()) {
