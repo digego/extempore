@@ -63,17 +63,6 @@ BUILD_DEPS:BOOL (default ON)
   get those things through another package manager (or not use them at
   all) then set this to ``OFF``.
 
-IN_TREE:BOOL (default ON)
-  when true, use the main Extempore source tree for libs/examples -
-  don't move those things into e.g. ``/usr/local``. If you're not
-  going to edit the built-in libraries, this makes no difference, but
-  if you're going to be working on them it avoids the problem that you
-  make a change to e.g. ``libs/core/math.xtm`` in your
-  version-controlled ``extempore`` directory, but ``(sys:load
-  "libs/core/math.xtm)`` in Extempore code loads the ``math.xtm`` in
-  ``/usr/local/share/extempore/libs/core``. This doesn't do anything
-  on Windows.
-
 PACKAGE:BOOL (default ON)
   when true, build Extempore (including all extended deps and
   AOT-compilation) for binary distribution, e.g.::
@@ -92,13 +81,9 @@ Variables
 EXT_SHARE_DIR
   the location of the Extempore "share directory", which containse a
   bunch of files Extempore needs at runtime, including ``runtime/``,
-  ``libs/``, ``examples/`` and ``assets/``. When ``IN_TREE`` is on,
-  this will just point to your Extempore source directory, otherwise
-  it defaults to ``/usr/local/share/extempore`` on unix-y platforms.
-  If you want to put that stuff somewhere else, you can specify it
-  with this CMake variable. You can also specify the location of the
-  sharedir at Extempore startup with the ``--sharedir`` command line
-  argument. Does nothing on Windows.
+  ``libs/``, ``examples/`` and ``assets/``. You can also specify the
+  location of the sharedir at Extempore startup with the
+  ``--sharedir`` command line argument. Does nothing on Windows.
 
 EXT_LLVM_DIR (environment variable)
   in the bad old days, the Extempore build process relied on this
