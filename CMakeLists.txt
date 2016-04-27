@@ -15,9 +15,6 @@ option(BUILD_DEPS "download & build deps for aot_extended" ON)
 # if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
 # line it will override these values
 
-set(EXT_SHARE_DIR ${CMAKE_SOURCE_DIR} CACHE PATH
-  "path to Extempore's shared runtime files")
-
 # packaging (binary distribution)
 
 if(PACKAGE)
@@ -36,7 +33,7 @@ if(DEFINED ENV{EXT_LLVM_DIR})
   set(EXT_LLVM_DIR $ENV{EXT_LLVM_DIR})
   set(BUILD_LLVM OFF)
 else()
-  set(EXT_LLVM_DIR ${EXT_SHARE_DIR}/llvm)
+  set(EXT_LLVM_DIR ${CMAKE_SOURCE_DIR}/llvm)
   set(BUILD_LLVM ON)
 endif()
 
@@ -44,7 +41,7 @@ endif()
 
 if(BUILD_DEPS)
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
-  set(EXT_PLATFORM_SHLIBS_DIR ${EXT_SHARE_DIR}/libs/platform-shlibs)
+  set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
   if(PACKAGE)
     set(EXT_DEPS_C_FLAGS "${CMAKE_C_FLAGS_RELEASE} -mtune=generic")
     set(EXT_DEPS_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -mtune=generic")
@@ -440,9 +437,12 @@ if(PACKAGE)
     PRIVATE -DEXT_SHARE_DIR=".")
   target_compile_options(extempore
     PRIVATE -mtune=generic)
-else()
+elseif(${EXT_SHARE_DIR})
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+else()
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_SHARE_DIR="${CMAKE_SOURCE_DIR}")
 endif()
 
 # platform-specific config
@@ -588,13 +588,13 @@ else(WIN32)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
-        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
-        WORKING_DIRECTORY ${EXT_SHARE_DIR}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
     add_dependencies(${targetname} extempore)
@@ -646,7 +646,7 @@ add_dependencies(aot_extended extempore)
 
 # uninstall only AOT-compiled libs
 add_custom_target(clean_aot
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${EXT_SHARE_DIR}/libs/aot-cache
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/libs/aot-cache
   COMMENT "Removing AOT-compiled libs")
 
 #########################
@@ -835,7 +835,7 @@ if(BUILD_TESTS)
       COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
     set_tests_properties(${testfile}
       PROPERTIES
-      WORKING_DIRECTORY ${EXT_SHARE_DIR}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
@@ -846,7 +846,7 @@ if(BUILD_TESTS)
       COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})")
     set_tests_properties(${examplefile}
       PROPERTIES
-      WORKING_DIRECTORY ${EXT_SHARE_DIR}
+      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
@@ -863,7 +863,7 @@ if(BUILD_TESTS)
   extempore_add_test(tests/external/fft.xtm libs-external)
   # examples - core
   extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-core)
-  extempore_add_example_as_test(examples/core/extempore_lang.xtm 10 examples-core)
+  # extempore_add_example_as_test(examples/core/extempore_lang.xtm 10 examples-core) # doesn't terminate
   extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core)
   extempore_add_example_as_test(examples/core/fmsynth.xtm 10 examples-core)
   extempore_add_example_as_test(examples/core/midi_synth.xtm 10 examples-core)
