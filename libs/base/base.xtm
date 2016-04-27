@@ -45,9 +45,6 @@
 
 (impc:aot:insert-header "xtmbase")
 
-(sys:compile-init-ll)
-(impc:aot:insert-forms (sys:compile-init-ll))
-
 ;; (suppress-compiler-messages #f)
 
 ;;;;;;;;;;;;;
@@ -141,11 +138,11 @@
 
 ;; prints a line break
 (bind-func print_return
-  (lambda () (llvm_printf "\n") void))
+  (lambda () (putchar 10) void))
 
 ;; prints a space
 (bind-func print_space
-  (lambda () (printf " ") void))
+  (lambda () (putchar 32) void))
 
 (bind-func print
   (lambda (x:i1) (printf "%d" x) void))
@@ -206,7 +203,7 @@
   `(/ (log ,x) (log ,base)))
 
 (bind-macro
-  "convert angle in degrees to radians" 
+  "convert angle in degrees to radians"
   (deg2rad degrees)
   `(/ ,degrees 57.2957795))
 
@@ -376,7 +373,7 @@ into any further sexp arguments."
 ;; (bind-poly fabs llvm_fabs)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; some zone helpers
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -811,7 +808,7 @@ If both strings are null an empty String will be returned
 (bind-func format_return
   (lambda ()
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "\n")
+      (sprintf str "\n")
       (String str))))
 
 ;; prints a space
@@ -822,37 +819,37 @@ If both strings are null an empty String will be returned
 (bind-func format
   (lambda (x:i1)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%d" x)
+      (sprintf str "%d" x)
       (String str))))
 
 (bind-func format
   (lambda (x:i8)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%d" x)
+      (sprintf str "%d" x)
       (String str))))
 
 (bind-func format
   (lambda (x:i32)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%d" x)
+      (sprintf str "%d" x)
       (String str))))
 
 (bind-func format
   (lambda (x:i64)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%lld" x)
+      (sprintf str "%lld" x)
       (String str))))
 
 (bind-func format
   (lambda (x:float)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%f" (ftod x))
+      (sprintf str "%f" (ftod x))
       (String str))))
 
 (bind-func format
   (lambda (x:double)
     (let ((str:i8* (salloc 256)))
-      (llvm_sprintf str "%f" x)
+      (sprintf str "%f" x)
       (String str))))
 
 ;; String formatting!

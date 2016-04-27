@@ -76,25 +76,28 @@
 
 ;; to compile the special init.ll file (which needs to be done on most
 ;; startups)
-(define sys:compile-init-ll
-  (lambda ()
+(define sys:compile-ll
+  (lambda (name)
     (let ((print? #f))
       (if (string=? (ipc:get-process-name) *impc:compiler:process*)
-          (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/init.ll"))))
+          (let ((init-ll-string (sys:slurp-file (string-append (sys:share-dir) "/runtime/" name))))
             (if (and init-ll-string (llvm:compile-ir init-ll-string))
                 (if print?
                     (begin
                       (print "\nCompiling ")
-                      (print-with-colors 'blue 'default #t (print "init.ll"))
+                      (print-with-colors 'blue 'default #t (print name))
                       (print "... ")
                       (print-with-colors 'green 'default #t (print "done"))
                       (print "\n\n"))
                     #t)
                 (begin
-                  (print-with-colors 'red 'default #t (print "\n\nError compiling init.ll IR\n\n"))
+                  (print-with-colors 'red 'default #t (print "\n\nError compiling " name " IR\n\n"))
                   (print "This is pretty bad.  Exiting...\n")
                   (quit 1))))))))
 
+(define sys:compile-init-ll
+  (lambda ()
+    (sys:compile-ll "init.ll")))
 
 ;; GCHANGE
 ;; removes %b when returning base types (i.e. !head%b returns !head)
@@ -737,7 +740,7 @@
                  ((impc:ir:tuple? (car type)) (car type))
                  ((impc:ir:array? (car type)) (car type))
                  ((impc:ir:vector? (car type)) (car type))
-                 (else *impc:ir:badtype*))) 
+                 (else *impc:ir:badtype*)))
           (else type))))
 
 
@@ -2330,7 +2333,7 @@
                             (make-list (length (cdr ast)) #f))))
              (num-elts (length elts))
              (fullt (string-append "[" (number->string num-elts) " x " (cadr (cdar elts)) "]")))
-        (emit "; stack alloc array literal")        
+        (emit "; stack alloc array literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "arrayl" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set array literal elts")
@@ -2529,7 +2532,7 @@
       ;;         (if (impc:ir:array? ttype)
       ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be an array type, maybe you want " (cadr var) "*") ast)
       ;;             (impc:compiler:print-bad-type-error-with-ast (cadr var) (string-append "cannot be a closure type, maybe you want " (cadr var) "*") ast))))
-               
+
       (if (not (equal? (impc:ir:get-type-from-str (cadr val))
                        (impc:ir:pointer-- (impc:ir:get-type-from-str (cadr var)))))
           (impc:compiler:print-type-mismatch-error
@@ -2569,7 +2572,7 @@
                             (make-list (length (cdr ast)) #f))))
              (num-elts (length elts))
              (fullt (string-append "<" (number->string num-elts) " x " (cadr (cdar elts)) ">")))
-        (emit "; stack alloc vector literal")        
+        (emit "; stack alloc vector literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "vecl" fullt) " = insertelement " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", i32 0\n" os)
         (emit "; set array literal elts")
@@ -2719,7 +2722,7 @@
               os)
         (emit (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", "
               *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, "
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, "
               *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
@@ -2752,7 +2755,7 @@
         ;;
         ;; (emit (impc:ir:gname "zonesize" "i64") " = mul "
         ;;       (cadr (impc:ir:gname "typesize")) " " (car (impc:ir:gname "typesize")) ", "
-        ;;       (car idx) "\n" os)        
+        ;;       (car idx) "\n" os)
         (emit (impc:ir:gname "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
         (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
@@ -2762,7 +2765,7 @@
          (impc:ir:gname "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (impc:ir:gname "zone")) ", i64 "
          (car (impc:ir:gname "zonesize"))
          ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
               " to " (impc:ir:get-type-str tt) "*\n" os)
@@ -2782,7 +2785,7 @@
       (let* ;;((t (impc:ir:convert-from-pretty-types (cadr ast))))
           ((t (impc:ir:pointer-- (car hint?))))
         (emit  (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, " *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, " *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size t)) ")\n" os)
         (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str t) "*"))
               " = bitcast i8* " (car (impc:ir:gname "dat"))
               " to " (impc:ir:get-type-str t) "*\n" os)
@@ -2794,7 +2797,7 @@
     (let* ((os (make-string 0)))
       (let* ((idx-str (impc:ir:compiler (cadr ast) types))
              (idx (impc:ir:gname))
-             (t (impc:ir:get-type-from-str (cadr idx)))        
+             (t (impc:ir:get-type-from-str (cadr idx)))
              (tt (impc:ir:pointer-- (car hint?)))
              (typesize (number->string (impc:ir:get-type-size tt))))
         ;;(impc:ir:convert-from-pretty-types (car hint?)))))
@@ -2826,7 +2829,7 @@
             (emit (string-append (impc:ir:gname "dat" "i8*") " = call i8* @malloc(" *impc:ir:size_t_str* " "
                                  (car (impc:ir:gname "zonesize"))
                                  ")\n") os))
-        (emit "call i8* @llvm_memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
+        (emit "call i8* @memset(i8* " (car (impc:ir:gname "dat")) ", i32 0, i64 " (car (impc:ir:gname "zonesize")) ")\n" os)
         (emit (string-append (impc:ir:gname "val" (string-append (impc:ir:get-type-str tt) "*"))
                              " = bitcast i8* " (car (impc:ir:gname "dat"))
                              " to " (impc:ir:get-type-str tt) "*\n") os)
@@ -2874,7 +2877,7 @@
 ;; makes a tuple 'literal'
 (define impc:ir:compiler:make-tuple
   (lambda (ast types hint?)
-    ;; (println 'make-tuple-ir hint?) 
+    ;; (println 'make-tuple-ir hint?)
     (let* ((os (make-string 0)))
       (let* ((elts (map (lambda (x t)
                           (cons (impc:ir:compiler x types t)
@@ -2890,7 +2893,7 @@
              (fullt (string-append "{" (caddr (car elts))
                                    (apply string-append (map (lambda (x) (string-append ", " (caddr x))) (cdr elts)))
                                    "}")))
-        (emit "; stack alloc tuple literal")        
+        (emit "; stack alloc tuple literal")
         (emit (caar elts) os)
         (emit (impc:ir:gname "tuplel" fullt) " = insertvalue " fullt " undef, " (cadr (cdar elts)) " " (car (cdar elts)) ", 0\n" os)
         (emit "; set tuple literal elts")
@@ -3117,7 +3120,7 @@
             (else (impc:compiler:print-bad-type-error "" "Bad VARARGS func!")))
       (if (equal? (car ast) 'llvm_printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
-                         "\n" va " = call i32 (i8*, ...) @llvm_printf("
+                         "\n" va " = call i32 (i8*, ...) @printf("
                          (caddr (car args)) " " (cadr (car args))
                          (apply string-append (map (lambda (a)
                                                      (string-append ", "
@@ -3127,7 +3130,7 @@
                          ")\n")
           (string-append (apply string-append (map (lambda (a) (car a)) args))
                          "\n" va " = call i32 (i8*,i8*, ...) @"
-                         (symbol->string (car ast)) "("
+                         (substring (symbol->string (car ast)) 5) "("
                          (caddr (car args)) " " (cadr (car args)) ", "
                          (caddr (cadr args)) " " (cadr (cadr args))
                          (apply string-append (map (lambda (a)
@@ -3290,7 +3293,7 @@
                        (impc:ir:compiler (cadddr ast) types (if (null? hint?) #f (car hint?)))
                        ""))
              (cval (if (< args 3) #f (impc:ir:gname)))
-             (os (make-string 0)))      
+             (os (make-string 0)))
         ;; (println 'intrinsice ast aval bval cval)
         ;; sanity checks
         (if (not (or (impc:ir:number? (cadr aval))
@@ -3787,6 +3790,19 @@
             "ccc"))))
 
 ;; THIS VERSION FOR _NATIVE CALL CLOSURES!
+
+(define impc:ir:intrinsic-substitution
+  (lambda (name)
+    (cond
+      ((string=? name "memcpy") "llvm.memcpy.p0i8.p0i8.i64")
+      (else name))))
+
+(define impc:ir:function-fixup-args
+  (lambda (name)
+    (cond
+      ((string=? name "memcpy") ", i32 1, i1 0")
+      (else ""))))
+
 (define impc:ir:compiler:native-call
   (lambda (ast types)
     ;; (println 'ast: ast 'types: types)
@@ -3837,7 +3853,7 @@
                            ;; "tail "
                            "call " (impc:ir:function-calling-convention fname)
                            " " (car ftypes)
-                           " @" fname "("
+                           " @" (impc:ir:intrinsic-substitution fname) "("
                            (apply string-append
                                   (map (lambda (p ft i)
                                          (let ((atype (cadr (cdr p)))
@@ -3850,6 +3866,7 @@
                                            (string-append (if (> i 0) ", " "")
                                                           atype " " aname)))
                                        args (cdr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
+                           (impc:ir:function-fixup-args fname)
                            ")\n") os)
       (impc:ir:strip-space os))))
 
@@ -3899,9 +3916,6 @@
                                        args (cddr ftypes) (make-list-with-proc (length args) (lambda (i) i))))
                            ")\n") os)
       (impc:ir:strip-space os))))
-
-
-
 
 (define impc:ir:compiler
   (let ((intrinsics '(sin cos ceil floor exp fmod pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi)))
@@ -3959,7 +3973,7 @@
                               (if (= *impc:ir:fp32* (car hint?))
                                   (impc:ir:gname (llvm:convert-float (number->string ast)) (impc:ir:get-type-str (car hint?)))
                                   (impc:ir:gname (number->string ast) (impc:ir:get-type-str (car hint?))))
-                              (impc:ir:gname (number->string ast) (if (integer? ast) "i64" "double")))                    
+                              (impc:ir:gname (number->string ast) (if (integer? ast) "i64" "double")))
                         "")))
                    ((string? ast)
                     (impc:ir:make-const-string ast))

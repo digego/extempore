@@ -1,34 +1,36 @@
+#include <iostream>
+
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -38,94 +40,78 @@
 
 #include "Scheme.h"
 #include <vector>
-#include <map>
 #include <string>
 #include <memory>
  //#include <ucontext.h>
 
-typedef struct _zone_hooks_t {
+#include "EXTMutex.h"
+#include "BranchPrediction.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/IR/Module.h"
+
+struct zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
   void* hook; // xtlang closure of type [void]*
-  struct _zone_hooks_t* hooks;
-} zone_hooks_t;
+  zone_hooks_t* hooks;
+};
 
-typedef struct _llvm_zone_t {
+struct llvm_zone_t {
   void* memory;
   uint64_t offset;
   uint64_t mark;
   uint64_t size;
   zone_hooks_t* cleanup_hooks;
-  struct _llvm_zone_t* memories;
-} llvm_zone_t;
+  llvm_zone_t* memories;
+};
 
-typedef struct _llvm_callback_struct_ {
+struct _llvm_callback_struct_ {
     void(*fptr)(void*);
     void* dat;
-  } _llvm_callback_struct_;
+};
 
+struct llvm_zone_stack
+{
+    llvm_zone_t* head;
+    llvm_zone_stack* tail;
+};
 
-/* extern double (&cosd)(double); */
-/* extern double (&tand)(double); */
-/* extern double (&sind)(double); */
-/* extern double (&coshd)(double); */
-/* extern double (&tanhd)(double); */
-/* extern double (&sinhd)(double); */
-/* extern double (&acosd)(double); */
-/* extern double (&asind)(double); */
-/* extern double (&atand)(double); */
-/* extern double (&atan2d)(double,double); */
-/* extern double (&ceild)(double); */
-/* extern double (&floord)(double); */
-/* extern double (&expd)(double); */
-/* extern double (&fmodd)(double,double); */
-/* extern double (&powd)(double,double); */
-/* extern double (&logd)(double); */
-/* extern double (&log2d)(double); */
-/* extern double (&log10d)(double); */
-/* extern double (&sqrtd)(double); */
-/* extern double (&fabsd)(double); */
-
+extern __thread llvm_zone_stack* tls_llvm_zone_stack;
+extern __thread uint64_t tls_llvm_zone_stacksize;
 
 extern "C"
 {
-  char* llvm_disassemble(const unsigned char*,int syntax);  
-  void* malloc16 (size_t s);
-  void free16(void* p);
-llvm_zone_t* llvm_threads_get_callback_zone();
-const char*  llvm_scheme_ff_get_name(foreign_func ff);
+
+const char* llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
-llvm_zone_t* llvm_zone_create(uint64_t size);
-llvm_zone_t* llvm_zone_reset(llvm_zone_t* zone);
+
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
 void llvm_zone_mark(llvm_zone_t* zone);
 uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
 uint64_t llvm_zone_ptr_size(void* ptr);
-void llvm_zone_destroy(llvm_zone_t* zone);
 void llvm_zone_print(llvm_zone_t* zone);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
-void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
-llvm_zone_t* llvm_pop_zone_stack();
-llvm_zone_t* llvm_peek_zone_stack();
-void llvm_push_zone_stack(llvm_zone_t*);
+
 bool llvm_ptr_in_zone(llvm_zone_t*, void*);
 bool llvm_ptr_in_current_zone(void*);
 
-void llvm_schedule_callback(long long, void*);  
+void llvm_schedule_callback(long long, void*);
 void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-uint64_t string_hash(unsigned char* str);
+static inline uint64_t string_hash(unsigned char* str)
+{
+    uint64_t result(0);
+    unsigned char c;
+    while((c = *(str++))) {
+        result = result * 33 + c;
+    }
+    return result;
+}
 
-  void* llvm_memset(void* ptr, int32_t c, int64_t n);
-  int llvm_printf(char* format, ...);
-  int llvm_fprintf(FILE* f, char* format, ...);
-  int llvm_sprintf(char* str, char* format, ...);
-  int llvm_sscanf(char* buffer, char* format, ...);
-  int llvm_fscanf(FILE* f, char* format, ...);
   void llvm_send_udp(char* host, int port, void* message, int message_length);
   int32_t llvm_samplerate();
   int32_t llvm_frames();
@@ -144,7 +130,7 @@ uint64_t string_hash(unsigned char* str);
   int64_t llvm_now();
 
   void* thread_fork(void*(*start_routine)(void*),void* args);
-  void thread_destroy(void* thread);  
+  void thread_destroy(void* thread);
   int thread_join(void* thread);
   int thread_kill(void* thread);
   int thread_equal(void* thread1, void* thread2);
@@ -166,7 +152,7 @@ uint64_t string_hash(unsigned char* str);
   bool check_address_type(uint64_t id, closure_address_table* table, const char* type);
 
   //  double llvm_cos(double x);
-  // double llvm_sin(double x);  
+  // double llvm_sin(double x);
   double llvm_tan(double x);
   double llvm_cosh(double x);
   double llvm_tanh(double x);
@@ -195,55 +181,147 @@ uint64_t string_hash(unsigned char* str);
 ///////////////////////////////////////////////////
 
 namespace llvm {
-  class Module;
-  class GlobalVariable;
-  class GlobalValue;
-  class Function;
-  class StructType;  
-  class ModuleProvider;
-  class SectionMemoryManager;
-  class ExecutionEngine;  
 
-  namespace legacy {
-    class PassManager;
-  }
+class Module;
+class GlobalVariable;
+class GlobalValue;
+class Function;
+class StructType;
+class ModuleProvider;
+class SectionMemoryManager;
+class ExecutionEngine;
+
+namespace legacy
+{
+
+class PassManager;
+
+}
+
 } // end llvm namespace
 
-namespace extemp {
+namespace extemp
+{
 
-    class EXTLLVM {
-    public:
-	EXTLLVM();
-	~EXTLLVM();
-	static EXTLLVM* I() { return &SINGLETON; }	
-	
-	void initLLVM();
+namespace EXTLLVM
+{
 
-  llvm::Module* activeModule();
-  llvm::Function* getFunction(std::string);
-  llvm::GlobalVariable* getGlobalVariable(std::string);
-  llvm::StructType* getNamedType(std::string);
-  llvm::GlobalValue* getGlobalValue(std::string);
-  uint64_t getSymbolAddress(std::string);
-  void addModule(llvm::Module* m) { Ms.push_back(m); }
-  std::vector<llvm::Module*>& getModules() { return Ms; }
-	
-	static int64_t LLVM_COUNT;
-	static bool OPTIMIZE_COMPILES;	
-	static bool VERIFY_COMPILES;	
+const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
+const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
 
+inline llvm_zone_t* llvm_zone_create(uint64_t size)
+{
+    auto zone(reinterpret_cast<llvm_zone_t*>(malloc(sizeof(llvm_zone_t))));
+    if (unlikely(!zone)) {
+        abort(); // in case a leak can be analyzed post-mortem
+    }
+#ifdef _WIN32
+    zone->memory = malloc(size_t(size)); // TODO: what about alignment for Windows???
+#else
+    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
+#endif
+    zone->mark = 0;
+    zone->offset = 0;
+    if (unlikely(!zone->memory)) {
+        size = 0;
+    }
+    zone->size = size;
+    zone->cleanup_hooks = nullptr;
+    zone->memories = nullptr;
+    return zone;
+}
 
-	llvm::Module* M;
-	llvm::ModuleProvider* MP;
-	llvm::ExecutionEngine* EE;
-  llvm::legacy::PassManager* PM;
-  std::unique_ptr<llvm::SectionMemoryManager> MM;
+extern "C" void llvm_zone_destroy(llvm_zone_t* Zone);
 
-    private:
-  std::vector<llvm::Module*> Ms;  
-	static EXTLLVM SINGLETON;
-    };
+inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
+{
+    Zone->offset = 0;
+    return Zone;
+}
 
-} // end extemp namespace
+extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
+
+inline llvm_zone_stack* llvm_threads_get_zone_stack()
+{
+    return tls_llvm_zone_stack;
+}
+
+inline void llvm_threads_set_zone_stack(llvm_zone_stack* Stack)
+{
+    tls_llvm_zone_stack = Stack;
+}
+
+inline void llvm_push_zone_stack(llvm_zone_t* Zone)
+{
+    auto stack(reinterpret_cast<llvm_zone_stack*>(malloc(sizeof(llvm_zone_stack))));
+    stack->head = Zone;
+    stack->tail = llvm_threads_get_zone_stack();
+    llvm_threads_set_zone_stack(stack);
+    return;
+}
+
+inline llvm_zone_t* llvm_peek_zone_stack()
+{
+    llvm_zone_t* z = 0;
+    llvm_zone_stack* stack = llvm_threads_get_zone_stack();
+    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
+#if DEBUG_ZONE_STACK
+        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
+#endif
+        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
+        llvm_push_zone_stack(z);
+        stack = llvm_threads_get_zone_stack();
+#if DEBUG_ZONE_STACK
+        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n",z,z->size,stack);
+#endif
+        return z;
+    }
+    z = stack->head;
+#if DEBUG_ZONE_STACK
+    printf("%p: peeking at zone %p:%lld\n",stack,z,z->size);
+#endif
+    return z;
+}
+
+extern "C" llvm_zone_t* llvm_pop_zone_stack();
+
+inline void llvm_threads_inc_zone_stacksize() {
+    ++tls_llvm_zone_stacksize;
+}
+
+inline void llvm_threads_dec_zone_stacksize() {
+    --tls_llvm_zone_stacksize;
+}
+
+inline uint64_t llvm_threads_get_zone_stacksize() {
+    return tls_llvm_zone_stacksize;
+}
+
+uint64_t getSymbolAddress(const std::string&);
+void addModule(llvm::Module* m);
+
+extern llvm::ExecutionEngine* EE; // TODO: nobody should need this (?)
+extern llvm::Module* M;
+extern int64_t LLVM_COUNT;
+extern bool OPTIMIZE_COMPILES;
+extern bool VERIFY_COMPILES;
+extern bool BACKGROUND_COMPILES;
+extern llvm::legacy::PassManager* PM;
+extern llvm::legacy::PassManager* PM_NO;
+extern std::vector<llvm::Module*> Ms;
+
+void initLLVM();
+const llvm::Function* getFunction(const char* name);
+const llvm::GlobalVariable* getGlobalVariable(const char* name);
+const llvm::GlobalValue* getGlobalValue(const char* name);
+inline llvm::StructType* getNamedType(const char* name) {
+    return M->getTypeByName(name);
+}
+inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
+extern "C" const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
+
+}
+
+}
 
 #endif

@@ -14,10 +14,12 @@
 
 (sys:load-preload-check 'gl)
 
+(define forced-gl-getprocaddress #f)
+
 (sys:load
- (cond ((string=? (sys:platform) "OSX")
-        "libs/external/gl/glcore-directbind.xtm")
+  (cond ((or forced-gl-getprocaddress (string=? (sys:platform) "Windows"))
+         "libs/external/gl/glcore-getprocaddress.xtm")
+       ((string=? (sys:platform) "OSX")
+         "libs/external/gl/glcore-directbind.xtm")
        ((string=? (sys:platform) "Linux")
-        "libs/external/gl/glcore-directbind.xtm")
-       ((string=? (sys:platform) "Windows")
-        "libs/external/gl/glcore-getprocaddress.xtm")))
+         "libs/external/gl/glcore-directbind.xtm")))

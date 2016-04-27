@@ -64,6 +64,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+if(NOT LLVM_BUILD_TYPE)
+  message(STATUS "Building 'Release' LLVM configuration")
+  set(LLVM_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+endif()
+
 # # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
@@ -282,7 +287,7 @@ if(PACKAGE)
 endif()
 
 ##############
-# LLVM 3.7.0 #
+# LLVM 3.8.0 #
 ##############
 
 # if you need to build LLVM by hand, the command will be something like
@@ -299,14 +304,14 @@ if(BUILD_LLVM)
   if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
+      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -315,12 +320,12 @@ if(BUILD_LLVM)
   else()
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.7.0/llvm-3.7.0.src.tar.xz
-      URL_MD5 b98b9495e5655a672d6cb83e1a180f8e
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.7.0.patch
+      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
+      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
+      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
@@ -337,8 +342,7 @@ endif()
 
 # the ordering of these libs matters, especially with the gcc linker.
 # Check the output of "llvm-config --libnames" to be sure
-set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMLinker;LLVMBitWriter;LLVMIRReader;LLVMAsmParser;LLVMOption;LLVMTableGen;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMipo;LLVMVectorize;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMObject;LLVMMCParser;LLVMBitReader;LLVMInstCombine;LLVMInstrumentation;LLVMTransformUtils;LLVMipa;LLVMMC;LLVMAnalysis;LLVMCore;LLVMSupport")
-
+set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMSymbolize;LLVMDebugInfoPDB;LLVMDebugInfoDWARF;LLVMMIRParser;LLVMLibDriver;LLVMOption;LLVMTableGen;LLVMOrcJIT;LLVMPasses;LLVMipo;LLVMVectorize;LLVMLinker;LLVMIRReader;LLVMAsmParser;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMLineEditor;LLVMDebugInfoCodeView;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMInstCombine;LLVMInstrumentation;LLVMProfileData;LLVMObject;LLVMMCParser;LLVMTransformUtils;LLVMMC;LLVMBitWriter;LLVMBitReader;LLVMAnalysis;LLVMCore;LLVMSupport")
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   get_filename_component(LLVM_LIB_FULLPATH "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}" ABSOLUTE)
   list(APPEND LLVM_LIBRARIES ${LLVM_LIB_FULLPATH})
@@ -381,10 +385,7 @@ endif()
 
 add_executable(extempore src/Extempore.cpp
   src/AudioDevice.cpp
-  src/EXTCondition.cpp
   src/EXTLLVM.cpp
-  src/EXTMonitor.cpp
-  src/EXTMutex.cpp
   src/EXTThread.cpp
   src/Extempore.cpp
   src/OSC.cpp
@@ -623,7 +624,7 @@ else(WIN32)
   aotcompile_lib(libs/external/portmidi.xtm aot_extended base)
   aotcompile_lib(libs/external/stb_image.xtm aot_extended base)
   aotcompile_lib(libs/external/glfw3.xtm aot_extended base)
-  if(WIN32)
+  if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
@@ -762,7 +763,7 @@ if(BUILD_DEPS)
       PREFIX libsndfile
       URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND make CFLAGS=${EXT_DEPS_C_FLAGS}
+      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
 
@@ -770,7 +771,7 @@ if(BUILD_DEPS)
       PREFIX apr
       URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --enable-threads --disable-static
-      BUILD_COMMAND make
+      BUILD_COMMAND $(MAKE)
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
   endif()

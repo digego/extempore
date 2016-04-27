@@ -36,9 +36,9 @@
   `(bind-func ,name 100000
      (let ((poly:i64 48)
            (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
-           (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
-           (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 10
+           (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
+           (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
+           (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
            (notes:[SAMPLE,SAMPLE,i64,i64]** (zalloc poly))
            (attack:i64 200)
            (decay:i64 200)
@@ -80,7 +80,7 @@
                                                                  (,note_kernel (aref-ptr samples bank) (aref-ptr samples_length bank) (aref-ptr samples_offsets bank)
                                                                                (aref-ptr samples_channels bank) new_idx (pref dargs 1) (pref dargs 2) #f)
                                                                  (,note_kernel (aref-ptr samples bank) (aref-ptr samples_length bank) (aref-ptr samples_offsets bank) (aref-ptr samples_channels bank) new_idx (pref dargs 1) (pref dargs 2) (if (< (pref dargs 3) 0.01) #f #t)))))
-                                                         
+
                                                      note_zone))
                                       (pset! note_starts free_note start)
                                       (pop_zone))
@@ -125,9 +125,9 @@
                                             ,bank
                                             0))))
                  (,parser file-list))
-       (ascii-print-color 0 6 10)
+       (ascii-print-color 0 6 9)
        (print 'Loaded cnt 'files 'into 'bank#: ,bank)
-       (ascii-print-color 0 7 10)
+       (ascii-print-color 0 7 9)
        (println)
        )))
 
@@ -140,9 +140,9 @@
        (dotimes (i 128)
          (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
              (set! cnt (+ cnt 1))))
-       (ascii-print-color 0 6 10)
+       (ascii-print-color 0 6 9)
        (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
-       (ascii-print-color 0 7 10)
+       (ascii-print-color 0 7 9)
        (println)
        #t)))
 
@@ -162,7 +162,7 @@
                  (cond ((string=? (caddr result) "#") 1)
                        ((string=? (caddr result) "b") -1)
                        (else 0))))))))
-    
+
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
 (define parse-sample-names-1
   (lambda (file-list)
@@ -402,7 +402,7 @@
       (eval `(sawlead.attack 40.0) (interaction-environment))
       (eval `(sawlead.decay 120.0) (interaction-environment))
       (eval `(sawlead.release 400.0) (interaction-environment))
-      (eval `(sawlead.sustain 0.75) (interaction-environment))             
+      (eval `(sawlead.sustain 0.75) (interaction-environment))
       (eval `(bind-func dsp:DSP
                (lambda (in time chan dat)
                  (+ (fmsynth in time chan dat)

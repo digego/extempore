@@ -66,18 +66,19 @@ private:
     std::thread   m_thread;
 #endif
 
+
 #ifdef _WIN32
-    static __declspec( thread ) EXTThread* sm_current;
+    static __declspec(thread) EXTThread* sm_current;
 #else
     static __thread EXTThread* sm_current;
 #endif
-
 public:
-    EXTThread(function_type EntryPoint = nullptr, void* Arg = nullptr, const std::string& Name = std::string()): m_function(EntryPoint), m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
+    EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
+            m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
     }
     ~EXTThread();
 
-    int create(function_type EntryPoint = nullptr, void* Arg = nullptr); // overrides - ugly, from OSC
+    int start(function_type EntryPoint = nullptr, void* Arg = nullptr); // overrides - ugly, from OSC
     int kill();
     int detach();
     int join();

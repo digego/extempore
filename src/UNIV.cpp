@@ -4,31 +4,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -43,6 +43,7 @@
 #include <iomanip>
 #include "pcre.h"
 #include "SchemeFFI.h"
+#include "SchemePrivate.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -53,83 +54,23 @@
 
 #ifdef _WIN32
 #include <malloc.h>
-//#include <unistd.h>
 #include <Windows.h>
-/*
-void uSleep(int waitTime){
- __int64 time1 = 0, time2 = 0, sysFreq = 0;
-
- QueryPerformanceCounter((LARGE_INTEGER *)&time1);
- QueryPerformanceFrequency((LARGE_INTEGER *)&sysFreq);
- do{
- QueryPerformanceCounter((LARGE_INTEGER *)&time2);
-
- //  }while((((time2-time1)*1.0)/sysFreq)<waitTime);
-   }while( (time2-time1) <waitTime);
-}
-*/
 
 enum Windows_Color_Convert
 {
-        Black       = 0,
-        Red         = FOREGROUND_RED,
-        Green       = FOREGROUND_GREEN,
-        Yellow      = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-        Blue        = FOREGROUND_BLUE,
-        Purple      = FOREGROUND_RED   | FOREGROUND_BLUE,
-        Cyan        = FOREGROUND_GREEN | FOREGROUND_BLUE,
-        White       = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
-        LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
-        Grey        = FOREGROUND_INTENSITY,
-        Orange      = FOREGROUND_RED   | FOREGROUND_GREEN,
-        LightRed    = FOREGROUND_RED   | FOREGROUND_INTENSITY,
-        LightGreen  = FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-        LightBlue   = FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        LightPurple = FOREGROUND_RED   | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        LightCyan   = FOREGROUND_GREEN | FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-        //LightGrey   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE,
+    Black   = 0,
+    Red     = FOREGROUND_RED,
+    Green   = FOREGROUND_GREEN,
+    Yellow  = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    Blue    = FOREGROUND_BLUE,
+    Magenta = FOREGROUND_RED   | FOREGROUND_BLUE,
+    Cyan    = FOREGROUND_GREEN | FOREGROUND_BLUE,
+    White   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
 };
 
-int WINDOWS_COLORS[16] = {Black,LightRed,LightGreen,Yellow,Blue,Purple,LightCyan,White,LightGrey,Orange,Grey,LightRed,LightGreen,LightBlue,Cyan};
+int WINDOWS_COLORS[] = { Black, Red, Green, Yellow, Blue, Magenta, Cyan, White };
 
 #endif
-
-void ascii_text_color(int attr, int fg, int bg)
-{
-  // for --term=nocolor, this function should do nothing
-  if (extemp::UNIV::EXT_TERM == 3) {
-    return;
-  }
-#ifdef _WIN32
-  if (extemp::UNIV::EXT_TERM == 1) {
-    char command[13];
-    if(fg>8) fg = 8;
-    if(bg>9) bg = 0;
-    sprintf(command, "COLOR %d%d", bg, fg);
-    HANDLE console=GetStdHandle(STD_OUTPUT_HANDLE);
-    SetConsoleTextAttribute(console, WINDOWS_COLORS[fg]);
-  }else{
-    char command[13];
-    /* Command is the control command to the terminal */
-    sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-    printf("%s", command);
-  }
-#else
-  char command[20];  
-  if(attr>1) attr=0;
-  if(bg==10) bg=9; // background default is 9 NOT 10
-  // if simple term (that doesn't support defaults)
-  // then default to black background and white text
-  if (extemp::UNIV::EXT_TERM == 2) {
-    attr=0;
-    if(bg==9) bg=0;
-    if(fg==9) fg=7;
-  }
-  sprintf(command, "%c[%d;%d;%dm", 0x1B, attr, fg + 30, bg + 40);
-  command[strlen(command)]=0;
-  printf("%s", command);
-#endif
-}
 
 static char base64_codesafe_encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
                                                 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
@@ -207,7 +148,7 @@ char* cname_encode(char *data,
     for (int i = 0; i < _base64_mod_table[input_length % 3]; i++) {
       encoded_data[*output_length - 1 - i] = 0; //'$';
     }
-    
+
     //printf("ENCODE: %d:%s\n",*output_length,encoded_data);
     return encoded_data;
 }
@@ -218,7 +159,7 @@ char* cname_decode(char *data,
                    size_t *output_length) {
 
     if (base64_codesafe_decoding_table == NULL) base64_codesafe_build_decoding_table();
-    
+
     char* d2 = NULL;
     // pad with $'s
     if (input_length % 4 != 0) {
@@ -330,34 +271,34 @@ unsigned char* base64_decode(const char *data,
 }
 
 
-bool rmatch(char* regex, char* str)
+bool rmatch(char* regex, const char* str)
 {
   //  char* data = char* strstring_value(pair_car(args));
   // char* pattern = string_value(pair_cadr(args));
-  char* data = str;
-  char* pattern = regex;		
-  
-  pcre *re; 
-  const char *error; 
+  const char* data = str;
+  char* pattern = regex;
+
+  pcre *re;
+  const char *error;
   int erroffset;
-  
-  re = pcre_compile(	pattern, /* the pattern */ 
-			0, /* default options */ 
-			&error, /* for error message */ 
-			&erroffset, /* for error offset */ 
-			NULL); /* use default character tables */
-  
+
+  re = pcre_compile(    pattern, /* the pattern */
+                        0, /* default options */
+                        &error, /* for error message */
+                        &erroffset, /* for error offset */
+                        NULL); /* use default character tables */
+
   int rc;
-  int ovector[30]; 
-  rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
-			30); /* number of elements (NOT size in bytes) */
-  
+  int ovector[30];
+  rc = pcre_exec(       re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the pattern */
+                        data, /* the subject string */
+                        strlen(data), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        30); /* number of elements (NOT size in bytes) */
+
   return (rc>=0) ? true : false;
 }
 
@@ -365,138 +306,134 @@ bool rmatch(char* regex, char* str)
 // bool rmatches(char* regex, char* str, struct regex_matched_buffer* result)
 //     {
 //   char* data = str;
-//   char* pattern = regex;		
-// 	pcre *re; 
-// 	const char *error; 
-// 	int erroffset; 
-// 	re = pcre_compile(	pattern, /* the pattern */ 
-// 				0, /* default options */ 
-// 				&error, /* for error message */ 
-// 				&erroffset, /* for error offset */ 
-// 				NULL); /* use default character tables */
-		
-// 	int rc; 
-// 	int ovector[60]; 
-// 	rc = pcre_exec(	re, /* result of pcre_compile() */ 
-// 			NULL, /* we didn’t study the pattern */ 
-// 			data, /* the subject string */ 
-// 			strlen(data), /* the length of the subject string */ 
-// 			0, /* start at offset 0 in the subject */ 
-// 			0, /* default options */ 
-// 			ovector, /* vector of integers for substring information */ 
-// 			60); /* number of elements (NOT size in bytes) */
-						
-// 	// if failed to match return empty list
-// 	if(rc<0 || rc>100) return false;
+//   char* pattern = regex;
+//      pcre *re;
+//      const char *error;
+//      int erroffset;
+//      re = pcre_compile(      pattern, /* the pattern */
+//                              0, /* default options */
+//                              &error, /* for error message */
+//                              &erroffset, /* for error offset */
+//                              NULL); /* use default character tables */
+
+//      int rc;
+//      int ovector[60];
+//      rc = pcre_exec( re, /* result of pcre_compile() */
+//                      NULL, /* we didn’t study the pattern */
+//                      data, /* the subject string */
+//                      strlen(data), /* the length of the subject string */
+//                      0, /* start at offset 0 in the subject */
+//                      0, /* default options */
+//                      ovector, /* vector of integers for substring information */
+//                      60); /* number of elements (NOT size in bytes) */
+
+//      // if failed to match return empty list
+//      if(rc<0 || rc>100) return false;
 
 //   result->matches = rc;
-// 	for(int i=0, p=0, k=(rc-1);i<rc;i++,k--)
-// 	{
-// 	    //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
+//      for(int i=0, p=0, k=(rc-1);i<rc;i++,k--)
+//      {
+//          //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
 //     p=i*2;
-   
-// 	  if(ovector[p]==-1) {
+
+//        if(ovector[p]==-1) {
 //       strcpy(result->data[k],"");
-// 	  }else{
-//       int range = ovector[p+1] - ovector[p];				
+//        }else{
+//       int range = ovector[p+1] - ovector[p];
 //       char* b = (char*) alloca(range+1);
 //       memset(b,0,range+1);
 //       char* a = data+ovector[p];
 //       char* substring = strncpy(b, a, range);
 //       strcpy(result->data[k],substring);
-// 	  }
-// 	}
+//        }
+//      }
 //   return true;
-// }	
+// }
 
 
 int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
     {
   char* data = str;
-  char* pattern = regex;		
-	pcre *re; 
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
-				NULL); /* use default character tables */
-		
-	// pointer to hold return results		
-	int rc; 
-	int ovector[60];
+  char* pattern = regex;
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
+
+        // pointer to hold return results
+        int rc;
+        int ovector[60];
   int64_t num=0;
-		
-	while(true) {
-	    rc = pcre_exec(	re, /* result of pcre_compile() */ 
-				NULL, /* we didn’t study the pattern */ 
-				data, /* the subject string */ 
-				strlen(data), /* the length of the subject string */ 
-				0, /* start at offset 0 in the subject */ 
-				0, /* default options */ 
-				ovector, /* vector of integers for substring information */ 
-				60); /* number of elements (NOT size in bytes) */
-							
-	    //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << "  num " << num << " max " << maxnum << std::endl;
-	    if(rc<1 || num>=maxnum) {
+
+        while(true) {
+            rc = pcre_exec(     re, /* result of pcre_compile() */
+                                NULL, /* we didn’t study the pattern */
+                                data, /* the subject string */
+                                strlen(data), /* the length of the subject string */
+                                0, /* start at offset 0 in the subject */
+                                0, /* default options */
+                                ovector, /* vector of integers for substring information */
+                                60); /* number of elements (NOT size in bytes) */
+
+            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << "  num " << num << " max " << maxnum << std::endl;
+            if(rc<1 || num>=maxnum) {
         return num;
-	    }
-	    int range = ovector[1] - ovector[0];
-	    char* b = (char*) alloca(range+1);
-	    memset(b,0,range+1);
-	    char* a = data+ovector[0];
-	    char* substring = strncpy(b, a, range);
+            }
+            int range = ovector[1] - ovector[0];
+            char* b = (char*) alloca(range+1);
+            b[range] = '\0';
+            char* a = data+ovector[0];
+            char* substring = strncpy(b, a, range);
       // std::cout << "substr:" << substring << std::endl;
       char* tmp = (char*) malloc(range+1);
-      memset(tmp,0,range+1);
+      tmp[range] = '\0';
       strncpy(tmp,substring,range);
       // std::cout << "adding:" << tmp << " at:" << num << std::endl;
       results[num]=tmp;
-      // std::cout << "done!" << std::endl;      
+      // std::cout << "done!" << std::endl;
       num++;
-	    //_sc->imp_env->insert(list);
-	    data = data+range+ovector[0];
-	}
+            //_sc->imp_env->insert(list);
+            data = data+range+ovector[0];
+        }
   return 0;
 }
 
-
-
-bool rsplit(char* regex, char* str, char* a, char* b)
-{
-  char* data = str;
-  int length = strlen(data);
-  char* pattern = regex;		
-  pcre *re; 
-  const char *error; 
-  int erroffset; 
-  //printf("dat: data\n");
+bool rsplit(const char* regex, const char* str, char* a, char* b)
+{ // TODO: harmonize with FFI
+  int length = strlen(str);
+  pcre *re;
+  const char *error;
+  int erroffset;
+  //printf("dat: str\n");
   // should probably move this regex compile to global
-  re = pcre_compile(	pattern, /* the pattern */ 
-			0, /* default options */ 
-			&error, /* for error message */ 
-			&erroffset, /* for error offset */ 
-			NULL); /* use default character tables */		
-  int rc; 
-  int ovector[60];					
-  rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
-			60); /* number of elements (NOT size in bytes) */
-  
+  re = pcre_compile(    regex, /* the regex */
+                        0, /* default options */
+                        &error, /* for error message */
+                        &erroffset, /* for error offset */
+                        NULL); /* use default character tables */
+  int rc;
+  int ovector[60];
+  rc = pcre_exec(       re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the regex */
+                        str, /* the subject string */
+                        strlen(str), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        60); /* number of elements (NOT size in bytes) */
+
   if(rc<1 || rc>1) return false; // then we failed
   int range = ovector[0];
   int range2 = ovector[1];
   //printf("reg ranges %d:%d\n",range,range2);
-  memset(a,0,range+1);
-  memcpy(a,data,range);
-  memset(b,0,(length-(range2+0))+1);
-  memcpy(b,data+range2+0,(length-(range2+0)));
+  a[range] = '\0';;
+  memcpy(a, str, range);
+  b[length - range2] = '\0';
+  memcpy(b, str + range2, length - range2);
   return true;
 }
 
@@ -505,73 +442,73 @@ bool rsplit(char* regex, char* str, char* a, char* b)
 char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
   char* data = str; //string_value(pair_car(args));
-	char* pattern = regex; //string_value(pair_cadr(args));
+        char* pattern = regex; //string_value(pair_cadr(args));
   char* replace = replacement;
-	//strcpy(result,replacement);
-		
-	pcre *re;
-	const char *error; 
-	int erroffset; 
-	re = pcre_compile(	pattern, /* the pattern */ 
-				0, /* default options */ 
-				&error, /* for error message */ 
-				&erroffset, /* for error offset */ 
-				NULL); /* use default character tables */
-		
-	int rc; 
-	int ovector[60];
+        //strcpy(result,replacement);
 
-	rc = pcre_exec(	re, /* result of pcre_compile() */ 
-			NULL, /* we didn’t study the pattern */ 
-			data, /* the subject string */ 
-			strlen(data), /* the length of the subject string */ 
-			0, /* start at offset 0 in the subject */ 
-			0, /* default options */ 
-			ovector, /* vector of integers for substring information */ 
-			60); /* number of elements (NOT size in bytes) */
+        pcre *re;
+        const char *error;
+        int erroffset;
+        re = pcre_compile(      pattern, /* the pattern */
+                                0, /* default options */
+                                &error, /* for error message */
+                                &erroffset, /* for error offset */
+                                NULL); /* use default character tables */
 
-	// no match found return original string
-	if(rc<1) {strcpy(result,str); return result;} // Return mk_string(_sc,data);
-	// ok we have a match
-	// first replace any groups in replace string (i.e. $1 $2 ...)
-	char* res = (char*) "";
-	char* sep = (char*) "$";
-	char* tmp = 0;
+        int rc;
+        int ovector[60];
+
+        rc = pcre_exec( re, /* result of pcre_compile() */
+                        NULL, /* we didn’t study the pattern */
+                        data, /* the subject string */
+                        strlen(data), /* the length of the subject string */
+                        0, /* start at offset 0 in the subject */
+                        0, /* default options */
+                        ovector, /* vector of integers for substring information */
+                        60); /* number of elements (NOT size in bytes) */
+
+        // no match found return original string
+        if(rc<1) {strcpy(result,str); return result;} // Return mk_string(_sc,data);
+        // ok we have a match
+        // first replace any groups in replace string (i.e. $1 $2 ...)
+        char* res = (char*) "";
+        char* sep = (char*) "$";
+        char* tmp = 0;
   int datalength = strlen(data);
-	int pos,range,size,cnt = 0;
+        int pos,range,size,cnt = 0;
   strcpy(result,replace);
-	char* p = strtok(result,sep);
+        char* p = strtok(result,sep);
   if(p==NULL) { strcpy(result, str); return result; };
-	do{
-	    char* cc;
-	    pos = strtol(p,&cc,10);
+        do{
+            char* cc;
+            pos = strtol(p,&cc,10);
       // std::cout << "p: " << p << " pos: " << pos << " cc:" << cc << std::endl;
-	    range = (pos>0 && pos<20) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
-      // std::cout << "cnt: " << cnt << " rc:" << rc << " range: " << range << std::endl;      
+            range = (pos>0 && pos<20) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
+      // std::cout << "cnt: " << cnt << " rc:" << rc << " range: " << range << std::endl;
       if(pos>=rc || range < 0 || range > datalength) {
         range = 0;
         cc = p;
       }
-	    size = strlen(res);
-	    tmp = (char*) alloca(size+range+strlen(cc)+1);
-	    memset(tmp,0,size+range+strlen(cc)+1);
-	    memcpy(tmp,res,size);
-	    memcpy(tmp+size,data+ovector[pos*2],range);
-	    memcpy(tmp+size+range,cc,strlen(cc));
-	    res = tmp;
-	    p = strtok(NULL, sep);
+            size = strlen(res);
+            tmp = (char*) alloca(size+range+strlen(cc)+1);
+            tmp[size+range+strlen(cc)] = '\0';
+            memcpy(tmp,res,size);
+            memcpy(tmp+size,data+ovector[pos*2],range);
+            memcpy(tmp+size+range,cc,strlen(cc));
+            res = tmp;
+            p = strtok(NULL, sep);
       cnt++;
-	}while(p);
-	// now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-	int lgth = (strlen(data)-range)+strlen(res)+1;
-	range = ovector[1] - ovector[0];
-	//char* result = (char*) alloca(lgth);
-  if(lgth>4096) return str; 
-	memset(result,0,lgth);
-	memcpy(result,data,ovector[0]);
-	memcpy(result+ovector[0],res,strlen(res));
-	memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
-	return result;
+        }while(p);
+        // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
+        int lgth = ovector[0] + strlen(res) + strlen(data) - ovector[1] + 1;
+        range = ovector[1] - ovector[0];
+        //char* result = (char*) alloca(lgth);
+        if(lgth>4096) return str;
+        result[lgth - 1] = '\0'; // TODO: lots of this can be simplified
+        memcpy(result,data,ovector[0]);
+        memcpy(result+ovector[0],res,strlen(res));
+        memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
+        return result;
 }
 
 const char* sys_sharedir(){
@@ -603,89 +540,6 @@ char* sys_slurp_file(const char* fname)
   return NULL;
 }
 
-//////////////////////////////////////////////////////////////////
-//  CLOCK/TIME
-#ifdef _WIN32
-double getRealTime()
-{
-  // going to go with system_clock on windows for the moment
-  using namespace std::chrono;
-  time_point<system_clock> time = system_clock::now();
-  system_clock::duration dur = time.time_since_epoch();
-  double units = (double) dur.count();
-  double seconds_per_unit = (double)system_clock::period::num / (double)system_clock::period::den;
-  return units * seconds_per_unit;
-}
-
-#elif __linux__
-
-double time_to_double(struct timespec t) {
-  return t.tv_sec + t.tv_nsec/D_BILLION;
-}
-
-struct timespec double_to_time(double tm) {
-  struct timespec t;
-
-  t.tv_sec = (long)tm;
-  t.tv_nsec = (tm - t.tv_sec)*BILLION;
-  if (t.tv_nsec == BILLION) {
-    t.tv_sec++;
-    t.tv_nsec = 0;
-  }
-  return t;
-}
-
-double getRealTime()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return time_to_double(t);
-}
-
-#elif __APPLE__
-
-#include <CoreAudio/HostTime.h>
-
-// same as linux version
-double time_to_double(struct timespec t) {
-  return t.tv_sec + t.tv_nsec/D_BILLION;
-}
-
-// same as linux version
-struct timespec double_to_time(double tm) {
-  struct timespec t;
-
-  t.tv_sec = (long)tm;
-  t.tv_nsec = (tm - t.tv_sec)*BILLION;
-  if (t.tv_nsec == BILLION) {
-    t.tv_sec++;
-    t.tv_nsec = 0;
-  }
-  return t;
-}
-
-double getRealTime()
-{
-  return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
-}
-#endif
-
-double audio_clock_base()
-  {
-    return extemp::UNIV::AUDIO_CLOCK_BASE;
-  }
-
-double audio_clock_now()
-  {
-    return extemp::UNIV::AUDIO_CLOCK_NOW;
-  }
-
-
-double clock_clock()
-{
-  return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
-}
-
 int register_for_window_events()
 {
 #ifdef __APPLE__
@@ -698,255 +552,239 @@ int register_for_window_events()
 #endif
 }
 
-namespace extemp {
+namespace extemp
+{
 
-  // this template should be filled by cmake during the build
-  // process - or you can do it yourself (by hand) if you're into
-  // that sort of thing
-  std::string UNIV::SHARE_DIR = std::string(EXT_SHARE_DIR);
-  uint32_t UNIV::FRAMES = 128;
-  uint32_t UNIV::CHANNELS = 2;
-  uint32_t UNIV::IN_CHANNELS = 0;
-  uint32_t UNIV::SAMPLERATE = 44100;
-  uint32_t UNIV::SECOND = SAMPLERATE;
-  uint32_t UNIV::MINUTE = SECOND * 60;
-  uint32_t UNIV::HOUR = MINUTE * 60;
-  uint64_t UNIV::TIME = 0l;
-  uint64_t UNIV::DEVICE_TIME = 0l;
-  double UNIV::AUDIO_CLOCK_NOW = 0.0;
-  double UNIV::AUDIO_CLOCK_BASE = 0.0;
-  uint64_t UNIV::TIME_DIVISION = 1;
-  uint32_t UNIV::AUDIO_NONE = 0; // 0 for real device, 1 for dummy device
-  uint32_t UNIV::AUDIO_DEVICE = -1;
-  uint32_t UNIV::AUDIO_IN_DEVICE = -1;
-  double UNIV::CLOCK_OFFSET = 0.0;
-  std::map<std::string,std::string> UNIV::CMDPARAMS;
-  std::vector<std::string> UNIV::ARCH;
-  std::vector<std::string> UNIV::ATTRS;
-  std::vector<std::string> UNIV::CPU;  
-  
-#ifdef EXT_BOOST
-  std::random_device UNIV::RNGDEV;
-  std::mt19937_64 UNIV::RNGGEN(UNIV::RNGDEV());
-  std::uniform_real_distribution<double> UNIV::uniform_01(0.0, 1.0);
-#endif
+namespace UNIV
+{
 
-    // 0 is for ansi, 1 is for MSDos CMD shell
+std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
+uint32_t FRAMES = 128;
+uint32_t CHANNELS = 2;
+uint32_t IN_CHANNELS = 0;
+uint32_t SAMPLERATE = 44100;
+volatile uint64_t TIME = 0l;
+uint64_t DEVICE_TIME = 0l;
+double AUDIO_CLOCK_NOW = 0.0;
+double AUDIO_CLOCK_BASE = 0.0;
+uint64_t TIME_DIVISION = 1;
+bool AUDIO_NONE = false;
+uint32_t AUDIO_DEVICE = -1;
+uint32_t AUDIO_IN_DEVICE = -1;
+double AUDIO_OUTPUT_LATENCY = 0.0;
+double CLOCK_OFFSET = 0.0;
+std::map<std::string, std::string> CMDPARAMS;
+std::string ARCH;
+std::string CPU;
+std::vector<std::string> ATTRS;
+// 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef _WIN32
-    uint32_t UNIV::EXT_TERM = 1;
+uint32_t EXT_TERM = 1;
 #else
-    uint32_t UNIV::EXT_TERM = 0; 
+uint32_t EXT_TERM = 0;
 #endif
-    uint32_t UNIV::EXT_LOADBASE = 1;
-
-    void UNIV::initRand() {
+bool EXT_LOADBASE = true;
+void initRand() {
 #ifdef _WIN32
-      srand((int)UNIV::DEVICE_TIME); ///UNIV::SECOND));
+    srand((int)DEVICE_TIME); ///SECOND));
 #elif __linux__
-      srand((int)(UNIV::DEVICE_TIME/UNIV::SECOND));
+    srand(DEVICE_TIME / SECOND());
 #else
-      sranddev();
+    sranddev();
 #endif
+}
+
+int random(int range) {
+    return (int)((double)rand() / (double)RAND_MAX * (double) range);
+}
+
+double random() {
+    return (double)rand() / (double)RAND_MAX;
+}
+
+double midi2frq(double pitch)
+{
+    return 220.0 * pow(2.0,(pitch - 57.0)/12);
+}
+
+double frqRatio(double semitones)
+{
+    return pow(2.0, (semitones/12.0));
+}
+
+bool file_check(const std::string& filename)
+{
+    FILE* fd = fopen(filename.c_str(),"r");
+    if(fd == NULL){
+        return false;
+    }else{
+        fclose(fd);
+        return true;
+    }
+}
+
+struct dump_stack_frame {
+    int op;
+    pointer args;
+    pointer envir;
+    pointer code;
+};
+
+
+void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full, bool stringquotes)
+{
+    if(val == 0) {
+        ss << "-ERROR BAD POINTER-";
+        return;
+    }
+    if (pointer_type(val) > T_LAST_SYSTEM_TYPE) {
+        printf("Bad cell type - not printing\n");
+        return;
     }
 
-    int UNIV::random(int range) {
-#ifdef EXT_BOOST
-      return (int)(UNIV::uniform_01(UNIV::RNGGEN)*(double)range);
-#else
-        return (int)((double)rand() / (double)RAND_MAX * (double) range);
-#endif
+    if(is_string(val)) {
+        if(stringquotes) {
+            ss << "\"" << string_value(val) << "\"";
+        }else{
+            ss << string_value(val);
+        }
+    }else if(is_symbol(val)){
+        ss << symname(val);
+    }else if(is_character(val)){
+        ss << charvalue(val);
+    }else if(is_environment(val)){
+        ss << "#<ENVIRONMENT " << val << " ";
+        if(full) {
+            if(is_vector(val->_object._cons._car)) {
+                ss << "<VECTOR-FRAME>";
+            }else{
+                printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
+            }
+            ss << " ";
+            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
+        }
+        ss << ">";
+    }else if(is_proc(val)){
+        ss << "#<PROC " << procname(val) << ">";
+    }else if(is_foreign(val)){
+        ss << "#<FOREIGN>";
+    }else if(is_macro(val)){
+        ss << "#<MACRO>";
+    }else if(is_closure(val)){
+        ss << "#<<CLOSURE " << val << ">";
+        if(full) {
+            ss << "<CODE ";
+            printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
+            ss << "> ";
+            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
+            ss << ">>";
+        }
+    }else if(is_continuation(val)){
+        ss << "#<<CONTINUATION " << val << ">";
+        if(full) {
+            unsigned int* stack = (unsigned int*) cptr_value(pair_cdr(val));
+            int nframes = stack[0];
+            dump_stack_frame* frames = (dump_stack_frame*)&stack[1];
+            for(int j=0;j<nframes;j++)
+            {
+                ss << std::endl << std::endl << "FRAME(" << j << ")--------------------------";
+                ss << std::endl << "OPCODE: " << frames[j].op; // << std::endl << "----------" << std::endl;
+
+                // print args
+                ss << std::endl << "ARGS: ";
+                pointer args = frames[j].args;
+                extemp::UNIV::printSchemeCell(_sc, ss, args, true, stringquotes);
+
+                // copy code
+                ss << std::endl << "CODE: ";
+                pointer code = frames[j].code;
+                //          ss.str("");
+                extemp::UNIV::printSchemeCell(_sc, ss, code, true, stringquotes);
+                //          std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
+
+                ss << std::endl << "ENVIR: ";
+                pointer envir = frames[j].envir;
+                //          ss.str("");
+                extemp::UNIV::printSchemeCell(_sc, ss, envir, true, stringquotes);
+                //          std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
+            }
+        }
+        ss << std::endl << ">>";
+    }else if(is_cptr(val)){
+        void* p = cptr_value(val);
+        ss << "#<CPTR: " << p << ">";
+    }else if(is_vector(val)){
+        //ss << "#<VECTOR>";
+        if(true) {
+            ss << "#(";
+            int i;
+            long long num=val->_size;//  /2+ivalue_unchecked(val)%2;
+            if(num > 1000 && !full) { // exit if larger than 1000 elements
+                ss << " -- " << num << " elements -- )";
+                return;
+            }
+            //std::cout << "  NUM: " << num << std::endl;
+            for(i=0; i<num; i++) {
+                /* Vector cells will be treated like ordinary cells */
+                printSchemeCell(_sc, ss, vector_elem(val,i), full, stringquotes);
+                if(i+1 < num) ss << " ";
+            }
+            ss << ")";
+        }
+    }else if(is_port(val)){
+        ss << "#<PORT" << val << ">";
+    }else if(is_pair(val)){
+        int lgth = list_length(_sc, val);
+        if(lgth<0) // is pair
+        {
+            ss << "(";
+            printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
+            ss << " . ";
+            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
+            ss << ")";
+        }else if(lgth>1000 && !full) {
+            ss << "( -- " << lgth << " elements -- )";
+            return;
+        }else{ // is list
+            ss << "(";
+            for(int i=0;i<lgth;i++)
+            {
+                printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
+                if(i<(lgth-1)) ss << " ";
+            }
+            ss << ")";
+        }
+    }else if(is_foreign(val)){
+        ss << "#<FOREIGN FUNC>";
+    }else if(val == _sc->NIL){
+        if(full) {
+            ss << "()";
+        }else{
+            ss << "NIL";
+        }
+    }else if(_sc->T == val){
+        ss << "#t";
+    }else if(_sc->F == val){
+        ss << "#f";
+    }else if(is_integer(val)){
+        ss << ivalue(val);
+    }else if(is_rational(val)){
+        ss << val->_object._number.value.ratvalue.n << "/" << val->_object._number.value.ratvalue.d;
+    }else if(is_real(val)){
+        if(full){
+            ss << std::fixed << std::showpoint << std::setprecision(23) << rvalue(val);
+        }else{
+            ss << std::fixed << std::showpoint << /* << std::setprecision(15) <<*/ rvalue(val);
+        }
+    }else if(_sc->EOF_OBJ == val){
+      ss << "#<EOF>";
+    }else{
+        ss << "UNKOWN VALUE: " << val << " (GC'd?) ";
     }
 
-    double UNIV::random() {
-#ifdef EXT_BOOST
-      return UNIV::uniform_01(UNIV::RNGGEN);
-#else      
-	return (double)rand() / (double)RAND_MAX;
-#endif
-    }
+    return;
+}
 
-    double UNIV::midi2frq(double pitch)
-    {
-	return 220.0 * pow(2.0,(pitch - 57.0)/12);
-    }
-	
-    double UNIV::frqRatio(double semitones)
-    {
-	return pow(2.0, (semitones/12.0));
-    }
-	
-    bool UNIV::file_check(const std::string& filename)
-    {
-	FILE* fd = fopen(filename.c_str(),"r");
-	if(fd == NULL){
-	    return false;
-	}else{
-	    fclose(fd);
-	    return true;
-	}
-    }
+}
 
-    struct dump_stack_frame { 
-	int op; 
-	pointer args; 
-	pointer envir; 
-	pointer code; 
-    }; 	
-
-	
-    void UNIV::printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full, bool stringquotes)
-    {
-	if(val == 0) {
-	    ss << "-ERROR BAD POINTER-";
-	    return;
-	}
-	if(pointer_type(val) > 16) {
-	    printf("Bad cell type - not printing\n");
-	    return;
-	}
-		
-	if(is_string(val)) {
-	    if(stringquotes) {
-		ss << "\"" << string_value(val) << "\"";
-	    }else{
-		ss << string_value(val);			
-	    }
-	}else if(is_symbol(val)){
-	    ss << symname(val);
-	}else if(is_character(val)){
-	    ss << charvalue(val);
-	}else if(is_environment(val)){
-	    ss << "#<ENVIRONMENT " << val << " ";
-	    if(full) {		
-		if(is_vector(val->_object._cons._car)) {
-		    ss << "<VECTOR-FRAME>";
-		}else{
-		    printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-		}
-		ss << " ";				
-		printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
-	    }
-	    ss << ">";			
-	}else if(is_proc(val)){
-	    ss << "#<PROC " << procname(val) << ">";
-	}else if(is_foreign(val)){
-	    ss << "#<FOREIGN>";
-	}else if(is_macro(val)){
-	    ss << "#<MACRO>";			
-	}else if(is_closure(val)){
-	    ss << "#<<CLOSURE " << val << ">";
-	    if(full) {
-		ss << "<CODE ";
-		printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-		ss << "> ";
-		printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);				
-		ss << ">>";
-	    }
-	}else if(is_continuation(val)){
-	    ss << "#<<CONTINUATION " << val << ">";
-	    if(full) {
-		unsigned int* stack = (unsigned int*) cptr_value(pair_cdr(val));
-		int nframes = stack[0];
-		dump_stack_frame* frames = (dump_stack_frame*)&stack[1];
-		for(int j=0;j<nframes;j++)
-		{
-		    ss << std::endl << std::endl << "FRAME(" << j << ")--------------------------";
-		    ss << std::endl << "OPCODE: " << frames[j].op; // << std::endl << "----------" << std::endl;
-					
-		    // print args
-		    ss << std::endl << "ARGS: ";
-		    pointer args = frames[j].args;
-		    extemp::UNIV::printSchemeCell(_sc, ss, args, true, stringquotes);
-					
-		    // copy code
-		    ss << std::endl << "CODE: "; 
-		    pointer code = frames[j].code;
-		    //		ss.str("");
-		    extemp::UNIV::printSchemeCell(_sc, ss, code, true, stringquotes);
-		    //		std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-					
-		    ss << std::endl << "ENVIR: ";
-		    pointer envir = frames[j].envir;
-		    //		ss.str("");
-		    extemp::UNIV::printSchemeCell(_sc, ss, envir, true, stringquotes);
-		    //		std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;					
-		}
-	    }
-	    ss << std::endl << ">>";
-	}else if(is_cptr(val)){
-	    void* p = cptr_value(val);
-	    ss << "#<CPTR: " << p << ">";
-	}else if(is_vector(val)){
-	    //ss << "#<VECTOR>";
-	    if(true) {
-		ss << "#(";
-		int i;
-		long long num=val->_size;//  /2+ivalue_unchecked(val)%2;
-		if(num > 1000 && !full) { // exit if larger than 1000 elements
-		    ss << " -- " << num << " elements -- )";
-		    return;
-		}
-		//std::cout << "  NUM: " << num << std::endl;		
-		for(i=0; i<num; i++) {
-		    /* Vector cells will be treated like ordinary cells */
-		    UNIV::printSchemeCell(_sc, ss, vector_elem(val,i), full, stringquotes);
-		    if(i+1 < num) ss << " ";
-		}
-		ss << ")";
-	    }
-	}else if(is_port(val)){
-	    ss << "#<PORT" << val << ">";
-	}else if(is_pair(val)){
-	    int lgth = list_length(_sc, val);	
-	    if(lgth<0) // is pair
-	    {
-		ss << "(";
-		printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-		ss << " . ";
-		printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
-		ss << ")";
-	    }else if(lgth>1000 && !full) {
-		ss << "( -- " << lgth << " elements -- )";
-		return;
-	    }else{ // is list
-		ss << "(";				
-		for(int i=0;i<lgth;i++)
-		{
-		    printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
-		    if(i<(lgth-1)) ss << " ";
-		}
-		ss << ")";
-	    }
-	}else if(is_foreign(val)){
-	    ss << "#<FOREIGN FUNC>";
-	}else if(val == _sc->NIL){
-	    if(full) {
-		ss << "()";
-	    }else{
-		ss << "NIL";
-	    }
-	}else if(_sc->T == val){
-	    ss << "#t";
-	}else if(_sc->F == val){
-	    ss << "#f";
-	}else if(is_integer(val)){
-	    ss << ivalue(val);            			
-	}else if(is_rational(val)){			
-	    ss << val->_object._number.value.ratvalue.n << "/" << val->_object._number.value.ratvalue.d;
-	}else if(is_real(val)){
-	    if(full){
-		ss << std::fixed << std::showpoint << std::setprecision(23) << rvalue(val);				
-	    }else{
-		ss << std::fixed << std::showpoint << /* << std::setprecision(15) <<*/ rvalue(val);
-	    }
-        }else if(_sc->EOF_OBJ == val){
-          ss << "#<EOF>";
-	}else{
-	    ss << "UNKOWN VALUE: " << val << " (GC'd?) ";
-	}
-		
-	return;
-    }
-	
-	
 } //End Namespace

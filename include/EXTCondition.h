@@ -46,28 +46,104 @@
 
 namespace extemp
 {
-    class EXTCondition
-    {
-        
-    public:
-	EXTCondition();
-	~EXTCondition();
-        
-	int init();
-	void destroy();
-        
-	int wait(EXTMutex *mutex);
-	int signal(EXTMutex *mutex);
-        
-    protected:
-	bool initialised;
-#ifdef EXT_BOOST
-	std::condition_variable_any boost_cond;
-#else
-	pthread_cond_t pthread_cond;
-#endif
 
-    };
+class EXTCondition
+{
+private:
+    bool                        m_initialised;
+#ifdef EXT_BOOST
+    std::condition_variable_any m_cond;
+#else
+    pthread_cond_t              m_cond;
+#endif
+public:
+    EXTCondition(): m_initialised(false) {
+    }
+    ~EXTCondition() {
+        destroy();
+    }
+
+    void init();
+    void destroy();
+
+    void wait(EXTMutex *mutex);
+    void signal();
+};
+
+#ifdef EXT_BOOST
+
+inline void EXTCondition::init(): m_initialised(true)
+{
+}
+
+void EXTCondition::destroy() {
+    m_initialised = false;
+}
+
+inline void EXTCondition::wait(EXTMutex* Mutex)
+{
+    std::unique_lock<std::recursive_mutex> lock(Mutex->m_mutex);
+    boost_cond.wait(lock);
+}
+
+inline void EXTCondition::signal()
+{
+    boost_cond.notify_one();
+}
+
+#else // begin POSIX
+
+inline void EXTCondition::init()
+{
+    auto result(pthread_cond_init(&m_cond, NULL));
+    m_initialised = !result;
+#ifdef _EXTCONDITION_DEBUG_
+    if (result)
+    {
+        dprintf(2, "Error initialising condition: %d\n", result);
+    }
+#endif
+}
+
+inline void EXTCondition::destroy()
+{
+    if (m_initialised)
+    {
+        m_initialised = false;
+        auto __attribute__((unused)) result(pthread_cond_destroy(&m_cond));
+#ifdef _EXTCONDITION_DEBUG_
+        if (result)
+        {
+            dprintf(2, "Error destroying condition: %d\n", result);
+        }
+#endif
+    }
+}
+
+inline void EXTCondition::wait(EXTMutex* Mutex)
+{
+    auto __attribute__((unused)) result(pthread_cond_wait(&m_cond, &Mutex->m_mutex));
+#ifdef _EXTCONDITION_DEBUG_
+    if (result)
+    {
+        dprintf(2, "Error waiting on condition: %d\n", result);
+    }
+#endif
+}
+
+inline void EXTCondition::signal()
+{
+    auto __attribute__((unused)) result(pthread_cond_signal(&m_cond));
+#ifdef _EXTCONDITION_DEBUG_
+    if (result)
+    {
+        dprintf(2, "Error signalling condition: %d\n", result);
+    }
+#endif
+}
+
+#endif // end POSIX
+
 } //End Namespace
 
 #endif

@@ -67,42 +67,40 @@ EXTThread::~EXTThread()
 #endif
 }
 
-  int EXTThread::create(function_type EntryPoint, void* Arg)
-  {
+int EXTThread::start(function_type EntryPoint, void* Arg)
+{
     if (EntryPoint) {
-      m_function = EntryPoint;
-    }
+        m_function = EntryPoint;
+	}
     if (Arg) {
-      m_arg = Arg;
+        m_arg = Arg;
     }
-    int result = 22; //EINVAL;
-    if (!m_initialised && m_function) {
+	int result = 22; //EINVAL;
+    if (!m_initialised) {
 #ifdef _WIN32
-      std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
-      m_thread = std::thread(fn);
-      result = 0;
+        std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
+        m_thread = std::thread(fn);
+        result = 0;
 #else
-      result = pthread_create(&m_thread, NULL, Trampoline, this);
+        result = pthread_create(&m_thread, NULL, Trampoline, this);
+        if (!result && !m_name.empty()) {
+            pthread_setname_np(m_thread, m_name.c_str());
+        }
 #endif
-#ifdef __linux__
-      if (!result && !m_name.empty()) {
-        pthread_setname_np(m_thread, m_name.c_str());
-      }
-#endif       
-      m_initialised = !result;
-    }
+        m_initialised = !result;
+	}
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
-      printf("Error creating thread: %d\n", result);
-    }
+        printf("Error creating thread: %d\n", result);
+	}
 #endif
-    return result;
-  }
+	return result;
+}
 
 int EXTThread::kill()
 {
 #ifdef _WIN32
-		return 0;
+	return 0;
 #else
     return pthread_cancel(m_thread);
 #endif
@@ -134,7 +132,7 @@ int EXTThread::join()
     if (m_initialised) {
 #ifdef _WIN32
         m_thread.join();
-            result = 0;
+        result = 0;
 #else
         result = pthread_join(m_thread, NULL);
 #endif

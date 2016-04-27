@@ -5,31 +5,31 @@
  * All rights reserved.
  *
  *
- * Redistribution and use in source and binary forms, with or without 
+ * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, 
+ * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation 
+ *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
  *
  * Neither the name of the authors nor other contributors may be used to endorse
- * or promote products derived from this software without specific prior written 
+ * or promote products derived from this software without specific prior written
  * permission.
  *
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -39,7 +39,7 @@
 //   Originally from TinyScheme v1.35 (2005) but subsequently reworked for use in impromptu
 //   Modified again before initial inclusion in Extempore project January 2011
 //
-//   Original TinyScheme Credits Below:   
+//   Original TinyScheme Credits Below:
 //   Dimitrios Souflis (dsouflis@acm.org)
 //   Based on MiniScheme (original credits follow)
 //   (MINISCM)               coded by Atsushi Moriwaki (11/5/1989)
@@ -50,7 +50,7 @@
 //   (MINISCM)
 //   (MINISCM) This is a revised and modified version by Akira KIDA.
 //   (MINISCM)	current version is 0.85k4 (15 May 1994)
-// 
+//
 //   TinyScheme v.1.35 released under MIT licence.  This file also released under MIT licence.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,13 +72,13 @@
 # define STANDALONE 1
 #endif
 
-#ifndef _MSC_VER 
-# define USE_STRCASECMP 1 
-# define USE_STRLWR 1 
+#ifndef _MSC_VER
+# define USE_STRCASECMP 1
+# define USE_STRLWR 1
 # define SCHEME_EXPORT
-#else 
-# define USE_STRCASECMP 0 
-# define USE_STRLWR 0 
+#else
+# define USE_STRCASECMP 0
+# define USE_STRLWR 0
 # ifdef _SCHEME_SOURCE
 #  define SCHEME_EXPORT __declspec(dllexport)
 # else
@@ -163,7 +163,7 @@
 #endif
 
 typedef struct scheme scheme;
-typedef struct cell *pointer; 
+typedef struct cell* pointer;
 
 typedef void * (*func_alloc)(size_t);
 typedef void (*func_dealloc)(void *);
@@ -178,11 +178,11 @@ typedef struct num {
 	struct {
 	    long long n;
 	    long long d;
-	} ratvalue;		
+	} ratvalue;
     } value;
 } num;
 
-extern "C" 
+extern "C"
 {
 scheme *scheme_init_new();
 scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free);
@@ -208,7 +208,7 @@ void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
 pointer find_slot_in_env(scheme *sc, pointer env, pointer sym, int all);
 void set_slot_in_env(scheme *sc, pointer slot, pointer value);
 pointer slot_value_in_env(pointer slot);
-void new_slot_in_env(scheme *sc, pointer variable, pointer value); 
+void new_slot_in_env(scheme *sc, pointer variable, pointer value);
 pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
@@ -221,7 +221,6 @@ pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 pointer mk_vector(scheme *sc, int len);
 void fill_vector(scheme* sc, pointer vec, pointer obj);
-pointer vector_elem(pointer vec, int ielem);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a);
 int scheme_init(scheme* sc);
 scheme* extempore_scheme_init_new();
@@ -257,7 +256,7 @@ pointer cons(scheme *sc, pointer a, pointer b);
 pointer immutable_cons(scheme *sc, pointer a, pointer b);
 pointer mk_integer(scheme *sc, long long num);
 pointer mk_real(scheme *sc, double num);
-pointer mk_rational(scheme *sc, long long n, long long d);	
+pointer mk_rational(scheme *sc, long long n, long long d);
 pointer mk_symbol(scheme *sc, const char *name);
 pointer gensym(scheme *sc);
 //    pointer (*rungc)(scheme* sc, pointer a, pointer b);
@@ -284,7 +283,6 @@ double rvalue(pointer p);
 double r64value(pointer p);
 float r32value(pointer p);
 int is_integer(pointer p);
-int is_real(pointer p);
 int is_rational(pointer p);
 int is_character(pointer p);
 long long charvalue(pointer p);
@@ -301,7 +299,7 @@ pointer pair_cdr(pointer p);
 pointer set_car(scheme* sc, pointer p, pointer q);
 pointer set_cdr(scheme* sc, pointer p, pointer q);
 
-int is_symbol(pointer p);
+int is_symbol(pointer Ptr);
 char* symname(pointer p);
 
 int is_syntax(pointer p);
@@ -324,6 +322,86 @@ void setimmutable(pointer p);
 
 void load_file(scheme *sc, FILE *fin);
 void load_string(scheme *sc, const char *input);
+
+enum scheme_types {
+    T_STRING = 1,
+    T_NUMBER = 2,
+    T_SYMBOL = 3,
+    T_PROC = 4,
+    T_PAIR = 5,
+    T_CLOSURE = 6,
+    T_CONTINUATION = 7,
+    T_FOREIGN = 8,
+    T_CHARACTER = 9,
+    T_PORT = 10,
+    T_VECTOR = 11,
+    T_MACRO = 12,
+    T_PROMISE = 13,
+    T_ENVIRONMENT = 14,
+    T_CPTR = 15,
+    T_LAST_SYSTEM_TYPE = 15
+};
+
+struct port {
+    unsigned char kind;
+    union {
+    struct {
+        FILE *file;
+        int closeit;
+    } stdio;
+    struct {
+        char *start;
+        char *past_the_end;
+        char *curr;
+    } string;
+    } rep;
+};
+
+
+/* cell structure */
+struct cell {
+    unsigned int _flag;
+//  unsigned int _colour;
+//  unsigned int _list_colour;
+    unsigned char _colour;
+    unsigned char _list_colour;
+    unsigned int _size;
+    cell* _debugger;
+    cell* _cw;
+    cell* _ccw;
+    union {
+    struct {
+        char   *_svalue;
+        int   _length;
+    } _string;
+    num _number;
+    port *_port;
+    foreign_func _ff;
+    struct {
+        struct cell *_car;
+        struct cell *_cdr;
+    } _cons;
+    void* _cptr;
+    } _object;
+};
+
+inline pointer vector_elem(pointer Vector, int Index)
+{
+    return reinterpret_cast<pointer*>(Vector->_object._cptr)[Index];
+}
+
+extern void insert_treadmill(scheme* sc, pointer p);
+
+inline pointer set_vector_elem(scheme* Scheme, pointer Vector, int Index, pointer Val)
+{
+#ifdef TREADMILL_CHECKS
+    last_call_to_insert_treadmill = 4;
+#endif
+    insert_treadmill(Scheme, Val);
+    reinterpret_cast<pointer*>(Vector->_object._cptr)[Index] = Val;
+    return Val;
+}
+
 }
 
 #endif

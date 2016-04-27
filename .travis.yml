@@ -1,0 +1,44 @@
+sudo: false
+
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.8
+    packages:
+    - gcc-5
+    - g++-5
+    - clang-3.8
+    - libasound2-dev
+    - libxrandr-dev
+    - libxcursor-dev
+    - libcurl3
+
+before_install:
+  - mkdir cmake && wget --no-check-certificate -O- https://cmake.org/files/v3.5/cmake-3.5.1-Linux-x86_64.tar.gz|tar xzf - --strip-components=1 -C cmake
+  - export PATH=$(pwd)/cmake/bin:$PATH
+
+install:  
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
+  - if [ "$CXX" = "clang++" ]; then export CXX="clang++-3.8" CC="clang-3.8"; fi
+  - export EXTEMPORE_FORCE_GL_GETPROCADDRESS=1
+  - sed -i libs/external/gl.xtm -e 's/forced-gl-getprocaddress \#f/forced-gl-getprocaddress \#t/'
+  - sed -i libs/external/glcompat.xtm -e 's/forced-gl-getprocaddress \#f/forced-gl-getprocaddress \#t/'
+  - mkdir cmake-build && cd cmake-build && cmake -DCMAKE_BUILD_TYPE=Release .. && cd ..
+
+script:
+  - cd cmake-build
+  - set -e
+  - make -j $(($(nproc) + 1)) extempore
+  - make -j $(($(nproc) + 1)) extended_deps
+  - make aot_extended
+  - ./extempore --noaudio --run ../tests/all-core.xtm
+
+after_success:  
+  - ../docker/trigger.sh
