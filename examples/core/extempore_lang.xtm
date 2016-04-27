@@ -940,11 +940,9 @@
 (bind-type list_t <i64,list_t*>)
 
 ;; check for pointer address equality
-(bind-func list_t_equal
+(bind-func xtm_equal
   (lambda (list1:list_t* list2:list_t*)
     (= (cast list1 i8*) (cast list2 i8*))))
-
-(bind-poly xtm_equal list_t_equal)
 
 ;; remove value from front of list
 (bind-func dequeue
@@ -1048,9 +1046,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; extempore supports ad-hoc polymorphism
-;; at some stage in the future this will
-;; be implicit - but for the moment
-;; it is explicitly defined using bind-poly
 
 ;; ad-hoc polymorphism allows you to provide
 ;; different specialisations depending on
@@ -1059,22 +1054,17 @@
 ;; implementations each with a uniqute
 ;; type.
 
-(bind-func my-func-1
+(bind-func myprint
   (lambda (a:i8*)
     (printf "%s\n" a)))
 
-(bind-func my-func-2
+(bind-func myprint
   (lambda (a:i8* b:i8*)
     (printf "%s %s\n" a b)))
 
-(bind-func my-func-3
+(bind-func myprint
   (lambda (a:i8* b:i8* c:i8*)
     (printf "%s %s %s\n" a b c)))
-
-;; bind these three functions to poly 'print'
-(bind-poly myprint my-func-1)
-(bind-poly myprint my-func-2)
-(bind-poly myprint my-func-3)
 
 (bind-func test44
   (lambda (a b c)
@@ -1085,18 +1075,15 @@
 (test44 "extempore's" "polymorphism" "rocks")
 
 
-;; polys can Also specialize
+;; can also specialize
 ;; on the return type
-(bind-func my-func-4
+(bind-func sqrd
   (lambda (a:double)
     (* a a)))
 
-(bind-func my-func-5
+(bind-func sqrd
   (lambda (a:double)
     (dtoi64 (* a a))))
-
-(bind-poly sqrd my-func-4)
-(bind-poly sqrd my-func-5)
 
 ;; specialize on [i64,double]*
 ;;
