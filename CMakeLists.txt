@@ -848,6 +848,7 @@ if(BUILD_TESTS)
     set_tests_properties(${examplefile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+      TIMEOUT 300 # nothing should take longer than 5mins
       LABELS ${label})
     # decrement port number by 2
     math(EXPR EXTEMPORE_TEST_PORT "${EXTEMPORE_TEST_PORT} - 2")
