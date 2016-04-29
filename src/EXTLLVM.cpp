@@ -171,8 +171,8 @@ void llvm_runtime_error(int error, void* arg)
   return;
 }
 
-__thread llvm_zone_stack* tls_llvm_zone_stack = 0;
-__thread uint64_t tls_llvm_zone_stacksize = 0;
+THREAD_LOCAL llvm_zone_stack* tls_llvm_zone_stack = 0;
+THREAD_LOCAL uint64_t tls_llvm_zone_stacksize = 0;
 
 void llvm_zone_print(llvm_zone_t* zone)
 {
@@ -511,12 +511,15 @@ int32_t llvm_frames() { return (int32_t)extemp::UNIV::FRAMES; }
 int32_t llvm_channels() { return (int32_t)extemp::UNIV::CHANNELS; }
 int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
 
-static thread_local std::minstd_rand sRandGen(time(nullptr)); // no dynamic-init hit here (due to scope)
+static THREAD_LOCAL std::minstd_rand* sRandGen;
 
 double imp_randd()
 {
+    if (unlikely(!sRandGen)) {
+        sRandGen = new std::minstd_rand(time(nullptr));
+    }
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was intended
-    return std::uniform_real_distribution<double>()(sRandGen);
+    return std::uniform_real_distribution<double>()(*sRandGen);
 }
 
 float imp_randf()

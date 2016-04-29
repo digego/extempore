@@ -46,6 +46,9 @@
 #ifdef _WIN32
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
+#define THREAD_LOCAL __declspec(thread)
+#else
+#define THREAD_LOCAL __thread
 #endif
 
 #if __APPLE__

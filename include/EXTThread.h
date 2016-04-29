@@ -45,6 +45,7 @@
 
 #include <string>
 
+#include "UNIV.h"
 
 namespace extemp
 {
@@ -66,12 +67,7 @@ private:
     std::thread   m_thread;
 #endif
 
-
-#ifdef _WIN32
-    static __declspec(thread) EXTThread* sm_current;
-#else
-    static __thread EXTThread* sm_current;
-#endif
+    static THREAD_LOCAL EXTThread* sm_current;
 public:
     EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
             m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {

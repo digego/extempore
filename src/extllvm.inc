@@ -198,7 +198,7 @@ static bool llvm_ptr_in_current_zone(void* ptr)
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }
 
-static __thread llvm_zone_t* tls_llvm_callback_zone = 0;
+static THREAD_LOCAL llvm_zone_t* tls_llvm_callback_zone = 0;
 
 static inline llvm_zone_t* llvm_threads_get_callback_zone()
 {

@@ -42,10 +42,10 @@
 #include <vector>
 #include <string>
 #include <memory>
- //#include <ucontext.h>
 
 #include "EXTMutex.h"
 #include "BranchPrediction.h"
+#include "UNIV.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/Module.h"
 
@@ -79,8 +79,8 @@ struct llvm_zone_stack
     llvm_zone_stack* tail;
 };
 
-extern __thread llvm_zone_stack* tls_llvm_zone_stack;
-extern __thread uint64_t tls_llvm_zone_stacksize;
+extern THREAD_LOCAL llvm_zone_stack* tls_llvm_zone_stack;
+extern THREAD_LOCAL uint64_t tls_llvm_zone_stacksize;
 
 extern "C"
 {

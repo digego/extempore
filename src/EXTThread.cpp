@@ -52,11 +52,7 @@
 namespace extemp
 {
 
-#ifdef _WIN32
-  __declspec(thread) EXTThread* EXTThread::sm_current = 0;
-#else
-  __thread EXTThread* EXTThread::sm_current = 0;
-#endif
+THREAD_LOCAL EXTThread* EXTThread::sm_current = 0;
 
 EXTThread::~EXTThread()
 {
