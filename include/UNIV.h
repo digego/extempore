@@ -41,7 +41,7 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 
 #ifdef _WIN32
 #include <SDKDDKVer.h>
@@ -95,10 +95,8 @@ char* cname_encode(char *data,size_t input_length,size_t *output_length);
 char* cname_decode(char *data,size_t input_length,size_t *output_length);
 const char* sys_sharedir();
 char* sys_slurp_file(const char* fname);
-  int register_for_window_events();
-  double clock_clock();
-  double audio_clock_base();
-  double audio_clock_now();
+int register_for_window_events();
+
 }
 
 namespace extemp
@@ -127,15 +125,13 @@ extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern double AUDIO_OUTPUT_LATENCY;
 extern double CLOCK_OFFSET;
-extern std::map<std::string, std::string> CMDPARAMS;
+extern std::unordered_map<std::string, std::string> CMDPARAMS;
 extern std::string ARCH;
 extern std::string CPU;
 extern std::vector<std::string> ATTRS;
 extern double midi2frq(double pitch);
 extern double frqRatio(double semitones);
 extern void initRand();
-extern int random(int range);
-extern double random();
 extern bool file_check(const std::string& filename);
 extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
 
@@ -163,12 +159,29 @@ inline double getRealTime()
 
 #elif __APPLE__
 
+#include <CoreAudio/HostTime.h>
+
 inline double getRealTime()
 {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 }
 
 #endif
+
+extern "C" inline double clock_clock()
+{
+    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
+extern "C" inline double audio_clock_base()
+{
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+}
+
+extern "C" inline double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
+}
 
 }
 

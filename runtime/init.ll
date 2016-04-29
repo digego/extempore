@@ -85,7 +85,6 @@ declare i32 @mutex_trylock(i8*)
 
 declare void @llvm_runtime_error(i64,i8*) nounwind
 declare i1 @llvm_zone_copy_ptr(i8*, i8*) nounwind
-declare void @llvm_zone_ptr_set_size(i8*, i64) nounwind
 declare i64 @llvm_zone_ptr_size(i8*) nounwind
 declare i8* @llvm_stack_alloc(i64) nounwind
 declare i1 @llvm_ptr_in_current_zone(i8*) nounwind
@@ -553,12 +552,9 @@ entry:
 ret i8* %e
 }
 
-declare i32 @llvm_samplerate()
 declare i32 @llvm_frames()
 declare i32 @llvm_channels()
 declare i32 @llvm_in_channels()
-
-declare i64 @llvm_now()
 
 declare i8* @memset(i8* %dest, i32 %val, i64 %len)
 
@@ -568,8 +564,6 @@ declare %mzone* @llvm_zone_callback_setup() nounwind
 declare %mzone* @llvm_pop_zone_stack() nounwind
 declare void @llvm_zone_destroy(%mzone*) nounwind
 declare void @llvm_zone_print(%mzone*) nounwind
-declare void @llvm_zone_mark(%mzone*) nounwind
-declare i64 @llvm_zone_mark_size(%mzone*) nounwind
 declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind
 declare i1 @llvm_ptr_in_zone(%mzone*, i8*) nounwind
 

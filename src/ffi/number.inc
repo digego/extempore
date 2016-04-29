@@ -1,11 +1,11 @@
 static pointer randomReal(scheme* Scheme, pointer Args)
 {
-    return mk_real(Scheme, UNIV::random());
+    return mk_real(Scheme, imp_randd());
 }
 
 static pointer randomInt(scheme* Scheme, pointer Args)
 {
-    return mk_integer(Scheme, UNIV::random(ivalue(pair_car(Args))));
+    return mk_integer(Scheme, imp_rand1_i64(ivalue(pair_car(Args))));
 }
 
 static pointer realToInteger(scheme* Scheme, pointer Args)

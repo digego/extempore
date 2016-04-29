@@ -351,7 +351,6 @@ void* SchemeProcess::taskImpl()
 
 void* SchemeProcess::serverImpl()
 {
-    UNIV::initRand();
     while (!m_libsLoaded) {
         usleep(1000);
     }

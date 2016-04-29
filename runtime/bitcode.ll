@@ -610,3 +610,33 @@ define private i32 @is_cptr_or_str(i8* %ptr) alwaysinline
   %res = or i32 %v1, %v2
   ret i32 %res
 }
+
+define private void @llvm_zone_ptr_set_size(i8* %zone, i64 %size) nounwind alwaysinline
+{
+  %ptr = bitcast i8* %zone to i64*
+  %size_ptr = getelementptr i64, i64* %ptr, i32 -1
+  store i64 %size, i64* %size_ptr
+  ret void
+}
+
+@_ZN6extemp4UNIV4TIMEE = external global i64 ; extemp::UNIV::TIME
+define private i64 @llvm_now() nounwind alwaysinline
+{
+  %res = load i64, i64* @_ZN6extemp4UNIV4TIMEE
+  ret i64 %res
+}
+
+@_ZN6extemp4UNIV10SAMPLERATEE = external global i64 ; extemp::UNIV::SAMPLERATE
+define private i32 @llvm_samplerate() nounwind alwaysinline
+{
+  %res = load i64, i64* @_ZN6extemp4UNIV10SAMPLERATEE
+  %res32 = trunc i64 %res to i32
+  ret i32 %res32
+}
+
+declare void @ascii_text_color_extern(i32 %bold, i32 %fg, i32 %bg)
+define private void @ascii_text_color(i32 %bold, i32 %fg, i32 %bg) nounwind alwaysinline "thunk"
+{
+  call void @ascii_text_color_extern(i32 %bold, i32 %fg, i32 %bg)
+  ret void
+}

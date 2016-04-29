@@ -55,6 +55,10 @@ struct zone_hooks_t {
   zone_hooks_t* hooks;
 };
 
+// WARNING WARNING WARNING - HERE BE DRAGONS
+// THIS STRUCTURE IS REFERENCED FROM GENERATED CODE
+// DO NOT ALTER IT!!!
+
 struct llvm_zone_t {
   void* memory;
   uint64_t offset;
@@ -86,8 +90,6 @@ void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
 void llvm_runtime_error(int error, void* arg);
 
 bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
-void llvm_zone_mark(llvm_zone_t* zone);
-uint64_t llvm_zone_mark_size(llvm_zone_t* zone);
 void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
 uint64_t llvm_zone_ptr_size(void* ptr);
 void llvm_zone_print(llvm_zone_t* zone);
@@ -113,10 +115,10 @@ static inline uint64_t string_hash(unsigned char* str)
 }
 
   void llvm_send_udp(char* host, int port, void* message, int message_length);
-  int32_t llvm_samplerate();
   int32_t llvm_frames();
   int32_t llvm_channels();
   int32_t llvm_in_channels();
+
   double imp_randd();
   float imp_randf();
   int64_t imp_rand1_i64(int64_t a);
@@ -127,7 +129,6 @@ static inline uint64_t string_hash(unsigned char* str)
   double imp_rand2_d(double a, double b);
   float imp_rand1_f(float a);
   float imp_rand2_f(float a, float b);
-  int64_t llvm_now();
 
   void* thread_fork(void*(*start_routine)(void*),void* args);
   void thread_destroy(void* thread);

@@ -655,7 +655,6 @@ void AudioDevice::start()
 	    exit(1);
     }
 
-    UNIV::initRand();
     err = Pa_StartStream(stream);
 
     if(err != paNoError) {
@@ -854,7 +853,6 @@ void AudioDevice::initMTAudio(int num,bool _zerolatency)
     extemp::EXTThread* render_thread(new EXTThread(&noAudioCallback, nullptr, "noaudio"));  // leak
     extemp::UNIV::CHANNELS = 1; // only one channel for dummy device
     extemp::UNIV::SAMPLERATE = 44100;
-    extemp::UNIV::initRand();
 
     ascii_normal();
     std::cout << "Output Device  : " << std::flush;

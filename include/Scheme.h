@@ -361,8 +361,6 @@ struct port {
 /* cell structure */
 struct cell {
     unsigned int _flag;
-//  unsigned int _colour;
-//  unsigned int _list_colour;
     unsigned char _colour;
     unsigned char _list_colour;
     unsigned int _size;
@@ -370,18 +368,18 @@ struct cell {
     cell* _cw;
     cell* _ccw;
     union {
-    struct {
-        char   *_svalue;
-        int   _length;
-    } _string;
-    num _number;
-    port *_port;
-    foreign_func _ff;
-    struct {
-        struct cell *_car;
-        struct cell *_cdr;
-    } _cons;
-    void* _cptr;
+        struct {
+            char   *_svalue;
+            int   _length;
+        } _string;
+        num _number;
+        port *_port;
+        foreign_func _ff;
+        struct {
+            struct cell *_car;
+            struct cell *_cdr;
+        } _cons;
+        void* _cptr;
     } _object;
 };
 

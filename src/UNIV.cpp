@@ -110,7 +110,6 @@ void base64_codesafe_build_decoding_table() {
         base64_codesafe_decoding_table[(unsigned char) base64_codesafe_encoding_table[i]] = i;
 }
 
-
 void base64_std_cleanup() {
     free(base64_std_decoding_table);
 }
@@ -118,7 +117,6 @@ void base64_std_cleanup() {
 void base64_codesafe_cleanup() {
     free(base64_codesafe_decoding_table);
 }
-
 
 char* cname_encode(char *data,
                     size_t input_length,
@@ -588,10 +586,11 @@ uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
 double AUDIO_OUTPUT_LATENCY = 0.0;
 double CLOCK_OFFSET = 0.0;
-std::map<std::string, std::string> CMDPARAMS;
+std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;
 std::string CPU;
 std::vector<std::string> ATTRS;
+
 // 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef _WIN32
 uint32_t EXT_TERM = 1;
@@ -599,23 +598,6 @@ uint32_t EXT_TERM = 1;
 uint32_t EXT_TERM = 0;
 #endif
 bool EXT_LOADBASE = true;
-void initRand() {
-#ifdef _WIN32
-    srand((int)DEVICE_TIME); ///SECOND));
-#elif __linux__
-    srand(DEVICE_TIME / SECOND());
-#else
-    sranddev();
-#endif
-}
-
-int random(int range) {
-    return (int)((double)rand() / (double)RAND_MAX * (double) range);
-}
-
-double random() {
-    return (double)rand() / (double)RAND_MAX;
-}
 
 double midi2frq(double pitch)
 {
@@ -800,6 +782,10 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
     return;
 }
 
+}
+
+extern "C" void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
+  ascii_text_color(Bold, Foreground, Background);
 }
 
 } //End Namespace

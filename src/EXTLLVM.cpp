@@ -188,24 +188,8 @@ void llvm_zone_print(llvm_zone_t* zone)
   return;
 }
 
-void llvm_zone_mark(llvm_zone_t* zone)
-{
-    zone->mark = zone->offset;
-}
-
-uint64_t llvm_zone_mark_size(llvm_zone_t* zone)
-{
-    return zone->offset - zone->mark;
-}
-
-void llvm_zone_ptr_set_size(void* ptr, uint64_t size)
-{
-    *(reinterpret_cast<uint64_t*>(ptr) - 1) = size;
-}
-
 uint64_t llvm_zone_ptr_size(void* ptr)
 {
-    // return ptr size from alloc map
     return *(reinterpret_cast<uint64_t*>(ptr) - 1);
 }
 
@@ -499,11 +483,6 @@ void llvm_print_f64(double num)
     return;
 }
 
-int64_t llvm_now()
-{
-    return extemp::UNIV::TIME;
-}
-
 // double llvm_cos(double x) { return cos(x); }
 // double llvm_sin(double x) { return sin(x); }
 double llvm_tan(double x) { return tan(x); }
@@ -528,101 +507,62 @@ double llvm_atan2(double x,double y) { return atan2(x,y); }
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-int32_t llvm_samplerate() { return (int32_t)extemp::UNIV::SAMPLERATE; }
 int32_t llvm_frames() { return (int32_t)extemp::UNIV::FRAMES; }
 int32_t llvm_channels() { return (int32_t)extemp::UNIV::CHANNELS; }
 int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
 
+static thread_local std::minstd_rand sRandGen(time(nullptr)); // no dynamic-init hit here (due to scope)
+
 double imp_randd()
 {
-#ifdef EXT_BOOST
-    return extemp::UNIV::random();
-#else
-    return (double)rand()/(double)RAND_MAX;
-#endif
+    // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was intended
+    return std::uniform_real_distribution<double>()(sRandGen);
 }
 
 float imp_randf()
 {
-#ifdef _WIN32
-    return extemp::UNIV::random();
-#else
-    return (float)rand()/(float)RAND_MAX;
-#endif
+    return imp_randd();
 }
 
-int64_t imp_rand1_i64(int64_t a)
+int64_t imp_rand1_i64(int64_t Limit)
 {
-#ifdef _WIN32
-  return (int64_t) ((double)extemp::UNIV::random()*(double)a);
-#else
-  return (int64_t) (((double)rand()/(double)RAND_MAX)*(double)a);
-#endif
+    return imp_randd() * Limit;
 }
 
-int64_t imp_rand2_i64(int64_t a, int64_t b)
+int64_t imp_rand2_i64(int64_t Start, int64_t Limit)
 {
-#ifdef _WIN32
-  return (int64_t) a+(extemp::UNIV::random()*((double)b-(double)a));
-#else
-  return (int64_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
-#endif
+    return imp_randd() * (Limit - Start) + Start;
 }
 
-int32_t imp_rand1_i32(int32_t a)
+int32_t imp_rand1_i32(int32_t Limit)
 {
-#ifdef _WIN32
-  return (int32_t) ((double)extemp::UNIV::random()*(double)a);
-#else
-  return (int32_t) (((double)rand()/(double)RAND_MAX)*(double)a);
-#endif
+    return imp_randd() * Limit;
 }
 
-int32_t imp_rand2_i32(int32_t a, int32_t b)
+int32_t imp_rand2_i32(int32_t Start, int32_t Limit)
 {
-#ifdef _WIN32
-  return (int32_t) a+(extemp::UNIV::random()*((double)b-(double)a));
-#else
-  return (int32_t) a+(((double)rand()/(double)RAND_MAX)*((double)b-(double)a));
-#endif
+    return imp_randd() * (Limit - Start) + Start;
 }
 
-double imp_rand1_d(double a)
+double imp_rand1_d(double Limit)
 {
-#ifdef _WIN32
-  return extemp::UNIV::random()*a;
-#else
-  return ((double)rand()/(double)RAND_MAX)*a;
-#endif
+    return imp_randd() * Limit;
 }
 
-double imp_rand2_d(double a, double b)
+double imp_rand2_d(double Start, double Limit)
 {
-#ifdef _WIN32
-  return a+(extemp::UNIV::random()*(b-a));
-#else
-  return a+(((double)rand()/(double)RAND_MAX)*(b-a));
-#endif
+    return imp_randd() * (Limit - Start) + Start;
 }
 
-float imp_rand1_f(float a)
+float imp_rand1_f(float Limit)
 {
-#ifdef _WIN32
-  return extemp::UNIV::random()*a;
-#else
-  return ((double)rand()/(double)RAND_MAX)*a;
-#endif
+    return imp_randf() * Limit;
 }
 
-float imp_rand2_f(float a, float b)
+float imp_rand2_f(float Start, float Limit)
 {
-#ifdef _WIN32
-  return a+((float)extemp::UNIV::random()*(b-a));
-#else
-  return a+(((float)rand()/(float)RAND_MAX)*(b-a));
-#endif
+    return imp_randf() * (Limit - Start) + Start;
 }
-
 
 ///////////////////////////////////
 
@@ -708,26 +648,15 @@ bool check_address_type(uint64_t id, closure_address_table* table, const char* t
   return 0;
 }
 
-struct closure_address_table* new_address_table()
-{
-    return 0; // NULL for empty table
-}
-
 struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
 {
   struct closure_address_table* t = NULL;
-  if(alloctype == 1) {
+  if (alloctype == 1) {
     t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
-  /* }  else if(alloctype == 2) {
-#ifdef _WIN32
-    t = (struct closure_address_table*) _alloca(sizeof(struct closure_address_table));
-#else
-    t = (struct closure_address_table*) alloca(sizeof(struct closure_address_table));
-#endif */
   } else {
     t = (struct closure_address_table*) extemp::EXTLLVM::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
   }
-    t->id = string_hash((unsigned char*) name);
+  t->id = string_hash((unsigned char*) name);
   t->name = name;
   t->offset = offset;
   t->type = type;
@@ -1044,22 +973,15 @@ void initLLVM()
             EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);
             EE->updateGlobalMapping("get_address_offset", (uint64_t)&get_address_offset);
             EE->updateGlobalMapping("add_address_table", (uint64_t)&add_address_table);
-            EE->updateGlobalMapping("new_address_table", (uint64_t)&new_address_table);
             EE->updateGlobalMapping("llvm_print_pointer", (uint64_t)&llvm_print_pointer);
             EE->updateGlobalMapping("llvm_print_i32", (uint64_t)&llvm_print_i32);
             EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
             EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
             EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-            EE->updateGlobalMapping("llvm_samplerate", (uint64_t)&llvm_samplerate);
             EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
             EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
             EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
-            EE->updateGlobalMapping("llvm_now", (uint64_t)&llvm_now);
-            EE->updateGlobalMapping("llvm_zone_reset_extern", (uint64_t)&llvm_zone_reset);
             EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
-            EE->updateGlobalMapping("llvm_zone_mark", (uint64_t)&llvm_zone_mark);
-            EE->updateGlobalMapping("llvm_zone_mark_size", (uint64_t)&llvm_zone_mark_size);
-            EE->updateGlobalMapping("llvm_zone_ptr_set_size", (uint64_t)&llvm_zone_ptr_set_size);
             EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
             EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
             EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
@@ -1158,11 +1080,6 @@ llvm_zone_t* llvm_peek_zone_stack_extern()
 void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
 {
     extemp::EXTLLVM::llvm_push_zone_stack(Zone);
-}
-
-llvm_zone_t* llvm_zone_reset_extern(llvm_zone_t* Zone)
-{
-    return extemp::EXTLLVM::llvm_zone_reset(Zone);
 }
 
 llvm_zone_t* llvm_zone_create_extern(uint64_t Size)

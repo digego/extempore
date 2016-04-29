@@ -270,6 +270,13 @@ int main(int argc, char** argv)
                 return 1;
             }
             extemp::UNIV::CMDPARAMS[key.substr(2)] = val;
+            ascii_warning();
+            std::cout << "**** WARNING: Setting non-standard option: " << key.substr(2);
+            if (args.OptionArg()) {
+                std::cout << " to " << val;
+            }
+            std::cout << std::endl << std::flush;
+            ascii_default();
         }
     }
     ascii_normal();
