@@ -1012,9 +1012,6 @@ void initLLVM()
             EE->updateGlobalMapping("base64_decode", (uint64_t)&base64_decode);
             EE->updateGlobalMapping("cname_encode", (uint64_t)&cname_encode);
             EE->updateGlobalMapping("cname_decode", (uint64_t)&cname_decode);
-      EE->updateGlobalMapping("clock_clock", (uint64_t)&clock_clock);
-      EE->updateGlobalMapping("audio_clock_base", (uint64_t)&audio_clock_base);
-      EE->updateGlobalMapping("audio_clock_now", (uint64_t)&audio_clock_now);
             EE->updateGlobalMapping("r64value", (uint64_t)&r64value);
             EE->updateGlobalMapping("mk_double", (uint64_t)&mk_double);
             EE->updateGlobalMapping("r32value", (uint64_t)&r32value);

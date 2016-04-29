@@ -134,7 +134,6 @@ extern double frqRatio(double semitones);
 extern void initRand();
 extern bool file_check(const std::string& filename);
 extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
-
 }
 
 extern "C" {
@@ -168,20 +167,9 @@ inline double getRealTime()
 
 #endif
 
-extern "C" inline double clock_clock()
-{
-    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
-}
-
-extern "C" inline double audio_clock_base()
-{
-    return extemp::UNIV::AUDIO_CLOCK_BASE;
-}
-
-extern "C" inline double audio_clock_now()
-{
-    return extemp::UNIV::AUDIO_CLOCK_NOW;
-}
+extern double clock_clock();
+extern double audio_clock_base();
+extern double audio_clock_now();
 
 }
 
