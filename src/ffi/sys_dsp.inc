@@ -20,7 +20,7 @@ static pointer setDSPMTWrapper(scheme* Scheme, pointer Args)
 {
     AudioDevice::I()->setDSPMTWrapper(dsp_f_ptr_sum(cptr_value(pair_car(Args))),
             dsp_f_ptr(cptr_value(pair_cadr(Args))));
-  return Scheme->T;
+    return Scheme->T;
 }
 
 static pointer initMTAudio(scheme* Scheme, pointer Args)
@@ -32,9 +32,9 @@ static pointer initMTAudio(scheme* Scheme, pointer Args)
 
 static pointer initMTAudioBuf(scheme* Scheme, pointer Args)
 {
-  bool zerolatency = (pair_cadr(Args) == Scheme->T);
-  AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(Args)), zerolatency);
-  return Scheme->T;
+    bool zerolatency = (pair_cadr(Args) == Scheme->T);
+    AudioDevice::I()->initMTAudioBuf(ivalue(pair_car(Args)), zerolatency);
+    return Scheme->T;
 }
 
 static pointer getAudioLoad(scheme* Scheme, pointer Args)

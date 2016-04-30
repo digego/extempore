@@ -56,10 +56,12 @@
 
 typedef float SAMPLE;
 
-typedef void(*dsp_f_ptr_array)(void*, void*, float*, float*, uint64_t, void*);
-typedef void(*dsp_f_ptr_sum_array)(void* ,void* ,float** ,float*, uint64_t, void*);
-typedef SAMPLE(*dsp_f_ptr)(void*, void*, SAMPLE, uint64_t, uint64_t, SAMPLE*);
-typedef SAMPLE(*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, SAMPLE*);
+typedef void (*dsp_f_ptr_array)(void*, void*, float*, float*, uint64_t, void*);
+typedef void (*dsp_f_ptr_sum_array)(void* ,void* ,float** ,float*, uint64_t, void*);
+typedef SAMPLE (*dsp_f_ptr)(void*, void*, SAMPLE, uint64_t, uint64_t, SAMPLE*);
+typedef SAMPLE (*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, SAMPLE*);
+
+typedef SAMPLE (*closure_fn_type)(SAMPLE, uint64_t, uint64_t, SAMPLE*);
 
 namespace extemp
 {
@@ -67,11 +69,15 @@ namespace extemp
 class AudioDevice
 {
 private:
+    typedef void* (*closure_getter_fn_type)();
+
+    static const unsigned MAX_RT_AUDIO_THREADS = 16;
+private:
     bool m_started;
     PaStream* stream;
     float* buffer;
-    void* dsp_closure;
-    void* dsp_mt_closure[128];
+    closure_getter_fn_type m_dsp_closure;
+    closure_getter_fn_type m_dsp_mt_closure[128];
     dsp_f_ptr dsp_wrapper;
     dsp_f_ptr_sum dsp_wrapper_sum;
     dsp_f_ptr_array dsp_wrapper_array;
@@ -80,12 +86,16 @@ private:
     SAMPLE* inbuf;
     float* outbuf_f;
     float* inbuf_f;
-    EXTThread** threads;
-    int numthreads;
-    bool zerolatency;
-    bool toggle;
+    EXTThread* m_threads[MAX_RT_AUDIO_THREADS];
+    int        m_numThreads;
+    bool       m_zeroLatency;
+    bool       m_toggle;
 
     static AudioDevice SINGLETON;
+private:
+    bool WrapperSet() const {
+        return dsp_wrapper || dsp_wrapper_array || dsp_wrapper_sum || dsp_wrapper_sum_array;
+    }
 public:
     AudioDevice();
     ~AudioDevice();
@@ -94,53 +104,62 @@ public:
     void start();
     void stop();
 
-    void setDSPClosure(void* _dsp_func)
-    {
-            if(dsp_closure != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
-            dsp_closure = _dsp_func;
-    }
-    void* getDSPClosure() { return dsp_closure; }
-    bool getZeroLatency() { return zerolatency; }
-    void setZeroLatency(bool z) { zerolatency = z; }
-    bool getToggle () { toggle = toggle ? false : true; return toggle; }
-
-    void setDSPMTClosure(void* _dsp_func, int idx)
-    {
-            if(dsp_mt_closure[idx] != NULL) { printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n"); return; }
-            dsp_mt_closure[idx] = _dsp_func;
-    }
-    void* getDSPMTClosure(int idx) { return dsp_mt_closure[idx]; }
-
-    void setDSPWrapperArray( void(*_wrapper)(void*,void*,float*,float*,uint64_t,void*) )
-    {
-            if(dsp_wrapper != NULL || dsp_wrapper_sum != NULL || dsp_wrapper_array != NULL || dsp_wrapper_sum_array != NULL) return;
-            dsp_wrapper_array = _wrapper;
-    }
-    void setDSPWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE,uint64_t,uint64_t,SAMPLE*) )
-    {
-            if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
-            dsp_wrapper = _wrapper;
-    }
-    void setDSPMTWrapper( SAMPLE(*_wrapper)(void*,void*,SAMPLE*,uint64_t,uint64_t,SAMPLE*),
-                          SAMPLE(*_wrappera)(void*,void*,SAMPLE,uint64_t,uint64_t,SAMPLE*))
-    {
-            if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
-            dsp_wrapper_sum = _wrapper;
-      dsp_wrapper = _wrappera;
-    }
-    void setDSPMTWrapperArray( void(*_wrapper)(void*,void*,float**,float*,uint64_t,void*),
-                               void(*_wrappera)(void*,void*,float*,float*,uint64_t,void*))
-    {
-            if(dsp_wrapper_array != NULL || dsp_wrapper_sum != NULL || dsp_wrapper != NULL || dsp_wrapper_sum_array != NULL) return;
-            dsp_wrapper_sum_array = _wrapper;
-      dsp_wrapper_array = _wrappera;
+    bool getZeroLatency() { return m_zeroLatency; }
+    void setZeroLatency(bool Val) { m_zeroLatency = Val; }
+    bool getToggle() {
+        m_toggle = !m_toggle;
+        return m_toggle;
     }
 
-    void initMTAudio(int,bool);
+    void setDSPClosure(void* Function) {
+        if (m_dsp_closure) {
+            printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
+            return;
+        }
+        m_dsp_closure = reinterpret_cast<closure_getter_fn_type>(Function);
+    }
+    closure_getter_fn_type getDSPClosure() { return m_dsp_closure; }
+    void setDSPMTClosure(void* Function, int Index) {
+        if (m_dsp_mt_closure[Index]) {
+            printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
+            return;
+        }
+        m_dsp_mt_closure[Index] = reinterpret_cast<closure_getter_fn_type>(Function);
+    }
+    closure_getter_fn_type getDSPMTClosure(int Index) { return m_dsp_mt_closure[Index]; }
+
+    void setDSPWrapper(dsp_f_ptr Wrapper) {
+        if (WrapperSet()) {
+            return;
+        }
+        dsp_wrapper = Wrapper;
+    }
+    void setDSPWrapperArray(dsp_f_ptr_array Wrapper) {
+        if (WrapperSet()) {
+            return;
+        }
+        dsp_wrapper_array = Wrapper;
+    }
+    void setDSPMTWrapper(dsp_f_ptr_sum WrapperSum, dsp_f_ptr Wrapper) {
+        if (WrapperSet()) {
+            return;
+        }
+        dsp_wrapper_sum = WrapperSum;
+        dsp_wrapper = Wrapper;
+    }
+    void setDSPMTWrapperArray(dsp_f_ptr_sum_array WrapperSumArray, dsp_f_ptr_array WrapperArray) {
+        if (WrapperSet()) {
+            return;
+        }
+        dsp_wrapper_sum_array = WrapperSumArray;
+        dsp_wrapper_array = WrapperArray;
+    }
+
+    void initMTAudio(int NumThreads, bool ZeroLatency);
     void initMTAudioBuf(int,bool);
 
-    EXTThread** getMTThreads() { return threads; }
-    int getNumThreads() { return numthreads; }
+    EXTThread** getMTThreads() { return m_threads; }
+    int getNumThreads() { return m_numThreads; }
     dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
     dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
     dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
@@ -150,8 +169,6 @@ public:
     SAMPLE* getDSPMTOutBuffer() { return outbuf; }
     float* getDSPMTInBufferArray() { return inbuf_f; }
     float* getDSPMTOutBufferArray() { return outbuf_f; }
-    //void setDSPMTOutBuffer(double* ob) { outbuf = ob; }
-    //void setDSPMTInBuffer(double* ib) { inbuf = ib; }
 
     PaStream* getPaStream() { return stream; }
 
@@ -164,8 +181,6 @@ public:
     static double CLOCKBASE;
     static double REALTIME;
     static double CLOCKOFFSET;
-
-    int thread_idx[128];
 };
 
 } //End Namespace
