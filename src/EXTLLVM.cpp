@@ -65,6 +65,7 @@
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCContext.h"
 
+#include <random>
 #include <fstream>
 #include "stdarg.h"
 #include "EXTLLVM.h"
