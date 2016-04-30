@@ -448,7 +448,6 @@ declare i32 @llvm_string_eq(i8*,i8*)
 declare void @llvm_string_set(i8*, i32, i8)
 declare i8 @llvm_string_ref(i8*, i32)
 
-
 declare double @imp_randd()
 declare float @imp_randf()
 declare i64 @imp_rand1_i64(i64)
@@ -464,92 +463,103 @@ declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
 declare void @free_after_delay(i8*, double)
 declare i8* @llvm_disassemble(i8*,i32)
 
+%wt = type double (i8*, i8*, double, i64, i64, double*)
 
 define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double,i64,i64,double*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double, i64, i64, double*)*}* %closureVal, i32 0, i32 1
-%f = load double (i8*, i8*, double,i64,i64,double*)*, double (i8*, i8*, double,i64,i64,double*)** %fPtr
-%e = load i8*, i8** %ePtr
-%result = tail call fastcc double %f(i8* %_impz, i8* %e, double %sample, i64 %time, i64 %channel, double* %data)
-ret double %result
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wt* }*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wt* }, { i8*, i8*, %wt* }* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wt* }, { i8*, i8*, %wt* }* %closureVal, i32 0, i32 1
+  %f = load %wt*, %wt** %fPtr
+  %e = load i8*, i8** %ePtr
+  %result = tail call fastcc double %f(i8* %_impz, i8* %e, double %sample, i64 %time, i64 %channel, double* %data)
+  ret double %result
 }
+
+%wts = type double (i8*, i8*, double*, i64, i64, double*)
 
 define dllexport double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, double (i8*,i8*,double*,i64,i64,double*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}, {i8*, i8*, double (i8*, i8*, double*, i64, i64, double*)*}* %closureVal, i32 0, i32 1
-%f = load double (i8*, i8*, double*,i64,i64,double*)*, double (i8*, i8*, double*,i64,i64,double*)** %fPtr
-%e = load i8*, i8** %ePtr
-%result = tail call fastcc double %f(i8* %_impz, i8* %e, double* %sample, i64 %time, i64 %channel, double* %data)
-ret double %result
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wts* }*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wts* }, { i8*, i8*, %wts* }* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wts* }, { i8*, i8*, %wts* }* %closureVal, i32 0, i32 1
+  %f = load %wts*, %wts** %fPtr
+  %e = load i8*, i8** %ePtr
+  %result = tail call fastcc double %f(i8* %_impz, i8* %e, double* %sample, i64 %time, i64 %channel, double* %data)
+  ret double %result
 }
+
+%wt_f = type float (i8*, i8*, float, i64, i64, float*)
 
 define dllexport float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float,i64,i64,float*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float, i64, i64, float*)*}* %closureVal, i32 0, i32 1
-%f = load float (i8*, i8*, float,i64,i64,float*)*, float (i8*, i8*, float,i64,i64,float*)** %fPtr
-%e = load i8*, i8** %ePtr
-%result = tail call fastcc float %f(i8* %_impz, i8* %e, float %sample, i64 %time, i64 %channel, float* %data)
-ret float %result
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wt_f*}*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wt_f* }, { i8*, i8*, %wt_f* }* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wt_f* }, { i8*, i8*, %wt_f* }* %closureVal, i32 0, i32 1
+  %f = load %wt_f*, %wt_f** %fPtr
+  %e = load i8*, i8** %ePtr
+  %result = tail call fastcc float %f(i8* %_impz, i8* %e, float %sample, i64 %time, i64 %channel, float* %data)
+  ret float %result
 }
+
+%wts_f = type float (i8*, i8*, float*, i64, i64, float*)
 
 define dllexport float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, float (i8*,i8*,float*,i64,i64,float*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}, {i8*, i8*, float (i8*, i8*, float*, i64, i64, float*)*}* %closureVal, i32 0, i32 1
-%f = load float (i8*, i8*, float*,i64,i64,float*)*, float (i8*, i8*, float*,i64,i64,float*)** %fPtr
-%e = load i8*, i8** %ePtr
-%result = tail call fastcc float %f(i8* %_impz, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
-ret float %result
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wts_f* }*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wts_f* }, { i8*, i8*, %wts_f* }* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wts_f* }, { i8*, i8*, %wts_f* }* %closureVal, i32 0, i32 1
+  %f = load %wts_f*, %wts_f** %fPtr
+  %e = load i8*, i8** %ePtr
+  %result = tail call fastcc float %f(i8* %_impz, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
+  ret float %result
 }
+
+%wta = type void (i8*, i8*, float*, float*, i64, i8*)
 
 define dllexport void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float*,float*,i64,i8*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float*, float*, i64, i8*)*}* %closureVal, i32 0, i32 1
-%f = load void (i8*, i8*, float*,float*,i64,i8*)*, void (i8*, i8*, float*,float*,i64,i8*)** %fPtr
-%e = load i8*, i8** %ePtr
-tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i64 %time, i8* %data)
-ret void
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wta*}*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wta* }, { i8*, i8*, %wta*}* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wta* }, { i8*, i8*, %wta*}* %closureVal, i32 0, i32 1
+  %f = load %wta*, %wta** %fPtr
+  %e = load i8*, i8** %ePtr
+  tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i64 %time, i8* %data)
+  ret void
 }
+
+%wta_s = type void (i8*, i8*, float**, float*, i64, i8*)
 
 define dllexport void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, void (i8*,i8*,float**,float*,i64,i8*)*}*
-; apply closure
-%fPtr = getelementptr {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}* %closureVal, i32 0, i32 2
-%ePtr = getelementptr {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}, {i8*, i8*, void (i8*, i8*, float**, float*, i64, i8*)*}* %closureVal, i32 0, i32 1
-%f = load void (i8*, i8*, float**,float*,i64,i8*)*, void (i8*, i8*, float**,float*,i64,i8*)** %fPtr
-%e = load i8*, i8** %ePtr
-tail call fastcc void %f(i8* %_impz, i8* %e, float** %datain, float* %dataout, i64 %time, i8* %data)
-ret void
+  %closureVal = bitcast i8* %closure to { i8*, i8*, %wta_s*}*
+  ; apply closure
+  %fPtr = getelementptr { i8*, i8*, %wta_s* }, {i8*, i8*, %wta_s*}* %closureVal, i32 0, i32 2
+  %ePtr = getelementptr { i8*, i8*, %wta_s* }, {i8*, i8*, %wta_s*}* %closureVal, i32 0, i32 1
+  %f = load %wta_s*, %wta_s** %fPtr
+  %e = load i8*, i8** %ePtr
+  tail call fastcc void %f(i8* %_impz, i8* %e, float** %datain, float* %dataout, i64 %time, i8* %data)
+  ret void
 }
 
 define dllexport i8* @impc_get_env(i8* %impz, i8* %closure)
 {
 entry:
-%closureVal = bitcast i8* %closure to { i8*, i8*, i8* }*
-%ePtr = getelementptr { i8*, i8*, i8* }, { i8*, i8*, i8* }* %closureVal, i32 0, i32 1
-%e = load i8*, i8** %ePtr
-ret i8* %e
+  %closureVal = bitcast i8* %closure to { i8*, i8*, i8* }*
+  %ePtr = getelementptr { i8*, i8*, i8* }, { i8*, i8*, i8* }* %closureVal, i32 0, i32 1
+  %e = load i8*, i8** %ePtr
+  ret i8* %e
 }
 
 declare i32 @llvm_frames()
