@@ -815,9 +815,9 @@ if(BUILD_DEPS)
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
   endif()
 
-endif(BUILD_DEPS)
-
 add_dependencies(aot_extended extended_deps)
+
+endif(BUILD_DEPS)
 
 #########
 # tests #
