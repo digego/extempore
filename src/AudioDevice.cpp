@@ -114,6 +114,10 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 #endif
 
 #if !defined(__clang__) && !defined(_WIN32)
+#include <xmmintrin.h>
+#undef isinf
+#undef isfinite
+#undef isnan
 #define isinf(x) __builtin_isinf(x)
 #define isnan(x) __builtin_isnan(x)
 #define isfinite(x) __builtin_finite(x)
