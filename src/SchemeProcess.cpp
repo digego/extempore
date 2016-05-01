@@ -257,7 +257,7 @@ void* SchemeProcess::taskImpl()
     }
     while (likely(m_running)) {
         if (unlikely(m_taskQueue.empty())) {
-            usleep(1000000);
+            usleep(1000); // 1 ms
             continue;
         }
         while (likely(!m_taskQueue.empty() && m_running)) {
