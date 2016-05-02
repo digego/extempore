@@ -121,7 +121,7 @@ static pointer get_function_args(scheme* Scheme, pointer Args)
                 rsplit(eq_type_string, tmp_name, tmp_str_a, tmp_str_b);
                 tmp_name = tmp_str_a;
             }
-            pointer str = mk_string(Scheme, tmp_name);
+            str = mk_string(Scheme, tmp_name);
         }
         p = cons(Scheme, str, p);
     }
@@ -248,7 +248,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
     }
     func->getArgumentList();
     Args = pair_cdr(Args);
-    int lgth = list_length(Scheme, Args);
+    unsigned lgth = list_length(Scheme, Args);
     if (unlikely(lgth != func->getArgumentList().size())) {
         printf("Wrong number of arguments for function!\n");
         return Scheme->F;
@@ -500,7 +500,6 @@ static pointer add_llvm_alias(scheme* Scheme, pointer Args)
 
 static pointer get_llvm_alias(scheme* Scheme, pointer Args)
 {
-    char* name = string_value(pair_car(Args));
     auto iter(LLVM_ALIAS_TABLE.find(std::string(string_value(pair_car(Args)))));
     if (iter != LLVM_ALIAS_TABLE.end()) {
         return mk_string(Scheme, iter->second.c_str());

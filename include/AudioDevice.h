@@ -87,7 +87,7 @@ private:
     float* outbuf_f;
     float* inbuf_f;
     EXTThread* m_threads[MAX_RT_AUDIO_THREADS];
-    int        m_numThreads;
+    unsigned   m_numThreads;
     bool       m_zeroLatency;
     bool       m_toggle;
 
@@ -173,7 +173,6 @@ public:
     PaStream* getPaStream() { return stream; }
 
     static AudioDevice* I() { return &SINGLETON; }
-    static void startNoAudioThread(); // the --noaudio flag
 
     static double getCPULoad();
     static void printDevices();

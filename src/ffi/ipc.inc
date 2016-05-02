@@ -75,7 +75,6 @@ static pointer ipcCall(scheme* Scheme, pointer Args)
     pointer sym = pair_cadr(Args);
     Args = pair_cddr(Args);
     for (; is_pair(Args); Args = pair_cdr(Args)) {
-        pointer value = pair_car(Args);
         if (!appendArg(Scheme, ss, pair_car(Args))) {
             return Scheme->F;
         }

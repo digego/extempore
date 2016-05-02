@@ -1,6 +1,5 @@
 extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
 {
-    int x64 = 1;
     size_t code_size = 1024 * 100;
     std::string Error;
     llvm::TargetMachine *TM = extemp::EXTLLVM::EE->getTargetMachine();
@@ -18,10 +17,6 @@ extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
     llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
     IP->setPrintImmHex(true);
     IP->setUseMarkup(true);
-    uint64_t MemoryAddr = 0;
-    uint64_t Size = code_size;
-    uint64_t Start = 0;
-    uint64_t End = code_size;
     std::string out_str;
     llvm::raw_string_ostream OS(out_str);
     llvm::ArrayRef<uint8_t> mem(Code, code_size);

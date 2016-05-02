@@ -206,7 +206,6 @@ static llvm::Module* jitCompile(const std::string& String)
 
     char modname[256];
     sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
-    char tmpbuf[1024];
 
     std::string asmcode(String);
     SMDiagnostic pa;

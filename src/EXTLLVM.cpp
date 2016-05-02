@@ -252,10 +252,8 @@ char* extitoa(int64_t val) {
 void llvm_send_udp(char* host, int port, void* message, int message_length)
 {
   int length = message_length;
-  int ret = 0;
-  char* ptr;
 
-#ifdef EXT_BOOST
+#ifdef EXT_BOOST // TODO: This should use WinSock on Windows
   boost::asio::io_service io_service;
   boost::asio::ip::udp::resolver::iterator end;
   boost::asio::ip::udp::resolver resolver(io_service);
@@ -324,13 +322,15 @@ void llvm_send_udp(char* host, int port, void* message, int message_length)
 
 void* thread_fork(void*(*start_routine)(void*), void* args) {
         auto thread = new extemp::EXTThread(start_routine, args, "fork");
-        int result = thread->start();
 
 #ifdef _EXTTHREAD_DEBUG_
+        int result = thread->start();
         if (result)
         {
                 std::cerr << "Error creating thread: " << result << std::endl;
         }
+#else
+        thread->start(); // TODO: portable attribute unused (???)
 #endif
 
         return static_cast<void*>(thread);

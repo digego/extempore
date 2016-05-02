@@ -242,7 +242,7 @@ namespace extemp {
   int get_message_length(std::string& typetags, char* args)
   {
     int pos = 0;
-    for(int i=1; i<typetags.size(); ++i) {
+    for(unsigned i=1; i<typetags.size(); ++i) {
       if(typetags[i] == 'i') {
         pos += 4;
       }else if(typetags[i] == 'f'){
@@ -281,7 +281,7 @@ namespace extemp {
       ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
     }
     //ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
-    for(int i=1; i<typetags.size(); ++i) {
+    for(unsigned i=1; i<typetags.size(); ++i) {
       if(typetags[i] == 'i') {
         int osc_int = 0;
         pos += OSC::getOSCInt(args+pos,&osc_int);
@@ -349,7 +349,7 @@ namespace extemp {
     std::stringstream ss;
     ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
     //ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << " \"" << address << "\"";
-    for(int i=1; i<typetags.size(); ++i) {
+    for(unsigned i=1; i<typetags.size(); ++i) {
       if(typetags[i] == 'i') {
         int osc_int = 0;
         pos += OSC::getOSCInt(args+pos,&osc_int);
@@ -852,7 +852,7 @@ namespace extemp {
       str->push_back('\0');
     }
     const char* str_d = str->data();
-    for(int i=0;i<str->length();++i) {
+    for(unsigned i=0;i<str->length();++i) {
       data[i] = str_d[i];
     }
     return str->length();
@@ -867,7 +867,7 @@ namespace extemp {
     str_cnt += (4 - (int)fmod((double)str_cnt,4.0));
 
     //added because we need to quote quotes to add to scheme expressions
-    for(int i=0;i<str->length();i++)
+    for(unsigned i=0;i<str->length();i++)
       {
         if(str->at(i)=='"')
           {
@@ -1042,7 +1042,6 @@ namespace extemp {
 #endif
     OSC* osc = OSC::I(_sc);
     int ret = 0;
-    int tmpsize = 1024;
     int items = list_length(_sc,arg);
     for(int i=0;i<items;++i) {
       if(is_string(pair_car(arg))) {
@@ -1319,7 +1318,7 @@ namespace extemp {
         std::cout << "Error opening OSC socket"<< std::endl;
       }
       int broadcastEnable=1;
-      int ret = setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+      setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)); // TODO: error check?
 
       fcntl(socket_fd, F_SETFL, O_NONBLOCK); //set to non-blocking socket
 
