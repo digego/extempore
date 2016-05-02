@@ -70,25 +70,27 @@ public:
     void signal();
 };
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 
-inline void EXTCondition::init(): m_initialised(true)
+inline void EXTCondition::init()
 {
+	m_initialised = true;
 }
 
-void EXTCondition::destroy() {
+inline void EXTCondition::destroy()
+{
     m_initialised = false;
 }
 
 inline void EXTCondition::wait(EXTMutex* Mutex)
 {
     std::unique_lock<std::recursive_mutex> lock(Mutex->m_mutex);
-    boost_cond.wait(lock);
+    m_cond.wait(lock);
 }
 
 inline void EXTCondition::signal()
 {
-    boost_cond.notify_one();
+    m_cond.notify_one();
 }
 
 #else // begin POSIX

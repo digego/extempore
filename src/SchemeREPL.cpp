@@ -150,9 +150,9 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 #endif
 
 #ifdef EXT_BOOST
-    m_socketIoService = new boost::asio::io_service;
+    m_serverIoService = new boost::asio::io_service;
     try {
-        m_serverSocket = new boost::asio::ip::tcp::socket(*m_socketIoService);
+        m_serverSocket = new boost::asio::ip::tcp::socket(*m_serverIoService);
         m_serverSocket->open(boost::asio::ip::tcp::v4());
         m_serverSocket->connect(ep);
     } catch(std::exception& e){
@@ -161,7 +161,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         ascii_default();
         return false;
     }
-    rc = m_serverSocket->read_some(boost::asio::buffer(buf, sizeof(buf)));
+    rc = m_serverSocket->read_some(boost::asio::buffer(m_buf, sizeof(m_buf)));
 #else
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
@@ -215,8 +215,8 @@ void SchemeREPL::closeREPL()
 #ifdef EXT_BOOST
     m_serverSocket->close();
     delete m_serverSocket;
-    delete m_socketIoService;
-    m_socketIoService = 0;
+    delete m_serverIoService;
+    m_serverIoService = 0;
 #else
     shutdown(m_serverSocket, SHUT_RDWR);
     close(m_serverSocket);

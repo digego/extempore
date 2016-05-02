@@ -40,13 +40,15 @@
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
 #include "SchemeREPL.h"
-#include "EXTLLVM.h"
 #include <string>
+#include "EXTLLVM.h"
 
 #ifndef _WIN32
 #include <unistd.h>
 #include <signal.h>
 #else
+#undef min
+#undef max
 #include "llvm/Support/Host.h"
 #endif
 
@@ -288,11 +290,11 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     ascii_default();
 #ifdef _WIN32
-        // on Windows with MCJIT we need to add "-elf" to the target triple, see
-        // http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
-        if (extemp::UNIV::ARCH.empty()) {
-                extemp::UNIV::ARCH.push_back(llvm::sys::getProcessTriple() + "-elf");
-        }
+    // on Windows with MCJIT we need to add "-elf" to the target triple, see
+    // http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
+    if (extemp::UNIV::ARCH.empty()) {
+        extemp::UNIV::ARCH = llvm::sys::getProcessTriple() + "-elf";
+    }
 #endif
 
     extemp::TaskScheduler::I()->start();

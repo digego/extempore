@@ -43,7 +43,9 @@
 #include <queue>
 #include <map>
 #include <sstream>
-#include "EXTLLVM.h"
+#include <assert.h>
+
+struct llvm_zone_t;
 
 #define pair_caar(p) pair_car(pair_car(p))
 #define pair_cadr(p) pair_car(pair_cdr(p))
@@ -106,14 +108,14 @@ private:
     EXTThread       m_threadServer;
     scheme*         m_scheme;
     uint64_t        m_maxDuration;
-    int             m_serverSocket;
+	int             m_serverSocket;
     task_queue_type m_taskQueue;
     llvm_zone_t*    m_defaultZone;
     extemp::CM*     m_extemporeCallback;
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
     static const char*                           sm_banner;
-    static __thread SchemeProcess*               sm_current;
+    static THREAD_LOCAL SchemeProcess*           sm_current;
 private:
     void schemeCallback(TaskI* Task) {
         addCallback(Task, SchemeTask::Type::SCHEME_CALLBACK);

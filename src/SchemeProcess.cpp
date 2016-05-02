@@ -41,17 +41,40 @@
 #include <iosfwd>
 #include <iomanip>
 #include <stdexcept>
+#include <errno.h>
+
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+static void usleep(LONGLONG Us)
+{
+	auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
+	if (!timer) {
+		return;
+	}
+	LARGE_INTEGER li;
+	li.QuadPart = -Us * 1000;
+	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
+		CloseHandle(timer);
+		return;
+	}
+	WaitForSingleObject(timer, INFINITE);
+	CloseHandle(timer);
+}
+#else
+#include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>         /* host to IP resolution       */
-#include <errno.h>
-#include <sys/select.h>
-
-#ifndef _WIN32
 #include <unistd.h>
+static int closesocket(int Socket) {
+	return close(Socket);
+}
 #endif
 #include <stdlib.h>
 #include "UNIV.h"
@@ -71,6 +94,8 @@ llvm_zone_t* llvm_zone_create(uint64_t);
 
 }
 }
+
+#include "EXTLLVM.h"
 
 namespace extemp {
 
@@ -129,7 +154,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
 
 bool SchemeProcess::start()
 {
-    //set socket options
+	//set socket options
     int t_reuse = 1;
     setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse), sizeof(t_reuse));
     struct sockaddr_in address;
@@ -232,7 +257,7 @@ void* SchemeProcess::taskImpl()
     }
     while (likely(m_running)) {
         if (unlikely(m_taskQueue.empty())) {
-            usleep(1000);
+            usleep(1000000);
             continue;
         }
         while (likely(!m_taskQueue.empty() && m_running)) {
@@ -286,7 +311,7 @@ void* SchemeProcess::taskImpl()
                             }
                             if (write_reply) {
                                 auto res(ss.str());
-                                write(returnSocket, res.c_str(), res.length() + 1);
+                                send(returnSocket, res.c_str(), res.length() + 1, 0);
                             }
                         }
                     }
@@ -412,18 +437,18 @@ void* SchemeProcess::serverImpl()
                 } else {
                     outString += "Welcome to extempore!";
                 }
-                write(res, outString.c_str(), outString.length() + 1);
+				send(res, outString.c_str(), outString.length() + 1, 0);
                 continue;
             }
         }
         for (unsigned index = 0; index < clientSockets.size(); ++index) {
             auto sock(clientSockets[index]);
-            int BUFLEN = 1024;
+            const int BUFLEN = 1024;
             char buf[BUFLEN + 1];
             if (FD_ISSET(sock, &curReadFds)) { //see if any client sockets have data for us
                 std::string evalStr;
                 for (int j = 0; true; j++) { //read from stream in BUFLEN blocks
-                    res = read(sock, buf, BUFLEN);
+                    res = recv(sock, buf, BUFLEN, 0);
                     if (unlikely(!res)) { //close the socket
                         FD_CLR(sock, &readFds);
                         inStrings.erase(sock);
@@ -431,7 +456,7 @@ void* SchemeProcess::serverImpl()
                         std::cout << "Close Client Socket" << std::endl;
                         ascii_normal();
                         clientSockets.erase(clientSockets.begin() + index);
-                        close(sock);
+                        closesocket(sock);
                         --index;
                         break;
                     } else if (unlikely(res < 0)) {
@@ -472,10 +497,10 @@ void* SchemeProcess::serverImpl()
     }
     for (auto sock : clientSockets) {
         std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
-        close(sock);
+        closesocket(sock);
         std::cout << "DONE-CLOSING_CLIENT" << std::endl;
     }
-    if (close(m_serverSocket)) {
+    if (closesocket(m_serverSocket)) {
         std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
         perror(NULL);
     }

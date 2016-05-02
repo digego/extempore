@@ -121,8 +121,9 @@
 #endif
 
 #include <queue>
-#include <unistd.h>
+//#include <unistd.h>
 #include <EXTMutex.h>
+#include <EXTLLVM.h>
 namespace extemp { namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
 }}

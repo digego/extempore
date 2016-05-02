@@ -1,5 +1,3 @@
-#include <iostream>
-
 /*
  * Copyright (c) 2011, Andrew Sorensen
  *
@@ -46,8 +44,6 @@
 #include "EXTMutex.h"
 #include "BranchPrediction.h"
 #include "UNIV.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/IR/Module.h"
 
 struct zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
@@ -315,9 +311,6 @@ void initLLVM();
 const llvm::Function* getFunction(const char* name);
 const llvm::GlobalVariable* getGlobalVariable(const char* name);
 const llvm::GlobalValue* getGlobalValue(const char* name);
-inline llvm::StructType* getNamedType(const char* name) {
-    return M->getTypeByName(name);
-}
 inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
 extern "C" const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
 

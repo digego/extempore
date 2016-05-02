@@ -36,6 +36,7 @@
 #include <time.h>
 #include <iostream>
 #include <string.h>
+#include <inttypes.h>
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -62,6 +63,7 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <atomic>
 
 // this is an aribrary maximum
 
@@ -168,6 +170,24 @@ static std::atomic_int_fast64_t sSignalCount;
 
 #ifndef _WIN32
 static struct timespec MT_SLEEP_DURATION = { 0, NANO_SLEEP_DURATION };
+#else
+static LONGLONG MT_SLEEP_DURATION = NANO_SLEEP_DURATION;
+
+static void nanosleep(LONGLONG* Ns, void*)
+{
+	auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
+	if (!timer) {
+		return;
+	}
+	LARGE_INTEGER li;
+	li.QuadPart = -*Ns;
+	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
+		CloseHandle(timer);
+		return;
+	}
+	WaitForSingleObject(timer, INFINITE);
+	CloseHandle(timer);
+}
 #endif
 
 void* audioCallbackMT(void* Args)
@@ -387,7 +407,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         auto closure = * ((SAMPLE(**)(SAMPLE*,uint64_t,uint64_t,SAMPLE*)) cache_closure);
         llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
         bool toggle = AudioDevice::I()->getToggle();
-        SAMPLE* indats[numthreads];
+        SAMPLE* indats[AudioDevice::MAX_RT_AUDIO_THREADS]; // can't be variable on wi
         indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
       // if we are NOT running zerolatency
       // and toggle is FALSE then use alternate buffers
@@ -427,7 +447,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
       int numthreads = AudioDevice::I()->getNumThreads();
 
-      double in[numthreads];
+      double in[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
       float* input = (float*) InputBuffer;
       for(int i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = input[i];
@@ -449,7 +469,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       auto closure  = *((void(**)(float**,float*,uint64_t,void*)) cache_closure);
       llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
       //float** indat = (float**)
-      float* indats[numthreads];
+      float* indats[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* outdat = (float*) OutputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
       for(int jj=1;jj<numthreads;jj++) {
@@ -488,6 +508,8 @@ AudioDevice::~AudioDevice()
       }
   }
 }
+
+#undef max
 
 void AudioDevice::start()
 {

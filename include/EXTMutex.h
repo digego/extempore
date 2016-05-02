@@ -86,10 +86,12 @@ public:
     friend class EXTCondition;
 };
 
-#ifdef _WIN32
+#ifdef EXT_BOOST
+#include <exception>
 
-inline void EXTMutex::init(bool Recursive = true): m_initialised(true)
+inline void EXTMutex::init(bool Recursive)
 {
+	m_initialised = true;
 }
 
 inline void EXTMutex::destroy()
@@ -102,7 +104,7 @@ inline void EXTMutex::lock()
     try {
         m_mutex.lock();
     } catch(std::exception& e) {
-        dprintf(2, "Problem locking mutex: %s\n", e.what());
+        fprintf(stderr, "Problem locking mutex: %s\n", e.what());
     }
 }
 
@@ -111,7 +113,7 @@ inline void EXTMutex::unlock()
     try {
         m_mutex.unlock();
     } catch(std::exception& e){
-        dprintf(2, "Problem unlocking mutex: %s\n", e.what());
+        fprintf(stderr, "Problem unlocking mutex: %s\n", e.what());
     }
 }
 

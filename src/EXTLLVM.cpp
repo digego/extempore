@@ -853,7 +853,7 @@ void initLLVM()
         factory.setMAttrs(extemp::UNIV::ATTRS);
     }
     if (!extemp::UNIV::CPU.empty()) {
-        factory.setMCPU(extemp::UNIV::CPU.front());
+        factory.setMCPU(extemp::UNIV::CPU);
     }
     llvm::TargetMachine* tm = factory.selectTarget();
 #else

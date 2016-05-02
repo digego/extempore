@@ -73,10 +73,14 @@ static pointer get_struct_size(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, size);
 }
 
+static llvm::StructType* getNamedType(const char* name) {
+    return EXTLLVM::M->getTypeByName(name);
+}
+
 static pointer get_named_struct_size(scheme* Scheme, pointer Args)
 {
     llvm::Module* M = EXTLLVM::M;
-    auto type(extemp::EXTLLVM::getNamedType(string_value(pair_car(Args))));
+    auto type(getNamedType(string_value(pair_car(Args))));
     if (!type) {
         return Scheme->F;
     }
@@ -464,7 +468,7 @@ static pointer bind_symbol(scheme* Scheme, pointer Args)
     llvm::ExecutionEngine* EE = EXTLLVM::EE;
     llvm::MutexGuard locked(EE->lock);
 #ifdef _WIN32
-    auto ptr(reintepret_cat<void*>(GetProcAddress(reinterpret_cast<HMODULE>(library), sym));
+    auto ptr(reinterpret_cast<void*>(GetProcAddress(reinterpret_cast<HMODULE>(library), sym)));
 #else
     auto ptr(dlsym(library, sym));
 #endif
@@ -515,7 +519,7 @@ static pointer get_named_type(scheme* Scheme, pointer Args)
     while (len >= 0 && name[len--] == '*') {
         ++ptrDepth;
     }
-    auto tt(extemp::EXTLLVM::getNamedType(std::string(name, len).c_str()));
+    auto tt(getNamedType(std::string(name, len).c_str()));
     if (tt) {
         std::string typestr;
         llvm::raw_string_ostream ss(typestr);

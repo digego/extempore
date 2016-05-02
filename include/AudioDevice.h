@@ -70,7 +70,7 @@ class AudioDevice
 {
 private:
     typedef void* (*closure_getter_fn_type)();
-
+public:
     static const unsigned MAX_RT_AUDIO_THREADS = 16;
 private:
     bool m_started;

@@ -270,7 +270,7 @@ unsigned char* base64_decode(const char *data,
 
 extern "C" double clock_clock()
 {
-    return extemp::getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
 }
 
 extern "C" double audio_clock_base()
@@ -558,7 +558,7 @@ int register_for_window_events()
   // to give Extempore it's own dock icon, etc
   return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 #else
-  // implement the required "recieve events" functionality for Linux
+  // implement the required "receive events" functionality for Linux
   // or Windows if necessary
   return 1;
 #endif

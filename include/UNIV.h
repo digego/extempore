@@ -47,6 +47,8 @@
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
 #define THREAD_LOCAL __declspec(thread)
+#undef min
+#undef max
 #else
 #define THREAD_LOCAL __thread
 #endif
@@ -137,22 +139,28 @@ extern double frqRatio(double semitones);
 extern void initRand();
 extern bool file_check(const std::string& filename);
 extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
+
 }
 
-extern "C" {
-// clock/time
+}
+
 #ifdef _WIN32
 #include <chrono>
+#include <Windows.h>
+#endif
 
-inline double getRealTime()
+// clock/time
+#ifdef _WIN32
+
+extern "C" inline double getRealTime()
 {
     return double(std::chrono::high_resolution_clock::now().time_since_epoch().count()) *
-            system_clock::period::num / system_clock::period::den;
+            std::chrono::system_clock::period::num / std::chrono::system_clock::period::den;
 }
 
 #elif __linux__
 
-inline double getRealTime()
+extern "C" inline double getRealTime()
 {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
@@ -163,20 +171,16 @@ inline double getRealTime()
 
 #include <CoreAudio/HostTime.h>
 
-inline double getRealTime()
+extern "C" inline double getRealTime()
 {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 }
 
 #endif
 
-extern double clock_clock();
-extern double audio_clock_base();
-extern double audio_clock_now();
-
-}
-
-} //End Namespace
+extern "C" double clock_clock();
+extern "C" double audio_clock_base();
+extern "C" double audio_clock_now();
 
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background)
 {
@@ -184,9 +188,9 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
         return;
     }
 #ifdef _WIN32
-    extern int WINDOWS_COLORS;
+    extern int WINDOWS_COLORS[];
     if (unlikely(extemp::UNIV::EXT_TERM == 1)) {
-        Foreground = std::min(Foreground, 7);
+        Foreground = (Foreground > 7) ? 7 : Foreground;
         HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
         SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
         return;
