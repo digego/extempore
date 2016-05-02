@@ -24,6 +24,10 @@ Download a pre-built binary
 Download a `binary release`_, unzip it and run ``extempore.exe``
 from inside the ``extempore`` folder.
 
+.. note:: If you're not planning to make changes to Extempore itself,
+          then downloading a binary is probably the best option. You
+          can still write your own xtlang code, run the examples, etc.
+
 .. _binary release: https://github.com/digego/extempore/releases
 
 .. _build-from-source-doc:
@@ -39,11 +43,11 @@ one-liner build commands:
 
 On **Linux/OSX**::
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
+    git clone https://github.com/digego/extempore --branch 0.7.0 && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
 
 On **Windows**::
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
+    git clone https://github.com/digego/extempore --branch 0.7.0 && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
 If you have problems, check out the :ref:`platform-specific notes
 below <platform-specific-build-docs>`.
