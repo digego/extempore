@@ -6451,7 +6451,7 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
 
     sc->call_end_time = ULLONG_MAX;
     //sc->call_default_time = 158760000ll;  // 1 hour
-    sc->call_default_time = extemp::UNIV::SAMPLERATE*60*5; // 5 minutes
+    sc->call_default_time = extemp::UNIV::MINUTE() * 5;
 
     sc->last_symbol_apply = sc->NIL;
 
@@ -6526,7 +6526,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     sc->inport=sc->loadport;
 
     sc->func_called_by_extempore = sc->NIL;
-    sc->call_end_time = extemp::UNIV::TIME+(uint64_t)(extemp::UNIV::SAMPLERATE*60*60); // 60 minutes
+    sc->call_end_time = extemp::UNIV::TIME+(uint64_t)(extemp::UNIV::HOUR());
 
     try{
         Eval_Cycle(sc, OP_T0LVL);

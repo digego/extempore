@@ -169,9 +169,9 @@ int EXTThread::setPriority(int Priority, bool Realtime)
     struct thread_time_constraint_policy ttcpolicy;
     int result;
     // OSX magic numbers
-    ttcpolicy.period = uint32_t(UNIV::SAMPLERATE / 100); // HZ/160
-    ttcpolicy.computation = uint32_t(UNIV::SAMPLERATE / 143); // HZ/3300;
-    ttcpolicy.constraint = uint32_t(UNIV::SAMPLERATE / 143); // HZ/2200;
+    ttcpolicy.period = uint32_t(UNIV::SAMPLE_RATE / 100); // HZ/160
+    ttcpolicy.computation = uint32_t(UNIV::SAMPLE_RATE / 143); // HZ/3300;
+    ttcpolicy.constraint = uint32_t(UNIV::SAMPLE_RATE / 143); // HZ/2200;
     ttcpolicy.preemptible = 1; // 1
     result = thread_policy_set(pthread_mach_thread_np(thread),
                                THREAD_TIME_CONSTRAINT_POLICY,

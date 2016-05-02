@@ -55,7 +55,7 @@ static double LAST_REALTIME_STAMP = 0.0;
 void TaskScheduler::timeSlice()
 {
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
-    uint64_t nanosecs = double(frames) / UNIV::SAMPLERATE * D_BILLION;
+    uint64_t nanosecs = double(frames) / UNIV::SAMPLE_RATE * D_BILLION;
     timespec remain { 0, 0 };
     if (unlikely(UNIV::AUDIO_NONE)) { // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
@@ -95,7 +95,7 @@ void TaskScheduler::timeSlice()
 #else
     // if last error (b.tv_nsec) is small then keep sleeping
         double realtimeStamp = getRealTime();
-        double timediff = realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLERATE);
+        double timediff = realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLE_RATE);
         LAST_REALTIME_STAMP = realtimeStamp;
         timespec delay { 0, long(nanosecs - remain.tv_nsec) }; // this better be all sub-second
         // subtract any timediff error!
@@ -103,7 +103,7 @@ void TaskScheduler::timeSlice()
         delay.tv_nsec -= timediff / 2 * BILLION;
         if (likely(!UNIV::AUDIO_NONE)) {
             delay.tv_nsec += (double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
-                    UNIV::SAMPLERATE / 2 * BILLION;
+                    UNIV::SAMPLE_RATE / 2 * BILLION;
         }
         nanosleep(&delay, &remain);
 #endif

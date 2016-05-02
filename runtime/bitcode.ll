@@ -619,17 +619,17 @@ define private void @llvm_zone_ptr_set_size(i8* %zone, i64 %size) nounwind alway
   ret void
 }
 
-@_ZN6extemp4UNIV4TIMEE = external global i64 ; extemp::UNIV::TIME
+@TIME = external global i64 ; extemp::UNIV::TIME
 define private i64 @llvm_now() nounwind alwaysinline
 {
-  %res = load i64, i64* @_ZN6extemp4UNIV4TIMEE
+  %res = load i64, i64* @TIME
   ret i64 %res
 }
 
-@_ZN6extemp4UNIV10SAMPLERATEE = external global i64 ; extemp::UNIV::SAMPLERATE
+@SAMPLE_RATE = external global i64 ; extemp::UNIV::SAMPLE_RATE
 define private i32 @llvm_samplerate() nounwind alwaysinline
 {
-  %res = load i64, i64* @_ZN6extemp4UNIV10SAMPLERATEE
+  %res = load i64, i64* @SAMPLE_RATE
   %res32 = trunc i64 %res to i32
   ret i32 %res32
 }

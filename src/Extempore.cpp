@@ -158,7 +158,7 @@ int main(int argc, char** argv)
                 extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
                 break;
             case OPT_SAMPLERATE:
-                extemp::UNIV::SAMPLERATE = atoi(args.OptionArg());
+                extemp::UNIV::SAMPLE_RATE = atoi(args.OptionArg());
                 break;
             case OPT_FRAMES:
                 extemp::UNIV::FRAMES = atoi(args.OptionArg());

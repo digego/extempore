@@ -115,14 +115,14 @@ namespace UNIV
 extern std::string SHARE_DIR;
 extern uint32_t CHANNELS;
 extern uint32_t IN_CHANNELS;
-extern uint32_t SAMPLERATE;
-extern volatile uint64_t TIME;
+EXPORT uint32_t SAMPLE_RATE;
+EXPORT volatile uint64_t TIME;
 extern uint64_t DEVICE_TIME;
 extern double AUDIO_CLOCK_BASE;
 extern double AUDIO_CLOCK_NOW;
 extern uint64_t TIME_DIVISION;
-inline uint32_t SECOND() { return SAMPLERATE; }
-inline uint32_t MINUTE() { return SAMPLERATE * 60; }
+inline uint32_t SECOND() { return SAMPLE_RATE; }
+inline uint32_t MINUTE() { return SAMPLE_RATE * 60; }
 inline uint32_t HOUR() { return MINUTE() * 60; }
 extern uint32_t FRAMES;
 extern uint32_t EXT_TERM;

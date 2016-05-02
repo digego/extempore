@@ -574,7 +574,7 @@ void AudioDevice::start()
     paout.suggestedLatency = std::max(UNIV::AUDIO_OUTPUT_LATENCY, deviceInfo->defaultLowOutputLatency);
     paout.hostApiSpecificStreamInfo = nullptr;
     PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
-    err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLERATE, UNIV::FRAMES, paNoFlag, audioCallback,
+    err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLE_RATE, UNIV::FRAMES, paNoFlag, audioCallback,
             TaskScheduler::I());
     if (err != paNoError) {
         ascii_error();
@@ -612,7 +612,7 @@ void AudioDevice::start()
     ascii_normal();
     std::cout << "SampleRate     : " << std::flush;
     ascii_info();
-    std::cout << UNIV::SAMPLERATE << std::endl << std::flush;
+    std::cout << UNIV::SAMPLE_RATE << std::endl << std::flush;
     ascii_normal();
     std::cout << "Channels Out   : " << std::flush;
     ascii_info();
