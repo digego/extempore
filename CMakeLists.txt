@@ -334,7 +334,7 @@ if(BUILD_LLVM)
     add_custom_target(LLVM_install
       COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
       DEPENDS LLVM
-      COMMAND ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
+      COMMAND ${CMAKE_COMMAND} -DBUILD_TYPE=${LLVM_BUILD_TYPE} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
   else()
     ExternalProject_Add_StepTargets(LLVM install)
   endif()
@@ -470,6 +470,9 @@ if(WIN32)
   target_compile_definitions(extempore
     PRIVATE -DPCRE_STATIC
     PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+  set_source_files_properties(
+    PROPERTIES
+    COMPILE_FLAGS "/EHsc")
 elseif(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILER clang)

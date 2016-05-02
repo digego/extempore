@@ -36,11 +36,7 @@ static pointer emit(scheme* Scheme, pointer Args)
 static pointer exit_extempore(scheme* Scheme, pointer Args)
 {
     int rc(ivalue(pair_car(Args)));
-#ifdef _WIN32
-    std::exit(rc);
-#else
-    std::_Exit(rc);
-#endif
+    std::_Exit(rc); // currently Windows is very unhappy trying to clean up resources
 }
 
 #define UTILITY_DEFS \

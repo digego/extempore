@@ -78,12 +78,12 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 void sig_handler(int Signo)
 {
   if (Signo == SIGINT) {
-    printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
-    _exit(0);
+      printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
+      _exit(0);
   }
   else if (Signo == SIGTERM) {
-    printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
-    exit(0);
+      printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
+      exit(0);
   }
 }
 
@@ -102,7 +102,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
     { OPT_SHAREDIR,    "--runtime",       SO_REQ_SEP    },
     { OPT_SHAREDIR,    "--sharedir",      SO_REQ_SEP    },
-    { OPT_NOBASE,       "--nobase",         SO_NONE       },
+    { OPT_NOBASE,      "--nobase",        SO_NONE       },
     { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
     { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
@@ -321,7 +321,7 @@ int main(int argc, char** argv)
             extemp::UNIV::TIME_DIVISION = 4;
         }
 #endif
-      }
+    }
     ascii_normal();
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
@@ -334,12 +334,12 @@ int main(int argc, char** argv)
     startup_ok &= primary->start();
     if (!startup_ok) {
         ascii_error();
-    printf("Error");
+        printf("Error");
         ascii_default();
-    printf(": processes failed to start. Exiting...\n");
-    fflush(NULL);
-    exit(1);
-   }
+        printf(": processes failed to start. Exiting...\n");
+        fflush(NULL);
+        exit(1);
+    }
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
 #ifdef __APPLE__
@@ -347,9 +347,9 @@ int main(int argc, char** argv)
 #else
     while (true) {
 #ifdef _WIN32
-      Sleep(5000);
+        Sleep(5000);
 #else
-      sleep(5000);
+        sleep(5000);
 #endif
     }
 #endif
