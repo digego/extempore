@@ -145,6 +145,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     }
     int flag = 1;
     setsockopt(m_serverSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(flag));
+    setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&flag), sizeof(flag));
     scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, "*imp-envs*"), m_scheme->NIL);
     scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, "*callback*"),
             mk_cptr(m_scheme, mk_cb(this, SchemeProcess, schemeCallback)));
