@@ -37,6 +37,7 @@
 #include <iostream>
 #include <string.h>
 #include <inttypes.h>
+#include <xmmintrin.h>
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -58,7 +59,6 @@
 #include <sys/sysctl.h>
 #include <time.h>
 #include <libkern/OSAtomic.h>
-#include <xmmintrin.h>
 #endif
 
 #include <stdlib.h>
@@ -114,15 +114,12 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 #endif
 
 #if !defined(__clang__) && !defined(_WIN32)
-#include <xmmintrin.h>
 #undef isinf
 #undef isfinite
 #undef isnan
 #define isinf(x) __builtin_isinf(x)
 #define isnan(x) __builtin_isnan(x)
 #define isfinite(x) __builtin_finite(x)
-#else
-#define isfinite(x) (!isinf(x) && !isnan(x))
 #endif
 
 static inline SAMPLE audio_sanity(SAMPLE x)
