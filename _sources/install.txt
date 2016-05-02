@@ -78,13 +78,6 @@ PACKAGE:BOOL (default ON)
 Variables
 """""""""
 
-EXT_SHARE_DIR
-  the location of the Extempore "share directory", which containse a
-  bunch of files Extempore needs at runtime, including ``runtime/``,
-  ``libs/``, ``examples/`` and ``assets/``. You can also specify the
-  location of the sharedir at Extempore startup with the
-  ``--sharedir`` command line argument. Does nothing on Windows.
-
 EXT_LLVM_DIR (environment variable)
   in the bad old days, the Extempore build process relied on this
   (system) environment variable a lot, but currently it's only useful
