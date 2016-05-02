@@ -208,10 +208,30 @@ static inline llvm_zone_t* llvm_threads_get_callback_zone()
     return tls_llvm_callback_zone;
 }
 
-extern "C" llvm_zone_t* llvm_zone_callback_setup()
+EXPORT llvm_zone_t* llvm_zone_callback_setup()
 {
     auto zone(llvm_threads_get_callback_zone());
     llvm_push_zone_stack(zone);
     return llvm_zone_reset(zone);
+}
+
+EXPORT void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background)
+{
+    ascii_text_color(Bold, Foreground, Background);
+}
+
+EXPORT double clock_clock()
+{
+    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
+}
+
+EXPORT double audio_clock_base()
+{
+    return extemp::UNIV::AUDIO_CLOCK_BASE;
+}
+
+EXPORT double audio_clock_now()
+{
+    return extemp::UNIV::AUDIO_CLOCK_NOW;
 }
 

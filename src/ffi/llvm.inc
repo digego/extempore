@@ -52,7 +52,7 @@ static pointer get_globalvar(scheme* Scheme, pointer Args)
 static pointer get_struct_size(scheme* Scheme, pointer Args)
 {
     char* struct_type_str = string_value(pair_car(Args));
-    unsigned long long hash = string_hash(reinterpret_cast<unsigned char*>(struct_type_str));
+    unsigned long long hash = string_hash(struct_type_str);
     char name[128];
     sprintf(name,"_xtmT%lld",hash);
     char assm[1024];

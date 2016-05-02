@@ -47,10 +47,12 @@
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
 #define THREAD_LOCAL __declspec(thread)
+#define EXPORT extern "C" __declspec(exportdll)
 #undef min
 #undef max
 #else
 #define THREAD_LOCAL __thread
+#define EXPORT extern "C"
 #endif
 
 #if __APPLE__
@@ -177,10 +179,6 @@ extern "C" inline double getRealTime()
 }
 
 #endif
-
-extern "C" double clock_clock();
-extern "C" double audio_clock_base();
-extern "C" double audio_clock_now();
 
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background)
 {

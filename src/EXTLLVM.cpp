@@ -652,20 +652,20 @@ bool check_address_type(uint64_t id, closure_address_table* table, const char* t
   return 0;
 }
 
-struct closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
+closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
 {
-  struct closure_address_table* t = NULL;
-  if (alloctype == 1) {
-    t = (struct closure_address_table*) malloc(sizeof(struct closure_address_table));
-  } else {
-    t = (struct closure_address_table*) extemp::EXTLLVM::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
-  }
-  t->id = string_hash((unsigned char*) name);
-  t->name = name;
-  t->offset = offset;
-  t->type = type;
-  t->next = table;
-  return t;
+    struct closure_address_table* t = NULL;
+    if (alloctype == 1) {
+        t = reinterpret_cast<closure_address_table*>(malloc(sizeof(struct closure_address_table)));
+    } else {
+        t = (struct closure_address_table*) extemp::EXTLLVM::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
+    }
+    t->id = string_hash(name);
+    t->name = name;
+    t->offset = offset;
+    t->type = type;
+    t->next = table;
+    return t;
 }
 
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
@@ -712,7 +712,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   pointer xtlang_f_name = find_slot_in_env(_sc,_sc->envir,mk_symbol(_sc,c),1);
   char* xtlang_name = strvalue(pair_cdr(xtlang_f_name));
   //printf("in llvm scheme env set %s.%s:%s  xtlang:%s\n",fname,vname,tname,xtlang_name);
-  uint64_t id = string_hash((unsigned char*)vname);
+  uint64_t id = string_hash(vname);
   // Module* M = extemp::EXTLLVM::M;
   std::string funcname(xtlang_name);
   std::string getter("_getter");
@@ -958,7 +958,7 @@ void initLLVM()
         { "llvm_zone_destroy", uintptr_t(&llvm_zone_destroy) },
         { "llvm_peek_zone_stack_extern", uintptr_t(&llvm_peek_zone_stack) },
         { "llvm_pop_zone_stack", uintptr_t(&llvm_pop_zone_stack) },
-        { "llvm_push_zone_stack_extern", uintptr_t(&llvm_push_zone_stack) }
+        { "llvm_push_zone_stack_extern", uintptr_t(&llvm_push_zone_stack) },
     };
     for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);
@@ -971,7 +971,6 @@ void initLLVM()
             EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
             EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
             EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
-            EE->updateGlobalMapping("llvm_zone_callback_setup", uintptr_t(&llvm_zone_callback_setup));
             EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
             EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
             EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);

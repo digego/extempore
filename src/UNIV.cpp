@@ -268,21 +268,6 @@ unsigned char* base64_decode(const char *data,
     return decoded_data;
 }
 
-extern "C" double clock_clock()
-{
-    return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
-}
-
-extern "C" double audio_clock_base()
-{
-    return extemp::UNIV::AUDIO_CLOCK_BASE;
-}
-
-extern "C" double audio_clock_now()
-{
-    return extemp::UNIV::AUDIO_CLOCK_NOW;
-}
-
 bool rmatch(char* regex, const char* str)
 {
   //  char* data = char* strstring_value(pair_car(args));
@@ -781,10 +766,6 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
     return;
 }
 
-}
-
-extern "C" void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
-  ascii_text_color(Bold, Foreground, Background);
 }
 
 } //End Namespace

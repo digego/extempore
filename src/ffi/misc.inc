@@ -67,7 +67,7 @@ static pointer stringStrip(scheme* Scheme, pointer Args)
 
 static pointer stringHash(scheme* Scheme, pointer Args)
 {
-    return mk_integer(Scheme, string_hash(reinterpret_cast<unsigned char*>(string_value(pair_car(Args)))));
+    return mk_integer(Scheme, string_hash(string_value(pair_car(Args))));
 }
 
 static pointer Base64Encode(scheme* Scheme, pointer Args)
