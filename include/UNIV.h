@@ -47,7 +47,7 @@
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
 #define THREAD_LOCAL __declspec(thread)
-#define EXPORT extern "C" __declspec(exportdll)
+#define EXPORT extern "C" __declspec(dllexport)
 #undef min
 #undef max
 #else

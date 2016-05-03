@@ -387,10 +387,9 @@ void* SchemeProcess::serverImpl()
     FD_SET(m_serverSocket, &readFds); //add server socket to open sockets list
     int numFds = m_serverSocket + 1;
     while (m_running) {
-        timeval timeout = { 60, 0 };
         fd_set curReadFds;
         FD_COPY(&readFds, &curReadFds);
-        int res(select(numFds, &curReadFds, NULL, NULL, &timeout));
+        int res(select(numFds, &curReadFds, NULL, NULL, nullptr));
         if (unlikely(res < 0)) { // assumes only one failure
             auto iter(clientSockets.begin());
             for (; iter != clientSockets.end(); ++iter) {
@@ -406,7 +405,7 @@ void* SchemeProcess::serverImpl()
             ascii_normal();
             continue;
         }
-        if (FD_ISSET(m_serverSocket, &curReadFds)) { //check if we have any new accepts on our server socket
+        if (unlikely(FD_ISSET(m_serverSocket, &curReadFds))) { //check if we have any new accepts on our server socket
             sockaddr_in client_address;
             socklen_t clientAddressSize(sizeof(client_address));
             res = accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
@@ -415,32 +414,31 @@ void* SchemeProcess::serverImpl()
                 std::cout << "Bad Accept in Server Socket Handling" << std::endl;
                 continue; //continue on error
             }
-            if (res >= numFds) {
-                numFds = res + 1;
-                FD_SET(res, &readFds); //add new socket to the FD_SET
-                ascii_warning();
-                printf("New Client Connection \n");
-                ascii_normal();
-                clientSockets.push_back(res);
-                inStrings[res] = std::string();
-                std::string outString;
-                if (m_banner) {
-                    outString += sm_banner;
-                    auto time(UNIV::TIME);
-                    unsigned hours(time / UNIV::HOUR());
-                    time -= hours * UNIV::HOUR();
-                    unsigned minutes(time / UNIV::MINUTE());
-                    time -= minutes * UNIV::MINUTE();
-                    unsigned seconds(time / UNIV::SECOND());
-                    char prompt[23];
-                    sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
-                    outString += prompt;
-                } else {
-                    outString += "Welcome to extempore!";
-                }
-				send(res, outString.c_str(), outString.length() + 1, 0);
-                continue;
+            numFds = res + 1;
+            FD_SET(res, &readFds); //add new socket to the FD_SET
+            ascii_warning();
+            printf("New Client Connection\n");
+            ascii_normal();
+            fflush(stdout);
+            clientSockets.push_back(res);
+			inStrings[res].clear();
+            std::string outString;
+            if (m_banner) {
+                outString += sm_banner;
+                auto time(UNIV::TIME);
+                unsigned hours(time / UNIV::HOUR());
+                time -= hours * UNIV::HOUR();
+                unsigned minutes(time / UNIV::MINUTE());
+                time -= minutes * UNIV::MINUTE();
+                unsigned seconds(time / UNIV::SECOND());
+                char prompt[23];
+                sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
+                outString += prompt;
+            } else {
+                outString += "Welcome to extempore!";
             }
+			send(res, outString.c_str(), outString.length() + 1, 0);
+			continue;
         }
         for (unsigned index = 0; index < clientSockets.size(); ++index) {
             auto sock(clientSockets[index]);

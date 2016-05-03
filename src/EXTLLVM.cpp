@@ -954,11 +954,8 @@ void initLLVM()
         { "llvm_destroy_zone_after_delay", uintptr_t(&llvm_destroy_zone_after_delay) },
         { "free_after_delay", uintptr_t(&free_after_delay) },
         // { "llvm_get_next_prime", uintptr_t(&llvm_get_next_prime) },
-        { "llvm_zone_create_extern", uintptr_t(&llvm_zone_create) },
         { "llvm_zone_destroy", uintptr_t(&llvm_zone_destroy) },
-        { "llvm_peek_zone_stack_extern", uintptr_t(&llvm_peek_zone_stack) },
         { "llvm_pop_zone_stack", uintptr_t(&llvm_pop_zone_stack) },
-        { "llvm_push_zone_stack_extern", uintptr_t(&llvm_push_zone_stack) },
     };
     for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);
@@ -1068,25 +1065,6 @@ void initLLVM()
       return;
     }
   }
-}
-
-extern "C" {
-
-llvm_zone_t* llvm_peek_zone_stack_extern()
-{
-    return extemp::EXTLLVM::llvm_peek_zone_stack();
-}
-
-void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
-{
-    extemp::EXTLLVM::llvm_push_zone_stack(Zone);
-}
-
-llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
-{
-    return extemp::EXTLLVM::llvm_zone_create(Size);
-}
-
 }
 
 #include <unordered_map>
