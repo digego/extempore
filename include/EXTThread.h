@@ -52,7 +52,7 @@ namespace extemp
 
 class EXTThread
 {
-private:
+public:
     typedef void* (*function_type)(void*);
 private:
     function_type m_function;
@@ -82,7 +82,6 @@ public:
     bool isCurrentThread() { return sm_current == this; }
     int setPriority(int Priority, bool Realtime);
     int getPriority() const; //doesn't say if it's realtime or not
-    bool isEqualTo(EXTThread* Other) { return this == Other; }
 #ifdef _WIN32
     std::thread& getThread() { return m_thread; }
 #else

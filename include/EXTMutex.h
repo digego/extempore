@@ -71,7 +71,7 @@ private:
     pthread_mutex_t      m_mutex;
 #endif
 public:
-    EXTMutex(const std::string& Name): m_name(Name), m_initialised(false) {
+    EXTMutex(const std::string& Name = std::string()): m_name(Name), m_initialised(false) {
     }
     ~EXTMutex() {
         destroy();
@@ -82,11 +82,12 @@ public:
 
     void lock();
     void unlock();
+    bool try_lock();
 
     friend class EXTCondition;
 };
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <exception>
 
 inline void EXTMutex::init(bool Recursive)
@@ -115,6 +116,11 @@ inline void EXTMutex::unlock()
     } catch(std::exception& e){
         fprintf(stderr, "Problem unlocking mutex: %s\n", e.what());
     }
+}
+
+inline bool EXTMutex::try_lock()
+{
+    return m_mutex->try_lock();
 }
 
 #else // begin POSIX
@@ -173,6 +179,11 @@ inline void EXTMutex::unlock()
         dprintf(2, "Error unlocking mutex: %s err: %d\n", name, result);
     }
 #endif
+}
+
+inline bool EXTMutex::try_lock()
+{
+    return !pthread_mutex_trylock(&m_mutex);
 }
 
 #endif // end POSIX

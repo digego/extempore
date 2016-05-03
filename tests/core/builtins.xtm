@@ -372,35 +372,15 @@
 
          (test_cos) 1.)
 
-;; (xtmtest '(bind-func test_mutex_trylock
-;;   (lambda ()
-;;     (mutex_trylock))))
-
-;;  (test-xtfunc test_mutex_trylock)
-
-;; (xtmtest '(bind-func test_mutex_unlock
-;;   (lambda ()
-;;     (mutex_unlock))))
-
-;;  (test-xtfunc test_mutex_unlock)
-
-;; (xtmtest '(bind-func test_mutex_lock
-;;   (lambda ()
-;;     (mutex_lock))))
-
-;;  (test-xtfunc test_mutex_lock)
-
-;; (xtmtest '(bind-func test_mutex_destroy
-;;   (lambda ()
-;;     (mutex_destroy))))
-
-;;  (test-xtfunc test_mutex_destroy)
-
-;; (xtmtest '(bind-func test_mutex_create
-;;   (lambda ()
-;;     (mutex_create))))
-
-;;  (test-xtfunc test_mutex_create)
+(xtmtest '(bind-func test_mutex
+  (lambda ()
+    (let ((mutex (mutex_create)))
+      (mutex_lock mutex)
+      (mutex_trylock mutex) ; this is allowed to spuriously fail, would that affect this test?
+      (mutex_unlock mutex)
+      (mutex_unlock mutex)
+      (mutex_destroy mutex))))
+  (test_mutex))
 
 ;; (xtmtest '(bind-func test_thread_sleep
 ;;   (lambda ()

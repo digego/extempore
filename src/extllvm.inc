@@ -230,6 +230,8 @@ EXPORT void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Ba
     ascii_text_color(Bold, Foreground, Background);
 }
 
+// CATEGORY: clock
+
 EXPORT double clock_clock()
 {
     return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
@@ -245,3 +247,93 @@ EXPORT double audio_clock_now()
     return extemp::UNIV::AUDIO_CLOCK_NOW;
 }
 
+// CATEGORY: native mutex
+
+EXPORT void* mutex_create()
+{
+    auto mutex(new EXTMutex);
+    mutex->init();
+    return mutex;
+}
+
+EXPORT int mutex_destroy(void* Mutex)
+{
+    delete reinterpret_cast<EXTMutex*>(Mutex);
+    return 0;
+}
+
+EXPORT int mutex_lock(void* Mutex)
+{
+    reinterpret_cast<EXTMutex*>(Mutex)->lock();
+    return 0;
+}
+
+EXPORT int mutex_unlock(void* Mutex)
+{
+    reinterpret_cast<EXTMutex*>(Mutex)->unlock();
+    return 0;
+}
+
+EXPORT int mutex_trylock(void* Mutex)
+{
+    return reinterpret_cast<EXTMutex*>(Mutex)->try_lock();
+}
+
+// CATEGORY: native thread
+
+EXPORT void* thread_fork(EXTThread::function_type Start, void* Args) {
+    auto thread(new extemp::EXTThread(Start, Args, "xt_fork"));
+    thread->start();
+    return thread;
+}
+
+EXPORT void thread_destroy(void* Thread)
+{
+    delete reinterpret_cast<EXTThread*>(Thread);
+}
+
+EXPORT int thread_join(void* Thread)
+{
+    return reinterpret_cast<EXTThread*>(Thread)->join();
+}
+
+EXPORT int thread_kill(void* Thread)
+{
+    return reinterpret_cast<EXTThread*>(Thread)->kill();
+}
+
+EXPORT int thread_equal(void* Thread1, void* Thread2)
+{
+    return Thread1 == Thread2;
+}
+
+EXPORT int thread_equal_self(void* Thread)
+{
+    return reinterpret_cast<EXTThread*>(Thread)->isCurrentThread();
+}
+
+EXPORT void* thread_self()
+{
+    return EXTThread::activeThread();
+}
+
+EXPORT int64_t thread_sleep(int64_t Secs, int64_t Nanosecs)
+{
+#ifdef _WIN32
+    std::this_thread::sleep_for(std::chrono::seconds(secs) + std::chrono::nanoseconds(nanosecs));
+    return 0;
+#else
+    timespec a = { Secs, Nanosecs };
+    timespec b;
+    while (true) {
+        auto res(nanosleep(&a ,&b));
+        if (likely(!res)) {
+            return 0;
+        }
+        if (unlikely(errno != EINTR)) {
+            return -1;
+        }
+        a = b;
+    }
+#endif
+}

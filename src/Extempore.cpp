@@ -133,7 +133,6 @@ int main(int argc, char** argv)
     std::string utility_name("utility");
     int primary_port = 7099;
     int utility_port = 7098;
-
 #ifndef _WIN32
     // redirect stderr to NULL
     freopen("/dev/null", "w", stderr);
@@ -146,8 +145,9 @@ int main(int argc, char** argv)
                 printf("\nWarning: can't catch SIGTERM.\n");
     }
 #else
-        // evil windows termination code
-    SetConsoleCtrlHandler( (PHANDLER_ROUTINE) CtrlHandler, TRUE );
+    WSADATA wsadata;
+    WSAStartup(0x0202, &wsadata); // I didn't seem to need to call this... but (?)
+    SetConsoleCtrlHandler(PHANDLER_ROUTINE(CtrlHandler), TRUE);
 #endif
 
     CSimpleOptA args(argc, argv, g_rgOptions);
