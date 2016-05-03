@@ -6,6 +6,7 @@ set(CTEST_DROP_LOCATION "/submit.php?project=Extempore")
 set(CTEST_DROP_SITE_CDASH TRUE)
 
 find_program(CTEST_GIT_COMMAND NAMES git)
+set(CTEST_UPDATE_COMMAND "${CTEST_GIT_COMMAND}")
 
 if(UNIX)
   set(CTEST_BASE_DIRECTORY "/tmp/extempore-ctest")
@@ -13,8 +14,8 @@ elseif(WIN32)
   set(CTEST_BASE_DIRECTORY "$ENV{TEMP}/extempore-ctest")
 endif()
 
-file(MAKE_DIRECTORY ${CTEST_BASE_DIRECTORY}/source)
-file(MAKE_DIRECTORY ${CTEST_BASE_DIRECTORY}/build)
+# file(MAKE_DIRECTORY ${CTEST_BASE_DIRECTORY}/source)
+# file(MAKE_DIRECTORY ${CTEST_BASE_DIRECTORY}/build)
 
 set(CTEST_BUILD_NAME "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
 # set(CTEST_BUILD_CONFIGURATION "Release")
@@ -31,7 +32,7 @@ endif()
 
 ctest_start(Continuous "${CTEST_BASE_DIRECTORY}/source" "${CTEST_BASE_DIRECTORY}/build")
 
-ctest_update(SOURCE ${CTEST_BASE_DIRECTORY}/source RETURN_VALUE)
+ctest_update(SOURCE ${CTEST_BASE_DIRECTORY}/source)
 
 ctest_configure(
   BUILD ${CTEST_BASE_DIRECTORY}/build
