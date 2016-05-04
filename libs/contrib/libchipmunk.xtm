@@ -8,11 +8,8 @@
 
 ;; typedef double cpFloat;
 
+(bind-alias cpBool i8)
 (bind-alias cpFloat double)
-
-;; struct cpVect{cpFloat x,y;}
-
-;; (bind-type cpVect <cpFloat,cpFloat>)
 (bind-type cpVect <cpFloat,cpFloat> (printer? . #f))
 
 (bind-func print
@@ -22,9 +19,119 @@
        (tref a 1))
      void))
 
+(bind-alias cpBB |4,cpFloat|)
+(bind-alias cpGroup i64)
+(bind-alias cpBitmask i32)
+(bind-alias cpTransform |6,cpFloat|)
+
 (bind-alias cpSpace i8) ;; keep these opaque
 (bind-alias cpShape i8)
 (bind-alias cpBody i8)
+(bind-alias cpConstraint i8)
+(bind-alias cpArbiter i8)
+
+(bind-alias cpDataPointer i8*)
+
+;; cpBody
+
+(bind-alias cpBodyVelocityFunc [void,cpBody*,cpVect,cpFloat,cpFloat]*)
+(bind-alias cpBodyPositionFunc [void,cpBody*,cpFloat]*)
+(bind-alias cpBodyShapeIteratorFunc [void,cpBody*,cpShape*,i8*]*)
+(bind-alias cpBodyConstraintIteratorFunc [void,cpBody*,cpConstraint*,i8*]*) ;; not sure how useful these are
+(bind-alias cpBodyArbiterIteratorFunc [void,cpBody*,cpArbiter*,i8*]*) ;; not sure how useful these are
+
+(bind-alias cpBodyType enum)
+(bind-val CP_BODY_TYPE_DYNAMIC cpBodyType 0)
+(bind-val CP_BODY_TYPE_KINEMATIC cpBodyType 1)
+(bind-val CP_BODY_TYPE_STATIC cpBodyType 2)
+
+(bind-lib libchipmunk cpBodyAlloc [cpBody*])
+(bind-lib libchipmunk cpBodyInit [cpBody*,cpBody*,cpFloat,cpFloat])
+(bind-lib libchipmunk cpBodyNew [cpBody*,cpFloat,cpFloat])
+(bind-lib libchipmunk cpBodyNewKinematic [cpBody*])
+(bind-lib libchipmunk cpBodyNewStatic [cpBody*])
+(bind-lib libchipmunk cpBodyDestroy [void,cpBody*])
+(bind-lib libchipmunk cpBodyFree [void,cpBody*])
+(bind-lib libchipmunk cpBodyActivate [void,cpBody*])
+(bind-lib libchipmunk cpBodyActivateStatic [void,cpBody*,cpShape*])
+(bind-lib libchipmunk cpBodySleep [void,cpBody*])
+(bind-lib libchipmunk cpBodySleepWithGroup [void,cpBody*,cpBody*])
+(bind-lib libchipmunk cpBodyIsSleeping [cpBool,cpBody*])
+(bind-lib libchipmunk cpBodyGetType [cpBodyType,cpBody*])
+(bind-lib libchipmunk cpBodySetType [void,cpBody*,cpBodyType])
+(bind-lib libchipmunk cpBodyGetSpace [cpSpace*,cpBody*])
+(bind-lib libchipmunk cpBodyGetMass [cpFloat,cpBody*])
+(bind-lib libchipmunk cpBodySetMass [void,cpBody*,cpFloat])
+(bind-lib libchipmunk cpBodyGetMoment [cpFloat,cpBody*])
+(bind-lib libchipmunk cpBodySetMoment [void,cpBody*,cpFloat])
+(bind-lib libchipmunk cpBodyGetPosition [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodySetPosition [void,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetCenterOfGravity [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodySetCenterOfGravity [void,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetVelocity [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodySetVelocity [void,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetForce [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodySetForce [void,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetAngularVelocity [cpFloat,cpBody*])
+(bind-lib libchipmunk cpBodySetAngularVelocity [void,cpBody*,cpFloat])
+(bind-lib libchipmunk cpBodyGetTorque [cpFloat,cpBody*])
+(bind-lib libchipmunk cpBodySetTorque [void,cpBody*,cpFloat])
+(bind-lib libchipmunk cpBodyGetRotation [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodyGetUserData [cpDataPointer,cpBody*])
+(bind-lib libchipmunk cpBodySetUserData [void,cpBody*,cpDataPointer])
+(bind-lib libchipmunk cpBodySetVelocityUpdateFunc [void,cpBody*,cpBodyVelocityFunc])
+(bind-lib libchipmunk cpBodySetPositionUpdateFunc [void,cpBody*,cpBodyPositionFunc])
+(bind-lib libchipmunk cpBodyUpdateVelocity [void,cpBody*,cpVect,cpFloat,cpFloat])
+(bind-lib libchipmunk cpBodyUpdatePosition [void,cpBody*,cpFloat])
+(bind-lib libchipmunk cpBodyLocalToWorld [cpVect,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyWorldToLocal [cpVect,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyApplyForceAtWorldPoint [void,cpBody*,cpVect,cpVect])
+(bind-lib libchipmunk cpBodyApplyForceAtLocalPoint [void,cpBody*,cpVect,cpVect])
+(bind-lib libchipmunk cpBodyApplyImpulseAtWorldPoint [void,cpBody*,cpVect,cpVect])
+(bind-lib libchipmunk cpBodyApplyImpulseAtLocalPoint [void,cpBody*,cpVect,cpVect])
+(bind-lib libchipmunk cpBodyGetVelocityAtWorldPoint [cpVect,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetVelocityAtLocalPoint [cpVect,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyKineticEnergy [cpFloat,cpBody*])
+(bind-lib libchipmunk cpBodyEachShape [void,cpBody*,cpBodyShapeIteratorFunc,i8])
+(bind-lib libchipmunk cpBodyEachConstraint [void,cpBody*,cpBodyConstraintIteratorFunc,i8])
+(bind-lib libchipmunk cpBodyEachArbiter [void,cpBody*,cpBodyArbiterIteratorFunc,i8])
+
+;; cpShape
+
+(bind-alias cpPointQueryInfo <cpShape*,cpVect,cpFloat,cpVect>)
+(bind-type cpShapeFilter <cpGroup,cpBitmask,cpBitmask> (printer? . #f))
+
+(bind-func print
+   (lambda (a:cpShapeFilter)
+     (printf "<cpShapeFilter: group=%d, cat=%d, mask=%d>"
+       (tref a 0)
+       (tref a 1)
+       (tref a 2))
+     void))
+
+(bind-func cpShapeFilterNew
+  (lambda (group:cpGroup categories:cpBitmask mask:cpBitmask)
+    (let ((filter:cpShapeFilter* (alloc)))
+      (tfill! filter group categories mask)
+      (pref filter 0))))
+
+(bind-lib libchipmunk cpShapeDestroy [void,cpShape*])
+(bind-lib libchipmunk cpShapeFree [void,cpShape*])
+(bind-lib libchipmunk cpShapeCacheBB [cpBB,cpShape*])
+(bind-lib libchipmunk cpShapeUpdate [cpBB,cpShape*,cpTransform])
+(bind-lib libchipmunk cpShapePointQuery [cpFloat,cpShape*,cpVect,cpPointQueryInfo*])
+
+;; Utility
+
+(bind-lib libchipmunk cpMomentForCircle [cpFloat,cpFloat,cpFloat,cpFloat,cpVect])
+(bind-lib libchipmunk cpAreaForCircle [cpFloat,cpFloat,cpFloat])
+(bind-lib libchipmunk cpMomentForSegment [cpFloat,cpFloat,cpVect,cpVect,cpFloat])
+(bind-lib libchipmunk cpAreaForSegment [cpFloat,cpVect,cpVect,cpFloat])
+(bind-lib libchipmunk cpMomentForPoly [cpFloat,cpFloat,i32,cpVect*,cpVect,cpFloat])
+(bind-lib libchipmunk cpAreaForPoly [cpFloat,i32,cpVect*,cpFloat])
+(bind-lib libchipmunk cpCentroidForPoly [cpFloat,i32,cpVect*,cpFloat])
+(bind-lib libchipmunk cpMomentForBox [cpFloat,cpFloat,cpFloat,cpFloat])
+(bind-lib libchipmunk cpMomentForBox2 [cpFloat,cpFloat,cpBB])
 
 (bind-lib libchipmunk cpSpaceNew [cpSpace*]*)
 (bind-lib libchipmunk cpSpaceSetGravity [void,cpSpace*,cpVect]*)
@@ -34,14 +141,8 @@
 (bind-lib libchipmunk cpSpaceAddBody [cpBody*,cpSpace*,cpBody*])
 (bind-lib libchipmunk cpSpaceStep [void,cpSpace*,cpFloat])
 
-(bind-lib libchipmunk cpMomentForCircle [cpFloat,cpFloat,cpFloat,cpFloat,cpVect])
 (bind-lib libchipmunk cpSegmentShapeNew [cpShape*,cpBody*,cpVect,cpVect,cpFloat])
 (bind-lib libchipmunk cpCircleShapeNew [cpShape*,cpBody*,cpFloat,cpVect])
-
-(bind-lib libchipmunk cpBodyNew [cpBody*,cpFloat,cpFloat])
-(bind-lib libchipmunk cpBodySetPosition [void,cpBody*,cpVect])
-(bind-lib libchipmunk cpBodyGetPosition [cpVect,cpBody*])
-(bind-lib libchipmunk cpBodyGetVelocity [cpVect,cpBody*])
 
 (bind-lib libchipmunk cpShapeSetFriction [void,cpShape*,cpFloat])
 
