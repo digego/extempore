@@ -751,7 +751,12 @@ if(BUILD_DEPS)
     add_dependencies(apr expat)
 
     # aargh! sndfile on Windows still requires sh, sed, etc. and
-    # doesn't work. so we'll just grab the pre-built one manually
+    # doesn't work. so we'll just grab the pre-built one manually. for
+    # the moment I've just hosted the (unmodified) libsndfile binaries
+    # (a bit of a hack), but you can get an installer from
+    # http://www.mega-nerd.com/libsndfile/#Download
+    file(DOWNLOAD https://dl.dropboxusercontent.com/u/18333720/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
+    file(DOWNLOAD https://dl.dropboxusercontent.com/u/18333720/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
 
     # ExternalProject_Add(sndfile
     #   PREFIX libsndfile
