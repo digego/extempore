@@ -272,7 +272,7 @@ int main(int argc, char** argv)
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
                 std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
                 std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
-                return 0;
+                std::_Exit(0);
             }
         } else {
             std::string key(args.OptionText());
