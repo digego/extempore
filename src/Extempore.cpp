@@ -264,8 +264,10 @@ int main(int argc, char** argv)
                 std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
                 std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
                 std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
-                std::cout << "         --latency: attempts to force audio output latency" << std::endl;
                 std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
+                std::cout << "     --device-name: the name of the audio device to use (output or duplex) (overrides index)" << std::endl;
+                std::cout << "   --indevice-name: the name of the audio input device to use (overrides index)" << std::endl;
+                std::cout << "         --latency: attempts to force audio output latency" << std::endl;
                 std::cout << "            --arch: the target architecture [current host]" << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
                 std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
