@@ -130,6 +130,8 @@ extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;
 extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
+extern std::string AUDIO_DEVICE_NAME;
+extern std::string AUDIO_IN_DEVICE_NAME;
 extern double AUDIO_OUTPUT_LATENCY;
 extern double CLOCK_OFFSET;
 extern std::unordered_map<std::string, std::string> CMDPARAMS;

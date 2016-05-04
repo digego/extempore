@@ -568,6 +568,8 @@ uint64_t TIME_DIVISION = 1;
 bool AUDIO_NONE = false;
 uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
+std::string AUDIO_DEVICE_NAME;
+std::string AUDIO_IN_DEVICE_NAME;
 double AUDIO_OUTPUT_LATENCY = 0.0;
 double CLOCK_OFFSET = 0.0;
 std::unordered_map<std::string, std::string> CMDPARAMS;

@@ -509,6 +509,21 @@ AudioDevice::~AudioDevice()
 
 #undef max
 
+static int findDevice(const std::string& Name)
+{
+    int numDevices(Pa_GetDeviceCount());
+    for (unsigned i = 0; i < numDevices; ++i) {
+        if (Name == Pa_GetDeviceInfo(i)->name) {
+            return i;
+        }
+    }
+    ascii_error();
+    printf("\n*** Can't find named device: %s\n", Name.c_str());
+    ascii_normal();
+    fflush(stdout);
+    std::_Exit(1);
+}
+
 void AudioDevice::start()
 {
     if (m_started) {
@@ -523,6 +538,12 @@ void AudioDevice::start()
     Pa_Initialize();
     PaError err;
     int numDevices = Pa_GetDeviceCount();
+    if (!UNIV::AUDIO_DEVICE_NAME.empty()) {
+        UNIV::AUDIO_DEVICE = findDevice(UNIV::AUDIO_DEVICE_NAME);
+    }
+    if (!UNIV::AUDIO_IN_DEVICE_NAME.empty()) {
+        UNIV::AUDIO_IN_DEVICE = findDevice(UNIV::AUDIO_IN_DEVICE_NAME);
+    }
     if (numDevices < 0) {
         printf("No audio devices found!\n");
         printf( "ERROR: Pa_CountDevices returned 0x%x\n", numDevices);

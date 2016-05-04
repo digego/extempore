@@ -89,10 +89,10 @@ void sig_handler(int Signo)
 
 #endif
 
-
 enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
+       OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
        OPT_LATENCY,
        OPT_HELP
@@ -100,28 +100,30 @@ enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
-    { OPT_SHAREDIR,    "--runtime",       SO_REQ_SEP    },
-    { OPT_SHAREDIR,    "--sharedir",      SO_REQ_SEP    },
-    { OPT_NOBASE,      "--nobase",        SO_NONE       },
-    { OPT_SAMPLERATE,  "--samplerate",    SO_REQ_SEP    },
-    { OPT_FRAMES,      "--frames",        SO_REQ_SEP    },
-    { OPT_CHANNELS,    "--channels",      SO_REQ_SEP    },
-    { OPT_IN_CHANNELS, "--inchannels",    SO_REQ_SEP    },
-    { OPT_INITEXPR,    "--eval",          SO_REQ_SEP    },
-    { OPT_INITFILE,    "--run",           SO_REQ_SEP    },
-    { OPT_PORT,        "--port",          SO_REQ_SEP    },
-    { OPT_TERM,        "--term",          SO_REQ_SEP    },
-    { OPT_NO_AUDIO,    "--noaudio",       SO_NONE       },
-    { OPT_TIME_DIV,    "--timediv",       SO_REQ_SEP    },
-    { OPT_DEVICE,      "--device",        SO_REQ_SEP    },
-    { OPT_IN_DEVICE,   "--indevice",      SO_REQ_SEP    },
-    { OPT_LATENCY,     "--latency",       SO_REQ_SEP    },
-    { OPT_PRT_DEVICES, "--print-devices", SO_NONE       },
-    { OPT_REALTIME,    "--realtime",      SO_NONE       },
-    { OPT_ARCH,        "--arch",          SO_REQ_SEP    },
-    { OPT_CPU,         "--cpu",           SO_REQ_SEP    },
-    { OPT_ATTR,        "--attr",          SO_MULTI      },
-    { OPT_HELP,        "--help",          SO_NONE       },
+    { OPT_SHAREDIR,       "--runtime",       SO_REQ_SEP    },
+    { OPT_SHAREDIR,       "--sharedir",      SO_REQ_SEP    },
+    { OPT_NOBASE,         "--nobase",        SO_NONE       },
+    { OPT_SAMPLERATE,     "--samplerate",    SO_REQ_SEP    },
+    { OPT_FRAMES,         "--frames",        SO_REQ_SEP    },
+    { OPT_CHANNELS,       "--channels",      SO_REQ_SEP    },
+    { OPT_IN_CHANNELS,    "--inchannels",    SO_REQ_SEP    },
+    { OPT_INITEXPR,       "--eval",          SO_REQ_SEP    },
+    { OPT_INITFILE,       "--run",           SO_REQ_SEP    },
+    { OPT_PORT,           "--port",          SO_REQ_SEP    },
+    { OPT_TERM,           "--term",          SO_REQ_SEP    },
+    { OPT_NO_AUDIO,       "--noaudio",       SO_NONE       },
+    { OPT_TIME_DIV,       "--timediv",       SO_REQ_SEP    },
+    { OPT_DEVICE,         "--device",        SO_REQ_SEP    },
+    { OPT_IN_DEVICE,      "--indevice",      SO_REQ_SEP    },
+    { OPT_DEVICE_NAME,    "--device-name",   SO_REQ_SEP    },
+    { OPT_IN_DEVICE_NAME, "--indevice-name", SO_REQ_SEP    },
+    { OPT_LATENCY,        "--latency",       SO_REQ_SEP    },
+    { OPT_PRT_DEVICES,    "--print-devices", SO_NONE       },
+    { OPT_REALTIME,       "--realtime",      SO_NONE       },
+    { OPT_ARCH,           "--arch",          SO_REQ_SEP    },
+    { OPT_CPU,            "--cpu",           SO_REQ_SEP    },
+    { OPT_ATTR,           "--attr",          SO_MULTI      },
+    { OPT_HELP,           "--help",          SO_NONE       },
     SO_END_OF_OPTIONS
 };
 
@@ -214,6 +216,12 @@ int main(int argc, char** argv)
                 break;
             case OPT_IN_DEVICE:
                 extemp::UNIV::AUDIO_IN_DEVICE = atoi(args.OptionArg());
+                break;
+            case OPT_DEVICE_NAME:
+                extemp::UNIV::AUDIO_DEVICE_NAME = args.OptionArg();
+                break;
+            case OPT_IN_DEVICE_NAME:
+                extemp::UNIV::AUDIO_IN_DEVICE_NAME = args.OptionArg();
                 break;
             case OPT_LATENCY:
                 extemp::UNIV::AUDIO_OUTPUT_LATENCY = atoi(args.OptionArg()) / 1000.0;
