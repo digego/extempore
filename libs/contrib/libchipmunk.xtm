@@ -1,0 +1,75 @@
+;; minimal bindings and test function
+;; do not use (yet)
+
+(bind-dylib libchipmunk
+  (if (string=? "Linux" (sys:platform))
+    "libchipmunk.so"
+    (print-error "tell me where to find the Chipmunk library on your platform here!")))
+
+;; typedef double cpFloat;
+
+(bind-alias cpFloat double)
+
+;; struct cpVect{cpFloat x,y;}
+
+;; (bind-type cpVect <cpFloat,cpFloat>)
+(bind-type cpVect <cpFloat,cpFloat> (printer? . #f))
+
+(bind-func print
+   (lambda (a:cpVect)
+     (printf "<cpVect: x=%.3lf, y=%.3lf>"
+       (tref a 0)
+       (tref a 1))
+     void))
+
+(bind-alias cpSpace i8) ;; keep these opaque
+(bind-alias cpShape i8)
+(bind-alias cpBody i8)
+
+(bind-lib libchipmunk cpSpaceNew [cpSpace*]*)
+(bind-lib libchipmunk cpSpaceSetGravity [void,cpSpace*,cpVect]*)
+(bind-lib libchipmunk cpSpaceGetGravity [cpVect,cpSpace*])
+(bind-lib libchipmunk cpSpaceGetStaticBody [cpBody*,cpSpace*])
+(bind-lib libchipmunk cpSpaceAddShape [cpSpace*,cpSpace*,cpShape*])
+(bind-lib libchipmunk cpSpaceAddBody [cpBody*,cpSpace*,cpBody*])
+(bind-lib libchipmunk cpSpaceStep [void,cpSpace*,cpFloat])
+
+(bind-lib libchipmunk cpMomentForCircle [cpFloat,cpFloat,cpFloat,cpFloat,cpVect])
+(bind-lib libchipmunk cpSegmentShapeNew [cpShape*,cpBody*,cpVect,cpVect,cpFloat])
+(bind-lib libchipmunk cpCircleShapeNew [cpShape*,cpBody*,cpFloat,cpVect])
+
+(bind-lib libchipmunk cpBodyNew [cpBody*,cpFloat,cpFloat])
+(bind-lib libchipmunk cpBodySetPosition [void,cpBody*,cpVect])
+(bind-lib libchipmunk cpBodyGetPosition [cpVect,cpBody*])
+(bind-lib libchipmunk cpBodyGetVelocity [cpVect,cpBody*])
+
+(bind-lib libchipmunk cpShapeSetFriction [void,cpShape*,cpFloat])
+
+(bind-func test
+  (lambda ()
+    (let (
+        (space (cpSpaceNew))
+        (ground (cpSegmentShapeNew (cpSpaceGetStaticBody space) (cpVect_val -20.0 5.0) (cpVect_val 20.0 -5.0) 0.0))
+        (mass 1.0)
+        (radius 5.0)
+        (moment (cpMomentForCircle mass 0.0 radius (cpVect_val 0.0 0.0)))
+        (ballBody (cpSpaceAddBody space (cpBodyNew mass moment)))
+        (ballShape (cpSpaceAddShape space (cpCircleShapeNew ballBody radius (cpVect_val 0.0 0.0))))
+        (timeStep (/ 1.0 60.0)))
+      (cpSpaceSetGravity space (cpVect_val 0.0 -100.0))
+      (cpShapeSetFriction ground 1.0)
+      (cpSpaceAddShape space ground)
+      (cpBodySetPosition ballBody (cpVect_val 0.0 15.0))
+      (cpShapeSetFriction ballShape 0.7)
+      (let ((i:i64 0))
+        (dotimes (i 120)
+          (let (
+              (pos (cpBodyGetPosition ballBody))
+              (vel (cpBodyGetVelocity ballBody)))
+            (printf "Tick: %3d pos: " i)
+            (print pos)
+            (printf " vel: ")
+            (println vel)
+            (cpSpaceStep space timeStep)))))))
+
+(test)
