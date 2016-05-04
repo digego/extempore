@@ -14,6 +14,9 @@ elseif(WIN32)
   set(CTEST_BASE_DIRECTORY "$ENV{TEMP}/extempore-ctest")
 endif()
 
+set(CTEST_SOURCE_DIRECTORY "${CTEST_BASE_DIRECTORY}/source")
+set(CTEST_BINARY_DIRECTORY "${CTEST_BASE_DIRECTORY}/build")
+
 if(NOT EXISTS "${CTEST_BASE_DIRECTORY}/source")
   set(CTEST_CHECKOUT_COMMAND "${CTEST_GIT_COMMAND} clone https://github.com/digego/extempore.git source")
 endif()
@@ -26,19 +29,14 @@ elseif(WIN32)
   set(CTEST_CMAKE_GENERATOR "Visual Studio 14 2015 Win64")
 endif()
 
-ctest_start(Continuous "${CTEST_BASE_DIRECTORY}/source" "${CTEST_BASE_DIRECTORY}/build")
+ctest_start(Continuous)
 
-ctest_update(SOURCE "${CTEST_BASE_DIRECTORY}/source")
+ctest_update()
 
-ctest_configure(
-  BUILD "${CTEST_BASE_DIRECTORY}/build"
-  SOURCE "${CTEST_BASE_DIRECTORY}/source"
-  OPTIONS "-DBUILD_TESTS=ON")
+ctest_configure()
 
-ctest_build(
-  BUILD "${CTEST_BASE_DIRECTORY}/build"
-  CONFIGURATION Release)
+ctest_build(CONFIGURATION Release)
 
-ctest_test(BUILD "${CTEST_BASE_DIRECTORY}/build")
+ctest_test()
 
 ctest_submit()
