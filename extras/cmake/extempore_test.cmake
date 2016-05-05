@@ -35,7 +35,7 @@ ctest_update()
 
 ctest_configure()
 
-ctest_build(CONFIGURATION Release)
+ctest_build(CONFIGURATION Release TARGET aot_extended)
 
 ctest_test()
 
