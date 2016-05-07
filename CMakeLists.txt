@@ -601,7 +601,7 @@ else(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
-    add_dependencies(${targetname} extempore)
+    add_dependencies(${targetname} extempore extended_deps)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
