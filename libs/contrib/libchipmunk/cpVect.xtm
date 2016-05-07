@@ -1,0 +1,153 @@
+;; cpVect
+(bind-type cpVect <cpFloat,cpFloat> (printer? . #f))
+
+(bind-func print
+   (lambda (a:cpVect)
+     (printf "<cpVect: x=%.3lf, y=%.3lf>"
+       (tref a 0)
+       (tref a 1))
+     void))
+
+(llvm:optimize #t)
+
+(bind-func cpveql
+  (lambda (v1:cpVect v2:cpVect)
+    (convert (and (= (tref v1 0) (tref v2 0)) (= (tref v1 1) (tref v2 1))) cpBool)))
+
+(bind-func cpvadd
+  (lambda (v1:cpVect v2:cpVect)
+    (cpVect_val (+ (tref v1 0) (tref v2 0)) (+ (tref v1 1) (tref v2 1)))))
+
+(bind-func cpvsub
+  (lambda (v1:cpVect v2:cpVect)
+    (cpVect_val (- (tref v1 0) (tref v2 0)) (- (tref v1 1) (tref v2 1)))))
+
+(bind-func cpvneg
+  (lambda (v:cpVect)
+    (cpvsub (cpVect_val 0. 0.) v)))
+
+(bind-func cpvmult
+  (lambda (v1:cpVect s:cpFloat)
+    (cpVect_val (* (tref v1 0) s) (* (tref v1 1) s))))
+
+(bind-func cpvdot
+  (lambda (v1:cpVect v2:cpVect)
+    (+ (* (tref v1 0) (tref v2 0)) (* (tref v1 1) (tref v2 1)))))
+
+(bind-func cpvcross
+  (lambda (v1:cpVect v2:cpVect)
+    (- (* (tref v1 0) (tref v2 1)) (* (tref v1 1) (tref v2 0)))))
+
+(bind-func cpverp
+  (lambda (v:cpVect)
+    (cpVect_val (- 0. (tref v 1)) (tref v 0))))
+
+(bind-func cpvrerp
+  (lambda (v:cpVect)
+    (cpVect_val (tref v 1) (- 0. (tref v 0)))))
+
+(bind-func cpvproject
+  (lambda (v1:cpVect v2:cpVect)
+    (cpvmult v2 (/ (cpvdot v1 v2) (cpvdot v2 v2)))))
+
+(bind-func cpvrotate
+  (lambda (v1:cpVect v2:cpVect)
+    (cpVect_val
+      (- (* (tref v1 0) (tref v2 0)) (* (tref v1 1) (tref v2 1)))
+      (+ (* (tref v1 0) (tref v2 1)) (* (tref v1 1) (tref v2 0))))))
+
+(bind-func cpvlength
+  (lambda (v:cpVect)
+    (sqrt (cpvdot v v))))
+
+(bind-func cpvlengthsq
+  (lambda (v:cpVect)
+    (cpvdot v v)))
+
+(bind-func cpvlerp
+  (lambda (v1:cpVect v2:cpVect t:cpFloat)
+    (cpvadd (cpvmult v1 (- 1.0 t)) (cpvmult v2 t))))
+
+(bind-func cpvnormalize
+  (lambda (v:cpVect)
+    (cpvmult v (/ 1.0 (+ (cpvlength v) CPFLOAT_MIN)))))
+
+(bind-func cpvclamp
+  (lambda (v:cpVect len:cpFloat)
+    (if (> (cpvdot v v) (* len len))
+      (cpvmult (cpvnormalize v) len)
+      v)))
+
+(bind-func cpvlerpconst
+  (lambda (v1:cpVect v2:cpVect d:cpFloat)
+    (cpvadd v1 (cpvclamp (cpvsub v2 v1) d))))
+
+(bind-func cpvslerp
+  (lambda (v1:cpVect v2:cpVect t:cpFloat)
+    (let (
+        (dot (cpvdot (cpvnormalize v1) (cpvnormalize v2)))
+        (omega (acos (clamp dot -1. 1.))))
+      (if (< omega 0.001)
+        (cpvlerp v1 v2 t)
+        (let ((denom (/ 1.0 (sin omega))))
+          (cpvadd
+            (cpvmult v1 (* (sin (* (- 1.0 t) omega)) denom))
+            (cpvmult v2 (* (sin (* t omega)) denom))))))))
+
+(bind-func cpvslerpconst
+  (lambda (v1:cpVect v2:cpVect a:cpFloat)
+    (let (
+        (dot (cpvdot (cpvnormalize v1) (cpvnormalize v2)))
+        (omega (acos (clamp dot -1. 1.))))
+      (cpvslerp v1 v2 (/ (min a omega) omega)))))
+
+(bind-func cpvdist
+  (lambda (v1:cpVect v2:cpVect)
+    (cpvlength (cpvsub v1 v2))))
+
+(bind-func cpvdistsq
+  (lambda (v1:cpVect v2:cpVect)
+    (cpvlengthsq (cpvsub v1 v2))))
+
+(bind-func cpvnear
+  (lambda (v1:cpVect v2:cpVect dist:cpFloat)
+    (convert (< (cpvdistsq v1 v2) (* dist dist)) cpBool)))
+
+(bind-func cpvforangle
+  (lambda (a:cpFloat)
+    (cpVect_val (cos a) (sin a))))
+
+(bind-func cpvtoangle
+  (lambda (v1:cpVect)
+    (atan2 (tref v1 1) (tref v1 0))))
+
+;; (bind-func test
+;;   (lambda ()
+;;     (let ((v1 (cpVect_val 5.2 3.1)) (v2 (cpVect_val 1.0 2.0)))
+;;       (println (cpveql v1 v2))
+;;       (println (cpvadd v1 v2))
+;;       (println (cpvsub v1 v2))
+;;       (println (cpvneg v1))
+;;       (println (cpvmult v1 5.))
+;;       (println (cpvdot v1 v2))
+;;       (println (cpvcross v1 v2))
+;;       (println (cpverp v1))
+;;       (println (cpvrerp v1))
+;;       (println (cpvproject v1 v2))
+;;       (println (cpvrotate v1 v2))
+;;       (println (cpvlength v1))
+;;       (println (cpvlengthsq v1))
+;;       (println (cpvlerp v1 v2 0.75))
+;;       (println (cpvlerpconst v1 v2 1.))
+;;       (println (cpvslerp v1 v2 0.75))
+;;       (println (cpvslerpconst v1 v2 0.25))
+;;       (println (cpvnormalize v1))
+;;       (println (cpvclamp v1 2.))
+;;       (println (cpvdist v1 v2))
+;;       (println (cpvdistsq v1 v2))
+;;       (println (cpvnear v1 v2 5.0))
+;;       (println (cpvforangle (/ PI 4.)))
+;;       (println (cpvtoangle v1))
+;;     )))
+
+;; (test)

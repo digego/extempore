@@ -10,16 +10,11 @@
 
 (bind-alias cpBool i8)
 (bind-alias cpFloat double)
-(bind-type cpVect <cpFloat,cpFloat> (printer? . #f))
+(bind-val CPFLOAT_MIN cpFloat 2.2250738585072014e-308)
 
-(bind-func print
-   (lambda (a:cpVect)
-     (printf "<cpVect: x=%.3lf, y=%.3lf>"
-       (tref a 0)
-       (tref a 1))
-     void))
+(sys:load "libs/contrib/libchipmunk/cpVect.xtm")
+(sys:load "libs/contrib/libchipmunk/cpBB.xtm")
 
-(bind-alias cpBB |4,cpFloat|)
 (bind-alias cpGroup i64)
 (bind-alias cpBitmask i32)
 (bind-alias cpTransform |6,cpFloat|)
@@ -31,6 +26,39 @@
 (bind-alias cpArbiter i8)
 
 (bind-alias cpDataPointer i8*)
+
+;; cpTransform
+
+(bind-func cpTransformNew
+  (lambda (a:cpFloat b:cpFloat c:cpFloat d:cpFloat tx:cpFloat ty:cpFloat)
+    (let ((transform:cpTransform* (alloc)))
+      (afill! transform a b c d tx ty)
+      (pref transform 0))))
+(bind-func cpTransferNewTranspose
+  (lambda (a:cpFloat c:cpFloat tx:cpFloat b:cpFloat d:cpFloat ty:cpFloat)
+    (cpTransformNew a b c d tx ty)))
+(bind-func cpTransformInverse
+  (lambda (transform:cpTransform)
+    (let (
+        (inv_det
+          (/ 1.0
+            (-
+              (* (aref transform 0) (aref transform 3))
+              (* (aref transform 2) (aref transform 1)))))
+        (new:cpTransform* (alloc)))
+      (afill! new
+        (* inv_det (aref transform 3))
+        (* (- 0.0 inv_det) (aref transform 2))
+        (* inv_det
+          (-
+            (* (aref transform 2) (aref transform 5))
+            (* (aref transform 4) (aref transform 3))))
+        (* (- 0.0 inv_det) (aref transform 1)
+        (* inv_det (aref transform 0))
+                (* inv_det
+          (-
+            (* (aref transform 4) (aref transform 1))
+            (* (aref transform 0) (aref transform 5)))))))))
 
 ;; cpBody
 
@@ -99,6 +127,7 @@
 ;; cpShape
 
 (bind-alias cpPointQueryInfo <cpShape*,cpVect,cpFloat,cpVect>)
+(bind-alias cpSegmentQueryInfo <cpShape*,cpVect,cpVect,cpFloat>)
 (bind-type cpShapeFilter <cpGroup,cpBitmask,cpBitmask> (printer? . #f))
 
 (bind-func print
@@ -115,13 +144,57 @@
       (tfill! filter group categories mask)
       (pref filter 0))))
 
+(bind-alias cpContactPointSet <i32,cpVect,|2,<cpVect,cpVect,cpFloat>|>)
+(bind-alias cpCollisionType i8*)
+(bind-alias cpCircleShape <cpShape,cpVect,cpVect,cpFloat>)
+(bind-alias cpSegmentShape <cpShape,cpVect,cpVect,cpVect,cpVect,cpVect,cpVect,cpFloat,cpVect,cpVect>)
+
 (bind-lib libchipmunk cpShapeDestroy [void,cpShape*])
 (bind-lib libchipmunk cpShapeFree [void,cpShape*])
 (bind-lib libchipmunk cpShapeCacheBB [cpBB,cpShape*])
 (bind-lib libchipmunk cpShapeUpdate [cpBB,cpShape*,cpTransform])
 (bind-lib libchipmunk cpShapePointQuery [cpFloat,cpShape*,cpVect,cpPointQueryInfo*])
+(bind-lib libchipmunk cpShapeSegmentQuery [cpBool,cpShape*,cpVect,cpVect,cpFloat,cpSegmentQueryInfo*])
+(bind-lib libchipmunk cpShapesCollide [cpContactPointSet,cpShape*,cpShape*])
+(bind-lib libchipmunk cpShapeGetSpace [cpSpace*,cpShape*])
+(bind-lib libchipmunk cpShapeGetBody [cpBody*,cpShape*])
+(bind-lib libchipmunk cpShapeSetBody [void,cpShape*,cpBody*])
+(bind-lib libchipmunk cpShapeGetMass [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeSetMass [void,cpShape*,cpFloat])
+(bind-lib libchipmunk cpShapeGetDensity [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeSetDensity [void,cpShape*,cpFloat])
+(bind-lib libchipmunk cpShapeGetMoment [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeGetArea [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeGetCenterOfGravity [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeGetBB [cpBB,cpShape*])
+(bind-lib libchipmunk cpShapeGetSensor [cpBool,cpShape*])
+(bind-lib libchipmunk cpShapeSetSensor [void,cpShape*,cpBool])
+(bind-lib libchipmunk cpShapeGetElasticity [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeSetElasticity [void,cpShape*,cpFloat])
+(bind-lib libchipmunk cpShapeGetFriction [cpFloat,cpShape*])
+(bind-lib libchipmunk cpShapeSetFriction [void,cpShape*,cpFloat])
+(bind-lib libchipmunk cpShapeGetSurfaceVelocity [cpVect,cpShape*])
+(bind-lib libchipmunk cpShapeSetSurfaceVelocity [void,cpShape*,cpVect])
+(bind-lib libchipmunk cpShapeGetUserData [cpDataPointer,cpShape*])
+(bind-lib libchipmunk cpShapeSetUserData [void,cpShape*,cpDataPointer])
+(bind-lib libchipmunk cpShapeGetCollisionType [cpCollisionType,cpShape*])
+(bind-lib libchipmunk cpShapeSetCollisionType [void,cpShape*,cpCollisionType])
+(bind-lib libchipmunk cpShapeGetFilter [cpShapeFilter,cpShape*])
+(bind-lib libchipmunk cpShapeSetFilter [void,cpShape*,cpShapeFilter])
+(bind-lib libchipmunk cpCircleShapeAlloc [cpCircleShape*])
+(bind-lib libchipmunk cpCircleShapeInit [cpCircleShape*,cpCircleShape*,cpBody*,cpFloat,cpVect])
+(bind-lib libchipmunk cpCircleShapeNew [cpShape*,cpBody*,cpFloat,cpVect])
+(bind-lib libchipmunk cpCircleShapeGetOffset [cpVect,cpShape*])
+(bind-lib libchipmunk cpCircleShapeGetRadius [cpFloat,cpShape*])
+(bind-lib libchipmunk cpSegmentShapeAlloc [cpSegmentShape*])
+(bind-lib libchipmunk cpSegmentShapeInit [cpSegmentShape*,cpSegmentShape*,cpBody*,cpVect,cpVect,cpFloat])
+(bind-lib libchipmunk cpSegmentShapeNew [cpShape*,cpBody*,cpVect,cpVect,cpFloat])
+(bind-lib libchipmunk cpSegmentShapeSetNeighbors [void,cpShape*,cpVect,cpVect])
+(bind-lib libchipmunk cpSegmentShapeGetA [cpVect,cpShape*])
+(bind-lib libchipmunk cpSegmentShapeGetB [cpVect,cpShape*])
+(bind-lib libchipmunk cpSegmentShapeGetNormal [cpVect,cpShape*])
+(bind-lib libchipmunk cpSegmentShapeGetRadius [cpFloat,cpShape*])
 
-;; Utility
 
 (bind-lib libchipmunk cpMomentForCircle [cpFloat,cpFloat,cpFloat,cpFloat,cpVect])
 (bind-lib libchipmunk cpAreaForCircle [cpFloat,cpFloat,cpFloat])
@@ -140,11 +213,6 @@
 (bind-lib libchipmunk cpSpaceAddShape [cpSpace*,cpSpace*,cpShape*])
 (bind-lib libchipmunk cpSpaceAddBody [cpBody*,cpSpace*,cpBody*])
 (bind-lib libchipmunk cpSpaceStep [void,cpSpace*,cpFloat])
-
-(bind-lib libchipmunk cpSegmentShapeNew [cpShape*,cpBody*,cpVect,cpVect,cpFloat])
-(bind-lib libchipmunk cpCircleShapeNew [cpShape*,cpBody*,cpFloat,cpVect])
-
-(bind-lib libchipmunk cpShapeSetFriction [void,cpShape*,cpFloat])
 
 (bind-func test
   (lambda ()
