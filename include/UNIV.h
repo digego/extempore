@@ -158,8 +158,7 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 
 extern "C" inline double getRealTime()
 {
-    return double(std::chrono::high_resolution_clock::now().time_since_epoch().count()) *
-            std::chrono::system_clock::period::num / std::chrono::system_clock::period::den;
+    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) / D_BILLION;
 }
 
 #elif __linux__
