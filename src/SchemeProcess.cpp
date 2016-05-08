@@ -57,7 +57,7 @@ static void usleep(LONGLONG Us)
 		return;
 	}
 	LARGE_INTEGER li;
-	li.QuadPart = -Us * 1000;
+	li.QuadPart = -Us * 10;
 	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
 		CloseHandle(timer);
 		return;

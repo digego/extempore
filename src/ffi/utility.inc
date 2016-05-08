@@ -1,6 +1,6 @@
 static pointer asciiColor(scheme* Scheme, pointer Args)
 {
-    ascii_text_color(ivalue(pair_car(Args)),ivalue(pair_cadr(Args)),ivalue(pair_caddr(Args)));
+    ascii_text_color(bool(ivalue(pair_car(Args))), ivalue(pair_cadr(Args)), ivalue(pair_caddr(Args)));
     return Scheme->T;
 }
 

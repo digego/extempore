@@ -87,6 +87,7 @@ public:
         }
         return m_queue.top().second;
     }
+    size_t size() { return m_queue.size(); }
 };
 
 } //End Namespace

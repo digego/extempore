@@ -181,7 +181,7 @@ static void nanosleep(LONGLONG* Ns, void*)
 		return;
 	}
 	LARGE_INTEGER li;
-	li.QuadPart = -*Ns;
+	li.QuadPart = -*Ns / 100;
 	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
 		CloseHandle(timer);
 		return;
