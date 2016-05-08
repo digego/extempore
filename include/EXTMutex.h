@@ -120,7 +120,7 @@ inline void EXTMutex::unlock()
 
 inline bool EXTMutex::try_lock()
 {
-    return m_mutex->try_lock();
+    return m_mutex.try_lock();
 }
 
 #else // begin POSIX

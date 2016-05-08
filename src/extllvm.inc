@@ -320,7 +320,7 @@ EXPORT void* thread_self()
 EXPORT int64_t thread_sleep(int64_t Secs, int64_t Nanosecs)
 {
 #ifdef _WIN32
-    std::this_thread::sleep_for(std::chrono::seconds(secs) + std::chrono::nanoseconds(nanosecs));
+    std::this_thread::sleep_for(std::chrono::seconds(Secs) + std::chrono::nanoseconds(Nanosecs));
     return 0;
 #else
     timespec a = { Secs, Nanosecs };
