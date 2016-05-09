@@ -690,8 +690,7 @@ llvm::legacy::PassManager* PM_NO;
 llvm::Module* M = nullptr; // TODO: obsolete?
 std::vector<llvm::Module*> Ms;
 int64_t LLVM_COUNT = 0l;
-bool OPTIMIZE_COMPILES = false;
-bool BACKGROUND_COMPILES = false;
+bool OPTIMIZE_COMPILES = true;
 bool VERIFY_COMPILES = true;
 
 static llvm::SectionMemoryManager* MM = nullptr;

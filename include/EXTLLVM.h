@@ -290,7 +290,6 @@ extern llvm::Module* M;
 extern int64_t LLVM_COUNT;
 extern bool OPTIMIZE_COMPILES;
 extern bool VERIFY_COMPILES;
-extern bool BACKGROUND_COMPILES;
 extern llvm::legacy::PassManager* PM;
 extern llvm::legacy::PassManager* PM_NO;
 extern std::vector<llvm::Module*> Ms;
