@@ -1,0 +1,168 @@
+(bind-type cpTransform <cpFloat,cpFloat,cpFloat,cpFloat,cpFloat,cpFloat>)
+
+(bind-func print
+   (lambda (a:cpTransform)
+     (printf "<cpVect: a=%.3lf, b=%.3lf, c=%.3lf, d=%.3lf, tx=%.3lf, ty=%.3lf>"
+       (tref a 0)
+       (tref a 1)
+       (tref a 2)
+       (tref a 3)
+       (tref a 4)
+       (tref a 5))
+     void))
+
+(bind-func cpTransformNew
+  (lambda (a:cpFloat b:cpFloat c:cpFloat d:cpFloat tx:cpFloat ty:cpFloat)
+    (cpTransform_val a b c d tx ty)))
+
+(bind-func cpTransformNewTranspose
+  (lambda (a:cpFloat c:cpFloat tx:cpFloat b:cpFloat d:cpFloat ty:cpFloat)
+    (cpTransformNew a b c d tx ty)))
+
+(bind-func cpTransformInverse
+  (lambda (transform:cpTransform)
+    (let (
+        (inv_det
+          (/ 1.0
+            (-
+              (* (tref transform 0) (tref transform 3))
+              (* (tref transform 2) (tref transform 1))))))
+      (cpTransformNewTranspose
+        (* inv_det (tref transform 3))
+        (* (- 0.0 inv_det) (tref transform 2))
+        (* inv_det
+          (-
+            (* (tref transform 2) (tref transform 5))
+            (* (tref transform 4) (tref transform 3))))
+        (* (- 0.0 inv_det) (tref transform 1))
+        (* inv_det (tref transform 0))
+        (* inv_det
+          (-
+            (* (tref transform 4) (tref transform 1))
+            (* (tref transform 0) (tref transform 5))))))))
+
+(bind-func cpTransformMult
+  (lambda (t1:cpTransform t2:cpTransform)
+    (cpTransformNewTranspose
+      (+ (* (tref t1 0) (tref t2 0)) (* (tref t1 2) (tref t2 1)))
+      (+ (* (tref t1 0) (tref t2 2)) (* (tref t1 2) (tref t2 3)))
+      (+ (* (tref t1 0) (tref t2 4)) (* (tref t1 2) (tref t2 5)) (tref t1 4))
+      (+ (* (tref t1 1) (tref t2 0)) (* (tref t1 3) (tref t2 1)))
+      (+ (* (tref t1 1) (tref t2 2)) (* (tref t1 3) (tref t2 3)))
+      (+ (* (tref t1 1) (tref t2 4)) (* (tref t1 3) (tref t2 5)) (tref t1 5)))))
+
+(bind-func cpTransformPoint
+  (lambda (t:cpTransform v:cpVect)
+    (cpVect_val
+      (+ (* (tref t 0) (tref v 0)) (* (tref t 2) (tref v 1)) (tref t 4))
+      (+ (* (tref t 1) (tref v 0)) (* (tref t 3) (tref v 1)) (tref t 5)))))
+
+(bind-func cpTransformVect
+  (lambda (t:cpTransform v:cpVect)
+    (cpVect_val
+      (+ (* (tref t 0) (tref v 0)) (* (tref t 2) (tref v 1)))
+      (+ (* (tref t 1) (tref v 0)) (* (tref t 3) (tref v 1))))))
+
+(bind-func cpTransformBB
+  (lambda (t:cpTransform bb:cpBB)
+    (let (
+        (center (cpBBCenter bb))
+        (hw (* 0.5 (- (tref bb 2) (tref bb 0))))
+        (hh (* 0.5 (- (tref bb 3) (tref bb 1))))
+        (a (* (tref t 0) hw))
+        (b (* (tref t 2) hh))
+        (d (* (tref t 1) hw))
+        (e (* (tref t 3) hh))
+        (hw_max (max (fabs (+ a b)) (fabs (- a b))))
+        (hh_max (max (fabs (+ d e)) (fabs (- d e)))))
+      (cpBBNewForExtents (cpTransformPoint t center) hw_max hh_max))))
+
+(bind-func cpTransformTranslate
+  (lambda (translate:cpVect)
+    (cpTransformNewTranspose 1. 0. (tref translate 0) 0. 1. (tref translate 1))))
+
+(bind-func cpTransformScale
+  (lambda (scaleX:cpFloat scaleY:cpFloat)
+    (cpTransformNewTranspose scaleX 0. 0. 0. scaleY 0.)))
+
+(bind-func cpTransformRotate
+  (lambda (radians:cpFloat)
+    (let ((rot (cpvforangle radians)))
+      (cpTransformNewTranspose (tref rot 0) (- 0.0 (tref rot 1)) 0. (tref rot 1) (tref rot 0) 0.))))
+
+(bind-func cpTransformRigid
+  (lambda (translate:cpVect radians:cpFloat)
+    (let ((rot (cpvforangle radians)))
+      (cpTransformNewTranspose
+        (tref rot 0) (- 0.0 (tref rot 1)) (tref translate 0)
+        (tref rot 1) (tref rot 0) (tref translate 1)))))
+
+(bind-func cpTransformRigidInverse
+  (lambda (t:cpTransform)
+    (cpTransformNewTranspose
+      (tref t 3) (- 0. (tref t 2)) (- (* (tref t 2) (tref t 5)) (* (tref t 4) (tref t 3)))
+      (- 0. (tref t 1)) (tref t 0) (- (* (tref t 4) (tref t 1)) (* (tref t 0) (tref t 5))))))
+
+(bind-func cpTransformWrap
+  (lambda (outer:cpTransform inner:cpTransform)
+    (cpTransformMult (cpTransformInverse outer) (cpTransformMult inner outer))))
+
+(bind-func cpTransformWrapInverse
+  (lambda (outer:cpTransform inner:cpTransform)
+    (cpTransformMult outer (cpTransformMult inner (cpTransformInverse outer)))))
+
+(bind-func cpTransformOrtho
+  (lambda (bb:cpBB)
+    (cpTransformNewTranspose
+      (/ 2.0 (- (tref bb 2) (tref bb 0)))
+      0.
+      (/ (- 0.0 (+ (tref bb 0) (tref bb 2))) (- (tref bb 2) (tref bb 0)))
+      0.
+      (/ 2.0 (- (tref bb 3) (tref bb 1)))
+      (/ (- 0.0 (+ (tref bb 1) (tref bb 3))) (- (tref bb 3) (tref bb 1))))))
+
+(bind-func cpTransformBoneScale
+  (lambda (v0:cpVect v1:cpVect)
+    (let ((d (cpvsub v1 v0)))
+      (cpTransformNewTranspose
+        (tref d 0) (- 0.0 (tref d 1)) (tref v0 0)
+        (tref d 1) (tref d 0) (tref v0 1)))))
+
+(bind-func cpTransformAxialScale
+  (lambda (axis:cpVect pivot:cpVect scale:cpFloat)
+    (let (
+        (A (* (tref axis 0) (tref axis 1) (- scale 1.)))
+        (B (* (cpvdot axis pivot) (- 1.0 scale))))
+      (cpTransformNewTranspose
+        (+ (* scale (tref axis 0) (tref axis 0)) (* (tref axis 1) (tref axis 1)))
+        A
+        (* (tref axis 0) B)
+        A
+        (+ (* (tref axis 0) (tref axis 0)) (* scale (tref axis 1) (tref axis 1)))
+        (* (tref axis 1) B)))))
+
+;; (bind-func test
+;;   (lambda ()
+;;     (let ((t1 (cpTransform_val 1. 0.25 .3 1. -1. 2.)) (t2 (cpTransform_val 0.5 3. 0. 1. .2 0.)))
+;;       (println (cpTransformNew 1. 2. 3. 4. 5. 6.))
+;;       (println (cpTransformNewTranspose 1. 2. 3. 4. 5. 6.))
+;;       (println (cpTransformInverse (cpTransformInverse t1)))
+;;       (println (cpTransformMult t1 t1))
+;;       (println (cpTransformPoint t1 (cpVect_val 1. 1.)))
+;;       (println (cpTransformVect t1 (cpVect_val 1. 1.)))
+;;       (println (cpTransformBB t1 (cpBB_val 1. 0. 2. 3.)))
+;;       (println (cpTransformTranslate (cpVect_val 10. 10.)))
+;;       (println (cpTransformScale 4. 0.5))
+;;       (println (cpTransformRotate (/ PI 4.0)))
+;;       (println (cpTransformRigid (cpVect_val 5. 3.) (/ PI 4.0)))
+;;       (println (cpTransformRigidInverse (cpTransformRigid (cpVect_val 5. 3.) (/ PI 4.0))))
+;;       (println (cpTransformMult (cpTransformRigid (cpVect_val 5. 3.) (/ PI 4.0))
+;;           (cpTransformRigidInverse (cpTransformRigid (cpVect_val 5. 3.) (/ PI 4.0)))))
+;;       (println (cpTransformWrap t1 t2))
+;;       (println (cpTransformWrapInverse t1 t2))
+;;       (println (cpTransformOrtho (cpBB_val 1. 0. 2. 3.)))
+;;       (println (cpTransformBoneScale (cpVect_val 1. 2.) (cpVect_val 3. 4.)))
+;;       (println (cpTransformAxialScale (cpVect_val 1. 0.) (cpVect_val 5. 5.) 3.))
+;;     )))
+
+;; (test)
