@@ -82,11 +82,14 @@
 
 ;; draw all the things
 
+(bind-func position_update
+  (lambda ()
+    (move_particles num_particles .01)))
+
 (bind-func gl_draw_particles
   (lambda ()
     (glClear GL_COLOR_BUFFER_BIT)
     ;; move particles, update VBO
-    (move_particles num_particles .01)    
     (VBO_update_data particles_vbo)
     ;; draw the world
     (let ((texloc (glGetUniformLocation sp "particles_tex")))
@@ -98,12 +101,11 @@
 
 (define gl-loop
   (lambda (time delta-t)
-    (let ((late-by (- (now) time))
-          (next-frame-time (+ time (* *second* delta-t))))
-      (if (> late-by 0)
-          (print "Late by " (* 1.0 (/ late-by *second*)) "seconds\n")
-          (gl_draw_particles))
-      (callback (* 0.9 next-frame-time)
+    (let ((next-frame-time (+ time (* *second* delta-t))))
+      (position_update)
+      (if (not (> (now) next-frame-time))
+        (gl_draw_particles))
+      (callback next-frame-time
                 'gl-loop
                 next-frame-time
                 delta-t))))
