@@ -75,60 +75,67 @@
 
 (bind-func vsum
   (lambda (buf:i32* len:i64)
-    (if (= (& len 3) 0) ;; i.e. mod 4
-        (let ((vbuf:/4,i32/* (cast buf))
-              (tot:/4,i32/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (+ (vref tot 0) (vref tot 1) (vref tot 2) (vref tot 3)))
-        (let ((tot 0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          tot))))
+    (let ((tot:i32 0) (i 0))
+      (if (> len 3)
+        (let ((chunks (/ len 4)) (vbuf:/4,i32/* (cast buf)) (vtot:/4,i32/* (salloc)))
+          (vfill! vtot 0 0 0 0)
+          (let ((totref (pref vtot 0)))
+            (dotimes (i chunks)
+              (set! totref (+ totref (pref-ptr vbuf i))))
+            (set! tot (+ (vref totref 0) (vref totref 1) (vref totref 2) (vref totref 3))))
+          (set! len (& len 3))
+          (set! buf (pref-ptr buf (* i 4)))))
+      (dotimes (i len)
+        (set! tot (+ tot (pref buf i))))
+      tot)))
 
 (bind-func vsum
   (lambda (buf:i64* len:i64)
-    (if (= (& len 1) 0) ;; i.e. mod 2
-        (let ((vbuf:/2,i64/* (cast buf))
-              (tot:/2,i64/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 2))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (+ (vref tot 0) (vref tot 1)))
-        (let ((tot 0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          tot))))
+    (let ((tot 0) (i 0))
+      (if (> len 1)
+        (let ((chunks (/ len 2)) (vbuf:/2,i64/* (cast buf)) (vtot:/2,i64/* (salloc)))
+          (vfill! vtot 0 0)
+          (let ((totref (pref vtot 0)))
+            (dotimes (i chunks)
+                (set! totref (+ totref (pref-ptr vbuf i))))
+            (set! tot (+ (vref totref 0) (vref totref 1))))
+        (set! len (& len 1))
+        (set! buf (pref-ptr buf (* i 2)))))
+      (dotimes (i len)
+        (set! tot (+ tot (pref buf i))))
+      tot)))
 
 (bind-func vsum
   (lambda (buf:float* len:i64)
-    (if (= (& len 3) 0) ;; i.e. mod 4
-        (let ((vbuf:/4,float/* (cast buf))
-              (tot:/4,float/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (+ (vref tot 0) (vref tot 1) (vref tot 2) (vref tot 3)))
-        (let ((tot 0.0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          tot))))
+    (let ((tot:float 0.) (i 0))
+      (if (> len 3)
+        (let ((chunks (/ len 4)) (vbuf:/4,float/* (cast buf)) (vtot:/4,float/* (salloc)))
+          (vfill! vtot 0. 0. 0. 0.)
+          (let ((totref (pref vtot 0)))
+            (dotimes (i chunks)
+              (set! totref (+ totref (pref-ptr vbuf i))))
+            (set! tot (+ (vref totref 0) (vref totref 1) (vref totref 2) (vref totref 3))))
+          (set! len (& len 3))
+          (set! buf (pref-ptr buf (* i 4)))))
+      (dotimes (i len)
+        (set! tot (+ tot (pref buf i))))
+      tot)))
 
 (bind-func vsum
   (lambda (buf:double* len:i64)
-    (if (= (& len 1) 0) ;; i.e. mod 2
-        (let ((vbuf:/2,double/* (cast buf))
-              (tot:/2,double/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 2))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (+ (vref tot 0) (vref tot 1)))
-        (let ((tot 0.0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          tot))))
-
+    (let ((tot:double 0.) (i 0))
+      (if (> len 1)
+        (let ((chunks (/ len 2)) (vbuf:/2,double/* (cast buf)) (vtot:/2,double/* (salloc)))
+          (vfill! vtot 0. 0.)
+          (let ((totref (pref vtot 0)))
+            (dotimes (i chunks)
+                (set! totref (+ totref (pref-ptr vbuf i))))
+            (set! tot (+ (vref totref 0) (vref totref 1))))
+        (set! len (& len 1))
+        (set! buf (pref-ptr buf (* i 2)))))
+      (dotimes (i len)
+        (set! tot (+ tot (pref buf i))))
+      tot)))
 
 ;; even for ints, you probably want a floating-point answer for the
 ;; mean - these ones return doubles to minimize the chance of
@@ -136,65 +143,19 @@
 
 (bind-func vmean
   (lambda (buf:i32* len:i64)
-    (if (= (& len 3) 0) ;; i.e. mod 4
-        (let ((vbuf:/4,i32/* (cast buf))
-              (tot:/4,i32/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (/ (i32tod (+ (vref tot 0) (vref tot 1)
-                        (vref tot 2) (vref tot 3)))
-             (i64tod len)))
-        (let ((tot 0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          (/ (i32tod tot) (i64tod len))))))
+    (/ (i32tod (vsum buf len)) (convert len))))
 
 (bind-func vmean
   (lambda (buf:i64* len:i64)
-    (if (= (& len 1) 0) ;; i.e. mod 2
-        (let ((vbuf:/2,i64/* (cast buf))
-              (tot:/2,i64/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (/ (i64tod (+ (vref tot 0) (vref tot 1)))
-             (i64tod len)))
-        (let ((tot 0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          (/ (i64tod tot) (i64tod len))))))
+    (/ (i64tod (vsum buf len)) (convert len))))
 
 (bind-func vmean
   (lambda (buf:float* len:i64)
-    (if (= (& len 3) 0) ;; i.e. mod 4
-        (let ((vbuf:/4,float/* (cast buf))
-              (tot:/4,float/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (/ (+ (vref tot 0) (vref tot 1)
-                (vref tot 2) (vref tot 3))
-             (i64tof len)))
-        (let ((tot 0.0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          (/ tot (i64tof len))))))
+    (/ (vsum buf len) (convert len))))
 
 (bind-func vmean
   (lambda (buf:double* len:i64)
-    (if (= (& len 1) 0) ;; i.e. mod 2
-        (let ((vbuf:/2,double/* (cast buf))
-              (tot:/2,double/* (alloc))
-              (j 0))
-          (dotimes (j (/ len 4))
-            (pset! tot 0 (+ (pref-ptr vbuf j) tot)))
-          (/ (+ (vref tot 0) (vref tot 1))
-             (i64tod len)))
-        (let ((tot 0.0) (i 0))
-          (dotimes (i len)
-            (set! tot (+ tot (pref buf i))))
-          (/ tot (i64tod len))))))
+    (/ (vsum buf len) (convert len))))
 
 (bind-func vmin
   (lambda (buf:i32* len:i64)
@@ -1145,11 +1106,6 @@ column-major (the same as OpenGL)
               (set! largest l)
               (set! j p))))
       j)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; random numbers
-;;
 
 ;;;;;;;;;;;;;;
 ;; Rational ;;
@@ -2510,8 +2466,8 @@ column-major (the same as OpenGL)
        (* dx dx))))
 
 (bind-func integrate
-  "integrate using Simpsons rule - N must be odd"  
-  (lambda (f:[double,double]* xmin xmax N) 
+  "integrate using Simpsons rule - N must be odd"
+  (lambda (f:[double,double]* xmin xmax N)
     (let ((sumeven:double 0.0)
           (sumodd:double 0.0)
           (x 0.0) (n 0)
@@ -2531,7 +2487,7 @@ column-major (the same as OpenGL)
          (/ interval 3.0)))))
 
 (bind-func integrate
-  "integrate using Simpsons rule - N must be odd"  
+  "integrate using Simpsons rule - N must be odd"
   (lambda (f:[double,double]* xmin xmax)
     (integrate:[double,[double,double]*,double,double,i64]* f xmin xmax 501)))
 
