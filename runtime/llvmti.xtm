@@ -10068,6 +10068,8 @@ xtlang's `let' syntax is the same as Scheme"
          (constructor? (if (assoc-strcmp 'constructor? extras)
                            (cdr (assoc-strcmp 'constructor? extras))
                            #t)))
+    (if (not (char=? (string-ref (symbol->string type_1) (- (string-length (symbol->string type_1)) 1)) #\>))
+        (impc:compiler:print-bad-type-error type_1 "is a malformed tuple type"))
     (if (impc:ti:bang-type? type) ;; send generic named types to aot
         (impc:aot:insert-generic-type `(bind-type ,@args)))
     (if (<> (impc:ir:get-ptr-depth type) 0)
