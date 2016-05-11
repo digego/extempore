@@ -219,7 +219,6 @@ void* SchemeProcess::taskImpl()
 {
     sm_current = this;
     OSC::schemeInit(this);
-    std::stringstream ss;
 #ifdef _WIN32
     Sleep(1000);
 #else
@@ -288,6 +287,7 @@ void* SchemeProcess::taskImpl()
                     auto returnSocket(atoi(task.getLabel().c_str()));
                     auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                     if (evalString->length() > 1) {
+                        std::stringstream ss;
                         bool write_reply = evalString->compare(0, 4, "(ipc");
                         if ((*evalString)[evalString->length() - 1] == TERMINATION_CHAR) {
                             evalString->erase(--evalString->end());
@@ -298,7 +298,6 @@ void* SchemeProcess::taskImpl()
                         if (unlikely(m_scheme->retcode)) { //scheme error
                             resetOutportString();
                         } else {
-                            UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
                             if (m_banner) {
                                 auto time(UNIV::TIME);
                                 unsigned hours(time / UNIV::HOUR());
@@ -310,6 +309,7 @@ void* SchemeProcess::taskImpl()
                                 sprintf(prompt, "\n[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
                                 ss << prompt;
                             }
+                            UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
                             if (write_reply) {
                                 auto res(ss.str());
                                 send(returnSocket, res.c_str(), res.length() + 1, 0);
@@ -333,6 +333,7 @@ void* SchemeProcess::taskImpl()
                             resetOutportString();
                         }
                     } else {
+                        std::stringstream ss;
                         UNIV::printSchemeCell(m_scheme, ss, pair);
                         std::cerr << "Bad Closure ... " << ss.str() << " Ignoring callback request " << std::endl;
                     }
@@ -353,6 +354,7 @@ void* SchemeProcess::taskImpl()
                             resetOutportString();
                         }
                     } else {
+                        std::stringstream ss;
                         extemp::UNIV::printSchemeCell(m_scheme, ss, func);
                         std::cerr << "Bad Closure From Symbol ... " << ss.str() <<
                                 " Ignoring callback request " << std::endl;
