@@ -199,8 +199,8 @@ int main(int argc, char** argv)
                     extemp::UNIV::EXT_TERM = 1;
                 } else if (!strcmp(args.OptionArg(), "basic")) {
                     extemp::UNIV::EXT_TERM = 2;
-                } else if (strcmp(args.OptionArg(), "nocolor")) {
-                        extemp::UNIV::EXT_TERM = 3;
+                } else if (!strcmp(args.OptionArg(), "nocolor")) {
+                    extemp::UNIV::EXT_TERM = 3;
                 } else {
                     extemp::UNIV::EXT_TERM = 0;
                 }
