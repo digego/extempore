@@ -194,7 +194,7 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
-static std::regex sGlobalSymRegex("@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
+static std::regex sGlobalSymRegex("[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
 static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
 
 static llvm::Module* jitCompile(const std::string& String)
