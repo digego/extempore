@@ -9859,7 +9859,6 @@ xtlang's `let' syntax is the same as Scheme"
                          (string-append (symbol->string name) "*")
                          x))
                    (impc:ir:get-pretty-tuple-arg-strings type)))
-           (compiler-suppress-on (if (equal? *impc:compiler:message:level* 'low) #f #t))
            (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
            (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
            (namestr (symbol->string name))
@@ -9949,98 +9948,95 @@ xtlang's `let' syntax is the same as Scheme"
                                 a arglst2 (range (length a)))))
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
       ;;(println 'hcopy: hcopy_body)
-      (suppress-compiler-messages #t)
-      (if constructor?
-          (begin
-            (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
-                     (lambda ,argslist
-                       (let ((obj (zalloc)))
-                         ,@body
-                         obj)))
-                  (interaction-environment))))
-      (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
-               (lambda ,argslist
-                 (let ((obj (zalloc)))
-                   ,@body
-                   obj)))
-            (interaction-environment))
-      (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
-               (lambda ,argslist
-                 (let ((obj (halloc)))
-                   ,@body
-                   obj)))
-            (interaction-environment))
-      (if (and generic printer?)
-          (begin
-            (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
-                     (lambda (x)
-                       (if (null? x)
-                           (sprintout ,(string-append "<" namestr ":null"))
-                           (sprintout ,(string-append "<" namestr ":")
-                                     ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
-                                     ">"))))
-                  (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
-                     (lambda (x)
-                       (if (null? x)
-                           (printout ,(string-append "<" namestr ":null"))
-                           (printout ,(string-append "<" namestr ":")
-                                     ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
-                                     ">"))
-                       void))
-                  (interaction-environment))))
-      (if (not generic)
-          (begin
-            (if (and (not (regex:match? namestr "_poly_")) printer?)
-                (begin
-                  (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
-                           (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                             (if (null? x)
-                                 (sprintout ,(string-append "<" namestr ":null>"))
-                                 (sprintout ,(string-append "<" namestr ":")
+      (sys:with-quiet-compiler
+       (if constructor?
+           (begin
+             (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
+                      (lambda ,argslist
+                        (let ((obj (zalloc)))
+                          ,@body
+                          obj)))
+                   (interaction-environment))))
+       (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+                (lambda ,argslist
+                  (let ((obj (zalloc)))
+                    ,@body
+                    obj)))
+             (interaction-environment))
+       (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
+                (lambda ,argslist
+                  (let ((obj (halloc)))
+                    ,@body
+                    obj)))
+             (interaction-environment))
+       (if (and generic printer?)
+           (begin
+             (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+                      (lambda (x)
+                        (if (null? x)
+                            (sprintout ,(string-append "<" namestr ":null"))
+                            (sprintout ,(string-append "<" namestr ":")
+                                       ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                       ">"))))
+                   (interaction-environment))
+             (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                      (lambda (x)
+                        (if (null? x)
+                            (printout ,(string-append "<" namestr ":null"))
+                            (printout ,(string-append "<" namestr ":")
+                                      ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                      ">"))
+                        void))
+                   (interaction-environment))))
+       (if (not generic)
+           (begin
+             (if (and (not (regex:match? namestr "_poly_")) printer?)
+                 (begin
+                   (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              (if (null? x)
+                                  (sprintout ,(string-append "<" namestr ":null>"))
+                                  (sprintout ,(string-append "<" namestr ":")
+                                             ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
+                                                                           (range (length a)))))
+                                             ">"))))
+                         (interaction-environment))
+                   (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              (if (null? x)
+                                  (printout ,(string-append "<" namestr ":null>"))
+                                  (printout ,(string-append "<" namestr ":")
                                             ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
                                                                           (range (length a)))))
-                                            ">"))))
-                        (interaction-environment))
-                  (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
-                           (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                             (if (null? x)
-                                 (printout ,(string-append "<" namestr ":null>"))
-                                 (printout ,(string-append "<" namestr ":")
-                                           ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
-                                                                         (range (length a)))))
-                                           ">"))
-                             void))
-                        (interaction-environment))))
-            (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
-                     (lambda ,argslist
-                       (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
-                             (val (pref obj 0)))
-                         (free obj)
-                         val)))
-                  (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
-                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                       (let ((obj (halloc)))
-                         ,@hcopy_body
-                         obj)))
-                  (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
-                     (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                       ,@hfree_body
-                       (free x)
-                       void))
-                  (interaction-environment))
-            (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
-                     (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
-                       (let ((obj (zalloc)))
-                         ,@zcopy_body
-                         obj)))
-                  (interaction-environment))))
+                                            ">"))
+                              void))
+                         (interaction-environment))))
+             (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
+                      (lambda ,argslist
+                        (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
+                              (val (pref obj 0)))
+                          (free obj)
+                          val)))
+                   (interaction-environment))
+             (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                        (let ((obj (halloc)))
+                          ,@hcopy_body
+                          obj)))
+                   (interaction-environment))
+             (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                        ,@hfree_body
+                        (free x)
+                        void))
+                   (interaction-environment))
+             (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
+                        (let ((obj (zalloc)))
+                          ,@zcopy_body
+                          obj)))
+                   (interaction-environment)))))
       ;; (println 'dc-out: name)
-      (if compiler-suppress-on
-          (suppress-compiler-messages #f)
-          'donothing)
       #t)))
 
 ;; bind-type expects: (symbol type [docstring])
