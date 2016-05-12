@@ -108,16 +108,6 @@ static pointer ipcEval(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer ipcLoad(scheme* Scheme, pointer Args)
-{
-    auto repl(findREPL(string_value(pair_car(Args))));
-    if (!repl) {
-        return Scheme->F;
-    }
-    repl->writeString(std::string("(sys:load \"") + string_value(pair_cadr(Args)) + '"');
-    return Scheme->T;
-}
-
 static pointer ipcSetPriority(scheme* Scheme, pointer Args)
 {
     auto repl(findREPL(string_value(pair_car(Args))));
@@ -148,7 +138,6 @@ static pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args)
         { "ipc:call-async", &ipcCall }, \
         { "ipc:define", &ipcDefine }, \
         { "ipc:eval-string", &ipcEval }, \
-        { "ipc:load", &ipcLoad }, \
         { "ipc:set-priority", &ipcSetPriority }, \
         { "ipc:get-priority", &ipcGetPriority }, \
         { "ipc:get-process-name", &getNameOfCurrentProcess }
