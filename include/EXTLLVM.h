@@ -136,13 +136,10 @@ static inline uint64_t string_hash(const char* str)
   bool check_address_exists(uint64_t id, closure_address_table* table);
   bool check_address_type(uint64_t id, closure_address_table* table, const char* type);
 
-  //  double llvm_cos(double x);
-  // double llvm_sin(double x);
   double llvm_tan(double x);
   double llvm_cosh(double x);
   double llvm_tanh(double x);
   double llvm_sinh(double x);
-  double llvm_acos(double x);
   double llvm_asin(double x);
   double llvm_atan(double x);
   double llvm_atan2(double x,double y);

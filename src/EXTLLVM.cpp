@@ -364,13 +364,11 @@ void llvm_print_f64(double num)
     return;
 }
 
-// double llvm_cos(double x) { return cos(x); }
 // double llvm_sin(double x) { return sin(x); }
 double llvm_tan(double x) { return tan(x); }
 double llvm_cosh(double x) { return cosh(x); }
 double llvm_tanh(double x) { return tanh(x); }
 double llvm_sinh(double x) { return sinh(x); }
-double llvm_acos(double x) { return acos(x); }
 double llvm_asin(double x) { return asin(x); }
 double llvm_atan(double x) { return atan(x); }
 double llvm_atan2(double x,double y) { return atan2(x,y); }
@@ -921,7 +919,6 @@ void initLLVM()
       EE->updateGlobalMapping("llvm_cosh", (uint64_t)&llvm_cosh);
       EE->updateGlobalMapping("llvm_tanh", (uint64_t)&llvm_tanh);
       EE->updateGlobalMapping("llvm_sinh", (uint64_t)&llvm_sinh);
-      EE->updateGlobalMapping("llvm_acos", (uint64_t)&llvm_acos);
       EE->updateGlobalMapping("llvm_asin", (uint64_t)&llvm_asin);
       EE->updateGlobalMapping("llvm_atan", (uint64_t)&llvm_atan);
       EE->updateGlobalMapping("llvm_atan2", (uint64_t)&llvm_atan2);
