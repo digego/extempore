@@ -10017,10 +10017,9 @@ xtlang's `let' syntax is the same as Scheme"
                          (interaction-environment))))
              (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
                       (lambda ,argslist
-                        (let ((obj (,(string->symbol (string-append namestr "_h")) ,@argslist))
-                              (val (pref obj 0)))
-                          (free obj)
-                          val)))
+                        (let ((,(string->symbol (string-append "obj:" namestr "*")) (salloc)))
+                          (tfill! obj ,@argslist)
+                          (pref obj 0))))
                    (interaction-environment))
              (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
                       (lambda (,(string->symbol (string-append "x:" namestr "*")))
