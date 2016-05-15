@@ -47,7 +47,6 @@
 #include <sys/stat.h>
 
 #ifdef _WIN32
-#include <winsock2.h>
 #include <ws2tcpip.h>
 
 static void usleep(LONGLONG Us)
@@ -288,7 +287,7 @@ void* SchemeProcess::taskImpl()
                     auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                     if (evalString->length() > 1) {
                         std::stringstream ss;
-                        bool write_reply = evalString->compare(0, 4, "(ipc");
+                        bool write_reply(!!evalString->compare(0, 4, "(ipc"));
                         if ((*evalString)[evalString->length() - 1] == TERMINATION_CHAR) {
                             evalString->erase(--evalString->end());
                         }
@@ -300,19 +299,19 @@ void* SchemeProcess::taskImpl()
                         } else {
                             if (m_banner) {
                                 auto time(UNIV::TIME);
-                                unsigned hours(time / UNIV::HOUR());
+                                auto hours(time / UNIV::HOUR());
                                 time -= hours * UNIV::HOUR();
-                                unsigned minutes(time / UNIV::MINUTE());
+                                auto minutes(time / UNIV::MINUTE());
                                 time -= minutes * UNIV::MINUTE();
-                                unsigned seconds(time / UNIV::SECOND());
+                                auto seconds(time / UNIV::SECOND());
                                 char prompt[24];
-                                sprintf(prompt, "\n[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
+                                sprintf(prompt, "\n[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
                                 ss << prompt;
                             }
                             UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
                             if (write_reply) {
                                 auto res(ss.str());
-                                send(returnSocket, res.c_str(), res.length() + 1, 0);
+                                send(returnSocket, res.c_str(), int(res.length() + 1), 0);
                             }
                         }
                     }
@@ -383,11 +382,11 @@ void* SchemeProcess::serverImpl()
         usleep(1000);
     }
     fd_set readFds;
-    std::vector<int> clientSockets;
-    std::map<int, std::string> inStrings;
+    std::vector<SOCKET> clientSockets;
+    std::map<SOCKET, std::string> inStrings;
     FD_ZERO(&readFds); //zero out open sockets
     FD_SET(m_serverSocket, &readFds); //add server socket to open sockets list
-    int numFds = m_serverSocket + 1;
+    int numFds = int(m_serverSocket) + 1;
     while (m_running) {
         fd_set curReadFds;
         FD_COPY(&readFds, &curReadFds);
@@ -396,7 +395,7 @@ void* SchemeProcess::serverImpl()
             auto iter(clientSockets.begin());
             for (; iter != clientSockets.end(); ++iter) {
                 struct stat buf;
-                if (fstat(*iter, &buf) < 0) {
+                if (fstat(int(*iter), &buf) < 0) {
                     FD_CLR(*iter, &readFds);
                     clientSockets.erase(iter);
                     break;
@@ -410,13 +409,12 @@ void* SchemeProcess::serverImpl()
         if (unlikely(FD_ISSET(m_serverSocket, &curReadFds))) { //check if we have any new accepts on our server socket
             sockaddr_in client_address;
             socklen_t clientAddressSize(sizeof(client_address));
-            res = accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
-                    &clientAddressSize);
+            auto res(accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address), &clientAddressSize));
             if (unlikely(res < 0)) {
                 std::cout << "Bad Accept in Server Socket Handling" << std::endl;
                 continue; //continue on error
             }
-            numFds = res + 1;
+            numFds = int(res) + 1;
             FD_SET(res, &readFds); //add new socket to the FD_SET
             ascii_warning();
             printf("New Client Connection\n");
@@ -428,18 +426,18 @@ void* SchemeProcess::serverImpl()
             if (m_banner) {
                 outString += sm_banner;
                 auto time(UNIV::TIME);
-                unsigned hours(time / UNIV::HOUR());
+                auto hours(time / UNIV::HOUR());
                 time -= hours * UNIV::HOUR();
-                unsigned minutes(time / UNIV::MINUTE());
+                auto minutes(time / UNIV::MINUTE());
                 time -= minutes * UNIV::MINUTE();
-                unsigned seconds(time / UNIV::SECOND());
+                auto seconds(time / UNIV::SECOND());
                 char prompt[23];
-                sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", hours, minutes, seconds);
+                sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
                 outString += prompt;
             } else {
                 outString += "Welcome to extempore!";
             }
-			send(res, outString.c_str(), outString.length() + 1, 0);
+			send(res, outString.c_str(), int(outString.length() + 1), 0);
 			continue;
         }
         for (unsigned index = 0; index < clientSockets.size(); ++index) {
@@ -487,7 +485,7 @@ void* SchemeProcess::serverImpl()
                     for (; end != std::string::npos; pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
                         EXTMonitor::ScopedLock lock(m_guard, true);
                         char c[8];
-                        sprintf(c, "%i", sock);
+                        sprintf(c, "%i", int(sock));
                         std::string* s = new std::string(evalStr.substr(pos, end - pos + 1));
                         // std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << *s << std::endl;
                         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c, SchemeTask::Type::REPL));

@@ -45,6 +45,12 @@
 #include <sstream>
 #include <assert.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+typedef int SOCKET;
+#endif
+
 struct llvm_zone_t;
 
 #define pair_caar(p) pair_car(pair_car(p))
@@ -108,7 +114,7 @@ private:
     EXTThread       m_threadServer;
     scheme*         m_scheme;
     uint64_t        m_maxDuration;
-	int             m_serverSocket;
+    SOCKET          m_serverSocket;
     task_queue_type m_taskQueue;
     llvm_zone_t*    m_defaultZone;
     extemp::CM*     m_extemporeCallback;
