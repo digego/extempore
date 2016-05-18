@@ -15,11 +15,14 @@
 (sys:load-preload-check 'gstreamer)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/base/base.xtm"))
-(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+ (sys:load "libs/base/base.xtm")
+ (sys:load "libs/external/glib.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/base/base.xtm" 'quiet)
+ (sys:load "libs/external/glib.xtm" 'quiet))
 
 ;; make sure that glib is loaded
-(sys:load "libs/external/glib.xtm")
+
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib gstlib
@@ -242,8 +245,6 @@
 
 (bind-alias GstSample i8) ;; opaque
 (bind-alias GstAppSink i8) ;; opaque
-(bind-alias GstSample i8) ;; opaque
-
 (bind-alias GstFlowReturn i32)
 (bind-val GST_FLOW_OK i32 0)
 (bind-val GST_FLOW_EOS i32 -3)

@@ -116,28 +116,28 @@
 (bind-val G_FILE_TEST_IS_EXECUTABLE i32 8)
 (bind-val G_FILE_TEST_EXISTS i32 16)
 
-(if (string=? "Windows" (sys:platform))
-    (begin 
-      (bind-lib libglib g_file_test_utf8 [gboolean,gchar*,i32]*)
-      (bind-lib libglib g_rename_utf8 [i32,gchar*,gchar*]*)
-      (bind-lib libglib g_remove_utf8 [i32,gchar*]*)
-      (bind-lib libglib g_chdir_utf8 [i32,gchar*]*)
-      (bind-lib libglib g_mkdir_utf8 [i32,gchar*,int]*)            
-      (bind-lib libglib g_dir_open_utf8 [GDir*,gchar*,guint,GError**]*)
-      (bind-lib libglib g_dir_close [void,GDir*]*)
-      (bind-lib libglib g_dir_read_name_utf8 [gchar*,GDir*]*)
-      (bind-lib libglib g_dir_rewind [void,GDir*]*)
-      )
-    (begin
-      (bind-lib libglib g_file_test [gboolean,gchar*,i32]*)
-      (bind-lib libglib g_rename [i32,gchar*,gchar*]*)
-      (bind-lib libglib g_remove [i32,gchar*]*)
-      (bind-lib libglib g_chdir [i32,gchar*]*)
-      (bind-lib libglib g_mkdir [i32,gchar*,i32]*)      
-      (bind-lib libglib g_dir_open [GDir*,gchar*,guint,GError**]*)
-      (bind-lib libglib g_dir_close [void,GDir*]*)
-      (bind-lib libglib g_dir_read_name [gchar*,GDir*]*)
-      (bind-lib libglib g_dir_rewind [void,GDir*]*)))
+(unix-or-Windows
+ (begin
+   (bind-lib libglib g_file_test [gboolean,gchar*,i32]*)
+   (bind-lib libglib g_rename [i32,gchar*,gchar*]*)
+   (bind-lib libglib g_remove [i32,gchar*]*)
+   (bind-lib libglib g_chdir [i32,gchar*]*)
+   (bind-lib libglib g_mkdir [i32,gchar*,i32]*)
+   (bind-lib libglib g_dir_open [GDir*,gchar*,guint,GError**]*)
+   (bind-lib libglib g_dir_close [void,GDir*]*)
+   (bind-lib libglib g_dir_read_name [gchar*,GDir*]*)
+   (bind-lib libglib g_dir_rewind [void,GDir*]*))
+ ;; on Windows, use utf8 versions
+ (begin
+   (bind-lib libglib g_file_test_utf8 [gboolean,gchar*,i32]*)
+   (bind-lib libglib g_rename_utf8 [i32,gchar*,gchar*]*)
+   (bind-lib libglib g_remove_utf8 [i32,gchar*]*)
+   (bind-lib libglib g_chdir_utf8 [i32,gchar*]*)
+   (bind-lib libglib g_mkdir_utf8 [i32,gchar*,int]*)
+   (bind-lib libglib g_dir_open_utf8 [GDir*,gchar*,guint,GError**]*)
+   (bind-lib libglib g_dir_close [void,GDir*]*)
+   (bind-lib libglib g_dir_read_name_utf8 [gchar*,GDir*]*)
+   (bind-lib libglib g_dir_rewind [void,GDir*]*)))
 
 ;; regex stuff
 (bind-lib libglib g_match_info_matches [gboolean,GMatchInfo]*)
@@ -639,7 +639,6 @@
       (g_value_set_boxed gv value)
       gv)))
 
-
 (bind-func sys_g_file_test
   (lambda (path)
     (g_file_test path G_FILE_TEST_EXISTS)))
@@ -676,41 +675,41 @@
   (lambda ()
     (g_get_current_dir)))
 
-(impc:aot:do-or-emit
- (define-macro (sys:mkdir path) `(sys_g_mkdir ,(symbol->string path))))
-(impc:aot:do-or-emit
- (define sys:username (lambda () (cptr->string (sys_g_get_user_name)))))
-(impc:aot:do-or-emit
- (define sys:hostname (lambda () (cptr->string (sys_g_get_host_name)))))
-(impc:aot:do-or-emit
- (define sys:home-directory (lambda () (cptr->string (sys_g_get_home_dir)))))
-(impc:aot:do-or-emit
- (define sys:getcwd (lambda () (cptr->string (sys_g_get_current_dir)))))
-(impc:aot:do-or-emit
- (define sys:pwd (lambda () (cptr->string (sys_g_get_current_dir)))))
-(impc:aot:do-or-emit
- (define sys:cwd (lambda () (cptr->string (sys_g_get_current_dir)))))
-(impc:aot:do-or-emit
- (define sys:rename sys_g_rename))
-(impc:aot:do-or-emit
- (define sys:remove sys_g_remove))
-(impc:aot:do-or-emit
- (define-macro (sys:rm path) `(sys_g_remove ,(symbol->string path))))
-(impc:aot:do-or-emit
- (define-macro (sys:mv path) `(sys_g_rename ,(symbol->string path))))
-(impc:aot:do-or-emit
- (define sys:file-exists? sys_g_file_test))
-(impc:aot:do-or-emit
- (define sys:chdir sys_g_chdir))
-(impc:aot:do-or-emit
- (define-macro (sys:cd . path)
-                       (if (null? path)
-                           `(sys_g_chdir (sys:home-directory))
-                           `(sys_g_chdir ,(symbol->string (car path))))))
-(impc:aot:do-or-emit
- (define-macro (sys:mkdir path) `(sys_g_mkdir ,(symbol->string path))))
-(impc:aot:do-or-emit
- (define sys:ls (lambda () (sys:directory-list "."))))
+;; need to figure out how to get these to work with new AOT adhoc poly stuff
+
+;; (impc:aot:do-or-emit
+;;  (define sys:username (lambda () (cptr->string (sys_g_get_user_name)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:hostname (lambda () (cptr->string (sys_g_get_host_name)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:home-directory (lambda () (cptr->string (sys_g_get_home_dir)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:getcwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:pwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:cwd (lambda () (cptr->string (sys_g_get_current_dir)))))
+;; (impc:aot:do-or-emit
+;;  (define sys:rename sys_g_rename))
+;; (impc:aot:do-or-emit
+;;  (define sys:remove sys_g_remove))
+;; (impc:aot:do-or-emit
+;;  (define sys:mv sys_g_rename))
+;; (impc:aot:do-or-emit
+;;  (define sys:rm sys_g_remove))
+;; (impc:aot:do-or-emit
+;;  (define sys:mkdir sys_g_mkdir))
+;; (impc:aot:do-or-emit
+;;  (define sys:file-exists? sys_g_file_test))
+;; (impc:aot:do-or-emit
+;;  (define sys:chdir sys_g_chdir))
+;; (impc:aot:do-or-emit
+;;  (define (sys:cd path)
+;;    (if (null? path)
+;;        (sys_g_chdir (sys:home-directory))
+;;        (sys_g_chdir path))))
+;; (impc:aot:do-or-emit
+;;  (define sys:ls (lambda () (sys:directory-list "."))))
 
 (impc:aot:insert-footer "xtmglib")
 (define *xtmlib-glib-loaded* #t)
