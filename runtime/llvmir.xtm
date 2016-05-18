@@ -302,6 +302,19 @@
 (define impc:ir:get-type-expand-poly #f)
 (define *impc:ir:get-type-callback-off* #f)
 
+;; helpful for generics and adhoc polys
+
+(define impc:ir:poly-or-adhoc?
+  (lambda (name)
+    (regex:match? name "(_adhoc_|_poly_)")))
+
+(define impc:ir:split-and-decode-poly-adhoc-name
+  (lambda (name)
+    (if (impc:ir:poly-or-adhoc? name)
+        (let ((split-name (regex:type-split name "(_adhoc_|_poly_)")))
+          (list (car split-name) (cname-decode (cadr split-name))))
+        #f)))
+
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str
   (lambda (string-type . args)

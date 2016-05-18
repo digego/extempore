@@ -581,7 +581,12 @@
     (print-with-colors *impc:compiler:pretty-print-error-color*
                        'default #t (print "Compiler Error"))
     (print " cannot find" type "")
-    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n"))
+    (if (impc:ir:poly-or-adhoc? (symbol->string name))
+        (let ((split-name (impc:ir:split-and-decode-poly-adhoc-name (symbol->string name))))
+          (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (car split-name)))
+          (print ":")
+          (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (cadr split-name) "\n")))
+        (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print name "\n")))
     (if (impc:aot:currently-compiling?)
         (quit 2)
         (throw ""))))
