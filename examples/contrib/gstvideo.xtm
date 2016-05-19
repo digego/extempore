@@ -15,35 +15,55 @@
 
 ;;; Code:
 
-(define fullscreen #f)
-;; (define width 1920.0)
-;; (define height 1200.0)
-(define width 1024.0)
-(define height 768.0)
+(sys:load "libs/external/glfw3.xtm")
 
-(bind-val width float width)
-(bind-val height float height)
+(bind-val width i32 1200)
+(bind-val height i32 800)
 
-;; setup opengl
-(define glctx (gl:make-ctx ":0.0" fullscreen 0.0 0.0 width height))
+(bind-val window GLFWwindow*
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
 
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/external/gl.xtm")
-(sys:load "libs/external/graphics-pipeline.xtm")
-(sys:load "libs/external/assimp.xtm")
-(sys:load "libs/external/glib.xtm")
+(sys:load "libs/external/gl/gl-objects.xtm")
 (sys:load "libs/external/gstreamer.xtm")
 
+(bind-val vao VAO* (VAO_create_ss_quad))
+(bind-val tex Texture (Texture_create))
+(bind-val sp ShaderProgram
+  (ShaderProgram_create
+   (sys_slurp_file "examples/external/shader-tutorials/texture.vert")
+   (sys_slurp_file "examples/external/shader-tutorials/texture.frag")))
 
-(bind-val texid i32 0)
+(bind-func xtm_frame_data_to_tex
+  (lambda (tex data)
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D tex)
+    (glTexImage2D GL_TEXTURE_2D
+                  0
+                  GL_RGB
+                  width height
+                  0
+                  GL_RGB
+                  GL_UNSIGNED_BYTE
+                  data)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
+    (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
+    (gl_print_error "in xtm_frame_data_to_tex")))
+
 (bind-val vplay i1 0)
 
 (bind-func xtm_decode 5000000
-  (let ((dat:i8* (alloc (* 1200 800 3))))
+  (let ((data:i8* (alloc (* 1200 800 3)))
+        (playing #f))
     (lambda (playz:GstElement* sink:GstElement* time rate preroll:i1)
-      (if (<> (gst_app_sink_is_eos (cast sink GstAppSink*)) 0)
+      (println "here")
+      (println "playz:" playz "sink:" sink "time:" time "rate:" rate "preroll:" preroll)
+      (if (= (gst_app_sink_is_eos (cast sink GstAppSink*)) 1)
           (begin
-            (printf "Finished Streaming! Try another video!\n")
+            (println "Finished streaming, try another video.")
             (gst_element_set_state playz GST_STATE_NULL)      
             (gst_object_unref (cast playz gpointer))
             (set! vplay #f)
@@ -60,28 +80,23 @@
                   (set! vplay #t)
                   (set! rate (ftoi64 (/ 44100.0 (/ (i32tof num) (i32tof denom)))))
                   (printf "Play format: %s\n" (gst_caps_to_string caps))))
-            (set! xsize (gst_buffer_extract buffer 0 dat (* 3 1200 800)))
+            (set! xsize (gst_buffer_extract buffer 0 data (* 3 1200 800)))
             ;; load texture into 11
             (if (= xsize (* 3 1200 800))
-                (set! texid (gl_load_tex 1200 800 3 GL_UNSIGNED_BYTE dat texid)))
-            (if (or preroll
-                    (and (> rate 0)
-                         (> xsize 0)))
-                (callback (+ time (/ rate 2)) xtm_decode playz sink (+ time rate) rate 0)
-                (begin (set! vplay #f)
-                       (printf "Are we here :(\n")
-                       void)))))))
-
+                (xtm_frame_data_to_tex tex data))
+            (if (or preroll (and (> rate 0) (> xsize 0)))
+                (callback (+ time (/ rate 2)) xtm_decode playz sink (+ time rate) rate #f)
+                (begin
+                  (set! vplay #f)
+                  (println "Are we here :(\n"))))))))
 
 ;; path must be a valid URI to media
+
 (bind-func xtm_play
   (lambda (path)
-    (gst_init null null)
     (if vplay
-        (begin (printf "Wait to finish the running video first!\n") 1)               
-        (let ((playz (gst_element_factory_make "playbin" "play"))
-              (sinkz (gst_element_factory_make "appsink" "app_sink"))
-              (bus (gst_pipeline_get_bus (cast playz GstPipeline*)))
+        (println "Wait to finish the running video first!\n")
+        (let ((bus (gst_pipeline_get_bus (cast playz GstPipeline*)))
               (caps:GstCaps* (gst_caps_from_string "video/x-raw,format=RGB,width=1200,height=800"))
               (rgbFilter:GstElement* (gst_element_factory_make "capsfilter" "rgb_filter"))
               (appBin:GstElement* (gst_bin_new "app_bin"))
@@ -101,64 +116,38 @@
           (g_object_set_property (cast playz GObject*) "uri" gv)
           ;; start decoding the media!
           (gst_element_set_state playz GST_STATE_PLAYING)
-          (callback (now) xtm_decode playz sinkz (now) 1024 1)
-          1))))
+          (println "hodi")
+          (callback (now) xtm_decode playz sinkz (now) 1024 #t)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;
-;; Glib event loop
+(bind-func gl_draw_loop
+  (let ((playbin (gst_element_factory_make "playbin" "play"))
+        (appsink (gst_element_factory_make "appsink" "sink")))
+    (lambda (time:i64 delta_t:double)
+      ;; step glib event loop
+      (g_main_context_iteration null 0)
+      ;; draw texture
+      (glClear GL_COLOR_BUFFER_BIT)
+      ;; draw the world
+      (let ((texloc (glGetUniformLocation sp "tex")))
+        (glUseProgram sp)
+        (glUniform1i texloc 0))
+      (VAO_bind_and_draw_arrays vao GL_TRIANGLE_STRIP 0 4)
+      (glfwSwapBuffers window)
+      (let ((next_time (+ time (convert (* 44100. delta_t)))))
+        (callback next_time gl_draw_loop next_time delta_t)))))
 
-;; glib message loop
-(bind-func _glib_main_loop_call
-  (lambda ()
-    (g_main_context_iteration null 0)))
+($ (gst_init null null))
 
-;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; NOW GL STUFF!
-;;
-(bind-func post:XTMRENDERCB
-  (lambda (frame shader m v p data)
-    (fill_orthographic_matrix p -1.0 1.0 -1.0 1.0 -1.0 1.0)
-    (fill_identity_matrix v)            
-    (fill_identity_matrix m)
-    (scale_matrix m 2.0 -2.0 0.0) ;; flip
-    (translate_matrix m -0.0 -0.0 0.0)
-    (if (> texid 0)
-        (xtm_draw_tex shader texid m v p))
-    void))
+;; (gl_draw_loop (now) (/ 1. 1.))
 
-(bind-func gl_render
-  (lambda ()
-    (xtm_render null null null post null)
-    void))
-
-;; standard impromptu callbacks 
-(define opengl-loop
-  (lambda (time dur degree)
-    (let ((v (now)))
-      (gl_render)
-      (gl:swap-buffers glctx)
-      )
-    (callback (+ time (* dur .1)) 'opengl-loop (+ time dur) 2000 (+ degree .5))))
-
-;; glib message loop
-(define glib-main-loop
-  (lambda ()
-    (_glib_main_loop_call)
-    (callback (+ (now) 2500) 'glib-main-loop)))
-
-;; init xtm render pipeline
-(xtm_render_setup (real->integer width) (real->integer height))
-
-;; start glib event loop
-(glib-main-loop)
-
-;; start opengl loop
-(opengl-loop (now) 1500 70.0)
+;; (bind-func gl_draw_loop
+;;   (lambda (time:i64 delta_t:double)
+;;     (println "gl_draw_loop callback stopped")
+;;     #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; start your movies here!
 
 ;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")
-;; (xtm_play "file:///Users/sorensen/Movies/cave.mov")
+(xtm_play "file:///Users/ben/Desktop/showreel.mov")
