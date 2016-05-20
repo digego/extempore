@@ -1,0 +1,77 @@
+(sys:load "libs/contrib/nuklear.xtm")
+
+(bind-val width i32 800)
+(bind-val height i32 600)
+
+(bind-val window GLFWwindow*
+  (begin
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+    (glfw_init_and_create_interaction_window width height)))
+
+(sys:load "libs/external/gl/gl-objects.xtm")
+
+(bind-val ctx nk_context*
+  (nk_glfw3_init window NK_GLFW3_INSTALL_CALLBACKS))
+
+(bind-val atlas nk_font_atlas*
+  (let ((pp:nk_font_atlas** (salloc)))
+    (nk_glfw3_font_stash_begin pp)
+    (nk_glfw3_font_stash_end)
+    (pref pp 0)))
+
+(bind-val background nk_color (nk_rgb 28 48 62))
+
+(bind-func gl_draw_loop
+  (let ((layout:nk_panel* null)
+        (combo:nk_panel* null)
+        (easy:i32 0) (hard:i32 1)
+        (op easy) (property:i32 20))
+    (lambda (time:i64 delta_t:double)
+      (if (<> (glfwWindowShouldClose window) 1)
+          (let ((bg:|4 ,float|* (alloc)))
+            (glClear GL_COLOR_BUFFER_BIT)
+            (if (nk_begin ctx layout "Demo" (nk_rect 50 50 230 250)
+                          (bor NK_WINDOW_BORDER NK_WINDOW_MOVABLE NK_WINDOW_SCALABLE
+                               NK_WINDOW_MINIMIZABLE NK_WINDOW_TITLE))
+                (begin
+                  (nk_layout_row_static ctx 30 80 1)
+                  (if (nk_button_label ctx "button" NK_BUTTON_DEFAULT)
+                      (println "button pressed"))
+                  (nk_layout_row_dynamic ctx 30 2)
+                  (if (nk_option_label ctx "easy" (convert (= op easy)))
+                      (set! op easy))
+                  (if (nk_option_label ctx "hard" (convert (= op hard)))
+                      (set! op hard)))
+                (nk_layout_row_dynamic ctx 20 1)
+                (nk_label ctx "background:" NK_TEXT_LEFT)
+                (nk_layout_row_dynamic ctx 25 1)
+                (if (nk_combo_begin_color ctx &combo background 400)
+                    (nk_layout_row_dynamic ctx 120 1)
+                    (set! background (nk_color_picker ctx background NK_RGBA))
+                    (nk_layout_row_dynamic ctx 25 1)
+                    (tset! background 0 (convert (nk_propertyi ctx "#R:" 0 (tref background 0) 255 1 1)))
+                    (tset! background 1 (convert (nk_propertyi ctx "#G:" 0 (tref background 1) 255 1 1)))
+                    (tset! background 2 (convert (nk_propertyi ctx "#B:" 0 (tref background 2) 255 1 1)))
+                    (tset! background 3 (convert (nk_propertyi ctx "#A:" 0 (tref background 3) 255 1 1)))
+                    (nk_combo_end ctx)))
+            (nk_end ctx)
+            ;; draw
+            (nk_color_fv bg background)
+            ;; (glfwGetWindowSize win &width &height)
+            ;; (glViewport 0 0 width height)
+            (glClear GL_COLOR_BUFFER_BIT)
+            (glClearColor (tref bg 0) (tref bg 1) (tref bg 2) (tref bg 3))
+            ;; /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
+            ;;  * with blending, scissor, face culling, depth test and viewport and
+            ;;  * defaults everything back into a default state.
+            ;;  * Make sure to either a.) save and restore or b.) reset your own state after
+            ;;  * rendering the UI. */
+            (nk_glfw3_render NK_ANTI_ALIASING_ON MAX_VERTEX_BUFFER MAX_ELEMENT_BUFFER)
+            (glfwSwapBuffers window)
+            (let ((next_time (+ time (convert (* 44100. delta_t)))))
+              (callback next_time gl_draw_loop next_time delta_t)))
+          (begin (nk_glfw3_shutdown)
+                 (glfwTerminate)
+                 (println "Window closed, stopping draw loop."))))))
+
+(gl_draw_loop (now) (/ 1.0 1.0))
