@@ -2761,7 +2761,7 @@
        (begin ,@forms)))
 
 (define impc:aot:compile-module
-  (lambda (module-name module exit-afterwards?)
+  (lambda (module-name module)
     (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
@@ -2835,7 +2835,7 @@
           (if (<> llc-res 0)
               (begin (print-with-colors 'red 'default #t
                                         (print "llc command failed with exit code " llc-res "\n"))
-                     (if exit-afterwards? (quit 1))))
+                     (quit 1)))
           (begin
             (print-with-colors 'black 'yellow #t (print " Compiling native shared library "))
             (print "\n  " link-command "\n\n"))
@@ -2843,7 +2843,7 @@
           (if (<> linker-res 0)
               (begin (print-with-colors 'red 'default #t
                                         (print "linking failed with exit code " linker-res "\n"))
-                     (if exit-afterwards? (quit 1)))
+                     (quit 1))
               (begin
                 (print-with-colors 'black 'green #t (print " Succesfully compiled "))
                 (print "\n  " output-shlib-path "\n\n"))))))))
@@ -2939,7 +2939,7 @@
     (Windows-add-libdir-to-PATH))
 
 (define impc:aot:compile-xtm-file
-  (lambda (lib-path exit-afterwards?)
+  (lambda (lib-path)
     (let ((start-time (now))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
@@ -2988,7 +2988,7 @@
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
                               (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                          (impc:aot:compile-module libname-no-extension module exit-afterwards?))
+                          (impc:aot:compile-module libname-no-extension module))
                         ;; (impc:aot:insert-footer libname-no-extension)
                         (close-port *impc:aot:current-output-port*)
                         (set! *impc:aot:current-lib-name* "xtmdylib")
@@ -2997,15 +2997,15 @@
                                     (print "Successfully wrote AOT-compilation file to ")
                                     (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
                                     (impc:aot:print-compilation-details start-time)
-                                    (if exit-afterwards? (quit 0)))
+                                    (quit 0))
                              (begin (print-with-colors 'black 'red #t (print " Error "))
                                     (print "\n\nsomething went wrong in writing the output file ")
                                     (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
-                                    (if exit-afterwards? (quit 1)))))
+                                    (quit 1))))
                       (begin (print-with-colors 'black 'red #t
                                                 (print " Error "))
                              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
-                             (if exit-afterwards? (quit 2)))))))))))
+                             (quit 2))))))))))
 
 
 (define icr:new-zone

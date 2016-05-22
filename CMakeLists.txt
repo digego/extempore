@@ -603,13 +603,13 @@ else(WIN32)
     if(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
-        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
       add_custom_target(${targetname}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
-        --eval "(impc:aot:compile-xtm-file \"${libfile}\" #t #t)"
+        --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)

@@ -39,7 +39,7 @@ echo
 # check all the required shared libs are there
 for f in $AOT_LIBS
 do
-    $AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"$f\" #t #t)"
+    $AOT_COMPILATION_COMMAND "(impc:aot:compile-xtm-file \"$f\" #t)"
     rc=$?
     if (($rc != 0))  ; then
         echo -e "\033[0;31mError AOT-compiling $f\033[0;00m"
