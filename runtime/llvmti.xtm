@@ -1167,7 +1167,17 @@
     (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
       (if closure-data
           (if (not (null? (vector-ref (cdr closure-data) 0)))
-              (print "Warning: attempting to re-type already typed closure" closure-name "to" (impc:ir:pretty-print-type type) "\n")
+              (begin (print-with-colors 'yellow 'default #t (print "Warning"))
+                     (print ": attempting to re-type already typed closure ")
+                     (if (impc:ir:poly-or-adhoc? closure-name)
+                         (let ((split-name (impc:ir:split-and-decode-poly-adhoc-name closure-name)))
+                           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #f (print (car split-name)))
+                           (print ":")
+                           (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print (cadr split-name))))
+                         (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print closure-name)))
+                     (print " to ")
+                     (print-with-colors *impc:compiler:pretty-print-type-color*
+                                        'default #f (print (impc:ir:pretty-print-type type) "\n")))
               (vector-set! (cdr closure-data) 0 type))
           (impc:compiler:print-compiler-error "tried to set type of unknown closure" closure-name)))))
 
