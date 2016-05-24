@@ -49,7 +49,7 @@
 //   (MINISCM) Mini-Scheme is now maintained by Akira KIDA.
 //   (MINISCM)
 //   (MINISCM) This is a revised and modified version by Akira KIDA.
-//   (MINISCM)	current version is 0.85k4 (15 May 1994)
+//   (MINISCM)  current version is 0.85k4 (15 May 1994)
 //
 //   TinyScheme v.1.35 released under MIT licence.  This file also released under MIT licence.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +87,7 @@ enum scheme_port_kind {
 class CharPtrLess {
 public:
     bool operator() ( const char* elem1, const char* elem2) const {
-	return (strcmp(elem1,elem2) < 0) ? true : false;
+        return (strcmp(elem1,elem2) < 0) ? true : false;
     }
 };
 
@@ -129,7 +129,7 @@ struct scheme {
     typedef std::set<pointer> env_type;
     env_type imp_env; // can't be unordered_set because of potential iterator invalidation
 //#define MARK_STACK_SIZE 200000 /* size of mark stack for knuth algorithm B */
-//	pointer mark_stack[MARK_STACK_SIZE];
+//  pointer mark_stack[MARK_STACK_SIZE];
 
     /* We use 4 registers. */
     pointer args;            /* register for arguments of function */
@@ -189,7 +189,7 @@ struct scheme {
     int file_i;
     int nesting;
 
-//	char    gc_verbose;      /* if gc_verbose is not zero, print gc status */
+//  char    gc_verbose;      /* if gc_verbose is not zero, print gc status */
 //    int     gc_on;
     char    no_memory;       /* Whether mem. alloc. has failed */
 
@@ -216,8 +216,8 @@ struct scheme {
     long gensym_cnt;
 
     struct scheme_interface *vptr;
-    void *dump_base;	 /* pointer to base of allocated dump stack */
-    int dump_size;		 /* number of frames allocated for dump stack */
+    void *dump_base;     /* pointer to base of allocated dump stack */
+    int dump_size;       /* number of frames allocated for dump stack */
 };
 
 /* operator code */

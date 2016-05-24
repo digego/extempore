@@ -307,11 +307,11 @@ namespace extemp {
         pos += OSC::getOSCTimestamp(args+pos, &timestamp);
         ss << " " << timestamp;
         // }else if(typetags[i] == 'b'){
-        // 	NSData* osc_data;
-        // 	pos += OSC::getOSCData(args+pos, &osc_data);
-        // 	char str[64];
-        // 	sprintf(str,"%p",osc_data);
-        // 	ss << " \"" << str << "\"";
+        //  NSData* osc_data;
+        //  pos += OSC::getOSCData(args+pos, &osc_data);
+        //  char str[64];
+        //  sprintf(str,"%p",osc_data);
+        //  ss << " \"" << str << "\"";
 
         //}else if(typetags[i] == ',') {
         //if it's a comma just skip over it
@@ -375,11 +375,11 @@ namespace extemp {
         pos += OSC::getOSCTimestamp(args+pos, &timestamp);
         ss << " " << timestamp;
         // }else if(typetags[i] == 'b'){
-        // 	NSData* osc_data;
-        // 	pos += OSC::getOSCData(args+pos, &osc_data);
-        // 	char str[64];
-        // 	sprintf(str,"%p",osc_data);
-        // 	ss << " \"" << str << "\"";
+        //  NSData* osc_data;
+        //  pos += OSC::getOSCData(args+pos, &osc_data);
+        //  char str[64];
+        //  sprintf(str,"%p",osc_data);
+        //  ss << " \"" << str << "\"";
 
         //}else if(typetags[i] == ',') {
         //if it's a comma just skip over it
@@ -521,7 +521,7 @@ namespace extemp {
     // while(true){
     //   io_service->run();
     // }
-	  return NULL;
+    return NULL;
   }
 #else
 

@@ -67,11 +67,11 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 {
     if (EntryPoint) {
         m_function = EntryPoint;
-	}
+    }
     if (Arg) {
         m_arg = Arg;
     }
-	int result = 22; //EINVAL;
+    int result = 22; //EINVAL;
     if (!m_initialised) {
 #ifdef _WIN32
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
@@ -86,19 +86,19 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
         }
 #endif
         m_initialised = !result;
-	}
+    }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
         printf("Error creating thread: %d\n", result);
-	}
+    }
 #endif
-	return result;
+    return result;
 }
 
 int EXTThread::kill()
 {
 #ifdef _WIN32
-	return 0;
+    return 0;
 #else
     return pthread_cancel(m_thread);
 #endif
@@ -106,27 +106,27 @@ int EXTThread::kill()
 
 int EXTThread::detach()
 {
-	int result = 22; //EINVAL;
+    int result = 22; //EINVAL;
     if (m_initialised) {
 #ifdef _WIN32
         m_thread.detach();
-	    result = 0;
+        result = 0;
 #else
         result = pthread_detach(m_thread);
 #endif
         m_detached = !result;
-	}
+    }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
         printf("Error detaching thread: %d\n", result);
-	}
+    }
 #endif
-	return result;
+    return result;
 }
 
 int EXTThread::join()
 {
-	int result = 22; //EINVAL;
+    int result = 22; //EINVAL;
     if (m_initialised) {
 #ifdef _WIN32
         m_thread.join();
@@ -135,13 +135,13 @@ int EXTThread::join()
         result = pthread_join(m_thread, NULL);
 #endif
         m_joined = ! result;
-	}
+    }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
         printf("Error joining thread: %d\n", result);
-	}
+    }
 #endif
-	return result;
+    return result;
 }
 
 int EXTThread::setPriority(int Priority, bool Realtime)

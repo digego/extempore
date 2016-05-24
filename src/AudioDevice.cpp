@@ -176,18 +176,18 @@ static LONGLONG MT_SLEEP_DURATION = NANO_SLEEP_DURATION;
 
 static void nanosleep(LONGLONG* Ns, void*)
 {
-	auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
-	if (!timer) {
-		return;
-	}
-	LARGE_INTEGER li;
-	li.QuadPart = -*Ns / 100;
-	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
-		CloseHandle(timer);
-		return;
-	}
-	WaitForSingleObject(timer, INFINITE);
-	CloseHandle(timer);
+    auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
+    if (!timer) {
+        return;
+    }
+    LARGE_INTEGER li;
+    li.QuadPart = -*Ns / 100;
+    if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
+        CloseHandle(timer);
+        return;
+    }
+    WaitForSingleObject(timer, INFINITE);
+    CloseHandle(timer);
 }
 #endif
 

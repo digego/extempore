@@ -92,7 +92,7 @@ public:
 
 inline void EXTMutex::init(bool Recursive)
 {
-	m_initialised = true;
+    m_initialised = true;
 }
 
 inline void EXTMutex::destroy()

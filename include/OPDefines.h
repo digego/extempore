@@ -121,7 +121,7 @@ _OP_DEF(opexe_3, "number?",                        1,  1,       TST_ANY,        
 _OP_DEF(opexe_3, "string?",                        1,  1,       TST_ANY,                         OP_STRINGP          )
 _OP_DEF(opexe_3, "integer?",                       1,  1,       TST_ANY,                         OP_INTEGERP         )
 _OP_DEF(opexe_3, "real?",                          1,  1,       TST_ANY,                         OP_REALP            )
-_OP_DEF(opexe_3, "rational?",                      1,  1,       TST_ANY,                         OP_RATIONALP        )	
+_OP_DEF(opexe_3, "rational?",                      1,  1,       TST_ANY,                         OP_RATIONALP        )
 _OP_DEF(opexe_3, "char?",                          1,  1,       TST_ANY,                         OP_CHARP            )
 #if USE_CHAR_CLASSIFIERS
 _OP_DEF(opexe_3, "char-alphabetic?",               1,  1,       TST_CHAR,                        OP_CHARAP           )

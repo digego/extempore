@@ -51,18 +51,18 @@
 
 static void usleep(LONGLONG Us)
 {
-	auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
-	if (!timer) {
-		return;
-	}
-	LARGE_INTEGER li;
-	li.QuadPart = -Us * 10;
-	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
-		CloseHandle(timer);
-		return;
-	}
-	WaitForSingleObject(timer, INFINITE);
-	CloseHandle(timer);
+    auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
+    if (!timer) {
+        return;
+    }
+    LARGE_INTEGER li;
+    li.QuadPart = -Us * 10;
+    if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
+        CloseHandle(timer);
+        return;
+    }
+    WaitForSingleObject(timer, INFINITE);
+    CloseHandle(timer);
 }
 #else
 #include <sys/socket.h>
@@ -72,7 +72,7 @@ static void usleep(LONGLONG Us)
 #include <netdb.h>         /* host to IP resolution       */
 #include <unistd.h>
 static int closesocket(int Socket) {
-	return close(Socket);
+    return close(Socket);
 }
 #endif
 #include <stdlib.h>
@@ -154,7 +154,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
 
 bool SchemeProcess::start()
 {
-	//set socket options
+    //set socket options
     int t_reuse = 1;
     setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse), sizeof(t_reuse));
     struct sockaddr_in address;
@@ -421,7 +421,7 @@ void* SchemeProcess::serverImpl()
             ascii_normal();
             fflush(stdout);
             clientSockets.push_back(res);
-			inStrings[res].clear();
+            inStrings[res].clear();
             std::string outString;
             if (m_banner) {
                 outString += sm_banner;
@@ -437,8 +437,8 @@ void* SchemeProcess::serverImpl()
             } else {
                 outString += "Welcome to extempore!";
             }
-			send(res, outString.c_str(), int(outString.length() + 1), 0);
-			continue;
+            send(res, outString.c_str(), int(outString.length() + 1), 0);
+            continue;
         }
         for (unsigned index = 0; index < clientSockets.size(); ++index) {
             auto sock(clientSockets[index]);

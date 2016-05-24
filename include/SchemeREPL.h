@@ -67,7 +67,7 @@ private:
 
     static repls_type sm_repls;
 public:
-	SchemeREPL(const std::string& Title, SchemeProcess* Process);
+    SchemeREPL(const std::string& Title, SchemeProcess* Process);
 
     const std::string& getTitle() { return m_title; }
     void writeString(std::string&&); // ick (modifying)

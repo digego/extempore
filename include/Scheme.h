@@ -49,7 +49,7 @@
 //   (MINISCM) Mini-Scheme is now maintained by Akira KIDA.
 //   (MINISCM)
 //   (MINISCM) This is a revised and modified version by Akira KIDA.
-//   (MINISCM)	current version is 0.85k4 (15 May 1994)
+//   (MINISCM)  current version is 0.85k4 (15 May 1994)
 //
 //   TinyScheme v.1.35 released under MIT licence.  This file also released under MIT licence.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,12 +173,12 @@ typedef void (*func_dealloc)(void *);
 typedef struct num {
     int num_type;
     union {
-	long long ivalue;
-	double rvalue;
-	struct {
-	    long long n;
-	    long long d;
-	} ratvalue;
+        long long ivalue;
+        double rvalue;
+        struct {
+            long long n;
+            long long d;
+        } ratvalue;
     } value;
 } num;
 
