@@ -5,7 +5,7 @@ static pointer assocstrcmp(scheme* Scheme, pointer Args)
 
 static pointer assocstrcmpall(scheme* Scheme, pointer Args)
 {
-    return assoc_strcmp_all(Scheme, pair_car(Args), pair_cadr(Args));
+    return assoc_strcmp(Scheme, pair_car(Args), pair_cadr(Args), true);
 }
 
 #define ASSOC_DEFS \

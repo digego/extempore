@@ -425,7 +425,7 @@ int is_syntax(pointer Ptr) { return typeflag(Ptr) & T_SYNTAX; }
 int is_integer(pointer Ptr) { return Ptr->_object._number.num_type == T_INTEGER; }
 int is_real(pointer Ptr) { return is_number(Ptr); }
 int is_rational(pointer Ptr) { return Ptr->_object._number.num_type == T_RATIONAL; }
-char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
+inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
 auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
 
 char* string_value(pointer Ptr)
@@ -559,9 +559,9 @@ char* symname(pointer p)
     return strvalue(car(p));
 }
 
-char* symname_sc(scheme* sc,pointer p)
+inline char* symname_sc(scheme* sc,pointer p)
 {
-    if(!is_symbol(p)) {
+    if (unlikely(!is_symbol(p))) {
         _Error_1(sc, "Attempting to return a string from non-symbol obj", p, sc->code->_debugger->_size);
     }
     return strvalue(car(p));
@@ -699,7 +699,7 @@ static int is_ascii_name(const char *name, int *pc) {
 static int file_push(scheme *sc, const char *fname);
 static void file_pop(scheme *sc);
 static int file_interactive(scheme *sc);
-static inline int is_one_of(char *s, int c);
+static inline int is_one_of(const char *s, int c);
 static int alloc_cellseg(scheme *sc, int n);
 static long binary_decode(const char *s);
 static inline pointer get_cell(scheme *sc, pointer a, pointer b);
@@ -1427,7 +1427,7 @@ static int hash_fn(const char *key, int table_size);
 
 static pointer oblist_initial_value(scheme *sc)
 {
-    return mk_vector(sc, 461); /* probably should be bigger */
+    return mk_vector(sc, 65521);
 }
 
 /* returns the new symbol */
@@ -1451,7 +1451,6 @@ static inline pointer oblist_find_by_name(scheme *sc, const char *name)
     int location;
     pointer x;
     char *s;
-
     location = hash_fn(name, sc->oblist->_size); //ivalue_unchecked(sc->oblist));
     for (x = vector_elem(sc->oblist, location); x != sc->NIL; x = cdr(x)) {
         s = symname_sc(sc,car(x));
@@ -2623,7 +2622,7 @@ static int basic_inchar(port *pt) {
 }
 
 /* back character to input buffer */
-static void backchar(scheme *sc, int c) {
+static inline void backchar(scheme *sc, int c) {
     port *pt;
     if(c==EOF) return;
     pt=sc->inport->_object._port;
@@ -2791,7 +2790,7 @@ static pointer readstrexp(scheme *sc) {
 }
 
 /* check c is in chars */
-static inline int is_one_of(char *s, int c) {
+static inline int is_one_of(const char *s, int c) {
     if(c==EOF) return 1;
     while (*s)
         if (*s++ == c)
@@ -2824,7 +2823,7 @@ static int token(scheme *sc) {
         return (TOK_RPAREN);
     case '.':
         c=inchar(sc);
-        if(is_one_of((char*)" \n\t",c)) {
+        if (is_one_of(" \n\t",c)) {
             return (TOK_DOT);
         } else {
             backchar(sc,c);
@@ -3227,7 +3226,7 @@ static inline uint64_t str_hash(const char* str)
     return result;
 }
 
-static int hash_fn(const char *key, int table_size)
+static inline int hash_fn(const char *key, int table_size)
 {
     return str_hash(key) % table_size;
 }
@@ -3245,7 +3244,7 @@ static void new_frame_in_env(scheme *sc, pointer old_env)
 
     /* The interaction-environment has about 300 variables in it. */
     if (old_env == sc->NIL) {
-        new_frame = mk_vector(sc, 1000);
+        new_frame = mk_vector(sc, 65521);
     } else {
         new_frame = sc->NIL;
     }
@@ -3261,7 +3260,6 @@ static inline void new_slot_spec_in_env(scheme *sc, pointer env,
 
   if (is_vector(car(env))) {
     int location = hash_fn(symname_sc(sc,variable), (car(env))->_size);
-
     set_vector_elem(sc, car(env), location,
                     immutable_cons(sc, slot, vector_elem(car(env), location)));
   } else {
@@ -3597,62 +3595,30 @@ static inline void dump_stack_mark(scheme *sc)
 }
 */
 
+static pointer list_copy(scheme* Scheme, pointer Args)
+{
+    pointer ret = Scheme->NIL;
+    for (; Args != Scheme->NIL; Args = cdr(Args)) {
+        ret = cons(Scheme, car(Args), ret);
+    }
+    return reverse_in_place(Scheme, Scheme->NIL, ret);
+}
+
 static void dump_stack_continuation_set(scheme* sc, pointer p)
 {
     unsigned int* olddump = (unsigned int*) cptr_value_sc(sc,p);
     ptrdiff_t nframes = olddump[0];
-    memcpy(sc->dump_base, &olddump[1], nframes*sizeof(struct dump_stack_frame));
-    sc->dump = (pointer)nframes;
-
-    // must also copy the args and code lists so the continuations versions don't get modified!
-    dump_stack_frame* frames = (dump_stack_frame*)sc->dump_base;
-
-//      std::cout << "STACK DUMP RETURN-----------------------------------------------------------------" << std::endl;
-    // for each frame copy the args and code lists
-    for(int j=0;j<nframes;j++)
-    {
-//              std::cout << "OPCODE: " << opcodename(frames[j].op) << std::endl << "----------" << std::endl;
-
-        // copy args
-        pointer args = frames[j].args;
-//              std::stringstream ss;
-//              imp::SchemeInterface::printSchemeCell(sc, ss, args, true);
-//              std::cout << "ARGS" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-
-        pointer t = sc->NIL;
-        int lgth = list_length(sc, args);
-        for(int i=0;i<lgth;i++)
-        {
-            t = cons(sc, list_ref(sc,i,args), t);
-        }
-        frames[j].args = reverse(sc,t);
-
-        // copy code
-        pointer code = frames[j].code;
-//              ss.str("");
-//              imp::SchemeInterface::printSchemeCell(sc, ss, code, true);
-//              std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-        if(is_symbol(code)) {
+    memcpy(sc->dump_base, &olddump[1], nframes * sizeof(struct dump_stack_frame));
+    sc->dump = pointer(nframes);
+    dump_stack_frame* frames = (dump_stack_frame*) sc->dump_base;
+    for (int j=0;j<nframes;j++) {
+        frames[j].args = list_copy(sc, frames[j].args);
+        if (is_symbol(frames[j].code)) {
             frames[j].code = mk_symbol(sc, symname_sc(sc,frames[j].code));
-        }else{
-            t = sc->NIL;
-            lgth = list_length(sc, code);
-            for(int i=0;i<lgth;i++)
-            {
-                t = cons(sc, list_ref(sc,i,code), t);
-            }
-            frames[j].code = reverse(sc,t);
+        } else {
+            frames[j].code = list_copy(sc, frames[j].code);
         }
-
-        //sticky into envir
-//          pointer envir = frames[j].envir;
-//              ss.str("");
-//              imp::SchemeInterface::printSchemeCell(sc, ss, envir, true);
-//              std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-
     }
-
-    return;
 }
 
 pointer dump_stack_copy(scheme* sc)
@@ -3667,50 +3633,15 @@ pointer dump_stack_copy(scheme* sc)
     EnvInjector injector(sc, new_stack_ptr);
 
     dump_stack_frame* frames = (dump_stack_frame*)&newdump[1];
-
-//      std::cout << "STACK DUMP-----------------------------------------------------------------" << std::endl;
-    // for each frame copy the args and code lists
-    for(int j=0;j<nframes;j++)
+    for (int j=0;j < nframes; j++)
     {
-//              std::cout << "OPCODE: " << opcodename(frames[j].op) << std::endl << "----------" << std::endl;
-
-        // copy args
-        pointer args = frames[j].args;
-//              std::stringstream ss;
-//              imp::SchemeInterface::printSchemeCell(sc, ss, args, true);
-//              std::cout << "ARGS" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-        pointer t = sc->NIL;
-        int lgth = list_length(sc, args);
-        for(int i=0;i<lgth;i++)
-        {
-            t = cons(sc, list_ref(sc,i,args), t);
-        }
-        frames[j].args = reverse(sc,t);
-
-        // copy code
-        pointer code = frames[j].code;
-//              ss.str("");
-//              imp::SchemeInterface::printSchemeCell(sc, ss, code, true);
-//              std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-        if(is_symbol(code)) {
+        frames[j].args = list_copy(sc, frames[j].args);
+        if (is_symbol(frames[j].code)) {
             frames[j].code = mk_symbol(sc, symname_sc(sc,frames[j].code));
-        }else{
-            t = sc->NIL;
-            lgth = list_length(sc, code);
-            for(int i=0;i<lgth;i++)
-            {
-                t = cons(sc, list_ref(sc,i,code), t);
-            }
-            frames[j].code = reverse(sc,t);
+        } else {
+            frames[j].code = list_copy(sc, frames[j].code);
         }
-
-        //sticky into envir
-//          pointer envir = frames[j].envir;
-//              ss.str("");
-//              imp::SchemeInterface::printSchemeCell(sc, ss, envir, true);
-//              std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
     }
-
     return new_stack_ptr;
 }
 
@@ -4989,108 +4920,62 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 
 
 // keys of assoc lst MUST be strings OR symbols
-/*static*/ pointer assoc_strcmp(scheme *sc, pointer key, pointer lst) {
-    pointer x;
-    pointer pair;
-    pointer r1;
-    char* lkey;
-    char* skey;
-
-    if(is_symbol(key)) {
-      skey = strvalue(car(key));
-      for (x = lst; is_pair(x); x = cdr(x)) {
-        pair = pair_car_sc(sc,x);
-        if(is_pair(pair)) {
-          r1 = pair_car_sc(sc,pair);
-          if(!is_symbol(r1)) return sc->F;
-          lkey = strvalue(car(r1));
-          if(0 == strcmp(lkey,skey)) {
-            return pair;
-          }
-        } else {
-          return sc->F;
+pointer assoc_strcmp(scheme *sc, pointer key, pointer lst, bool all)
+{
+    pointer errVal = (!all) ? sc->F : sc->NIL;
+    pointer retlist = errVal;
+    if (likely(is_symbol(key))) {
+        auto skey = strvalue(car(key));
+        for (auto x = lst; is_pair(x); x = cdr(x)) {
+            auto pair = car(x);
+            if (unlikely(!is_pair(pair))) {
+                return errVal;
+            }
+            auto r1 = car(pair);
+            if (unlikely(!is_symbol(r1))) {
+                return errVal;
+            }
+            auto lkey = strvalue(car(r1));
+            if (!strcmp(lkey, skey)) {
+                if (likely(!all)) {
+                    return pair;
+                }
+                retlist = cons(sc, pair, retlist);
+            }
         }
-      }
-    } else if(is_string(key)) {
-      skey = strvalue(key);
-      for (x = lst; is_pair(x); x = cdr(x)) {
-        pair = pair_car_sc(sc,x);
-        if(is_pair(pair)) {
-          lkey = strvalue(pair_car_sc(sc,pair));
-          if(0 == strcmp(lkey,skey)) {
-            return pair;
-          }
-        } else {
-          return sc->F;
-        }
-      }
-    } else {
-      // it not neccessarily a problem for the key to be a non-symbol/string
-      // although it should return false of course
-      // which it does after falling through to the final return
+        return retlist;
     }
-    return sc->F;
+    if (is_string(key)) {
+        auto skey = strvalue(key);
+        for (auto x = lst; is_pair(x); x = cdr(x)) {
+            auto pair = car(x);
+            if (unlikely(!is_pair(pair))) {
+                return errVal;
+            }
+            auto lkey = strvalue(car(pair));
+            if (!strcmp(lkey,skey)) {
+                if (likely(!all)) {
+                    return pair;
+                }
+                retlist = cons(sc, pair, retlist);
+            }
+        }
+        return retlist;
+    }
+    // it not neccessarily a problem for the key to be a non-symbol/string
+    // although it should return false of course
+    // which it does after falling through to the final return
+    return retlist;
 }
 
-// keys of assoc lst MUST be strings OR symbols
-/*static*/ pointer assoc_strcmp_all(scheme *sc, pointer key, pointer lst) {
+pointer list_ref(scheme *sc, const int pos, pointer a) {
     pointer x;
-    pointer pair;
-    pointer r1;
-    char* lkey;
-    char* skey;
-    pointer retlst = sc->NIL;
-
-    if(is_symbol(key)) {
-      skey = strvalue(car(key));
-      for (x = lst; is_pair(x); x = cdr(x)) {
-        pair = pair_car_sc(sc,x);
-        if(is_pair(pair)) {
-          r1 = pair_car_sc(sc,pair);
-          if(!is_symbol(r1)) return sc->NIL;
-          lkey = strvalue(car(r1));
-          if(0 == strcmp(lkey,skey)) {
-            retlst = cons(sc, pair, retlst);
-            continue;
-          }
-        } else {
-          return sc->NIL;
-        }
-      }
-    } else if(is_string(key)) {
-      skey = strvalue(key);
-      for (x = lst; is_pair(x); x = cdr(x)) {
-        pair = pair_car_sc(sc,x);
-        if(is_pair(pair)) {
-          lkey = strvalue(pair_car_sc(sc,pair));
-          if(0 == strcmp(lkey,skey)) {
-            retlst = cons(sc, pair, retlst);
-            continue;
-          }
-        } else {
-          return sc->NIL;
-        }
-      }
-    } else {
-      // it not neccessarily a problem for the key to be a non-symbol/string
-      // although it should return false of course
-      // which it does after falling through to the final return
-    }
-    if (retlst == sc->NIL) {
-      return sc->NIL;
-    }else{
-      return retlst;
-    }
-}
-
-
-/*static*/ pointer list_ref(scheme *sc, const int pos, pointer a) {
-    pointer x;
-    for (int i=0; i<=pos; i++,a = cdr(a))
+    for (int i=0; i <= pos; ++i, a = cdr(a))
     {
-        if(!is_pair(a)) return sc->NIL;
-        //x = pair_car(a);
-        x = pair_car_sc(sc,a);
+        if (unlikely(!is_pair(a))) {
+            return sc->NIL;
+        }
+        x = car(a);
     }
     return x;
 }
