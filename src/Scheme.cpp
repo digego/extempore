@@ -376,21 +376,6 @@ static const uint32_t CLRATOM = ~T_ATOM;
 static const uint32_t MARK = 1 << 15;
 static const uint32_t UNMARK = ~MARK;
 
-static int MY_ARR[] = {0,1,1,3,1,-1,3};
-
-static num num_add(num a, num b);
-static num num_mul(num a, num b);
-static num num_div(num a, num b);
-static num num_intdiv(num a, num b);
-static num num_sub(num a, num b);
-static num num_rem(num a, num b);
-static num num_mod(num a, num b);
-static int num_eq(num a, num b);
-static int num_gt(num a, num b);
-static int num_ge(num a, num b);
-static int num_lt(num a, num b);
-static int num_le(num a, num b);
-
 #if USE_MATH
 static double round_per_R5RS(double x);
 #endif
@@ -398,12 +383,6 @@ static int is_zero_double(double x);
 
 static num num_zero;
 static num num_one;
-
-enum num_type {
-    T_INTEGER = 0,
-    T_REAL = 1,
-    T_RATIONAL = 3
-};
 
 inline auto typeflag(pointer Ptr) -> decltype(cell::_flag)& { return Ptr->_flag; }
 inline auto type(pointer Ptr) -> decltype(cell::_flag) { return typeflag(Ptr) & T_MASKTYPE; }
@@ -436,78 +415,67 @@ char* string_value(pointer Ptr)
     return strvalue(Ptr);
 }
 
-num nvalue(pointer p)
+static inline const num& nvalue(pointer Ptr)
 {
-    return ((p)->_object._number);
+    return Ptr->_object._number;
 }
 
-long long ivalue(pointer p)
+int64_t ivalue(pointer Ptr)
 {
-    switch(p->_object._number.num_type){
-    case 0:
-        return (p)->_object._number.value.ivalue;
-    case 1:
-        return (long long)(p)->_object._number.value.rvalue;
-    case 3:
-        return (long long)((p)->_object._number.value.ratvalue.n/(p)->_object._number.value.ratvalue.d);
+    auto type(Ptr->_object._number.num_type);
+    if (likely(type == T_INTEGER)) {
+        return Ptr->_object._number.value.ivalue;
+    }
+    if (likely(type == T_REAL)) {
+        return Ptr->_object._number.value.rvalue;
+    }
+    if (likely(type == T_RATIONAL)) {
+        return Ptr->_object._number.value.ratvalue.n / Ptr->_object._number.value.ratvalue.d;
     }
     return 0;
 }
 
-long long i64value(pointer p)
+int64_t i64value(pointer p)
 {
     return ivalue(p);
 }
 
-int i32value(pointer p)
+int32_t i32value(pointer p)
 {
-    return (int) ivalue(p);
+    return ivalue(p);
 }
 
-short i16value(pointer p)
+int16_t i16value(pointer p)
 {
-    return (short) ivalue(p);
+    return ivalue(p);
 }
 
-char i8value(pointer p)
+int8_t i8value(pointer p)
 {
-  return (char) ivalue(p);
+    return ivalue(p);
 }
 
 bool i1value(scheme* _sc, pointer p)
 {
-    return (p == _sc->T) ? true : false;
-}
-
-double rvalue(pointer p)
-{
-    switch(p->_object._number.num_type){
-    case 0:
-        return (double)(p)->_object._number.value.ivalue;
-    case 1:
-        return (p)->_object._number.value.rvalue;
-    case 3:
-        return ((double)(p)->_object._number.value.ratvalue.n)/((double)(p)->_object._number.value.ratvalue.d);
-    }
-    return 0.0;
+    return p == _sc->T;
 }
 
 double r64value(pointer p)
 {
-  return (double) rvalue(p);
+    return rvalue(p);
 }
 
 float r32value(pointer p)
 {
-  return (float) rvalue(p);
+    return rvalue(p);
 }
 
-#define ivalue_unchecked(p)       ((p)->_object._number.value.ivalue)
-#define rvalue_unchecked(p)       ((p)->_object._number.value.rvalue)
-#define ratvalue_unchecked(p)       ((p)->_object._number.value.ratvalue)
-#define set_integer(p)   (p)->_object._number.num_type=0;
-#define set_real(p)      (p)->_object._number.num_type=1;
-#define set_rational(p)      (p)->_object._number.num_type=3;
+#define ivalue_unchecked(p)   (p)->_object._number.value.ivalue
+#define rvalue_unchecked(p)   (p)->_object._number.value.rvalue
+#define ratvalue_unchecked(p) (p)->_object._number.value.ratvalue
+#define set_integer(p)        (p)->_object._number.num_type = T_INTEGER;
+#define set_real(p)           (p)->_object._number.num_type = T_REAL;
+#define set_rational(p)       (p)->_object._number.num_type = T_RATIONAL;
 
 long long charvalue(pointer p)
 {
@@ -526,7 +494,6 @@ long long charvalue_sc(scheme* sc, pointer p)
 
 #define car(p)           ((p)->_object._cons._car)
 #define cdr(p)           ((p)->_object._cons._cdr)
-
 
 pointer pair_car(pointer p)
 {
@@ -705,7 +672,7 @@ static long binary_decode(const char *s);
 static inline pointer get_cell(scheme *sc, pointer a, pointer b);
 static pointer _get_cell(scheme *sc, pointer a, pointer b);
 static void finalize_cell(scheme *sc, pointer a);
-static pointer mk_number(scheme *sc, num n);
+static pointer mk_number(scheme *sc, const num& n);
 static pointer mk_empty_string(scheme *sc, int len, char fill);
 static char *store_string(scheme *sc, int len, const char *str, char fill);
 static pointer mk_atom(scheme *sc, char *q);
@@ -761,412 +728,270 @@ pointer list_ref(scheme *sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 int eqv_sc(scheme* sc, pointer a, pointer b);
 
-static inline long long num_ivalue(num n) {
-    switch(n.num_type) {
-    case 0:
-        return (n).value.ivalue;
-    case 1:
-        return (long long)(n).value.rvalue;
-    case 3:
-        return (long long)((n).value.ratvalue.n/(n).value.ratvalue.d);
+static inline int64_t num_ivalue(const num& Val) {
+    if (likely(Val.num_type == T_INTEGER)) {
+        return Val.value.ivalue;
     }
-    return 0;
+    if (likely(Val.num_type == T_REAL)) {
+        return Val.value.rvalue;
+    }
+    return Val.value.ratvalue.n / Val.value.ratvalue.d;
 }
 
-static inline double num_rvalue(num n) {
-    switch(n.num_type) {
-    case 0:
-        return (double)(n).value.ivalue;
-    case 1:
-        return (n).value.rvalue;
-    case 3:
-        return (double)((n).value.ratvalue.n)/(double)((n).value.ratvalue.d);
+static inline double num_rvalue(const num& Val) {
+    if (likely(Val.num_type == T_INTEGER)) {
+        return Val.value.ivalue;
     }
-    return 0.0;
+    if (likely(Val.num_type == T_REAL)) {
+        return Val.value.rvalue;
+    }
+    return double(Val.value.ratvalue.n) / Val.value.ratvalue.d;
 }
 
-static num num_add(num a, num b) {
+static const num_type MY_ARR[] = { T_INTEGER, T_REAL, T_REAL, T_RATIONAL, T_REAL, T_INTEGER, T_RATIONAL };
+
+static num num_add(const num& a, const num& b)
+{
     num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-
-    switch(ret.num_type){
-    case 0:
-        ret.value.ivalue=a.value.ivalue+b.value.ivalue;
-        break;
-    case 1:
-        ret.value.rvalue=num_rvalue(a)+num_rvalue(b);
-        break;
-    case 3:
-        if(a.num_type == 0)
-        {
-            ret.value.ratvalue.n=(a.value.ivalue*b.value.ratvalue.d)+b.value.ratvalue.n;
-            ret.value.ratvalue.d=b.value.ratvalue.d;
-        }
-        else if(b.num_type == 0)
-        {
-            ret.value.ratvalue.n=(b.value.ivalue*a.value.ratvalue.d)+a.value.ratvalue.n;
-            ret.value.ratvalue.d=a.value.ratvalue.d;
-        }
-        else
-        {
-            ret.value.ratvalue.n=(a.value.ratvalue.n*b.value.ratvalue.d)+(b.value.ratvalue.n*a.value.ratvalue.d);
-            ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.d;
-        }
-        break;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        ret.value.ivalue = a.value.ivalue + b.value.ivalue;
+        return ret;
+    }
+    if (likely(ret.num_type == T_REAL)) {
+        ret.value.rvalue = num_rvalue(a) + num_rvalue(b);
+        return ret;
+    }
+    if (a.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ivalue * b.value.ratvalue.d + b.value.ratvalue.n;
+        ret.value.ratvalue.d = b.value.ratvalue.d;
+    } else if (b.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = b.value.ivalue * a.value.ratvalue.d + a.value.ratvalue.n;
+        ret.value.ratvalue.d = a.value.ratvalue.d;
+    } else {
+        ret.value.ratvalue.n = a.value.ratvalue.n * b.value.ratvalue.d + b.value.ratvalue.n * a.value.ratvalue.d;
+        ret.value.ratvalue.d = a.value.ratvalue.d * b.value.ratvalue.d;
     }
     return ret;
 }
 
-static num num_mul(num a, num b) {
+static num num_mul(const num& a, const num& b)
+{
     num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-
-    switch(ret.num_type) {
-    case 0:
-        ret.value.ivalue= a.value.ivalue*b.value.ivalue;
-        break;
-    case 1:
-        ret.value.rvalue=num_rvalue(a)*num_rvalue(b);
-        break;
-    case 3:
-        if(a.num_type == 0)
-        {
-            ret.value.ratvalue.n=a.value.ivalue*b.value.ratvalue.n;
-            ret.value.ratvalue.d=b.value.ratvalue.d;
-        }
-        else if(b.num_type == 0)
-        {
-            ret.value.ratvalue.n=b.value.ivalue*a.value.ratvalue.n;
-            ret.value.ratvalue.d=a.value.ratvalue.d;
-        }
-        else
-        {
-            ret.value.ratvalue.n=a.value.ratvalue.n*b.value.ratvalue.n;
-            ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.d;
-        }
-        break;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        ret.value.ivalue = a.value.ivalue * b.value.ivalue;
+        return ret;
     }
-
-    return ret;
-}
-
-static num num_div(num a, num b) {
-    num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-
-    switch(ret.num_type) {
-    case 0:
-        if(!(a.value.ivalue%b.value.ivalue))
-        {
-            ret.value.ivalue=a.value.ivalue/b.value.ivalue;
-        }
-        else
-        {
-            ret.num_type = 3;
-            ret.value.ratvalue.n=a.value.ivalue;
-            ret.value.ratvalue.d=b.value.ivalue;
-        }
-        break;
-    case 1:
-        ret.value.rvalue=num_rvalue(a)/num_rvalue(b);
-        break;
-    case 3:
-        if(a.num_type == 0)
-        {
-            ret.value.ratvalue.n=(a.value.ivalue*b.value.ratvalue.d);
-            ret.value.ratvalue.d=b.value.ratvalue.n;
-        }
-        else if(b.num_type == 0)
-        {
-            ret.value.ratvalue.n=a.value.ratvalue.n;
-            ret.value.ratvalue.d=(b.value.ivalue*a.value.ratvalue.d);
-        }
-        else
-        {
-            //std::cout << a.value.ratvalue.n << " * " << b.value.ratvalue.d << " / " << a.value.ratvalue.d << " * " << b.value.ratvalue.n << std::endl;
-            ret.value.ratvalue.n=a.value.ratvalue.n*b.value.ratvalue.d;
-            ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.n;
-        }
-        break;
+    if (likely(ret.num_type == T_REAL)) {
+        ret.value.rvalue = num_rvalue(a) * num_rvalue(b);
+        return ret;
     }
-
-    return ret;
-}
-
-static num num_bitnot(num a) {
-  num ret;
-  ret.num_type = MY_ARR[a.num_type];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= ~ (a.value.ivalue);
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= ~((int)a.value.ivalue);
-  }
-
-  return ret;
-}
-
-static num num_bitand(num a, num b) {
-  num ret;
-  int tot = a.num_type + b.num_type;
-  ret.num_type = MY_ARR[tot];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= a.value.ivalue & b.value.ivalue;
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= (int)a.value.ivalue & (int)b.value.ivalue;
-  }
-
-  return ret;
-}
-
-static num num_bitor(num a, num b) {
-  num ret;
-  int tot = a.num_type + b.num_type;
-  ret.num_type = MY_ARR[tot];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= a.value.ivalue | b.value.ivalue;
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= (int)a.value.ivalue | (int)b.value.ivalue;
-  }
-
-  return ret;
-}
-
-static num num_biteor(num a, num b) {
-  num ret;
-  int tot = a.num_type + b.num_type;
-  ret.num_type = MY_ARR[tot];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= a.value.ivalue ^ b.value.ivalue;
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= (int)a.value.ivalue ^ (int)b.value.ivalue;
-  }
-
-  return ret;
-}
-
-static num num_bitlsl(num a, num b) {
-  num ret;
-  int tot = a.num_type + b.num_type;
-  ret.num_type = MY_ARR[tot];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= a.value.ivalue << b.value.ivalue;
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= (int)a.value.ivalue << (int)b.value.ivalue;
-  }
-
-  return ret;
-}
-
-static num num_bitlsr(num a, num b) {
-  num ret;
-  int tot = a.num_type + b.num_type;
-  ret.num_type = MY_ARR[tot];
-
-  switch(ret.num_type) {
-  case 0:
-    ret.value.ivalue= a.value.ivalue >> b.value.ivalue;
-    break;
-  case 1:
-  case 3:
-    ret.num_type = 0;
-    ret.value.ivalue= (int)a.value.ivalue >> (int)b.value.ivalue;
-  }
-
-  return ret;
-}
-
-
-static num num_intdiv(num a, num b) {
-    num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-
-    switch(ret.num_type) {
-    case 0:
-        if(!(a.value.ivalue%b.value.ivalue))
-        {
-            ret.value.ivalue=a.value.ivalue/b.value.ivalue;
-        }
-        else
-        {
-            ret.value.ivalue=a.value.ivalue/b.value.ivalue;
-        }
-        break;
-    case 1:
-    case 3:
-        ret.num_type = 0;
-        ret.value.ivalue=(int)(num_rvalue(a)/num_rvalue(b));
-    }
-
-    return ret;
-}
-
-static num num_sub(num a, num b) {
-    num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-    switch(ret.num_type){
-    case 0:
-        ret.value.ivalue=a.value.ivalue-b.value.ivalue;
-        break;
-    case 1:
-        ret.value.rvalue=num_rvalue(a)-num_rvalue(b);
-        break;
-    case 3:
-        if(a.num_type == 0)
-        {
-            ret.value.ratvalue.n=(a.value.ivalue*b.value.ratvalue.d)-b.value.ratvalue.n;
-            ret.value.ratvalue.d=b.value.ratvalue.d;
-        }
-        else if(b.num_type == 0)
-        {
-            ret.value.ratvalue.n=a.value.ratvalue.n-(b.value.ivalue*a.value.ratvalue.d);
-            ret.value.ratvalue.d=a.value.ratvalue.d;
-        }
-        else
-        {
-            ret.value.ratvalue.n=(a.value.ratvalue.n*b.value.ratvalue.d)-(b.value.ratvalue.n*a.value.ratvalue.d);
-            ret.value.ratvalue.d=a.value.ratvalue.d*b.value.ratvalue.d;
-        }
-        break;
+    if (a.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ivalue * b.value.ratvalue.n;
+        ret.value.ratvalue.d = b.value.ratvalue.d;
+    } else if (b.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = b.value.ivalue * a.value.ratvalue.n;
+        ret.value.ratvalue.d = a.value.ratvalue.d;
+    } else {
+        ret.value.ratvalue.n = a.value.ratvalue.n * b.value.ratvalue.n;
+        ret.value.ratvalue.d = a.value.ratvalue.d * b.value.ratvalue.d;
     }
     return ret;
 }
 
-static num num_rem(num a, num b) {
+static num num_div(const num& a, const num& b)
+{
     num ret;
-    long e1, e2, res;
-    ret.num_type = 0;
-    e1=num_ivalue(a);
-    e2=num_ivalue(b);
-    res=e1%e2;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        if (unlikely(!(a.value.ivalue % b.value.ivalue))) {
+            ret.value.ivalue = a.value.ivalue / b.value.ivalue;
+            return ret;
+        }
+        ret.num_type = T_RATIONAL;
+        ret.value.ratvalue.n = a.value.ivalue;
+        ret.value.ratvalue.d = b.value.ivalue;
+        return ret;
+    }
+    if (likely(ret.num_type == T_REAL)) {
+        ret.value.rvalue = num_rvalue(a) / num_rvalue(b);
+        return ret;
+    }
+    if (a.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ivalue * b.value.ratvalue.d;
+        ret.value.ratvalue.d = b.value.ratvalue.n;
+    } else if (b.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ratvalue.n;
+        ret.value.ratvalue.d = b.value.ivalue * a.value.ratvalue.d;
+    } else {
+        ret.value.ratvalue.n = a.value.ratvalue.n * b.value.ratvalue.d;
+        ret.value.ratvalue.d = a.value.ratvalue.d * b.value.ratvalue.n;
+    }
+    return ret;
+}
+
+static num num_bitnot(const num& a)
+{
+    num ret;
+    ret.num_type = a.num_type;
+    if (likely(ret.num_type == T_INTEGER)) {
+        ret.value.ivalue = ~a.value.ivalue;
+        return ret;
+    }
+    ret.num_type = T_INTEGER;
+    ret.value.ivalue= ~num_ivalue(a);
+    return ret;
+}
+
+#define BBOP(NAME, OP) \
+    static num num_bit ## NAME(const num& a, const num& b) { \
+        num ret; \
+        ret.num_type = MY_ARR[a.num_type + b.num_type]; \
+        if (likely(ret.num_type == T_INTEGER)) { \
+            ret.value.ivalue = a.value.ivalue OP b.value.ivalue; \
+            return ret; \
+        } \
+        ret.num_type = T_INTEGER; \
+        ret.value.ivalue = num_ivalue(a) OP num_ivalue(b); \
+        return ret; \
+    }
+
+BBOP(and, &)
+BBOP(or, |)
+BBOP(eor, ^)
+BBOP(lsl, <<)
+BBOP(lsr, >>)
+
+static num num_intdiv(const num& a, const num& b)
+{
+    num ret;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        ret.value.ivalue = a.value.ivalue / b.value.ivalue;
+        return ret;
+    }
+    ret.num_type = T_INTEGER;
+    ret.value.ivalue = int64_t(num_rvalue(a) / num_rvalue(b));
+    return ret;
+}
+
+static num num_sub(const num& a, const num& b)
+{
+    num ret;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        ret.value.ivalue = a.value.ivalue - b.value.ivalue;
+        return ret;
+    }
+    if (likely(ret.num_type == T_REAL)) {
+        ret.value.rvalue = num_rvalue(a) - num_rvalue(b);
+        return ret;
+    }
+    if (a.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ivalue * b.value.ratvalue.d - b.value.ratvalue.n;
+        ret.value.ratvalue.d = b.value.ratvalue.d;
+    } else if(b.num_type == T_INTEGER) {
+        ret.value.ratvalue.n = a.value.ratvalue.n - b.value.ivalue * a.value.ratvalue.d;
+        ret.value.ratvalue.d = a.value.ratvalue.d;
+    } else {
+        ret.value.ratvalue.n = a.value.ratvalue.n * b.value.ratvalue.d - b.value.ratvalue.n * a.value.ratvalue.d;
+        ret.value.ratvalue.d = a.value.ratvalue.d * b.value.ratvalue.d;
+    }
+    return ret;
+}
+
+static num num_rem(const num& a, const num& b)
+{
+    num ret;
+    ret.num_type = T_INTEGER;
+    auto e1 = num_ivalue(a);
+    auto e2 = num_ivalue(b);
+    auto res = e1 % e2;
     /* modulo should have same sign as second operand */
     if (res > 0) {
         if (e1 < 0) {
-            res -= labs(e2);
+            res -= std::llabs(e2);
         }
     } else if (res < 0) {
         if (e1 > 0) {
-            res += labs(e2);
+            res += std::llabs(e2);
         }
     }
-    ret.value.ivalue=res;
+    ret.value.ivalue = res;
     return ret;
 }
 
-static num num_mod(num a, num b) {
+static num num_mod(const num& a, const num& b)
+{
     num ret;
-    int tot = a.num_type + b.num_type;
-    ret.num_type = MY_ARR[tot];
-    switch(ret.num_type) {
-    case 0: {
-        long e1, e2, res;
-        ret.num_type = 0;
-        e1=num_ivalue(a);
-        e2=num_ivalue(b);
-        res=e1%e2;
-        if(res*e2<0) {    /* modulo should have same sign as second operand */
-            e2=labs(e2);
-            if(res>0) {
-                res-=e2;
+    ret.num_type = MY_ARR[a.num_type + b.num_type];
+    if (likely(ret.num_type == T_INTEGER)) {
+        auto e1 = num_ivalue(a);
+        auto e2 = num_ivalue(b);
+        auto res = e1 % e2;
+        if (res * e2 < 0) {    /* modulo should have same sign as second operand */  // TODO: NOT FOR MODUL
+            if (res > 0) {
+                res -= std::llabs(e2);
             } else {
-                res+=e2;
+                res += std::llabs(e2);
             }
         }
-        ret.value.ivalue=res;
-        break;
+        ret.value.ivalue = res;
+        return ret;
     }
-    case 1: {
-        double e1=num_rvalue(a);
-        double e2=num_rvalue(b);
-
-        double res = fmod(e1,e2);
-
-        ret.value.rvalue = res;
-        break;
+    if (likely(ret.num_type == T_REAL)) {
+        ret.value.rvalue = fmod(num_rvalue(a), num_rvalue(b));
+        return ret;
     }
-    case 3:
-        ret = num_div(a, b);
-        ret.value.ratvalue.n = ret.value.ratvalue.n%ret.value.ratvalue.d;
-        ret = num_mul(b,ret);
-        break;
-    }
+    ret = num_div(a, b);
+    ret.value.ratvalue.n = ret.value.ratvalue.n % ret.value.ratvalue.d;
+    return num_mul(b, ret);
     return ret;
 }
 
-static int num_eq(num a, num b) {
-    int ret;
-    int tot = a.num_type + b.num_type;
-    //ret.num_type = arr[tot];
-    switch(MY_ARR[tot]){
-    case 0:
-        ret=a.value.ivalue==b.value.ivalue;
-        break;
-    case 1:
-        ret=num_rvalue(a)==num_rvalue(b);
-        break;
-    case 3:
-        if(b.num_type==0) {
-            ret=a.value.ratvalue.d*b.value.ivalue==a.value.ratvalue.n;
-        }else if(a.num_type==0){
-            ret=b.value.ratvalue.d*a.value.ivalue==b.value.ratvalue.n;
-        }else{
-            ret=a.value.ratvalue.n==b.value.ratvalue.n && a.value.ratvalue.d==b.value.ratvalue.d;
-        }
+static int num_eq(const num& a, const num& b)
+{
+    auto type(MY_ARR[a.num_type + b.num_type]);
+    if (likely(type == T_INTEGER)) {
+        return a.value.ivalue == b.value.ivalue;
     }
-    return ret;
-}
-
-static int num_gt(num a, num b) {
-    if(a.num_type == 0 && b.num_type == 0) {
-        return a.value.ivalue>b.value.ivalue;
-    }else{
-        return num_rvalue(a)>num_rvalue(b);
+    if (likely(type == T_REAL)) {
+        return num_rvalue(a) == num_rvalue(b);
     }
-}
-
-static int num_ge(num a, num b) {
-    return !num_lt(a,b);
-}
-
-static int num_lt(num a, num b) {
-    if(a.num_type == 0 && b.num_type == 0) {
-        return a.value.ivalue<b.value.ivalue;
-    }else{
-        return num_rvalue(a)<num_rvalue(b);
+    if (b.num_type == T_INTEGER) {
+        return a.value.ratvalue.d * b.value.ivalue == a.value.ratvalue.n;
     }
+    if (a.num_type == T_INTEGER) {
+        return b.value.ratvalue.d * a.value.ivalue == b.value.ratvalue.n;
+    }
+    return a.value.ratvalue.n == b.value.ratvalue.n && a.value.ratvalue.d == b.value.ratvalue.d;
 }
 
-static int num_le(num a, num b) {
-    return !num_gt(a,b);
+static int num_gt(const num& a, const num& b)
+{
+    if (a.num_type == T_INTEGER && b.num_type == T_INTEGER) {
+        return a.value.ivalue > b.value.ivalue;
+    }
+    return num_rvalue(a) > num_rvalue(b);
+}
+
+static int num_le(const num& a, const num& b)
+{
+    return !num_gt(a, b);
+}
+
+static int num_lt(const num& a, const num& b)
+{
+    if (a.num_type == T_INTEGER && b.num_type == T_INTEGER) {
+        return a.value.ivalue < b.value.ivalue;
+    }
+    return num_rvalue(a) < num_rvalue(b);
+}
+
+static int num_ge(const num& a, const num& b)
+{
+    return !num_lt(a, b);
 }
 
 #if USE_MATH
@@ -1559,25 +1384,14 @@ pointer mk_float(scheme* sc, float n) {
     return mk_real(sc, (double) n);
 }
 
-
-long long gcd(long long a,long long b)
+int64_t gcd(int64_t a, int64_t b)
 {
-    //if(a==0) return 1;
-    long long c;
-    if(a<b)
-    {
-        c = a;
+    while (b) {
+        auto r(a % b);
         a = b;
-        b = c;
+        b = r;
     }
-    while(1)
-    {
-        c = a%b;
-        if(c==0)
-            return b;
-        a = b;
-        b = c;
-    }
+    return a;
 }
 
 pointer mk_rational(scheme *sc, long long n, long long d) {
@@ -1591,7 +1405,7 @@ pointer mk_rational(scheme *sc, long long n, long long d) {
         ivalue_unchecked(x)=0;
         set_integer(x);
     }else{
-        long long _gcd = gcd(n,d);
+        auto _gcd = gcd(n, d);
 
         typeflag(x) = (T_NUMBER | T_ATOM);
         //NSLog(@"MKRAT: %d %d",n,d);
@@ -1604,16 +1418,16 @@ pointer mk_rational(scheme *sc, long long n, long long d) {
     return (x);
 }
 
-static pointer mk_number(scheme *sc, num n) {
-    switch(n.num_type) {
-    case 0:
-        return mk_integer(sc,n.value.ivalue);
-    case 1:
-        return mk_real(sc,n.value.rvalue);
-    case 3:
-        return mk_rational(sc,n.value.ratvalue.n,n.value.ratvalue.d);
+static pointer mk_number(scheme *sc, const num& n) {
+    if (likely(n.num_type == T_INTEGER)) {
+        return mk_integer(sc, n.value.ivalue);
     }
-
+    if (likely(n.num_type == T_REAL)) {
+        return mk_real(sc,n.value.rvalue);
+    }
+    if (likely(n.num_type == T_RATIONAL)) {
+        return mk_rational(sc, n.value.ratvalue.n, n.value.ratvalue.d);
+    }
     return sc->NIL;
 }
 
@@ -2941,10 +2755,10 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         strcpy(p, "#<PORT>");
     } else if (is_number(l)) {
         p = sc->strbuff;
-        if(is_integer(l)) {
-            sprintf(p, "%lli", ivalue_unchecked(l));
+        if (is_integer(l)) {
+            sprintf(p, "%" PRId64, ivalue_unchecked(l));
         } else if(is_rational(l)) {
-            sprintf(p, "%lli/%lli", ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
+            sprintf(p, "%" PRId64 "/ %" PRId64, ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
             //sprintf(p, "%ld/%ld", l->_object._number.value.ratvalue.n, l->_object._number.value.ratvalue.d);
         } else {
             //std::stringstream ss;
@@ -2997,7 +2811,7 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         p = symname_sc(sc,l);
     } else if (is_proc(l)) {
         p = sc->strbuff;
-        sprintf(p, "#<%s PROCEDURE %lli>", procname(l),procnum(l));
+        sprintf(p, "#<%s PROCEDURE %" PRId64 ">", procname(l),procnum(l));
     } else if (is_macro(l)) {
         p = (char*)"#<MACRO>";
     } else if (is_closure(l)) {
@@ -3006,7 +2820,7 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         p = (char*)"#<PROMISE>";
     } else if (is_foreign(l)) {
         p = sc->strbuff;
-        sprintf(p, "#<FOREIGN PROCEDURE %lli>", procnum(l));
+        sprintf(p, "#<FOREIGN PROCEDURE %" PRId64 ">", procnum(l));
     } else if (is_continuation(l)) {
         p = (char*)"#<CONTINUATION>";
     } else if (is_cptr(l)) {
@@ -4498,11 +4312,11 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
 #endif
 
     case OP_ADD:        /* + */
-        v=num_zero;
+        v = num_zero;
         for (x = sc->args; x != sc->NIL; x = cdr(x)) {
-            v=num_add(v,nvalue(car(x)));
+            v = num_add(v, nvalue(car(x)));
         }
-        s_return(sc,mk_number(sc, v));
+        s_return(sc, mk_number(sc, v));
 
     case OP_MUL:        /* * */
         v=num_one;
@@ -4983,7 +4797,7 @@ pointer list_ref(scheme *sc, const int pos, pointer a) {
 static pointer opexe_3(scheme *sc, enum scheme_opcodes op) {
     pointer x;
     num v;
-    int (*comp_func)(num,num)=0;
+    int (*comp_func)(const num&, const num&) = 0;
 
     switch (op) {
     case OP_NOT:        /* not */
@@ -6127,9 +5941,9 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
     pointer x;
     //printf("Scheme init custom alloc %p\n",sc);
 
-    num_zero.num_type=0; //is_fixnum=1;
+    num_zero.num_type=T_INTEGER; //is_fixnum=1;
     num_zero.value.ivalue=0;
-    num_one.num_type=0; //is_fixnum=1;
+    num_one.num_type=T_INTEGER; //is_fixnum=1;
     num_one.value.ivalue=1;
 
 #if USE_
@@ -6434,7 +6248,7 @@ void scheme_load_file(scheme *sc, FILE *fin) {
     sc->call_end_time = ULLONG_MAX;
 }
 
-void scheme_load_string(scheme *sc, const char *cmd, unsigned long long start_time, unsigned long long end_time) {
+void scheme_load_string(scheme *sc, const char *cmd, uint64_t start_time, uint64_t end_time) {
 
     dump_stack_reset(sc);
     sc->envir = sc->global_env;

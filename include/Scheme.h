@@ -62,6 +62,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "BranchPrediction.h"
+
 #define macintosh 1
 #define USE_INTERFACE 1
 
@@ -165,22 +167,8 @@
 typedef struct scheme scheme;
 typedef struct cell* pointer;
 
-typedef void * (*func_alloc)(size_t);
-typedef void (*func_dealloc)(void *);
-
-
-/* num, for generic arithmetic */
-typedef struct num {
-    int num_type;
-    union {
-        long long ivalue;
-        double rvalue;
-        struct {
-            long long n;
-            long long d;
-        } ratvalue;
-    } value;
-} num;
+typedef void* (*func_alloc)(size_t);
+typedef void (*func_dealloc)(void*);
 
 extern "C"
 {
@@ -194,7 +182,7 @@ void scheme_set_input_port_string(scheme *sc, char *start, char *past_the_end);
 void scheme_set_output_port_file(scheme *sc, FILE *fin);
 void scheme_set_output_port_string(scheme *sc, char *start, char *past_the_end);
 void scheme_load_file(scheme *sc, FILE *fin);
-void scheme_load_string(scheme *sc, const char *cmd, unsigned long long int start_time, unsigned long long int end_time);
+void scheme_load_string(scheme *sc, const char *cmd, uint64_t start_time, uint64_t end_time);
 void scheme_apply0(scheme *sc, const char *procname);
 pointer scheme_apply1(scheme *sc, const char *procname, pointer);
 const char *procname(pointer x);
@@ -271,12 +259,11 @@ void putcharacter(scheme *sc, int c);
 int is_string(pointer p);
 char* string_value(pointer p);
 int is_number(pointer p);
-num nvalue(pointer p);
-long long ivalue(pointer p);
-long long i64value(pointer p);
-int i32value(pointer p);
-short i16value(pointer p);
-char i8value(pointer p);
+int64_t ivalue(pointer p);
+int64_t i64value(pointer p);
+int32_t i32value(pointer p);
+int16_t i16value(pointer p);
+int8_t i8value(pointer p);
 bool i1value(scheme* _sc, pointer p);
 double rvalue(pointer p);
 double r64value(pointer p);
@@ -356,6 +343,24 @@ struct port {
     } rep;
 };
 
+enum num_type {
+    T_INTEGER = 0,
+    T_REAL = 1,
+    T_RATIONAL = 3
+};
+
+/* num, for generic arithmetic */
+typedef struct num {
+    num_type num_type;
+    union {
+        int64_t ivalue;
+        double rvalue;
+        struct {
+            int64_t n;
+            int64_t d;
+        } ratvalue;
+    } value;
+} num;
 
 /* cell structure */
 struct cell {
@@ -368,19 +373,34 @@ struct cell {
     cell* _ccw;
     union {
         struct {
-            char   *_svalue;
+            char* _svalue;
             int   _length;
         } _string;
         num _number;
-        port *_port;
+        port* _port;
         foreign_func _ff;
         struct {
-            struct cell *_car;
-            struct cell *_cdr;
+            cell* _car;
+            cell* _cdr;
         } _cons;
         void* _cptr;
     } _object;
 };
+
+inline double rvalue(pointer Ptr)
+{
+    auto type(Ptr->_object._number.num_type);
+    if (likely(type == T_INTEGER)) {
+        return Ptr->_object._number.value.ivalue;
+    }
+    if (likely(type == T_REAL)) {
+        return Ptr->_object._number.value.rvalue;
+    }
+    if (likely(type == T_RATIONAL)) {
+        return double(Ptr->_object._number.value.ratvalue.n) / Ptr->_object._number.value.ratvalue.d;
+    }
+    return 0.0;
+}
 
 inline pointer vector_elem(pointer Vector, int Index)
 {
