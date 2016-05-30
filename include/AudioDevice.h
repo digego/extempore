@@ -58,10 +58,10 @@ typedef float SAMPLE;
 
 typedef void (*dsp_f_ptr_array)(void*, void*, float*, float*, uint64_t, void*);
 typedef void (*dsp_f_ptr_sum_array)(void* ,void* ,float** ,float*, uint64_t, void*);
-typedef SAMPLE (*dsp_f_ptr)(void*, void*, SAMPLE, uint64_t, uint64_t, SAMPLE*);
-typedef SAMPLE (*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, SAMPLE*);
+typedef SAMPLE (*dsp_f_ptr)(void*, void*, SAMPLE, uint64_t, uint64_t, const SAMPLE*);
+typedef SAMPLE (*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, const SAMPLE*);
 
-typedef SAMPLE (*closure_fn_type)(SAMPLE, uint64_t, uint64_t, SAMPLE*);
+typedef SAMPLE (*closure_fn_type)(SAMPLE, uint64_t, uint64_t, const SAMPLE*);
 
 namespace extemp
 {

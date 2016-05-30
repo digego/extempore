@@ -320,12 +320,9 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     auto dsp_closure(AudioDevice::I()->getDSPClosure());
     if (unlikely(!dsp_closure)) {
         memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
-        return 0;
+        return paContinue;
     }
     auto cache_closure(dsp_closure());
-
-    SAMPLE indata[256]; // 256 channels MAX!
-
     if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
         if (StatusFlags & paOutputUnderflow) {
             printf("Audio underflow: are you pushing extempore too hard?\n");
@@ -343,30 +340,31 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         auto in(reinterpret_cast<const float*>(InputBuffer));
         auto time(UNIV::DEVICE_TIME);
         if (likely(!UNIV::IN_CHANNELS)) {
+            float dummy(0.0);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0, time, k,
-                            indata))); // why indata (can't be null?)
+                            &dummy)));
                     extemp::EXTLLVM::llvm_zone_reset(zone);
                 }
             }
         } else if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
-            std::copy(in, in + UNIV::IN_CHANNELS, indata);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
+                auto indata(in);
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
-                            time, k, indata))); // indata??
+                            time, k, indata)));
                     extemp::EXTLLVM::llvm_zone_reset(zone);
                 }
             }
         } else if (UNIV::IN_CHANNELS == 1) {
-            std::copy(in, in + UNIV::IN_CHANNELS, indata);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
-                for (uint64_t k=0; k <UNIV::CHANNELS; k++) {
-                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
-                            time, k, indata))); // indata??
+                for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
+                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *in,
+                            time, k, in)));
                     extemp::EXTLLVM::llvm_zone_reset(zone);
                 }
+                ++in;
             } // what about other values (between 1 and UNIV_CHANNELS?)
         }
         return 0;
@@ -425,7 +423,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
             for(int jj=0;jj<numthreads;jj++) {
               in[jj] = indats[jj][iout+k];
             }
-            dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (i+UNIV::DEVICE_TIME),k,&(indata[0])));
+            dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (i+UNIV::DEVICE_TIME),k,nullptr));
             extemp::EXTLLVM::llvm_zone_reset(zone);
           }
         }
