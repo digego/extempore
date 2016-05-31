@@ -9110,7 +9110,7 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:scm_rt_check_string
   (lambda (n closure-name)
     (let* ((os (make-string 0))
-           (n1 (substring n 1 2))
+           (n1 (substring n 1 (string-length n)))
            (name-str (impc:ir:make-const-string (string-append closure-name " Scheme wrapper error: check the arg arity and types\n")))
            (name (impc:ir:gname)))
       (emit n "_bool = icmp ne i32 " n "_rt_check, 0\n" os)
@@ -9372,8 +9372,10 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                                  a " = load " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* " ap "\n"))
                                                                                                                 (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
                                                                                                                 (cdr stub-type)
-                                                                                                                '("%ap" "%bp" "%cp" "%dp" "%ep" "%fp" "%gp" "%hp" "%ip" "%jp" "%kp" "%lp" "%mp" "%np" "%op" "%pp" "%qp" "%rp" "%sp" "%tp" "%tu" "%tv" "%tw" "%tx" "%ty" "%tz")
-                                                                                                                '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")))
+                                                                                                                (make-list-with-proc (- (length stub-type) 1)
+                                                                                                                                     (lambda (i) (string-append "%arg_p_" (atom->string i))))
+                                                                                                                (make-list-with-proc (- (length stub-type) 1)
+                                                                                                                                     (lambda (i) (string-append "%arg_" (atom->string i))))))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                                                       "%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
                                                                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
@@ -9396,7 +9398,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                                  (impc:ir:get-type-str t)
                                                                                                                                  " " n))
                                                                                                                 (cdr stub-type)
-                                                                                                                '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")))
+                                                                                                                (make-list-with-proc (length (cdr stub-type))
+                                                                                                                                     (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                                                       ")\n"
                                                                                       "call ccc %mzone* @llvm_pop_zone_stack()\n"
                                                                                       "ret void\n"
@@ -9468,8 +9471,9 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                                         n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
                                                                                                    (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
                                                                             (cdr stub-type)
-                                                                            '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")
-                                                                            (make-list-with-proc 26 (lambda (i) i))))
+                                                                            (make-list-with-proc (length (cdr stub-type))
+                                                                                                 (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                            (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
 
                                         ;(begin (println 'bbbbb) "")
 
@@ -9491,7 +9495,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                        (map (lambda (t n)
                                                                               (string-append ", " (impc:ir:get-type-str t) " " n))
                                                                             (cdr stub-type)
-                                                                            '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")))
+                                                                            (make-list-with-proc (length (cdr stub-type))
+                                                                                                 (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                                 ")\n"
 
                                         ;(begin (println 'ccccc) "")
@@ -9529,8 +9534,9 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                      (string-append c (impc:ir:get-type-str t) " "
                                                                                                     n))
                                                                                    (cdr stub-type)
-                                                                                   '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")
-                                                                                   '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
+                                                                                   (make-list-with-proc (length (cdr stub-type))
+                                                                                                        (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                                   (cons "" (make-list (length (cdr stub-type)) ","))))
                                                          ") nounwind \n"
                                                          "{\nentry:\n"
                                                          "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
@@ -9553,7 +9559,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                     (impc:ir:get-type-str t)
                                                                                                     " " n))
                                                                                    (cdr stub-type)
-                                                                                   '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")))
+                                                                                   (make-list-with-proc (length (cdr stub-type))
+                                                                                                        (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                          ")\nret " (impc:ir:get-type-str (car stub-type))
                                                          (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
                                                          "}\n\n")))
@@ -9563,8 +9570,9 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                        (string-append c (impc:ir:get-type-str t) " "
                                                                                                       n))
                                                                                      (cdr stub-type)
-                                                                                     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")
-                                                                                     '("" "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," "," ",")))
+                                                                                     (make-list-with-proc (length (cdr stub-type))
+                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                                     (cons "" (make-list (length (cdr stub-type)) ","))))
                                                            ") nounwind \n"
                                                            "{\nentry:\n"
                                                            "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
@@ -9587,7 +9595,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                       (impc:ir:get-type-str t)
                                                                                                       " " n))
                                                                                      (cdr stub-type)
-                                                                                     '("%a" "%b" "%c" "%d" "%e" "%f" "%g" "%h" "%i" "%j" "%k" "%l" "%m" "%n" "%o" "%p" "%q" "%r" "%s" "%t" "%u" "%v" "%w" "%x" "%y" "%z")))
+                                                                                     (make-list-with-proc (length (cdr stub-type))
+                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                            ")\nret " (impc:ir:get-type-str (car stub-type))
                                                            (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
                                                            "}\n\n"))))
@@ -9878,8 +9887,8 @@ xtlang's `let' syntax is the same as Scheme"
                          (string-append (symbol->string name) "*")
                          x))
                    (impc:ir:get-pretty-tuple-arg-strings type)))
-           (arglst1 *impc:alphabetlist*) ;; '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
-           (arglst2 *impc:alphabetidxlist*) ;; '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
+           (arglst1 (make-list-with-proc (length a) (lambda (i) (string->symbol (string-append "arg_" (atom->string i))))))
+           (arglst2 (range (length a)))
            (namestr (symbol->string name))
            ;;(namestrup (impc:ti:word-upcase (symbol->string name)))
            ;;(namestrdown (impc:ti:word-downcase (symbol->string name)))
@@ -10666,7 +10675,11 @@ e.g.
 ;; Wrap a native, bound C function, allowing it to be called from scheme
 (define-macro (bind-wrapper local-sym native-sym)
   (let* ((types (cdr (impc:ti:get-closure-arg-types (symbol->string native-sym))))
-         (args (map (lambda (t v) v) types *impc:alphabetlist*))) ;; '(a b c d e f g h i j k l m n o p))))
+         (args (map (lambda (t v) v)
+                    types (make-list-with-proc
+                           (length types)
+                           (lambda (i)
+                             (string->symbol (string-append "arg_" (atom->string i))))))))
     `(bind-func ,local-sym
        (lambda ,args
          ,(cons native-sym args)))))
