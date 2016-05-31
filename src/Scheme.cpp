@@ -1400,7 +1400,7 @@ pointer mk_rational(scheme *sc, long long n, long long d) {
         return sc->NIL;
     }
     pointer x = get_cell(sc,sc->NIL, sc->NIL);
-    if(n==0) { // return intenger 0
+    if(n==0) { // return integer 0
         typeflag(x) = (T_NUMBER | T_ATOM);
         ivalue_unchecked(x)=0;
         set_integer(x);
@@ -2758,7 +2758,7 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         if (is_integer(l)) {
             sprintf(p, "%" PRId64, ivalue_unchecked(l));
         } else if(is_rational(l)) {
-            sprintf(p, "%" PRId64 "/ %" PRId64, ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
+            sprintf(p, "%" PRId64 "/%" PRId64, ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
             //sprintf(p, "%ld/%ld", l->_object._number.value.ratvalue.n, l->_object._number.value.ratvalue.d);
         } else {
             //std::stringstream ss;
