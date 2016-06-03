@@ -188,6 +188,11 @@ extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     return newptr;
 }
 
+extern "C" void* llvm_zone_malloc_from_current_zone(uint64_t size)
+{
+  return llvm_zone_malloc(llvm_peek_zone_stack(), size);
+}
+
 static bool llvm_ptr_in_current_zone(void* ptr)
 {
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);

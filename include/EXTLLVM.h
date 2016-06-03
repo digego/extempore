@@ -222,6 +222,7 @@ inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 }
 
 extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
+extern "C" void* llvm_zone_malloc_from_current_zone(uint64_t size);
 
 inline llvm_zone_stack* llvm_threads_get_zone_stack()
 {

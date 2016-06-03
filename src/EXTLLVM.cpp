@@ -845,6 +845,7 @@ void initLLVM()
             EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
             EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
             EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
+            EE->updateGlobalMapping("llvm_zone_malloc_from_current_zone", (uint64_t)&llvm_zone_malloc_from_current_zone);
             EE->updateGlobalMapping("get_address_table", (uint64_t)&get_address_table);
             EE->updateGlobalMapping("check_address_type", (uint64_t)&check_address_type);
             EE->updateGlobalMapping("check_address_exists", (uint64_t)&check_address_exists);

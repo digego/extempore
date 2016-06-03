@@ -576,6 +576,7 @@ declare %mzone* @llvm_pop_zone_stack() nounwind
 declare void @llvm_zone_destroy(%mzone*) nounwind
 declare void @llvm_zone_print(%mzone*) nounwind
 declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind
+declare i8* @llvm_zone_malloc_from_current_zone(i64) nounwind
 declare i1 @llvm_ptr_in_zone(%mzone*, i8*) nounwind
 
 declare %clsvar* @add_address_table(%mzone*, i8*, i32, i8*, i32, %clsvar*) nounwind
