@@ -684,7 +684,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(nanovg
     PREFIX nanovg
-    URL https://github.com/extemporelang/nanovg/archive/master.zip
+    URL https://github.com/extemporelang/nanovg/archive/0.7.1.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
