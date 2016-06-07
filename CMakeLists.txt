@@ -711,7 +711,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(glfw3
     PREFIX glfw3
-    URL https://github.com/glfw/glfw/archive/3.1.2.zip
+    URL https://github.com/glfw/glfw/archive/3.2.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
