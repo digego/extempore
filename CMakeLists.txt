@@ -681,10 +681,13 @@ if(BUILD_DEPS)
     PREFIX nanovg
     URL https://github.com/extemporelang/nanovg/archive/0.7.1.zip
     CMAKE_ARGS
+    -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  add_dependencies(nanovg extempore)
 
   ExternalProject_Add(kiss_fft
     PREFIX kiss_fft
