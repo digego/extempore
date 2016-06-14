@@ -295,18 +295,13 @@ endif()
 
 if(BUILD_LLVM)
   include(ExternalProject)
-  find_program(PATCH_PROGRAM patch)
-
-  if(NOT PATCH_PROGRAM)
-    message(WARNING "Cannot find \"patch.exe\", which is required to patch LLVM")
-  endif()
 
   if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
       URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
       URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
+      PATCH_COMMAND git apply -p0 ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
       -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
@@ -328,7 +323,7 @@ if(BUILD_LLVM)
       PREFIX llvm
       URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
       URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
+      PATCH_COMMAND git apply -p0 ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
