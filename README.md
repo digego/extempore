@@ -21,8 +21,12 @@ one-liner build commands:
 
 On **Linux/OSX**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make install
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && sudo make install
+    
+On **Linux/OSX with JACK**:
 
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -DJACK=ON .. && sudo make install
+    
 On **Windows**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
