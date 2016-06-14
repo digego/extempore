@@ -691,7 +691,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(kiss_fft
     PREFIX kiss_fft
-    URL https://github.com/extemporelang/kiss_fft/archive/master.zip
+    URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
