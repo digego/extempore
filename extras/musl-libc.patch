@@ -1,11 +1,285 @@
---- lib/Support/DynamicLibrary.cpp	2016-04-19 09:48:17.000000000 +1000
-+++ lib/Support/DynamicLibrary.cpp	2015-06-10 02:57:30.000000000 +1000
-@@ -138,7 +138,7 @@
+--- a/include/llvm/ADT/Triple.h
++++ b/include/llvm/ADT/Triple.h
+@@ -174,6 +174,10 @@
+ public:
+     EABIHF,
+     Android,
  
- // This macro returns the address of a well-known, explicit symbol
++    Musl,
++    MuslEABI,
++    MuslEABIHF,
++
+     MSVC,
+     Itanium,
+     Cygnus,
+@@ -544,6 +548,13 @@
+ public:
+   /// Tests whether the target is Android
+   bool isAndroid() const { return getEnvironment() == Triple::Android; }
+ 
++  /// Tests whether the target is musl libc
++  bool isMusl() const {
++    return getEnvironment() == Triple::Musl ||
++           getEnvironment() == Triple::MuslEABI ||
++           getEnvironment() == Triple::MuslEABIHF;
++  }
++
+   /// @}
+   /// @name Mutators
+   /// @{
+--- a/lib/Support/Triple.cpp
++++ b/lib/Support/Triple.cpp
+@@ -199,6 +199,9 @@
+ const char *Triple::getEnvironmentTypeName(EnvironmentType Kind) {
+   case CODE16: return "code16";
+   case EABI: return "eabi";
+   case EABIHF: return "eabihf";
++  case Musl: return "musl";
++  case MuslEABIHF: return "muslgnueabihf";
++  case MuslEABI: return "muslgnueabi";
+   case Android: return "android";
+   case MSVC: return "msvc";
+   case Itanium: return "itanium";
+@@ -454,6 +457,9 @@
+ static Triple::EnvironmentType parseEnvironment(StringRef EnvironmentName) {
+     .StartsWith("code16", Triple::CODE16)
+     .StartsWith("gnu", Triple::GNU)
+     .StartsWith("android", Triple::Android)
++    .StartsWith("muslgnueabihf", Triple::MuslEABIHF)
++    .StartsWith("muslgnueabi", Triple::MuslEABI)
++    .StartsWith("musl", Triple::Musl)
+     .StartsWith("msvc", Triple::MSVC)
+     .StartsWith("itanium", Triple::Itanium)
+     .StartsWith("cygnus", Triple::Cygnus)
+@@ -1431,6 +1437,7 @@
+ StringRef Triple::getARMCPUForArch(StringRef MArch) const {
+     switch (getEnvironment()) {
+     case llvm::Triple::EABIHF:
+     case llvm::Triple::GNUEABIHF:
++    case llvm::Triple::MuslEABIHF:
+       return "arm1176jzf-s";
+     default:
+       return "arm7tdmi";
+--- a/lib/Target/ARM/ARMSubtarget.h
++++ b/lib/Target/ARM/ARMSubtarget.h
+@@ -405,8 +405,10 @@
+ public:
+   bool isTargetEHABICompatible() const {
+     return (TargetTriple.getEnvironment() == Triple::EABI ||
+             TargetTriple.getEnvironment() == Triple::GNUEABI ||
++	    TargetTriple.getEnvironment() == Triple::MuslEABI ||
+             TargetTriple.getEnvironment() == Triple::EABIHF ||
+             TargetTriple.getEnvironment() == Triple::GNUEABIHF ||
++	    TargetTriple.getEnvironment() == Triple::MuslEABIHF ||
+             isTargetAndroid()) &&
+            !isTargetDarwin() && !isTargetWindows();
+   }
+@@ -415,6 +417,7 @@
+ public:
+     // FIXME: this is invalid for WindowsCE
+     return TargetTriple.getEnvironment() == Triple::GNUEABIHF ||
+            TargetTriple.getEnvironment() == Triple::EABIHF ||
++	   TargetTriple.getEnvironment() == Triple::MuslEABIHF ||
+            isTargetWindows() || isAAPCS16_ABI();
+   }
+   bool isTargetAndroid() const { return TargetTriple.isAndroid(); }
+--- a/lib/Target/ARM/ARMTargetMachine.cpp
++++ b/lib/Target/ARM/ARMTargetMachine.cpp
+@@ -101,6 +101,8 @@
+ computeTargetABI(const Triple &TT, StringRef CPU,
+     case llvm::Triple::GNUEABIHF:
+     case llvm::Triple::EABIHF:
+     case llvm::Triple::EABI:
++    case llvm::Triple::MuslEABI:
++    case llvm::Triple::MuslEABIHF:
+       TargetABI = ARMBaseTargetMachine::ARM_ABI_AAPCS;
+       break;
+     case llvm::Triple::GNU:
+--- a/include/llvm/Analysis/TargetLibraryInfo.h
++++ b/include/llvm/Analysis/TargetLibraryInfo.h
+@@ -18,6 +18,15 @@
+ #include "llvm/IR/Module.h"
+ #include "llvm/Pass.h"
+ 
++#undef fopen64
++#undef fseeko64
++#undef fstat64
++#undef fstatvfs64
++#undef ftello64
++#undef lstat64
++#undef stat64
++#undef tmpfile64
++
+ namespace llvm {
+ /// VecDesc - Describes a possible vectorization of a function.
+ /// Function 'VectorFnName' is equivalent to 'ScalarFnName' vectorized
+--- a/lib/Support/DynamicLibrary.cpp
++++ b/lib/Support/DynamicLibrary.cpp
+@@ -140,10 +140,10 @@
+ void* DynamicLibrary::SearchForAddressOfSymbol(const char *symbolName) {
  #define EXPLICIT_SYMBOL(SYM) \
--   if (!strcmp(symbolName, #SYM)) return (void *) &SYM
-+   if (!strcmp(symbolName, #SYM)) return &SYM
+    if (!strcmp(symbolName, #SYM)) return &SYM
  
- // On linux we have a weird situation. The stderr/out/in symbols are both
+-// On linux we have a weird situation. The stderr/out/in symbols are both
++// On GNU libc we have a weird situation. The stderr/out/in symbols are both
  // macros and global variables because of standards requirements. So, we
+ // boldly use the EXPLICIT_SYMBOL macro without checking for a #define first.
+-#if defined(__linux__) and !defined(__ANDROID__)
++#if defined(__GLIBC__)
+   {
+     EXPLICIT_SYMBOL(stderr);
+     EXPLICIT_SYMBOL(stdout);
+--- a/lib/Transforms/InstCombine/InstCombineLoadStoreAlloca.cpp
++++ b/lib/Transforms/InstCombine/InstCombineLoadStoreAlloca.cpp
+@@ -523,16 +523,17 @@
+ static Instruction *unpackLoadToAggregate(InstCombiner &IC, LoadInst &LI) {
+   if (!T->isAggregateType())
+     return nullptr;
+ 
++  auto Name = LI.getName();
+   assert(LI.getAlignment() && "Alignment must be set at this point");
+ 
+   if (auto *ST = dyn_cast<StructType>(T)) {
+     // If the struct only have one element, we unpack.
+-    unsigned Count = ST->getNumElements();
+-    if (Count == 1) {
++    auto NumElements = ST->getNumElements();
++    if (NumElements == 1) {
+       LoadInst *NewLoad = combineLoadToNewType(IC, LI, ST->getTypeAtIndex(0U),
+                                                ".unpack");
+       return IC.ReplaceInstUsesWith(LI, IC.Builder->CreateInsertValue(
+-        UndefValue::get(T), NewLoad, 0, LI.getName()));
++        UndefValue::get(T), NewLoad, 0, Name));
+     }
+ 
+     // We don't want to break loads with padding here as we'd loose
+@@ -542,23 +543,29 @@
+ static Instruction *unpackLoadToAggregate(InstCombiner &IC, LoadInst &LI) {
+     if (SL->hasPadding())
+       return nullptr;
+ 
+-    auto Name = LI.getName();
++    auto Align = LI.getAlignment();
++    if (!Align)
++      Align = DL.getABITypeAlignment(ST);
++
+     SmallString<16> LoadName = Name;
+     LoadName += ".unpack";
+     SmallString<16> EltName = Name;
+     EltName += ".elt";
++
+     auto *Addr = LI.getPointerOperand();
+-    Value *V = UndefValue::get(T);
+-    auto *IdxType = Type::getInt32Ty(ST->getContext());
++    auto *IdxType = Type::getInt32Ty(T->getContext());
+     auto *Zero = ConstantInt::get(IdxType, 0);
+-    for (unsigned i = 0; i < Count; i++) {
++
++    Value *V = UndefValue::get(T);
++    for (unsigned i = 0; i < NumElements; i++) {
+       Value *Indices[2] = {
+         Zero,
+         ConstantInt::get(IdxType, i),
+       };
+-      auto *Ptr = IC.Builder->CreateInBoundsGEP(ST, Addr, makeArrayRef(Indices), EltName);
+-      auto *L = IC.Builder->CreateAlignedLoad(Ptr, LI.getAlignment(),
+-                                              LoadName);
++      auto *Ptr = IC.Builder->CreateInBoundsGEP(ST, Addr,
++                                            makeArrayRef(Indices), EltName);
++      auto EltAlign = MinAlign(Align, SL->getElementOffset(i));
++      auto *L = IC.Builder->CreateAlignedLoad(Ptr, EltAlign, LoadName);
+       V = IC.Builder->CreateInsertValue(V, L, i);
+     }
+ 
+@@ -950,11 +957,16 @@
+ static bool unpackStoreToAggregate(InstCombiner &IC, StoreInst &SI) {
+     if (SL->hasPadding())
+       return false;
+ 
++    auto Align = SI.getAlignment();
++    if (!Align)
++      Align = DL.getABITypeAlignment(ST);
++
+     SmallString<16> EltName = V->getName();
+     EltName += ".elt";
+     auto *Addr = SI.getPointerOperand();
+     SmallString<16> AddrName = Addr->getName();
+     AddrName += ".repack";
++
+     auto *IdxType = Type::getInt32Ty(ST->getContext());
+     auto *Zero = ConstantInt::get(IdxType, 0);
+     for (unsigned i = 0; i < Count; i++) {
+@@ -962,9 +974,11 @@
+ static bool unpackStoreToAggregate(InstCombiner &IC, StoreInst &SI) {
+         Zero,
+         ConstantInt::get(IdxType, i),
+       };
+-      auto *Ptr = IC.Builder->CreateInBoundsGEP(ST, Addr, makeArrayRef(Indices), AddrName);
++      auto *Ptr = IC.Builder->CreateInBoundsGEP(ST, Addr,
++                                            makeArrayRef(Indices), AddrName);
+       auto *Val = IC.Builder->CreateExtractValue(V, i, EltName);
+-      IC.Builder->CreateStore(Val, Ptr);
++      auto EltAlign = MinAlign(Align, SL->getElementOffset(i));
++      IC.Builder->CreateAlignedStore(Val, Ptr, EltAlign);
+     }
+ 
+     return true;
+--- a/test/Transforms/InstCombine/unpack-fca.ll
++++ b/test/Transforms/InstCombine/unpack-fca.ll
+@@ -151,3 +151,30 @@
+ define i32 @packed_alignment(%struct.S* dereferenceable(9) %s) {
+   %v = extractvalue %struct.T %tv, 1
+   ret i32 %v
+ }
++
++%struct.U = type {i8, i8, i8, i8, i8, i8, i8, i8, i64}
++
++define void @check_alignment(%struct.U* %u, %struct.U* %v) {
++; CHECK-LABEL: check_alignment
++; CHECK: load i8, i8* {{.*}}, align 8
++; CHECK: load i8, i8* {{.*}}, align 1
++; CHECK: load i8, i8* {{.*}}, align 2
++; CHECK: load i8, i8* {{.*}}, align 1
++; CHECK: load i8, i8* {{.*}}, align 4
++; CHECK: load i8, i8* {{.*}}, align 1
++; CHECK: load i8, i8* {{.*}}, align 2
++; CHECK: load i8, i8* {{.*}}, align 1
++; CHECK: load i64, i64* {{.*}}, align 8
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 8
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 1
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 2
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 1
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 4
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 1
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 2
++; CHECK: store i8 {{.*}}, i8* {{.*}}, align 1
++; CHECK: store i64 {{.*}}, i64* {{.*}}, align 8
++  %1 = load %struct.U, %struct.U* %u
++  store %struct.U %1, %struct.U* %v
++  ret void
++}
+--- a/tools/llvm-nm/llvm-nm.cpp
++++ b/tools/llvm-nm/llvm-nm.cpp
+@@ -486,7 +486,7 @@
+ static void sortAndPrintSymbolList(SymbolicFile &Obj, bool printName,
+                                    std::string ArchiveName,
+                                    std::string ArchitectureName) {
+   if (!NoSort) {
+-    std::function<bool(const NMSymbol &, const NMSymbol &)> Cmp;
++    bool (*Cmp)(const NMSymbol &, const NMSymbol &);
+     if (NumericSort)
+       Cmp = compareSymbolAddress;
+     else if (SizeSort)
+@@ -495,8 +495,9 @@
+ static void sortAndPrintSymbolList(SymbolicFile &Obj, bool printName,
+       Cmp = compareSymbolName;
+ 
+     if (ReverseSort)
+-      Cmp = [=](const NMSymbol &A, const NMSymbol &B) { return Cmp(B, A); };
+-    std::sort(SymbolList.begin(), SymbolList.end(), Cmp);
++      std::sort(SymbolList.begin(), SymbolList.end(), [=](const NMSymbol &A, const NMSymbol &B) { return Cmp(B, A); });
++    else
++      std::sort(SymbolList.begin(), SymbolList.end(), Cmp);
+   }
+ 
+   if (!PrintFileName) {
