@@ -49,3 +49,10 @@ define private %mzone* @llvm_zone_reset(%mzone* %zone) nounwind alwaysinline
   store i64 0, i64* %offset_ptr
   ret %mzone* %zone
 }
+
+declare i32 @is_integer_extern(i8*)
+define private i32 @is_integer(i8* %ptr) nounwind alwaysinline
+{
+  %res = call i32 @is_integer_extern(i8* %ptr)
+  ret i32 %res
+}

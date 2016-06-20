@@ -119,24 +119,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#ifndef macintosh
-# include <malloc.h>
-#else
-/* static int strcmp(const char *s1, const char *s2) */
-/* { */
-/*   unsigned char c1, c2; */
-/*   do { */
-/*     c1 = tolower(*s1); */
-/*     c2 = tolower(*s2); */
-/*     if (c1 < c2) */
-/*       return -1; */
-/*     else if (c1 > c2) */
-/*       return 1; */
-/*     s1++, s2++; */
-/*   } while (c1 != 0); */
-/*   return 0; */
-/* } */
-#endif
 
 #ifdef _WIN32
 #define atoll _atoi64
@@ -168,13 +150,6 @@ static const char *strlwr(char *s) {
 # define FIRST_CELLSEGS 1
 #endif
 
-
-class ScmRuntimeError {
-public:
-  ScmRuntimeError(const char* _msg, pointer _p) {msg = _msg;p = _p;};
-  const char* msg;
-  pointer p;
-};
 
 static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int errnum=0);
 
@@ -365,17 +340,6 @@ inline void insert_treadmill(scheme* sc, pointer p)
     return;
 }
 
-/* ADJ is enough slack to align cells in a TYPE_BITS-bit boundary */
-#define ADJ 32 // this is the minimum cell size in bytes!
-static const unsigned TYPE_BITS = 5;
-static const uint32_t T_MASKTYPE = (1 << TYPE_BITS) - 1;
-static const uint32_t T_SYNTAX = 1 << 12;
-static const uint32_t T_IMMUTABLE = 1 << 13;
-static const uint32_t T_ATOM = 1 << 14;
-static const uint32_t CLRATOM = ~T_ATOM;
-static const uint32_t MARK = 1 << 15;
-static const uint32_t UNMARK = ~MARK;
-
 #if USE_MATH
 static double round_per_R5RS(double x);
 #endif
@@ -384,78 +348,32 @@ static int is_zero_double(double x);
 static num num_zero;
 static num num_one;
 
-inline auto typeflag(pointer Ptr) -> decltype(cell::_flag)& { return Ptr->_flag; }
-inline auto type(pointer Ptr) -> decltype(cell::_flag) { return typeflag(Ptr) & T_MASKTYPE; }
-int pointer_type(pointer Ptr) { return type(Ptr); }
-int is_string(pointer Ptr) { return type(Ptr) == T_STRING; }
-int is_character(pointer Ptr) { return type(Ptr) == T_CHARACTER; }
-int is_vector(pointer Ptr) { return type(Ptr) == T_VECTOR; }
-int is_number(pointer Ptr) { return type(Ptr) == T_NUMBER; }
-int is_symbol(pointer Ptr) { return type(Ptr) == T_SYMBOL; }
-int is_port(pointer Ptr) { return type(Ptr) == T_PORT; }
-int is_pair(pointer Ptr) { return type(Ptr) == T_PAIR; }
-int is_environment(pointer Ptr) { return type(Ptr) == T_ENVIRONMENT; }
-int is_proc(pointer Ptr) { return type(Ptr) == T_PROC; }
-int is_foreign(pointer Ptr) { return type(Ptr) == T_FOREIGN; }
-int is_cptr(pointer Ptr) { return type(Ptr) == T_CPTR; }
-int is_cptr_or_str(pointer Ptr) { return is_cptr(Ptr) || is_string(Ptr); }
-int is_syntax(pointer Ptr) { return typeflag(Ptr) & T_SYNTAX; }
-
-int is_integer(pointer Ptr) { return Ptr->_object._number.num_type == T_INTEGER; }
-int is_real(pointer Ptr) { return is_number(Ptr); }
-int is_rational(pointer Ptr) { return Ptr->_object._number.num_type == T_RATIONAL; }
-inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
-auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
-
-char* string_value(pointer Ptr)
-{
-    if (unlikely(!is_string(Ptr))) {
-      throw ScmRuntimeError("Attempting to return a string from a non-string obj", Ptr);
-    }
-    return strvalue(Ptr);
-}
-
 static inline const num& nvalue(pointer Ptr)
 {
     return Ptr->_object._number;
 }
 
-int64_t ivalue(pointer Ptr)
-{
-    auto type(Ptr->_object._number.num_type);
-    if (likely(type == T_INTEGER)) {
-        return Ptr->_object._number.value.ivalue;
-    }
-    if (likely(type == T_REAL)) {
-        return Ptr->_object._number.value.rvalue;
-    }
-    if (likely(type == T_RATIONAL)) {
-        return Ptr->_object._number.value.ratvalue.n / Ptr->_object._number.value.ratvalue.d;
-    }
-    return 0;
-}
-
-int64_t i64value(pointer p)
+EXPORT int64_t i64value(pointer p)
 {
     return ivalue(p);
 }
 
-int32_t i32value(pointer p)
+EXPORT int32_t i32value(pointer p)
 {
     return ivalue(p);
 }
 
-int16_t i16value(pointer p)
+EXPORT int16_t i16value(pointer p)
 {
     return ivalue(p);
 }
 
-int8_t i8value(pointer p)
+EXPORT int8_t i8value(pointer p)
 {
     return ivalue(p);
 }
 
-bool i1value(scheme* _sc, pointer p)
+EXPORT bool i1value(scheme* _sc, pointer p)
 {
     return p == _sc->T;
 }
@@ -492,12 +410,19 @@ long long charvalue_sc(scheme* sc, pointer p)
 #define is_inport(p) (type(p)==T_PORT && p->_object._port->kind&port_input)
 #define is_outport(p) (type(p)==T_PORT && p->_object._port->kind&port_output)
 
-#define car(p)           ((p)->_object._cons._car)
-#define cdr(p)           ((p)->_object._cons._cdr)
+inline pointer& car(pointer P)
+{
+    return P->_object._cons._car;
+}
+
+inline pointer& cdr(pointer P)
+{
+    return P->_object._cons._cdr;
+}
 
 pointer pair_car(pointer p)
 {
-  if(!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive",p);
+  if (!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive",p);
     return car(p);
 }
 
@@ -541,7 +466,7 @@ inline int hasprop(pointer p)     { return (typeflag(p)&T_SYMBOL); }
 
 //int is_objc(pointer p) { return (type(p) == T_OBJC); }
 
-void* cptr_value(pointer p)
+EXPORT void* cptr_value(pointer p)
 {
   if(!is_cptr(p)) {
      if(is_string(p)) return (void*) strvalue(p);
@@ -1432,21 +1357,20 @@ static pointer mk_number(scheme *sc, const num& n) {
 }
 
 /* allocate name to string area */
-static char *store_string(scheme *sc, int len_str, const char *str, char fill) {
-    char *q;
-
-    q=(char*)sc->malloc(len_str+1);
-    if(q==0) {
-        sc->no_memory=1;
+static char* store_string(scheme *sc, int len_str, const char *str, char fill)
+{
+    auto q = reinterpret_cast<char*>(sc->malloc(len_str + 1));
+    if (unlikely(!q)) {
+        sc->no_memory = 1;
         return sc->strbuff;
     }
-    if(str!=0) {
+    if (str) {
         strcpy(q, str);
     } else {
         memset(q, fill, len_str);
-        q[len_str]=0;
+        q[len_str] = '\0';
     }
-    return (q);
+    return q;
 }
 
 /* get new string */
@@ -1619,10 +1543,10 @@ static pointer mk_atom(scheme *sc, char *q) {
             return (mk_symbol(sc, strlwr(q)));
         }
     }
-    if(has_dec_point) {
-        return mk_real(sc,atof(q));
+    if (has_dec_point) {
+        return mk_real(sc, atof(q));
     }
-    if(has_rational) {
+    if (has_rational) {
         //std::cout << "N: " << atoll(ratn) << " D: " << atoll(ratd) << std::endl;
         return mk_rational(sc,atoll(ratn),atoll(ratd));
     }
@@ -2189,7 +2113,7 @@ static void* treadmill_scanner(void* obj)
              sc->treadmill_scan = sc->treadmill_scan->_ccw;
              total_previous_scan++;
 
-             if(!(count%100)) {         // force a yield every now and then?
+             if(!(count & 16383)) {         // force a yield every now and then?
                sc->mutex->unlock();
                sc->mutex->lock();
              }
@@ -3090,31 +3014,22 @@ static inline void new_slot_spec_in_env(scheme *sc, pointer env,
 
 pointer find_slot_in_env(scheme *sc, pointer env, pointer hdl, int all)
 {
-    pointer x = NULL;
-    pointer y = NULL;;
-    int location;
-
-    for (x = env; x != sc->NIL; x = cdr(x)) {
+    for (auto x = env; x != sc->NIL; x = cdr(x)) {
+        pointer y;
         if (is_vector(car(x))) {
-            location = hash_fn(symname_sc(sc,hdl), (car(x))->_size);
+            auto location = hash_fn(symname_sc(sc, hdl), car(x)->_size);
             y = vector_elem(car(x), location);
         } else {
             y = car(x);
         }
-        for ( ; y != sc->NIL; y = cdr(y)) {
+        for (; y != sc->NIL; y = cdr(y)) {
             if (caar(y) == hdl) {
-                break;
+                return car(y);
             }
         }
-        if (y != sc->NIL) {
-            break;
-        }
-        if(!all) {
+        if (!all) {
             return sc->NIL;
         }
-    }
-    if (x != sc->NIL) {
-        return car(y);
     }
     return sc->NIL;
 }
@@ -6306,7 +6221,6 @@ void scheme_define(scheme *sc, pointer envir, pointer symbol, pointer value) {
     }
 }
 
-//#if !STANDALONE
 void scheme_apply0(scheme *sc, const char *procname) {
     pointer carx=mk_symbol(sc,procname);
     pointer cdrx=sc->NIL;
@@ -6370,3 +6284,8 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
     sc->call_end_time = ULLONG_MAX;
 }
 //#endif
+
+extern "C" int is_integer_extern(pointer Ptr)
+{
+    return is_integer(Ptr);
+}

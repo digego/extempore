@@ -151,6 +151,9 @@
   (lambda (x:i8) (printf "%d" (convert x i32)) void))
 
 (bind-func print
+  (lambda (x:i16) (printf "%d" (convert x i32)) void))
+
+(bind-func print
   (lambda (x:i32) (printf "%d" x) void))
 
 (bind-func print
@@ -333,45 +336,28 @@ into any further sexp arguments."
 (bind-poly random imp_rand2_d)
 
 ;;;;;;;;;;;;;;;;;;
-;; triginometry ;;
+;; trigonometry ;;
 ;;;;;;;;;;;;;;;;;;
 
 ;; many of these are handled through llvm intrinsics these days
 
-(bind-poly tan tanf)
 (bind-poly tan llvm_tan)
+(bind-poly tan tanf)
+
+(bind-poly acos acos)
+(bind-poly acos acosf)
+(bind-poly asin asin)
+(bind-poly asin asinf)
+(bind-poly atan atan)
+(bind-poly atan atanf)
+(bind-poly atan2 atan2)
+(bind-poly atan2 atan2f)
+(bind-poly cosh cosh)
 (bind-poly cosh coshf)
-(bind-poly cosh llvm_cosh)
+(bind-poly sinh llvm_sinh)
+(bind-poly sinh sinhf)
 (bind-poly tanh tanhf)
 (bind-poly tanh llvm_tanh)
-(bind-poly sinh sinhf)
-(bind-poly sinh llvm_sinh)
-(bind-poly asin asinf)
-(bind-poly asin llvm_asin)
-(bind-poly atan atanf)
-(bind-poly atan llvm_atan)
-(bind-poly atan2 atan2f)
-(bind-poly atan2 llvm_atan2)
-;; (bind-poly ceil ceilf)
-;; (bind-poly ceil llvm_ceil)
-;; (bind-poly floor floorf)
-;; (bind-poly floor llvm_floor)
-;; (bind-poly exp expf)
-;; (bind-poly exp llvm_exp)
-;; (bind-poly fmod fmodf)
-;; (bind-poly fmod llvm_fmod)
-;; (bind-poly pow powf)
-;; (bind-poly pow llvm_pow)
-;; (bind-poly log logf)
-;; (bind-poly log llvm_log)
-;; (bind-poly log2 log2f)
-;; (bind-poly log2 llvm_log2)
-;; (bind-poly log10 log10f)
-;; (bind-poly log10 llvm_log10)
-;; (bind-poly sqrt sqrtf)
-;; (bind-poly sqrt llvm_sqrt)
-;; (bind-poly fabs fabsf)
-;; (bind-poly fabs llvm_fabs)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -825,6 +811,12 @@ If both strings are null an empty String will be returned
 
 (bind-func format
   (lambda (x:i8)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "%d" x)
+      (String str))))
+
+(bind-func format
+  (lambda (x:i16)
     (let ((str:i8* (salloc 256)))
       (sprintf str "%d" x)
       (String str))))

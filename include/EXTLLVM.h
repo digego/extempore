@@ -117,43 +117,12 @@ static inline uint64_t string_hash(const char* str)
   int32_t llvm_channels();
   int32_t llvm_in_channels();
 
-  double imp_randd();
-  float imp_randf();
-  int64_t imp_rand1_i64(int64_t a);
-  int64_t imp_rand2_i64(int64_t a, int64_t b);
-  int32_t imp_rand1_i32(int32_t a);
-  int32_t imp_rand2_i32(int32_t a, int32_t b);
-  double imp_rand1_d(double a);
-  double imp_rand2_d(double a, double b);
-  float imp_rand1_f(float a);
-  float imp_rand2_f(float a, float b);
-
-  closure_address_table* new_address_table();
-  closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table);
-  closure_address_table* get_address_table(const char* name, closure_address_table* table);
-  uint32_t get_address_offset(uint64_t id, closure_address_table* table);
-  char* get_address_type(uint64_t id, closure_address_table* table);
-  bool check_address_exists(uint64_t id, closure_address_table* table);
-  bool check_address_type(uint64_t id, closure_address_table* table, const char* type);
+double imp_randd();
+int64_t imp_rand1_i64(int64_t a);
 
   double llvm_tan(double x);
-  double llvm_cosh(double x);
   double llvm_tanh(double x);
   double llvm_sinh(double x);
-  double llvm_asin(double x);
-  double llvm_atan(double x);
-  double llvm_atan2(double x,double y);
-  /* double llvm_ceil(double x); */
-  /* double llvm_floor(double x); */
-  /* double llvm_exp(double x); */
-  /* double llvm_fmod(double x,double y); */
-  /* double llvm_pow(double x,double y); */
-  /* double llvm_log(double x); */
-  /* double llvm_log2(double x); */
-  /* double llvm_log10(double x); */
-  /* double llvm_sqrt(double x); */
-  /* double llvm_fabs(double x);   */
-
 }
 
 ///////////////////////////////////////////////////

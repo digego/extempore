@@ -60,7 +60,7 @@ static extemp::CMG FreeWithDelayCM(
             free(static_cast<extemp::Task<char*>*>(Task)->getArg());
         });
 
-static void free_after_delay(char* Data, double Delay)
+EXPORT void free_after_delay(char* Data, double Delay)
 {
     extemp::TaskScheduler::I()->add(new extemp::Task<char*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),
             &FreeWithDelayCM, Data));
