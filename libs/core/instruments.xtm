@@ -78,7 +78,7 @@
 
 (bind-func xtm_play_note
   (lambda (time inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* freq amp dur nargs:i64 dargs)
-    (if (> freq 10.0)        
+    (if (> freq 10.0)
         (let ((f (inst.new_note:[i64,i64,SAMPLE,i64,SAMPLE,i64,SAMPLE*]*)))
           (f time freq dur amp nargs dargs)
           ;; so that we only copy an integer from memzone
@@ -131,7 +131,7 @@
                        (oscl 0.8 (+ freq (oscl3 (* 2.01 freq)
                                                 (* freq 2.01)))))))
                 ((= chan 1)
-                 (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude	       
+                 (* amp (/ 5.0 (log freq)) ;; frequency scale amplitude
                     (+ (oscr2 1.0 (+ freq (* 5.0 (random))))
                        (lpf2 (saw2 fxamp freq) (* 3.0 freq) res)
                        (oscr 0.8 (+ freq (oscr3 (* 0.99 freq)
@@ -152,7 +152,7 @@
       (if (< pan_old pan) ;; interpolate pan
           (set! pan_old (+ pan_old .001))
           (set! pan_old (- pan_old .001)))
-      (cond ((= chan 0) 
+      (cond ((= chan 0)
              (dlyl (* 2.0 pan_old in) wet fb))
             ((= chan 1)
              (dlyr (* 2.0 (- 1.0 pan_old) in) wet fb))
@@ -162,17 +162,17 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; extempore_pad 
+;; extempore_pad
 ;;
 (bind-func epad_note_c
   (let ((res 0.1))
     (lambda (data:NoteInitData* nargs:i64 dargs:SAMPLE*)
-      (let ((oscl (square_c 0.0)) 
+      (let ((oscl (square_c 0.0))
             (oscr (square_c 0.1))
             (o1 (osc_c 0.0))
             (oscl2 (square_c (random)))
             (lpfl (lpf_c))
-            (lpfr (lpf_c))	  
+            (lpfr (lpf_c))
             (oscr2 (square_c (random)))
             (a:SAMPLE (+ 1.0 (* 0.02 (random))))
             (b:SAMPLE (+ 1.0 (* 0.02 (random)))))
@@ -193,14 +193,14 @@
         (c1 (chorus_c 0.0))
         (c2 (chorus_c 0.1))
         (rev1 (reverb_c 200.0))
-        (rev2 (reverb_c 120.0))	
+        (rev2 (reverb_c 120.0))
         (ipan pan)
         (cwet 0.5)
         (cfb 0.5)
         (wet 0.2)
         (fb 0.5)
         (opan (osc_c 0.0)))
-    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)      
+    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (set! pan (+ 0.5 (opan 0.2 3.0)))
       (cond ((= chan 0)
              (rev1 (c1 (* 2.0 pan in) cwet cfb)
@@ -352,14 +352,14 @@
 
 (bind-func fmsynth_fx 700000
   (let ((o1 (osc_c 0.0))
-        (o2 (osc_c (* 0.5 SPI))) 
+        (o2 (osc_c (* 0.5 SPI)))
         (cl (chorus_c 0.0))
         (cr (chorus_c 0.314))
-        (del1 (delay_c (convert (/ (convert (llvm_samplerate) double) 2.0))))
-        (del2 (delay_c (convert (/ (convert (llvm_samplerate) double) 3.0))))
+        (del1 (delay_c (convert (/ (convert SAMPLE_RATE double) 2.0))))
+        (del2 (delay_c (convert (/ (convert SAMPLE_RATE double) 3.0))))
         (lpfl (lpf_c))
         (lpfr (lpf_c))
-        (res 0.4)        
+        (res 0.4)
         (revl (reverb_c 70.0))
         (revr (reverb_c 60.0))
         (cwet 0.5)
@@ -408,14 +408,14 @@
 
 (bind-func fmpad_fx 700000
   (let ((o1 (osc_c 0.0))
-        (o2 (osc_c (* 0.5 SPI))) 
+        (o2 (osc_c (* 0.5 SPI)))
         (cl (chorus_c 0.0))
         (cr (chorus_c 0.314))
         (cwet 0.5)
         (cfb 0.5)
         (lpfl (lpf_c))
         (lpfr (lpf_c))
-        (res 0.4)        
+        (res 0.4)
         (revl (reverb_c 70.0))
         (revr (reverb_c 60.0))
         (wet 0.3)
@@ -434,7 +434,7 @@
             (else 0.0)))))
 
 
-;; 
+;;
 ;; simple saw
 ;;
 (bind-func sawbass_note_c
@@ -448,17 +448,17 @@
   (let ((cl (chorus_mc_c 2 0.0))
         (lpf (lpf_mc_c 2))
         (del (delay_t_st_c
-              (convert (* (convert (llvm_samplerate) double) (/ 1.0 2.1)))
-              (convert (* (convert (llvm_samplerate) double) (/ 1.0 2.0))) 0))
+              (convert (* (convert SAMPLE_RATE double) (/ 1.0 2.1)))
+              (convert (* (convert SAMPLE_RATE double) (/ 1.0 2.0))) 0))
         (h (hann_t_mc_c 0)))
     (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
       (del chan (* 1.0
                    (lpf chan (cl chan in 1.0 0.6)
-                        (+ 350.0 (* 3000.0 (h chan time (convert (* (convert (llvm_samplerate) double) 8.)))))
+                        (+ 350.0 (* 3000.0 (h chan time (convert (* (convert SAMPLE_RATE double) 8.)))))
                         0.75))
            time 0.8 0.5))))
 
-;; 
+;;
 ;; simple sine subbass
 ;;
 (bind-func subbass_note_c
@@ -508,7 +508,7 @@
              (r2 (combr in
                         (+ 3.0 (lfo1r 1.9 1.0))
                         0.8 0.8)
-                 rev 0.5))             
+                 rev 0.5))
             (else 0.0)))))
 
 

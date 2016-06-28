@@ -243,4 +243,13 @@ struct EnvInjector
     }
 };
 
+extern inline int list_length(scheme *sc, pointer a)
+{
+    int v(0);
+    for (; likely(is_pair(a)); a = cdr(a)) {
+       ++v;
+    }
+    return likely(a == sc->NIL) ? v : -1;
+}
+
 #endif

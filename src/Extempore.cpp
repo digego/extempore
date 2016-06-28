@@ -163,7 +163,7 @@ int main(int argc, char** argv)
                 extemp::UNIV::SAMPLE_RATE = atoi(args.OptionArg());
                 break;
             case OPT_FRAMES:
-                extemp::UNIV::FRAMES = atoi(args.OptionArg());
+                extemp::UNIV::NUM_FRAMES = atoi(args.OptionArg());
                 break;
             case OPT_CHANNELS:
                 extemp::UNIV::CHANNELS = atoi(args.OptionArg());

@@ -36,7 +36,7 @@
 (bind-alias SComplex Complexf)
 
 ;; STFT
-;; 
+;;
 ;; r, n and k should be powers of 2
 ;;
 ;; r is the rate at which you want forward fft's to be calculated
@@ -51,7 +51,7 @@
     (if (> r n) (set! r n))
     (let ((buf:SAMPLE* (alloc n))
           (sample_size_in_bytes 4) ;; assuming float SAMPLE
-          (spectrum:SComplex* (alloc k))          
+          (spectrum:SComplex* (alloc k))
           (pad:SAMPLE* (alloc k))
           (segments (/ n r))
           (pad_offset (dtoi64 (- (* .5 (i64tod k)) (* .5 (i64tod n)))))
@@ -62,7 +62,7 @@
         (if (= t2 0)
             (let ((start (* idx r))
                   (samps (- n start)))
-              ;; copy 'n' samples to padded buffer 
+              ;; copy 'n' samples to padded buffer
               (memcpy padbuf (convert (pref-ptr buf start)) (* sample_size_in_bytes samps))
               (memcpy padbuf (convert (pref-ptr buf 0)) (* sample_size_in_bytes start))
               ;; apply windowing function
@@ -72,9 +72,9 @@
               ;; inc index
               (set! idx (% (+ idx 1) segments))
               ))
-        (pset! buf t x)        
+        (pset! buf t x)
         (set! t (+ t 1))
-        (if (= t n) (set! t 0))        
+        (if (= t n) (set! t 0))
         (set! t2 (+ t2 1))
         (if (= t2 r) (set! t2 0))
         x))))
@@ -93,7 +93,7 @@
 (bind-func stft_mc_c
   (lambda (channels:i64 r n k)
     (let ((fftchans:[float,float]** (alloc channels))
-          (spectrums:SComplex** (alloc channels)) 
+          (spectrums:SComplex** (alloc channels))
           (i 0))
       (dotimes (i channels)
         (let ((F (stft_c r n k)))
@@ -112,19 +112,19 @@
           (po 0)                 ;; partition offset
           (irs:SComplex* (zalloc (* 2 ir_len))) ;; storage for all IR FFT 'partitions'
           (ffts:SComplex* (zalloc (* 2 ir_len))) ;; storage for all total forward ffts
-          (padlgth (* len 2)) ;; padlgth is for convolution buffers                    
-          (aorb:i1 #t)        ;; #t for a #f for b          
+          (padlgth (* len 2)) ;; padlgth is for convolution buffers
+          (aorb:i1 #t)        ;; #t for a #f for b
           (irtaila:SAMPLE* (zalloc len)) ;; buffer ir tail
           (irtailb:SAMPLE* (zalloc len))
           (drya:SAMPLE* (zalloc padlgth)) ;; buffer input signal
           (dryb:SAMPLE* (zalloc padlgth))
           (t1:i64 0) (i:i64 0) (out:SAMPLE 0.0) (j:i64 0)
-          (A:SComplex* (zalloc padlgth)) 
+          (A:SComplex* (zalloc padlgth))
           (B:SComplex* (zalloc padlgth))
           (a:SAMPLE* (zalloc padlgth))
           (t2:double 0.0)
           (output:SAMPLE* (zalloc len))) ;; buffer output
-      (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (ftod (/ (convert ir_len) (convert (llvm_samplerate)))) len parts)
+      (printf "IR:(%.1f seconds) Partitions(size:%lld num:%lld)\n" (ftod (/ (convert ir_len) (convert SAMPLE_RATE))) len parts)
       ;; partition and store IR spectra (circlar convolution so padded)
       (dotimes (i parts)
         (memset (cast A i8*) 0 (convert (* 8 padlgth))) ;; zero pad, assumes Complexf (8 bytes per struct)
@@ -138,7 +138,7 @@
         ;; set output which is len samples behind 'in'
         (set! out ;; out is always delayed by len
               (+ (* dry (pref (if aorb dryb drya) t1)) ;; playback 'delayed' input
-                 (* 4.0 wet             ;; wet output signal 
+                 (* 4.0 wet             ;; wet output signal
                     (+ (pref output t1) ;; overlap-add current-output with ...
                        (pref (if aorb irtaila irtailb) t1))))) ;; delayed-irtail
         ;; increment time
@@ -154,7 +154,7 @@
               ;; run convolution over all partions
               (dotimes (i parts)
                 (set! j (% (+ parts (- po i)) parts))
-                (set! _fft (pref-ptr ffts (* j padlgth)))                
+                (set! _fft (pref-ptr ffts (* j padlgth)))
                 (set! _ir (pref-ptr irs (* i padlgth)))
                 ;; '*' and '+' are overloaded for buffers of Complex{f,d}
                 (Complex_multiplication_bybuf _fft _ir A padlgth)
@@ -180,7 +180,7 @@
 ;; poly wrapper for spectral_convolution_c
 (bind-func creverb_c
   (lambda (path:i8*)
-    (creverb_c:[[float,float,float,float]*,i8*,i64]* path (* 4 (convert (llvm_frames))))))
+    (creverb_c:[[float,float,float,float]*,i8*,i64]* path (* 4 (convert FRAMES)))))
 
 
 (bind-func creverb_st_c
@@ -196,7 +196,7 @@
 
 (bind-func creverb_st_c
   (lambda (pathl pathr)
-    (creverb_st_c:[[float,i64,float,float,float]*,i8*,i8*,i64]* pathl pathr (* (convert (llvm_frames)) 4))))
+    (creverb_st_c:[[float,i64,float,float,float]*,i8*,i8*,i64]* pathl pathr (* (convert FRAMES) 4))))
 
 
 (define *xtmlib-audio_dsp_ext-loaded* #t)

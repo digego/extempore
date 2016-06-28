@@ -3102,13 +3102,13 @@
                              (impc:ir:gname)))
                      (cdr ast)))
           (va (impc:ir:gname "val" "i32")))
-      (cond ((equal? (car ast) 'llvm_printf)
+      (cond ((equal? (car ast) 'printf)
              (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
                      (impc:ir:pointer++ *impc:ir:si8*))
                  (impc:compiler:print-bad-type-error-with-ast
                   (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
                   "first argument must be a format string" ast)))
-            ((member (car ast) '(llvm_fprintf llvm_fscanf))
+            ((member (car ast) '(fprintf fscanf))
              (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
                      (impc:ir:pointer++ *impc:ir:si8*))
                  (impc:compiler:print-bad-type-error-with-ast
@@ -3119,7 +3119,7 @@
                  (impc:compiler:print-bad-type-error-with-ast
                   (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
                   "second argument must be a format string" ast)))
-            ((member (car ast) '(llvm_sprintf llvm_sscanf))
+            ((member (car ast) '(sprintf sscanf))
              (if (<> (impc:ir:get-type-from-str (car (cdr (cdr (car args)))))
                      (impc:ir:pointer++ *impc:ir:si8*))
                  (impc:compiler:print-bad-type-error-with-ast
@@ -3131,7 +3131,7 @@
                   (impc:ir:get-type-from-str (car (cdr (cdr (cadr args)))))
                   "second argument must be a format string" ast)))
             (else (impc:compiler:print-bad-type-error "" "Bad VARARGS func!")))
-      (if (equal? (car ast) 'llvm_printf)
+      (if (equal? (car ast) 'printf)
           (string-append (apply string-append (map (lambda (a) (car a)) args))
                          "\n" va " = call i32 (i8*, ...) @printf("
                          (caddr (car args)) " " (cadr (car args))
@@ -3143,7 +3143,7 @@
                          ")\n")
           (string-append (apply string-append (map (lambda (a) (car a)) args))
                          "\n" va " = call i32 (i8*,i8*, ...) @"
-                         (substring (symbol->string (car ast)) 5) "("
+                         (symbol->string (car ast)) "("
                          (caddr (car args)) " " (cadr (car args)) ", "
                          (caddr (cadr args)) " " (cadr (cadr args))
                          (apply string-append (map (lambda (a)
@@ -4134,7 +4134,7 @@
                    ((and (symbol? (car ast))
                          (or (impc:ti:nativefunc-exists? (symbol->string (car ast)))
                              (impc:ti:closure-exists? (symbol->string (car ast)))))
-                    (if (member (car ast) '(llvm_printf llvm_fprintf llvm_sprintf llvm_sscanf llvm_fscanf))
+                    (if (member (car ast) '(printf fprintf sprintf sscanf fscanf))
                         (impc:ir:compiler:llvm_varargs ast types)
                         (impc:ir:compiler:native-call ast types)))
                    ((equal? (car ast) 'ret->) ;; return from function

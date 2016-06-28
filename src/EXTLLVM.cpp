@@ -125,7 +125,7 @@ std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
 
 extemp::EXTMutex alloc_mutex("alloc mutex");
 
-static void* malloc16(size_t Size)
+EXPORT void* malloc16(size_t Size)
 {
 #ifdef _WIN32
     return _aligned_malloc(Size, 16);
@@ -158,7 +158,7 @@ void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
 }
 
 // LLVM RUNTIME ERROR
-void llvm_runtime_error(int error, void* arg)
+EXPORT void llvm_runtime_error(int error, void* arg)
 {
   ascii_error();
   switch(error){
@@ -175,7 +175,7 @@ void llvm_runtime_error(int error, void* arg)
 THREAD_LOCAL llvm_zone_stack* tls_llvm_zone_stack = 0;
 THREAD_LOCAL uint64_t tls_llvm_zone_stacksize = 0;
 
-void llvm_zone_print(llvm_zone_t* zone)
+EXPORT void llvm_zone_print(llvm_zone_t* zone)
 {
   auto tmp(zone);
   auto total_size(zone->size);
@@ -189,12 +189,12 @@ void llvm_zone_print(llvm_zone_t* zone)
   return;
 }
 
-uint64_t llvm_zone_ptr_size(void* ptr)
+EXPORT uint64_t llvm_zone_ptr_size(void* ptr) // could be inline version in llvm (as well)
 {
     return *(reinterpret_cast<uint64_t*>(ptr) - 1);
 }
 
-bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
+EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
 {
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
@@ -212,7 +212,7 @@ bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     return 0;
 }
 
-bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
+EXPORT bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
 {
     while (unlikely(zone && (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
       zone = zone->memories;
@@ -220,7 +220,7 @@ bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
     return zone;
 }
 
-void llvm_schedule_callback(long long time, void* dat)
+EXPORT void llvm_schedule_callback(long long time, void* dat)
 {
   //printf("scheduled callback %lld\n",time);
   extemp::SchemeProcess* proc = extemp::SchemeProcess::I(); //extemp::SchemeProcess::I()->extemporeCallback(time,dat);
@@ -231,7 +231,7 @@ void llvm_schedule_callback(long long time, void* dat)
   return;
 }
 
-void* llvm_get_function_ptr(char* fname)
+EXPORT void* llvm_get_function_ptr(char* fname)
 {
   return reinterpret_cast<void*>(extemp::EXTLLVM::EE->getFunctionAddress(fname));
 }
@@ -243,7 +243,7 @@ EXPORT char* extitoa(int64_t val)
     return buf;
 }
 
-void llvm_send_udp(char* host, int port, void* message, int message_length)
+EXPORT void llvm_send_udp(char* host, int port, void* message, int message_length)
 {
   int length = message_length;
 
@@ -328,47 +328,39 @@ void llvm_send_udp(char* host, int port, void* message, int message_length)
 ///////////////////////////////////////////////////
 
 // these are helpers for runtime debugging in llvm
-void llvm_print_pointer(void* ptr)
+EXPORT void llvm_print_pointer(void* ptr)
 {
     printf("llvm:ptr:>%p -- %" PRId64 "\n",ptr,*((int64_t*)ptr));
     return;
 }
 
-void llvm_print_i32(int32_t num)
+EXPORT void llvm_print_i32(int32_t num)
 {
     printf("llvm:i32:>%d\n",num);
     return;
 }
 
-void llvm_print_i64(int64_t num)
+EXPORT void llvm_print_i64(int64_t num)
 {
     printf("llvm:i64:>%" PRId64 "\n",num);
     return;
 }
 
-void llvm_print_f32(float num)
+EXPORT void llvm_print_f32(float num)
 {
     printf("llvm:f32:>%f\n",num);
     return;
 }
 
-void llvm_print_f64(double num)
+EXPORT void llvm_print_f64(double num)
 {
     printf("llvm:f64:>%f\n",num);
     return;
 }
 
-double llvm_tan(double x) { return tan(x); }
-double llvm_tanh(double x) { return tanh(x); }
-double llvm_sinh(double x) { return sinh(x); }
-
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-int32_t llvm_frames() { return (int32_t)extemp::UNIV::FRAMES; }
-int32_t llvm_channels() { return (int32_t)extemp::UNIV::CHANNELS; }
-int32_t llvm_in_channels() { return (int32_t)extemp::UNIV::IN_CHANNELS; }
-
 static THREAD_LOCAL std::minstd_rand* sRandGen;
 
 EXPORT double imp_randd()
@@ -803,36 +795,14 @@ void initLLVM()
         const char* name;
         uintptr_t   address;
     } mappingTable[] = {
-        { "llvm_disassemble", uintptr_t(&llvm_disassemble) },
-        { "llvm_destroy_zone_after_delay", uintptr_t(&llvm_destroy_zone_after_delay) },
         { "llvm_zone_destroy", uintptr_t(&llvm_zone_destroy) },
-        { "llvm_pop_zone_stack", uintptr_t(&llvm_pop_zone_stack) },
     };
     for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);
     }
 
       // tell LLVM about some built-in functions
-            EE->updateGlobalMapping("llvm_zone_print", (uint64_t)&llvm_zone_print);
-            EE->updateGlobalMapping("llvm_runtime_error", (uint64_t)&llvm_runtime_error);
-            EE->updateGlobalMapping("llvm_send_udp", (uint64_t)&llvm_send_udp);
-            EE->updateGlobalMapping("llvm_schedule_callback", (uint64_t)&llvm_schedule_callback);
-            EE->updateGlobalMapping("llvm_get_function_ptr", (uint64_t)&llvm_get_function_ptr);
-            EE->updateGlobalMapping("llvm_zone_malloc", (uint64_t)&llvm_zone_malloc);
-            EE->updateGlobalMapping("llvm_zone_malloc_from_current_zone", (uint64_t)&llvm_zone_malloc_from_current_zone);
             EE->updateGlobalMapping("get_address_offset", (uint64_t)&get_address_offset);
-            EE->updateGlobalMapping("llvm_print_pointer", (uint64_t)&llvm_print_pointer);
-            EE->updateGlobalMapping("llvm_print_i32", (uint64_t)&llvm_print_i32);
-            EE->updateGlobalMapping("llvm_print_i64", (uint64_t)&llvm_print_i64);
-            EE->updateGlobalMapping("llvm_print_f32", (uint64_t)&llvm_print_f32);
-            EE->updateGlobalMapping("llvm_print_f64", (uint64_t)&llvm_print_f64);
-            EE->updateGlobalMapping("llvm_frames", (uint64_t)&llvm_frames);
-            EE->updateGlobalMapping("llvm_channels", (uint64_t)&llvm_channels);
-            EE->updateGlobalMapping("llvm_in_channels", (uint64_t)&llvm_in_channels);
-            EE->updateGlobalMapping("llvm_zone_copy_ptr", (uint64_t)&llvm_zone_copy_ptr);
-            EE->updateGlobalMapping("llvm_zone_ptr_size", (uint64_t)&llvm_zone_ptr_size);
-            EE->updateGlobalMapping("llvm_ptr_in_zone", (uint64_t)&llvm_ptr_in_zone);
-            EE->updateGlobalMapping("llvm_ptr_in_current_zone", (uint64_t)&llvm_ptr_in_current_zone);
             EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
             EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);
             EE->updateGlobalMapping("swap64f", (uint64_t)&swap64f);
@@ -849,7 +819,6 @@ void initLLVM()
             EE->updateGlobalMapping("mk_double", (uint64_t)&mk_double);
             EE->updateGlobalMapping("r32value", (uint64_t)&r32value);
             EE->updateGlobalMapping("mk_float", (uint64_t)&mk_float);
-            EE->updateGlobalMapping("is_real", (uint64_t)&is_real);
             EE->updateGlobalMapping("mk_i64", (uint64_t)&mk_i64);
             EE->updateGlobalMapping("mk_i32", (uint64_t)&mk_i32);
             EE->updateGlobalMapping("mk_i16", (uint64_t)&mk_i16);
@@ -857,16 +826,8 @@ void initLLVM()
             EE->updateGlobalMapping("mk_i1", (uint64_t)&mk_i1);
             EE->updateGlobalMapping("string_value", (uint64_t)&string_value);
             EE->updateGlobalMapping("mk_string", (uint64_t)&mk_string);
-            EE->updateGlobalMapping("is_string", (uint64_t)&is_string);
             EE->updateGlobalMapping("cptr_value", (uint64_t)&cptr_value);
             EE->updateGlobalMapping("mk_cptr", (uint64_t)&mk_cptr);
-            EE->updateGlobalMapping("is_cptr", (uint64_t)&is_cptr);
-            EE->updateGlobalMapping("is_cptr_or_str", (uint64_t)&is_cptr_or_str);
-            EE->updateGlobalMapping("malloc16", (uint64_t)&malloc16);
-            EE->updateGlobalMapping("list_ref", (uint64_t)&list_ref);
-      EE->updateGlobalMapping("llvm_tan", (uint64_t)&llvm_tan);
-      EE->updateGlobalMapping("llvm_tanh", (uint64_t)&llvm_tanh);
-      EE->updateGlobalMapping("llvm_sinh", (uint64_t)&llvm_sinh);
       EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
       extemp::EXTLLVM::EE->finalizeObject();

@@ -208,8 +208,8 @@ void* audioCallbackMT(void* Args)
     auto zone(extemp::EXTLLVM::llvm_peek_zone_stack());
     SAMPLE* outbuf = AudioDevice::I()->getDSPMTOutBuffer();
     SAMPLE* outbufs[2];
-    outbufs[0] = outbuf + UNIV::CHANNELS * UNIV::FRAMES * idx * 2;
-    outbufs[1] = outbufs[0] + UNIV::CHANNELS * UNIV::FRAMES;
+    outbufs[0] = outbuf + UNIV::CHANNELS * UNIV::NUM_FRAMES * idx * 2;
+    outbufs[1] = outbufs[0] + UNIV::CHANNELS * UNIV::NUM_FRAMES;
     SAMPLE* inbuf = AudioDevice::I()->getDSPMTInBuffer();
     SAMPLE* indata = (SAMPLE*) malloc(UNIV::IN_CHANNELS * 8);
     bool zerolatency = AudioDevice::I()->getZeroLatency();
@@ -232,7 +232,7 @@ void* audioCallbackMT(void* Args)
         } // spin
         ++lcount;
         uint64_t LTIME = UNIV::DEVICE_TIME;
-        for (uint32_t i=0;i<UNIV::FRAMES;i++) {
+        for (uint32_t i=0;i<UNIV::NUM_FRAMES;i++) {
             uint32_t iout = i*UNIV::CHANNELS;
             uint32_t iin = i*UNIV::IN_CHANNELS;
             for (unsigned k=0;k<UNIV::IN_CHANNELS;k++) {
@@ -279,7 +279,7 @@ void* audioCallbackMTBuf(void* dat) {
     dsp_f_ptr_array cache_wrapper = dsp_wrapper_array;
     llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
     float* outbuf = AudioDevice::I()->getDSPMTOutBufferArray();
-    outbuf = outbuf+(UNIV::CHANNELS*UNIV::FRAMES*idx);
+    outbuf = outbuf+(UNIV::CHANNELS*UNIV::NUM_FRAMES*idx);
     float* inbuf = AudioDevice::I()->getDSPMTInBufferArray();
 // TODO: USED FOR????    float* indata = (float*) malloc(UNIV::IN_CHANNELS*4);
     while (true) {
@@ -383,7 +383,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         SAMPLE in[32];
         SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
         float* input = (float*) InputBuffer;
-        for(unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = (SAMPLE) input[i];
+        for(unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = (SAMPLE) input[i];
         sThreadDoneCount = 0;
         if (zerolatency) {
             ++sSignalCount;
@@ -409,12 +409,12 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       // if we are NOT running zerolatency
       // and toggle is FALSE then use alternate buffers
         if (!zerolatency && !toggle) {
-            indats[0] = indats[0] + UNIV::FRAMES*UNIV::CHANNELS;
+            indats[0] = indats[0] + UNIV::NUM_FRAMES*UNIV::CHANNELS;
         }
         for (int jj=1;jj<numthreads;jj++) {
-            indats[jj] = indats[0] + (UNIV::FRAMES*UNIV::CHANNELS*jj*2);
+            indats[jj] = indats[0] + (UNIV::NUM_FRAMES*UNIV::CHANNELS*jj*2);
         }
-        for(uint64_t i=0;i<UNIV::FRAMES;i++) {
+        for(uint64_t i=0;i<UNIV::NUM_FRAMES;i++) {
             uint32_t iout = i*UNIV::CHANNELS;
             float* dat = (float*) OutputBuffer;
 
@@ -446,7 +446,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
 // TODO: UNUSED???      double in[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
       float* input = (float*) InputBuffer;
-      for (unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::FRAMES;i++) inb[i] = input[i];
+      for (unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = input[i];
       // start computing in all audio threads
         sThreadDoneCount = 0;
         ++sSignalCount;
@@ -469,14 +469,14 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       float* outdat = (float*) OutputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
       for(int jj=1;jj<numthreads;jj++) {
-        indats[jj] = indats[0]+(UNIV::FRAMES*UNIV::CHANNELS*jj);
+        indats[jj] = indats[0]+(UNIV::NUM_FRAMES*UNIV::CHANNELS*jj);
       }
       cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, UserData);
       extemp::EXTLLVM::llvm_zone_reset(zone);
       //printf("main out\n");
     } else {
         //zero out audiobuffer
-        memset(OutputBuffer,0,(UNIV::CHANNELS*UNIV::FRAMES*sizeof(float)));
+        memset(OutputBuffer,0,(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(float)));
         //nothin to do
     }
     return 0;
@@ -593,7 +593,7 @@ void AudioDevice::start()
     paout.suggestedLatency = std::max(UNIV::AUDIO_OUTPUT_LATENCY, deviceInfo->defaultLowOutputLatency);
     paout.hostApiSpecificStreamInfo = nullptr;
     PaStreamParameters* paoutptr = (UNIV::CHANNELS < 1) ? nullptr : &paout;
-    err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLE_RATE, UNIV::FRAMES, paNoFlag, audioCallback,
+    err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLE_RATE, UNIV::NUM_FRAMES, paNoFlag, audioCallback,
             TaskScheduler::I());
     if (err != paNoError) {
         ascii_error();
@@ -643,7 +643,7 @@ void AudioDevice::start()
     ascii_normal();
     std::cout << "Frames         : " << std::flush;
     ascii_info();
-    std::cout << UNIV::FRAMES << std::endl << std::flush;
+    std::cout << UNIV::NUM_FRAMES << std::endl << std::flush;
     ascii_normal();
     std::cout << "Latency        : " << std::flush;
     ascii_info();
@@ -672,10 +672,10 @@ void AudioDevice::initMTAudio(int Num, bool ZeroLatency)
     m_numThreads = Num;
     m_zeroLatency = ZeroLatency;
     m_toggle = true;
-    inbuf = (SAMPLE*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*sizeof(SAMPLE));
+    inbuf = (SAMPLE*) malloc(UNIV::IN_CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE));
     // outbuf * 2 for double buffering
-    outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*m_numThreads*2);
-    memset(outbuf, 0, UNIV::CHANNELS*UNIV::FRAMES*sizeof(SAMPLE)*m_numThreads*2);
+    outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
+    memset(outbuf, 0, UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
     for (unsigned i = 0; i < m_numThreads; ++i) {
         m_threads[i] = new EXTThread(audioCallbackMT, reinterpret_cast<void*>(uintptr_t(i)),
                 std::string("MT_AUD_") + char('A' + i));
@@ -691,8 +691,8 @@ void AudioDevice::initMTAudioBuf(int Num, bool ZeroLatency)
     }
     m_numThreads = Num;
     m_zeroLatency = ZeroLatency;
-    inbuf_f = (float*) malloc(UNIV::IN_CHANNELS*UNIV::FRAMES*4);
-    outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::FRAMES*4*m_numThreads);
+    inbuf_f = (float*) malloc(UNIV::IN_CHANNELS*UNIV::NUM_FRAMES*4);
+    outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*4*m_numThreads);
     for (unsigned i = 0; i < m_numThreads; ++i) {
         m_threads[i] = new EXTThread(audioCallbackMTBuf, reinterpret_cast<void*>(uintptr_t(i)),
             std::string("MT_AUDB_") + char('A' + i));

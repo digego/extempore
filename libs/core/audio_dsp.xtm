@@ -92,11 +92,11 @@
 ;;                       (+ (* t m) c))))))
 ;;       (Metronome tempoR 0 offset beat (Rat 4 1)
 ;;                  (line (Rat offset 1) beat
-;;                        (+ offset (* tempoR (llvm_samplerate)))
+;;                        (+ offset (* tempoR SAMPLE_RATE))
 ;;                        (+ beat 1/1))
 ;;                  (line beat (Rat offset 1)
 ;;                        (+ beat 1/1)
-;;                        (+ offset (* tempoR (llvm_samplerate))))))))
+;;                        (+ offset (* tempoR SAMPLE_RATE)))))))
 
 ;; (bind-func MakeMetro_1
 ;;   (lambda (tempo)
@@ -122,7 +122,7 @@
 ;;   (lambda (m:Metronome* q:Rational)
 ;;     (let ((val (+ (tref m 3) ;; total beats
 ;;                   (/ (- (now) (tref m 2)) ;; mark
-;;                      (* (llvm_samplerate) (tref m 0)))))
+;;                      (* SAMPLE_RATE (tref m 0)))))
 ;;           (q2 (- q (% val q))))
 ;;       (+ val (- q (% val q))))))
 
@@ -132,7 +132,7 @@
 
 ;; (bind-func metro_get_duration
 ;;   (lambda (m:Metronome* dur:Rational)
-;;     (convert (* (convert (llvm_samplerate) SAMPLE) (* dur (tref m 0))) i64)))
+;;     (convert (* (convert SAMPLE_RATE SAMPLE) (* dur (tref m 0))) i64)))
 
 ;; (bind-func print_metronome:[void,Metronome*]*
 ;;   (lambda (m)
@@ -253,7 +253,7 @@
 (bind-func hann
   (lambda (time:i64 width:i64 repeat:i64)
     (if (or (< width 1)
-            (> (% time (* width repeat)) width))            
+            (> (% time (* width repeat)) width))
         0.0
         (* 0.5
            (- 1.0
@@ -312,7 +312,7 @@
   (lambda (phase)
     (let ((t (/ STWOPI SAMPLERATE)))
       (lambda (amp freq)
-        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs)))) 
+        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
         (if (> phase SPI) (set! phase (- phase STWOPI)))
         (* amp (_sin phase))))))
 
@@ -339,7 +339,7 @@
 (bind-func square_c
   (lambda (phase)
     (let ((osc (osc_c phase)))
-      (lambda (amp freq)        
+      (lambda (amp freq)
         (* amp 0.8:f
            (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
                     (osc 1.0 freq))))))))
@@ -489,7 +489,7 @@
 (bind-func fade_c
   (lambda ()
     (let ((t 0.0)
-          (incr (/ 1.0 (convert (llvm_samplerate) SAMPLE))))
+          (incr (/ 1.0 (convert SAMPLE_RATE SAMPLE))))
       (lambda (initial:SAMPLE final dur)
         (set! t (+ t incr))
         (if (> t dur)
@@ -970,9 +970,9 @@
           ((= chan 1) (* x c2))
           ((= chan 2) (* x c3))
           ((= chan 3) (* x c4))
-          ((= chan 4) (* x c5))          
-          ((= chan 5) (* x c6))          
-          ((= chan 6) (* x c7))          
+          ((= chan 4) (* x c5))
+          ((= chan 5) (* x c6))
+          ((= chan 6) (* x c7))
           ((= chan 7) (* x c8))
           (else 0.0))))
 
@@ -1000,7 +1000,7 @@
 @param in - input pointer |6,SAMPLE|* (|in,low,band,high,notch,peak|)
 @param cutoff - filter cutoff (Hz)
 @param res - filter resonance
-@param outarray - place to store the output 
+@param outarray - place to store the output
 "
 	(lambda ()
 	  (let ((ic1eq 0.0) (ic2eq 0.0)
@@ -1010,7 +1010,7 @@
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1044,7 +1044,7 @@
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1072,7 +1072,7 @@ but v1 and v2 can be computed in parallel"
           (a1 0.0) (a2 0.0) (a3 0.0)
           (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
 	    (lambda (in cutoff res)
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
         (set! a2 (* g a1))
@@ -1103,7 +1103,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1131,7 +1131,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1159,7 +1159,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1187,7 +1187,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (- 2.0 (* 2.0 res)))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
         (set! a2 (* g a1))
@@ -1218,7 +1218,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff (convert (llvm_samplerate)))))
+        (set! g (/ (tan (* SPI (/ cutoff (convert SAMPLE_RATE))))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1255,7 +1255,7 @@ but v1 and v2 can be computed in parallel"
 	    (lambda (in cutoff gain Q)
         ;; one option: do the check (= res oldres) trick here
 	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff (convert (llvm_samplerate)))))
+        (set! g (/ (tan (* SPI (/ cutoff (convert SAMPLE_RATE))))
                    (sqrt A)))
         (set! k (/ 1.0 Q))
         (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
@@ -1292,7 +1292,7 @@ but v1 and v2 can be computed in parallel"
           (v1 0.0) (v2:SAMPLE 0.0))
 	    (lambda (in cutoff res)
         ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert (llvm_samplerate))))))
+	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
         (set! k (* 2.0 res))
         (set! a0 (/ 1.0 (- (* (+ 1.0 g)
                               (+ 1.0 g))
@@ -1352,7 +1352,7 @@ but v1 and v2 can be computed in parallel"
           (gidx 0)
           (offset 0)
           (out:SAMPLE 0.0) (i 0)
-          (cachesize:i64 (* 88200 2 channels)) 
+          (cachesize:i64 (* 88200 2 channels))
           (cnt cachesize)
           (audio_cache:SAMPLE* (alloc cachesize))
           (lengths:|200,double|* (alloc))
@@ -1364,7 +1364,7 @@ but v1 and v2 can be computed in parallel"
           (panning:|200,float|* (alloc))
           (active:|200,i1|* (alloc)))
       (dotimes (i 200) (aset! active i 0))
-      (lambda (chan time:i64 in)        
+      (lambda (chan time:i64 in)
         (set! iotn (+ iotn 1))
         (pset! audio_cache (% cnt cachesize) in)
         (if (and (>= iotn iot)
@@ -1377,7 +1377,7 @@ but v1 and v2 can be computed in parallel"
               (aset! panning gidx (+ plo (* (- phi plo) (random))))
               (aset! durations gidx (aref lengths gidx))
               (aset! rates gidx (+ rlo (* (- rhi rlo)  (random))))
-              (set! offset 
+              (set! offset
                     (if (> (aref rates gidx) 1.0)
                         (+ 128
                            (* channels (dtoi64 (floor (- (* (aref rates gidx)
@@ -1387,7 +1387,7 @@ but v1 and v2 can be computed in parallel"
               (aset! startidx gidx (% (- cnt offset) cachesize))
               (aset! phases gidx 0.0)
               (set! gidx (% (+ gidx 1) 200))))
-        (set! cnt (+ cnt 1))        
+        (set! cnt (+ cnt 1))
         (set! out 0.0)
         (dotimes (i 200)
           (if (= #t (aref active i))
@@ -1437,7 +1437,7 @@ but v1 and v2 can be computed in parallel"
           (offset 0)
           (y1 0.0) (x0 0.0) (x1 0.0) (x2 0.0)
           (out:SAMPLE 0.0) (i 0)
-          (cachesize:i64 (* 88200 2 channels)) 
+          (cachesize:i64 (* 88200 2 channels))
           (cnt cachesize)
           (audio_cache:SAMPLE* (alloc cachesize))
           (lengths:|200,double|* (alloc))
@@ -1449,7 +1449,7 @@ but v1 and v2 can be computed in parallel"
           (panning:|200,float|* (alloc))
           (active:|200,i1|* (alloc)))
       (dotimes (i 200) (aset! active i 0))
-      (lambda (chan time:i64 in)        
+      (lambda (chan time:i64 in)
         (set! iotn (+ iotn 1))
         (pset! audio_cache (% cnt cachesize) in)
         (if (and (>= iotn iot)
@@ -1462,7 +1462,7 @@ but v1 and v2 can be computed in parallel"
               (aset! panning gidx (+ plo (* (- phi plo) (random))))
               (aset! durations gidx (aref lengths gidx))
               (aset! rates gidx (+ rlo (* (- rhi rlo)  (random))))
-              (set! offset 
+              (set! offset
                     (if (> (aref rates gidx) 1.0)
                         (+ 128
                            (* channels (dtoi64 (floor (- (* (aref rates gidx)
@@ -1472,7 +1472,7 @@ but v1 and v2 can be computed in parallel"
               (aset! startidx gidx (% (- cnt offset) cachesize))
               (aset! phases gidx 0.0)
               (set! gidx (% (+ gidx 1) 200))))
-        (set! cnt (+ cnt 1))        
+        (set! cnt (+ cnt 1))
         (set! out 0.0)
         (dotimes (i 200)
           (if (= #t (aref active i))
@@ -1767,7 +1767,7 @@ but v1 and v2 can be computed in parallel"
 (bind-func env_follow_c
   (lambda (ms:SAMPLE)
     (let ((y1 0.0)
-          (coeff (/ 1000. (* ms (convert (llvm_samplerate))))))
+          (coeff (/ 1000. (* ms (convert SAMPLE_RATE)))))
       (lambda (x:SAMPLE)
         (set! y1 (+ x (* coeff (- y1 x))))
         y1))))
@@ -1776,8 +1776,8 @@ but v1 and v2 can be computed in parallel"
 (bind-func atkrel_env_follow_c
   (lambda (atk:SAMPLE rel:SAMPLE)
     (let ((y1 0.0)
-          (atkcoeff (/ 1000. (* atk (convert (llvm_samplerate)))))
-          (relcoeff (/ 1000. (* rel (convert (llvm_samplerate))))))
+          (atkcoeff (/ 1000. (* atk (convert SAMPLE_RATE))))
+          (relcoeff (/ 1000. (* rel (convert SAMPLE_RATE)))))
       (lambda (x)
         (set! y1 (+ x (* (if (> x y1) atkcoeff relcoeff) (- y1 x))))
         y1))))
@@ -2085,7 +2085,7 @@ but v1 and v2 can be computed in parallel"
       (lambda (chan:i64 g a d s r)
         (if (<> chan 0)
             out
-            (begin              
+            (begin
               (set! a (+ 1.0 (* a .001 SRs)))
               (set! d (+ 1.0 (* d .001 SRs)))
               (set! r (+ 1.0 (* r .001 SRs)))
@@ -2170,16 +2170,16 @@ but v1 and v2 can be computed in parallel"
           (dat (AudioBuffer_ptr buf 0 0))
           (start 0) ;; loop start in frames
           (loop 0) ;; loop length in frames (negative plays backwards)
-          (ploop 0)) ;; previous loop value          
+          (ploop 0)) ;; previous loop value
       (lambda (x)
         (if (<> prec rec) (set! rhead 0))
         (if (> rec 0)
             (begin (pset! dat rhead x)
                    (set! rhead (+ 1 rhead))
                    (if (= chan 0) (set! rec (- rec 1)))
-                   (if (= rhead lgth) (set! rec 0)))                                          
+                   (if (= rhead lgth) (set! rec 0)))
             (begin (set! rhead 0)))
-        (if (<> ploop loop) (set! phead 0))        
+        (if (<> ploop loop) (set! phead 0))
         (if (<> loop 0)
             (begin
               (set! pos (+ (* start chans) phead))
@@ -2189,7 +2189,7 @@ but v1 and v2 can be computed in parallel"
               (set! phead (+ phead (if (< loop 0) -1 1)))
               (if (= phead (* chans loop)) (set! phead 0))))
         ;; (if (= 0 (% t (* chans SR)))
-        ;;     (println "rec:" rec "loop:" loop "start:" start "rhead:" rhead "phead:" phead)) 
+        ;;     (println "rec:" rec "loop:" loop "start:" start "rhead:" rhead "phead:" phead))
         (set! chan (+ chan 1))
         (if (= chan chans) (set! chan 0))
         (set! t (+ t 1))

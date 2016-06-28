@@ -496,39 +496,10 @@ define private double @fp80ptrtod(i8* %fp80ptr)
 }
 
 declare i32 @printf(i8* noalias nocapture, ...)
-define private i32 @llvm_printf(i8* noalias nocapture %format, ...) alwaysinline "thunk"
-{
-  %1 = musttail call i32 (i8*, ...) @printf(i8* %format, ...)
-  ret i32 %1
-}
-
 declare i32 @sprintf(i8*, i8* noalias nocapture, ...)
-define private i32 @llvm_sprintf(i8* %string, i8* noalias nocapture %format, ...) alwaysinline "thunk"
-{
-  %1 = musttail call i32 (i8*, i8*, ...) @sprintf(i8* %string, i8* %format, ...)
-  ret i32 %1
-}
-
 declare i32 @sscanf(i8*, i8* noalias nocapture, ...)
-define private i32 @llvm_sscanf(i8* %string, i8* noalias nocapture %format, ...) alwaysinline "thunk"
-{
-  %1 = musttail call i32 (i8*, i8*, ...) @sscanf(i8* %string, i8* %format, ...)
-  ret i32 %1
-}
-
 declare i32 @fprintf(i8*, i8* noalias nocapture, ...)
-define private i32 @llvm_fprintf(i8* %file, i8* noalias nocapture %format, ...) alwaysinline "thunk"
-{
-  %1 = musttail call i32 (i8*, i8*, ...) @fprintf(i8* %file, i8* %format, ...)
-  ret i32 %1
-}
-
 declare i32 @fscanf(i8*, i8* noalias nocapture, ...)
-define private i32 @llvm_fscanf(i8* %file, i8* noalias nocapture %format, ...) alwaysinline "thunk"
-{
-  %1 = musttail call i32 (i8*, i8*, ...) @fscanf(i8* %file, i8* %format, ...)
-  ret i32 %1
-}
 
 ;; scheme helpers
 
@@ -581,14 +552,6 @@ define private i64 @llvm_now() nounwind alwaysinline
 {
   %res = load i64, i64* @TIME
   ret i64 %res
-}
-
-@SAMPLE_RATE = external global i64 ; extemp::UNIV::SAMPLE_RATE
-define private i32 @llvm_samplerate() nounwind alwaysinline
-{
-  %res = load i64, i64* @SAMPLE_RATE
-  %res32 = trunc i64 %res to i32
-  ret i32 %res32
 }
 
 declare void @ascii_text_color_extern(i32 %bold, i32 %fg, i32 %bg)

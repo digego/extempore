@@ -410,16 +410,6 @@ long long charvalue_sc(scheme* sc, pointer p)
 #define is_inport(p) (type(p)==T_PORT && p->_object._port->kind&port_input)
 #define is_outport(p) (type(p)==T_PORT && p->_object._port->kind&port_output)
 
-inline pointer& car(pointer P)
-{
-    return P->_object._cons._car;
-}
-
-inline pointer& cdr(pointer P)
-{
-    return P->_object._cons._cdr;
-}
-
 pointer pair_car(pointer p)
 {
   if (!is_pair(p)) throw ScmRuntimeError("Attempting to access the car of a primitive",p);
@@ -648,8 +638,6 @@ static void treadmill_flip(scheme* sc, pointer a, pointer b);
 pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
-int list_length(scheme *sc, pointer a);
-pointer list_ref(scheme *sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 int eqv_sc(scheme* sc, pointer a, pointer b);
 
@@ -1293,10 +1281,10 @@ pointer mk_i1(scheme *sc, bool num) {
 }
 
 pointer mk_real(scheme *sc, double n) {
-    pointer x = get_cell(sc,sc->NIL, sc->NIL);
+    pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = (T_NUMBER | T_ATOM);
-    rvalue_unchecked(x)= n;
+    rvalue_unchecked(x) = n;
     set_real(x);
     return (x);
 }
@@ -4633,21 +4621,6 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     return sc->T;
 }
 
-/*static*/ int list_length(scheme *sc, pointer a) {
-    int v=0;
-    pointer x;
-    for (x = a, v = 0; is_pair(x); x = cdr(x)) {
-           ++v;
-    }
-
-    if(x==sc->NIL) {
-           return v;
-    }
-
-    return -1;
-}
-
-
 // keys of assoc lst MUST be strings OR symbols
 pointer assoc_strcmp(scheme *sc, pointer key, pointer lst, bool all)
 {
@@ -4697,10 +4670,9 @@ pointer assoc_strcmp(scheme *sc, pointer key, pointer lst, bool all)
     return retlist;
 }
 
-pointer list_ref(scheme *sc, const int pos, pointer a) {
+EXPORT pointer list_ref(scheme *sc, const int pos, pointer a) {
     pointer x;
-    for (int i=0; i <= pos; ++i, a = cdr(a))
-    {
+    for (int i = 0; i <= pos; ++i, a = cdr(a)) {
         if (unlikely(!is_pair(a))) {
             return sc->NIL;
         }
@@ -6285,7 +6257,7 @@ void scheme_call(scheme *sc, pointer func, pointer args, uint64_t start_time, ui
 }
 //#endif
 
-extern "C" int is_integer_extern(pointer Ptr)
+EXPORT int is_integer_extern(pointer Ptr)
 {
     return is_integer(Ptr);
 }

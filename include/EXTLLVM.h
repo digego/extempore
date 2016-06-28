@@ -85,19 +85,9 @@ extern "C"
 
 const char* llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
-void llvm_runtime_error(int error, void* arg);
 
-bool llvm_zone_copy_ptr(void* ptr1, void* ptr2);
-void llvm_zone_ptr_set_size(void* ptr, uint64_t size);
-uint64_t llvm_zone_ptr_size(void* ptr);
-void llvm_zone_print(llvm_zone_t* zone);
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 
-bool llvm_ptr_in_zone(llvm_zone_t*, void*);
-bool llvm_ptr_in_current_zone(void*);
-
-void llvm_schedule_callback(long long, void*);
-void* llvm_get_function_ptr(char* n);
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
@@ -112,17 +102,9 @@ static inline uint64_t string_hash(const char* str)
     return result;
 }
 
-  void llvm_send_udp(char* host, int port, void* message, int message_length);
-  int32_t llvm_frames();
-  int32_t llvm_channels();
-  int32_t llvm_in_channels();
-
 double imp_randd();
 int64_t imp_rand1_i64(int64_t a);
 
-  double llvm_tan(double x);
-  double llvm_tanh(double x);
-  double llvm_sinh(double x);
 }
 
 ///////////////////////////////////////////////////
@@ -182,7 +164,7 @@ inline llvm_zone_t* llvm_zone_create(uint64_t size)
     return zone;
 }
 
-extern "C" void llvm_zone_destroy(llvm_zone_t* Zone);
+EXPORT void llvm_zone_destroy(llvm_zone_t* Zone);
 
 inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 {
@@ -190,8 +172,7 @@ inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
     return Zone;
 }
 
-extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
-extern "C" void* llvm_zone_malloc_from_current_zone(uint64_t size);
+EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 
 inline llvm_zone_stack* llvm_threads_get_zone_stack()
 {
@@ -235,7 +216,7 @@ inline llvm_zone_t* llvm_peek_zone_stack()
     return z;
 }
 
-extern "C" llvm_zone_t* llvm_pop_zone_stack();
+EXPORT llvm_zone_t* llvm_pop_zone_stack();
 
 inline void llvm_threads_inc_zone_stacksize() {
     ++tls_llvm_zone_stacksize;
@@ -266,7 +247,7 @@ const llvm::Function* getFunction(const char* name);
 const llvm::GlobalVariable* getGlobalVariable(const char* name);
 const llvm::GlobalValue* getGlobalValue(const char* name);
 inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
-extern "C" const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
+EXPORT const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
 
 }
 

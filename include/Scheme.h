@@ -167,9 +167,7 @@ void new_slot_in_env(scheme *sc, pointer variable, pointer value);
 pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
-int list_length(scheme *sc, pointer a);
 pointer assoc_strcmp(scheme *sc, pointer key, pointer alist, bool all = false);
-int is_real(pointer a);
 char *string_value(pointer p);
 pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
@@ -208,27 +206,12 @@ void treadmill_print(scheme* sc, char* title);
 void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
 pointer cons(scheme *sc, pointer a, pointer b);
 pointer immutable_cons(scheme *sc, pointer a, pointer b);
-pointer mk_integer(scheme *sc, long long num);
-pointer mk_real(scheme *sc, double num);
-pointer mk_rational(scheme *sc, long long n, long long d);
-pointer mk_symbol(scheme *sc, const char *name);
-pointer gensym(scheme *sc);
-//    pointer (*rungc)(scheme* sc, pointer a, pointer b);
-pointer mk_string(scheme *sc, const char *str);
-pointer mk_counted_string(scheme *sc, const char *str, int len);
-pointer mk_character(scheme *sc, int c);
-pointer mk_vector(scheme *sc, int len);
-pointer mk_foreign_func(scheme *sc, foreign_func f);
-pointer mk_cptr(scheme* sc, void* p);
-void putstr(scheme *sc, const char *s);
 void putcharacter(scheme *sc, int c);
 
-int is_string(pointer p);
 char* string_value(pointer p);
 int is_number(pointer p);
 double r64value(pointer p);
 float r32value(pointer p);
-int is_integer(pointer p);
 int is_rational(pointer p);
 int is_character(pointer p);
 long long charvalue(pointer p);
@@ -239,7 +222,6 @@ pointer vector_elem(pointer vec, int ielem);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer newel);
 int is_port(pointer p);
 
-int is_pair(pointer p);
 pointer pair_car(pointer p);
 pointer pair_cdr(pointer p);
 pointer set_car(scheme* sc, pointer p, pointer q);
@@ -251,8 +233,6 @@ char* symname(pointer p);
 int is_syntax(pointer p);
 int is_proc(pointer p);
 int is_foreign(pointer p);
-int is_cptr(pointer p);
-int is_cptr_or_str(pointer p);
 void* cptr_value(pointer p);
 char* syntaxname(pointer p);
 int is_closure(pointer p);
@@ -346,6 +326,16 @@ struct cell {
         void* _cptr;
     } _object;
 };
+
+extern inline pointer& car(pointer P)
+{
+    return P->_object._cons._car;
+}
+
+extern inline pointer& cdr(pointer P)
+{
+    return P->_object._cons._cdr;
+}
 
 inline extern int64_t ivalue(pointer Ptr)
 {

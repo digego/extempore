@@ -1,8 +1,8 @@
-;;; vaudio_dsp.xtm -- SIMD audio DSP library 
+;;; vaudio_dsp.xtm -- SIMD audio DSP library
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
-;; Required dylibs: 
+;; Required dylibs:
 
 ;;; Commentary:
 
@@ -60,7 +60,7 @@
 (bind-func print_audio_state
   (lambda ()
     (printf "    FRAMES: %lld\n" FRAMES)
-    (printf "   VFRAMES: %d\n" VFRAMES)    
+    (printf "   VFRAMES: %d\n" VFRAMES)
     (printf " OUT CHANS: %lld\n" CHANNELS)
     (printf "  IN CHANS: %lld\n" IN_CHANNELS)
     (printf "SAMPLERATE: %f\n" SAMPLERATE)))
@@ -136,7 +136,7 @@
         (y:/4,float/* (zalloc))
 	(c (v4val (/ -4.0 (* PIf PIf)))))
     (lambda (x:/4,float/*)
-      (pset! y 0 (+ (* b x) (* c x (v4fabsf x)))) 
+      (pset! y 0 (+ (* b x) (* c x (v4fabsf x))))
       (pset! y 0 (+ (* p (- (* y (v4fabsf y)) y)) y))
       y)))
 
@@ -153,7 +153,7 @@
     (let ((i 0)
           (y:/4,float/* (alloc))
           (vphase:/4,float/* (alloc))
-          (srv (v4val (llvm_samplerate)))
+          (srv (v4val SAMPLE_RATE))
           (twopiv (v4val TWOPIf))
           (inc:/4,float/* (alloc)))
       (vset! vphase 0 phase)
@@ -171,11 +171,11 @@
     (let ((i:i32 0) (p 0)
           (y:/4,float/* (alloc))
           (vphase:/4,float/* (alloc))
-          (srv (v4val (llvm_samplerate)))
+          (srv (v4val SAMPLE_RATE))
           (twopiv (v4val TWOPIf)))
       (vset! vphase 0 phase)
       (lambda (amp:/4,float/* freq:/4,float/*)
-        (let ((inc (* TWOPIf (/ (vref freq 0) (llvm_samplerate)))))
+        (let ((inc (* TWOPIf (/ (vref freq 0) SAMPLE_RATE))))
           (dotimes (i 4)
             (vset! vphase i phase)
             (if (= (% p chans) 0)
@@ -184,5 +184,5 @@
             (set! p (+ p 1)))
           (pset! y 0 (* amp (_sin vphase)))
           y)))))
-        
+
 (define *xtmlib-vaudio_dsp-loaded* #t)
