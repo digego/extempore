@@ -102,8 +102,8 @@ static inline uint64_t string_hash(const char* str)
     return result;
 }
 
-double imp_randd();
-int64_t imp_rand1_i64(int64_t a);
+EXPORT double imp_randd();
+EXPORT int64_t imp_rand1_i64(int64_t a);
 
 }
 

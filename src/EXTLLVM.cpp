@@ -238,7 +238,7 @@ EXPORT void* llvm_get_function_ptr(char* fname)
 
 EXPORT char* extitoa(int64_t val)
 {
-    static __thread char buf[32];
+    static THREAD_LOCAL char buf[32];
     sprintf(buf, "%" PRId64, val);
     return buf;
 }

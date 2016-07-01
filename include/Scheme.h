@@ -63,6 +63,7 @@
 #include <stdint.h>
 
 #include "BranchPrediction.h"
+#include "UNIV.h"
 
 #ifndef _MSC_VER
 # define USE_STRCASECMP 1
@@ -169,7 +170,7 @@ pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
 pointer assoc_strcmp(scheme *sc, pointer key, pointer alist, bool all = false);
 char *string_value(pointer p);
-pointer list_ref(scheme* sc, int pos, pointer a);
+EXPORT pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 pointer mk_vector(scheme *sc, int len);
 void fill_vector(scheme* sc, pointer vec, pointer obj);
@@ -233,7 +234,7 @@ char* symname(pointer p);
 int is_syntax(pointer p);
 int is_proc(pointer p);
 int is_foreign(pointer p);
-void* cptr_value(pointer p);
+EXPORT void* cptr_value(pointer p);
 char* syntaxname(pointer p);
 int is_closure(pointer p);
 int is_macro(pointer p);
