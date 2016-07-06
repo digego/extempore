@@ -2116,7 +2116,7 @@
         (map (lambda (x)
                ;; (println 'x x)
                (cond ((string? x)
-                      (if (regex:match? x "_poly_")
+                      (if (string-contains? x "_poly_")
                           (cadr (regex:matched x "%(.*)_poly_.*"))
                           (cadr (regex:matched x "%([^-*]*)"))))
                      ((and (symbol? x)
@@ -2552,7 +2552,7 @@
 
 (define impc:aot:add-win-link-library
   (lambda (libname)
-    (if (not (regex:match? libname "opengl32"))
+    (if (not (string-contains? libname "opengl32"))
         (set! *impc:aot:win-link-libraries*
               (cons (regex:replace (sanitize-platform-path libname) "dll$" "lib")
                     *impc:aot:win-link-libraries*)))))
@@ -2936,7 +2936,7 @@
 (define Windows-add-libdir-to-PATH
   (lambda ()
     (let ((path (sys:command-output "echo %PATH%")))
-      (if (not (regex:match? path "libs/platform-shlibs"))
+      (if (not (string-contains? path "libs/platform-shlibs"))
           (sys:set-env "PATH" (string-append path ";" (sys:share-dir) "/libs/platform-shlibs"))))))
 
 ;; do it!
@@ -3082,7 +3082,7 @@
                                      (if (and (list? a)
                                               (eq? (car a) '*colon-hook*))
                                          (impc:compiler:print-double-colon-error (caddr a)))
-                                     (if (regex:match? (symbol->string a) ":")
+                                     (if (string-contains? (symbol->string a) ":")
                                          (let ((t (regex:type-split (symbol->string a) ":")))
                                            (if (regex:match? (cadr t) "^\\<|\\[")
                                                (if (not (regex:match? (cadr t) "\\>|\\]"))
@@ -3103,7 +3103,7 @@
                                      (if (and (list? (car a))
                                               (eq? (car (car a)) '*colon-hook*))
                                          (impc:compiler:print-double-colon-error (caddr (car a))))
-                                     (if (regex:match? (symbol->string (car a)) ":")
+                                     (if (string-contains? (symbol->string (car a)) ":")
                                          (let ((t (regex:type-split (symbol->string (car a)) ":")))
                                            (if (regex:match? (cadr t) "^\\<|\\[")
                                                (if (not (regex:match? (cadr t) "\\>|\\]"))
@@ -3187,7 +3187,7 @@
      "["
      (string-join
       (map (lambda (x)
-             (if (regex:match? x ":")
+             (if (string-contains? x ":")
                  (impc:ir:pointer++ (car (regex:type-split x ":"))
                                     (impc:ir:get-ptr-depth x))
                  x))
@@ -3201,7 +3201,7 @@
      "<"
      (string-join
       (map (lambda (x)
-             (if (regex:match? x ":")
+             (if (string-contains? x ":")
                  (impc:ir:pointer++ (car (regex:type-split x ":"))
                                     (impc:ir:get-ptr-depth x))
                  x))
@@ -4142,7 +4142,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; bang (!) the only thing to check?
 (define impc:ti:bang-type?
   (lambda (type)
-    (regex:match? (atom->string type) "!")))
+    (string-contains? (atom->string type) "!")))
 
 ;; newname mappings is an assoc list
 ;; containing xlist*##105 -> "xlist--3823948324392" mappings
@@ -4214,7 +4214,7 @@ Continue executing `body' forms until `test-expression' returns #f"
           ;; next check if type is already maximized!
           (if (or (not (impc:ti:get-generictype-candidate-types (car p)))  ;; not generic!
                   (and (not (regex:match? (cadr p) "({|!)"))
-                       (not (regex:match? string-type "{"))))
+                       (not (string-contains? string-type "{"))))
               string-type
               ;; otherwise we really do need to max type!
               (let* ((name (car p))
@@ -4312,8 +4312,8 @@ Continue executing `body' forms until `test-expression' returns #f"
            ;; (lllllllllll (println 'lst2: typevars))
            (tv2 (map (lambda (x)
                        ;; (println 'x: x)
-                       (if (regex:match? (cdr x) ":")
-                           (if (regex:match? (car x) ":")
+                       (if (string-contains? (cdr x) ":")
+                           (if (string-contains? (car x) ":")
                                (let* ((pdth (impc:ir:get-ptr-depth (cdr x)))
                                       (splita (impc:ti:split-namedtype (car x)))
                                       (splitb (impc:ti:split-namedtype (cdr x)))
@@ -4340,7 +4340,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                         "{"
                                         (string-join (impc:ti:minimize-generic-type
                                                       (cadr (regex:type-split (cdr x) ":"))
-                                                      (if (regex:match? (car x) ":")
+                                                      (if (string-contains? (car x) ":")
                                                           (cadr (regex:type-split (car x) ":"))
                                                           (symbol->string (impc:ti:get-generictype-candidate-types
                                                                            (string->symbol
@@ -4380,7 +4380,7 @@ Continue executing `body' forms until `test-expression' returns #f"
     (let ((mint (impc:ti:minimize-generic-type t gtype)))
       ;; (println 'generatecname: t 'gtype gtype 'min mint)
       (for-each (lambda (x)
-                  (if (regex:match? x "!")
+                  (if (string-contains? x "!")
                       (impc:compiler:print-bad-type-error t
                                                           (string-append "Could not generate type cname:" (sexpr->string mint)))))
                 mint)
@@ -4413,10 +4413,10 @@ Continue executing `body' forms until `test-expression' returns #f"
              (impc:ir:type? (cadr (assoc-strcmp vs vars))))
         (cadr (assoc-strcmp vs vars))
         (if (and (symbol? vs)
-                 (regex:match? (symbol->string vs) "##")
+                 (string-contains? (symbol->string vs) "##")
                  (not (regex:match? (symbol->string vs) "^!")))
             (let* ((rsplit1a (regex:split (symbol->string vs) "##")) ;\\$\\$\\$"))
-                   (rsplit1 (if (regex:match? (car rsplit1a) "{")
+                   (rsplit1 (if (string-contains? (car rsplit1a) "{")
                                 (cons (impc:ti:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
                                 rsplit1a))
                    (gnum (if (> (length rsplit1) 1) (cadr rsplit1) #f))
@@ -4453,7 +4453,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (tr (cl:remove-if (lambda (x)
                                          ;; (println 'x: x 'gpolyname: gpolyname)
                                          (if (and (not (regex:match? x "^(<|\\[)"))
-                                                  (regex:match? x ":"))
+                                                  (string-contains? x ":"))
                                              (let ((p (regex:type-split x ":")))
                                                (or (string=? (car p) gpolyname)
                                                    (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
@@ -4468,7 +4468,7 @@ Continue executing `body' forms until `test-expression' returns #f"
               ;; (println '->C: t1 (impc:ti:type-normalize t1))
               ;; (println 'elements: elements 'tr: validelements? 't1: t1 'vs: vs (regex:match? t1 "!"))
               (if (and validelements?
-                       (not (regex:match? t1 "!")))
+                       (not (string-contains? t1 "!")))
                   (let* ((base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
                          ;; (newname (string-append base "_poly_" (cname-encode t1)))
                          (newname (string-append base "_poly_" (impc:ti:generate-generic-type-cname t1 gtype)))
@@ -4887,7 +4887,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define impc:ti:generic-type-details
   (lambda (a)
     (if (and (symbol? a)
-             (regex:match? (symbol->string a) "##"))
+             (string-contains? (symbol->string a) "##"))
         (let* ((gname (car (regex:split (symbol->string a) "##")))
                (gnum (string->number (cadr (regex:split (symbol->string a) "##"))))
                (_basename (impc:ir:get-base-type gname))
@@ -5173,7 +5173,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                             (set-car! (cdr t) res)))))
                                 ;; uncomment the following lines to do reverse bang tests
                                 (if (and (string? t) ;; if a named type
-                                         (regex:match? (symbol->string sym) "##"))
+                                         (string-contains? (symbol->string sym) "##"))
                                     (let ((gtd (impc:ti:generic-type-details sym)))
                                       (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
                                 (if (and
@@ -5216,7 +5216,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                   (begin
                     ;; uncomment the following lines to do reverse bang tests
                     (if (and (string? t) ;; if a named type
-                             (regex:match? (symbol->string sym) "##"))
+                             (string-contains? (symbol->string sym) "##"))
                         (let ((gtd (impc:ti:generic-type-details sym)))
                           (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
                     (set-cdr! pair (list t)))
@@ -5442,7 +5442,7 @@ Continue executing `body' forms until `test-expression' returns #f"
              (if (and (not (assoc-strcmp ast vars))
                       (not (impc:ti:closure-exists? (symbol->string ast)))
                       (not (impc:ti:globalvar-exists? (symbol->string ast))))
-                 (if (and (regex:match? (symbol->string ast) ":")
+                 (if (and (string-contains? (symbol->string ast) ":")
                           (or (impc:ti:genericfunc-exists?
                                (string->symbol (car (regex:type-split (symbol->string ast) ":"))))
                               (impc:ti:polyfunc-exists? (car (regex:type-split (symbol->string ast) ":")))))
@@ -5751,7 +5751,7 @@ Continue executing `body' forms until `test-expression' returns #f"
   (lambda (x)
     (if (and (string? x)
              (regex:match? x "^%")
-             (regex:match? x "_poly_")
+             (string-contains? x "_poly_")
              (if (null? (impc:ti:get-named-type x))
                  (impc:compiler:print-missing-identifier-error x 'type)
                  #t))
@@ -5798,7 +5798,7 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; (println 'trying 'to 'match 'generic 'type aa 'against 'generic 'type bb)
     (if (or (not (symbol? aa))
             (not (or (string? bb) (symbol? bb)))
-            (not (regex:match? (symbol->string aa) ":")))
+            (not (string-contains? (symbol->string aa) ":")))
         #f
         (let* ((a (symbol->string aa))
                (b (if (symbol? bb) (symbol->string bb) bb))
@@ -5870,7 +5870,7 @@ Continue executing `body' forms until `test-expression' returns #f"
              (if (and (atom? gt)
                       (symbol? gt)
                       (assoc-strcmp gt vars)
-                      (if (regex:match? (symbol->string gt) ":")
+                      (if (string-contains? (symbol->string gt) ":")
                           (impc:ti:generic-types-matchup? gt tt vars)
                           #t))
 	     	 (begin ;; (println '----matched-polytype-1: gt '-> tt)
@@ -5913,7 +5913,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                     (if (and (atom? aa)
                              (symbol? aa)
                              (assoc-strcmp aa vars)
-                             (if (regex:match? (symbol->string aa) ":")
+                             (if (string-contains? (symbol->string aa) ":")
                                  (impc:ti:generic-types-matchup? aa bb vars)
                                  #t))
                         (if (and (symbol? bb) (assoc-strcmp bb vars))
@@ -5951,7 +5951,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                     ;; (println 'pt2: pt 'kk: kk)
                     kk))
                  ;; check for xlist%b*
-                 ((and (regex:match? (symbol->string pt) "%") ;; check for
+                 ((and (string-contains? (symbol->string pt) "%") ;; check for
                        (assoc-strcmp (string->symbol (impc:ir:get-base-type (car (regex:split (symbol->string pt) "%")))) *impc:ti:generictype-cache*))
                   (let ((kk (string->symbol (string-append (symbol->string pt) "##" (number->string gnum)))))
                     ;; (println 'pt: pt 'kk: kk)
@@ -6004,7 +6004,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                vars '() a)))
                       (if (and (string? a)
                                (not (string=? a reified)) ;; watch out for recursive!
-                               (regex:match? a "_poly_"))
+                               (string-contains? a "_poly_"))
                           (impc:ti:reverse-set-bangs-from-reified b a gnum vars)))
                     namedtype gpolytype)))))
 
@@ -6041,7 +6041,7 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; attempt to reify any gtype symbols that don't currenty have type values (i.e. not var entry)
     (for-each (lambda (a)
                 (if (and (symbol? a)
-                         (regex:match? (symbol->string a) "##")
+                         (string-contains? (symbol->string a) "##")
                          (not (assoc-strcmp a vars)))
                     ;; (null? (cdr (assoc-strcmp a vars))))
                     ;; should call this impc:ti:symbol-tryto-reify-generic-type
@@ -6210,7 +6210,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                  ;; (println 'kk k)
                  (if (regex:match? k "^\\[")
                      (impc:ti:get-type-for-gpoly k)
-                     (if (regex:match? k ":") ;; if generic either gvar of named type
+                     (if (string-contains? k ":") ;; if generic either gvar of named type
                          (string->symbol k)
                          (if (regex:match? k "^[A-Za-z0-9]*{")
                              (string->symbol k)
@@ -6371,7 +6371,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                (set! gpoly-type (map (lambda (x)
                                        (if (symbol? x)
                                            (let ((p (regex:split (symbol->string x) "##")))
-                                             (if (and (regex:match? (car p) "{")
+                                             (if (and (string-contains? (car p) "{")
                                                       (impc:ir:type? (impc:ir:get-type-from-pretty-str (car p))))
                                                  (impc:ir:get-type-from-pretty-str (car p))
                                                  x))
@@ -7176,7 +7176,7 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts request?)
     ;; (println 'null-check 'ast: ast 'request? request?)
     (let ((res (if (and (symbol? request?)
-                        (regex:match? (symbol->string request?) "##"))
+                        (string-contains? (symbol->string request?) "##"))
                    (if (assoc-strcmp request? vars)
                        (if (null? (cdr (assoc-strcmp request? vars)))
                            request?
@@ -8240,20 +8240,20 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) ;; poly func (specific match)
                 (symbol? (car ast))
                 request?
-                (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
+                (string-contains? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                 (impc:ti:nativef-poly-exact-check ast vars kts request?))
            ;; (println 'poly-exact: ast 'r: request?)
            request?)
           ((and (list? ast) ;; generic function
                 (symbol? (car ast))
-                (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
+                (string-contains? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                 (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
                                              (length (cdr ast))))
            ;; (println 'generic: ast 'r: request?)
            (impc:ti:nativef-generics ast vars kts request?))
           ((and (list? ast) ;; poly func (closest match)
                 (symbol? (car ast))
-                (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
+                (string-contains? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                 (impc:ti:get-polyfunc-candidate-types (car (regex:split (symbol->string (car ast)) "##"))))
            ;; (println 'poly: ast 'r: request?)
            (let ((reses (impc:ti:nativef-poly-check ast vars kts request?)))
@@ -8457,7 +8457,7 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (symname ast types envvars . prev)
     ;; (println 'symname: symname 'ast: ast)
     (cond ((and (symbol? ast)
-                (not (regex:match? (symbol->string ast) ":"))
+                (not (string-contains? (symbol->string ast) ":"))
                 (impc:ti:polyfunc-exists? (symbol->string ast)))
            (let* ((pname (symbol->string ast))
                   (ts (impc:ti:get-polyfunc-candidate-types pname)))
@@ -8465,7 +8465,7 @@ xtlang's `let' syntax is the same as Scheme"
                  (string->symbol (string-append pname "_adhoc_" (cname-encode (impc:ir:get-base-type (impc:ir:pretty-print-type (car ts))))))
                  (impc:compiler:print-compiler-error "Try forcing a type. Ambiguous polymorphic function" ast))))
           ((and (symbol? ast)
-                (regex:match? (symbol->string ast) ":")
+                (string-contains? (symbol->string ast) ":")
                 (impc:ti:polyfunc-exists? (car (regex:type-split (symbol->string ast) ":"))))
            (let* ((res (regex:type-split (symbol->string ast) ":"))
                   (pname (car res))
@@ -8474,7 +8474,7 @@ xtlang's `let' syntax is the same as Scheme"
                              (impc:ir:get-base-type (cadr res)))))
              (string->symbol (string-append pname "_adhoc_" (cname-encode ptype)))))
           ((and (symbol? ast)
-                (regex:match? (symbol->string ast) ":"))
+                (string-contains? (symbol->string ast) ":"))
            (let* ((p (regex:type-split (symbol->string ast) ":"))
                   (ptrs (impc:ir:get-ptr-depth ast))
                   (gpoly? (impc:ti:genericfunc-exists? (string->symbol (car p))))
@@ -8512,7 +8512,7 @@ xtlang's `let' syntax is the same as Scheme"
                      (string->symbol (string-append (car p) "_adhoc_" etype))
                      (impc:compiler:print-missing-identifier-error ast 'variable)))))
           ((and (symbol? ast)
-                (regex:match? (symbol->string ast) "##")
+                (string-contains? (symbol->string ast) "##")
                 (assoc-strcmp ast types)
                 (impc:ti:polyfunc-exists? (impc:ir:get-base-type (symbol->string ast))))
            (let* ((nm (regex:split (symbol->string ast) "##"))
@@ -8525,7 +8525,7 @@ xtlang's `let' syntax is the same as Scheme"
                  (impc:compiler:print-compiler-error (string-append "Bad type: " ptype " for polymorphic function " (car nm)) ast))
              (string->symbol newn)))
           ((and (symbol? ast)
-                (regex:match? (symbol->string ast) "##")
+                (string-contains? (symbol->string ast) "##")
                 (assoc-strcmp ast types))
            (let* ((nm (regex:split (symbol->string ast) "##"))
                   (n1 (car nm))
@@ -8620,7 +8620,7 @@ xtlang's `let' syntax is the same as Scheme"
               ;; inject (and potential compile) generic functions
               ;; do generic functions before polys
               ((and (symbol? (car ast))
-                    (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
+                    (string-contains? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                     (impc:ti:genericfunc-exists? (string->symbol (car (regex:split (symbol->string (car ast)) "##")))
                                                  (length (cdr ast))))
                ;; (println 'types types)
@@ -8648,7 +8648,7 @@ xtlang's `let' syntax is the same as Scheme"
                  ;; (impc:ti:genericfunc-src-changed polyname arity))
                  ;; (println 'p: (car ast) 'exists: exists 'changed: (impc:ti:genericfunc-src-changed polyname arity))
                  (if (or (if exists
-                             (if (and (regex:match? (symbol->string exists) "_poly_")
+                             (if (and (string-contains? (symbol->string exists) "_poly_")
                                       (not *impc:aot:current-output-port*)
                                       (impc:ti:genericfunc-src-changed polyname arity))
                                  #f
@@ -8696,7 +8696,7 @@ xtlang's `let' syntax is the same as Scheme"
                                   (cdr ast)))))))
               ;; inject polymorphic functions
               ((and (symbol? (car ast))
-                    (regex:match? (symbol->string (car ast)) "##")) ;"\\$\\$\\$"))
+                    (string-contains? (symbol->string (car ast)) "##")) ;"\\$\\$\\$"))
                (let* ((pname (car (regex:split (symbol->string (car ast)) "##"))) ;"\\$\\$\\$"))))
                       (type (cdr (assoc-strcmp (car ast) types)))
                       (polyname (impc:ti:get-polyfunc-candidate pname type)))

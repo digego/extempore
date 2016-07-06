@@ -235,7 +235,7 @@
 (define impc:ir:get-generic-tuple-typevars
   (lambda (t)
     (if (impc:ti:namedtype-exists? (impc:ir:get-base-type t))
-        (if (regex:match? t "_poly_")
+        (if (string-contains? t "_poly_")
             (let* ((base (impc:ir:get-base-type t))
                    (ptrs (impc:ir:get-ptr-depth t))
                    (p (regex:split base "_poly_"))
@@ -418,7 +418,7 @@
                     (argstr (cadr p)) ;;(string-append "<" (substring (cadr p) 0 (- (string-length (cadr p)) 1)) ">"))
                     (res ""))
                ;; (println 'base base 'p p 'argstr argstr)
-               (if (not (regex:match? argstr "!")) ;; if no bangs present we can reify
+               (if (not (string-contains? argstr "!")) ;; if no bangs present we can reify
                    (set! res (apply string-append "%" (car p) "_poly_"
                                     (cname-encode argstr)
                                     ; (string-append "<" argstr ">"))
@@ -649,7 +649,7 @@
             ((string=? base "vector") (+ *impc:ir:vector* offset))
                                         ;((regex:match? base "\\<\\{\\s?i8\\*,\\s?i8\\*.*")
             ((and (regex:match? base "^\\<.* x .*\\>\\**$")
-                  (not (regex:match? base ",")))
+                  (not (string-contains? base ",")))
              (cons (+ offset *impc:ir:vector*) (impc:ir:get-vector-type-from-str string-type)))
             ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*$")
              (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
@@ -662,7 +662,7 @@
             ((char=? (string-ref base 0) #\%)
              (if (impc:ti:namedtype-exists? (substring base 1 (string-length base)))
                  string-type
-                 (if (regex:match? string-type "_poly_")
+                 (if (string-contains? string-type "_poly_")
                      (if (impc:ti:spec-new-type? string-type)
                          string-type
                          (impc:compiler:print-bad-type-error string-type "Poly type not yet instantiated??"))

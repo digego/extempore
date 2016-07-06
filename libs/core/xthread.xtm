@@ -62,13 +62,13 @@
                 (pop_zone)
                 void))
           (thread null))
-      (pop_zone) ;; pop z1      
+      (pop_zone) ;; pop z1
       (set! thread (thread_fork (get_native_fptr thread_native_call) (cast ff i8*)))
       (lambda ()
         (thread_join thread)
         (let ((r2 (zcopy res z1 (llvm_peek_zone_stack))))
           (llvm_zone_destroy z1)
-          (thread_destroy thread)          
+          (thread_destroy thread)
           r2)))))
 
 
@@ -100,7 +100,7 @@
   (sync . expr)
   (begin
     (define final '(cast null i8*))
-    (if (not (regex:match? (sexpr->string (car (reverse expr))) "spawn"))
+    (if (not (string-contains? (sexpr->string (car (reverse expr))) "spawn"))
         (begin (set! final (car (reverse expr)))
                (set! expr (reverse (cdr (reverse expr))))))
     (set! expr (cons 'begin expr))
