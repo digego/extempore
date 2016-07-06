@@ -5789,12 +5789,6 @@ static int syntaxnum(pointer p) {
     }
 }
 
-scheme* extempore_scheme_init_new() {
-  scheme *sc=(scheme*)malloc(sizeof(scheme));
-  printf("Scheme (xtm) init new %p \n",sc);
-    return sc;
-}
-
 scheme *scheme_init_new() {
   scheme *sc=(scheme*)malloc(sizeof(scheme));
   //printf("Scheme init new %p \n",sc);

@@ -176,7 +176,6 @@ pointer mk_vector(scheme *sc, int len);
 void fill_vector(scheme* sc, pointer vec, pointer obj);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a);
 int scheme_init(scheme* sc);
-scheme* extempore_scheme_init_new();
 
 typedef pointer (*foreign_func)(scheme *, pointer);
 
