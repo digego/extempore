@@ -5695,7 +5695,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
                         ok=0;
                         std::stringstream ss;
                         extemp::UNIV::printSchemeCell(sc, ss, sc->args, true);
-                        sprintf(msg,"function(%s): argument %d must be: %s\nargument values: %s",
+                        snprintf(msg, sizeof(msg), "function(%s): argument %d must be: %s\nargument values: %s",
                                 pcd->name,
                                 i+1,
                                 tests[j].kind,
