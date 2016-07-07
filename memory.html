@@ -96,7 +96,7 @@
 <li class="toctree-l1"><a class="reference internal" href="c-xtlang-interop.html">C-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheme-xtlang-interop.html">Scheme-xtlang interop</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concurrency.html">Concurrency</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">Memory management in Extempore</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Memory management in Extempore</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#automatic-garbage-collection-in-scheme">Automatic garbage collection in Scheme</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#manual-memory-management-in-xtlang">Manual memory management in xtlang</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#the-three-flavours-of-memory-in-extempore">The three flavours of memory in Extempore</a></li>
@@ -135,6 +135,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Unit testing in Extempore</a></li>
 </ul>
 
             
@@ -189,7 +190,7 @@ welcome.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">It&#8217;s not really possible to explain Extempore&#8217;s memory
-allocation story without a detour into <a class="reference internal" href="types.html"><em>xtlang types</em></a>, so we&#8217;ll cover some of that as well.</p>
+allocation story without a detour into <a class="reference internal" href="types.html"><span class="doc">xtlang types</span></a>, so we&#8217;ll cover some of that as well.</p>
 </div>
 <p>The two languages hosted by the Extempore compiler, xtlang and Scheme,
 have different approaches to dealing with memory allocation and
@@ -268,7 +269,7 @@ where timing is critical, such as real-time audio and video.</p>
 <p>Hang on a sec&#8212;isn&#8217;t working with real-time audio and video xtlang (and
 therefore Extempore&#8217;s) <em>raison d&#8217;etre?</em> Well, yes is is&#8212;the sluggishness
 (and non-determinism) of Impromptu&#8217;s Scheme interpreter was the spark
-which ignited the development of xtlang (as mentioned in <a class="reference internal" href="philosophy.html"><em>The Extempore philosophy</em></a>).
+which ignited the development of xtlang (as mentioned in <a class="reference internal" href="philosophy.html"><span class="doc">The Extempore philosophy</span></a>).
 Again, this isn&#8217;t a knock on Scheme in general as slow&#8212;there are some
 very sprightly Scheme compilers, but Impromptu&#8217;s one was slow. The
 non-determinism was even more of a problem, because the last thing you
@@ -331,7 +332,7 @@ a zone.</p>
 <h2>Stack allocation with salloc<a class="headerlink" href="#stack-allocation-with-salloc" title="Permalink to this headline">¶</a></h2>
 <p>As I mentioned above, the stack is associated with function calls,
 their arguments and local variables. Because xtlang uses (in general)
-<a class="reference internal" href="types.html#closure-type-doc"><span>closures</span></a> rather than just plain functions,
+<a class="reference internal" href="types.html#closure-type-doc"><span class="std std-ref">closures</span></a> rather than just plain functions,
 stack allocation and <code class="docutils literal"><span class="pre">salloc</span></code> in xtlang is used in the body of a
 closure. Remember that closures are just functions with their
 enclosing scope: think of a function which has packaged up any
@@ -355,7 +356,7 @@ xtlang. String literals are bound globally (more on this shortly), but
 that&#8217;s the exception to the rule&#8212;everything else which is bound in a
 <code class="docutils literal"><span class="pre">let</span></code> inside an xtlang <code class="docutils literal"><span class="pre">lambda</span></code> will be stack allocated, unless you
 explicitly request otherwise with <code class="docutils literal"><span class="pre">halloc</span></code> or <code class="docutils literal"><span class="pre">zalloc</span></code>.</p>
-<p><a class="reference internal" href="types.html#string-type-doc"><span>String</span></a> literals are the exception to the &#8220;all
+<p><a class="reference internal" href="types.html#string-type-doc"><span class="std std-ref">String</span></a> literals are the exception to the &#8220;all
 literals are on the stack&#8221; rule. String literals are actually stored
 as <code class="docutils literal"><span class="pre">i8*</span></code> on the heap (as though they were <em>halloced</em>). If you
 capture a pointer to one of these strings (e.g. with <code class="docutils literal"><span class="pre">pref-ptr</span></code>),
@@ -381,7 +382,7 @@ call <code class="docutils literal"><span class="pre">salloc</span></code> expli
 as creating input-output pairs for the function <em>f(x) = 2x</em>.</p>
 <p>Notice how the tuple pointer <code class="docutils literal"><span class="pre">tup:&lt;i64,i64&gt;*</span></code> was <code class="docutils literal"><span class="pre">let</span></code>-bound to
 the return value of the call to <code class="docutils literal"><span class="pre">salloc</span></code>. Initially, the memory was
-uninitialised (<a class="reference internal" href="#pointer-doc"><span>see here</span></a> for more background about
+uninitialised (<a class="reference internal" href="#pointer-doc"><span class="std std-ref">see here</span></a> for more background about
 pointers), then two <code class="docutils literal"><span class="pre">i64</span></code> values were filled into it with
 <code class="docutils literal"><span class="pre">tfill!</span></code>. This is basically all the closure does, apart from the
 <code class="docutils literal"><span class="pre">printf</span></code> calls which are just reading and printing out what&#8217;s going
@@ -525,8 +526,8 @@ with a much longer buffer of <code class="docutils literal"><span class="pre">i6
 <p>This time, with a region length of one million, the code still works (at
 least, the 367Th element is still correct), but the compiler also prints
 a warning message to the log:</p>
-<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7ff7ac99a100 size:100000 is full ... leaking 8000000 bytes
-Leaving a leaky zone can be dangerous ... particularly for concurrency
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">Zone</span><span class="p">:</span><span class="mh">0x7ff7ac99a100</span> <span class="n">size</span><span class="p">:</span><span class="mi">100000</span> <span class="ow">is</span> <span class="n">full</span> <span class="o">...</span> <span class="n">leaking</span> <span class="mi">8000000</span> <span class="nb">bytes</span>
+<span class="n">Leaving</span> <span class="n">a</span> <span class="n">leaky</span> <span class="n">zone</span> <span class="n">can</span> <span class="n">be</span> <span class="n">dangerous</span> <span class="o">...</span> <span class="n">particularly</span> <span class="k">for</span> <span class="n">concurrency</span>
 </pre></div>
 </div>
 <p>So what&#8217;s wrong? Well, remember that the <code class="docutils literal"><span class="pre">memzone</span></code> has a size (in
@@ -594,8 +595,8 @@ With a region length of one thousand:</p>
 form, so the memory will be coming from the zone associated with the
 closure <code class="docutils literal"><span class="pre">fill_buffer_closure_zone</span></code>. When we try and compile that, we
 get the warning:</p>
-<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7fb8b3a4a610 size:8192 is full ... leaking 32 bytes
-Leaving a leaky zone can be dangerous ... particularly for concurrency
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">Zone</span><span class="p">:</span><span class="mh">0x7fb8b3a4a610</span> <span class="n">size</span><span class="p">:</span><span class="mi">8192</span> <span class="ow">is</span> <span class="n">full</span> <span class="o">...</span> <span class="n">leaking</span> <span class="mi">32</span> <span class="nb">bytes</span>
+<span class="n">Leaving</span> <span class="n">a</span> <span class="n">leaky</span> <span class="n">zone</span> <span class="n">can</span> <span class="n">be</span> <span class="n">dangerous</span> <span class="o">...</span> <span class="n">particularly</span> <span class="k">for</span> <span class="n">concurrency</span>
 </pre></div>
 </div>
 <p>Let&#8217;s try it again, but with a &#8216;zone size&#8217; argument to <code class="docutils literal"><span class="pre">bind-func</span></code></p>
@@ -703,12 +704,12 @@ allocate a memory region of 10<sup>15</sup> 8-byte <code class="docutils literal
 </div>
 <p>When I call <code class="docutils literal"><span class="pre">(fill_massive_buffer)</span></code> on my computer (with 8GB of RAM),
 disaster strikes.</p>
-<div class="code highlight-python"><div class="highlight"><pre>Zone:0x7fc5cbc268c0 size:100000 is full ... leaking 8000000000000000 bytes
-Leaving a leaky zone can be dangerous ... particularly for concurrency
-extempore(21386,0x11833d000) malloc: *** mmap(size=8000000000000000) failed (error code=12)
-error: can&#39;t allocate region
-set a breakpoint in malloc_error_break to debug
-Segmentation fault: 11
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">Zone</span><span class="p">:</span><span class="mh">0x7fc5cbc268c0</span> <span class="n">size</span><span class="p">:</span><span class="mi">100000</span> <span class="ow">is</span> <span class="n">full</span> <span class="o">...</span> <span class="n">leaking</span> <span class="mi">8000000000000000</span> <span class="nb">bytes</span>
+<span class="n">Leaving</span> <span class="n">a</span> <span class="n">leaky</span> <span class="n">zone</span> <span class="n">can</span> <span class="n">be</span> <span class="n">dangerous</span> <span class="o">...</span> <span class="n">particularly</span> <span class="k">for</span> <span class="n">concurrency</span>
+<span class="n">extempore</span><span class="p">(</span><span class="mi">21386</span><span class="p">,</span><span class="mh">0x11833d000</span><span class="p">)</span> <span class="n">malloc</span><span class="p">:</span> <span class="o">***</span> <span class="n">mmap</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">8000000000000000</span><span class="p">)</span> <span class="n">failed</span> <span class="p">(</span><span class="n">error</span> <span class="n">code</span><span class="o">=</span><span class="mi">12</span><span class="p">)</span>
+<span class="n">error</span><span class="p">:</span> <span class="n">can</span><span class="s1">&#39;t allocate region</span>
+<span class="nb">set</span> <span class="n">a</span> <span class="n">breakpoint</span> <span class="ow">in</span> <span class="n">malloc_error_break</span> <span class="n">to</span> <span class="n">debug</span>
+<span class="n">Segmentation</span> <span class="n">fault</span><span class="p">:</span> <span class="mi">11</span>
 </pre></div>
 </div>
 <p>If you&#8217;re not used to working directly with memory, you&#8217;ll almost
@@ -990,7 +991,7 @@ value). So, in the example above, <code class="docutils literal"><span class="pr
 </div>
 <div class="section" id="pointers-to-higher-order-types">
 <h2>Pointers to higher-order types<a class="headerlink" href="#pointers-to-higher-order-types" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference internal" href="types.html"><em>xtlang type system</em></a> has both primitive types
+<p>The <a class="reference internal" href="types.html"><span class="doc">xtlang type system</span></a> has both primitive types
 (floats and ints) and higher-order types like tuples, arrays and
 closures. Higher-order in this instance just means that they are made
 up of other types, although these component types may be themselves

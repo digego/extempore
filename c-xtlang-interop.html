@@ -93,7 +93,7 @@
 <li class="toctree-l1"><a class="reference internal" href="philosophy.html">The Extempore philosophy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="caas.html">Interacting with the Extempore Compiler</a></li>
 <li class="toctree-l1"><a class="reference internal" href="time.html">Time in Extempore</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="">C-xtlang interop</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">C-xtlang interop</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#xtlang-c-interaction">xtlang-C interaction</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#foolib-the-world-s-most-useless-c-library">Foolib: the world&#8217;s most useless C library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#kissfft-a-more-useful-library">KissFFT: a more useful library</a></li>
@@ -127,6 +127,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Unit testing in Extempore</a></li>
 </ul>
 
             
@@ -212,7 +213,7 @@ together.</p>
 <p>Having said that, there are some key differences between C and xtlang. C
 is the archetype of the &#8216;static language&#8217;, while xtlang is designed to
 allow the programmer to redefine core parts of the program <em>while it is
-executing</em> (see <a class="reference internal" href="philosophy.html"><em>The Extempore philosophy</em></a> for more details).
+executing</em> (see <a class="reference internal" href="philosophy.html"><span class="doc">The Extempore philosophy</span></a> for more details).
 Extempore supports REPL-style development, with the programmer
 interacting with the source code, evaluating and compiling parts of it
 in a non-linear fashion, and then modifying and recompiling it as
@@ -271,7 +272,7 @@ platforms as well.</p>
 <code class="docutils literal"><span class="pre">.dylib</span></code> extension, but just substitute in the appropriate extension
 for your platform. To build the shared library on OSX, move into
 libfoo&#8217;s directory and build it with the <code class="docutils literal"><span class="pre">-dynamiclib</span></code> flag:</p>
-<div class="code highlight-python"><div class="highlight"><pre>clang libfoo.c -dynamiclib -o libfoo.dylib
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">clang</span> <span class="n">libfoo</span><span class="o">.</span><span class="n">c</span> <span class="o">-</span><span class="n">dynamiclib</span> <span class="o">-</span><span class="n">o</span> <span class="n">libfoo</span><span class="o">.</span><span class="n">dylib</span>
 </pre></div>
 </div>
 <p><code class="docutils literal"><span class="pre">clang</span></code> is a C compiler that&#8217;s part of the LLVM project. I could also
@@ -389,7 +390,7 @@ important.</p>
 this &#8220;pass in a location for the answer to be written to&#8221; approach is
 that the memory with the answer in it can be managed by the calling
 function (that is, the function which calls <code class="docutils literal"><span class="pre">kiss_fft</span></code>). As
-discussed in the <a class="reference internal" href="memory.html"><em>Memory management in Extempore</em></a>, the explicit nature of memory
+discussed in the <a class="reference internal" href="memory.html"><span class="doc">Memory management in Extempore</span></a>, the explicit nature of memory
 allocation and deallocation in xtlang (and in C) gives the programmer
 great control over the lifetime of any memory the program allocates.
 The function which <em>calls</em> <code class="docutils literal"><span class="pre">kiss_fft</span></code> will have a much better idea
@@ -407,7 +408,7 @@ that xtlang uses <code class="docutils literal"><span class="pre">i8*</span></co
 </div>
 <p>But then when we try and evaluate the <code class="docutils literal"><span class="pre">bind-lib</span></code>, the compiler throws
 an error:</p>
-<div class="code highlight-python"><div class="highlight"><pre>Compiler Error: cannot find type for &quot;kiss_fft_cfg&quot;
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">Compiler</span> <span class="n">Error</span><span class="p">:</span> <span class="n">cannot</span> <span class="n">find</span> <span class="nb">type</span> <span class="k">for</span> <span class="s2">&quot;kiss_fft_cfg&quot;</span>
 </pre></div>
 </div>
 <p>Ah, Extempore can&#8217;t recognise the type signature for <code class="docutils literal"><span class="pre">kiss_fft</span></code>
@@ -506,10 +507,10 @@ fact we&#8217;ll <em>have to</em> if we want to actually call the functions from
 library.</p>
 <p>So after all this detective work, finding and declaring the appropriate
 type signatures, the above code finally compiles:</p>
-<div class="code highlight-python"><div class="highlight"><pre>Bound kiss_fft_cpx &gt;&gt;&gt; &lt;float,float&gt;
-Bound kiss_fft_state &gt;&gt;&gt; &lt;i32,i32,|64,i32|,|1,kiss_fft_cpx|&gt;
-Aliased kiss_fft_cfg &gt;&gt;&gt; kiss_fft_state*
-Bound kiss_fft &gt;&gt;&gt; [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*
+<div class="code highlight-default"><div class="highlight"><pre><span class="n">Bound</span> <span class="n">kiss_fft_cpx</span> <span class="o">&gt;&gt;&gt;</span> <span class="o">&lt;</span><span class="nb">float</span><span class="p">,</span><span class="nb">float</span><span class="o">&gt;</span>
+<span class="n">Bound</span> <span class="n">kiss_fft_state</span> <span class="o">&gt;&gt;&gt;</span> <span class="o">&lt;</span><span class="n">i32</span><span class="p">,</span><span class="n">i32</span><span class="p">,</span><span class="o">|</span><span class="mi">64</span><span class="p">,</span><span class="n">i32</span><span class="o">|</span><span class="p">,</span><span class="o">|</span><span class="mi">1</span><span class="p">,</span><span class="n">kiss_fft_cpx</span><span class="o">|&gt;</span>
+<span class="n">Aliased</span> <span class="n">kiss_fft_cfg</span> <span class="o">&gt;&gt;&gt;</span> <span class="n">kiss_fft_state</span><span class="o">*</span>
+<span class="n">Bound</span> <span class="n">kiss_fft</span> <span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="n">i8</span><span class="o">*</span><span class="p">,</span><span class="n">kiss_fft_cfg</span><span class="p">,</span><span class="n">kiss_fft_cpx</span><span class="o">*</span><span class="p">,</span><span class="n">kiss_fft_cpx</span><span class="o">*</span><span class="p">]</span><span class="o">*</span>
 </pre></div>
 </div>
 <p>There are a few more functions in the actual <code class="docutils literal"><span class="pre">fft.xtm</span></code> file which I

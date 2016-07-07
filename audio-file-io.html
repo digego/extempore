@@ -119,6 +119,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting-help.html">Getting Help</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Unit testing in Extempore</a></li>
 </ul>
 
             
@@ -170,7 +171,7 @@ reading and writing audio files. Here’s a short example of how to both
 read and write audio files.</p>
 <p>First, load up the required libraries and create an audio file closure
 with <code class="docutils literal"><span class="pre">audiofile_c</span></code></p>
-<div class="code extempore highlight-python"><div class="highlight"><pre>(sys:load &quot;libs/external/sndfile.xtm&quot;)
+<div class="code extempore highlight-default"><div class="highlight"><pre>(sys:load &quot;libs/external/sndfile.xtm&quot;)
 
 (bind-func dsp:DSP 1000000000  ;; allocate memory to store the audio file
   (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0)))
@@ -194,10 +195,10 @@ the audio file in such a way that <code class="docutils literal"><span class="pr
 output sample and will play through the audio file at normal speed. When
 <code class="docutils literal"><span class="pre">dsp</span></code> is compiled, the log view also prints some info about the
 file <a class="footnote-reference" href="#id5" id="id2">[2]</a>:</p>
-<div class="code bash highlight-python"><div class="highlight"><pre>file name:     /Users/ben/Desktop/xtm-assets/peg.wav
-samplerate:    44100
-channels:      2
-samples read:  21202944
+<div class="code bash highlight-default"><div class="highlight"><pre><span class="n">file</span> <span class="n">name</span><span class="p">:</span>     <span class="o">/</span><span class="n">Users</span><span class="o">/</span><span class="n">ben</span><span class="o">/</span><span class="n">Desktop</span><span class="o">/</span><span class="n">xtm</span><span class="o">-</span><span class="n">assets</span><span class="o">/</span><span class="n">peg</span><span class="o">.</span><span class="n">wav</span>
+<span class="n">samplerate</span><span class="p">:</span>    <span class="mi">44100</span>
+<span class="n">channels</span><span class="p">:</span>      <span class="mi">2</span>
+<span class="n">samples</span> <span class="n">read</span><span class="p">:</span>  <span class="mi">21202944</span>
 </pre></div>
 </div>
 <p>It’s important to realise that the playhead—the point in the file which
@@ -208,17 +209,17 @@ when the playhead gets to the end of the file it wraps to the start, so
 the file playback will loop on forever.</p>
 <p>To mess with this audio stream, let’s add some valve saturation-style
 distortion to both channels:</p>
-<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
-  (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
-        (saturationl (saturation_c))
-        (saturationr (saturation_c)))
-    (lambda (in time chan dat)
-      (* 0.1 ;; to compensate for saturation boost
-         (cond ((= chan 0)
-                (saturationl (audiofile) 1.0 0.9))
-               ((= chan 1)
-                (saturationr (audiofile) 1.0 0.9))
-               (else (convert 0.0 SAMPLE)))))))
+<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span><span class="p">:</span><span class="n">DSP</span> <span class="mi">1000000000</span>
+  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">audiofile</span> <span class="p">(</span><span class="n">audiofile_c</span> <span class="s2">&quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot;</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="p">(</span><span class="n">saturationl</span> <span class="p">(</span><span class="n">saturation_c</span><span class="p">))</span>
+        <span class="p">(</span><span class="n">saturationr</span> <span class="p">(</span><span class="n">saturation_c</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span> <span class="n">time</span> <span class="n">chan</span> <span class="n">dat</span><span class="p">)</span>
+      <span class="p">(</span><span class="o">*</span> <span class="mf">0.1</span> <span class="p">;;</span> <span class="n">to</span> <span class="n">compensate</span> <span class="k">for</span> <span class="n">saturation</span> <span class="n">boost</span>
+         <span class="p">(</span><span class="n">cond</span> <span class="p">((</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">saturationl</span> <span class="p">(</span><span class="n">audiofile</span><span class="p">)</span> <span class="mf">1.0</span> <span class="mf">0.9</span><span class="p">))</span>
+               <span class="p">((</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="p">(</span><span class="n">saturationr</span> <span class="p">(</span><span class="n">audiofile</span><span class="p">)</span> <span class="mf">1.0</span> <span class="mf">0.9</span><span class="p">))</span>
+               <span class="p">(</span><span class="k">else</span> <span class="p">(</span><span class="n">convert</span> <span class="mf">0.0</span> <span class="n">SAMPLE</span><span class="p">)))))))</span>
 </pre></div>
 </div>
 <p>Sounds saturated and messy—great. <a class="footnote-reference" href="#id6" id="id3">[3]</a> Now, we want to write the
@@ -227,7 +228,7 @@ some memory</a> to write the output samples into. Looking at the file info
 which was printed out earlier (in particular <code class="docutils literal"><span class="pre">samples</span> <span class="pre">read:</span>
 <span class="pre">21202944</span></code>), we know that there are <code class="docutils literal"><span class="pre">21202944</span></code> samples in the input
 file, so that’s how big we want our output buffer to be.</p>
-<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
+<div class="code extempore highlight-default"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
   (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
         (saturationl (saturation_c))
         (saturationr (saturation_c))
@@ -265,7 +266,7 @@ channel)</li>
 <li>a pointer to the buffer of audio samples</li>
 </ul>
 <p>Let’s add a function <code class="docutils literal"><span class="pre">write_data</span></code> to write the audio file:</p>
-<div class="code extempore highlight-python"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
+<div class="code extempore highlight-default"><div class="highlight"><pre>(bind-func dsp:DSP 1000000000
   (let ((audiofile (audiofile_c &quot;/Users/ben/Desktop/xtm-assets/peg.wav&quot; 0 0))
         (saturationl (saturation_c))
         (saturationr (saturation_c))
