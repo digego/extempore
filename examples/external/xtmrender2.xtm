@@ -71,7 +71,7 @@
 ;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (let ((nodes:XTMNode** (cast data XTMNode**)))
+    (let ((nodes:XTMModel** (cast data XTMModel**)))
       (scale_matrix m 1.5 1.5 1.5)
       (translate_matrix m 2.0 -1.9 0.0)                  
       ;; (xtm_update_matrices shader m v p)
@@ -83,8 +83,8 @@
       void)))
 
 (bind-func gl_render
-  (let ((models:XTMNode** (alloc 3)))
-    (lambda (model1:XTMNode* model2:XTMNode* model3:XTMNode*)
+  (let ((models:XTMModel** (alloc 3)))
+    (lambda (model1:XTMModel* model2:XTMModel* model3:XTMModel*)
       (if (null? model1)
           (println "gl_render recieved null pointer for model1 - did you load the model successfully?"))
       (if (null? model2)
@@ -97,11 +97,11 @@
 
 (bind-val model_path i8*
   (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))))
-(bind-val peppino XTMNode*
+(bind-val peppino XTMModel*
   (assimp_load_model model_path "peppino.dae" aiProcess_Triangulate))
-(bind-val scene XTMNode*
+(bind-val scene XTMModel*
   (assimp_load_model model_path "scene.dae" aiProcess_Triangulate))
-(bind-val dome XTMNode*
+(bind-val dome XTMModel*
   (assimp_load_model model_path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup
