@@ -12,6 +12,7 @@
 ;;; Code:
 
 (sys:load "libs/external/glfw3.xtm")
+(sys:load "libs/external/gl.xtm")
 
 (bind-val width i32 1024)
 (bind-val height i32 768)
@@ -21,24 +22,24 @@
   ;; versions, so we need a "compatibility" graphics context
   (begin
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    (glfw_init_and_create_interaction_compatibility_window width height)))
+    (glfw_init_and_create_interaction_window width height)))
 
 (sys:load "libs/external/assimp.xtm")
 
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (rotate_matrix m (* .1 (i64tof frame)) 0.0 1.0 0.0)
-    (xtm_draw_model (convert data xtm_node*) shader m v p)
+    (xtm_draw_model (convert data XTMNode*) shader m v p)
     void))
 
 (bind-func gl_render
-  (lambda (model:xtm_node*)
+  (lambda (model:XTMNode*)
     (if (null? model)
         (println "gl_render recieved null pointer for model - did you load the model successfully?")
         (begin (xtm_render null render:XTMRENDERCB null null (convert model i8*))
                void))))
 
-(bind-val peppino xtm_node*
+(bind-val peppino XTMNode*
   (assimp_load_model (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))) "peppino.dae" aiProcess_Triangulate))
 
 (xtm_render_setup
@@ -47,6 +48,7 @@
 
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
+    (gl_print_error "start loop errors?")
     (gl_render peppino)
     ;; swap buffers
     (glfwPollEvents)

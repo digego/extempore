@@ -40,44 +40,51 @@
 
 (sys:load "libs/external/glfw3.xtm")
 
-(bind-val width i32 1024)
-(bind-val height i32 768)
+;; (bind-val width i32 1024)
+;; (bind-val height i32 768)
+
+(bind-val width i32 1920)
+(bind-val height i32 1200)
 
 (bind-val window GLFWwindow*
   ;; some of the shaders in the graphics pipeline use older glsl
   ;; versions, so we need a "compatibility" graphics context
   (begin
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    (glfw_init_and_create_interaction_compatibility_window width height)))
+    ;;(glfw_create_fullscreen_window)))
+    (glfw_init_and_create_interaction_window width height)))
 
 (sys:load "libs/external/assimp.xtm")
 
 ;; for lights and cameras
 (bind-func prerender:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (xtm_light_pos 1 0.0 10.0 15.0)
+    (xtm_light_pos 1 0.0 30.0 50.0)
     (xtm_light_tgt 1 0.0 5.0 0.0)
     (xtm_light_up 1 0.0 1.0 0.0)        
     (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
-    (xtm_light_power 1 (+ 70.0 (* 50.0 (cos (+ 1.0 (* .1 (i64tof frame)))))))
-    (xtm_light_angle 1 30.0)
+    (xtm_light_power 1 (+ 60.0 (* 50.0 (cos (+ 1.0 (* .1 (i64tof frame)))))))
+    (xtm_light_angle 1 300.0)
 
-    (xtm_light_pos 2 10.0 10.0 7.0)
+    (xtm_light_pos 2 10.0 10.0 20.0)
     (xtm_light_tgt 2 0.0 0.0 -5.0)
     (xtm_light_up 2 0.0 1.0 0.0)        
     (xtm_light_diffuse 2 1.0 0.3 0.6 1.0)
-    (xtm_light_power 2 (+ 70.0 (* 50.0 (cos (+ 3.0 (* .1 (i64tof frame)))))))
+    (xtm_light_power 2 (+ 60.0 (* 50.0 (cos (+ 3.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 2 30.0)
 
-    (xtm_light_pos 3 -10.0 10.0 10.0)
+    (xtm_light_pos 3 -10.0 10.0 15.0)
     (xtm_light_tgt 3 0.0 0.0 0.0)
     (xtm_light_up 3 0.0 1.0 0.0)        
     (xtm_light_diffuse 3 0.3 1.0 0.6 1.0)
-    (xtm_light_power 3 (+ 70.0 (* 50.0 (cos (+ 5.0 (* .1 (i64tof frame)))))))
+    (xtm_light_power 3 (+ 60.0 (* 50.0 (cos (+ 5.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 3 30.0)
     
-    (xtm_camera_pos 0.0 5.0 20.0)
-    (xtm_camera_tgt 1.0 2.0 0.0)
+    (xtm_camera_pos
+     -2.0
+     3.0
+     (+ 12.0 (* 2.0 (cos (* .01:f (i64tof frame))))))
+    (xtm_camera_tgt 5.0 0.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
     void
     ))
@@ -85,21 +92,33 @@
 ;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (let ((nodes:xtm_node** (cast data xtm_node**)))
+    (let ((nodes:XTMNode** (cast data XTMNode**)))
       (scale_matrix m 1.5 1.5 1.5)
       (translate_matrix m 2.0 -1.9 0.0)            
       (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
-      (xtm_update_matrices shader m v p)
+      ;; (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
-      (xtm_update_matrices shader m v p)      
+      (scale_matrix m 1.5 1.5 1.5)      
+      (translate_matrix m -1.0 -1.9 3.0)            
+      (xtm_draw_model (pref nodes 0) shader m v p)      
+      (fill_identity_matrix m)
+      (scale_matrix m 1.5 1.5 1.5)      
+      (translate_matrix m 0.0 -1.9 2.0)            
+      (xtm_draw_model (pref nodes 0) shader m v p)      
+      (fill_identity_matrix m)
+      (scale_matrix m 1.5 1.5 1.5)      
+      (translate_matrix m 1.0 -1.9 1.0)            
+      (xtm_draw_model (pref nodes 0) shader m v p)      
+      (fill_identity_matrix m)      
+      ;; (xtm_update_matrices shader m v p)      
       (xtm_draw_model (pref nodes 1) shader m v p)
       (xtm_draw_model (pref nodes 2) shader m v p)
       void)))
 
 (bind-func gl_render
-  (let ((models:xtm_node** (alloc 4)))
-    (lambda (model1:xtm_node* model2:xtm_node* model3:xtm_node*)
+  (let ((models:XTMNode** (alloc 4)))
+    (lambda (model1:XTMNode* model2:XTMNode* model3:XTMNode*)
       (cond ((null? model1)
              (println "gl_render recieved null pointer for model1 - did you load the model successfully?"))
             ((null? model2)
@@ -114,11 +133,11 @@
 
 (bind-val model_path i8*
   (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))))
-(bind-val peppino xtm_node*
+(bind-val peppino XTMNode*
   (assimp_load_model model_path "peppino.dae" aiProcess_Triangulate))
-(bind-val scene xtm_node*
+(bind-val scene XTMNode*
   (assimp_load_model model_path "scene.dae" aiProcess_Triangulate))
-(bind-val dome xtm_node*
+(bind-val dome XTMNode*
   (assimp_load_model model_path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup

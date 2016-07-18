@@ -3,7 +3,7 @@
 "// VERTEX SHADER
 // #version 330
 
-varying vec2 TexCoord;
+out vec2 TexCoord;
 
 void main() {
    // pass through texture coordinate
@@ -24,10 +24,12 @@ void main() {
 uniform sampler2DRect tex1;
 uniform float     time;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
+
+out vec4 xtmColor
 
 void main() {
-   gl_FragColor = texture2DRect(tex1,TexCoord);
+   xtmColor = texture2DRect(tex1,TexCoord);
 }")
 
 
@@ -41,7 +43,7 @@ void main() {
 uniform sampler2DRect tex1;
 uniform float     time;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    float alpha = texture2DRect(tex1,TexCoord).a;
@@ -60,7 +62,7 @@ void main() {
 uniform sampler2DRect tex1;
 uniform float     time;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    float alpha = texture2DRect(tex1,TexCoord).a;
@@ -78,7 +80,7 @@ void main() {
 uniform sampler2DRect tex1;
 uniform float     time;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    float alpha = texture2DRect(tex1,TexCoord).a;
@@ -97,7 +99,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    vec4 sample[25];
@@ -129,7 +131,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    gl_FragColor = vec4(0.0);
@@ -155,7 +157,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
     vec4 sample[25];
@@ -185,7 +187,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
    vec4 sample[25];
@@ -214,7 +216,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
     vec4 sample[25];
@@ -242,7 +244,7 @@ uniform sampler2DRect tex1;
 uniform float     time;
 uniform vec2      texoffset[25];
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
     vec4 sample[25];
@@ -274,7 +276,7 @@ uniform sampler2DRect blendBuf;
 uniform float       time;
 uniform float       opacity;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
     vec4 base = texture2DRect(baseBuf, TexCoord);
@@ -292,13 +294,12 @@ void main() {
 "// VERTEX SHADER
 // GLSL 1.2 compatible
 
-//varying vec2 TexCoord;
 
-attribute vec2 myVertex;
-attribute vec4 myColour;
-attribute float mySize;
-attribute vec2 myVelocity;
-attribute float myState;
+in vec2 myVertex;
+in vec4 myColour;
+in float mySize;
+in vec2 myVelocity;
+in float myState;
 
 void main() {
    gl_PointSize = mySize;
@@ -313,25 +314,23 @@ void main() {
 
 (define particles-frag
 "//  FRAGMENT SHADER
-// #version 330
-
-#version 120
+#version 400
 
 #extension GL_ARB_texture_rectangle : disable
 
 uniform sampler2D tex1;
 
-//varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
-   gl_FragColor = texture2D(tex1,gl_PointCoord)*gl_Color;
+   gl_FragColor = texture(tex1,gl_PointCoord)*gl_Color;
    //gl_FragColor = gl_Color;
 }")
 
 
 (define green-frag
 "//  FRAGMENT SHADER
-// #version 330
+#version 400
 
 #extension GL_ARB_texture_rectangle : enable
 
@@ -344,7 +343,7 @@ uniform float scale_front;
 uniform int flipx;
 uniform int flipy;
 
-varying vec2 TexCoord;
+in vec2 TexCoord;
 
 void main() {
     vec4 base = texture2DRect(tex_back, TexCoord);
@@ -360,64 +359,67 @@ void main() {
 }")
 
 
-(define dof-frag
-"
-#extension GL_ARB_texture_rectangle : enable
+;; (define dof-frag
+;;   "
+;; #version 400
 
-uniform sampler2DRect dBuf;
-uniform sampler2DRect cBuf;
-//uniform vec2 frameBufSize;
-uniform float blur;
-uniform float fp;  // focal point
-uniform int show_depth;
-uniform float dfact; // depth factor (shorten or make longer)
-uniform float near;
-uniform float far;
+;; #extension GL_ARB_texture_rectangle : enable
 
-varying vec2 TexCoord;
+;; uniform sampler2DRect dBuf;
+;; uniform sampler2DRect cBuf;
+;; //uniform vec2 frameBufSize;
+;; uniform float blur;
+;; uniform float fp;  // focal point
+;; uniform int show_depth;
+;; uniform float dfact; // depth factor (shorten or make longer)
+;; uniform float near;
+;; uniform float far;
 
-// const float near = 0.1;
-// const float far = 1000.0;
-const vec2 frameBufSize = vec2(1.0,1.0);
+;; in vec2 TexCoord;
 
-vec4 blurKawase( const sampler2DRect tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
-	// Function assumes that tex is using bilinear hardware filtering
+;; // const float near = 0.1;
+;; // const float far = 1000.0;
+;; const vec2 frameBufSize = vec2(1.0,1.0);
 
-	vec2 dUV = (iteration + 0.5) / texSize;
+;; vec4 blurKawase( const sampler2DRect tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
+;; 	// Function assumes that tex is using bilinear hardware filtering
 
-	vec4 col = texture2DRect( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
-	col += texture2DRect( tex, texCoord + dUV );		        // Top right
-	col += texture2DRect( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
-	col += texture2DRect( tex, texCoord - dUV );		        // Bottom left
+;; 	vec2 dUV = (iteration + 0.5) / texSize;
 
-	return col * 0.25;
-}
+;; 	vec4 col = texture2DRect( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
+;; 	col += texture2DRect( tex, texCoord + dUV );		        // Top right
+;; 	col += texture2DRect( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
+;; 	col += texture2DRect( tex, texCoord - dUV );		        // Bottom left
 
-void main( void ) {
-        // get z depth from dBuf tex
-	float depth = texture2DRect(dBuf,TexCoord).x;
+;; 	return col * 0.25;
+;; }
 
-        // scale depth buffer
-        depth *= far-near;
-        depth = (far+near)-depth;
-        depth = abs(depth - fp); // fp focal point
+;; void main( void ) {
+;;         // get z depth from dBuf tex
+;; 	float depth = texture2DRect(dBuf,TexCoord).x;
 
-        // show_depth is true display depth buffer
-        if (show_depth == 1) {
-          gl_FragColor = vec4(depth,depth,depth,1.0);
-        } else { // else apply depth blur
-          gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
-        }
-}
-")
+;;         // scale depth buffer
+;;         depth *= far-near;
+;;         depth = (far+near)-depth;
+;;         depth = abs(depth - fp); // fp focal point
+
+;;         // show_depth is true display depth buffer
+;;         if (show_depth == 1) {
+;;           gl_FragColor = vec4(depth,depth,depth,1.0);
+;;         } else { // else apply depth blur
+;;           gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
+;;         }
+;; }
+;; ")
 
 
 (define light-vert
   "
-//#version 120
-#version 120
-varying vec3 N, L, E, V;
-varying float D;
+#version 400
+
+out vec3 N, L, E, V;
+out float D;
+
 uniform vec4 LightPos;
 uniform vec4 CameraPos;
 
@@ -445,9 +447,11 @@ void main()
 
 (define light-frag
   "
-#version 120
-varying vec3 N, L, E, V;
-varying float D;
+#version 400
+
+in vec3 N, L, E, V;
+in float D;
+
 uniform vec4 LightAmbient;
 uniform vec4 LightDiffuse;
 uniform vec4 LightSpecular;
@@ -514,6 +518,8 @@ void main()
 
 (define simple-vert
   "
+#version 400
+
 uniform mat4 ModelMatrix;
 uniform mat4 ViewMatrix;
 uniform mat4 ProjectionMatrix;
@@ -528,6 +534,8 @@ void main() {
 
 (define simple-vert-xtm
   "
+#version 400
+
 uniform mat4 ModelMatrix;
 uniform mat4 ViewMatrix;
 uniform mat4 ProjectionMatrix;
@@ -535,27 +543,96 @@ uniform mat3 NormalMatrix;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewProjectionMatrix;
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
 
 void main() {
    gl_Position = ModelViewProjectionMatrix * xtmVertex;
 }
 ")
 
-(define simple-frag
+(define simple-bone-vert-xtm
   "
+#version 400
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+uniform mat4 Bone[20];
+
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 4) in vec4 xtmBoneIndexes;
+layout (location = 5) in vec4 xtmBoneWeights;
+layout (location = 6) in int xtmActiveBones;
 
 void main() {
-   gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+   vec4 newVertex;
+   vec4 newNormal;
+   int index;
+   if(1 > 0) { //xtmActiveBones > 3) {
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+     index=int(xtmBoneIndexes.z);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.z;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.z;
+     index=int(xtmBoneIndexes.w);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.w;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.w;
+   }else if(xtmActiveBones > 2){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+     index=int(xtmBoneIndexes.z);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.z;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.z;
+   }else if(xtmActiveBones > 1){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+   }else if(xtmActiveBones > 0){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+   } else {
+     newVertex = xtmVertex;
+     newNormal = vec4(xtmNormal, 0.0);
+   }
+   gl_Position = ModelViewProjectionMatrix * newVertex;
+}
+")
+
+(define simple-frag
+  "
+#version 400
+
+out vec4 xtmColor;
+
+void main() {
+   xtmColor = vec4(1.0,0.0,0.0,1.0);
 }
 ")
 
 (define quad-vert
   "
-#version 120
+#version 400
 
 uniform mat4 ModelMatrix;
 uniform mat4 ViewMatrix;
@@ -564,36 +641,43 @@ uniform mat3 NormalMatrix;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewProjectionMatrix;
 
-varying vec2 TexCoord;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+
+out vec2 UVCoord;
 
 void main() {
-   TexCoord = gl_MultiTexCoord0.st;
-   gl_FrontColor = gl_Color;
-   gl_Position = ModelViewProjectionMatrix * gl_Vertex;
+   UVCoord = xtmUVW.st;
+   gl_Position = ModelViewProjectionMatrix * xtmVertex;
 }
 ")
 
 (define quad-frag
   "
+#version 400
+
 uniform sampler2D tex1;
-varying vec2 TexCoord;
+in vec2 UVCoord;
+out vec4 xtmColor;
 
 void main() {
-   gl_FragColor = texture2D(tex1,TexCoord);
+   xtmColor = texture(tex1,UVCoord);
 }
 ")
 
 (define light-and-shade-vert-xtm
   "
-#version 120
+// #version 120
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
 
-varying vec3 N, L, E, V;
-varying float D;
+out vec3 N, L, E, V;
+out float D;
 
 uniform vec4 LightPos;
 uniform vec4 CameraPos;
@@ -607,9 +691,9 @@ uniform mat4 ModelViewProjectionMatrix;
 
 uniform mat4 LightModelViewProjectionMatrix;
 
-varying vec4 lightVertexPosition;
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition;
+out vec3 UVWCoord;
+out vec4 Color;
 
 
 void main()
@@ -631,9 +715,10 @@ void main()
 
 (define light-and-shade-frag
   "
-//#version 120
-varying vec3 N, L, E, V;
-varying float D;
+#version 400
+
+in vec3 N, L, E, V;
+in float D;
 
 uniform vec4 LightAmbient;
 uniform vec4 LightDiffuse;
@@ -661,9 +746,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition;
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition;
+in vec3 UVWCoord;
+in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -712,17 +799,17 @@ else
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,lightVertexPosition2.xy+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,lightVertexPosition2.xy+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-     vec4 texcolor = LightDiffuse * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
-     gl_FragColor = vec4((texcolor.xyz*shadowValue),1.0);
+     vec4 texcolor = LightDiffuse * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
+     xtmColor = vec4((texcolor.xyz*shadowValue),1.0);
   } else {
-     gl_FragColor = vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
+     xtmColor = vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 }
 ")
@@ -730,16 +817,16 @@ else
 
 (define xtmvert-xtm
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -755,9 +842,9 @@ uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+out vec4 Color;
 
 
 void main()
@@ -782,10 +869,11 @@ void main()
 
 (define xtmfrag
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -816,9 +904,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -873,14 +963,14 @@ void main()
     // softer shadowing by adding dither
     for(float x=-0.0004; x<=0.0004; x+=0.0002) {
       for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-        if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+        if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
           shadowValue+=1.0;
       }
     }
     shadowValue/=16.0;
 
     if(IsTextured>0.5) {
-      vec4 texcolor = LightDiffuse[i] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+      vec4 texcolor = LightDiffuse[i] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
       outcolor += vec4((texcolor.xyz*shadowValue),1.0);
     } else {
       outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -891,22 +981,23 @@ void main()
     nl = 1.0;
     float dotE = max(0.0, dot(NN,EE));
     if(IsTextured>0.5) {
-      outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+      outcolor.xyz = texture(tex1,UVWCoord.xy).xyz*dotE;
     }else{
       outcolor.xyz = MaterialDiffuse.xyz*dotE;
     }
   }
-  gl_FragColor = vec4(outcolor.xyz/nl,1.0);
+  xtmColor = vec4(outcolor.xyz/nl,1.0);
 }
 ")
 
 
 (define xtmfrag_nolight
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -937,9 +1028,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -958,26 +1051,25 @@ void main()
 
   float dotE = max(0.0, dot(NN,EE));
   if(IsTextured>0.5) {
-    outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+    outcolor.xyz = texture(tex1,UVWCoord.xy).xyz*dotE;
   }else{
     outcolor.xyz = MaterialDiffuse.xyz*dotE;
   }
-  gl_FragColor = vec4(outcolor.xyz,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 (define xtmvert0
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 7) in mat4 xtmIMat; // instance matrix
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -992,43 +1084,45 @@ uniform mat4 ModelViewProjectionMatrix;
 uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
+uniform int instances;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
-
+out vec3 UVWCoord;
 
 void main()
 {
+  vec4 vPosition;
+  vec4 vpos;
+  if (instances > 0) {
+    vpos = xtmIMat * xtmVertex;
+  } else {
+    vpos = xtmVertex;
+  }
+
   gl_Position = ModelViewProjectionMatrix * xtmVertex;
-  vec4 vPosition = ModelViewMatrix * xtmVertex;
-  N = NormalMatrix * xtmNormal; //normal
+  vPosition = ModelViewMatrix * xtmVertex;
+
+  N = NormalMatrix * xtmNormal;
   float j = 0.5;
 
-  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
-  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
-  D[0] = length(L[0]);
-  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
-
-  V = vPosition.xyz; // vertex (3d)
+  V = vPosition.xyz;
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
 }
 ")
 
 (define xtmvert1
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 7) in mat4 xtmIMat; // instance matrix
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -1043,37 +1137,150 @@ uniform mat4 ModelViewProjectionMatrix;
 uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
+uniform int instances;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
 
 
 void main()
 {
-  gl_Position = ModelViewProjectionMatrix * xtmVertex;
-  vec4 vPosition = ModelViewMatrix * xtmVertex;
-  N = NormalMatrix * xtmNormal; //normal
+  vec4 vPosition;
+  vec4 vpos;
+
+  if (instances > 0) {
+    vpos = xtmIMat * xtmVertex;
+  } else {
+    vpos = xtmVertex;
+  }
+
+  gl_Position = ModelViewProjectionMatrix * vpos;
+  vPosition = ModelViewMatrix * vpos;
+
+  N = NormalMatrix * xtmNormal;
   float j = 0.5;
 
-  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[0] = (LightPos[0] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
   D[0] = length(L[0]);
-  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * vpos;
 
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
+  // Color = xtmColor;
+}
+")
+
+(define xtmvertbone1
+  "
+#version 400
+
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 4) in vec4 xtmBoneIndexes;
+layout (location = 5) in vec4 xtmBoneWeights;
+layout (location = 6) in float xtmActiveBones;
+
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
+
+uniform vec4 LightPos[10];
+uniform vec4 CameraPos;
+
+uniform mat4 ModelMatrix;
+uniform mat4 ViewMatrix;
+uniform mat4 ProjectionMatrix;
+uniform mat3 NormalMatrix;
+uniform mat4 ModelViewMatrix;
+uniform mat4 ModelViewProjectionMatrix;
+uniform mat4 Bone[20];
+
+uniform mat4 LightModelViewProjectionMatrix[10];
+
+uniform float numlights;
+
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+// out vec4 Color;
+
+
+void main()
+{
+   vec4 newVertex;
+   vec4 newNormal;
+   vec3 new3Normal;
+   int index;
+   if(int(xtmActiveBones) > 4) {
+     newVertex = vec4(0.0,0.0,0.0,0.0);
+     newNormal = newVertex;     
+   }else if(int(xtmActiveBones) > 3) {
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+     index=int(xtmBoneIndexes.z);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.z;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.z;
+     index=int(xtmBoneIndexes.w);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.w;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.w;
+   }else if(int(xtmActiveBones) > 2){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+     index=int(xtmBoneIndexes.z);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.z;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.z;
+   }else if(int(xtmActiveBones) > 1){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+     index=int(xtmBoneIndexes.y);
+     newVertex += (Bone[index] * xtmVertex) * xtmBoneWeights.y;
+     newNormal += (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.y;
+   }else if(int(xtmActiveBones) > 0){
+     index=int(xtmBoneIndexes.x);
+     newVertex = (Bone[index] * xtmVertex) * xtmBoneWeights.x;
+     newNormal = (Bone[index] * vec4(xtmNormal, 0.0)) * xtmBoneWeights.x;
+   } else {
+     newVertex = xtmVertex;
+     newNormal = vec4(xtmNormal, 0.0);
+   }
+  new3Normal = newNormal.xyz;
+  
+  gl_Position = ModelViewProjectionMatrix * newVertex;
+  vec4 vPosition = ModelViewMatrix * newVertex;
+  N = NormalMatrix * new3Normal; //normal
+  float j = 0.5;
+
+  L[0] = (LightPos[0] - (ModelMatrix * newVertex)).xyz; // vector from source to light
+  if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
+  D[0] = length(L[0]);
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * newVertex;
+
+  V = vPosition.xyz; // vertex (3d)
+  E = (CameraPos - vPosition).xyz; // vector from source to eye
+  UVWCoord = xtmUVW;
+  // Color = xtmColor;
 }
 ")
 
 (define xtmfrag0
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+//in vec3 L[10];
+//in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -1104,9 +1311,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+//in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+//in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -1125,21 +1334,22 @@ void main()
 
   float dotE = max(0.0, dot(NN,EE));
   if(IsTextured>0.5) {
-    outcolor.xyz = texture2D(tex1,UVWCoord.xy).xyz*dotE;
+    outcolor.xyz = texture(tex1,UVWCoord.xy).xyz*dotE;
   }else{
     outcolor.xyz = MaterialDiffuse.xyz*dotE;
   }
-  gl_FragColor = vec4(outcolor.xyz,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 
 (define xtmfrag1
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -1170,9 +1380,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+// in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -1225,35 +1437,36 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    vec4 texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    vec4 texcolor = LightDiffuse[0] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 (define xtmvert2
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 7) in mat4 xtmIMat; // instance matrix
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -1268,42 +1481,51 @@ uniform mat4 ModelViewProjectionMatrix;
 uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
+uniform int instances;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+// out vec4 Color;
 
 
 void main()
 {
-  gl_Position = ModelViewProjectionMatrix * xtmVertex;
-  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  vec4 vpos;
+  if (instances > 0) {
+     vpos = xtmIMat * xtmVertex;
+  } else {
+     vpos = xtmVertex;
+  }
+
+  gl_Position = ModelViewProjectionMatrix * vpos;
+  vec4 vPosition = ModelViewMatrix * vpos;
   N = NormalMatrix * xtmNormal; //normal
   float j = 0.5;
 
-  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[0] = (LightPos[0] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
   D[0] = length(L[0]);
-  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * vpos;
 
-  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[1] = (LightPos[1] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
   D[1] = length(L[1]);
-  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * vpos;
 
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
+  // Color = xtmColor;
 }
 ")
 
 (define xtmfrag2
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -1334,9 +1556,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+// in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -1390,14 +1614,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    vec4 texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    vec4 texcolor = LightDiffuse[0] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -1441,35 +1665,36 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[1] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 (define xtmvert3
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
+layout (location = 7) in mat4 xtmIMat; // instance matrix
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -1484,47 +1709,57 @@ uniform mat4 ModelViewProjectionMatrix;
 uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
+uniform int instances;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+// out vec4 Color;
 
 
 void main()
 {
-  gl_Position = ModelViewProjectionMatrix * xtmVertex;
-  vec4 vPosition = ModelViewMatrix * xtmVertex;
+  vec4 vpos;
+
+  if (instances > 0) {
+     vpos = xtmIMat * xtmVertex;
+  } else {
+     vpos = xtmVertex;
+  }
+
+  gl_Position = ModelViewProjectionMatrix * vpos;
+  vec4 vPosition = ModelViewMatrix * vpos;
   N = NormalMatrix * xtmNormal; //normal
   float j = 0.5;
 
-  L[0] = (LightPos[0] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[0] = (LightPos[0] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[0].w == 0.0) L[0] = LightPos[0].xyz; // i.e. if LightPos is already a direction vector
   D[0] = length(L[0]);
-  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * xtmVertex;
+  lightVertexPosition[0] = LightModelViewProjectionMatrix[0] * vpos;
 
-  L[1] = (LightPos[1] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[1] = (LightPos[1] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[1].w == 0.0) L[1] = LightPos[1].xyz; // i.e. if LightPos is already a direction vector
   D[1] = length(L[1]);
-  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * xtmVertex;
+  lightVertexPosition[1] = LightModelViewProjectionMatrix[1] * vpos;
 
-  L[2] = (LightPos[2] - (ModelMatrix * xtmVertex)).xyz; // vector from source to light
+  L[2] = (LightPos[2] - (ModelMatrix * vpos)).xyz; // vector from source to light
   if(LightPos[2].w == 0.0) L[2] = LightPos[2].xyz; // i.e. if LightPos is already a direction vector
   D[2] = length(L[2]);
-  lightVertexPosition[2] = LightModelViewProjectionMatrix[2] * xtmVertex;
+  lightVertexPosition[2] = LightModelViewProjectionMatrix[2] * vpos;
 
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
+  // Color = xtmColor;
 }
 ")
 
 (define xtmfrag3
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -1555,9 +1790,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+// in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -1611,14 +1848,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[0] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -1662,14 +1899,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[1] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -1713,35 +1950,35 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[2] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 (define xtmvert4
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -1757,9 +1994,9 @@ uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+// out vec4 Color;
 
 
 void main()
@@ -1792,16 +2029,17 @@ void main()
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
+  // Color = xtmColor;
 }
 ")
 
 (define xtmfrag4
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -1832,9 +2070,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+// in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -1888,14 +2128,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[0] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -1939,14 +2179,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[1] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -1990,14 +2230,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[2] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -2041,35 +2281,35 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[3] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[3] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
 (define xtmvert5
   "
-#version 120
+#version 400
 
-attribute vec4 xtmVertex;
-attribute vec3 xtmNormal;
-attribute vec3 xtmUVW;
-attribute vec4 xtmColor;
+layout (location = 0) in vec4 xtmVertex;
+layout (location = 1) in vec3 xtmNormal;
+layout (location = 2) in vec3 xtmUVW;
+layout (location = 3) in vec4 xtmColor;
 
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+out vec3 N, E, V;
+out vec3 L[10];
+out float D[10];
 
 uniform vec4 LightPos[10];
 uniform vec4 CameraPos;
@@ -2085,9 +2325,9 @@ uniform mat4 LightModelViewProjectionMatrix[10];
 
 uniform float numlights;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+out vec4 lightVertexPosition[10];
+out vec3 UVWCoord;
+// out vec4 Color;
 
 
 void main()
@@ -2125,16 +2365,17 @@ void main()
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
   UVWCoord = xtmUVW;
-  Color = xtmColor;
+  // Color = xtmColor;
 }
 ")
 
 (define xtmfrag5
   "
-//#version 120
-varying vec3 N, E, V;
-varying vec3 L[10];
-varying float D[10];
+#version 400
+
+in vec3 N, E, V;
+in vec3 L[10];
+in float D[10];
 
 uniform vec4 LightAmbient[10];
 uniform vec4 LightDiffuse[10];
@@ -2165,9 +2406,11 @@ uniform sampler2D shadowMap;
 uniform sampler2D tex1;
 uniform float IsTextured;
 
-varying vec4 lightVertexPosition[10];
-varying vec3 UVWCoord;
-varying vec4 Color;
+in vec4 lightVertexPosition[10];
+in vec3 UVWCoord;
+// in vec4 Color;
+
+out vec4 xtmColor;
 
 void main()
 {
@@ -2221,14 +2464,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[0] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[0] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -2272,14 +2515,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[1] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[1] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -2323,14 +2566,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[2] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[2] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -2374,14 +2617,14 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[3] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[3] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
@@ -2425,96 +2668,488 @@ void main()
   // softer shadowing by adding dither
   for(float x=-0.0004; x<=0.0004; x+=0.0002) {
     for(float y=-0.0004; y<=0.0004; y+=0.0002) {
-      if(texture2D(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
+      if(texture(shadowMap,(lightVertexPosition2.xy*0.25)+offset+vec2(x,y)).r >= lightVertexPosition2.z)
         shadowValue+=1.0;
     }
   }
   shadowValue/=16.0;
 
   if(IsTextured>0.5) {
-    texcolor = LightDiffuse[4] * texture2D(tex1,UVWCoord.xy) * nDotLL * attenuation;
+    texcolor = LightDiffuse[4] * texture(tex1,UVWCoord.xy) * nDotLL * attenuation;
     outcolor += vec4((texcolor.xyz*shadowValue),1.0);
   } else {
     outcolor += vec4(((ambient + diffuse + specular).xyz*shadowValue),1.0);
   }
 
-  gl_FragColor = vec4(outcolor.xyz/numlights,1.0);
+  xtmColor = vec4(outcolor.xyz,1.0);
 }
 ")
 
-(define quad-vert
+;; (define dof-frag
+;; "
+;; #version 400
+
+;; uniform sampler2D dBuf;
+;; uniform sampler2D cBuf;
+;; uniform float blur;
+;; uniform float dof;
+;; uniform float fp;  // focal point
+;; uniform int show_depth;
+;; uniform float near;
+;; uniform float far;
+;; uniform vec2 frameBufSize;
+
+;; in vec2 UVCoord;
+
+;; out vec4 xtmColor;
+
+;; vec4 blurKawase( const sampler2D tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
+;; 	// Function assumes that tex is using bilinear hardware filtering
+
+;; 	vec2 dUV = (iteration + 0.5) / texSize;
+
+;; 	vec4 col = texture( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
+;; 	col += texture( tex, texCoord + dUV );		        // Top right
+;; 	col += texture( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
+;; 	col += texture( tex, texCoord - dUV );		        // Bottom left
+
+;; 	return col * 0.25;
+;; }
+
+;; void main( void ) {
+;;   // get z depth from dBuf tex
+;; 	float depth = texture(dBuf,UVCoord).x;
+;;   // linearly scale depth buffer
+;;   depth = (near*2.0) / ((far+near) - (depth*(far-near)));
+;;   // depth to focal point
+;;   depth = log(1.0+abs(depth-fp)) / log(dof);
+
+;;   // show_depth is true display depth buffer
+;;   if (show_depth == 1) {
+;;     xtmColor = vec4(depth,depth,depth,1.0);
+;;   } else if (show_depth == -1) { // else show colour buf (no blur)
+;;     xtmColor = texture( cBuf, UVCoord );
+;;   } else { // else apply depth blur
+;;     xtmColor = blurKawase( cBuf, UVCoord, frameBufSize, depth * blur);
+;;   }
+
+;;   //xtmColor = texture(cBuf,UVCoord); //vec4(0.0,1.0,0.0,1.0);
+;; }
+;; ")
+
+
+;; DoF with bokeh GLSL shader v2.4
+;; by Martins Upitis (martinsh) (devlog-martinsh.blogspot.com)
+;; public domain.
+;;
+(define dof-frag
   "
-#version 120
+#version 400
 
-uniform mat4 ModelMatrix;
-uniform mat4 ViewMatrix;
-uniform mat4 ProjectionMatrix;
-uniform mat3 NormalMatrix;
-uniform mat4 ModelViewMatrix;
-uniform mat4 ModelViewProjectionMatrix;
+uniform sampler2D bgl_RenderedTexture;
+uniform sampler2D bgl_DepthTexture;
+uniform float bgl_RenderedTextureWidth;
+uniform float bgl_RenderedTextureHeight;
 
-varying vec2 TexCoord;
+#define PI  3.14159265
 
-void main() {
-   TexCoord = gl_MultiTexCoord0.st;
-   gl_FrontColor = gl_Color;
-   gl_Position = ModelViewProjectionMatrix * gl_Vertex;
+float width = bgl_RenderedTextureWidth; //texture width
+float height = bgl_RenderedTextureHeight; //texture height
+
+vec2 texel = vec2(1.0/width,1.0/height);
+
+//uniform variables from external script
+
+uniform float focalDepth;  //focal distance value in meters, but you may use autofocus option below
+uniform float focalLength; //focal length in mm
+uniform float fstop; //f-stop value
+uniform bool showFocus; //show debug focus point and focal range (red = focal point, green = focal range)
+uniform bool autofocus; // autofocus on or off
+uniform vec2 focus;     // autofocus point if auto is on (0,0 bottom left 1,1 top right)
+
+/* 
+make sure that these two values are the same for your camera, otherwise distances will be wrong.
+*/
+
+float znear = 0.1; //camera clipping start
+float zfar = 100.0; //camera clipping end
+
+//------------------------------------------
+//user variables
+
+int samples = 3; //samples on the first ring
+int rings = 3; //ring count
+
+bool manualdof = false; //manual dof calculation
+float ndofstart = 1.0; //near dof blur start
+float ndofdist = 2.0; //near dof blur falloff distance
+float fdofstart = 1.0; //far dof blur start
+float fdofdist = 3.0; //far dof blur falloff distance
+
+float CoC = 0.03;//circle of confusion size in mm (35mm film = 0.03mm)
+
+bool vignetting = true; //use optical lens vignetting?
+float vignout = 1.3; //vignetting outer border
+float vignin = 0.0; //vignetting inner border
+float vignfade = 22.0; //f-stops till vignete fades
+
+//bool autofocus = false; //use autofocus in shader? disable if you use external focalDepth value
+//vec2 focus = vec2(0.5,0.5); // autofocus point on screen (0.0,0.0 - left lower corner, 1.0,1.0 - upper right)
+float maxblur = 1.0; //clamp value of max blur (0.0 = no blur,1.0 default)
+
+float threshold = 0.5; //highlight threshold;
+float gain = 2.0; //highlight gain;
+
+float bias = 0.5; //bokeh edge bias
+float fringe = 0.7; //bokeh chromatic aberration/fringing
+
+bool noise = true; //use noise instead of pattern for sample dithering
+float namount = 0.0001; //dither amount
+
+bool depthblur = false; //blur the depth buffer?
+float dbsize = 1.25; //depthblursize
+
+/*
+next part is experimental
+not looking good with small sample and ring count
+looks okay starting from samples = 4, rings = 4
+*/
+
+bool pentagon = false; //use pentagon as bokeh shape?
+float feather = 0.4; //pentagon shape feather
+
+in vec2 UVCoord;
+
+out vec4 xtmColor;
+
+//------------------------------------------
+
+
+float penta(vec2 coords) //pentagonal shape
+{
+	float scale = float(rings) - 1.3;
+	vec4  HS0 = vec4( 1.0,         0.0,         0.0,  1.0);
+	vec4  HS1 = vec4( 0.309016994, 0.951056516, 0.0,  1.0);
+	vec4  HS2 = vec4(-0.809016994, 0.587785252, 0.0,  1.0);
+	vec4  HS3 = vec4(-0.809016994,-0.587785252, 0.0,  1.0);
+	vec4  HS4 = vec4( 0.309016994,-0.951056516, 0.0,  1.0);
+	vec4  HS5 = vec4( 0.0        ,0.0         , 1.0,  1.0);
+	
+	vec4  one = vec4( 1.0 );
+	
+	vec4 P = vec4((coords),vec2(scale, scale)); 
+	
+	vec4 dist = vec4(0.0);
+	float inorout = -4.0;
+	
+	dist.x = dot( P, HS0 );
+	dist.y = dot( P, HS1 );
+	dist.z = dot( P, HS2 );
+	dist.w = dot( P, HS3 );
+	
+	dist = smoothstep( -feather, feather, dist );
+	
+	inorout += dot( dist, one );
+	
+	dist.x = dot( P, HS4 );
+	dist.y = HS5.w - abs( P.z );
+	
+	dist = smoothstep( -feather, feather, dist );
+	inorout += dist.x;
+	
+	return clamp( inorout, 0.0, 1.0 );
+}
+
+float bdepth(vec2 coords) //blurring depth
+{
+	float d = 0.0;
+	float kernel[9];
+	vec2 offset[9];
+	
+	vec2 wh = vec2(texel.x, texel.y) * dbsize;
+	
+	offset[0] = vec2(-wh.x,-wh.y);
+	offset[1] = vec2( 0.0, -wh.y);
+	offset[2] = vec2( wh.x -wh.y);
+	
+	offset[3] = vec2(-wh.x,  0.0);
+	offset[4] = vec2( 0.0,   0.0);
+	offset[5] = vec2( wh.x,  0.0);
+	
+	offset[6] = vec2(-wh.x, wh.y);
+	offset[7] = vec2( 0.0,  wh.y);
+	offset[8] = vec2( wh.x, wh.y);
+	
+	kernel[0] = 1.0/16.0;   kernel[1] = 2.0/16.0;   kernel[2] = 1.0/16.0;
+	kernel[3] = 2.0/16.0;   kernel[4] = 4.0/16.0;   kernel[5] = 2.0/16.0;
+	kernel[6] = 1.0/16.0;   kernel[7] = 2.0/16.0;   kernel[8] = 1.0/16.0;
+	
+	
+	for( int i=0; i<9; i++ )
+	{
+		float tmp = texture(bgl_DepthTexture, coords + offset[i]).r;
+		d += tmp * kernel[i];
+	}
+	
+	return d;
+}
+
+
+vec3 color(vec2 coords,float blur) //processing the sample
+{
+	vec3 col = vec3(0.0);
+	
+	col.r = texture(bgl_RenderedTexture,coords + vec2(0.0,1.0)*texel*fringe*blur).r;
+	col.g = texture(bgl_RenderedTexture,coords + vec2(-0.866,-0.5)*texel*fringe*blur).g;
+	col.b = texture(bgl_RenderedTexture,coords + vec2(0.866,-0.5)*texel*fringe*blur).b;
+	
+	vec3 lumcoeff = vec3(0.299,0.587,0.114);
+	float lum = dot(col.rgb, lumcoeff);
+	float thresh = max((lum-threshold)*gain, 0.0);
+	return col+mix(vec3(0.0),col,thresh*blur);
+}
+
+vec2 rand(vec2 coord) //generating noise/pattern texture for dithering
+{
+	float noiseX = ((fract(1.0-coord.s*(width/2.0))*0.25)+(fract(coord.t*(height/2.0))*0.75))*2.0-1.0;
+	float noiseY = ((fract(1.0-coord.s*(width/2.0))*0.75)+(fract(coord.t*(height/2.0))*0.25))*2.0-1.0;
+	
+	if (noise)
+	{
+		noiseX = clamp(fract(sin(dot(coord ,vec2(12.9898,78.233))) * 43758.5453),0.0,1.0)*2.0-1.0;
+		noiseY = clamp(fract(sin(dot(coord ,vec2(12.9898,78.233)*2.0)) * 43758.5453),0.0,1.0)*2.0-1.0;
+	}
+	return vec2(noiseX,noiseY);
+}
+
+vec3 debugFocus(vec3 col, float blur, float depth)
+{
+	float edge = 0.002*depth; //distance based edge smoothing
+	float m = clamp(smoothstep(0.0,edge,blur),0.0,1.0);
+	float e = clamp(smoothstep(1.0-edge,1.0,blur),0.0,1.0);
+	
+	col = mix(col,vec3(1.0,0.5,0.0),(1.0-m)*0.6);
+	col = mix(col,vec3(0.0,0.5,1.0),((1.0-e)-(1.0-m))*0.2);
+
+	return col;
+}
+
+float linearize(float depth)
+{
+	return -zfar * znear / (depth * (zfar - znear) - zfar);
+}
+
+float vignette()
+{
+	float dist = distance(UVCoord.xy, vec2(0.5,0.5));
+	dist = smoothstep(vignout+(fstop/vignfade), vignin+(fstop/vignfade), dist);
+	return clamp(dist,0.0,1.0);
+}
+
+void main() 
+{
+	//scene depth calculation
+	
+	float depth = linearize(texture(bgl_DepthTexture,UVCoord.xy).x);
+	
+	if (depthblur)
+	{
+		depth = linearize(bdepth(UVCoord.xy));
+	}
+	
+	//focal plane calculation
+	
+	float fDepth = focalDepth;
+	
+	if (autofocus)
+	{
+		fDepth = linearize(texture(bgl_DepthTexture,focus).x);
+	}
+	
+	//dof blur factor calculation
+	
+	float blur = 0.0;
+	
+	if (manualdof)
+	{    
+		float a = depth-fDepth; //focal plane
+		float b = (a-fdofstart)/fdofdist; //far DoF
+		float c = (-a-ndofstart)/ndofdist; //near Dof
+		blur = (a>0.0)?b:c;
+	}
+	
+	else
+	{
+		float f = focalLength; //focal length in mm
+		float d = fDepth*1000.0; //focal plane in mm
+		float o = depth*1000.0; //depth in mm
+		
+		float a = (o*f)/(o-f); 
+		float b = (d*f)/(d-f); 
+		float c = (d-f)/(d*fstop*CoC); 
+		
+		blur = abs(a-b)*c;
+	}
+	
+	blur = clamp(blur,0.0,1.0);
+	
+	// calculation of pattern for ditering
+	
+	vec2 noise = rand(UVCoord.xy)*namount*blur;
+	
+	// getting blur x and y step factor
+	
+	float w = (1.0/width)*blur*maxblur+noise.x;
+	float h = (1.0/height)*blur*maxblur+noise.y;
+	
+	// calculation of final color
+	
+	vec3 col = vec3(0.0);
+	
+	if(blur < 0.05) //some optimization thingy
+	{
+		col = texture(bgl_RenderedTexture, UVCoord.xy).rgb;
+	}
+	
+	else
+	{
+		col = texture(bgl_RenderedTexture, UVCoord.xy).rgb;
+		float s = 1.0;
+		int ringsamples;
+		
+		for (int i = 1; i <= rings; i += 1)
+		{   
+			ringsamples = i * samples;
+			
+			for (int j = 0 ; j < ringsamples ; j += 1)   
+			{
+				float step = PI*2.0 / float(ringsamples);
+				float pw = (cos(float(j)*step)*float(i));
+				float ph = (sin(float(j)*step)*float(i));
+				float p = 1.0;
+				if (pentagon)
+				{ 
+					p = penta(vec2(pw,ph));
+				}
+				col += color(UVCoord.xy + vec2(pw*w,ph*h),blur)*mix(1.0,(float(i))/(float(rings)),bias)*p;  
+				s += 1.0*mix(1.0,(float(i))/(float(rings)),bias)*p;   
+			}
+		}
+		col /= s; //divide by sample count
+	}
+	
+	if (showFocus)
+	{
+		col = debugFocus(col, blur, depth);
+	}
+	
+	if (vignetting)
+	{
+		col *= vignette();
+	}
+	
+	xtmColor.rgb = col;
+	xtmColor.a = 1.0;
 }
 ")
 
-(define dof_frag
-"
-#version 120
-uniform sampler2D dBuf;
-uniform sampler2D cBuf;
-uniform float blur;
-uniform float dof;
-uniform float fp;  // focal point
-uniform int show_depth;
-uniform float near;
-uniform float far;
-uniform vec2 frameBufSize;
+(define lense-flare-frag
+  "
+#version 400
 
-varying vec2 TexCoord;
-
-vec4 blurKawase( const sampler2D tex, const vec2 texCoord, const vec2 texSize, const float iteration ) {
-	// Function assumes that tex is using bilinear hardware filtering
-
-	vec2 dUV = (iteration + 0.5) / texSize;
-
-	vec4 col = texture2D( tex, texCoord + vec2( -dUV.x, dUV.y ) );	// Top left
-	col += texture2D( tex, texCoord + dUV );		        // Top right
-	col += texture2D( tex, texCoord + vec2( dUV.x, -dUV.y ) );      // Bottom right
-	col += texture2D( tex, texCoord - dUV );		        // Bottom left
-
-	return col * 0.25;
+float noise(float t)
+{
+	return texture2D(iChannel0,vec2(t,.0)/iChannelResolution[0].xy).x;
+}
+float noise(vec2 t)
+{
+	return texture2D(iChannel0,t/iChannelResolution[0].xy).x;
 }
 
-void main( void ) {
-        // get z depth from dBuf tex
-	float depth = texture2D(dBuf,TexCoord).x;
+vec3 lensflare(vec2 uv,vec2 pos)
+{
+	vec2 main = uv-pos;
+	vec2 uvd = uv*(length(uv));
+	
+	float ang = atan(main.x,main.y);
+	float dist=length(main); dist = pow(dist,.1);
+	float n = noise(vec2(ang*16.0,dist*32.0));
+	
+	float f0 = 1.0/(length(uv-pos)*16.0+1.0);
+	
+	f0 = f0+f0*(sin(noise((pos.x+pos.y)*2.2+ang*4.0+5.954)*16.0)*.1+dist*.1+.8);
+	
+	float f1 = max(0.01-pow(length(uv+1.2*pos),1.9),.0)*7.0;
 
-        // linearly scale depth buffer
-        depth = (near*2.0) / ((far+near) - (depth*(far-near)));
-        // depth to focal point
-        depth = log(1.0+abs(depth-fp)) / log(dof);
+	float f2 = max(1.0/(1.0+32.0*pow(length(uvd+0.8*pos),2.0)),.0)*00.25;
+	float f22 = max(1.0/(1.0+32.0*pow(length(uvd+0.85*pos),2.0)),.0)*00.23;
+	float f23 = max(1.0/(1.0+32.0*pow(length(uvd+0.9*pos),2.0)),.0)*00.21;
+	
+	vec2 uvx = mix(uv,uvd,-0.5);
+	
+	float f4 = max(0.01-pow(length(uvx+0.4*pos),2.4),.0)*6.0;
+	float f42 = max(0.01-pow(length(uvx+0.45*pos),2.4),.0)*5.0;
+	float f43 = max(0.01-pow(length(uvx+0.5*pos),2.4),.0)*3.0;
+	
+	uvx = mix(uv,uvd,-.4);
+	
+	float f5 = max(0.01-pow(length(uvx+0.2*pos),5.5),.0)*2.0;
+	float f52 = max(0.01-pow(length(uvx+0.4*pos),5.5),.0)*2.0;
+	float f53 = max(0.01-pow(length(uvx+0.6*pos),5.5),.0)*2.0;
+	
+	uvx = mix(uv,uvd,-0.5);
+	
+	float f6 = max(0.01-pow(length(uvx-0.3*pos),1.6),.0)*6.0;
+	float f62 = max(0.01-pow(length(uvx-0.325*pos),1.6),.0)*3.0;
+	float f63 = max(0.01-pow(length(uvx-0.35*pos),1.6),.0)*5.0;
+	
+	vec3 c = vec3(.0);
+	
+	c.r+=f2+f4+f5+f6; c.g+=f22+f42+f52+f62; c.b+=f23+f43+f53+f63;
+	c = c*1.3 - vec3(length(uvd)*.05);
+	c+=vec3(f0);
+	
+	return c;
+}
 
-        // show_depth is true display depth buffer
-        if (show_depth == 1) {
-          gl_FragColor = vec4(depth,depth,depth,1.0);
-        } else { // else apply depth blur
-          gl_FragColor = blurKawase( cBuf, TexCoord, frameBufSize, depth * blur);
-        }
-        // gl_FragColor = texture2D(cBuf,TexCoord);
+vec3 cc(vec3 color, float factor,float factor2) // color modifier
+{
+	float w = color.x+color.y+color.z;
+	return mix(color,vec3(w)*factor,w*factor2);
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+	vec2 uv = fragCoord.xy / iResolution.xy - 0.5;
+	uv.x *= iResolution.x/iResolution.y; //fix aspect ratio
+	vec3 mouse = vec3(iMouse.xy/iResolution.xy - 0.5,iMouse.z-.5);
+	mouse.x *= iResolution.x/iResolution.y; //fix aspect ratio
+	if (iMouse.z<.5)
+	{
+		mouse.x=sin(iGlobalTime)*.5;
+		mouse.y=sin(iGlobalTime*.913)*.5;
+	}
+	
+	vec3 color = vec3(1.4,1.2,1.0)*lensflare(uv,mouse.xy);
+	color -= noise(fragCoord.xy)*.015;
+	color = cc(color,.5,.1);
+	fragColor = vec4(color,1.0);
 }
 ")
 
 (define xtm_render_setup
   (lambda (w h . args)
+    (println 'init 'QUAD 'shader)
     (xtm_render_init_quad_shader quad-vert quad-frag)
-    (xtm_render_init_dof_shader quad-vert dof_frag)
+    (println 'init 'DOF 'shader)
+    (xtm_render_init_dof_shader quad-vert dof-frag)
+    (println 'init 'SIMPLE 'shader)
     (xtm_render_init_simple_shader simple-vert-xtm simple-frag)
+    (println 'init 'SIMPLE_BONE 'shader)
+    (xtm_render_init_simple_bone_shader simple-bone-vert-xtm simple-frag)
+    (println 'init 'LIGHT 'shader)
     (xtm_render_init_light_shaders xtmvert0 xtmfrag0 xtmvert1 xtmfrag1 xtmvert2 xtmfrag2 xtmvert3 xtmfrag3 xtmvert4 xtmfrag4 xtmvert5 xtmfrag5)
+    (println 'all-shaders-initialized)
     (cond ((null? args)
            (xtm_render_setup_a (real->integer w) (real->integer h)
                                simple-vert-xtm simple-frag
@@ -2586,6 +3221,7 @@ void main( void ) {
     (ipc:define proc 'xtmfrag5 xtmfrag5)
     ;; vert shaders
     (ipc:define proc 'simple-vert-xtm simple-vert-xtm)
+    (ipc:define proc 'simple-bone-vert-xtm simple-bone-vert-xtm)    
     (ipc:define proc 'quad-vert quad-vert)
     (ipc:define proc 'xtmvert-xtm xtmvert-xtm)
     (ipc:define proc 'xtmvert0 xtmvert0)

@@ -137,7 +137,7 @@
 (bind-val aiProcess_Debone enum  #x4000000)
 
 (bind-type aiString <size_t,|1024,i8|> (printer? . #f))
-                                        ;(llvm:compile "%aiString = type {i64, |1024xi8|}
+;;(llvm:compile "%aiString = type {i64, |1024xi8|}
 (bind-type aiMatrix4x4 <float,float,float,float,float,float,float,float,float,float,float,float,float,float,float,float>)
 (bind-type aiMatrix3x3 <float,float,float,float,float,float,float,float,float>)
 (bind-type aiVector4D <float,float,float,float>)
@@ -160,21 +160,19 @@
 (bind-type aiFace <i32,i32*>) ;; good
 ;; mVertexId,mWeightm
 (bind-type aiVertexWeight <i32,float>) ;; good
-;; mName,mNumWeights,mWeights,mOffsetMatrix
+;; mName(0),mNumWeights(1),mWeights(2),mOffsetMatrix(3)
 (bind-type aiBone <aiString,i32,aiVertexWeight*,aiMatrix4x4>) ;; good
 ;; mVertices,mNormals,mTangents,mBitangents,mColors,mNumVertices
 (bind-type aiAnimMesh <aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,i32>) ;; good
 ;; mPrimitiveTypes(0),mNumVertices(1),mNumFaces(2),mVertices(3),mNormals(4),mTangents(5),mBitangents(6),mColors(7),mTextureCoords(8),mNumUVComponents(9),mFaces(10),mNumBones(11),mBones(12),mMaterialIndex(13),mName(14),mNumAnimMeshes(15)
-
 (bind-type aiMesh <i32,i32,i32,aiVector3D*,aiVector3D*,aiVector3D*,aiVector3D*,|8,aiColor4D*|,|8,aiVector3D*|,|8,i32|,aiFace*,i32,aiBone**,i32,aiString,i32,aiAnimMesh**,i64>) ;; i64 on end is padding
-
 ;; mTranslation,mScaling,mRotation
 (bind-type aiUVTransform <aiVector2D,aiVector2D,float>) ;; good
 ;; mKey(0),mSemantic(1),mIndex(2),mDataLength(3),mType(4),mData(5)
 (bind-type aiMaterialProperty <aiString,i32,i32,i32,i32,i8*>) ;; good
 ;; mProperties,mNumProperties,mNumAllocated
 (bind-type aiMaterial <aiMaterialProperty**,i32,i32>) ;; good
-;; mNodeName,mNumPositionKeys,mPositionKeys,mNumRotationKeys,mRotationKeys,mNumScalingKeys,mScalingKeys,mPreState,mPostState
+;; mNodeName(0),mNumPositionKeys(1),mPositionKeys(2),mNumRotationKeys(3),mRotationKeys(4),mNumScalingKeys(5),mScalingKeys(6),mPreState(7),mPostState(8)
 (bind-type aiNodeAnim <aiString,i32,aiVectorKey*,i32,aiQuatKey*,i32,aiVectorKey*,i32,i32>) ;; good
 ;; mName,mNumKeys,mKeys
 (bind-type aiMeshAnim <aiString,i32,aiMeshKey*>) ;; good
@@ -220,12 +218,50 @@
     (doloop (i 16)
       (pset! mat2 i (aref (convert mat1 |16,float|*) i)))))
 
-(bind-func print
-  (lambda (str:aiString*)
-    (let ((size (tref str 0))
-          (dat (convert (tref-ptr str 1) i8*)))
-      (printf "%.*s\n" size dat)
-      void)))
+(bind-func print:[void,aiString*]*
+  (lambda (str)
+    (if (null? str)
+        (begin (printout "''") void)
+        (let ((size (tref str 0))
+              (dat (convert (tref-ptr str 1) i8*)))
+          (printf "'%s'" dat)
+          void))))
+
+(bind-func toString:[String*,aiString*]*
+  (lambda (str)
+    (if (null? str)
+        (Str "")
+        (let ((size (tref str 0))
+              (dat (convert (tref-ptr str 1) i8*)))
+          (Str dat)))))
+
+(bind-func match_aiString:[i1,aiString*,aiString*]*
+  (lambda (s1 s2)
+    ;; (println 'matchstrings: s1 s2)
+    (if (<> (tref s1 0)
+            (tref s2 0))
+        #f
+        (if (= (strcmp (cast (tref-ptr s1 1) i8*)
+                       (cast (tref-ptr s2 1) i8*))
+               0)
+            #t
+            #f))))
+
+(bind-func ai_find_matching_node:[aiNode*,aiNode*,aiString*]*
+  (lambda (node search_str)
+    ;; (println 'aifn (cast node i8*) (cast search_str i8*)) ;search_str) ;; (cast node i8*))
+    (if (null? node)
+        null
+        (if (match_aiString (tref-ptr node 0) search_str)
+            node
+            (let ((num (tref node 3))
+                  (i:i32 0)
+                  (children (tref node 4))
+                  (match:aiNode* null))
+              (while (and (null? match) (< i num))
+                (set! match (ai_find_matching_node (pref children i) search_str))
+                (set! i (+ i 1)))
+              match)))))
 
 (bind-func ai_color4_to_float4
   (lambda (colour:aiColor4D* dat:float*)
@@ -239,99 +275,192 @@
 ;; last vertex positions mode was
 ;; GL_POINTS GL_LINES GL_TRIANGLE GL_QUADS or GL_POLYGON
 (bind-func ai_build_mesh_vbo
-  (lambda (mesh:aiMesh* modes:i32*)
+  (lambda (vao:VAO* mesh:aiMesh* xmesh:XTMMesh* modes:i32*)
     ;; (printf "... mesh vbo\n")    
-    (let ((i:i32 0) (j:i32 0)
+    (let ((i:i32 0) (j:i32 0) (k:i64 0)
           (vbodata:float* null)
-          (vbostride:i32 14) ;; 4d+3d+3d+4d in floats
-          (positions:i32 0)
-          (position_cnt:i32 -1)
+          (max_active_bones:i32 0) ;; most active bones on any 1 vertex
+          (num_bones:i32 (tref mesh 11))
+          (meshbones:XTMBone* (halloc num_bones))
+          (vbostride:i64 (i32toi64 (+ 16 (* 2 4)))) ;; 2d+4d+3d+3d+4d + 4 active bones * 2d space (weight+idx per bone)
+          (positions:i64 0)
+          (position_cnt:i64 -1)
           (vertices:aiVector3D* (tref mesh 3))
           (normals:aiVector3D* (tref mesh 4))
           (num_vertices (tref mesh 1))
           (num_faces:i32 (tref mesh 2))
+          (bones:aiBone** (tref mesh 12))
           (faces (tref mesh 10))
           (face:aiFace* null)
           (num_indicies:i32 0)
           (face_mode:i32 0)
           (index:i32 0)
+          (dat:float* null)
+          (idat:i32* null)
+          (tmp:float 0.0)
           (indicies:i32* null)
           (colors:aiColor4D* (aref (tref-ptr mesh 7) 0)) ;; only use first 'set' of colors
           (texturecoords:aiVector3D* (aref (tref-ptr mesh 8) 0))) ;; only use first 'set' of texcoords
+      (tset! xmesh 12 num_bones)
+      (tset! xmesh 13 meshbones)
       ;; precalc the total number of positions required
       ;; this is the total number of faces * the total number of
       ;; indexes per face
       (dotimes (i num_faces)        
         (set! face (pref-ptr faces i))
-        (set! positions (+ positions (tref face 0)))
+        (set! positions (+ positions (convert (tref face 0))))
         (set! indicies (tref face 1))
         (dotimes (j (tref face 0))
           (set! index (pref indicies j))
           ;; (printf "index: %d:%d\n" (+ (- positions 3) j) index)
           (if (or (< index 0) (> index num_vertices))
               (printf "Bad Index Value: %d:%d (%d:%d) %d:%d\n" index num_vertices i j (pref indicies (+ j 1)) (pref indicies (+ j 2))))))
-      (printf "...mesh:> faces:%d vertices:%d\n" num_faces positions)
-      ;; 4d position + 3d normal + 3d coord + 4d colors
+      (printf "...mesh:> faces:%d vertices:%d bones:%d\n" num_faces positions num_bones)
+      (dotimes (i num_bones)
+        (println ".....bone:>" (tref-ptr (pref bones i) 0) "ptr:" (cast (pref bones i) i8*)))
+      ;; 1d id + 4d position + 3d normal + 3d coord + 4d colors + (num_bones * ids) + (num_bones * weights)
+      ;; where ids are i32 and everything else is a float
       (let ((vbod:float* (halloc (* positions vbostride))))
-        (set! vbodata vbod)) ;; (cast (malloc (i32toi64 (* positions vbostride 4))) float*))
+        ;;(memset (cast vbod i8*) 0 (* positions vbostride 4))
+        (set! vbodata vbod))
       (dotimes (i num_faces)
         (set! face (pref-ptr faces i))
         (set! num_indicies (tref face 0))
         (if (<> num_indicies 3)
-            (printf "ERROR: all faces should be triangulated!!!!\n"))
+            (printf "ERROR: all faces must be triangulated!!!!\n"))
         (set! indicies (tref face 1))
         (dotimes (j num_indicies)
           (set! position_cnt (+ position_cnt 1))
-          ;; (set! index position_cnt) ;;(pref indicies j))
           (set! index (pref indicies j))
+          ;; set index (as i32)
+          (pset! (cast (pref-ptr vbodata (+ 0 (* position_cnt vbostride))) i32*) 0 index)
           ;; (printf "index %d:%d:%d:%d:%p:%p:%p\n" j num_indicies index position_cnt face indicies faces)
           (if (or (< index 0) (> index num_vertices))
-              (printf "...Bad Index Value: %d:%d  (%d:%d)  %d:%d\n" index num_vertices i j
-                      (pref indicies (+ j 1)) (pref indicies (+ j 2))))
-          (pfill! (pref-ptr vbodata (* position_cnt vbostride))
+              (printf "...Bad Index Value: %d:%d\n" index num_vertices))
+          (pfill! (pref-ptr vbodata (+ 2 (* position_cnt vbostride)))
                   (tref (pref-ptr vertices index) 0) ;; x
                   (tref (pref-ptr vertices index) 1) ;; y
                   (tref (pref-ptr vertices index) 2) ;; z
                   1.0 ;; we are a position (i.e. w==1)
                   )
           (if (null? normals)
-              (pfill! (pref-ptr vbodata (+ 4 (* position_cnt vbostride))) ;; offset 4
+              (pfill! (pref-ptr vbodata (+ 6 (* position_cnt vbostride))) ;; offset 4
                       0.0 1.0 0.0) ;; normal pointing up Y
-              (pfill! (pref-ptr vbodata (+ 4 (* position_cnt vbostride))) ;; offset 4
+              (pfill! (pref-ptr vbodata (+ 6 (* position_cnt vbostride))) ;; offset 4
                       (tref (pref-ptr normals index) 0) ;; x
                       (tref (pref-ptr normals index) 1) ;; y
                       (tref (pref-ptr normals index) 2) ;; z
                       ))
           (if (null? texturecoords)
-              (pfill! (pref-ptr vbodata (+ 7 (* position_cnt vbostride))) ;; offset 4+3
+              (pfill! (pref-ptr vbodata (+ 9 (* position_cnt vbostride))) ;; offset 4+3
                       0.0 1.0 0.0) ;; normal pointing up Y
-              (pfill! (pref-ptr vbodata (+ 7 (* position_cnt vbostride)))
+              (pfill! (pref-ptr vbodata (+ 9 (* position_cnt vbostride)))
                       (tref (pref-ptr texturecoords index) 0) ;; x
                       (tref (pref-ptr texturecoords index) 1) ;; y
                       0.0 ;;(tref (pref-ptr texturecoords index) 2) ;; z
                       ))
           (if (null? colors) ;; if colors is null make vertex color red
-              (pfill! (pref-ptr vbodata (+ 10 (* position_cnt vbostride))) ;; offset 4+3+3
+              (pfill! (pref-ptr vbodata (+ 12 (* position_cnt vbostride))) ;; offset 4+3+3
                       1.0 0.0 0.0 1.0)
-              (pfill! (pref-ptr vbodata (+ 10 (* position_cnt vbostride))) ;; offset 4+3+3
+              (pfill! (pref-ptr vbodata (+ 12 (* position_cnt vbostride))) ;; offset 4+3+3
                       (tref (pref-ptr colors index) 0) ;; r
                       (tref (pref-ptr colors index) 1) ;; g
                       (tref (pref-ptr colors index) 2) ;; b
                       (tref (pref-ptr colors index) 3) ;; a
                       ))))
       (if (<> (+ 1 position_cnt) positions)
-          (printf "Error: positions:%d <> position_cnt:%d" positions (+ position_cnt 1)))
-      (pset! modes 0 GL_TRIANGLES) ;;  face_mode)
+          (printf "Error: positions:%ld <> position_cnt:%ld" positions (+ position_cnt 1)))
+      (pset! modes 0 GL_TRIANGLES) ;;  face_mode)      
+      ;; do bones!
+      (dotimes (i num_bones)
+        ;; do bones!
+        (let ((bone:aiBone* (pref bones i))
+              (xbone:XTMBone* (pref-ptr meshbones i))
+              (num_weights:i32 (tref bone 1))
+              (weights:aiVertexWeight* (tref bone 2))              
+              (weight:aiVertexWeight* null)
+              (offsetmat:aiMatrix4x4* (tref-ptr bone 3))
+              (xoffsetmat:float* (halloc 16))
+              (vidx:i32 0)
+              (vid:i32 0)
+              (looking:i1 #t)
+              (vertdat:float* null)
+              (boneidx:i32* null)
+              (boneweight:float* null)
+              (vertbones:i32 0)
+              (vweight:float 0.0)
+              (transform (pref bone 3)))
+          (memcpy (cast offsetmat i8*) (cast offsetmat i8*) (* 16 4))
+          (tfill! xbone (toString (tref-ptr bone 0)) i null xoffsetmat 0 null)
+          (dotimes (k positions)
+            (set! vertdat (pref-ptr vbodata (* k vbostride)))
+            (set! vertbones (pref (cast vertdat i32*) 1))
+            (set! vid (pref (cast vertdat i32*) 0))
+            (if (> vertbones 3)
+                (begin ;; keep overwriting last bone if more than 4!
+                  (set! boneidx (pref-ptr (cast vertdat i32*) (+ 16 3)))
+                  (set! boneweight (pref-ptr vertdat (+ 16 4 3))))
+                (begin
+                  (set! boneidx (pref-ptr (cast vertdat i32*) (+ 16 vertbones)))
+                  (set! boneweight (pref-ptr vertdat (+ 16 4 vertbones)))))
+            (set! looking #t)
+            (set! j 0)
+            (while (and looking (< j num_weights))
+              (set! weight (pref-ptr weights j))
+              (set! vidx (tref weight 0))
+              (set! vweight (tref weight 1))
+              (if (= vidx vid)
+                  (begin (pset! boneidx 0 i)
+                         (pset! boneweight 0 vweight)
+                         (set! looking #f)
+                         (set! vertbones (+ vertbones 1))
+                         (pset! (cast vertdat i32*) 1 vertbones)
+                         ))
+              (if (> vertbones max_active_bones)
+                  (set! max_active_bones vertbones))
+              (set! j (+ j 1))))))
+      (if (> max_active_bones 4)
+          (println "Warning! More than 4 active bones in mesh!"))
+      (println "MAX ACTIVE BONES:" max_active_bones)
+      (tset! xmesh 14 max_active_bones)
+      ;; bone sanity check
+      (dotimes (k positions)
+        (set! tmp 0.0)
+        (set! dat (pref-ptr vbodata (+ 16 (i32toi64 num_bones) (* k vbostride))))
+        (set! idat (cast (pref-ptr vbodata (* k vbostride)) i32*))
+        (dotimes (i num_bones)
+          (set! tmp (+ tmp (pref dat i))))
+        ;; (println "vertidx:" k "vid:" (pref idat 0) "bones:" (pref idat 1) "total-weight:" tmp))        
+        (if (and (> tmp 0.01)
+                 (< tmp 0.95))
+            (println "Error weight for vert:" k "bones:" (pref idat 1) "total:" tmp)
+            void))
       ;; return vbo
-      (let ((vbo (VBO_create_float_usage vbodata (convert (* positions vbostride)) GL_STATIC_DRAW)))
+      (let ((vbo (VBO vbodata (* positions vbostride) GL_STATIC_DRAW positions vbostride)))
+        (set_attribute vao vbo 0 4 vbostride 2)
+        (set_attribute vao vbo 1 3 vbostride 6)
+        (set_attribute vao vbo 2 3 vbostride 9)
+        (set_attribute vao vbo 3 4 vbostride 12)
+        ;;; santiy check for num of bones
+        (dotimes (k positions)
+          (println "pos:" k "bones:" (pref (cast (pref-ptr vbodata (* k vbostride)) i32*) 1)))
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        (if (> num_bones 0)
+            (begin
+              (set_attribute vao vbo 4 4 vbostride 16) ;; bone ids
+              (set_attribute vao vbo 5 4 vbostride (+ 16 num_bones)))) ;; bone weights
+        (gl_print_error "error before setting GL_INT active")
+        (set_attribute vao vbo 6 1 vbostride 1)  ;; active bones
+        (gl_print_error "error IN setting GL_INT active")
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
 
 (bind-func ai_build_mesh
-  (lambda (scene:aiScene* mesh:aiMesh* aimesh:xtm_mesh* dir:i8*)
+  (lambda (scene:aiScene* mesh:aiMesh* xmesh:XTMMesh* dir:i8*)
     ;; (printf "\tBuild Mesh\n")
     (let ((facemode:i32* (salloc)) 
           (vbo:VBO* null)
+          (vao:VAO* (VAO))
           (color:aiColor4D* (salloc))
           (val:float* (salloc))
           (diffuse:float* (halloc 4))
@@ -340,11 +469,12 @@
           (emissive:float* (halloc 4))
           (material_index (tref mesh 13))
           (material (pref (tref scene 5) material_index))
-          (texid 0)
+          ;; (texid 0)
+          (text:Texture* null)
           (texfile:aiString* (salloc))          
           (name:aiString* (tref-ptr mesh 14)))
-      (set! vbo (ai_build_mesh_vbo mesh facemode))
-      (tset! aimesh 0 vbo)
+      (set! vbo (ai_build_mesh_vbo vao mesh xmesh facemode))
+      (tset! xmesh 0 vbo)
       (if (= (aiGetMaterialTexture material 1 0 texfile null null null null null null) 0)
           (let ((s1 (cast (tref-ptr texfile 1) i8*))
                 (lgth (+ (strlen dir) (tref texfile 0) 1))
@@ -358,53 +488,72 @@
                       (texdata (cast (tref texture 3) i8*))
                       (datasize (if (= texheight 0) texwidth (* 4 texwidth texheight))))
                   ;;(printf "tidx:%d of num:%d w:%d h:%d size:%d\n" texidx (tref scene 8) texwidth texheight datasize)
-                  (set! texid (ai_load_ogl_texture_from_buffer texdata datasize 0)))
+                  (set! text (Texture texwidth texheight 4 texdata))
+                  (println text)
+                  ;; (set! texid (ai_load_ogl_texture_from_buffer texdata datasize 0))
+                  void)
                 (begin 
                   (memset s2 0 lgth)
                   (memcpy s2 dir (strlen dir))
                   (memcpy (pref-ptr s2 (strlen dir)) s1 (tref texfile 0))
-                  (set! texid (ai_load_ogl_texture s2 0))))))
-      (tset! aimesh 1 texid)
+                  (println 'load-texture-from-file: (Str s2))
+                  (set! text (Texture (Str s2)))
+                  (println text)
+                  ;; (set! texid (ai_load_ogl_texture s2 0))
+                  void))))
+      (tset! xmesh 1 text)
       (if (= (aiGetMaterialColor material "$clr.diffuse" 0 0 color) 0)
           (ai_color4_to_float4 color diffuse))
-      (tset! aimesh 2 diffuse)
+      (tset! xmesh 2 diffuse)
       (if (= (aiGetMaterialColor material "$clr.ambient" 0 0 color) 0)          
           (ai_color4_to_float4 color ambient))
-      (tset! aimesh 3 ambient)      
+      (tset! xmesh 3 ambient)      
       (if (= (aiGetMaterialColor material "$clr.specular" 0 0 color) 0)
           (ai_color4_to_float4 color specular))
-      (tset! aimesh 4 specular)            
+      (tset! xmesh 4 specular)            
       (if (= (aiGetMaterialColor material "$clr.emissive" 0 0 color) 0)
           (ai_color4_to_float4 color emissive))
-      (tset! aimesh 5 emissive)
+      (tset! xmesh 5 emissive)
       (if (= (aiGetMaterialFloat material "$mat.shininess" 0 0 val) 0)
-          (begin (tset! aimesh 6 (pref val 0)) 1)
-          (begin (tset! aimesh 6 0.0) 1))
+          (begin (tset! xmesh 6 (pref val 0)) 1)
+          (begin (tset! xmesh 6 0.0) 1))
       (if (= (aiGetMaterialFloat material "$mat.opacity" 0 0 val) 0)
-          (begin (tset! aimesh 7 (pref val 0)) 1)
-          (begin (tset! aimesh 7 0.0) 1))
-      (tset! aimesh 8 (pref facemode 0))
+          (begin (tset! xmesh 7 (pref val 0)) 1)
+          (begin (tset! xmesh 7 0.0) 1))
+      (tset! xmesh 8 (pref facemode 0))
+      (tset! xmesh 9 (elements vbo))
+      (tset! xmesh 10 vao)
+      (tset! xmesh 11 (Str (cast (tref-ptr name 1) i8*)))      
       void)))
 
-;; returns the scenes top level node as xtm_node*
+;; returns the scenes top level node as XTMModel*
 (bind-func ai_build_node
-  (lambda (scene:aiScene* node:aiNode* _node:xtm_node* parent:xtm_node* dir:i8*)
+  (lambda (scene:aiScene* node:aiNode* _node:XTMModel* parent:XTMModel* dir:i8*)
     (let ((i:i32 0)
+          (aiparent:aiNode* (tref node 2))
+          (aipn:aiString* (if (null? aiparent) null (tref-ptr aiparent 0)))
+          (pnamelgth (if (null? aipn) 0 (tref aipn 0)))
+          (pname:i8* (if (null? aipn) null (halloc (+ 1 pnamelgth))))
           (ain:aiString* (tref-ptr node 0))
           (namelgth (tref ain 0))
           (name:i8* (halloc (+ 1 namelgth)))
           (numchildren:i32 (tref node 3))
           (children:aiNode** (tref node 4))          
-          (_children:xtm_node* (halloc (+ 1 numchildren)))
+          (_children:XTMModel* (halloc (+ 1 numchildren)))
           (nummeshes:i32 (tref node 5))
           (meshes:aiMesh** (tref scene 3))          
-          (_meshes:xtm_mesh* (halloc (+ 1 nummeshes)))
+          (_meshes:XTMMesh* (halloc (+ 1 nummeshes)))
           (transmat:float* (halloc 16)))
       (memset name 0 (+ namelgth 1))
       (memcpy name (cast (tref-ptr ain 1) i8*) namelgth)
-      (printf "Node:%s\n" name)
+      (if (null? aiparent)
+          (println "Node:" (Str name) "Parent:" (Str "") "Children:" numchildren "ptr:" (cast node i8*))
+          (begin
+            (memset pname 0 (+ pnamelgth 1))
+            (memcpy pname (cast (tref-ptr aipn 1) i8*) pnamelgth)            
+            (println "Node:" (Str name) "Parent:" (Str pname) "Children:" numchildren "ptr:" (cast node i8*))))
       ;;(printf "Build node:%s:%p children(%d)  meshes(%d)\n" name _node numchildren nummeshes)
-      (tset! _node 0 name)
+      (tset! _node 0 (Str name))
       (ai_matrix4_to_float (tref-ptr node 1) transmat)
       (tset! _node 1 transmat)
       (tset! _node 2 parent)
@@ -418,13 +567,87 @@
       (tset! _node 6 _meshes)
       void)))
 
-;; returns the scenes top level node as xtm_node*
+(bind-func xtm_find_bone
+  (lambda (root:XTMModel* str:String*)
+    (let ((num_children (tref root 3))
+          (children (tref root 4))
+          (num_meshes (tref root 5))
+          (meshes (tref root 6))
+          (found:XTMBone* null)
+          (i 0) (j:i32 0))
+      (dotimes (i num_meshes)
+        (let ((mesh (pref meshes i))
+              (num_bones (tref mesh 12))
+              (bones (tref mesh 13)))
+          (dotimes (j num_bones)
+            (if (equal (tref (pref-ptr bones j) 0) str)
+                (set! found (pref-ptr bones j))))))
+      (set! i 0)
+      (while (and (null? found) (< i num_children))
+        (set! found (xtm_find_bone (pref-ptr children i) str))
+        (set! i (+ i 1)))
+      found)))
+
+(bind-func xtm_bone_add_children
+  (lambda (bone:XTMBone* node:aiNode* root:XTMModel*)
+    (let ((num_children (tref node 3))
+          (i:i32 0)
+          (children (tref node 4))
+          (xtmchildren:XTMBone** (halloc num_children)))
+      (dotimes (i num_children)
+        (pset! xtmchildren i (xtm_find_bone root (toString (tref-ptr (pref children i) 0)))))
+      void)))
+
+(bind-func ai_build_anim_channel
+  (lambda (node:aiNodeAnim* scene:aiScene* root:XTMModel*)
+    (println "...animNode:>" (tref-ptr node 0) "keyframes:" (tref node 1))
+    (let ((aires (ai_find_matching_node (tref scene 1) (tref-ptr node 0)))
+          (xtmres (xtm_find_bone root (toString (tref-ptr node 0)))))
+      (if (or (null? aires) (null? xtmres))
+          (begin (println ".....bone:> No bone found! " (tref-ptr node 0)) void)
+          (let ((aiparent (tref aires 2))
+                (parent:XTMBone* null)
+                (mat:float* (cast (tref-ptr aires 1)))
+                (newmat:float* (halloc 16)))
+            (memcpy (cast newmat i8*) (cast mat i8*) (* 4 16))
+            (tset! xtmres 2 newmat) ;; set transform matrix for xtmbone
+            (tset! xtmres 4 (tref aires 3)) ;; set num children for xtmbone
+            (xtm_bone_add_children xtmres aires root) ;; add children
+            (if (not (null? aiparent))
+                (set! parent (xtm_find_bone root (toString (tref-ptr aiparent 0)))))
+            (tset! xtmres 6 parent)
+            (println ".....bone:>" (tref-ptr aires 0) "parent:"
+                     (if (null? parent) (Str "<null>") (tref parent 0))
+                     "children:" (tref aires 3) "ptr:" (cast aires i8*))
+            void)))))
+
+(bind-func ai_build_animation
+  (lambda (scene:aiScene* root:XTMModel*)
+    (let ((numanims (convert (tref scene 6)))
+          (animations:aiAnimation** (tref scene 7))
+          (i:i64 0))
+      (dotimes (i numanims)
+        (let ((j:i32 0)
+              (animation (pref animations i))
+              (name (tref-ptr animation 0))
+              (duration:double (tref animation 1))
+              (tps:double (tref animation 2)) ;; ticks per second
+              (num_channels:i32 (tref animation 3))
+              (channels:aiNodeAnim** (tref animation 4))
+              (num_mesh_channels:i32 (tref animation 5))
+              (mesh_channels:aiMeshAnim** (tref animation 6)))
+          (println 'Animation: name 'dur: duration 'nodes: num_channels 'meshes: num_mesh_channels)
+          (dotimes (j num_channels)
+            (ai_build_anim_channel (pref channels j) scene root))
+          void)))))
+
+;; returns the scenes top level node as XTMModel*
 (bind-func ai_build_scene  
   (lambda (scene:aiScene* dir:i8*)
-    (printf "embedded textures: %d\n" (tref scene 8))
-    (let ((root:xtm_node* (halloc)))
-      ;; (printf "\nNew Scene ... %p\n" scene)
+    (printf "Embedded textures: %d\n" (tref scene 8))
+    (let ((root:XTMModel* (halloc)))
       (ai_build_node scene (tref scene 1) root null dir)
+      (ai_build_animation scene root)            
       root)))
 
 ;; where post is any post processing required
@@ -445,9 +668,9 @@
           (set! scene (aiImportFile path post))
           (set! scene (aiImportFile path (+ aiProcess_FindDegenerates aiProcess_PreTransformVertices aiProcess_OptimizeMeshes aiProcess_OptimizeGraph aiProcess_Triangulate))))
       ;;(set! scene (aiImportFile path 498379))
-      (let ((root:xtm_node*
+      (let ((root:XTMModel*
              (if (null? scene)
-                 (begin (printf "Bad Asset! %s\n" path) (cast null xtm_node*))
+                 (begin (printf "Bad Asset! %s\n" path) (cast null XTMModel*))
                  (ai_build_scene scene dir))))
         (if (not (null? scene))
             (begin ;; (printf "delete scene: %p\n" scene)
@@ -456,7 +679,7 @@
 
 (bind-func assimp_load_model
   (lambda (dir file)
-    (assimp_load_model:[xtm_node*,i8*,i8*,i32]* dir file 0)))
+    (assimp_load_model:[XTMModel*,i8*,i8*,i32]* dir file 0)))
 
 
 (bind-func ai_print_export_formats

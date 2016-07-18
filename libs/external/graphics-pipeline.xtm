@@ -1,4 +1,4 @@
-;;; graphics-pipeline.xtm -- OpenGL graphics pipeline
+;;; graphics-pipeline.xtm -- OpenGL Extempore graphics pipeline
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
@@ -16,181 +16,19 @@
 (define *xtmlib-graphics-pipeline-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/external/glcompat.xtm"))
-(impc:aot:insert-forms (sys:load "libs/external/glcompat.xtm" 'quiet))
+ (sys:load "libs/base/base.xtm")
+ (sys:load "libs/core/math.xtm")
+ (sys:load "libs/external/gl.xtm")
+ (sys:load "libs/external/stb_image.xtm")
+ (sys:load "libs/external/gl/gl-objects2.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/base/base.xtm" 'quiet)
+ (sys:load "libs/core/math.xtm" 'quiet) 
+ (sys:load "libs/external/gl.xtm" 'quiet)
+ (sys:load "libs/external/stb_image.xtm" 'quiet)
+ (sys:load "libs/external/gl/gl-objects2.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmgraphics-pipeline")
-
-;; from math.xtm, but duplicated here so we don't have to pull in the
-;; whole lib
-
-(bind-func vnormf
-  (lambda (v:float* lgth:i64 n:float*)
-    (let ((mag 0.0)
-          (i 0))
-      (dotimes (i lgth)
-        (set! mag (+ mag (* (pref v i) (pref v i)))))
-      (set! mag (sqrt mag))
-      (dotimes (i lgth)
-        (pset! n i (/ (pref v i) mag)))
-      void)))
-
-;; for 3d only SO NO LGTH
-(bind-func vcrossf
-  (let ((i 0))
-    (lambda (v1:float* v2:float* v3:float*)
-      (pfill! v3
-              (- (* (pref v1 1) (pref v2 2))
-                 (* (pref v2 1) (pref v1 2)))
-              (- (* (pref v2 0) (pref v1 2))
-                 (* (pref v1 0) (pref v2 2)))
-              (- (* (pref v1 0) (pref v2 1))
-                 (* (pref v2 0) (pref v1 1))))
-      void)))
-
-(bind-func vsubf
-  (let ((i 0))
-    (lambda (v1:float* v2:float* lgth:i64 v3:float*)
-      (dotimes (i lgth)
-        (pset! v3 i (- (pref v1 i) (pref v2 i))))
-      void)))
-
-(bind-func vsmulf
-  (lambda (s:float v1:float* lgth:i64 v2:float*)
-    (let ((i 0))
-      (dotimes (i lgth)
-        (pset! v2 i (* s (pref v1 i))))
-      void)))
-
-;; matrix transposition (floats)
-(bind-func mtransf
-  (lambda (ma:float* r1:i64 c1:i64 mb:float*)
-    (let ((i 0) (j 0))
-      (dotimes (i r1)
-        (dotimes (j c1)
-          (pset! mb (+ (* j c1) i)
-                 (pref ma (+ (* i c1) j)))))
-      mb)))
-
-;; optimized 4x4 matrix only!!!
-(bind-func mmul4f
-  (lambda (ma:float* mb:float* mc:float*)
-    (let ((row1:/4,float/* (cast (pref-ptr mb 0)))
-          (row2:/4,float/* (cast (pref-ptr mb 4)))
-          (row3:/4,float/* (cast (pref-ptr mb 8)))
-          (row4:/4,float/* (cast (pref-ptr mb 12)))
-          (out:/4,float/* (cast mc))
-          (tmp:/4,float/* null) (i 0))
-      (dotimes (i 4)
-        (set! tmp (cast (pref-ptr ma (* 4 i))))
-        (let ((a (vshuffle tmp null 0 0 0 0))
-              (b (vshuffle tmp null 1 1 1 1))
-              (c (vshuffle tmp null 2 2 2 2))
-              (d (vshuffle tmp null 3 3 3 3)))
-          (pset! out i
-                 (+ (+ (* a row1)
-                       (* b row2))
-                    (+ (* c row3)
-                       (* d row4))))))
-      mc)))
-
-;; determinant (floats)
-;; k is for sqr matrix
-(bind-func mdetrmf
-  (lambda (ma:float* k:i64)
-    (if (= k 1) (pref ma 0)
-        (let ((det:float 0.0) (s:float 1.0)
-              (c 0) (i 0) (j 0) (m 0) (n 0)
-              (mb:float* (salloc (* k k))))
-          (dotimes (c k)
-            (set! m 0) (set! n 0)
-            (dotimes (i k)
-              (dotimes (j k)
-                (pset! mb (+ (* i k) j) 0.0)
-                (if (and (<> i 0) (<> j c))
-                    (begin
-                      (pset! mb (+ (* m (- k 1)) n)
-                             (pref ma (+ (* i k) j)))
-                      (if (< n (- k 2))
-                          (set! n (+ n 1))
-                          (begin
-                            (set! n 0)
-                            (set! m (+ m 1)))))
-                    (begin 1))))
-            (set! det (+ det (* s (* (pref ma c)
-                                     (mdetrmf mb (- k 1))))))
-            (set! s (* -1.0 s)))
-          det))))
-
-;; invert matrix (floats)
-(bind-func minvf
-  (lambda (ma:float* k:i64 inv:float*)
-    (let ((mb:float* (salloc (* k k)))
-          (fac:float* (salloc (* k k)))
-          (d:float 0.0)
-          (i 0) (j 0) (m 0) (n 0) (q:i64 0) (p:i64 0))
-      (dotimes (q k)
-        (dotimes (p k)
-          (set! m 0)
-          (set! n 0)
-          (dotimes (i k)
-            (dotimes (j k)
-              (pset! mb (+ (* i k) j) 0.0)
-              (if (and (<> i q) (<> j p))
-                  (begin
-                    (pset! mb (+ (* m (- k 1)) n)
-                           (pref ma (+ (* i k) j)))
-                    (if (< n (- k 2))
-                        (set! n (+ n 1))
-                        (begin
-                          (set! n 0)
-                          (set! m (+ m 1)))))
-                  (begin 1))))
-          (pset! fac (+ (* q k) p)
-                 (* (pow (dtof -1.0) (i64tof (+ q p)))
-                    (mdetrmf mb (- k 1))))))
-
-      (dotimes (i k)
-        (dotimes (j k)
-          (pset! mb (+ (* i k) j)
-                 (pref fac (+ (* j k) i)))))
-      (set! d (mdetrmf ma k))
-      (dotimes (i k)
-        (dotimes (j k)
-          (pset! inv (+ (* i k) j)
-                 (/ (pref mb (+ (* i k) j)) d))))
-      void)))
-
-(bind-func mcopyf
-  (lambda (m1:float* row col m2:float*)
-    (memcpy (cast m2 i8*) (cast m1 i8*) (* row col 4))
-    void))
-
-;; this from gl-objects.xtm - we can remove it once graphics-pipeline
-;; can use the core profile
-
-(bind-func gl_print_error
-  (lambda (msg:i8*)
-    (let ((err (glGetError)))
-      (cond
-       ((= err GL_INVALID_ENUM)
-        (printf "%s: Invalid Enum\n" msg))
-       ((= err GL_INVALID_VALUE)
-        (printf "%s: Invalid Value\n" msg))
-       ((= err GL_INVALID_OPERATION)
-        (printf "%s: Invalid Operation\n" msg))
-       ((= err GL_OUT_OF_MEMORY)
-        (printf "%s: Out Of Memory\n" msg))
-       ((= err GL_NO_ERROR)
-        1:i32)
-       (else
-        (printf "%s\n" msg)))
-      void)))
-
-(bind-func gl_print_error
-  (lambda ()
-    (gl_print_error:[void,i8*]* "OpenGL Error")))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -214,8 +52,7 @@
               0.0 1.0 0.0 0.0
               0.0 0.0 1.0 0.0
               x   y   z   1.0)
-      ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4f mat2 mat mat3)
+      (mmmul mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -228,8 +65,7 @@
               0.0   y     0.0   0.0
               0.0   0.0   z     0.0
               0.0   0.0   0.0   1.0)
-      ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4f mat2 mat mat3)
+      (mmmul mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -243,7 +79,7 @@
           (vec1:float* (salloc 3)) ;; axis to rotate around (normalized)
           (vec2:float* (salloc 3))) ;; axis to rotate around (normalized)
       (pfill! vec1 x y z)
-      (vnormf vec1 3 vec2)
+      (vnormalise vec1 3 vec2)
       (set! x (pref vec2 0))
       (set! y (pref vec2 1))
       (set! z (pref vec2 2))
@@ -252,8 +88,7 @@
               (+ (* y x c-1) (* z s)) (+ (* y y c-1) c) (- (* y z c-1) (* x s)) 0.0
               (- (* x z c-1) (* y s)) (+ (* y z c-1) (* x s)) (+ (* z z c-1) c) 0.0
               0.0               0.0                     0.0                     1.0)
-      ;;(mmulf mat2 4 4 mat 4 4 mat3)
-      (mmul4f mat2 mat mat3)
+      (mmmul mat2 mat mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -302,8 +137,8 @@
 (bind-func fill_direction_vector
   (lambda (v1:float* v2:float* v3:float*)
     (let ((tmp:float* (salloc 4)))
-      (vsubf v1 v2 3 tmp)
-      (vnormf tmp 3 v3)
+      (vvsub v1 v2 3 tmp)
+      (vnormalise tmp 3 v3)
       (pset! v3 3 0.0) ;; direction vectors get w = 0.0
       void)))
 
@@ -320,18 +155,18 @@
             (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
-        (vsubf vEye vTarget 3 vtmp1)
-        (vnormf vtmp1 3 vz)
-        (vnormf vUp 3 vtmp2)
-        (vcrossf vtmp2 vz vtmp1)
-        (vnormf vtmp1 3 vx)
-        (vcrossf vz vx vy)
+        (vvsub vEye vTarget 3 vtmp1)
+        (vnormalise vtmp1 3 vz)
+        (vnormalise vUp 3 vtmp2)
+        (vvcross vtmp2 vz vtmp1)
+        (vnormalise vtmp1 3 vx)
+        (vvcross vz vx vy)
         (pfill! mat
                 (pref vx 0) (pref vx 1) (pref vx 2) 0.0
                 (pref vy 0) (pref vy 1) (pref vy 2) 0.0
                 (pref vz 0) (pref vz 1) (pref vz 2) 0.0
                 (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
-        (minvf mat 4 matrix)
+        (minverse mat 4 matrix)
         void))))
 
 ;; this is similar to gl_look_at
@@ -351,18 +186,73 @@
             (mtmp1:float* (salloc 16))          
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
-        (vnormf vDir 3 vz)
-        (vnormf vUp 3 vtmp2)
-        (vcrossf vtmp2 vz vtmp1)
-        (vnormf vtmp1 3 vx)
-        (vcrossf vz vx vy)
+        (vnormalise vDir 3 vz)
+        (vnormalise vUp 3 vtmp2)
+        (vvcross vtmp2 vz vtmp1)
+        (vnormalise vtmp1 3 vx)
+        (vvcross vz vx vy)
         (pfill! mat
                 (pref vx 0) (pref vx 1) (pref vx 2) 0.0
                 (pref vy 0) (pref vy 1) (pref vy 2) 0.0
                 (pref vz 0) (pref vz 1) (pref vz 2) 0.0
                 (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
-        (minvf mat 4 matrix)
+        (minverse mat 4 matrix)
         void))))
+
+
+;; 0 vertex id
+;; 1 weight
+(bind-type XTMVertexWeight <i32,float>)
+;; 0 name
+;; 1 idx
+;; 2 transmat
+;; 3 offsetmat
+;; 4 num_children
+;; 5 children
+;; 6 parent (null if no parent)
+(bind-type XTMBone <String*,i32,float*,float*,i32,XTMBone**,XTMBone*>)
+;; 0 vbo
+;; 1 texture
+;; 2 diffuse
+;; 3 ambient
+;; 4 specular
+;; 5 emissive
+;; 6 shininess
+;; 7 opacity
+;; 8 facemode (GL_TRIANGLE, GL_QUAD etc.)
+;; 9 number of verts
+;; 10 vao
+;; 11 name
+;; 12 num bones
+;; 13 bones
+;; 14 max active bones
+(bind-type XTMMesh <VBO*,Texture*,float*,float*,float*,float*,float,float,i32,i64,VAO*,String*,i32,XTMBone*,i32>)
+;; 0 name
+;; 1 transmat
+;; 2 parent
+;; 3 num_children
+;; 4 chidren
+;; 5 num_of_meshes
+;; 6 meshes
+(bind-type XTMModel <String*,float*,XTMModel*,i32,XTMModel*,i32,XTMMesh*>)
+
+
+(bind-func set_instance_matrices
+  (lambda (model:XTMModel* vbo:VBO*)
+    (let ((i 0)
+          (num_children (tref model 3))
+          (children (tref model 4))
+          (num_meshes (tref model 5))
+          (meshes (tref model 6))
+          (mesh:XTMMesh* null)
+          (vao:VAO* null))
+      (dotimes (i num_children)
+        (set_instance_matrices (pref-ptr children i) vbo))
+      (dotimes (i num_meshes)
+        (set! mesh (pref-ptr meshes i))
+        (set! vao (tref mesh 10))
+        (set_attribute vao vbo 7 16 #t))
+      void))) ;; true for instance attrib
 
 ;; matrix should be float* 5x5
 (bind-func shader_set_grid_offsets
@@ -382,41 +272,41 @@
 
 ;; matrix should be float* 5x5
 (bind-func shader_setup_convolution_filter
-  (lambda (matrix:float* shader offset)
+  (lambda (matrix:float* shader:ShaderProgram* offset)
     (shader_set_grid_offsets matrix 1.0 1.0 offset) ;(* 2.0 (dtof (cos (* 2222.2 (i64tod (now)))))))
-    (glUniform2fv (glGetUniformLocation shader "texoffset") 25 matrix)
-    (glUniform1i (glGetUniformLocation shader "tex1") 0)))
+    (glUniform2fv (glGetUniformLocation (id shader) "texoffset") 25 matrix)
+    (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)))
 
 (bind-func shader_update_camera
-  (lambda (shader:i32 position target)
+  (lambda (shader:ShaderProgram* position target)
     (let ((direction:float* (salloc 8))
           (tmp:float* (pref-ptr direction 4)))
-      (vsubf position target 3 tmp)
-      (vnormf tmp 3 direction)
+      (vvsub position target 3 tmp)
+      (vnormalise tmp 3 direction)
       (pset! direction 3 0.0)
-      (glUniform4fv (glGetUniformLocation shader "CameraPos") 1 position)
-      (glUniform4fv (glGetUniformLocation shader "CameraDir") 1 direction)
+      (glUniform4fv (glGetUniformLocation (id shader) "CameraPos") 1 position)
+      (glUniform4fv (glGetUniformLocation (id shader) "CameraDir") 1 direction)
       void)))
 
 (bind-func shader_update_light
-  (lambda (shader:i32 position target angle power:float ambient diffuse specular)
+  (lambda (shader:ShaderProgram* position target angle power:float ambient diffuse specular)
                                         ;(vprint position 4)
                                         ;(vprint target 4)
-    (glUniform1f (glGetUniformLocation shader "ConstantAttenuation") 1.0)
-    (glUniform1f (glGetUniformLocation shader "LinearAttenuation") 0.0)
-    (glUniform1f (glGetUniformLocation shader "QuadraticAttenuation") 0.0)
-    (glUniform1f (glGetUniformLocation shader "SpotExponent") power)
-    (glUniform1f (glGetUniformLocation shader "SpotAngle") (- 1.0 (/ angle 180.0)))
-    (glUniform4fv (glGetUniformLocation shader "LightPos") 1 position)
-    (glUniform4fv (glGetUniformLocation shader "LightAmbient") 1 ambient)
-    (glUniform4fv (glGetUniformLocation shader "LightSpecular") 1 specular)
-    (glUniform4fv (glGetUniformLocation shader "LightDiffuse") 1 diffuse)
+    (glUniform1f (glGetUniformLocation (id shader) "ConstantAttenuation") 1.0)
+    (glUniform1f (glGetUniformLocation (id shader) "LinearAttenuation") 0.0)
+    (glUniform1f (glGetUniformLocation (id shader) "QuadraticAttenuation") 0.0)
+    (glUniform1f (glGetUniformLocation (id shader) "SpotExponent") power)
+    (glUniform1f (glGetUniformLocation (id shader) "SpotAngle") (- 1.0 (/ angle 180.0)))
+    (glUniform4fv (glGetUniformLocation (id shader) "LightPos") 1 position)
+    (glUniform4fv (glGetUniformLocation (id shader) "LightAmbient") 1 ambient)
+    (glUniform4fv (glGetUniformLocation (id shader) "LightSpecular") 1 specular)
+    (glUniform4fv (glGetUniformLocation (id shader) "LightDiffuse") 1 diffuse)
     (let ((direction:float* (salloc 4))
           (tmp:float* (salloc 4)))
-      (vsubf target position 3 tmp)
-      (vnormf tmp 3 direction)
+      (vvsub target position 3 tmp)
+      (vnormalise tmp 3 direction)
       (pset! direction 3 0.0)
-      (glUniform4fv (glGetUniformLocation shader "SpotDir") 1 direction))
+      (glUniform4fv (glGetUniformLocation (id shader) "SpotDir") 1 direction))
     void))
 
 (bind-func shader_update_lights
@@ -429,51 +319,51 @@
         (tmp:float* (alloc (* 10 4))))
     (dotimes (i 10)
       (pset! ca i 1.0) (pset! la i 0.0) (pset! qa i 0.0))
-    (lambda (shader:i32 numlights:i32 position target angle:float* power ambient diffuse specular)
+    (lambda (shader:ShaderProgram* numlights:i32 position target angle:float* power ambient diffuse specular)
       (dotimes (i numlights) (pset! sa i (- 1.0 (/ (pref angle i) 180.0))))
-      (glUniform1f (glGetUniformLocation shader "numlights") (i32tof numlights))
-      (glUniform1fv (glGetUniformLocation shader "ConstantAttenuation") numlights ca)
-      (glUniform1fv (glGetUniformLocation shader "LinearAttenuation") numlights la)
-      (glUniform1fv (glGetUniformLocation shader "QuadraticAttenuation") numlights qa)
-      (glUniform1fv (glGetUniformLocation shader "SpotExponent") numlights power)
-      (glUniform1fv (glGetUniformLocation shader "SpotAngle") numlights sa)
-      (glUniform4fv (glGetUniformLocation shader "LightPos") numlights position)
-      (glUniform4fv (glGetUniformLocation shader "LightAmbient") numlights ambient)
-      (glUniform4fv (glGetUniformLocation shader "LightSpecular") numlights specular)
-      (glUniform4fv (glGetUniformLocation shader "LightDiffuse") numlights diffuse)
+      (glUniform1f (glGetUniformLocation (id shader) "numlights") (i32tof numlights))
+      (glUniform1fv (glGetUniformLocation (id shader) "ConstantAttenuation") numlights ca)
+      (glUniform1fv (glGetUniformLocation (id shader) "LinearAttenuation") numlights la)
+      (glUniform1fv (glGetUniformLocation (id shader) "QuadraticAttenuation") numlights qa)
+      (glUniform1fv (glGetUniformLocation (id shader) "SpotExponent") numlights power)
+      (glUniform1fv (glGetUniformLocation (id shader) "SpotAngle") numlights sa)
+      (glUniform4fv (glGetUniformLocation (id shader) "LightPos") numlights position)
+      (glUniform4fv (glGetUniformLocation (id shader) "LightAmbient") numlights ambient)
+      (glUniform4fv (glGetUniformLocation (id shader) "LightSpecular") numlights specular)
+      (glUniform4fv (glGetUniformLocation (id shader) "LightDiffuse") numlights diffuse)
       (dotimes (i numlights)
-        (vsubf (pref-ptr target (* i 4))
+        (vvsub (pref-ptr target (* i 4))
               (pref-ptr position (* i 4))
               3
               (pref-ptr tmp (* i 4)))
-        (vnormf (pref-ptr tmp (* i 4))
+        (vnormalise (pref-ptr tmp (* i 4))
                3
                (pref-ptr dir (* i 4)))
         (pset! (pref-ptr dir (* i 4)) 3 0.0))
-      (glUniform4fv (glGetUniformLocation shader "SpotDir") numlights dir)
+      (glUniform4fv (glGetUniformLocation (id shader) "SpotDir") numlights dir)
       void)))
 
 ;; when working with OpenGL
 ;; extempore's mmul is pre mutipled (not post as in GLSL)
 ;; so the same matrix mul is post in GLSL and pre in XTM (i.e. here!)
 (bind-func shader_update_matrices
-  (lambda (id:i32 m v p)
+  (lambda (shader:ShaderProgram* m v p)
     (let ((mv (salloc 48))
           (mvp (pref-ptr mv 16))
           (mn (pref-ptr mv 32)))
       ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-      (mmul4f m v mv) ;; final mv set
-      (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
-      (minvf mn 4 mvp) ;; using mvp as a temporary
+      (mmmul m v mv) ;; final mv set
+      (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
+      (minverse mn 4 mvp) ;; using mvp as a temporary
       (mat4_to_mat3 mvp mn)  ;; final mn set
       ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-      (mmul4f mv p mvp)
-      (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
-      (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
-      (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
-      (glUniformMatrix3fv (glGetUniformLocation id "NormalMatrix") 1 GL_FALSE mn)      
-      (glUniformMatrix4fv (glGetUniformLocation id "ModelViewMatrix") 1 GL_FALSE mv)
-      (glUniformMatrix4fv (glGetUniformLocation id "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
+      (mmmul mv p mvp)
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelMatrix") 1 GL_FALSE m)
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "ViewMatrix") 1 GL_FALSE v)
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "ProjectionMatrix") 1 GL_FALSE p)
+      (glUniformMatrix3fv (glGetUniformLocation (id shader) "NormalMatrix") 1 GL_FALSE mn)      
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewMatrix") 1 GL_FALSE mv)
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
       void)))
 
 ;; when working with OpenGL
@@ -492,33 +382,33 @@
             0.0 0.5 0.0 0.5
             0.0 0.0 0.5 0.5
             0.0 0.0 0.0 1.0)   
-    (lambda (id:i32 m:float* v p:float* lv:float*) ;; lv light view
+    (lambda (shader:ShaderProgram* m:float* v p:float* lv:float*) ;; lv light view
       (let ((mlv:float* (salloc 16))
             (mlvp:float* (salloc 16))
             (mlvpb:float* (salloc 16)))
         ;;(mmul m 4 4 lv 4 4 mlv)
-        (mmul4f m lv mlv)
+        (mmmul m lv mlv)
         ;;(mmul mlv 4 4 p 4 4 mlvp)
-        (mmul4f mlv p mlvp)
+        (mmmul mlv p mlvp)
         ;;(mmul mlvp 4 4 biasmc 4 4 mlvpb)
-        (mmul4f mlvp biasmc mlvpb)
-        (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
+        (mmmul mlvp biasmc mlvpb)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
         ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-        (mmul4f m v mv) ;; final mv set
-        (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
-        (minvf mn 4 mvp) ;; using mvp as a temporary
+        (mmmul m v mv) ;; final mv set
+        (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
+        (minverse mn 4 mvp) ;; using mvp as a temporary
         (mat4_to_mat3 mvp mn)  ;; final mn set
         ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-        (mmul4f mv p mvp) ;; final mvp set
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
-        (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
-        (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
-        (glUniformMatrix3fv (glGetUniformLocation id "NormalMatrix") 1 GL_FALSE mn)      
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewMatrix") 1 GL_FALSE mv)
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
+        (mmmul mv p mvp) ;; final mvp set
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelMatrix") 1 GL_FALSE m)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ViewMatrix") 1 GL_FALSE v)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ProjectionMatrix") 1 GL_FALSE p)
+        (glUniformMatrix3fv (glGetUniformLocation (id shader) "NormalMatrix") 1 GL_FALSE mn)      
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewMatrix") 1 GL_FALSE mv)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
         void))))
 
 ;; when working with OpenGL
@@ -539,92 +429,80 @@
             0.0 0.5 0.0 0.5
             0.0 0.0 0.5 0.5
             0.0 0.0 0.0 1.0)   
-    (lambda (id:i32 m:float* v p:float* lights:i32 lv:float*) ;; lv is lights
+    (lambda (shader:ShaderProgram* m:float* v p:float* lights:i32 lv:float*) ;; lv is lights
       ;; view
       (dotimes (i lights)
         (let ((mlv:float* (salloc 16))
               (mlvp:float* (salloc 16)))
           ;; (mmul m 4 4 (pref-ptr lv (* i 16)) 4 4 mlv)
-          (mmul4f m (pref-ptr lv (* i 16)) mlv)
+          (mmmul m (pref-ptr lv (* i 16)) mlv)
           ;;(mmul mlv 4 4 p 4 4 mlvp)
-          (mmul4f mlv p mlvp)
+          (mmmul mlv p mlvp)
           ;; (mmul mlvp 4 4 biasmc 4 4 (pref-ptr mlvpb (* i 16)))))
-          (mmul4f mlvp biasmc (pref-ptr mlvpb (* i 16)))))
-      (glUniformMatrix4fv (glGetUniformLocation id "LightModelViewProjectionMatrix")
+          (mmmul mlvp biasmc (pref-ptr mlvpb (* i 16)))))
+      (glUniformMatrix4fv (glGetUniformLocation (id shader) "LightModelViewProjectionMatrix")
                           lights GL_FALSE mlvpb)
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
             (mn (pref-ptr mv 32)))
         ;;(mmul m 4 4 v 4 4 mv) ;; final mv set
-        (mmul4f m v mv) ;; final mv set
-        (mtransf mv 4 4 mn) ;; using mn as a temporary here!!
-        (minvf mn 4 mvp) ;; using mvp as a temporary
+        (mmmul m v mv) ;; final mv set
+        (mtrans mv 4 4 mn) ;; using mn as a temporary here!!
+        (minverse mn 4 mvp) ;; using mvp as a temporary
         (mat4_to_mat3 mvp mn)  ;; final mn set
         ;;(mmul mv 4 4 p 4 4 mvp) ;; final mvp set
-        (mmul4f mv p mvp) ;; final mvp set
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelMatrix") 1 GL_FALSE m)
-        (glUniformMatrix4fv (glGetUniformLocation id "ViewMatrix") 1 GL_FALSE v)
-        (glUniformMatrix4fv (glGetUniformLocation id "ProjectionMatrix") 1 GL_FALSE p)
-        (glUniformMatrix3fv (glGetUniformLocation id "NormalMatrix") 1 GL_FALSE mn)      
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewMatrix") 1 GL_FALSE mv)
-        (glUniformMatrix4fv (glGetUniformLocation id "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
+        (mmmul mv p mvp) ;; final mvp set
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelMatrix") 1 GL_FALSE m)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ViewMatrix") 1 GL_FALSE v)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ProjectionMatrix") 1 GL_FALSE p)
+        (glUniformMatrix3fv (glGetUniformLocation (id shader) "NormalMatrix") 1 GL_FALSE mn)      
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewMatrix") 1 GL_FALSE mv)
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
         void))))
 
 (bind-func shader_update_material
-  (lambda (id:i32 ambient:float* diffuse:float* specular:float* shininess:float)
-    (glUniform4fv (glGetUniformLocation id "MaterialAmbient") 1 ambient)
-    (glUniform4fv (glGetUniformLocation id "MaterialDiffuse") 1 diffuse)
-    (glUniform4fv (glGetUniformLocation id "MaterialSpecular") 1 specular)
-    (glUniform1f (glGetUniformLocation id "MaterialShininess") shininess)
+  (lambda (shader:ShaderProgram* ambient:float* diffuse:float* specular:float* shininess:float)
+    (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient)
+    (glUniform4fv (glGetUniformLocation (id shader) "MaterialDiffuse") 1 diffuse)
+    (glUniform4fv (glGetUniformLocation (id shader) "MaterialSpecular") 1 specular)
+    (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
     void))
 
-;; VBO named type taken from libs/external/gl.xtm
-
-;; id, type, size (bytes), data
-(bind-type VBO <GLuint,GLenum,GLsizeiptr,GLvoid*>)
-
-(bind-func VBO_create_float_usage
-  (lambda (buf:float* buflen usage)
-    (let ((vbo:VBO* (halloc))
-          (id:GLuint* (salloc)))
-      (glGenBuffers 1 id)
-      (gl_print_error "Error creating VBO")
-      (tfill! vbo
-              (pref id 0)
-              GL_FLOAT
-              (* buflen 4) ;; sizeof(float)
-              (cast buf GLvoid*))
-      (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
-      (glBufferData GL_ARRAY_BUFFER (tref vbo 2) (tref vbo 3) usage)
-      (gl_print_error "Error setting VBO data")
-      vbo)))
-
-;; 0 vbo
-;; 1 texid
-;; 2 diffuse
-;; 3 ambient
-;; 4 specular
-;; 5 emissive
-;; 6 shininess
-;; 7 opacity
-;; 8 facemode (GL_TRIANGLE, GL_QUAD etc.)
-(bind-type xtm_mesh <VBO*,i32,float*,float*,float*,float*,float,float,i32>)
-;; 0 name
-;; 1 transmat
-;; 2 parent
-;; 3 num_children
-;; 4 chidren
-;; 5 num_of_meshes
-;; 6 meshes
-(bind-type xtm_node <i8*,float*,xtm_node*,i32,xtm_node*,i32,xtm_mesh*>)
+(bind-func shader_update_bones
+  (let ((bonesdat:float* (alloc (* 16 4 20))) ;; 16 (4x4 array) * 20 * 4 (bytes per float)
+        (i:i32 0))
+    ;; default to id matrix
+    (dotimes (i 20) (fill_identity_matrix (pref-ptr bonesdat (* 16 i))))
+    (lambda (shader:ShaderProgram* mesh:XTMMesh*)
+      (let ((num_bones (tref mesh 12))
+            (bones (tref mesh 13))
+            (bone:XTMBone* null)
+            (mymat:float* (alloc 16))
+            (transmat:float* null))
+        (fill_identity_matrix mymat)
+        (translate_matrix mymat 2.0 2.0 2.0)
+        ;; (dotimes (i 20) (fill_identity_matrix (pref-ptr bonesdat (* 16 i))))
+        (dotimes (i num_bones)
+          (set! bone (pref-ptr bones i))
+          (set! transmat (tref bone 2))
+          (memcpy (cast mymat i8*) (cast transmat i8*) (* 16 4))
+          (if (= i -1)
+              (begin
+                (rotate_matrix mymat 50.0 0.0 1.0 0.0)
+                (memcpy (cast (pref-ptr bonesdat (* 16 i)) i8*) (cast mymat i8*) (* 16 4)))
+              (memcpy (cast (pref-ptr bonesdat (* 16 i)) i8*) (cast transmat i8*) (* 16 4))))
+        ;; update 20 bones
+        (glUniformMatrix4fv (glGetUniformLocation (id shader) "Bone") 20 GL_FALSE bonesdat)
+        (gl_print_error "Error updating bones")
+        void))))
 
 (bind-func xtm_build_mesh_vbo
-  (lambda (verts:float* num_verts:i32)
-    (let ((i:i32 0)
+  (lambda (vao:VAO* verts:float* num_verts:i64)
+    (let ((i:i64 0)
           (vert:float* null)
           (n1:float* (salloc 3))          
           (norm:float* (salloc 3))
-          (vbostride:i32 14) ;; 4d+3d+3d+4d
+          (vbostride:i64 14) ;; 4d+3d+3d+4d
           (vbodata:float* (halloc (* num_verts vbostride))))
       (dotimes (i num_verts)
         (set! vert (pref-ptr verts (* i 3)))
@@ -632,8 +510,8 @@
             (if (> i (- num_verts 2))
                 (begin (pfill! norm 0.0 1.0 0.0) 1)
                 (begin
-                  (vcrossf vert (pref-ptr vert 3) n1)
-                  (vsmulf -1.0 n1 3 norm)
+                  (vvcross vert (pref-ptr vert 3) n1)
+                  (vsmul n1 -1.0 3 norm)
                   1))
             1)
         (pfill! (pref-ptr vbodata (* i vbostride))
@@ -653,15 +531,19 @@
                 (pfill! (pref-ptr vbodata (+ 7 (* i vbostride))) 0.5 1.0 0.0)
                 (pfill! (pref-ptr vbodata (+ 7 (* i vbostride))) 1.0 0.0 0.0)))
         ;; color is green
-        (pfill! (pref-ptr vbodata (+ 10 (* i vbostride))) 0.2 1.0 0.2 1.0))
-      (let ((vbo (VBO_create_float_usage vbodata (convert (* num_verts vbostride)) GL_STATIC_DRAW)))
-        (glBindBuffer GL_ARRAY_BUFFER 0)
+        (pfill! (pref-ptr vbodata (+ 10 (* i vbostride))) 0.2 1.0 0.2 1.0))      
+      (let ((vbo (VBO vbodata (* num_verts vbostride) GL_STATIC_DRAW num_verts vbostride)))
+        ;; (glBindBuffer GL_ARRAY_BUFFER 0)                
+        (set_attribute vao vbo 0 4 vbostride 0)
+        (set_attribute vao vbo 1 3 vbostride 4)
+        (set_attribute vao vbo 2 3 vbostride 7)
+        (set_attribute vao vbo 3 4 vbostride 10)
         vbo))))
 
 (bind-func xtm_make_node
-  (lambda (name:i8* verts:float* num_verts:i32 r g b)
-    (let ((mesh:xtm_mesh* (halloc))
-          (node:xtm_node* (halloc))
+  (lambda (name:String* verts:float* num_verts:i64 r g b)
+    (let ((mesh:XTMMesh* (halloc))
+          (node:XTMModel* (halloc))
           (transmat:float* (halloc 16))
           (vbostride:i32 14) ;; 4d+3d+3d+4d
           (vbodata:float* null)
@@ -671,12 +553,14 @@
           (ambient:float* (halloc 4))
           (specular:float* (halloc 4))
           (emissive:float* (halloc 4))
-          (vbo:VBO* (xtm_build_mesh_vbo verts num_verts)))
+          (vao (VAO))
+          (vbo:VBO* (xtm_build_mesh_vbo vao verts num_verts)))
       (pfill! ambient 0.0 0.0 0.0 1.0)
       (pfill! diffuse r   g   b   1.0)
       (pfill! specular 1.0 1.0 1.0 1.0)
       (pfill! emissive 0.0 0.0 0.0 1.0)
-      (tfill! mesh vbo 0 diffuse ambient specular emissive shininess opacity GL_TRIANGLES)
+      ;; null is for no texture
+      (tfill! mesh vbo null diffuse ambient specular emissive shininess opacity GL_TRIANGLES num_verts vao name)
       (fill_identity_matrix transmat)
       (tfill! node name transmat null 0 null 1 mesh)
       node)))
@@ -866,11 +750,11 @@
                                    (pref-ptr (tref lights 1) (* light 4)) ;; target
                                    (pref-ptr (tref lights 2) (* light 4))) ;; up
                  (if (not (null? view))
-                     (mcopyf (pref-ptr (tref lights 8) (* light 16)) 4 4 view))
+                     (mcopy (pref-ptr (tref lights 8) (* light 16)) 4 4 view))
                  void)))))
 
 (bind-func xtm_update_lights
-  (lambda (shader:i32)
+  (lambda (shader:ShaderProgram*)
     (let ((lights (xtm_get_lights)))
       (shader_update_lights shader (tref lights 9)
                             (tref lights 0) (tref lights 1)
@@ -879,7 +763,7 @@
                             (tref lights 5)))))
 
 (bind-func xtm_update_matrices
-  (lambda (shader:i32 model:float* view:float* projection:float*)
+  (lambda (shader:ShaderProgram* model:float* view:float* projection:float*)
     (let ((lights (xtm_get_lights)))
       (shader_update_matrices_lvs shader model view projection (tref lights 9) (tref lights 8)))))
 
@@ -889,10 +773,12 @@
         (norm:i32 1)
         (uvw:i32 2)
         (color:i32 3))
-    (lambda (mesh:xtm_mesh* shader:i32)
-      ;; (printf "draw mesh\n")
-      (let ((vbo (tref mesh 0))
-            (texid (tref mesh 1))
+    (lambda (mesh:XTMMesh* shader:ShaderProgram* instances:i32 vbo:VBO*)
+      (gl_print_error "Error BEFORE drawing XTMMesh!")
+      ;; (println mesh)
+      (let (;; (vbo (tref mesh 0))
+            (vao (tref mesh 10))
+            (texture (tref mesh 1))
             (diffuse (tref mesh 2))
             (ambient (tref mesh 3))
             (specular (tref mesh 4))
@@ -900,50 +786,48 @@
             (facemode (tref mesh 8)))
         (set! shininess (dtof 100.0))
         (if (not (null? ambient))
-            (glUniform4fv (glGetUniformLocation shader "MaterialAmbient") 1 ambient))
+            (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient))
         (if (not (null? diffuse))
-            (glUniform4fv (glGetUniformLocation shader "MaterialDiffuse") 1 diffuse))
+            (glUniform4fv (glGetUniformLocation (id shader) "MaterialDiffuse") 1 diffuse))
         (if (not (null? specular))
-            (glUniform4fv (glGetUniformLocation shader "MaterialSpecular") 1 specular))
-        (glUniform1f (glGetUniformLocation shader "MaterialShininess") shininess)
-        ;; (printf "texid %d\n" texid)
+            (glUniform4fv (glGetUniformLocation (id shader) "MaterialSpecular") 1 specular))
+        (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
+        (glUniform1i (glGetUniformLocation (id shader) "instances") instances)
+        (if (> (tref mesh 14) 0) ;; do we have any bones in our mesh!
+            (begin
+              (shader_update_bones shader mesh)))
+        ;; (printf "texid %d\n" (id texture))
         ;; texture stuff
-        (if (> texid 0)
+        (if (> (id texture) 0)
             (begin
-              (glActiveTexture GL_TEXTURE2)
-              
-              (glBindTexture GL_TEXTURE_2D texid)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-              (glUniform1f (glGetUniformLocation shader "IsTextured") 1.0)
-              (glUniform1i (glGetUniformLocation shader "tex1") 2))
+              (bind texture #t 2)
+              (glUniform1f (glGetUniformLocation (id shader) "IsTextured") 1.0)
+              (glUniform1i (glGetUniformLocation (id shader) "tex1") 2))
             (begin
-              (glUniform1f (glGetUniformLocation shader "IsTextured") 0.0)))
-        ;; vbo stuff
-        (glBindBuffer GL_ARRAY_BUFFER (tref vbo 0))
-        (glEnableVertexAttribArray vert) ;; 56
-        (glVertexAttribPointer vert 4 GL_FLOAT GL_FALSE 56 null)
-        (glEnableVertexAttribArray norm) 
-        (glVertexAttribPointer norm 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 16))
-        (glEnableVertexAttribArray uvw) 
-        (glVertexAttribPointer uvw 3 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 28))
-        (glEnableVertexAttribArray color) 
-        (glVertexAttribPointer color 4 GL_FLOAT GL_FALSE 56 (pref-ptr (cast null i8*) 40))
-        (glDrawArrays facemode 0 (/ (convert (tref vbo 2)) 56))
-        (glDisableVertexAttribArray vert)
-        (glDisableVertexAttribArray norm)
-        (glDisableVertexAttribArray uvw)
-        (glDisableVertexAttribArray color)
-        (glBindBuffer GL_ARRAY_BUFFER 0)
+              (glUniform1f (glGetUniformLocation (id shader) "IsTextured") 0.0)))
+        (gl_print_error "Error setting uniforms! in xtm_draw_mesh")
+        ;;
+        (if (> instances 0)
+            (begin
+              (set_attribute vao vbo 7 16 #t) ;; 7 for xtmIMat
+              (gl_print_error "Error setting instance attrib in xtm_draw_mesh")              
+              (draw vao facemode 0 (convert (tref mesh 9)) instances))
+            (draw vao facemode 0 (convert (tref mesh 9))))
         ;; undo texture stuff
-        (glActiveTexture GL_TEXTURE2)
-        (glBindTexture GL_TEXTURE_2D 0)
+        (unbind texture 2)
+        ;; (glActiveTexture GL_TEXTURE2)
+        ;; (glBindTexture GL_TEXTURE_2D 0)
+        ;; (glActiveTexture GL_TEXTURE0)
+        (gl_print_error "Error drawing XTMMesh!")        
         void))))
 
-(bind-func xtm_draw_node
-  (lambda (node:xtm_node* shader:i32 model:float* view:float* projection:float*)
+(bind-func xtm_draw_mesh
+  (lambda (mesh shader)
+    (xtm_draw_mesh:[void,XTMMesh*,ShaderProgram*,i32,VBO*]* mesh shader 0 null)))
+
+(bind-func xtm_draw_model
+  (lambda (node:XTMModel* shader:ShaderProgram* model:float* view:float* projection:float* instances:i32 vbo:VBO*)
+    (gl_print_error "Error before drawing XTMModel")
     (let ((i:i32 0)
           (lights (xtm_get_lights))
           (children (tref node 4))
@@ -951,39 +835,46 @@
           (transmat:float* (tref node 1))
           (m2:float* (salloc 16))
           (m:float* (salloc 16)))
-      ;; (printf "draw node: %s\n" (tref node 0))
-      ;;(mprint transmat 4 4 1)      
-      ;;(mprintf model 4 4 1)
+      ;; (println "instances:" instances)
       (if (null? transmat)
           (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
           (begin
-            (mtransf transmat 4 4 m2)
+            (mtrans transmat 4 4 m2)
             ;;(mmul m2 4 4 model 4 4 m)
-            (mmul4f m2 model m)
+            (mmmul m2 model m)
             1))
       (xtm_update_matrices shader m view projection)
+      (gl_print_error "Error before dragon!")
       ;; first draw meshes
       (dotimes (i (tref node 5))
-        (xtm_draw_mesh (pref-ptr meshes i) shader))
+        (xtm_draw_mesh (pref-ptr meshes i) shader instances vbo))
+      (gl_print_error "Here be dragons")
       ;; then draw other children recursively
       (dotimes (i (tref node 3))
-        (xtm_draw_node (pref-ptr children i) shader model view projection))
+        (xtm_draw_model (pref-ptr children i) shader model view projection instances vbo))
+      (gl_print_error "Error drawing XTMModel!")
       void)))
 
 (bind-func xtm_draw_model
-  (lambda (scene:xtm_node* shader:i32 model view projection)
-    (xtm_draw_node scene shader model view projection)
-    void))
+  (lambda (node:XTMModel* shader:ShaderProgram* model:float* view:float* projection:float*)    
+    (xtm_draw_model:[void,XTMModel*,ShaderProgram*,float*,float*,float*,i32,VBO*]* node shader model view projection 0 null)))
+
+
+;; (bind-func xtm_draw_model
+;;   (lambda (scene:XTMModel* shader:ShaderProgram* model view projection)
+;;     (xtm_draw_model:[void,XTMModel*,ShaderProgram*,float*,float*,float*]* scene shader model view projection)
+;;     void))
 
 ;; some globalvars to hold shader program names
 (bind-val xtm_render_s1 i32 0)
 (bind-val xtm_render_s2 i32 0)
 (bind-val xtm_render_s3 i32 0)
 (bind-val xtm_render_s4 i32 0)
-(bind-val xtm_render_light_shaders |8,i32|)
-(bind-val xtm_render_simple_shader i32 0)
-(bind-val xtm_render_quad_shader i32 0)
-(bind-val xtm_render_dof_shader i32 0)
+(bind-val xtm_render_light_shaders |8,ShaderProgram*|)
+(bind-val xtm_render_simple_shader ShaderProgram*)
+(bind-val xtm_render_simple_bone_shader ShaderProgram*)
+(bind-val xtm_render_quad_shader ShaderProgram*)
+(bind-val xtm_render_dof_shader ShaderProgram*)
 (bind-val xtm_render_x i32 0)
 (bind-val xtm_render_y i32 0)
 (bind-val xtm_render_w i32 1024)
@@ -993,125 +884,123 @@
 (bind-val xtm_render_far float 100.0)
 
 ;; a couple of shader helper functions
-(bind-func print_shader_info_log
-  (lambda (obj:i32)
-    (let ((infologLength (salloc 1 i32))
-          (charsWritten (salloc 1 i32)))
-      (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
-      (if (> (pref infologLength 0) 1)
-          (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
-            (glGetShaderInfoLog obj (pref infologLength 0) charsWritten l)
-            (printf "printShaderInfoLog: %s\n" l)
-            (free l)
-            1)
-          (begin (printf "Shader Info log: OK\n") 1)))))
+;; (bind-func print_shader_info_log
+;;   (lambda (obj:i32)
+;;     (let ((infologLength (salloc 1 i32))
+;;           (charsWritten (salloc 1 i32)))
+;;       (glGetShaderiv obj GL_INFO_LOG_LENGTH infologLength)
+;;       (if (> (pref infologLength 0) 1)
+;;           (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
+;;             (glGetShaderInfoLog obj (pref infologLength 0) charsWritten l)
+;;             (printf "printShaderInfoLog: %s\n" l)
+;;             (free l)
+;;             1)
+;;           (begin (printf "Shader Info log: OK\n") 1)))))
 
-(bind-func print_program_info_log
-  (lambda (obj:i32)
-    (let ((infologLength (salloc 1 i32))
-          (charsWritten (salloc 1 i32)))
-      (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
-      (if (> (pref infologLength 0) 1)
-          (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
-            (glGetProgramInfoLog obj (pref infologLength 0) charsWritten l)
-            (printf "Program Info Log:\n %s\n" l)
-            (free l)
-            1)
-          (begin (printf "Program Info log: OK\n") 1)))))
+;; (bind-func print_program_info_log
+;;   (lambda (obj:i32)
+;;     (let ((infologLength (salloc 1 i32))
+;;           (charsWritten (salloc 1 i32)))
+;;       (glGetProgramiv obj GL_INFO_LOG_LENGTH infologLength)
+;;       (if (> (pref infologLength 0) 1)
+;;           (let ((l (bitcast (malloc (convert (pref infologLength 0))) i8*)))
+;;             (glGetProgramInfoLog obj (pref infologLength 0) charsWritten l)
+;;             (printf "Program Info Log:\n %s\n" l)
+;;             (free l)
+;;             1)
+;;           (begin (printf "Program Info log: OK\n") 1)))))
 
 ;; with default attributes for
 ;; 0 vertex 4d
 ;; 1 normals 3d
 ;; 2 coords (uvw) 3d
 ;; 3 color 4d
-(bind-func create_shader_xtm
-  (lambda (vsource:i8* fsource:i8*)
-    (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
-	  (vshader (glCreateShader GL_VERTEX_SHADER))
-	  (fcode:|1,i8*|* (salloc 1))
-	  (vcode:|1,i8*|* (salloc 1))
-	  (program (glCreateProgram))
-	  (temp:i32* (salloc 1)))
-      (aset! fcode 0 fsource)
-      (aset! vcode 0 vsource)      
-      (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
-      (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
-      (glCompileShader fshader)
-      (glCompileShader vshader)   
-      (glAttachShader program fshader)
-      (glAttachShader program vshader)
-      (glBindAttribLocation program 0 "xtmVertex")
-      (glBindAttribLocation program 1 "xtmNormal")
-      (glBindAttribLocation program 2 "xtmUVW")
-      (glBindAttribLocation program 3 "xtmColor")
-      (glLinkProgram program)
-      (print_shader_info_log fshader)
-      (print_shader_info_log vshader)
-      (print_program_info_log program)
-      program)))
+;; (bind-func create_shader_xtm
+;;   (lambda (vsource:i8* fsource:i8*)
+;;     (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
+;; 	  (vshader (glCreateShader GL_VERTEX_SHADER))
+;; 	  (fcode:|1,i8*|* (salloc 1))
+;; 	  (vcode:|1,i8*|* (salloc 1))
+;; 	  (program (glCreateProgram))
+;; 	  (temp:i32* (salloc 1)))
+;;       (aset! fcode 0 fsource)
+;;       (aset! vcode 0 vsource)      
+;;       (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
+;;       (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
+;;       (glCompileShader fshader)
+;;       (glCompileShader vshader)   
+;;       (glAttachShader program fshader)
+;;       (glAttachShader program vshader)
+;;       (glBindAttribLocation program 0 "xtmVertex")
+;;       (glBindAttribLocation program 1 "xtmNormal")
+;;       (glBindAttribLocation program 2 "xtmUVW")
+;;       (glBindAttribLocation program 3 "xtmColor")
+;;       (glLinkProgram program)
+;;       (print_shader_info_log fshader)
+;;       (print_shader_info_log vshader)
+;;       (print_program_info_log program)
+;;       program)))
 
-(bind-func xtm_render_init_light_shaders
+(bind-func xtm_render_init_light_shaders:[void,i8*,i8*,i8*,i8*,i8*,i8*,i8*,i8*,i8*,i8*,i8*,i8*]*
   (lambda (a1 a2 b1 b2 c1 c2 d1 d2 e1 e2 f1 f2)
-    (aset! xtm_render_light_shaders 0 (create_shader_xtm a1 a2))
-    (aset! xtm_render_light_shaders 1 (create_shader_xtm b1 b2))
-    (aset! xtm_render_light_shaders 2 (create_shader_xtm c1 c2))
-    (aset! xtm_render_light_shaders 3 (create_shader_xtm d1 d2))
-    (aset! xtm_render_light_shaders 4 (create_shader_xtm e1 e2))
-    (aset! xtm_render_light_shaders 5 (create_shader_xtm f1 f2))
+    (aset! xtm_render_light_shaders 0 (ShaderProgram (Str "Lights(0)") (Str a1) (Str a2)))
+    (aset! xtm_render_light_shaders 1 (ShaderProgram (Str "Lights(1)") (Str b1) (Str b2)))
+    (aset! xtm_render_light_shaders 2 (ShaderProgram (Str "Lights(2)") (Str c1) (Str c2)))
+    (aset! xtm_render_light_shaders 3 (ShaderProgram (Str "Lights(3)") (Str d1) (Str d2)))
+    (aset! xtm_render_light_shaders 4 (ShaderProgram (Str "Lights(4)") (Str e1) (Str e2)))
+    (aset! xtm_render_light_shaders 5 (ShaderProgram (Str "Lights(5)") (Str f1) (Str f2)))
     void))
 
 (bind-func xtm_render_init_simple_shader
-  (lambda (v f)
-    (set! xtm_render_simple_shader (create_shader_xtm v f))
+  (lambda (v:i8* f:i8*)
+    (set! xtm_render_simple_shader (ShaderProgram (Str "Simple-Shader") (Str v) (Str f)))
+    void))
+
+(bind-func xtm_render_init_simple_bone_shader
+  (lambda (v:i8* f:i8*)
+    (set! xtm_render_simple_bone_shader (ShaderProgram (Str "Simple-Bone-Shader") (Str v) (Str f)))
     void))
 
 (bind-func xtm_render_init_quad_shader
-  (lambda (v f)
-    (set! xtm_render_quad_shader (create_shader_xtm v f))
+  (lambda (v:i8* f:i8*)
+    (set! xtm_render_quad_shader (ShaderProgram (Str "QUAD-Shader") (Str v) (Str f)))
     void))
 
 (bind-func xtm_render_init_dof_shader
-  (lambda (v f)
-    (set! xtm_render_dof_shader (create_shader_xtm v f))
+  (lambda (v:i8* f:i8*)
+    (set! xtm_render_dof_shader (ShaderProgram (Str "DOF-Shader") (Str v) (Str f)))
     void))
 
-;; draw a quad
-;; tw and th are framebuffer width and height
-(bind-func gl_draw_shader_quad
-  (lambda (x y w h r tw th)
-    (let ((hx (* -0.5 w))
-          (hy (* -0.5 h))
-          (xx (+ x (* .5 w)))
-          (yy (+ y (* .5 h))))
-      (glPushMatrix)
-      (glTranslated xx yy 0.0)
-      (glRotated r 0.0 0.0 1.0)
-      (glBegin GL_QUADS)
-      (glTexCoord2d 0.0 0.0)
-      (glVertex2d hx hy)
-      (glTexCoord2d 0.0 th)
-      (glVertex2d hx (+ hy h))
-      (glTexCoord2d tw th)
-      (glVertex2d (+ hx w) (+ hy h))
-      (glTexCoord2d tw 0.0)
-      (glVertex2d (+ hx w) hy)
-      (glTexCoord2d 0.0 0.0)
-      (glEnd)
-      (glPopMatrix)
-      void)))
+(bind-func draw_quad
+  (let ((quad_vao:VAO* null)
+        (quad_vbo:VBO* null)
+        (data:float* (alloc 28)))
+    (pfill! data 
+            -1.0 -1.0 0. 1.   0. 0. 0.
+            -1.0  1.0 0. 1.   0. 1. 0.
+            1.0 -1.0 0. 1.   1. 0. 0.
+            1.0  1.0 0. 1.   1. 1. 0.)
+    (lambda ()
+      (if (null? quad_vao)
+          (begin
+            (set! quad_vao (VAO))
+            (set! quad_vbo (VBO data 28))
+            ;; index size stride offset
+            (set_attribute quad_vao quad_vbo 0 4 7:i32 0)
+            (set_attribute quad_vao quad_vbo 2 3 7:i32 4)
+            (gl_print_error "Error Creating DRAW QUAD vao")))
+      (draw quad_vao GL_TRIANGLE_STRIP 0 4))))
+
 
 (bind-func xtm_draw_tex
-  (lambda (shader:i32 tex:i32 m v p)
-    (glUseProgram shader)
+  (lambda (shader:ShaderProgram* tex:Texture* m v p)
+    (start shader)
     (shader_update_matrices shader m v p)
-    ;; setup shadowmap texture from FBO
-    (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
-    (glBindTexture GL_TEXTURE_2D tex)
-    (glUniform1i (glGetUniformLocation shader "tex1") 0)
-    ;; (glViewport x y w h)
-    (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)
-    (glBindTexture GL_TEXTURE_2D 0)
-    (glUseProgram 0)
+    (bind tex #f 0)
+    (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)
+    (draw_quad) 
+    (unbind tex)
+    (stop shader)
     void))
 
 ;; FBO named type taken from libs/external/gl.xtm
@@ -1123,156 +1012,271 @@
 ;; depth buffer id 2
 ;; width           3
 ;; height          4
-(bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
+;; (bind-type FBO <GLuint,GLuint,GLuint,GLsizei,GLsizei>)
 
 ;; creates an empty texture
 ;; suitable to back an FBO
-(bind-func FBO_create_texture
-  (lambda (width height)
-    (let ((id:i32* (salloc))
-          (tex:i32* (salloc)))
-      (glGenRenderbuffers 1 id)
-      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
-      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
-      (glGenTextures 1 tex)
-      (glBindTexture GL_TEXTURE_2D (pref tex 0))
-      (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-      (glBindTexture GL_TEXTURE_2D 0)
-      (pref tex 0))))
+;; (bind-func FBO_create_texture
+;;   (lambda (width height)
+;;     (let ((id:i32* (salloc))
+;;           (tex:i32* (salloc)))
+;;       (glGenRenderbuffers 1 id)
+;;       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+;;       (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
+;;       (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER (pref id 0))
+;;       (glGenTextures 1 tex)
+;;       (glBindTexture GL_TEXTURE_2D (pref tex 0))
+;;       (glTexImage2D GL_TEXTURE_2D 0 GL_RGBA8 width height 0 GL_RGBA GL_UNSIGNED_BYTE null)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+;;       (glBindTexture GL_TEXTURE_2D 0)
+;;       (pref tex 0))))
 
 ;; create fbo depth buffer
-(bind-func FBO_create_depth_buffer
-  (lambda (width height)
-    (let ((id:i32* (salloc))
-          (tex:i32* (salloc)))
-      (glGenRenderbuffers 1 id)
-      (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
-      (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
-      ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
-      (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
-      (glGenTextures 1 tex)
-      (glBindTexture GL_TEXTURE_2D (pref tex 0))
-      (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
-      ;; (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-      (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-      (glBindTexture GL_TEXTURE_2D 0)
-      (pref tex 0))))
+;; (bind-func FBO_create_depth_buffer
+;;   (lambda (width height)
+;;     (let ((id:i32* (salloc))
+;;           (tex:i32* (salloc)))
+;;       (glGenRenderbuffers 1 id)
+;;       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
+;;       (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
+;;       ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT24 width height)
+;;       (glFramebufferRenderbuffer GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER (pref id 0))
+;;       (glGenTextures 1 tex)
+;;       (glBindTexture GL_TEXTURE_2D (pref tex 0))
+;;       (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT32 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+;;       ;; (glTexImage2D GL_TEXTURE_2D 0 GL_DEPTH_COMPONENT24 width height 0 GL_DEPTH_COMPONENT GL_FLOAT null)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+;;       (glBindTexture GL_TEXTURE_2D 0)
+;;       (pref tex 0))))
 
 ;; create and return a frame buffer struct (FBO)
 ;; if _texid is greater than 0 then use existing _texid
-(bind-func FBO_create
-  (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
-    (let ((texid:i32 0) 
-          (depthid:i32 0) 
-          (fboid:i32* (salloc))
-          (fbo:FBO* (halloc))) ;; heap alloc
-      (glGenFramebuffers 1 fboid)
-      ;; bind the fbo
-      (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
-      (if (> _texid 0) (set! texid _texid))
-      (if (> _depthid 0) (set! texid _depthid))
-      (set! texid (FBO_create_texture width height))
-      (set! depthid (FBO_create_depth_buffer width height))
-      ;; Attach the texture texid to the color buffer of our fbo
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
-      ;; Attach the texture depthid to the depth buffer of our fbo
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depthid 0)
-      (tfill! fbo (pref fboid 0) texid depthid width height)
-      (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
-            (err:i32 (glGetError)))
-        (if (<> status GL_FRAMEBUFFER_COMPLETE)
-            (if (<> err GL_NO_ERROR)
-                (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
-                       (set! fbo (cast null FBO*))
-                       1)
-                (begin
-                  (printf "Possible framebuf error?: %d\n" err)
-                  1))))
-      (glClearColor 0.0 1.0 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
-      ;; unbind the frame buffer
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      ;; return the extfbo struct
-      fbo)))
+;; (bind-func FBO_create
+;;   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
+;;     (let ((texid:i32 0) 
+;;           (depthid:i32 0) 
+;;           (fboid:i32* (salloc))
+;;           (fbo:FBO* (halloc))) ;; heap alloc
+;;       (glGenFramebuffers 1 fboid)
+;;       ;; bind the fbo
+;;       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
+;;       (if (> _texid 0) (set! texid _texid))
+;;       (if (> _depthid 0) (set! texid _depthid))
+;;       (set! texid (FBO_create_texture width height))
+;;       (set! depthid (FBO_create_depth_buffer width height))
+;;       ;; Attach the texture texid to the color buffer of our fbo
+;;       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
+;;       ;; Attach the texture depthid to the depth buffer of our fbo
+;;       (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D depthid 0)
+;;       (tfill! fbo (pref fboid 0) texid depthid width height)
+;;       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
+;;             (err:i32 (glGetError)))
+;;         (if (<> status GL_FRAMEBUFFER_COMPLETE)
+;;             (if (<> err GL_NO_ERROR)
+;;                 (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
+;;                        (set! fbo (cast null FBO*))
+;;                        1)
+;;                 (begin
+;;                   (printf "Possible framebuf error?: %d\n" err)
+;;                   1))))
+;;       (glClearColor 0.0 1.0 0.0 1.0)
+;;       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+;;       ;; unbind the frame buffer
+;;       (glBindFramebuffer GL_FRAMEBUFFER 0)
+;;       ;; return the extfbo struct
+;;       fbo)))
 
 ;; fp represents the focal point
 ;; as a distance from the current camera location (in meters)
 ;;
 ;; dof is the depth of field 1.1 is very shallow 1.5 is quite deep
 ;;
+;; (bind-func xtm_dof_fx
+;;   (let ((show_depth:i32 1)
+;;         (near 0.1)
+;;         (far 5.0)
+;;         (dof 1.01)
+;;         (blur 2.0))
+;;     (lambda (fbo:FBO* fp model view projection)
+;;       (let ((shader xtm_render_dof_shader)
+;;             (framebufsize:float* (alloc 2)))
+;;         (set! fp 4.0) ;(+ 10.0:f (* 10.0 (cos (* 0.00001 (i64tof (now)))))))
+;;         (glDisable GL_DEPTH_TEST)
+;;         (start shader)
+;;         ;; (glUseProgram (id shader))
+;;         (shader_update_matrices shader model view projection)
+;;         ;; (bind fbo)
+;;         ;; (bind (depth_tex fbo) #t 0)
+;;         ;; (glActiveTexture GL_TEXTURE0)        
+;;         ;; (glBindTexture GL_TEXTURE_2D (id (tref fbo 2)))
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+;;         ;; (glActiveTexture GL_TEXTURE2)
+;;         ;; (glBindTexture GL_TEXTURE_2D (id (tref fbo 1)))
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
+;;         ;; (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
+        
+;;         (bind (depth_tex fbo) #f 0)        
+;;         (glUniform1i (glGetUniformLocation (id shader) "dBuf") 0)
+;;         (bind (colour_tex fbo) #f 2)        
+;;         (glUniform1i (glGetUniformLocation (id shader) "cBuf") 2)
+        
+;;         (glUniform1f (glGetUniformLocation (id shader) "blur") blur)
+;;         (glUniform1f (glGetUniformLocation (id shader) "dof") dof)
+;;         ;; ;; (println xtm_render_near xtm_render_far)
+;;         (if (> near -0.01)
+;;             (glUniform1f (glGetUniformLocation (id shader) "near") near)
+;;             (glUniform1f (glGetUniformLocation (id shader) "near") xtm_render_near))
+;;         (if (> far 0.0)
+;;             (glUniform1f (glGetUniformLocation (id shader) "far") far)
+;;             (glUniform1f (glGetUniformLocation (id shader) "far") xtm_render_far))
+;;         (set! fp (/ fp (if (> far 0.0) far xtm_render_far)))
+;;         (glUniform1f (glGetUniformLocation (id shader) "fp") fp)        
+;;         (pfill! framebufsize (i32tof xtm_render_w) (i32tof xtm_render_h))
+;;         (glUniform2fv (glGetUniformLocation (id shader) "frameBufSize") 1 framebufsize)
+;;         (glUniform1i (glGetUniformLocation (id shader) "show_depth") show_depth)        
+;;         (draw_quad) ;; 0.0 0.0 1.0 1.0 0.0 1.0 1.0)        
+;;         ;; (glActiveTexture GL_TEXTURE0) 
+;;         ;; (glBindTexture GL_TEXTURE_2D 0)
+;;         ;; (glActiveTexture GL_TEXTURE2) 
+;;         ;; (glBindTexture GL_TEXTURE_2D 0)
+;;         ;;(unbind fbo)
+;;         (unbind (colour_tex fbo) 0)
+;;         (unbind (depth_tex fbo) 2)
+;;         (stop shader)
+;;         void))))
+
+;;;;;;;;;;;;;
+;;
+;;  DOF
+;;
+;;;;;;;;;;;;;
+
+(bind-val XTM_DOF_ON i1 #f)
+(bind-val XTM_DOF_DEBUG i1 #f)
+(bind-val XTM_DOF_AUTOFOCUS i1 #f)
+(bind-val XTM_DOF_DISTANCE float 0.0)
+(bind-val XTM_DOF_X float 0.5)
+(bind-val XTM_DOF_Y float 0.5)
+(bind-val XTM_DOF_FSTOP float 4.0)
+(bind-val XTM_DOF_FLENGTH float 50.0)
+
+(bind-func xtm_dof
+  (lambda (distance fstop flength debug)
+    (set! XTM_DOF_ON 1)
+    (set! XTM_DOF_DEBUG debug)
+    (set! XTM_DOF_AUTOFOCUS #f)
+    (set! XTM_DOF_DISTANCE distance)
+    (set! XTM_DOF_FSTOP fstop)
+    (set! XTM_DOF_FLENGTH flength)
+    void))
+
+(bind-func xtm_dof
+  (lambda (x y fstop flength debug)
+    (set! XTM_DOF_ON 1)
+    (set! XTM_DOF_DEBUG debug)
+    (set! XTM_DOF_AUTOFOCUS #t)    
+    (set! XTM_DOF_X x)
+    (set! XTM_DOF_X y)    
+    (set! XTM_DOF_FSTOP fstop)
+    (set! XTM_DOF_FLENGTH flength)
+    void))
+
+(bind-func xtm_dof
+  (lambda (distance fstop flength)
+    (xtm_dof:[void,float,float,float,i1]* distance fstop flength #f)))
+
+(bind-func xtm_dof
+  (lambda (x y fstop flength)
+    (xtm_dof:[void,float,float,float,float,i1]* x y fstop flength #f)))
+
+(bind-func xtm_dof
+  (lambda (distance)
+    (xtm_dof:[void,float,float,float,i1]* distance 4.0 80.0 #f)))
+
+(bind-func xtm_dof
+  (lambda (x y)
+    (xtm_dof:[void,float,float,float,float,i1]* x y 4.0 80.0 #f)))
+
+
+;; focal depth (i.e. focal point) in meters
+;; focal length in mm
+;; fstop (camera)
+;; show_focus draws orange colour at focus depth
 (bind-func xtm_dof_fx
-  (let ((show_depth 0)
-        (near 0.0)
-        (far 0.0)
-        (dof 1.4)
-        (blur 2.0))
-    (lambda (fbo:FBO* fp model view projection)
-      (let ((shader (xtm_render_dof_shader))
-            (framebufsize:float* (alloc 2)))
-        (glDisable GL_DEPTH_TEST)                        
-        (glUseProgram xtm_render_dof_shader)
-        (shader_update_matrices xtm_render_dof_shader model view projection)
-        (glActiveTexture GL_TEXTURE0)            
-        (glBindTexture GL_TEXTURE_2D (tref fbo 2))
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-        (glActiveTexture GL_TEXTURE2)
-        (glBindTexture GL_TEXTURE_2D (tref fbo 1))
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
-        (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
-        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "dBuf") 0)
-        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "cBuf") 2)
-        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "blur") blur)
-        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "dof") dof)
-        (if (> near -0.01)
-            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "near") near)
-            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "near") xtm_render_near))            
-        (if (> far 0.0)
-            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "far") far)
-            (glUniform1f (glGetUniformLocation xtm_render_dof_shader "far") xtm_render_far))
-        (set! fp (/ fp far))
-        (glUniform1f (glGetUniformLocation xtm_render_dof_shader "fp") fp)        
-        (pfill! framebufsize (i32tof xtm_render_w) (i32tof xtm_render_h))
-        (glUniform2fv (glGetUniformLocation xtm_render_dof_shader "frameBufSize") 1 framebufsize)
-        (glUniform1i (glGetUniformLocation xtm_render_dof_shader "show_depth") show_depth)        
-        (gl_draw_shader_quad 0.0 0.0 1.0 1.0 0.0 1.0 1.0)        
-        (glActiveTexture GL_TEXTURE0) 
-        (glBindTexture GL_TEXTURE_2D 0)
-        (glActiveTexture GL_TEXTURE2) 
-        (glBindTexture GL_TEXTURE_2D 0)
-        (glUseProgram 0)
-        void))))      
+  (lambda (fbo:FBO* autofocus focusx focusy fdepth flength fstop show_focus model view projection)
+    (let ((shader xtm_render_dof_shader)
+          (focuspt:float* (salloc 2)))
+      (glDisable GL_DEPTH_TEST)
+      (start shader)
+      (shader_update_matrices shader model view projection)
+      (bind (depth_tex fbo) #f 0)        
+      (glUniform1i (glGetUniformLocation (id shader) "bgl_DepthTexture") 0)
+      (bind (colour_tex fbo) #f 2)        
+      (glUniform1i (glGetUniformLocation (id shader) "bgl_RenderedTexture") 2)
+      (glUniform1f (glGetUniformLocation (id shader) "znear") xtm_render_near)
+      (glUniform1f (glGetUniformLocation (id shader) "zfar") xtm_render_far)
+      (glUniform1f (glGetUniformLocation (id shader) "focalDepth") fdepth)
+      (glUniform1f (glGetUniformLocation (id shader) "focalLength") flength)
+      (glUniform1f (glGetUniformLocation (id shader) "fstop") fstop)
+      (glUniform1i (glGetUniformLocation (id shader) "showFocus") show_focus)
+      (glUniform1i (glGetUniformLocation (id shader) "autofocus") autofocus)
+      (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureWidth") (i32tof xtm_render_w))
+      (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureHeight") (i32tof xtm_render_h))
+      (pfill! focuspt focusx focusy)
+      (glUniform2fv (glGetUniformLocation (id shader) "focus") 1 focuspt)
+      (draw_quad)
+      (unbind (colour_tex fbo) 0)
+      (unbind (depth_tex fbo) 2)
+      (stop shader)
+      void)))
+
+(bind-func xtm_dof_fx
+  (lambda (fbo:FBO* fdepth flength fstop model view projection)
+    (xtm_dof_fx:[void,FBO*,i32,float,float,float,float,float,i32,float*,float*,float*]* fbo 0 0.5 0.5 fdepth flength fstop 0 model view projection)))
+
+(bind-func xtm_dof_fx
+  (lambda (fbo:FBO* x y flength fstop model view projection)
+    (xtm_dof_fx:[void,FBO*,i32,float,float,float,float,float,i32,float*,float*,float*]* fbo 1 x y 0.0 flength fstop 0 model view projection)))
+
+(bind-func xtm_dof_fx
+  (lambda (fbo:FBO* fdepth flength fstop show_depth model view projection)
+    (xtm_dof_fx:[void,FBO*,i32,float,float,float,float,float,i32,float*,float*,float*]* fbo 0 0.5 0.5 fdepth flength fstop show_depth model view projection)))
+
+(bind-func xtm_dof_fx
+  (lambda (fbo:FBO* x y flength fstop show_depth model view projection)
+    (xtm_dof_fx:[void,FBO*,i32,float,float,float,float,float,i32,float*,float*,float*]* fbo 1 x y 0.0 flength fstop show_depth model view projection)))
 
 (bind-func xtm_render_fbo
   (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (FBO_create xtm_render_w xtm_render_h 0 0)))
+      (if (null? fbo) (set! fbo (FBO xtm_render_w xtm_render_h #t)))
       fbo)))
 
-(bind-func xtm_shader_fbo
+(bind-func xtm_shadow_fbo
   (let ((fbo:FBO* null))
     (lambda ()
-      (if (null? fbo) (set! fbo (FBO_create (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) 0 0)))
+      (if (null? fbo) (set! fbo (FBO (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) #t)))
       fbo)))
 
 (bind-func xtm_render_setup_a
   (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8* s4v:i8* s4f:i8*)
     (set! xtm_render_w w)
     (set! xtm_render_h h)
-    (xtm_shader_fbo)        
-    (xtm_render_fbo)        
+    (xtm_shadow_fbo)
+    (gl_print_error "error setting-up xtm_shadow_fbo")
+    (xtm_render_fbo)
+    (gl_print_error "error setting-up xtm_render_fbo")
     ;; (set! xtm_render_s1 (create_shader_xtm s1v s1f))
     ;; (set! xtm_render_s2 (create_shader_xtm s2v s2f))
     ;; (set! xtm_render_s3 (create_shader_xtm s2v s2f_nl))
@@ -1281,10 +1285,10 @@
     void))
 
 (bind-func xtm_render_setup_b
-  (lambda (w h n f s1v s1f s2v s2f s2f_nl s4v s4f)
+  (lambda (w h n f s1v s1f s2v s2f s2f_nl s4v s4f)    
     (set! xtm_render_near n)
     (set! xtm_render_far f)
-    (xtm_render_setup_a w h s1v s1f s2v s2f s2f_nl s4v s4f)     
+    (xtm_render_setup_a w h s1v s1f s2v s2f s2f_nl s4v s4f)
     void))
 
 (bind-func xtm_render_setup_c
@@ -1299,7 +1303,7 @@
 (impc:aot:do-or-emit
  (sys:load "libs/external/graphics-pipeline-scm.xtm"))
 
-(bind-alias XTMRENDERCB [void,i64,i32,float*,float*,float*,i8*]*)
+(bind-alias XTMRENDERCB [void,i64,ShaderProgram*,float*,float*,float*,i8*]*)
 
 ;;
 ;; near  = 0.1
@@ -1313,39 +1317,45 @@
         (camera:xtm_camera* (xtm_get_camera))
         (activelights:i32 0)
         (framebufsize:float* (alloc 2))
-        (sh1:i32 0)
-        (sh2:i32 0)
+        (sh1:ShaderProgram* null)
+        (sh2:ShaderProgram* null)
         (model:float* (alloc 16))
         (view:float* (alloc 16))
         (projection:float* (alloc 16))
         (shadow_fbo:FBO* null)
         (render_fbo:FBO* null))
     (lambda (pre:XTMRENDERCB opaque:XTMRENDERCB transparent:XTMRENDERCB post:XTMRENDERCB data:i8*)
-      (set! shadow_fbo (xtm_shader_fbo))
-      (set! render_fbo (xtm_render_fbo))      
-      (glShadeModel GL_SMOOTH)
+      (set! shadow_fbo (xtm_shadow_fbo))
+      (set! render_fbo (xtm_render_fbo))
+      ;; (glShadeModel GL_SMOOTH)
       (glEnable GL_DEPTH_TEST)
-      (glEnable GL_TEXTURE_2D)
+      ;; (glEnable GL_TEXTURE_2D)
       ;; seutp projection matrix            
       (fill_projection_matrix projection xtm_render_angle
                               (i32tof (/ xtm_render_w xtm_render_h))
                               xtm_render_near xtm_render_far)
-
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; pre - move lights cameras etc..
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (if (not (null? pre))
           (begin
             ;; each cycle set lights back to 0
             (tset! (xtm_get_lights) 9 0)            
             (xtm_camera_view view)       ;; set view
             (fill_identity_matrix model) ;; set model
-            (pre frame 0 model view projection data)))
-
-      (glBindFramebuffer GL_FRAMEBUFFER (tref shadow_fbo 0))
-      ;;(set! sh1 xtm_render_s1)
-      (set! sh1 xtm_render_simple_shader)
-      (glUseProgram sh1)
-      ;; clear shadow buffer
-      (glClearColor 0.0 0.0 0.0 1.0)
+            (pre frame null model view projection data)))
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; calc shadow for each light into shadow_fbo
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      (gl_print_error "blah")      
+      ;; (set! sh1 xtm_render_simple_bone_shader)
+      (set! sh1 xtm_render_simple_shader)      
+      (start sh1) ;; start program
+      (bind shadow_fbo) ;; bind fbo
+      ;; clear shadow fbo
+      (glClearColor 0.0 0.25 0.25 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+      ;; this all for shadows?
       (if (not (null? opaque))
           (dotimes (i (tref lights 9))
             ;; 4 x 4 shadow texture texture
@@ -1355,34 +1365,29 @@
             (fill_identity_matrix model)  ;; set model matrix
             (xtm_light_view (+ i 1) view) ;; set view matrix
             (xtm_update_matrices sh1 model view projection)
-            (opaque frame sh1 model view projection data)))
+            (opaque frame sh1 model view projection data)
+            (gl_print_error)
+            void))
       ;; turn off shadow FBO
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram 0)
-      ;;
+      (unbind shadow_fbo)
+      (stop sh1)
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; main render to FBO using shadow fbo as shadow map
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (set! activelights (tref lights 9))
       (if (> activelights 5) (set! activelights (i64toi32 5)))
-      ;;
       ;; Finally render the scene to the window
       ;; using the shadow FBO's depth buffer as a shadow map
-      ;;      
-      ;; make sure we are not writing to a framebuffer!
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      ;; actually we want to render to the render fbo
-      (glBindFramebuffer GL_FRAMEBUFFER (tref render_fbo 0))
       (set! sh2 (aref xtm_render_light_shaders activelights))
-      ;;(set! sh2 (if (> activelights 0) xtm_render_s2 xtm_render_s3))
-      (glUseProgram sh2)
-      ;; setup shadowmap texture from FBO
-      (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
-      (glBindTexture GL_TEXTURE_2D (tref shadow_fbo 2))      
-      (glUniform1i (glGetUniformLocation sh2 "shadowMap") 0)      
-      ;;(shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
+      (start sh2) ;; start program
+      (bind render_fbo) ;; bind fbo
+      (bind (depth_tex shadow_fbo) #f 0) ;; bind shadow texture
+      (glUniform1i (glGetUniformLocation (id sh2) "shadowMap") 0)
       ;; draw scene
       (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
-      (glDisable GL_CULL_FACE) ;; turn face culling off
+      (glDisable GL_CULL_FACE) ;; turn face culling off      
       ;; clear main framebuffer
-      (glClearColor 0.0 0.0 0.0 1.0)
+      (glClearColor 0.7 0.7 0.7 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (if (not (null? opaque))
           (begin
@@ -1392,34 +1397,43 @@
             (xtm_update_lights sh2) ;; update lights on shader
             (xtm_update_camera sh2) ;; update camera on shader
             (xtm_update_matrices sh2 model view projection) ;; update mats on shader
-            (opaque frame sh2 model view projection data)))
+            (opaque frame sh2 model view projection data)
+            void))
+      (gl_print_error "Error in XTM pipeline rendering Opaque!")      
       ;; turn everything off again.
-      (glActiveTexture GL_TEXTURE0)
-      (glBindTexture GL_TEXTURE_2D 0)
-      ;;
-      (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram 0)
-
-      (if (null? post)
-          (begin ;; if no post then just render fbo            
+      (unbind (depth_tex shadow_fbo))
+      (unbind render_fbo)
+      (stop sh2)
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      ;; post - for fullscreen 2d stuff (drawing overlays) 2D fx etc..
+      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+      (if (null? post) ;; if no post then just draw render fbo fullscreen
+          (begin
             (glDisable GL_DEPTH_TEST)
             (fill_identity_matrix model)
-            (fill_identity_matrix view)         
-            (fill_orthographic_matrix projection -0.5 0.5 -0.5 0.5 -0.5 0.5)          
-            (xtm_draw_tex xtm_render_quad_shader (tref render_fbo 1) model view projection))
+            (fill_identity_matrix view)
+            (fill_orthographic_matrix projection -1.0 1.0 -1.0 1.0 -1.0 1.0)
+            (if XTM_DOF_ON
+                (if XTM_DOF_AUTOFOCUS
+                    (xtm_dof_fx render_fbo XTM_DOF_X XTM_DOF_Y XTM_DOF_FLENGTH XTM_DOF_FSTOP
+                                (i1toi32 XTM_DOF_DEBUG) model view projection)
+                    (xtm_dof_fx render_fbo XTM_DOF_DISTANCE XTM_DOF_FLENGTH XTM_DOF_FSTOP
+                                (i1toi32 XTM_DOF_DEBUG) model view projection))
+                (xtm_draw_tex xtm_render_quad_shader (colour_tex render_fbo) model view projection))
+            void)
           (begin
             ;; post is usually 2D? so no DEPTH test by default!
             (glDisable GL_DEPTH_TEST)                  
-            (xtm_camera_view view)       ;; get view from current settings
-            (fill_identity_matrix model) ;; setup model
+            ;; (xtm_camera_view view)       ;; get view from current settings
+            (fill_identity_matrix model)            
+            (fill_identity_matrix view)
+            (fill_orthographic_matrix projection -1.0 1.0 -1.0 1.0 -1.0 1.0)
             ;; should probably really pass in 0 for shader id here!
             ;; as we don't want ANY shaders running by default in
             ;; the post processing stage.
-            (post frame xtm_render_quad_shader model view projection data)))
-      ;;
-      (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
-      ;; print errors?
-      (gl_print_error)
+            (post frame xtm_render_quad_shader model view projection data)
+            void))
+      (gl_print_error "Error in xtm_render")
       (set! frame (+ frame 1)))))
 
 (impc:aot:insert-footer "xtmgraphics-pipeline")
