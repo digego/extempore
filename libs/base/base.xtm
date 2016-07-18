@@ -100,15 +100,16 @@
 (bind-val SE SAMPLE 2.7182818284590452353602874713526624977572470936999595749669
           "e (base of natural log) of type SAMPLE")
 
-(bind-val SAMPLERATE SAMPLE (llvm_samplerate)
-  "audio sample rate")
-(bind-val SRs SAMPLE SAMPLERATE "audio sample rate")
-(bind-val SRf float SAMPLERATE "audio sample rate (float)")
-(bind-val SRd double SAMPLERATE "audio sample rate (double)")
-(bind-val SR i64 SAMPLERATE) "audio sample rate (i64)"
-(bind-val CHANNELS i64 (llvm_channels)) "number of audio output channels"
-(bind-val IN_CHANNELS i64 (llvm_in_channels)) "number of audio input channels"
-(bind-val FRAMES i64 (llvm_frames)) "audio signal chain block size"
+(bind-ext-val SAMPLE_RATE i32 "audio sample rate")
+(bind-val SAMPLERATE SAMPLE SAMPLE_RATE "audio sample rate")
+(bind-val SRs SAMPLE SAMPLE_RATE "audio sample rate")
+(bind-val SRf float SAMPLE_RATE "audio sample rate (float)")
+(bind-val SRd double SAMPLE_RATE "audio sample rate (double)")
+(bind-val SR i64 SAMPLE_RATE "audio sample rate (i64)")
+(bind-ext-val CHANNELS i32 "number of audio output channels")
+(bind-ext-val IN_CHANNELS i32 "number of audio input channels")
+(bind-ext-val NUM_FRAMES i32 "audio signal chain block size")
+(bind-val FRAMES i64 NUM_FRAMES "audio signal chain block size")
 
 ;; IEEE floating point NaNs
 
@@ -149,6 +150,9 @@
 
 (bind-func print
   (lambda (x:i8) (printf "%d" (convert x i32)) void))
+
+(bind-func print
+  (lambda (x:i16) (printf "%d" (convert x i32)) void))
 
 (bind-func print
   (lambda (x:i32) (printf "%d" x) void))
@@ -333,45 +337,26 @@ into any further sexp arguments."
 (bind-poly random imp_rand2_d)
 
 ;;;;;;;;;;;;;;;;;;
-;; triginometry ;;
+;; trigonometry ;;
 ;;;;;;;;;;;;;;;;;;
 
-;; many of these are handled through llvm intrinsics these days
-
+(bind-poly tan tan)
 (bind-poly tan tanf)
-(bind-poly tan llvm_tan)
-(bind-poly cosh coshf)
-(bind-poly cosh llvm_cosh)
-(bind-poly tanh tanhf)
-(bind-poly tanh llvm_tanh)
-(bind-poly sinh sinhf)
-(bind-poly sinh llvm_sinh)
+
+(bind-poly acos acos)
+(bind-poly acos acosf)
+(bind-poly asin asin)
 (bind-poly asin asinf)
-(bind-poly asin llvm_asin)
+(bind-poly atan atan)
 (bind-poly atan atanf)
-(bind-poly atan llvm_atan)
+(bind-poly atan2 atan2)
 (bind-poly atan2 atan2f)
-(bind-poly atan2 llvm_atan2)
-;; (bind-poly ceil ceilf)
-;; (bind-poly ceil llvm_ceil)
-;; (bind-poly floor floorf)
-;; (bind-poly floor llvm_floor)
-;; (bind-poly exp expf)
-;; (bind-poly exp llvm_exp)
-;; (bind-poly fmod fmodf)
-;; (bind-poly fmod llvm_fmod)
-;; (bind-poly pow powf)
-;; (bind-poly pow llvm_pow)
-;; (bind-poly log logf)
-;; (bind-poly log llvm_log)
-;; (bind-poly log2 log2f)
-;; (bind-poly log2 llvm_log2)
-;; (bind-poly log10 log10f)
-;; (bind-poly log10 llvm_log10)
-;; (bind-poly sqrt sqrtf)
-;; (bind-poly sqrt llvm_sqrt)
-;; (bind-poly fabs fabsf)
-;; (bind-poly fabs llvm_fabs)
+(bind-poly cosh cosh)
+(bind-poly cosh coshf)
+(bind-poly sinh sinh)
+(bind-poly sinh sinhf)
+(bind-poly tanh tanh)
+(bind-poly tanh tanhf)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -825,6 +810,12 @@ If both strings are null an empty String will be returned
 
 (bind-func format
   (lambda (x:i8)
+    (let ((str:i8* (salloc 256)))
+      (sprintf str "%d" x)
+      (String str))))
+
+(bind-func format
+  (lambda (x:i16)
     (let ((str:i8* (salloc 256)))
       (sprintf str "%d" x)
       (String str))))

@@ -96,10 +96,10 @@ bool rmatch(char* regex, const char* str);
 int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
 bool rsplit(const char* regex, const char* str, char* a, char* b);
 char* rreplace(char* regex, char* str, char* replacement, char* result);
-char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
-unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
-char* cname_encode(char *data,size_t input_length,size_t *output_length);
-char* cname_decode(char *data,size_t input_length,size_t *output_length);
+EXPORT char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
+EXPORT unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
+EXPORT char* cname_encode(char *data,size_t input_length,size_t *output_length);
+EXPORT char* cname_decode(char *data,size_t input_length,size_t *output_length);
 const char* sys_sharedir();
 char* sys_slurp_file(const char* fname);
 int register_for_window_events();
@@ -113,8 +113,8 @@ namespace UNIV
 {
 
 extern std::string SHARE_DIR;
-extern uint32_t CHANNELS;
-extern uint32_t IN_CHANNELS;
+EXPORT uint32_t CHANNELS;
+EXPORT uint32_t IN_CHANNELS;
 EXPORT uint32_t SAMPLE_RATE;
 EXPORT volatile uint64_t TIME;
 extern uint64_t DEVICE_TIME;
@@ -124,7 +124,7 @@ extern uint64_t TIME_DIVISION;
 inline uint32_t SECOND() { return SAMPLE_RATE; }
 inline uint32_t MINUTE() { return SAMPLE_RATE * 60; }
 inline uint32_t HOUR() { return MINUTE() * 60; }
-extern uint32_t FRAMES;
+EXPORT uint32_t NUM_FRAMES;
 extern uint32_t EXT_TERM;
 extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;

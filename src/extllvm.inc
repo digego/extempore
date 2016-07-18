@@ -1,4 +1,4 @@
-extern "C" const char* llvm_disassemble(const unsigned char* Code, int syntax)
+EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
 {
     size_t code_size = 1024 * 100;
     std::string Error;
@@ -49,7 +49,7 @@ static extemp::CMG DestroyMallocZoneWithDelayCM(
             llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(Task)->getArg());
         });
 
-extern "C" void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
+EXPORT void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
 {
     extemp::TaskScheduler::I()->add(new extemp::Task<llvm_zone_t*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),
             &DestroyMallocZoneWithDelayCM, Zone));
@@ -60,7 +60,7 @@ static extemp::CMG FreeWithDelayCM(
             free(static_cast<extemp::Task<char*>*>(Task)->getArg());
         });
 
-static void free_after_delay(char* Data, double Delay)
+EXPORT void free_after_delay(char* Data, double Delay)
 {
     extemp::TaskScheduler::I()->add(new extemp::Task<char*>(extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(),
             &FreeWithDelayCM, Data));
@@ -100,7 +100,7 @@ static long long llvm_get_next_prime(long long start)
 }
 #endif
 
-extern "C" void llvm_zone_destroy(llvm_zone_t* Zone)
+EXPORT void llvm_zone_destroy(llvm_zone_t* Zone)
 {
 #if DEBUG_ZONE_ALLOC
     printf("DestroyZone: %p:%p:%lld:%lld\n", Zone, Zone->memory, Zone->offset, Zone->size);
@@ -112,7 +112,7 @@ extern "C" void llvm_zone_destroy(llvm_zone_t* Zone)
     free(Zone);
 }
 
-extern "C" llvm_zone_t* llvm_pop_zone_stack()
+EXPORT llvm_zone_t* llvm_pop_zone_stack()
 {
     auto stack(llvm_threads_get_zone_stack());
     if (unlikely(!stack)) {
@@ -136,7 +136,7 @@ extern "C" llvm_zone_t* llvm_pop_zone_stack()
     return head;
 }
 
-extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
+EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     extemp::EXTMutex::ScopedLock lock(alloc_mutex);
 #if DEBUG_ZONE_ALLOC
@@ -188,7 +188,12 @@ extern "C" void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
     return newptr;
 }
 
-static bool llvm_ptr_in_current_zone(void* ptr)
+EXPORT void* llvm_zone_malloc_from_current_zone(uint64_t size)
+{
+  return llvm_zone_malloc(llvm_peek_zone_stack(), size);
+}
+
+EXPORT bool llvm_ptr_in_current_zone(void* ptr)
 {
     return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
 }

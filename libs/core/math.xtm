@@ -1808,7 +1808,7 @@ column-major (the same as OpenGL)
 
 (bind-func Complex_phase
   (lambda (a:Complexd)
-    (atan (/ (tref a 1) (tref a 0)))))
+    (atan2 (tref a 1) (tref a 0))))
 
 (bind-func Complex_conj
   (lambda (a:Complexd)
@@ -1819,18 +1819,19 @@ column-major (the same as OpenGL)
   (lambda (a:Complexd)
     (Cpxd (sqrt (+ (* (tref a 0) (tref a 0))
                    (* (tref a 1) (tref a 1))))
-          (atan (/ (tref a 1) (tref a 0))))))
+          (atan2 (tref a 1) (tref a 0)))))
 
 (bind-func cart_to_pol
   "transform a whole buffer cart->pol in-place"
   (lambda (a:Complexd* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (sqrt (+ (* (tref a 0) (tref a 0))
-                      (* (tref a 1) (tref a 1)))))
-      (tset! (pref-ptr a i) 1
-             (atan (/ (tref a 1) (tref a 0)))))
-    void))
+    (let ((temp:double 0.0))
+      (doloop (i n)
+        (set! temp (sqrt (+ (* (tref (pref a i) 0) (tref (pref a i) 0))
+                            (* (tref (pref a i) 1) (tref (pref a i) 1)))))
+        (tset! (pref-ptr a i) 1
+               (atan2 (tref (pref a i) 1) (tref (pref a i) 0)))
+        (tset! (pref-ptr a i) 0 temp))
+      void)))
 
 (bind-func pol_to_cart
   (lambda (a:Complexd)
@@ -1840,13 +1841,13 @@ column-major (the same as OpenGL)
 (bind-func pol_to_cart
   "transform a whole buffer pol->cart in-place"
   (lambda (a:Complexd* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (* (tref a 0) (cos (tref a 1))))
-      (tset! (pref-ptr a i) 1
-             (* (tref a 0) (sin (tref a 1)))))
-    void))
-
+    (let ((temp:double 0.0))
+      (doloop (i n)
+        (set! temp (* (tref (pref a i) 0) (cos (tref (pref a i) 1))))
+        (tset! (pref-ptr a i) 1
+               (* (tref (pref a i) 0) (sin (tref (pref a i) 1))))
+        (tset! (pref-ptr a i) 0 temp))
+      void)))
 
 ;; Complexf (float versions)
 
@@ -1896,7 +1897,6 @@ column-major (the same as OpenGL)
                    (ftod (tref c 0))
                    (ftod (tref c 1))))
       (Str str))))
-
 
 (bind-func xtm_addition
   (lambda (a:Complexf b:Complexf)
@@ -2072,7 +2072,6 @@ column-major (the same as OpenGL)
         (tset! (pref-ptr c i) 1 (/ l k)))
       void)))
 
-
 (bind-func Complex_mag
   (lambda (a:Complexf)
     (sqrt (+ (* (tref a 0) (tref a 0))
@@ -2080,7 +2079,7 @@ column-major (the same as OpenGL)
 
 (bind-func Complex_phase
   (lambda (a:Complexf)
-    (atan (/ (tref a 1) (tref a 0)))))
+    (atan2 (tref a 1) (tref a 0))))
 
 (bind-func Complex_conj
   (lambda (a:Complexf)
@@ -2091,19 +2090,19 @@ column-major (the same as OpenGL)
   (lambda (a:Complexf)
     (Cpxf (sqrt (+ (* (tref a 0) (tref a 0))
                    (* (tref a 1) (tref a 1))))
-          (atan (/ (tref a 1) (tref a 0))))))
+          (atan2 (tref a 1) (tref a 0)))))
 
 (bind-func cart_to_pol
   "transform a whole buffer cart->pol in-place"
   (lambda (a:Complexf* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (sqrt (+ (* (tref a 0) (tref a 0))
-                      (* (tref a 1) (tref a 1)))))
-      (tset! (pref-ptr a i) 1
-             (atan (/ (tref a 1) (tref a 0)))))
-    void))
-
+    (let ((temp:float 0.0))
+      (doloop (i n)
+        (set! temp (sqrt (+ (* (tref (pref a i) 0) (tref (pref a i) 0))
+                            (* (tref (pref a i) 1) (tref (pref a i) 1)))))
+        (tset! (pref-ptr a i) 1
+               (atan2 (tref (pref a i) 1) (tref (pref a i) 0)))
+        (tset! (pref-ptr a i) 0 temp))
+      void)))
 
 (bind-func pol_to_cart
   (lambda (a:Complexf)
@@ -2113,12 +2112,13 @@ column-major (the same as OpenGL)
 (bind-func pol_to_cart
   "transform a whole buffer pol->cart in-place"
   (lambda (a:Complexf* n:i64)
-    (doloop (i n)
-      (tset! (pref-ptr a i) 0
-             (* (tref a 0) (cos (tref a 1))))
-      (tset! (pref-ptr a i) 1
-             (* (tref a 0) (sin (tref a 1)))))
-    void))
+    (let ((temp:float 0.0))
+      (doloop (i n)
+        (set! temp (* (tref (pref a i) 0) (cos (tref (pref a i) 1))))
+        (tset! (pref-ptr a i) 1
+               (* (tref (pref a i) 0) (sin (tref (pref a i) 1))))
+        (tset! (pref-ptr a i) 0 temp))
+      void)))
 
 ;; "bufferize" whole buffers of real & complex values (take two real
 ;; buffers with real & imaginary components, fill buffer of Complex

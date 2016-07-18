@@ -254,9 +254,11 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
         return Scheme->F;
     }
     int i = 0;
-    std::vector<llvm::GenericValue> fargs(lgth);
+    std::vector<llvm::GenericValue> fargs;
+    fargs.reserve(lgth);
     for (const auto& arg : func->getArgumentList()) {
-        pointer p = list_ref(Scheme, i++, Args);
+        pointer p = car(Args);
+        Args = cdr(Args);
         if (is_integer(p)) {
             if (unlikely(arg.getType()->getTypeID() != llvm::Type::IntegerTyID)) {
                 printf("Bad argument type %i\n",i);

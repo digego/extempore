@@ -277,6 +277,13 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
+static pointer string_contains(scheme* Scheme, pointer Args)
+{
+    char* data = string_value(pair_car(Args));
+    char* find = string_value(pair_cadr(Args));
+    return strstr(data, find) ? Scheme->T : Scheme->F;
+}
+
 #define MISC_DEFS \
         { "cptr:get-i64", &dataGETi64 }, \
         { "cptr:get-double", &dataGETdouble }, \
@@ -307,4 +314,5 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
         { "mk-ff", &scmAddForeignFunc }, \
         { "impc:ir:getname", &impcirGetName }, \
         { "impc:ir:gettype", &impcirGetType }, \
-        { "impc:ir:addtodict", &impcirAdd }
+        { "impc:ir:addtodict", &impcirAdd }, \
+        { "string-contains?", &string_contains }

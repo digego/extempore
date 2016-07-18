@@ -63,16 +63,7 @@
 #include <stdint.h>
 
 #include "BranchPrediction.h"
-
-#define macintosh 1
-#define USE_INTERFACE 1
-
-/*
- * Default values for #define'd symbols
- */
-#ifndef STANDALONE       /* If used as standalone interpreter */
-# define STANDALONE 1
-#endif
+#include "UNIV.h"
 
 #ifndef _MSC_VER
 # define USE_STRCASECMP 1
@@ -87,29 +78,6 @@
 #  define SCHEME_EXPORT __declspec(dllimport)
 # endif
 #endif
-
-#if USE_NO_FEATURES
-# define USE_MATH 0
-# define USE_CHAR_CLASSIFIERS 0
-# define USE_ASCII_NAMES 0
-# define USE_STRING_PORTS 0
-# define USE_ERROR_HOOK 0
-# define USE_TRACING 0
-# define USE_COLON_HOOK 0
-# define USE_DL 0
-# define USE_PLIST 0
-#endif
-
-/*
- * Leave it defined if you want continuations, and also for the Sharp Zaurus.
- * Undefine it if you only care about faster speed and not strict Scheme compatibility.
- */
-//#define USE_SCHEME_STACK
-
-#if USE_DL
-# define USE_INTERFACE 1
-#endif
-
 
 #ifndef USE_MATH         /* If math support is needed */
 # define USE_MATH 1
@@ -152,17 +120,8 @@
 # define USE_STRLWR 1
 #endif
 
-#ifndef STDIO_ADDS_CR    /* Define if DOS/Windows */
-# define STDIO_ADDS_CR 0
-#endif
-
-//#ifndef INLINE
-//# define INLINE
-//#endif
-
-#ifndef USE_INTERFACE
-# define USE_INTERFACE 0
-#endif
+extern "C"
+{
 
 typedef struct scheme scheme;
 typedef struct cell* pointer;
@@ -170,8 +129,17 @@ typedef struct cell* pointer;
 typedef void* (*func_alloc)(size_t);
 typedef void (*func_dealloc)(void*);
 
-extern "C"
-{
+/* ADJ is enough slack to align cells in a TYPE_BITS-bit boundary */
+#define ADJ 32 // this is the minimum cell size in bytes!
+static const unsigned TYPE_BITS = 5;
+static const uint32_t T_MASKTYPE = (1 << TYPE_BITS) - 1;
+static const uint32_t T_SYNTAX = 1 << 12;
+static const uint32_t T_IMMUTABLE = 1 << 13;
+static const uint32_t T_ATOM = 1 << 14;
+static const uint32_t CLRATOM = ~T_ATOM;
+static const uint32_t MARK = 1 << 15;
+static const uint32_t UNMARK = ~MARK;
+
 scheme *scheme_init_new();
 scheme *scheme_init_new_custom_alloc(func_alloc malloc, func_dealloc free);
 int scheme_init(scheme *sc);
@@ -200,17 +168,14 @@ void new_slot_in_env(scheme *sc, pointer variable, pointer value);
 pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
-int list_length(scheme *sc, pointer a);
 pointer assoc_strcmp(scheme *sc, pointer key, pointer alist, bool all = false);
-int is_real(pointer a);
 char *string_value(pointer p);
-pointer list_ref(scheme* sc, int pos, pointer a);
+EXPORT pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
 pointer mk_vector(scheme *sc, int len);
 void fill_vector(scheme* sc, pointer vec, pointer obj);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a);
 int scheme_init(scheme* sc);
-scheme* extempore_scheme_init_new();
 
 typedef pointer (*foreign_func)(scheme *, pointer);
 
@@ -241,34 +206,12 @@ void treadmill_print(scheme* sc, char* title);
 void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
 pointer cons(scheme *sc, pointer a, pointer b);
 pointer immutable_cons(scheme *sc, pointer a, pointer b);
-pointer mk_integer(scheme *sc, long long num);
-pointer mk_real(scheme *sc, double num);
-pointer mk_rational(scheme *sc, long long n, long long d);
-pointer mk_symbol(scheme *sc, const char *name);
-pointer gensym(scheme *sc);
-//    pointer (*rungc)(scheme* sc, pointer a, pointer b);
-pointer mk_string(scheme *sc, const char *str);
-pointer mk_counted_string(scheme *sc, const char *str, int len);
-pointer mk_character(scheme *sc, int c);
-pointer mk_vector(scheme *sc, int len);
-pointer mk_foreign_func(scheme *sc, foreign_func f);
-pointer mk_cptr(scheme* sc, void* p);
-void putstr(scheme *sc, const char *s);
 void putcharacter(scheme *sc, int c);
 
-int is_string(pointer p);
 char* string_value(pointer p);
 int is_number(pointer p);
-int64_t ivalue(pointer p);
-int64_t i64value(pointer p);
-int32_t i32value(pointer p);
-int16_t i16value(pointer p);
-int8_t i8value(pointer p);
-bool i1value(scheme* _sc, pointer p);
-double rvalue(pointer p);
 double r64value(pointer p);
 float r32value(pointer p);
-int is_integer(pointer p);
 int is_rational(pointer p);
 int is_character(pointer p);
 long long charvalue(pointer p);
@@ -279,7 +222,6 @@ pointer vector_elem(pointer vec, int ielem);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer newel);
 int is_port(pointer p);
 
-int is_pair(pointer p);
 pointer pair_car(pointer p);
 pointer pair_cdr(pointer p);
 pointer set_car(scheme* sc, pointer p, pointer q);
@@ -291,9 +233,7 @@ char* symname(pointer p);
 int is_syntax(pointer p);
 int is_proc(pointer p);
 int is_foreign(pointer p);
-int is_cptr(pointer p);
-int is_cptr_or_str(pointer p);
-void* cptr_value(pointer p);
+EXPORT void* cptr_value(pointer p);
 char* syntaxname(pointer p);
 int is_closure(pointer p);
 int is_macro(pointer p);
@@ -387,7 +327,32 @@ struct cell {
     } _object;
 };
 
-inline double rvalue(pointer Ptr)
+extern inline pointer& car(pointer P)
+{
+    return P->_object._cons._car;
+}
+
+extern inline pointer& cdr(pointer P)
+{
+    return P->_object._cons._cdr;
+}
+
+inline extern int64_t ivalue(pointer Ptr)
+{
+    auto type(Ptr->_object._number.num_type);
+    if (likely(type == T_INTEGER)) {
+        return Ptr->_object._number.value.ivalue;
+    }
+    if (likely(type == T_REAL)) {
+        return Ptr->_object._number.value.rvalue;
+    }
+    if (likely(type == T_RATIONAL)) {
+        return Ptr->_object._number.value.ratvalue.n / Ptr->_object._number.value.ratvalue.d;
+    }
+    return 0;
+}
+
+inline extern double rvalue(pointer Ptr)
 {
     auto type(Ptr->_object._number.num_type);
     if (likely(type == T_INTEGER)) {
@@ -417,6 +382,44 @@ inline pointer set_vector_elem(scheme* Scheme, pointer Vector, int Index, pointe
     insert_treadmill(Scheme, Val);
     reinterpret_cast<pointer*>(Vector->_object._cptr)[Index] = Val;
     return Val;
+}
+
+inline auto typeflag(pointer Ptr) -> decltype(cell::_flag)& { return Ptr->_flag; }
+inline auto type(pointer Ptr) -> decltype(cell::_flag) { return typeflag(Ptr) & T_MASKTYPE; }
+inline int pointer_type(pointer Ptr) { return type(Ptr); }
+inline int is_string(pointer Ptr) { return type(Ptr) == T_STRING; }
+inline int is_character(pointer Ptr) { return type(Ptr) == T_CHARACTER; }
+inline int is_vector(pointer Ptr) { return type(Ptr) == T_VECTOR; }
+inline int is_number(pointer Ptr) { return type(Ptr) == T_NUMBER; }
+inline int is_symbol(pointer Ptr) { return type(Ptr) == T_SYMBOL; }
+inline int is_port(pointer Ptr) { return type(Ptr) == T_PORT; }
+inline int is_pair(pointer Ptr) { return type(Ptr) == T_PAIR; }
+inline int is_environment(pointer Ptr) { return type(Ptr) == T_ENVIRONMENT; }
+inline int is_proc(pointer Ptr) { return type(Ptr) == T_PROC; }
+inline int is_foreign(pointer Ptr) { return type(Ptr) == T_FOREIGN; }
+inline int is_cptr(pointer Ptr) { return type(Ptr) == T_CPTR; }
+inline int is_cptr_or_str(pointer Ptr) { return is_cptr(Ptr) || is_string(Ptr); }
+inline int is_syntax(pointer Ptr) { return typeflag(Ptr) & T_SYNTAX; }
+
+extern inline int is_integer(pointer Ptr) { return Ptr->_object._number.num_type == T_INTEGER; }
+extern inline int is_real(pointer Ptr) { return is_number(Ptr); }
+extern inline int is_rational(pointer Ptr) { return Ptr->_object._number.num_type == T_RATIONAL; }
+extern inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
+extern inline auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
+
+class ScmRuntimeError {
+public:
+  ScmRuntimeError(const char* _msg, pointer _p) {msg = _msg;p = _p;};
+  const char* msg;
+  pointer p;
+};
+
+inline char* string_value(pointer Ptr)
+{
+    if (unlikely(!is_string(Ptr))) {
+        throw ScmRuntimeError("Attempting to return a string from a non-string obj", Ptr);
+    }
+    return strvalue(Ptr);
 }
 
 }

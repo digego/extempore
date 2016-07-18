@@ -150,7 +150,7 @@ void initSchemeFFI(scheme* sc)
         const char* name;
         uint32_t    value;
     } integerTable[] = {
-        { "*au:block-size*", UNIV::FRAMES },
+        { "*au:block-size*", UNIV::NUM_FRAMES },
         { "*au:samplerate*", UNIV::SAMPLE_RATE },
         { "*au:channels*", UNIV::CHANNELS },
         { "*au:in-channels*", UNIV::IN_CHANNELS },

@@ -40,7 +40,14 @@ self-contained static site.
 
 Currently, we're hosting it on GitHub pages through the Extempore
 repo, in a special ``gh-pages`` branch.
-  
+
+.. note:: The xtlang lexer has been accepted into Pygments (for proper
+          syntax highlighting of xtlang code) but it hasn't landed in
+          a stable release yet. If you want to use it, you can get it
+          from `bitbucket`_.
+
+.. _bitbucket: https://bitbucket.org/benswift/pygments-main/downloads
+
 Contributing
 ------------
 

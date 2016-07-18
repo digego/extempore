@@ -1,11 +1,20 @@
 ;; minimal bindings and test function
 ;; do not use (yet)
 
+(sys:load "libs/aot-cache/libchipmunk.xtm" 'quiet)
+(sys:load-preload-check 'libchipmunk)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/base/base.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/base/base.xtm" 'quiet))
+
 (bind-dylib libchipmunk
-  (cond
-    ((string=? (sys:platform) "Linux") "libchipmunk.so")
-    ((string=? (sys:platform) "Windows")
-      (print-error 'Windows 'is 'unlikely 'to 'be '(directly) 'supported 'due 'to 'ABI 'requirements '(aggregates)))))
+  (cond ((string=? (sys:platform) "OSX") "libchipmunk.dylib")
+        ((string=? (sys:platform) "Linux") "libchipmunk.so")
+        (print-error (sys:platform) 'is 'unsupported '(so far))))
+
+(impc:aot:insert-header "xtmlibchipmunk")
 
 ;; typedef double cpFloat;
 
@@ -73,3 +82,5 @@
 ;;             (cpSpaceStep space timeStep)))))))
 
 ;; (test)
+
+(impc:aot:insert-footer "xtmlibchipmunk")

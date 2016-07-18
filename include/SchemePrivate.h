@@ -136,6 +136,7 @@ struct scheme {
     pointer envir;           /* stack register for current environment */
     pointer code;            /* register for current code */
     pointer dump;            /* stack register for next evaluation */
+    pointer value;
 
     pointer func_called_by_extempore; //for use in stack tracing
     pointer last_symbol_apply;
@@ -201,7 +202,6 @@ struct scheme {
     FILE *tmpfp;
     int tok;
     int print_flag;
-    pointer value;
     int op;
 
     char error_fname[256];
@@ -242,5 +242,14 @@ struct EnvInjector
         m_env.erase(m_iter);
     }
 };
+
+extern inline int list_length(scheme *sc, pointer a)
+{
+    int v(0);
+    for (; likely(is_pair(a)); a = cdr(a)) {
+       ++v;
+    }
+    return likely(a == sc->NIL) ? v : -1;
+}
 
 #endif

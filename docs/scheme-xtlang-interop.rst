@@ -104,33 +104,13 @@ automatically bound to the same name. So in this example:
     (lambda (f:[double,double]* x:double)
       (f x)))
 
-  (test_apply squarer 2.0)
+  (test_apply squarer 2.0) ;; this won't work
 
 ``squarer``, when used as an argument to ``test_apply`` (in Scheme
-land), is actually a Scheme function, not a Scheme cptr. This is handy
-because it lets you call ``squarer`` directly from Scheme, but it also
-means that if you try to pass ``squarer`` (the "Scheme variable" bound to
-a "Scheme function") to xtlang it rightfully complains that it doesn't
-know what to do with it.
-
-The slightly kludgy way around this is to ask Extempore to give you
-the xtlang closure as a cptr---you can do this by calling
+land), is actually a Scheme function, not a Scheme cptr. The way
+around this is to make sure the final ``test_apply`` call is an xtlang
+one using a ``$`` form the xtlang closure as a cptr:
 
 .. code-block:: extempore
 
-  (llvm:get-native-closure "squarer")
-
-so calling
-
-.. code-block:: extempore
-
-  (test_apply (llvm:get-native-closure "squarer") 2.0)
-
-will do what you probably want, or if you are going to call it a lot
-you could bind to a different Scheme variable:
-
-.. code-block:: extempore
-
-  (define squarer2 (llvm:get-native-closure "squarer"))
-
-  (test_apply squarer2 5.0)
+  ($ (test_apply squarer 2.0))

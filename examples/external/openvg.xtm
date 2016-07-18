@@ -36,11 +36,17 @@
 
 ;; background image
 (bind-val bg_paint NVGpaint*
-  (_nvgImagePattern vg
+  (nvgImagePattern vg
                    0. 0.
                    width height
                    0.
-                   (nvgCreateImage vg "assets/images/image.png"  0)
+                   (nvgCreateImage vg
+                                   (cstring
+                                    (cat
+                                     (String (sys_sharedir))
+                                     (String
+                                      "/assets/images/image.png")))
+                                   0)
                    1.))
 
 (bind-func draw_frame
@@ -54,7 +60,7 @@
       (if (not (null? bg_paint))
           ;; draw background image
           (begin
-            (_nvgFillPaint vg bg_paint)
+            (nvgFillPaint vg bg_paint)
             (nvgBeginPath vg)
             (nvgRect vg 0. 0. width height)
             (nvgFill vg)))        
@@ -67,10 +73,10 @@
         (nvgBeginPath vg)
         (nvgCircle vg 0. 0. 20.)
         (tfill! fill (/ i 200.0) 0.0 (- 1.0 (/ i 200.0)) 0.5)
-        (_nvgFillColor vg fill)
+        (nvgFillColor vg fill)
         (nvgFill vg)
         (nvgStrokeWidth vg 10.)
-        (_nvgStrokeColor vg stroke)
+        (nvgStrokeColor vg stroke)
         (nvgStroke vg))
       (set! frame (+ frame 1))
       (nvgEndFrame vg))))
