@@ -647,14 +647,14 @@ else(WIN32)
   aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended base)
   aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended base math glcore-${GL_BIND_METHOD} stb_image) 
   aotcompile_lib(libs/external/gl/gl-objects2.xtm aot_extended base math glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended base glcore-${GL_BIND_METHOD})  
   aotcompile_lib(libs/external/nanovg.xtm aot_extended base glcore-${GL_BIND_METHOD})
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended base)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended base glcore-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
     # aotcompile_lib(libs/external/glib.xtm aot_extended base)
     aotcompile_lib(libs/external/assimp.xtm aot_extended base stb_image graphics-pipeline)
-  endif()
+  endif()  
+  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended base)
 
 endif(WIN32)
 

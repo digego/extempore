@@ -12,7 +12,6 @@
 ;;; Code:
 
 (sys:load "libs/external/glfw3.xtm")
-(sys:load "libs/external/gl.xtm")
 
 (bind-val width i32 1024)
 (bind-val height i32 768)
@@ -29,17 +28,17 @@
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (rotate_matrix m (* .1 (i64tof frame)) 0.0 1.0 0.0)
-    (xtm_draw_model (convert data XTMNode*) shader m v p)
+    (xtm_draw_model (convert data XTMModel*) shader m v p)
     void))
 
 (bind-func gl_render
-  (lambda (model:XTMNode*)
+  (lambda (model:XTMModel*)
     (if (null? model)
         (println "gl_render recieved null pointer for model - did you load the model successfully?")
         (begin (xtm_render null render:XTMRENDERCB null null (convert model i8*))
                void))))
 
-(bind-val peppino XTMNode*
+(bind-val peppino XTMModel*
   (assimp_load_model (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))) "peppino.dae" aiProcess_Triangulate))
 
 (xtm_render_setup

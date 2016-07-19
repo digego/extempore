@@ -40,11 +40,8 @@
 
 (sys:load "libs/external/glfw3.xtm")
 
-;; (bind-val width i32 1024)
-;; (bind-val height i32 768)
-
-(bind-val width i32 1920)
-(bind-val height i32 1200)
+(bind-val width i32 1024)
+(bind-val height i32 768)
 
 (bind-val window GLFWwindow*
   ;; some of the shaders in the graphics pipeline use older glsl
@@ -63,22 +60,25 @@
     (xtm_light_tgt 1 0.0 5.0 0.0)
     (xtm_light_up 1 0.0 1.0 0.0)        
     (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
-    (xtm_light_power 1 (+ 60.0 (* 50.0 (cos (+ 1.0 (* .1 (i64tof frame)))))))
+    (xtm_light_power 1 (+ 100.0 (* 40.0 (cos (+ 1.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 1 300.0)
 
     (xtm_light_pos 2 10.0 10.0 20.0)
     (xtm_light_tgt 2 0.0 0.0 -5.0)
     (xtm_light_up 2 0.0 1.0 0.0)        
     (xtm_light_diffuse 2 1.0 0.3 0.6 1.0)
-    (xtm_light_power 2 (+ 60.0 (* 50.0 (cos (+ 3.0 (* .1 (i64tof frame)))))))
+    (xtm_light_power 2 (+ 120.0 (* 30.0 (cos (+ 3.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 2 30.0)
 
     (xtm_light_pos 3 -10.0 10.0 15.0)
     (xtm_light_tgt 3 0.0 0.0 0.0)
     (xtm_light_up 3 0.0 1.0 0.0)        
     (xtm_light_diffuse 3 0.3 1.0 0.6 1.0)
-    (xtm_light_power 3 (+ 60.0 (* 50.0 (cos (+ 5.0 (* .1 (i64tof frame)))))))
+    (xtm_light_power 3 (+ 100.0 (* 30.0 (cos (+ 5.0 (* .1 (i64tof frame)))))))
     (xtm_light_angle 3 30.0)
+
+    ;; f1.4 35mm focused at 10meters from camera
+    (xtm_dof 10.0 1.4 35.0 #f)
     
     (xtm_camera_pos
      -2.0
@@ -92,7 +92,7 @@
 ;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (let ((nodes:XTMNode** (cast data XTMNode**)))
+    (let ((nodes:XTMModel** (cast data XTMModel**)))
       (scale_matrix m 1.5 1.5 1.5)
       (translate_matrix m 2.0 -1.9 0.0)            
       (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
@@ -117,8 +117,8 @@
       void)))
 
 (bind-func gl_render
-  (let ((models:XTMNode** (alloc 4)))
-    (lambda (model1:XTMNode* model2:XTMNode* model3:XTMNode*)
+  (let ((models:XTMModel** (alloc 4)))
+    (lambda (model1:XTMModel* model2:XTMModel* model3:XTMModel*)
       (cond ((null? model1)
              (println "gl_render recieved null pointer for model1 - did you load the model successfully?"))
             ((null? model2)
@@ -133,11 +133,11 @@
 
 (bind-val model_path i8*
   (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))))
-(bind-val peppino XTMNode*
+(bind-val peppino XTMModel*
   (assimp_load_model model_path "peppino.dae" aiProcess_Triangulate))
-(bind-val scene XTMNode*
+(bind-val scene XTMModel*
   (assimp_load_model model_path "scene.dae" aiProcess_Triangulate))
-(bind-val dome XTMNode*
+(bind-val dome XTMModel*
   (assimp_load_model model_path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
 (xtm_render_setup
