@@ -31,6 +31,15 @@
 (bind-alias DWORD_PTR i64)
 (bind-alias BOOL i1)
 (bind-alias PDWORD_PTR i64*) ;; pointer to DWORD_PTR
+(bind-alias LONG_PTR i64)  ;; not actually a ptr!
+(bind-alias LRESULT i64)
+(bind-alias ULONG_PTR i64) ;; not actually a ptr!
+(if (= 64 (sys:pointer-size))
+    (bind-alias WPARAM i64)
+    (bind-alias WPARAM i32))
+(if (= 64 (sys:pointer-size))
+    (bind-alias LPARAM i64)
+    (bind-alias LPARAM i32))
 
 (bind-type POINT <LONG,LONG>) ;; x y
 (bind-type RECT <LONG,LONG,LONG,LONG>) ;; left,top,right,bottom
@@ -62,6 +71,7 @@
 
 (bind-alias HWND i8*)
 (bind-alias HDC i8*)
+(bind-alias WNDPROC [LRESULT,HWND,UINT,WPARAM,LPARAM]*)
 
 (bind-val GWL_EXSTYLE i32 -20)
 (bind-val GWL_HINSTANCE i32 -6)
@@ -70,6 +80,7 @@
 (bind-val GWL_STYLE i32 -16)
 (bind-val GWL_USERDATA i32 -21)
 (bind-val GWL_WNDPROC i32 -4)
+(bind-val GWLP_WNDPROC i32 -4)
 
 (bind-val WS_OVERLAPPED DWORD #x00000000)
 (bind-val WS_CAPTION DWORD #x00C00000)
@@ -80,12 +91,143 @@
 (bind-val WS_POPUP DWORD #x80000000)
 (bind-val WS_OVERLAPPEDWINDOW DWORD (+ WS_OVERLAPPED WS_CAPTION WS_SYSMENU WS_THICKFRAME WS_MINIMIZEBOX WS_MAXIMIZEBOX))
 
+(bind-val WM_NULL DWORD #x0000)
+(bind-val WM_DESTROY DWORD #x0002)
+(bind-val WM_MOVE DWORD #x0003)
+(bind-val WM_SIZE DWORD #x0005)
+(bind-val WM_SIZING DWORD #x0214)
+(bind-val WM_MOVING DWORD #x0216)
+(bind-val WM_QUIT DWORD #x0012)
+(bind-val WM_SHOWWINDOW DWORD #x0018)
+(bind-val WM_WINDOWPOSCHANGING DWORD #x0046)
+(bind-val WM_WINDOWPOSCHANGED DWORD #x0047)
+(bind-val WM_TOUCH DWORD #x0240)
+(bind-val WM_NCPOINTERUPDATE DWORD #x0241)
+(bind-val WM_NCPOINTERDOWN DWORD #x0242)
+(bind-val WM_NCPOINTERUP DWORD #x0243)
+(bind-val WM_POINTERUPDATE DWORD #x0245)
+(bind-val WM_POINTERDOWN DWORD #x0246)
+(bind-val WM_POINTERUP DWORD #x0247)
+(bind-val WM_POINTERWHEEL DWORD #x024E)
+(bind-val WM_POINTERHWHEEL DWORD #x024F)
+
+(bind-val WM_GESTURE DWORD #x0119)
+(bind-val WM_GESTURENOTIFY DWORD #x011A)
+
+(bind-val GID_BEGIN                       DWORD 1)
+(bind-val GID_END                         DWORD 2)
+(bind-val GID_ZOOM                        DWORD 3)
+(bind-val GID_PAN                         DWORD 4)
+(bind-val GID_ROTATE                      DWORD 5)
+(bind-val GID_TWOFINGERTAP                DWORD 6) 
+(bind-val GID_PRESSANDTAP                 DWORD 7)
+(bind-val GID_ROLLOVER                    DWORD GID_PRESSANDTAP)
+
+(bind-val TOUCHEVENTF_MOVE            DWORD #x0001)
+(bind-val TOUCHEVENTF_DOWN            DWORD #x0002)
+(bind-val TOUCHEVENTF_UP              DWORD #x0004)
+(bind-val TOUCHEVENTF_INRANGE         DWORD #x0008)
+(bind-val TOUCHEVENTF_PRIMARY         DWORD #x0010)
+(bind-val TOUCHEVENTF_NOCOALESCE      DWORD #x0020)
+(bind-val TOUCHEVENTF_PEN             DWORD #x0040)
+(bind-val TOUCHEVENTF_PALM            DWORD #x0080)
+
+(bind-val GCLP_WNDPROC DWORD -24)
+
+;; typedef struct tagTOUCHINPUT {
+;;     LONG x;
+;;     LONG y;
+;;     HANDLE hSource;
+;;     DWORD dwID;
+;;     DWORD dwFlags;
+;;     DWORD dwMask;
+;;     DWORD dwTime;
+;;     ULONG_PTR dwExtraInfo;
+;;     DWORD cxContact;
+;;     DWORD cyContact;
+;; } TOUCHINPUT, *PTOUCHINPUT;
+(bind-type TOUCHINPUT <LONG,LONG,HANDLE,DWORD,DWORD,DWORD,DWORD,ULONG_PTR,DWORD,DWORD> (printer? . #f))
+
+(bind-func print:[void,TOUCHINPUT*]*
+  (lambda (obj)
+    (printout "<TOUCH id(" (tref obj 3) ") x(" (/ (i32tod (tref obj 0)) 100.0) ") y(" (/ (i32tod (tref obj 1)) 100.0) ")>")
+    void))
+
+(bind-func get_touch_id:[i32,TOUCHINPUT*]*
+  (lambda (obj)
+    (tref obj 3)))
+
+;; touches are 1/100 of a pixel
+(bind-func get_touch_x:[float,TOUCHINPUT*]*
+  (lambda (obj)
+    (/ (i32tof (tref obj 0)) 100.0)))
+
+;; touches are 1/100 of a pixel
+(bind-func get_touch_y:[float,TOUCHINPUT*]*
+  (lambda (obj)
+    (/ (i32tof (tref obj 1)) 100.0)))
+
+;; predicate
+(bind-func is_touch_up:[i1,TOUCHINPUT*]*
+  (lambda (obj)
+    (if (= (& (tref obj 4) TOUCHEVENTF_UP) 0)
+        #f #t)))
+
+;; predicate
+(bind-func is_touch_down:[i1,TOUCHINPUT*]*
+  (lambda (obj)
+    (if (= (& (tref obj 4) TOUCHEVENTF_DOWN) 0)
+        #f #t)))
+
+;; predicate
+(bind-func is_touch_move:[i1,TOUCHINPUT*]*
+  (lambda (obj)
+    (if (= (& (tref obj 4) TOUCHEVENTF_MOVE) 0)
+        #f #t)))
+
+
+(bind-alias PTOUCHINPUT TOUCHINPUT*)
+(bind-alias HTOUCHINPUT TOUCHINPUT*)
+
 (bind-lib libuser32 WindowFromDC [HWND,HDC]*)
 (bind-lib libuser32 BringWindowToTop [BOOL,HWND]*)
 (bind-lib libuser32 SetFocus [HWND,HWND]*)
 (bind-lib libuser32 GetWindowLongA [DWORD,HWND,i32]*)
+(bind-lib libuser32 GetWindowLongPtrW [LONG_PTR,HWND,i32]*)
+(bind-lib libuser32 GetWindowLongPtrA [LONG_PTR,HWND,i32]*)
 (bind-lib libuser32 SetWindowLongA [DWORD,HWND,i32,DWORD]*)
+(bind-lib libuser32 SetWindowLongPtrW [DWORD,HWND,i32,LONG_PTR]*)
+(bind-lib libuser32 SetWindowLongPtrA [DWORD,HWND,i32,LONG_PTR]*)
 (bind-lib libuser32 SendInput [UINT,UINT,LPINPUT,i32]*)
+;; (bind-lib libuser32 SetWindowsHookEx [HHOOK,i32,HOOKPROC,HINSTANCE,DWORD]*)
+(bind-lib libuser32 SetClassLongPtrA [ULONG_PTR,HWND,i32,LONG_PTR]*)
+;; where i8* is a char[num] and final i32 is num
+(bind-lib libuser32 GetWindowTextA [i32,HWND,i8*,i32]*)
+(bind-lib libuser32 SetWindowTextA [BOOL,HWND,i8*]*)
+(bind-lib libuser32 DefWindowProcA [LRESULT,HWND,i32,WPARAM,LPARAM]*)
+(bind-lib libuser32 CallWindowProcA [LRESULT,WNDPROC,HWND,i32,WPARAM,LPARAM]*)
+(bind-lib libuser32 RegisterTouchWindow [BOOL,HWND,i64]*)
+(bind-lib libuser32 IsTouchWindow [BOOL,HWND,i64*]*)
+(bind-lib libuser32 GetTouchInputInfo [BOOL,HTOUCHINPUT,i32,PTOUCHINPUT,i32]*)
+(bind-lib libuser32 CloseTouchInputHandle [BOOL,HTOUCHINPUT]*)
+
+(bind-val OLD_WINDOWS_WNDPROC i8*)
+
+(bind-func set_window_wndproc
+  (lambda (window:HWND proc:i8*)  ;; proc must be native [LRESULT,HWND,UINT,WPARAM,LPARAM]*
+    (let (;; (res (SetClassLongPtrA window GCLP_WNDPROC (ptrtoi64 proc)))
+          ;; (oldproc (i64toptr (GetWindowLongPtrW window GWL_WNDPROC)))         
+          ;; (res (SetWindowLongPtrW window GWL_WNDPROC (ptrtoi64 proc))))
+          (oldproc (i64toptr (GetWindowLongPtrA window GWL_WNDPROC)))         
+          (res (SetWindowLongPtrA window GWL_WNDPROC (ptrtoi64 proc))))
+      (if (null? oldproc)
+          (println "Error retrieving OLDPROC")
+          (println "Success retrieving OLDPROC"))
+      (set! OLD_WINDOWS_WNDPROC oldproc)
+      (if (= res 0)
+          (println "Error setting wndproc: err(" (GetLastError) ")")
+          (println "Sucessess setting wndproc!")))
+    void))
 
 ;; mouse down = -1
 ;; mouse up = 1

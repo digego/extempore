@@ -1269,10 +1269,13 @@
       (if (null? fbo) (set! fbo (FBO (ftoi32 (* 4.0 1024.0)) (ftoi32 (* 4.0 1024.0)) #t)))
       fbo)))
 
+(bind-val XTM_BACKGROUND_COLOUR /4,float/)
+
 (bind-func xtm_render_setup_a
   (lambda (w h s1v:i8* s1f:i8* s2v:i8* s2f:i8* s2f_nl:i8* s4v:i8* s4f:i8*)
     (set! xtm_render_w w)
     (set! xtm_render_h h)
+    (set! XTM_BACKGROUND_COLOUR (vector 0.7:float 0.7 0.7 1.0))
     (xtm_shadow_fbo)
     (gl_print_error "error setting-up xtm_shadow_fbo")
     (xtm_render_fbo)
@@ -1304,6 +1307,16 @@
  (sys:load "libs/external/graphics-pipeline-scm.xtm"))
 
 (bind-alias XTMRENDERCB [void,i64,ShaderProgram*,float*,float*,float*,i8*]*)
+
+(bind-func xtm_background_colour
+  (lambda (r:float g b a)
+    (set! XTM_BACKGROUND_COLOUR (vector r g b a))
+    void))
+
+(bind-func xtm_background_colour
+  (lambda (r:float g b)
+    (set! XTM_BACKGROUND_COLOUR (vector r g b 1.0))
+    void))
 
 ;;
 ;; near  = 0.1
@@ -1387,7 +1400,11 @@
       (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
       (glDisable GL_CULL_FACE) ;; turn face culling off      
       ;; clear main framebuffer
-      (glClearColor 0.7 0.7 0.7 1.0)
+      ;; (glClearColor 0.7 0.7 0.7 1.0)
+      (glClearColor (vref XTM_BACKGROUND_COLOUR 0)
+                    (vref XTM_BACKGROUND_COLOUR 1)
+                    (vref XTM_BACKGROUND_COLOUR 2)
+                    (vref XTM_BACKGROUND_COLOUR 3))                    
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (if (not (null? opaque))
           (begin

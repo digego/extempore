@@ -586,9 +586,9 @@
 (bind-func glfw_create_fullscreen_window
   "creates a windowed fullscreen window (i.e. doesn't change video mode)"
   (let ((window_title:i8* (zalloc 128)))
-    (lambda ()
+    (lambda (mon)
       (sprintf window_title "Extempore OpenGL Window")
-      (let ((monitor (glfwGetPrimaryMonitor))
+      (let ((monitor mon) ;;(glfwGetPrimaryMonitor))
             (vidmode (glfwGetVideoMode monitor))
             (width (tref vidmode 0))
             (height (tref vidmode 1))
@@ -598,9 +598,39 @@
         ;; (glfwWindowHint GLFW_BLUE_BITS (tref vidmode 4))
         ;; (glfwWindowHint GLFW_REFRESH_RATE (tref vidmode 5))
         (glfwWindowHint GLFW_DECORATED 0)
-        (set! res (glfwCreateWindow width height window_title null null))
+        (glfwWindowHint GLFW_AUTO_ICONIFY 0)        
+        (set! res (glfwCreateWindow width height window_title monitor null))
         (glfwSetWindowPos res 0 0)
         res))))
+
+(bind-func glfw_create_fullscreen_window
+  (lambda ()
+    (glfw_create_fullscreen_window:[i8*,i8*]* (glfwGetPrimaryMonitor))))
+
+(bind-func glfw_create_fullscreen_interaction_window
+  "creates a windowed fullscreen window (i.e. doesn't change video mode)"
+  (let ((window_title:i8* (zalloc 128)))
+    (lambda (mon)
+      (sprintf window_title "Extempore OpenGL Window")
+      (let ((monitor mon) ;;(glfwGetPrimaryMonitor))
+            (vidmode (glfwGetVideoMode monitor))
+            (width (tref vidmode 0))
+            (height (tref vidmode 1))
+            (res:GLFWwindow* null))
+        ;; (glfwWindowHint GLFW_RED_BITS (tref vidmode 2))
+        ;; (glfwWindowHint GLFW_GREEN_BITS (tref vidmode 3))
+        ;; (glfwWindowHint GLFW_BLUE_BITS (tref vidmode 4))
+        ;; (glfwWindowHint GLFW_REFRESH_RATE (tref vidmode 5))
+        (glfwWindowHint GLFW_DECORATED 0)
+        (glfwWindowHint GLFW_AUTO_ICONIFY 0)
+        (register_for_window_events)
+        (set! res (glfwCreateWindow width height window_title monitor null))
+        (glfwSetWindowPos res 0 0)
+        res))))
+
+(bind-func glfw_create_fullscreen_interaction_window
+  (lambda ()
+    (glfw_create_fullscreen_interaction_window:[i8*,i8*]* (glfwGetPrimaryMonitor))))
 
 (bind-func glfw_create_window
   (let ((window_title:i8* (zalloc 128)))
@@ -753,15 +783,43 @@
       window)))
 
 (bind-func glfw_init_and_create_fullscreen_window
-  (lambda ()
+  (lambda (monitor_idx)
     (glfw_init)
     (glfw_set_core_profile)
-    (let ((window (glfw_create_fullscreen_window)))
+    (let ((num:i32* (salloc))
+          (monitors (glfwGetMonitors num))
+          (window (glfw_create_fullscreen_window (if (< monitor_idx (pref num 0))
+                                                     (pref monitors monitor_idx)
+                                                     (pref monitors 0)))))
       (glfwShowWindow window)
       (glfwMakeContextCurrent window)
       (glfwSwapInterval 1)
       (glfwSwapBuffers window)
       window)))
+
+(bind-func glfw_init_and_create_fullscreen_window
+  (lambda ()
+    (glfw_init_and_create_fullscreen_window:[i8*,i32]* 0:i32)))
+
+(bind-func glfw_init_and_create_fullscreen_interaction_window
+  (lambda (monitor_idx)
+    (glfw_init)
+    (glfw_set_core_profile)
+    (let ((num:i32* (salloc))
+          (monitors (glfwGetMonitors num))
+          (window (glfw_create_fullscreen_interaction_window (if (< monitor_idx (pref num 0))
+                                                                 (pref monitors monitor_idx)
+                                                                 (pref monitors 0)))))
+      (glfwShowWindow window)
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
+      window)))
+
+(bind-func glfw_init_and_create_fullscreen_interaction_window
+  (lambda ()
+    (glfw_init_and_create_fullscreen_interaction_window:[i8*,i32]* 0:i32)))
+
 
 (bind-func glfw_init_and_create_fullscreen_compatibility_window
   (lambda ()
