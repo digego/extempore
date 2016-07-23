@@ -1,0 +1,78 @@
+;TSM_example
+;This example goes with TSM_library.xtm
+;The library is intended for Stereo use but would require small changes to
+;allow for this.
+;The thesis written in conjunction with this project can be found at
+;ftp://ftp.timrobertssound.com.au
+;username: TSM@timrobertssound.com.au
+;password: extempore
+;It currently uses three global variables for adjusting some of the parameters
+;TSM_active - 0 is not active, 1 is active
+;speed -  smaller is slower.  0.5 is half speed and 2 is double speed
+;beta - factor that reduces graininess of sPL-PV.  Normally set to (/ (+ 1.0 (* 2.0 speed)) (* 3.0 speed))
+;range - Sets maximum jump between frequency bins before using phase of previous bin. Distance is bin number * range
+
+(sys:load "/libs/contrib/TSM_library.xtm")
+
+;The included TSM methods are:
+;Overlap-Add - TSM_TIM_OLA (THIS IS INCLUDED FOR DEMONSTRATION PURPOSES, OR WACKY EFFECTS)
+;Traditional Phase Vocoder - TSM_TIM_PV
+;Identity Phase Locking Phase Vocoder - TSM_TIM_iPL
+;Improved Scaled Phase Locking Phase Vocoder - TSM_TIM_sPL
+;To increase the quality of the time stretching, increase the window size in the TSM_TIM closures.
+;Make sure that it is a power of 2 however. Bigger=better harmonic quality, worse transient smearing, more latency.
+;Each method has audio types that it handles better.
+
+(bind-func dsp:[float,float,i64,i64,float*]*
+  (let ((TSM_method (TSM_TIM_sPL)))
+    (lambda (in time chan dat)
+      (TSM_method in))))
+
+(dsp:set! dsp)
+
+($ (is_TSM_active)) ;check to see if TSM is active. 1 = active
+
+($ (set_speed 1.0))  ;As above. smaller = slower ; Also sets Beta for SPL
+
+($ (set_beta 1.0))
+($ (set_beta (/ 1.0 speed))) ; Beta = alpha
+($ (set_beta (/ (+ 1.0 (* 2.0 speed)) (* 3.0 speed))))
+
+($ (set_range 0.2))  ;Set the allowable range for sinusoids to jump.
+
+;($ (set_trigger)) ;used for debugging.
+
+(bind-func speed_ramp   ;Ramp between low and high speeds
+  (let ((n:float speed)
+        (switch:i64 0))
+  (lambda()
+    (let ((low:float 0.5)
+          (high:float 1.5))
+    (set! speed n)
+    ;(printf "n=%f speed=%f\n"(ftod n)(ftod speed))
+    (set! beta (/ (+ 1.0 (* 2.0 n)) (* 3.0 n)))
+    (cond ((= switch 0) ;slower
+            (set! n (- n 0.01))
+            (if (> n 1.0)
+                  (set! n (- n 0.01)))
+            (if (< n low)
+              (begin
+                (set! n low)
+                (set! switch 1)
+                (println "speeding up")
+                )))
+          ((= switch 1) ;faster
+            (set! n (+ n 0.01))
+            (if (> n 1.0)
+                  (set! n (+ n 0.01)))
+            (if (> n high)
+              (begin
+                (set! n high)
+                (set! switch 0)
+                (println "slowing down")
+                ))))
+    void
+    ;(callback (+ (now) 3000) speed_ramp)
+    ))))
+;
+($ (speed_ramp))
