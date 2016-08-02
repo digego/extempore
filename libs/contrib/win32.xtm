@@ -14,12 +14,15 @@
 
 (bind-dylib libkernel32 "Kernel32.dll")
 (bind-dylib libuser32 "User32.dll")
+(bind-dylib libshell32 "Shell32.dll")
 (bind-dylib libwmapi "Dwmapi.dll")
 (bind-dylib libgdi "Gdi32.dll")
 
 (bind-alias HANDLE i8*)
+(bind-alias HINSTANCE i8*)
 (bind-alias DWORD i32)
 (bind-alias WORD i16)
+(bind-alias INT i32)
 (bind-alias UINT i32)
 (bind-alias UINT32 i32)
 (bind-alias INT32 i32)
@@ -34,6 +37,12 @@
 (bind-alias LONG_PTR i64)  ;; not actually a ptr!
 (bind-alias LRESULT i64)
 (bind-alias ULONG_PTR i64) ;; not actually a ptr!
+(bind-alias LPVOID i8*)
+(bind-alias LPSTR i8*)
+(bind-alias LPCSTR i8*)
+(bind-alias LPCTSTR i8*) ;; I think this is OK but wide char might be 16bit??
+(bind-alias LPTSTR i8*)
+
 (if (= 64 (sys:pointer-size))
     (bind-alias WPARAM i64)
     (bind-alias WPARAM i32))
@@ -343,3 +352,31 @@
 (bind-lib libuser32 InitializeTouchInjection [BOOL,UINT32,DWORD]*)
 (bind-lib libuser32 InjectTouchInput [BOOL,UINT32,POINTER_TOUCH_INFO*]*)        
       
+
+;;;;;;;;;; mem mapping ;;;;;;;
+
+(bind-alias LPSECURITY_ATTRIBUTES i8*)
+(bind-val PAGE_READONLY DWORD #x02)
+(bind-val PAGE_READWRITE DWORD #x04)
+(bind-val PAGE_WRITECOPY DWORD #x08)
+(bind-val INVALID_HANDLE_VALUE HANDLE (i64toptr -1))
+
+(bind-val STANDARD_RIGHTS_REQUIRED DWORD #x000F0000)
+(bind-val SECTION_QUERY DWORD #x0001)
+(bind-val SECTION_MAP_WRITE DWORD  #x0002)
+(bind-val SECTION_MAP_READ DWORD #x0004)
+(bind-val SECTION_MAP_EXECUTE DWORD #x0008)
+(bind-val SECTION_EXTEND_SIZE DWORD #x0010)
+(bind-val SECTION_ALL_ACCESS DWORD (bor STANDARD_RIGHTS_REQUIRED (bor SECTION_QUERY (bor SECTION_MAP_WRITE (bor SECTION_MAP_READ (bor SECTION_MAP_EXECUTE SECTION_EXTEND_SIZE))))))
+(bind-val FILE_MAP_ALL_ACCESS DWORD SECTION_ALL_ACCESS)
+
+;; CreateFileMapping
+(bind-lib libkernel32 CreateFileMappingA [HANDLE,HANDLE,LPSECURITY_ATTRIBUTES,DWORD,DWORD,DWORD,LPCTSTR]*)
+(bind-lib libkernel32 MapViewOfFile [LPVOID,HANDLE,DWORD,DWORD,DWORD,size_t]*)
+
+;; file path stuff
+(bind-lib libkernel32 GetFullPathNameA [DWORD,LPCTSTR,DWORD,LPTSTR,LPTSTR]*)
+
+;; execute
+;; (bind-lib libkenrel32 CreateProcessA [BOOL,LPCTSTR,LPTSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCTSTR,LPSTARTUPINFO,LPPROCESS_INFORMATION]*)
+(bind-lib libshell32 ShellExecuteA [HINSTANCE,HWND,LPCTSTR,LPCTSTR,LPCTSTR,LPCTSTR,INT]*)

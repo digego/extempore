@@ -188,11 +188,17 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     }
 #ifdef _WIN32
     extern int WINDOWS_COLORS[];
+    extern int WINDOWS_BGCOLORS[];    
     if (unlikely(extemp::UNIV::EXT_TERM == 1)) {
-        Foreground = (Foreground > 7) ? 7 : Foreground;
-        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+      Foreground = (Foreground > 7) ? 7 : Foreground;
+      Background = (Background > 7) ? 0 : Background;
+      HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+      if (Background > 0) {
+        SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground] | WINDOWS_BGCOLORS[Background]);
+      } else {
         SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
-        return;
+      }
+      return;
     }
 #else
     // if simple term (that doesn't support defaults)
