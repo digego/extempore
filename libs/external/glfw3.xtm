@@ -816,6 +816,20 @@
       (glfwSwapBuffers window)
       window)))
 
+(bind-func glfw_init_and_create_fullscreen_interaction_compatibility_window
+  (lambda (monitor_idx)
+    (glfw_init)
+    (let ((num:i32* (salloc))
+          (monitors (glfwGetMonitors num))
+          (window (glfw_create_fullscreen_interaction_window (if (< monitor_idx (pref num 0))
+                                                                 (pref monitors monitor_idx)
+                                                                 (pref monitors 0)))))
+      (glfwShowWindow window)
+      (glfwMakeContextCurrent window)
+      (glfwSwapInterval 1)
+      (glfwSwapBuffers window)
+      window)))
+
 (bind-func glfw_init_and_create_fullscreen_interaction_window
   (lambda ()
     (glfw_init_and_create_fullscreen_interaction_window:[i8*,i32]* 0:i32)))

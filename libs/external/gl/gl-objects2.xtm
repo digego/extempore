@@ -252,6 +252,17 @@
         VAO_NULL_VBOS
         (tref-ptr vao 2))))
 
+(bind-func get_vbo
+  (lambda (vao:VAO* idx)
+    (if (< idx 16)
+        (aref (tref-ptr vao 2) idx)
+        (cast null VBO*))))
+
+(bind-func attrib_set_p
+  (lambda (vao:VAO* index)
+    (if (< index 16)
+        (aref (tref-ptr vao 1) index)
+        #f)))
 
 (bind-func VAO
   (lambda ()
@@ -287,6 +298,16 @@
           (sprintf s "<VAO: id %d>" (tref vao 0)))
       (String s))))
 
+(bind-func unset_attribute
+  (lambda (vao index)
+    (glBindVertexArray (id vao))
+    (aset! (attribs vao) index #f)
+    (aset! (buffers vao) index null)
+    (glDisableVertexAttribArray index)
+    (glVertexAttribDivisor index 0)
+    (glBindVertexArray 0)
+    void))
+
 ;; where size is number of components for vertex
 (bind-func set_attribute
   (lambda (vao:VAO* vbo:VBO* type index size stride:GLsizei offset instance_attr:i1)
@@ -301,23 +322,25 @@
         (if (= size 16) ;; i.e. if a mat4
             (begin ;; this is a pain but matrix is simply 4 * vec4
               (glEnableVertexAttribArray (+ index 0)) ;; i dn't know if i need these enables
-              (glVertexAttribPointer (+ index 0) 4 type GL_FALSE (* 16 component_size)
-                                     (pref-ptr (cast null GLvoid*) (* component_size 0)))
+              (glVertexAttribPointer (+ index 0) 4 type GL_FALSE (* stride component_size)
+                                     (pref-ptr (cast null GLvoid*) (* component_size (+ offset 0))))
               (glEnableVertexAttribArray (+ index 1))
-              (glVertexAttribPointer (+ index 1) 4 type GL_FALSE (* 16 component_size)
-                                     (pref-ptr (cast null GLvoid*) (* component_size 4)))
+              (glVertexAttribPointer (+ index 1) 4 type GL_FALSE (* stride component_size)
+                                     (pref-ptr (cast null GLvoid*) (* component_size (+ offset 4))))
               (glEnableVertexAttribArray (+ index 2))
-              (glVertexAttribPointer (+ index 2) 4 type GL_FALSE (* 16 component_size)
-                                     (pref-ptr (cast null GLvoid*) (* component_size 8)))
+              (glVertexAttribPointer (+ index 2) 4 type GL_FALSE (* stride component_size)
+                                     (pref-ptr (cast null GLvoid*) (* component_size (+ offset 8))))
               (glEnableVertexAttribArray (+ index 3))                            
-              (glVertexAttribPointer (+ index 3) 4 type GL_FALSE (* 16 component_size)
-                                     (pref-ptr (cast null GLvoid*) (* component_size 12))))
-            (glVertexAttribPointer index
-                                   size
-                                   type ;;(type vbo)
-                                   GL_FALSE
-                                   (* component_size stride)
-                                   (pref-ptr (cast null GLvoid*) (* component_size offset)))))
+              (glVertexAttribPointer (+ index 3) 4 type GL_FALSE (* stride component_size)
+                                     (pref-ptr (cast null GLvoid*) (* component_size (+ offset 12)))))
+            (begin
+              (glEnableVertexAttribArray index)
+              (glVertexAttribPointer index
+                                     size
+                                     type ;;(type vbo)
+                                     GL_FALSE
+                                     (* component_size stride)
+                                     (pref-ptr (cast null GLvoid*) (* component_size offset))))))
       (gl_print_error "Error binding VAO attribute")
       (if (= size 16)
           (begin
@@ -331,7 +354,7 @@
       (glBindBuffer GL_ARRAY_BUFFER 0)
       (if (and instance_attr (<> size 16))
           (begin (glVertexAttribDivisor index 1)
-                 (gl_print_error "Error setting VAO attribute divisor")))          
+                 (gl_print_error "Error setting VAO attribute divisor")))       
       (if (and instance_attr (= size 16))
           (begin (glVertexAttribDivisor (+ index 0) 1)
                  (glVertexAttribDivisor (+ index 1) 1)
@@ -350,8 +373,8 @@
     (set_attribute:[void,VAO*,VBO*,i32,i32,i32,GLsizei,i32,i1]* vao vbo (type vbo) index size stride offset #f)))
 
 (bind-func set_attribute
-  (lambda (vao vbo index size stride:i64 offset:i32)
-    (set_attribute:[void,VAO*,VBO*,i32,i32,i32,GLsizei,i32,i1]* vao vbo (type vbo) index size (convert stride) offset #f)))
+  (lambda (vao vbo index size stride:i32 offset:i32 instance_attr:i1)
+    (set_attribute:[void,VAO*,VBO*,i32,i32,i32,GLsizei,i32,i1]* vao vbo (type vbo) index size stride offset instance_attr)))
 
 (bind-func set_attribute
   (lambda (vao vbo index size)
@@ -427,6 +450,12 @@
     (if (null? tex)
         -1
         (tref tex 1))))
+
+(bind-func type
+  (lambda (tex:Texture* value:i32)
+    (if (null? tex)
+        -1
+        (tset! tex 1 value))))
 
 (bind-func width
   (lambda (tex:Texture*)
@@ -565,6 +594,15 @@
       (tset! tex 4 (cast data i8*))
       tex)))
 
+;; texture from existing data (no copy) with type
+;; (bind-func Texture 
+;;   (lambda (width:i32 height:i32 comp:i32 type:i32 data:i8*)
+;;     (let ((tex (Texture:[Texture*,i32]* type)))
+;;       (tset! tex 2 width)
+;;       (tset! tex 3 height)
+;;       (tset! tex 4 (cast data i8*))
+;;       tex)))
+
 ;; methods
 
 (bind-func bind
@@ -581,7 +619,8 @@
                       GL_UNSIGNED_BYTE
                       (data tex)))
     (gl_print_error "couldn't Texture_bind_image")    
-    (cond ((= (type tex) GL_RGBA)
+    (cond ((or (= (type tex) GL_RGBA)
+               (= (type tex) GL_BGRA))
            (begin
              ;; set some parameters
              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)

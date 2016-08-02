@@ -437,20 +437,20 @@
             void))
       ;; return vbo
       (let ((vbo (VBO vbodata (* positions vbostride) GL_STATIC_DRAW positions vbostride)))
-        (set_attribute vao vbo 0 4 vbostride 2)
-        (set_attribute vao vbo 1 3 vbostride 6)
-        (set_attribute vao vbo 2 3 vbostride 9)
-        (set_attribute vao vbo 3 4 vbostride 12)
+        (set_attribute vao vbo 0 4 (convert vbostride) 2)
+        (set_attribute vao vbo 1 3 (convert vbostride) 6)
+        (set_attribute vao vbo 2 3 (convert vbostride) 9)
+        (set_attribute vao vbo 3 4 (convert vbostride) 12)
         ;;; santiy check for num of bones
         ;; (dotimes (k positions)
         ;;   (println "pos:" k "bones:" (pref (cast (pref-ptr vbodata (* k vbostride)) i32*) 1)))
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (if (> num_bones 0)
             (begin
-              (set_attribute vao vbo 4 4 vbostride 16) ;; bone ids
-              (set_attribute vao vbo 5 4 vbostride (+ 16 num_bones)))) ;; bone weights
+              (set_attribute vao vbo 4 4 (convert vbostride) 16) ;; bone ids
+              (set_attribute vao vbo 5 4 (convert vbostride) (+ 16 num_bones)))) ;; bone weights
         (gl_print_error "error before setting GL_INT active")
-        (set_attribute vao vbo 6 1 vbostride 1)  ;; active bones
+        (set_attribute vao vbo 6 1 (convert vbostride) 1)  ;; active bones
         (gl_print_error "error IN setting GL_INT active")
         (glBindBuffer GL_ARRAY_BUFFER 0)
         vbo))))
