@@ -4,63 +4,104 @@
 ;; Version: 1.0
 ;; Keywords: lisp, extempore
 ;; URL: http://github.com/extemporelang/extempore-emacs-mode
+;; Package-Requires:((emacs "24.4"))
 
 ;; Copyright (c) 2011-2015, Andrew Sorensen
 
 ;; All rights reserved.
 
 ;; Redistribution and use in source and binary forms, with or without
-;; modification, are permitted provided that the following conditions are met:
+;; modification, are permitted provided that the following conditions
+;; are met:
 
-;; 1. Redistributions of source code must retain the above copyright notice,
-;;    this list of conditions and the following disclaimer.
+;; 1. Redistributions of source code must retain the above copyright
+;;    notice, this list of conditions and the following disclaimer.
 
-;; 2. Redistributions in binary form must reproduce the above copyright notice,
-;;    this list of conditions and the following disclaimer in the documentation
-;;    and/or other materials provided with the distribution.
+;; 2. Redistributions in binary form must reproduce the above
+;;    copyright notice, this list of conditions and the following
+;;    disclaimer in the documentation and/or other materials provided
+;;    with the distribution.
 
-;; Neither the name of the authors nor other contributors may be used to endorse
-;; or promote products derived from this software without specific prior written
-;; permission.
+;; Neither the name of the authors nor other contributors may be used
+;; to endorse or promote products derived from this software without
+;; specific prior written permission.
 
-;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-;; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-;; IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-;; ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-;; LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-;; CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-;; SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-;; INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-;; CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-;; POSSIBILITY OF SUCH DAMAGE.
+;; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+;; "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+;; LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+;; FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+;; COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+;; INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+;; (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+;; SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+;; HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+;; STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+;; OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ;;; Commentary:
 
-;; A major mode for editing Extempore code. See the Extempore project
-;; page at http://github.com/digego/extempore for more details.
-
-;; History
-
-;; Adapted from: scheme.el by Bill Rozas and Dave Love
-;; Also includes some work done by Hector Levesque and Andrew Sorensen
-
-;; Installation:
-
-;; Install via package.el with
-
-;; (package-install-file "/path/to/extempore-mode.el")
-
-;; Currently, extempore.el requires Emacs 24, because it inherits from
-;; prog-mode (via lisp-mode)
+;;    A major mode for editing Extempore code. See the Extempore
+;;    project page at http://github.com/digego/extempore for more
+;;    details.
+;;
+;;  Installation
+;;
+;;    Available through MELPA:
+;;
+;;    M-x `package-install' RET `extempore-mode' RET
+;;
+;;    If you don't want to get it from MELPA, just download the file and
+;;    use `package-install-file'
+;;
+;;    (package-install-file "/path/to/extempore-mode.el")
+;;
+;;  Usage
+;;
+;;    The most important commands are
+;;
+;;      M-x `extempore-connect-or-disconnect' (C-c C-j)
+;;
+;;      Connect the current extempore-mode buffer to a running
+;;      Extempore process - this is necessary to begin sending code
+;;      for evaluation. An Extempore process may have multiple
+;;      connected buffers, and each buffer can be connected to
+;;      multiple Extempore processes. If called with a prefix arg,
+;;      disconnect current buffer.
+;;
+;;      M-x `switch-to-extempore' (C-c C-z)
+;;
+;;      Switch to the Extempore process buffer running in Emacs. If
+;;      not currently running, prompt to start one.
+;;
+;;      M-x `extempore-send-definition' (C-c C-c, C-M-x)
+;;
+;;      Send the Extempore form under point (or a whole region, if
+;;      region is active) to all Extempore processes connected to the
+;;      current buffer.
+;;
+;;      M-x `extempore-repl' (C-c C-c, C-M-x)
+;;
+;;      Create an Extempore REPL buffer.
+;;
+;;  History
+;;
+;;    Adapted from: scheme.el by Bill Rozas and Dave Love
+;;    Also includes some work done by Hector Levesque and Andrew Sorensen
+;;
+;;  Caveats
+;;
+;;    extempore-mode requires Emacs 24, because it inherits from
+;;    prog-mode (via lisp-mode)
 
 ;;; Code:
 
 (require 'lisp-mode)
 (require 'thingatpt)
 (require 'eldoc)
-(require 'cl-macs)
+(require 'cl-lib)
 (require 'subr-x)
+
 
 (defvar extempore-mode-syntax-table
   (let ((st (make-syntax-table))
@@ -299,10 +340,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
   (define-key keymap (kbd "C-c M-r") 'extempore-send-buffer-or-region-and-go)
   (define-key keymap (kbd "C-c C-z") 'switch-to-extempore)
   (define-key keymap (kbd "C-c C-e") 'extempore-repl)
-  (define-key keymap (kbd "C-c C-l") 'exlog-mode)
-  ;; slave buffer mode
-  (define-key keymap (kbd "C-c c s") 'extempore-sb-mode)
-  (define-key keymap (kbd "C-c c p") 'extempore-sb-toggle-current-buffer))
+  (define-key keymap (kbd "C-c C-l") 'exlog-mode))
 
 (extempore-keybindings extempore-mode-map)
 
@@ -372,7 +410,7 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
   ;; This list is curated by hand - it's usually pretty up to date,
   ;; but shouldn't be relied on as an Extempore language reference.
   (eval-when-compile
-    (let ((extempore-xtlang-names '("random" "afill!" "pfill!" "tfill!" "vfill!" "array-fill!" "pointer-fill!" "tuple-fill!" "vector-fill!" "free" "array" "tuple" "list" "~" "cset!" "cref" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset!" "pref-ptr" "vset!" "vref" "aset!" "aref" "aref-ptr" "tset!" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>")))
+    (let ((extempore-xtlang-names '("random" "afill!" "pfill!" "tfill!" "vfill!" "array-fill!" "pointer-fill!" "tuple-fill!" "vector-fill!" "free" "array" "tuple" "list" "~" "cset!" "cref" "&" "bor" "ang-names" "<<" ">>" "nil" "printf" "sprintf" "null" "now" "pset!" "pref-ptr" "vset!" "vref" "aset!" "aref" "aref-ptr" "tset!" "tref" "tref-ptr" "salloc" "halloc" "zalloc" "alloc" "schedule" "exp" "log" "sin" "cos" "tan" "asin" "acos" "atan" "atan2" "sqrt" "expt" "floor" "ceiling" "truncate" "round" "llvm_printf" "push_zone" "pop_zone" "memzone" "callback" "llvm_sprintf" "make-array" "array-set!" "array-ref" "array-ref-ptr" "pointer-set!" "pointer-ref" "pointer-ref-ptr" "stack-alloc" "heap-alloc" "zone-alloc" "make-tuple" "tuple-set!" "tuple-ref" "tuple-ref-ptr" "closure-set!" "closure-ref" "pref" "pdref" "impc_null" "bitcast" "void" "ifret" "ret->" "clrun->" "make-env-zone" "make-env" "<>")))
       (list
        ;; xtlang "keywords"
        (list
@@ -382,6 +420,8 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        '("(\\(bind-func\\)\\s-+\\([[:alnum:]_-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face))
+       '("(\\(bind-macro\\)"
+         (1 font-lock-keyword-face))
        '("(\\(bind-poly\\)\\s-+\\([[:alnum:]_-]+\\)\\s-+\\([[:alnum:]_-]+\\)"
          (1 font-lock-keyword-face)
          (2 font-lock-constant-face t)
@@ -434,9 +474,6 @@ To restore the old C-x prefixed versions, add something like this to your .emacs
        '("(\\(cast\\|convert\\)\\s-+\\S-+\\s-+\\([^ \t)]?+\\))"
          (1 font-lock-keyword-face)
          (2 font-lock-type-face))
-       ;; convert
-       '("(\\(convert\\)\\s-+\\S-+)"
-         (1 font-lock-keyword-face))
        '("(\\(constrain-genericfunc\\|specialize-genericfunc\\|specialize-generictype\\)\\s-+\\(\\S-+\\)\\s-+\\([^)]?+\\))"
          (1 font-lock-keyword-face)
          (2 font-lock-function-name-face)
@@ -583,6 +620,7 @@ indentation."
 (put 'lambda 'extempore-indent-function 1)
 (put 'memzone 'extempore-indent-function 1)
 (put 'bind-func 'extempore-indent-function 'defun)
+(put 'bind-macro 'extempore-indent-function 'defun)
 (put 'bind-poly 'extempore-indent-function 'defun)
 (put 'bind-type 'extempore-indent-function 'defun)
 (put 'bind-val 'extempore-indent-function 'defun)
@@ -1017,24 +1055,27 @@ to continue it."
 (defalias 'extempore-start-repl 'extempore-repl)
 
 ;;;###autoload
-(defun extempore-run (program-args)
+(defun extempore-run (program-args run-directory)
   "Run an inferior Extempore process, input and output via buffer `*extempore*'.
 If there is a process already running in `*extempore*', switch to that buffer.
 
 \(Type \\[describe-mode] in the process buffer for a list of commands.)"
 
-  (interactive (list (read-string "Run Extempore: extempore " extempore-program-args)))
-  (unless extempore-share-directory
-    (error "Error: `extempore-share-directory' not set!\n\nNote that this var used to be called `user-extempore-directory', so you may need to update your .emacs"))
-  (if (not (comint-check-proc "*extempore*"))
-      (let* ((default-directory (file-name-as-directory
-                                 (expand-file-name extempore-share-directory)))
-             (runtime-directory (concat default-directory "runtime")))
-        (message (concat "Running extempore with: " program-args))
-        (set-buffer (apply #'make-comint "extempore" "extempore" nil
-                           (split-string-and-unquote program-args)))
-        (inferior-extempore-mode))
-    (message "extempore is already running in *extempore* buffer."))
+  (interactive
+   (list (read-string "Run: extempore " extempore-program-args)
+         (if (equal system-type 'windows-nt)
+             extempore-share-directory  ;; must run in sharedir on Windows
+           (read-directory-name "In directory: " extempore-share-directory))))
+  (unless (comint-check-proc "*extempore*")
+    (with-current-buffer (get-buffer-create "*extempore*")
+      (setq-local default-directory run-directory)
+      (message (concat "Running: extempore " program-args))
+      (apply #'make-comint "extempore"
+             (concat (if (equal system-type 'windows-nt)
+                         extempore-share-directory "")
+                     "extempore") nil
+             (split-string-and-unquote program-args))
+      (inferior-extempore-mode)))
   (setq extempore-buffer "*extempore*"))
 
 (defun extempore-stop ()
@@ -1177,12 +1218,16 @@ See variable `extempore-buffer'."
 Since this command is run implicitly, always ask the user for the
 command to run."
   (save-window-excursion
-    (extempore-run (read-string "Start Extempore as: " (concat "extempore " extempore-program-args))))
+    (call-interactively #'extempore-run))
   (display-buffer "*extempore*" #'display-buffer-pop-up-window))
 
 ;;;;;;;;;;;
 ;; eldoc ;;
 ;;;;;;;;;;;
+
+;; this required for Emacs 25, see GH issue #243
+(unless (fboundp 'eldoc-beginning-of-sexp)
+  (defalias 'eldoc-beginning-of-sexp 'elisp--beginning-of-sexp))
 
 (defcustom extempore-eldoc-active t
   "If non-nil, attempt to display live argument lists for the
@@ -1794,8 +1839,8 @@ If you don't want to be prompted for this name each time, set the
         (replace-match
          (save-match-data
            (format "(%s)"
-                   (mapconcat (lambda (str) (car-safe (reverse (string-utils-split str "[ \f\t\n\r\v*]+" nil :omit-nulls))))
-                              (string-utils-split (match-string-no-properties 1) "[][,]+" :omit-nulls)
+                   (mapconcat (lambda (str) (car-safe (reverse (split-string str "[ \f\t\n\r\v*]+" :omit-nulls))))
+                              (split-string (match-string-no-properties 1) "[][,]+" :omit-nulls)
                               " ")))
          nil :literal)
         (indent-for-tab-command))))
@@ -1856,7 +1901,7 @@ If you don't want to be prompted for this name each time, set the
                                  (substring newdef (length ptr-string))
                                  (extempore-parser-type-from-function-arg typedef-string))))))))
 
-(defun extmpore-parser-process-current-buffer ()
+(defun extempore-parser-process-current-buffer ()
   (interactive)
   (dolist (parse-fn (list #'extempore-parser-remove-ifdef-guards
                           #'extempore-parser-handle-c-comments
