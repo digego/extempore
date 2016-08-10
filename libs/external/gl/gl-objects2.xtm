@@ -611,11 +611,11 @@
     (glBindTexture GL_TEXTURE_2D (id tex))
     (if newdata
         (glTexImage2D GL_TEXTURE_2D 0
-                      (type tex)
+                      (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
                       (width tex)
                       (height tex)
                       0
-                      (type tex)
+                      (type tex)        ;; this is external type (i.e. conversion from external to internal required)
                       GL_UNSIGNED_BYTE
                       (data tex)))
     (gl_print_error "couldn't Texture_bind_image")    
