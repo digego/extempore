@@ -200,7 +200,7 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
       }
       return;
     }
-#else
+#endif //#else
     // if simple term (that doesn't support defaults)
     // then default to black background and white text
     Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
@@ -214,7 +214,7 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
         }
     }
     printf("\x1b[%u;%u;%um", Bold, Foreground + 30, Background + 40);
-#endif
+    // #endif
 }
 
 inline void ascii_default() { ascii_text_color(false, 9, 9); }

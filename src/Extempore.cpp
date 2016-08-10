@@ -200,9 +200,15 @@ int main(int argc, char** argv)
                 } else if (!strcmp(args.OptionArg(), "basic")) {
                     extemp::UNIV::EXT_TERM = 2;
                 } else if (!strcmp(args.OptionArg(), "nocolor")) {
-                    extemp::UNIV::EXT_TERM = 3;
+                  extemp::UNIV::EXT_TERM = 3;
+                } else if (!strcmp(args.OptionArg(), "ansi")) {
+                  extemp::UNIV::EXT_TERM = 0;
                 } else {
-                    extemp::UNIV::EXT_TERM = 0;
+#ifdef _WIN32
+                  extemp::UNIV::EXT_TERM = 1;
+#else                  
+                  extemp::UNIV::EXT_TERM = 0;
+#endif                  
                 }
                 break;
             case OPT_NO_AUDIO:
