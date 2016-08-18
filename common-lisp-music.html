@@ -175,87 +175,80 @@
 list, suggestions/feedback welcome!</p>
 </div>
 <p>First, we load in the DSP library</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">sys</span><span class="p">:</span><span class="n">load</span> <span class="s2">&quot;libs/core/audio_dsp.xtm&quot;</span><span class="p">)</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/audio_dsp.xtm&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>First, we need a <em>master</em> dsp callback. We can call it whatever we
 like, but by convention we call it <code class="docutils literal"><span class="pre">dsp</span></code>. It&#8217;s type <strong>must</strong> be
 <code class="docutils literal"><span class="pre">[float,float,i64,i64,float*]*</span></code></p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil</span> <span class="p">(</span><span class="n">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span> <span class="p">;;</span> <span class="n">instantiates</span> <span class="n">an</span> <span class="n">oscilator</span> <span class="k">with</span> <span class="n">phase</span> <span class="mf">0.0</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span><span class="p">:</span><span class="nb">float</span> <span class="n">time</span><span class="p">:</span><span class="n">i64</span> <span class="n">chan</span><span class="p">:</span><span class="n">i64</span> <span class="n">dat</span><span class="p">:</span><span class="nb">float</span><span class="o">*</span><span class="p">)</span>
-      <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">0</span><span class="p">)</span>         <span class="p">;;</span> <span class="k">if</span> <span class="n">sample</span> <span class="n">request</span> <span class="ow">is</span> <span class="k">for</span> <span class="n">channel</span> <span class="mi">0</span> <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">e</span><span class="o">.</span> <span class="n">left</span><span class="p">)</span>
-          <span class="p">(</span><span class="n">oscil</span> <span class="mf">0.3</span> <span class="mf">220.0</span><span class="p">)</span>  <span class="p">;;</span> <span class="k">return</span> <span class="n">sound</span> <span class="n">a</span> <span class="mi">220</span><span class="n">hz</span> <span class="n">tone</span> <span class="k">with</span> <span class="n">amplitude</span> <span class="mf">0.3</span>
-          <span class="mf">0.0</span><span class="p">))))</span>            <span class="p">;;</span> <span class="n">otherwise</span> <span class="nb">all</span> <span class="n">other</span> <span class="n">channels</span> <span class="k">return</span> <span class="n">silence</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span> <span class="c1">;; instantiates an oscilator with phase 0.0</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:float</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:float*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span>         <span class="c1">;; if sample request is for channel 0 (i.e. left)</span>
+          <span class="p">(</span><span class="nv">oscil</span> <span class="mf">0.3</span> <span class="mf">220.0</span><span class="p">)</span>  <span class="c1">;; return sound a 220hz tone with amplitude 0.3</span>
+          <span class="mf">0.0</span><span class="p">))))</span>            <span class="c1">;; otherwise all other channels return silence</span>
 </pre></div>
 </div>
 <p>We need to tell extempore what we called our DSP callback function
 using <code class="docutils literal"><span class="pre">dsp:set!</span></code>. We only call <code class="docutils literal"><span class="pre">dsp:set!</span></code> once per session&#8212;from
 that point until the end of the session this function is the audio
 callback</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre>(dsp:set! dsp)
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">dsp:set!</span> <span class="nv">dsp</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>We can of course recompile dsp on-the-fly:</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil</span> <span class="p">(</span><span class="n">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span><span class="p">:</span><span class="nb">float</span> <span class="n">time</span><span class="p">:</span><span class="n">i64</span> <span class="n">chan</span><span class="p">:</span><span class="n">i64</span> <span class="n">dat</span><span class="p">:</span><span class="nb">float</span><span class="o">*</span><span class="p">)</span>
-      <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">1</span><span class="p">)</span>         <span class="p">;;</span> <span class="n">swith</span> <span class="kn">from</span> <span class="nn">left</span> <span class="n">channel</span> <span class="n">to</span> <span class="n">right</span> <span class="n">channel</span>
-          <span class="p">(</span><span class="n">oscil</span> <span class="mf">0.3</span> <span class="mf">330.0</span><span class="p">)</span>  <span class="p">;;</span> <span class="n">change</span> <span class="n">to</span> <span class="mf">330.0</span> <span class="n">hz</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:float</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:float*</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span>         <span class="c1">;; swith from left channel to right channel</span>
+          <span class="p">(</span><span class="nv">oscil</span> <span class="mf">0.3</span> <span class="mf">330.0</span><span class="p">)</span>  <span class="c1">;; change to 330.0 hz</span>
           <span class="mf">0.0</span><span class="p">))))</span>
 </pre></div>
 </div>
 <p>Now we have two oscillators, one for the left channel and one for the
 right. We also introduce <code class="docutils literal"><span class="pre">DSP</span></code>, a type alias for <code class="docutils literal"><span class="pre">[float,float,i64,i64,float*]*</span></code></p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span><span class="p">:</span><span class="n">DSP</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil_left</span> <span class="p">(</span><span class="n">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">oscil_right</span> <span class="p">(</span><span class="n">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span> <span class="n">time</span> <span class="n">chan</span> <span class="n">dat</span><span class="p">)</span>
-      <span class="p">(</span><span class="n">cond</span> <span class="p">((</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">0</span><span class="p">)</span> <span class="p">;;</span> <span class="n">left</span>
-             <span class="p">(</span><span class="n">oscil_left</span> <span class="mf">0.3</span> <span class="mf">330.0</span><span class="p">))</span>
-            <span class="p">((</span><span class="o">=</span> <span class="n">chan</span> <span class="mi">1</span><span class="p">)</span> <span class="p">;;</span> <span class="n">right</span>
-             <span class="p">(</span><span class="n">oscil_right</span> <span class="mf">0.3</span> <span class="mf">220.0</span><span class="p">))</span>
-            <span class="p">(</span><span class="k">else</span> <span class="p">;;</span> <span class="nb">any</span> <span class="n">other</span> <span class="n">channels</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil_left</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">oscil_right</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+      <span class="p">(</span><span class="k">cond</span> <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">0</span><span class="p">)</span> <span class="c1">;; left</span>
+             <span class="p">(</span><span class="nv">oscil_left</span> <span class="mf">0.3</span> <span class="mf">330.0</span><span class="p">))</span>
+            <span class="p">((</span><span class="nf">=</span> <span class="nv">chan</span> <span class="mi">1</span><span class="p">)</span> <span class="c1">;; right</span>
+             <span class="p">(</span><span class="nv">oscil_right</span> <span class="mf">0.3</span> <span class="mf">220.0</span><span class="p">))</span>
+            <span class="p">(</span><span class="k">else</span> <span class="c1">;; any other channels</span>
              <span class="mf">0.0</span><span class="p">)))))</span>
 </pre></div>
 </div>
 <p>Equivalently, Extempore&#8217;s audio DSP library has multi-channel
 oscillators, so we can clean up our code a bit:</p>
-<dl class="docutils">
-<dt>(bind-func dsp:DSP</dt>
-<dd><dl class="first last docutils">
-<dt>(let ((oscil (osc_mc_c 0.0)))</dt>
-<dd><dl class="first last docutils">
-<dt>(lambda (in time chan dat)</dt>
-<dd>(oscil chan 0.3 220.0)))) ;; any number of channels (takes additional</dd>
-</dl>
-</dd>
-</dl>
-</dd>
-</dl>
-<p>chan argument)</p>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_mc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+      <span class="p">(</span><span class="nv">oscil</span> <span class="nv">chan</span> <span class="mf">0.3</span> <span class="mf">220.0</span><span class="p">))))</span> <span class="c1">;; any number of channels</span>
+</pre></div>
+</div>
 <p>Let&#8217;s add a frequency sweep. <code class="docutils literal"><span class="pre">SRf</span></code> is a global variable which holds
 the audio sample rate (f for <code class="docutils literal"><span class="pre">float</span></code>)</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span><span class="p">:</span><span class="n">DSP</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil</span> <span class="p">(</span><span class="n">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">duration</span> <span class="p">(</span><span class="o">*</span> <span class="n">SRf</span> <span class="mf">1.0</span><span class="p">))</span>      <span class="p">;;</span> <span class="n">samplerate</span> <span class="o">*</span> <span class="mf">1.0</span> <span class="n">seconds</span>
-        <span class="p">(</span><span class="nb">range</span> <span class="p">(</span><span class="o">/</span> <span class="mf">440.0</span> <span class="n">duration</span><span class="p">)))</span> <span class="p">;;</span> <span class="n">rise</span> <span class="n">up</span> <span class="n">to</span> <span class="mf">440.0</span> <span class="n">hz</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span> <span class="n">time</span> <span class="n">chan</span> <span class="n">dat</span><span class="p">)</span>
-      <span class="p">;;</span> <span class="n">explicit</span> <span class="n">conversion</span> <span class="n">required</span> <span class="n">to</span> <span class="n">coerce</span> <span class="n">time</span> <span class="p">(</span><span class="n">i64</span><span class="p">)</span> <span class="n">into</span> <span class="n">a</span> <span class="nb">float</span>
-      <span class="p">(</span><span class="n">oscil</span> <span class="n">chan</span> <span class="mf">0.3</span> <span class="p">(</span><span class="o">*</span> <span class="nb">range</span> <span class="p">(</span><span class="o">%</span> <span class="p">(</span><span class="n">i64tof</span> <span class="n">time</span><span class="p">)</span> <span class="n">duration</span><span class="p">))))))</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">duration</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">SRf</span> <span class="mf">1.0</span><span class="p">))</span>      <span class="c1">;; samplerate * 1.0 seconds</span>
+        <span class="p">(</span><span class="nv">range</span> <span class="p">(</span><span class="nf">/</span> <span class="mf">440.0</span> <span class="nv">duration</span><span class="p">)))</span> <span class="c1">;; rise up to 440.0 hz</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+      <span class="c1">;; explicit conversion required to coerce time (i64) into a float</span>
+      <span class="p">(</span><span class="nv">oscil</span> <span class="nv">chan</span> <span class="mf">0.3</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">range</span> <span class="p">(</span><span class="nf">%</span> <span class="p">(</span><span class="nf">i64tof</span> <span class="nv">time</span><span class="p">)</span> <span class="nv">duration</span><span class="p">))))))</span>
 </pre></div>
 </div>
 <p>Now, we can &#8220;granulate&#8221; the rising oscillator. With the default
 settings, the the granulator will have little effect on the original
 signal.</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span><span class="p">:</span><span class="n">DSP</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil</span> <span class="p">(</span><span class="n">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">duration</span> <span class="p">(</span><span class="o">*</span> <span class="n">SRf</span> <span class="mf">1.0</span><span class="p">))</span>      <span class="p">;;</span> <span class="n">samplerate</span> <span class="o">*</span> <span class="mf">1.0</span> <span class="n">seconds</span>
-        <span class="p">(</span><span class="nb">range</span> <span class="p">(</span><span class="o">/</span> <span class="mf">440.0</span> <span class="n">duration</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">grains</span> <span class="p">(</span><span class="n">granulator_c</span> <span class="mi">2</span><span class="p">)))</span>  <span class="p">;;</span> <span class="n">setup</span> <span class="n">granulator</span> <span class="k">for</span> <span class="n">two</span> <span class="n">channels</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span> <span class="n">time</span> <span class="n">chan</span> <span class="n">dat</span><span class="p">)</span>
-      <span class="p">(</span><span class="n">grains</span> <span class="n">chan</span> <span class="n">time</span>  <span class="p">;;</span> <span class="n">granulator</span> <span class="n">takes</span> <span class="n">chan</span><span class="p">,</span> <span class="n">time</span> <span class="ow">and</span> <span class="nb">input</span>
-              <span class="p">(</span><span class="n">oscil</span> <span class="n">chan</span> <span class="mf">0.7</span> <span class="p">(</span><span class="o">*</span> <span class="nb">range</span> <span class="p">(</span><span class="o">%</span> <span class="p">(</span><span class="n">convert</span> <span class="n">time</span><span class="p">)</span> <span class="n">duration</span><span class="p">)))))))</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">duration</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">SRf</span> <span class="mf">1.0</span><span class="p">))</span>      <span class="c1">;; samplerate * 1.0 seconds</span>
+        <span class="p">(</span><span class="nv">range</span> <span class="p">(</span><span class="nf">/</span> <span class="mf">440.0</span> <span class="nv">duration</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">grains</span> <span class="p">(</span><span class="nv">granulator_c</span> <span class="mi">2</span><span class="p">)))</span>  <span class="c1">;; setup granulator for two channels</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+      <span class="p">(</span><span class="nv">grains</span> <span class="nv">chan</span> <span class="nv">time</span>  <span class="c1">;; granulator takes chan, time and input</span>
+              <span class="p">(</span><span class="nv">oscil</span> <span class="nv">chan</span> <span class="mf">0.7</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">range</span> <span class="p">(</span><span class="nf">%</span> <span class="p">(</span><span class="k">convert</span> <span class="nv">time</span><span class="p">)</span> <span class="nv">duration</span><span class="p">)))))))</span>
 </pre></div>
 </div>
 <p>Now the fun part&#8212;start playing around with the granulator&#8217;s
@@ -263,20 +256,20 @@ settings! Extempore&#8217;s granulator is stochastic and supports lo and hi
 ranges for most parameters, making a stochastic choice for each grain
 in that range. You can get determinstic behaviour by making lo and hi
 the same value.</p>
-<div class="code extempore highlight-default"><div class="highlight"><pre><span class="p">(</span><span class="n">bind</span><span class="o">-</span><span class="n">func</span> <span class="n">dsp</span><span class="p">:</span><span class="n">DSP</span>
-  <span class="p">(</span><span class="n">let</span> <span class="p">((</span><span class="n">oscil</span> <span class="p">(</span><span class="n">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">duration</span> <span class="p">(</span><span class="o">*</span> <span class="n">SRf</span> <span class="mf">1.0</span><span class="p">))</span>
-        <span class="p">(</span><span class="nb">range</span> <span class="p">(</span><span class="o">/</span> <span class="mf">440.0</span> <span class="n">duration</span><span class="p">))</span>
-        <span class="p">(</span><span class="n">grains</span> <span class="p">(</span><span class="n">granulator_c</span> <span class="mi">2</span><span class="p">)))</span>
-    <span class="p">;;</span> <span class="nb">set</span> <span class="n">some</span> <span class="n">initial</span> <span class="n">values</span>
-    <span class="p">(</span><span class="n">grains</span><span class="o">.</span><span class="n">iot</span> <span class="mi">500</span><span class="p">)</span>     <span class="p">;;</span> <span class="n">inter</span><span class="o">-</span><span class="n">offset</span> <span class="n">time</span> <span class="p">(</span><span class="n">time</span> <span class="n">between</span> <span class="n">grains</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">)</span>
-    <span class="p">(</span><span class="n">grains</span><span class="o">.</span><span class="n">dlo</span> <span class="mf">1000.0</span><span class="p">)</span>  <span class="p">;;</span> <span class="n">shortest</span> <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">e</span><span class="o">.</span> <span class="n">low</span><span class="p">)</span>  <span class="n">duration</span> <span class="p">(</span><span class="ow">in</span> <span class="n">samples</span><span class="p">)</span>
-    <span class="p">(</span><span class="n">grains</span><span class="o">.</span><span class="n">dhi</span> <span class="mf">10000.0</span><span class="p">)</span> <span class="p">;;</span> <span class="n">longest</span>  <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">e</span><span class="o">.</span> <span class="n">high</span><span class="p">)</span> <span class="n">duration</span>  <span class="p">(</span><span class="ow">in</span> <span class="n">samples</span><span class="p">)</span>
-    <span class="p">(</span><span class="n">grains</span><span class="o">.</span><span class="n">rlo</span> <span class="mf">0.5</span><span class="p">)</span>     <span class="p">;;</span> <span class="n">slowest</span>  <span class="p">(</span><span class="n">low</span><span class="p">)</span> <span class="n">playback</span> <span class="n">rate</span>  <span class="p">(</span><span class="o">%</span><span class="mi">50</span><span class="p">)</span>
-    <span class="p">(</span><span class="n">grains</span><span class="o">.</span><span class="n">rhi</span> <span class="mf">2.0</span><span class="p">)</span>     <span class="p">;;</span> <span class="n">fastest</span>  <span class="p">(</span><span class="n">high</span><span class="p">)</span> <span class="n">playback</span> <span class="n">rate</span> <span class="p">(</span><span class="o">%</span><span class="mi">200</span><span class="p">)</span>
-    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="ow">in</span> <span class="n">time</span> <span class="n">chan</span> <span class="n">dat</span><span class="p">)</span>
-      <span class="p">(</span><span class="n">grains</span> <span class="n">chan</span> <span class="n">time</span>  <span class="p">;;</span> <span class="n">granulator</span> <span class="n">takes</span> <span class="n">chan</span><span class="p">,</span> <span class="n">time</span> <span class="ow">and</span> <span class="nb">input</span>
-              <span class="p">(</span><span class="n">oscil</span> <span class="n">chan</span> <span class="mf">0.7</span> <span class="p">(</span><span class="o">*</span> <span class="nb">range</span> <span class="p">(</span><span class="o">%</span> <span class="p">(</span><span class="n">convert</span> <span class="n">time</span><span class="p">)</span> <span class="n">duration</span><span class="p">)))))))</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+  <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">oscil</span> <span class="p">(</span><span class="nv">osc_mc_c</span> <span class="mf">0.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">duration</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">SRf</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">range</span> <span class="p">(</span><span class="nf">/</span> <span class="mf">440.0</span> <span class="nv">duration</span><span class="p">))</span>
+        <span class="p">(</span><span class="nv">grains</span> <span class="p">(</span><span class="nv">granulator_c</span> <span class="mi">2</span><span class="p">)))</span>
+    <span class="c1">;; set some initial values</span>
+    <span class="p">(</span><span class="nv">grains.iot</span> <span class="mi">500</span><span class="p">)</span>     <span class="c1">;; inter-offset time (time between grains in samples)</span>
+    <span class="p">(</span><span class="nv">grains.dlo</span> <span class="mf">1000.0</span><span class="p">)</span>  <span class="c1">;; shortest (i.e. low)  duration (in samples)</span>
+    <span class="p">(</span><span class="nv">grains.dhi</span> <span class="mf">10000.0</span><span class="p">)</span> <span class="c1">;; longest  (i.e. high) duration  (in samples)</span>
+    <span class="p">(</span><span class="nv">grains.rlo</span> <span class="mf">0.5</span><span class="p">)</span>     <span class="c1">;; slowest  (low) playback rate  (%50)</span>
+    <span class="p">(</span><span class="nv">grains.rhi</span> <span class="mf">2.0</span><span class="p">)</span>     <span class="c1">;; fastest  (high) playback rate (%200)</span>
+    <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span> <span class="nv">time</span> <span class="nv">chan</span> <span class="nv">dat</span><span class="p">)</span>
+      <span class="p">(</span><span class="nv">grains</span> <span class="nv">chan</span> <span class="nv">time</span>  <span class="c1">;; granulator takes chan, time and input</span>
+              <span class="p">(</span><span class="nv">oscil</span> <span class="nv">chan</span> <span class="mf">0.7</span> <span class="p">(</span><span class="nf">*</span> <span class="nv">range</span> <span class="p">(</span><span class="nf">%</span> <span class="p">(</span><span class="k">convert</span> <span class="nv">time</span><span class="p">)</span> <span class="nv">duration</span><span class="p">)))))))</span>
 </pre></div>
 </div>
 </div>

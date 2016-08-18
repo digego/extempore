@@ -6,7 +6,7 @@
 
 First, we load in the DSP library
           
-.. code:: extempore
+.. code-block:: extempore
 
       (sys:load "libs/core/audio_dsp.xtm")
 
@@ -14,7 +14,7 @@ First, we need a *master* dsp callback. We can call it whatever we
 like, but by convention we call it ``dsp``. It's type **must** be
 ``[float,float,i64,i64,float*]*``
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp
         (let ((oscil (osc_c 0.0))) ;; instantiates an oscilator with phase 0.0
@@ -28,13 +28,13 @@ using ``dsp:set!``. We only call ``dsp:set!`` once per session---from
 that point until the end of the session this function is the audio
 callback
 
-.. code:: extempore
+.. code-block:: extempore
 
       (dsp:set! dsp)
 
 We can of course recompile dsp on-the-fly:
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp
         (let ((oscil (osc_c 0.0)))
@@ -46,7 +46,7 @@ We can of course recompile dsp on-the-fly:
 Now we have two oscillators, one for the left channel and one for the
 right. We also introduce ``DSP``, a type alias for ``[float,float,i64,i64,float*]*``
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp:DSP
         (let ((oscil_left (osc_c 0.0))
@@ -62,18 +62,17 @@ right. We also introduce ``DSP``, a type alias for ``[float,float,i64,i64,float*
 Equivalently, Extempore's audio DSP library has multi-channel
 oscillators, so we can clean up our code a bit:
 
-.. code:: extempore
+.. code-block:: extempore
 
-(bind-func dsp:DSP
-  (let ((oscil (osc_mc_c 0.0)))
-    (lambda (in time chan dat)
-      (oscil chan 0.3 220.0)))) ;; any number of channels (takes additional
-chan argument)
+    (bind-func dsp:DSP
+      (let ((oscil (osc_mc_c 0.0)))
+        (lambda (in time chan dat)
+          (oscil chan 0.3 220.0)))) ;; any number of channels
 
 Let's add a frequency sweep. ``SRf`` is a global variable which holds
 the audio sample rate (f for ``float``)
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp:DSP
         (let ((oscil (osc_mc_c 0.0))
@@ -87,7 +86,7 @@ Now, we can "granulate" the rising oscillator. With the default
 settings, the the granulator will have little effect on the original
 signal.
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp:DSP
         (let ((oscil (osc_mc_c 0.0))
@@ -104,7 +103,7 @@ ranges for most parameters, making a stochastic choice for each grain
 in that range. You can get determinstic behaviour by making lo and hi
 the same value.
 
-.. code:: extempore
+.. code-block:: extempore
 
       (bind-func dsp:DSP
         (let ((oscil (osc_mc_c 0.0))
