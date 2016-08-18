@@ -60,6 +60,7 @@ this is an attempt to do things right, using Sphinx_.
    audio-signal-processing
    making-an-instrument
    note-level-music
+   common-lisp-music
    sampler
    graphics
    impromptu-users
