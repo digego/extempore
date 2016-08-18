@@ -67,7 +67,7 @@ BUILD_DEPS:BOOL (default ON)
   get those things through another package manager (or not use them at
   all) then set this to ``OFF``.
 
-PACKAGE:BOOL (default ON)
+PACKAGE:BOOL (default OFF)
   when true, build Extempore (including all extended deps and
   AOT-compilation) for binary distribution, e.g.::
 
