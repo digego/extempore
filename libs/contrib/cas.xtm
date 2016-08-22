@@ -21,7 +21,8 @@
         ((string=? (sys:platform) "Linux")
          "libgiac.so.0")
         ((string=? (sys:platform) "Windows")
-         "libgiac.dll")))
+         "Giac_on_Windows.dll")))
+         ;; "libgiac.dll")))
 
 (bind-lib giac caseval [i8*,i8*]*)
 
@@ -255,16 +256,18 @@
          (b (regex:replace-all a "}" "\)")))
     `(cptr->string (casppon ,b))))
 
+;; inlined cas for inlining 'pure' giac code into xtlang
 (bind-macro (icas . args)
-            (let* ((a (regex:replace-all (if (list? (car args))
-                                             (cas-xtm-to-string (car args))
-                                             (sexpr->string args))                                         
-                                         "{" "\("))
-                   (b (regex:replace-all a "}" "\)"))
-                   (c b) ; (string-append "simplify(" b ")"))
-                   (d (eval `(string->sexpr (string-append (cptr->string (cstring (cas2xtm (Str ,(casppoff c))))))))))
-              (if *icas-print-inline* (println 'inlined 'cas: d))
-              `(let ((res ,d)) res)))
+  (let* ((a (regex:replace-all (if (list? (car args))
+                                   (cas-xtm-to-string (car args))
+                                   (sexpr->string args))                                         
+                               "{" "\("))
+         (b (regex:replace-all a "}" "\)"))
+         (c b) ; (string-append "simplify(" b ")"))
+         (d (string->sexpr (cptr->string (cas2xtm_scm (eval `(casppoff c)))))))
+    (if *icas-print-inline* (println 'inlined 'cas: d))
+    `(let ((res ,d)) res)))
+
 
 (define (scmcas name e . args)
   (let* ((a (cas-xtm-to-string `(,name ,e ,@args)))
