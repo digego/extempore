@@ -54,70 +54,86 @@
 ;; add a light and a camera
 (bind-func prerender:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (xtm_light_pos 1 10.0 10.0 15.0)
-    (xtm_light_tgt 1 1.0 3.0 0.0)
-    (xtm_light_up 1 0.0 1.0 0.0)        
-    (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
-    (xtm_light_power 1 30.0)
-    (xtm_light_angle 1 60.0)
-    
-    (xtm_camera_pos (* 10.0 (cos (* .02 (i64tof frame)))) 7.0 15.0)
-    (xtm_camera_tgt 0.0 3.0 0.0)
+    ;; (xtm_light_pos 1 10.0 10.0 15.0)
+    ;; (xtm_light_tgt 1 1.0 3.0 0.0)
+    ;; (xtm_light_up 1 0.0 1.0 0.0)        
+    ;; (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
+    ;; (xtm_light_power 1 30.0)
+    ;; (xtm_light_angle 1 60.0)    
+    (xtm_camera_pos (+ 0.0 (* 10.0 (sin (* .005 (i64tof frame)))))
+                    0.0
+                    (+ 0.0 (* 10.0 (cos (* .005 (i64tof frame))))))                    
+    (xtm_camera_tgt 0.0 0.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
-    void
-    ))
+    void))
 
 ;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (let ((nodes:XTMModel** (cast data XTMModel**)))
-      (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -1.9 0.0)                  
-      ;; (xtm_update_matrices shader m v p)
-      (xtm_draw_model (pref nodes 0) shader m v p)
+    (let ((model:XTMModel* (cast data XTMModel*)))
+      (scale_matrix m 2.0 2.0 2.0)
+      (translate_matrix m 0.0 -3.0 0.0)
+      ;; (rotate_matrix m (* 0.01 (i64tof frame)) 0.0 1.0 0.0)
+      (xtm_draw_model model shader m v p)
       (fill_identity_matrix m)
-      ;; (xtm_update_matrices shader m v p)
-      (rotate_matrix m 270.0 1.0 0.0 0.0) 
-      (xtm_draw_model (pref nodes 1) shader m v p)
-      (fill_identity_matrix m)
-      (xtm_draw_model (pref nodes 2) shader m v p)
       void)))
 
 (bind-func gl_render
   (let ((models:XTMModel** (alloc 3)))
-    (lambda (model1:XTMModel* model2:XTMModel* model3:XTMModel*)
+    (lambda (model1:XTMModel*)
       (if (null? model1)
           (println "gl_render recieved null pointer for model1 - did you load the model successfully?"))
-      (if (null? model2)
-          (println "gl_render recieved null pointer for model2 - did you load the model successfully?"))
-      (if (null? model3)
-          (println "gl_render recieved null pointer for model3 - did you load the model successfully?"))
-      (pfill! models model1 model2 model3)
-      (xtm_render prerender:XTMRENDERCB render:XTMRENDERCB null null (cast models i8*))
+      (xtm_render prerender:XTMRENDERCB render:XTMRENDERCB null null (cast model1 i8*))
       void)))
 
 (bind-val model_path i8*
   (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))))
 (bind-val peppino XTMModel*
   (assimp_load_model model_path "peppino.dae" aiProcess_Triangulate))
-(bind-val scene XTMModel*
-  (assimp_load_model model_path "scene.dae" aiProcess_Triangulate))
-(bind-val dome XTMModel*
-  (assimp_load_model model_path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
+
+(bind-func init_env_map
+  (lambda ()
+    (let ((path (cat2 (String (sys_sharedir)) (String "/assets/images/Yokohama/"))))
+      (xtm_envmap_init #f ;; don't flip images
+                       (cat2 path (Str "posz.jpg"))  ;; front        
+                       (cat2 path (Str "negz.jpg"))  ;; back                       
+                       (cat2 path (Str "posy.jpg"))  ;; top
+                       (cat2 path (Str "negy.jpg"))  ;; bottom                       
+                       (cat2 path (Str "posx.jpg"))  ;; right
+                       (cat2 path (Str "negx.jpg")))  ;; left
+      void)))
+
+(init_env_map)
+    
+;; initialize
+(bind-func init_sky
+  (lambda ()
+    (let ((path (cat2 (String (sys_sharedir)) (String "/assets/images/Yokohama/")))
+          (model (assimp_load_model model_path "skybox.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder))))
+      (xtm_skybox_init model
+                       #f ;; don't flip images
+                       (cat2 path (Str "posz.jpg"))  ;; front
+                       (cat2 path (Str "negz.jpg"))  ;; back
+                       (cat2 path (Str "posy.jpg"))  ;; top
+                       (cat2 path (Str "negy.jpg"))  ;; bottom
+                       (cat2 path (Str "posx.jpg"))  ;; right
+                       (cat2 path (Str "negx.jpg"))) ;; left
+      void)))
+
+(init_sky)
 
 (xtm_render_init
  (call-as-xtlang (glfw_get_framebuffer_width window))
  (call-as-xtlang (glfw_get_framebuffer_height window)))
 
 (bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)
-    (gl_render peppino scene dome)
+  (lambda ()
+    (gl_render peppino)
     ;; swap buffers
     (glfwPollEvents)
     (glfwSwapBuffers window)
     ;; set next frame callback
-    (let ((next_time (+ time (convert (* 44100. delta_t)))))
-      (callback next_time gl_draw_loop next_time delta_t))))
+    (callback (now) gl_draw_loop)))
 
 ;; and to start it running...
-(gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
+(gl_draw_loop)
