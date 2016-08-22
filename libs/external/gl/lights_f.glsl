@@ -32,9 +32,13 @@ uniform mat3 NormalMatrix;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewProjectionMatrix;
 
+uniform samplerCube envMap;
 uniform sampler2D shadowMap;
 uniform sampler2D tex1;
-uniform float IsTextured;
+
+uniform int isEnvMapped;
+uniform int isTextured;
+uniform float envMapWeight;
 
 in vec4 lightVertexPosition[5];
 in vec3 UVWCoord;
@@ -77,6 +81,7 @@ float calcShadow(int idx) {
 }
 
 vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
+  vec3 reflected;
   vec3 LL = normalize(L[idx]); // light vector
   vec4 outcolor, ambient, diffuse, specular, texcolour;
   vec3 HV = normalize(LL+EE); // half vector
@@ -92,17 +97,23 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
   diffuse  = LightDiffuse[idx]   * MaterialDiffuse  * attenuation * nDotLL;
   specular = LightSpecular[idx]  * MaterialSpecular * attenuation * pf;
 
-  if(IsTextured>0.5) {
+  if(isTextured > 0) {
     texcolour = diffuse * texture(tex1,UVWCoord.xy) * vColour; 
     outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
   } else {
     outcolor = vec4(((ambient + diffuse + specular).xyz*shadowValue*vColour.xyz),vColour.a);
+  }
+  if(isEnvMapped > 0) {
+    reflected = reflect(-EE,NN);
+    reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
+    outcolor += vec4(texture(envMap,reflected).xyz * pf,1.0);
   }
   return outcolor;
 }
 
 void main()
 {
+  vec3 reflected;
   vec4 outcolour = vec4(0.0);
   vec3 NN = normalize(N); // surface normal
   vec3 EE = normalize(E); // eye vector
@@ -141,11 +152,17 @@ void main()
 
   if(numLights < 1) { // NO LIGHTS!
     float dotE = max(0.0, dot(NN,EE));
-    if(IsTextured>0.5) {
+    if(isTextured > 0) {
       outcolour = texture(tex1,UVWCoord.xy) * dotE * vColour;
     }else{
       outcolour = vec4(MaterialDiffuse.xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }
+    if(isEnvMapped > 0) {
+      reflected = reflect(-EE,NN);
+      reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
+      outcolour = vec4(texture(envMap,reflected).xyz * 1.0,1.0);      
+      // outcolour += vec4(texture(envMap,reflected).xyz * 0.25,1.0);
+    }    
   } else {
     outcolour /= float(numLights);
   }
