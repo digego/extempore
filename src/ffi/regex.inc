@@ -114,7 +114,9 @@ static pointer regex_replace(scheme* Scheme, pointer Args)
     if (!p) {
         return mk_string(Scheme, (std::string(data, ovector[0]) + replace + (data + ovector[1])).c_str());
     }
-    std::string result(replace, p - replace);
+    // add anything from the start
+    std::string result(data, ovector[0]);
+    result += std::string(replace, p - replace);
     while (p) {
         int pos = strtol(p, &replace, 10);
         p = strchr(replace, '$');
@@ -129,6 +131,8 @@ static pointer regex_replace(scheme* Scheme, pointer Args)
         result += std::string(data + ovector[pos * 2], range);
         result += std::string(replace, len);
     }
+    // add anything from the end
+    result += std::string(data + ovector[1], strlen(data)-ovector[1]);
     return mk_string(Scheme, result.c_str());
 }
 
