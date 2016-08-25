@@ -22,6 +22,7 @@ uniform mat4 ProjectionMatrix;
 uniform mat3 NormalMatrix;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewProjectionMatrix;
+uniform mat3 UVWMatrix;
 
 uniform mat4 LightModelViewProjectionMatrix[5];
 

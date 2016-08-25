@@ -377,6 +377,12 @@
       (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
       void)))
 
+;; uvw should be a 3x3
+(bind-func shader_update_uvwmatrix
+  (lambda (shader:ShaderProgram* uvmat:float*)
+    (glUniformMatrix4fv (glGetUniformLocation (id shader) "UVMatrix") 1 GL_FALSE uvmat)
+    void))
+
 ;; when working with OpenGL
 ;; extempore's mmul is pre mutipled (not post as in GLSL)
 ;; so the same matrix mul is post in GLSL and pre in XTM (i.e. here!)
@@ -951,9 +957,10 @@
 (bind-val DRAW_QUAD_VBO VBO*)
 
 (bind-func draw_quad
-  (lambda ()
+  (lambda (shader uvmat)
+    (shader_update_uvwmatrix shader uvmat)
     (draw DRAW_QUAD_VAO GL_TRIANGLE_STRIP 0 4)
-    (gl_print_error "Error drawing QUAD vao")
+    (gl_print_error "Error drawing QUAD vao")    
     void))
 
 (bind-func init_draw_quad
@@ -973,19 +980,57 @@
 
 ;; update should be #f for static texture and #t for dynamic texture
 (bind-func xtm_draw_tex
-  (lambda (shader:ShaderProgram* tex:Texture* update m v p)
-    (start shader)
-    (shader_update_matrices shader m v p)
-    (bind tex update 0)
-    (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)
-    (draw_quad) 
-    (unbind tex)
-    (stop shader)
+  (let ((idmat:float* (alloc 16)))
+    (fill_identity_matrix idmat)
+    (lambda (shader:ShaderProgram* tex:Texture* uvmat update alpha m v p)
+      (start shader)
+      (shader_update_matrices shader m v p)
+      (bind tex update 0)
+      ;; (glEnable GL_BLEND) ;; alpha blending
+      ;; (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)     
+      (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)
+      (if (< alpha 0.0)
+          (begin
+            (glUniform1i (glGetUniformLocation (id shader) "override_alpha") 0))
+          (begin
+            (glUniform1i (glGetUniformLocation (id shader) "override_alpha") 1)
+            (glUniform1f (glGetUniformLocation (id shader) "alpha") alpha)))
+      (if (null? uvmat)
+          (draw_quad shader idmat)
+          (draw_quad shader uvmat))
+      ;; (glDisable GL_BLEND)
+      (unbind tex)
+      (stop shader)
+      void)))
+
+(bind-func xtm_draw_tex
+  (lambda (shader:ShaderProgram* tex:Texture* uvmat:float* update:i1 m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex uvmat update -1.0 m v p)
+    void))
+
+(bind-func xtm_draw_tex
+  (lambda (shader:ShaderProgram* tex:Texture* uvmat:float* alpha:float m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex uvmat #f alpha m v p)
+    void))
+
+(bind-func xtm_draw_tex
+  (lambda (shader:ShaderProgram* tex:Texture* uvmat:float* m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex uvmat #f -1.0 m v p)
+    void))
+
+(bind-func xtm_draw_tex
+  (lambda (shader:ShaderProgram* tex:Texture* update:i1 m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex null update -1.0 m v p)
+    void))
+
+(bind-func xtm_draw_tex
+  (lambda (shader:ShaderProgram* tex:Texture* alpha:float m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex null #f alpha m v p)
     void))
 
 (bind-func xtm_draw_tex
   (lambda (shader:ShaderProgram* tex:Texture* m v p)
-    (xtm_draw_tex:[void,ShaderProgram*,Texture*,i1,float*,float*,float*]* shader tex #f m v p)
+    (xtm_draw_tex:[void,ShaderProgram*,Texture*,float*,i1,float,float*,float*,float*]* shader tex null #f -1.0 m v p)
     void))
 
 ;; FBO named type taken from libs/external/gl.xtm
@@ -1269,32 +1314,35 @@
 ;; fstop (camera)
 ;; show_focus draws orange colour at focus depth
 (bind-func xtm_dof_fx
-  (lambda (fbo:FBO* autofocus focusx focusy fdepth flength fstop show_focus model view projection)
-    (let ((shader xtm_render_dof_shader)
-          (focuspt:float* (salloc 2)))
-      (glDisable GL_DEPTH_TEST)
-      (start shader)
-      (shader_update_matrices shader model view projection)
-      (bind (depth_tex fbo) #f 0)        
-      (glUniform1i (glGetUniformLocation (id shader) "bgl_DepthTexture") 0)
-      (bind (colour_tex fbo) #f 2)        
-      (glUniform1i (glGetUniformLocation (id shader) "bgl_RenderedTexture") 2)
-      (glUniform1f (glGetUniformLocation (id shader) "znear") xtm_render_near)
-      (glUniform1f (glGetUniformLocation (id shader) "zfar") xtm_render_far)
-      (glUniform1f (glGetUniformLocation (id shader) "focalDepth") fdepth)
-      (glUniform1f (glGetUniformLocation (id shader) "focalLength") flength)
-      (glUniform1f (glGetUniformLocation (id shader) "fstop") fstop)
-      (glUniform1i (glGetUniformLocation (id shader) "showFocus") show_focus)
-      (glUniform1i (glGetUniformLocation (id shader) "autofocus") autofocus)
-      (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureWidth") (i32tof xtm_render_w))
-      (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureHeight") (i32tof xtm_render_h))
-      (pfill! focuspt focusx focusy)
-      (glUniform2fv (glGetUniformLocation (id shader) "focus") 1 focuspt)
-      (draw_quad)
-      (unbind (colour_tex fbo) 0)
-      (unbind (depth_tex fbo) 2)
-      (stop shader)
-      void)))
+  (let ((idmat:float* (alloc 16)))
+    (fill_identity_matrix idmat)
+    (lambda (fbo:FBO* autofocus focusx focusy fdepth flength fstop show_focus model view projection)
+      (let ((shader xtm_render_dof_shader)
+            (focuspt:float* (salloc 2)))
+        (fill_identity_matrix idmat)
+        (glDisable GL_DEPTH_TEST)
+        (start shader)
+        (shader_update_matrices shader model view projection)
+        (bind (depth_tex fbo) #f 0)        
+        (glUniform1i (glGetUniformLocation (id shader) "bgl_DepthTexture") 0)
+        (bind (colour_tex fbo) #f 2)        
+        (glUniform1i (glGetUniformLocation (id shader) "bgl_RenderedTexture") 2)
+        (glUniform1f (glGetUniformLocation (id shader) "znear") xtm_render_near)
+        (glUniform1f (glGetUniformLocation (id shader) "zfar") xtm_render_far)
+        (glUniform1f (glGetUniformLocation (id shader) "focalDepth") fdepth)
+        (glUniform1f (glGetUniformLocation (id shader) "focalLength") flength)
+        (glUniform1f (glGetUniformLocation (id shader) "fstop") fstop)
+        (glUniform1i (glGetUniformLocation (id shader) "showFocus") show_focus)
+        (glUniform1i (glGetUniformLocation (id shader) "autofocus") autofocus)
+        (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureWidth") (i32tof xtm_render_w))
+        (glUniform1f (glGetUniformLocation (id shader) "bgl_RenderedTextureHeight") (i32tof xtm_render_h))
+        (pfill! focuspt focusx focusy)
+        (glUniform2fv (glGetUniformLocation (id shader) "focus") 1 focuspt)
+        (draw_quad shader idmat)      
+        (unbind (colour_tex fbo) 0)
+        (unbind (depth_tex fbo) 2)
+        (stop shader)
+        void))))
 
 (bind-func xtm_dof_fx
   (lambda (fbo:FBO* fdepth flength fstop model view projection)
@@ -1509,33 +1557,27 @@
       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; post - for fullscreen 2d stuff (drawing overlays) 2D fx etc..
       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-      (if (null? post) ;; if no post then just draw render fbo fullscreen
-          (begin
-            (glDisable GL_DEPTH_TEST)
-            (fill_identity_matrix model)
-            (fill_identity_matrix view)
-            (fill_orthographic_matrix projection -1.0 1.0 -1.0 1.0 -1.0 1.0)
-            (if XTM_DOF_ON
-                (if XTM_DOF_AUTOFOCUS
-                    (xtm_dof_fx render_fbo XTM_DOF_X XTM_DOF_Y XTM_DOF_FLENGTH XTM_DOF_FSTOP
-                                (i1toi32 XTM_DOF_DEBUG) model view projection)
-                    (xtm_dof_fx render_fbo XTM_DOF_DISTANCE XTM_DOF_FLENGTH XTM_DOF_FSTOP
-                                (i1toi32 XTM_DOF_DEBUG) model view projection))
-                (xtm_draw_tex xtm_render_quad_shader (colour_tex render_fbo) model view projection))
-            void)
-          (begin
-            ;; post is usually 2D? so no DEPTH test by default!
-            (glDisable GL_DEPTH_TEST)                  
-            ;; (xtm_camera_view view)       ;; get view from current settings
-            (fill_identity_matrix model)            
-            (fill_identity_matrix view)
-            (fill_orthographic_matrix projection -1.0 1.0 -1.0 1.0 -1.0 1.0)
-            ;; should probably really pass in 0 for shader id here!
-            ;; as we don't want ANY shaders running by default in
-            ;; the post processing stage.
-            (post frame xtm_render_quad_shader model view projection data)
-            void))
+      (glDisable GL_DEPTH_TEST)
+      (fill_identity_matrix model)
+      (fill_identity_matrix view)
+      (fill_orthographic_matrix projection -1.0 1.0 -1.0 1.0 -1.0 1.0)
+      (bind render_fbo)
+      (if XTM_DOF_ON
+          (if XTM_DOF_AUTOFOCUS
+              (xtm_dof_fx render_fbo XTM_DOF_X XTM_DOF_Y XTM_DOF_FLENGTH XTM_DOF_FSTOP
+                          (i1toi32 XTM_DOF_DEBUG) model view projection)
+              (xtm_dof_fx render_fbo XTM_DOF_DISTANCE XTM_DOF_FLENGTH XTM_DOF_FSTOP
+                          (i1toi32 XTM_DOF_DEBUG) model view projection)))
+      (unbind render_fbo)
+      ;; if post render is enabled it is the responsibility of the postrender
+      ;; function to draw the render_fbo - which can be globally accessed calling (xtm_render_fbo)
+      (if (null? post) ;; if no post then draw render_fbo out
+          (xtm_draw_tex xtm_render_quad_shader (colour_tex render_fbo) model view projection)          
+          (post frame xtm_render_quad_shader model view projection data))
+      (glEnable GL_DEPTH_TEST)      
       (gl_print_error "Error in xtm_render")
+      ;; if (xtm_dof ...) will get reset on next cycle
+      (set! XTM_DOF_ON #f)
       (set! frame (+ frame 1)))))
 
 (impc:aot:insert-footer "xtmgraphics-pipeline")
