@@ -799,6 +799,30 @@ If you don't have OpenSans on your system, you can download it for free from htt
              (println "OpenSans fonts successfully loaded")
              1:i1)))))
 
+(bind-func nvg_draw_text
+  (lambda (vg text:String* bounds:Rect* face:String* font_size)
+    ;; find bounds
+    (let ((h (tref bounds 3))
+          (textbox_height font_size)
+          (b_ptr:float* (salloc 4)))
+      (nvgTextAlign vg (bor NVG_ALIGN_BOTTOM NVG_ALIGN_CENTER))
+      (nvgFontFace vg (cstring face))
+      (nvgFontSize vg font_size)
+      (nvgTextBoxBounds vg
+                        (tref bounds 0)
+                        (tref bounds 1)
+                        (tref bounds 2)
+                        (cstring text) null
+                        b_ptr)
+      (set! textbox_height (- (pref b_ptr 3) (pref b_ptr 1)))
+      ;; draw text
+      (nvgTextBox vg
+                  (tref bounds 0)
+                  (+ (tref bounds 1) (/ (+ (tref bounds 3) textbox_height) 2.0))
+                  (tref bounds 2)
+                  (cstring text) null))))
+
+
 ;; run the init code
 ;; (impc:aot:do-and-emit
 ;;  (if (not (impc:aot:currently-compiling?))
