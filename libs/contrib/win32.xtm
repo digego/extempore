@@ -20,6 +20,8 @@
 
 (bind-alias HANDLE i8*)
 (bind-alias HINSTANCE i8*)
+(bind-alias HBITMAP i8*)
+(bind-alias HGDIOBJ i8*)
 (bind-alias DWORD i32)
 (bind-alias WORD i16)
 (bind-alias INT i32)
@@ -33,6 +35,7 @@
 (bind-alias HRESULT i32)
 (bind-alias DWORD_PTR i64)
 (bind-alias BOOL i1)
+(bind-alias BYTE i8)
 (bind-alias PDWORD_PTR i64*) ;; pointer to DWORD_PTR
 (bind-alias LONG_PTR i64)  ;; not actually a ptr!
 (bind-alias LRESULT i64)
@@ -53,6 +56,64 @@
 (bind-type POINT <LONG,LONG>) ;; x y
 (bind-type RECT <LONG,LONG,LONG,LONG>) ;; left,top,right,bottom
 (bind-alias LPRECT RECT*)
+
+(bind-func left (lambda (r:LPRECT) (tref r 0)))
+(bind-func top (lambda (r:LPRECT) (tref r 1)))
+(bind-func right (lambda (r:LPRECT) (tref r 2)))
+(bind-func bottom (lambda (r:LPRECT) (tref r 3)))
+
+;; typedef struct tagRGBQUAD {
+;;   BYTE rgbBlue;
+;;   BYTE rgbGreen;
+;;   BYTE rgbRed;
+;;   BYTE rgbReserved;
+;; } RGBQUAD;
+(bind-type RGBQUAD <BYTE,BYTE,BYTE,BYTE>)
+
+;; typedef struct tagBITMAPINFOHEADER {
+;;   DWORD biSize;
+;;   LONG  biWidth;
+;;   LONG  biHeight;
+;;   WORD  biPlanes;
+;;   WORD  biBitCount;
+;;   DWORD biCompression;
+;;   DWORD biSizeImage;
+;;   LONG  biXPelsPerMeter;
+;;   LONG  biYPelsPerMeter;
+;;   DWORD biClrUsed;
+;;   DWORD biClrImportant;
+;; } BITMAPINFOHEADER, *PBITMAPINFOHEADER;
+(bind-type BITMAPINFOHEADER <DWORD,LONG,LONG,WORD,WORD,DWORD,DWORD,LONG,LONG,DWORD,DWORD>)
+
+(bind-type BITMAPINFO <BITMAPINFOHEADER,|1,RGBQUAD|>)
+(bind-alias LPBITMAPINFO BITMAPINFO*)
+
+(bind-func biSize (lambda (obj:BITMAPINFO*) (tref (tref-ptr obj 0) 0)))
+(bind-func biWidth (lambda (obj:BITMAPINFO*) (tref (tref-ptr obj 0) 1)))
+(bind-func biHeight (lambda (obj:BITMAPINFO*) (tref (tref-ptr obj 0) 2)))
+(bind-func biCompression (lambda (obj:BITMAPINFO*) (tref (tref-ptr obj 0) 5)))
+(bind-func biCompression (lambda (obj:BITMAPINFO* val:DWORD) (tset! (tref-ptr obj 0) 5 val)))
+(bind-func biSizeImage (lambda (obj:BITMAPINFO*) (tref (tref-ptr obj 0) 6))) ;; image size in bytes
+
+
+;; typedef struct tagBITMAP {
+;;   LONG   bmType;
+;;   LONG   bmWidth;
+;;   LONG   bmHeight;
+;;   LONG   bmWidthBytes;
+;;   WORD   bmPlanes;
+;;   WORD   bmBitsPixel;
+;;   LPVOID bmBits;
+;; } BITMAP, *PBITMAP;
+(bind-type BITMAP <LONG,LONG,LONG,LONG,WORD,WORD,LPVOID>)
+
+(bind-func bmType (lambda (img:BITMAP*) (tref img 0)))
+(bind-func bmWidth (lambda (img:BITMAP*) (tref img 1)))
+(bind-func bmHeight (lambda (img:BITMAP*) (tref img 2)))
+(bind-func bmWidthBytes (lambda (img:BITMAP*) (tref img 3)))
+(bind-func bmPlanes (lambda (img:BITMAP*) (tref img 4)))
+(bind-func bmBitsPixel (lambda (img:BITMAP*) (tref img 5)))
+(bind-func bmBits (lambda (img:BITMAP*) (tref img 6)))
 
 (bind-type MOUSEINPUT <i32,i32,DWORD,DWORD,DWORD,i64>)
 (bind-type KEYBDINPUT <WORD,WORD,DWORD,DWORD,i64>)
@@ -233,6 +294,13 @@
 (bind-lib libuser32 IsTouchWindow [BOOL,HWND,i64*]*)
 (bind-lib libuser32 GetTouchInputInfo [BOOL,HTOUCHINPUT,i32,PTOUCHINPUT,i32]*)
 (bind-lib libuser32 CloseTouchInputHandle [BOOL,HTOUCHINPUT]*)
+(bind-lib libuser32 FindWindowA [HWND,LPCTSTR,LPCTSTR]*)
+(bind-lib libuser32 GetForegroundWindow [HWND]*)
+(bind-lib libuser32 GetClientRect [BOOL,HWND,LPRECT]*)
+(bind-lib libuser32 GetDC [HDC,HWND]*)
+(bind-lib libuser32 PrintWindow [BOOL,HWND,HDC,UINT]*)
+(bind-lib libuser32 ReleaseDC [i32,HWND,HDC]*)
+
 
 (bind-val OLD_WINDOWS_WNDPROC i8*)
 
@@ -277,6 +345,22 @@
 (bind-lib libwmapi DwmEnableBlurBehindWindow [HRESULT,HWND,DWM_BLURBEHIND*]*)
 ;; x upper left, upper left, x lower right, y lower right 
 (bind-lib libgdi CreateRectRgn [HRGN,i32,i32,i32,i32]*)
+(bind-lib libgdi GetBitmapBits [LONG,HBITMAP,LONG,LPVOID]*)
+(bind-lib libgdi CreateCompatibleBitmap [HBITMAP,HDC,i32,i32]*)
+(bind-lib libgdi SelectObject [HGDIOBJ,HDC,HGDIOBJ]*)
+(bind-lib libgdi DeleteDC [BOOL,HDC]*)
+(bind-lib libgdi DeleteObject [BOOL,HGDIOBJ]*)
+(bind-lib libgdi CreateCompatibleDC [HDC,HDC]*)
+;; int GetDIBits(
+;;   _In_    HDC          hdc,
+;;   _In_    HBITMAP      hbmp,
+;;   _In_    UINT         uStartScan,
+;;   _In_    UINT         cScanLines,
+;;   _Out_   LPVOID       lpvBits,
+;;   _Inout_ LPBITMAPINFO lpbi,
+;;   _In_    UINT         uUsage
+;; );
+(bind-lib libgdi GetDIBits [i32,HDC,HBITMAP,UINT,UINT,LPVOID,LPBITMAPINFO,UINT]*)
 
 (bind-func make_window_transparent
   (lambda (win32dow)
@@ -392,3 +476,42 @@
 ;; execute
 ;; (bind-lib libkenrel32 CreateProcessA [BOOL,LPCTSTR,LPTSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCTSTR,LPSTARTUPINFO,LPPROCESS_INFORMATION]*)
 (bind-lib libshell32 ShellExecuteA [HINSTANCE,HWND,LPCTSTR,LPCTSTR,LPCTSTR,LPCTSTR,INT]*)
+
+;;; xtlang wrappers ;;;;;
+(bind-func bitmap_from_window
+  (lambda (window_name:i8*)
+    (let ((hwnd (if (null? window_name)
+                    (GetForegroundWindow)
+                    (FindWindowA window_name null)))
+          (rc (RECT 0 0 0 0)))
+      (if (null? hwnd)
+          (begin (println "could not find window named" (Str hwnd))
+                 (tuple 0 0 3:i32 (cast null i8*)))
+          (let ((PW_CLIENTONLY 1) ;; to grab full window set to 0
+                (DIB_RGB_COLORS 0)
+                (BI_RGB 0)
+                (BI_PNG:i32 5)
+                (res (GetClientRect hwnd rc)) ;; fills rc
+                (hdcScreen (GetDC null))
+                (info:BITMAPINFO* (alloc))
+                (hdc (CreateCompatibleDC hdcScreen))
+                (bmp (CreateCompatibleBitmap hdcScreen
+                                             (- (right rc) (left rc))
+                                             (- (bottom rc) (top rc)))))
+
+            (SelectObject hdc bmp)
+            (PrintWindow hwnd hdc PW_CLIENTONLY)
+            ;; first populate 'info'
+            (GetDIBits hdc bmp 0 0 null info DIB_RGB_COLORS)
+            (let ((buf:i8* (alloc (biSizeImage info))))
+              ;; set compression value (not compressed!)
+              (biCompression info BI_RGB)
+              ;; now fill for reals!
+              (GetDIBits hdc bmp 0 (biHeight info) buf info DIB_RGB_COLORS)
+              ;; release stuff
+              (DeleteDC hdc)
+              (DeleteObject bmp)
+              (ReleaseDC null hdcScreen)
+              ;; and return as vector of <width,height,channels,data>
+              (tuple (biWidth info) (biHeight info) 3:i32 buf)))))))
+
