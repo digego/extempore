@@ -106,9 +106,9 @@
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (let ((nodes:XTMModel** (cast data XTMModel**)))
-      (scale_matrix m 1.5 1.5 1.5)
-      (translate_matrix m 2.0 -1.9 0.0)
       (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
+      (translate_matrix m 2.0 -1.9 0.0)
+      (scale_matrix m 1.5 1.5 1.5)      
       ;; (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
@@ -155,13 +155,13 @@
       ;; let's draw a picture in picture while we are at it!
       (mcopy p 4 4 pcopy)
       ;; add picture in picture
-      ;; first translate/scale the PIP to a size and location on screen
+      ;; first scale and translate the PIP to a size and location on screen
+      (scale_matrix pcopy 0.4 0.3 0.5) ;; flip the image (and possibly resize?)      
       (translate_matrix pcopy -0.5 -0.6 0.0) ;; move the image somewhere?      
-      (scale_matrix pcopy 0.4 0.3 0.5) ;; flip the image (and possibly resize?)
       ;; second uvmap translate/scale to zoom into peppino (i.e. zoom into fbo)
       (fill_identity_matrix uvmat)
-      (translate_matrix uvmat .4 .45 0.0)
-      (scale_matrix uvmat 0.2 0.2 1.0)      
+      (scale_matrix uvmat 0.2 0.2 1.0)
+      (translate_matrix uvmat .4 .45 0.0)      
       ;; next setup blending for transparent draw
       (glEnable GL_BLEND)  ;; add for blending
       (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)      

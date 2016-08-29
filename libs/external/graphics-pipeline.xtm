@@ -52,7 +52,7 @@
               0.0 1.0 0.0 0.0
               0.0 0.0 1.0 0.0
               x   y   z   1.0)
-      (mmmul mat2 mat mat3)
+      (mmmul mat mat2 mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -65,8 +65,15 @@
               0.0   y     0.0   0.0
               0.0   0.0   z     0.0
               0.0   0.0   0.0   1.0)
-      (mmmul mat2 mat mat3)
+      (mmmul mat mat2 mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
+      void)))
+
+(bind-func invert_matrix
+  (lambda (mat:float*)
+    (let ((mat2:float* (salloc 16)))
+      (minverse mat 4 mat2)
+      (memcpy (cast mat i8*) (cast mat2 i8*) (* 16 4))
       void)))
 
 (bind-func rotate_matrix
@@ -88,7 +95,7 @@
               (+ (* y x c-1) (* z s)) (+ (* y y c-1) c) (- (* y z c-1) (* x s)) 0.0
               (- (* x z c-1) (* y s)) (+ (* y z c-1) (* x s)) (+ (* z z c-1) c) 0.0
               0.0               0.0                     0.0                     1.0)
-      (mmmul mat2 mat mat3)
+      (mmmul mat mat2 mat3)
       (memcpy (cast mat i8*) (cast mat3 i8*) (* 16 4))
       void)))
 
@@ -114,18 +121,39 @@
 
 ;; this is similar to gluPerspective
 ;; but fills a suitable PROJECTION matrix
+;; (bind-func fill_projection_matrix
+;;   (lambda (mat:float* fovy aspect near far)
+;;     (let ((top (* near (tanf fovy)))
+;;           (right (* top aspect))
+;;           (left (* -1.0 right))
+;;           (bottom (* -1.0 top)))
+;;       (pfill! mat
+;;               (/ near right) 0.0 0.0 0.0
+;;               0.0 (/ near top) 0.0 0.0
+;;               0.0 0.0 (* -1.0 (/ (+ far near) (- far near))) -1.0
+;;               0.0 0.0 (* -1.0 (/ (* 2.0 far near) (- far near))) 0.0)
+;;       void)))
+
 (bind-func fill_projection_matrix
   (lambda (mat:float* fovy aspect near far)
-    (let ((top (* near (tanf fovy)))
-          (right (* top aspect))
-          (left (* -1.0 right))
-          (bottom (* -1.0 top)))
+    (let ((a (* fovy (/ PIf 180.0))) ;; convert deg to rad
+          (c (/ (cos (* a 0.5)) (sin (* a 0.5)))))
       (pfill! mat
-              (/ near right) 0.0 0.0 0.0
-              0.0 (/ near top) 0.0 0.0
-              0.0 0.0 (/ (+ (* -1.0 far) near) (- far near)) -1.0
-              0.0 0.0 (/ (* -2.0 far near) (- far near)) 0.0)
+              (/ c aspect) 0.0 0.0 0.0
+              0.0 c 0.0 0.0
+              0.0 0.0 (* -1.0 (/ (+ far near) (- far near))) -1.0
+              0.0 0.0 (* -1.0 (/ (* 2.0 far near) (- far near))) 0.0)
       void)))
+
+;; left right bottom top near far
+(bind-func fill_projection_matrix
+  (lambda (mat:float* l r b t n f)
+    (pfill! mat
+            (/ 2.0 (- r l)) 0.0 0.0 0.0
+            0.0 (/ (* 2.0 n) (- t b)) 0.0 0.0
+            (/ (+ r l) (- r l)) (/ (+ t b) (- t b)) (* -1.0 (/ (+ f n) (- f n))) -1.0
+            0.0 0.0 (* -1.0 (* 2.0 f n) (- f n)) 0.0)
+    void))
 
 ;; this is similar to gluPerspective
 ;; but fills a suitable PROJECTION matrix
@@ -154,28 +182,37 @@
 ;; this is similar to gl_look_at
 ;; but returns a suitable VIEW matrix
 (bind-func fill_view_matrix
-  (let ((mattt:float* (alloc 16)))
+  (let ((orientation_matrix:float* (alloc 16))
+        (translation_matrix:float* (alloc 16))
+        (vz:float* (alloc 3)) ;; vector z axes
+        (vy:float* (alloc 3)) ;; vector y axes
+        (vx:float* (alloc 3)) ;; vector x axes
+        (vtmp:float* (alloc 3)))
     (lambda (matrix:float* vEye vTarget vUp)
-      (let ((vz:float* (salloc 3))
-            (vy:float* (salloc 3))
-            (vx:float* (salloc 3))
-            (i 0)
-            (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))          
-            (vtmp1:float* (salloc 3))
-            (vtmp2:float* (salloc 3)))
-        (vvsub vEye vTarget 3 vtmp1)
-        (vnormalise vtmp1 3 vz)
-        (vnormalise vUp 3 vtmp2)
-        (vvcross vtmp2 vz vtmp1)
-        (vnormalise vtmp1 3 vx)
-        (vvcross vz vx vy)
-        (pfill! mat
-                (pref vx 0) (pref vx 1) (pref vx 2) 0.0
-                (pref vy 0) (pref vy 1) (pref vy 2) 0.0
-                (pref vz 0) (pref vz 1) (pref vz 2) 0.0
-                (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
-        (minverse mat 4 matrix)
+      (let ((i 0))
+        (vvsub vEye vTarget 3 vtmp)
+        (vnormalise vtmp 3 vz) ;; gives z axes
+        ;; cross z with up
+        (vvcross vUp vz vtmp)
+        (vnormalise vtmp 3 vx) ;; gives x axes
+        (vvcross vz vx vy) ;; gives y axes
+        ;; (pfill! mat
+        ;;         (pref vx 0) (pref vx 1) (pref vx 2) 0.0
+        ;;         (pref vy 0) (pref vy 1) (pref vy 2) 0.0
+        ;;         (pref vz 0) (pref vz 1) (pref vz 2) 0.0
+        ;;         (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
+        (pfill! orientation_matrix
+                (pref vx 0) (pref vy 0) (pref vz 0) 0.0
+                (pref vx 1) (pref vy 1) (pref vz 1) 0.0
+                (pref vx 2) (pref vy 2) (pref vz 2) 0.0
+                0.0 0.0 0.0 1.0)
+        (pfill! translation_matrix
+                1.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0
+                0.0 0.0 1.0 0.0
+                (* -1.0 (pref vEye 0)) (* -1.0 (pref vEye 1)) (* -1.0 (pref vEye 2)) 1.0)
+        ;; (minverse mat 4 matrix)
+        (mmmul translation_matrix orientation_matrix matrix)
         void))))
 
 ;; this is similar to gl_look_at
@@ -185,29 +222,38 @@
 ;; instead of a target:position
 ;; we provide a    dir:vector
 (bind-func fill_view_matrix_dir
-  (let ((mattt:float* (alloc 16)))
+  (let ((orientation_matrix:float* (alloc 16))
+        (translation_matrix:float* (alloc 16))
+        (vz:float* (alloc 3)) ;; vector z axes
+        (vy:float* (alloc 3)) ;; vector y axes
+        (vx:float* (alloc 3)) ;; vector x axes
+        (vtmp:float* (alloc 3)))
     (lambda (matrix:float* vEye:float* vDir vUp)
-      (let ((vz:float* (salloc 3))
-            (vy:float* (salloc 3))
-            (vx:float* (salloc 3))
-            (i 0)
-            (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))          
-            (vtmp1:float* (salloc 3))
-            (vtmp2:float* (salloc 3)))
+      (let ((i 0))
         (vnormalise vDir 3 vz)
-        (vnormalise vUp 3 vtmp2)
-        (vvcross vtmp2 vz vtmp1)
-        (vnormalise vtmp1 3 vx)
+        (vnormalise vUp 3 vtmp)
+        (vvcross vtmp vz vy) ;; use vy as a tmp here
+        (vnormalise vy 3 vx)
         (vvcross vz vx vy)
-        (pfill! mat
-                (pref vx 0) (pref vx 1) (pref vx 2) 0.0
-                (pref vy 0) (pref vy 1) (pref vy 2) 0.0
-                (pref vz 0) (pref vz 1) (pref vz 2) 0.0
-                (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
-        (minverse mat 4 matrix)
+        ;; (pfill! mat
+        ;;         (pref vx 0) (pref vx 1) (pref vx 2) 0.0
+        ;;         (pref vy 0) (pref vy 1) (pref vy 2) 0.0
+        ;;         (pref vz 0) (pref vz 1) (pref vz 2) 0.0
+        ;;         (pref vEye 0) (pref vEye 1) (pref vEye 2) 1.0)
+        ;; (minverse mat 4 matrix)
+        (pfill! orientation_matrix
+                (pref vx 0) (pref vy 0) (pref vz 0) 0.0
+                (pref vx 1) (pref vy 1) (pref vz 1) 0.0
+                (pref vx 2) (pref vy 2) (pref vz 2) 0.0
+                0.0 0.0 0.0 1.0)
+        (pfill! translation_matrix
+                1.0 0.0 0.0 0.0
+                0.0 1.0 0.0 0.0
+                0.0 0.0 1.0 0.0
+                (* -1.0 (pref vEye 0)) (* -1.0 (pref vEye 1)) (* -1.0 (pref vEye 2)) 1.0)
+        ;; (minverse mat 4 matrix)
+        (mmmul translation_matrix orientation_matrix matrix)        
         void))))
-
 
 
 ;; 0 vertex id
@@ -387,28 +433,19 @@
 ;; extempore's mmul is pre mutipled (not post as in GLSL)
 ;; so the same matrix mul is post in GLSL and pre in XTM (i.e. here!)
 (bind-func shader_update_matrices_lv
-  (let ((biasmc:float* (alloc 16))
-        (biasmr:float* (alloc 16)))
-    (pfill! biasmc
+  (let ((bias:float* (alloc 16)))
+    (pfill! bias
             0.5 0.0 0.0 0.0
             0.0 0.5 0.0 0.0
             0.0 0.0 0.5 0.0
             0.5 0.5 0.5 1.0)    
-    (pfill! biasmr
-            0.5 0.0 0.0 0.5
-            0.0 0.5 0.0 0.5
-            0.0 0.0 0.5 0.5
-            0.0 0.0 0.0 1.0)   
     (lambda (shader:ShaderProgram* m:float* v p:float* lv:float*) ;; lv light view
       (let ((mlv:float* (salloc 16))
             (mlvp:float* (salloc 16))
             (mlvpb:float* (salloc 16)))
-        ;;(mmul m 4 4 lv 4 4 mlv)
         (mmmul m lv mlv)
-        ;;(mmul mlv 4 4 p 4 4 mlvp)
         (mmmul mlv p mlvp)
-        ;;(mmul mlvp 4 4 biasmc 4 4 mlvpb)
-        (mmmul mlvp biasmc mlvpb)
+        (mmmul mlvp bias mlvpb)
         (glUniformMatrix4fv (glGetUniformLocation (id shader) "LightModelViewProjectionMatrix") 1 GL_FALSE mlvpb))
       (let ((mv (salloc 48))
             (mvp (pref-ptr mv 16))
@@ -434,18 +471,12 @@
 (bind-func shader_update_matrices_lvs
   (let ((i:i32 0)
         (mlvpb:float* (alloc (* 10 16)))
-        (biasmc:float* (alloc 16))
-        (biasmr:float* (alloc 16)))
-    (pfill! biasmc
+        (bias:float* (alloc 16)))
+    (pfill! bias
             0.5 0.0 0.0 0.0
             0.0 0.5 0.0 0.0
             0.0 0.0 0.5 0.0
             0.5 0.5 0.5 1.0)    
-    (pfill! biasmr
-            0.5 0.0 0.0 0.5
-            0.0 0.5 0.0 0.5
-            0.0 0.0 0.5 0.5
-            0.0 0.0 0.0 1.0)   
     (lambda (shader:ShaderProgram* m:float* v p:float* lights:i32 lv:float*) ;; lv is lights
       ;; view
       (dotimes (i lights)
@@ -453,7 +484,7 @@
               (mlvp:float* (salloc 16)))
           (mmmul m (pref-ptr lv (* i 16)) mlv)
           (mmmul mlv p mlvp)
-          (mmmul mlvp biasmc (pref-ptr mlvpb (* i 16)))))
+          (mmmul mlvp bias (pref-ptr mlvpb (* i 16)))))
       (glUniformMatrix4fv (glGetUniformLocation (id shader) "LightModelViewProjectionMatrix")
                           lights GL_FALSE mlvpb)
       (let ((mv (salloc 48))
@@ -601,9 +632,9 @@
         (p:float* (zalloc 4))
         (t:float* (zalloc 4))
         (u:float* (zalloc 4)))
-    (pfill! p 0.0 5.0 10.0 1.0)
-    (pfill! t 0.0 2.0 0.0 1.0)
-    (pfill! u 0.0 1.0 0.0 1.0)
+    (pfill! p 0.0 0.0 10.0 1.0)
+    (pfill! t 0.0 0.0 0.0 1.0)
+    (pfill! u 0.0 1.0 0.0 0.0)
     (tfill! camera p t u)
     (lambda ()
       camera)))
@@ -883,7 +914,6 @@
           (begin (memcpy (cast m i8*) (cast model i8*) (* 4 16)) 1)
           (begin
             (mtrans transmat 4 4 m2)
-            ;;(mmul m2 4 4 model 4 4 m)
             (mmmul m2 model m)
             1))
       (xtm_update_matrices shader m view projection)
@@ -914,7 +944,61 @@
 (bind-val xtm_render_h i32 768)
 (bind-val xtm_render_angle float 35.0)
 (bind-val xtm_render_near float 0.1)
-(bind-val xtm_render_far float 100.0)
+(bind-val xtm_render_far float 1000.0)
+
+;; note that xtlang mmmul is pre-multiplied! (not post as GLSL)
+(bind-func xtm_project
+  (lambda (pt_in:float* pt_out:float* model view projection)
+    (let ((x (pref pt_in 0))
+          (y (pref pt_in 1))
+          (z (pref pt_in 2))
+          (vp_x (i32tof xtm_render_x)) ;; viewport x
+          (vp_y (i32tof xtm_render_y)) ;; viewport y
+          (vp_w (i32tof xtm_render_w))
+          (vp_h (i32tof xtm_render_h))
+          (vp_n xtm_render_near)
+          (vp_f xtm_render_far)
+          (mvp:float* (salloc 16))
+          (tmp:float* (salloc 16))
+          (vec:float* (salloc 4)))
+      (mmmul model view tmp)
+      (mmmul tmp projection mvp)
+      (mmmul pt_in 1 4 mvp 4 4 vec)
+      (if (<> (pref vec 3) 0.0)
+          (vsmul vec (/ 1.0 (pref vec 3)) 4 pt_out)) ;; normalize W!
+      (pset! pt_out 0 (* (+ 1.0 (pref pt_out 0)) 0.5 vp_w))
+      (pset! pt_out 1 (* (+ 1.0 (pref pt_out 1)) 0.5 vp_h))
+      (pset! pt_out 2 (+ (* (pref pt_out 2) (- vp_f vp_n)) vp_n))
+      void)))
+
+;; note that xtlang mmmul is pre-multiplied! (not post as GLSL)
+(bind-func xtm_unproject
+  (lambda (pt_in:float* pt_out:float* model view projection)
+    (let ((x (pref pt_in 0))
+          (y (pref pt_in 1))
+          (z (pref pt_in 2))
+          (vp_x (i32tof xtm_render_x)) ;; viewport x
+          (vp_y (i32tof xtm_render_y)) ;; viewport y
+          (vp_w (i32tof xtm_render_w))
+          (vp_h (i32tof xtm_render_h))
+          (tmp:float* (salloc 16))
+          (tmp2:float* (salloc 16))
+          (imvp:float* (salloc 16))
+          (vec:float* (salloc 4))
+          (out:float* (salloc 4)))
+      (mmmul model view tmp)
+      (mmmul tmp projection imvp)
+      (invert_matrix imvp)
+      (pset! vec 0 (- (* (/ x vp_w) 2.0) 1.0))
+      (pset! vec 1 (- (* (/ y vp_h) 2.0) 1.0))
+      (pset! vec 2 (- (* 2.0 z) 1.0))
+      (pset! vec 3 1.0)
+      (mmmul vec 1 4 imvp 4 4 out)
+      (if (= (pref out 3) 0.0)
+          void
+          (begin
+            (vsmul out (/ 1.0 (pref out 3)) 4 pt_out)  ;; make sure W is normalised!
+            void)))))
 
 (bind-func xtm_render_init_light_shader:[void,i8*,i8*]*
   (lambda (a1 a2)
@@ -1198,7 +1282,7 @@
 (bind-val SKY_BOX_MODEL XTMModel*)
 (bind-val SKY_BOX_TEXTURE Texture*)
 (bind-val SKY_BOX i1 #f)
-(bind-val SKY_BOX_SCALE float 100.0)
+(bind-val SKY_BOX_SCALE float 500.0)
 
 (bind-func xtm_skybox_init
   (lambda (model flipped:i1 front:String* back:String* top:String* bottom:String* left:String* right:String*)
@@ -1214,7 +1298,6 @@
   (lambda (fbo:FBO* model:float* view:float* projection:float*)
     (let ((shader xtm_render_skybox_shader)
           (camera_pos:float* (tref (xtm_get_camera) 0)))
-      (set! SKY_BOX_SCALE 300.0:f)
       ;; (glDepthMask GL_FALSE)            
       (bind fbo)
       (start shader)
@@ -1450,7 +1533,7 @@
       ;; (glEnable GL_TEXTURE_2D)
       ;; seutp projection matrix            
       (fill_projection_matrix projection xtm_render_angle
-                              (i32tof (/ xtm_render_w xtm_render_h))
+                              (/ (i32tof xtm_render_w) (i32tof xtm_render_h))
                               xtm_render_near xtm_render_far)
       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; pre - move lights cameras etc..
