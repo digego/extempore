@@ -120,20 +120,20 @@
               (dat (aref samples index)))
           (* amp (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx))))))))
 
-
+(sys:load "libs/external/instruments_ext.xtm")
 ;; hermite sampler  (multi-channels version)
 ;;
 ;; slower but less noisy (default)
 (bind-func sampler_note_hermite_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index pan:SAMPLE offset:SAMPLE rev:i1)
-    (let ((idx_freq (midi2frq (convert index)))
+  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index:i64 pan:SAMPLE offset:SAMPLE rev:i1)
+    (let ((idx_freq (ftod (midi2frq (convert index SAMPLE))))
           (channels:i64 (convert (aref samples_channels index)))
-          (phase (+ offset (convert (aref samples_offsets index))))) ;; phase unit is audio frames
+          (phase:double (ftod (+ offset (convert (aref samples_offsets index)))))) ;; phase unit is audio frames
       (if (and rev (< phase 0.01))
           (set! phase (convert (- (aref samples_length index) 10))))
       (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
-        (let ((rate (/ freq idx_freq))              
-              (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
+        (let ((rate (/ (ftod freq) idx_freq))
+              (pos:double (if (= chan 0) ;; only increment once per frame
                               (if rev
                                   (set! phase (- phase rate))
                                   (set! phase (+ phase rate)))
@@ -158,7 +158,7 @@
                                 (pref dat (- posx (* 2 channels)))
                                 (pref dat (+ posx (* 2 channels)))))))
                 (* (panner chan pan)
-                   amp (hermite_interp (modulo pos 1.0) y1 x0 x1 x2)))))))))
+                   amp (hermite_interp (dtof (modulo pos 1.0)) y1 x0 x1 x2)))))))))
 
 
 (bind-func set_sampler_audiobuffer
