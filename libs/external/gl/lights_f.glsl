@@ -24,6 +24,7 @@ uniform float MaterialShininess;
 uniform vec4 MaterialAmbient;
 uniform vec4 MaterialDiffuse;
 uniform vec4 MaterialSpecular;
+uniform vec4 MaterialEmissive;
 
 uniform mat4 ModelMatrix;
 uniform mat4 ViewMatrix;
@@ -35,13 +36,25 @@ uniform mat4 ModelViewProjectionMatrix;
 uniform samplerCube envMap;
 uniform sampler2D shadowMap;
 uniform sampler2D tex1;
+uniform sampler2D diffuseTexture;
+uniform sampler2D heightTexture;
+uniform sampler2D specularTexture;
+uniform sampler2D normalsTexture;
+uniform sampler2D projectionTexture;
 
 uniform int isEnvMapped;
 uniform int isTextured;
+uniform int isBumpMapped;
+uniform int isDiffuseMapped;
+uniform int isSpecularMapped;
+uniform int isProjectionTextured;
+uniform int emitVColour;
 uniform float envMapWeight;
+uniform float projectionTextureWeight;
 
 in vec4 lightVertexPosition[5];
 in vec3 UVWCoord;
+in vec4 UVWCoordProjectionTexture;
 in vec4 vColour;
 
 out vec4 xtmColour;
@@ -81,9 +94,9 @@ float calcShadow(int idx) {
 }
 
 vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
-  vec3 reflected;
+  vec3 reflected, tmp;
   vec3 LL = normalize(L[idx]); // light vector
-  vec4 outcolor, ambient, diffuse, specular, texcolour;
+  vec4 outcolor, ambient, diffuse, specular, texcolour, emissive;
   vec3 HV = normalize(LL+EE); // half vector
   float pf = 0.0;
   float nDotLL = max(0.0, dot(NN,LL));
@@ -93,21 +106,33 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     pf = pow(nDotHV, MaterialShininess);
   }
 
-  ambient  = LightAmbient[idx]   * MaterialAmbient  * attenuation;
-  diffuse  = LightDiffuse[idx]   * MaterialDiffuse  * attenuation * nDotLL;
+  ambient  = LightAmbient[idx]   * MaterialAmbient  * attenuation * vColour;
+  diffuse  = LightDiffuse[idx]   * MaterialDiffuse  * attenuation * nDotLL * vColour;
   specular = LightSpecular[idx]  * MaterialSpecular * attenuation * pf;
 
   if(isTextured > 0) {
     texcolour = diffuse * texture(tex1,UVWCoord.xy) * vColour; 
     outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
   } else {
-    outcolor = vec4(((ambient + diffuse + specular).xyz*shadowValue*vColour.xyz),vColour.a);
+    outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),diffuse.a*vColour.a);
   }
   if(isEnvMapped > 0) {
     reflected = reflect(-EE,NN);
     reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
-    outcolor += vec4(texture(envMap,reflected).xyz * pf,1.0);
+    outcolor += vec4(texture(envMap,reflected).xyz * envMapWeight * pf,outcolor.a);
   }
+  /*
+  if(isProjectionTextured > 0) {
+    //tmp = normalize(NN * vec3(1.0,1.0,10.0));
+    //reflected = reflect(-EE,tmp); //tmp);
+    //reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
+    //outcolor += vec4(texture(projectionTexture,reflected.xy).xyz * projectionTextureWeight, outcolor.a);
+    //UVWCoordProjectionTexture
+    tmp = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
+    outcolor += vec4(texture(projectionTexture,tmp.xy).xyz * projectionTextureWeight, outcolor.a);      
+    }
+  */
+  
   return outcolor;
 }
 
@@ -115,10 +140,15 @@ void main()
 {
   vec3 reflected;
   vec4 outcolour = vec4(0.0);
+  vec4 projCoord;
+  vec3 tmp1, tmp2;
   vec3 NN = normalize(N); // surface normal
   vec3 EE = normalize(E); // eye vector
   vec3 VV = normalize(V); // vertex 3d
   float attenuation, shadowValue;
+  vec4 emissive = MaterialEmissive;
+  if(emitVColour > 0) { emissive *= vColour; }
+  projCoord = UVWCoordProjectionTexture / UVWCoordProjectionTexture.w;
 
   if(numLights > 0) { // light 1
     attenuation = calcAttenuation(0);
@@ -160,14 +190,26 @@ void main()
     if(isEnvMapped > 0) {
       reflected = reflect(-EE,NN);
       reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
-      outcolour = vec4(texture(envMap,reflected).xyz * 1.0,1.0);      
+      outcolour += vec4(texture(envMap,reflected).xyz * envMapWeight, outcolour.a);      
       // outcolour += vec4(texture(envMap,reflected).xyz * 0.25,1.0);
     }    
   } else {
     outcolour /= float(numLights);
   }
 
-  xtmColour = outcolour;
+  if(isProjectionTextured > 0) {
+    //tmp2 = vec3(1.0,1.0,8.0) * NN;
+    //tmp1 = normalize(tmp2);
+    // tmp1 = vec3(0.0,0.0,1.0);
+    // reflected = reflect(-EE,tmp1); //tmp);
+    // reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
+    // outcolour += vec4(texture(projectionTexture,reflected.xy).xyz * projectionTextureWeight, outcolour.a);
+      tmp1 = projCoord.xyz; //projCoord.z; //vec3((projCoord.x * 2.0)+1.0,(projCoord.y * 2.0)+1.0,projCoord.z);    
+      tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
+      outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);
+  }
+  
+  xtmColour = outcolour+emissive;
 }
 
 // end file

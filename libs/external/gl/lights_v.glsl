@@ -31,6 +31,7 @@ uniform int instances;
 
 out vec4 lightVertexPosition[5];
 out vec3 UVWCoord;
+out vec4 UVWCoordProjectionTexture;
 out vec4 vColour;
 
 void main()
@@ -46,6 +47,7 @@ void main()
   }
 
   gl_Position = ModelViewProjectionMatrix * vpos;
+  UVWCoordProjectionTexture = ModelViewProjectionMatrix * vec4(vpos.x,vpos.y,0.0,1.0);
   vPosition = ModelViewMatrix * vpos;
 
   N = NormalMatrix * xtmNormal;
@@ -60,6 +62,7 @@ void main()
   
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
+
   UVWCoord = xtmUVW;
   if (instances > 0) {
     vColour = xtmIColour;

@@ -43,6 +43,19 @@
             (pref mat4 8) (pref mat4 9) (pref mat4 10))
     void))
 
+(bind-func plane_intersection
+  (lambda (ray_origin:float* ray_dir:float* plane_centre:float* plane_normal:float*)
+    (let ((denom (vvdot plane_normal ray_dir 3))
+          (t -1.0))
+      (if (> (fabs denom) 0.0001:f) ;; epsilon
+          (begin
+            (vvsub plane_centre ray_origin 3 plane_centre)
+            (set! t (/ (vvdot plane_centre plane_normal 3)
+                       denom))))
+      (if (>= t 0.0)
+          #t
+          #f))))
+                
 (bind-func translate_matrix
   (lambda (mat:float* x y z)
     (let ((mat2:float* (salloc 32))
@@ -282,7 +295,80 @@
 ;; 12 num bones
 ;; 13 bones
 ;; 14 max active bones
-(bind-type XTMMesh <VBO*,Texture*,float*,float*,float*,float*,float,float,i32,i64,VAO*,String*,i32,XTMBone*,i32>)
+;; 15 diffuse texture (currently same as 1)
+;; 16 specular texture
+;; 17 height texture
+;; 18 normal texture
+(bind-type XTMMesh <VBO*,Texture*,float*,float*,float*,float*,float,float,i32,i64,VAO*,String*,i32,XTMBone*,i32,Texture*,Texture*,Texture*,Texture*> (printer? . #f))
+
+(bind-func print:[void,XTMMesh*]*
+  (lambda (mesh)
+    (if (null? mesh)
+        (println "<XTMMesh:NULL>")
+        (let ((name (tref mesh 11))
+              (texture (tref mesh 1))
+              (diffuse:float* (tref mesh 2))
+              (ambient:float* (tref mesh 3))
+              (specular:float* (tref mesh 4))
+              (emissive:float* (tref mesh 5))
+              (shininess:float (tref mesh 6))
+              (opacity:float (tref mesh 7))
+              (verts:i64 (tref mesh 9))
+              (bones:i32 (tref mesh 12))
+              (diffuse_tex:Texture* (tref mesh 15))
+              (specular_tex:Texture* (tref mesh 16))
+              (height_tex:Texture* (tref mesh 17))
+              (normal_tex:Texture* (tref mesh 18)))          
+          (printout "------ mesh ---------")
+          (printout "\n name    : " name)
+          (printout "\n texture : " texture)
+          (printout "\n diffuse : ") (mprint diffuse 1 4)
+          (printout " ambient : ") (mprint ambient 1 4)
+          (printout " speculr : ") (mprint specular 1 4)
+          (printout " emissiv : ") (mprint emissive 1 4)
+          (printout " shine   : " shininess)
+          (printout "\n opacity : " opacity)
+          (printout "\n verts   : " verts)
+          (printout "\n bones   : " bones)
+          (printout "\n diff tex: " (if (null? diffuse_tex) #f #t))
+          (printout "\n spec tex: " (if (null? specular_tex) #f #t))
+          (printout "\n high tex: " (if (null? height_tex) #f #t))
+          (printout "\n norm tex: " (if (null? normal_tex) #f #t))
+          (println)
+          void))))
+
+(bind-func xtm_mesh_diffuse
+  (lambda (mesh:XTMMesh* r g b a)
+    (let ((c (tref mesh 2)))
+      (pfill! c r g b a)
+      void)))
+
+(bind-func xtm_mesh_ambient
+  (lambda (mesh:XTMMesh* r g b a)
+    (let ((c (tref mesh 3)))
+      (pfill! c r g b a)
+      void)))
+
+(bind-func xtm_mesh_specular
+  (lambda (mesh:XTMMesh* r g b a)
+    (let ((c (tref mesh 4)))
+      (pfill! c r g b a)
+      void)))
+
+(bind-func xtm_mesh_emissive
+  (lambda (mesh:XTMMesh* r g b a)
+    (let ((c (tref mesh 5)))
+      (pfill! c r g b a)
+      void)))
+
+(bind-func xtm_mesh_shininess
+  (lambda (mesh:XTMMesh* value)
+    (tset! mesh 6 value)))
+
+(bind-func xtm_mesh_opacity
+  (lambda (mesh:XTMMesh* value)
+    (tset! mesh 7 value)))
+
 ;; 0 name
 ;; 1 transmat
 ;; 2 parent
@@ -290,7 +376,54 @@
 ;; 4 chidren
 ;; 5 num_of_meshes
 ;; 6 meshes
-(bind-type XTMModel <String*,float*,XTMModel*,i32,XTMModel*,i32,XTMMesh*>)
+(bind-type XTMModel <String*,float*,XTMModel*,i32,XTMModel*,i32,XTMMesh*> (printer? . #f))
+
+(bind-func print_xtmmodel:[void,XTMModel*]*
+  (lambda (model)
+    (if (null? model)
+        (println "<XTMModel:null>")
+        (let ((i:i32 0)
+              (name (tref model 0))
+              (parent (tref model 2))
+              (parent_name (if (null? parent) (Str "<null>") (tref parent 0)))
+              (num_children (tref model 3))          
+              (children (tref model 4))
+              (num_meshes (tref model 5))
+              (meshes (tref model 6)))
+          (printout "\n======= model =========")
+          (printout "\nname    : " name)
+          (printout "\nparent  : " parent_name)
+          (printout "\nchildren: " num_children)
+          (printout "\nmeshes  : " num_meshes)
+          (println)
+          (dotimes (i num_meshes)
+            (println (pref-ptr meshes i))
+            1)          
+          (dotimes (i num_children)
+            (print_xtmmodel (pref-ptr children i))
+            1)
+          void))))
+
+(bind-func print:[void,XTMModel*]*
+  (lambda (model)
+    (print_xtmmodel model)))
+
+
+(bind-func xtm_model_child
+  (lambda (model:XTMModel* idx:i32)
+    (let ((num_children (tref model 3))
+          (models (tref model 4)))
+      (if (< idx num_children)
+          (pref-ptr models idx)
+          null))))
+
+(bind-func xtm_model_mesh
+  (lambda (model:XTMModel* idx:i32)
+    (let ((num_meshes (tref model 5))
+          (meshes (tref model 6)))
+      (if (< idx num_meshes)
+          (pref-ptr meshes idx)
+          null))))
 
 
 (bind-func set_instance_matrices
@@ -503,12 +636,21 @@
         (glUniformMatrix4fv (glGetUniformLocation (id shader) "ModelViewProjectionMatrix") 1 GL_FALSE mvp)
         void))))
 
+(bind-val XTM_EMIT_VCOLOUR i32 0)
+
+(bind-func xtm_emit_vcolour
+  (lambda (x)
+    (set! XTM_EMIT_VCOLOUR x)
+    void))
+
 (bind-func shader_update_material
-  (lambda (shader:ShaderProgram* ambient:float* diffuse:float* specular:float* shininess:float)
+  (lambda (shader:ShaderProgram* ambient:float* diffuse:float* emissive:float* specular:float* shininess:float)
     (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient)
     (glUniform4fv (glGetUniformLocation (id shader) "MaterialDiffuse") 1 diffuse)
     (glUniform4fv (glGetUniformLocation (id shader) "MaterialSpecular") 1 specular)
+    (glUniform4fv (glGetUniformLocation (id shader) "MaterialEmissive") 1 emissive)
     (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
+    (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)    
     void))
 
 (bind-func shader_update_bones
@@ -539,20 +681,41 @@
         (gl_print_error "Error updating bones")
         void))))
 
+(bind-val PROJECTION_TEXTURE_WEIGHT float 0.5)
+
+(bind-func shader_update_projection_texture
+  (lambda (shader:ShaderProgram* textureUnit texture:Texture*)
+    (if (or (null? texture)
+            (< (id texture) 1))
+        (begin
+          (glUniform1i (glGetUniformLocation (id shader) "isProjectionTextured") 0)
+          (glUniform1f (glGetUniformLocation (id shader) "projectionTextureWeight") PROJECTION_TEXTURE_WEIGHT))
+        (begin
+          (bind texture #f textureUnit)
+          (glUniform1f (glGetUniformLocation (id shader) "projectionTextureWeight") PROJECTION_TEXTURE_WEIGHT)
+          (glUniform1i (glGetUniformLocation (id shader) "isProjectionTextured") 1)
+          (glUniform1i (glGetUniformLocation (id shader) "projectionTexture") textureUnit)))
+    (gl_print_error "Error setting up projection texture")
+    void))
+
+(bind-val ENV_MAP_WEIGHT float 1.0)
+
 ;; where texture is expected to be a CUBE texture
 (bind-func shader_update_envmap
-  (lambda (shader:ShaderProgram* texture:Texture*)
+  (lambda (shader:ShaderProgram* textureUnit texture:Texture*)
     (if (or (null? texture)
             (< (id texture) 1))
         (begin
           (glUniform1i (glGetUniformLocation (id shader) "isEnvMapped") 0)
+          (glUniform1f (glGetUniformLocation (id shader) "envMapWeight") ENV_MAP_WEIGHT)          
           void)
         (begin
-          (bind_cube texture #f 1)
+          (bind_cube texture #f textureUnit)
           (glUniform1i (glGetUniformLocation (id shader) "isEnvMapped") 1)
-          (glUniform1i (glGetUniformLocation (id shader) "envMap") 1)
+          (glUniform1f (glGetUniformLocation (id shader) "envMapWeight") ENV_MAP_WEIGHT)
+          (glUniform1i (glGetUniformLocation (id shader) "envMap") textureUnit)
           void))
-    (gl_print_error "Error setting uniforms! in xtm_draw_mesh")
+    (gl_print_error "Error setting up envmap!")
     void))
 
 (bind-func xtm_build_mesh_vbo
@@ -853,17 +1016,21 @@
             (diffuse (tref mesh 2))
             (ambient (tref mesh 3))
             (specular (tref mesh 4))
+            (emissive (tref mesh 5))
             (shininess (tref mesh 6))
             (facemode (tref mesh 8)))
-        (set! shininess (dtof 100.0))
+        ;; (set! shininess (dtof 100.0))
         (if (not (null? ambient))
             (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient))
         (if (not (null? diffuse))
             (glUniform4fv (glGetUniformLocation (id shader) "MaterialDiffuse") 1 diffuse))
         (if (not (null? specular))
             (glUniform4fv (glGetUniformLocation (id shader) "MaterialSpecular") 1 specular))
+        (if (not (null? specular))
+            (glUniform4fv (glGetUniformLocation (id shader) "MaterialEmissive") 1 emissive))
         (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
         (glUniform1i (glGetUniformLocation (id shader) "instances") instances)
+        (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)
         (if (> (tref mesh 14) 0) ;; do we have any bones in our mesh!
             (begin
               (shader_update_bones shader mesh)))
@@ -1315,11 +1482,35 @@
       ;; (glDepthMask GL_TRUE)
       void)))
 
-;;;;;;;;;;;;;
+;;;;;;;;;;;;;;
+;;
+;; PROJECTED TEXTURE
+;;
+;;;;;;;;;;;;;;
+
+(bind-val PROJECTION_TEXTURE Texture*)
+(bind-val PROJECTION_TEXTURE_ON i1 #f)
+
+(bind-func xtm_projection_texture_load
+  (lambda (flipped:i1 filename:String*)
+    (set! PROJECTION_TEXTURE (Texture))
+    (load_data PROJECTION_TEXTURE (i1toi32 flipped) filename)
+    (bind PROJECTION_TEXTURE #t 0) ;; send data to card
+    (unbind PROJECTION_TEXTURE 0)
+    (set! PROJECTION_TEXTURE_ON #t)
+    (set! PROJECTION_TEXTURE_WEIGHT 0.5:f)    
+    void))
+
+(bind-func xtm_projecton_texture_weight
+  (lambda (x)
+    (set! PROJECTION_TEXTURE_WEIGHT x)
+    void))
+
+;;;;;;;;;;;;;;
 ;;
 ;; ENV MAP
 ;;
-;;;;;;;;;;;;;
+;;;;;;;;;;;;;;
 
 (bind-val ENV_MAP_TEXTURE Texture*)
 (bind-val ENV_MAP i1 #f)
@@ -1331,6 +1522,12 @@
     (bind_cube ENV_MAP_TEXTURE #t 0) ;; send data to card
     (unbind_cube SKY_BOX_TEXTURE 0)
     (set! ENV_MAP #t)
+    (set! ENV_MAP_WEIGHT 1.0:f)
+    void))
+
+(bind-func xtm_envmap_weight
+  (lambda (x)
+    (set! ENV_MAP_WEIGHT x)
     void))
 
 (bind-func xtm_envmap_as_skybox
@@ -1605,11 +1802,14 @@
       (set! sh2 xtm_render_light_shader)
       (start sh2) ;; start program
       (bind render_fbo) ;; bind fbo
-      (bind (depth_tex shadow_fbo) #f 0) ;; bind shadow texture
-      (glUniform1i (glGetUniformLocation (id sh2) "shadowMap") 0)
-      (if ENV_MAP
-          (shader_update_envmap sh2 ENV_MAP_TEXTURE)
-          (shader_update_envmap sh2 null))
+      (bind (depth_tex shadow_fbo) #f 0) ;; bind shadow texture (texunit 0)
+      (glUniform1i (glGetUniformLocation (id sh2) "shadowMap") 0) 
+      (if ENV_MAP ;; env map bound to texture unit 4
+          (shader_update_envmap sh2 4 ENV_MAP_TEXTURE)
+          (shader_update_envmap sh2 4 null))
+      (if PROJECTION_TEXTURE_ON  ;; projection texture bound to tex unit 5
+          (shader_update_projection_texture sh2 5 PROJECTION_TEXTURE)
+          (shader_update_projection_texture sh2 5 null))
       ;; draw scene
       (glViewport xtm_render_x xtm_render_y xtm_render_w xtm_render_h)
       (glDisable GL_CULL_FACE) ;; turn face culling off      
