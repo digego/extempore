@@ -47,7 +47,7 @@ Hello, World! is pretty straightforward in Extempore
 
 .. code-block:: extempore
 
-  (printf "Hello, World!")
+  (println "Hello, World!")
 
 "Hello, Sine!"
 --------------
