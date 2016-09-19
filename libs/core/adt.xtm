@@ -413,7 +413,7 @@
     (let ((ith_val (nth lst i)))
       (set_car (nth_tail lst i) (nth lst j))
       (set_car (nth_tail lst j) ith_val))
-    lst))
+    lst))          
 
 ;; fold/reduce
 
@@ -511,6 +511,14 @@
 (bind-func flatten:[List{!a}*,List{List{!a}*}*]*
   (lambda (nl)
     (foldl (lambda (acc x) (append acc x)) (list) nl)))
+
+
+(bind-func rotate:[List{!a}*,List{!a}*,i64]*
+  (lambda (l n)
+    (if (< n 0)
+        (append (drop l (* -1 n)) (take l (* -1 n)))
+        (append (drop l (- (length l) n))
+                (take l (- (length l) n))))))
 
 ;; push can't really work without changing the cells around, and can
 ;; never work for the (push 42 (list)) case, so it's best to not use
