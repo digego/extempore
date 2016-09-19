@@ -315,6 +315,30 @@
       (doloop (j neighbors)
         (pset! dest (+ (* neighbors i) j) (pref src (+ (* stride i) j)))))))
 
+(bind-func vcopy
+  (lambda (src:double* len:i64 dest:double*)
+    (doloop (i len)
+      (pset! dest i (pref src i)))
+    void))
+
+(bind-func vcopy
+  (lambda (src:float* len:i64 dest:float*)
+    (doloop (i len)
+      (pset! dest i (pref src i)))
+    void))
+
+(bind-func vcopy
+  (lambda (src:i64* len:i64 dest:i64*)
+    (doloop (i len)
+      (pset! dest i (pref src i)))
+    void))
+
+(bind-func vcopy
+  (lambda (src:i32* len:i64 dest:i32*)
+    (doloop (i len)
+      (pset! dest i (pref src i)))
+    void))
+
 (bind-func vnormalise
   (lambda (v1:float* len:i64 result:float*)
     (let ((mag 0.0)
@@ -1106,6 +1130,61 @@ column-major (the same as OpenGL)
               (set! largest l)
               (set! j p))))
       j)))
+
+;;;;;;;;;;;;;;
+;;
+;; v sphere ;;
+;;
+;;;;;;;;;;;;;;
+
+;; calculate the minimum bouning sphere
+;; for a buf full of 'n' 3d vertices
+;; stride will usually ee either 3 (if already 3d) or 4 if (4d)
+;;
+;; c and r are a |3,float|* and a |1,float|*
+;; they are the centre and radius of the returned bounding sphere
+;;
+;; bouncing bouble algorithm - Tian Bo
+(bind-func vsphere
+  (lambda (buf:float* n:i64 stride:i64 c:float* r:float*)
+    (let ((centre:float* buf) ;; start guess with 1st vertex
+          (radius 0.0001:f)
+          (pos:float* null)
+          (diff:float* (salloc 3))
+          (tmp:float* (salloc 3))
+          (len:float 0.0)
+          (alpha:float 0.0)
+          (alphasq:float 0.0)
+          (i 0) (j 0))
+      (dotimes (i 2)
+        (dotimes (j n)
+          (set! pos (pref-ptr buf (* stride j)))
+          (vvsub pos centre 3 diff)
+          (set! len (vmag diff 3))
+          (if (> len radius)
+              (begin
+                (set! alpha (/ len radius))
+                (set! alphasq (* alpha alpha))
+                (set! radius (* 0.5:f (+ alpha (/ 1.0 alpha)) radius))
+                ;; (set! centre (+ (* 0.5:f (+ 1 (/ 1.0 alphasq)) centre)
+                ;;                 (* (- 1 (/ 1.0 alphasq)) pos)))))))
+                (vsmul centre (* 0.5 (+ 1.0 (/ 1.0 alphasq))) 3 centre)
+                (vsmul pos (- 1.0 (/ 1.0 alphasq)) 3 tmp)
+                (vvsum centre tmp 3 centre)))))
+      (dotimes (j n)
+        (set! pos (pref-ptr buf (* stride j)))
+        (vvsub pos centre 3 diff)
+        (set! len (vmag diff 3))
+        (if (> len radius)
+            (begin
+              (set! radius (/ (+ radius len) 2.0))
+              ;; (set! centre (+ centre (/ (- len radius) (* len diff)))))))
+              (vsmul diff len 3 diff)
+              (vsdiv diff (- len radius) 3 diff)
+              (vvsum centre diff 3 centre))))              
+      (vcopy centre 3 c) ;; set c
+      (pset! r 0 radius) ;; set r
+      void)))
 
 ;;;;;;;;;;;;;;
 ;; Rational ;;
