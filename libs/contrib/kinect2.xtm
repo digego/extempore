@@ -45,9 +45,30 @@
 (bind-val	TrackingState_Inferred i32 1)
 (bind-val	TrackingState_Tracked i32 2)
 
+(bind-val HandState_Unknown i32 0)
+(bind-val HandState_NotTracked i32 1)
+(bind-val HandState_Open i32 2)
+(bind-val HandState_Closed i32 3)
+(bind-val HandState_Lasso i32 4)
+
 (bind-type CameraSpacePoint <float,float,float>)
+(bind-func get_x:[float,CameraSpacePoint*]* (lambda (obj) (tref obj 0)))
+(bind-func get_x:[float,CameraSpacePoint]* (lambda (obj) (tref obj 0)))
+(bind-func get_y:[float,CameraSpacePoint*]* (lambda (obj) (tref obj 1)))
+(bind-func get_y:[float,CameraSpacePoint]* (lambda (obj) (tref obj 1)))
+(bind-func get_z:[float,CameraSpacePoint*]* (lambda (obj) (tref obj 2)))
+(bind-func get_z:[float,CameraSpacePoint]* (lambda (obj) (tref obj 2)))
+
 (bind-type Joint <JointType,CameraSpacePoint,TrackingState> (printer? . #f))
+(bind-func get_type:[JointType,Joint*]* (lambda (obj) (tref obj 0)))
+(bind-func get_position:[CameraSpacePoint,Joint*]* (lambda (obj) (tref obj 1)))
+(bind-func get_state:[TrackingState,Joint*]* (lambda (obj) (tref obj 2)))
+
 (bind-type XTM_Point2d <float,float>)
+(bind-func get_x:[float,XTM_Point2d]* (lambda (obj) (tref obj 0)))
+(bind-func get_y:[float,XTM_Point2d]* (lambda (obj) (tref obj 1)))
+(bind-func get_x:[float,XTM_Point2d*]* (lambda (obj) (tref obj 0)))
+(bind-func get_y:[float,XTM_Point2d*]* (lambda (obj) (tref obj 1)))
 
 (bind-func print:[void,Joint*]*
   (lambda (x)
@@ -144,6 +165,18 @@
             (tfill! xy (tref p 0) (tref p 1))
             #t)))))
 
+(bind-func kinect_get_joint_xy
+  (lambda (id:i64 joint_id:i32)
+    (let ((points:XTM_Point2d* (kinect_update_body.points))
+          (ids:i64* (kinect_update_body.ids))
+          (i:i64 0) (idx:i64 -1))
+      (dotimes (i 6) (if (= (pref ids i) id) (set! idx i)))
+      (if (< idx 0)
+          (tuple 0.0:f 0.0:f)
+          (let ((p (pref-ptr points (+ (* idx 25) (convert joint_id)))))
+            (tuple (tref p 0) (tref p 1)))))))
+
+;; returns the left hands state (i.e. HandState_*)
 (bind-func kinect_get_hand_left
   (lambda (id:i64)
     (let ((hands:i32* (kinect_update_body.hands))
@@ -154,6 +187,7 @@
           -1
           (pref hands (* 2 idx))))))
 
+;; returns the left hands state (i.e. HandState_*)
 (bind-func kinect_get_hand_right
   (lambda (id:i64)
     (let ((hands:i32* (kinect_update_body.hands))
@@ -163,7 +197,6 @@
       (if (< idx 0)
           -1
           (pref hands (+ 1 (* 2 idx)))))))
-
 
 (bind-func kinect_print_body
   (lambda ()

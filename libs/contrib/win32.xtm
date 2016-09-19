@@ -205,6 +205,14 @@
 
 (bind-val GCLP_WNDPROC DWORD -24)
 
+;; system metrics
+
+(bind-val SM_CXSCREEN i32 0)
+(bind-val SM_CYSCREEN i32 1)
+
+(bind-lib libuser32 GetSystemMetrics [i32,i32]*)
+
+
 ;; typedef struct tagTOUCHINPUT {
 ;;     LONG x;
 ;;     LONG y;
@@ -300,7 +308,12 @@
 (bind-lib libuser32 GetDC [HDC,HWND]*)
 (bind-lib libuser32 PrintWindow [BOOL,HWND,HDC,UINT]*)
 (bind-lib libuser32 ReleaseDC [i32,HWND,HDC]*)
+(bind-lib libuser32 SetActiveWindow [HWND,HWND]*)
+(bind-lib libuser32 SetForegroundWindow [BOOL,HWND]*)
+(bind-lib libuser32 SetCursorPos [BOOL,INT,INT]*)
+(bind-lib libuser32 mouse_event [void,DWORD,DWORD,DWORD,DWORD,ULONG_PTR]*)
 
+(bind-lib libkernel32 GetConsoleWindow [HWND]*)
 
 (bind-val OLD_WINDOWS_WNDPROC i8*)
 
@@ -320,22 +333,65 @@
           (println "Sucessess setting wndproc!")))
     void))
 
+(bind-val INPUT_MOUSE i32 0)
+(bind-val INPUT_KEYBOARD i32 1)
+(bind-val INPUT_HARDWARE i32 2)
+(bind-val XBUTTON1 i32 #x0001)
+(bind-val XBUTTON2 i32 #x0002)
+(bind-val MOUSEEVENTF_ABSOLUTE i32 #x8000)
+(bind-val MOUSEEVENTF_HWHEEL i32 #x01000)
+(bind-val MOUSEEVENTF_MOVE i32 #x0001)
+(bind-val MOUSEEVENTF_MOVE_NOCOALESCE i32 #x2000)
+(bind-val MOUSEEVENTF_VIRTUALDESK i32 #x4000)
+(bind-val MOUSEEVENTF_LEFTDOWN i32 #x0002)
+(bind-val MOUSEEVENTF_LEFTUP i32 #x0004)
+(bind-val MOUSEEVENTF_RIGHTDOWN i32 #x0008)
+(bind-val MOUSEEVENTF_RIGHTUP i32 #x0010)
+(bind-val MOUSEEVENTF_MIDDLEDOWN i32 #x0020)
+(bind-val MOUSEEVENTF_MIDDLETUP i32 #x0040)
+
 ;; mouse down = -1
 ;; mouse up = 1
 ;; otherwise = 0
-(bind-func mouse-injection2
-  (let ((evt:LPINPUT (alloc))
-        (mi (tref-ptr evt 1)))
-    (tset! evt 0 0)
-    (lambda (x:float y:float down_or_up:i32)
-      (let ((md
-             (i64toi32
-              (cond ((< down_or_up 0:i32) #x0002)
-                    ((> down_or_up 0:i32) #x0004)
-                    (else #x0001)))))
-        (tfill! mi (ftoi32 (* x 65536.0)) (ftoi32 (* y 65536.0)) (i64toi32 #x0001) (+ md (i64toi32 #x8000)) 0 0)
-        ;;(mi (MOUSEINPUT x y (i64toi32 #x0001) (+ md (i64toi32 #x8000)) 0 0))
-        (SendInput 1 evt 40)))))
+;; (bind-func mouse_injection2
+;;   (let ((evt:LPINPUT (alloc 1))
+;;         (mi (tref-ptr evt 1)))
+;;     (memset (cast evt i8*) 0 40)
+;;     (tset! evt 0 INPUT_MOUSE)
+;;     (lambda (x:float y:float down_or_up:i32)
+;;       (let ((md (cond ((< down_or_up 0:i32)
+;;                        (bitwise-or 0:i32 MOUSEEVENTF_LEFTDOWN))
+;;                       ((> down_or_up 0:i32)
+;;                        (bitwise-or 0:i32 MOUSEEVENTF_LEFTUP))
+;;                       (else
+;;                        (bitwise-or MOUSEEVENTF_MOVE MOUSEEVENTF_ABSOLUTE MOUSEEVENTF_VIRTUALDESK)))))
+;;         (if (= 0:i32 down_or_up)        
+;;             (tfill! mi
+;;                     (ftoi32 (* 65536.0:f (/ x (i32tof (GetSystemMetrics SM_CXSCREEN)))))
+;;                     (ftoi32 (* 65536.0:f (/ y (i32tof (GetSystemMetrics SM_CYSCREEN)))))
+;;                     0
+;;                     md
+;;                     0 0)
+;;             (tfill! mi 0 0 0 md 0 0))
+;;         ;;(mi (MOUSEINPUT x y (i64toi32 #x0001) (+ md (i64toi32 #x8000)) 0 0))
+;;         (SendInput 1 evt 40)))))
+
+(bind-func mouse_injection
+  (lambda (x y down_or_up:i32)
+    (let ((md (cond ((< down_or_up 0:i32) (bitwise-or MOUSEEVENTF_LEFTDOWN
+                                                      MOUSEEVENTF_ABSOLUTE
+                                                      MOUSEEVENTF_VIRTUALDESK))
+                    ((> down_or_up 0:i32) (bitwise-or MOUSEEVENTF_LEFTUP
+                                                      MOUSEEVENTF_ABSOLUTE
+                                                      MOUSEEVENTF_VIRTUALDESK))
+                    (else (bitwise-or MOUSEEVENTF_MOVE
+                                      MOUSEEVENTF_ABSOLUTE
+                                      MOUSEEVENTF_VIRTUALDESK)))))
+      (mouse_event md
+                   (ftoi32 (* 65536.0:f (/ x (i32tof (GetSystemMetrics SM_CXSCREEN)))))
+                   (ftoi32 (* 65536.0:f (/ y (i32tof (GetSystemMetrics SM_CYSCREEN)))))
+                   0 0))))
+
 
 (bind-alias HRGN i8*)
 (bind-type DWM_BLURBEHIND <DWORD,BOOL,HRGN,BOOL>)
