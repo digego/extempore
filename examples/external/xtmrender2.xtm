@@ -55,7 +55,7 @@
 ;; for lights and cameras
 (bind-func prerender:XTMRENDERCB
   (lambda (frame shader m v p data)
-    (xtm_light_pos 1 0.0 5.0 15.0)
+    (xtm_light_pos 1 -5.0 5.0 15.0)
     (xtm_light_tgt 1 0.0 0.0 0.0) ;; was 2
     (xtm_light_up 1 0.0 1.0 0.0)        
     (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
@@ -64,20 +64,18 @@
     (xtm_light_power 1 10.0)
     (xtm_light_angle 1 60.0)
         
-    (xtm_camera_pos 0.0 3.0 15.0)
+    (xtm_camera_pos 0.0 3.0 20.0)
     (xtm_camera_tgt 3.0 2.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
     void))
-
-(xtm_mesh_ambient (xtm_model_mesh 1.0 1.0 1.0 1.0)
 
 
 ;; for models
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
     (let ((nodes:XTMModel** (cast data XTMModel**)))
-      ;; (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
-      (translate_matrix m 2.0 2.0 0.0)      
+      (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
+      (translate_matrix m 2.0 -1.9 0.0)      
       (scale_matrix m 1.5 1.5 1.5)      
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
@@ -108,19 +106,6 @@
 (bind-val dome XTMModel*
   (assimp_load_model model_path "dome_cut.dae" (+ aiProcess_Triangulate aiProcess_FlipWindingOrder)))
 
-(bind-val hex10 XTMModel*
-  (assimp_load_model model_path "hex10.dae" aiProcess_Triangulate))
-
-
-($  (xtm_mesh_shininess (xtm_model_mesh (xtm_model_child hex10 0) 0) 3.0)
-    (xtm_mesh_ambient (xtm_model_mesh (xtm_model_child hex10 0) 0) 0.0 0.0 0.0 1.0)
-    (xtm_mesh_diffuse (xtm_model_mesh (xtm_model_child hex10 0) 0) 0.0 0.0 0.0 1.0)
-    (xtm_mesh_specular (xtm_model_mesh (xtm_model_child hex10 0) 0) 1.0 0.0 0.0 1.0)        
-    ;(xtm_mesh_emissive (xtm_model_mesh (xtm_model_child hex10 0) 0) 0.1 0.1 0.1 1.0)
-    (xtm_mesh_emissive (xtm_model_mesh (xtm_model_child hex10 0) 0) 0.2 0.2 0.2 1.0)    
-    (println
-     (xtm_model_mesh (xtm_model_child hex10 0) 0)))
-
 ($ (println "print models--------------")
    (println "peppino:")
    (println peppino)
@@ -137,7 +122,7 @@
 
 (bind-func gl_draw_loop
   (lambda (time:i64 delta_t:double)
-    (gl_render hex10 scene dome)
+    (gl_render peppino scene dome)
     ;; swap buffers
     (glfwPollEvents)
     (glfwSwapBuffers window)
