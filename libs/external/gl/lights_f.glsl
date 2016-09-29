@@ -33,14 +33,14 @@ uniform mat3 NormalMatrix;
 uniform mat4 ModelViewMatrix;
 uniform mat4 ModelViewProjectionMatrix;
 
-uniform samplerCube envMap;
-uniform sampler2D shadowMap;
-uniform sampler2D tex1;
-uniform sampler2D diffuseTexture;
-uniform sampler2D heightTexture;
-uniform sampler2D specularTexture;
-uniform sampler2D normalsTexture;
-uniform sampler2D projectionTexture;
+uniform sampler2D shadowMap;         // unit 0
+uniform sampler2D diffuseTexture;    // unit 1
+uniform samplerCube envMap;          // unit 2
+uniform sampler2D projectionTexture; // unit 3
+//uniform sampler2D heightTexture;
+//uniform sampler2D specularTexture;
+//uniform sampler2D normalsTexture;
+
 
 uniform int isEnvMapped;
 uniform int isTextured;
@@ -111,7 +111,7 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
   specular = LightSpecular[idx]  * MaterialSpecular * attenuation * pf;
 
   if(isTextured > 0) {
-    texcolour = diffuse * texture(tex1,UVWCoord.xy) * vColour; 
+    texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy) * vColour; 
     outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
   } else {
     outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),diffuse.a*vColour.a);
@@ -121,7 +121,7 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
     outcolor += vec4(texture(envMap,reflected).xyz * envMapWeight * pf,outcolor.a);
   }
-  /*
+
   if(isProjectionTextured > 0) {
     //tmp = normalize(NN * vec3(1.0,1.0,10.0));
     //reflected = reflect(-EE,tmp); //tmp);
@@ -131,7 +131,6 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     tmp = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
     outcolor += vec4(texture(projectionTexture,tmp.xy).xyz * projectionTextureWeight, outcolor.a);      
     }
-  */
   
   return outcolor;
 }
@@ -183,7 +182,7 @@ void main()
   if(numLights < 1) { // NO LIGHTS!
     float dotE = max(0.0, dot(NN,EE));
     if(isTextured > 0) {
-      outcolour = texture(tex1,UVWCoord.xy) * dotE * vColour;
+      outcolour = texture(diffuseTexture,UVWCoord.xy) * dotE * vColour;
     }else{
       outcolour = vec4(MaterialDiffuse.xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }
@@ -198,12 +197,6 @@ void main()
   }
 
   if(isProjectionTextured > 0) {
-    //tmp2 = vec3(1.0,1.0,8.0) * NN;
-    //tmp1 = normalize(tmp2);
-    // tmp1 = vec3(0.0,0.0,1.0);
-    // reflected = reflect(-EE,tmp1); //tmp);
-    // reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
-    // outcolour += vec4(texture(projectionTexture,reflected.xy).xyz * projectionTextureWeight, outcolour.a);
       tmp1 = projCoord.xyz; //projCoord.z; //vec3((projCoord.x * 2.0)+1.0,(projCoord.y * 2.0)+1.0,projCoord.z);    
       tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
       outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);

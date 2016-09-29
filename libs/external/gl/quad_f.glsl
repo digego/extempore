@@ -5,7 +5,7 @@
 uniform int override_alpha;
 uniform float alpha;
 
-uniform sampler2D tex1;
+uniform sampler2D tex1;   // tex unit 0
 in vec2 UVCoord;
 out vec4 xtmColour;
 
