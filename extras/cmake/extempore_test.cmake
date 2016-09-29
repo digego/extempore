@@ -57,7 +57,7 @@ set(CTEST_UPDATE_COMMAND "${CTEST_GIT_COMMAND}")
 if(UNIX)
   set(CTEST_BASE_DIRECTORY "/tmp/extempore-ctest")
 elseif(WIN32)
-  set(CTEST_BASE_DIRECTORY "$ENV{TEMP}/extempore-ctest")
+  set(CTEST_BASE_DIRECTORY "$ENV{HOMEPATH}/extempore-ctest")
 endif()
 
 set(CTEST_SOURCE_DIRECTORY "${CTEST_BASE_DIRECTORY}/source")
