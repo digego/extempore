@@ -54,6 +54,7 @@
     (bind-alias LPARAM i32))
 
 (bind-type POINT <LONG,LONG>) ;; x y
+(bind-alias LPPOINT POINT*)
 (bind-type RECT <LONG,LONG,LONG,LONG>) ;; left,top,right,bottom
 (bind-alias LPRECT RECT*)
 
@@ -311,11 +312,18 @@
 (bind-lib libuser32 SetActiveWindow [HWND,HWND]*)
 (bind-lib libuser32 SetForegroundWindow [BOOL,HWND]*)
 (bind-lib libuser32 SetCursorPos [BOOL,INT,INT]*)
+(bind-lib libuser32 GetCursorPos [BOOL,LPPOINT]*)
 (bind-lib libuser32 mouse_event [void,DWORD,DWORD,DWORD,DWORD,ULONG_PTR]*)
 
 (bind-lib libkernel32 GetConsoleWindow [HWND]*)
 
 (bind-val OLD_WINDOWS_WNDPROC i8*)
+
+(bind-func get_cursor_pos:[<float,float>]*
+  (let ((p:LPPOINT (alloc)))
+    (lambda ()
+      (GetCursorPos p)
+      (tuple (convert (tref p 0) float) (convert (tref p 1) float)))))
 
 (bind-func set_window_wndproc
   (lambda (window:HWND proc:i8*)  ;; proc must be native [LRESULT,HWND,UINT,WPARAM,LPARAM]*
@@ -502,7 +510,7 @@
 ;; } POINTER_TOUCH_INFO;
 (bind-type POINTER_TOUCH_INFO <POINTER_INFO,DWORD,DWORD,RECT,RECT,UINT32,UINT32>)
 (bind-lib libuser32 InitializeTouchInjection [BOOL,UINT32,DWORD]*)
-(bind-lib libuser32 InjectTouchInput [BOOL,UINT32,POINTER_TOUCH_INFO*]*)        
+(bind-lib libuser32 InjectTouchInput [BOOL,UINT32,POINTER_TOUCH_INFO*]*)   
       
 
 ;;;;;;;;;; mem mapping ;;;;;;;
