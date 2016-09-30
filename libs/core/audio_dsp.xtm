@@ -437,7 +437,6 @@
           (set! saw (* leak (+ saw dc (/ (sin x) x))))
           (* amp saw))))))
 
-
 ;; saw oscillator
 (bind-func saw_mc_c
   (lambda (phase)
@@ -445,6 +444,152 @@
           (saw (saw_c phase)))
       (lambda (chan:i64 amp freq)
         (if (= chan 0) (set! mem (saw amp freq)))
+        mem))))
+
+;;
+;; phase adjustable bandlimited saw wave
+;;
+;; from:
+;; Synthesis of Quasi-Bandlimited Analog Waveforms Using Frequency Modulation /Draft, version 3/
+;; Peter Scholffhauzer
+;;
+;; where brightness is betwee 0.0-1.0
+(bind-func saw_bright_c
+  (lambda (phase brightness)
+    (let ((w 0.0) ;; normalized freq
+          (osc 0.0)
+          (ppwr (+ 5.0 (- 1.0 brightness)))
+          (a0 2.5:f)
+          (a1 -1.5:f) 
+          (out 0.0)
+          (oldphase 0.0)
+          (p 0.0)
+          (n 0.0)
+          (norm 0.0)
+          (dc 0.0)
+          (oldfreq 0.0)
+          (scaling 0.0)
+          (in_hist:float 0.0)
+          )
+      (lambda (amp:float freq)
+        ;; only update on freq change
+        (if (<> oldfreq freq)
+            (begin
+              (set! w (/ freq SAMPLERATE))
+              (set! n (- 0.5 w))
+              (set! scaling (* 13.0:f (pow n ppwr)))
+              (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
+              (set! norm (- 1.0 (* 2.0 w)))))
+        (set! oldfreq freq)                        
+        (set! p (+ p (- phase oldphase) (* 1.0 w)))
+        (set! oldphase phase)
+        (if (>= p 1.0) (set! p (- p 2.0)))
+        (set! osc (* 0.5
+                     (+ osc
+                        (sin (* STWOPI (+ p (* osc scaling)))))))
+        ;; compensate HF rolloff
+        (set! out (+ (* a0 osc) (* a1 in_hist)))
+        (set! in_hist osc)
+        ;; compensate dc offset
+        (set! out (+ out dc))
+        (* amp out norm)))))
+
+(bind-func saw_bright_mc_c
+  (lambda (phase brightness)
+    (let ((mem 0.0)
+          (saw (saw_bright_c phase brightness)))
+      (lambda (chan:i64 amp freq)
+        (if (= chan 0) (set! mem (saw amp freq)))
+        mem))))
+
+(bind-func saw_dark_c
+  (lambda (phase)
+    (let ((w 0.0) ;; normalized freq
+          (osc 0.0)
+          (a0 2.5:f)
+          (a1 -1.5:f) 
+          (out 0.0)
+          (oldphase 0.0)
+          (p 0.0)
+          (n 0.0)
+          (norm 0.0)
+          (dc 0.0)
+          (oldfreq 0.0)
+          (scaling 0.0)
+          (in_hist:float 0.0)
+          )
+      (lambda (amp:float freq)
+        ;; only update on freq change
+        (if (<> oldfreq freq)
+            (begin
+              (set! w (/ freq SAMPLERATE))
+              (set! n (- 0.5 w))
+              (set! scaling (* 13.0:f (pow n 6.0)))
+              (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
+              (set! norm (- 1.0 (* 2.0 w)))))
+        (set! oldfreq freq)                        
+        (set! p (+ p (- phase oldphase) (* 1.0 w)))
+        (set! oldphase phase)
+        (if (>= p 1.0) (set! p (- p 2.0)))
+        (set! osc (* 0.5
+                     (+ osc
+                        (sin (* STWOPI (+ p (* osc scaling)))))))
+        ;; compensate HF rolloff
+        (set! out (+ (* a0 osc) (* a1 in_hist)))
+        (set! in_hist osc)
+        ;; compensate dc offset
+        (set! out (+ out dc))
+        (* amp out norm)))))
+
+(bind-func saw_dark_mc_c
+  (lambda (phase)
+    (let ((mem 0.0)
+          (saw (saw_dark_c phase)))
+      (lambda (chan:i64 amp freq)
+        (if (= chan 0) (set! mem (saw amp freq)))
+        mem))))
+
+;; starts as square (oldpw 0.5)
+(bind-func pulse_c
+  (lambda (brightness)
+    (let ((s1 (saw_bright_c 0.0 brightness))
+          (oldpw 0.5)
+          (s2 (saw_bright_c oldpw brightness)))
+      (lambda (amp freq pw:float)
+        (if (<> pw oldpw)
+            (set! oldpw pw)
+            (s2.phase pw))
+        (+ (s1 amp freq)
+           (s2 (* amp -1.0) freq))))))
+
+;; pw for pulse width (0.0 - 1.0) 0.5 = square wave
+(bind-func pulse_mc_c
+  (lambda (brightness)
+    (let ((mem 0.0)
+          (pulse (pulse_bright_c brightness)))
+      (lambda (chan:i64 amp freq pw)
+        (if (= chan 0) (set! mem (pulse amp freq pw)))
+        mem))))
+
+(bind-func pulse_dark_c
+  (lambda ()
+    (let ((s1 (saw_dark_c 0.0))
+          (oldpw 0.5)
+          (s2 (saw_dark_c oldpw)))
+      (lambda (amp freq pw:float)
+        (if (<> pw oldpw)
+            (set! oldpw pw)
+            (s2.phase pw))
+        (+ (s1 amp freq)
+           (s2 (* amp -1.0) freq))))))
+
+;; pw for pulse width (0.0 - 1.0) 0.5 = square wave
+(bind-func pulse_dark_mc_c
+  (lambda ()
+    (let ((mem 0.0)
+          (pulse (pulse_dark_c)))
+      (lambda (chan:i64 amp freq pw)
+        (if (= chan 0) (set! mem (pulse amp freq pw)))
         mem))))
 
 ;; white noise generator
@@ -465,25 +610,25 @@
         (set! b2 (+ (* b2 0.57000) (* (dsp_randn) 1.0526913)))
         (* 0.33 (+ b0 b1 b2 (* (dsp_randn) 0.1848)))))))
 
-;; pulse train
-(bind-func pulse_c
-  (lambda ()
-    (let ((time -1.0)
-          (period:SAMPLE 0.0))
-      (lambda (amp:SAMPLE freq width)
-        (set! period (/ SAMPLERATE freq))
-        (set! time (+ time 1.0))
-        (if (< (modulo time period) width)
-            amp
-            0.0)))))
+;; ;; pulse train
+;; (bind-func pulse_c
+;;   (lambda ()
+;;     (let ((time -1.0)
+;;           (period:SAMPLE 0.0))
+;;       (lambda (amp:SAMPLE freq width)
+;;         (set! period (/ SAMPLERATE freq))
+;;         (set! time (+ time 1.0))
+;;         (if (< (modulo time period) width)
+;;             amp
+;;             0.0)))))
 
-(bind-func pulse_mc_c
-  (lambda ()
-    (let ((pulse (pulse_c))
-          (mem 0.0))
-      (lambda (chan:i64 amp freq width)
-        (if (= chan 0) (set! mem (pulse amp freq width)))
-        mem))))
+;; (bind-func pulse_mc_c
+;;   (lambda ()
+;;     (let ((pulse (pulse_c))
+;;           (mem 0.0))
+;;       (lambda (chan:i64 amp freq width)
+;;         (if (= chan 0) (set! mem (pulse amp freq width)))
+;;         mem))))
 
 ;; linear fade closure
 (bind-func fade_c
