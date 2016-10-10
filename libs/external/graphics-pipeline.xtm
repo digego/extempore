@@ -719,6 +719,37 @@
     (gl_print_error "Error setting up envmap!")
     void))
 
+(bind-func shader_prepare_draw
+  (lambda (shader:ShaderProgram* tex:Texture* instances:i32 pointTex:i1)
+    (glUniform1i (glGetUniformLocation (id shader) "isPoints") (if pointTex 1 0))
+    (glUniform1i (glGetUniformLocation (id shader) "isTextured") (if (or (null? tex) pointTex) 0 1))
+    (if (not (null? tex))
+        (glUniform1i (glGetUniformLocation (id shader) "diffuseTexture") 1))
+    (glUniform1i (glGetUniformLocation (id shader) "instances") instances)
+    (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)      
+    void))
+
+(bind-func shader_prepare_draw
+  (lambda (shader:ShaderProgram* tex:Texture*)
+    (shader_prepare_draw:[void,ShaderProgram*,Texture*,i32,i1]* shader tex 0 #f)
+    void))
+
+(bind-func shader_prepare_draw
+  (lambda (shader:ShaderProgram* tex:Texture* pointTex:i1)
+    (shader_prepare_draw:[void,ShaderProgram*,Texture*,i32,i1]* shader tex 0 pointTex)
+    void))
+
+(bind-func shader_prepare_draw
+  (lambda (shader:ShaderProgram* instances:i32)
+    (shader_prepare_draw:[void,ShaderProgram*,Texture*,i32,i1]* shader null instances #f)
+    void))
+
+(bind-func shader_prepare_draw
+  (lambda (shader:ShaderProgram*)
+    (shader_prepare_draw:[void,ShaderProgram*,Texture*,i32,i1]* shader null 0 #f)
+    void))
+
+
 (bind-func xtm_build_mesh_vbo
   (lambda (vao:VAO* verts:float* num_verts:i64)
     (let ((i:i64 0)
@@ -1001,6 +1032,62 @@
     (let ((lights (xtm_get_lights)))
       (shader_update_matrices_lvs shader model view projection (tref lights 9) (tref lights 8)))))
 
+;; vbo at vao index
+;; where idx is the index of the vbo to draw
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* idx shader m v p type update_data:i1 sz tex:Texture* blendmode)
+    (xtm_update_matrices shader m v p)
+    (let ((vbo (get_vbo vao idx))
+          (elmts (i64toi32 (elements vbo))))
+      ;; (println vbo)
+      (if update_data (update vbo))
+      (if (= type GL_POINTS)
+          (glPointSize sz)
+          (glLineWidth sz))
+      (if (> blendmode 0)
+          (begin (glEnable GL_BLEND)
+                 (glBlendFunc GL_SRC_COLOR GL_ONE_MINUS_SRC_COLOR)))          
+      (if (not (null? tex)) (bind tex #t 1:i32))
+      (shader_prepare_draw shader tex 0 (if (and (not (null? tex)) (= type GL_POINTS)) #t #f))
+      (draw vao type 0 elmts 0)
+      (if (not (null? tex)) (unbind tex 1:i32))
+      (if (> blendmode 0) (glDisable GL_BLEND))
+      void)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t 1.0 null 0)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type blendmode)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t 1.0 null blendmode)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type sz)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t sz null 0)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type sz blendmode)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t sz null blendmode)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type tex)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t 1.0 tex 0)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type sz tex)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t sz tex 0)))
+
+(bind-func xtm_draw_vbo
+  (lambda (vao:VAO* shader m v p type sz tex blendmode)
+    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
+     vao 0 shader m v p type #t sz tex blendmode)))
 
 (bind-func xtm_draw_mesh
   (let ((vert:i32 0)
@@ -1011,15 +1098,14 @@
     (lambda (mesh:XTMMesh* shader:ShaderProgram* instances:i32 vbo:VBO*)
       (gl_print_error "Error BEFORE drawing XTMMesh!")
       ;; (println mesh)
-      (let (;; (vbo (tref mesh 0))
-            (vao (tref mesh 10))
+      (let ((vao (tref mesh 10))
             (texture (tref mesh 1))
             (diffuse (tref mesh 2))
             (ambient (tref mesh 3))
             (specular (tref mesh 4))
             (emissive (tref mesh 5))
             (shininess (tref mesh 6))
-            (facemode (tref mesh 8)))
+            (facemode (tref mesh 8)))        
         ;; (set! shininess (dtof 100.0))
         (if (not (null? ambient))
             (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient))
