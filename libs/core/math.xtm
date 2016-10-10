@@ -2499,14 +2499,15 @@ column-major (the same as OpenGL)
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func diff
+;; numeric differentation
+(bind-func ndiff
   "numeric differentiation - central diff"
   (lambda (f:[double,double]* x)
     (/ (- (f (+ x (/ 1e-5 2.0)))
           (f (- x (/ 1e-5 2.0))))
        1e-5)))
 
-(bind-func diff
+(bind-func ndiff
   "numeric differentiation - central diff"
   (lambda (f:[double,double]* x dx)
     (/ (- (f (+ x (/ dx 2.0)))
@@ -2514,14 +2515,14 @@ column-major (the same as OpenGL)
        dx)))
 
 ;; same as above (i.e. central)
-(bind-func differentiate
+(bind-func ndifferentiate
   "numeric differentiation - central diff"
   (lambda (f:[double,double]* x)
     (/ (- (f (+ x (/ 1e-5 2.0)))
           (f (- x (/ 1e-5 2.0))))
        1e-5)))
 
-(bind-func diff_extrapolated
+(bind-func ndiff_extrapolated
   "numeric differentiation - extrapolated diff"
   (lambda (f:[double,double]* x dx)
     (/ (- (* 8.0 (- (f (+ x (/ dx 4.0)))
@@ -2530,21 +2531,21 @@ column-major (the same as OpenGL)
              (f (- x (/ dx 2.0)))))
        (* 3.0 dx))))
 
-(bind-func diff2
+(bind-func ndiff2
   "numeric differentiation (2nd deriv) - central diff"
   (lambda (f:[double,double]* x)
     (/ (- (- (f (+ x 1e-5)) (f x))
           (- (f x) (f (- x 1e-5))))
        (* 1e-5 1e-5))))
 
-(bind-func diff2
+(bind-func ndiff2
   "numeric differentiation (2nd deriv) - central diff"
   (lambda (f:[double,double]* x dx)
     (/ (- (- (f (+ x dx)) (f x))
           (- (f x) (f (- x dx))))
        (* dx dx))))
 
-(bind-func integrate
+(bind-func nintegrate
   "integrate using Simpsons rule - N must be odd"
   (lambda (f:[double,double]* xmin xmax N)
     (let ((sumeven:double 0.0)
@@ -2565,7 +2566,7 @@ column-major (the same as OpenGL)
             (f xmin) (f xmax))
          (/ interval 3.0)))))
 
-(bind-func integrate
+(bind-func nintegrate
   "integrate using Simpsons rule - N must be odd"
   (lambda (f:[double,double]* xmin xmax)
     (integrate:[double,[double,double]*,double,double,i64]* f xmin xmax 501)))
