@@ -48,6 +48,7 @@ uniform int isBumpMapped;
 uniform int isDiffuseMapped;
 uniform int isSpecularMapped;
 uniform int isProjectionTextured;
+uniform int isPoints;
 uniform int emitVColour;
 uniform float envMapWeight;
 uniform float projectionTextureWeight;
@@ -57,7 +58,7 @@ in vec3 UVWCoord;
 in vec4 UVWCoordProjectionTexture;
 in vec4 vColour;
 
-out vec4 xtmColour;
+out vec4 xtmOutColour;
 
 float calcAttenuation(int idx) {
   vec3 LL = normalize(L[idx]); // light vector
@@ -113,6 +114,8 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
   if(isTextured > 0) {
     texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy) * vColour; 
     outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
+  }else if(isPoints > 0){
+    outcolor = texture(diffuseTexture,gl_PointCoord) * vColour;
   } else {
     outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),diffuse.a*vColour.a);
   }
@@ -183,7 +186,9 @@ void main()
     float dotE = max(0.0, dot(NN,EE));
     if(isTextured > 0) {
       outcolour = texture(diffuseTexture,UVWCoord.xy) * dotE * vColour;
-    }else{
+    }else if(isPoints > 0){
+      outcolour = texture(diffuseTexture,gl_PointCoord) * dotE * vColour;
+    }else{      
       outcolour = vec4(MaterialDiffuse.xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }
     if(isEnvMapped > 0) {
@@ -202,7 +207,7 @@ void main()
       outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);
   }
   
-  xtmColour = outcolour+emissive;
+  xtmOutColour = outcolour+emissive;
 }
 
 // end file

@@ -67,7 +67,7 @@ void main()
   if (instances > 0) {
     vColour = xtmIColour;
   } else {
-    vColour = vec4(1.0); //xtmColour;
+    vColour = vec4(xtmColour);
   }
 }
 
