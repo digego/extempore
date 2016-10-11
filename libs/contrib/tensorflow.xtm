@@ -1,0 +1,279 @@
+;;; tensorflow.xtm -- Google's TensorFlow machine intelligence library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libtensorflow
+
+;;; Commentary:
+
+;; These bindings are taken from the TensorFlow C API
+;; (tensorflow/core/public/tensor_c_api.h), which contains the
+;; following licence header
+
+;; /* Copyright 2015 Google Inc. All Rights Reserved.
+
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+
+;;     http://www.apache.org/licenses/LICENSE-2.0
+
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+;; ==============================================================================*/
+
+;; --------------------------------------------------------------------------
+;; C API for TensorFlow.
+
+;; The API leans towards simplicity and uniformity instead of convenience
+;; since most usage will be by language specific wrappers.
+
+;; Conventions:
+;; * We use the prefix TF_ for everything in the API.
+;; * Objects are always passed around as pointers to opaque structs
+;;   and these structs are allocated/deallocated via the API.
+;; * TF_Status holds error information.  It is an object type
+;;   and threfore is passed around as a pointer to an opaque
+;;   struct as mentioned above.
+;; * Every call that has a TF_Status* argument clears it on success
+;;   and fills it with error info on failure.
+
+;; Questions left to address:
+;; * Might need to add stride info to TF_Tensor?
+;; * Might at some point need a way for callers to provide their own Env.
+;; * Should we remove the TF_Status arg from TF_AddProto calls and only
+;;   report errors later (e.g., on Run call).
+;; * Should dimensions be unsigned instead of signed?
+;; * Maybe add TF_TensorShape that encapsulates dimension info.
+
+;; Design decisions made:
+;; * Backing store for tensor memory has an associated deallocation
+;;   function.  This deallocation function will point to client code
+;;   for tensors populated by the client.  So the client can do things
+;;   like shadowing a numpy array.
+;; * We do not provide TF_OK since it is not strictly necessary and we
+;;   are not optimizing for convenience.
+;; * We make assumption that one session has one graph.  This should be
+;;   fine since we have the ability to run sub-graphs.
+;; * We are not providing TF_AddNode/TF_AddNodes to better support
+;;   languages/platforms where proto is not available.  This is because
+;;   we can just point authors of bindings at the .proto file and the
+;;   proto serialization spec and they can do the right thing for
+;;   their language.
+;; * We could allow NULL for some arguments (e.g., NULL options arg).
+;;   However since convenience is not a primary goal, we don't do this.
+;; * Devices are not in this API.  Instead, they are created/used internally
+;;   and the API just provides high level controls over the number of
+;;   devices of each type.
+
+;;; Code:
+
+;; --------------------------------------------------------------------------
+;; TF_DataType holds the type for a scalar value.  E.g., one slot in a tensor.
+;; The enum values here are identical to corresponding values in types.proto.
+(bind-alias TF_DataType enum)
+(bind-val TF_FLOAT TF_DataType 1)
+(bind-val TF_DOUBLE TF_DataType 2)
+(bind-val TF_INT32 TF_DataType 3)      ;; Int32 tensors are always in 'host' memory.
+(bind-val TF_UINT8 TF_DataType 4)
+(bind-val TF_INT16 TF_DataType 5)
+(bind-val TF_INT8 TF_DataType 6)
+(bind-val TF_STRING TF_DataType 7)
+(bind-val TF_COMPLEX TF_DataType 8)    ;; Single-precision complex
+(bind-val TF_INT64 TF_DataType 9)
+(bind-val TF_BOOL TF_DataType 10)
+(bind-val TF_QINT8 TF_DataType 11)     ;; Quantized int8
+(bind-val TF_QUINT8 TF_DataType 12)    ;; Quantized uint8
+(bind-val TF_QINT32 TF_DataType 13)    ;; Quantized int32
+(bind-val TF_BFLOAT16 TF_DataType 14)  ;; Float32 truncated to 16 bits.  Only for cast ops.
+(bind-val TF_QINT16 TF_DataType 15)    ;; Quantized int16
+(bind-val TF_QUINT16 TF_DataType 16)   ;; Quantized uint16
+
+;; --------------------------------------------------------------------------
+;; TF_Code holds an error code.  The enum values here are identical to
+;; corresponding values in error_codes.proto.
+(bind-alias TF_Code enum)
+(bind-val TF_OK TF_Code 0)
+(bind-val TF_CANCELLED TF_Code 1)
+(bind-val TF_UNKNOWN TF_Code 2)
+(bind-val TF_INVALID_ARGUMENT TF_Code 3)
+(bind-val TF_DEADLINE_EXCEEDED TF_Code 4)
+(bind-val TF_NOT_FOUND TF_Code 5)
+(bind-val TF_ALREADY_EXISTS TF_Code 6)
+(bind-val TF_PERMISSION_DENIED TF_Code 7)
+(bind-val TF_UNAUTHENTICATED TF_Code 16)
+(bind-val TF_RESOURCE_EXHAUSTED TF_Code 8)
+(bind-val TF_FAILED_PRECONDITION TF_Code 9)
+(bind-val TF_ABORTED TF_Code 10)
+(bind-val TF_OUT_OF_RANGE TF_Code 11)
+(bind-val TF_UNIMPLEMENTED TF_Code 12)
+(bind-val TF_INTERNAL TF_Code 13)
+(bind-val TF_UNAVAILABLE TF_Code 14)
+(bind-val TF_DATA_LOSS TF_Code 15)
+
+;; --------------------------------------------------------------------------
+;; TF_Status holds error information.  It either has an OK code, or
+;; else an error code with an associated error message.
+(bind-alias TF_Status TF_Status)
+
+;; --------------------------------------------------------------------------
+;; TF_Buffer holds a pointer to a block of data and its associated length.
+;; Typically, the data consists of a serialized protocol buffer, but other data
+;; may also be held in a buffer.
+
+;; TF_Buffer itself does not do any memory management of the pointed-to block.
+
+(bind-type TF_Buffer <i8*,size_t>)
+
+;; --------------------------------------------------------------------------
+;; TF_Library holds information about dynamically loaded TensorFlow plugins.
+(bind-alias TF_Library TF_Library)
+
+;; Return a new status object.
+(bind-lib libtensorflow TF_NewStatus [TF_Status*]*)
+
+;; Delete a previously created status object.
+(bind-lib libtensorflow TF_DeleteStatus [void,TF_Status*]*)
+
+;; Record <code, msg> in *s.  Any previous information is lost.
+;; A common use is to clear a status: TF_SetStatus(s, TF_OK, "");
+(bind-lib libtensorflow TF_SetStatus [void,TF_Status*,TF_Code,i8*]*)
+
+;; Return the code record in *s.
+(bind-lib libtensorflow TF_GetCode [TF_Code,TF_Status*]*)
+
+;; Return a pointer to the error message in *s.  The return value
+;; points to memory that is only usable until the next mutation to *s.
+;; Always returns an empty string if TF_GetCode(s) is TF_OK.
+(bind-lib libtensorflow TF_Message [i8*,TF_Status*]*)
+
+;; --------------------------------------------------------------------------
+;; TF_Tensor holds a multi-dimensional array of elements of a single data type.
+;; For all types other than TF_STRING, the data buffer stores elements
+;; in row major order.  E.g. if data is treated as a vector of TF_DataType:
+
+;;   element 0:   index (0, ..., 0)
+;;   element 1:   index (0, ..., 1)
+;;   ...
+
+;; TODO(jeff,sanjay): Define format for TF_STRING tensors.  Perhaps:
+;;   start_offset: array[uint64]
+;;   data:         byte[...]
+
+;;   String length is encoded (varint?) starting at data[start_offset[i]]
+;;   String contents follow immediately after string length.
+
+(bind-alias TF_Tensor TF_Tensor)
+
+;; Return a new tensor that holds the bytes data[0,len-1].
+
+;; The data will be deallocated by a subsequent call to TF_DeleteTensor via:
+;;      (*deallocator_fn)(data, len, deallocator_arg)
+;; Clients must provide a custom deallocator function so they can pass in
+;; memory managed by something like numpy.
+(bind-lib libtensorflow TF_NewTensor [TF_Tensor*,TF_DataType,i64*,i32,i8*,size_t,[void,i8*,size_t,i8*]*,i8*]*)
+
+;; Destroy a tensor.
+(bind-lib libtensorflow TF_DeleteTensor [void,TF_Tensor*]*)
+
+;; Return the type of a tensor element.
+(bind-lib libtensorflow TF_TensorType [TF_DataType,TF_Tensor*]*)
+
+;; Return the number of dimensions that the tensor has.
+(bind-lib libtensorflow TF_NumDims [i32,TF_Tensor*]*)
+
+;; Return the length of the tensor in the "dim_index" dimension.
+;; REQUIRES: 0 <= dim_index < TF_NumDims(tensor)
+(bind-lib libtensorflow TF_Dim [i64,TF_Tensor*,i32]*)
+
+;; Return the size of the underlying data in bytes.
+(bind-lib libtensorflow TF_TensorByteSize [size_t,TF_Tensor*]*)
+
+;; Return a pointer to the underlying data buffer.
+(bind-lib libtensorflow TF_TensorData [void*,TF_Tensor*]*)
+
+;; --------------------------------------------------------------------------
+;; TF_SessionOptions holds options that can be passed during session creation.
+(bind-alias TF_SessionOptions TF_SessionOptions)
+
+;; Return a new options object.
+(bind-lib libtensorflow TF_NewSessionOptions [TF_SessionOptions*]*)
+
+;; Set the target in TF_SessionOptions.options.
+;; target can be empty, a single entry, or a comma separated list of entries.
+;; Each entry is in one of the following formats :
+;; "local"
+;; ip:port
+;; host:port
+(bind-lib libtensorflow TF_SetTarget [void,TF_SessionOptions*,i8*]*)
+
+;; Set the config in TF_SessionOptions.options.
+;; config should be a serialized brain.ConfigProto proto.
+;; If config was not parsed successfully as a ConfigProto, record the
+;; error information in *status.
+(bind-lib libtensorflow TF_SetConfig [void,TF_SessionOptions*,i8*,size_t,TF_Status*]*)
+
+;; Destroy an options object.
+(bind-lib libtensorflow TF_DeleteSessionOptions [void,TF_SessionOptions*]*)
+
+;; TODO(jeff,sanjay):
+;; - export functions to set Config fields
+
+;; --------------------------------------------------------------------------
+;; TF_Session manages a single graph and execution.
+(bind-alias TF_Session TF_Session)
+
+;; Return a new execution session, or NULL on error.
+(bind-lib libtensorflow TF_NewSession [TF_Session*,TF_SessionOptions*,TF_Status*]*)
+
+;; Close a session.
+(bind-lib libtensorflow TF_CloseSession [void,TF_Session*,TF_Status*]*)
+
+;; Destroy a session.  Even if error information is recorded in *status,
+;; this call discards all resources associated with the session.
+(bind-lib libtensorflow TF_DeleteSession [void,TF_Session*,TF_Status*]*)
+
+;; Treat the bytes proto[0,proto_len-1] as a serialized GraphDef and
+;; add the nodes in that GraphDef to the graph for the session.
+(bind-lib libtensorflow TF_ExtendGraph [void,TF_Session*,i8*,size_t,TF_Status*]*)
+
+;; Run the graph associated with the session starting with the
+;; supplied inputs (inputs[0,ninputs-1]).  Regardless of success or
+;; failure, inputs[] become the property of the implementation (the
+;; implementation will eventually call TF_DeleteTensor on each input).
+
+;; On success, the tensors corresponding to output_names[0,noutputs-1]
+;; are placed in outputs[].  and these outputs[] become the property
+;; of the caller (the caller must eventually call TF_DeleteTensor on
+;; them).
+
+;; On failure, outputs[] contains nulls.
+(bind-lib libtensorflow TF_Run [void,TF_Session*,i8**,TF_Tensor**,i32,i8**,TF_Tensor**,i32,i8**,i32,TF_Status*]*)
+
+;; --------------------------------------------------------------------------
+;; Load plugins containing custom ops and kernels
+
+;; Load the library specified by library_filename and register the ops and
+;; kernels present in that library.
+
+;; Pass "library_filename" to a platform-specific mechanism for dynamically
+;; loading a library. The rules for determining the exact location of the
+;; library are platform-specific and are not documented here.
+;; Expects the symbols "RegisterOps", "RegisterKernels", and "GetOpList", to be
+;; defined in the library.
+
+;; On success, place OK in status and return the newly created library handle.
+;; The caller owns the library handle.
+
+;; On failure, place an error status in status and return nullptr.
+(bind-lib libtensorflow TF_LoadLibrary [TF_Library*,i8*,TF_Status*]*)
+
+;; Get the OpList of OpDefs defined in the library pointed by lib_handle.
+
+;; Returns a TF_Buffer. The memory pointed to by the result is owned by
+;; lib_handle. The data in the buffer will be the serialized OpList proto for
+;; ops defined in the library.
+(bind-lib libtensorflow TF_GetOpList [TF_Buffer,TF_Library*]*)
