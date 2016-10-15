@@ -101,7 +101,7 @@ difference.
     //synchronous timing
     play-note(now)
     time = (now) + 44100
-    play-note(now)
+    play-note(time)
 
     //asynchronous timing
     play-note(now)
