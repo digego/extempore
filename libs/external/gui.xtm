@@ -1150,5 +1150,19 @@ The widget will be assigned the next available id based on the current state of 
 ;; to stop it:
 ;; (gui_render_loop.stop #t)
 
+;; to close the gui window:
+;; (gui_shutdown)
+
+(bind-func gui_shutdown
+  (lambda ()
+    (gui_render_loop.stop #t)
+    (gui_reset)
+    (if (not (null? (GUI_context EXTEMPORE_GUI)))
+      (nvgDeleteGL3 (GUI_context EXTEMPORE_GUI)))
+    (tset! EXTEMPORE_GUI 1 null)
+    (if (not (null? (GUI_window EXTEMPORE_GUI)))
+      (glfwDestroyWindow (GUI_window EXTEMPORE_GUI)))
+    (tset! EXTEMPORE_GUI 0 null)))
+
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
