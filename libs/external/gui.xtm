@@ -6,7 +6,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 
@@ -203,8 +203,10 @@
         widget
         (if (not (null? widget))
             (begin
-              (Widget_find_preorder (Widget_left_child widget) pred)
-              (Widget_find_preorder (Widget_right_child widget) pred))
+              (let ((left:Widget* (Widget_find_preorder (Widget_left_child widget) pred)))
+                (if (not (null? left))
+                  left
+                  (Widget_find_preorder (Widget_right_child widget) pred))))
             null))))
 
 ;; this is untested
@@ -215,7 +217,7 @@
           (Widget_find_inorder (Widget_left_child widget) pred)
           (if (and (not (null? widget)) (pred widget))
               widget
-              
+
               (Widget_find_inorder (Widget_right_child widget) pred)))
         null)))
 
@@ -302,7 +304,7 @@
 ;; this is the global gui structure - there can only be one in each
 ;; Extempore process
 
-(bind-val EXTEMPORE_GUI GUI*)
+(bind-val EXTEMPORE_GUI GUI* (GUI_h null null null 0.0 0.0 0.0))
 
 (bind-func gui_init
   (lambda (width height)
@@ -413,17 +415,20 @@
 
 (bind-func gui_render
   (lambda ()
-    (glClear (bitwise-or GL_COLOR_BUFFER_BIT
-                         GL_DEPTH_BUFFER_BIT
-                         GL_STENCIL_BUFFER_BIT))
-    (nvgBeginFrame (GUI_context EXTEMPORE_GUI)
-                   (convert (GUI_width EXTEMPORE_GUI))
-                   (convert (GUI_height EXTEMPORE_GUI))
-                   (GUI_pixel_ratio EXTEMPORE_GUI))
-    (gui_render_subtree (GUI_root EXTEMPORE_GUI) (Rect 0. 0. (GUI_width EXTEMPORE_GUI) (GUI_height EXTEMPORE_GUI)))
-    (nvgEndFrame (GUI_context EXTEMPORE_GUI))
-    (glfwPollEvents)
-    (glfwSwapBuffers (GUI_window EXTEMPORE_GUI))))
+    (if (not (null? (GUI_window EXTEMPORE_GUI)))
+      (begin
+        (glClear (bitwise-or GL_COLOR_BUFFER_BIT
+                             GL_DEPTH_BUFFER_BIT
+                             GL_STENCIL_BUFFER_BIT))
+        (nvgBeginFrame (GUI_context EXTEMPORE_GUI)
+                       (convert (GUI_width EXTEMPORE_GUI))
+                       (convert (GUI_height EXTEMPORE_GUI))
+                       (GUI_pixel_ratio EXTEMPORE_GUI))
+        (gui_render_subtree (GUI_root EXTEMPORE_GUI) (Rect 0. 0. (GUI_width EXTEMPORE_GUI) (GUI_height EXTEMPORE_GUI)))
+        (nvgEndFrame (GUI_context EXTEMPORE_GUI))
+        (glfwPollEvents)
+        (glfwSwapBuffers (GUI_window EXTEMPORE_GUI)))
+      void)))
 
 ;; some useful helper search functions
 
@@ -1131,14 +1136,34 @@ The widget will be assigned the next available id based on the current state of 
 ;; running the GUI interaction loop
 
 (bind-func gui_render_loop
-  (lambda (time:i64 delta_t:double)
-    (gui_render)
-    (let ((next_time (+ time (convert (* 44100. delta_t)))))
-      (callback next_time gui_render_loop next_time delta_t))))
+  (let ((stop #f))
+    (lambda (time:i64 delta_t:double)
+      (if stop
+        (begin
+          (set! stop #f)
+          void)
+        (begin
+          (gui_render)
+          (let ((next_time (+ time (convert (* 44100. delta_t)))))
+            (callback next_time gui_render_loop next_time delta_t)))))))
 
 ;; to start the render loop - call this after (gui_init)
-
 ;; (gui_render_loop (now) (/ 1. 30.))
+;; to stop it:
+;; (gui_render_loop.stop #t)
+
+;; to close the gui window:
+;; (gui_shutdown)
+
+(bind-func gui_shutdown
+  (lambda ()
+    (gui_reset)
+    (if (not (null? (GUI_context EXTEMPORE_GUI)))
+      (nvgDeleteGL3 (GUI_context EXTEMPORE_GUI)))
+    (tset! EXTEMPORE_GUI 1 null)
+    (if (not (null? (GUI_window EXTEMPORE_GUI)))
+      (glfwDestroyWindow (GUI_window EXTEMPORE_GUI)))
+    (tset! EXTEMPORE_GUI 0 null)))
 
 (impc:aot:insert-footer "xtmgui")
 (define *xtmlib-gui-loaded* #t)
