@@ -306,6 +306,13 @@
 
 (bind-val EXTEMPORE_GUI GUI* (GUI_h null null null 0.0 0.0 0.0))
 
+(bind-func gui_window_size_callback
+  (lambda (window:GLFWwindow* width:i32 height:i32)
+    (tset! EXTEMPORE_GUI 3 (convert width))
+    (tset! EXTEMPORE_GUI 4 (convert height))
+    (glViewport 0 0 width height)
+    void))
+
 (bind-func gui_init
   (lambda (width height)
     ;; (if (not (null? EXTEMPORE_GUI))
@@ -320,7 +327,9 @@
           (vg null))
       ;; set up GLFW
       (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+      (glfwInit)
       (set! window (glfw_init_and_create_interaction_window width height))
+      (glfwSetWindowSizeCallback window (convert (get_native_fptr gui_window_size_callback)))
       ;; (glfwSetInputMode window GLFW_STICKY_KEYS 1)
       ;; (glfwSetInputMode window GLFW_STICKY_MOUSE_BUTTONS 1)
       ;; set up nanovg
@@ -367,14 +376,13 @@
               ;; (nvgScale vg w h)
               (cb widget bounds)
               null)
-            ;; otherwise recurse into the child widgets - horizontal
-            ;; splits only at this point
+            ;; otherwise recurse into the child widgets
             (let ((lchild (Widget_left_child widget))
                   (rchild (Widget_right_child widget))
                   (split (Widget_split widget)))
               ;; recurse into children
               (if (Widget_split_vertical_p widget)
-                  ;; split horizontally (default)
+                  ;; split vertically
                   (begin
                     (let ((sub_bounds:Rect* (zalloc)))
                       (tfill! sub_bounds
@@ -393,7 +401,7 @@
                               (* (- 1. split) (tref bounds 3)))
                       (gui_render_subtree (Widget_right_child widget)
                                           sub_bounds)))
-                  ;; split vertically
+                  ;; split horizontally
                   (begin
                     (let ((sub_bounds:Rect* (zalloc)))
                       (tfill! sub_bounds
