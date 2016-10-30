@@ -306,6 +306,13 @@
 
 (bind-val EXTEMPORE_GUI GUI* (GUI_h null null null 0.0 0.0 0.0))
 
+(bind-func gui_window_size_callback
+  (lambda (window:GLFWwindow* width:i32 height:i32)
+    (tset! EXTEMPORE_GUI 3 (convert width))
+    (tset! EXTEMPORE_GUI 4 (convert height))
+    (glViewport 0 0 width height)
+    void))
+
 (bind-func gui_init
   (lambda (width height)
     ;; (if (not (null? EXTEMPORE_GUI))
@@ -320,7 +327,9 @@
           (vg null))
       ;; set up GLFW
       (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+      (glfwInit)
       (set! window (glfw_init_and_create_interaction_window width height))
+      (glfwSetWindowSizeCallback window (convert (get_native_fptr gui_window_size_callback)))
       ;; (glfwSetInputMode window GLFW_STICKY_KEYS 1)
       ;; (glfwSetInputMode window GLFW_STICKY_MOUSE_BUTTONS 1)
       ;; set up nanovg
@@ -367,48 +376,45 @@
               ;; (nvgScale vg w h)
               (cb widget bounds)
               null)
-            ;; otherwise recurse into the child widgets - horizontal
-            ;; splits only at this point
-            (let ((lchild (Widget_left_child widget))
-                  (rchild (Widget_right_child widget))
-                  (split (Widget_split widget)))
+            ;; otherwise recurse into the child widgets
+            (let ((split (Widget_split widget)))
               ;; recurse into children
               (if (Widget_split_vertical_p widget)
-                  ;; split horizontally (default)
-                  (begin
-                    (let ((sub_bounds:Rect* (zalloc)))
-                      (tfill! sub_bounds
-                              (tref bounds 0)
-                              (tref bounds 1)
-                              (tref bounds 2)
-                              (* split (tref bounds 3)))
-                      (gui_render_subtree (Widget_left_child widget)
-                                          sub_bounds))
-                    (let ((sub_bounds:Rect* (zalloc)))
-                      (tfill! sub_bounds
-                              (tref bounds 0)
-                              (+ (tref bounds 1)
-                                 (* split (tref bounds 3)))
-                              (tref bounds 2)
-                              (* (- 1. split) (tref bounds 3)))
-                      (gui_render_subtree (Widget_right_child widget)
-                                          sub_bounds)))
                   ;; split vertically
                   (begin
                     (let ((sub_bounds:Rect* (zalloc)))
                       (tfill! sub_bounds
                               (tref bounds 0)
                               (tref bounds 1)
-                              (* split (tref bounds 2))
+                              (tref bounds 2)
+                              (floor (* split (tref bounds 3))))
+                      (gui_render_subtree (Widget_left_child widget)
+                                          sub_bounds))
+                    (let ((sub_bounds:Rect* (zalloc)))
+                      (tfill! sub_bounds
+                              (tref bounds 0)
+                              (floor (+ (tref bounds 1)
+                                 (* split (tref bounds 3))))
+                              (tref bounds 2)
+                              (ceil (* (- 1. split) (tref bounds 3))))
+                      (gui_render_subtree (Widget_right_child widget)
+                                          sub_bounds)))
+                  ;; split horizontally
+                  (begin
+                    (let ((sub_bounds:Rect* (zalloc)))
+                      (tfill! sub_bounds
+                              (tref bounds 0)
+                              (tref bounds 1)
+                              (floor (* split (tref bounds 2)))
                               (tref bounds 3))
                       (gui_render_subtree (Widget_left_child widget)
                                           sub_bounds))
                     (let ((sub_bounds:Rect* (zalloc)))
                       (tfill! sub_bounds
-                              (+ (tref bounds 0)
-                                 (* split (tref bounds 2)))
+                              (floor (+ (tref bounds 0)
+                                 (* split (tref bounds 2))))
                               (tref bounds 1)
-                              (* (- 1. split) (tref bounds 2))
+                              (ceil (* (- 1. split) (tref bounds 2)))
                               (tref bounds 3))
                       (gui_render_subtree (Widget_right_child widget)
                                           sub_bounds)))))))))
@@ -801,15 +807,15 @@ several different editors."
 ;; these are the standard widgets, but feel free to implement your own
 ;; custom ones - it's basically just an xtlang closure callback
 
-(bind-val GUI_BUTTON i64 (<< 1 2))
-(bind-val GUI_BUTTON_CHECKBOX i64 (<< 1 3))
-(bind-val GUI_BUTTON_RADIO i64 (<< 1 4))
-(bind-val GUI_TEXT i64 (<< 1 5))
-(bind-val GUI_SLIDER i64 (<< 1 6))
-(bind-val GUI_SLIDER2D i64 (<< 1 7))
-(bind-val GUI_IMAGE i64 (<< 1 8))
-(bind-val GUI_FBO i64 (<< 1 9))
-(bind-val GUI_BLANK i64 (<< 1 10))
+(bind-val GUI_BUTTON i64 (<< 2 1))
+(bind-val GUI_BUTTON_CHECKBOX i64 (<< 3 1))
+(bind-val GUI_BUTTON_RADIO i64 (<< 4 1))
+(bind-val GUI_TEXT i64 (<< 5 1))
+(bind-val GUI_SLIDER i64 (<< 6 1))
+(bind-val GUI_SLIDER2D i64 (<< 7 1))
+(bind-val GUI_IMAGE i64 (<< 8 1))
+(bind-val GUI_FBO i64 (<< 9 1))
+(bind-val GUI_BLANK i64 (<< 10 1))
 
 ;; button
 
