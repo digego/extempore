@@ -147,6 +147,53 @@
 (bind-val NVG_ALIGN_BOTTOM   NVGalign (<< 1 5)) ;; Align text vertically to bottom.
 (bind-val NVG_ALIGN_BASELINE NVGalign (<< 1 6)) ;; Default, align text vertically to baseline.
 
+
+(bind-alias NVGblendFactor enum)
+(bind-val NVG_ZERO enum (<< 1 0))
+(bind-val NVG_ONE enum (<< 1 1))
+(bind-val NVG_SRC_COLOR enum (<< 1 2))
+(bind-val NVG_ONE_MINUS_SRC_COLOR enum (<< 1 3))
+(bind-val NVG_DST_COLOR enum (<< 1 4))
+(bind-val NVG_ONE_MINUS_DST_COLOR enum (<< 1 5))
+(bind-val NVG_SRC_ALPHA enum (<< 1 6))
+(bind-val NVG_ONE_MINUS_SRC_ALPHA enum (<< 1 7))
+(bind-val NVG_DST_ALPHA enum (<< 1 8))
+(bind-val NVG_ONE_MINUS_DST_ALPHA enum (<< 1 9))
+(bind-val NVG_SRC_ALPHA_SATURATE enum (<< 1 10))
+
+(bind-alias NVGcompositeOperation enum)
+(bind-val NVG_SOURCE_OVER enum 0)
+(bind-val NVG_SOURCE_IN enum 1)
+(bind-val NVG_SOURCE_OUT enum 2)
+(bind-val NVG_ATOP enum 3)
+(bind-val NVG_DESTINATION_OVER enum 4)
+(bind-val NVG_DESTINATION_IN enum 5)
+(bind-val NVG_DESTINATION_OUT enum 6)
+(bind-val NVG_DESTINATION_ATOP enum 7)
+(bind-val NVG_LIGHTER enum 8)
+(bind-val NVG_COPY enum 9)
+(bind-val NVG_XOR enum 10)
+
+(bind-type NVGcompositeOperationState <i32,i32,i32,i32>
+"@member srcRGB - index 0
+@member dstRGB - index 1
+@member srcAlpha - index 2
+@member dstAlpha - index 3")
+
+(bind-lib libnanovg nvgGlobalCompositeOperation [void,NVGcontext*,i32]*
+"@param ctx - index 0
+@param op - index 1")
+(bind-lib libnanovg nvgGlobalCompositeBlendFunc [void,NVGcontext*,i32,i32]*
+"@param ctx - index 0
+@param sfactor - index 1
+@param dfactor - index 2")
+(bind-lib libnanovg nvgGlobalCompositeBlendFuncSeparate [void,NVGcontext*,i32,i32,i32,i32]*
+"@param ctx - index 0
+@param srcRGB - index 1
+@param dstRGB - index 2
+@param srcAlpha - index 3
+@param dstAlpha - index 4")
+
 ;; struct NVGglyphPosition {
 ;;  const char* str; ;; Position of the glyph in the input string.
 ;;  float x;   ;; The x-coordinate of the logical glyph position.
@@ -496,6 +543,17 @@
 ;; Creates new rounded rectangle shaped sub-path.
 (bind-lib libnanovg nvgRoundedRect [void,NVGcontext*,float,float,float,float,float]*)
 
+(bind-lib libnanovg nvgRoundedRectVarying [void,NVGcontext*,float,float,float,float,float,float,float,float]*
+"@param ctx - index 0
+@param x - index 1
+@param y - index 2
+@param w - index 3
+@param h - index 4
+@param radTopLeft - index 5
+@param radTopRight - index 6
+@param radBottomRight - index 7
+@param radBottomLeft - index 8")
+
 ;; Creates new ellipse shaped sub-path.
 (bind-lib libnanovg nvgEllipse [void,NVGcontext*,float,float,float,float]*)
 
@@ -574,6 +632,16 @@
 ;; Sets the font face based on specified name of current text style.
 (bind-lib libnanovg nvgFontFace [void,NVGcontext*,i8*]*)
 
+(bind-lib libnanovg nvgAddFallbackFontId [i32,NVGcontext*,i32,i32]*
+  "@param ctx - index 0
+@param baseFont - index 1
+@param fallbackFont - index 2")
+
+(bind-lib libnanovg nvgAddFallbackFont [i32,NVGcontext*,i8*,i8*]*
+"@param ctx - index 0
+@param baseFont - index 1
+@param fallbackFont - index 2")
+
 ;; Draws text string at specified location. If end is specified only the sub-string up to the end is drawn.
 (bind-lib libnanovg nvgText [float,NVGcontext*,float,float,i8*,i8*]*)
 
@@ -640,22 +708,25 @@
 (bind-type NVGpath <i32,i32,i8,i32,NVGvertex*,i32,NVGvertex*,i32,i32,i32>)
 
 ;; struct NVGparams {
-;;  void* userPtr;
-;;  int edgeAntiAlias;
-;;  int (*renderCreate)(void* uptr);
-;;  int (*renderCreateTexture)(void* uptr, int type, int w, int h, int imageFlags, const unsigned char* data);
-;;  int (*renderDeleteTexture)(void* uptr, int image);
-;;  int (*renderUpdateTexture)(void* uptr, int image, int x, int y, int w, int h, const unsigned char* data);
-;;  int (*renderGetTextureSize)(void* uptr, int image, int* w, int* h);
-;;  void (*renderViewport)(void* uptr, int width, int height);
-;;  void (*renderCancel)(void* uptr);
-;;  void (*renderFlush)(void* uptr);
-;;  void (*renderFill)(void* uptr, NVGpaint* paint, NVGscissor* scissor, float fringe, const float* bounds, const NVGpath* paths, int npaths);
-;;  void (*renderStroke)(void* uptr, NVGpaint* paint, NVGscissor* scissor, float fringe, float strokeWidth, const NVGpath* paths, int npaths);
-;;  void (*renderTriangles)(void* uptr, NVGpaint* paint, NVGscissor* scissor, const NVGvertex* verts, int nverts);
-;;  void (*renderDelete)(void* uptr);
+;; 	void* userPtr;
+;; 	int edgeAntiAlias;
+;; 	int (*renderCreate)(void* uptr);
+;; 	int (*renderCreateTexture)(void* uptr, int type, int w, int h, int imageFlags, const unsigned char* data);
+;; 	int (*renderDeleteTexture)(void* uptr, int image);
+;; 	int (*renderUpdateTexture)(void* uptr, int image, int x, int y, int w, int h, const unsigned char* data);
+;; 	int (*renderGetTextureSize)(void* uptr, int image, int* w, int* h);
+;; 	void (*renderViewport)(void* uptr, int width, int height, float devicePixelRatio);
+;; 	void (*renderCancel)(void* uptr);
+;; 	void (*renderFlush)(void* uptr, NVGcompositeOperationState compositeOperation);
+;; 	void (*renderFill)(void* uptr, NVGpaint* paint, NVGscissor* scissor, float fringe, const float* bounds, const NVGpath* paths, int npaths);
+;; 	void (*renderStroke)(void* uptr, NVGpaint* paint, NVGscissor* scissor, float fringe, float strokeWidth, const NVGpath* paths, int npaths);
+;; 	void (*renderTriangles)(void* uptr, NVGpaint* paint, NVGscissor* scissor, const NVGvertex* verts, int nverts);
+;; 	void (*renderDelete)(void* uptr);
 ;; };
-(bind-type NVGparams <i8*,i32,i32,i32,i32,i32,i32,[void,i8*,i32,i32]*,[void,i8*]*,[void,i8*]*,[void,i8*,NVGpaint*,NVGscissor*,float,float*,NVGpath*,i32]*,[void,i8*,NVGpaint*,NVGscissor*,float,float*,NVGpath*,i32]*,[void,i8*,NVGpaint*,NVGscissor*,NVGvertex*,i32]*,[void,i8*]>)
+;; typedef struct NVGparams NVGparams;
+
+;; opaque pointer
+(bind-alias NVGparams i8*)
 
 ;; Constructor and destructor, called by the render back-end.
 (bind-lib libnanovg nvgCreateInternal [NVGcontext*,NVGparams*]*)
