@@ -138,6 +138,50 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;; Some helpful functions for using MIDI devices by name ;;;
+(bind-func midi_input_port_id:[i32,i8*]*
+  (lambda (port_name)
+    (let* ((n:i32 (Pm_CountDevices))
+           (loop:[i32,i32]*
+            (lambda (i:i32)
+              (cond
+               ((and (<= (i64toi32 0) i) (< i n))
+                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                       (name:i8* (tref info 2))
+                       (input:bool (= (i64toi32 1) (tref info 3)))
+                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                  (cond
+                   ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
+                   (else
+                    (loop (+ i (i64toi32 1)))))))
+               (else
+                (printf "No MIDI input port found with name %s\n" port_name)
+                (i64toi32 -1))))))
+        (loop (i64toi32 0)))))
+                  
+
+(bind-func midi_output_port_id:[i32,i8*]*
+  (lambda (port_name)
+    (let* ((n:i32 (Pm_CountDevices))
+           (loop:[i32,i32]*
+            (lambda (i:i32)
+              (cond
+               ((and (<= (i64toi32 0) i) (< i n))
+                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                       (name:i8* (tref info 2))
+                       (output:bool (= (i64toi32 1) (tref info 4)))
+                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                  (cond
+                   ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
+                   (else
+                    (loop (+ i (i64toi32 1)))))))
+               (else
+                (printf "No MIDI output port found with name %s\n" port_name)
+                (i64toi32 -1))))))
+        (loop (i64toi32 0)))))
+
+
+
 ;; first off create a native 'clock' scheduler
 ;; update rate of 200hz
 (bind-val clock_sched [void]* (clock_scheduler 200.0))
