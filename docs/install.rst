@@ -37,7 +37,7 @@ Build from source
 
 The build-from-source workflow will download and build all the
 dependencies you need (including LLVM). So, if you've got a C++
-compiler (for `gcc`, version 4.9 or later is required), git and CMake
+compiler (for ``gcc``, version 4.9 or later is required), git and CMake
 (and an :ref:`ALSA backend <linux-portaudio-backend-instructions>` on
 Linux) then here are some one-liner build commands:
 
