@@ -16,8 +16,9 @@ it and run `extempore.exe` from inside the `extempore` folder.
 ## Build from source
 
 This will download and build all the dependencies you need (including
-LLVM). So, if you've got a C++ compiler, git and CMake, here are some
-one-liner build commands:
+LLVM). So, if you've got a C++ compiler (for `gcc`, version 4.9 or
+later is required), git and CMake, here are some one-liner build
+commands:
 
 On **Linux/OSX**:
 
