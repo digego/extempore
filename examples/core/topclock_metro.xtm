@@ -1,3 +1,4 @@
+
 ;;
 ;; metronome test for topclock.
 ;;
@@ -7,7 +8,8 @@
 (sys:load "libs/core/topclock.xtm")
 (sys:load "libs/core/instruments.xtm")
 
-(bind-instrument metrosynth fmsynth_note_c fmsynth_fx)
+(bind-val metrosynth INSTRUMENT (make_instrument (fmsynth_note) (fmsynth_fx)))
+(define metrosynth ($$ metrosynth))
 
 (bind-func dsp:DSP 1000000
   (let ((t 0))
@@ -19,10 +21,6 @@
           0.0))))
 
 (dsp:set! dsp)
-
-;; turn off all effects
-(fmsynth_fx.wet .0)
-(fmsynth_fx.dfb .0)
 
 ;; any client can send tempo/cycle changes
 (define test

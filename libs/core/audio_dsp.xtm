@@ -301,8 +301,37 @@
                    (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
 
 
+;; high precision
+(bind-func parabolicSineHP
+  (let ((B (/ 4.0 SPI)) 
+        (C (/ -4.0 (* SPI SPI)))
+        (P 0.225)
+        (y 0.0))
+    (lambda (x)
+      (set! y (+ (* B x) (* C x (fabs x))))
+      (+ (* P (- (* y (fabs y)) y)) y))))
+
+;; low precision
+(bind-func parabolicSineLP
+  (let ((B (/ 4.0 SPI)) 
+        (C (/ -4.0 (* SPI SPI)))
+        (P 0.225))
+    (lambda (x)
+      (+ (* B x) (* C x) (fabs x)))))
+
+
+(bind-func fasttan
+  (let ((halfpi 1.5707963267948966:f))
+    (lambda (x)
+      (/ (sin x) (sin (+ x halfpi))))))
+
+(bind-func fasttanh
+  (lambda (x)
+    (/ x (+ (fabs (* 2.0 x)) (/ 3.0 (+ 2.0 (* 2.0 x 2.0 x)))))))
+
+  
 ;; x values must fall within the range -PI ... PI
-(bind-func _sin
+(bind-func fastsin
   (let ((p 0.225) ; :_abuf* (alloc))
         (b (/ 4.0 SPI))
         (c (/ -4.0 (* SPI SPI))))
@@ -317,50 +346,36 @@
 ;; 	(set! phase (+ phase incr))
 ;; 	(* amp (sin phase))))))
 
-(bind-func osc_c
-  (lambda (phase)
-    (let ((t (/ STWOPI SAMPLERATE)))
-      (lambda (amp freq)
-        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
-        (if (> phase SPI) (set! phase (- phase STWOPI)))
-        (* amp (_sin phase))))))
-
-(bind-func osc_mc_c
-  (lambda (phase)
-    (let ((val 0.0)
-          (osc (osc_c phase)))
-      (lambda (chan amp freq)
-        (if (= chan 0) (set! val (osc amp freq)))
-        val))))
+;; phase between 0.0-1.0
 
 ;; square oscillator
 ;; where 'n' is how squared off the wave is
 ;; an n of 1.0 is very rounded
 ;; an n of 30.0 is very sharp
-(bind-func square_n_c
-  (lambda (phase)
-    (let ((osc (osc_c phase)))
-      (lambda (amp freq n)
-        (* amp 0.8:f (tanh (* n (osc 1.0 freq))))))))
+;; (bind-func square_n_c
+;;   (lambda (phase)
+;;     (let ((osc (osc_c phase)))
+;;       (lambda (amp freq n)
+;;         (* amp 0.8:f (tanh (* n (osc 1.0 freq))))))))
 
 ;; same as square_n_c
 ;; but 'n' is a function of frequency
-(bind-func square_c
-  (lambda (phase)
-    (let ((osc (osc_c phase)))
-      (lambda (amp freq)
-        (* amp 0.8:f
-           (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
-                    (osc 1.0 freq))))))))
+;; (bind-func square_c
+;;   (lambda (phase)
+;;     (let ((osc (osc_c phase)))
+;;       (lambda (amp freq)
+;;         (* amp 0.8:f
+;;            (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
+;;                     (osc 1.0 freq))))))))
 
 ;; square oscillator multichannel
-(bind-func square_mc_c
-  (lambda (phase)
-    (let ((sqr (square_c phase))
-          (mem 0.0))
-      (lambda (chan:i64 amp freq)
-        (if (= chan 0) (set! mem (sqr amp freq)))
-        mem))))
+;; (bind-func square_mc_c
+;;   (lambda (phase)
+;;     (let ((sqr (square_c phase))
+;;           (mem 0.0))
+;;       (lambda (chan:i64 amp freq)
+;;         (if (= chan 0) (set! mem (sqr amp freq)))
+;;         mem))))
 
 ;; a 'leaky' integrator
 (bind-func integrator_c
@@ -373,87 +388,87 @@
 ;; triangle oscillator
 ;; by using leak integrator over square
 ;; see square wave for 'n'
-(bind-func triangle_n_c
-  (lambda (phase)
-    (let ((osc (osc_c phase))
-          (old:SAMPLE 0.0)
-          (new:SAMPLE 0.0)
-          (leak 0.9))
-      (lambda (amp freq n)
-        (set! old (+ (* leak old)
-                     (* amp (tanh (* n (osc 1.0 freq))))))
-        (* 0.125 old)))))
+;; (bind-func triangle_n_c
+;;   (lambda (phase)
+;;     (let ((osc (osc_c phase))
+;;           (old:SAMPLE 0.0)
+;;           (new:SAMPLE 0.0)
+;;           (leak 0.9))
+;;       (lambda (amp freq n)
+;;         (set! old (+ (* leak old)
+;;                      (* amp (tanh (* n (osc 1.0 freq))))))
+;;         (* 0.125 old)))))
 
-(bind-func triangle_c
-  (lambda (phase)
-    (let ((osc (osc_c phase))
-          (old:SAMPLE 0.0)
-          (new:SAMPLE 0.0)
-          (leak 0.9))
-      (lambda (amp freq)
-        (set! old (+ (* leak old)
-                     (* amp (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
-                                     (osc 1.0 freq))))))
-        (* 0.125 old)))))
+;; (bind-func triangle_c
+;;   (lambda (phase)
+;;     (let ((osc (osc_c phase))
+;;           (old:SAMPLE 0.0)
+;;           (new:SAMPLE 0.0)
+;;           (leak 0.9))
+;;       (lambda (amp freq)
+;;         (set! old (+ (* leak old)
+;;                      (* amp (tanh (* (clamp (- 100.0 (frq2midi freq)) 2.0 150.0)
+;;                                      (osc 1.0 freq))))))
+;;         (* 0.125 old)))))
 
 
 ;; saw oscillator
-(bind-func triangle_mc_c
-  (lambda (phase)
-    (let ((mem 0.0)
-          (tri (triangle_c phase)))
-      (lambda (chan:i64 amp freq)
-        (if (= chan 0) (set! mem (tri amp freq)))
-        mem))))
+;; (bind-func triangle_mc_c
+;;   (lambda (phase)
+;;     (let ((mem 0.0)
+;;           (tri (triangle_c phase)))
+;;       (lambda (chan:i64 amp freq)
+;;         (if (= chan 0) (set! mem (tri amp freq)))
+;;         mem))))
 
 ;; rect wave oscillator - useful for pulse width modulation
-(bind-func rect_c
-  (lambda (phase)
-    (lambda (amp:SAMPLE freq duty)
-      (let ((incr (/ freq SAMPLERATE)))
-        (set! phase (+ phase incr))
-        (if (> phase 1.0) (set! phase (- phase 1.0)))
-        (if (< phase duty) amp (* -1.0 amp))))))
+;; (bind-func rect_c
+;;   (lambda (phase)
+;;     (lambda (amp:SAMPLE freq duty)
+;;       (let ((incr (/ freq SAMPLERATE)))
+;;         (set! phase (+ phase incr))
+;;         (if (> phase 1.0) (set! phase (- phase 1.0)))
+;;         (if (< phase duty) amp (* -1.0 amp))))))
 
-(bind-func rect_mc_c
-  (lambda (phase)
-    (let ((val 0.0)
-          (rct (rect_c phase)))
-      (lambda (chan:i64 amp freq duty)
-        (if (= chan 0) (set! val (rct amp freq duty)))
-        val))))
-
-;; saw oscillator
-(bind-func saw_c
-  (lambda (phase)
-    (let ((dp 1.0)
-          (x:SAMPLE 0.0)
-          (limitchk:SAMPLE 0.000001)
-          (leak 0.995)
-          (saw 0.0))
-      (lambda (amp freq)
-        (let* ((qmax (/ SAMPLERATE freq 2.0))
-               (dc (/ -0.498 qmax)))
-          (set! phase (+ phase dp))
-          (if (< phase 0.0)
-              (begin (set! phase (- 0.0 phase))
-                     (set! dp (- 0.0 dp)))
-              (if (> phase qmax)
-                  (begin (set! phase (+ qmax (- qmax phase)))
-                         (set! dp (- 0.0 dp)))))
-          (set! x (* SPI phase))
-          (if (< x limitchk) (set! x limitchk))
-          (set! saw (* leak (+ saw dc (/ (sin x) x))))
-          (* amp saw))))))
+;; (bind-func rect_mc_c
+;;   (lambda (phase)
+;;     (let ((val 0.0)
+;;           (rct (rect_c phase)))
+;;       (lambda (chan:i64 amp freq duty)
+;;         (if (= chan 0) (set! val (rct amp freq duty)))
+;;         val))))
 
 ;; saw oscillator
-(bind-func saw_mc_c
-  (lambda (phase)
-    (let ((mem 0.0)
-          (saw (saw_c phase)))
-      (lambda (chan:i64 amp freq)
-        (if (= chan 0) (set! mem (saw amp freq)))
-        mem))))
+;; (bind-func saw_c
+;;   (lambda (phase)
+;;     (let ((dp 1.0)
+;;           (x:SAMPLE 0.0)
+;;           (limitchk:SAMPLE 0.000001)
+;;           (leak 0.995)
+;;           (saw 0.0))
+;;       (lambda (amp freq)
+;;         (let* ((qmax (/ SAMPLERATE freq 2.0))
+;;                (dc (/ -0.498 qmax)))
+;;           (set! phase (+ phase dp))
+;;           (if (< phase 0.0)
+;;               (begin (set! phase (- 0.0 phase))
+;;                      (set! dp (- 0.0 dp)))
+;;               (if (> phase qmax)
+;;                   (begin (set! phase (+ qmax (- qmax phase)))
+;;                          (set! dp (- 0.0 dp)))))
+;;           (set! x (* SPI phase))
+;;           (if (< x limitchk) (set! x limitchk))
+;;           (set! saw (* leak (+ saw dc (/ (sin x) x))))
+;;           (* amp saw))))))
+
+;; saw oscillator
+;; (bind-func saw_mc_c
+;;   (lambda (phase)
+;;     (let ((mem 0.0)
+;;           (saw (saw_c phase)))
+;;       (lambda (chan:i64 amp freq)
+;;         (if (= chan 0) (set! mem (saw amp freq)))
+;;         mem))))
 
 ;;
 ;; phase adjustable bandlimited saw wave
@@ -463,149 +478,639 @@
 ;; Peter Scholffhauzer
 ;;
 ;; where brightness is betwee 0.0-1.0
-(bind-func saw_bright_c
-  (lambda (phase brightness)
-    (let ((w 0.0) ;; normalized freq
-          (osc 0.0)
-          (ppwr (+ 5.0 (- 1.0 brightness)))
-          (a0 2.5:f)
-          (a1 -1.5:f) 
-          (out 0.0)
-          (oldphase 0.0)
-          (p 0.0)
-          (n 0.0)
-          (norm 0.0)
-          (dc 0.0)
-          (oldfreq 0.0)
-          (scaling 0.0)
-          (in_hist:float 0.0)
-          )
-      (lambda (amp:float freq)
-        ;; only update on freq change
-        (if (<> oldfreq freq)
-            (begin
-              (set! w (/ freq SAMPLERATE))
-              (set! n (- 0.5 w))
-              (set! scaling (* 13.0:f (pow n ppwr)))
-              (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
-              (set! norm (- 1.0 (* 2.0 w)))))
-        (set! oldfreq freq)                        
-        (set! p (+ p (- phase oldphase) (* 1.0 w)))
-        (set! oldphase phase)
-        (if (>= p 1.0) (set! p (- p 2.0)))
-        (set! osc (* 0.5
-                     (+ osc
-                        (sin (* STWOPI (+ p (* osc scaling)))))))
-        ;; compensate HF rolloff
-        (set! out (+ (* a0 osc) (* a1 in_hist)))
-        (set! in_hist osc)
-        ;; compensate dc offset
-        (set! out (+ out dc))
-        (* amp out norm)))))
+;; (bind-func saw_bright_c
+;;   (lambda (phase brightness)
+;;     (let ((w 0.0) ;; normalized freq
+;;           (osc 0.0)
+;;           (ppwr (+ 5.0 (- 1.0 brightness)))
+;;           (a0 2.5:f)
+;;           (a1 -1.5:f) 
+;;           (out 0.0)
+;;           (oldphase 0.0)
+;;           (p 0.0)
+;;           (n 0.0)
+;;           (norm 0.0)
+;;           (dc 0.0)
+;;           (oldfreq 0.0)
+;;           (scaling 0.0)
+;;           (in_hist:float 0.0)
+;;           )
+;;       (lambda (amp:float freq)
+;;         ;; only update on freq change
+;;         (if (<> oldfreq freq)
+;;             (begin
+;;               (set! w (/ freq SAMPLERATE))
+;;               (set! n (- 0.5 w))
+;;               (set! scaling (* 13.0:f (pow n ppwr)))
+;;               (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
+;;               (set! norm (- 1.0 (* 2.0 w)))))
+;;         (set! oldfreq freq)                        
+;;         (set! p (+ p (- phase oldphase) (* 1.0 w)))
+;;         (set! oldphase phase)
+;;         (if (>= p 1.0) (set! p (- p 2.0)))
+;;         (set! osc (* 0.5
+;;                      (+ osc
+;;                         (sin (* STWOPI (+ p (* osc scaling)))))))
+;;         ;; compensate HF rolloff
+;;         (set! out (+ (* a0 osc) (* a1 in_hist)))
+;;         (set! in_hist osc)
+;;         ;; compensate dc offset
+;;         (set! out (+ out dc))
+;;         (* amp out norm)))))
 
-(bind-func saw_bright_mc_c
-  (lambda (phase brightness)
-    (let ((mem 0.0)
-          (saw (saw_bright_c phase brightness)))
-      (lambda (chan:i64 amp freq)
-        (if (= chan 0) (set! mem (saw amp freq)))
-        mem))))
+;; (bind-func saw_bright_mc_c
+;;   (lambda (phase brightness)
+;;     (let ((mem 0.0)
+;;           (saw (saw_bright_c phase brightness)))
+;;       (lambda (chan:i64 amp freq)
+;;         (if (= chan 0) (set! mem (saw amp freq)))
+;;         mem))))
 
-(bind-func saw_dark_c
+;; (bind-func saw_dark_c
+;;   (lambda (phase)
+;;     (let ((w 0.0) ;; normalized freq
+;;           (osc 0.0)
+;;           (a0 2.5:f)
+;;           (a1 -1.5:f) 
+;;           (out 0.0)
+;;           (oldphase 0.0)
+;;           (p 0.0)
+;;           (n 0.0)
+;;           (norm 0.0)
+;;           (dc 0.0)
+;;           (oldfreq 0.0)
+;;           (scaling 0.0)
+;;           (in_hist:float 0.0)
+;;           )
+;;       (lambda (amp:float freq)
+;;         ;; only update on freq change
+;;         (if (<> oldfreq freq)
+;;             (begin
+;;               (set! w (/ freq SAMPLERATE))
+;;               (set! n (- 0.5 w))
+;;               (set! scaling (* 13.0:f (pow n 6.0)))
+;;               (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
+;;               (set! norm (- 1.0 (* 2.0 w)))))
+;;         (set! oldfreq freq)                        
+;;         (set! p (+ p (- phase oldphase) (* 1.0 w)))
+;;         (set! oldphase phase)
+;;         (if (>= p 1.0) (set! p (- p 2.0)))
+;;         (set! osc (* 0.5
+;;                      (+ osc
+;;                         (sin (* STWOPI (+ p (* osc scaling)))))))
+;;         ;; compensate HF rolloff
+;;         (set! out (+ (* a0 osc) (* a1 in_hist)))
+;;         (set! in_hist osc)
+;;         ;; compensate dc offset
+;;         (set! out (+ out dc))
+;;         (* amp out norm)))))
+
+;; (bind-func saw_dark_mc_c
+;;   (lambda (phase)
+;;     (let ((mem 0.0)
+;;           (saw (saw_dark_c phase)))
+;;       (lambda (chan:i64 amp freq)
+;;         (if (= chan 0) (set! mem (saw amp freq)))
+;;         mem))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; OSCILLATORS
+;;
+
+;;
+;; simple oscillators
+;;
+;; these are useful for modulation etc.
+;; use bandlimited variants for signal production
+;;
+
+;;;;;;;;; sinusoidal
+
+;; phased between 0.0-1.0
+(bind-func osc_c
   (lambda (phase)
-    (let ((w 0.0) ;; normalized freq
-          (osc 0.0)
-          (a0 2.5:f)
-          (a1 -1.5:f) 
-          (out 0.0)
-          (oldphase 0.0)
-          (p 0.0)
-          (n 0.0)
-          (norm 0.0)
-          (dc 0.0)
-          (oldfreq 0.0)
-          (scaling 0.0)
-          (in_hist:float 0.0)
-          )
-      (lambda (amp:float freq)
-        ;; only update on freq change
-        (if (<> oldfreq freq)
-            (begin
-              (set! w (/ freq SAMPLERATE))
-              (set! n (- 0.5 w))
-              (set! scaling (* 13.0:f (pow n 6.0)))
-              (set! dc (- 0.376 (* w 0.752))) ;; dc compensation
-              (set! norm (- 1.0 (* 2.0 w)))))
-        (set! oldfreq freq)                        
-        (set! p (+ p (- phase oldphase) (* 1.0 w)))
-        (set! oldphase phase)
-        (if (>= p 1.0) (set! p (- p 2.0)))
-        (set! osc (* 0.5
-                     (+ osc
-                        (sin (* STWOPI (+ p (* osc scaling)))))))
-        ;; compensate HF rolloff
-        (set! out (+ (* a0 osc) (* a1 in_hist)))
-        (set! in_hist osc)
-        ;; compensate dc offset
-        (set! out (+ out dc))
-        (* amp out norm)))))
+    (set! phase (- (* phase STWOPI) SPI))
+    (let ((t (/ STWOPI SAMPLERATE)))
+      (lambda (amp freq)
+        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
+        (if (> phase SPI) (set! phase (- phase STWOPI)))
+        (* amp (parabolicSineHP phase))))))
 
-(bind-func saw_dark_mc_c
+(bind-func osc_mc_c
   (lambda (phase)
-    (let ((mem 0.0)
-          (saw (saw_dark_c phase)))
-      (lambda (chan:i64 amp freq)
-        (if (= chan 0) (set! mem (saw amp freq)))
-        mem))))
+    (let ((val 0.0)
+          (osc (osc_c phase)))
+      (lambda (chan amp freq)
+        (if (= chan 0) (set! val (osc amp freq)))
+        val))))
 
-;; starts as square (oldpw 0.5)
+
+;;;;;;;;;; sawtooth
+
+;; simple sawtooth
+;;
+;; mod is phase between 0.0-1.0 (i.e. not 2pi)
+;; ramp is rising by default (invert for falling)
+(bind-func saw_c
+  (lambda (mod inverted:i1)
+    (let ((inc:float 0.0) (absinc 0.0:f) (out 0.0)
+          (rising (if inverted #t #f))
+          (inv (if inverted -1.0 1.0)))
+      (lambda (amp:float frq:float)
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))
+        (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
+        (set! mod (+ mod inc)) ;; update mod
+        (* amp out)))))
+
+(bind-func saw_c
+  (lambda (mod)
+    (saw_c:[[float,float,float]*,float,i1]* mod #f)))
+
+(bind-func saw_mc_c
+  (lambda (mod inverted)
+    (let ((osc (saw_c mod inverted))
+          (out 0.0))
+      (lambda (chan amp frq)
+        (if (= chan 0)
+            (set! out (osc amp frq)))
+        out))))
+
+(bind-func saw_mc_c
+  (lambda (mod)
+    (saw_mc_c:[[float,i64,float,float]*,float,i1]* mod #f)))
+
+
+;; simple pulsewave
+
+;; mod is phase between 0.0-1.0
+;; pw for pulse width 0.0-1.0 = 0.5 is square
 (bind-func pulse_c
-  (lambda (brightness)
-    (let ((s1 (saw_bright_c 0.0 brightness))
-          (oldpw 0.5)
-          (s2 (saw_bright_c oldpw brightness)))
-      (lambda (amp freq pw:float)
-        (if (<> pw oldpw)
-            (set! oldpw pw)
-            (s2.phase pw))
-        (+ (s1 amp freq)
-           (s2 (* amp -1.0) freq))))))
+  (lambda (mod:float)
+    (let ((out 0.0) (inc 0.0))
+      (lambda (amp:float frq:float pw:float)
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))
+        (set! out (if (> mod pw) -1.0 1.0))
+        (set! mod (+ mod inc))
+        (* amp out)))))
 
-;; pw for pulse width (0.0 - 1.0) 0.5 = square wave
 (bind-func pulse_mc_c
-  (lambda (brightness)
-    (let ((mem 0.0)
-          (pulse (pulse_c brightness)))
-      (lambda (chan:i64 amp freq pw)
-        (if (= chan 0) (set! mem (pulse amp freq pw)))
-        mem))))
+  (lambda (mod)
+    (let ((osc (pulse_c mod))
+          (out 0.0))
+      (lambda (chan amp frq pw)
+        (if (= chan 0)
+            (set! out (osc amp frq pw)))
+        out))))
 
-(bind-func pulse_dark_c
-  (lambda ()
-    (let ((s1 (saw_dark_c 0.0))
-          (oldpw 0.5)
-          (s2 (saw_dark_c oldpw)))
-      (lambda (amp freq pw:float)
-        (if (<> pw oldpw)
-            (set! oldpw pw)
-            (s2.phase pw))
-        (+ (s1 amp freq)
-           (s2 (* amp -1.0) freq))))))
+;; simple triangle
+;;
+;; mod is phase 0.0-1.0
+;;
+(bind-func tri_c
+  (lambda (mod:float)
+    (let ((out 0.0) (inc 0.0))
+      (lambda (amp:float frq:float)
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))
+        (set! out (- (* 2.0 (fabs (- (* 2.0 mod) 1.0))) 1.0))
+        (set! mod (+ mod inc))
+        (* amp out)))))
 
-;; pw for pulse width (0.0 - 1.0) 0.5 = square wave
-(bind-func pulse_dark_mc_c
-  (lambda ()
-    (let ((mem 0.0)
-          (pulse (pulse_dark_c)))
-      (lambda (chan:i64 amp freq pw)
-        (if (= chan 0) (set! mem (pulse amp freq pw)))
-        mem))))
+(bind-func tri_mc_c
+  (lambda (mod)
+    (let ((osc (tri_c mod))
+          (out 0.0))
+      (lambda (chan amp frq)
+        (if (= chan 0)
+            (set! out (osc amp frq)))
+        out))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; band limited oscillators
+;;
+
+
+;; polynomial bandlimited step functions
+(bind-func poly_blep
+  (lambda (pos:float inc height rising_edge:i1)
+    (let ((out 0.0) (t 0.0))
+      (if (> pos (- 1.0 inc))
+          (begin ;; leftside of discontinuity
+            (set! t (/ (- pos 1.0) inc))
+            (set! out (* height (+ (* t t) (* 2.0 t) 1.0))))
+          (if (< pos inc)          
+              (begin ;; rightside of discontinunity
+                (set! t (/ pos inc))
+                (set! out (* height (- (* 2.0 t) (* t t) 1.0))))))
+      (if (not rising_edge) ;; if falling
+          (set! out (* out -1.0)))
+      out)))
+
+(sys:load "libs/core/bleptables.xtm")
+
+(bind-func LinTerp
+  (lambda (x1:SAMPLE x2 y1 y2 x)
+    (let ((dx 0.0))
+      (if (= (- x2 x1) 0.0)
+          y1
+          (begin
+            (set! dx (/ (- x x1) (- x2 x1)))
+            (+ (* dx y2) (* y1 (- 1.0 dx))))))))
+
+
+;; --- N Sample BLEP (uPointsPerSide = N)
+(bind-func blep_n
+  (lambda (table:SAMPLE* tablelen:SAMPLE mod:SAMPLE inc:SAMPLE height:SAMPLE rising:i1 num_points:SAMPLE interp:i1)
+    (let ((blep 0.0) (t 0.0) (table_centre (- (/ tablelen 2.0) 1.0))
+          (doright #t) (frac 0.0)
+          (i:i64 1) (idx 0.0))
+      ;; left side
+      (while (<= i (convert num_points))
+        (if (> mod (- 1.0 (* (convert i) inc)))
+            (begin
+              ;; calc distance
+              (set! t (/ (- mod 1.0) (* num_points inc)))
+              ;; get index
+              (set! idx (* (+ 1.0 t) table_centre))
+              ;; truncate
+              (if (not interp)
+                  (begin
+                    (set! blep (pref table (convert idx i64)))
+                    void)
+                  (begin
+                    (set! frac (- idx (convert (convert idx i64))))
+                    (set! blep (LinTerp 0.0 1.0
+                                        (pref table (convert idx i64))
+                                        (pref table (convert (+ idx 1.0) i64))
+                                        frac))
+                    void))
+                  
+              (if (not rising)
+                  (set! blep (* blep -1.0)))
+              (set! blep (* blep height))
+              (set! doright #f)
+              (set! i (convert num_points))))
+        (set! i (+ i 1)))
+      ;; reset for right side or done?
+      (if doright
+          (set! i 1)
+          (set! i (+ 1 (convert num_points))))
+      ;; right side
+      (while (<= i (convert num_points))
+        (if (< mod (* (convert i) inc))
+            (begin
+              ;; calc distance
+              (set! t (/ mod (* num_points inc)))
+              ;; get index
+              (set! idx (+ (* t table_centre) (+ table_centre 1.0)))
+              ;; truncate
+              (if (not interp)
+                  (begin
+                    (set! blep (pref table (convert idx i64)))
+                    void)
+                  (begin
+                    (set! frac (- idx (convert (convert idx i64))))
+                    (if (>= (convert (+ (convert idx i64) 1) SAMPLE)
+                            tablelen)
+                        (set! blep (LinTerp 0.0 1.0
+                                            (pref table (convert idx i64))
+                                            (pref table 0)
+                                            frac))
+                        (set! blep (LinTerp 0.0 1.0
+                                            (pref table (convert idx i64))
+                                            (pref table (+ 1 (convert idx i64)))
+                                            frac)))
+                    void))
+              (if (not rising)
+                  (set! blep (* blep -1.0)))
+              (set! blep (* blep height))
+              (set! i (convert num_points))))
+        (set! i (+ i 1)))
+      ;; it is possible for blep to be 0.0
+      blep)))
+
+
+;; bandlimited sawtooth (blep variant of saw_c)
+;;
+;; mod is phase between 0.0-1.0 (i.e. not 2pi)
+;; ramp is rising by default (invert for falling)
+;; (bind-func blsaw_c
+;;   (lambda (mod inverted:i1)
+;;     (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
+;;           (rising (if inverted #t #f))
+;;           (inv (if inverted -1.0 1.0)))
+;;       (lambda (amp:float frq:float)
+;;         (set! inc (/ frq SRs))
+;;         ;; positive frequencies
+;;         (if (and (> inc 0.0) (>= mod 1.0))
+;;             (set! mod (- mod 1.0)))
+;;         ;; negative frequencies
+;;         (if (and (< inc 0.0) (<= mod 0.0))
+;;             (set! mod (+ mod 1.0)))
+;;         ;; inline polyblep
+;;         (set! absinc (fabs inc))
+;;         (set! blep 0.0)
+;;         (if (> mod (- 1.0 absinc))
+;;             (begin (set! t (/ (- mod 1.0) absinc))                   
+;;                    (set! blep (+ (* t t) (* 2.0 t) 1.0)))
+;;             (if (< mod absinc)
+;;                 (begin (set! t (/ mod absinc))
+;;                        (set! blep (- (* 2.0 t) (* t t) 1.0)))))
+;;         (if (not rising) (set! blep (* blep -1.0)))
+;;         (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
+;;         (set! mod (+ mod inc)) ;; update mod
+;;         (* amp (+ out blep))))))
+
+;; bandlimited sawtooth (blep variant of saw_c)
+;;
+;; mod is phase between 0.0-1.0 (i.e. not 2pi)
+;; ramp is rising by default (invert for falling)
+;; highcpu=#t - better wave at higher cpu cost
+(bind-func blsaw_c
+  (lambda (mod inverted:i1 highcpu:i1)
+    (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
+          (rising (if inverted #t #f))
+          (inv (if inverted -1.0 1.0)))
+      (lambda (amp:float frq:float)
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))        
+        (set! blep
+              (if highcpu
+                  (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 rising 4.0 #f)
+                  (poly_blep mod (fabs inc) 1.0 rising)))
+        (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
+        (set! mod (+ mod inc)) ;; update mod
+        (* amp (+ out blep))))))
+
+(bind-func blsaw_c
+  (lambda (mod inverted)
+    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod inverted #f)))
+
+(bind-func blsaw_c
+  (lambda (mod)
+    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod #f #f)))
+
+(bind-func blsaw_mc_c
+  (lambda (mod inverted highcpu)
+    (let ((osc (blsaw_c mod inverted highcpu))
+          (out 0.0))
+      (lambda (chan amp frq)
+        (if (= chan 0)
+            (set! out (osc amp frq)))
+        out))))
+
+(bind-func blsaw_mc_c
+  (lambda (mod inverted)    
+    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod inverted #f)))
+
+(bind-func blsaw_mc_c
+  (lambda (mod)    
+    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod #f #f)))
+
+;;;;;;;;;;;; pulse waves  
+
+
+;; bandlimited pulse wave
+;; use sum of saws method
+;; (bind-func blpulse_c
+;;   (lambda (mod:float)
+;;     (let ((out 0.0) (inc 0.0) (mod2:float 0.0)
+;;           (blep 0.0:f) (absinc 0.0) (t 0.0)
+;;           (saw1 0.0) (saw2 0.0) (dcorr 0.0))
+;;       (lambda (amp:float frq:float pw:float)
+;;         (set! pw (clamp (fabs pw) 0.05 0.95))
+;;         (set! inc (/ frq SRs))
+;;         ;; positive frequencies
+;;         (if (and (> inc 0.0) (>= mod 1.0))
+;;             (set! mod (- mod 1.0)))
+;;         ;; negative frequencies
+;;         (if (and (< inc 0.0) (<= mod 0.0))
+;;             (set! mod (+ mod 1.0)))
+;;         ;; saw 1
+;;         ;; inline polyblep
+;;         (set! absinc (fabs inc))
+;;         (set! blep 0.0)
+;;         (if (> mod (- 1.0 absinc))
+;;             (begin (set! t (/ (- mod 1.0) absinc))                   
+;;                    (set! blep (+ (* t t) (* 2.0 t) 1.0)))
+;;             (if (< mod absinc)
+;;                 (begin (set! t (/ mod absinc))
+;;                        (set! blep (- (* 2.0 t) (* t t) 1.0)))))
+;;         (set! saw1 (+ blep (- (* mod 2.0) 1.0)))
+;;         ;; saw 2
+;;         ;; first calc offset for saw2 based on pw
+;;         (if (> inc 0.0)
+;;             (set! mod2 (+ mod pw))
+;;             (set! mod2 (- mod pw)))
+;;         ;; positive frequencies
+;;         (if (and (> inc 0.0) (>= mod2 1.0))
+;;             (set! mod2 (- mod2 1.0)))
+;;         ;; negative frequencies
+;;         (if (and (< inc 0.0) (<= mod2 0.0))
+;;             (set! mod2 (+ mod2 1.0)))
+;;         ;; saw 2
+;;         ;; inline polyblep
+;;         (set! absinc (fabs inc))
+;;         (set! blep 0.0)
+;;         (if (> mod2 (- 1.0 absinc))
+;;             (begin (set! t (/ (- mod2 1.0) absinc))                   
+;;                    (set! blep (+ (* t t) (* 2.0 t) 1.0)))
+;;             (if (< mod2 absinc)
+;;                 (begin (set! t (/ mod2 absinc))
+;;                        (set! blep (- (* 2.0 t) (* t t) 1.0)))))
+;;         (set! saw2 (+ blep (- (* mod2 2.0) 1.0)))
+;;         ;; subtract 180 out of phase
+;;         (set! out (- (* 0.5 saw1) (* 0.5 saw2)))
+;;         ;; dc correction
+;;         (set! dcorr (/ 1.0 pw))
+;;         (if (< pw 0.5)
+;;             (set! dcorr (/ 1.0 (- 1.0 pw))))
+;;         (set! out (* out dcorr))
+;;         (set! mod (+ mod inc)) ;; update mod
+;;         (* amp out)))))
+
+
+;; bandlimited pulse wave
+;; use sum of saws method
+(bind-func blpulse2_c
+  (lambda (mod:float)
+    (let ((out 0.0) (inc 0.0) (mod2:float 0.0)
+          (blep 0.0:f) (absinc 0.0) (t 0.0)
+          (saw1 0.0) (saw2 0.0) (dcorr 0.0))
+      (lambda (amp:float frq:float pw:float)
+        (set! pw (clamp (fabs pw) 0.05 0.95))
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))
+        ;; saw 1
+        ;; inline polyblep
+        (set! blep (poly_blep mod (fabs inc) 1.0 #f))        
+        (set! saw1 (+ blep (- (* mod 2.0) 1.0)))
+        ;; saw 2        
+        ;; first calc offset for saw2 based on pw
+        (if (> inc 0.0)
+            (set! mod2 (+ mod pw))
+            (set! mod2 (- mod pw)))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod2 1.0))
+            (set! mod2 (- mod2 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod2 0.0))
+            (set! mod2 (+ mod2 1.0)))
+        ;; saw 2
+        ;; inline polyblep
+        (set! blep (poly_blep mod2 (fabs inc) 1.0 #f))
+        (set! saw2 (+ blep (- (* mod2 2.0) 1.0)))
+        ;; subtract 180 out of phase
+        (set! out (- (* 0.5 saw1) (* 0.5 saw2)))
+        ;; dc correction
+        (set! dcorr (/ 1.0 pw))
+        (if (< pw 0.5)
+            (set! dcorr (/ 1.0 (- 1.0 pw))))
+        (set! out (* out dcorr))
+        (set! mod (+ mod inc)) ;; update mod
+        (* amp out)))))
+
+
+;; bandlimited pulse wave
+;; use sum of saws method
+;; highcpu #t (default is lowcpu #f)
+(bind-func blpulse_c
+  (lambda (mod:float highcpu:i1)
+    (let ((out 0.0) (inc 0.0) (mod2:float 0.0)
+          (blep 0.0:f) (absinc 0.0) (t 0.0)
+          (saw1 0.0) (saw2 0.0) (dcorr 0.0))
+      (lambda (amp:float frq:float pw:float)
+        (set! pw (clamp (fabs pw) 0.05 0.95))
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (set! mod (- mod 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (set! mod (+ mod 1.0)))
+        ;; saw 1
+        (set! blep (if highcpu
+                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 #f 4.0 #f)
+                       (poly_blep mod (fabs inc) 1.0 #f)))
+        (set! saw1 (+ blep (- (* mod 2.0) 1.0)))
+        ;; saw 2
+        ;; first calc offset for saw2 based on pw
+        (if (> inc 0.0)
+            (set! mod2 (+ mod pw))
+            (set! mod2 (- mod pw)))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod2 1.0))
+            (set! mod2 (- mod2 1.0)))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod2 0.0))
+            (set! mod2 (+ mod2 1.0)))
+        ;; now calc saw 2
+        (set! blep (if highcpu
+                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod2 (fabs inc) 1.0 #f 4.0 #f)
+                       (poly_blep mod2 (fabs inc) 1.0 #f)))
+        (set! saw2 (+ blep (- (* mod2 2.0) 1.0)))
+        ;; subtract 180 out of phase
+        (set! out (- (* 0.5 saw1) (* 0.5 saw2)))
+        ;; dc correction
+        (set! dcorr (/ 1.0 pw))
+        (if (< pw 0.5)
+            (set! dcorr (/ 1.0 (- 1.0 pw))))
+        (set! out (* out dcorr))
+        (set! mod (+ mod inc)) ;; update mod
+        (* amp out)))))
+
+;; mod is phase (0.0-1.0)
+(bind-func blpulse_c
+  (lambda (mod)
+    (blpulse_c:[[float,float,float,float]*,float,i1]* mod #f)))
+
+
+;;;;;;;;;;;;; triangle waves
+
+;; mod is phase (0.0-1.0)
+
+(bind-func bltri_c
+  (lambda (mod:float)
+    (let ((sawout:float 0.0) (sqrout 0.0) (inc 0.0)
+          (out:float 0.0)
+          (sqrmod 1.0)
+          (diffout 0.0) (zreg:float 0.0) (c 0.0))
+      (lambda (amp:float frq:float)
+        (set! inc (/ frq SRs))
+        ;; positive frequencies
+        (if (and (> inc 0.0) (>= mod 1.0))
+            (begin (set! mod (- mod 1.0))
+                   (set! sqrmod (* sqrmod -1.0))))
+        ;; negative frequencies
+        (if (and (< inc 0.0) (<= mod 0.0))
+            (begin (set! mod (+ mod 1.0))
+                   (set! sqrmod (* sqrmod -1.0))))
+        ;; start with saw
+        (set! sawout (- (* mod 2.0) 1.0)) ;; bipolar sawtooth
+        (set! sawout (* sawout sawout)) ;; sqr'd sawtooth
+        (set! sawout (- 1.0 sawout)) ;; inverted sqr'd sawtooth
+        ;; modulate with sqr (50 % pulse width)
+        (set! out (* sawout sqrmod))
+        ;; differentiate
+        (set! diffout (- out zreg))
+        (set! zreg out)
+        (set! c (/ SRs (* 4.0 2.0 frq (- 1.0 inc))))
+        (set! mod (+ mod inc)) ;; update mod        
+        (set! mod (+ mod inc)) ;; update mod        
+        (* diffout c amp)))))
+
+
+;; ;;;;;;;;;;;;;;;;; sine waves
+
+;; same as osc_c
+(bind-func sin_c
+  (lambda (phase)
+    (let ((t (/ STWOPI SAMPLERATE)))
+      (lambda (amp freq)
+        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
+        (if (> phase SPI) (set! phase (- phase STWOPI)))
+        (* amp (parabolicSineHP phase))))))
+
+     
+;;;;;;;;;;;;;;;;;;;;; noise
+
 
 ;; white noise generator
 (bind-func white_c
   (lambda ()
     (lambda ()
       (* 0.33 (dsp_randn)))))
+
 
 ;; pink noise generator
 ;; uses Paul Kellet's economy method
@@ -618,6 +1123,634 @@
         (set! b1 (+ (* b1 0.96300) (* (dsp_randn) 0.2965164)))
         (set! b2 (+ (* b2 0.57000) (* (dsp_randn) 1.0526913)))
         (* 0.33 (+ b0 b1 b2 (* (dsp_randn) 0.1848)))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  filters
+;;
+
+;; tivial one pole LPF
+;; cutoff controlled via g (0.0-1.0)
+(bind-func lpf_1p_c
+  (lambda ()
+    (let ((y-1 0.0))
+      (lambda (x:SAMPLE g)
+        (set! y-1
+              (+ (* x (- 1.0 g))
+                 (* y-1 g)))
+        y-1))))
+
+;; VAOnePole from will pirkle
+
+(bind-val LPF1 enum 0)
+(bind-val LPF2 enum 1)
+(bind-val LPF4 enum 2)
+(bind-val HPF1 enum 3)
+(bind-val HPF2 enum 4)
+(bind-val HPF4 enum 5)
+(bind-val BPF1 enum 6)
+(bind-val BPF2 enum 7)
+(bind-val BPF4 enum 8)
+
+(bind-func va_onepole
+  (lambda (type) ;; either LPF1 or HPF1
+    (if (and (<> type HPF1) (<> type LPF1)) (println "BAD TYPE FOR FILTER: should be LPF1 or HPF1"))
+    (let ((m_dAlpha:SAMPLE* (alloc 1))    ;; feed forward coeff
+          (m_dBeta:SAMPLE* (alloc 1))     ;; for korg and moog
+          (m_dGamma 1.0)    ;; pre gain
+          (m_dDelta 0.0)    ;; FB in
+          (m_dEpsilon 0.0)  ;; FB out
+          (m_da0 1.0)       ;; input gain
+          (m_dFeedback:SAMPLE 0.0) ;; feedback coeff from S
+          (m_dZ1 0.0)       ;; z-1 register
+          (vn 0.0)          ;; fn
+          (xn:SAMPLE 0.0)
+          (feedbackOutput (lambda () (* (pref m_dBeta 0) (+ m_dZ1 (* m_dFeedback m_dDelta)))))
+          (lpf 0.0)
+          (hpf 0.0)
+          (oldfrq 0.0)
+          (T (/ 1.0 SRs))
+          (halfT (/ T 2.0)))
+      (lambda (x:SAMPLE fb)
+        (set! m_dFeedback fb)
+        ;; for diode filter support
+        (set! xn (+ (* x m_dGamma) m_dFeedback (* m_dEpsilon (feedbackOutput))))
+        (set! vn (* (- (* m_da0 xn) m_dZ1) (pref m_dAlpha 0)))
+        (set! lpf (+ vn m_dZ1))
+        (set! m_dZ1 (+ vn lpf))
+        (set! hpf (- xn lpf))
+        (if (= type HPF1) hpf
+            (if (= type LPF1) lpf
+                x)))))) ;; not a valid filter simply return input
+
+
+;; type is LPF4, LPF2, BPF4, BPF2, HPF4, HPF2 
+;; rate is the minimum number of samples to allow between frq/res updates
+(bind-func moog_ladder
+  (lambda (type)
+    (let ((m_dK 0.0)
+          (m_dAlpha_0 1.0)
+          (m_dAlpha 0.0)
+          (m_dGamma 0.0)
+          (dSigma 0.0) (dU 0.0)
+          (m_dA 0.0) (m_dB 0.0) (m_dC 0.0) (m_dD 0.0) (m_dE 1.0)
+          (dlpf1 0.0) (dlpf2 0.0) (dlpf3 0.0) (dlpf4 0.0)
+          (lpf1 (va_onepole LPF1))
+          (lpf2 (va_onepole LPF1))
+          (lpf3 (va_onepole LPF1))
+          (lpf4 (va_onepole LPF1))
+          (lpf1output:[SAMPLE]* (lpf1.feedbackOutput))
+          (lpf2output:[SAMPLE]* (lpf2.feedbackOutput))
+          (lpf3output:[SAMPLE]* (lpf3.feedbackOutput))
+          (lpf4output:[SAMPLE]* (lpf4.feedbackOutput))
+          (lpf1alpha:SAMPLE* (lpf1.m_dAlpha))
+          (lpf2alpha:SAMPLE* (lpf2.m_dAlpha))
+          (lpf3alpha:SAMPLE* (lpf3.m_dAlpha))
+          (lpf4alpha:SAMPLE* (lpf4.m_dAlpha))
+          (lpf1beta:SAMPLE* (lpf1.m_dBeta))
+          (lpf2beta:SAMPLE* (lpf2.m_dBeta))
+          (lpf3beta:SAMPLE* (lpf3.m_dBeta))
+          (lpf4beta:SAMPLE* (lpf4.m_dBeta))
+          (feedback 0.0)
+          (saturation 0.0)
+          (T (/ 1.0 SRs))
+          (g:SAMPLE 0.0)
+          (G:SAMPLE 0.0)
+          (t2 (/ 2.0 T))
+          (halfT (/ T 2.0))
+          (oldfrq 0.0)
+          (oldQ 0.0))
+      (cond ((= type LPF4) (set! m_dA 0.0) (set! m_dB 0.0) (set! m_dC 0.0) (set! m_dD 0.0) (set! m_dE 1.0))
+            ((= type LPF2) (set! m_dA 0.0) (set! m_dB 0.0) (set! m_dC 1.0) (set! m_dD 0.0) (set! m_dE 0.0))
+            ((= type BPF4) (set! m_dA 0.0) (set! m_dB 0.0) (set! m_dC 4.0) (set! m_dD -8.0) (set! m_dE 4.0))
+            ((= type BPF2) (set! m_dA 0.0) (set! m_dB 2.0) (set! m_dC -2.0) (set! m_dD 0.0) (set! m_dE 0.0))
+            ((= type HPF4) (set! m_dA 1.0) (set! m_dB -4.0) (set! m_dC 6.0) (set! m_dD -4.0) (set! m_dE 1.0))
+            ((= type HPF2) (set! m_dA 1.0) (set! m_dB -4.0) (set! m_dC 6.0) (set! m_dD -4.0) (set! m_dE 1.0))
+            (else ;; default to LPF4
+             (set! m_dA 0.0) (set! m_dB 0.0) (set! m_dC 0.0) (set! m_dD 0.0) (set! m_dE 1.0)))
+      (lambda (in:SAMPLE frq:SAMPLE Q:SAMPLE)
+        ;; update Q
+        (if (or (<> oldQ Q) (<> oldfrq frq))
+            (begin (if (< frq 0.0) (set! frq (fabs frq)))
+                   (if (< Q 0.0) (set! Q (fabs Q)))
+                   (set! oldQ Q)
+                   (set! oldfrq frq)
+                   (set! m_dK (* 4.0 Q))
+                   (set! oldfrq frq)
+                   (set! m_dAlpha (* t2 (tan (* STWOPI frq halfT))))
+                   (set! g (* halfT m_dAlpha))
+                   (set! G (/ g (+ 1.0 g)))
+                   (pset! lpf1alpha 0 G)
+                   (pset! lpf2alpha 0 G)
+                   (pset! lpf3alpha 0 G)
+                   (pset! lpf4alpha 0 G)
+                   (pset! lpf1beta 0 (* G G (/ G (+ 1.0 g))))
+                   (pset! lpf2beta 0 (* G (/ G (+ 1.0 g))))
+                   (pset! lpf3beta 0 (/ G (+ 1.0 g)))
+                   (pset! lpf4beta 0 (/ 1.0 (+ 1.0 g)))
+                   (set! m_dGamma (* G G G G))
+                   (set! m_dAlpha_0 (/ 1.0 (+ 1.0 (* m_dK m_dGamma))))))
+        (set! dSigma (+ (lpf1output) (lpf2output) (lpf3output) (lpf4output)))
+        (set! in (* in (+ 1.0 m_dK)))
+        (set! dU (* (- in (* m_dK dSigma)) m_dAlpha_0))
+        ;; cascade filters
+        (set! dlpf1 (lpf1 dU feedback))
+        (set! dlpf2 (lpf2 dlpf1 feedback))
+        (set! dlpf3 (lpf3 dlpf2 feedback))
+        (set! dlpf4 (lpf4 dlpf3 feedback))
+        ;; (println "1:" dlpf)
+        ;; filter type
+        (+ (* m_dA dU) (* m_dB dlpf1) (* m_dC dlpf2) (* m_dD dlpf3) (* m_dE dlpf4))))))
+
+
+;; http://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
+;; the 'using v1 to compute v2' version
+
+
+;; the @param tags in the docstring are actually for the returned
+;; closure (hence being below the @return tag in the docstring)
+(bind-func svf_c
+  "a state variable filter (SVF)
+
+@return - a closure which takes 4 arguments:
+@param in - input pointer |6,SAMPLE|* (|low,band,high,notch,peak,allpass|)
+@param cutoff - filter cutoff (Hz)
+@param res - filter resonance
+@param outarray - place to store the output
+"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)          
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
+        ;; one option: do the check (= res oldres) trick here
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              (set! ocutoff cutoff)
+              (set! ores res)        
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (aset! outarray 0 v2) ;; low
+        (aset! outarray 1 v1) ;; band
+        (aset! outarray 2 (- (- in (* k v1)) v2)) ;; high
+        (aset! outarray 3 (- in (* k v1))) ;; notch
+        (aset! outarray 4 (- (- in (* k v1)) (* 2.0 v2))) ;; peak
+        (aset! outarray 5 (- in (* 2.0 k v1))) ;; all pass
+        outarray))))
+
+(bind-func svf_mc_c
+  (lambda (nchan:i64)
+    (let ((svf_buf:[|6,float|*,float,float,float,|6,float|*]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! svf_buf i (svf_c)))
+      (lambda (chan in cutoff res outarray)
+        ((pref svf_buf chan) in cutoff res outarray)))))
+
+(bind-func lpf_c
+  "lowpass filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g:SAMPLE 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)
+          (v1 0.0) (v2:SAMPLE 0.0))      
+	    (lambda (in cutoff res)
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))
+              (set! ocutoff cutoff)
+              (set! ores res)
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(bind-func lpf_mc_c
+  (lambda (nchan:i64)
+    (let ((lpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! lpf_buf i (lpf_c)))
+      (lambda (chan in cutoff res)
+        ((pref lpf_buf chan) in cutoff res)))))
+
+(bind-func lpf2_c
+  "a state variable lowpass filter. slightly more flops than lpf_c,
+but v1 and v2 can be computed in parallel"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+	      (set! g (tan (* SPI (/ cutoff SRs))))
+        (set! k (- 2.0 (* 2.0 res)))
+        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
+        (set! a2 (* g a1))
+        (set! a3 (* g a2))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0:f v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(bind-func lpf2_mc_c
+  (lambda (nchan:i64)
+    (let ((lpf2_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan)
+        (pset! lpf2_buf i (lpf2_c)))
+      (lambda (chan in cutoff res)
+        ((pref lpf2_buf chan) in cutoff res)))))
+
+(bind-func bpf_c
+  "bandpass filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)          
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))              
+              (set! ocutoff cutoff)
+              (set! ores res)
+              (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v1))))
+
+(bind-func bpf_mc_c
+  (lambda (nchan:i64)
+    (let ((bpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! bpf_buf i (bpf_c)))
+      (lambda (chan in cutoff res)
+        ((pref bpf_buf chan) in cutoff res)))))
+
+(bind-func hpf_c
+  "highpass filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)          
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)        
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))              
+              (set! ocutoff cutoff)
+              (set! ores res)        
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- (- in (* k v1)) v2)))))
+
+(bind-func hpf_mc_c
+  (lambda (nchan:i64)
+    (let ((hpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! hpf_buf i (hpf_c)))
+      (lambda (chan in cutoff res)
+        ((pref hpf_buf chan) in cutoff res)))))
+
+
+(bind-func apf_c
+  "allpass filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g:SAMPLE 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)
+          (v1 0.0) (v2:SAMPLE 0.0))      
+	    (lambda (in cutoff res)
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))              
+              (set! ocutoff cutoff)
+              (set! ores res)
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- in (* 2.0 k v1))))))
+
+
+
+(bind-func notch_c
+  "notch filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)          
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))              
+              (set! ocutoff cutoff)
+              (set! ores res)
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- in (* k v1))))))
+
+(bind-func notch_mc_c
+  (lambda (nchan:i64)
+    (let ((notch_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! notch_buf i (notch_c)))
+      (lambda (chan in cutoff res)
+        ((pref notch_buf chan) in cutoff res)))))
+
+(bind-func peak_c
+  "peak filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0)
+          (ocutoff -1.0) (ores -1.0)          
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        (if (or (<> cutoff ocutoff)
+                (<> res ores))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< res 0.0) (set! res (fabs res)))              
+              (set! ocutoff cutoff)
+              (set! ores res)              
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (- 2.0 (* 2.0 res)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))))
+        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
+        (set! v2 (+ ic2eq (* g v1)))
+        (set! ic1eq (- (* 2.0 v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (- (- in (* k v1)) (* 2.0 v2))))))
+
+(bind-func peak_mc_c
+  (lambda (nchan:i64)
+    (let ((peak_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! peak_buf i (peak_c)))
+      (lambda (chan in cutoff res)
+        ((pref peak_buf chan) in cutoff res)))))
+
+;; Q is usually around 0.5
+;; gain is either a boost up to +5.0db or a reduction down to -24.0db
+(bind-func bell_c
+  "bell filter: returns filtering closure which implements a state variable filter"
+  (lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (A 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (m0 1.0) (m1 1.0) (m2 1.0)
+          (ogain -100000.0) (ocutoff -1.0) (oQ -1.0)          
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff gain Q)
+        ;; one option: do the check (= res oldres) trick here
+        (if (or (<> gain ogain)
+                (<> cutoff ocutoff)
+                (<> Q oQ))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< Q 0.0) (set! Q (fabs Q)))              
+              (set! ogain gain)
+              (set! ocutoff cutoff)
+              (set! oQ Q)        
+              (set! A (pow 10.0 (/ gain 40.0)))
+              (set! g (tan (* SPI (/ cutoff SRs))))
+              (set! k (/ 1.0 (* (+ Q 0.0000001) A)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))
+              (set! a3 (* g a2))
+              (set! m0 1.0)
+              (set! m1 (* k (- (* A A) 1.0)))
+              (set! m2 0.0)))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0:f v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (+ in (* m1 v1))))))
+
+(bind-func bell_mc_c
+  (lambda (nchan:i64)
+    (let ((bell_buf:[float,float,float,float,float]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! bell_buf i (bell_c)))
+      (lambda (chan in cutoff gain Q)
+        ((pref bell_buf chan) in cutoff gain Q)))))
+
+
+;; Q is usually around 0.5
+;; gain is either a boost up to +5.0db or a reduction down to -24.0db
+(bind-func lshelf_c
+  "low shelf filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (A 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (m0 1.0) (m1 1.0) (m2 1.0)
+          (ogain -1000000.0) (ocutoff -1.0) (oQ -1.0)
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff gain Q)
+        (if (or (<> gain ogain)
+                (<> cutoff ocutoff)
+                (<> Q oQ))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< Q 0.0) (set! Q (fabs Q)))              
+              (set! ogain gain)
+              (set! ocutoff cutoff)
+              (set! oQ Q)
+              ;; one option: do the check (= res oldres) trick here
+              (set! A (pow 10.0 (/ gain 40.0)))
+              (set! g (/ (tan (* SPI (/ cutoff SRs)))
+                         (sqrt A)))
+              (set! k (/ 1.0 (+ Q 0.0000001)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))
+              (set! a3 (* g a2))
+              (set! m0 1.0)
+              (set! m1 (* k (- A 1.0)))
+              (set! m2 (- (* A A) 1.0))))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0:f v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (+ in (* m1 v1) (* m2 v2))))))
+
+(bind-func lshelf_mc_c
+  (lambda (nchan:i64)
+    (let ((lshelf_buf:[float,float,float,float,float]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! lshelf_buf i (lshelf_c)))
+      (lambda (chan in cutoff gain Q)
+        ((pref lshelf_buf chan) in cutoff gain Q)))))
+
+
+(bind-func hshelf_c
+  "high shelf filter: returns filtering closure which implements a state variable filter"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (A 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a1 0.0) (a2 0.0) (a3 0.0)
+          (m0 0.0) (m1 1.0) (m2 1.0)
+          (ogain -100000000.0) (ocutoff -1.0) (oQ -1.0)          
+          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
+	    (lambda (in cutoff gain Q)
+        (if (or (<> gain ogain)
+                (<> cutoff ocutoff)
+                (<> Q oQ))
+            (begin
+              ;; negative frq & res
+              (if (< cutoff 0.0) (set! cutoff (fabs cutoff)))
+              (if (< Q 0.0) (set! Q (fabs Q)))              
+              (set! ogain gain)
+              (set! ocutoff cutoff)
+              (set! oQ Q)
+              (set! A (pow 10.0 (/ gain 40.0)))
+              (set! g (/ (tan (* SPI (/ cutoff SRs)))
+                         (sqrt A)))
+              (set! k (/ 1.0 (+ Q 0.0000001)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))
+              (set! a3 (* g a2))
+              (set! m0 (* A A))
+              (set! m1 (* k (- 1.0 A) A))
+              (set! m2 (- 1.0 (* A A)))))
+        (set! v3 (- in ic2eq))
+        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
+        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
+        (set! ic1eq (- (* 2.0:f v1) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        (+ (* m0 in) (* m1 v1) (* m2 v2))))))
+
+(bind-func hshelf_mc_c
+  (lambda (nchan:i64)
+    (let ((hshelf_buf:[float,float,float,float,float]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! hshelf_buf i (hshelf_c)))
+      (lambda (chan in cutoff gain Q)
+        ((pref hshelf_buf chan) in cutoff gain Q)))))
+
+;; Andy Simper's Sallen Key LPF
+;; http://cytomic.com/files/dsp/SkfLinearTrapOptimised2.pdf
+
+(bind-func skf_c
+  "lowpass filter: returns filtering closure using a Sallen Key lpf"
+	(lambda ()
+	  (let ((ic1eq 0.0) (ic2eq 0.0)
+          (g 0.0)
+          (k 0.0)
+          (a0 0.0) (a1 0.0) (a2 0.0) (a3 0.0) (a4 0.0) (a5 0.0)
+          (v1 0.0) (v2:SAMPLE 0.0))
+	    (lambda (in cutoff res)
+        ;; one option: do the check (= res oldres) trick here
+	      (set! g (tan (* SPI (/ cutoff SRs))))
+        (set! k (* 2.0 res))
+        (set! a0 (/ 1.0 (- (* (+ 1.0 g)
+                              (+ 1.0 g))
+                           (* g k))))
+        (set! a1 (* k a0))
+        (set! a2 (* (+ 1.0 g) a0))
+        (set! a3 (* g a2))
+        (set! a4 (/ 1.0 (+ 1.0 g)))
+        (set! a5 (* g a4))
+        (set! v1 (+ (* a1 ic2eq)
+                    (* a2 ic1eq)
+                    (* a3 in)))
+        (set! v2 (+ (* a4 ic2eq)
+                    (* a5 v1)))
+        (set! ic1eq (- (* 2.0 (- v1 (* k v2))) ic1eq))
+        (set! ic2eq (- (* 2.0 v2) ic2eq))
+        v2))))
+
+(bind-func skf_mc_c
+  (lambda (nchan:i64)
+    (let ((skf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
+          (i:i64 0))
+      (dotimes (i nchan) (pset! skf_buf i (skf_c)))
+      (lambda (chan in cutoff res)
+        ((pref skf_buf chan) in cutoff res)))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;; ;; pulse train
 ;; (bind-func pulse_c
@@ -658,31 +1791,13 @@
         (if (= chan 0) (set! val (fader initial final dur)))
         val))))
 
-;; iir comb without interpolation
-;; more efficient than comb if you
-;; don't need variable length
-(bind-func delay_old_c
-  (lambda (max_delay)
-    (let ((line:SAMPLE* (zalloc max_delay))
-          (time 0)
-          (delay max_delay)
-          (in 1.0)
-          (out 0.5))
-      (lambda (x:SAMPLE)
-        (let* ((n (modulo time delay))
-               (delayed (pref line n))
-               (y (+ (* in x) (* out delayed))))
-          (pset! line n y)
-          (set! time (+ time 1))
-          y)))))
 
 ;; iir comb without interpolation
 ;; more efficient than comb if you
 ;; don't need variable length
 (bind-func delay_c
-  (lambda (max_delay:i64)
-    (let ((delay max_delay)
-          (line:SAMPLE* (zalloc delay))
+  (lambda (delay:i64)
+    (let ((line:SAMPLE* (zalloc delay))
           (time 0)
           (n 0)
           (y 0.0))
@@ -711,109 +1826,164 @@
       (lambda (chan:i64 x wet feedback)
         ((pref dlines chan) x wet feedback)))))
 
-;; iir comb without interpolation
-;; more efficient than comb if you
-;; don't need variable length
-;;
-;; offset is for metro 'get-mark offset
-(bind-func delay_t_c
-  (lambda (max_delay offset:i64)
-    (let ((delay max_delay)
-          (line:SAMPLE* (zalloc delay))
-          ;; (time 0)
+;; a delay all pass filter
+(bind-func delay_apf_c
+  (lambda (delay:i64)
+    (let ((line:SAMPLE* (zalloc delay))
+          (time 0)
           (n 0)
+          (tmp 0.0)
           (y 0.0))
-      (lambda (x:SAMPLE time:i64 wet:SAMPLE feedback:SAMPLE)
-        (set! n (modulo (convert (- time offset)) delay))
+      (lambda (x:SAMPLE afp_gain)
+        (set! n (modulo time delay))
         (set! y (pref line n))
-        ;;(set! time (+ time 1))
-        (pset! line n (* feedback (+ x y)))
-        (+ x (* y wet))))))
-
-
-(bind-func delay_t_mc_c
-  (lambda (channels:i64 max_delay:i64 offset:i64)
-    (let ((dlines:[SAMPLE,SAMPLE,i64,SAMPLE,SAMPLE]** (alloc channels))
-          (i:i64 0))
-      (dotimes (i channels) (pset! dlines i (delay_t_c max_delay offset)))
-      (lambda (chan:i64 x time:i64 wet:SAMPLE feedback)
-        ((pref dlines chan) x time wet feedback)))))
-
-(bind-func delay_t_st_c
-  (lambda (d1 d2 offset)
-    (let ((dlines:[SAMPLE,SAMPLE,i64,SAMPLE,SAMPLE]** (alloc 2))
-          (i:i64 0))
-      (pset! dlines 0 (delay_t_c d1 offset))
-      (pset! dlines 1 (delay_t_c d2 offset))
-      (lambda (chan:i64 x time wet feedback)
-        ((pref dlines chan) x time wet feedback)))))
-
-
-
+        (set! time (+ time 1))
+        (set! tmp (+ x (* afp_gain y)))
+        (pset! line n tmp)
+        (+ (* -1.0 afp_gain tmp) y)))))
 
 ;; iir comb with interpolation
 ;; delay for COMB needs to stay
 ;; as a fractional argument (i.e. float)
 (bind-func comb_c
-  (lambda (max_delay:i64)
-    (let ((maxdelay max_delay)
-          (line:SAMPLE* (zalloc maxdelay))
+  (lambda (maxdelay:i64)
+    (let ((line:SAMPLE* (zalloc maxdelay))
           (in_head 0)
           (out_head 0)
-          (delay_:SAMPLE (convert max_delay))
+          (olddelay:SAMPLE (convert maxdelay))
           (alpha 0.0)
-          (om_alpha 1.0)
-          (ih:i64 0)
-          (oh:i64 0)
-          (delayed1 0.0)
-          (delayed2 0.0)
+          (i:i64 0)
           (delayed 0.0))
-      (dotimes (ih maxdelay) (pset! line ih 0.0))
-      (lambda (x:SAMPLE delay:SAMPLE wet:SAMPLE feedback:SAMPLE)
-        (if (<> delay delay_)
-            (begin (set! delay_ delay)
+      (dotimes (i maxdelay) (pset! line i 0.0))
+      (lambda (x:SAMPLE delay:SAMPLE in:SAMPLE mix:SAMPLE fb:SAMPLE)
+        (if (<> delay olddelay)
+            (begin (set! olddelay delay)
                    (set! alpha (- delay (floor delay)))
-                   (set! om_alpha (- 1.0 alpha))
                    (set! out_head (- (+ maxdelay in_head)
                                      (convert delay)))))
-        (set! ih (modulo in_head maxdelay))
-        (set! oh (modulo out_head maxdelay))
-        (set! delayed1 (pref line oh))
-        (set! delayed2 (pref line (modulo (+ oh 1) maxdelay)))
-        (set! delayed (+ (* alpha delayed1) (* om_alpha delayed2)))
-        ;;(set! y (+ (* in x) (* out delayed)))
-        (pset! line ih (* feedback (+ x delayed)))
-        (set! in_head (+ ih 1))
-        (set! out_head (+ oh 1))
-        (+ x (* delayed wet))))))
-
+        (if (> out_head maxdelay) (set! out_head (- out_head maxdelay)))
+        (if (> in_head maxdelay) (set! in_head (- in_head maxdelay)))                
+        (set! delayed (pref line out_head))
+        (pset! line in_head (+ (* in x) (* fb delayed)))
+        (set! in_head (+ in_head 1))
+        (set! out_head (+ out_head 1))
+        (+ (* x (- 1.0 mix)) (* delayed mix))))))
 
 (bind-func comb_mc_c
   (lambda (channels:i64 max_delay)
-    (let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
+    (let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
           (i:i64 0))
       (dotimes (i channels) (pset! dlines i (comb_c max_delay)))
-      (lambda (chan:i64 x delay wet feedback)
-        (let ((f (pref dlines chan)))
-          (f x delay wet feedback))))))
+      (lambda (chan:i64 x delay in mix fb)
+        ((pref dlines chan) x delay in mix fb)))))
+
+
+;; same as comb_c but includes LPF damping
+(bind-func comb_lpf_c
+  (lambda (maxdelay:i64)
+    (let ((line:SAMPLE* (zalloc maxdelay))
+          (in_head 0)
+          (lpf (lpf_c))
+          (out_head 0)
+          (olddelay:SAMPLE (convert maxdelay))
+          (alpha 0.0)
+          (i:i64 0)
+          (delayed 0.0))
+      (dotimes (i maxdelay) (pset! line i 0.0))
+      (lambda (x:SAMPLE delay:SAMPLE in:SAMPLE mix:SAMPLE fb:SAMPLE cof:SAMPLE res:SAMPLE)
+        (if (<> delay olddelay)
+            (begin (set! olddelay delay)
+                   (set! alpha (- delay (floor delay)))
+                   (set! out_head (- (+ maxdelay in_head)
+                                     (convert delay)))))
+        (if (> out_head maxdelay) (set! out_head (- out_head maxdelay)))
+        (if (> in_head maxdelay) (set! in_head (- in_head maxdelay)))                        
+        (set! delayed (pref line out_head))
+        (pset! line in_head (+ (* in x) (lpf (* delayed fb) cof res)))
+        (set! in_head (+ in_head 1))
+        (set! out_head (+ out_head 1))
+        (+ (* x (- 1.0 mix)) (* delayed mix))))))
+
+(bind-func comb_lpf_mc_c
+  (lambda (channels:i64 maxdelay)
+    (let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
+          (i:i64 0))
+      (dotimes (i channels) (pset! dlines i (comb_lpf_c maxdelay)))
+      (lambda (chan:i64 x delay in mix fb cof res)
+        ((pref dlines chan) x delay in mix fb cof res)))))
+
+;; same as comb_lpf_c but with a simple 1 pole filter
+(bind-func comb_lpf_1p_c
+  (lambda (maxdelay:i64)
+    (let ((line:SAMPLE* (zalloc maxdelay))
+          (in_head 0)
+          (lpf (lpf_1p_c))
+          (out_head 0)
+          (olddelay:SAMPLE (convert maxdelay))
+          (alpha 0.0)
+          (i:i64 0)
+          (delayed:SAMPLE 0.0))
+      (dotimes (i maxdelay) (pset! line i 0.0))
+      (lambda (x:SAMPLE delay:SAMPLE mix:SAMPLE combg:SAMPLE lpfg:SAMPLE)
+        (if (<> delay olddelay)
+            (begin (set! olddelay delay)
+                   (set! alpha (- delay (floor delay)))
+                   (set! out_head (- (+ maxdelay in_head)
+                                     (convert delay)))))
+        (if (> out_head maxdelay) (set! out_head (- out_head maxdelay)))
+        (if (> in_head maxdelay) (set! in_head (- in_head maxdelay)))        
+        (set! delayed (pref line out_head))
+        ;; (pset! line in_head (lpf (+ x (* combg delayed)) lpfg))
+        (pset! line in_head (+ x (* combg (lpf delayed lpfg))))
+        (set! in_head (+ in_head 1))
+        (set! out_head (+ out_head 1))
+        (+ (* (- 1.0 mix) x) (* mix delayed))))))
+
+;; same as comb_c but includes APF
+(bind-func comb_apf_c
+  (lambda (maxdelay:i64)
+    (let ((line:SAMPLE* (zalloc maxdelay))
+          (in_head 0)
+          (out_head 0)
+          (olddelay:SAMPLE (convert maxdelay))
+          (alpha 0.0)
+          (tmp:SAMPLE 0.0)
+          (i:i64 0)
+          (lpf (lpf_c))          
+          (delayed:SAMPLE 0.0))
+      (dotimes (i maxdelay) (pset! line i 0.0))
+      (lambda (x:SAMPLE delay:SAMPLE apf_gain:SAMPLE)
+        (if (<> delay olddelay)
+            (begin (set! olddelay delay)
+                   (set! alpha (- delay (floor delay)))
+                   (set! out_head (- (+ maxdelay in_head)
+                                     (convert delay)))))
+        (if (> out_head maxdelay) (set! out_head (- out_head maxdelay)))
+        (if (> in_head maxdelay) (set! in_head (- in_head maxdelay)))                
+        (set! delayed (pref line out_head))
+        (set! tmp (+ x (* apf_gain delayed)))
+        (pset! line in_head tmp)
+        (set! in_head (+ in_head 1))
+        (set! out_head (+ out_head 1))
+        (+ (* -1.0:f apf_gain tmp) delayed)))))
+
 
 
 ;; flanger
+;; delay in milliseconds
+;; range in milliseconds
+;; rate in hertz
 (bind-func flanger_c
-  (lambda (delay:SAMPLE mod_phase:SAMPLE mod_range mod_rate)
-    (let ((comb (comb_c (convert (+ delay mod_range))))
-          (mod (osc_c mod_phase)))
-      (lambda (x:SAMPLE wet feedback)
-        (comb x (+ delay (mod mod_range mod_rate)) wet feedback)))))
+  (lambda (delay:SAMPLE)
+    (let ((ms (* .001 SRf))
+          (del (* delay ms))
+          (comb (comb_c (convert (+ del SRf))))
+          (mod (osc_c 0.0)))
+      (lambda (x:SAMPLE in out range rate feedback)
+        (comb x
+              (+ del (clamp (mod (* ms range) rate) 0.0 SRf))
+              in out feedback)))))
 
-
-(bind-func flanger_mc_c
-  (lambda (channels:i64 delay:SAMPLE mod_phase:SAMPLE mod_range mod_rate)
-    (let ((comb (comb_mc_c channels (convert (+ delay mod_range))))
-          (mod (osc_mc_c mod_phase))
-          (i:i64 0))
-      (lambda (chan:i64 x wet feedback)
-        (comb chan x (+ delay (mod chan mod_range mod_rate)) wet feedback)))))
 
 ;; chorus
 (bind-func chorus_c
@@ -836,19 +2006,19 @@
           (mod1 (osc_c phase))
           (mod2 (osc_c phase))
           (mod3 (osc_c phase)))
-      (lambda (x:SAMPLE wet fb)
-        (+ (comb1 x (+ dly1 (mod1 mrng1 mrte1) wet fb) wet fb)
-           (comb2 x (+ dly2 (mod2 mrng2 mrte2) wet fb) wet fb)
-           (comb3 x (+ dly3 (mod3 mrng3 mrte3) wet fb) wet fb))))))
+      (lambda (x:SAMPLE in out fb)
+        (+ (comb1 x (+ dly1 (mod1 mrng1 mrte1) out fb) in out fb)
+           (comb2 x (+ dly2 (mod2 mrng2 mrte2) out fb) in out fb)
+           (comb3 x (+ dly3 (mod3 mrng3 mrte3) out fb) in out fb))))))
 
 (bind-func chorus_mc_c
   (lambda (channels:i64 phase)
-    (let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
+    (let ((dlines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
           (i:i64 0))
       (dotimes (i channels) (pset! dlines i (chorus_c phase)))
-      (lambda (chan:i64 x wet fb)
+      (lambda (chan:i64 x in out fb)
         (let ((f (pref dlines chan)))
-          (f x wet fb))))))
+          (f x in out fb))))))
 
 
 ;; tap delay
@@ -878,152 +2048,177 @@
       (lambda (chan x)
         ((pref tap_delay_buf chan) x)))))
 
-;; allpass
-(bind-func allpass_old_c
-  (lambda (delay)
-    (let ((inline:SAMPLE* (zalloc delay))
-          (outline:SAMPLE* (zalloc delay))
-          (time 0)
-          (g 0.9))
-      (lambda (x)
-        (let* ((n (% time delay))
-               (dy (pref outline n))
-               (dx (pref inline n))
-               (y (+ (* -1.0 g x)
-                     dx
-                     (* g dy))))
-          (pset! inline n x)
-          (pset! outline n y)
-          (set! time (+ time 1))
-          y)))))
-
-;; allpass
-(bind-func allpass_c
-  (lambda (delay)
-    (let ((_delay delay)
-          (inline:SAMPLE* (zalloc _delay))
-          (outline:SAMPLE* (zalloc _delay))
-          (time 0))
-      (lambda (x fb)
-        (let* ((n (% time _delay))
-               (dy (pref outline n))
-               (dx (pref inline n))
-               (y (+ (* -1.0 fb x)
-                     dx
-                     (* fb dy))))
-          (pset! inline n x)
-          (pset! outline n y)
-          (set! time (+ time 1))
-          y)))))
 
 
-(bind-func allpass_mc_c
-  (lambda (channels:i64 delay)
-    (let ((lines:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
-          (i:i64 0))
-      (dotimes (i channels) (pset! lines i (allpass_c delay)))
-      (lambda (chan:i64 x wet)
-        (let ((f (pref lines chan)))
-          (f x wet))))))
+;; helpfer function for newverb_c
+;; where rt60 is in milliseconds from 0.0 - 5000.0
+;; and delay is the comb filter delay in samples
+(bind-func comb_fb_from_rtsixty
+  (let ((fexponent 0.0)
+        (rt 0.0))
+    (lambda (rt60 delay)
+      (set! fexponent (* -3.0 delay (/ 1.0 SRs)))
+      (set! rt (* rt60 .001))
+      (pow 10.0 (/ fexponent rt)))))
 
-
-;; a dodgy reverb
-;; (bind-func reverb_c
-;;   (lambda (size) ; size in ms
-;;     (let ((ms (/ SAMPLERATE 1000.0))
-;; 	  (wet .25)
-;; 	  (dly1 (delay_c (dtoi64 (* ms (* .192 size)))))
-;; 	  (dly2 (delay_c (dtoi64 (* ms (* .373 size)))))
-;; 	  (dly3 (delay_c (dtoi64 (* ms (* .671 size)))))
-;; 	  (dly4 (delay_c (dtoi64 (* ms (* .712 size)))))
-;; 	  (ap1 (allpass_c (dtoi64 (* ms size))))
-;; 	  (ap2 (allpass_c (dtoi64 (* ms (* .329 size))))))
-;;       (ap1.g .8)
-;;       (ap2.g .8)
-;;       (lambda (in)
-;; 	(let ((wetin (* in wet)))
-;; 	  (+ (* in (- 1.0 wet)) (ap1 (ap2 (+ (dly1 wetin)
-;; 					     (dly2 wetin)
-;; 					     (dly3 wetin)
-;; 					     (dly4 wetin))))))))))
-
-;; a dodgy reverb mk2
-(bind-func reverb_old_c
-  (lambda (size:SAMPLE) ; size in ms
-    (let ((ms (/ SAMPLERATE 1000.0))
-          (dly1 (delay_old_c (convert (* ms (* .192 size)))))
-          (dly2 (delay_old_c (convert (* ms (* .373 size)))))
-          (dly3 (delay_old_c (convert (* ms (* .671 size)))))
-          (dly4 (delay_old_c (convert (* ms (* .712 size)))))
-          (ap1 (allpass_old_c (convert (* ms size))))
-          (ap3 (allpass_old_c (convert (* ms (* .929 size)))))
-          (ap2 (allpass_old_c (convert (* ms (* .329 size))))))
-      (ap1.g .8)
-      (ap2.g .7)
-      (ap3.g .6)
-      (lambda (in:SAMPLE wet)
-        (let ((wetin (* in wet)))
-          (+ (* in (- 1.0 wet))
-             (ap1 (ap2 (ap3 (+ (dly1 wetin)
-                               (dly2 wetin)
-                               (dly3 wetin)
-                               (dly4 wetin)))))))))))
-
-
-;; a dodgy reverb mk2
+;; where size is a roomsize from 0.0-1.0
+;; predelay is in ms - 40ms is a good start but can go as high as 2 seconds
+;; absorb is the amount of highfrq damping 0.0-1.0
+;; mix is 0.0 dry to 1.0 wet
+;; works as stereo or mono (mono input only)
 (bind-func reverb_c
-  (lambda (size:SAMPLE) ; size in ms
-    (let ((ms (/ SAMPLERATE 1000.0))
-          (dly1 (delay_c (convert (* ms (* .192 size)))))
-          (dly2 (delay_c (convert (* ms (* .373 size)))))
-          (dly3 (delay_c (convert (* ms (* .671 size)))))
-          (dly4 (delay_c (convert (* ms (* .712 size)))))
-          (ap1 (allpass_c (convert (* ms size))))
-          (ap3 (allpass_c (convert (* ms (* .929 size)))))
-          (ap2 (allpass_c (convert (* ms (* .329 size))))))
-      (lambda (in:SAMPLE wet fb)
-        (let ((wetin (* in wet)))
-          (+ (* in (- 1.0 wet))
-             (ap1 (ap2 (ap3 (* .3 (+ (dly1 wetin 1.0 fb)
-                                     (dly2 wetin 1.0 fb)
-                                     (dly3 wetin 1.0 fb)
-                                     (dly4 wetin 1.0 fb)))
-                            .8)
-                       .7)
-                  .6)))))))
+  (lambda ()
+    (let ((MILLIS (* .001 SRs))
+          (dly1 (comb_c (* SR 4))) (dly1_delay (* 40.0 MILLIS)) (dly1_fb 0.0)
+          (lpf1 (lpf_1p_c)) (lpf1_g 0.45)
+          (apf1 (comb_apf_c (/ SR 4))) (apf1_delay (* 13.28 MILLIS)) (apf1_gain 0.7) 
+          (apf2 (comb_apf_c (/ SR 4))) (apf2_delay (* 28.13 MILLIS)) (apf2_gain -0.7)
+          (comb1 (comb_c (/ SR 4))) (comb1_delay (* 31.71 MILLIS)) (comb1_fb 0.0)
+          (comb2 (comb_c (/ SR 4))) (comb2_delay (* 37.11 MILLIS)) (comb2_fb 0.0)
+          (comb3 (comb_c (/ SR 4))) (comb3_delay (* 40.23 MILLIS)) (comb3_fb 0.0)
+          (comb4 (comb_c (/ SR 4))) (comb4_delay (* 44.14 MILLIS)) (comb4_fb 0.0) 
+          (comb5 (comb_c (/ SR 4))) (comb5_delay (* 30.47 MILLIS)) (comb5_fb 0.0)
+          (comb6 (comb_c (/ SR 4))) (comb6_delay (* 33.98 MILLIS)) (comb6_fb 0.0) 
+          (comb7 (comb_c (/ SR 4))) (comb7_delay (* 41.41 MILLIS)) (comb7_fb 0.0)
+          (comb8 (comb_c (/ SR 4))) (comb8_delay (* 42.58 MILLIS)) (comb8_fb 0.0)
+          (lpf2 (lpf_1p_c)) (lpf2_g 0.5)
+          (lpf3 (lpf_1p_c)) (lpf3_g 0.5)
+          (apf3 (comb_apf_c (* SR 1))) (apf3_delay (* 9.38 MILLIS)) (apf3_gain -0.6)          
+          (apf4 (comb_apf_c (* SR 1))) (apf4_delay (* 11.0 MILLIS)) (apf4_gain 0.6)
+          (oldsize:SAMPLE 0.0)
+          (lout:SAMPLE 0.0)
+          (rout:SAMPLE 0.0)
+          (input 0.0)
+          (out:SAMPLE 0.0))
+      (lambda (chan:i64 x size predelay:SAMPLE absorb:SAMPLE mix)
+        (if (= chan 0)
+            (begin
+              (if (<> size oldsize)
+                  (begin (set! oldsize size)
+                         (set! size (* size 5000.0))
+                         (set! comb1_fb (comb_fb_from_rtsixty size comb1_delay))
+                         (set! comb2_fb (comb_fb_from_rtsixty size comb2_delay))
+                         (set! comb3_fb (comb_fb_from_rtsixty size comb3_delay))
+                         (set! comb4_fb (comb_fb_from_rtsixty size comb4_delay))
+                         (set! comb5_fb (comb_fb_from_rtsixty size comb5_delay))
+                         (set! comb6_fb (comb_fb_from_rtsixty size comb6_delay))
+                         (set! comb7_fb (comb_fb_from_rtsixty size comb7_delay))
+                         (set! comb8_fb (comb_fb_from_rtsixty size comb8_delay))))
+              (set! input x)
+              ;; predelay
+              (set! dly1_delay (* predelay MILLIS))
+              (set! out (dly1 input dly1_delay 0.5 0.5 0.0)) ;dly1_fb))
+              ;; input diffusion
+              (set! out (lpf1 out absorb))
+              (set! out (apf1 out apf1_delay apf1_gain))
+              (set! out (apf2 out apf2_delay apf2_gain))))
+        ;; left channel
+        (if (= chan 0)
+            (begin
+              (set! lout (+ (* 0.15 (comb1 out comb1_delay 1.0 1.0 comb1_fb))
+                            (* -0.15 (comb2 out comb2_delay 1.0 1.0 comb2_fb))
+                            (* 0.15 (comb3 out comb3_delay 1.0 1.0 comb3_fb))
+                            (* -0.15 (comb4 out comb4_delay 1.0 1.0 comb4_fb))))
+              (set! lout (lpf2 lout lpf2_g))
+              (set! lout (apf3 lout apf3_delay apf3_gain))))
+        ;; right channel
+        (if (= chan 1)
+            (begin
+              (set! rout (+ (* 0.15 (comb5 out comb5_delay 1.0 1.0 comb5_fb))
+                            (* -0.15 (comb6 out comb6_delay 1.0 1.0 comb6_fb))
+                            (* 0.15 (comb7 out comb7_delay 1.0 1.0  comb7_fb))
+                            (* -0.15 (comb8 out comb8_delay 1.0 1.0 comb8_fb))))
+              (set! rout (lpf3 rout lpf3_g))
+              (set! rout (apf4 rout apf4_delay apf4_gain))))
+        (if (= chan 0)
+            (+ (* input (- 1.0 mix)) (* lout mix))
+            (if (= chan 1)
+                (+ (* input (- 1.0 mix)) (* rout mix))
+                0.0))))))
 
-(bind-func reverb_mc_c
-  (lambda (channels:i64 size)
-    (let ((lines:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
-          (i:i64 0))
-      (dotimes (i channels) (pset! lines i (reverb_c size)))
-      (lambda (chan:i64 x wet fb)
-        (let ((f (pref lines chan)))
-          (f x wet fb))))))
 
-
-;; a dodgy reverb mk2
-(bind-func reverb2_c
-  (lambda (size:SAMPLE) ; size in ms
-    (let ((ms (/ SAMPLERATE 1000.0))
-          (ap1 (allpass_c (convert (* ms size))))
-          (ap3 (allpass_c (convert (* ms (* .929 size)))))
-          (ap2 (allpass_c (convert (* ms (* .329 size))))))
-      (lambda (in:SAMPLE wet)
-        (let ((wetin (* in wet)))
-          (+ (* in (- 1.0 wet))
-             (ap1 (ap2 (ap3 wetin .8) .7) .6)))))))
-
-
-(bind-func reverb2_mc_c
-  (lambda (channels:i64 size)
-    (let ((lines:[SAMPLE,SAMPLE,SAMPLE]** (alloc channels))
-          (i:i64 0))
-      (dotimes (i channels) (pset! lines i (reverb2_c size)))
-      (lambda (chan:i64 x wet)
-        (let ((f (pref lines chan)))
-          (f x wet))))))
-
+;; this is a stereo cludge 
+(bind-func reverb_st_c
+  (lambda ()
+    (let ((MILLIS (* .001 SRs))
+          (dly1_l (comb_c (* SR 4))) (dly1_delay (* 40.0 MILLIS)) (dly1_fb 0.0)
+          (dly1_r (comb_c (* SR 4)))
+          (lpf1_l (lpf_1p_c)) (lpf1_g 0.45)
+          (lpf1_r (lpf_1p_c))
+          (apf1_l (comb_apf_c (/ SR 4))) (apf1_delay (* 13.28 MILLIS)) (apf1_gain 0.7)
+          (apf1_r (comb_apf_c (/ SR 4)))          
+          (apf2_l (comb_apf_c (/ SR 4))) (apf2_delay (* 28.13 MILLIS)) (apf2_gain -0.7)
+          (apf2_r (comb_apf_c (/ SR 4)))
+          (comb1 (comb_c (/ SR 4))) (comb1_delay (* 31.71 MILLIS)) (comb1_fb 0.0)
+          (comb2 (comb_c (/ SR 4))) (comb2_delay (* 37.11 MILLIS)) (comb2_fb 0.0)
+          (comb3 (comb_c (/ SR 4))) (comb3_delay (* 40.23 MILLIS)) (comb3_fb 0.0)
+          (comb4 (comb_c (/ SR 4))) (comb4_delay (* 44.14 MILLIS)) (comb4_fb 0.0) 
+          (comb5 (comb_c (/ SR 4))) (comb5_delay (* 30.47 MILLIS)) (comb5_fb 0.0)
+          (comb6 (comb_c (/ SR 4))) (comb6_delay (* 33.98 MILLIS)) (comb6_fb 0.0) 
+          (comb7 (comb_c (/ SR 4))) (comb7_delay (* 41.41 MILLIS)) (comb7_fb 0.0)
+          (comb8 (comb_c (/ SR 4))) (comb8_delay (* 42.58 MILLIS)) (comb8_fb 0.0)
+          (lpf2 (lpf_1p_c)) (lpf2_g 0.5)
+          (lpf3 (lpf_1p_c)) (lpf3_g 0.5)
+          (apf3 (comb_apf_c (* SR 1))) (apf3_delay (* 9.38 MILLIS)) (apf3_gain -0.6)          
+          (apf4 (comb_apf_c (* SR 1))) (apf4_delay (* 11.0 MILLIS)) (apf4_gain 0.6)
+          (oldsize:SAMPLE 0.0)
+          (lout:SAMPLE 0.0)
+          (rout:SAMPLE 0.0)
+          (input 0.0)
+          (out:SAMPLE 0.0))
+      (lambda (chan:i64 x size predelay:SAMPLE absorb:SAMPLE mix)
+        (if (= chan 0)
+            (begin
+              (if (<> size oldsize)
+                  (begin (set! oldsize size)
+                         (set! size (* size 5000.0))
+                         (set! comb1_fb (comb_fb_from_rtsixty size comb1_delay))
+                         (set! comb2_fb (comb_fb_from_rtsixty size comb2_delay))
+                         (set! comb3_fb (comb_fb_from_rtsixty size comb3_delay))
+                         (set! comb4_fb (comb_fb_from_rtsixty size comb4_delay))
+                         (set! comb5_fb (comb_fb_from_rtsixty size comb5_delay))
+                         (set! comb6_fb (comb_fb_from_rtsixty size comb6_delay))
+                         (set! comb7_fb (comb_fb_from_rtsixty size comb7_delay))
+                         (set! comb8_fb (comb_fb_from_rtsixty size comb8_delay))))
+              (set! input x)
+              ;; predelay
+              (set! dly1_delay (* predelay MILLIS))
+              (set! out (dly1_l input dly1_delay 0.5 0.5 0.0)) ;dly1_fb))
+              ;; input diffusion
+              (set! out (lpf1_l out absorb))
+              (set! out (apf1_l out apf1_delay apf1_gain))
+              (set! out (apf2_l out apf2_delay apf2_gain))))
+        (if (= chan 1)
+            (begin
+              (set! input x)
+              (set! out (dly1_r input dly1_delay 0.5 0.5 0.0)) ;dly1_fb))
+              ;; input diffusion
+              (set! out (lpf1_r out absorb))
+              (set! out (apf1_r out apf1_delay apf1_gain))
+              (set! out (apf2_r out apf2_delay apf2_gain))))
+        ;; left channel
+        (if (= chan 0)
+            (begin
+              (set! lout (+ (* 0.15 (comb1 out comb1_delay 1.0 1.0 comb1_fb))
+                            (* -0.15 (comb2 out comb2_delay 1.0 1.0 comb2_fb))
+                            (* 0.15 (comb3 out comb3_delay 1.0 1.0 comb3_fb))
+                            (* -0.15 (comb4 out comb4_delay 1.0 1.0 comb4_fb))))
+              (set! lout (lpf2 lout lpf2_g))
+              (set! lout (apf3 lout apf3_delay apf3_gain))))
+        ;; right channel
+        (if (= chan 1)
+            (begin
+              (set! rout (+ (* 0.15 (comb5 out comb5_delay 1.0 1.0 comb5_fb))
+                            (* -0.15 (comb6 out comb6_delay 1.0 1.0 comb6_fb))
+                            (* 0.15 (comb7 out comb7_delay 1.0 1.0  comb7_fb))
+                            (* -0.15 (comb8 out comb8_delay 1.0 1.0 comb8_fb))))
+              (set! rout (lpf3 rout lpf3_g))
+              (set! rout (apf4 rout apf4_delay apf4_gain))))
+        (if (= chan 0)
+            (+ (* input (- 1.0 mix)) (* lout mix))
+            (if (= chan 1)
+                (+ (* input (- 1.0 mix)) (* rout mix))
+                0.0))))))
 
 
 ;; a dodgy bitcrusher
@@ -1116,7 +2311,6 @@
               ((= chan 3) (* out c4))
               (else 0.0))))))
 
-
 ;; simple oct weights
 (bind-func mix8
   (lambda (chan x:SAMPLE c1 c2 c3 c4 c5 c6 c7 c8)
@@ -1129,6 +2323,7 @@
           ((= chan 6) (* x c7))
           ((= chan 7) (* x c8))
           (else 0.0))))
+  
 
 ;; an n channel mixer
 ;; cdat is an array of doubles values
@@ -1141,337 +2336,6 @@
           0.0))))
 
 
-;; http://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
-;; the 'using v1 to compute v2' version
-
-
-;; the @param tags in the docstring are actually for the returned
-;; closure (hence being below the @return tag in the docstring)
-(bind-func svf_c
-  "a state variable filter (SVF)
-
-@return - a closure which takes 4 arguments:
-@param in - input pointer |6,SAMPLE|* (|in,low,band,high,notch,peak|)
-@param cutoff - filter cutoff (Hz)
-@param res - filter resonance
-@param outarray - place to store the output
-"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res outarray:|6,SAMPLE|*)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (aset! outarray 0 in) ;; input
-        (aset! outarray 1 v2) ;; low
-        (aset! outarray 2 v1) ;; band
-        (aset! outarray 3 (- in (- (* k v1) v2))) ;; high
-        (aset! outarray 4 (- in (* k v1))) ;; notch
-        (aset! outarray 5 (- in (- (* k v1) (* 2.0 v2)))) ;; peak
-        outarray))))
-
-(bind-func svf_mc_c
-  (lambda (nchan:i64)
-    (let ((svf_buf:[|6,float|*,float,float,float,|6,float|*]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! svf_buf i (svf_c)))
-      (lambda (chan in cutoff res outarray)
-        ((pref svf_buf chan) in cutoff res outarray)))))
-
-(bind-func lpf_c
-  "lowpass filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g:SAMPLE 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        v2))))
-
-(bind-func lpf_mc_c
-  (lambda (nchan:i64)
-    (let ((lpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! lpf_buf i (lpf_c)))
-      (lambda (chan in cutoff res)
-        ((pref lpf_buf chan) in cutoff res)))))
-
-(bind-func lpf2_c
-  "a state variable lowpass filter. slightly more flops than lpf_c,
-but v1 and v2 can be computed in parallel"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0) (a3 0.0)
-          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k )))))
-        (set! a2 (* g a1))
-        (set! a3 (* g a2))
-        (set! v3 (- in ic2eq))
-        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
-        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
-        (set! ic1eq (- (* 2.0:f v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        v2))))
-
-(bind-func lpf2_mc_c
-  (lambda (nchan:i64)
-    (let ((lpf2_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan)
-        (pset! lpf2_buf i (lpf2_c)))
-      (lambda (chan in cutoff res)
-        ((pref lpf2_buf chan) in cutoff res)))))
-
-(bind-func bpf_c
-  "bandpass filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        v1))))
-
-(bind-func bpf_mc_c
-  (lambda (nchan:i64)
-    (let ((bpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! bpf_buf i (bpf_c)))
-      (lambda (chan in cutoff res)
-        ((pref bpf_buf chan) in cutoff res)))))
-
-(bind-func hpf_c
-  "highpass filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (- in (- (* k v1) v2))))))
-
-(bind-func hpf_mc_c
-  (lambda (nchan:i64)
-    (let ((hpf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! hpf_buf i (hpf_c)))
-      (lambda (chan in cutoff res)
-        ((pref hpf_buf chan) in cutoff res)))))
-
-(bind-func notch_c
-  "notch filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (- in (* k v1))))))
-
-(bind-func notch_mc_c
-  (lambda (nchan:i64)
-    (let ((notch_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! notch_buf i (notch_c)))
-      (lambda (chan in cutoff res)
-        ((pref notch_buf chan) in cutoff res)))))
-
-(bind-func peak_c
-  "peak filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (- 2.0 (* 2.0 res)))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! v1 (+ (* a1 ic1eq) (* a2 (- in ic2eq))))
-        (set! v2 (+ ic2eq (* g v1)))
-        (set! ic1eq (- (* 2.0 v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (- in (- (* k v1) (* 2.0 v2)))))))
-
-(bind-func peak_mc_c
-  (lambda (nchan:i64)
-    (let ((peak_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! peak_buf i (peak_c)))
-      (lambda (chan in cutoff res)
-        ((pref peak_buf chan) in cutoff res)))))
-
-(bind-func lshelf_c
-  "low shelf filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (A 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0) (a3 0.0)
-          (m0 1.0) (m1 1.0) (m2 1.0)
-          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
-	    (lambda (in cutoff gain Q)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff (convert SAMPLE_RATE))))
-                   (sqrt A)))
-        (set! k (/ 1.0 Q))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! a3 (* g a2))
-        (set! m1 (* k (- A 1.0)))
-        (set! m2 (- (* A A) 1.0))
-        (set! v3 (- in ic2eq))
-        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
-        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
-        (set! ic1eq (- (* 2.0:f v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (+ in (* m1 v1) (* m2 v2))))))
-
-(bind-func lshelf_mc_c
-  (lambda (nchan:i64)
-    (let ((lshelf_buf:[float,float,float,float,float]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! lshelf_buf i (lshelf_c)))
-      (lambda (chan in cutoff gain Q)
-        ((pref lshelf_buf chan) in cutoff gain Q)))))
-
-
-(bind-func hshelf_c
-  "low shelf filter: returns filtering closure which implements a state variable filter"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (A 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a1 0.0) (a2 0.0) (a3 0.0)
-          (m0 0.0) (m1 1.0) (m2 1.0)
-          (v1 0.0) (v2 0.0) (v3:SAMPLE 0.0))
-	    (lambda (in cutoff gain Q)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! A (pow 10.0 (/ gain 40.0)))
-        (set! g (/ (tan (* SPI (/ cutoff (convert SAMPLE_RATE))))
-                   (sqrt A)))
-        (set! k (/ 1.0 Q))
-        (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-        (set! a2 (* g a1))
-        (set! a3 (* g a2))
-        (set! m0 (* A A))
-        (set! m1 (* k (- 1.0 A) A))
-        (set! m2 (- 1.0 (* A A)))
-        (set! v3 (- in ic2eq))
-        (set! v1 (+ (* a1 ic1eq) (* a2 v3)))
-        (set! v2 (+ ic2eq (* a2 ic1eq) (* a3 v3)))
-        (set! ic1eq (- (* 2.0:f v1) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        (+ (* m0 in) (* m1 v1) (* m2 v2))))))
-
-(bind-func hshelf_mc_c
-  (lambda (nchan:i64)
-    (let ((hshelf_buf:[float,float,float,float,float]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! hshelf_buf i (hshelf_c)))
-      (lambda (chan in cutoff gain Q)
-        ((pref hshelf_buf chan) in cutoff gain Q)))))
-
-;; Andy Simper's Sallen Key LPF
-;; http://cytomic.com/files/dsp/SkfLinearTrapOptimised2.pdf
-
-(bind-func skf_c
-  "lowpass filter: returns filtering closure using a Sallen Key lpf"
-	(lambda ()
-	  (let ((ic1eq 0.0) (ic2eq 0.0)
-          (g 0.0)
-          (k 0.0)
-          (a0 0.0) (a1 0.0) (a2 0.0) (a3 0.0) (a4 0.0) (a5 0.0)
-          (v1 0.0) (v2:SAMPLE 0.0))
-	    (lambda (in cutoff res)
-        ;; one option: do the check (= res oldres) trick here
-	      (set! g (tan (* SPI (/ cutoff (convert SAMPLE_RATE)))))
-        (set! k (* 2.0 res))
-        (set! a0 (/ 1.0 (- (* (+ 1.0 g)
-                              (+ 1.0 g))
-                           (* g k))))
-        (set! a1 (* k a0))
-        (set! a2 (* (+ 1.0 g) a0))
-        (set! a3 (* g a2))
-        (set! a4 (/ 1.0 (+ 1.0 g)))
-        (set! a5 (* g a4))
-        (set! v1 (+ (* a1 ic2eq)
-                    (* a2 ic1eq)
-                    (* a3 in)))
-        (set! v2 (+ (* a4 ic2eq)
-                    (* a5 v1)))
-        (set! ic1eq (- (* 2.0 (- v1 (* k v2))) ic1eq))
-        (set! ic2eq (- (* 2.0 v2) ic2eq))
-        v2))))
-
-(bind-func skf_mc_c
-  (lambda (nchan:i64)
-    (let ((skf_buf:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]** (zalloc nchan))
-          (i:i64 0))
-      (dotimes (i nchan) (pset! skf_buf i (skf_c)))
-      (lambda (chan in cutoff res)
-        ((pref skf_buf chan) in cutoff res)))))
 
 
 (bind-func hermite_interp
@@ -1482,6 +2346,8 @@ but v1 and v2 can be computed in parallel"
           (a (+ w v (* (- x2 x0) 0.5)))
           (b (+ w a)))
       (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
+
+
 
 
 ;; a rough and ready granulator
@@ -2068,18 +2934,38 @@ but v1 and v2 can be computed in parallel"
 ;; http://plugin.org.uk/
 
 (bind-func overdrive_c
-  "Drive range:[1.0,3.0]"
-  (lambda (drive)
-    (let ((drive_minus_1 (- drive 1.0)))
-      (lambda (x:SAMPLE)
-        (let ((absx (fabs x)))
-          (/ (* x (+ absx drive))
-             (+ (* x x)
-                (* drive_minus_1 absx)
-                1.0)))))))
+  "Drive range:[1.0,3.0] - user input is 0.0-1.0"
+  (lambda ()
+    (lambda (x:SAMPLE drive)
+      (set! drive (+ 1.0 (* 2.0 (clamp drive 0.0 1.0))))
+      (let ((absx (fabs x))
+            (drive_minus_1 (- drive 1.0)))
+        (/ (* x (+ absx drive))
+           (+ (* x x)
+              (* drive_minus_1 absx)
+              1.0))))))
 
 ;; based on Steve Harris's Valve Saturation lv2 plugin
 ;; http://plugin.org.uk/
+
+;; (bind-func saturation_c
+;;   "level:[0.0,1.0] character:[0.0,1.0]"
+;;   (lambda ()
+;;     (let ((itm1 0.0)
+;;           (otm1 0.0))
+;;       (lambda (x:SAMPLE level:SAMPLE character:SAMPLE)
+;;         (set! level (clamp level .001 0.999))
+;;         (let ((q (- level 0.999))
+;;               (dist (+ (* character 40.0) 0.1))
+;;               (fx (if (= x q)
+;;                       (/ (/ 1.0 (+ dist q))
+;;                          (- 1.0 (exp (* dist q))))
+;;                       (/ (/ (- x q)
+;;                             (+ (- 1.0 (exp (* -1.0 dist (- x q)))) q))
+;;                          (- 1.0 (exp (* dist q)))))))
+;;           (set! otm1 (- (+ (* 0.999 otm1) fx) itm1))
+;;           (set! itm1 fx)
+;;           otm1)))))
 
 (bind-func saturation_c
   "level:[0.0,1.0] character:[0.0,1.0]"
@@ -2087,14 +2973,15 @@ but v1 and v2 can be computed in parallel"
     (let ((itm1 0.0)
           (otm1 0.0))
       (lambda (x:SAMPLE level:SAMPLE character:SAMPLE)
+        (set! level (clamp level .1 0.9))
         (let ((q (- level 0.999))
               (dist (+ (* character 40.0) 0.1))
               (fx (if (= x q)
                       (/ (/ 1.0 (+ dist q))
                          (- 1.0 (exp (* dist q))))
-                      (/ (/ (- x q)
-                            (+ (- 1.0 (exp (* -1.0 dist (- x q)))) q))
-                         (- 1.0 (exp (* dist q)))))))
+                      (+ (/ (- x q)
+                            (- 1.0 (exp (* -1.0 dist (- x q)))))
+                         (/ q (- 1.0 (exp (* dist q))))))))
           (set! otm1 (- (+ (* 0.999 otm1) fx) itm1))
           (set! itm1 fx)
           otm1)))))
@@ -2229,33 +3116,348 @@ but v1 and v2 can be computed in parallel"
           res)))))
 
 
-;; chan, gate, attack, decay, sustain, release
-(bind-func adsr_c
+;; pan around 'n' channels
+;; with a bleed to surrounding channels.
+;;
+;; the 1st speaker (channel) is pan 0.0
+;; the 2nd speaker           is pan 1.0
+;; etc..
+;; the last speaker          is pan (- n 1.0)
+;; it is legal to pan past (- n 1.0) to n
+;; this makes it possible to pan between the
+;; last speaker and the first speaker
+;;
+;; for example: assuming 4 channels
+;; (pan chan in 1.0 (% pos 4.0))
+;; would pan around a circle of 4 speakers
+;;
+;; the amount of 'bleed' is the amount of bleed
+;; between speakers.  A bleed of 4.0 with 4.0 channels
+;; would mean all speakers would always be sounding.
+;; A bleed of less than 0.5 would ensure that only one
+;; speaker at a time will ever be sounding.
+;; 
+(bind-func pan_c
+  (lambda (chans)
+    (let ((fchans (i64tof (+ chans 0)))
+          (fchan 0.0)
+          (chk 0)
+          (p1 0.0) (p2 0.0) (p3 0.0)
+          (b1 0.0) (b2 0.0))
+      (lambda (chan in bleed pan)
+        (set! fchan (i64tof chan))
+        (set! p1 pan)
+        (set! p2 (- pan fchans))
+        (set! p3 (+ pan fchans))
+        (set! b1 (- fchan bleed))
+        (set! b2 (+ fchan bleed))
+        (cond ((and (> p1 b1) (< p1 b2)) (* in (/ 1.0 bleed) (- bleed (fabs (- fchan p1)))))
+              ((and (> p2 b1) (< p2 b2)) (* in (/ 1.0 bleed) (- bleed (fabs (- fchan p2)))))
+              ((and (> p3 b1) (< p3 b2)) (* in (/ 1.0 bleed) (- bleed (fabs (- fchan p3)))))
+              (else 0.0))))))
+
+
+
+;; explin is a function that can smoothly interpolate
+;; between logarithmic and exponential curves
+;;
+;; t is a value between [0.0 .. 1.0] for time.
+;; x is a value between [-1.0 ... 1.0] that
+;; moves between logathmic (negative) and exponential (positive)
+;; curves with a centre value of 0.0 being exactly linear
+(bind-func explin
+  (let ((time 0.0:f)
+        (Ef (dtof E))
+        (scale (/ 1.0 (- Ef 1.0))))
+    (lambda (t:float x:float)
+      (if (< x 0.0)
+          (set! x (+ 1.0 x))
+          (if (< (fabs x) 0.0001)
+              (set! x 1.0)
+              (set! x (/ 1.0 (- 1.0 x)))))
+      (set! time (+ 1.0 (* t (- Ef 1.0))))
+      (* (+ -1.0 (exp (pow (log time) x))) scale))))
+
+
+
+;; g is gate
+;; a is attack in milliseconds
+;; d is decay in milliseconds
+;; ela is the explin for attach
+;; eld is the explin for decay
+;;
+;; cycle is a boolean closure variable that makes the ad self oscillate
+;;
+;; explin is a value between [-1.0 ... 1.0] that
+;; moves between logathmic (negatives) and exponential (positive)
+;; curves with a centre value of 0.0 being exactly linear
+(bind-func ad_c
   (lambda ()
     (let ((t:SAMPLE 0.0)
           (out:SAMPLE 0.0)
-          (t1 0.0) (t2 0.0) (t3 0.0) (t4 0.0)
+          (time:SAMPLE 0.0)
+          (aa 0.0) (dd 0.0)
+          (cycle:i1 #f)
           (inc1 0.0) (inc2 0.0) (inc3 0.0))
-      (lambda (chan:i64 g a d s r)
+      (lambda (chan:i64 g a d ela eld)
         (if (<> chan 0)
             out
             (begin
-              (set! a (+ 1.0 (* a .001 SRs)))
-              (set! d (+ 1.0 (* d .001 SRs)))
-              (set! r (+ 1.0 (* r .001 SRs)))
-              (if (< g 0.00001:f) (set! t 0.0) (inc t 1.0))
-              (set! t1 a)
-              (set! t2 (+ a d))
-              (set! inc1 (/ 1.0 a))
-              (set! inc2 (/ (- 1.0 s) d))
-              (set! inc3 (if (or (< s .01) (> out s)) (/ 1.0 r) (/ s r)))
-              (cond ((< t 0.001) (dec out inc3)) ;; release
-                    ((> t (+ a d)) (set! out s)) ;; sustain
-                    ((> t a) (dec out inc2)) ;; decay
-                    ((> t 0.0) (inc out inc1)) ;; attack
+              (if (< g 0.00001:f)
+                  (begin (set! t 0.0)
+                         (set! aa (+ 1.0 (* a .001 SRs)))
+                         (set! dd (+ 1.0 (* d .001 SRs)))
+                         (set! inc1 (/ 1.0 aa))
+                         (set! inc2 (/ 1.0 dd))
+                         void)
+                  (begin (inc t 1.0)
+                         void))
+              (cond ((> t (+ aa dd))
+                     (if (and cycle (> g 0.0)) ; (< out 0.0001))
+                         (begin (set! t 0.0)
+                                (set! aa (+ 1.0 (* a .001 SRs)))
+                                (set! dd (+ 1.0 (* d .001 SRs)))
+                                (set! inc1 (/ 1.0 aa))
+                                (set! inc2 (/ 1.0 dd))
+                                void))
+                     (set! time 0.0)
+                     (set! out 0.0)) ;(clamp (- out .001) 0.0 1.0)))
+                    ((> t aa)
+                     (dec time inc2)
+                     (set! out (explin (clamp time 0.0 1.0) eld))) ;; decay
+                    ((> t 0.0)
+                     (inc time inc1)
+                     (set! out (explin time ela))) ;; attack
                     (else (set! out 0.0)))
-              (set! out (clamp out 0.0 1.0))
               out))))))
+
+
+;; chan, gate, attack, decay, sustain, release
+;; (bind-func adsr_c
+;;   (lambda ()
+;;     (let ((t:double 0.0)
+;;           (tt:i64 0)
+;;           (out:double 0.0)
+;;           (ms (* .001 SRd))
+;;           (a 0.0) (d 0.0) (r 0.0) (s 0.0)
+;;           (t1 0.0) (t2 0.0) (t3 0.0) (t4 0.0)
+;;           (inc1 0.0) (inc2 0.0) (inc3 0.0))
+;;       (lambda (chan:i64 g:float aa:float dd:float ss:float rr:float)
+;;         (if (<> chan 0)
+;;             (dtof out)
+;;             (begin
+;;               (set! a (+ 1.0 (* (ftod aa) ms)))
+;;               (set! d (+ 1.0 (* (ftod dd) ms)))
+;;               (set! r (+ 1.0 (* (ftod rr) ms)))
+;;               (set! s (ftod ss))
+;;               (if (< g 0.00001:f) (set! t 0.0) (set! t (+ t 1.0)))
+;;               ;; (set! t1 a)
+;;               ;; (set! t2 (+ a d))
+;;               (cond ((< t 0.001)
+;;                      (set! inc3 (if (or (< s .01) (> out (+ s 0.001))) (/ 1.0 r) (/ s r)))
+;;                      (set! out (- out inc3))) ;; release
+;;                     ((> t (+ a d)) out) ;(set! out s)) ;; sustain
+;;                     ((> t a)
+;;                      (set! inc2 (/ (- 1.0 s) d))
+;;                      (set! out (- out inc2))) ;; decay
+;;                     ((> t 0.0)
+;;                      (set! inc1 (/ 1.0 a))                     
+;;                      (set! out (+ out inc1))) ;; attack
+;;                     (else (set! out (- out .01)))) ;; fast decay to 0.0 (shouldn't get here!)
+;;               (set! out (clamp out 0.0 1.0))
+;;               (dtof out)))))))
+
+
+
+;;
+;;
+;;
+(bind-func adsr_c
+  (lambda ()
+    (let ((calcCoef (lambda (rate:float targetRatio:float)
+                      (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
+                                              targetRatio)))
+                              rate))))
+          (targetRatioA 0.3)          
+          (targetRatioDR 0.0001)
+          (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4)
+          (state env_idle)
+          (attackRate 0.0)
+          (attackCoef 0.0)
+          (attackBase 0.0)
+          (decayRate 0.0)
+          (decayCoef 0.0)
+          (decayBase 0.0)
+          (sustainLevel 0.0)
+          (releaseRate 0.0)
+          (releaseCoef 0.0)
+          (releaseBase 0.0)
+          (old_g 0.0)
+          (old_a -1.0)
+          (old_d -1.0)
+          (old_s -1.0)
+          (old_r -1.0)
+          (out 0.0))
+      (lambda (chan:i64 g:SAMPLE a d s r)
+        (if (= chan 0)
+            (begin
+              (if (<> a old_a)
+                  (begin
+                    (set! old_a a)
+                    (set! attackRate (* a SRf 0.001))
+                    (set! attackCoef (calcCoef attackRate targetRatioA))
+                    (set! attackBase (* (+ 1.0 targetRatioA) (- 1.0 attackCoef)))))
+              (if (<> d old_d)
+                  (begin
+                    (set! old_d d)
+                    (set! decayRate (* d SRf 0.001))
+                    (set! decayCoef (calcCoef decayRate targetRatioDR))
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))
+              (if (<> s old_s)
+                  (begin
+                    (set! old_s s)
+                    (set! sustainLevel s)
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))        
+              (if (<> r old_r)
+                  (begin
+                    (set! old_r r)
+                    (set! releaseRate (* r SRf 0.001))
+                    (set! releaseCoef (calcCoef releaseRate targetRatioDR))
+                    (set! releaseBase (* -1.0 targetRatioDR (- 1.0 releaseCoef)))))
+              (if (<> g old_g)
+                  (if (> g 0.1)
+                      (set! state env_attack)
+                      (set! state env_release)))
+              (set! old_g g)
+              (cond ((= state env_idle)
+                     out)
+                    ((= state env_attack)
+                     (set! out (+ attackBase (* out attackCoef)))
+                     (if (>= out 1.0)
+                         (begin (set! out 1.0)
+                                (set! state env_decay)))
+                     out)
+                    ((= state env_decay)
+                     (set! out (+ decayBase (* out decayCoef)))
+                     (if (<= out sustainLevel)
+                         (begin (set! out sustainLevel)
+                                (set! state env_sustain)))
+                     out)
+                    ((= state env_sustain) out)
+                    ((= state env_release)
+                     (set! out (+ releaseBase (* out releaseCoef)))
+                     (if (<= out 0.0)
+                         (begin (set! out 0.0)
+                                (set! state env_idle)))
+                     out)))
+            out)))))
+
+
+(bind-func retrigger_adsr
+  (lambda (adsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
+    ;; (cset! adsr state 1 i64) ;; 1 == env_attack
+    void))
+
+
+(bind-func adsr_ratio_c
+  (lambda ()
+    (let ((calcCoef (lambda (rate:float targetRatio:float)
+                      (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
+                                              targetRatio)))
+                              rate))))
+          (targetRatioA 0.3)          
+          (targetRatioDR 0.0001)
+          (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4)
+          (state env_idle)
+          (attackRate 0.0)
+          (attackCoef 0.0)
+          (attackBase 0.0)
+          (decayRate 0.0)
+          (decayCoef 0.0)
+          (decayBase 0.0)
+          (sustainLevel 0.0)
+          (releaseRate 0.0)
+          (releaseCoef 0.0)
+          (releaseBase 0.0)
+          (old_g 0.0)
+          (old_a -1.0)
+          (old_d -1.0)
+          (old_s -1.0)
+          (old_r -1.0)
+          (old_a_ratio targetRatioA)
+          (old_dr_ratio targetRatioDR)
+          (out 0.0))
+      (lambda (chan:i64 g:float a d s r a_ratio dr_ratio)
+        (if (= chan 0)
+            (begin
+              (if (<> a old_a)
+                  (begin
+                    (set! old_a a)
+                    (set! attackRate (* a SRf 0.001))
+                    (set! attackCoef (calcCoef attackRate targetRatioA))
+                    (set! attackBase (* (+ 1.0 targetRatioA) (- 1.0 attackCoef)))))
+              (if (<> d old_d)
+                  (begin
+                    (set! old_d d)
+                    (set! decayRate (* d SRf 0.001))
+                    (set! decayCoef (calcCoef decayRate targetRatioDR))
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))
+              (if (<> s old_s)
+                  (begin
+                    (set! old_s s)
+                    (set! sustainLevel s)
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))        
+              (if (<> r old_r)
+                  (begin
+                    (set! old_r r)
+                    (set! releaseRate (* r SRf 0.001))
+                    (set! releaseCoef (calcCoef releaseRate targetRatioDR))
+                    (set! releaseBase (* -1.0 targetRatioDR (- 1.0 releaseCoef)))))
+              (if (<> a_ratio old_a_ratio)
+                  (begin
+                    (set! old_a_ratio a_ratio)
+                    (if (< a_ratio 0.000000001) (set! a_ratio 0.000000001)) ;; -180db
+                    (set! targetRatioA a_ratio)
+                    (set! attackCoef (calcCoef attackRate targetRatioA))
+                    (set! attackBase (* (+ 1.0 targetRatioA) (- 1.0 attackCoef)))))
+              (if (<> dr_ratio old_dr_ratio)
+                  (begin
+                    (set! old_dr_ratio dr_ratio)
+                    (if (< a_ratio 0.000000001) (set! a_ratio 0.000000001)) ;; -180db
+                    (set! targetRatioDR dr_ratio)
+                    (set! decayCoef (calcCoef decayRate targetRatioDR))
+                    (set! releaseCoef (calcCoef releaseRate targetRatioDR))
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))
+                    (set! releaseBase (* -1.0 targetRatioDR (- 1.0 releaseCoef)))))
+              (if (<> g old_g)
+                  (if (> g 0.1)
+                      (set! state env_attack)
+                      (set! state env_release)))
+              (set! old_g g)
+              (cond ((= state env_idle)
+                     out)
+                    ((= state env_attack)
+                     (set! out (+ attackBase (* out attackCoef)))
+                     (if (>= out 1.0)
+                         (begin (set! out 1.0)
+                                (set! state env_decay)))
+                     out)
+                    ((= state env_decay)
+                     (set! out (+ decayBase (* out decayCoef)))
+                     (if (<= out sustainLevel)
+                         (begin (set! out sustainLevel)
+                                (set! state env_sustain)))
+                     out)
+                    ((= state env_sustain) out)
+                    ((= state env_release)
+                     (set! out (+ releaseBase (* out releaseCoef)))
+                     (if (<= out 0.0)
+                         (begin (set! out 0.0)
+                                (set! state env_idle)))
+                     out)))
+            out)))))
+
+
 
 
 ;; an accumulative adsr (random access not allowed! time must be linear).

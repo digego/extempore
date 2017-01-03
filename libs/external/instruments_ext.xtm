@@ -101,64 +101,216 @@
 ;; linear sampler
 ;;
 ;; faster but noisy
-(bind-func sampler_note_linear_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* index pan:SAMPLE offset:i64 rev:i1)
-    (let ((idx_freq:SAMPLE (midi2frq (convert index)))
-          (phase:SAMPLE (convert (+ offset (aref samples_offsets index))))) ;; phase unit is audio frames
-      (if (and rev (< phase 0.01))
-          (set! phase (convert (- (aref samples_length index) 10))))      
-      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
-        (let ((rate (/ freq idx_freq))
-              (pos:SAMPLE (if (= chan 0) ;; only increment once per frame
-                              (if rev
-                                  (set! phase (- phase rate))
-                                  (set! phase (+ phase rate)))
-                              phase))
-              (posi:i64 (convert (floor pos))) 
-              (posx (+ (* posi 2) chan))
-              (lgth:i64 (convert (- (aref samples_length index) 10)))
-              (dat (aref samples index)))
-          (* amp (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx))))))))
+(bind-func sampler_note_linear
+  (lambda ()
+    (let ((amp_env:|4,float| (array 10.0:f 50.0 0.6 200.0)))    
+      (lambda (data:NoteData* samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index:i64 nargs:i64 dargs)
+        (let ((starttime (note_starttime data))
+              (freq (note_frequency data))
+              (amp (note_amplitude data))
+              (duration (note_duration data))
+              (gate 1.0:f)
+              (pan:SAMPLE (if (> nargs 1) (pref dargs 1) 0.5)) ;; first darg is bank
+              (offset:SAMPLE (if (> nargs 2) (pref dargs 2) 0.0))
+              (rev:i1 (if (> nargs 3) (if (> (pref dargs 3) 0.01) #t #f) #f))              
+              (a (aref amp_env 0))
+              (d (aref amp_env 1))
+              (s (aref amp_env 2))
+              (r (aref amp_env 3))
+              (rtime:i64 (convert (* SRf (/ (aref amp_env 3) 1000.0))))
+              (dt 0) (rt 0)
+              (total_time (+ duration rtime))
+              (env (adsr_c))
+              (eamp 0.0)
+              (idx_freq (convert (midi2frq (convert index))))
+              (phase:double (convert (+ offset (convert (aref samples_offsets index)))))) ;; phase unit is audio frames
+          (if (and rev (< phase 0.01))
+              (set! phase (convert (- (aref samples_length index) 10))))      
+          (lambda (time:i64 chan:i64)
+            (if (= chan 0)
+                (begin
+                  (set! dt (+ dt 1))
+                  (if (> dt duration) (set! gate 0.0))
+                  (set! eamp (env chan gate a d s r))
+                  (if (< gate 0.1)
+                      (begin (set! rt (+ rt 1))
+                             (if (> rt rtime) (note_active data #f))))))
+            (let ((rate:double (/ (convert freq) idx_freq))
+                  (pos:double (if (= chan 0) ;; only increment once per frame
+                                  (if rev
+                                      (set! phase (- phase rate))
+                                      (set! phase (+ phase rate)))
+                                  phase))
+                  (posi:i64 (convert (floor pos))) 
+                  (posx (+ (* posi 2) chan))
+                  (lgth:i64 (convert (- (aref samples_length index) 10)))
+                  (dat (aref samples index)))
+              (* amp eamp (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx))))))))))
 
-(sys:load "libs/external/instruments_ext.xtm")
+;; (sys:load "libs/external/instruments_ext.xtm")
 ;; hermite sampler  (multi-channels version)
 ;;
 ;; slower but less noisy (default)
-(bind-func sampler_note_hermite_c
-  (lambda (samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index:i64 pan:SAMPLE offset:SAMPLE rev:i1)
-    (let ((idx_freq (ftod (midi2frq (convert index SAMPLE))))
-          (channels:i64 (convert (aref samples_channels index)))
-          (phase:double (ftod (+ offset (convert (aref samples_offsets index)))))) ;; phase unit is audio frames
-      (if (and rev (< phase 0.01))
-          (set! phase (convert (- (aref samples_length index) 10))))
-      (lambda (time:i64 chan:i64 freq:SAMPLE amp:SAMPLE)
-        (let ((rate (/ (ftod freq) idx_freq))
-              (pos:double (if (= chan 0) ;; only increment once per frame
-                              (if rev
-                                  (set! phase (- phase rate))
-                                  (set! phase (+ phase rate)))
-                              phase))
-              (posi:i64 (convert (floor pos)))
-              (posx (+ (* posi channels) (if (< chan channels) chan 0)))
-              (lgth:i64 (- (aref samples_length index) 10))
-              (dat (aref samples index)))
-          (if (< (fabs (- rate 1.0)) 0.01)
-              (if (or (> posi lgth) (< posi 0))  0.0 (* amp (panner chan pan) (pref dat posx)))
-              (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0
-                            (if rev
-                                (pref dat (+ posx channels))
-                                (pref dat (- posx channels)))))
-                    (x0 (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx)))
-                    (x1 (if (or (> (+ posi 1) lgth) (< (- posi 1) 0)) 0.0
-                            (if rev
-                                (pref dat (- posx channels))
-                                (pref dat (+ posx channels)))))
-                    (x2 (if (or (> (+ posi 2) lgth) (< (- posi 2) 0)) 0.0
-                            (if rev
-                                (pref dat (- posx (* 2 channels)))
-                                (pref dat (+ posx (* 2 channels)))))))
-                (* (panner chan pan)
-                   amp (hermite_interp (dtof (modulo pos 1.0)) y1 x0 x1 x2)))))))))
+(bind-func sampler_note
+  (lambda ()
+    (let ((amp_env:|4,float| (array 3.0:f 0.0 1.0 20.0)))
+      (lambda (data:NoteData* samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index:i64 nargs dargs)
+        (let ((starttime (note_starttime data))
+              (freq (note_frequency data))
+              (amp (note_amplitude data))
+              (duration (note_duration data))
+              (gate 1.0:f)
+              (pan:SAMPLE (if (> nargs 1) (pref dargs 1) 0.5)) ;; first darg is bank
+              (offset:SAMPLE (if (> nargs 2) (pref dargs 2) 0.0))
+              (rev:i1 (if (> nargs 3) (if (> (pref dargs 3) 0.01) #t #f) #f))
+              (a (aref amp_env 0))
+              (d (aref amp_env 1))
+              (s (aref amp_env 2))
+              (r (aref amp_env 3))
+              (rtime:i64 (convert (* SRf (/ (aref amp_env 3) 1000.0))))
+              (dt 0) (rt 0)
+              (total_time (+ duration rtime))
+              (env (adsr_c))
+              (eamp 0.0)
+              (idx_freq (convert (midi2frq (convert index SAMPLE))))
+              (channels:i64 (convert (aref samples_channels index)))
+              (phase:double (convert (+ offset (convert (aref samples_offsets index)))))) ;; phase unit is audio frames
+          (if (and rev (< phase 0.01))
+              (set! phase (convert (- (aref samples_length index) 10))))
+          (lambda (time:i64 chan:i64)
+            (if (= chan 0)
+                (begin
+                  (set! dt (+ dt 1))
+                  (if (> dt duration) (set! gate 0.0))
+                  (set! eamp (env chan gate a d s r))
+                  (if (< gate 0.1)
+                      (begin (set! rt (+ rt 1))
+                             (if (> rt rtime) (note_active data #f))))))
+            (let ((rate (/ (convert freq) idx_freq))
+                  (pos:double (if (= chan 0) ;; only increment once per frame
+                                  (if rev
+                                      (set! phase (- phase rate))
+                                      (set! phase (+ phase rate)))
+                                  phase))
+                  (posi:i64 (convert (floor pos)))
+                  (posx (+ (* posi channels) (if (< chan channels) chan 0)))
+                  (lgth:i64 (- (aref samples_length index) 10))
+                  (dat (aref samples index)))
+              (if (< (fabs (- rate 1.0)) 0.01)
+                  (if (or (> posi lgth) (< posi 0)) 0.0 (* amp eamp (panner chan pan) (pref dat posx)))
+                  (let ((y1 (if (or (> posi lgth) (< posi 1)) 0.0
+                                (if rev
+                                    (pref dat (+ posx channels))
+                                    (pref dat (- posx channels)))))
+                        (x0 (if (or (> posi lgth) (< posi 0)) 0.0 (pref dat posx)))
+                        (x1 (if (or (> (+ posi 1) lgth) (< (- posi 1) 0)) 0.0
+                                (if rev
+                                    (pref dat (- posx channels))
+                                    (pref dat (+ posx channels)))))
+                        (x2 (if (or (> (+ posi 2) lgth) (< (- posi 2) 0)) 0.0
+                                (if rev
+                                    (pref dat (- posx (* 2 channels)))
+                                    (pref dat (+ posx (* 2 channels)))))))
+                    (* (panner chan pan)
+                       amp eamp (hermite_interp (dtof (modulo pos 1.0)) y1 x0 x1 x2)))))))))))
+
+(bind-alias NOTE_KERNEL_SAMPLER [[SAMPLE,i64,i64]*,NoteData*,|128,SAMPLE*|*,|128,i64|*,|128,i64|*,|128,i64|*,i64,i64,SAMPLE*]*)
+
+;; make sampler instrument
+(bind-func make_instrument
+  (lambda (note_kernel:NOTE_KERNEL_SAMPLER effect_kernel:FX_KERNEL)
+    (effect_kernel.notekernel:NOTE_KERNEL_SAMPLER note_kernel)
+    (let ((poly:i64 36)
+          (samples:|20,|128,SAMPLE*||* (zalloc)) ;; 128 samples * 20 'banks'
+          (samples_length:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
+          (samples_channels:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
+          (samples_offsets:|20,|128,i64||* (zalloc)) ;; 128 samples * 20
+          (notes:NoteData** (zalloc poly))
+          (note:NoteData* null)
+          (kernels:[SAMPLE,i64,i64]** (zalloc poly))
+          (kernel:[SAMPLE,i64,i64]* null)
+          (starttime:i64 0)
+          (out:SAMPLE 0.0)
+          (k:i64 0) (i:i64 0)
+          (new_note (lambda (start:i64 freq:SAMPLE dur:i64 amp:SAMPLE nargs:i64 dargs:SAMPLE*)
+                      (let ((free_note (instrument_find_note notes poly))
+                            (idx (note_idx free_note))
+                            (zone (note_zone (free_note)))
+                            (bank:i32 (if (< nargs 1) (i64toi32 0) (convert (pref dargs 0))))
+                            (midiidx:i64 (convert (floor (frq2midi freq))))
+                            (closest 1000000)
+                            (i:i64 0) (iii:i64 0) (idxi:i64 0)
+                            (new_idx idx))
+                        (dotimes (idxi 128)
+                          (let ((v (llabs (- midiidx idxi))))
+                            (if (and (<> (aref (aref-ptr samples_length bank) idxi) 0)
+                                     (< v closest))
+                                (begin (set! new_idx idxi)
+                                       (set! closest v) 0))))
+                        (if (null? free_note)
+                            null
+                            (if (note_active free_note)
+                                (begin
+                                  ;; existing kernel is still in use!
+                                  ;; simply update note details (i.e. data) and keep on truckin!
+                                  (tfill! free_note idx start freq amp dur 1.0 #t (cast zone))
+                                  free_note)
+                                (begin ;; new kernel required!
+                                  (reset_zone zone)
+                                  (push_zone zone)
+                                  (tfill! free_note idx start freq amp dur 1.0 #t (cast zone))
+                                  (pset! kernels idx (note_kernel free_note
+                                                                  (aref-ptr samples bank)
+                                                                  (aref-ptr samples_length bank)
+                                                                  (aref-ptr samples_offsets bank)
+                                                                  (aref-ptr samples_channels bank)
+                                                                  new_idx
+                                                                  nargs
+                                                                  dargs))
+                                  (pop_zone)
+                                  free_note)))))))
+      (dotimes (k 128)
+        (dotimes (i 20) ;20 banks
+          (aset! (aref-ptr samples_offsets i) k 0)
+          (aset! (aref-ptr samples_length i) k 0)))
+      ;; init notes
+      (dotimes (i poly)
+        (pset! kernels i (cast null))
+        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f (cast (create_zone (* 10 1024))))))
+      (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+        (set! out 0.0)
+        (dotimes (k poly) ;; sum all active notes
+          (set! note (pref notes k))
+          (set! starttime (note_starttime note))
+          (if (not (note_active note)) (pset! kernels k (cast null)))
+          (set! kernel (pref kernels k))
+          (if (and (> time starttime) (not (null? kernel)))
+              (set! out (+ out (* 0.3 (kernel time chan))))))
+        (* 2.0 (effect_kernel out time chan dat))))))
+
+
+(bind-func sampler_fx
+  (lambda ()
+    (let ((notekernel:NOTE_KERNEL_SAMPLER null)
+          (reverb (reverb_st_c))
+          (reverb_mix 0.15)
+          (reverb_predelay 40.0) ;; in ms
+          (reverb_size 0.3)
+          (reverb_absorb 0.45)
+          (pan (pan_c (i32toi64 CHANNELS)))
+          (pan_pos 0.5)          
+          (pan_width 1.0)
+          (gain 2.0)
+          (out 0.0))
+      (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+        (set! out (pan chan in pan_width pan_pos))
+        (if (> reverb_mix 0.001)
+            (set! out (reverb chan out
+                              reverb_size
+                              reverb_predelay
+                              reverb_absorb
+                              reverb_mix)))
+        (* gain out)))))
 
 
 (bind-func set_sampler_audiobuffer
@@ -176,67 +328,6 @@
       (aset! (aref-ptr offsets bank) index (AudioBuffer_loop_start buf))
       (aset! (aref-ptr samples_length bank) index num)          
       1)))
-
-
-(bind-func sampler_fx 400000
-  (let ((reverbl (reverb_c 80.0))
-        (reverbr (reverb_c 79.0))
-        (pan .5)
-        (pan_ pan)
-        (wet .1)
-        (fb .5))
-    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-      (if (< pan pan_)
-          (set! pan_ (- pan_ .001))
-          (set! pan_ (+ pan_ .001)))
-      (if (= chan 0)
-          (reverbl (* 1.5 (* pan_ in)) wet fb)
-          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
-
-(bind-func sampler1_fx 400000
-  (let ((reverbl (reverb_c 80.0))
-        (reverbr (reverb_c 79.0))
-        (pan .5)
-        (pan_ pan)
-        (wet .1)
-        (fb .5))
-    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-      (if (< pan pan_)
-          (set! pan_ (- pan_ .001))
-          (set! pan_ (+ pan_ .001)))
-      (if (= chan 0)
-          (reverbl (* 1.5 (* pan_ in)) wet fb)
-          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
-
-(bind-func sampler2_fx 400000
-  (let ((reverbl (reverb_c 80.0))
-        (reverbr (reverb_c 79.0))
-        (pan .5)
-        (pan_ pan)
-        (wet .1)
-        (fb .5))
-    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-      (if (< pan pan_)
-          (set! pan_ (- pan_ .001))
-          (set! pan_ (+ pan_ .001)))
-      (if (= chan 0)
-          (reverbl (* 1.5 (* pan_ in)) wet fb)
-          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
-
-(bind-func sampler3_fx 400000
-  (let ((reverbl (reverb_c 80.0))
-        (reverbr (reverb_c 79.0))
-        (pan .5)
-        (pan_ pan)
-        (wet .1)
-        (fb .5))
-    (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
-      (if (< pan pan_)
-          (set! pan_ (- pan_ .001))
-          (set! pan_ (+ pan_ .001)))
-      (if (= chan 0)
-          (reverbl (* 1.5 (* pan_ in)) wet fb)
-          (reverbr (* 1.5 (* (- 1.0 pan_) in)) wet fb)))))
 
 
 (sys:load "libs/external/instruments_ext-scm.xtm")

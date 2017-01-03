@@ -21,7 +21,8 @@
 (sys:load "libs/external/audio_dsp_ext.xtm")
 (sys:load "libs/external/instruments_ext.xtm")
 
-(default-audio-setup)
+(bind-val sampler INSTRUMENT (make_instrument (sampler_note) (sampler_fx)))
+(define sampler ($$ sampler))
 
 ;; just for processing sampler
 (bind-func dsp1:DSP
@@ -31,7 +32,7 @@
 
 ;; convolution reverb takes mono
 ;; files as input (i.e. separates left and right)
-(bind-func dspsum:DSPMT 100000000
+(bind-func dspsum:DSPMT
   (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
                               "assets/ir/minsterr.aif"))
         (rms (rms_st_c))
@@ -55,8 +56,8 @@
 ;; load up the sampler!
 (load-sampler sampler "assets/samples/piano/")
 
-(sampler.release 5000)
-(sampler.attack 2000)
+;; set envelope for sampler2
+(set_amp_env sampler 100.0 0.0 1.0 100.0)
 
 (dspsum.wet 2.0)
 (dspsum.dry 0.0)

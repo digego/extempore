@@ -10885,18 +10885,15 @@ e.g.
          (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
            (eval `(bind-func xtlang_expression
                     (lambda ()
-                      ,(if (equal? type -1)
-                           `(let ((s:i8* (halloc 2)))
+                      ,(if (not (impc:ir:pointer? type))
+                           `(let ((s:i8* null))
+                              (println "returning null for non-pointer type")
                               ,@expr
                               s)
-                           `(let ((s:String* (sprintln (begin ,@expr)))
-                                  (lgth (+ 1 (tref s 0)))
-                                  (oldcs (tref s 1))
-                                  (newcs:i8* (halloc lgth)))
-                              (strcpy newcs oldcs)
-                              newcs))))
+                           `(let ((res:i8* (cast (begin ,@expr) i8*)))
+                              res))))
                  (interaction-environment))
-           (quote (string->atom (cptr->string (xtlang_expression)))))))))
+           (quote (xtlang_expression)))))))
 
 (define $$ call-as-xtlang-leaky)
 

@@ -21,7 +21,7 @@
 ;; Now define the sampler instrument and DSP callback function (in
 ;; this case, it just calls the sampler closure)
 
-(bind-sampler sampler sampler_note_hermite_c sampler_fx)
+(make-instrument sampler sampler)
 
 (bind-func dsp:DSP
   (lambda (in time chan dat)
@@ -48,7 +48,7 @@
 ;; first let's just read in one sample
 ;; we'll choose an index of 60 - the midi note number for middle C
 ;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "assets/samples/christmas_carol.aif" 60 (* 44100 90) 0 0 1)
+(set-sampler-index sampler "assets/samples/xmas_carol.wav" 60 (* 44100 90) 0 0 1)
 
 ;; playing back at 60 should playback without pitch shift
 (play-note (now) sampler 60 120 (* 44100 15))  ;; play 15 seconds
@@ -103,8 +103,5 @@
 (loop2 (*metro* 'get-beat 4) 4 0)
 
 ;; try messing around with the ADSR parameters to see how it affects the sound
-
-(sampler.attack 20.0)
-(sampler.decay 20.0)
-(sampler.release 400.0)
-(sampler.sustain 1.0)
+;; AD & R in milliseconds - S between 0.0 - 1.0
+(set_amp_env sampler 10.0 0.0 1.0 200.0)

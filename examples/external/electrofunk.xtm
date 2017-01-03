@@ -10,13 +10,16 @@
 
 (sys:load "libs/external/instruments_ext.xtm")
 
-(default-audio-setup)
+(bind-val sampler INSTRUMENT (make_instrument (sampler_note) (sampler_fx)))
+(define sampler ($$ sampler))
+
+(bind-val fmsynth INSTRUMENT (make_instrument (fmsynth_note) (fmsynth_fx)))
+(define fmsynth ($$ fmsynth))
 
 (load-sampler sampler "assets/samples/808/" 0)
 
-(sampler.attack 300)
-(sampler.decay 300)
-(sampler.release 500)
+;; a d s r (ad & r in milliseconds) (s 0.0-1.0)
+(set_amp_env sampler 10.0 0.0 1.0 50.0)
 
 (define test808
   (lambda (beat dur)
@@ -30,9 +33,6 @@
     (callback (*metro* (+ beat (* .5 dur))) 'test808 (+ beat dur) dur)))
 
 (test808 (*metro* 'get-beat 4) 1/4)
-
-(fmsynth_fx.wet .17)
-(fmsynth_fx.dfb .15)
 
 (define bass
   (lambda (beat ps ds)

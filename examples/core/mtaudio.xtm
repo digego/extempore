@@ -1,3 +1,4 @@
+
 ;;; mtaudio.xtm -- basic multithreaded audio example
 
 ;; Author: Andrew Sorensen
@@ -14,9 +15,13 @@
 (sys:load "libs/core/audio_dsp.xtm")
 (sys:load "libs/core/instruments.xtm")
 
-(bind-instrument fmsynth fmsynth_note_c fmsynth_fx)
-(bind-instrument synth synth_note_c synth_fx)
-(bind-instrument epad epad_note_c epad_fx)
+(bind-val fmsynth INSTRUMENT (make_instrument (fmsynth_note) (fmsynth_fx)))
+(define fmsynth ($$ fmsynth))
+(bind-val synth INSTRUMENT (make_instrument (synth_note) (synth_fx)))
+(define synth ($$ synth))
+(bind-val pad INSTRUMENT (make_instrument (synth_note) (synth_fx)))
+(define pad ($$ pad))
+
 
 ;; normal dsp definiton to be run
 ;; on RT audio thread #1
@@ -34,18 +39,19 @@
 ;; on RT audio thread #3
 (bind-func dsp3:DSP
   (lambda (in time chan dat)
-    (epad in time chan dat)))
+    (pad in time chan dat)))
+
 
 ;; dspmt takes 3 inputs (i.e. from dsp1 dsp2 and dsp3)
 ;; in is of type double*
 (bind-func dspmt:DSPMT 1000000
-  (let ((reverb (reverb_mc_c 2 100.)))
+  (let ((reverb (reverb_st_c)))
     (lambda (in time chan dat)
       (reverb chan
               (+ (* 0.5 (pref in 0))
                  (* 0.5 (pref in 1))
                  (* 0.5 (pref in 2)))
-              0.5 0.5))))
+              0.5 20.0 0.2 0.4))))
 
 ;; first argument is exected to be
 ;; a closure of type DSPMT
@@ -62,7 +68,7 @@
   (lambda (beat dur)
     (play fmsynth (random 40 70) 80 (* 1.0 dur))
     (play synth (random 60 80) 80 (* 1.0 dur))
-    (play epad (random 30 50) 80 (* 1.0 dur))
+    (play pad (random 30 50) 80 (* 1.0 dur))
     (callback (*metro* (+ beat (* .5 dur))) 't1 (+ beat dur) dur)))
 
 (t1 (*metro* 'get-beat 4) 1/4)
