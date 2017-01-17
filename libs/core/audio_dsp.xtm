@@ -1974,16 +1974,41 @@ but v1 and v2 can be computed in parallel"
 ;; range in milliseconds
 ;; rate in hertz
 (bind-func flanger_c
-  (lambda (delay:SAMPLE)
+  (lambda ()
     (let ((ms (* .001 SRf))
-          (del (* delay ms))
-          (comb (comb_c (convert (+ del SRf))))
+          (halfsrf (* 0.5 SRf))
+          (comb (comb_c (convert SRf)))
           (mod (osc_c 0.0)))
-      (lambda (x:SAMPLE in out range rate feedback)
+      (lambda (x:SAMPLE in out delay range rate feedback)
         (comb x
-              (+ del (clamp (mod (* ms range) rate) 0.0 SRf))
+              (+ (* ms delay)
+                 (clamp (* ms range (+ 0.5 (mod 0.5 rate)))
+                        0.0 halfsrf))
               in out feedback)))))
 
+;; stereo flanger (quadrature)
+(bind-func flanger_st_c
+  (lambda ()
+    (let ((ms (* .001 SRf))
+          (halfsrf (* 0.5 SRf))
+          (combl (comb_c (convert SRf)))
+          (combr (comb_c (convert SRf)))
+          (modl (osc_c 0.0))
+          (modr (osc_c 0.25)))
+      (lambda (chan:i64 x:SAMPLE in out low high rate feedback)
+        (if (= chan 0)
+            (combl x
+                   (+ (* ms low)
+                      (clamp (* ms high (+ 0.5 (modl 0.5 rate)))
+                             0.0 halfsrf))
+                  in out feedback)
+            (if (= chan 1)
+                (combr x
+                       (+ (* ms low)
+                          (clamp (* ms high (+ 0.5 (modr 0.5 rate)))
+                                 0.0 halfsrf))
+                       in out feedback)
+                0.0))))))
 
 ;; chorus
 (bind-func chorus_c
@@ -2019,7 +2044,6 @@ but v1 and v2 can be computed in parallel"
       (lambda (chan:i64 x in out fb)
         (let ((f (pref dlines chan)))
           (f x in out fb))))))
-
 
 ;; tap delay
 (bind-func tap_delay_c
@@ -3278,6 +3302,7 @@ but v1 and v2 can be computed in parallel"
                       (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
                                               targetRatio)))
                               rate))))
+          (retrigger #f)          
           (targetRatioA 0.3)          
           (targetRatioDR 0.0001)
           (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4)
@@ -3301,6 +3326,10 @@ but v1 and v2 can be computed in parallel"
       (lambda (chan:i64 g:SAMPLE a d s r)
         (if (= chan 0)
             (begin
+              (if retrigger
+                  (begin (set! retrigger #f)
+                         (set! out 0.0)
+                         (set! state env_attack)))
               (if (<> a old_a)
                   (begin
                     (set! old_a a)
@@ -3355,7 +3384,7 @@ but v1 and v2 can be computed in parallel"
 
 (bind-func retrigger_adsr
   (lambda (adsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
-    ;; (cset! adsr state 1 i64) ;; 1 == env_attack
+    (cset! adsr retrigger #t i1) ;; 1 == env_attack
     void))
 
 

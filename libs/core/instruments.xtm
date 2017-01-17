@@ -34,8 +34,8 @@
 (bind-val MAXPOLYPHONY i64 20)
 
 ;; Structure for init values of each note
-;; idx(0) start(1) freq(2) amp(3) dur(4) gate(5) active(6) zone(7)
-(bind-type NoteData <i64,i64,SAMPLE,SAMPLE,i64,SAMPLE,i1,i8*>)
+;; idx(0) start(1) freq(2) amp(3) dur(4) gate(5) active(6) refcnt(7) zone(8)
+(bind-type NoteData <i64,i64,SAMPLE,SAMPLE,i64,SAMPLE,i1,i64,i8*>)
 
 (bind-func note_idx (lambda (data:NoteData*) (tref data 0)))
 (bind-func note_starttime (lambda (data:NoteData*) (tref data 1)))
@@ -46,7 +46,13 @@
 (bind-func note_gate (lambda (data:NoteData* value) (tset! data 5 value)))
 (bind-func note_active (lambda (data:NoteData*) (tref data 6)))
 (bind-func note_active (lambda (data:NoteData* value) (tset! data 6 value)))
-(bind-func note_zone (lambda (data:NoteData*) (cast (tref data 7) mzone*)))
+(bind-func note_refcnt (lambda (data:NoteData*) (tref data 7)))
+(bind-func note_ref_inc (lambda (data:NoteData*) (tset! data 7 (+ 1 (tref data 7)))))
+(bind-func note_ref_dec (lambda (data:NoteData*) (let ((v (- (tref data 7) 1)))
+                                              (if (< v 0)
+                                                  (tset! data 7 0)
+                                                  (tset! data 7 v)))))
+(bind-func note_zone (lambda (data:NoteData*) (cast (tref data 8) mzone*)))
 
 (bind-alias INSTRUMENT [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
 (bind-alias NOTE_KERNEL [[SAMPLE,i64,i64]*,NoteData*,i64,SAMPLE*]*)
@@ -71,6 +77,7 @@
         void)
       (pref notes idx))))
 
+
 (bind-func make_instrument
   (lambda (note_kernel:NOTE_KERNEL effect_kernel:FX_KERNEL)
     (effect_kernel.notekernel:NOTE_KERNEL note_kernel)
@@ -79,52 +86,119 @@
            (numactive:i64 0)           
            (poly:i64 maxpoly)
            (notes:NoteData** (zalloc poly))
+           (note_event_buf:i64 10)
+           (note_events:<i64,SAMPLE,SAMPLE,i64,NoteData*>* (alloc note_event_buf))
+           (note_event:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)
+           (note_event_b:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)           
+           (note_event_c:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)           
+           (note_event_in_idx:i64 0)
+           (note_event_out_idx:i64 0)
+           (note_event_out_idx_b:i64 0)
+           (note_event_out_idx_c:i64 0)
+           (note_event_out_time:i64 #x0FFFFFFFFFFFFFFF)
+           (note_event_out_time_b:i64 #x0FFFFFFFFFFFFFFF)           
+           (note_event_out_time_c:i64 #x0FFFFFFFFFFFFFFF)           
+           (note_event_note:NoteData* null)
            (note:NoteData* null)           
            (kernels:[SAMPLE,i64,i64]** (zalloc poly))
            (kernel:[SAMPLE,i64,i64]* null)
            (nullkernel:[SAMPLE,i64,i64]* null)           
            (starttime:i64 0)
            (out:SAMPLE 0.0)
-           (k:i64 0) (i:i64 0)
+           (zzone:mzone* null)
+           (k:i64 0) (i:i64 0) (j:i64 0)
            (new_note (lambda (start:i64 freq:SAMPLE dur:i64 amp:SAMPLE nargs:i64 dargs:SAMPLE*)
                        (let ((free_note (instrument_find_note notes poly))
                              (idx (note_idx free_note))
                              (zone (note_zone free_note)))
                          (if (null? free_note)
-                             null 
-                             (if (note_active free_note)
-                                 (begin
+                             null
+                             (if (or (note_active free_note)
+                                     (> (note_refcnt free_note) 0))
+                                 (begin ;; resuse existing kernel
+                                   (set! note_event_b (pref-ptr note_events note_event_in_idx))
+                                   (tfill! note_event_b start freq amp dur free_note)
+                                   (note_ref_inc free_note) ;; increment note refcnt
+                                   ;; (println "A idx:" (note_idx free_note) start freq amp dur)
+                                   (set! note_event_out_time_b #x0FFFFFFFFFFFFFFF)
+                                   (dotimes (j note_event_buf)
+                                     (set! note_event_b (pref-ptr note_events j))
+                                     (if (< (tref note_event_b 0) note_event_out_time_b)
+                                         (begin (set! note_event_out_time_b (tref note_event_b 0))
+                                                (set! note_event_out_idx_b j))))
+                                   (set! note_event_out_time note_event_out_time_b)
+                                   (set! note_event_out_idx note_event_out_idx_b)
+                                   ;; (println "Next new event is:" note_event_out_time note_event_out_idx)
+                                   (set! note_event_in_idx (% (+ 1 note_event_in_idx) note_event_buf))
                                    ;; existing kernel is still in use!
-                                   ;; simply update note details (i.e. data) and keep on truckin!
-                                   (tfill! free_note idx start freq amp dur 1.0 #t (cast zone i8*))
                                    free_note)
-                                 (begin ;; new kernel required!
+                                 (begin ;; create new kernel
+                                   ;; (println "B idx:" (note_idx free_note) start freq amp dur)
                                    (reset_zone zone)
                                    (push_zone zone)
-                                   (tfill! free_note idx start freq amp dur 1.0 #t (cast zone i8*))
+                                   ;; refcnt should already be 0!! (otherwise we shouldn't get here!)
+                                   (if (> (note_refcnt free_note) 0)
+                                       (println "ERROR: note with refcnt > 0 should'nt get here!"))
+                                   ;; initialize kernel with active set to #f
+                                   (tfill! free_note idx start freq amp dur 1.0 #f 0 (cast zone i8*))
+                                   ;; init new kernel
                                    (pset! kernels idx (note_kernel free_note nargs dargs))
+                                   ;; activate to true once kernel is valid
+                                   (note_active free_note #t) ;; don't activate until kernel is valid!
                                    (pop_zone)
                                    free_note)))))))
+      ;; init note events
+      (dotimes (i 10)
+        (tfill! (pref-ptr note_events i) #x0FFFFFFFFFFFFFFF 0.0 0.0 0 null))      
       ;; init notes
       (dotimes (i poly)
         (pset! kernels i (cast null))
-        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f (cast (create_zone (* 10 1024))))))
+        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f 0 (cast (create_zone (* 10 1024))))))
       ;; sum all active note kernels and then process through effect kernel
       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
         (set! out 0.0)
         (set! tmp_active 0)
+        (if (> time note_event_out_time)
+            (begin
+              ;; (println "HIT with new event:" note_event_out_time note_event_out_idx)
+              (set! note_event_c (pref-ptr note_events note_event_out_idx))
+              (set! note_event_note (tref note_event_c 4)) ;(instrument_find_note notes poly))
+              (if (not (null? note_event_note))
+                  (begin
+                    (tset! note_event_note 1 (tref note_event_c 0))
+                    (tset! note_event_note 2 (tref note_event_c 1))
+                    (tset! note_event_note 3 (tref note_event_c 2))
+                    (tset! note_event_note 4 (tref note_event_c 3))
+                    (tset! note_event_note 5 1.0)
+                    (tset! note_event_note 6 #t)
+                    (note_ref_dec note_event_note)
+                    ;; (println "C:" note_event_note)
+                    void))
+              (tset! note_event_c 0 #x0FFFFFFFFFFFFFFF)
+              (tset! note_event_c 4 null)
+              (set! note_event_out_time_c #x0FFFFFFFFFFFFFFF)
+              (dotimes (k note_event_buf)
+                (set! note_event_c (pref-ptr note_events k))
+                (if (< (tref note_event_c 0) note_event_out_time_c)
+                    (begin (set! note_event_out_time_c (tref note_event_c 0))
+                           (set! note_event_out_idx_c k))))
+              (set! note_event_out_time note_event_out_time_c)
+              (set! note_event_out_idx note_event_out_idx_c)
+              ;; (println "Next new event will be:" note_event_out_time note_event_out_idx)
+              void))
         (dotimes (k poly) ;; sum all active notes
           (set! note (pref notes k))
           (set! starttime (tref note 1)) ;; tref (faster)
           (if (not (tref note 6)) ;; if not active
-              (begin (pset! kernels k nullkernel) void)
+              (begin void) ;(tset! note 1 #x0FFFFFFFFFFFFFFF) void) ;; (pset! kernels k nullkernel) void)
               (begin (set! tmp_active (+ tmp_active 1)) void))
           (set! kernel (pref kernels k))
-          (if (and (> time starttime) (not (null? kernel)))
+          (if (and (> time starttime) (tref note 6)) ; (not (null? kernel)))
               (set! out (+ out (* 0.2 (kernel time chan))))))
         (set! numactive tmp_active)
         (effect_kernel out time chan dat)))))
 
+                       
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -195,13 +269,13 @@
 (bind-val PARAM_WHITE enum 0)
 (bind-val PARAM_PINK enum 1)
 
-(define PARAM_SINE 0)
-(define PARAM_SAW 1)
-(define PARAM_PULSE 2)
-(define PARAM_TRI 3)
-(define PARAM_AD 4)
-(define PARAM_WHITE 0)
-(define PARAM_PINK 1)
+;; filter types
+(bind-val PARAM_LPF enum 0)
+(bind-val PARAM_BPF enum 1)
+(bind-val PARAM_HPF enum 2)
+(bind-val PARAM_Notch enum 3)
+(bind-val PARAM_Peak enum 4)
+(bind-val PARAM_APF enum 5)
 
 ;; modulation sources
 (bind-val PARAM_LFO1 enum 0)
@@ -209,47 +283,42 @@
 (bind-val PARAM_LFO3 enum 2)
 (bind-val PARAM_LFO4 enum 3)
 
-(define PARAM_LFO1 0)
-(define PARAM_LFO2 1)
-(define PARAM_LFO3 2)
-(define PARAM_LFO4 3)
-
 ;; modulation destinations (note)
 (bind-val PARAM_OSC1_AMP enum 0)
 (bind-val PARAM_OSC1_FRQ enum 1)
 (bind-val PARAM_OSC1_PW enum 2)
-(bind-val PARAM_OSC2_AMP enum 3)
-(bind-val PARAM_OSC2_FRQ enum 4)
-(bind-val PARAM_OSC2_PW enum 5)
-(bind-val PARAM_NOISE_AMP enum 6)
-(bind-val PARAM_FILTER_FRQ enum 7)
-;; modulation destinations (fx)
-(bind-val PARAM_PAN_WIDTH enum 8)
-(bind-val PARAM_PAN_POS enum 9) 
-(bind-val PARAM_DELAY_TIME enum 10)
-(bind-val PARAM_DELAY_FB enum 11) ;; feedback
-(bind-val PARAM_REVERB_SIZE enum 12)
-(bind-val PARAM_REVERB_PREDELAY enum 13)
-(bind-val PARAM_REVERB_ABSORB enum 14)
-(bind-val PARAM_REVERB_MIX enum 15)
+(bind-val PARAM_OSC1_PAN enum 3)
+(bind-val PARAM_OSC2_AMP enum 4)
+(bind-val PARAM_OSC2_FRQ enum 5)
+(bind-val PARAM_OSC2_PW enum 6)
+(bind-val PARAM_OSC2_PAN enum 7)
+(bind-val PARAM_OSC3_AMP enum 8)
+(bind-val PARAM_OSC3_FRQ enum 9)
+(bind-val PARAM_OSC3_PW enum 10)
+(bind-val PARAM_OSC3_PAN enum 11)
+(bind-val PARAM_OSC4_AMP enum 12)
+(bind-val PARAM_OSC4_FRQ enum 13)
+(bind-val PARAM_OSC4_PW enum 14)
+(bind-val PARAM_OSC4_PAN enum 15)
+(bind-val PARAM_NOISE_AMP enum 16)
+(bind-val PARAM_FILTER_FRQ enum 17)
+(bind-val PARAM_FILTER_RES enum 18)
 
-(define PARAM_OSC1_AMP 0)
-(define PARAM_OSC1_FRQ 1)
-(define PARAM_OSC1_PW 2)
-(define PARAM_OSC2_AMP 3)
-(define PARAM_OSC2_FRQ 4)
-(define PARAM_OSC2_PW 5)
-(define PARAM_NOISE_AMP 6)
-(define PARAM_FILTER_FRQ 7)
 ;; modulation destinations (fx)
-(define PARAM_PAN_WIDTH 8)
-(define PARAM_PAN_POS 9) 
-(define PARAM_DELAY_TIME 10)
-(define PARAM_DELAY_FB 11) ;; feedback
-(define PARAM_REVERB_SIZE 12)
-(define PARAM_REVERB_PREDELAY 13)
-(define PARAM_REVERB_ABSORB 14)
-(define PARAM_REVERB_MIX 15)
+(bind-val PARAM_PAN_WIDTH enum 19)
+(bind-val PARAM_PAN_POS enum 20) 
+(bind-val PARAM_DELAY_TIME_LEFT enum 21)
+(bind-val PARAM_DELAY_TIME_RIGHT enum 22)
+(bind-val PARAM_DELAY_FB enum 23) ;; feedback
+(bind-val PARAM_REVERB_SIZE enum 24)
+(bind-val PARAM_REVERB_PREDELAY enum 25)
+(bind-val PARAM_REVERB_ABSORB enum 26)
+(bind-val PARAM_REVERB_MIX enum 27)
+(bind-val PARAM_FLANGER_LOW enum 28)
+(bind-val PARAM_FLANGER_HIGH enum 29)
+(bind-val PARAM_FLANGER_RATE enum 30)
+(bind-val PARAM_FLANGER_FB enum 31)
+
 
 
 ;;
@@ -276,6 +345,18 @@
                void))
     void))
 
+(bind-func set_monophonic
+  (lambda (inst:i8*)
+    (stop_running inst)  ;; force a stop on all notes before changing poly count
+    (cset! (cast inst [void]*) poly 1 i64)
+    void))
+
+(bind-func set_polyphonic
+  (lambda (inst:i8*)
+    (stop_running inst)  ;; force a stop on all notes before changing poly count
+    (cset! (cast inst [void]*) poly MAXPOLYPHONY i64)
+    void))
+
 
 (bind-func active_notes
   (lambda (inst:i8*)
@@ -294,16 +375,30 @@
       (cset! note portamento val float)
       void)))
 
+;; only effects monophonic (i.e. 1 note polyphony)
+;; if legato is #t then don't retrigger adsr's
+(bind-func set_legato
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note legato (if (= val 0) #f #t) i1)
+      void)))
+
+(bind-func set_osc1_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc1_pan val float)
+      void)))
+
 (bind-func set_osc1_amp
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cset! note osc1_amp val float)
       void)))
 
-(bind-func set_osc1_octave
+(bind-func set_osc1_tune
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note octave1 val float)
+      (cset! note tune1 val float)
       void)))
 
 (bind-func set_osc1_pw
@@ -318,16 +413,22 @@
       (cset! note osc1_wave val i32)
       void)))
 
+(bind-func set_osc2_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc2_pan val float)
+      void)))
+
 (bind-func set_osc2_amp
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cset! note osc2_amp val float)
       void)))
 
-(bind-func set_osc2_octave
+(bind-func set_osc2_tune
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note octave2 val float)
+      (cset! note tune2 val float)
       void)))
 
 (bind-func set_osc2_pw
@@ -342,16 +443,22 @@
       (cset! note osc2_wave val i32)
       void)))
 
+(bind-func set_osc3_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc3_pan val float)
+      void)))
+
 (bind-func set_osc3_amp
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cset! note osc3_amp val float)
       void)))
 
-(bind-func set_osc3_octave
+(bind-func set_osc3_tune
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note octave3 val float)
+      (cset! note tune3 val float)
       void)))
 
 (bind-func set_osc3_pw
@@ -366,10 +473,52 @@
       (cset! note osc3_wave val i32)
       void)))
 
+(bind-func set_osc4_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_pan val float)
+      void)))
+
+(bind-func set_osc4_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_amp val float)
+      void)))
+
+(bind-func set_osc4_tune
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note tune4 val float)
+      void)))
+
+(bind-func set_osc4_pw
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pw4 val float)
+      void)))
+
+(bind-func set_osc4_wave
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_wave val i32)
+      void)))
+
+(bind-func set_sub_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note sub_pan val float)
+      void)))
+
 (bind-func set_sub_amp
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cset! note sub_amp val float)
+      void)))
+
+(bind-func set_noise_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note noise_pan val float)
       void)))
 
 (bind-func set_noise_type
@@ -399,6 +548,12 @@
 (bind-func set_filter_frq (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
 (bind-func set_lpf_frq (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
 (bind-func set_lpf_cutoff (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
+
+(bind-func set_filter_type
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_type (convert val i64) i64)
+      void)))
 
 (bind-func set_filter_res
   (lambda (inst:i8* val:float)
@@ -474,7 +629,20 @@
 (bind-func set_delay_time
   (lambda (inst:i8* val:float)
     (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
-      (cset! effect delay_time val float)
+      (cset! effect delay_time_left val float)
+      (cset! effect delay_time_right val float)      
+      void)))
+
+(bind-func set_delay_time_left
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_time_left val float)
+      void)))
+
+(bind-func set_delay_time_right
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_time_right val float)
       void)))
 
 (bind-func set_delay_mix
@@ -572,26 +740,54 @@
       (cset! fx reverb_predelay val float)
       void)))
 
+(bind-func set_flanger_mix
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_mix val float)
+      void)))
+
+(bind-func set_flanger_low
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_low val float)
+      void)))
+
+(bind-func set_flanger_high
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_high val float)
+      void)))
+
+(bind-func set_flanger_rate
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_rate val float)
+      void)))
+
+(bind-func set_flanger_fb
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_fb val float)
+      void)))
+
 ;; modulation matrix
 
 (bind-func set_mod_matrix
   (lambda (inst:i8* src:enum dst:enum value:float)
-    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*))
-          (note_matrix (effect.note_matrix:|4,/8,float/|*))
-          (fx_matrix (effect.fx_matrix:|4,/8,float/|*)))
-      (if (< dst 8)
-          (vset! (aref-ptr note_matrix src) dst value)
-          (vset! (aref-ptr fx_matrix src) (- dst 8) value))
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aset! (aref-ptr mod_matrix src) dst value))
       value)))
 
 (bind-func get_mod_matrix
   (lambda (inst:i8* src:enum dst:enum)
-    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*))
-          (fx_matrix (effect.fx_matrix:|4,/8,float/|*))
-          (note_matrix (effect.note_matrix:|4,/8,float/|*)))
-      (if (< dst 8)
-          (vref (aref-ptr note_matrix src) dst)
-          (vref (aref-ptr fx_matrix src) (- dst 8))))))
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aref (aref-ptr mod_matrix src) dst)
+          0.0))))
+
 
 
 
@@ -719,42 +915,407 @@
 
 
 ;; NOTE
-(bind-func synth_note
-  (lambda (highcpu)
+;; (bind-func synth_note
+;;   (lambda ()
+;;     (let ((MILLISEC (* .001 SRs))
+;;           (amp_env:|4,SAMPLE| (array 10.0:f 10.0 0.6 50.0))
+;;           (filter_env:|4,SAMPLE| (array 10.0:f 10.0 0.6 50.0))
+;;           (pitch_env:|2,SAMPLE| (array 5.0:f 5.0))
+;;           (oldfreq 440.0:f)
+;;           (tune1:SAMPLE 1.0)
+;;           (tune2:SAMPLE 1.0)
+;;           (tune3:SAMPLE 1.0)
+;;           (osc1_wave:enum PARAM_SAW)
+;;           (osc2_wave:enum PARAM_SAW) 
+;;           (osc3_wave:enum PARAM_SAW)
+;;           (pw1:SAMPLE 0.5)
+;;           (pw2:SAMPLE 0.5)        
+;;           (pw3:SAMPLE 0.5)                  
+;;           (noise:enum PARAM_WHITE) ;; white
+;;           (noise_amp:SAMPLE 0.0)
+;;           (osc1_amp:SAMPLE 0.4)
+;;           (osc2_amp:SAMPLE 0.0)
+;;           (osc3_amp:SAMPLE 0.0)
+;;           (sub_amp:SAMPLE 0.0) 
+;;           (mods:/8,SAMPLE/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;           (noise_amp_mod:SAMPLE 0.0)
+;;           (filter_type:i64 0) ;; LPF 0, BPF 1, HPF 2, Notch 3, Peak 4, APF 5
+;;           (follow_frq 0.0)
+;;           (follow_amp 0.0)
+;;           (legato #f) ;; if legato is true then don't retrigger adsr's!
+;;           (filter_frq:SAMPLE 15000.0) ;; 
+;;           (filter_env_amt:SAMPLE 0.0) ;; this for lpf
+;;           (pitch_env_amt:SAMPLE 0.0)
+;;           (portamento:SAMPLE 2.0) ;; in millis
+;;           (reso:SAMPLE 0.25))
+;;       (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
+;;         ;; (println "NEW NOTE!" data)
+;;         (let ((starttime:i64 (note_starttime data))
+;;               (frequency:SAMPLE (note_frequency data))
+;;               (target_frq:SAMPLE frequency)
+;;               (amplitude:SAMPLE (note_amplitude data))
+;;               (duration:i64 (note_duration data))
+;;               (glideinc:SAMPLE 0.0) ;; for portamento
+;;               (midifrq:SAMPLE 0.0)
+;;               (new_note_timer:i64 0)
+;;               (frq 0.0)
+;;               (adsr1 (adsr_c))
+;;               (adsr2 (adsr_c))
+;;               (adsr3 (adsr_c))
+;;               (adsr1_val 0.0)
+;;               (target_adsr1_val 0.0)
+;;               (adsr2_val 0.0)
+;;               (target_adsr2_val 0.0)
+;;               (adsr3_val 0.0)
+;;               (target_adsr3_val 0.0)          
+;;               (gate:SAMPLE 1.0)
+;;               (amp:SAMPLE 0.0)
+;;               (cof:SAMPLE 0.0)
+;;               (amp_attack (aref amp_env 0))
+;;               (amp_decay (aref amp_env 1))
+;;               (amp_sustain (aref amp_env 2))
+;;               (amp_release (aref amp_env 3))
+;;               (amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
+;;               (reltime:i64 0)
+;;               (filter_attack (aref filter_env 0))
+;;               (filter_decay (aref filter_env 1))
+;;               (filter_sustain (aref filter_env 2))
+;;               (filter_release (aref filter_env 3))
+;;               (pitch_attack (aref pitch_env 0))
+;;               (pitch_decay (aref pitch_env 1))
+;;               (filter (svf_c))
+;;               (filter_out:|6,SAMPLE|* (alloc))
+;;               (sin1 (osc_c (* .025 (random))))
+;;               (sin2 (osc_c (* .025 (random))))
+;;               (sin3 (osc_c (* .025 (random))))
+;;               (saw1 (blsaw_c (* .025 (random)) #f #f))
+;;               (saw2 (blsaw_c (* .025 (random)) #f #f))
+;;               (saw3 (blsaw_c (* .025 (random)) #f #f))
+;;               (pulse1 (blpulse_c 1.0 #f))
+;;               (pulse2 (blpulse_c 1.0 #f))
+;;               (pulse3 (blpulse_c 1.0 #f))
+;;               (tri1 (bltri_c 1.0))
+;;               (tri2 (bltri_c 1.0))
+;;               (tri3 (bltri_c 1.0))
+;;               (osc1_out 0.0)
+;;               (osc2_out 0.0)
+;;               (osc3_out 0.0)
+;;               (zero:SAMPLE 0.0)
+;;               (white (white_c))
+;;               (pink (pink_c))
+;;               (sub_out 0.0)
+;;               (noise_out 0.0)
+;;               (subosc (osc_c 0.0))              
+;;               (main_out 0.0:f))
+;;           (lambda (time:i64 chan:i64)
+;;             (if (= chan 0) 
+;;                 (begin
+;;                   ;; this here for mono synths
+;;                   (if (<> starttime (tref data 1))
+;;                       (begin
+;;                         ;; param updates :(
+;;                         (set! amp_attack (aref amp_env 0))
+;;                         (set! amp_decay (aref amp_env 1))
+;;                         (set! amp_sustain (aref amp_env 2))
+;;                         (set! amp_release (aref amp_env 3))
+;;                         (set! amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
+;;                         (set! filter_attack (aref filter_env 0))
+;;                         (set! filter_decay (aref filter_env 1))
+;;                         (set! filter_sustain (aref filter_env 2))
+;;                         (set! filter_release (aref filter_env 3))
+;;                         (set! pitch_attack (aref pitch_env 0))
+;;                         (set! pitch_decay (aref pitch_env 1))
+;;                         ;; now note updates
+;;                         (set! starttime (tref data 1))
+;;                         (set! target_frq (frq2midi (tref data 2)))
+;;                         (set! midifrq (frq2midi frequency))
+;;                         (set! reltime 0)
+;;                         (if (< portamento 0.001)
+;;                             (begin (set! frequency target_frq)
+;;                                    (set! glideinc 0.0))
+;;                             (set! glideinc (* (- target_frq midifrq)
+;;                                               (/ 1.0 (* portamento MILLISEC)))))
+;;                         (if (and (> portamento amp_attack)
+;;                                  (> portamento filter_attack))
+;;                             (set! new_note_timer (convert (* portamento MILLISEC) i64))
+;;                             (if (> amp_attack filter_attack)
+;;                                 (set! new_note_timer (convert (* amp_attack MILLISEC) i64))
+;;                                 (set! new_note_timer (convert (* filter_attack MILLISEC) i64))))
+;;                         (set! duration (tref data 4))                 
+;;                         (set! gate 1.0)
+;;                         (if legato
+;;                             (begin
+;;                               (set! target_adsr1_val 0.0)
+;;                               (set! target_adsr2_val 0.0)
+;;                               (set! target_adsr3_val 0.0)
+;;                               void)                                  
+;;                             (begin
+;;                               (if (> adsr1_val target_adsr1_val)
+;;                                   (set! target_adsr1_val adsr1_val))
+;;                               (if (> adsr2_val target_adsr2_val)
+;;                                   (set! target_adsr2_val adsr2_val))
+;;                               (if (> adsr3_val target_adsr3_val)
+;;                                   (set! target_adsr3_val adsr3_val))
+;;                               (retrigger_adsr adsr1)
+;;                               (retrigger_adsr adsr2)
+;;                               (retrigger_adsr adsr3)
+;;                               void))
+;;                         ;; (println "START:" starttime "FRQ:" target_frq "AMPAKT:" amp_attack "FATTK:" filter_attack "A1:" target_adsr1_val "A2:" target_adsr2_val)                        
+;;                         void))
+;;                   ;;;;;;;;mono;;;mono;;;mono;;;;;;;;
+;;                   (if (and (> gate 0.5) (> (- time starttime) duration)) (set! gate 0.0))
+;;                   (set! adsr1_val (adsr1 chan gate amp_attack amp_decay amp_sustain amp_release))
+;;                   (set! adsr2_val (adsr2 chan gate filter_attack filter_decay filter_sustain filter_release))
+;;                   (set! adsr3_val (adsr3 chan gate pitch_attack pitch_decay 0.0 0.0))
+;;                   ;;;; this needed for mono synths
+;;                   (if (> new_note_timer 0) ;; try to minimize the amount of work needed for monosynths :(
+;;                       (begin
+;;                         (if (< glideinc 0.0) ;; this for portamento
+;;                             (if (< (- target_frq midifrq) glideinc)
+;;                                 (set! midifrq (+ glideinc midifrq))
+;;                                 (set! midifrq target_frq))
+;;                             (if (> (- target_frq midifrq) glideinc)
+;;                                 (set! midifrq (+ glideinc midifrq))
+;;                                 (set! midifrq target_frq)))
+;;                         (set! frequency (midi2frq midifrq))
+;;                         (if (< adsr1_val target_adsr1_val)
+;;                             (set! adsr1_val target_adsr1_val)
+;;                             (set! target_adsr1_val 0.0))
+;;                         (if (< adsr2_val target_adsr2_val)
+;;                             (set! adsr2_val target_adsr2_val)
+;;                             (set! target_adsr2_val 0.0))
+;;                         (set! new_note_timer (- new_note_timer 1))))
+;;                   ;;;;;;;;;mono;;;mono;;;;;;;;
+;;                   (set! amp (* amplitude adsr1_val))
+;;                   (set! cof (+ filter_frq (* follow_frq frequency) (* follow_amp amplitude)
+;;                                (vref mods PARAM_FILTER_FRQ)
+;;                                (* filter_env_amt adsr2_val)))
+;;                   (set! frq (+ frequency (* pitch_env_amt frequency adsr3_val) 0.0))
+;;                   (if (< frq 10.0) (set! frq 10.0))
+;;                   ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
+;;                   (if (< gate 0.1) (set! reltime (+ reltime 1)))
+;;                   (if (> reltime amp_release_samples)
+;;                       (begin
+;;                         ;; (println "NOTE OFF!" data)
+;;                         (note_active data #f)))
+;;                   ;; (if (and (< gate 0.5) (< amp 0.00001)) (note_active data #f))
+;;                   ;; setup mod sources
+;;                   (if (> osc1_amp 0.001)
+;;                       (set! osc1_out (* (+ osc1_amp (vref mods PARAM_OSC1_AMP))
+;;                                         (cond ((= osc1_wave 0) (sin1 1.0 (+ (* tune1 frq) (vref mods PARAM_OSC1_FRQ))))
+;;                                               ((= osc1_wave 1) (saw1 1.0 (+ (* tune1 frq) (vref mods PARAM_OSC1_FRQ))))
+;;                                               ((= osc1_wave 2) (pulse1 1.0 (+ (* tune1 frq) (vref mods PARAM_OSC1_FRQ))
+;;                                                                        (+ pw1 (vref mods PARAM_OSC1_PW))))
+;;                                               ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (vref mods PARAM_OSC1_FRQ))))
+;;                                               (else zero))))
+;;                       (set! osc1_out 0.0))
+;;                   (if (> osc2_amp 0.001)
+;;                       (set! osc2_out (* (+ osc2_amp (vref mods PARAM_OSC2_AMP))
+;;                                         (cond ((= osc2_wave 0) (sin2 1.0 (+ (* tune2 frq) (vref mods PARAM_OSC2_FRQ))))
+;;                                               ((= osc2_wave 1) (saw2 1.0 (+ (* tune2 frq) (vref mods PARAM_OSC2_FRQ))))
+;;                                               ((= osc2_wave 2) (pulse2 1.0 (+ (* tune2 frq) (vref mods PARAM_OSC2_FRQ))
+;;                                                                        (+ pw2 (vref mods PARAM_OSC2_PW))))
+;;                                               ((= osc2_wave 3) (tri2 1.0 (+ (* tune1 frq) (vref mods PARAM_OSC2_FRQ))))
+;;                                               (else zero))))
+;;                       (set! osc2_out 0.0))
+;;                   (if (> osc3_amp 0.001)
+;;                       (set! osc3_out (* osc3_amp
+;;                                         (cond ((= osc3_wave 0) (sin3 1.0 (* tune3 frq)))
+;;                                               ((= osc3_wave 1) (saw3 1.0 (* tune3 frq)))
+;;                                               ((= osc3_wave 2) (pulse3 1.0 (* tune3 frq) pw3))
+;;                                               ((= osc3_wave 3) (tri3 1.0 (* tune3 frq)))
+;;                                               (else zero))))
+;;                       (set! osc3_out 0.0))
+;;                   (if (> sub_amp 0.001)
+;;                       (set! sub_out (* sub_amp (subosc 1.0 (* frq 0.25))))
+;;                       (set! sub_out 0.0))
+;;                   (if (> noise_amp 0.001)
+;;                       (if (= noise PARAM_WHITE)
+;;                           (set! noise_out (* 0.5 (+ noise_amp (vref mods PARAM_NOISE_AMP)) (white)))
+;;                           (set! noise_out (* 0.5 (+ noise_amp (vref mods PARAM_NOISE_AMP)) (pink))))
+;;                       (set! noise_out 0.0))
+;;                   (filter (* amp (+ osc1_out osc2_out osc3_out sub_out noise_out)) cof reso filter_out)
+;;                   ;; (set! filter_out (filter (* amp (+ osc1_out osc2_out osc3_out sub_out noise_out)) cof reso))
+;;                   (set! main_out (aref filter_out filter_type))
+;;                   main_out)
+;;                 0.0:f)))))))
+
+
+;; FX
+;; (bind-func synth_fx
+;;   (let ((MILLISEC (* .001 SRf))
+;;         (CHANSF (i32tof CHANNELS))
+;;         (PAN_WIDTH (- PARAM_PAN_WIDTH 8))
+;;         (PAN_POS (- PARAM_PAN_POS 8))
+;;         (DELAY_TIME (- PARAM_DELAY_TIME 8))
+;;         (DELAY_FB (- PARAM_DELAY_FB 8))
+;;         (REV_SIZE (- PARAM_REVERB_SIZE 8))
+;;         (REV_PREDELAY (- PARAM_REVERB_PREDELAY 8))
+;;         (REV_ABSORB (- PARAM_REVERB_ABSORB 8))
+;;         (REV_MIX (- PARAM_REVERB_MIX 8)))
+;;     (lambda ()
+;;       (let ((notekernel:NOTE_KERNEL null)            
+;;             (mod_amp:|4,float|* (array_ref 1.0 1.0 1.0 1.0))
+;;             (mod_frq:|4,float|* (array_ref 1.0 1.0 1.0 1.0))
+;;             (mod_attack:|4,float|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
+;;             (mod_decay:|4,float|* (array_ref 10.0 10.0 10.0 10.0))
+;;             (mod_attack_slope:|4,float|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
+;;             (mod_decay_slope:|4,float|* (array_ref 0.0 0.0 0.0 0.0))
+;;             (fxmods:/8,float/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;             (notemods:/8,float/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;             (vtmp:/8,float/* (alloc))
+;;             (lfos:|4,|5,[SAMPLE,i64,i64]*||* (alloc))
+;;             (lfo_types:|4,i32|* (alloc))
+;;             (fx_matrix:|4,/8,float/|* (alloc))
+;;             (note_matrix:|4,/8,float/|* (alloc))
+;;             (hpf (hpf_c))
+;;             (hpf_frq 20001.0)
+;;             (dly (comb_lpf_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
+;;             (delay_time 50.0) ;; in ms
+;;             (delay_in 1.0)
+;;             (delay_mix 0.0)
+;;             (delay_fb 0.5)
+;;             (delay_frq 12000.0)
+;;             (delay_res 0.0)
+;;             (rev (reverb_st_c))
+;;             (reverb_mix 0.0)
+;;             (reverb_predelay 40.0) ;; in ms
+;;             (reverb_size 0.3)
+;;             (reverb_absorb 0.45)
+;;             (pan (pan_c (i32toi64 CHANNELS)))
+;;             (pan_pos 0.5)          
+;;             (pan_width 1.0)
+;;             (overdrive (overdrive_c))
+;;             (overdrive_amt 0.5) ;; always use some overdrive
+;;             (out:SAMPLE 0.0)
+;;             (tmpv:/8,float/ (vector .0 .0 .0 .0 .0 .0 .0 .0))
+;;             (i:i64 0)
+;;             (tmp 0.0)
+;;             (fxout 0.0)
+;;             (gain 2.0))
+;;         (dotimes (i 4)
+;;           (aset! lfo_types i PARAM_SINE)
+;;           (aset! fx_matrix i (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;           (aset! note_matrix i (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;           (aset! lfos i
+;;                  (array (let ((osc (osc_c 0.0)))
+;;                           (lambda (chan:i64 idx:i64)
+;;                             (osc (aref mod_amp idx)
+;;                                  (aref mod_frq idx))))
+;;                         (let ((osc (saw_c 0.0)))
+;;                           (lambda (chan:i64 idx:i64)
+;;                             (osc (aref mod_amp idx)
+;;                                  (aref mod_frq idx))))
+;;                         (let ((osc (pulse_c 0.0)))
+;;                           (lambda (chan:i64 idx:i64)
+;;                             (osc (aref mod_amp idx)
+;;                                  (aref mod_frq idx)
+;;                                  0.5)))
+;;                         (let ((osc (tri_c 0.0)))
+;;                           (lambda (chan:i64 idx:i64)
+;;                             (osc (aref mod_amp idx)
+;;                                  (aref mod_frq idx))))
+;;                         (let ((osc (ad_c)))
+;;                           (cset! osc cycle #t i1)
+;;                           (lambda (chan:i64 idx:i64)
+;;                             (osc chan 1.0
+;;                                  (aref mod_attack idx)
+;;                                  (aref mod_decay idx)
+;;                                  (aref mod_attack_slope idx)
+;;                                  (aref mod_decay_slope idx)))))))
+;;         (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+;;           (if (= chan 0)
+;;               (begin
+;;                 (set! fxmods (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;                 (set! notemods (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+;;                 (dotimes (i 4)
+;;                   (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
+;;                   (set! tmpv (vector tmp tmp tmp tmp tmp tmp tmp tmp))
+;;                   (set! fxmods (+ fxmods (* tmpv (aref fx_matrix i))))
+;;                   (set! notemods (+ notemods (* tmpv (aref note_matrix i)))))
+;;                 (notekernel.mods:/8,float/ notemods)
+;;                 (set! out in)
+;;                 (set! out (overdrive out overdrive_amt))
+;;                 (if (< hpf_frq 20000.0)
+;;                     (set! out (hpf out hpf_frq 0.0)))
+;;                 out))
+;;           (set! tmp (+ pan_pos (vref fxmods PAN_POS)))
+;;           (if (> tmp CHANSF) (set! tmp (- tmp CHANSF)))
+;;           ;; always with the panning!
+;;           (set! fxout (pan chan out
+;;                            (+ pan_width (vref fxmods PAN_WIDTH))
+;;                            tmp))
+;;           (if (> delay_mix 0.001)
+;;               (set! fxout (dly chan fxout
+;;                                (* MILLISEC (+ delay_time (vref fxmods DELAY_TIME)))
+;;                                delay_in
+;;                                delay_mix
+;;                                (+ delay_fb (vref fxmods DELAY_FB))
+;;                                delay_frq
+;;                                delay_res)))
+;;           (if (> reverb_mix 0.001)
+;;               (set! fxout (rev chan fxout
+;;                                (+ reverb_size (vref fxmods REV_SIZE))
+;;                                (+ reverb_predelay (vref fxmods REV_PREDELAY))
+;;                                (+ reverb_absorb (vref fxmods REV_ABSORB))
+;;                                (+ reverb_mix (vref fxmods REV_MIX)))))
+;;           (* gain fxout))))))
+
+
+
+;; NOTE
+(bind-func analogue_note
+  (lambda ()
     (let ((MILLISEC (* .001 SRs))
           (amp_env:|4,SAMPLE| (array 10.0:f 10.0 0.6 50.0))
           (filter_env:|4,SAMPLE| (array 10.0:f 10.0 0.6 50.0))
           (pitch_env:|2,SAMPLE| (array 5.0:f 5.0))
           (oldfreq 440.0:f)
-          (octave1:SAMPLE 1.0)
-          (octave2:SAMPLE 1.0)
-          (octave3:SAMPLE 1.0)
+          (tune1:SAMPLE 1.0)
+          (tune2:SAMPLE 1.0)
+          (tune3:SAMPLE 1.0)
+          (tune4:SAMPLE 1.0)
           (osc1_wave:enum PARAM_SAW)
           (osc2_wave:enum PARAM_SAW) 
           (osc3_wave:enum PARAM_SAW)
+          (osc4_wave:enum PARAM_SAW)
           (pw1:SAMPLE 0.5)
           (pw2:SAMPLE 0.5)        
           (pw3:SAMPLE 0.5)                  
+          (pw4:SAMPLE 0.5)                  
           (noise:enum PARAM_WHITE) ;; white
           (noise_amp:SAMPLE 0.0)
           (osc1_amp:SAMPLE 0.4)
           (osc2_amp:SAMPLE 0.0)
           (osc3_amp:SAMPLE 0.0)
+          (osc4_amp:SAMPLE 0.0)
+          (osc1_pan:SAMPLE 0.5)
+          (osc2_pan:SAMPLE 0.5)
+          (osc3_pan:SAMPLE 0.5)
+          (osc4_pan:SAMPLE 0.5)
+          (sub_pan:SAMPLE 0.5)
+          (noise_pan:SAMPLE 0.5)
           (sub_amp:SAMPLE 0.0) 
-          (mods:/8,SAMPLE/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
+          (mods:|32,SAMPLE|* (alloc))
           (noise_amp_mod:SAMPLE 0.0)
+          (filter_type:i64 0) ;; LPF 0, BPF 1, HPF 2, Notch 3, Peak 4, APF 5
           (follow_frq 0.0)
           (follow_amp 0.0)
+          (legato #f) ;; if legato is true then don't retrigger adsr's!
           (filter_frq:SAMPLE 15000.0) ;; 
           (filter_env_amt:SAMPLE 0.0) ;; this for lpf
           (pitch_env_amt:SAMPLE 0.0)
           (portamento:SAMPLE 2.0) ;; in millis
-          (reso:SAMPLE 0.25))
+          (res:SAMPLE 0.0)
+          (reso:SAMPLE 0.0))
       (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
+        ;; (println "NEW NOTE!" data)
         (let ((starttime:i64 (note_starttime data))
               (frequency:SAMPLE (note_frequency data))
               (target_frq:SAMPLE frequency)
               (amplitude:SAMPLE (note_amplitude data))
+              (target_amp:SAMPLE amplitude)
+              (newampinc:SAMPLE 0.0)
               (duration:i64 (note_duration data))
               (glideinc:SAMPLE 0.0) ;; for portamento
               (midifrq:SAMPLE 0.0)
@@ -768,7 +1329,7 @@
               (adsr2_val 0.0)
               (target_adsr2_val 0.0)
               (adsr3_val 0.0)
-              (target_adsr3_val 0.0)              
+              (target_adsr3_val 0.0)          
               (gate:SAMPLE 1.0)
               (amp:SAMPLE 0.0)
               (cof:SAMPLE 0.0)
@@ -777,34 +1338,41 @@
               (amp_sustain (aref amp_env 2))
               (amp_release (aref amp_env 3))
               (amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
+              (reltime:i64 0)
               (filter_attack (aref filter_env 0))
               (filter_decay (aref filter_env 1))
               (filter_sustain (aref filter_env 2))
               (filter_release (aref filter_env 3))
               (pitch_attack (aref pitch_env 0))
               (pitch_decay (aref pitch_env 1))
-              (filter (if highcpu (moog_ladder LPF4) (lpf_c)))
+              (filter (svf_c))
+              (filterR (svf_c))
+              (filter_out:|6,SAMPLE|* (alloc))
               (sin1 (osc_c (* .025 (random))))
               (sin2 (osc_c (* .025 (random))))
               (sin3 (osc_c (* .025 (random))))
-              (saw1 (blsaw_c (* .025 (random)) #f highcpu))
-              (saw2 (blsaw_c (* .025 (random)) #f highcpu))
-              (saw3 (blsaw_c (* .025 (random)) #f highcpu))
-              (pulse1 (blpulse_c 1.0 highcpu))
-              (pulse2 (blpulse_c 1.0 highcpu))
-              (pulse3 (blpulse_c 1.0 highcpu))
+              (sin4 (osc_c (* .025 (random))))
+              (saw1 (blsaw_c (* .025 (random)) #f #f))
+              (saw2 (blsaw_c (* .025 (random)) #f #f))
+              (saw3 (blsaw_c (* .025 (random)) #f #f))
+              (saw4 (blsaw_c (* .025 (random)) #f #f))
+              (pulse1 (blpulse_c 1.0 #f))
+              (pulse2 (blpulse_c 1.0 #f))
+              (pulse3 (blpulse_c 1.0 #f))
+              (pulse4 (blpulse_c 1.0 #f))
               (tri1 (bltri_c 1.0))
               (tri2 (bltri_c 1.0))
               (tri3 (bltri_c 1.0))
+              (tri4 (bltri_c 1.0))
               (osc1_out 0.0)
               (osc2_out 0.0)
               (osc3_out 0.0)
+              (osc4_out 0.0)
               (zero:SAMPLE 0.0)
               (white (white_c))
               (pink (pink_c))
               (sub_out 0.0)
               (noise_out 0.0)
-              (filter_out 0.0)
               (subosc (osc_c 0.0))              
               (main_out 0.0:f))
           (lambda (time:i64 chan:i64)
@@ -824,11 +1392,13 @@
                         (set! filter_sustain (aref filter_env 2))
                         (set! filter_release (aref filter_env 3))
                         (set! pitch_attack (aref pitch_env 0))
-                        (set! pitch_decay (aref pitch_env 1))                        
+                        (set! pitch_decay (aref pitch_env 1))
                         ;; now note updates
                         (set! starttime (tref data 1))
                         (set! target_frq (frq2midi (tref data 2)))
+                        (set! target_amp (tref data 3))
                         (set! midifrq (frq2midi frequency))
+                        (set! reltime 0)
                         (if (< portamento 0.001)
                             (begin (set! frequency target_frq)
                                    (set! glideinc 0.0))
@@ -840,17 +1410,28 @@
                             (if (> amp_attack filter_attack)
                                 (set! new_note_timer (convert (* amp_attack MILLISEC) i64))
                                 (set! new_note_timer (convert (* filter_attack MILLISEC) i64))))
-                        (set! duration (tref data 4))                    
+                        (set! newampinc (/ (- target_amp amplitude) (convert new_note_timer)))
+                        (set! duration (tref data 4))                 
                         (set! gate 1.0)
-                        (if (> adsr1_val target_adsr1_val)
-                            (set! target_adsr1_val adsr1_val))
-                        (if (> adsr2_val target_adsr2_val)
-                            (set! target_adsr2_val adsr2_val))
-                        (if (> adsr3_val target_adsr3_val)
-                            (set! target_adsr3_val adsr3_val))
-                        (retrigger_adsr adsr1)
-                        (retrigger_adsr adsr2)
-                        (retrigger_adsr adsr3)))
+                        (if legato
+                            (begin
+                              (set! target_adsr1_val 0.0)
+                              (set! target_adsr2_val 0.0)
+                              (set! target_adsr3_val 0.0)
+                              void)                                  
+                            (begin
+                              (if (> adsr1_val target_adsr1_val)
+                                  (set! target_adsr1_val adsr1_val))
+                              (if (> adsr2_val target_adsr2_val)
+                                  (set! target_adsr2_val adsr2_val))
+                              (if (> adsr3_val target_adsr3_val)
+                                  (set! target_adsr3_val adsr3_val))
+                              (retrigger_adsr adsr1)
+                              (retrigger_adsr adsr2)
+                              (retrigger_adsr adsr3)
+                              void))
+                        ;; (println "START:" starttime "FRQ:" target_frq "AMPAKT:" amp_attack "FATTK:" filter_attack "A1:" target_adsr1_val "A2:" target_adsr2_val)                        
+                        void))
                   ;;;;;;;;mono;;;mono;;;mono;;;;;;;;
                   (if (and (> gate 0.5) (> (- time starttime) duration)) (set! gate 0.0))
                   (set! adsr1_val (adsr1 chan gate amp_attack amp_decay amp_sustain amp_release))
@@ -866,6 +1447,7 @@
                             (if (> (- target_frq midifrq) glideinc)
                                 (set! midifrq (+ glideinc midifrq))
                                 (set! midifrq target_frq)))
+                        (set! amplitude (+ amplitude newampinc))
                         (set! frequency (midi2frq midifrq))
                         (if (< adsr1_val target_adsr1_val)
                             (set! adsr1_val target_adsr1_val)
@@ -877,89 +1459,113 @@
                   ;;;;;;;;;mono;;;mono;;;;;;;;
                   (set! amp (* amplitude adsr1_val))
                   (set! cof (+ filter_frq (* follow_frq frequency) (* follow_amp amplitude)
-                               (vref mods PARAM_FILTER_FRQ)
+                               (aref mods PARAM_FILTER_FRQ)
                                (* filter_env_amt adsr2_val)))
+                  (set! res (+ reso (aref mods PARAM_FILTER_RES)))
                   (set! frq (+ frequency (* pitch_env_amt frequency adsr3_val) 0.0))
                   (if (< frq 10.0) (set! frq 10.0))
                   ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
-                  (if (and (< gate 0.5) (< amp 0.00001)) (note_active data #f))
+                  (if (< gate 0.1) (set! reltime (+ reltime 1)))
+                  (if (> reltime amp_release_samples)
+                      (begin
+                        ;; (println "NOTE OFF!" data)
+                        (note_active data #f)))
+                  ;; (if (and (< gate 0.5) (< amp 0.00001)) (note_active data #f))
                   ;; setup mod sources
                   (if (> osc1_amp 0.001)
-                      (set! osc1_out (* (+ osc1_amp (vref mods PARAM_OSC1_AMP))
-                                        (cond ((= osc1_wave 0) (sin1 1.0 (+ (* octave1 frq) (vref mods PARAM_OSC1_FRQ))))
-                                              ((= osc1_wave 1) (saw1 1.0 (+ (* octave1 frq) (vref mods PARAM_OSC1_FRQ))))
-                                              ((= osc1_wave 2) (pulse1 1.0 (+ (* octave1 frq) (vref mods PARAM_OSC1_FRQ))
-                                                                       (+ pw1 (vref mods PARAM_OSC1_PW))))
-                                              ((= osc1_wave 3) (tri1 1.0 (+ (* octave1 frq) (vref mods PARAM_OSC1_FRQ))))
+                      (set! osc1_out (* (+ osc1_amp (aref mods PARAM_OSC1_AMP))
+                                        (cond ((= osc1_wave 0) (sin1 1.0 (+ (* tune1 frq) (aref mods PARAM_OSC1_FRQ))))
+                                              ((= osc1_wave 1) (saw1 1.0 (+ (* tune1 frq) (aref mods PARAM_OSC1_FRQ))))
+                                              ((= osc1_wave 2) (pulse1 1.0 (+ (* tune1 frq) (aref mods PARAM_OSC1_FRQ))
+                                                                       (+ pw1 (aref mods PARAM_OSC1_PW))))
+                                              ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (aref mods PARAM_OSC1_FRQ))))
                                               (else zero))))
                       (set! osc1_out 0.0))
                   (if (> osc2_amp 0.001)
-                      (set! osc2_out (* (+ osc2_amp (vref mods PARAM_OSC2_AMP))
-                                        (cond ((= osc2_wave 0) (sin2 1.0 (+ (* octave2 frq) (vref mods PARAM_OSC2_FRQ))))
-                                              ((= osc2_wave 1) (saw2 1.0 (+ (* octave2 frq) (vref mods PARAM_OSC2_FRQ))))
-                                              ((= osc2_wave 2) (pulse2 1.0 (+ (* octave2 frq) (vref mods PARAM_OSC2_FRQ))
-                                                                       (+ pw2 (vref mods PARAM_OSC2_PW))))
-                                              ((= osc2_wave 3) (tri2 1.0 (+ (* octave1 frq) (vref mods PARAM_OSC2_FRQ))))
+                      (set! osc2_out (* (+ osc2_amp (aref mods PARAM_OSC2_AMP))
+                                        (cond ((= osc2_wave 0) (sin2 1.0 (+ (* tune2 frq) (aref mods PARAM_OSC2_FRQ))))
+                                              ((= osc2_wave 1) (saw2 1.0 (+ (* tune2 frq) (aref mods PARAM_OSC2_FRQ))))
+                                              ((= osc2_wave 2) (pulse2 1.0 (+ (* tune2 frq) (aref mods PARAM_OSC2_FRQ))
+                                                                       (+ pw2 (aref mods PARAM_OSC2_PW))))
+                                              ((= osc2_wave 3) (tri2 1.0 (+ (* tune2 frq) (aref mods PARAM_OSC2_FRQ))))
                                               (else zero))))
                       (set! osc2_out 0.0))
                   (if (> osc3_amp 0.001)
-                      (set! osc3_out (* osc3_amp
-                                        (cond ((= osc3_wave 0) (sin3 1.0 (* octave3 frq)))
-                                              ((= osc3_wave 1) (saw3 1.0 (* octave3 frq)))
-                                              ((= osc3_wave 2) (pulse3 1.0 (* octave3 frq) pw3))
-                                              ((= osc3_wave 3) (tri3 1.0 (* octave3 frq)))
+                      (set! osc3_out (* (+ osc3_amp (aref mods PARAM_OSC3_AMP))
+                                        (cond ((= osc3_wave 0) (sin3 1.0 (+ (* tune3 frq) (aref mods PARAM_OSC3_FRQ))))
+                                              ((= osc3_wave 1) (saw3 1.0 (+ (* tune3 frq) (aref mods PARAM_OSC3_FRQ))))
+                                              ((= osc3_wave 2) (pulse3 1.0 (+ (* tune3 frq) (aref mods PARAM_OSC3_FRQ))
+                                                                       (+ pw3 (aref mods PARAM_OSC3_PW))))
+                                              ((= osc3_wave 3) (tri3 1.0 (+ (* tune3 frq) (aref mods PARAM_OSC3_FRQ))))
                                               (else zero))))
                       (set! osc3_out 0.0))
+                  (if (> osc4_amp 0.001)
+                      (set! osc4_out (* (+ osc4_amp (aref mods PARAM_OSC4_AMP))
+                                        (cond ((= osc4_wave 0) (sin4 1.0 (+ (* tune4 frq) (aref mods PARAM_OSC4_FRQ))))
+                                              ((= osc4_wave 1) (saw4 1.0 (+ (* tune4 frq) (aref mods PARAM_OSC4_FRQ))))
+                                              ((= osc4_wave 2) (pulse4 1.0 (+ (* tune4 frq) (aref mods PARAM_OSC4_FRQ))
+                                                                       (+ pw4 (aref mods PARAM_OSC4_PW))))
+                                              ((= osc4_wave 3) (tri4 1.0 (+ (* tune4 frq) (aref mods PARAM_OSC4_FRQ))))
+                                              (else zero))))
+                      (set! osc4_out 0.0))
                   (if (> sub_amp 0.001)
                       (set! sub_out (* sub_amp (subosc 1.0 (* frq 0.25))))
                       (set! sub_out 0.0))
                   (if (> noise_amp 0.001)
                       (if (= noise PARAM_WHITE)
-                          (set! noise_out (* 0.5 (+ noise_amp (vref mods PARAM_NOISE_AMP)) (white)))
-                          (set! noise_out (* 0.5 (+ noise_amp (vref mods PARAM_NOISE_AMP)) (pink))))
-                      (set! noise_out 0.0))
-                  (set! filter_out (filter (* amp (+ osc1_out osc2_out osc3_out sub_out noise_out)) cof reso))
-                  (set! main_out filter_out)
+                          (set! noise_out (* 0.5 (+ noise_amp (aref mods PARAM_NOISE_AMP)) (white)))
+                          (set! noise_out (* 0.5 (+ noise_amp (aref mods PARAM_NOISE_AMP)) (pink))))
+                      (set! noise_out 0.0))))
+            (if (= chan 0)
+                (begin
+                  (filter (* amp (+ (* osc1_out osc1_pan)
+                                    (* osc2_out osc2_pan)
+                                    (* osc3_out osc3_pan)
+                                    (* osc4_out osc4_pan)
+                                    (* sub_out sub_pan)
+                                    (* noise_out noise_pan)))
+                          cof reso
+                          filter_out)
+                  (set! main_out (aref filter_out filter_type))
                   main_out)
-                0.0:f)))))))
-
-;; default to highcpu - not that much difference.
-(bind-func synth_note
-  (lambda ()
-    (synth_note:[[[float,i64,i64]*,NoteData*,i64,float*]*,i1]* #t)))
+                (if (= chan 1)
+                    (begin
+                      (filterR (* amp (+ (* osc1_out (- 1.0 osc1_pan))
+                                         (* osc2_out (- 1.0 osc2_pan))
+                                         (* osc3_out (- 1.0 osc3_pan))
+                                         (* osc4_out (- 1.0 osc4_pan))
+                                         (* sub_out (- 1.0 sub_pan))
+                                         (* noise_out (- 1.0 noise_pan))))
+                               cof reso
+                               filter_out)
+                      (set! main_out (aref filter_out filter_type))
+                      main_out)
+                    0.0))))))))
 
 
 ;; FX
-(bind-func synth_fx
+(bind-func analogue_fx
   (let ((MILLISEC (* .001 SRf))
-        (CHANSF (i32tof CHANNELS))
-        (PAN_WIDTH (- PARAM_PAN_WIDTH 8))
-        (PAN_POS (- PARAM_PAN_POS 8))
-        (DELAY_TIME (- PARAM_DELAY_TIME 8))
-        (DELAY_FB (- PARAM_DELAY_FB 8))
-        (REV_SIZE (- PARAM_REVERB_SIZE 8))
-        (REV_PREDELAY (- PARAM_REVERB_PREDELAY 8))
-        (REV_ABSORB (- PARAM_REVERB_ABSORB 8))
-        (REV_MIX (- PARAM_REVERB_MIX 8)))
+        (CHANSF (i32tof CHANNELS)))
     (lambda ()
       (let ((notekernel:NOTE_KERNEL null)            
-            (mod_amp:|4,float|* (array_ref 1.0 1.0 1.0 1.0))
-            (mod_frq:|4,float|* (array_ref 1.0 1.0 1.0 1.0))
-            (mod_attack:|4,float|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
-            (mod_decay:|4,float|* (array_ref 10.0 10.0 10.0 10.0))
-            (mod_attack_slope:|4,float|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
-            (mod_decay_slope:|4,float|* (array_ref 0.0 0.0 0.0 0.0))
-            (fxmods:/8,float/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
-            (notemods:/8,float/ (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
-            (vtmp:/8,float/* (alloc))
+            (mod_amp:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+            (mod_frq:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+            (mod_attack:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
+            (mod_decay:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0))
+            (mod_attack_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
+            (mod_decay_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0))
+            (mods:|32,SAMPLE|* null) ;(alloc))
+            (mod_matrix:|4,|32,SAMPLE||* (alloc))
+            (tmpmod:|32,SAMPLE|* null)
             (lfos:|4,|5,[SAMPLE,i64,i64]*||* (alloc))
             (lfo_types:|4,i32|* (alloc))
-            (fx_matrix:|4,/8,float/|* (alloc))
-            (note_matrix:|4,/8,float/|* (alloc))
             (hpf (hpf_c))
+            (hpfR (hpf_c))
             (hpf_frq 20001.0)
             (dly (comb_lpf_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
-            (delay_time 50.0) ;; in ms
+            (delay_time_left 50.0) ;; in ms
+            (delay_time_right 50.0) ;; in ms
             (delay_in 1.0)
             (delay_mix 0.0)
             (delay_fb 0.5)
@@ -973,18 +1579,21 @@
             (pan (pan_c (i32toi64 CHANNELS)))
             (pan_pos 0.5)          
             (pan_width 1.0)
+            (flanger (flanger_st_c))
+            (flanger_low 0.1)
+            (flanger_high 15.0)
+            (flanger_rate 1.0)
+            (flanger_fb 0.0)
+            (flanger_mix 0.0)
             (overdrive (overdrive_c))
             (overdrive_amt 0.5) ;; always use some overdrive
             (out:SAMPLE 0.0)
-            (tmpv:/8,float/ (vector .0 .0 .0 .0 .0 .0 .0 .0))
-            (i:i64 0)
+            (i:i64 0) (j:i64 0)
             (tmp 0.0)
             (fxout 0.0)
             (gain 2.0))
         (dotimes (i 4)
           (aset! lfo_types i PARAM_SINE)
-          (aset! fx_matrix i (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
-          (aset! note_matrix i (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
           (aset! lfos i
                  (array (let ((osc (osc_c 0.0)))
                           (lambda (chan:i64 idx:i64)
@@ -1012,42 +1621,65 @@
                                  (aref mod_attack_slope idx)
                                  (aref mod_decay_slope idx)))))))
         (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+          ;; calc mod matrix changes
+          (begin
+            (if (= mods null) (set! mods (notekernel.mods:|32,SAMPLE|*)))
+            (memset (cast mods i8*) 0 128) ;(size_of mods))
+            (dotimes (i 4)
+              (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
+              (set! tmpmod (aref-ptr mod_matrix i))
+              (dotimes (j 32) (aset! mods j (+ (aref mods j) (* tmp (aref tmpmod j)))))
+              void))
+          ;; sound in for channel 1
           (if (= chan 0)
               (begin
-                (set! fxmods (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
-                (set! notemods (vector 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0))
-                (dotimes (i 4)
-                  (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
-                  (set! tmpv (vector tmp tmp tmp tmp tmp tmp tmp tmp))
-                  (set! fxmods (+ fxmods (* tmpv (aref fx_matrix i))))
-                  (set! notemods (+ notemods (* tmpv (aref note_matrix i)))))
-                (notekernel.mods:/8,float/ notemods)
                 (set! out in)
                 (set! out (overdrive out overdrive_amt))
                 (if (< hpf_frq 20000.0)
                     (set! out (hpf out hpf_frq 0.0)))
                 out))
-          (set! tmp (+ pan_pos (vref fxmods PAN_POS)))
+          ;; sound in for channel 2
+          (if (= chan 1)
+              (begin
+                (set! out in)
+                (set! out (overdrive out overdrive_amt))
+                (if (< hpf_frq 20000.0)
+                    (set! out (hpfR out hpf_frq 0.0)))
+                out))
+          ;; apply FX to both channels 1 and 2
+          (set! tmp (+ pan_pos (aref mods PARAM_PAN_POS)))
           (if (> tmp CHANSF) (set! tmp (- tmp CHANSF)))
           ;; always with the panning!
           (set! fxout (pan chan out
-                           (+ pan_width (vref fxmods PAN_WIDTH))
+                           (+ pan_width (aref mods PARAM_PAN_WIDTH))
                            tmp))
+          (if (> flanger_mix 0.001)
+              (set! fxout (flanger chan fxout
+                                   1.0 flanger_mix
+                                   (* MILLISEC (+ flanger_low 0.0)) ;(aref mods PARAM_FLANGER_LOW)))
+                                   (* MILLISEC (+ flanger_high 0.0)) ;(aref mods PARAM_FLANGER_HIGH)))
+                                   (+ flanger_rate 0.0) ;(aref mods PARAM_FLANGER_RATE))
+                                   (+ flanger_fb 0.0)))) ;;(aref mods PARAM_FLANGER_FB)))))
           (if (> delay_mix 0.001)
               (set! fxout (dly chan fxout
-                               (* MILLISEC (+ delay_time (vref fxmods DELAY_TIME)))
+                               (if (= chan 0)
+                                   (* MILLISEC (+ delay_time_left (aref mods PARAM_DELAY_TIME_LEFT)))
+                                   (* MILLISEC (+ delay_time_right (aref mods PARAM_DELAY_TIME_RIGHT))))
                                delay_in
                                delay_mix
-                               (+ delay_fb (vref fxmods DELAY_FB))
+                               (+ delay_fb (aref mods PARAM_DELAY_FB))
                                delay_frq
                                delay_res)))
           (if (> reverb_mix 0.001)
               (set! fxout (rev chan fxout
-                               (+ reverb_size (vref fxmods REV_SIZE))
-                               (+ reverb_predelay (vref fxmods REV_PREDELAY))
-                               (+ reverb_absorb (vref fxmods REV_ABSORB))
-                               (+ reverb_mix (vref fxmods REV_MIX)))))
+                               (+ reverb_size (aref mods PARAM_REVERB_SIZE))
+                               (+ reverb_predelay (aref mods PARAM_REVERB_PREDELAY))
+                               (+ reverb_absorb (aref mods PARAM_REVERB_ABSORB))
+                               (+ reverb_mix (aref mods PARAM_REVERB_MIX)))))
           (* gain fxout))))))
+
+
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1060,7 +1692,7 @@
 
 
 ;;
-(bind-func synth_reset
+(bind-func analogue_reset
   (let ((i 0) (j 0))
     (lambda (inst:i8*)
       ;;
@@ -1070,27 +1702,43 @@
       (set_osc1_amp inst 0.3)
       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
       (set_osc1_wave inst PARAM_SAW)
-      ;; frequency shift of osc - tuning - 2.0 up octave 0.5 down octave etc..
-      (set_osc1_octave inst 1.0)
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc1_tune inst 1.0)
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set_osc1_pw inst 0.5)
+      ;; stereo pan (default is 0.5)
+      (set_osc1_pan inst 0.5)
       ;; amplitude of osc 2
       (set_osc2_amp inst 0.0)
       ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
       (set_osc2_wave inst PARAM_SAW)
-      ;; frequency shift of osc - tuning - 2.0 up octave 0.5 down octave etc..
-      (set_osc2_octave inst 1.0)
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc2_tune inst 1.0)
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set_osc2_pw inst 0.5)
+      ;; stereo pan (default is 0.5)
+      (set_osc2_pan inst 0.5)      
       ;; amplitude of osc 3
       (set_osc3_amp inst 0.0)
       ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
       (set_osc3_wave inst PARAM_SAW)
-      ;; frequency shift of osc - tuning - 2.0 up octave 0.5 down octave etc..
-      (set_osc3_octave inst 1.0)
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc3_tune inst 1.0)
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set_osc3_pw inst 0.5)
-      ;; sub oscilltor amp (two octaves under sine wave)
+      ;; stereo pan (default is 0.5)
+      (set_osc3_pan inst 0.5)
+      ;; amplitude of osc 4
+      (set_osc4_amp inst 0.0)
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set_osc4_wave inst PARAM_SAW)
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc4_tune inst 1.0)
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set_osc4_pw inst 0.5)
+      ;; stereo pan (default is 0.5)
+      (set_osc4_pan inst 0.5)            
+      ;; sub oscilltor amp (two tunes under sine wave)
       (set_sub_amp inst 0.0)
       ;; noise (PARAM_WHITE or PARAM_PINK)
       (set_noise_type inst PARAM_WHITE)
@@ -1102,7 +1750,7 @@
       ;; lpf filter cutoff frq in hz
       (set_filter_frq inst 15000.0)
       ;; lpf filter resonance (0.0-1.0)
-      (set_filter_res inst 0.25)
+      (set_filter_res inst 0.0)
       ;; hpf cutoff frequency
       (set_hpf_frq inst 20001.0)
       ;;
@@ -1124,14 +1772,15 @@
       ;; pitch envelope attack and decay only in ms
       (set_pitch_env inst 1.0 1.0)
       ;; the amount of pitch envelope to apply as a ratio of the note frequency
-      ;; i.e. a value of 1.0 will add 1 octave to current pitch
-      ;;      a value of 0.5 will subtract 1 octave 
+      ;; i.e. a value of 1.0 will add 1 tune to current pitch
+      ;;      a value of 0.5 will subtract 1 tune 
       (set_pitch_env_amt inst 0.0)      
       ;;
       ;; delay
       ;;
       ;; delay time in ms
-      (set_delay_time inst 50.0)
+      (set_delay_time_left inst 50.0)
+      (set_delay_time_right inst 50.0)
       ;; delay amt (gain) 0.0-1.0
       (set_delay_mix inst 0.0)
       ;; delay fb
@@ -1152,6 +1801,18 @@
       ;; reverb absorbtion 0.0-1.0
       (set_reverb_absorb inst 0.45)
       ;;
+      ;; flanger
+      ;;
+      (set_flanger_mix inst 0.0)
+      ;; the low mark (time in ms) for the flanger
+      (set_flanger_low inst 0.001)
+      ;; the high mark (time in ms) for the flanger
+      (set_flanger_high inst 10.0)
+      ;; the rate (in hz) of the flanger
+      (set_flanger_rate inst 0.01)
+      ;; any feedback -1.0 - 1.0
+      (set_flanger_fb inst 0.5)
+      ;;
       ;; panning
       ;;
       ;; see pan_c in audio_dsp for detailed info
@@ -1169,6 +1830,9 @@
       ;;
       ;; portamento (in millis)
       (set_portamento inst 2.0)
+      ;;
+      ;; set max polyphony
+      (set_polyphonic inst)
       ;;
       ;; lfos
       ;;
@@ -1193,30 +1857,30 @@
       ;;
       ;; reset mod matrix - turn everything off
       (dotimes (i 4)   ;; 4 modulation sources
-        (doloop (j 16) ;; 16 modulation targets
+        (doloop (j 32) ;; 32 modulation targets
           (set_mod_matrix inst i j 0.0)))    
       ;; done
-      (println "Synth Reset!")
+      (println "Analogue Synthesizer Reset!")
       void)))
 
-(bind-func synth_preset_pluckbass
+(bind-func analogue_pluckbass
   (lambda (inst:i8*)
     ;; first reset to defaults
-    (synth_reset inst)
+    (analogue_reset inst)
     ;; setup osc1
     (set_osc1_amp inst 0.2)
     (set_osc1_wave inst PARAM_PULSE)
     (set_osc1_pw inst 0.25)
-    (set_osc1_octave inst 0.5)
+    (set_osc1_tune inst 0.5)
     ;; setup osc2
     (set_osc2_amp inst 0.2)
     (set_osc2_wave inst PARAM_PULSE)
     (set_osc2_pw inst 0.3)
-    (set_osc2_octave inst 0.5017)
+    (set_osc2_tune inst 0.5017)
     ;; setup osc3
     (set_osc3_amp inst 0.2)
     (set_osc3_wave inst PARAM_TRI)
-    (set_osc3_octave inst 0.253)
+    (set_osc3_tune inst 0.253)
     ;;
     ;; set envelopes
     (set_amp_env inst 0.0 0.0 1.0 400.0)
@@ -1243,9 +1907,9 @@
     (println "Synth 'test' preset initialized")
     void))
 
-(bind-func synth_preset_brownpad
+(bind-func analogue_brownpad
   (lambda (inst:i8*)
-    (synth_reset inst)
+    (analogue_reset inst)
 
     (set_osc1_amp inst 0.4)
     (set_amp_env inst 150.0 400.0 0.7 1000.0)
@@ -1253,10 +1917,10 @@
     (set_osc1_pw inst 0.4)
     (set_osc2_amp inst 0.5)
     (set_osc2_wave inst PARAM_SAW)
-    (set_osc2_octave inst 1.0019)
+    (set_osc2_tune inst 1.0019)
     (set_osc3_amp inst 0.15)
     (set_osc3_wave inst PARAM_SINE)
-    (set_osc3_octave inst 0.50017)
+    (set_osc3_tune inst 0.50017)
     (set_filter_frq inst 800.0)
     (set_filter_res inst 0.4)
     (set_filter_env inst 600.0 500.0 0.5 1000.0)
@@ -1265,7 +1929,8 @@
     (set_lfo_ad inst PARAM_LFO1 2000.0 2000.0 -0.0 0.0)
     (set_mod_matrix inst PARAM_LFO1 PARAM_OSC1_FRQ 3.0)
     (set_delay_mix inst 0.3)
-    (set_delay_time inst 500.0) ; change with tempo
+    (set_delay_time_left inst 500.0) ; change with tempo
+    (set_delay_time_right inst 500.0) ; change with tempo
     (set_delay_fb inst 0.8)
     (set_delay_frq inst 3000.0)
     (set_delay_res inst 0.0)

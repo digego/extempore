@@ -8,126 +8,128 @@
 ;;; Code:
 
 (sys:load "libs/core/instruments.xtm")
-(sys:load "libs/external/instruments_ext.xtm")
-;; (sys:load "libs/core/pc_ivl.xtm")
-;; (sys:load "../../digego/code/andrewlib.xtm")
 
-(make-instrument synth1 synth)
-(make-instrument synth2 synth)
-(make-instrument sampler1 sampler)
-
-;; (bind-val synth1 INSTRUMENT (make_instrument (synth_note #t) (synth_fx)))
-;; (define synth1 ($$ synth1))
-;; (bind-val synth2 INSTRUMENT (make_instrument (synth_note #f) (synth_fx)))
-;; (define synth2 ($$ synth2))
-;; (bind-val sampler INSTRUMENT (make_instrument (sampler_note) (sampler_fx)))
-;; (define sampler ($$ sampler))
-;; (bind-val sampler2 INSTRUMENT (make_instrument (sampler_note) (sampler_fx)))
-;; (define sampler2 ($$ sampler2))
-
-(load-sampler sampler1 "/home/andrew/Documents/Samples/accordian")
-(load-sampler sampler1 "/home/andrew/Documents/Samples/piano" 1)
-
-
-
-;; (bind-val synth3 INSTRUMENT (make_instrument (synth_note_c #t) (synth_fx)))
-;; (define synth3 ($$ synth3))
-
-(set_polyphony synth1 20)
-
-(set_gain synth2 10.0)
-
-(define testp
-  (lambda (beat dur)
-    (active_notes synth4)
-    (callback (*metro* (+ beat (* .5 dur))) 'testp (+ beat dur) dur)))
-
-(testp (*metro* 'get-beat 4) 1)
+(make-instrument bass analog)
+(make-instrument lead analog)
 
 (bind-func dsp:DSP
   (lambda (in time chan dat)
     (cond ((< chan 2)
-           (+ 0.0
-              ;; (* 0.1 (random))
-              ;; (* 1.0 (synth2 in time chan dat))
-              (* 1.0 (synth2 in time chan dat))
-              ;; (* 1.0 (synth3 in time chan dat))
-              ;; (* 1.0 (sampler1 in time chan dat))
-              ;; (* 1.0 (fmsynth in time chan dat))
-              ;; (* 1.0 (synth3 in time chan dat))
-              0.0))
+           (+ (* 1.0 (lead in time chan dat))
+              (* 1.0 (bass in time chan dat))))
           (else 0.0))))
-
 
 (dsp:set! dsp)
 
-(synth_preset_brownpad synth1)
-(synth_preset_brownpad synth2)
-(synth_preset_brownpad synth3)
-(synth_preset_brownpad synth4)
+(bind-func drwho_bass
+  (lambda (inst)
+    (synth_reset inst)
+    ;; oscs
+    (set_osc1_amp inst 0.4)
+    (set_osc1_wave inst PARAM_PULSE)
+    (set_osc1_tune inst 0.5)
+    (set_osc1_pan inst 0.4)
+    (set_osc1_pw inst 0.55)
 
-(play-note (now) synth4 60 80 100000)
-(play-note (now) synth4 67 80 100000)
+    (set_osc2_amp inst 0.4)
+    (set_osc2_wave inst PARAM_PULSE)
+    (set_osc2_tune inst 1.001)
+    (set_osc2_pan inst 0.5)
+    (set_osc2_pw inst 0.65)
+    
+    (set_osc3_amp inst 0.2)
+    (set_osc3_wave inst PARAM_PULSE)
+    (set_osc3_tune inst 2.0025)
+    (set_osc3_pan inst 0.6)
+    (set_osc3_pw inst 0.75)
 
-(set_gain sampler1 5.0)
+    (set_osc4_amp inst 0.5)
+    (set_osc4_wave inst PARAM_SINE)
+    (set_osc4_tune inst 0.2501)
+    (set_osc4_pan inst 0.5)
+    (set_osc4_pw inst 0.5)
+    
+    ;; amp env
+    (set_amp_env inst 5.0 1000.0 0.1 250.0)    
 
-(set_filter_res synth1 0.1)
-;; initialize
-(synth_preset_pluckbass synth2)
-;; (synth_preset_pluckbass synth3)
-(synth_preset_brownpad synth3)
+    ;; filter
+    (set_filter_frq inst 700.0) ;; 700 hz
+    (set_filter_env inst 5.0 200.0 0.1 250.0)
+    (set_filter_env_amt inst 2500.0)
+    (set_filter_res inst 0.25)
 
-(synth_reset sampler1)
+    ;; pitch env
+    (set_pitch_env inst 100.0 0.0)
+    (set_pitch_env_amt inst -0.01)
 
-(set_amp_env synth3 10.0 10.0 0.5 50.0)
+    ;; set reverb
+    (set_reverb_mix inst 0.5)
+    (set_reverb_size inst 0.8)
 
-(set_reverb_mix sampler1 0.5)
-(set_reverb_size sampler1 0.95)
-(set_pan_pos sampler1 0.5)
-(set_pan_pos synth1 1.0)
-(set_gain sampler2 5.0)
+    ;; set gain
+    (set_gain inst 5.0)
 
-(set_filter_res synth1 0.0)
-(set_amp_env synth1 20.0 50.0 0.5 1000.0)
-(set_filter_frq
-(set_filter_env synth3 0.0 0.0 0.0 0.0)
-(set_filter_env_amt synth1 0.0)
-(set_filter_frq synth1 5000.0)
-
-(set_amp_env synth1 25.0 35.0 0.3 400.0)
-(set_filter_env synth1 15.0 35.0 1.0 400.0)
+    ;; polyphonic
+    (set_polyphonic inst)
+    void))
 
 
-(set_polyphony synth2 1)
-(set_portamento synth2 100.0)
+(bind-func drwho_lead
+  (lambda (inst)
+    (synth_reset inst)
+    ;; oscs
+    (set_osc1_amp inst 0.6)
+    (set_osc1_wave inst PARAM_SINE)
+    (set_osc1_tune inst 1.0)
 
-;; first let's play with synth
-(define l1)
-  (let ((kk 0))    
-    (lambda (beat dur cell)
-      ;; (println (active_notes synth2))
-      ;; (onbeat? 1 (random 2 9)
-      ;;          (play sampler2 (pc:q (random 24 110) (pc:scale 0 'aeolian))
-      ;;                (random 80 130) 8 1))
-      ;; (play sampler1 (+ -48 (car cell)) 120 (* dur 2.0) 0)
-      ;; (play fmsynth (+ 3 (car cell)) 80 (* dur 1.0))
-      (play synth2 (+ 0 (car cell)) 110 (* dur 1.1))
-      (callback (*metro* (+ beat (* dur 0.95))) 'l1
-                (+ beat dur)
-                1
-                (rotate cell -1)))))
+    (set_osc2_amp inst 0.4)
+    (set_osc2_wave inst PARAM_PULSE)
+    (set_osc2_tune inst 2.003)
+    (set_osc2_pw inst 0.5) ;; sqr
+    
+    ;; frq mod osc1
+    (set_lfo inst PARAM_LFO1 1.0 3.128)    
+    (set_mod_matrix inst PARAM_LFO1 PARAM_OSC1_FRQ 7.0)
+    
+    ;; amp env
+    (set_amp_env inst 50.0 0.0 1.0 3000.0)
+    
+    ;; filter
+    (set_filter_frq inst 800.0) ;; 700 hz
+    (set_filter_env_amt inst 0.0) ;; no envelope
+    (set_filter_res inst 0.2)
+    (set_filter_env_follow_frq inst 2.0)
+    
+    ;; set reverb
+    (set_reverb_mix inst 0.65)
+    (set_reverb_size inst 0.8)
+    
+    ;; mono synth
+    (set_monophonic inst)
+    (set_portamento inst 60.0)
+    (set_legato inst 1)
+    
+    ;; set gain
+    (set_gain inst 6.0)
+    void))
 
-(l1 (*metro* 'get-beat 4) 1/4 '(60 63 62 67 72 65 84 77 65 67))
 
-(define root 0)
+(drwho_bass bass)
+(drwho_lead lead)
 
-(define l2)
+(*metro* 'set-tempo 135.0)
+
+(define R repeat)
+
+(define test
   (lambda (beat dur)
-    (set! root (modulo (random '(0 2 5 7)) 12))
-    (map (lambda (p)
-           (play synth1 (+ 0 p) 100 (* 0.8 dur) 0.1 1.0))
-         (pc:make-chord 55 75 4 (pc:chord root '-7)))
-    (callback (*metro* (+ beat (* .95 dur))) 'l2 (+ beat dur)
-              dur)))
+    (playp 8 0 bass 0 `(,@(R `(e3 __ e3) 6) (g3 __ g3) (g3 __ d3))  (cosr 70 20 2) 0.5)
+    (playp 32 0 lead 0 `((b4 b4 b4 d5)
+                           (b4 b4 b4 __)
+                           (b4 g4 g4 b3 d4 (d4 __ c4) b3 (b3 __ a3))
+                           (b3 b3 b3 (b3 c4 d4) b3 __ b3 c5))
+           (cosr 80 10 3) 2.5)
+    (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
-(l2 (*metro* 'get-beat 4) 8)
+(test (*metro* 'get-beat 4) 1/4)
+

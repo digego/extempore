@@ -12,6 +12,127 @@
 
 (sys:load "libs/core/pc_ivl.xtm")
 
+(define PARAM_OSC1_AMP 0)
+(define PARAM_OSC1_FRQ 1)
+(define PARAM_OSC1_PW 2)
+(define PARAM_OSC2_AMP 3)
+(define PARAM_OSC2_FRQ 4)
+(define PARAM_OSC2_PW 5)
+(define PARAM_NOISE_AMP 6)
+(define PARAM_FILTER_FRQ 7)
+;; modulation destinations (fx)
+(define PARAM_PAN_WIDTH 8)
+(define PARAM_PAN_POS 9) 
+(define PARAM_DELAY_TIME 10)
+(define PARAM_DELAY_FB 11) ;; feedback
+(define PARAM_REVERB_SIZE 12)
+(define PARAM_REVERB_PREDELAY 13)
+(define PARAM_REVERB_ABSORB 14)
+(define PARAM_REVERB_MIX 15)
+
+(define PARAM_SINE 0)
+(define PARAM_SAW 1)
+(define PARAM_PULSE 2)
+(define PARAM_TRI 3)
+(define PARAM_AD 4)
+(define PARAM_WHITE 0)
+(define PARAM_PINK 1)
+
+(define PARAM_LPF 0)
+(define PARAM_BPF 1)
+(define PARAM_HPF 2)
+(define PARAM_Notch 3)
+(define PARAM_Peak 4)
+(define PARAM_APF 5)
+
+(define PARAM_LFO1 0)
+(define PARAM_LFO2 1)
+(define PARAM_LFO3 2)
+(define PARAM_LFO4 3)
+
+;; modulation destinations (note)
+(define PARAM_OSC1_AMP 0)
+(define PARAM_OSC1_FRQ 1)
+(define PARAM_OSC1_PW 2)
+(define PARAM_OSC1_PAN 3)
+(define PARAM_OSC2_AMP 4)
+(define PARAM_OSC2_FRQ 5)
+(define PARAM_OSC2_PW 6)
+(define PARAM_OSC2_PAN 7)
+(define PARAM_OSC3_AMP 8)
+(define PARAM_OSC3_FRQ 9)
+(define PARAM_OSC3_PW 10)
+(define PARAM_OSC3_PAN 11)
+(define PARAM_OSC4_AMP 12)
+(define PARAM_OSC4_FRQ 13)
+(define PARAM_OSC4_PW 14)
+(define PARAM_OSC4_PAN 15)
+(define PARAM_NOISE_AMP 16)
+(define PARAM_FILTER_FRQ 17)
+(define PARAM_FILTER_RES 18)
+
+;; modulation destinations (fx)
+(define PARAM_PAN_WIDTH 19)
+(define PARAM_PAN_POS 20) 
+(define PARAM_DELAY_TIME_LEFT 21)
+(define PARAM_DELAY_TIME_RIGHT 22)
+(define PARAM_DELAY_FB 23) ;; feedback
+(define PARAM_REVERB_SIZE 24)
+(define PARAM_REVERB_PREDELAY 25)
+(define PARAM_REVERB_ABSORB 26)
+(define PARAM_REVERB_MIX 27)
+
+(define set_lfo1
+  (lambda (inst . args)
+    (if (= (length args) 2)
+        (apply set_lfo inst 0 args)
+        (if (= (length args) 4)
+            (apply set_lfo_ad inst 0 args)
+            #f))))
+
+(define set_lfo1_type
+  (lambda (inst val)
+    (set_lfo_type inst 0 val)))
+
+(define set_lfo2
+  (lambda (inst . args)
+    (if (= (length args) 2)
+        (apply set_lfo inst 1 args)
+        (if (= (length args) 4)
+            (apply set_lfo_ad inst 1 args)
+            #f))))
+
+(define set_lfo2_type
+  (lambda (inst val)
+    (set_lfo_type inst 1 val)))
+
+(define set_lfo3
+  (lambda (inst . args)
+    (if (= (length args) 2)
+        (apply set_lfo inst 2 args)
+        (if (= (length args) 4)
+            (apply set_lfo_ad inst 2 args)
+            #f))))
+
+(define set_lfo3_type
+  (lambda (inst val)
+    (set_lfo_type inst 2 val)))
+
+(define set_lfo4
+  (lambda (inst . args)
+    (if (= (length args) 2)
+        (apply set_lfo inst 3 args)
+        (if (= (length args) 4)
+            (apply set_lfo_ad inst 3 args)
+            #f))))
+
+(define set_lfo4_type
+  (lambda (inst val)
+    (set_lfo_type inst 3 val)))
+
+
+
+
 (define-macro (make-instrument defname synthname . args)
   (let* ((note (append (string->sexpr (string-append "(" (symbol->string synthname) "_note)")) args))
          (fx (string->sexpr (string-append "(" (symbol->string synthname) "_fx)"))))
@@ -456,9 +577,9 @@ for use with native beat shceduler"
 (define b8 (+ 71 48))
 (define cb8 (+ 71 48))
 
-(define-macro (repeat num e)
-  (let ((l (make-list (eval e) (eval num))))
-    (cons 'list l)))
+(define-macro (repeat expr num)
+  `(make-list ,(eval num) ,expr))
+
 
 (define playp_play_list
   (let ((lst_idx (range 0 1000)))

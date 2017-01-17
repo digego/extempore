@@ -253,12 +253,12 @@
                                 (begin
                                   ;; existing kernel is still in use!
                                   ;; simply update note details (i.e. data) and keep on truckin!
-                                  (tfill! free_note idx start freq amp dur 1.0 #t (cast zone))
+                                  (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
                                   free_note)
                                 (begin ;; new kernel required!
                                   (reset_zone zone)
                                   (push_zone zone)
-                                  (tfill! free_note idx start freq amp dur 1.0 #t (cast zone))
+                                  (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
                                   (pset! kernels idx (note_kernel free_note
                                                                   (aref-ptr samples bank)
                                                                   (aref-ptr samples_length bank)
@@ -276,7 +276,7 @@
       ;; init notes
       (dotimes (i poly)
         (pset! kernels i (cast null))
-        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f (cast (create_zone (* 10 1024))))))
+        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f 0 (cast (create_zone (* 10 1024))))))
       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
         (set! out 0.0)
         (dotimes (k poly) ;; sum all active notes
