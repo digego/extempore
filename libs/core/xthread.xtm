@@ -30,9 +30,12 @@
     ;; (println "zone in:" (peek_zone))
     (let ((z1 (push_new_zone 4096))
           (res (convert null))
+          (running:i1 #t)
+          (finished:i1 #f)
           (ff (lambda ()
                 (push_zone z1)
                 (set! res (f))
+                (set! finished #t)
                 (pop_zone)
                 void))
           (thread null))
@@ -45,6 +48,7 @@
           (thread_destroy thread)
           r2)))))
 
+
 ;; async returns a 'future'
 ;;
 ;; see examples/core/xthread.xtm for usage
@@ -56,9 +60,12 @@
     ;; (println "zone in:" (peek_zone))
     (let ((z1 (push_new_zone 4096))
           (res (convert null))
+          (running:i1 #t)
+          (finished:i1 #f)          
           (ff (lambda ()
                 (push_zone z1)
                 (set! res (f arg))
+                (set! finished #t)                
                 (pop_zone)
                 void))
           (thread null))
@@ -70,6 +77,15 @@
           (llvm_zone_destroy z1)
           (thread_destroy thread)
           r2)))))
+
+(bind-func async_done:[i1,[!a]*]*
+  (lambda (f)
+    (cref (cast f [void]*) finished i1)))
+
+(bind-func async_kill:[i1,[!a]*]*
+  (lambda (f)
+    (cset! (cast f [void]*) running #f i1)))
+
 
 
 (bind-macro

@@ -47,21 +47,33 @@
 (bind-func await_futures
   (lambda (num:i64)
     (letz ((future1 (async (lambda () ;; aysnc accepts zero arguments
-                            (let ((ress 0))
-                              (thread_sleep (random 0 3) 0)
-                              (doloop (i num) (set! ress (+ ress (* i i i))))
+                             (let ((ress 0))
+                               (thread_sleep 5 0)
+                               (doloop (i num) (set! ress (+ ress (* i i i))))
                               5))))
-          (future2 (async (lambda (x) ;; async also optionally accepts one argument
-                            (thread_sleep (random 0 3) 0)
-                            x)
-                          10)) ;; must give async the argument to be applied!
-          (result 0))
-      (println "\nRandom sleep 0-5 seconds")
-      (thread_sleep (random 0 5) 0)
-      ;; add two futures!
-      (set! result (+ (future1) (future2)))
+           (future2 (async (lambda (x) ;; async also optionally accepts one argument
+                             (thread_sleep 2 0)
+                             x)
+                           10)) ;; must give async the argument to be applied!
+           (future3 (async (lambda () ;; AN INFINITE FUTURE!
+                             (while (future3.running:i1)
+                               (thread_sleep 1 0))
+                             20)))
+           (result 0))
+      (println "\nCheck for finish")
+      (doloop (i 11)
+        (if (> i 7) (async_kill future3)) ;; after 7 force kill future3
+        (println "finished 1:" (async_done future1)
+                 " finished 2:" (async_done future2)
+                 " finished 3:" (async_done future3))
+        (thread_sleep 1 0))
+      ;; add the three futures!
+      (set! result (+ (future1) (future2) (future3)))
       (println "(future1) + (future2) =" result)
       result)))
+
+(sys:load "libs/core/xthread.xtm")
+(await_futures 10)
 
 ($ 
  (doloop (i 10)
