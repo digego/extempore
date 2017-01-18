@@ -1,0 +1,46 @@
+;;
+;; a little petri net
+;;
+
+;; places
+(define place (lambda (name tokens) (vector name tokens)))
+(define name (lambda (p) (vector-ref p 0)))
+(define take-token (lambda (p)
+                     (vector-set! p 1 (- (vector-ref p 1) 1))
+                     (>= (vector-ref p 1) 0)))
+(define give-token (lambda (p) (vector-set! p 1 (+ (vector-ref p 1) 1))))
+(define check-token (lambda (p) (vector-ref p 1)))
+
+;; transitions
+(define transition
+  (lambda (name pre post)
+    (let* ((f (lambda ()
+                (let ((tokens (map (lambda (p) (take-token p)) pre)))
+                  (if (member #f tokens)
+                      (for-each (lambda (p) (give-token p)) pre)
+                      (for-each (lambda (p) (give-token p)) post))))))
+      f)))
+
+;; simlulator
+(define run-petri-net
+  (lambda (cnt places transitions killstate)
+    (println cnt 'state: places)
+    (for-each (lambda (t) (t)) transitions)
+    (if (killstate places)
+        (println 'final 'state: places)
+        (schedule (+ (now) (* .5 *second*)) 'run-petri-net
+                  (+ cnt 1)
+                  places transitions
+                  killstate))))
+
+(define p1 (place 'A 1))
+(define p2 (place 'B 0))
+(define p3 (place 'C 5))
+(define t1 (transition 'T1 (list p1 p1) (list p2)))
+(define t2 (transition 'T2 (list p2) (list p3)))
+(define t3 (transition 'T3 (list p3) (list p1)))
+
+(run-petri-net 0 (list p1 p2 p3) (list t1 t2 t3)
+               (lambda (places)
+                 (= (check-token p3) 0)))
+
