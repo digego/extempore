@@ -148,7 +148,8 @@ You'll also need to specify an `ALSA`_ backend for portaudio.
 
 ALSA
   To use the asound portaudio backend (the default) you'll need the
-  libasound package.
+  libasound package. This might have a slightly different name on different
+  distros, e.g. on Mint 18 it's called ``libasound2-dev``
 
 Jack
   To use the `Jack`_ portaudio backend, you'll need to have Jack
