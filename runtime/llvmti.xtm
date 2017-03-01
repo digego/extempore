@@ -4256,14 +4256,20 @@ Continue executing `body' forms until `test-expression' returns #f"
                                     (length named_ags))
                                 gtype
                                 (regex:replace-everything gtype named_gags named_ags)))
+                       ;; (lll (println 'gt2 gt2))
                        (newt (if (<> (length ags) (length gags))
                                  gt2
                                  (regex:replace-everything gt2 gags ags)))
+                       ;; (lllll (println 'newt newt))
                        (newt2 (map (lambda (x)
+                                     ;; (println 'string-type string-type 'x x)
                                      (if (regex:match? x "^[A-Za-z0-9_]*{")
-                                         (impc:ti:maximize-generic-type x)
+                                         (if (regex:match? x (string-append string-type "\\**"))
+                                             (regex:replace x "^([^{]*).+(\\*+)$" "$1$2")
+                                             (impc:ti:maximize-generic-type x))
                                          x))
                                    (impc:ir:get-pretty-tuple-arg-strings newt)))
+                       ;; (lllllllll (println 'newt2 newt2))
                        (newtype_c (apply string-append (car p) ":<" (string-join newt2 ",") ">"
                                          (make-list ptr-depth "*"))))
                   ;; (println 'maxtypeout: string-type newtype_c)
@@ -4375,15 +4381,71 @@ Continue executing `body' forms until `test-expression' returns #f"
       tv5)))
 
 
+(define impc:ti:minimize-gen-type-finalize-x
+  (lambda (lst)
+    (let* ((newl1 (car lst))
+           (newl2 (cdr lst))
+           (mem '())
+           (res (map (lambda (x y)
+                       ;; (println 'x x 'y y)
+                       (if (member x mem)
+                           #f
+                           (if (equal? x y)
+                               #f
+                               (begin                             
+                                 (set! mem (cons x mem))
+                                 y))))
+                     newl1
+                     newl2))
+           (ret (cl:remove-if (lambda (x) (not x)) res)))
+      ;; (println '>> 'new1 newl1 'new2 newl2 'res res 'mem mem 'ret ret)
+      (if (null? ret)
+          ret
+          (map (lambda (x) (impc:ir:pretty-print-type x)) ret)))))
+    
+
+(define impc:ti:minimize-gen-type-x
+  (lambda (l1 newl1 l2 newl2)
+    (if (string? l2) (set! l2 (impc:ti:get-generic-type-as-tuple l2)))
+    (if (null? l1)
+        (cons newl1 newl2)
+        (if (list? (car l1))
+            (let ((res (impc:ti:minimize-gen-type-x (car l1) '() (car l2) '())))
+              (impc:ti:minimize-gen-type-x
+               (cdr l1) (append (car res) newl1)
+               (cdr l2) (append (cdr res) newl2)))
+            (if (and (symbol? (car l1))
+                     (regex:match? (symbol->string (car l1)) "^!"))
+                (impc:ti:minimize-gen-type-x (cdr l1) (cons (car l1) newl1)
+                        (cdr l2) (cons (car l2) newl2))
+                (impc:ti:minimize-gen-type-x (cdr l1) newl1
+                                             (cdr l2) newl2))))))
+
+
+(define impc:ti:minimized-gen-type
+  (lambda (type gtype)    
+    ;; (println 'minimize-type 'type: (impc:ir:get-type-from-pretty-str type) 'gtype: (impc:ir:get-type-from-pretty-str gtype))
+    (impc:ti:minimize-gen-type-finalize-x
+     (impc:ti:minimize-gen-type-x (impc:ir:get-type-from-pretty-str gtype) '()
+                                  (impc:ir:get-type-from-pretty-str type) '()))))
+
+
+
+(define impc:ti:tuple-list-from-pretty-tuple-str
+  (lambda (str)
+    (impc:ir:get-pretty-tuple-arg-strings str)))
+
 (define impc:ti:generate-generic-type-cname
   (lambda (t gtype)
-    (let ((mint (impc:ti:minimize-generic-type t gtype)))
+    (let (;(mint (impc:ti:minimize-generic-type t gtype)))
+          (mint (impc:ti:minimized-gen-type t gtype)))
       ;; (println 'generatecname: t 'gtype gtype 'min mint)
       (for-each (lambda (x)
                   (if (string-contains? x "!")
                       (impc:compiler:print-bad-type-error t
                                                           (string-append "Could not generate type cname:" (sexpr->string mint)))))
                 mint)
+      ;; (println 'new_cname_for: 't: t 'is (string-append "<" (string-join mint ",") ">"))
       (cname-encode (string-append "<" (string-join mint ",") ">")))))
 
 
