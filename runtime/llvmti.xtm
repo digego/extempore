@@ -4382,7 +4382,8 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 
 (define impc:ti:minimize-gen-type-finalize-x
-  (lambda (lst)
+  (lambda (typevars lst)
+    ;; (println 'finalize: lst)
     (let* ((newl1 (car lst))
            (newl2 (cdr lst))
            (mem '())
@@ -4397,15 +4398,28 @@ Continue executing `body' forms until `test-expression' returns #f"
                                  y))))
                      newl1
                      newl2))
-           (ret (cl:remove-if (lambda (x) (not x)) res)))
-      ;; (println '>> 'new1 newl1 'new2 newl2 'res res 'mem mem 'ret ret)
-      (if (null? ret)
-          ret
-          (map (lambda (x) (impc:ir:pretty-print-type x)) ret)))))
+           (ret (cl:remove-if (lambda (x) (not x)) res))
+           (chk1 (if (> (length typevars) (length ret))
+                     (begin (set! typevars (cl:remove-duplicates typevars))
+                            #f)
+                     #t))                            
+           (errchk (if (<> (length ret) (length typevars))
+                       (begin (impc:compiler:print-compiler-error "Type Vars and Ret should be same length in Minimize Finalize X"
+                                                                  (list ret typevars))
+                              #f)
+                       #t))
+           (pairs (map (lambda (x y) (cons x y)) ret typevars))
+           (ps (cl:remove-duplicates pairs))
+           (result (map (lambda (p) (car p)) ps)))
+      ;; (println '>> 'new1 newl1 'new2 newl2 'res res 'mem mem 'ret ret 'typevars typevars 'result result)
+      (if (null? result)
+          result
+          (map (lambda (x) (impc:ir:pretty-print-type x)) result)))))
     
 
 (define impc:ti:minimize-gen-type-x
   (lambda (l1 newl1 l2 newl2)
+;    (println 'l1 l1 'nl1 newl1 'l2 l2 'nlw newl2)
     (if (string? l2) (set! l2 (impc:ti:get-generic-type-as-tuple l2)))
     (if (null? l1)
         (cons newl1 newl2)
@@ -4423,9 +4437,10 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 
 (define impc:ti:minimized-gen-type
-  (lambda (type gtype)    
-    ;; (println 'minimize-type 'type: (impc:ir:get-type-from-pretty-str type) 'gtype: (impc:ir:get-type-from-pretty-str gtype))
+  (lambda (type gtype)
+    ;; (println 'mingentype: type gtype)
     (impc:ti:minimize-gen-type-finalize-x
+     (map (lambda (x) (string->symbol x)) (regex:match-all gtype "\\![a-zA-Z0-9_]*"))
      (impc:ti:minimize-gen-type-x (impc:ir:get-type-from-pretty-str gtype) '()
                                   (impc:ir:get-type-from-pretty-str type) '()))))
 
@@ -4437,6 +4452,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:generate-generic-type-cname
   (lambda (t gtype)
+    ;; (println 'gentypecname: t gtype)
     (let (;(mint (impc:ti:minimize-generic-type t gtype)))
           (mint (impc:ti:minimized-gen-type t gtype)))
       ;; (println 'generatecname: t 'gtype gtype 'min mint)
@@ -4471,7 +4487,9 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; (println 'vars: vars)
     ;; (println 'all-vs: all-vs)
     ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
-    (if (and (not (null? (cdr (assoc-strcmp vs vars))))
+    ;; (println '-> (assoc-strcmp vs vars))
+    (if (and (assoc-strcmp vs vars)
+             (not (null? (cdr (assoc-strcmp vs vars))))
              (impc:ir:type? (cadr (assoc-strcmp vs vars))))
         (cadr (assoc-strcmp vs vars))
         (if (and (symbol? vs)
@@ -6035,6 +6053,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define impc:ti:reverse-set-bangs-from-reified
   (lambda (poly reified gnum vars)
     ;; (println 'reverse-bangs: poly 'gnum: gnum)
+    ;; (println 'vars vars)    
     ;; (println 'reified: reified)
     ;; (println 'pretty: (impc:ir:pretty-print-type reified))
     ;; (println 'okpretty)
@@ -6043,20 +6062,18 @@ Continue executing `body' forms until `test-expression' returns #f"
                  (not (regex:match? (symbol->string poly) "(:|{)"))))
         'done ;; we can only check reified if poly IS a list (not a reference to a list!)
         (let* ((prettyreified (impc:ir:pretty-print-type reified))
+               (sss (if (list? poly) "" (car (regex:type-split (symbol->string poly) "##"))))
+               ;; (gpolytype (if (list? poly) poly (impc:ir:get-type-from-pretty-str sss)))
+               (namedtype (impc:ir:get-type-from-str (impc:ti:get-named-type reified)))
                (gpolytype (if (list? poly) poly
-                              (impc:ir:get-type-from-pretty-str (car (regex:type-split (symbol->string poly) "##")))))
-               (namedtype (impc:ir:get-type-from-str (impc:ti:get-named-type reified))))
-               ;; (namedtype
-               ;;  (if (regex:match? prettyreified "^[A-Za-z0-9_]*{")
-               ;;      (impc:ir:get-type-from-str (impc:ir:get-type-str (impc:ti:maximize-generic-type (impc:ir:pretty-print-type reified))))
-               ;;      (impc:ir:get-type-from-str (impc:ti:get-named-type reified)))))
+                              (cons (car namedtype) (impc:ir:get-type-from-pretty-tuple
+                                        (cadr (impc:ti:split-namedtype (impc:ti:maximize-generic-type sss))))))))
           ;; (println 'poly: poly 'gnum gnum)
           ;; (println 'reified: (impc:ti:get-named-type reified))
           ;; (println 'polyt: gpolytype)
           ;; (println 'named: namedtype)
           (if (<> (length gpolytype)
                   (length namedtype))
-              ;; not sure if this error message will work properly:
               (impc:compiler:print-type-mismatch-error (list poly gpolytype) (list reified namedtype)))
           (for-each (lambda (a b)
                       ;; (println 'a: a 'b: b)
@@ -8888,6 +8905,9 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                    (impc:ir:pretty-print-type b)
                                                                                                    "##" (number->string gnum)))))))
                                                       typestrs types)))
+                                       ;; (ll (println 'new1: newsyms))
+                                       ;; (lll (println 'tstrings: typestrs))
+                                       ;; (llll  (println 'types: types))
                                        (gvars
                                         (cl:remove-duplicates
                                          (cl:remove-if-not (lambda (x)
@@ -8902,7 +8922,7 @@ xtlang's `let' syntax is the same as Scheme"
                                ((and (symbol? (car ast)) ;; this for polys
                                      (regex:match? (symbol->string (car ast)) "##") ;"\\$\\$\\$")
                                      (impc:ti:get-polyfunc-candidate-types (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$")))))
-                                ;; (println 'poly!var (car ast))
+                                ;(println 'poly!var (car ast))
                                 (set! syms (append (list (car ast)) syms))
                                 (f (cdr ast)))
                                ((member (car ast) '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
@@ -9268,6 +9288,7 @@ xtlang's `let' syntax is the same as Scheme"
            (t2 (impc:ti:mark-returns t1 symname #f #f #f))
            (t3 (impc:ti:closure:convert t2 (list symname)))
            (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
+           ;; (llllllllll (begin (println 'vars: vars) (error)))
            (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
            (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
            (typespre (impc:ti:run-type-check vars forced-types t4))
@@ -10192,7 +10213,7 @@ xtlang's `let' syntax is the same as Scheme"
                           (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
                    (impc:compiler:print-compiler-error "could not compile IR for type" ',type)))))
        ;; the next line is to help specialize any element types that may not already be specialized!
-       (map (lambda (a) (impc:ir:get-type-from-pretty-str a)) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
+       (map (lambda (a) (impc:ir:get-type-from-pretty-str a (symbol->string ',(car args)))) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
        (set! *impc:ir:get-type-callback-off* #f)
        ;; (sys:wait (now))
        ;; now compile data constructor
