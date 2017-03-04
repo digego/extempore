@@ -317,7 +317,10 @@
 
 (define impc:ir:get-type-from-pretty-str
   (lambda (string-type . args)
-    (apply impc:ir:get-type-from-pretty-str-rec string-type args)))
+    ;; (println 'pretty-string-type-in string-type)   
+    (let ((res (apply impc:ir:get-type-from-pretty-str-rec string-type args)))
+      ;; (println 'pretty-string-type string-type 'to res)
+      res)))
 
 ;; now with pretty print support
 (define impc:ir:get-type-from-pretty-str-rec
@@ -372,6 +375,7 @@
                ;; set p in case we have aliased types in args that need unaliasing!
                (set! p (list (car p) (string-append "<" (string-join ags2 ",") ">")))
                ;; (println 'postalias-p: p)
+               
                ;; (println 'kit: base 'P: p)
                ;; (println 't (cadr p))
                ;; (println 'ags: ags2)
@@ -386,6 +390,22 @@
                           ;; (type-all (regex:match-all (cadr p) "(![a-zA-Z0-9-_]*)")))
                           (gtype-all (impc:ir:get-pretty-tuple-arg-strings (symbol->string gtype)))
                           (type-all (impc:ir:get-pretty-tuple-arg-strings (cadr p))))
+
+                     ;; (if (and (not (null? args))
+                     ;;          (string? (car args))
+                     ;;          (string=? (car p) (car args)))
+                     ;;     (println 'return 'this:
+                     ;;              (cons (+ *impc:ir:tuple* (* *impc:ir:pointer* ptr-depth))
+                     ;;                    (map string->symbol (impc:ir:get-pretty-tuple-arg-strings (cadr p))))))
+
+                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                     ;; just here as a print check
+                     ;; (if (not (and (not (null? args))
+                     ;;               (string? (car args))
+                     ;;               (string=? (car p) (car args))))
+                     ;;     (println "I *think* I'm a reified type!" (car p) " with:" p " and: " args))
+                     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                     
                      ;; (println '------ 'p p 'gtype-all gtype-all)
                      ;; (println 'type-all type-all)
                      ;; (println 'hitmarck gtype-all type-all)
@@ -393,20 +413,37 @@
                      ;; (println 'pingo: (impc:ir:pointer++ (car p) ptr-depth))
                      (if (<> (length gtype-all) (length type-all))
                          (impc:compiler:print-type-mismatch-error (cadr p) gtype))
-                     (apply impc:ir:get-type-from-pretty-str-rec
-                            (impc:ir:pointer++ (car p) ptr-depth)
-                            (list (car p) (cons
-                                           (cons (car p) base)
-                                           (map (lambda (a b)
-                                                  (let ((aa (apply impc:ir:get-type-from-pretty-str-rec a args))
-                                                        (bb (apply impc:ir:get-type-from-pretty-str-rec b args)))
-                                                    ;; (println 'a a 'b b)
-                                                    ;; (println 'aa aa 'bb bb)
-                                                    ;; (println (impc:ir:type? aa) '- (impc:ir:type? bb))
-                                                    (if (impc:ir:type? aa) (set! a aa))
-                                                    (if (impc:ir:type? bb) (set! b bb))
-                                                    (cons a b)))
-                                                gtype-all type-all)))))
+                     (if (and (not (null? args))
+                              (string? (car args))
+                              (string=? (car p) (car args)))
+                         (cons (+ *impc:ir:tuple* (* *impc:ir:pointer* ptr-depth))
+                               (map string->symbol (impc:ir:get-pretty-tuple-arg-strings (cadr p))))
+                         (apply impc:ir:get-type-from-pretty-str-rec
+                                (impc:ir:pointer++ (car p) ptr-depth)
+                                (list (car p) (cons
+                                               (cons (car p) base)
+                                               (map (lambda (a b)
+                                                      ;; (println 'a a 'b b)
+                                                      (let ((aa (apply impc:ir:get-type-from-pretty-str-rec a args))
+                                                            (bb (apply impc:ir:get-type-from-pretty-str-rec b args)))
+                                                        ;; (println 'a a 'b b)
+                                                        ;; (println 'aa aa 'bb bb)
+                                                        ;; (println (impc:ir:type? aa) '- (impc:ir:type? bb))
+                                                        (if (impc:ir:type? aa) (set! a aa))
+                                                        (if (impc:ir:type? bb) (set! b bb))
+                                                        (cons a b)))
+                                                    gtype-all type-all))))))
+                   ;; (string-append "%" (car p) "_poly_"
+                   ;;                       (if (impc:ti:generictype-exists? (car p))
+                   ;;                           (impc:ti:generate-generic-type-cname
+                   ;;                            (cadr p)
+                   ;;                            (symbol->string (impc:ti:get-generictype-candidate-types (car p))))
+                   ;;                           (if (= (length p) 2)
+                   ;;                               (cname-encode (cadr p))
+                   ;;                               (cname-encode (apply string-append (cadr p)
+                   ;;                                                    (map (lambda (x) (string-append ":" x))
+                   ;;                                                         (cddr p))))))
+                   ;;                       (make-string ptr-depth #\*)))))
                    (apply impc:ir:get-type-from-pretty-str-rec ;; otherwise fully typed
                           (string-append "%" (car p) "_poly_"
                                          (if (impc:ti:generictype-exists? (car p))
@@ -423,7 +460,9 @@
             ((regex:match? base "^[A-Za-z0-9_]*\\{")
              (let* ((p (impc:ti:split-namedtype base)) ;; (regex:type-split base "{"))
                     (argstr (cadr p)) ;;(string-append "<" (substring (cadr p) 0 (- (string-length (cadr p)) 1)) ">"))
-                    (res ""))
+                    (res "")
+                    (tup (impc:ir:get-pretty-tuple-arg-strings argstr))
+                    (max (impc:ti:maximize-generic-type base)))
                ;; if base does not exist as a
                ;; (println 'base base 'p p 'argstr argstr 'args args)               
                (if (not (or (impc:ti:namedtype-exists? (car p))
@@ -431,7 +470,16 @@
                             (and (not (null? args))
                                  (string=? (car p) (car args)))))
                    (impc:compiler:print-compiler-error "Bad type in context" base))
-               (if (not (string-contains? argstr "!")) ;; if no bangs present we can reify
+               ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+               ;; just here as a print check
+               ;; (if (not (string-contains? argstr "!")) ;; if no bangs present we can reify
+               ;;     (println "I *think* I'm a reified type!" p " with:" argstr " tup:" tup 'max: max 'st: string-type))
+               ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+               ;; (println 'bingo----> p) 
+               ;; I want the follow two lines but ... :(
+               (if (not (string-contains? argstr "!")) ;; I don't what this one :( I want the next two :)
+               ;; (if (and (not (string-contains? argstr "!")) ;; if no bangs present we can reify
+               ;;          (not (regex:match? argstr "[A-Za-z0-9]*(\\}|\\>)")))
                    (set! res (apply string-append "%" (car p) "_poly_"
                                     (cname-encode argstr)
                                     ; (string-append "<" argstr ">"))
@@ -439,46 +487,57 @@
                    (let ((max (impc:ti:maximize-generic-type base)))
                      ;; (println 'MAX: max '-> base)
                      (set! max (apply string-append max (make-list ptr-depth "*")))
-                     (set! res (apply impc:ir:get-type-from-pretty-str-rec max args))))
+                     (set! res (apply impc:ir:get-type-from-pretty-str-rec max (cons (car p) args)))))
                ;; (println 'res: res 'base: base)
                (if (string? res)
-                   (apply impc:ir:get-type-from-pretty-str-rec res args)
+                   (apply impc:ir:get-type-from-pretty-str-rec res (cons (car p) args))
                    res)))
-            ((and (char=? (string-ref base 0) #\%)
-                  (impc:ti:namedtype-exists? base))
+            ((or (and (char=? (string-ref base 0) #\%)
+                      (impc:ti:namedtype-exists? base))
+                 (and (char=? (string-ref base 0) #\%)
+                      (not (null? args))
+                      (string=? (car args) base)))
              string-type)
             ((char=? (string-ref base 0) #\%)
+             ;; (println 'doingit! base 'args: args)
+             ;; (if (not (impc:ti:namedtype-exists? base))
+             ;;     (begin (println 'adding 'base base 'as 'opaque)
+             ;;            (llvm:compile-ir (string-append base " = type opaque"))))
              (let* ((name1 (substring base 1 (string-length base)))
                     (p1 (regex:type-split name1 "_poly_"))
                     (name (car p1))
                     (encoding (cadr p1))
                     (t1a (cname-decode encoding))
-                    (t1 (if (impc:ti:generictype-exists? name)
+                    (t1b (if (impc:ti:generictype-exists? name)
                             (cadr (impc:ti:split-namedtype
                                    (impc:ti:maximize-generic-type
                                     (string-append name "{" (substring t1a 1 (- (string-length t1a) 1)) "}"))))
                             t1a))
+                    (t1 (regex:replace-all t1b (string-append name "(?!_)") base))
+                    ;; (llllllll (println 't1a t1a 't1b t1b 't1 t1))
                     (t2 (impc:ir:get-pretty-tuple-arg-strings t1))
+                    ;; (llllllllll (println 't2 t2))
                     (t3 (map (lambda (k)
+                               ;; (println 'k: k (impc:ir:get-base-type k) 'name name 'name1 name1)
                                (if (string=? (impc:ir:get-base-type k) name)
                                    (string-append "%" name1
                                                   (make-string (impc:ir:get-ptr-depth k) #\*))
-                                   (impc:ir:get-type-str (apply impc:ir:get-type-from-pretty-str-rec k args))))
+                                   (impc:ir:get-type-str (apply impc:ir:get-type-from-pretty-str-rec k (cons base args)))))
                              t2))
                     (t4 (string-append "{ " (string-join t3 ", ") " }"))
+                    ;; (t5 (map (lambda (k) (impc:ir:get-type-from-str k)) t3))
                     (type t4))
-               ;; (println 'name1 name1 't1a t1a 't1 t1 't2 t2)
-               (if (apply impc:ir:get-type-from-pretty-str-rec t1 args)
-                   (begin
-                     ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
+               ;; (println 'name1 name1 't1 t1 't2 t2 't3 t3 't4 t4 'type type)
+                     (println 'make-new-type: (string-append "%" name1 " = type " type))
+                     ;; (llvm:compile-ir (string-append "%" name1 " = type " type))
                      (if (llvm:compile-ir (string-append "%" name1 " = type " type))
                          (impc:ti:register-new-namedtype name1 (impc:ir:get-type-from-str type) "")
                          (impc:compiler:print-compiler-error "could not compile new type" (cons name type)))
                      (if *impc:ir:get-type-callback-off*
                          (impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t)
                          (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t))
-                     string-type)
-                   (error ""))))
+                     string-type))
+                   ;; (error ""))))
             ((impc:ti:bang-type? base) (string->symbol base))
             ((or (impc:ti:get-generictype-candidate-types base)
                  (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
@@ -694,13 +753,14 @@
             ((regex:match? base "^\\[.*x.*\\]\\**$")
              (cons (+ offset *impc:ir:array*) (impc:ir:get-array-type-from-str string-type)))
             ((char=? (string-ref base 0) #\%)
-             (if (impc:ti:namedtype-exists? (substring base 1 (string-length base)))
-                 string-type
-                 (if (string-contains? string-type "_poly_")
-                     (if (impc:ti:spec-new-type? string-type)
-                         string-type
-                         (impc:compiler:print-bad-type-error string-type "Poly type not yet instantiated??"))
-                     (impc:compiler:print-bad-type-error string-type "Named Type Does not EXisT!"))))
+             string-type)
+             ;; (if (impc:ti:namedtype-exists? (substring base 1 (string-length base)))
+             ;;     string-type
+             ;;     (if (string-contains? string-type "_poly_")
+             ;;         (if (impc:ti:spec-new-type? string-type)
+             ;;             string-type
+             ;;             (impc:compiler:print-bad-type-error string-type "Poly type not yet instantiated??"))
+             ;;         (impc:compiler:print-bad-type-error string-type "Named Type Does not EXisT!"))))
             ((assoc-strcmp (string->symbol string-type) *impc:ti:generic-type-mappings*)
              (impc:ir:get-type-from-str (cdr (assoc-strcmp (string->symbol string-type) *impc:ti:generic-type-mappings*))))
             ;; ((regex:match? string-type "##") string-type)
