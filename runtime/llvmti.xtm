@@ -4422,7 +4422,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;    (println 'l1 l1 'nl1 newl1 'l2 l2 'nlw newl2)
     (if (string? l2) (set! l2 (impc:ti:get-generic-type-as-tuple l2)))
     (if (null? l1)
-        (cons newl1 newl2)
+        (cons (reverse newl1) (reverse newl2))
         (if (list? (car l1))
             (let ((res (impc:ti:minimize-gen-type-x (car l1) '() (car l2) '())))
               (impc:ti:minimize-gen-type-x
@@ -4552,6 +4552,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                   (let* ((base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
                          ;; (newname (string-append base "_poly_" (cname-encode t1)))
                          (newname (string-append base "_poly_" (impc:ti:generate-generic-type-cname t1 gtype)))
+                         (max (impc:ti:maximize-generic-type (impc:ir:pretty-print-type (string-append "%" newname))))
                          (newtype1 t1) ;;(regex:replace t2 (string-append base "([^-][^-])") (string-append newname "$1")))
                          (newtype2 (cons 14 (map (lambda (x)
                                                    (if (string? (impc:ir:get-type-from-pretty-str x))

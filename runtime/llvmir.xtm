@@ -374,8 +374,8 @@
                ;; (println 'prealias-p: p)
                ;; set p in case we have aliased types in args that need unaliasing!
                (set! p (list (car p) (string-append "<" (string-join ags2 ",") ">")))
+
                ;; (println 'postalias-p: p)
-               
                ;; (println 'kit: base 'P: p)
                ;; (println 't (cadr p))
                ;; (println 'ags: ags2)
@@ -507,14 +507,26 @@
                     (p1 (regex:type-split name1 "_poly_"))
                     (name (car p1))
                     (encoding (cadr p1))
-                    (t1a (cname-decode encoding))
+                    (t1aa (cname-decode encoding))
+                    (t1a (string-append
+                           "<" (string-join
+                                (map (lambda (x)
+                                       ;; (println 'testx: x (string-append "^" (car p1) "\\{"))
+                                       (if (regex:match? x (string-append "^" (car p1) "\\{"))
+                                           (impc:ir:get-type-from-pretty-str x)
+                                           x))
+                                     (impc:ir:get-pretty-tuple-arg-strings t1aa))
+                                ",")
+                           ">"))
+                    ;; (ll (println 't1aa: t1aa))
                     (t1b (if (impc:ti:generictype-exists? name)
-                            (cadr (impc:ti:split-namedtype
-                                   (impc:ti:maximize-generic-type
-                                    (string-append name "{" (substring t1a 1 (- (string-length t1a) 1)) "}"))))
-                            t1a))
-                    (t1 (regex:replace-all t1b (string-append name "(?!_)") base))
-                    ;; (llllllll (println 't1a t1a 't1b t1b 't1 t1))
+                             (cadr (impc:ti:split-namedtype
+                                    (impc:ti:maximize-generic-type
+                                     (string-append name "{" (substring t1a 1 (- (string-length t1a) 1)) "}"))))
+                             t1a))
+                    ;; (t1 (regex:replace-all t1b (string-append name "(?!_)") base))
+                    (t1 (regex:replace-all t1b (string-append name "([*\\]>,])") (string-append base "$1")))
+                    ;; (llllllll (println 'encoding encoding 't1a t1a 't1aa t1aa 't1b t1b 't1 t1))
                     (t2 (impc:ir:get-pretty-tuple-arg-strings t1))
                     ;; (llllllllll (println 't2 t2))
                     (t3 (map (lambda (k)
@@ -528,7 +540,7 @@
                     ;; (t5 (map (lambda (k) (impc:ir:get-type-from-str k)) t3))
                     (type t4))
                ;; (println 'name1 name1 't1 t1 't2 t2 't3 t3 't4 t4 'type type)
-                     (println 'make-new-type: (string-append "%" name1 " = type " type))
+                     ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
                      ;; (llvm:compile-ir (string-append "%" name1 " = type " type))
                      (if (llvm:compile-ir (string-append "%" name1 " = type " type))
                          (impc:ti:register-new-namedtype name1 (impc:ir:get-type-from-str type) "")
