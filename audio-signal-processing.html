@@ -196,7 +196,7 @@ signature) to be the audio output &#8216;sink&#8217;. The values returned by thi
 function are sent directly to the audio driver and output as sound
 through the computer speakers. Every audio sample (that is, at a rate
 of 44100Hz) this function is called with a few arguments:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
     <span class="p">(</span><span class="nf">*</span> <span class="nv">.1</span> <span class="p">(</span><span class="nf">sin</span> <span class="p">(</span><span class="nf">/</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="mf">3.1415</span>               <span class="c1">;; 2pi(ish)</span>
                      <span class="mf">440.0</span>                    <span class="c1">;; frequency (Hz)</span>
@@ -220,7 +220,7 @@ channels.</li>
 the <code class="docutils literal"><span class="pre">dsp</span></code> function.</li>
 </ul>
 <p>By default, the type of <code class="docutils literal"><span class="pre">SAMPLE</span></code> is <code class="docutils literal"><span class="pre">float</span></code>, it&#8217;s just a type alias:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">SAMPLE</span> <span class="nv">float</span><span class="p">)</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">SAMPLE</span> <span class="nv">float</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>but it can also be <code class="docutils literal"><span class="pre">double</span></code> (if <code class="docutils literal"><span class="pre">SAMPLE</span></code> was an alias to <code class="docutils literal"><span class="pre">double</span></code>).</p>
@@ -231,7 +231,7 @@ the <code class="docutils literal"><span class="pre">dsp</span></code> function.
 is that like all functions in Extempore, this <code class="docutils literal"><span class="pre">dsp</span></code> function can be
 redefined on-the-fly, as long as the type signature stays the same. So,
 if I change the <code class="docutils literal"><span class="pre">dsp</span></code> function to</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
     <span class="p">(</span><span class="nf">*</span> <span class="mf">0.1</span> <span class="p">(</span><span class="k">convert</span> <span class="p">(</span><span class="nf">random</span><span class="p">)</span> <span class="nv">SAMPLE</span><span class="p">))))</span>
 </pre></div>
@@ -245,7 +245,7 @@ language, it&#8217;s all mixed in together.</p>
 <div class="section" id="abstraction-and-higher-order-functions">
 <h2>Abstraction and higher-order functions<a class="headerlink" href="#abstraction-and-higher-order-functions" title="Permalink to this headline">¶</a></h2>
 <p>Let&#8217;s create some oscillators:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">phase</span><span class="p">)</span>
     <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">amp</span> <span class="nv">freq</span><span class="kt">:SAMPLE</span><span class="p">)</span>
       <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">incr</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="mf">3.1415</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">freq</span> <span class="mi">44100</span><span class="nv">.</span><span class="p">))))</span>
@@ -259,7 +259,7 @@ and takes an amplitude and a phase argument. This idiom is a useful one,
 and comes up so much in xtlang code that by convention we give any
 closure which returns another closure a <code class="docutils literal"><span class="pre">_c</span></code> suffix.</p>
 <p>The type message printed by the compiler when we evaluate <code class="docutils literal"><span class="pre">osc_c</span></code> is:</p>
-<div class="highlight-default"><div class="highlight"><pre>Compiled osc_c &gt;&gt;&gt; [[float,float,float]*,float]*``
+<div class="highlight-default"><div class="highlight"><pre><span></span>Compiled osc_c &gt;&gt;&gt; [[float,float,float]*,float]*``
 </pre></div>
 </div>
 <p>See that the return type of the <code class="docutils literal"><span class="pre">osc_c</span></code> function is
@@ -267,7 +267,7 @@ closure which returns another closure a <code class="docutils literal"><span cla
 <code class="docutils literal"><span class="pre">float</span></code> arguments and returns a <code class="docutils literal"><span class="pre">float</span></code>. This is our oscillator,
 and we can use our <code class="docutils literal"><span class="pre">osc_c</span></code> function to create as many oscillators as
 we need:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span>
   <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc1</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">osc2</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">)))</span>
     <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:float</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">channel</span><span class="kt">:i64</span> <span class="nv">data</span><span class="kt">:float*</span><span class="p">)</span>
@@ -303,7 +303,7 @@ from first principles to show how it all works.</p>
 <p>Playing a single sine tone is boring. Now, instead of just using the
 <em>one</em> oscillator, let&#8217;s use a few of them to generate a whole bunch of
 sine tones of different frequencies:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span> <span class="c1">; osc_c is the same as last time</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">osc_c</span> <span class="c1">; osc_c is the same as last time</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">phase</span><span class="p">)</span>
     <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">amp</span> <span class="nv">freq</span><span class="p">)</span>
       <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">inc</span><span class="kt">:SAMPLE</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">3.141592</span> <span class="p">(</span><span class="nf">*</span> <span class="mf">2.0</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">freq</span> <span class="mf">44100.0</span><span class="p">)))))</span>
@@ -349,7 +349,7 @@ Syntactically, tuples use angle brackets (<code class="docutils literal"><span c
 <p>When programming in xtlang you don&#8217;t really ever deal with tuples
 directly&#8212;you deal with them by <em>reference</em> through pointers. There are
 no &#8216;literals&#8217; for tuples either&#8212;you can&#8217;t just go</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
     <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;</span> <span class="kt">&lt;a,a&gt;</span><span class="p">))</span>
       <span class="nv">tup</span><span class="p">)))</span>
@@ -359,7 +359,7 @@ no &#8216;literals&#8217; for tuples either&#8212;you can&#8217;t just go</p>
 </div>
 <p>Instead, this time in the <code class="docutils literal"><span class="pre">let</span></code> we get a pointer to a tuple through a
 call to <code class="docutils literal"><span class="pre">alloc</span></code>.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">tuple_maker</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
     <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span><span class="kt">:&lt;i64,i64&gt;*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">)))</span>
       <span class="p">(</span><span class="nf">tset!</span> <span class="nv">tup</span> <span class="mi">0</span> <span class="nv">a</span><span class="p">)</span>
@@ -383,7 +383,7 @@ one <code class="docutils literal"><span class="pre">i64</span></code> argument 
 values.</p>
 <p>Just to check that everything&#8217;s working properly, let&#8217;s write a little
 <code class="docutils literal"><span class="pre">test</span></code> function</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">test</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">test</span>
     <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">a</span><span class="kt">:i64</span><span class="p">)</span>
       <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">tup</span> <span class="p">(</span><span class="nf">tuple</span><span class="nv">_maker</span> <span class="nv">a</span><span class="p">)))</span>
         <span class="p">(</span><span class="nf">printf</span> <span class="s">&quot;&lt;%d,%d&gt;\n&quot;</span>
@@ -397,7 +397,7 @@ values.</p>
 <p>Tuples come in handy in lots of places, for instance we can use them to
 rewrite one of the <code class="docutils literal"><span class="pre">dsp</span></code> functions from earlier (the one with the
 three oscs)</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">osc_t</span> <span class="kt">[SAMPLE,SAMPLE,SAMPLE]*</span><span class="p">)</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-alias</span> <span class="nf">osc_t</span> <span class="kt">[SAMPLE,SAMPLE,SAMPLE]*</span><span class="p">)</span>
 
 <span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
   <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_tuple</span><span class="kt">:&lt;osc_t,osc_t,osc_t&gt;*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">)))</span>
@@ -441,7 +441,7 @@ let&#8217;s create a <code class="docutils literal"><span class="pre">dsp</span>
 do some additive synthesis. We&#8217;ll make an array <code class="docutils literal"><span class="pre">osc_array</span></code>, and then
 two more arrays (<code class="docutils literal"><span class="pre">amp_array</span></code> and <code class="docutils literal"><span class="pre">freq_array</span></code>) to keep track of the
 amplitude and frequency values.</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
   <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_array</span><span class="kt">:|30,[SAMPLE,SAMPLE,SAMPLE]*|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">amp_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">freq_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
@@ -489,7 +489,7 @@ most musical results, so it&#8217;s a good idea to choose them in some sort of
 systematic way. In our last example, we&#8217;ll play only the <em>even</em>
 harmonics of a given base frequency (I&#8217;ve also simplified the output to
 one channel for clarity).</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">dsp</span><span class="kt">:DSP</span>
   <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">osc_array</span><span class="kt">:|30,[SAMPLE,SAMPLE,SAMPLE]*|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">amp_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">freq_array</span><span class="kt">:|30,SAMPLE|*</span> <span class="p">(</span><span class="nf">alloc</span><span class="p">))</span>
@@ -500,7 +500,7 @@ one channel for clarity).</p>
       <span class="p">(</span><span class="nf">aset!</span> <span class="nv">osc_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nv">osc_c</span> <span class="mf">0.0</span><span class="p">))</span>
       <span class="p">(</span><span class="nf">aset!</span> <span class="nv">amp_array</span>
              <span class="nv">i</span>
-             <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">/</span> <span class="nv">i</span> <span class="mi">2</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>
+             <span class="p">(</span><span class="k">if</span> <span class="p">(</span><span class="nf">=</span> <span class="p">(</span><span class="nf">modulo</span> <span class="nv">i</span> <span class="mi">2</span><span class="p">)</span> <span class="mi">0</span><span class="p">)</span>
                  <span class="mf">0.3</span>
                  <span class="mf">0.0</span><span class="p">))</span>
       <span class="p">(</span><span class="nf">aset!</span> <span class="nv">freq_array</span> <span class="nv">i</span> <span class="p">(</span><span class="nf">*</span> <span class="p">(</span><span class="k">convert</span> <span class="p">(</span><span class="nf">+</span> <span class="nv">i</span> <span class="mi">1</span><span class="p">)</span> <span class="nv">SAMPLE</span><span class="p">)</span> <span class="nv">base_freq</span><span class="p">)))</span>
@@ -557,7 +557,7 @@ arguments, and returns another closure which takes four arguments:</p>
 also be <code class="docutils literal"><span class="pre">double</span></code>.</p>
 <p>The <em>returned</em> closure will be called to provide the basic audio signal
 for the note, so that&#8217;s where we put our code to generate the saw wave</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/instruments.xtm&quot;</span><span class="p">)</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="nv">sys:load</span> <span class="s">&quot;libs/core/instruments.xtm&quot;</span><span class="p">)</span>
 
 <span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_note_c</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">data</span><span class="kt">:NoteInitData*</span> <span class="nv">nargs</span><span class="kt">:i64</span> <span class="nv">dargs</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
@@ -586,7 +586,7 @@ argument will range from <code class="docutils literal"><span class="pre">0</spa
 for the nth output channel (the number of output channels you have will
 depend on your audio device). It&#8217;s therefore easy to generalise our note
 kernel to multiple channels, so let&#8217;s make it a stereo note kernel</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_note_c</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_note_c</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">data</span><span class="kt">:NoteInitData*</span> <span class="nv">nargs</span><span class="kt">:i64</span> <span class="nv">dargs</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
     <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">sawl</span> <span class="p">(</span><span class="nv">saw_c</span> <span class="mi">0</span><span class="nv">.</span><span class="p">))</span>
           <span class="p">(</span><span class="nv">sawr</span> <span class="p">(</span><span class="nv">saw_c</span> <span class="mi">0</span><span class="nv">.</span><span class="p">)))</span>
@@ -614,7 +614,7 @@ And that&#8217;s where the <strong>fx closure</strong> comes in.</p>
 which represents the (dry) input signal that you want to process. It
 <em>is</em> necessary to have an fx closure in your Extempore instrument,
 although it may just pass its input through untouched:</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span>
   <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
     <span class="nv">in</span><span class="p">))</span>
 
@@ -623,7 +623,7 @@ although it may just pass its input through untouched:</p>
 </pre></div>
 </div>
 <p>Let&#8217;s add a stereo delay to make things a bit more interesting</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span> <span class="mi">200000</span> <span class="c1">;; extra memory for the delay lines</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="k">bind-func</span> <span class="nf">saw_synth_fx</span> <span class="mi">200000</span> <span class="c1">;; extra memory for the delay lines</span>
   <span class="p">(</span><span class="k">let</span> <span class="p">((</span><span class="nv">delayl</span> <span class="p">(</span><span class="nv">delay_c</span> <span class="mi">22050</span><span class="p">))</span>
         <span class="p">(</span><span class="nv">delayr</span> <span class="p">(</span><span class="nv">delay_c</span> <span class="mi">22050</span><span class="p">)))</span>
     <span class="p">(</span><span class="k">lambda</span> <span class="p">(</span><span class="nv">in</span><span class="kt">:SAMPLE</span> <span class="nv">time</span><span class="kt">:i64</span> <span class="nv">chan</span><span class="kt">:i64</span> <span class="nv">dat</span><span class="kt">:SAMPLE*</span><span class="p">)</span>
@@ -642,14 +642,14 @@ although it may just pass its input through untouched:</p>
 <h2>Putting it all together<a class="headerlink" href="#putting-it-all-together" title="Permalink to this headline">¶</a></h2>
 <p>Finally, to complete the instrument, we use a special
 <code class="docutils literal"><span class="pre">bind-instrument</span></code> macro</p>
-<div class="highlight-extempore"><div class="highlight"><pre><span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">saw_synth</span> <span class="nv">saw_synth_note_c</span> <span class="nv">saw_synth_fx</span><span class="p">)</span>
+<div class="highlight-extempore"><div class="highlight"><pre><span></span><span class="p">(</span><span class="nv">bind-instrument</span> <span class="nv">saw_synth</span> <span class="nv">saw_synth_note_c</span> <span class="nv">saw_synth_fx</span><span class="p">)</span>
 </pre></div>
 </div>
 <img alt="_images/whole-instrument.png" src="_images/whole-instrument.png" />
 <p>As long as your kernel (<code class="docutils literal"><span class="pre">saw_synth_note_c</span></code>) and fx (<code class="docutils literal"><span class="pre">saw_synth_fx</span></code>)
 closures have the right signature, then evaluating the above line should
 print for you</p>
-<div class="code bash highlight-default"><div class="highlight"><pre><span class="n">Compiled</span> <span class="n">saw_synth</span> <span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="nb">float</span><span class="p">,</span><span class="nb">float</span><span class="p">,</span><span class="n">i64</span><span class="p">,</span><span class="n">i64</span><span class="p">,</span><span class="nb">float</span><span class="o">*</span><span class="p">]</span><span class="o">*</span>
+<div class="code bash highlight-default"><div class="highlight"><pre><span></span><span class="n">Compiled</span> <span class="n">saw_synth</span> <span class="o">&gt;&gt;&gt;</span> <span class="p">[</span><span class="nb">float</span><span class="p">,</span><span class="nb">float</span><span class="p">,</span><span class="n">i64</span><span class="p">,</span><span class="n">i64</span><span class="p">,</span><span class="nb">float</span><span class="o">*</span><span class="p">]</span><span class="o">*</span>
 </pre></div>
 </div>
 <p>and now the instrument is ready to play.</p>
