@@ -197,30 +197,12 @@ tricky to add if you know a bit about how ST2 works.
 Vim
 ---
 
-Extempore's `vim`_ plugin can be found in the ``extras/`` subdirectory.
-The plugin uses python to get the job done, so it won't work in ``vi``.
-To install it, you can either ``:source`` it each time, or put it in
-your vim plugin directory (probably a better option if you're going to
-be using it often).
+Extempore's `vim plugin`_ is maintained by Tim Burgess.
 
-.. _vim: http://www.vim.org/
+.. _vim: https://github.com/timburgess/extempore.vim
 
-The ``extempore.vim`` plugin file has a full list of the commands up the
-top, but the most important ones (and their default keybindings) are:
-
--  ``ExtemporeOpenConnection`` (``<Leader>o``) connect this vim session
-   to a running Extempore process
--  ``ExtemporeCloseConnection`` (``<Leader>O``) close the connection
--  ``ExtemporeSendEnclosingBlock`` (``<Leader>w``) send the current
-   (i.e. where the cursor is) definition to Extempore
--  ``ExtemporeSendSelection`` (``<Leader>s``) send the current selection
-   to Extempore
--  ``ExtemporeSendEntireFile`` (``<Leader>a``) send the current file to
-   Extempore
-
-Remember to have your terminal (where Extempore is running) somewhere
-you can see it, since Extempore's ``stdout`` will show up there (and not
-in vim).
+Remember to have your terminal (where Extempore is running) somewhere you can
+see it, since Extempore's ``stdout`` will show up there (and not in vim).
 
 Writing Extempore code
 ^^^^^^^^^^^^^^^^^^^^^^
