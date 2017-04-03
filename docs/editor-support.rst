@@ -199,7 +199,7 @@ Vim
 
 Extempore's `vim plugin`_ is maintained by Tim Burgess.
 
-.. _vim: https://github.com/timburgess/extempore.vim
+.. _vim plugin: https://github.com/timburgess/extempore.vim
 
 Remember to have your terminal (where Extempore is running) somewhere you can
 see it, since Extempore's ``stdout`` will show up there (and not in vim).
