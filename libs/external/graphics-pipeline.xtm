@@ -692,7 +692,7 @@
           (glUniform1i (glGetUniformLocation (id shader) "projectionTexture") textureUnit)
           (glUniform1f (glGetUniformLocation (id shader) "projectionTextureWeight") PROJECTION_TEXTURE_WEIGHT))
         (begin
-          (bind texture #f textureUnit)
+          (bind texture textureUnit)
           (glUniform1f (glGetUniformLocation (id shader) "projectionTextureWeight") PROJECTION_TEXTURE_WEIGHT)
           (glUniform1i (glGetUniformLocation (id shader) "isProjectionTextured") 1)
           (glUniform1i (glGetUniformLocation (id shader) "projectionTexture") textureUnit)))
@@ -711,7 +711,7 @@
           (glUniform1i (glGetUniformLocation (id shader) "envMap") textureUnit)          
           void)
         (begin
-          (bind_cube texture #f textureUnit)
+          (bind_cube texture textureUnit)
           (glUniform1i (glGetUniformLocation (id shader) "isEnvMapped") 1)
           (glUniform1f (glGetUniformLocation (id shader) "envMapWeight") ENV_MAP_WEIGHT)
           (glUniform1i (glGetUniformLocation (id shader) "envMap") textureUnit)
@@ -1047,7 +1047,7 @@
       (if (> blendmode 0)
           (begin (glEnable GL_BLEND)
                  (glBlendFunc GL_SRC_COLOR GL_ONE_MINUS_SRC_COLOR)))          
-      (if (not (null? tex)) (bind tex #t 1:i32))
+      (if (not (null? tex)) (bind tex 1:i32))
       (shader_prepare_draw shader tex 0 (if (and (not (null? tex)) (= type GL_POINTS)) #t #f))
       (draw vao type 0 elmts 0)
       (if (not (null? tex)) (unbind tex 1:i32))
@@ -1105,7 +1105,7 @@
             (specular (tref mesh 4))
             (emissive (tref mesh 5))
             (shininess (tref mesh 6))
-            (facemode (tref mesh 8)))        
+            (facemode (tref mesh 8)))
         ;; (set! shininess (dtof 100.0))
         (if (not (null? ambient))
             (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 ambient))
@@ -1125,7 +1125,7 @@
         ;; texture stuff
         (if (> (id texture) 0)
             (begin
-              (bind texture #t 1)
+              (bind texture 1)
               (glUniform1i (glGetUniformLocation (id shader) "isTextured") 1)
               (glUniform1i (glGetUniformLocation (id shader) "diffuseTexture") 1))
             (begin
@@ -1137,8 +1137,10 @@
                  (<> (ptrtoi64 (cast instancesvbo i8*))
                      (ptrtoi64 (cast vbo i8*))))
             (begin
-              (set_attribute vao vbo 4 16 20 0 #t)
-              (set_attribute vao vbo 8 4  20 16 #t)))
+              (set_attribute vao vbo 4 16  36 0 #t)
+              (set_attribute vao vbo 8 4   36 16 #t)
+              (set_attribute vao vbo 9 16  36 20 #t)
+              ))
         (gl_print_error "Error setting instance attrib in xtm_draw_mesh")
         ;; (println "instances" instances)
         (if (> instances 0)
@@ -1320,10 +1322,11 @@
 (bind-func xtm_draw_tex
   (let ((idmat:float* (alloc 16)))
     (fill_identity_matrix idmat)
-    (lambda (shader:ShaderProgram* tex:Texture* uvmat update alpha m v p)
+    (lambda (shader:ShaderProgram* tex:Texture* uvmat update:i1 alpha m v p)
       (start shader)
       (shader_update_matrices shader m v p)
-      (bind tex update 0)
+      (if update (update tex))
+      (bind tex 0)
       ;; (glEnable GL_BLEND) ;; alpha blending
       ;; (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)     
       (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)
@@ -1543,8 +1546,9 @@
     (set! SKY_BOX_MODEL model)
     (set! SKY_BOX_TEXTURE (Texture))
     (load_cube_data SKY_BOX_TEXTURE (i1toi32 flipped) front back top bottom left right)
-    (bind_cube SKY_BOX_TEXTURE #t 0) ;; send data to card
-    (unbind_cube SKY_BOX_TEXTURE 0)
+    (update_cube SKY_BOX_TEXTURE)
+    ;; (bind_cube SKY_BOX_TEXTURE #t 0) ;; send data to card
+    ;; (unbind_cube SKY_BOX_TEXTURE 0)
     (set! SKY_BOX #t)
     void))
 
@@ -1560,7 +1564,7 @@
        (pref camera_pos 0) (pref camera_pos 1) (pref camera_pos 2) ;; position
        SKY_BOX_SCALE SKY_BOX_SCALE SKY_BOX_SCALE)                  ;; scale
       (shader_update_matrices shader model view projection)
-      (bind_cube SKY_BOX_TEXTURE #f 0) ;; update off (sky never changes!)
+      (bind_cube SKY_BOX_TEXTURE 0) ;; update off (sky never changes!)
       (glUniform1i (glGetUniformLocation (id shader) "tex1") 0)
       (xtm_draw_model SKY_BOX_MODEL shader model view projection)
       (unbind_cube SKY_BOX_TEXTURE 0)
@@ -1582,8 +1586,7 @@
   (lambda (flipped:i1 filename:String*)
     (set! PROJECTION_TEXTURE (Texture))
     (load_data PROJECTION_TEXTURE (i1toi32 flipped) filename)
-    (bind PROJECTION_TEXTURE #t 3) ;; send data to card
-    (unbind PROJECTION_TEXTURE 3)
+    (update PROJECTION_TEXTURE) ;; send data to card
     (set! PROJECTION_TEXTURE_ON #t)
     (set! PROJECTION_TEXTURE_WEIGHT 0.5:f)    
     void))
@@ -1606,8 +1609,9 @@
   (lambda (flipped:i1 front:String* back:String* top:String* bottom:String* left:String* right:String*)
     (set! ENV_MAP_TEXTURE (Texture))
     (load_cube_data ENV_MAP_TEXTURE (i1toi32 flipped) front back top bottom left right)
-    (bind_cube ENV_MAP_TEXTURE #t 2) ;; send data to card
-    (unbind_cube SKY_BOX_TEXTURE 2)
+    (update_cube ENV_MAP_TEXTURE) ;; send data to card
+    ;; (bind_cube ENV_MAP_TEXTURE #t 2) ;; send data to card
+    ;; (unbind_cube SKY_BOX_TEXTURE 2)
     (set! ENV_MAP #t)
     (set! ENV_MAP_WEIGHT 1.0:f)
     void))
@@ -1690,9 +1694,9 @@
         (glDisable GL_DEPTH_TEST)
         (start shader)
         (shader_update_matrices shader model view projection)
-        (bind (depth_tex fbo) #f 0)        
+        (bind (depth_tex fbo) 0)        
         (glUniform1i (glGetUniformLocation (id shader) "bgl_DepthTexture") 0)
-        (bind (colour_tex fbo) #f 2)        
+        (bind (colour_tex fbo) 2)        
         (glUniform1i (glGetUniformLocation (id shader) "bgl_RenderedTexture") 2)
         (glUniform1f (glGetUniformLocation (id shader) "znear") xtm_render_near)
         (glUniform1f (glGetUniformLocation (id shader) "zfar") xtm_render_far)
@@ -1889,7 +1893,7 @@
       (set! sh2 xtm_render_light_shader)
       (start sh2) ;; start program
       (bind render_fbo) ;; bind fbo
-      (bind (depth_tex shadow_fbo) #f 0) ;; bind shadow texture (texunit 0)
+      (bind (depth_tex shadow_fbo) 0) ;; bind shadow texture (texunit 0)
       (glUniform1i (glGetUniformLocation (id sh2) "shadowMap") 0) 
       (if ENV_MAP ;; env map bound to texture unit 4
           (shader_update_envmap sh2 2 ENV_MAP_TEXTURE)

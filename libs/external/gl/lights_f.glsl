@@ -95,7 +95,7 @@ float calcShadow(int idx) {
 }
 
 vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
-  vec3 reflected, tmp;
+  vec3 reflected, tmp1, tmp2;
   vec3 LL = normalize(L[idx]); // light vector
   vec4 outcolor, ambient, diffuse, specular, texcolour, emissive;
   vec3 HV = normalize(LL+EE); // half vector
@@ -131,8 +131,9 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     //reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
     //outcolor += vec4(texture(projectionTexture,reflected.xy).xyz * projectionTextureWeight, outcolor.a);
     //UVWCoordProjectionTexture
-    tmp = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
-    outcolor += vec4(texture(projectionTexture,tmp.xy).xyz * projectionTextureWeight, outcolor.a);      
+    tmp1 = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
+    tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
+    outcolor += vec4(texture(projectionTexture,tmp2.xy).xyz * projectionTextureWeight, outcolor.a);
     }
   
   return outcolor;
@@ -201,7 +202,7 @@ void main()
     outcolour /= float(numLights);
   }
 
-  if(isProjectionTextured > 0) {
+  if((isProjectionTextured > 0) && (numLights < 1)) {
       tmp1 = projCoord.xyz; //projCoord.z; //vec3((projCoord.x * 2.0)+1.0,(projCoord.y * 2.0)+1.0,projCoord.z);    
       tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
       outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);

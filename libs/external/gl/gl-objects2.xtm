@@ -693,72 +693,75 @@
 
 ;; methods
 
+(bind-func update_cube
+  (lambda (tex:Texture*)
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_CUBE_MAP (id tex))
+    (gl_print_error "error binding texture cube data")        
+    ;; front
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 0)))
+    ;; back
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 1)))
+    ;; top
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 2)))
+    ;; bottom
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 3)))
+    ;; left
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 4)))
+    ;; right
+    (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex)        ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (pref-ptr (data tex) (* (width tex) (height tex) 4 5)))
+    (glBindTexture GL_TEXTURE_CUBE_MAP 0)
+    (gl_print_error "could not update cube!")
+    void))
+
 (bind-func bind_cube
-  (lambda (tex:Texture* newdata:i1 active:i32)
+  (lambda (tex:Texture* active:i32)
     ;; (println "start bind cube")
     (glActiveTexture (+ GL_TEXTURE0 active))
     (glBindTexture GL_TEXTURE_CUBE_MAP (id tex))
-    ;; (println "new data?" newdata)
     (gl_print_error "error binding texture cube data")    
-    (if newdata
-        (begin
-          (gl_print_error "error binding texture cube data hmmmmm")
-          ;; front
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 0)))
-          (gl_print_error "ok we have an error here")
-          ;; back
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 1)))
-          ;; top
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 2)))
-          ;; bottom
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 3)))
-          ;; left
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 4)))
-          ;; right
-          (glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0
-                        (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                        (width tex)
-                        (height tex)
-                        0
-                        (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                        GL_UNSIGNED_BYTE
-                        (pref-ptr (data tex) (* (width tex) (height tex) 4 5)))))    
-    (gl_print_error "couldn't load new texture cube data")
     (cond ((or (= (type tex) GL_RGBA)
                (= (type tex) GL_BGRA))
            (begin
@@ -774,21 +777,26 @@
     (gl_print_error "error setting tex cube parameters")
     (id tex)))
 
+(bind-func update
+  (lambda (tex:Texture*)
+    (glActiveTexture GL_TEXTURE0)
+    (glBindTexture GL_TEXTURE_2D (id tex))
+    (glTexImage2D GL_TEXTURE_2D 0
+                  (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
+                  (width tex)
+                  (height tex)
+                  0
+                  (type tex) ;; this is external type (i.e. conversion from external to internal required)
+                  GL_UNSIGNED_BYTE
+                  (data tex))
+    (glBindTexture GL_TEXTURE_2D 0)
+    (gl_print_error "couldn't update texture")
+    void))
 
 (bind-func bind
-  (lambda (tex:Texture* newdata:i1 active:i32)
-    (glActiveTexture (+ GL_TEXTURE0 active))
+  (lambda (tex:Texture* unit:i32)
+    (glActiveTexture (+ GL_TEXTURE0 unit))
     (glBindTexture GL_TEXTURE_2D (id tex))
-    (if newdata
-        (glTexImage2D GL_TEXTURE_2D 0
-                      (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
-                      (width tex)
-                      (height tex)
-                      0
-                      (type tex)        ;; this is external type (i.e. conversion from external to internal required)
-                      GL_UNSIGNED_BYTE
-                      (data tex)))
-    (gl_print_error "couldn't Texture_bind_image")    
     (cond ((or (= (type tex) GL_RGBA)
                (= (type tex) GL_BGRA))
            (begin
@@ -811,20 +819,12 @@
     (id tex)))
 
 (bind-func bind
-  (lambda (tex:Texture* newdata:i1)
-    (bind:[i32,Texture*,i1,i32]* tex newdata 0)))
-
-(bind-func bind
-  (lambda (tex:Texture* active:i32)
-    (bind:[i32,Texture*,i1,i32]* tex #t active)))
-
-(bind-func bind
   (lambda (tex:Texture*)
-    (bind:[i32,Texture*,i1,i32]* tex #t 0)))
+    (bind:[i32,Texture*,i32]* tex 0)))
 
 (bind-func unbind
-  (lambda (tex:Texture* active:i32)
-    (glActiveTexture (+ GL_TEXTURE0 active))    
+  (lambda (tex:Texture* unit:i32)
+    (glActiveTexture (+ GL_TEXTURE0 unit))
     (glBindTexture GL_TEXTURE_2D 0)
     (gl_print_error "couldn't unbind texture")
     void))
@@ -1060,14 +1060,20 @@
 (bind-func print
   (lambda (fbo:FBO*)
     (if (null? fbo)
-        (printf "<FBO: 0x0>")
-        (printf "<FBO: id=%d color_tex=%d depth_tex=%d width=%d height=%d>"
-                (id fbo)
-                (colour_tex fbo)
-                (depth_tex fbo)
-                (width fbo)
-                (height fbo)))
+        (begin (printf "<FBO: 0x0>") void)
+        (printout "<FBO: id="
+                  (id fbo)
+                  " color_tex="
+                  (colour_tex fbo)
+                  " depth_tex="
+                  (depth_tex fbo)
+                  " width="
+                  (width fbo)
+                  " height="
+                  (height fbo)
+                  ">\n"))
     void))
+
 
 (bind-func toString
   (lambda (fbo:FBO*)
@@ -1097,7 +1103,10 @@
       (glGenFramebuffers 1 (tref-ptr fbo 0))
       (gl_print_error "Error creating FBO")
       (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
-      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D (tref colour 0) 0)
+      (bind colour)
+      (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D (id colour) 0)
+      (unbind colour)
+      (update colour)
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       fbo)))
 
@@ -1110,9 +1119,11 @@
       (bind colour)
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D (id colour) 0)
       (unbind colour)
+      (update colour)
       (bind depth)
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_2D (id depth) 0)
       (unbind depth)
+      (update depth)
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       fbo)))
 
