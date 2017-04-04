@@ -16,6 +16,16 @@
 (bind-val fmsynth INSTRUMENT (make_instrument (fmsynth_note) (fmsynth_fx)))
 (define fmsynth ($$ fmsynth))
 
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (if (< chan 2)
+        (+ (sampler in time chan dat)
+           (fmsynth in time chan dat)
+           0.0)
+        0.0)))
+
+(dsp:set! dsp)
+
 (load-sampler sampler "assets/samples/808/" 0)
 
 ;; a d s r (ad & r in milliseconds) (s 0.0-1.0)
@@ -36,7 +46,7 @@
 
 (define bass
   (lambda (beat ps ds)
-    (play fmsynth (- (car ps) 12) (cosr 60 40 7/3) (* .6 (car ds))
+    (play fmsynth (- (car ps) 12) (cosr 90 40 7/3) (* .6 (car ds))
           (trir 0.0 2.0 5/3) 0.5)
     (callback (*metro* (+ beat (* .5 (car ds)))) 'bass (+ beat (car ds))
               (rotate ps -1)
