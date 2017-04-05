@@ -628,6 +628,16 @@
       (tset! tex 4 (cast data i8*))
       void)))
 
+(bind-func write
+  (lambda (tex:Texture* filename:String* flip:i1)
+    (let ((comp (if (= (type tex) GL_RGB) 3 4)))
+      (if flip (stbi_flip_vertically (width tex) (height tex) comp (data tex)))
+      (stbi_write_png (cstring filename) (width tex) (height tex)
+                      comp
+                      (data tex) (* (width tex) comp 1))
+      void)))
+    
+
 ;;; constructors
 
 
@@ -1149,6 +1159,21 @@
   (lambda (fbo:FBO*)
     (glBindFramebuffer GL_FRAMEBUFFER 0)
     (id fbo)))
+
+;; get colour tex data back from the GPU and into the texture data structure
+(bind-func pull_colour
+  (lambda (fbo:FBO*)
+    (let ((tex (colour_tex fbo)))
+      (glBindFramebuffer GL_FRAMEBUFFER (id fbo))
+      (glReadPixels 0 0 (width tex) (height tex) GL_RGBA GL_UNSIGNED_BYTE (data tex))
+      (glBindFramebuffer GL_FRAMEBUFFER 0)
+      (id fbo))))
+
+(bind-func write_colour
+  (lambda (fbo:FBO* filename:String*)
+    (pull_colour fbo)
+    (write (colour_tex fbo) filename #t)
+    void))
 
 
 (impc:aot:insert-footer "xtmgl-objects2")
