@@ -107,17 +107,17 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     pf = pow(nDotHV, MaterialShininess);
   }
 
-  ambient  = LightAmbient[idx]   * MaterialAmbient  * attenuation * vColour;
-  diffuse  = LightDiffuse[idx]   * MaterialDiffuse  * attenuation * nDotLL * vColour;
-  specular = LightSpecular[idx]  * MaterialSpecular * attenuation * pf;
+  ambient  = vec4(LightAmbient[idx].xyz * MaterialAmbient.xyz * vColour.xyz * attenuation,1.0);
+  diffuse  = vec4(LightDiffuse[idx].xyz * MaterialDiffuse.xyz * vColour.xyz * attenuation * nDotLL,1.0);
+  specular = vec4(LightSpecular[idx].xyz * MaterialSpecular.xyz * attenuation * pf,1.0);
 
   if(isTextured > 0) {
-    texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy) * vColour; 
-    outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
-  }else if(isPoints > 0){
-    outcolor = texture(diffuseTexture,gl_PointCoord) * vColour;
+    texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy);
+    outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a*vColour.a);
+  }else if(isPoints > 0) {
+    outcolor = texture(diffuseTexture,gl_PointCoord) * MaterialDiffuse * vColour;
   } else {
-    outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),diffuse.a*vColour.a);
+    outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),MaterialDiffuse.a*vColour.a);
   }
   if(isEnvMapped > 0) {
     reflected = reflect(-EE,NN);
@@ -186,9 +186,9 @@ void main()
   if(numLights < 1) { // NO LIGHTS!
     float dotE = max(0.0, dot(NN,EE));
     if(isTextured > 0) {
-      outcolour = texture(diffuseTexture,UVWCoord.xy) * dotE * vColour;
+      outcolour = vec4(texture(diffuseTexture,UVWCoord.xy).xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }else if(isPoints > 0){
-      outcolour = texture(diffuseTexture,gl_PointCoord) * dotE * vColour;
+            outcolour = texture(diffuseTexture,gl_PointCoord) * vColour * MaterialDiffuse; // * dotE * vColour;
     }else{      
       outcolour = vec4(MaterialDiffuse.xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }
@@ -208,7 +208,7 @@ void main()
       outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);
   }
   
-  xtmOutColour = outcolour+emissive;
+  xtmOutColour = vec4(outcolour.xyz+emissive.xyz,outcolour.a);
 }
 
 // end file

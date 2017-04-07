@@ -653,6 +653,40 @@
     (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)    
     void))
 
+
+(bind-func array_4_ptr_copy
+  (lambda (a:|4,float| data:float*)
+    (pset! data 0 (aref a 0))
+    (pset! data 1 (aref a 1))
+    (pset! data 2 (aref a 2))
+    (pset! data 3 (aref a 3))
+    void))
+
+(bind-func shader_update_material
+  (let ((data:float* (alloc (* 4 4))) (i:i32 0))
+    (lambda (shader:ShaderProgram* ambient:|4,float| diffuse:|4,float| emissive:|4,float| specular:|4,float| shininess:float)      
+      (array_4_ptr_copy ambient (pref-ptr data 0))
+      (array_4_ptr_copy diffuse (pref-ptr data 4))
+      (array_4_ptr_copy emissive (pref-ptr data 8))
+      (array_4_ptr_copy specular (pref-ptr data 12))
+      (glUniform4fv (glGetUniformLocation (id shader) "MaterialAmbient") 1 (pref-ptr data 0))
+      (glUniform4fv (glGetUniformLocation (id shader) "MaterialDiffuse") 1 (pref-ptr data 4))
+      (glUniform4fv (glGetUniformLocation (id shader) "MaterialEmissive") 1 (pref-ptr data 8))      
+      (glUniform4fv (glGetUniformLocation (id shader) "MaterialSpecular") 1 (pref-ptr data 12))
+      (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
+      (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)    
+      void)))
+
+(bind-func shader_update_material
+  (lambda (shader:ShaderProgram* diffuse:|4,float| shininess)    
+    (shader_update_material:[void,ShaderProgram*,|4,float|,|4,float|,|4,float|,|4,float|,float]*
+     shader
+     (array 0.0 0.0 0.0 1.0)
+     diffuse
+     (array 0.0 0.0 0.0 1.0) 
+     (array 0.0 0.0 0.0 1.0)
+     shininess)))
+
 (bind-func shader_update_bones
   (let ((bonesdat:float* (alloc (* 16 4 20))) ;; 16 (4x4 array) * 20 * 4 (bytes per float)
         (i:i32 0))
@@ -720,13 +754,12 @@
     void))
 
 (bind-func shader_prepare_draw
-  (lambda (shader:ShaderProgram* tex:Texture* instances:i32 pointTex:i1)
-    (glUniform1i (glGetUniformLocation (id shader) "isPoints") (if pointTex 1 0))
-    (glUniform1i (glGetUniformLocation (id shader) "isTextured") (if (or (null? tex) pointTex) 0 1))
-    (if (not (null? tex))
-        (glUniform1i (glGetUniformLocation (id shader) "diffuseTexture") 1))
+  (lambda (shader:ShaderProgram* tex:Texture* instances:i32 is_points:i1)
+    (glUniform1i (glGetUniformLocation (id shader) "isPoints") (if is_points 1 0))
+    (glUniform1i (glGetUniformLocation (id shader) "isTextured") (if (or (null? tex) is_points) 0 1))
+    (glUniform1i (glGetUniformLocation (id shader) "diffuseTexture") 1)
     (glUniform1i (glGetUniformLocation (id shader) "instances") instances)
-    (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)      
+    (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)
     void))
 
 (bind-func shader_prepare_draw
@@ -749,7 +782,6 @@
     (shader_prepare_draw:[void,ShaderProgram*,Texture*,i32,i1]* shader null 0 #f)
     void))
 
-
 (bind-func xtm_build_mesh_vbo
   (lambda (vao:VAO* verts:float* num_verts:i64)
     (let ((i:i64 0)
@@ -757,7 +789,7 @@
           (n1:float* (salloc 3))          
           (norm:float* (salloc 3))
           (vbostride:i64 14) ;; 4d+3d+3d+4d
-          (vbodata:float* (halloc (* num_verts vbostride))))
+          (vbodata:float* (zalloc (* num_verts vbostride))))
       (dotimes (i num_verts)
         (set! vert (pref-ptr verts (* i 3)))
         (if (= (% i 3) 0)
@@ -795,19 +827,19 @@
         (set_attribute vao vbo 3 4 (i64toi32 vbostride) 10)
         vbo))))
 
-(bind-func xtm_make_node
+(bind-func xtm_make_model
   (lambda (name:String* verts:float* num_verts:i64 r g b)
-    (let ((mesh:XTMMesh* (halloc))
-          (node:XTMModel* (halloc))
-          (transmat:float* (halloc 16))
+    (let ((mesh:XTMMesh* (alloc))
+          (node:XTMModel* (alloc))
+          (transmat:float* (alloc 16))
           (vbostride:i32 14) ;; 4d+3d+3d+4d
           (vbodata:float* null)
           (shininess:float 1.0)
           (opacity:float 1.0)
-          (diffuse:float* (halloc 4))
-          (ambient:float* (halloc 4))
-          (specular:float* (halloc 4))
-          (emissive:float* (halloc 4))
+          (diffuse:float* (alloc 4))
+          (ambient:float* (alloc 4))
+          (specular:float* (alloc 4))
+          (emissive:float* (alloc 4))
           (vao (VAO))
           (vbo:VBO* (xtm_build_mesh_vbo vao verts num_verts)))
       (pfill! ambient 0.0 0.0 0.0 1.0)
@@ -1032,62 +1064,37 @@
     (let ((lights (xtm_get_lights)))
       (shader_update_matrices_lvs shader model view projection (tref lights 9) (tref lights 8)))))
 
-;; vbo at vao index
-;; where idx is the index of the vbo to draw
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* idx shader m v p type update_data:i1 sz tex:Texture* blendmode)
+;; draw vao
+;; where vao is expected to have
+;; index 0: vectices - MANDATORY
+;; index 1: normals - optional
+;; index 2: uvw's - optional
+;; index 3: colours - optional
+(bind-func xtm_draw_vao
+  (lambda (vao:VAO* shader m v p type update_data:i1 sz tex:Texture* blend:i1)
     (xtm_update_matrices shader m v p)
-    (let ((vbo (get_vbo vao idx))
+    (let ((vbo (get_vbo vao 0))
           (elmts (i64toi32 (elements vbo))))
       ;; (println vbo)
       (if update_data (update vbo))
       (if (= type GL_POINTS)
           (glPointSize sz)
-          (glLineWidth sz))
-      (if (> blendmode 0)
+          (glLineWidth 1.0))
+      (if blend
           (begin (glEnable GL_BLEND)
-                 (glBlendFunc GL_SRC_COLOR GL_ONE_MINUS_SRC_COLOR)))          
+                 (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)))
+                 ;; (glBlendFunc GL_SRC_COLOR GL_ONE_MINUS_SRC_COLOR)))
       (if (not (null? tex)) (bind tex 1:i32))
-      (shader_prepare_draw shader tex 0 (if (and (not (null? tex)) (= type GL_POINTS)) #t #f))
+      (shader_prepare_draw shader tex 0 (if (= type GL_POINTS) #t #f))
       (draw vao type 0 elmts 0)
       (if (not (null? tex)) (unbind tex 1:i32))
-      (if (> blendmode 0) (glDisable GL_BLEND))
+      (if blend (glDisable GL_BLEND))
       void)))
 
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t 1.0 null 0)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type blendmode)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t 1.0 null blendmode)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type sz)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t sz null 0)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type sz blendmode)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t sz null blendmode)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type tex)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t 1.0 tex 0)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type sz tex)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t sz tex 0)))
-
-(bind-func xtm_draw_vbo
-  (lambda (vao:VAO* shader m v p type sz tex blendmode)
-    (xtm_draw_vbo:[void,VAO*,i64,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i64]*
-     vao 0 shader m v p type #t sz tex blendmode)))
+(bind-func xtm_draw_vao
+  (lambda (vao:VAO* shader m v p type update)
+    (xtm_draw_vao:[void,VAO*,ShaderProgram*,float*,float*,float*,i32,i1,float,Texture*,i1]*
+     vao shader m v p type update 1.0 null 0)))
 
 (bind-func xtm_draw_mesh
   (let ((vert:i32 0)
@@ -1118,6 +1125,7 @@
         (glUniform1f (glGetUniformLocation (id shader) "MaterialShininess") shininess)
         (glUniform1i (glGetUniformLocation (id shader) "instances") instances)
         (glUniform1i (glGetUniformLocation (id shader) "emitVColour") XTM_EMIT_VCOLOUR)
+        (glUniform1i (glGetUniformLocation (id shader) "isPoints") 0)
         (if (> (tref mesh 14) 0) ;; do we have any bones in our mesh!
             (begin
               (shader_update_bones shader mesh)))
@@ -1924,8 +1932,21 @@
             (opaque frame sh2 model view projection data)
             void))
       (gl_print_error "Error in XTM pipeline rendering Opaque!")
-      ;; turn everything off again.
-      (unbind (depth_tex shadow_fbo))
+      
+      (if (not (null? transparent))
+          (begin
+            ;; setup matrices
+            (xtm_camera_view view)       ;; setup view
+            (fill_identity_matrix model) ;; setup model
+            (xtm_update_lights sh2) ;; update lights on shader
+            (xtm_update_camera sh2) ;; update camera on shader
+            (xtm_update_matrices sh2 model view projection) ;; update mats on shader
+            (transparent frame sh2 model view projection data)
+            void))
+      (gl_print_error "Error in XTM pipeline rendering Transparent!")      
+
+      ;; turn everything off
+      (unbind (depth_tex shadow_fbo))      
       (unbind render_fbo)
       (stop sh2)
       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

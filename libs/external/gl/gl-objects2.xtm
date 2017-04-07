@@ -638,59 +638,6 @@
       void)))
     
 
-;;; constructors
-
-
-(bind-func Texture
-  (lambda (type)
-    (let ((tex (Texture:[Texture*,i32,i32,i32,i32,i8*]* 0 type 0 0 null)))
-      (glGenTextures 1 (tref-ptr tex 0))
-      (gl_print_error "Error creating Texture")
-      (zone_cleanup (glDeleteTextures 1 (tref-ptr tex 0))
-                    (gl_print_error "Error deleting Texture")
-                    (free_image tex))
-      tex)))
-
-(bind-func Texture
-  (lambda ()
-    (Texture:[Texture*,i32]* 0)))
-
-;; create data
-(bind-func Texture
-  (lambda (width:i32 height:i32 comp:i32)
-    (let ((tex (cond ((= comp 1)
-                      (Texture:[Texture*,i32]* GL_DEPTH_COMPONENT))
-                     ((= comp 3)
-                      (Texture:[Texture*,i32]* GL_RGB))
-                     (else
-                      (Texture:[Texture*,i32]* GL_RGBA)))))
-      (create_data tex width height comp)
-      tex)))
-
-;; load data from file
-(bind-func Texture
-  (lambda (filename flipped)
-    (let ((tex (Texture:[Texture*]*)))
-      (load_data tex flipped filename)
-      tex)))
-
-(bind-func Texture
-  (lambda (filename)
-    (Texture:[Texture*,String*,i32]* filename 1)))
-
-;; texture from existing data (no copy)
-(bind-func Texture 
-  (lambda (width:i32 height:i32 comp:i32 data:i8*)
-    (let ((tex (cond ((= comp 1)
-                      (Texture:[Texture*,i32]* GL_DEPTH_COMPONENT))
-                     ((= comp 3)
-                      (Texture:[Texture*,i32]* GL_RGB))
-                     (else
-                      (Texture:[Texture*,i32]* GL_RGBA)))))
-      (tset! tex 2 width)
-      (tset! tex 3 height)
-      (tset! tex 4 (cast data i8*))
-      tex)))
 
 ;; texture from existing data (no copy) with type
 ;; (bind-func Texture 
@@ -853,6 +800,66 @@
 (bind-func unbind_cube
   (lambda (tex:Texture*)
     (unbind_cube:[void,Texture*,i32]* tex 0)))
+
+
+;;; constructors
+
+
+(bind-func Texture
+  (lambda (type)
+    (let ((tex (Texture:[Texture*,i32,i32,i32,i32,i8*]* 0 type 0 0 null)))
+      (glGenTextures 1 (tref-ptr tex 0))
+      (gl_print_error "Error creating Texture")
+      (zone_cleanup (glDeleteTextures 1 (tref-ptr tex 0))
+                    (gl_print_error "Error deleting Texture")
+                    (free_image tex))
+      tex)))
+
+(bind-func Texture
+  (lambda ()
+    (Texture:[Texture*,i32]* 0)))
+
+;; create data
+(bind-func Texture
+  (lambda (width:i32 height:i32 comp:i32)
+    (let ((tex (cond ((= comp 1)
+                      (Texture:[Texture*,i32]* GL_DEPTH_COMPONENT))
+                     ((= comp 3)
+                      (Texture:[Texture*,i32]* GL_RGB))
+                     (else
+                      (Texture:[Texture*,i32]* GL_RGBA)))))
+      (create_data tex width height comp)
+      (update tex)
+      tex)))
+
+;; load data from file
+(bind-func Texture
+  (lambda (filename flipped)
+    (let ((tex (Texture:[Texture*]*)))
+      (load_data tex flipped filename)
+      (update tex)
+      tex)))
+
+(bind-func Texture
+  (lambda (filename)
+    (let ((tex (Texture:[Texture*,String*,i32]* filename 1)))
+      (update tex)
+      tex)))
+
+;; texture from existing data (no copy)
+(bind-func Texture 
+  (lambda (width:i32 height:i32 comp:i32 data:i8*)
+    (let ((tex (cond ((= comp 1)
+                      (Texture:[Texture*,i32]* GL_DEPTH_COMPONENT))
+                     ((= comp 3)
+                      (Texture:[Texture*,i32]* GL_RGB))
+                     (else
+                      (Texture:[Texture*,i32]* GL_RGBA)))))
+      (tset! tex 2 width)
+      (tset! tex 3 height)
+      (tset! tex 4 (cast data i8*))
+      (update tex)
+      tex)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
