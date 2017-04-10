@@ -1,0 +1,190 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; a little streams example
+;;
+
+;; Implement a stream
+
+(bind-type Stream <!a,[Stream*]*>)
+
+(bind-macro (scons x y)
+  `(Stream ,x (lambda () ,y)))
+
+(bind-func scar:[!a,Stream{!a}*]*
+  (lambda (a)
+    (tref a 0)))
+
+(bind-func scdr:[Stream{!a}*,Stream{!a}*]*
+  (lambda (a)
+    (let ((delay (tref a 1)))
+      (if (null? delay)
+          null
+          (delay)))))
+
+(bind-func smap:[Stream{!a}*,[!a,!a]*,Stream{!a}*]*
+  (lambda (func xs)
+    (if (null? xs)
+        null
+        (scons (func (scar xs)) (smap func (scdr xs))))))
+
+(bind-func smap:[Stream{!a}*,[!a,!a,!a]*,Stream{!a}*,Stream{!a}*]*
+  (lambda (func xs ys)
+    (if (null? xs ys)
+        null
+        (scons (func (scar xs) (scar ys))
+               (smap func (scdr xs) (scdr ys))))))
+
+(bind-func srange:[Stream{!a}*,!a,!a]*
+  (lambda (low high)
+    (if (> low high)
+        null
+        (scons low (srange (+ low 1) high)))))
+
+(bind-func sfixed:[Stream{!a}*,!a]*
+  (lambda (x)
+    (scons x (sfixed x))))
+
+(bind-func run:[void,Stream{!a}*,i64]*
+  (lambda (s cnt)
+    (if (or (<= cnt 0) (null? s))
+        void
+        (begin
+          (println (scar s))
+          (run (scdr s) (- cnt 1))))))
+
+(bind-func run:[void,Stream{!a}*]*
+  (lambda (s)
+    (run s 10000000000)))
+
+
+;;;;;;;; tests
+
+
+;; ($ (let ((obj:Stream{i64}* null)) obj))
+
+(bind-func test_stream_2
+  (lambda ()
+    (let ((s1 (srange 2 10)))
+      s1)))
+
+($ (test_stream_2))
+
+;; in reify-generic-type
+
+(bind-func test_stream_3
+  (lambda ()
+    (let ((s1 (srange 5 15))
+          (s2 (smap (lambda (x) (println x "->" (* 2 x)) (* 2 x)) s1)))
+      s2)))
+
+($ (test_stream_3))
+
+(bind-func test_stream_4
+  (lambda ()
+    (let ((s1 (srange 0 10))
+          (s2 (sfixed 2)))
+      (smap (lambda (x y) (* x y)) s1 s2))))
+
+($ (run (test_stream_4)))
+
+;;; stream audio processing!
+
+(sys:load "libs/core/audio_dsp.xtm")
+
+(bind-func lift
+  (lambda (x:float)
+    (scons x (lift x))))
+
+(bind-func osc
+  (lambda (phase freq amp)
+    (let ((phase_ (+ phase (* (/ STWOPI SAMPLERATE) (scar freq)))))
+      (scons (* (scar amp) (cos phase))             
+             (osc (if (> phase_ SPI) (- phase_ STWOPI) phase_)
+                  (scdr freq)
+                  (scdr amp))))))
+
+(bind-func osc
+  (lambda (freq amp)
+    (osc:[Stream{float}*,SAMPLE,Stream{float}*,Stream{float}*]* 0.0 freq amp)))
+
+(bind-func osc
+  (lambda (freq:SAMPLE amp:SAMPLE)
+    (osc:[Stream{float}*,SAMPLE,Stream{float}*,Stream{float}*]*
+     0.0 (sfixed freq) (sfixed amp))))
+
+(bind-func osc
+  (lambda (freq:Stream{float}* amp:SAMPLE)
+    (osc:[Stream{float}*,SAMPLE,Stream{float}*,Stream{float}*]*
+     0.0 freq (sfixed amp))))
+
+(bind-func osc
+  (lambda (freq:SAMPLE amp:Stream{float}*)
+    (osc:[Stream{float}*,SAMPLE,Stream{float}*,Stream{float}*]*
+     0.0 (sfixed freq) amp)))
+
+(bind-macro (mix . args)
+  (set! args (map (lambda (x) (if (number? x) `(lift ,x) x)) args))
+  (cond ((< (length args) 1) (error))
+        ((= (length args) 1) (car args))
+        ((= (length args) 2)
+         `(smap (lambda (x:SAMPLE y) (+ x y)) ,(car args) ,(cadr args)))
+        (else
+         `(smap (lambda (x:SAMPLE y) (+ x y)) (mix ,@(cdr args)) ,(car args)))))
+
+(bind-macro (amp . args)
+  (set! args (map (lambda (x) (if (number? x) `(lift ,x) x)) args))
+  (cond ((< (length args) 1) (error))
+        ((= (length args) 1) (car args))
+        ((= (length args) 2)
+         `(smap (lambda (x:SAMPLE y) (* x y)) ,(car args) ,(cadr args)))
+        (else
+         `(smap (lambda (x:SAMPLE y) (* x y)) (amp ,@(cdr args)) ,(car args)))))
+
+
+(bind-func pure_dsp
+  (lambda ()
+    (mix (amp (osc 220.0 1.0)
+              (osc 1.0 0.25)
+              (osc 2.0 1.0))
+         (osc (mix 440.0 (osc 0.1 200.0)) 0.25)
+         (osc (mix 500.0 (osc 10.0 20.0)) 0.25)
+         (osc 220.0 0.25))))
+
+
+(bind-func dsp:DSP
+  (let ((out 0.0)
+        (stream (pure_dsp)))
+    (lambda (in time chan dat)
+      (if (= chan 0)
+          (begin
+            (set! out (scar stream))
+            (set! stream (scdr stream))))
+      out)))
+
+(dsp:set! dsp)
+
+
+;; the same code using normal dsp routines (for performance comparison)
+
+;; (bind-func dsp:DSP
+;;   (let ((o1 (osc_c 0.0))
+;;         (o2 (osc_c 0.0))
+;;         (o3 (osc_c 0.0))
+;;         (o4 (osc_c 0.0))
+;;         (o5 (osc_c 0.0))
+;;         (o6 (osc_c 0.0))
+;;         (o7 (osc_c 0.0))
+;;         (o8 (osc_c 0.0))
+;;         (out 0.0))
+;;     (lambda (in time chan dat)
+;;       (if (= chan 0)
+;;           (set! out
+;;                 (+ (* (o1 1.0 220.0)
+;;                       (o2 0.25 1.0)
+;;                       (o3 1.0 2.0))
+;;                    (o4 0.25 (+ 440.0 (o5 200.0 0.1)))
+;;                    (o6 0.25 (+ 500.0 (o7 20.0 10.0)))
+;;                    (o8 0.25 220.0))))
+;;       out)))
+
+
