@@ -95,7 +95,7 @@ float calcShadow(int idx) {
 }
 
 vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
-  vec3 reflected, tmp;
+  vec3 reflected, tmp1, tmp2;
   vec3 LL = normalize(L[idx]); // light vector
   vec4 outcolor, ambient, diffuse, specular, texcolour, emissive;
   vec3 HV = normalize(LL+EE); // half vector
@@ -107,17 +107,17 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     pf = pow(nDotHV, MaterialShininess);
   }
 
-  ambient  = LightAmbient[idx]   * MaterialAmbient  * attenuation * vColour;
-  diffuse  = LightDiffuse[idx]   * MaterialDiffuse  * attenuation * nDotLL * vColour;
-  specular = LightSpecular[idx]  * MaterialSpecular * attenuation * pf;
+  ambient  = vec4(LightAmbient[idx].xyz * MaterialAmbient.xyz * vColour.xyz * attenuation,1.0);
+  diffuse  = vec4(LightDiffuse[idx].xyz * MaterialDiffuse.xyz * vColour.xyz * attenuation * nDotLL,1.0);
+  specular = vec4(LightSpecular[idx].xyz * MaterialSpecular.xyz * attenuation * pf,1.0);
 
   if(isTextured > 0) {
-    texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy) * vColour; 
-    outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a);
-  }else if(isPoints > 0){
-    outcolor = texture(diffuseTexture,gl_PointCoord) * vColour;
+    texcolour = diffuse * texture(diffuseTexture,UVWCoord.xy);
+    outcolor = vec4(texcolour.xyz*shadowValue,texcolour.a*vColour.a);
+  }else if(isPoints > 0) {
+    outcolor = texture(diffuseTexture,gl_PointCoord) * MaterialDiffuse * vColour;
   } else {
-    outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),diffuse.a*vColour.a);
+    outcolor = vec4(((diffuse + specular + ambient).xyz*shadowValue),MaterialDiffuse.a*vColour.a);
   }
   if(isEnvMapped > 0) {
     reflected = reflect(-EE,NN);
@@ -131,8 +131,9 @@ vec4 calcFrag(int idx, vec3 NN, vec3 EE, float attenuation, float shadowValue) {
     //reflected = vec3(inverse(ViewMatrix) * vec4(reflected,0.0));
     //outcolor += vec4(texture(projectionTexture,reflected.xy).xyz * projectionTextureWeight, outcolor.a);
     //UVWCoordProjectionTexture
-    tmp = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
-    outcolor += vec4(texture(projectionTexture,tmp.xy).xyz * projectionTextureWeight, outcolor.a);      
+    tmp1 = UVWCoordProjectionTexture.xyz / UVWCoordProjectionTexture.w;
+    tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
+    outcolor += vec4(texture(projectionTexture,tmp2.xy).xyz * projectionTextureWeight, outcolor.a);
     }
   
   return outcolor;
@@ -185,9 +186,9 @@ void main()
   if(numLights < 1) { // NO LIGHTS!
     float dotE = max(0.0, dot(NN,EE));
     if(isTextured > 0) {
-      outcolour = texture(diffuseTexture,UVWCoord.xy) * dotE * vColour;
+      outcolour = vec4(texture(diffuseTexture,UVWCoord.xy).xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }else if(isPoints > 0){
-      outcolour = texture(diffuseTexture,gl_PointCoord) * dotE * vColour;
+            outcolour = texture(diffuseTexture,gl_PointCoord) * vColour * MaterialDiffuse; // * dotE * vColour;
     }else{      
       outcolour = vec4(MaterialDiffuse.xyz*vColour.xyz*dotE,MaterialDiffuse.a*vColour.a);
     }
@@ -201,13 +202,13 @@ void main()
     outcolour /= float(numLights);
   }
 
-  if(isProjectionTextured > 0) {
+  if((isProjectionTextured > 0) && (numLights < 1)) {
       tmp1 = projCoord.xyz; //projCoord.z; //vec3((projCoord.x * 2.0)+1.0,(projCoord.y * 2.0)+1.0,projCoord.z);    
       tmp2 = vec3((tmp1.x*0.5) + 0.5,(tmp1.y*0.5) + 0.5,tmp1.z);
       outcolour = mix(outcolour,vec4(texture(projectionTexture,tmp2.xy).xyz, outcolour.a),projectionTextureWeight);
   }
   
-  xtmOutColour = outcolour+emissive;
+  xtmOutColour = vec4(outcolour.xyz+emissive.xyz,outcolour.a);
 }
 
 // end file

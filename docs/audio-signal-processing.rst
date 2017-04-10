@@ -358,7 +358,7 @@ one channel for clarity).
             (aset! osc_array i (osc_c 0.0))
             (aset! amp_array
                    i
-                   (if (= (/ i 2) 0)
+                   (if (= (modulo i 2) 0)
                        0.3
                        0.0))
             (aset! freq_array i (* (convert (+ i 1) SAMPLE) base_freq)))

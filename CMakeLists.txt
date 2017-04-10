@@ -685,7 +685,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(nanovg
     PREFIX nanovg
-    URL https://github.com/extemporelang/nanovg/archive/fc4eb1b4f89a29d9c85e3a795136f1d518a7a0c5.tar.gz
+    URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
     CMAKE_ARGS
     -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}

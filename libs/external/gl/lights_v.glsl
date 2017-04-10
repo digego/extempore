@@ -8,6 +8,7 @@ layout (location = 2) in vec3 xtmUVW;
 layout (location = 3) in vec4 xtmColour;
 layout (location = 4) in mat4 xtmIMat;       // instance matrix
 layout (location = 8) in vec4 xtmIColour;    // instance colour
+layout (location = 9) in mat4 xtmIUVWMat;    // instance texture matrix
 
 out vec3 N, E, V;
 out vec3 L[5];
@@ -63,11 +64,14 @@ void main()
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
 
-  UVWCoord = xtmUVW;
+  //UVWCoord = xtmUVW;
   if (instances > 0) {
     vColour = xtmIColour;
+    UVWCoord = (xtmIUVWMat * vec4(xtmUVW.xyz,1)).xyz;
+    // UVWCoord = xtmUVW;    
   } else {
     vColour = vec4(xtmColour);
+    UVWCoord = xtmUVW;
   }
 }
 
