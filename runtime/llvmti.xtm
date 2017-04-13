@@ -8901,10 +8901,12 @@ xtlang's `let' syntax is the same as Scheme"
                                                                 (string->symbol (string-append a "##" (number->string gnum)))
                                                                 (if (regex:match? a ":")
                                                                     (string->symbol (string-append a "##" (number->string gnum)))
-                                                                    (string->symbol (string-append (impc:ir:get-base-type a)
-                                                                                                   ":"
-                                                                                                   (impc:ir:pretty-print-type b)
-                                                                                                   "##" (number->string gnum)))))))
+                                                                    (if (not (null? (impc:ir:pretty-print-type b)))
+                                                                        (string->symbol (string-append (impc:ir:get-base-type a)
+                                                                                                       ":"
+                                                                                                       (impc:ir:pretty-print-type b)
+                                                                                                       "##" (number->string gnum)))
+                                                                        #f)))))
                                                       typestrs types)))
                                        ;; (ll (println 'new1: newsyms))
                                        ;; (lll (println 'tstrings: typestrs))
