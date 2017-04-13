@@ -10066,13 +10066,15 @@ xtlang's `let' syntax is the same as Scheme"
       (sys:with-quiet-compiler
        (if constructor?
            (begin
+             ;; (println 'building 'constructor (string-append namestr ":" ctype))
              (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
                       (lambda ,argslist
                         (let ((obj (zalloc)))
                           ,@body
                           obj)))
                    (interaction-environment))))
-       (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+       ;; (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+       (eval `(bind-func ,(string->symbol (string-append namestr "_z:" ctype)) #t                
                 (lambda ,argslist
                   (let ((obj (zalloc)))
                     ,@body
