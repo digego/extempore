@@ -54,7 +54,7 @@ You can also join the Extempore community:
 
 # Licence
 
-Copyright (c) 2011-2016, Andrew Sorensen
+Copyright (c) 2011-2017, Andrew Sorensen
 
 All rights reserved.
 
