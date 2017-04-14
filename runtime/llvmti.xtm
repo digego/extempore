@@ -2003,88 +2003,98 @@
 
 (define impc:ti:register-new-genericfunc
   (lambda (code)
-    ;; (println 'adding: code)
-    (set! *impc:ti:generic-count* (+ *impc:ti:generic-count* 1))
-    ;; (println 'addgpoly: code 'at: *impc:ti:generic-count*)
-    ;; (println 'code-pre-macro: code)
-    ;; apply any macros to generic code!
-    (set! code (cons (car code)
-                     (list (cadr code)
-                           (impc:ti:genericfunc-apply-macros (caddr code)))))
-    ;; (println 'code-post-macro: code)
-    (if (not (regex:match? (symbol->string (cadr code)) "(:|{)"))
-        (impc:compiler:print-compiler-error "generic functions must supply type"))
-    (let* ((res (impc:ti:split-namedfunc (cadr code))) ;;(regex:type-split (symbol->string (cadr code)) ":"))
-           (name (string->symbol (car res)))
-           (numl (assoc-strcmp (car res) *impc:ti:genericfunc-num-list*))
-           ;; (num (if numl (cdr numl) *impc:ti:generic-count*))
-           (num *impc:ti:generic-count*)
-           ;; (ftype (string->symbol (cadr res))))
-           (type (cadr res))
-           (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
-           (newsyms (map (lambda (s)
-                           ;; (println 's: s)
-                           (if (regex:match? s "^!g")
-                               (let ((r (regex:split s "_")))
-                                 (string-append (car r) "___" (number->string num)))
-                               (let ((r (string-append "!gx"
-                                                       (substring s 1 (string-length s))
-                                                       "_"
-                                                       (number->string num))))
-                                 r)))
-                         ;; (string-append "!g"
-                         ;;                (substring s 1 (string-length s))
-                         ;;                "_"
-                         ;;                (number->string num)))
-                         syms))
-           (newtype1 (regex:replace-everything type syms newsyms))
-           (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
-           (newtypematch (map (lambda (k) (if (regex:match? k "(:|{)")
-                                         ;; (car (regex:type-split k ":"))
-                                         (car (impc:ti:split-namedtype k))
-                                         (if (regex:match? k "^\\!g")
-                                             "_"
-                                             (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
-                              (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
-           (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
-           (newcode (list 'bind-func
-                          (string->symbol (string-append (symbol->string name)
-                                                         ":"
-                                                         (symbol->string newtype)))
-                          (caddr code))))
-      ;; (println 'newtype newtype 'newsyms newsyms)
-      (let ((v (cl:remove-if (lambda (x)
-                               (or
-                                (<> arity (cadr x))
-                                (not (string=? (symbol->string name) (symbol->string (car x))))
-                                (member #f
-                                        (map (lambda (xx yy)
-                                               ;; (println 'xx: xx 'yy: yy)
-                                               (let ((res (if (regex:match? xx "^\\!g")
-                                                              (string=?
-                                                               (car (regex:type-split yy "_"))
-                                                               (car (regex:type-split xx "_")))
-                                                              (string=?
-                                                               ;; (car (regex:type-split yy ":"))
-                                                               ;; (car (regex:type-split xx ":"))))))
-                                                               (car (impc:ti:split-namedtype yy))
-                                                               (car (impc:ti:split-namedtype xx))))))
-                                                 ;; (println 'res: res)
-                                                 res))
-                                             (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
-                                             (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
-                             *impc:ti:genericfunc-cache*)))
-        (if (= num *impc:ti:generic-count*)
-            (set! *impc:ti:genericfunc-num-list* (cons (cons (symbol->string name) *impc:ti:generic-count*) *impc:ti:genericfunc-num-list*)))
+    (let ((type-constraint #f))
+      ;; (println 'adding: code)
+      (set! *impc:ti:generic-count* (+ *impc:ti:generic-count* 1))
+      ;; (println 'addgpoly: code 'at: *impc:ti:generic-count*)
+      ;; (println 'code-pre-macro: code)
+      ;; apply any macros to generic code!
+      (if (and (symbol? (caddr code))
+               (equal? '-> (caddr code)))
+          (set! type-constraint (cadddr code))
+          (set! type-constraint #f))
+      ;; (set! code (cons (car code)
+      ;;                  (list (cadr code)
+      ;;                        (impc:ti:genericfunc-apply-macros (car (cddddr code))))))
+      (set! code (cons (car code)
+                       (list (cadr code)
+                             (impc:ti:genericfunc-apply-macros (if type-constraint
+                                                                   (car (cddddr code))
+                                                                   (caddr code))))))
+      ;; (println 'code-post-macro: code)
+      (if (not (regex:match? (symbol->string (cadr code)) "(:|{)"))
+          (impc:compiler:print-compiler-error "generic functions must supply type"))
+      (let* ((res (impc:ti:split-namedfunc (cadr code))) ;;(regex:type-split (symbol->string (cadr code)) ":"))
+             (name (string->symbol (car res)))
+             (numl (assoc-strcmp (car res) *impc:ti:genericfunc-num-list*))
+             ;; (num (if numl (cdr numl) *impc:ti:generic-count*))
+             (num *impc:ti:generic-count*)
+             ;; (ftype (string->symbol (cadr res))))
+             (type (cadr res))
+             (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
+             (newsyms (map (lambda (s)
+                             ;; (println 's: s)
+                             (if (regex:match? s "^!g")
+                                 (let ((r (regex:split s "_")))
+                                   (string-append (car r) "___" (number->string num)))
+                                 (let ((r (string-append "!gx"
+                                                         (substring s 1 (string-length s))
+                                                         "_"
+                                                         (number->string num))))
+                                   r)))
+                           ;; (string-append "!g"
+                           ;;                (substring s 1 (string-length s))
+                           ;;                "_"
+                           ;;                (number->string num)))
+                           syms))
+             (newtype1 (regex:replace-everything type syms newsyms))
+             (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
+             (newtypematch (map (lambda (k) (if (regex:match? k "(:|{)")
+                                           ;; (car (regex:type-split k ":"))
+                                           (car (impc:ti:split-namedtype k))
+                                           (if (regex:match? k "^\\!g")
+                                               "_"
+                                               (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
+                                (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
+             (arity (- (length (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))) 1))
+             (newcode (list 'bind-func
+                            (string->symbol (string-append (symbol->string name)
+                                                           ":"
+                                                           (symbol->string newtype)))
+                            (caddr code))))
+        ;; (println 'newtype newtype 'newsyms newsyms)
+        (let ((v (cl:remove-if (lambda (x)
+                                 (or
+                                  (<> arity (cadr x))
+                                  (not (string=? (symbol->string name) (symbol->string (car x))))
+                                  (member #f
+                                          (map (lambda (xx yy)
+                                                 ;; (println 'xx: xx 'yy: yy)
+                                                 (let ((res (if (regex:match? xx "^\\!g")
+                                                                (string=?
+                                                                 (car (regex:type-split yy "_"))
+                                                                 (car (regex:type-split xx "_")))
+                                                                (string=?
+                                                                 ;; (car (regex:type-split yy ":"))
+                                                                 ;; (car (regex:type-split xx ":"))))))
+                                                                 (car (impc:ti:split-namedtype yy))
+                                                                 (car (impc:ti:split-namedtype xx))))))
+                                                   ;; (println 'res: res)
+                                                   res))
+                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
+                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
+                               *impc:ti:genericfunc-cache*)))
+          (if (= num *impc:ti:generic-count*)
+              (set! *impc:ti:genericfunc-num-list* (cons (cons (symbol->string name) *impc:ti:generic-count*) *impc:ti:genericfunc-num-list*)))
                                         ;            (set! *impc:ti:generic-count* (- *impc:ti:generic-count* 1)))
-        ;; (if (not (null? v))
-        ;;     (println 'updating: name 'with newtype)
-        ;;     (println 'adding: name 'with newtype))
-        (if (not (null? v))
-            (set-cdr! (car v) (list arity newtype newcode newtypematch))
-            (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch) *impc:ti:genericfunc-cache*)))
-        (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
-        #t))))
+          ;; (if (not (null? v))
+          ;;     (println 'updating: name 'with newtype)
+          ;;     (println 'adding: name 'with newtype))
+          (if (not (null? v))
+              (set-cdr! (car v) (list arity newtype newcode newtypematch type-constraint))
+              (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch type-constraint) *impc:ti:genericfunc-cache*)))
+          (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
+          #t)))))
 
 ;; with an optional arity check
 (define impc:ti:genericfunc-exists?
@@ -2096,6 +2106,18 @@
         (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
                (results (map (lambda (r) (cadr r)) res)))
           (if (and (not (null? results)) (member (car arity) results)) #t #f)))))
+
+(define impc:ti:genericfunc-type-constraint
+  (lambda (name . arity)
+    (if (string? name) (set! name (string->symbol name)))
+    (if (null? arity)
+        (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
+          (if res (list-ref (cdr res) 4)  #f))
+        (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
+               (results (map (lambda (r) (cadr r)) res)))
+          (if (and (not (null? results)) (member (car arity) results))
+              (list-ref (cdr (cl:find-if (lambda (x) (= (cadr x) (car arity))) res)) 4)
+              #f)))))
 
 (define impc:ir:genericfunc-stringify-generic-arg-strings
   (lambda (args)
@@ -6345,11 +6367,15 @@ Continue executing `body' forms until `test-expression' returns #f"
                   (gpt (impc:ti:genericfunc-types gname arity (if request? (cons request? args) args)))
                   ;; request? request? args)))
                   (gpoly-code (cadr gpt))
+                  (constraint (cadddr gpt))
                   (lambda-code (caddr gpoly-code))
                   (gtype (impc:ir:get-type-from-pretty-str (symbol->string (car gpt))))
                   (gpoly-type (impc:ti:get-type-for-gpoly
                                (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
                   (gpoly-type-orig (impc:ti:nativef-generics-make-gtypes-unique gpoly-type gnum)))
+             ;; (println "gpt:" gpt)
+             ;; (println "gtype:" gtype)
+             ;; (println "constraint:" constraint)
 
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
              ;; it is possible for some generic types to be missed from 'vars'
@@ -6563,6 +6589,35 @@ Continue executing `body' forms until `test-expression' returns #f"
                        (set! gftype (impc:ti:type-clean (car gftype)))
                        ;; (println 'gftype2: gftype)
                        (impc:ti:nativef-generics-final-tests ast gpoly-type gftype gnum vars kts)
+                       ;; (println 'pre ast 'constraint 'grtype grtype 'gftype gftype)
+                       (if (and (impc:ir:type? grtype)
+                                constraint)
+                           (let ((chk (if (and (list? (cadr constraint))
+                                               (<> (length (cdr grtype))
+                                                   (length (cadr constraint))))
+                                          'false
+                                          (apply (eval constraint) (cdr grtype)) #t)))
+                             (if (boolean? chk)
+                                 (if chk
+                                     'great
+                                     (impc:compiler:print-compiler-error
+                                      (string-append "Failed constraint check: "
+                                                     (sexpr->string constraint)
+                                                     " for generic call "
+                                                     (sexpr->string ast)
+                                                     " for type "
+                                                     (impc:ir:pretty-print-type grtype))))
+                                 (if (impc:ir:type? chk)
+                                     (set! grtype chk)
+                                     (impc:compiler:print-compiler-error
+                                      (string-append "Poorly defined constraint check: "
+                                                     (sexpr->string constraint)
+                                                     " for generic call "
+                                                     (sexpr->string ast)
+                                                     " for type "
+                                                     (impc:ir:pretty-print-type grtype)))))))
+                                 
+                       ;; (println 'post ast 'constraint 'grtype grtype 'gftype gftype)                           
                        ;; if grtype is VALID
                        ;; and if the return type of gftype is a symbol
                        ;; THEN update the return type of gftype (symbol)
