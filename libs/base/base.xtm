@@ -609,7 +609,7 @@ If both strings are null an empty String will be returned
 ;; cat macro (poor-man's varargs)
 
 (bind-macro
-  "concatenate Strings"
+  "concatenate Strings or Symbols"
   (cat . args)
   (let loop ((rem (cdr args))
              (ret (car args)))
@@ -1036,6 +1036,26 @@ Use via the polymorphic Str function
   (lambda (s1:Symbol* s2:Symbol*)
     (if (= (strcmp (tref s1 1) (tref s2 1)) 0)
         1:i1 0:i1)))
+
+(bind-func cat2
+  "Concatenate 2 Symbols!
+
+If one symbol is null, the alternate symbol will be returned.
+If both symbols are null an empty symbol will be returned
+
+@param s1 - first string to be concatenated
+@param s2 - second string to be concatenated
+@return - pointer to new Symbol
+"
+  (lambda (s1:Symbol* s2:Symbol*)
+    (if (null? s2) (Symbol s1)
+        (if (null? s1) (Symbol s2)
+            (let ((size (+ (tref s1 0) (tref s2 0)))
+                  (news:i8* (zalloc (+ 1 size))))
+              (strcpy news (tref s1 1))
+              (strncat news (tref s2 1) size)
+              (Symbol news))))))
+
 
 (define *xtmlib-base-loaded* #t)
 
