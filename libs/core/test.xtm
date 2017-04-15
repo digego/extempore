@@ -69,6 +69,8 @@
                          ('no-compile ' red))
                        'default #t (print label "\n"))))
 
+;; some tests are supposed to fail compilation (type check catch for example)
+;; by passing 'copmile-should-fail as expected-result the failure will be marked as success
 (define-macro (xtmtest form call . expected-result)
   `(let ((func-sym (quote ,(car call)))
          (exp-res ,(if (null? expected-result)
@@ -77,7 +79,10 @@
      (print-with-colors 'cyan 'default #t (print "xtmtest "))
      (print-with-colors 'black 'cyan #t (print "" func-sym ""))
      (println)
-     (catch (xtmtest-update-test-result func-sym 'no-compile ',call #f #f)
+     (catch (if (and (symbol? exp-res)
+                     (equal? exp-res 'compile-should-fail))
+                (xtmtest-update-test-result func-sym 'correct ',call #f #f)
+                (xtmtest-update-test-result func-sym 'no-compile ',call #f #f))
             (eval ,form (interaction-environment))
             (catch (xtmtest-update-test-result func-sym 'compile ',call #f #f)
                    (let ((result (eval ,call (interaction-environment))))
