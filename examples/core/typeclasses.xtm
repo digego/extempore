@@ -10,31 +10,46 @@
 ;; note that although this class NUM has four functions of the same type
 ;; there is no need for them all to have the same type, the tuple can
 ;; include functions of different types.
-(bind-type NUM <[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*>)
+(bind-type NUM <[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*,[!a,!a,!a]*,!a> (constructor? . #f))
 
 ;; first function
-(bind-func plus:[!a,NUM*,!a,!a]*
-  (lambda (dict a b)
-    (let ((f (tref dict 0)))
+(bind-func plus:[!a,!a,!a]* 
+  (lambda (a b)
+    (let ((dict (NUM a))
+          (f (tref dict 0)))
       (f a b))))
 
 ;; second function
-(bind-func minus:[!a,NUM*,!a,!a]*
-  (lambda (dict a b)
-    (let ((f (tref dict 1)))
+(bind-func minus:[!a,!a,!a]*
+  (lambda (a b)
+    (let ((dict (NUM a))
+          (f (tref dict 1)))
       (f a b))))
 
 ;; third function
-(bind-func mul:[!a,NUM*,!a,!a]*
-  (lambda (dict a b)
-    (let ((f (tref dict 2)))
+(bind-func mul:[!a,!a,!a]*
+  (lambda (a b)
+    (let ((dict (NUM a))
+          (f (tref dict 2)))
       (f a b))))
 
+(bind-func mul:[!a,NUM{!a},NUM{!a}]*
+  (lambda (a b)
+    (let ((dict (NUM (val a)))
+          (f (tref dict 2)))
+      (f (val a) (val b)))))
+
 ;; fourth function
-(bind-func div:[!a,NUM*,!a,!a]*
-  (lambda (dict a b)
-    (let ((f (tref dict 3)))
+(bind-func div:[!a,!a,!a]*
+  (lambda (a b)
+    (let ((dict (NUM a))
+          (f (tref dict 3)))
       (f a b))))
+
+(bind-func val:[!a,NUM{!a}*]*
+  (lambda (obj)
+    (tref obj 4)))
+
 
 ;;;;
 ;; Now provide instances f64,f32,i64 and i32 of class NUM
@@ -57,15 +72,15 @@
   (lambda (a:double b:double)
     (/ a b)))
 
-;; (bind-val NUM_f64 NUM{[double,double,double]*}*)
-;; (bind-val NUM_f64 NUM{[double,double,double]*}*)
-(bind-val NUM_f64 NUM{double}*)
+;; (bind-val NUM_f64 NUM{i64}* (NUM num_i64_plus num_i64_minus num_i64_mul num_i64_div))
 
-(bind-func init_num_f64_dict
-  (lambda ()
-    (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
+(bind-func NUM
+  (lambda (a:double)
+    (let ((obj:NUM{double}* (alloc)))
+      (tfill! obj num_f64_plus num_f64_minus num_f64_mul num_f64_div a)
+      obj)))
 
-(init_num_f64_dict)
+
 ;; finished instance of NUM_double
 
 ;; i64 INSTANCE of NUM
@@ -85,13 +100,13 @@
   (lambda (a:i64 b:i64)
     (/ a b)))
 
-(bind-val NUM_i64 NUM{i64}*)
+;; (bind-val NUM_i64 NUM{i64}* (NUM num_i64_plus num_i64_minus num_i64_mul num_i64_div))
+(bind-func NUM
+  (lambda (a:i64)
+    (let ((obj:NUM{i64}* (alloc)))
+      (tfill! obj num_i64_plus num_i64_minus num_i64_mul num_i64_div a)
+      obj)))
 
-(bind-func init_num_i64_dict
-  (lambda ()   
-    (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
-
-(init_num_i64_dict)
 ;; finished instance of NUM_i64
 
 ;; i32 INSTANCE of NUM
@@ -111,13 +126,14 @@
   (lambda (a:i32 b:i32)
     (/ a b)))
 
-(bind-val NUM_i32 NUM{i32}*)
+;; (bind-val NUM_i32 NUM{i32}* (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))
 
-(bind-func init_num_i32_dict
-  (lambda ()   
-    (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
+(bind-func NUM
+  (lambda (a:i32)
+    (let ((obj:NUM{i32}* (alloc)))      
+      (tfill! obj num_i32_plus num_i32_minus num_i32_mul num_i32_div a)
+      obj)))
 
-(init_num_i32_dict)
 ;; finished instance of NUM_i32
 
 ;; f32 INSTANCE of NUM
@@ -137,13 +153,13 @@
   (lambda (a:float b:float)
     (/ a b)))
 
-(bind-val NUM_f32 NUM{float}*)
+;; (bind-val NUM_f32 NUM{float}* (NUM num_f32_plus num_f32_minus num_f32_mul num_f32_div))
+(bind-func NUM
+  (lambda (a:float)
+    (let ((obj:NUM{float}* (alloc)))      
+      (tfill! obj num_f32_plus num_f32_minus num_f32_mul num_f32_div a)
+      obj)))
 
-(bind-func init_num_f32_dict
-  (lambda ()   
-    (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
-
-(init_num_f32_dict)
 ;; finished instance of f32 NUM
 
 
@@ -153,10 +169,122 @@
 
 (bind-func type_class_test
   (lambda ()
-    (println (plus NUM_f32 3.0:f 2.0:f)
-             (minus NUM_f32 3.0:f 2.0:f)
-             (mul NUM_f64 3.0 2.0)
-             (div NUM_i64 12 3))
-    (plus NUM_i32 3:i32 2:i32)))
+    (println (plus 3.0:f 2.0:f)
+             (minus 3.0:f 2.0:f)
+             (mul 3.0 2.0)
+             (div 12 3))
+    (plus 3:i32 2:i32)))
 
 (type_class_test)
+
+(bind-func mysqr2:[!a,NUM*]*
+  (lambda (x)
+    (mul x x)))
+
+(bind-func testms
+  (lambda ()
+    (mysqr2 (NUM 4.0:f))))
+
+
+(bind-func mysqrs:[<!a,!b,!c>,!a,!b,!c]*
+  (lambda (x y z)
+    (tuple (mysqr x) (mysqr y) (mysqr z))))
+
+(bind-func test
+  (lambda (x:i32 y:float z:double)
+    (mysqrs x y z)))
+
+($ (println (test 1 2.0 3.0)))
+
+
+
+
+
+
+;;;;; DEFINE EQ Typeclass ;;;;;;;;;;;;;
+
+;; DEFINE a type class EQ
+;; with one function (i.e. 1 element)
+;; note we DO NOT want a constructor
+;; because we don't want it to interfere (i.e. override) the poly calls!
+(bind-type EQ <[i1,!a,!a]*> (constructor? . #f))
+
+
+;; first function
+(bind-func eql:[i1,!a,!a]*
+  (lambda (a b)
+    (let ((dict:EQ* (EQ a))
+          (f (tref dict 0)))
+      (f a b))))
+
+
+;;;;; DEFIN INSTANCES for EQ ;;;;;;;;;
+
+(bind-func eq_i64_equal
+  (lambda (a:i64 b:i64)
+    (= a b)))
+
+(bind-func EQ
+  (lambda (a:i64)
+    (let ((obj:EQ{i64}* (alloc)))
+      (tfill! obj eq_i64_equal)
+      obj)))
+
+(bind-func eq_i32_equal
+  (lambda (a:i32 b:i32)
+    (= a b)))
+
+(bind-func EQ
+  (lambda (a:i32)
+    (let ((obj:EQ{i32}* (alloc)))
+      (tfill! obj eq_i32_equal)
+      obj)))
+
+(bind-func eq_float_equal
+  (lambda (a:float b:float)
+    (= a b)))
+
+(bind-func EQ
+  (lambda (a:float)
+    (let ((obj:EQ{float}* (alloc)))
+      (tfill! obj eq_float_equal)
+      obj)))
+
+(bind-func eq_double_equal
+  (lambda (a:double b:double)
+    (= a b)))
+
+(bind-func EQ
+  (lambda (a:double)
+    (let ((obj:EQ{double}* (alloc)))
+      (tfill! obj eq_double_equal)
+      obj)))
+
+(bind-func eq_test2
+  (lambda (x:i32 y:i32)
+    (println (eql 3 3)
+             (eql 4.0 3.0)
+             (eql 3.0:f 3.0))
+    (eql x y)))
+
+(eq_test2 3 4)
+
+
+(eq_test_one)
+
+
+
+
+
+(bind-func abseq:[i1,EQAB{!a}*,!a,!a]*
+  (lambda (d x y)
+    (equal d x y)))
+
+(bind-func eq_test_two
+  (lambda ()
+    (abseq EQ_f32 3.0:f 2.0:f)))
+
+(eq_test_two)
+
+
+
