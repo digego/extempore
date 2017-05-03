@@ -29,6 +29,7 @@ uniform mat4 LightModelViewProjectionMatrix[5];
 
 uniform int numLights;
 uniform int instances;
+uniform int isPoints;
 
 out vec4 lightVertexPosition[5];
 out vec3 UVWCoord;
@@ -51,7 +52,6 @@ void main()
   UVWCoordProjectionTexture = ModelViewProjectionMatrix * vec4(vpos.x,vpos.y,0.0,1.0);
   vPosition = ModelViewMatrix * vpos;
 
-  N = NormalMatrix * xtmNormal;
   float j = 0.5;
   
   for (k = 0; k < numLights; k++) {
@@ -63,6 +63,13 @@ void main()
   
   V = vPosition.xyz; // vertex (3d)
   E = (CameraPos - vPosition).xyz; // vector from source to eye
+  if (isPoints > 0) { // points always point towards the camera!
+    gl_PointSize = xtmNormal.x;
+    N = normalize(E); // normal is E
+  }else{
+    N = NormalMatrix * xtmNormal;
+  }
+    
 
   //UVWCoord = xtmUVW;
   if (instances > 0) {
