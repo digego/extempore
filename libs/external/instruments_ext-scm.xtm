@@ -22,7 +22,7 @@
 ;; (set-sample-offset sampler 60 50000)
 ;; this would offset the sample at index 60 by 50000 samples
 (define-macro (set-sample-offset inst index offset)
-  `(let ((native (llvm:get-native-closure ,(impc:ti:get_mono_name (symbol->string inst)))))
+  `(let ((native ,inst)) ;;(llvm:get-native-closure ,(impc:ti:get-mono-name (symbol->string inst)))))
      (if (cptr? native)
          (set_sample_offset_ native
                              (real->integer ,index)
@@ -65,7 +65,7 @@
 
 (define-macro (clear-sampler sampler . args)
   (let ((bank (if (> (length args) 0) (car args) 0)))
-    `(let ((native (llvm:get-native-closure ,(impc:ti:get_mono_name (symbol->string sampler))))
+    `(let ((native ,sampler) ;(llvm:get-native-closure ,(impc:ti:get-mono-name (symbol->string sampler))))
            (cnt 0))
        (dotimes (i 128)
          (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
