@@ -7,7 +7,7 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
     sp->start();
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
     if (repl->connectToProcessAtHostname("localhost", port)) {
-        return Scheme->T;
+        return pair_car(Args); //return Scheme->T;
     }
     sp->stop();
     delete sp;
