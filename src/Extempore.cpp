@@ -57,6 +57,17 @@
 #include <AppKit/AppKit.h>
 #endif
 
+// main callback for use by XTLang code
+void (*XTMMainCallback)();
+
+extern "C" {
+  void xtm_set_main_callback( void(*f)() )
+  {
+    XTMMainCallback = f;
+    return;
+  }
+}
+
 // WARNING EVIL WINDOWS TERMINATION CODE!
 #ifdef _WIN32
 
@@ -358,16 +369,21 @@ int main(int argc, char** argv)
     }
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
+    /*
 #ifdef __APPLE__
     [[NSApplication sharedApplication] run];
-#else
+    #else
+    */
     while (true) {
+      if (XTMMainCallback) { XTMMainCallback(); }
 #ifdef _WIN32
-        Sleep(5000);
+      Sleep(2000);
+#elif __APPLE__
+      sleep(2);
 #else
-        sleep(5000);
+      sleep(2000);
 #endif
     }
-#endif
+    // #endif
     return 0;
 }

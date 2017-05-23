@@ -13,17 +13,28 @@
 
 (sys:load "libs/external/glfw3.xtm")
 
+(sys:load "libs/core/scheduler.xtm")
+
+(run_main_event_loop)
+
 (bind-val width i32 1024)
 (bind-val height i32 768)
+(bind-val window GLFWwindow*)
 
-(bind-val window GLFWwindow*
-  ;; some of the shaders in the graphics pipeline use older glsl
-  ;; versions, so we need a "compatibility" graphics context
-  (begin
+(bind-func init_window:MAINEVT
+  (lambda (t d)
     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
-    (glfw_init_and_create_interaction_window width height)))
+    (set! window (glfw_init_and_create_interaction_window width height))
+    void))
+
+;; need gfx context before loading opengl related libs on win32 platform
+($ (sched_main init_window))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (sys:load "libs/external/assimp.xtm")
+
+(bind-val peppino XTMModel*)
 
 (bind-func render:XTMRENDERCB
   (lambda (frame shader m v p data)
@@ -39,23 +50,25 @@
         (begin (xtm_render null render:XTMRENDERCB null null (convert model i8*))
                void))))
 
-(bind-val peppino XTMModel*
-  (assimp_load_model (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))) "peppino.dae" aiProcess_Triangulate))
+(bind-func init_gfx:MAINEVT
+  (lambda (t d)
+    (set! peppino (assimp_load_model (cstring (cat2 (String (sys_sharedir)) (String "/assets/models/"))) "peppino.dae" aiProcess_Triangulate))    
+    (xtm_render_init (glfw_get_framebuffer_width window) (glfw_get_framebuffer_height window))
+    void))
 
-(xtm_render_init
- (call-as-xtlang (glfw_get_framebuffer_width window))
- (call-as-xtlang (glfw_get_framebuffer_height window)))
-
-(bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)
+(bind-func gl_draw_loop:MAINEVT
+  (lambda (time data)
     (gl_print_error "start loop errors?")
     (gl_render peppino)
     ;; swap buffers
     (glfwPollEvents)
     (glfwSwapBuffers window)
-    ;; set next frame callback
-    (let ((next_time (+ time (convert (* 44100. delta_t)))))
-      (callback next_time gl_draw_loop next_time delta_t))))
+    ;; schedule next frame callback
+    (sched_main (+ time (/ 1.0 30.0)) gl_draw_loop:MAINEVT)))
 
+
+($ (sched_main init_gfx))
+($ (sched_main gl_draw_loop))
 ;; and to start it running...
-(gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
+;; (gl_draw_loop (now) (/ 1.0 30.0)) ;; 30fps
+

@@ -93,6 +93,7 @@
                       ,time (get_native_name ,fname) ,(car args))))
 
 
+(bind-alias CLOCKEVT [void,double,i8*]*)
 
 (bind-func clock_scheduler
   (lambda (hz:double)
@@ -117,7 +118,8 @@
       (f)
       f)))
 
-    
+(bind-alias BEATEVT [void,Rational,i8*]*)
+
 (bind-func beat_scheduler
   (lambda (bpm:double hz:double)
     (let ((evtlist:SchedEvt{Rational}* null)
@@ -143,3 +145,55 @@
       (f)
       f)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; this is a special case to run a clock scheduler on/as the main loop
+;; i.e. to schedule xtlang code on process thread 0
+;;
+(bind-val MAIN [void]*)
+
+(bind-alias MAINEVT [void,double,i8*]*)
+
+(bind-func clock_scheduler_main_callback
+  (let ((hz:double 500.0)
+        (evtlist:SchedEvt{double}* null)
+        (ft:[void,double,i8*]* null)
+        (scheduler:[i64,double]* null)
+        (running:i64 1)
+        (time 0.0)
+        (err 0)
+        (i (/ 1.0 hz)))
+    (lambda ()      
+      (set! scheduler (scheduler_init evtlist ft))
+      (set! time (clock_clock))
+      (while (> running 0)
+        (scheduler time)
+        (while (< (clock_clock) time) (thread_sleep 0 100000))
+        (set! time (+ time i))
+        void)
+      void)))
+
+(bind-func run_main_event_loop
+  (lambda ()
+    (clock_scheduler_main_callback.hz:double 500.0)
+    (xtm_set_main_callback (get_native_fptr clock_scheduler_main_callback))
+    (set! MAIN clock_scheduler_main_callback)
+    void))
+
+;; called as either
+;;
+;; (sched_main func)      ;; call now
+;; or
+;; (sched_main time func) ;; call in future
+;;
+(bind-macro
+  ""
+  (sched_main . args)
+  (if (= (length args) 1)
+      `(scheduler_evt (,(string->symbol (string-append "MAIN" ".scheduler")))
+                      (clock_clock) (get_native_name ,(car args)) null)
+      `(scheduler_evt (,(string->symbol (string-append "MAIN" ".scheduler")))
+                      ,(car args) (get_native_name ,(cadr args)) null)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

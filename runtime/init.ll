@@ -58,6 +58,8 @@ declare double @audio_clock_now()
 
 declare i32 @register_for_window_events()
 
+declare void @xtm_set_main_callback(i8*)
+
 ;; swap stuff
 declare i64 @swap64f(double)
 declare double @unswap64f(i64)
