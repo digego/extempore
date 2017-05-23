@@ -255,6 +255,10 @@
  (get_native_name closure-name . type)
  (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
         (base (if (null? (cdr pair)) "" (impc:ir:get-base-type (cadr pair)))))
+   ;; apply any aliases
+   (if (and (not (null? (cdr pair)))
+            (impc:ti:typealias-exists? base))
+       (set! base (impc:ir:get-base-type (impc:ir:pretty-print-type (impc:ti:get-typealias-type base)))))
    (set! closure-name (symbol->string closure-name))
    (if (not (null? (cdr pair)))
        (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
