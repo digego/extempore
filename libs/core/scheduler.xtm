@@ -14,15 +14,15 @@
 (sys:load "libs/core/math.xtm")
 (sys:load "libs/core/xthread.xtm")
 
-(bind-type SchedEvt <!a,i8*,i8*,SchedEvt*,SchedEvt*>)
+(bind-type SchedEvt <!a,i8*,SchedEvt*,SchedEvt*>)
 
-(bind-func scheduler_init:[[i64,!a]*,SchedEvt{!a}*,[void,!a,i8*]*]*
+(bind-func scheduler_init:[[i64,!a]*,SchedEvt{!a}*,[void,!a]*]*
   (lambda (el f)
     (let ((mutex:i8* (mutex_create))
           (thread:i8* (thread_self))
           (cnt 0)
           (evtlist:SchedEvt* el)
-          (fp:[void,!a,i8*]* f)
+          (fp:[void,!a]* f)
           (element:SchedEvt* null)
           (next:SchedEvt* null)
           (prev:SchedEvt* null))
@@ -35,13 +35,13 @@
           (set! cnt (+ cnt 1))
           (set! fp (cast (llvm_get_function_ptr (tref element 1))))
           ;; (println "exec: " time ":" (tref element 0))
-          (fptrcall fp (tref element 0) (tref element 2))
-          (set! next (tref element 4))          
-          (set! prev (tref element 3))
+          (fptrcall fp (tref element 0)) ; (tref element 2))
+          (set! next (tref element 3))          
+          (set! prev (tref element 2))
           (if (null? prev)
               (set! evtlist next)
-              (tset! prev 4 next))
-          (if (not (null? next)) (tset! next 3 prev))
+              (tset! prev 3 next))
+          (if (not (null? next)) (tset! next 2 prev))
           (free element)
           (set! element next))
         (mutex_unlock mutex)
@@ -54,14 +54,14 @@
       (while (and (not (null? evtlist))
                   (<= (tref evtlist 0) time))
         (set! prev evtlist)
-        (set! evtlist (tref evtlist 4)))
+        (set! evtlist (tref evtlist 3)))
       prev)))
 
-(bind-func scheduler_evt:[void,[i64,!a]*,!a,i8*,i8*]*
+(bind-func scheduler_evt:[void,[i64,!a]*,!a,i8*]*
   (let ((evtlist:SchedEvt* null)
         (next:SchedEvt* null)
         (new:SchedEvt* null))
-    (lambda (scheduler time fname data)
+    (lambda (scheduler time fname)
       ;; (println "sched:" scheduler time fname data)
       (if (= (thread_equal_self (scheduler.thread)) 0)
           (mutex_lock (scheduler.mutex)))
@@ -69,36 +69,34 @@
       (if (null? evtlist)
           (begin
             (set! next (scheduler.evtlist))
-            (set! new (SchedEvt_h time fname data null next))
+            (set! new (SchedEvt_h time fname null next))
             (scheduler.evtlist new)
             void)
           (begin
-            (set! next (tref evtlist 4)) ;; get next from previous
-            (set! new (SchedEvt_h time fname data evtlist next))
-            (tset! evtlist 4 new) ;; make us next of previous            
-            (if (not (null? next)) (tset! next 3 new)) ;; set us to previous of next
+            (set! next (tref evtlist 3)) ;; get next from previous
+            (set! new (SchedEvt_h time fname evtlist next))
+            (tset! evtlist 3 new) ;; make us next of previous            
+            (if (not (null? next)) (tset! next 2 new)) ;; set us to previous of next
             void))
       (if (= (thread_equal_self (scheduler.thread)) 0)
           (mutex_unlock (scheduler.mutex)))
       void)))
 
+(bind-alias SCHED [void]*)
 
 (bind-macro
   ""
-  (sched sname time fname . args)
-  (if (null? args)
-      `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
-                      ,time (get_native_name ,fname) null)
-      `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
-                      ,time (get_native_name ,fname) ,(car args))))
+  (sched sname time fname)
+  `(scheduler_evt (,(string->symbol (string-append (symbol->string sname) ".scheduler")))
+                  ,time (get_native_name ,fname)))
 
 
-(bind-alias CLOCKEVT [void,double,i8*]*)
+(bind-alias CLOCKEVT [void,double]*)
 
 (bind-func clock_scheduler
   (lambda (hz:double)
     (let ((evtlist:SchedEvt{double}* null)
-          (ft:[void,double,i8*]* null)
+          (ft:[void,double]* null)
           (scheduler:[i64,double]* null)
           (running:i64 1)
           (time 0.0)
@@ -118,12 +116,12 @@
       (f)
       f)))
 
-(bind-alias BEATEVT [void,Rational,i8*]*)
+(bind-alias BEATEVT [void,Rational]*)
 
 (bind-func beat_scheduler
   (lambda (bpm:double hz:double)
     (let ((evtlist:SchedEvt{Rational}* null)
-          (ft:[void,Rational,i8*]* null)
+          (ft:[void,Rational]* null)
           (scheduler:[i64,Rational]* null)
           (beat:Rational 1/1)
           (running:i64 1)
@@ -152,12 +150,12 @@
 ;;
 (bind-val MAIN [void]*)
 
-(bind-alias MAINEVT [void,double,i8*]*)
+(bind-alias MAINEVT [void,double]*)
 
 (bind-func clock_scheduler_main_callback
   (let ((hz:double 500.0)
         (evtlist:SchedEvt{double}* null)
-        (ft:[void,double,i8*]* null)
+        (ft:[void,double]* null)
         (scheduler:[i64,double]* null)
         (running:i64 1)
         (time 0.0)
