@@ -122,15 +122,16 @@
      void)
     void))
 
+;; glfw poll events must be called in primary thread
 (bind-func event_poll
-  (lambda (beat)
+  (lambda (time:i64 delta_t:double)
+    ;; (println "HIT" time)
     (glfwPollEvents)
-    (sched bs1 (+ 1/16 beat) event_poll:[void,Rational]*)
-    void))
+    (let ((next_time (+ time (convert (* 44100. delta_t)))))
+      (callback next_time event_poll next_time delta_t))))
 
-;; start event poll
-($ (let ((beat:Rational (bs1.beat)))
-     (sched bs1 beat event_poll)))
+;; glfw poll events must be called on primary
+(event_poll (now) (/ 1.0 30.0))
 
 ;; helper function
 (bind-func floor_rat
