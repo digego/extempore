@@ -72,7 +72,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
         m_arg = Arg;
     }
     int result = 22; //EINVAL;
-    if (!m_initialised) {
+    if (!m_initialised && !m_subsume) {
 #ifdef _WIN32
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
         m_thread = std::thread(fn);
@@ -86,6 +86,16 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
         }
 #endif
         m_initialised = !result;
+    }
+    if(m_subsume && !m_initialised) {
+      m_initialised = true;
+#ifdef __linux__      
+      if (!result && !m_name.empty()) {
+         pthread_setname_np(m_thread, m_name.c_str());
+      }
+#endif            
+      // Trampoline here never returns!
+      Trampoline(this);
     }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {

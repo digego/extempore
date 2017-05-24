@@ -178,7 +178,7 @@ public:
     }
     void createSchemeTask(void* Arg, const std::string& label, SchemeTask::Type TaskType);
     void stop();
-    bool start();
+    bool start(bool subsume=false);
 
     static SchemeProcess* I() { return sm_current; }
 };

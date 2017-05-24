@@ -61,6 +61,7 @@ private:
     bool          m_initialised;
     bool          m_detached;
     bool          m_joined;
+    bool          m_subsume; // subsume the current thread
 #ifndef _WIN32
     pthread_t     m_thread;
 #else
@@ -70,7 +71,7 @@ private:
     static THREAD_LOCAL EXTThread* sm_current;
 public:
     EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
-            m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false) {
+      m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false), m_subsume(false) {
     }
     ~EXTThread();
 
@@ -78,6 +79,7 @@ public:
     int kill();
     int detach();
     int join();
+    void setSubsume() { m_subsume = true; }
     bool isRunning() const { return m_initialised; }
     bool isCurrentThread() { return sm_current == this; }
     int setPriority(int Priority, bool Realtime);

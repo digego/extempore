@@ -152,7 +152,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     SchemeFFI::initSchemeFFI(m_scheme);
 }
 
-bool SchemeProcess::start()
+bool SchemeProcess::start(bool subsume)
 {
     //set socket options
     int t_reuse = 1;
@@ -173,9 +173,12 @@ bool SchemeProcess::start()
         m_running = false;
         return false;
     }
-    m_threadTask.start();
+    if (subsume) {
+      m_threadTask.setSubsume();
+    }
+    m_guard.init();    
     m_threadServer.start();
-    m_guard.init();
+    m_threadTask.start();    
     return true;
 }
 
@@ -230,9 +233,9 @@ void* SchemeProcess::taskImpl()
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
     m_libsLoaded = true;
 #ifdef _WIN32
-    Sleep(1000);
+    Sleep(2000);
 #else
-    sleep(1); // give time for NSApp etc. to init
+    sleep(2); // give time for NSApp etc. to init
 #endif
     // only load extempore.xtm in primary process
     if (m_name == "primary") {

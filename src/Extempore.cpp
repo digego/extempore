@@ -57,6 +57,8 @@
 #include <AppKit/AppKit.h>
 #endif
 
+#define SUBSUME_PRIMARY
+
 // main callback for use by XTLang code
 void (*XTMMainCallback)();
 
@@ -66,6 +68,21 @@ extern "C" {
     XTMMainCallback = f;
     return;
   }
+}
+
+int pass_primary_port = 7099; // lazy :(
+
+void* extempore_primary_repl_delayed_connect(void* dat)
+{
+    extemp::SchemeProcess* primary = (extemp::SchemeProcess*) dat;
+    std::string host("localhost");
+    std::string primary_name("primary");
+    int primary_port = pass_primary_port;
+
+    sleep(1);
+  
+    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
+    primary_repl->connectToProcessAtHostname(host, primary_port);
 }
 
 // WARNING EVIL WINDOWS TERMINATION CODE!
@@ -350,6 +367,11 @@ int main(int argc, char** argv)
 #endif
     }
     ascii_normal();
+#ifdef SUBSUME_PRIMARY
+    ascii_info();
+    std::cout << std::endl << "Primary on Thread 0" << std::endl;
+    ascii_normal();
+#endif    
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
     bool startup_ok = true;
@@ -357,8 +379,13 @@ int main(int argc, char** argv)
     startup_ok &= utility->start();
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
     utility_repl->connectToProcessAtHostname(host, utility_port);
+
+#ifndef SUBSUME_PRIMARY // if not subsume primary (i.e. primary NOT on thread 0)
     primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
     startup_ok &= primary->start();
+    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
+    primary_repl->connectToProcessAtHostname(host, primary_port);
+    //std::cout << "primary started:" << std::endl << std::flush;    
     if (!startup_ok) {
         ascii_error();
         printf("Error");
@@ -367,13 +394,6 @@ int main(int argc, char** argv)
         fflush(NULL);
         exit(1);
     }
-    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
-    primary_repl->connectToProcessAtHostname(host, primary_port);
-    /*
-#ifdef __APPLE__
-    [[NSApplication sharedApplication] run];
-    #else
-    */
     while (true) {
       if (XTMMainCallback) { XTMMainCallback(); }
 #ifdef _WIN32
@@ -383,7 +403,16 @@ int main(int argc, char** argv)
 #else
       sleep(2000);
 #endif
-    }
-    // #endif
+    }      
+#else
+    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+
+    // need to connect to primary from alternate thread (can be short lived simply puts repl on heap)
+    extemp::EXTThread* replthread = new extemp::EXTThread(extempore_primary_repl_delayed_connect,primary);
+    pass_primary_port = primary_port;
+    replthread->start();
+    // start the primary process running on this thread (i.e. process thread 0)
+    primary->start(true); // this will not return
+#endif // end SUBSUME_PRIMARY
     return 0;
 }
