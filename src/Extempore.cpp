@@ -78,9 +78,11 @@ void* extempore_primary_repl_delayed_connect(void* dat)
     std::string host("localhost");
     std::string primary_name("primary");
     int primary_port = pass_primary_port;
-
+#ifdef _WIN32
+	Sleep(1000);
+#else
     sleep(1);
-  
+#endif
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
 }
