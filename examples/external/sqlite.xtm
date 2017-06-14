@@ -2,10 +2,6 @@
 ;;
 ;; A trivial SQL example
 ;;
-;; this example does not store to disk
-;; tirivally change ":memory:" to a filename
-;; and your database will be stored!
-;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (sys:load "libs/external/sqlite.xtm")
@@ -49,7 +45,7 @@
        (if (<> SQLITE_OK res)          
            (println "SQLITE Err:" (Str (sqlite3_errstr res)))
            (let ((columns (sqlite3_column_count stmt)) (i 0))
-             (printout " | ")
+             (printout "\n | ")
              (dotimes (i columns)
                (printout (Str (sqlite3_column_name stmt i)) " | "))
              (println "\n------------------------")
@@ -73,11 +69,17 @@
 ;; note that if your new.db is NOT empty (i.e. already has Hackers)
 ;; then you will 'correctly' get an SQL error here!
 (db_cmd "create table Hackers (id integer primary key autoincrement, name text);")
+;; show new table! (sqlite_master is sqlite's meta table)
+(db_cmd "select * from sqlite_master;")
 ;; insert two hackers!
-(db_cmd "insert into Hackers (name) values ('Andrew Sorensen'), ('Ben Swift');")
+(db_cmd "insert into Hackers (name) values ('Andrew Sorensen'), ('Ben Swift'), ('Ali Kerr');")
 ;; select everything in table Hackers
 (db_cmd "select * from Hackers;")
+;; select Ali from hackers
+(db_cmd "select * from Hackers where name like '%Kerr';")
 ;; close the DB
 (db_close)
+
+
 
 
