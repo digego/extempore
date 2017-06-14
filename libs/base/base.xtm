@@ -166,6 +166,35 @@
 (bind-func print
   (lambda (x:double) (printf "%f" x) void))
 
+(bind-func print:[void,!a]* -> (lambda (r a) (t:vector? a))
+  (lambda (vec)
+    (printout "/" (vref vec 0))
+    (doloop (i (- (num-of-elts vec) 1))
+      (printout "," (vref vec (+ 1 i))))
+    (printout "/")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r a)
+                                 (and (t:array? a)
+                                      (not (t:pointer? a))))
+  (lambda (arr)
+    (let ((a1 (ref arr)))
+      (printout "|" (aref a1 0))
+      (doloop (i (- (num-of-elts a1) 1))
+        (printout "," (aref a1 (+ 1 i))))
+      (printout "|")
+      void)))
+
+(bind-func print:[void,!a]* -> (lambda (r a)
+                                 (and (t:array? a)
+                                      (t:pointer? a)))
+  (lambda (arr)
+    (printout "|" (aref arr 0))
+    (doloop (i (- (num-of-elts arr) 1))
+      (printout "," (aref arr (+ 1 i))))
+    (printout "|")
+    void))
+
 (bind-func print:[void,!a]*
   "generic \"catch-all\" print"
   (lambda (x) (printf "_") void))

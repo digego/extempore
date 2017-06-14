@@ -153,3 +153,53 @@
  (constraint10)
  'compile-should-fail)
 
+
+;; zip array if arrays if arrays are values
+(bind-func zip_array_test:[!a,!b,!b]* -> (lambda (r a b)
+                                           (if (and (t:array? a)
+                                                    (not (t:pointer? a)))
+                                               (list 213
+                                                     (list (car a)
+                                                           (* (cadr a) 2)
+                                                           (caddr a))
+                                                     a
+                                                     b)
+                                               #f))
+  (lambda (aprime bprime)
+    (let ((a (ref aprime))
+          (b (ref bprime))
+          (r (salloc))
+          (num (num-of-elts a))
+          (i 0))
+      (dotimes (i num)
+        (aset! r (+ (* i 2) 0) (aref a i))
+        (aset! r (+ (* i 2) 1) (aref b i)))
+      (pref r 0))))
+
+
+;; zip array if arrays are pointers
+(bind-func zip_array_test:[!a,!b,!b]* -> (lambda (r a b)
+                                           (if (and (t:array? a)
+                                                    (t:pointer? a))
+                                               (list 213                                                     
+                                                     (list (car a)
+                                                           (* (cadr a) 2)
+                                                           (caddr a))
+                                                     a b)
+                                               #f))
+  (lambda (a b)
+    (let ((r (alloc))
+          (num (num-of-elts a))
+          (i 0))
+      (dotimes (i num)
+        (aset! r (+ (* i 2) 0) (aref a i))
+        (aset! r (+ (* i 2) 1) (aref b i)))
+      r)))
+
+(xtmtest
+ '(bind-func constraint11
+    (lambda ()
+      (println (zip_array_test (array_ref 1:i64 2 3 4) (array_ref 0:i64 0 0 0)))    
+      (println (zip_array_test (array 1.0:f 2.0 3.0 4.0) (array 0.0:f 0.0 0.0 0.0)))
+      void))
+ (constraint11))

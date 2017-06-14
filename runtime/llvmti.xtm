@@ -2108,17 +2108,17 @@
                (results (map (lambda (r) (cadr r)) res)))
           (if (and (not (null? results)) (member (car arity) results)) #t #f)))))
 
-(define impc:ti:genericfunc-type-constraint
-  (lambda (name . arity)
-    (if (string? name) (set! name (string->symbol name)))
-    (if (null? arity)
-        (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
-          (if res (list-ref (cdr res) 4)  #f))
-        (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
-               (results (map (lambda (r) (cadr r)) res)))
-          (if (and (not (null? results)) (member (car arity) results))
-              (list-ref (cdr (cl:find-if (lambda (x) (= (cadr x) (car arity))) res)) 4)
-              #f)))))
+;; (define impc:ti:genericfunc-type-constraint
+;;   (lambda (name . arity)
+;;     (if (string? name) (set! name (string->symbol name)))
+;;     (if (null? arity)
+;;         (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
+;;           (if res (list-ref (cdr res) 4)  #f))
+;;         (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
+;;                (results (map (lambda (r) (cadr r)) res)))
+;;           (if (and (not (null? results)) (member (car arity) results))
+;;               (list-ref (cdr (cl:find-if (lambda (x) (= (cadr x) (car arity))) res)) 4)
+;;               #f)))))
 
 (define impc:ir:genericfunc-stringify-generic-arg-strings
   (lambda (args)
@@ -2166,6 +2166,11 @@
                       "notype")
                      ((impc:ir:type? x)
                       (impc:ir:pretty-print-type x))
+                     ((and (list? x) ;; if we have mulitple VALID type
+                           ;; options then just choose the first valid
+                           ;; type 
+                           (member #t (map (lambda (xx) (impc:ir:type? xx)) x)))
+                      (impc:ir:pretty-print-type (car (cl:remove-if-not (lambda (xx) (impc:ir:type? xx)) x))))
                      (else "_")))
              (if (and (number? (car type))
                       (impc:ir:closure? type))
@@ -2257,12 +2262,16 @@
                                             #t))
                                    (<> arity (cadr x))))
                                 tmp)))
-        (if (null? res)
-            (impc:compiler:print-compiler-error (string-append "Failed to find suitable generic match for call to "
-                                                               name ;(symbol->string name)
-                                                               " arity(" (number->string arity)
-                                                               ") for type " (sexpr->string type))))
-        ;; (println 'res res)
+        ;; (println 'res res 'tmp tmp)
+        ;; if we are searching for 'notype' (i.e. haven't really
+        ;; started looking yet) then we will just return the first
+        ;; thing with the correct arity.
+        (if (and (null? res)
+                 (member #t (map (lambda (x) (and (string? x) (string=? x "_"))) type)))
+            (let ((t2 (cl:remove-if (lambda (x) (<> arity (cadr x))) tmp)))
+              (if (not (null? t2))
+                  (set! res (list (car t2))))))
+
         ;; if the initial type request was #f (i.e. arity only check) then...
         ;; (if (and (null? res) arity_check_only) (set! res tmp))
         ;; (println 'res: (map (lambda (gp) (car (cddddr gp))) res))
@@ -5315,6 +5324,10 @@ Continue executing `body' forms until `test-expression' returns #f"
                                     (set-cdr! pair (list t))
                                     (set-cdr! pair (cl:remove-duplicates (append (list t) pair-rest))))
                                 )
+                              ;(set-cdr! pair (cl:remove-if-not
+                              ;                (lambda (x) (impc:ir:type? x))
+                              ;                (cl:remove-duplicates
+                              ;                 (append t pair-rest))))))                              
                               (set-cdr! pair (cl:remove-duplicates (append t pair-rest))))))
                     '())))))))
 
@@ -5542,7 +5555,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                 (equal? request? (impc:ti:type-unify (cdr (assoc-strcmp ast vars)) vars))
                 #t))
            (begin
-             ;;(println '.................saving-time!)
+             ;; (println '.................saving-time!)
              (list (impc:ti:type-unify (cdr (assoc-strcmp ast vars)) vars))))
           ((impc:ti:globalvar-exists? (symbol->string ast))
            (list (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string ast)))))
@@ -6352,7 +6365,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define *impc:ti:nativef-generics:calls* 0)
 
-
 ;; generics check
 (define impc:ti:nativef-generics
   (lambda (ast vars kts request?)
@@ -6618,23 +6630,29 @@ Continue executing `body' forms until `test-expression' returns #f"
                        (set! gftype (impc:ti:type-clean (car gftype)))
                        ;; (println 'gftype2: gftype)
                        (impc:ti:nativef-generics-final-tests ast gpoly-type gftype gnum vars kts)
-                       ;; (println 'pre ast 'constraint 'grtype grtype 'gftype gftype)
-                       (if (and (impc:ir:type? grtype)
+
+                       ;; (println 'pre ast 'grtype grtype 'gftype gftype)
+                                              
+                       (if (and (not (null? grtype)) 
                                 constraint)
-                           (let ((chk (if (and (list? (cadr constraint))
-                                               (<> (length (cdr grtype))
+                           (let* ((lgrtype (if (= (length grtype) (+ 2 arity)) ;; in case grtype is a list of multiple closure options rather than 1 specific closure type
+                                               grtype
+                                               (car (cl:remove-if-not (lambda (x)
+                                                                        (impc:ir:closure? x))
+                                                                      grtype))))
+                                  (chk (if (and (list? (cadr constraint))
+                                               (<> (length (cdr lgrtype))
                                                    (length (cadr constraint))))
                                           'false
-                                          (apply (eval constraint) (cdr grtype)) #t)))
+                                          (apply (eval constraint) (cdr lgrtype)) #t)))
+                             ;; (println 'chk chk)
                              (if (boolean? chk)
                                  (if chk
                                      'great
                                      (impc:compiler:print-compiler-error
-                                      (string-append "Failed constraint check: "
-                                                     (sexpr->string constraint)
-                                                     " for generic call "
-                                                     (sexpr->string ast)
-                                                     " for type "
+                                      (string-append "Failed constraint check calling \""
+                                                     (car (regex:split (atom->string (car ast)) "##"))
+                                                     "\" with type " 
                                                      (impc:ir:pretty-print-type grtype))))
                                  (if (impc:ir:type? chk)
                                      (set! grtype chk)
@@ -6644,7 +6662,9 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                      " for generic call "
                                                      (sexpr->string ast)
                                                      " for type "
-                                                     (impc:ir:pretty-print-type grtype)))))))
+                                                     (if (impc:ir:type? grtype)
+                                                         (impc:ir:pretty-print-type grtype)
+                                                         "<uknown>")))))))
                                  
                        ;; (println 'post ast 'constraint 'grtype grtype 'gftype gftype)                           
                        ;; if grtype is VALID
@@ -7486,8 +7506,7 @@ xtlang's `let' syntax is the same as Scheme"
            (b (map (lambda (x) (set! a (impc:ti:type-check x vars kts a))) (cddr ast))))
       (list *impc:ir:array* (length (cdr ast)) a))))
 
-
-(define impc:ti:array-set-check
+(define impc:ti:array-set-check  
   (lambda (ast vars kts request?)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error (car ast)))
@@ -7495,14 +7514,15 @@ xtlang's `let' syntax is the same as Scheme"
            ;; b should be fixed point types
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si64* *impc:ir:si32*)))
            ;; c should be of type a*
-           (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f
-                                                            (if (and (not (impc:ir:type? a))
-                                                                     (impc:ir:array? (car a)))
-                                                                (list (caddr (car a)))
-                                                                (list (impc:ir:pointer-- (car a))))))))
+           (c (impc:ti:type-check (cadddr ast) vars kts (if (or (null? a)
+                                                                (not (impc:ir:type? (car a))))
+                                                            #f
+                                                            (list (caddr (car a)))))))
       (if (or (and (not (null? a))
+                   (impc:ir:type? (car a))
                    (not (impc:ir:array? (car a))))
               (and (not (null? a))
+                   (impc:ir:type? (car a))
                    (> (impc:ir:get-ptr-depth (car a)) 1)))
           (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a) c)))
       ;; array set check will return the value set
@@ -7560,8 +7580,10 @@ xtlang's `let' syntax is the same as Scheme"
            ;; c should be of type a*
            (c (impc:ti:type-check (cadddr ast) vars kts (if (null? a) #f (list (caddr (car a)))))))
       (if (or (and (not (null? a))
+                   (impc:ir:type? (car a))
                    (not (impc:ir:vector? (car a))))
               (and (not (null? a))
+                   (impc:ir:type? (car a))
                    (> (impc:ir:get-ptr-depth (car a)) 1)))
           (impc:compiler:print-bad-type-error (impc:ir:get-type-str (car a))))
       ;; vector set returns a whole new vector!  check llvm ir doc
@@ -7725,6 +7747,15 @@ xtlang's `let' syntax is the same as Scheme"
           request?)
         request?)))
 
+(define impc:ti:num-of-elts-check
+  (lambda (ast vars kts request?)
+    *impc:ir:si64*))
+
+(define impc:ti:ref-check
+  (lambda (ast vars kts request?)
+    (if (not (assoc-strcmp (cadr ast) vars))
+        (impc:compiler:print-compiler-error "no valid local variable found in call to ref" ast))
+    (impc:ir:pointer++ (cadr (assoc-strcmp (cadr ast) vars)))))
 
 (define impc:ti:make-tuple-check
   (lambda (ast vars kts request?)
@@ -8388,6 +8419,8 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) (member (car ast) '(heap-alloc))) (impc:ti:heap-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(zone-alloc))) (impc:ti:zone-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(num-of-elts))) (impc:ti:num-of-elts-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(ref))) (impc:ti:ref-check ast vars kts request?))                    
           ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref-ptr))) (impc:ti:tuple-ref-ptr-check ast vars kts request?))
@@ -11060,7 +11093,7 @@ e.g.
                     (lambda ()
                       ,(if (not (impc:ir:pointer? type))
                            `(let ((s:i8* null))
-                              (println "returning null for non-pointer type")
+                              ;; (println "returning null for non-pointer type")
                               ,@expr
                               s)
                            `(let ((res:i8* (cast (begin ,@expr) i8*)))
@@ -11551,17 +11584,30 @@ e.g.
 ;; they should succeed against *impc:ir:notype*
 ;;
 
-(define t:integer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:fixed-point? x))))
-(define t:float? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:floating-point? x))))
-(define t:number? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:number? x))))
-(define t:void? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:void? x))))
-(define t:signed? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:signed? x))))
-(define t:closure? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:closure? x))))
-(define t:vector? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:vector? x))))
-(define t:array? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:array? x))))
-(define t:tuple? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:tuple? x))))
-(define t:scalar? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:scalar? x))))
-(define t:pointer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:pointer? x))))
+;; (define t:integer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:fixed-point? x))))
+;; (define t:float? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:floating-point? x))))
+;; (define t:number? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:number? x))))
+;; (define t:void? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:void? x))))
+;; (define t:signed? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:signed? x))))
+;; (define t:closure? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:closure? x))))
+;; (define t:vector? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:vector? x))))
+;; (define t:array? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:array? x))))
+;; (define t:tuple? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:tuple? x))))
+;; (define t:scalar? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:scalar? x))))
+;; (define t:pointer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:pointer? x))))
+;; (define t:notype? (lambda (x) (equal? x *impc:ir:notype*)))
+
+(define t:integer? (lambda (x) (impc:ir:fixed-point? x)))
+(define t:float? (lambda (x) (impc:ir:floating-point? x)))
+(define t:number? (lambda (x) (impc:ir:number? x)))
+(define t:void? (lambda (x) (impc:ir:void? x)))
+(define t:signed? (lambda (x) (impc:ir:signed? x)))
+(define t:closure? (lambda (x) (impc:ir:closure? x)))
+(define t:vector? (lambda (x) (impc:ir:vector? x)))
+(define t:array? (lambda (x) (impc:ir:array? x)))
+(define t:tuple? (lambda (x) (impc:ir:tuple? x)))
+(define t:scalar? (lambda (x) (impc:ir:scalar? x)))
+(define t:pointer? (lambda (x) (impc:ir:pointer? x)))
 (define t:notype? (lambda (x) (equal? x *impc:ir:notype*)))
 
 (define t:cleanup-string-type

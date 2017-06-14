@@ -2483,6 +2483,9 @@
           (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-str t) "array index must be an integer" ast))
       (if (and (integer? (caddr ast)) (> (+ 1 (caddr ast)) (cadr ttype)))
           (impc:compiler:print-index-oob-error 'array ast))
+      (if (and (not (impc:ir:pointer? ttype))
+               (not (number? (caddr ast))))
+          (impc:compiler:print-compiler-error "Value Arrays can only be accessed by literal integer offets.  You could try using an array reference instead?" ast))
       (emit index-str os)
       (emit var-str os)
       (emit "; array ref\n" os)
@@ -2829,7 +2832,25 @@
                            ">") os)
       (impc:ir:strip-space os))))
 
+(define impc:ir:compiler:num-of-elts
+  (lambda (ast types)
+    (let* ((t (assoc-strcmp (cadr ast) types)))
+      (if (or (null? t)
+              (and (not (impc:ir:array? (cdr t)))
+                   (not (impc:ir:vector? (cdr t)))))
+          (impc:compiler:print-compiler-error "num-of-elts must take a variable of array or vector type not: " (cdr ast)))
+      (impc:ir:gname (number->string (cadr (cdr t))) "i64")
+      "")))
 
+(define impc:ir:compiler:ref
+  (lambda (ast types)
+    (let* ((t (assoc-strcmp (cadr ast) types)))
+      (if (null? t)
+          (impc:compiler:print-compiler-error "single argument to ref must be a valid variable"))
+      (impc:ir:gname (string-append (symbol->string (cadr ast)) "Ptr")
+                     (string-append "%" (symbol->string (cadr ast)) "Ptr")
+                     (impc:ir:get-type-str (impc:ir:pointer++ (cdr t))))
+      "")))
 
 (define impc:ir:compiler:zone-alloc-without-size
   (lambda (ast types hint?)
@@ -3558,7 +3579,6 @@
         ;; 	  (emit (impc:ir:gname "olddat" "i8*") " = bitcast " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) " to i8*\n" os)
         ;; 	  (emit "call i8* @memcpy(i8* " (car (impc:ir:gname "newdat")) ", i8* " (car (impc:ir:gname "olddat")) ", i64 " (number->string zallocsize) ")\n" os)
         ;; 	  (emit (impc:ir:gname "newvect" (string-append (cadr mathval) "*")) " = bitcast i8* " (car (impc:ir:gname "newdat")) " to " (string-append (cadr mathval) "*") "\n" os)))
-
         (impc:ir:strip-space os)))))
 
 
@@ -4187,6 +4207,10 @@
                     (impc:ir:compiler:heap-alloc ast types hint?))
                    ((equal? (car ast) 'stack-alloc)
                     (impc:ir:compiler:stack-alloc ast types hint?))
+                   ((equal? (car ast) 'num-of-elts)
+                    (impc:ir:compiler:num-of-elts ast types))
+                   ((equal? (car ast) 'ref)
+                    (impc:ir:compiler:ref ast types))
                    ((equal? (car ast) 'make-tuple)
                     (impc:ir:compiler:make-tuple ast types hint?))
                    ((equal? (car ast) 'tuple-ref)
