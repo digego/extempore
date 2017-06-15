@@ -169,7 +169,27 @@
 (define *impc:compiler:pretty-print-name-color* 'green)
 (define *impc:compiler:pretty-print-type-color* 'yellow)
 (define *impc:compiler:pretty-print-error-color* 'red)
-(define *impc:compiler:pretty-print-code-color* 'blue)
+(define *impc:compiler:pretty-print-code-color* 'cyan)
+
+(define impc:compiler:print-constraint-error
+  (lambda (name type constraint . args)
+    (print-with-colors *impc:compiler:pretty-print-error-color*
+                       'default #t (print "Constraint Error"))
+    (print " ")
+    (print-with-colors *impc:compiler:pretty-print-name-color* 'default #f (print name))
+    (print " failed constraint ")
+    (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print constraint))
+    (print "\nwith type: ")
+    (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f (print type))           
+    (if (not (null? args))
+        (begin
+          (print "\nast: ")
+          (define ast (cons (string->symbol name) (cdar args)))
+          (print (sexpr->string ast))))
+    (println)
+    (if (impc:aot:currently-compiling?)
+        (quit 2)
+        (throw ""))))
 
 (define impc:compiler:print-double-colon-error
   (lambda (var)
@@ -2012,11 +2032,7 @@
       ;; apply any macros to generic code!
       (if (and (symbol? (caddr code))
                (equal? '-> (caddr code)))
-          (set! type-constraint (cadddr code))
-          (set! type-constraint #f))
-      ;; (set! code (cons (car code)
-      ;;                  (list (cadr code)
-      ;;                        (impc:ti:genericfunc-apply-macros (car (cddddr code))))))
+          (set! type-constraint (cadddr code)))
       (set! code (cons (car code)
                        (list (cadr code)
                              (impc:ti:genericfunc-apply-macros (if type-constraint
@@ -6409,6 +6425,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                   ;; request? request? args)))
                   (gpoly-code (cadr gpt))
                   (constraint (cadddr gpt))
+                  (constraint-code (if (not constraint) #f (if (symbol? constraint) (get-closure-code (eval constraint)) constraint)))
                   (lambda-code (caddr gpoly-code))
                   (gtype (impc:ir:get-type-from-pretty-str (symbol->string (car gpt))))
                   (gpoly-type (impc:ti:get-type-for-gpoly
@@ -6417,6 +6434,7 @@ Continue executing `body' forms until `test-expression' returns #f"
              ;; (println "gpt:" gpt)
              ;; (println "gtype:" gtype)
              ;; (println "constraint:" constraint)
+             ;; (println "constraint-code:" constraint-code)
 
           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
              ;; it is possible for some generic types to be missed from 'vars'
@@ -6640,20 +6658,20 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                (car (cl:remove-if-not (lambda (x)
                                                                         (impc:ir:closure? x))
                                                                       grtype))))
-                                  (chk (if (and (list? (cadr constraint))
-                                               (<> (length (cdr lgrtype))
-                                                   (length (cadr constraint))))
+                                  (chk (if (and (list? (cadr constraint-code))
+                                                (<> (length (cdr lgrtype))
+                                                    (length (cadr constraint-code))))
                                           'false
                                           (apply (eval constraint) (cdr lgrtype)) #t)))
                              ;; (println 'chk chk)
                              (if (boolean? chk)
                                  (if chk
                                      'great
-                                     (impc:compiler:print-compiler-error
-                                      (string-append "Failed constraint check calling \""
-                                                     (car (regex:split (atom->string (car ast)) "##"))
-                                                     "\" with type " 
-                                                     (impc:ir:pretty-print-type grtype))))
+                                     (impc:compiler:print-constraint-error
+                                      (car (regex:split (atom->string (car ast)) "##"))
+                                      (impc:ir:pretty-print-type grtype)
+                                      constraint
+                                      ast))
                                  (if (impc:ir:type? chk)
                                      (set! grtype chk)
                                      (impc:compiler:print-compiler-error
