@@ -155,16 +155,19 @@
 
 
 ;; zip array if arrays if arrays are values
-(bind-func zip_array_test:[!a,!b,!b]* -> (lambda (r a b)
-                                           (if (and (t:array? a)
-                                                    (not (t:pointer? a)))
-                                               (list 213
-                                                     (list (car a)
-                                                           (* (cadr a) 2)
-                                                           (caddr a))
-                                                     a
-                                                     b)
-                                               #f))
+(define zip_array_val_constraint
+  (lambda (r a b)
+    (if (and (t:array? a)
+             (not (t:pointer? a)))
+        (list 213
+              (list (car a)
+                    (* (cadr a) 2)
+                    (caddr a))
+              a
+              b)
+        #f)))
+
+(bind-func zip_array_test:[!a,!b,!b]* -> zip_array_val_constraint
   (lambda (aprime bprime)
     (let ((a (ref aprime))
           (b (ref bprime))
@@ -178,15 +181,18 @@
 
 
 ;; zip array if arrays are pointers
-(bind-func zip_array_test:[!a,!b,!b]* -> (lambda (r a b)
-                                           (if (and (t:array? a)
-                                                    (t:pointer? a))
-                                               (list 213                                                     
-                                                     (list (car a)
-                                                           (* (cadr a) 2)
-                                                           (caddr a))
-                                                     a b)
-                                               #f))
+(define zip_array_ptr_constraint
+  (lambda (r a b)
+    (if (and (t:array? a)
+             (t:pointer? a))
+        (list 213                                                     
+              (list (car a)
+                    (* (cadr a) 2)
+                    (caddr a))
+              a b)
+        #f)))  
+
+(bind-func zip_array_test:[!a,!b,!b]* -> zip_array_ptr_constraint
   (lambda (a b)
     (let ((r (alloc))
           (num (num-of-elts a))
