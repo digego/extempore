@@ -9,8 +9,8 @@
 
 (sys:load "libs/core/instruments.xtm")
 
-(make-instrument bass analog)
-(make-instrument lead analog)
+(make-instrument bass analogue)
+(make-instrument lead analogue)
 
 (bind-func dsp:DSP
   (lambda (in time chan dat)
@@ -21,114 +21,91 @@
 
 (dsp:set! dsp)
 
-(bind-func drwho_bass
+
+(bind-func analogue_oxygene_bass
   (lambda (inst)
-    (synth_reset inst)
+    (analogue_reset inst)
     ;; oscs
     (set_osc1_amp inst 0.4)
     (set_osc1_wave inst PARAM_PULSE)
-    (set_osc1_tune inst 0.5)
-    (set_osc1_pan inst 0.4)
-    (set_osc1_pw inst 0.55)
+    (set_osc1_tune inst 0.25)
+    (set_osc1_pw inst 0.5) ;; square
 
     (set_osc2_amp inst 0.4)
-    (set_osc2_wave inst PARAM_PULSE)
-    (set_osc2_tune inst 1.001)
-    (set_osc2_pan inst 0.5)
-    (set_osc2_pw inst 0.65)
+    (set_osc2_wave inst PARAM_SAW)
+    (set_osc2_tune inst 0.5)
     
-    (set_osc3_amp inst 0.2)
-    (set_osc3_wave inst PARAM_PULSE)
-    (set_osc3_tune inst 2.0025)
-    (set_osc3_pan inst 0.6)
-    (set_osc3_pw inst 0.75)
-
-    (set_osc4_amp inst 0.5)
-    (set_osc4_wave inst PARAM_SINE)
-    (set_osc4_tune inst 0.2501)
-    (set_osc4_pan inst 0.5)
-    (set_osc4_pw inst 0.5)
-    
-    ;; amp env
-    (set_amp_env inst 5.0 1000.0 0.1 250.0)    
-
     ;; filter
-    (set_filter_frq inst 700.0) ;; 700 hz
-    (set_filter_env inst 5.0 200.0 0.1 250.0)
-    (set_filter_env_amt inst 2500.0)
-    (set_filter_res inst 0.25)
+    (set_filter_frq inst 400.0)
+    (set_filter_res inst 0.0)
+    (set_filter_env inst 0.0 100.0 0.0 750.0)
+    (set_filter_env_amt inst 300.0)
+    
+    ;; amplitude
+    (set_amp_env inst 0.0 0.0 1.0 750.0)        
+    (set_gain inst 10.0)
 
-    ;; pitch env
-    (set_pitch_env inst 100.0 0.0)
-    (set_pitch_env_amt inst -0.01)
+    ;; polyphony
+    (set_polyphonic inst) ;monophonic inst)
+    (set_legato inst 1)   
+    void))
 
-    ;; set reverb
-    (set_reverb_mix inst 0.5)
-    (set_reverb_size inst 0.8)
 
-    ;; set gain
-    (set_gain inst 5.0)
+(bind-func analogue_oxygene_lead
+  (lambda (inst)
+    (analogue_reset inst)
+    ;; oscs
+    (set_osc1_amp inst 0.4)
+    (set_osc1_wave inst PARAM_SAW)
+    (set_osc1_tune inst 0.5)
+
+    (set_osc2_amp inst 0.4)
+    (set_osc2_wave inst PARAM_SAW)
+    (set_osc2_tune inst 0.50025)
+    
+    (set_osc3_amp inst 0.4)
+    (set_osc3_wave inst PARAM_SAW)
+    (set_osc3_tune inst 0.4996)
+    
+    ;; filter
+    (set_filter_frq inst 1500.0)
+    (set_filter_env_follow_frq inst 2.5)
+    (set_filter_env inst 0.0 400.0 0.0 0.0)            
+    (set_filter_env_amt inst -1500.0)
+    (set_filter_res inst 0.0)
+
+    ;; set delay
+    (set_delay_mix inst 0.3)
+    (set_delay_time_left inst (* 0.125 .125 (/ 60.0 125.0) SRs))
+    (set_delay_time_right inst (* 0.125 .125 (/ 60.0 125.0) SRs))
+    (set_delay_fb inst 0.45)
+
+    ;; amplitude
+    (set_amp_env inst 150.0 0.0 1.0 600.0)        
+    (set_gain inst 15.0)
 
     ;; polyphonic
     (set_polyphonic inst)
     void))
 
 
-(bind-func drwho_lead
-  (lambda (inst)
-    (synth_reset inst)
-    ;; oscs
-    (set_osc1_amp inst 0.6)
-    (set_osc1_wave inst PARAM_SINE)
-    (set_osc1_tune inst 1.0)
+(analogue_oxygene_bass bass)
+(analogue_oxygene_lead lead)
 
-    (set_osc2_amp inst 0.4)
-    (set_osc2_wave inst PARAM_PULSE)
-    (set_osc2_tune inst 2.003)
-    (set_osc2_pw inst 0.5) ;; sqr
-    
-    ;; frq mod osc1
-    (set_lfo inst PARAM_LFO1 1.0 3.128)    
-    (set_mod_matrix inst PARAM_LFO1 PARAM_OSC1_FRQ 7.0)
-    
-    ;; amp env
-    (set_amp_env inst 50.0 0.0 1.0 3000.0)
-    
-    ;; filter
-    (set_filter_frq inst 800.0) ;; 700 hz
-    (set_filter_env_amt inst 0.0) ;; no envelope
-    (set_filter_res inst 0.2)
-    (set_filter_env_follow_frq inst 2.0)
-    
-    ;; set reverb
-    (set_reverb_mix inst 0.65)
-    (set_reverb_size inst 0.8)
-    
-    ;; mono synth
-    (set_monophonic inst)
-    (set_portamento inst 60.0)
-    (set_legato inst 1)
-    
-    ;; set gain
-    (set_gain inst 6.0)
-    void))
-
-
-(drwho_bass bass)
-(drwho_lead lead)
-
-(*metro* 'set-tempo 135.0)
+(*metro* 'set-tempo 125.0)
 
 (define R repeat)
 
 (define test
   (lambda (beat dur)
-    (playp 8 0 bass 0 `(,@(R `(e3 __ e3) 6) (g3 __ g3) (g3 __ d3))  (cosr 70 20 2) 0.5)
-    (playp 32 0 lead 0 `((b4 b4 b4 d5)
-                           (b4 b4 b4 __)
-                           (b4 g4 g4 b3 d4 (d4 __ c4) b3 (b3 __ a3))
-                           (b3 b3 b3 (b3 c4 d4) b3 __ b3 c5))
-           (cosr 80 10 3) 2.5)
+    (playp 32 0 bass `(,@(R `((60 __ 60) (58 __ 60) (__ __ 55) (58 __ 55)) 4)
+                       ,@(R `((62 __ 62) (60 __ 62) (__ __ 57) (60 __ 57)) 2)
+                       ,@(R `((65 __ 65) (63 __ 60) (__ __ 65) (63 __ 60)) 2))
+           (cosr 80 20 2) 1/4)    
+    (playp 32 0 lead 12 `(,@(R `(72 (__ __ 67) (63 __ 67) (__ __ 60) ,@(R __ 4)) 2)
+                          ,@(R `(70 (__ __ 69) (67 __ 69) (__ __ 62) ,@(R __ 4)) 1)
+                          ,(R `((69 __ 67) (65 __ 60) __ __) 2))
+           (cosr 80 20 2) (* 2.0 dur))
     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
 
 (test (*metro* 'get-beat 4) 1/4)
