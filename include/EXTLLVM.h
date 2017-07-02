@@ -149,7 +149,14 @@ inline llvm_zone_t* llvm_zone_create(uint64_t size)
         abort(); // in case a leak can be analyzed post-mortem
     }
 #ifdef _WIN32
-    zone->memory = malloc(size_t(size)); // TODO: what about alignment for Windows???
+	if (size == 0) {
+		zone->memory = NULL;
+	}
+	else {
+		// this crashes extempore but I have no idea why????
+		// zone->memory = _aligned_malloc((size_t)size, (size_t)LLVM_ZONE_ALIGN);
+		zone->memory = malloc(size_t(size));
+	}
 #else
     posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
 #endif

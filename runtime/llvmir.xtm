@@ -876,8 +876,9 @@
            (apply max (map (lambda (tt)
                              (impc:ir:get-alignment tt))
                            (cdr t))))
+          ;; (else (impc:ir:get-type-size t)))))
           (else ;; under MCJIT i64 appears to be 4-byte aligned, not
-                ;; 8-byte aligned. WTF?
+           ;; 8-byte aligned. WTF?
            (if (= t 2) 4 (impc:ir:get-type-size t))))))
 
 
@@ -3157,7 +3158,7 @@
     (let* ((os (make-string 0))
            (var-str (impc:ir:compiler (cadr ast) types))
            (var (impc:ir:gname))
-                                        ;(tuple-type (impc:ir:get-type-from-str (cadr var)))
+           ;;(tuple-type (impc:ir:get-type-from-str (cadr var)))
            (tuple-type (or (impc:ti:get-namedtype-type (cadr var))
                            (impc:ir:get-type-from-str (cadr var))))
            (element-type (list-ref (cdr tuple-type) (caddr ast)))
@@ -3165,7 +3166,7 @@
            (idx (impc:ir:gname))
            (val-str (impc:ir:compiler (cadddr ast) types element-type))
            (val (impc:ir:gname)))
-                                        ;(println 'var: var 'idx: idx 'val: val 'elementtype: element-type)
+      ;;(println 'var: var 'idx: idx 'val: val 'elementtype: element-type)
       ;; type tests
       (if (not (impc:ir:tuple? (impc:ir:get-type-from-str (cadr var))))
           (impc:compiler:print-bad-type-error-with-ast (cadr var) "tuple must be a pointer" ast))
@@ -3191,7 +3192,6 @@
                            (cadr var) " " (car var) ", i64 0, i32 " (car idx) "\n") os)
       (emit (string-append "store " (cadr val) " " (car val) ", "
                            (cadr (impc:ir:gname)) " " (car (impc:ir:gname)) "\n") os)
-
       (impc:ir:gname "val" (car val) (cadr val))
       (impc:ir:strip-space os))))
 

@@ -112,11 +112,12 @@
 (define my-tuple-chk
   (lambda (x)
     (if (t:notype? x) #t
-        (and (t:tuple? x) (= (length x) 4)))))
+        (and (t:tuple? x) (t:elts? x 3)))))
 
 (bind-func printer:[void,!a]* -> (lambda (r x) (my-tuple-chk x))
   (lambda (x)
     (println "->" (tref x 0) (tref x 1) (tref x 2))))
+
 
 (xtmtest
  '(bind-func constraint7
@@ -128,7 +129,7 @@
 ;; check for Symbol or String
 ;;
 
-(bind-func print-str-sym:[void,!a]* -> (lambda (r x) (or (t:equal? 'String* x) (t:equal? 'Symbol* x)))
+(bind-func print-str-sym:[void,!a]* -> (lambda (r x) (or (t:named? 'String* x) (t:named? 'Symbol* x)))
   (lambda (x)
     (println "You must be a String or a Symbol! " x)))
 

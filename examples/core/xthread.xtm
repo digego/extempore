@@ -55,30 +55,24 @@
                              (thread_sleep 2 0)
                              x)
                            10)) ;; must give async the argument to be applied!
-           (future3 (async (lambda () ;; AN INFINITE FUTURE!
-                             (while (future3.running:i1)
-                               (thread_sleep 1 0))
-                             20)))
+           ;; (future3 (async (lambda () ;; AN INFINITE FUTURE!
+           ;;                   (while (future3.running:i1)
+           ;;                     (thread_sleep 1 0))
+           ;;                   20)))
            (result 0))
       (println "\nCheck for finish")
       (doloop (i 11)
-        (if (> i 7) (async_kill future3)) ;; after 7 force kill future3
+        ;; (if (> i 7) (async_kill future3)) ;; after 7 force kill future3
         (println "finished 1:" (async_done future1)
-                 " finished 2:" (async_done future2)
-                 " finished 3:" (async_done future3))
+                 " finished 2:" (async_done future2))
+                 ;" finished 3:" (async_done future3))
         (thread_sleep 1 0))
       ;; add the three futures!
-      (set! result (+ (future1) (future2) (future3)))
+      (set! result (+ (future1) (future2))) ; (future3)))
       (println "(future1) + (future2) =" result)
       result)))
 
-(sys:load "libs/core/xthread.xtm")
 (await_futures 10)
-
-($ 
- (doloop (i 10)
-   (println "\ni:" i)
-   (await_futures 100000)))
 
 ;;
 ;; parallel map

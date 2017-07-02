@@ -166,13 +166,35 @@
 (bind-func print
   (lambda (x:double) (printf "%f" x) void))
 
-(bind-func print:[void,!a]* -> (lambda (r a) (t:vector? a))
+;; (bind-func print:[void,!a]* -> (lambda (r a) (t:vector? a))
+;;   (lambda (vec)
+;;     (printout "/" (vref vec 0))
+;;     (doloop (i (- (num-of-elts vec) 1))
+;;       (printout "," (vref vec (+ 1 i))))
+;;     (printout "/")
+;;     void))
+
+(bind-func print:[void,!a]* -> (lambda (r a)
+                                 (and (t:vector? a)
+                                      (not (t:pointer? a))))
+  (lambda (vec)
+    (let ((a1 (ref vec)))
+      (printout "/" (vref a1 0))
+      (doloop (i (- (num-of-elts a1) 1))
+        (printout "," (vref a1 (+ 1 i))))
+      (printout "/")
+      void)))
+
+(bind-func print:[void,!a]* -> (lambda (r a)
+                                 (and (t:vector? a)
+                                      (t:pointer? a)))
   (lambda (vec)
     (printout "/" (vref vec 0))
     (doloop (i (- (num-of-elts vec) 1))
       (printout "," (vref vec (+ 1 i))))
     (printout "/")
     void))
+
 
 (bind-func print:[void,!a]* -> (lambda (r a)
                                  (and (t:array? a)
@@ -193,6 +215,36 @@
     (doloop (i (- (num-of-elts arr) 1))
       (printout "," (aref arr (+ 1 i))))
     (printout "|")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 1)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) ">")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 2)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) "," (tref tup 1) ">")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 3)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) "," (tref tup 1) "," (tref tup 2) ">")    
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 4)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) "," (tref tup 1) "," (tref tup 2) "," (tref tup 3) ">")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 5)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) "," (tref tup 1) "," (tref tup 2) "," (tref tup 3) "," (tref tup 4) ">")
+    void))
+
+(bind-func print:[void,!a]* -> (lambda (r x) (and (t:tuple? x) (t:elts? x 6)))
+  (lambda (tup)
+    (printout "<" (tref tup 0) "," (tref tup 1) "," (tref tup 2) "," (tref tup 3) "," (tref tup 4) "," (tref tup 4) ">")
     void))
 
 (bind-func print:[void,!a]*

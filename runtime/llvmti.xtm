@@ -2067,7 +2067,8 @@
              (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
              (newtypematch (map (lambda (k) (if (regex:match? k "(:|{)")
                                            ;; (car (regex:type-split k ":"))
-                                           (car (impc:ti:split-namedtype k))
+                                           (apply string-append (car (impc:ti:split-namedtype k))
+                                                  (make-list (impc:ir:get-ptr-depth k) "*"))
                                            (if (regex:match? k "^\\!g")
                                                "_"
                                                (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
@@ -2078,7 +2079,7 @@
                                                            ":"
                                                            (symbol->string newtype)))
                             (caddr code))))
-        ;; (println 'newtype newtype 'newsyms newsyms 'newcode newcode 'constraint type-constraint)
+        ;; (println 'newtype newtype 'newsyms newsyms 'newcode newcode 'newtypem newtypematch 'constraint type-constraint)
         (let ((v (cl:remove-if (lambda (x)
                                  (or
                                   (<> arity (cadr x))
@@ -2177,6 +2178,20 @@
                                    string-append "<" (impc:ir:genericfunc-stringify-generic-arg-strings (cdr x)) ">"
                                    (make-list depth "*"))))
                         res))
+                     ((impc:ir:array? x)
+                      (if (impc:ir:type? x)
+                          (impc:ir:pretty-print-type x)
+                          (if (and (list? (caddr x))
+                                   (impc:ir:type? (car (caddr x))))
+                              (impc:ir:pretty-print-type (list (car x) (cadr x) (car (caddr x))))
+                              (impc:compiler:print-compiler-error "Bad array for gen type" x))))
+                     ((impc:ir:vector? x)
+                      (if (impc:ir:type? x)
+                          (impc:ir:pretty-print-type x)
+                          (if (and (list? (caddr x))
+                                   (impc:ir:type? (car (caddr x))))
+                              (impc:ir:pretty-print-type (list (car x) (cadr x) (car (caddr x))))
+                              (impc:compiler:print-compiler-error "Bad vector for gen type" x))))
                      ((and (number? x)
                            (= x *impc:ir:notype*))
                       "notype")
@@ -2236,6 +2251,7 @@
 
 (define impc:ti:genericfunc-types
   (lambda (name arity type)
+    ;; (println 'name name 'arity arity 'type type)
     (let ((arity_check_only (if (equal? type #f) #t #f))
           (failed_constraint_check #f))
       ;; (println 'poly: name 'a: arity 't: type)
@@ -2255,7 +2271,8 @@
                                          (char=? (string-ref x 0) (integer->char 60)))
                                      x
                                      (if (regex:match? x "(:|{)")
-                                         (car (impc:ti:split-namedtype x))
+                                         (apply string-append (car (impc:ti:split-namedtype x))
+                                                (make-list (impc:ir:get-ptr-depth x) "*"))
                                          (if (regex:match? x "^\\!")
                                              "_"
                                              x))))
@@ -2312,7 +2329,23 @@
                                                        type))
                                          gp))
                                  res))
-                   (w (apply max (map (lambda (x) (car x)) weights))))
+                   (constraint_chks (map (lambda (gp)
+                                           (let ((chk (cadr (cddddr gp))))
+                                             (if (not (list? chk))
+                                                 #t
+                                                 (apply (eval chk)
+                                                        (map (lambda (x)
+                                                               (if (and (string? x)
+                                                                        (string=? "_" x))
+                                                                   *impc:ir:notype*
+                                                                   x))
+                                                             type)))))
+                                         res))
+                   (filtered_weights (foldl (lambda (lst x)
+                                              (if (car x) (cons (cdr x) lst) lst))
+                                            '()
+                                            (map cons constraint_chks weights)))
+                   (w (apply max (map (lambda (x) (car x)) (if (null? filtered_weights) weights filtered_weights)))))
               ;; (println '++++++++++++++ (length weights))
               ;; (println (for-each (lambda (k)
               ;;                      (println k))
@@ -6155,19 +6188,21 @@ Continue executing `body' forms until `test-expression' returns #f"
           ;; (println 'named: namedtype)
           (if (<> (length gpolytype)
                   (length namedtype))
-              (impc:compiler:print-type-mismatch-error (list poly gpolytype) (list reified namedtype)))
-          (for-each (lambda (a b)
-                      ;; (println 'a: a 'b: b)
-                      (if (symbol? b)
-                          (if (regex:match? (symbol->string b) "^!")
-                              (impc:ti:update-var
-                               (string->symbol (string-append (symbol->string b) "##" (number->string gnum)))
-                               vars '() a)))
-                      (if (and (string? a)
-                               (not (string=? a reified)) ;; watch out for recursive!
-                               (string-contains? a "_poly_"))
-                          (impc:ti:reverse-set-bangs-from-reified b a gnum vars)))
-                    namedtype gpolytype)))))
+              ;; (impc:compiler:print-type-mismatch-error (list poly
+              ;; gpolytype) (list reified namedtype)))
+              '()
+              (for-each (lambda (a b)
+                          ;; (println 'a: a 'b: b)
+                          (if (symbol? b)
+                              (if (regex:match? (symbol->string b) "^!")
+                                  (impc:ti:update-var
+                                   (string->symbol (string-append (symbol->string b) "##" (number->string gnum)))
+                                   vars '() a)))
+                          (if (and (string? a)
+                                   (not (string=? a reified)) ;; watch out for recursive!
+                                   (string-contains? a "_poly_"))
+                              (impc:ti:reverse-set-bangs-from-reified b a gnum vars)))
+                        namedtype gpolytype))))))
 
 ;;
 ;; first for generic functions we do a gnum test
@@ -6662,7 +6697,15 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                 (<> (length (cdr lgrtype))
                                                     (length (cadr constraint-code))))
                                           'false
-                                          (apply (eval constraint) (cdr lgrtype)) #t)))
+                                          (apply (eval constraint)
+                                                 (map (lambda (x)
+                                                        (if (string? x)
+                                                            (apply string-append
+                                                                   (car (regex:split (impc:ir:pretty-print-type x) "{"))
+                                                                   (make-list (impc:ir:get-ptr-depth x) "*"))
+                                                            x))
+                                                      (cdr lgrtype)))
+                                          #t)))
                              ;; (println 'chk chk)
                              (if (boolean? chk)
                                  (if chk
@@ -9497,7 +9540,7 @@ xtlang's `let' syntax is the same as Scheme"
       ;; (println 'newtypes:)
       ;; (for-each (lambda (t) (println t)) types)
 
-      ;; if this function has been defined before make sure we aren't changing its signature!!
+      ;; If this function has been defined before make sure we aren't changing its signature!!
       (if (and (impc:ti:closure-exists? symname-string)
                (or (<> (length (impc:ti:get-closure-arg-types symname-string))
                        (length (cddr (assoc-strcmp symname types))))
@@ -11616,30 +11659,57 @@ e.g.
 ;; (define t:pointer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:pointer? x))))
 ;; (define t:notype? (lambda (x) (equal? x *impc:ir:notype*)))
 
-(define t:integer? (lambda (x) (impc:ir:fixed-point? x)))
-(define t:float? (lambda (x) (impc:ir:floating-point? x)))
-(define t:number? (lambda (x) (impc:ir:number? x)))
-(define t:void? (lambda (x) (impc:ir:void? x)))
-(define t:signed? (lambda (x) (impc:ir:signed? x)))
-(define t:closure? (lambda (x) (impc:ir:closure? x)))
-(define t:vector? (lambda (x) (impc:ir:vector? x)))
-(define t:array? (lambda (x) (impc:ir:array? x)))
-(define t:tuple? (lambda (x) (impc:ir:tuple? x)))
-(define t:scalar? (lambda (x) (impc:ir:scalar? x)))
-(define t:pointer? (lambda (x) (impc:ir:pointer? x)))
-(define t:notype? (lambda (x) (equal? x *impc:ir:notype*)))
+(define t:integer? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:fixed-point? x)))
+(define t:float? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:floating-point? x)))
+(define t:number? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:number? x)))
+(define t:void? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:void? x)))
+(define t:signed? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:signed? x)))
+(define t:closure? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:closure? x)))
+(define t:vector? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:vector? x)))
+(define t:array? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:array? x)))
+(define t:tuple? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:tuple? x)))
+(define t:scalar? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:scalar? x)))
+(define t:pointer? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:pointer? x)))
+(define t:notype? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (equal? x *impc:ir:notype*)))
+
+;; how many elements (or args for closure) does type have
+;; 
+(define t:elts? (lambda (x num)
+                  (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x)))
+                  (cond ((string? x) (= num -1))
+                        ((or (t:array? x) (t:vector? x))
+                         (= (cadr x) num))
+                        ((t:tuple? x)
+                         (println 'tup: x)
+                         (= (- (length x) 1) num))
+                        ((t:closure? x)
+                         (= (- (length x) 2) num))
+                        (else (= num 1)))))
+
+;; named type check strips pointers!
+;; (you can use t:pointer? fo
+;; (define t:cleanup-string-type
+;;   (lambda (a)
+;;     (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+;;            (bt (impc:ir:get-base-type (impc:ir:clean-named-type a)))
+;;            (ptrdepth (impc:ir:get-ptr-depth a))
+;;            (strtype (impc:ir:pointer++ nt ptrdepth)))
+;;       ;; (println 'bt bt 'ptrdepth ptrdepth 'nt nt 'strtype strtype)
+;;       (apply string-append bt (make-list ptrdepth "*")))))
 
 (define t:cleanup-string-type
   (lambda (a)
     (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
-           (bt (impc:ir:get-base-type (impc:ir:clean-named-type a)))
-           (ptrdepth (impc:ir:get-ptr-depth a))
-           (strtype (impc:ir:pointer++ nt ptrdepth)))
-      ;; (println 'bt bt 'ptrdepth ptrdepth 'nt nt 'strtype strtype)
-      (apply string-append bt (make-list ptrdepth "*")))))
-    
-(define t:equal? (lambda (x y)
-                   ;; (println 'tequal: 'x x 'y y)
+           (bt (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+      bt)))
+
+(define reduce-ptrdepth-to-zero
+  (lambda (t)
+    (if (> (impc:ir:get-ptr-depth t) 0)
+        (reduce-ptrdepth-to-zero (impc:ir:pointer-- t))
+        t)))
+
+(define t:named? (lambda (x y)
                    (if (or (t:notype? x) (t:notype? y))
                        #t
                        (begin
@@ -11647,11 +11717,27 @@ e.g.
                          (if (symbol? y) (set! y (symbol->string y)))
                          (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x)))
                          (if (string? y) (set! y (impc:ir:get-type-from-pretty-str y)))
+                         (set! x (reduce-ptrdepth-to-zero x))
+                         (set! y (reduce-ptrdepth-to-zero y))
+                         ;; (println 'x x 'y y)
                          (if (and (string? x) (string? y))
                              (if (string=? (t:cleanup-string-type x) (t:cleanup-string-type y))
                                  #t
                                  #f)
                              (impc:ir:types-equal? x y))))))
+
+;; (define t:named? (lambda (x y)
+;;                    (if (or (t:notype? x) (t:notype? y))
+;;                        #t
+;;                        (begin
+;;                          (if (symbol? x) (set! x (symbol->string x)))
+;;                          (if (symbol? y) (set! y (symbol->string y)))
+;;                          (if (not (and (string? x) (string? y)))
+;;                              (impc:compiler:print-compiler-error "poorly formed t:named? constraint args" (list x y)))
+;;                          (if (string=? (t:cleanup-string-type-b x) (t:cleanup-string-type-b y))
+;;                                  #t
+;;                                  #f)))))                  
+                   
 
 (define t:poly-exists?
   (lambda (name type)

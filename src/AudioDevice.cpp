@@ -199,7 +199,7 @@ void* audioCallbackMT(void* Args)
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 // fix for RT windows
+#elif _WIN32 
     SetThreadPriority(GetCurrentThread(), 15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     printf("Starting RT Audio Process\n");
@@ -268,7 +268,7 @@ void* audioCallbackMTBuf(void* dat) {
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 // fix for RT windows
+#elif _WIN32 
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     printf("Starting RT Buffered Audio Process\n");
