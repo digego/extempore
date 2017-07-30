@@ -12,6 +12,10 @@
 
 ;;; Code:
 
+;; load adt!
+(sys:load "libs/core/adt.xtm")
+
+
 (bind-dylib libkernel32 "Kernel32.dll")
 (bind-dylib libuser32 "User32.dll")
 (bind-dylib libshell32 "Shell32.dll")
@@ -24,6 +28,7 @@
 (bind-alias HGDIOBJ i8*)
 (bind-alias DWORD i32)
 (bind-alias WORD i16)
+(bind-alias SHORT i16)
 (bind-alias INT i32)
 (bind-alias UINT i32)
 (bind-alias UINT32 i32)
@@ -40,6 +45,7 @@
 (bind-alias LONG_PTR i64)  ;; not actually a ptr!
 (bind-alias LRESULT i64)
 (bind-alias ULONG_PTR i64) ;; not actually a ptr!
+(bind-alias ULONGLONG i64)
 (bind-alias LPVOID i8*)
 (bind-alias LPSTR i8*)
 (bind-alias LPCSTR i8*)
@@ -54,6 +60,7 @@
     (bind-alias LPARAM i32))
 
 (bind-type POINT <LONG,LONG>) ;; x y
+(bind-type POINTS <SHORT,SHORT>) ;; x y
 (bind-alias LPPOINT POINT*)
 (bind-type RECT <LONG,LONG,LONG,LONG>) ;; left,top,right,bottom
 (bind-alias LPRECT RECT*)
@@ -196,6 +203,13 @@
 (bind-val GID_PRESSANDTAP                 DWORD 7)
 (bind-val GID_ROLLOVER                    DWORD GID_PRESSANDTAP)
 
+(bind-val GC_ALLGESTURES DWORD #x00000001)
+(bind-val GC_ZOOM DWORD #x00000001)
+(bind-val GC_PAN DWORD #x00000001)
+(bind-val GC_ROTATE DWORD #x00000001)
+(bind-val GC_TWOFINGERTAP DWORD #x00000001)
+(bind-val GC_PRESSANDTAP DWORD #x00000001)
+
 (bind-val TOUCHEVENTF_MOVE            DWORD #x0001)
 (bind-val TOUCHEVENTF_DOWN            DWORD #x0002)
 (bind-val TOUCHEVENTF_UP              DWORD #x0004)
@@ -214,6 +228,31 @@
 
 (bind-lib libuser32 GetSystemMetrics [i32,i32]*)
 
+;; typedef struct _GESTUREINFO {
+;;   UINT      cbSize;
+;;   DWORD     dwFlags;
+;;   DWORD     dwID;
+;;   HWND      hwndTarget;
+;;   POINTS    ptsLocation;
+;;   DWORD     dwInstanceID;
+;;   DWORD     dwSequenceID;
+;;   ULONGLONG ullArguments;
+;;   UINT      cbExtraArgs;
+;; } GESTUREINFO, *PGESTUREINFO;
+
+;; DODGY! extra DWORD inserted after POINTS for correct size_of????
+(bind-type GESTUREINFO <UINT,DWORD,DWORD,HWND,POINTS,DWORD,DWORD,DWORD,ULONGLONG,UINT>)
+(bind-type GESTURECONFIG <DWORD,DWORD,DWORD>)
+
+(bind-val GF_BEGIN   DWORD #x00000001)
+(bind-val GF_INERTIA DWORD #x00000002)
+(bind-val GF_END DWORD #x00000004)
+
+(bind-alias HGESTUREINFO i8*)
+
+(bind-lib libuser32 SetGestureConfig [BOOL,HWND,DWORD,UINT,GESTURECONFIG*,UINT]*)
+(bind-lib libuser32 GetGestureInfo [BOOL,HGESTUREINFO,GESTUREINFO*]*)
+(bind-lib libuser32 CloseGestureInfoHandle [BOOL,HGESTUREINFO]*)
 
 ;; typedef struct tagTOUCHINPUT {
 ;;     LONG x;
@@ -533,6 +572,7 @@
 
 ;; CreateFileMapping
 (bind-lib libkernel32 CreateFileMappingA [HANDLE,HANDLE,LPSECURITY_ATTRIBUTES,DWORD,DWORD,DWORD,LPCTSTR]*)
+(bind-lib libkernel32 OpenFileMappingA [HANDLE,DWORD,BOOL,LPCTSTR]*)
 (bind-lib libkernel32 MapViewOfFile [LPVOID,HANDLE,DWORD,DWORD,DWORD,size_t]*)
 
 ;; file path stuff
@@ -580,3 +620,95 @@
               ;; and return as vector of <width,height,channels,data>
               (tuple (biWidth info) (biHeight info) 3:i32 buf)))))))
 
+
+;; FILE IO
+(bind-val GENERIC_ALL DWORD #x10000000)
+(bind-val GENERIC_EXECUTE DWORD #x20000000)
+(bind-val GENERIC_WRITE DWORD #x40000000)
+(bind-val GENERIC_READ DWORD #x80000000)
+
+(bind-type FILETIME <DWORD,DWORD>)
+(bind-type WIN32_FIND_DATA <DWORD,FILETIME,FILETIME,FILETIME,DWORD,DWORD,DWORD,DWORD,|260,i8|,|14,i8|> (constructor . #f) (printer . #f))
+(bind-alias LPWIN32_FIND_DATA WIN32_FIND_DATA*)
+(bind-func get_file_name (lambda (dat:WIN32_FIND_DATA*) (String (cast (tref-ptr dat 8) i8*))))
+
+(bind-lib libkernel32 FindFirstFileA [HANDLE,LPCTSTR,LPWIN32_FIND_DATA]*)
+(bind-lib libkernel32 FindNextFileA [BOOL,HANDLE,LPWIN32_FIND_DATA]*)
+(bind-lib libkernel32 FindClose [BOOL,HANDLE]*)
+(bind-lib libkernel32 CreateFileA [HANDLE,LPCTSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE]*)
+
+;; returns a list of file names in dir
+;; 
+;; for example:
+;; (win32_list_dir2 (Str "c:/Users/andrew/Documents/code/extempore/*"))
+;; (win32_list_dir2 (Str "c:/Users/andrew/Documents/code/extempore/*.exe"))
+(bind-func win32_list_dir
+  (lambda (dir:String*)
+    (let ((data:WIN32_FIND_DATA* (salloc))
+          (hfind:HANDLE (FindFirstFileA (cstring dir) data))
+          (lst:List{String*}* (list)))
+      (if (= hfind INVALID_HANDLE_VALUE)
+          lst
+          (begin
+            (set! lst (cons (get_file_name data) lst))
+            (while (FindNextFileA hfind data)
+              (set! lst (cons (get_file_name data) lst)))
+            (FindClose hfind)
+            lst)))))
+
+
+;; #define DELETE                           (0x00010000L)
+;; #define READ_CONTROL                     (0x00020000L)
+;; #define WRITE_DAC                        (0x00040000L)
+;; #define WRITE_OWNER                      (0x00080000L)
+;; #define SYNCHRONIZE                      (0x00100000L)
+
+;; #define STANDARD_RIGHTS_REQUIRED         (0x000F0000L)
+
+;; #define STANDARD_RIGHTS_READ             (READ_CONTROL)
+;; #define STANDARD_RIGHTS_WRITE            (READ_CONTROL)
+;; #define STANDARD_RIGHTS_EXECUTE          (READ_CONTROL)
+
+;; #define FILE_READ_DATA            ( 0x0001 )    // file & pipe
+;; #define FILE_LIST_DIRECTORY       ( 0x0001 )    // directory
+
+;; #define FILE_WRITE_DATA           ( 0x0002 )    // file & pipe
+;; #define FILE_ADD_FILE             ( 0x0002 )    // directory
+
+;; #define FILE_APPEND_DATA          ( 0x0004 )    // file
+;; #define FILE_ADD_SUBDIRECTORY     ( 0x0004 )    // directory
+;; #define FILE_CREATE_PIPE_INSTANCE ( 0x0004 )    // named pipe
+
+
+;; #define FILE_READ_EA              ( 0x0008 )    // file & directory
+
+;; #define FILE_WRITE_EA             ( 0x0010 )    // file & directory
+
+;; #define FILE_EXECUTE              ( 0x0020 )    // file
+;; #define FILE_TRAVERSE             ( 0x0020 )    // directory
+
+;; #define FILE_DELETE_CHILD         ( 0x0040 )    // directory
+
+;; #define FILE_READ_ATTRIBUTES      ( 0x0080 )    // all
+
+;; #define FILE_WRITE_ATTRIBUTES     ( 0x0100 )    // all
+
+;; #define FILE_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x1FF)
+
+;; #define FILE_GENERIC_READ         (STANDARD_RIGHTS_READ     |\
+;;                                    FILE_READ_DATA           |\
+;;                                    FILE_READ_ATTRIBUTES     |\
+;;                                    FILE_READ_EA             |\
+;;                                    SYNCHRONIZE)
+
+;; #define FILE_GENERIC_WRITE        (STANDARD_RIGHTS_WRITE    |\
+;;                                    FILE_WRITE_DATA          |\
+;;                                    FILE_WRITE_ATTRIBUTES    |\
+;;                                    FILE_WRITE_EA            |\
+;;                                    FILE_APPEND_DATA         |\
+;;                                    SYNCHRONIZE)
+
+;; #define FILE_GENERIC_EXECUTE      (STANDARD_RIGHTS_EXECUTE  |\
+;;                                    FILE_READ_ATTRIBUTES     |\
+;;                                    FILE_EXECUTE             |\
+;;                                    SYNCHRONIZE)
