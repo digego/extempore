@@ -9599,7 +9599,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                           "@" symname-string "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
                                            "") ;; if global var alread exists do nothing
                                        "define dllexport ccc void @" (string-append symname-string "_setter")
-                                       "() nounwind {\nentry:\n"
+                                       "() alwaysinline nounwind {\nentry:\n"
                                        "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                        "%_impz = bitcast %mzone* %_zone to i8*\n"
                                        "%oldzone1 = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
@@ -9621,7 +9621,7 @@ xtlang's `let' syntax is the same as Scheme"
                                        "cont:\n"
                                        "ret void\n}\n\n"))
              (stub-type (impc:ir:get-closure-type-from-str closure-type))
-             (getter-ir (string-append "define dllexport ccc i8* @" symname-string "_getter() nounwind {\n"
+             (getter-ir (string-append "define dllexport ccc i8* @" symname-string "_getter() alwaysinline nounwind {\n"
                                        "entry:\n"
                                        "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                        "%func = load i8*, i8** %ptr\n"
@@ -9636,7 +9636,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                 (string-append ", " (impc:ir:get-type-str a)))
                                               (cddr stub-type)))
                                   "}*")))
-             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat) nounwind {\n"
+             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat) alwaysinline nounwind {\n"
                                                                                       "entry:\n"
                                                                                       (if (null? cb-struct-type)
                                                                                           "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
@@ -9811,7 +9811,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                    (make-list-with-proc (length (cdr stub-type))
                                                                                                         (lambda (i) (string-append "%arg_" (atom->string i))))
                                                                                    (cons "" (make-list (length (cdr stub-type)) ","))))
-                                                         ") nounwind \n"
+                                                         ") alwaysinline nounwind \n"
                                                          "{\nentry:\n"
                                                          "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                          "%_impz = bitcast %mzone* %_zone to i8*\n"
@@ -9847,7 +9847,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                      (make-list-with-proc (length (cdr stub-type))
                                                                                                           (lambda (i) (string-append "%arg_" (atom->string i))))
                                                                                      (cons "" (make-list (length (cdr stub-type)) ","))))
-                                                           ") nounwind \n"
+                                                           ") alwaysinline nounwind \n"
                                                            "{\nentry:\n"
                                                            "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                            "%_impz = bitcast %mzone* %_zone to i8*\n"
