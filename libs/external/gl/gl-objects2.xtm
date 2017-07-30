@@ -519,6 +519,7 @@
 
 (bind-func load_data
   (lambda (tex:Texture* flipped:i32 filename:String*)
+    ;; (println "LOAD:" filename)
     ;; seems to need to be set
     (stbi_set_flip_vertically_on_load flipped)
     (let ((width_ptr:i32* (tref-ptr tex 2))
@@ -528,7 +529,7 @@
       (cond ((= (pref comp_ptr 0) 4)
              (tset! tex 1 GL_RGBA))
             ((= (pref comp_ptr 0) 3)
-             (tset! tex 1 GL_RGB))
+             (tset! tex 1 GL_RGBA)) ;; rgb should be converted to RGBA
             ((= (pref comp_ptr 0) 1)
              (tset! tex 1 GL_DEPTH_COMPONENT))
             (else (println "Unknown componenet depth: " (pref comp_ptr 0)) 1:i32))
@@ -755,6 +756,8 @@
     (glActiveTexture (+ GL_TEXTURE0 unit))
     (glBindTexture GL_TEXTURE_2D (id tex))
     (cond ((or (= (type tex) GL_RGBA)
+               (= (type tex) GL_RGB)
+               (= (type tex) GL_BGR)               
                (= (type tex) GL_BGRA))
            (begin
              ;; set some parameters
@@ -843,7 +846,7 @@
 (bind-func Texture
   (lambda (filename)
     (let ((tex (Texture:[Texture*,String*,i32]* filename 1)))
-      (update tex)
+      ;; (update tex)
       tex)))
 
 ;; texture from existing data (no copy)
