@@ -137,8 +137,10 @@ namespace extemp {
 	EXTThread& getThread() { return threadOSC; }
 	bool getStarted() { return started; }
 	void setStarted(bool val) { started = val; }
-        int (*getNative()) (char*,char*,char*,int) { return native; }
-	void setNative(int(*val)(char*,char*,char*,int)) { native = val; }
+  int (*getNativeOSC()) (char*,char*,char*,int) { return nativeOSC; }
+	void setNativeOSC(int(*val)(char*,char*,char*,int)) { nativeOSC = val; }
+  int (*getNativeUDP()) (char*,int) { return nativeUDP; }
+	void setNativeUDP(int(*val)(char*,int)) { nativeUDP = val; }
 	void sendOSC(TaskI* task);
 		
 		
@@ -170,7 +172,8 @@ namespace extemp {
       char message_data[70000];
       int message_length;
       bool started;
-      int(*native)(char*,char*,char*,int); /* if not null then use this compiled function for callbacks */
+      int(*nativeOSC)(char*,char*,char*,int); /* if not null then use this compiled function for callbacks */
+      int(*nativeUDP)(char*,int);
     };
 
 } //End Namespace

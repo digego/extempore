@@ -427,7 +427,12 @@ namespace extemp {
       std::string netaddy(inet_ntoa(osc->getClientAddress()->sin_addr));
       int netport = (int) ntohs(osc->getClientAddress()->sin_port);
 #endif
-      if(bytes_read > -1) {
+      if(osc->getNativeUDP() != NULL) {       
+        char* args = osc->getMessageData();
+        int (*nativeUDP) (char*,int) = osc->getNativeUDP();
+        nativeUDP(args,bytes_read);
+      }
+      if(bytes_read > -1 && osc->getNativeUDP() == NULL) {
         //printf("udp packet size(%lld)\n",bytes_read);
         //std::cout << "OSC from client port: " << osc->getClientAddress() << " " << osc->getAddress() <<  std::endl;
         char* args = osc->getMessageData();
@@ -467,26 +472,26 @@ namespace extemp {
             res = OSC::getOSCString(args+pos,&typetags);
             used += res;
             pos += res;
-            if(osc->getNative() == NULL) {
+            if(osc->getNativeOSC() == NULL) {
               int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,netaddy,netport,args+pos);
               if(ret_from_call < 0) break;
               else pos += size-used; //ret_from_call;
             }else{
-              int (*native) (char*,char*,char*,int) = osc->getNative();
-              native((char*)address.c_str(),(char*)typetags.c_str(),args+pos,size-used);
+              int (*nativeOSC) (char*,char*,char*,int) = osc->getNativeOSC();
+              nativeOSC((char*)address.c_str(),(char*)typetags.c_str(),args+pos,size-used);
               pos += size-used; //get_message_length(typetags, args);
             }
           }
         }else{
-          if(osc->getNative() == NULL) {
+          if(osc->getNativeOSC() == NULL) {
             pos += OSC::getOSCString(args+pos,&typetags);
             pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,netaddy,netport,args+pos);
           }else{
             int res = OSC::getOSCString(args+pos,&typetags);
             pos+=res;
             used+=res;
-            int (*native) (char*,char*,char*,int) = osc->getNative();
-            native((char*)address.c_str(),(char*)typetags.c_str(),args+pos,length-used);
+            int (*nativeOSC) (char*,char*,char*,int) = osc->getNativeOSC();
+            nativeOSC((char*)address.c_str(),(char*)typetags.c_str(),args+pos,length-used);
           }
         }
         char reply[256];
@@ -597,26 +602,26 @@ namespace extemp {
           res = OSC::getOSCString(args+oscpos,&typetags);
           used += res;
           oscpos += res;
-          if(osc->getNative() == NULL) {
+          if(osc->getNativeOSC() == NULL) {
             int ret_from_call = send_scheme_process_call(scm,osc->fname,timestamp,address,typetags,args+oscpos);
             if(ret_from_call < 0) break;
             else oscpos += size-used; //ret_from_call;
           }else{
-            int (*native) (char*,char*,char*,int) = osc->getNative();
-            native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,size-used);
+            int (*nativeOSC) (char*,char*,char*,int) = osc->getNativeOSC();
+            nativeOSC((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,size-used);
             oscpos += size-used; //get_message_length(typetags, args);
           }
         }
       }else{
-        if(osc->getNative() == NULL) {
+        if(osc->getNativeOSC() == NULL) {
           oscpos += OSC::getOSCString(args+oscpos,&typetags);
           oscpos += send_scheme_process_call(scm,osc->fname,0.0,address,typetags,args+oscpos);
         }else{
           int res = OSC::getOSCString(args+oscpos,&typetags);
           oscpos+=res;
           used+=res;
-          int (*native) (char*,char*,char*,int) = osc->getNative();
-          native((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,length-used);
+          int (*nativeOSC) (char*,char*,char*,int) = osc->getNativeOSC();
+          nativeOSC((char*)address.c_str(),(char*)typetags.c_str(),args+oscpos,length-used);
         }
       }
       char reply[256];
@@ -1264,9 +1269,14 @@ namespace extemp {
 
     // should we use native callback?
     if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
-      osc->setNative( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
+      if (pair_cdddr(args) != _sc->NIL && pair_cadddr(args) == _sc->T) {
+        osc->setNativeUDP( (int(*)(char*,int)) cptr_value(pair_caddr(args)));        
+      }else{        
+        osc->setNativeOSC( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
+      }
     }else{
-      osc->setNative(NULL);
+      osc->setNativeOSC(NULL);
+      osc->setNativeUDP(NULL);      
     }
 
     // setup server port

@@ -43,7 +43,7 @@
 (bind-func osc_receive_7020
   (lambda (address:i8* types:i8* args:i8*)
     (let ((data (bitcast args i32*)))
-      (printf "address:%s  type:%s arg1:%f arg2:%lld\n"
+      (printf "address:%s  type:%s arg1:%f arg2:%d\n"
 	      address types
 	      (ftod (unswap32f (pref data 0)))
 	      (unswap32i (pref data 1))))))
@@ -65,13 +65,13 @@
 (bind-func my_osc_send
   (lambda (address a:float b:i32)
     (let ((types ",fi")
-	  (mod (modulo (+ (strlen address) 1) 4))
-	  (addressl (+ (+ (strlen address) 1)
-		       (if (= 0 mod) 0 (- 4 mod))))
-	  (typesl 4)		     
-	  (length (+ addressl typesl 4 4))
-	  (data (malloc length))
-	  (args (bitcast (pref-ptr data (+ addressl typesl)) i32*)))
+          (mod (modulo (+ (strlen address) 1) 4))
+          (addressl (+ (+ (strlen address) 1)
+                       (if (= 0 mod) 0 (- 4 mod))))
+          (typesl 4)		     
+          (length (+ addressl typesl 4 4))
+          (data (malloc length))
+          (args (bitcast (pref-ptr data (+ addressl typesl)) i32*)))
       (printf "addy length %d:%d:%d\n" (strlen address) addressl (- 4 (modulo (+ (strlen address) 1) 4)))
       (strcpy (pref-ptr data 0) address)
       (strcpy (pref-ptr data addressl) types)
@@ -82,3 +82,5 @@
 ;; Send another test message
 
 (my_osc_send "/native/mytest" 6.6 4321)
+
+
