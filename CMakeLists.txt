@@ -794,7 +794,7 @@ if(BUILD_DEPS)
 
     ExternalProject_Add(apr
       PREFIX apr
-      URL http://mirror.ventraip.net.au/apache/apr/apr-1.5.2.tar.gz
+      URL http://mirror.ventraip.net.au/apache/apr/apr-1.6.2.tar.gz
       CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --enable-threads --disable-static
       BUILD_COMMAND $(MAKE)
       INSTALL_COMMAND make install
