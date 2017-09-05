@@ -3152,6 +3152,7 @@
 ;; indexing into structures is limited to i32 indexes!!
 (define impc:ir:compiler:tuple-set
   (lambda (ast types)
+    ;; (println 'ast ast 'type types)
     ;; arg 1 for tuples must be a symbol
     ;; arg 2 for tuples must be a number
     ;; this should make it easy for us!
@@ -3177,7 +3178,9 @@
       ;; ;; i.e. check to see if a given 'named type' is equivelent to the
       ;; ;; requied tuple type (of vica-versa) if it is we will need to bitcast.
       (if (not (impc:ir:types-equal? element-type (cadr val)))
-          (impc:compiler:print-type-conflict-error (cadr val) (caddr ast) ast))
+          (impc:compiler:print-type-conflict-error (impc:ir:pretty-print-type element-type)
+                                                   (impc:ir:pretty-print-type (cadr val))
+                                                   ast))
       ;; type tests done
       (emit index-str os)
       (emit var-str os)
