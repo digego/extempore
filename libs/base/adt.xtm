@@ -1,0 +1,192 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Algebraic Data Types
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (bind-data-type n name)
+  (let* ((types (regex:type-split (symbol->string name) "{"))
+         (dtypes (if (null? (cdr types)) "" (cadr types)))
+         (tstr (if (null? (cdr types))
+                   ""
+                   (substring dtypes 0 (- (string-length dtypes) 1)))))
+    `(bind-type ,n
+       ,(string->symbol (string-append "<i64,i8*"
+                                       (if (> (string-length tstr) 0)
+                                           "," "")
+                                       tstr ">"))
+       (printer? . #f)       
+       (constructor? . #f))))
+
+(define (bind-data-type-constructor n name)
+  (let* ((type (impc:ir:get-type-from-pretty-str (symbol->string name)))
+         (gentypes (cdddr type)))
+    `(bind-func ,(string->symbol
+                  (string-append (symbol->string n) "_Make:["
+                                 (symbol->string name) "*,i64,i8*]*"))
+       (lambda (a0 a1)
+         (let ((obj (alloc 2)))
+           ,(if (null? gentypes)
+                `(tfill! obj a0 a1)
+                `(tfill! obj a0 a1 ,@(map (lambda (t) `(convert null)) gentypes)))
+           obj)))))
+
+(define (bind-data-types name constructors)
+  (map (lambda (xs)
+         (list 'bind-type
+               (string->symbol
+                (string-append (symbol->string name)
+                               "_data_"
+                               (symbol->string (car xs))))
+               (string->symbol
+                (string-append "<"
+                               (if (null? (cdr xs))
+                                   "i64"
+                                   (string-join
+                                    (map (lambda (x)
+                                           (symbol->string x))
+                                         (cdr xs))
+                                    ","))
+                               ">"))
+               `(printer? . #f)))
+       constructors))
+
+(define local_gen_type_minimize
+  (lambda (n t)    
+    (let* ((l (map atom->string t))
+           (l1 (foldl (lambda (xs x) (if (regex:match? (atom->string x) "^!") (cons x xs) xs)) '() (cdr l)))
+           (l2 (cl:remove-duplicates (reverse l1)))
+           (l3 (foldl (lambda (xs x)
+                        (if (string=? "" xs)
+                            (string-append xs x)
+                            (string-append xs "," x)))
+                      "" l2)))
+      (if (null? l2)
+          (string-append (symbol->string n) "_data_" (car l))
+          (string-append (symbol->string n) "_data_" (car l) "{" l3 "}")))))
+
+(define (bind-data-getters n name constructors)
+  (map (lambda (xs)
+         (list 'bind-func
+               (string->symbol
+                (string-append (symbol->string n)
+                               "_get_"
+                               (symbol->string (car xs))
+                               ":["
+                               (local_gen_type_minimize n xs)
+                               "*,"
+                               (symbol->string name)
+                               "*]*"))
+               `(lambda (x) (cast (tref x 1)))))
+       constructors))
+
+(define (constructor-name-and-type n type constructor)
+  (let* ((name (symbol->string (car constructor)))
+         (types (string-join (map (lambda (x) (symbol->string x)) (cdr constructor)) ",")))
+    ;; (println 'name name 'types types)
+    (string->symbol (string-append name ":[" (symbol->string type)
+                                   (if (string=? types "") "*" "*,")
+                                   types "]*"))))
+
+(define (bind-data-constructors n type constructors)
+  ;; (println 'datacont 'n n 'type type 'constructors constructors)
+  (map (lambda (x num)
+         (let ((args (map (lambda (x) (string->symbol (string-append "a" (number->string x)))) (range (length (cdr x)))))
+               (tuplename (string->symbol (string-append (symbol->string n) "_data_" (symbol->string (car x))))))
+           `(bind-func ,(constructor-name-and-type n type x)
+              (lambda ,(if (null? args) '() args)
+                (let ((obj (,tuplename ,@(if (null? args) (list 0) args))))
+                  (,(string->symbol (string-append (symbol->string n) "_Make")) ,num (cast obj i8*)))))))
+       constructors
+       (range (length constructors))))
+
+(define (deconstructor-name-and-type n type constructor)
+  (let* ((name (symbol->string (car constructor)))
+         (gentype "!zzz")
+         (failtype (string-append "[" gentype "]*"))
+         (successtype (string-append "[" gentype (if (null? (cdr constructor)) "" ",")
+                                  (string-join (map (lambda (x) (symbol->string x)) (cdr constructor)) ",")
+                                  "]*")))
+    ;; (println 'name name 'types types)
+    (string->symbol (string-append name "_Dstrct:[" gentype "," (symbol->string type) "*,"
+                                   successtype "," failtype "]*"))))
+
+(define (bind-data-deconstructors n type constructors)
+  ;; (println 'datadecont 'n n 'type type 'constructors constructors)
+  (map (lambda (x num)
+         (let ((args (map (lambda (x) (string->symbol (string-append "a" (number->string x)))) (range (length (cdr x)))))
+               (getter (string->symbol (string-append (symbol->string n) "_get_" (symbol->string (car x))))))
+           `(bind-func ,(deconstructor-name-and-type n type x)
+              (lambda (obj success fail)
+                (if (= (tref obj 0) ,num)
+                    (let ((cir (,getter obj)))
+                      (success ,@(map (lambda (anum) `(tref cir ,anum)) (range (- (length x) 1)))))
+                    (fail))))))
+       constructors
+       (range (length constructors))))
+
+(define (bind-data-deconstructors-macros n type constructors)
+  ;; (println 'datadecont 'n n 'type type 'constructors constructors)
+  (map (lambda (x num)
+         (let ((nm (symbol->string (car x)))
+               (args (map (lambda (x) (string->symbol (string-append "a" (number->string x)))) (range (length (cdr x)))))
+               (getter (string->symbol (string-append (symbol->string n) "_get_" (symbol->string (car x))))))
+           `(bind-macro (,(string->symbol (string-append nm "$")) obj args success fail)
+              (list ',(string->symbol (string-append nm "_Dstrct"))
+                    obj
+                    (list 'lambda (map (lambda (x n)
+                                    (if (= 95 (char->integer (string-ref (symbol->string x) 0)))
+                                        (string->symbol (string-append "argx" (atom->string n)))
+                                        x))
+                                  args
+                                  (range (length args)))
+                          success)
+                    (list 'lambda '() fail)))))
+       constructors
+       (range (length constructors))))
+
+
+(define-macro (bind-data name . constructors)
+  (let ((n (string->symbol (car (regex:type-split (symbol->string name) "{")))))
+    ;; (println 'shape_datatype: (bind-data-type n name))
+    (eval (bind-data-type n name) (interaction-environment))
+    ;; (println 'shape_construct: (bind-data-type-constructor n name))
+    (eval (bind-data-type-constructor n name) (interaction-environment))
+    (map (lambda (x)
+           ;; (println 'datatype: x)
+           (eval x (interaction-environment)))
+         (bind-data-types n constructors))
+    (map (lambda (x)
+           ;; (println 'getter: x)
+           (eval x (interaction-environment)))
+         (bind-data-getters n name constructors))
+    (map (lambda (x)
+           ;; (println 'construct: x)
+           (eval x (interaction-environment)))
+         (bind-data-constructors n name constructors))
+    (map (lambda (x)
+           ;; (println 'dstruct: x)
+           (eval x (interaction-environment)))
+         (bind-data-deconstructors n name constructors))
+    (map (lambda (x)
+           ;; (println 'macro: x)
+           (eval x (interaction-environment)))
+         (bind-data-deconstructors-macros n name constructors))    
+    ;; (println "DataT: " name)
+    #t))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; do notation
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(bind-macro
+  "a haskell style do syntax 'dolet'"
+  (dolet . args)
+  (letrec ((f (lambda (xs body)
+                (if (null? xs) body
+                    `(flatmap ,(cadar xs)
+                              (lambda (,(caar xs))
+                                ,(f (cdr xs) body)))))))
+    (f (car args) (cadr args))))
+
