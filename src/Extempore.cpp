@@ -85,6 +85,7 @@ void* extempore_primary_repl_delayed_connect(void* dat)
 #endif
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
+    return NULL;
 }
 
 // WARNING EVIL WINDOWS TERMINATION CODE!
