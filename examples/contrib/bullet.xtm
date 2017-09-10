@@ -6,24 +6,45 @@
 
 ;;; Code:
 
-(define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+;; (define pr2 (gl:make-ctx ":0.0" #f 0.0 0.0 900.0 600.0))
+
+(sys:load "libs/external/glfw3.xtm")
+
+;; (sys:load "libs/core/scheduler.xtm")
+
+;; (run_main_event_loop)
+
+(bind-val width i32 1024)
+(bind-val height i32 768)
+
+;; (bind-val window GLFWwindow*
+;;   ;; some of the shaders in the graphics pipeline use older glsl
+;;   ;; versions, so we need a "compatibility" graphics context
+;;   (begin
+;;     (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
+;;     (glfw_init_and_create_interaction_window width height)))
+
+(bind-val window GLFWwindow*
+  (glfw_init_and_create_interaction_compatibility_window width height))
+
+(sys:load "libs/external/glcompat.xtm")
 
 (sys:load "libs/external/horde3d.xtm")
 (sys:load "libs/external/bullet.xtm")
-(sys:load "libs/external/gl.xtm")
+;; (sys:load "libs/external/gl.xtm")
 
 (bind-func degToRad
   (lambda (f:float)
     (* f (/ 3.141592 180.0))))
 
 
-(define _objects (sys:make-cptr (* 2000 4)))
-(bind-val _objects i32* _objects)
+;; (define _objects (sys:make-cptr (* 2000 4)))
+(bind-val _objects i32* 2000) ;(* 2000 4)) ;_objects)
 ;; array of rigid bodies (one for each object
-(define _bodies (sys:make-cptr (* 8 2000)))
-(bind-val _bodies plRigidBodyHandle* _bodies)
-(define _sbodies (sys:make-cptr (* 8 5)))
-(bind-val _sbodies plRigidBodyHandle* _sbodies)
+;; (define _bodies (sys:make-cptr (* 8 2000)))
+(bind-val _bodies plRigidBodyHandle* 2000) ;(* 8 2000)) ;;_bodies)
+;; (define _sbodies (sys:make-cptr (* 8 5)))
+(bind-val _sbodies plRigidBodyHandle* 50) ; (* 8 5)) ;_sbodies)
 
 ;; globals
 (bind-val light i32 0)
@@ -169,7 +190,7 @@
       (h3dSetNodeParamF light H3DLight_ColorF3 2 0.7)
       (h3dSetNodeParamF light H3DLight_ColorMultiplierF 0 1.0)
       
-      (resize 900.0 600.0)
+      (resize (i32tof width) (i32tof height)) ;900.0 600.0)
       
       1)))
 
@@ -232,9 +253,9 @@
       (h3dutDumpMessages)
       1)))
 
-(bind-func rot
-  (lambda (deg x y z)
-    (glRotated deg x y z)))
+;; (bind-func rot
+;;   (lambda (deg x y z)
+;;     (glRotated deg x y z)))
 
 (bind-func set-mouse-pos
   (lambda (x y)
@@ -243,18 +264,21 @@
     void))
 
 ;; standard impromptu callback
-(define opengl-test
+(bind-func opengl-test
   (lambda (time degree)
-    (let ((evt (if (string=? (sys:platform) "Linux")
-		   (gl:get-event pr2)
-		   (gl:get-event))))
-      (if (not (null? evt))
-	  (if (string=? (sys:platform) "Linux")	      
-	      (set-mouse-pos (caddr evt) (cadddr evt)) 
-	      (set-mouse-pos (cadr evt) (car evt)))))
+    ;; (println time)
+    ;; (let ((evt (if (string=? (sys:platform) "Linux")
+    ;;                (gl:get-event pr2)
+    ;;                (gl:get-event))))
+    ;;   (if (not (null? evt))
+    ;;       (if (string=? (sys:platform) "Linux")	      
+    ;;           (set-mouse-pos (caddr evt) (cadddr evt)) 
+    ;;           (set-mouse-pos (cadr evt) (car evt)))))
     (mainLoop)
-    (gl:swap-buffers pr2)
-    (callback (+ time 50) 'opengl-test (+ time 512) (+ degree 0.001))))
+    (glfwPollEvents)
+    (glfwSwapBuffers window)        
+    ;; (gl:swap-buffers pr2)
+    (callback (+ time 50) opengl-test (+ time 512) (+ degree 0.001))))
 
 
 
