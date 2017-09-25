@@ -410,7 +410,7 @@ add_executable(extempore src/Extempore.cpp
   )
 
 if(MSVC)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:$(ProjectDir)../src/extempore.def")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_SOURCE_DIR}/src/extempore.def")
 endif()
 
 target_include_directories(extempore PRIVATE include)
