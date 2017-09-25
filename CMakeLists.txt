@@ -409,8 +409,8 @@ add_executable(extempore src/Extempore.cpp
   src/UNIV.cpp
   )
 
-if(WIN32)
-  target_sources(extempore PRIVATE src/extempore.def)
+if(MSVC)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:$(ProjectDir)../src/extempore.def")
 endif()
 
 target_include_directories(extempore PRIVATE include)
@@ -676,7 +676,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(portmidi
     PREFIX portmidi
-    URL https://github.com/extemporelang/portmidi/archive/217.zip
+    URL http://extempore.moso.com.au/extras/portmidi_217.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -744,8 +744,8 @@ if(BUILD_DEPS)
     # the moment I've just hosted the (unmodified) libsndfile binaries
     # (a bit of a hack), but you can get an installer from
     # http://www.mega-nerd.com/libsndfile/#Download
-    file(DOWNLOAD https://dl.dropboxusercontent.com/u/18333720/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    file(DOWNLOAD https://dl.dropboxusercontent.com/u/18333720/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
 
     # ExternalProject_Add(sndfile
     #   PREFIX libsndfile
