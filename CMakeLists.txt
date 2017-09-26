@@ -676,7 +676,7 @@ if(BUILD_DEPS)
 
   ExternalProject_Add(portmidi
     PREFIX portmidi
-    URL http://extempore.moso.com.au/extras/portmidi_217.zip
+    URL https://github.com/extemporelang/portmidi/archive/master.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
