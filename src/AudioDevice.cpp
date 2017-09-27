@@ -365,7 +365,18 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                     extemp::EXTLLVM::llvm_zone_reset(zone);
                 }
                 ++in;
-            } // what about other values (between 1 and UNIV_CHANNELS?)
+            } 
+        } else { // for when in channels & out channels don't match
+          //SAMPLE* indata = alloc(UNIV::IN_CHANNELS); // auto
+          //indata(in);
+          auto indata(in);
+          for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
+                for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
+                    *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0,
+                                                                  time, k, &indata[i*UNIV::IN_CHANNELS])));
+                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                }
+            }
         }
         return 0;
     }
@@ -443,7 +454,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
       int numthreads = AudioDevice::I()->getNumThreads();
 
-// TODO: UNUSED???      double in[AudioDevice::MAX_RT_AUDIO_THREADS];
+      // TODO: UNUSED???      double in[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
       float* input = (float*) InputBuffer;
       for (unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = input[i];
