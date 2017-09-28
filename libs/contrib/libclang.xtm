@@ -107,6 +107,7 @@
 (bind-lib libclang clang_getFileUniqueID [i32,CXFile,CXFileUniqueID*]*
   "@param file - index 0
 @param outID - index 1")
+(bind-alias CXTranslationUnit i8*) ;; for use as a void pointer
 (bind-lib libclang clang_isFileMultipleIncludeGuarded [i32,CXTranslationUnit,CXFile]*
   "@param tu - index 0
 @param file - index 1")
@@ -383,6 +384,7 @@
   "@param TU - index 0")
 (bind-lib libclang clang_disposeCXTUResourceUsage [void,CXTUResourceUsage]*
   "@param usage - index 0")
+(bind-alias CXTargetInfo i8*) ;; for use as a void pointer
 (bind-lib libclang clang_getTranslationUnitTargetInfo [CXTargetInfo,CXTranslationUnit]*
   "@param CTUnit - index 0")
 (bind-lib libclang clang_TargetInfo_dispose [void,CXTargetInfo]*
@@ -703,6 +705,7 @@
   "@param cursor - index 0")
 (bind-lib libclang clang_Cursor_getTranslationUnit [CXTranslationUnit,CXCursor]*
   "@param  - index 0")
+(bind-alias CXCursorSet i8*) ;; for use as a void pointer
 (bind-lib libclang clang_createCXCursorSet [CXCursorSet]*
   "")
 (bind-lib libclang clang_disposeCXCursorSet [void,CXCursorSet]*
@@ -1020,7 +1023,7 @@
 (bind-val CXChildVisit_Break enum 0)
 (bind-val CXChildVisit_Continue enum 1)
 (bind-val CXChildVisit_Recurse enum 2)
-(bind-lib libclang CXCursorVisitor [CXChildVisitResult,CXCursor,CXCursor,CXClientData]*
+(bind-alias CXCursorVisitor [CXChildVisitResult,CXCursor,CXCursor,CXClientData]*
   "@param cursor - index 0
 @param parent - index 1
 @param client_data - index 2")
@@ -1179,7 +1182,6 @@
 (bind-val CXToken_Identifier enum 2)
 (bind-val CXToken_Literal enum 3)
 (bind-val CXToken_Comment enum 4)
-(bind-alias CXTokenKind enum)
 (bind-type CXToken <i32*,i8*>
   "@member int_data - index 0
 @member ptr_data - index 1")
@@ -1308,7 +1310,7 @@
 (bind-val CXCompletionContext_ObjCSelectorName enum 1)
 (bind-val CXCompletionContext_MacroName enum 1)
 (bind-val CXCompletionContext_NaturalLanguage enum 1)
-(bind-val CXCompletionContext_Unknown enum ((1 << 22) - 1))
+(bind-val CXCompletionContext_Unknown enum (- (<< 1 22) 1))
 (bind-lib libclang clang_defaultCodeCompleteOptions [i32]*
   "")
 (bind-lib libclang clang_codeCompleteAt [CXCodeCompleteResults*,CXTranslationUnit,i8*,i32,i32,CXUnsavedFile*,i32,i32]*
@@ -1342,7 +1344,7 @@
   "")
 (bind-lib libclang clang_toggleCrashRecovery [void,i32]*
   "@param isEnabled - index 0")
-(bind-lib libclang CXInclusionVisitor [void,CXFile,CXSourceLocation*,i32,CXClientData]*
+(bind-alias CXInclusionVisitor [void,CXFile,CXSourceLocation*,i32,CXClientData]*
   "@param included_file - index 0
 @param inclusion_stack - index 1
 @param include_len - index 2
@@ -1645,10 +1647,13 @@
 @param offset - index 5")
 (bind-lib libclang clang_indexLoc_getCXSourceLocation [CXSourceLocation,CXIdxLoc]*
   "@param loc - index 0")
-(bind-lib libclang CXFieldVisitor [CXVisitorResult,CXCursor,CXClientData]*
+(bind-alias CXFieldVisitor [CXVisitorResult,CXCursor,CXClientData]*
   "@param C - index 0
 @param client_data - index 1")
 (bind-lib libclang clang_Type_visitFields [i32,CXType,CXFieldVisitor,CXClientData]*
   "@param T - index 0
 @param visitor - index 1
 @param client_data - index 2")
+
+(impc:aot:insert-footer "xtmlibclang")
+(define *xtmlib-libclang-loaded* #t)
