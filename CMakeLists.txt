@@ -818,14 +818,8 @@ if(BUILD_TESTS)
   set(EXTEMPORE_TEST_PORT 17099)
 
   macro(extempore_add_test testfile label)
-    if(${label} STREQUAL "libs-core")
-      # in the libs-core case, pass the noaudio flag
-      add_test(NAME ${testfile}
-        COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
-    else()
-      add_test(NAME ${testfile}
-        COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
-    endif()
+    add_test(NAME ${testfile}
+      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
     set_tests_properties(${testfile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
