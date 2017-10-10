@@ -852,7 +852,7 @@ if(BUILD_TESTS)
   # examples - core
   extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
   # extempore_add_example_as_test(examples/core/extempore_lang.xtm 10 examples-core) # doesn't terminate
-  extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core)
+  # extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core) # no fdopen on Windows at this point
   extempore_add_example_as_test(examples/core/fmsynth.xtm 10 examples-audio)
   extempore_add_example_as_test(examples/core/midi_synth.xtm 10 examples-audio)
   extempore_add_example_as_test(examples/core/mtaudio.xtm 10 examples-audio)
