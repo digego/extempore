@@ -6,6 +6,13 @@ option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
+##################
+# CMake policies #
+##################
+
+# rpath stuff, see "cmake --help-policy CMP0068" for more info
+cmake_policy(SET CMP0068 NEW)
+
 ####################
 # option wrangling #
 ####################
@@ -485,6 +492,7 @@ if(WIN32)
   set_source_files_properties(
     PROPERTIES
     COMPILE_FLAGS "/EHsc")
+
 elseif(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILER clang)
