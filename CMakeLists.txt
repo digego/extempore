@@ -6,6 +6,13 @@ option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(BUILD_DEPS "download & build deps for aot_extended" ON)
 
+##################
+# CMake policies #
+##################
+
+# rpath stuff, see "cmake --help-policy CMP0068" for more info
+cmake_policy(SET CMP0068 NEW)
+
 ####################
 # option wrangling #
 ####################
@@ -485,6 +492,7 @@ if(WIN32)
   set_source_files_properties(
     PROPERTIES
     COMPILE_FLAGS "/EHsc")
+
 elseif(APPLE) # OSX
   # use clang++ by default
   set(CMAKE_C_COMPILER clang)
@@ -818,14 +826,8 @@ if(BUILD_TESTS)
   set(EXTEMPORE_TEST_PORT 17099)
 
   macro(extempore_add_test testfile label)
-    if(${label} STREQUAL "libs-core")
-      # in the libs-core case, pass the noaudio flag
-      add_test(NAME ${testfile}
-        COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
-    else()
-      add_test(NAME ${testfile}
-        COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
-    endif()
+    add_test(NAME ${testfile}
+      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
     set_tests_properties(${testfile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -858,7 +860,7 @@ if(BUILD_TESTS)
   # examples - core
   extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
   # extempore_add_example_as_test(examples/core/extempore_lang.xtm 10 examples-core) # doesn't terminate
-  extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core)
+  # extempore_add_example_as_test(examples/core/fasta_lang_shootout.xtm 10 examples-core) # no fdopen on Windows at this point
   extempore_add_example_as_test(examples/core/fmsynth.xtm 10 examples-audio)
   extempore_add_example_as_test(examples/core/midi_synth.xtm 10 examples-audio)
   extempore_add_example_as_test(examples/core/mtaudio.xtm 10 examples-audio)

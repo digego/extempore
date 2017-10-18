@@ -193,14 +193,13 @@ option.
 .. _ASIO SDK: http://www.steinberg.net/nc/en/company/developer/sdk_download_portal.html
 .. _ASIO4ALL: http://www.asio4all.com/
 
-The one caveat to the "extempore will download and build all the
-extended dependencies you need" is the **libsndfile** ``.lib`` and
-``.dll``. Currentyl, you need to manually get them from here `here`_
-and move them into ``libs/platform-shlibs`` (or if anyone can figure
-out how to build a 64-bit libsndfile on Windows in a sane way then let
-me know).
+The (musical) sampler also requires the `libsndfile`_ ``.lib`` and ``.dll``.
+Currently, we host pre-built binaries on ``http://extempore.moso.com.au``, which
+the CMake build process will download for you and move into
+``libs/platform-shlibs``. If anyone can figure out how to build a 64-bit
+libsndfile on Windows (preferrably with CMake) in a sane way then let me know.
 
-.. _here: http://www.mega-nerd.com/libsndfile/#Download
+.. _libsndfile: http://www.mega-nerd.com/libsndfile/#Download
 .. _install-extended-doc:
 
 Shared library dependencies
