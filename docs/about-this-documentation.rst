@@ -19,32 +19,26 @@ Generating
 To generate these docs, you'll need a few python packages, something
 like::
 
-    pip install sphinx sphinx-autobuild sphinx_rtd_theme
+    pip install sphinx sphinx-autobuild sphinx_rtd_theme pygments
 
 The docs are generated from the reStructured text (``.rst``) files
 in the ``docs/`` subdirectory in the Extempore source distribution.
-You can edit those files and build the documentation locally if you've
-got all the Sphinx stuff on your box, just run::
+
+If you want to work on the docs locally (with a live-reload server so that you
+can see the changes) you can use run ``sphinx-autobuild`` in this ``docs/``
+directory on your local machine::
 
     sphinx-autobuild . _build
 
-in the ``docs/`` subdirectory.
-
-To actually build the docs to host somewhere, just::
+To actually build the docs to host somewhere, use the makefile::
 
   make html
 
-in the ``docs/`` subdirectory, then take the generated output from
-``_build/html`` and dump it on a webserver somewhere---it's a
-self-contained static site.
+then take the generated output from ``_build/html`` and dump it on a webserver
+somewhere---it's a self-contained static site.
 
 Currently, we're hosting it on GitHub pages through the Extempore
 repo, in a special ``gh-pages`` branch.
-
-.. note:: The xtlang lexer has been accepted into Pygments (for proper
-          syntax highlighting of xtlang code) but it hasn't landed in
-          a stable release yet. If you want to use it, you can get it
-          from `bitbucket`_.
 
 .. _bitbucket: https://bitbucket.org/benswift/pygments-main/downloads
 
