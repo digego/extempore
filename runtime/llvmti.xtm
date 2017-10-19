@@ -6444,18 +6444,19 @@ Continue executing `body' forms until `test-expression' returns #f"
     (set! *impc:ti:nativef-generics:calls* (+ *impc:ti:nativef-generics:calls* 1))
     ;; (println 'native: *impc:ti:nativef-generics:calls* ast 'request: request?)
     ;; (println 'vars: vars)
-    ;; (println 'genericf-in: (assoc-strcmp (car ast) vars) 'request?)
+    ;; (println 'genericf-in: (assoc-strcmp (car ast) vars))
     (set! impc:ir:get-type-expand-poly #f)
     (if (or (null? request?)
             (and (list? request?)
                  (equal? (car request?) *impc:ir:notype*)))
         (set! request? #f))
-    ;; flatten request
+     ;; flatten request
     (if (and request? 
              (list? request?)
-             (not (impc:ir:complex-type? request?))
+             ;; (not (impc:ir:complex-type? request?))
+             (not (impc:ir:type? request?)) ;
              (impc:ir:type? (car request?)))
-        (set! request? (car request?)))
+        (set! request? (car request?)))    
     (if (not (impc:ir:type? request?))
         (set! request? #f))
     ;; 
