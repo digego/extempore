@@ -439,7 +439,7 @@ this (this is just a skeleton---it won’t compile)
                   (else 0.0)))))
 
       (bind-func organ_fx
-        (lambda (in:float time: chan:i64 dat:float*)
+        (lambda (in:float time:i64 chan:i64 dat:float*)
           (cond ((= chan 0)
                  ;; left channel effects goes here
                  )

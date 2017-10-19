@@ -111,7 +111,7 @@ defining both ``global-val`` and ``my-scm-func`` in *myproc*.
 .. code-block:: extempore
 
   (ipc:define "myproc" 'global-val global-val)
-  (ipc:define "myproc 'my-scm-func my-scm-func)
+  (ipc:define "myproc" 'my-scm-func my-scm-func)
 
 now the ``ipc:call`` works as expected---i.e. executing
 ``my-scm-func`` in the *myproc* process.
