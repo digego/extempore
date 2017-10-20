@@ -20,7 +20,10 @@
 
 (define (bind-data-type-constructor n name)
   (let* ((type (impc:ir:get-type-from-pretty-str (symbol->string name)))
-         (gentypes (cdddr type)))
+         (gentypes (if (and (list? type)
+                            (= (length type) 4))
+                       (cdddr type)
+                       '())))
     `(bind-func ,(string->symbol
                   (string-append (symbol->string n) "_Make:["
                                  (symbol->string name) "*,i64,i8*]*"))
