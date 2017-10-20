@@ -52,12 +52,14 @@
                                     ","))
                                ">"))
                `(printer? . #f)))
-       constructors))
+       constructors))               
 
 (define local_gen_type_minimize
-  (lambda (n t)    
+  (lambda (n t)
     (let* ((l (map atom->string t))
-           (l1 (foldl (lambda (xs x) (if (regex:match? (atom->string x) "^!") (cons x xs) xs)) '() (cdr l)))
+           (l1 (foldl (lambda (xs x)
+                         (append (regex:match-all (atom->string x) "(![a-z]*)") xs))
+                      '() (cdr l)))
            (l2 (cl:remove-duplicates (reverse l1)))
            (l3 (foldl (lambda (xs x)
                         (if (string=? "" xs)
