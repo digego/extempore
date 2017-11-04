@@ -63,9 +63,8 @@ in sequence (an arpeggiated triad).
       ;; load the instruments file
       (sys:load "libs/core/instruments.xtm")
 
-      ;; define a synth using the provided components
-      ;; synth_note_c and synth_fx
-      (bind-instrument synth synth_note_c synth_fx)
+      ;; define a synth using the predefined instrument fmsynth
+      (make-instrument synth fmsynth)
 
       ;; add the instrument to the DSP output callback
       (bind-func dsp:DSP
