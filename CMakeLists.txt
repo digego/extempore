@@ -4,7 +4,9 @@ option(BOOST "use boost library" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
-option(BUILD_DEPS "download & build deps for aot_extended" ON)
+option(EXTENDED_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
+option(EXTENDED_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
+set(EXTENDED_SHLIBS (EXTENDED_SHLIBS_AUDIO OR EXTENDED_SHLIBS_GRAPHICS))
 
 ##################
 # CMake policies #
@@ -29,8 +31,6 @@ if(PACKAGE)
   set(CMAKE_OSX_SYSROOT macosx)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
   message(STATUS "Building Extempore for binary distribution")
-  # need deps if we're packaging
-  set(BUILD_DEPS ON CACHE BOOL "" FORCE)
 endif()
 
 # LLVM
@@ -46,7 +46,10 @@ endif()
 
 # building external shared library dependencies
 
-if(BUILD_DEPS)
+if(EXTENDED_SHLIBS)
+
+  include(ExternalProject)
+
   set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
   set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
   if(PACKAGE)
@@ -621,7 +624,7 @@ else(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
-    add_dependencies(${targetname} extempore extended_deps)
+    add_dependencies(${targetname} extempore extended_shlibs_audio extended_shlibs_graphics)
     add_dependencies(${group} ${targetname})
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
@@ -638,36 +641,45 @@ else(WIN32)
   aotcompile_lib(libs/core/audio_dsp.xtm aot base math audiobuffer)
   aotcompile_lib(libs/core/instruments.xtm aot base math audio_dsp)
 
-  # extended
-  add_custom_target(aot_extended ALL)
-  aotcompile_lib(libs/external/fft.xtm aot_extended base math)
-  aotcompile_lib(libs/external/sndfile.xtm aot_extended base)
-  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended base fft sndfile)
-  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended base sndfile instruments)
-  aotcompile_lib(libs/external/portmidi.xtm aot_extended base)
-  aotcompile_lib(libs/external/stb_image.xtm aot_extended base)
-  aotcompile_lib(libs/external/glfw3.xtm aot_extended base)
+  # extended audio
+  add_custom_target(aot_extended_audio ALL)
+  aotcompile_lib(libs/external/fft.xtm aot_extended_audio base math)
+  aotcompile_lib(libs/external/sndfile.xtm aot_extended_audio base)
+  aotcompile_lib(libs/external/audio_dsp_ext.xtm aot_extended_audio base fft sndfile)
+  aotcompile_lib(libs/external/instruments_ext.xtm aot_extended_audio base sndfile instruments)
+  aotcompile_lib(libs/external/portmidi.xtm aot_extended_audio base)
+
+  # extended graphics
+  add_custom_target(aot_extended_graphics ALL)
+  aotcompile_lib(libs/external/stb_image.xtm aot_extended_graphics base)
+  aotcompile_lib(libs/external/glfw3.xtm aot_extended_graphics base)
   if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
     set(GL_BIND_METHOD getprocaddress)
   else()
     set(GL_BIND_METHOD directbind)
   endif()
-  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended base)
-  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended base math glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/gl/gl-objects2.xtm aot_extended base glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended base math glcore-${GL_BIND_METHOD} stb_image gl-objects2)
-  aotcompile_lib(libs/external/nanovg.xtm aot_extended base glcore-${GL_BIND_METHOD})
+  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm aot_extended_graphics base)
+  aotcompile_lib(libs/external/gl/gl-objects.xtm aot_extended_graphics base math glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/gl/gl-objects2.xtm aot_extended_graphics base glcore-${GL_BIND_METHOD} stb_image)
+  aotcompile_lib(libs/external/graphics-pipeline.xtm aot_extended_graphics base math glcore-${GL_BIND_METHOD} stb_image gl-objects2)
+  aotcompile_lib(libs/external/nanovg.xtm aot_extended_graphics base glcore-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
     # aotcompile_lib(libs/external/glib.xtm aot_extended base)
-    aotcompile_lib(libs/external/assimp.xtm aot_extended base stb_image graphics-pipeline)
-  endif()  
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended base)
+    aotcompile_lib(libs/external/assimp.xtm aot_extended_graphics base stb_image graphics-pipeline)
+  endif()
+  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm aot_extended_graphics base)
 
 endif(WIN32)
 
 add_dependencies(aot extempore)
-add_dependencies(aot_extended extempore)
+
+if(EXTENDED_SHLIBS_AUDIO)
+  add_dependencies(aot_extended_audio extempore)
+endif()
+if(EXTENDED_SHLIBS_GRAPHICS)
+  add_dependencies(aot_extended_graphics extempore)
+endif()
 
 # uninstall only AOT-compiled libs
 add_custom_target(clean_aot
@@ -678,7 +690,7 @@ add_custom_target(clean_aot
 # deps for AOT-extended #
 #########################
 
-if(BUILD_DEPS)
+if(EXTENDED_SHLIBS_AUDIO)
 
   include(ExternalProject)
 
@@ -691,6 +703,70 @@ if(BUILD_DEPS)
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
+  ExternalProject_Add(kiss_fft
+    PREFIX kiss_fft
+    URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  if(WIN32)
+    # aargh! sndfile on Windows still requires sh, sed, etc. and
+    # doesn't work. so we'll just grab the pre-built one manually. for
+    # the moment I've just hosted the (unmodified) libsndfile binaries
+    # (a bit of a hack), but you can get an installer from
+    # http://www.mega-nerd.com/libsndfile/#Download
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+
+    # ExternalProject_Add(sndfile
+    #   PREFIX libsndfile
+    #   URL https://github.com/erikd/libsndfile/archive/master.zip
+    #   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
+    #   CMAKE_ARGS
+    #   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    #   -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  else()
+    # build with as few deps as we can get away with
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
+      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
+      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
+      INSTALL_COMMAND make install
+      BUILD_IN_SOURCE ON)
+  endif()
+
+  if(UNIX)
+    add_custom_target(extended_shlibs_audio
+      COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS sndfile kiss_fft portmidi LLVM sndfile
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+
+  elseif(WIN32)
+    add_custom_target(extended_shlibs_audio
+      COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
+  endif()
+
+  add_dependencies(aot_extended_audio extended_shlibs_audio)
+
+endif(EXTENDED_SHLIBS_AUDIO)
+
+if(EXTENDED_SHLIBS_GRAPHICS)
+
   ExternalProject_Add(nanovg
     PREFIX nanovg
     URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
@@ -702,15 +778,6 @@ if(BUILD_DEPS)
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   add_dependencies(nanovg extempore)
-
-  ExternalProject_Add(kiss_fft
-    PREFIX kiss_fft
-    URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
-    CMAKE_ARGS
-    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   ExternalProject_Add(stb_image
     PREFIX stb_image
@@ -746,72 +813,37 @@ if(BUILD_DEPS)
     -DASSIMP_BUILD_TESTS=OFF
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
-  if(WIN32)
-    # aargh! sndfile on Windows still requires sh, sed, etc. and
-    # doesn't work. so we'll just grab the pre-built one manually. for
-    # the moment I've just hosted the (unmodified) libsndfile binaries
-    # (a bit of a hack), but you can get an installer from
-    # http://www.mega-nerd.com/libsndfile/#Download
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
-
-    # ExternalProject_Add(sndfile
-    #   PREFIX libsndfile
-    #   URL https://github.com/erikd/libsndfile/archive/master.zip
-    #   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
-    #   CMAKE_ARGS
-    #   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    #   -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-  else()
-    # build with as few deps as we can get away with
-    ExternalProject_Add(sndfile
-      PREFIX libsndfile
-      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-      INSTALL_COMMAND make install
-      BUILD_IN_SOURCE ON)
-  endif()
-
-  # wrap the whole thing in a target
-
   if(UNIX)
-    add_custom_target(extended_deps
+    add_custom_target(extended_shlibs_graphics
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
+      DEPENDS assimp glfw3 stb_image nanovg LLVM
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+
   elseif(WIN32)
-    add_custom_target(extended_deps
+    add_custom_target(extended_shlibs_graphics
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
       # glfw3 has different base names for the .dll and .lib, so fix that
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
   endif()
 
-add_dependencies(aot_extended extended_deps)
+  add_dependencies(aot_extended_graphics extended_shlibs_graphics)
 
-endif(BUILD_DEPS)
+endif(EXTENDED_SHLIBS_GRAPHICS)
 
 #########
 # tests #
