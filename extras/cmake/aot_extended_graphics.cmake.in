@@ -1,0 +1,44 @@
+set(PACKAGE @PACKAGE@)
+
+# this is only necessary on Windows, since the aot-compilation runs
+# can't happen in parallel there, and I can't get Visual Studio to
+# deparallelise
+
+set(AOT_LIBS
+  # core
+  "libs/base/base.xtm"
+  "libs/core/math.xtm"
+  "libs/core/audiobuffer.xtm"
+  "libs/core/audio_dsp.xtm"
+  "libs/core/instruments.xtm"
+  # external graphics (mostly OpenGL)
+  "libs/external/stb_image.xtm"
+  "libs/external/glfw3.xtm"
+  "libs/external/gl/glcore-getprocaddress.xtm"
+  "libs/external/gl/gl-objects.xtm"
+  "libs/external/gl/gl-objects2.xtm"
+  "libs/external/nanovg.xtm"
+  "libs/external/gl/glcompat-getprocaddress.xtm"
+  "libs/external/graphics-pipeline.xtm"
+  "libs/external/assimp.xtm")
+
+foreach(aot-lib ${AOT_LIBS})
+  message(STATUS "AOT-compiling ${aot-lib}")
+  if(PACKAGE)
+    # pass --attr=none when packaging
+    execute_process(
+      COMMAND ./extempore --nobase --attr=none --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\")"
+      WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
+      TIMEOUT 900 # 15 minutes
+      RESULT_VARIABLE aot_retval)
+  else(PACKAGE)
+    execute_process(
+      COMMAND ./extempore --nobase --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\")"
+      WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
+      TIMEOUT 900 # 15 minutes
+      RESULT_VARIABLE aot_retval)
+  endif(PACKAGE)
+  if(NOT "${aot_retval}" STREQUAL 0)
+    message(FATAL_ERROR "Problem compiling ${aot-lib}")
+  endif()
+endforeach()

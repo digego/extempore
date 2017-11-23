@@ -582,25 +582,16 @@ endif()
 
 if(WIN32)
 
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake.in
-    ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
-    @ONLY)
-
-  configure_file(
-    ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake.in
-    ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
-    @ONLY)
-
-  add_custom_target(aot
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot.cmake
-    COMMENT "Ahead-of-time compiling the standard library..."
+  foreach(file aot aot_extended_audio aot_extended_graphics)
+    configure_file(
+      ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake.in
+      ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
+      @ONLY)
+  add_custom_target(${file}
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
+    COMMENT "Ahead-of-time compiling the ${file} standard library..."
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
-  add_custom_target(aot_extended ALL
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/aot_extended.cmake
-    COMMENT "Ahead-of-time compiling the standard library..."
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  endforeach()
 
 else(WIN32)
 
