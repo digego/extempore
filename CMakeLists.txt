@@ -4,9 +4,9 @@ option(BOOST "use boost library" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
-option(EXTENDED_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
-option(EXTENDED_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
-set(EXTENDED_SHLIBS (EXTENDED_SHLIBS_AUDIO OR EXTENDED_SHLIBS_GRAPHICS))
+option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
+option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
+set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
 ##################
 # CMake policies #
@@ -46,7 +46,7 @@ endif()
 
 # building external shared library dependencies
 
-if(EXTENDED_SHLIBS)
+if(EXTERNAL_SHLIBS)
 
   include(ExternalProject)
 
@@ -582,7 +582,7 @@ endif()
 
 if(WIN32)
 
-  foreach(file aot aot_extended_audio aot_extended_graphics)
+  foreach(file aot aot_external_audio aot_external_graphics)
     configure_file(
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake.in
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
@@ -617,8 +617,8 @@ else(WIN32)
     endif(PACKAGE)
     add_dependencies(${targetname} extempore)
     if(NOT ${group} STREQUAL "core")
-      add_dependencies(${targetname} extended_shlibs_${group})
-      add_dependencies(aot_extended_${group} ${targetname})
+      add_dependencies(${targetname} external_shlibs_${group})
+      add_dependencies(aot_external_${group} ${targetname})
     endif()
     foreach(dep ${ARGN})
       add_dependencies(${targetname} aot_${dep})
@@ -644,10 +644,10 @@ add_custom_target(clean_aot
   COMMENT "Removing AOT-compiled libs")
 
 ########################################
-# extended shared library dependencies #
+# external shared library dependencies #
 ########################################
 
-if(EXTENDED_SHLIBS_AUDIO)
+if(EXTERNAL_SHLIBS_AUDIO)
 
   # first, download & build the shared libraries themselves (these are all external to Extempore)
 
@@ -691,7 +691,7 @@ if(EXTENDED_SHLIBS_AUDIO)
   endif()
 
   if(UNIX)
-    add_custom_target(extended_shlibs_audio
+    add_custom_target(external_shlibs_audio
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile kiss_fft portmidi LLVM sndfile
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
@@ -701,7 +701,7 @@ if(EXTENDED_SHLIBS_AUDIO)
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
 
   elseif(WIN32)
-    add_custom_target(extended_shlibs_audio
+    add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
@@ -713,19 +713,19 @@ if(EXTENDED_SHLIBS_AUDIO)
   endif()
 
   # set up these libs for AOT compilation
-  add_custom_target(aot_extended_audio ALL)
+  add_custom_target(aot_external_audio ALL)
   aotcompile_lib(libs/external/fft.xtm audio base math)
   aotcompile_lib(libs/external/sndfile.xtm audio base)
   aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft sndfile)
   aotcompile_lib(libs/external/instruments_ext.xtm audio base sndfile instruments)
   aotcompile_lib(libs/external/portmidi.xtm audio base)
 
-  add_dependencies(aot_extended_audio extempore)
-  add_dependencies(aot_extended_audio extended_shlibs_audio)
+  add_dependencies(aot_external_audio extempore)
+  add_dependencies(aot_external_audio external_shlibs_audio)
 
-endif(EXTENDED_SHLIBS_AUDIO)
+endif(EXTERNAL_SHLIBS_AUDIO)
 
-if(EXTENDED_SHLIBS_GRAPHICS)
+if(EXTERNAL_SHLIBS_GRAPHICS)
 
   include(ExternalProject)
 
@@ -776,7 +776,7 @@ if(EXTENDED_SHLIBS_GRAPHICS)
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(UNIX)
-    add_custom_target(extended_shlibs_graphics
+    add_custom_target(external_shlibs_graphics
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS assimp glfw3 stb_image nanovg LLVM
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
@@ -787,7 +787,7 @@ if(EXTENDED_SHLIBS_GRAPHICS)
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
 
   elseif(WIN32)
-    add_custom_target(extended_shlibs_graphics
+    add_custom_target(external_shlibs_graphics
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
@@ -804,7 +804,7 @@ if(EXTENDED_SHLIBS_GRAPHICS)
   endif()
 
   # set up these libs for AOT compilation
-  add_custom_target(aot_extended_graphics ALL)
+  add_custom_target(aot_external_graphics ALL)
   aotcompile_lib(libs/external/stb_image.xtm graphics base)
   aotcompile_lib(libs/external/glfw3.xtm graphics base)
   if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
@@ -819,15 +819,15 @@ if(EXTENDED_SHLIBS_GRAPHICS)
   aotcompile_lib(libs/external/nanovg.xtm graphics base glcore-${GL_BIND_METHOD})
   if(NOT WIN32)
     # these ones don't currently work on Windows
-    # aotcompile_lib(libs/external/glib.xtm aot_extended base)
+    # aotcompile_lib(libs/external/glib.xtm aot_external base)
     aotcompile_lib(libs/external/assimp.xtm graphics base stb_image graphics-pipeline)
   endif()
   aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm graphics base)
 
-  add_dependencies(aot_extended_graphics extempore)
-  add_dependencies(aot_extended_graphics extended_shlibs_graphics)
+  add_dependencies(aot_external_graphics extempore)
+  add_dependencies(aot_external_graphics external_shlibs_graphics)
 
-endif(EXTENDED_SHLIBS_GRAPHICS)
+endif(EXTERNAL_SHLIBS_GRAPHICS)
 
 #########
 # tests #
