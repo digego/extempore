@@ -626,16 +626,93 @@ else(WIN32)
     # decrement port number by 2
     math(EXPR EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT} - 2")
   endmacro(aotcompile_lib)
+endif(WIN32)
 
-  # core
-  add_custom_target(aot_core)
-  aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
-  aotcompile_lib(libs/core/math.xtm core base)
-  aotcompile_lib(libs/core/audiobuffer.xtm core base)
-  aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
-  aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
+# core
+add_custom_target(aot_core)
+aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
+aotcompile_lib(libs/core/math.xtm core base)
+aotcompile_lib(libs/core/audiobuffer.xtm core base)
+aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
+aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
 
-  # extended audio
+add_dependencies(aot_core extempore)
+
+# uninstall only AOT-compiled libs
+add_custom_target(clean_aot
+  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/libs/aot-cache
+  COMMENT "Removing AOT-compiled libs")
+
+########################################
+# extended shared library dependencies #
+########################################
+
+if(EXTENDED_SHLIBS_AUDIO)
+
+  # first, download & build the shared libraries themselves (these are all external to Extempore)
+
+  include(ExternalProject)
+
+  ExternalProject_Add(portmidi
+    PREFIX portmidi
+    URL https://github.com/extemporelang/portmidi/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(kiss_fft
+    PREFIX kiss_fft
+    URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  if(WIN32)
+    # aargh! sndfile on Windows still requires sh, sed, etc. and
+    # doesn't work. so we'll just grab the pre-built one manually. for
+    # the moment I've just hosted the (unmodified) libsndfile binaries
+    # (a bit of a hack), but you can get an installer from
+    # http://www.mega-nerd.com/libsndfile/#Download
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
+    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+  else()
+    # build with as few deps as we can get away with
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
+      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
+      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
+      INSTALL_COMMAND make install
+      BUILD_IN_SOURCE ON)
+  endif()
+
+  if(UNIX)
+    add_custom_target(extended_shlibs_audio
+      COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS sndfile kiss_fft portmidi LLVM sndfile
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+
+  elseif(WIN32)
+    add_custom_target(extended_shlibs_audio
+      COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
+  endif()
+
+  # set up these libs for AOT compilation
   add_custom_target(aot_extended_audio ALL)
   aotcompile_lib(libs/external/fft.xtm audio base math)
   aotcompile_lib(libs/external/sndfile.xtm audio base)
@@ -643,7 +720,90 @@ else(WIN32)
   aotcompile_lib(libs/external/instruments_ext.xtm audio base sndfile instruments)
   aotcompile_lib(libs/external/portmidi.xtm audio base)
 
-  # extended graphics
+  add_dependencies(aot_extended_audio extempore)
+  add_dependencies(aot_extended_audio extended_shlibs_audio)
+
+endif(EXTENDED_SHLIBS_AUDIO)
+
+if(EXTENDED_SHLIBS_GRAPHICS)
+
+  include(ExternalProject)
+
+  ExternalProject_Add(nanovg
+    PREFIX nanovg
+    URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
+    CMAKE_ARGS
+    -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  add_dependencies(nanovg extempore)
+
+  ExternalProject_Add(stb_image
+    PREFIX stb_image
+    URL https://github.com/extemporelang/stb/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(glfw3
+    PREFIX glfw3
+    URL https://github.com/glfw/glfw/releases/download/3.2.1/glfw-3.2.1.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DBUILD_SHARED_LIBS=ON
+    -DGLFW_BUILD_EXAMPLES=OFF
+    -DGLFW_BUILD_TESTS=OFF
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  ExternalProject_Add(assimp
+    PREFIX assimp
+    URL https://github.com/assimp/assimp/archive/v3.2.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_DEBUG_POSTFIX=
+    -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
+    -DASSIMP_BUILD_SAMPLES=OFF
+    -DASSIMP_BUILD_TESTS=OFF
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+
+  if(UNIX)
+    add_custom_target(extended_shlibs_graphics
+      COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS assimp glfw3 stb_image nanovg LLVM
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+
+  elseif(WIN32)
+    add_custom_target(extended_shlibs_graphics
+      COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
+      DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      # glfw3 has different base names for the .dll and .lib, so fix that
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
+      WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
+  endif()
+
+  # set up these libs for AOT compilation
   add_custom_target(aot_extended_graphics ALL)
   aotcompile_lib(libs/external/stb_image.xtm graphics base)
   aotcompile_lib(libs/external/glfw3.xtm graphics base)
@@ -664,166 +824,10 @@ else(WIN32)
   endif()
   aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm graphics base)
 
-endif(WIN32)
+  add_dependencies(aot_extended_graphics extempore)
+  add_dependencies(aot_extended_graphics extended_shlibs_graphics)
 
-add_dependencies(aot_core extempore)
-add_dependencies(aot_extended_audio extempore)
-add_dependencies(aot_extended_graphics extempore)
-
-# uninstall only AOT-compiled libs
-add_custom_target(clean_aot
-  COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_SOURCE_DIR}/libs/aot-cache
-  COMMENT "Removing AOT-compiled libs")
-
-#########################
-# deps for AOT-extended #
-#########################
-
-include(ExternalProject)
-
-ExternalProject_Add(portmidi
-  PREFIX portmidi
-  URL https://github.com/extemporelang/portmidi/archive/master.zip
-  CMAKE_ARGS
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-ExternalProject_Add(kiss_fft
-  PREFIX kiss_fft
-  URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
-  CMAKE_ARGS
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-if(WIN32)
-  # aargh! sndfile on Windows still requires sh, sed, etc. and
-  # doesn't work. so we'll just grab the pre-built one manually. for
-  # the moment I've just hosted the (unmodified) libsndfile binaries
-  # (a bit of a hack), but you can get an installer from
-  # http://www.mega-nerd.com/libsndfile/#Download
-  file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-  file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
-
-  # ExternalProject_Add(sndfile
-  #   PREFIX libsndfile
-  #   URL https://github.com/erikd/libsndfile/archive/master.zip
-  #   CONFIGURE_COMMAND ${CMAKE_BINARY_DIR}/libsndfile/src/sndfile/autogen.sh cmake && ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR}
-  #   CMAKE_ARGS
-  #   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  #   -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-else()
-  # build with as few deps as we can get away with
-  ExternalProject_Add(sndfile
-    PREFIX libsndfile
-    URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-    CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-    BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-    INSTALL_COMMAND make install
-    BUILD_IN_SOURCE ON)
-endif()
-
-if(UNIX)
-  add_custom_target(extended_shlibs_audio
-    COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
-    DEPENDS sndfile kiss_fft portmidi LLVM sndfile
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
-
-elseif(WIN32)
-  add_custom_target(extended_shlibs_audio
-    COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-    DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
-    WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
-endif()
-
-add_dependencies(aot_extended_audio extended_shlibs_audio)
-
-ExternalProject_Add(nanovg
-  PREFIX nanovg
-  URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
-  CMAKE_ARGS
-  -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-add_dependencies(nanovg extempore)
-
-ExternalProject_Add(stb_image
-  PREFIX stb_image
-  URL https://github.com/extemporelang/stb/archive/master.zip
-  CMAKE_ARGS
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-ExternalProject_Add(glfw3
-  PREFIX glfw3
-  URL https://github.com/glfw/glfw/releases/download/3.2.1/glfw-3.2.1.zip
-  CMAKE_ARGS
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DBUILD_SHARED_LIBS=ON
-  -DGLFW_BUILD_EXAMPLES=OFF
-  -DGLFW_BUILD_TESTS=OFF
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-ExternalProject_Add(assimp
-  PREFIX assimp
-  URL https://github.com/assimp/assimp/archive/v3.2.zip
-  CMAKE_ARGS
-  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-  -DCMAKE_DEBUG_POSTFIX=
-  -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
-  -DASSIMP_BUILD_SAMPLES=OFF
-  -DASSIMP_BUILD_TESTS=OFF
-  -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
-
-if(UNIX)
-  add_custom_target(extended_shlibs_graphics
-    COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
-    DEPENDS assimp glfw3 stb_image nanovg LLVM
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-    WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
-
-elseif(WIN32)
-  add_custom_target(extended_shlibs_graphics
-    COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-    DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
-    # glfw3 has different base names for the .dll and .lib, so fix that
-    COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
-    WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
-endif()
-
+endif(EXTENDED_SHLIBS_GRAPHICS)
 
 #########
 # tests #
