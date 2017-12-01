@@ -582,7 +582,7 @@ endif()
 
 if(WIN32)
 
-  foreach(file aot aot_external_audio aot_external_graphics)
+  macro(aotcompile file)
     configure_file(
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake.in
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
@@ -591,7 +591,9 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
       COMMENT "Ahead-of-time compiling the ${file} standard library..."
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  endforeach()
+  endmacro(aotcompile)
+
+  aotcompile(aot)
 
 else(WIN32)
 
@@ -626,17 +628,18 @@ else(WIN32)
     # decrement port number by 2
     math(EXPR EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT} - 2")
   endmacro(aotcompile_lib)
+
+  # core
+  add_custom_target(aot_core)
+  aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
+  aotcompile_lib(libs/core/math.xtm core base)
+  aotcompile_lib(libs/core/audiobuffer.xtm core base)
+  aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
+  aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
+
+  add_dependencies(aot_core extempore)
+
 endif(WIN32)
-
-# core
-add_custom_target(aot_core)
-aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
-aotcompile_lib(libs/core/math.xtm core base)
-aotcompile_lib(libs/core/audiobuffer.xtm core base)
-aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
-aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
-
-add_dependencies(aot_core extempore)
 
 # uninstall only AOT-compiled libs
 add_custom_target(clean_aot
@@ -691,6 +694,13 @@ if(EXTERNAL_SHLIBS_AUDIO)
   endif()
 
   if(UNIX)
+    add_custom_target(aot_external_audio ALL)
+    aotcompile_lib(libs/external/fft.xtm audio base math)
+    aotcompile_lib(libs/external/sndfile.xtm audio base)
+    aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft sndfile)
+    aotcompile_lib(libs/external/instruments_ext.xtm audio base sndfile instruments)
+    aotcompile_lib(libs/external/portmidi.xtm audio base)
+
     add_custom_target(external_shlibs_audio
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile kiss_fft portmidi LLVM sndfile
@@ -701,6 +711,8 @@ if(EXTERNAL_SHLIBS_AUDIO)
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
 
   elseif(WIN32)
+    aotcompile(aot_external_audio)
+
     add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
@@ -711,14 +723,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
   endif()
-
-  # set up these libs for AOT compilation
-  add_custom_target(aot_external_audio ALL)
-  aotcompile_lib(libs/external/fft.xtm audio base math)
-  aotcompile_lib(libs/external/sndfile.xtm audio base)
-  aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft sndfile)
-  aotcompile_lib(libs/external/instruments_ext.xtm audio base sndfile instruments)
-  aotcompile_lib(libs/external/portmidi.xtm audio base)
 
   add_dependencies(aot_external_audio extempore)
   add_dependencies(aot_external_audio external_shlibs_audio)
@@ -776,6 +780,23 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
 
   if(UNIX)
+    add_custom_target(aot_external_graphics ALL)
+
+    aotcompile_lib(libs/external/stb_image.xtm graphics base)
+    aotcompile_lib(libs/external/glfw3.xtm graphics base)
+    if(DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
+      set(GL_BIND_METHOD getprocaddress)
+    else()
+      set(GL_BIND_METHOD directbind)
+    endif()
+    aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm graphics base)
+    aotcompile_lib(libs/external/gl/gl-objects.xtm graphics base math glcore-${GL_BIND_METHOD} stb_image)
+    aotcompile_lib(libs/external/gl/gl-objects2.xtm graphics base glcore-${GL_BIND_METHOD} stb_image)
+    aotcompile_lib(libs/external/graphics-pipeline.xtm graphics base math glcore-${GL_BIND_METHOD} stb_image gl-objects2)
+    aotcompile_lib(libs/external/nanovg.xtm graphics base glcore-${GL_BIND_METHOD})
+    aotcompile_lib(libs/external/assimp.xtm graphics base stb_image graphics-pipeline)
+    aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm graphics base)
+
     add_custom_target(external_shlibs_graphics
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS assimp glfw3 stb_image nanovg LLVM
@@ -787,6 +808,8 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
 
   elseif(WIN32)
+    aotcompile(aot_external_graphics)
+
     add_custom_target(external_shlibs_graphics
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
       DEPENDS sndfile assimp glfw3 stb_image kiss_fft nanovg portmidi LLVM sndfile
@@ -804,26 +827,6 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
   endif()
 
   # set up these libs for AOT compilation
-  add_custom_target(aot_external_graphics ALL)
-  aotcompile_lib(libs/external/stb_image.xtm graphics base)
-  aotcompile_lib(libs/external/glfw3.xtm graphics base)
-  if(WIN32 OR DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
-    set(GL_BIND_METHOD getprocaddress)
-  else()
-    set(GL_BIND_METHOD directbind)
-  endif()
-  aotcompile_lib(libs/external/gl/glcore-${GL_BIND_METHOD}.xtm graphics base)
-  aotcompile_lib(libs/external/gl/gl-objects.xtm graphics base math glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/gl/gl-objects2.xtm graphics base glcore-${GL_BIND_METHOD} stb_image)
-  aotcompile_lib(libs/external/graphics-pipeline.xtm graphics base math glcore-${GL_BIND_METHOD} stb_image gl-objects2)
-  aotcompile_lib(libs/external/nanovg.xtm graphics base glcore-${GL_BIND_METHOD})
-  if(NOT WIN32)
-    # these ones don't currently work on Windows
-    # aotcompile_lib(libs/external/glib.xtm aot_external base)
-    aotcompile_lib(libs/external/assimp.xtm graphics base stb_image graphics-pipeline)
-  endif()
-  aotcompile_lib(libs/external/gl/glcompat-${GL_BIND_METHOD}.xtm graphics base)
-
   add_dependencies(aot_external_graphics extempore)
   add_dependencies(aot_external_graphics external_shlibs_graphics)
 
