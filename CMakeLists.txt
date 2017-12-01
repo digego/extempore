@@ -587,7 +587,7 @@ if(WIN32)
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake.in
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
       @ONLY)
-    add_custom_target(${file}
+    add_custom_target(${file} ALL
       COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
       COMMENT "Ahead-of-time compiling the ${file} standard library..."
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
