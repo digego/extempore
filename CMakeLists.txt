@@ -8,13 +8,6 @@ option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library de
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
-##################
-# CMake policies #
-##################
-
-# rpath stuff, see "cmake --help-policy CMP0068" for more info
-cmake_policy(SET CMP0068 NEW)
-
 ####################
 # option wrangling #
 ####################
