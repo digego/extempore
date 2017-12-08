@@ -8,6 +8,9 @@ option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library de
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
+## this is useful because we can group targets together (e.g. all the AOT libs)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 ####################
 # option wrangling #
 ####################
@@ -587,6 +590,7 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake
       COMMENT "Ahead-of-time compiling the ${file} standard library..."
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_target_properties(${file} PROPERTIES FOLDER AOT)
   endmacro(aotcompile)
 
   aotcompile(aot)
@@ -614,6 +618,7 @@ else(WIN32)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
+    set_target_properties(${targetname} PROPERTIES FOLDER AOT)
     add_dependencies(${targetname} extempore)
     if(NOT ${group} STREQUAL "core")
       add_dependencies(${targetname} external_shlibs_${group})
@@ -634,6 +639,7 @@ else(WIN32)
   aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
   aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
 
+  set_target_properties(aot_core PROPERTIES FOLDER AOT)
   add_dependencies(aot_core extempore)
 
 endif(WIN32)
@@ -661,6 +667,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(portmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   ExternalProject_Add(kiss_fft
     PREFIX kiss_fft
@@ -670,6 +677,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   if(WIN32)
     # aargh! sndfile on Windows still requires sh, sed, etc. and
@@ -688,10 +696,12 @@ if(EXTERNAL_SHLIBS_AUDIO)
       BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
       INSTALL_COMMAND make install
       BUILD_IN_SOURCE ON)
+  set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
   endif()
 
   if(UNIX)
     add_custom_target(aot_external_audio ALL)
+    set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
     aotcompile_lib(libs/external/fft.xtm audio base math)
     aotcompile_lib(libs/external/sndfile.xtm audio base)
     aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft sndfile)
@@ -706,6 +716,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
       COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+    set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   elseif(WIN32)
     aotcompile(aot_external_audio)
@@ -719,6 +730,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
   endif()
 
   add_dependencies(aot_external_audio extempore)
@@ -739,6 +751,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(nanovg PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   add_dependencies(nanovg extempore)
 
@@ -750,6 +763,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(nanovg PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   ExternalProject_Add(glfw3
     PREFIX glfw3
@@ -762,6 +776,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     -DGLFW_BUILD_EXAMPLES=OFF
     -DGLFW_BUILD_TESTS=OFF
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(glfw3 PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   ExternalProject_Add(assimp
     PREFIX assimp
@@ -775,9 +790,11 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     -DASSIMP_BUILD_SAMPLES=OFF
     -DASSIMP_BUILD_TESTS=OFF
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+  set_target_properties(assimp PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   if(UNIX)
     add_custom_target(aot_external_graphics ALL)
+    set_target_properties(assimp PROPERTIES FOLDER AOT)
 
     aotcompile_lib(libs/external/stb_image.xtm graphics base)
     aotcompile_lib(libs/external/glfw3.xtm graphics base)
@@ -803,6 +820,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
       COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
+    set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   elseif(WIN32)
     aotcompile(aot_external_graphics)
@@ -821,6 +839,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
       # glfw3 has different base names for the .dll and .lib, so fix that
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
   endif()
 
   # set up these libs for AOT compilation
