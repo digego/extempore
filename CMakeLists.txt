@@ -575,6 +575,9 @@ endif()
 
 if(WIN32)
 
+## this is the "just run the AOT script" approach - it doesn't create individual
+## targets or a dependency graph, so it doesn't parallelise. but it's simpler
+
   macro(aotcompile file)
     configure_file(
       ${CMAKE_SOURCE_DIR}/extras/cmake/${file}.cmake.in
@@ -590,7 +593,8 @@ if(WIN32)
 
 else(WIN32)
 
-  # this approach requires specifying the inter-lib dependencies by hand, but allows us to do AOT compilation in parallell
+  # this approach requires specifying the inter-lib dependencies by hand, but
+  # allows us to do AOT compilation in parallell
 
   set(EXTEMPORE_AOT_COMPILE_PORT 17099)
 
