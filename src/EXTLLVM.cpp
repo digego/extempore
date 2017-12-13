@@ -290,6 +290,13 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
   socket.send_to(boost::asio::buffer(message, length), sa);
 #else
   fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+  //////// Dr Offig addition ////////
+  int broadcastEnable = 1;
+  int ret = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+  if (ret) { printf("Error: Could not open set socket to broadcast mode\n"); }
+  //////////////////////////////////////
+    
   int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
   close(fd);
 #endif
