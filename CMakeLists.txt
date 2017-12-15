@@ -24,7 +24,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if(PACKAGE)
   # this needs to be set before project() is called
-  set(CMAKE_OSX_SYSROOT macosx)
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
   message(STATUS "Building Extempore for binary distribution")
 endif()
@@ -314,7 +313,6 @@ if(BUILD_LLVM)
       URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
       PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
       CMAKE_ARGS
-      -DCMAKE_OSX_SYSROOT=macosx
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
