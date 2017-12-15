@@ -1,0 +1,148 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; rhythm map + looper
+;; 
+
+(define rmap_helper_lst_sym_transform
+  (lambda (lst)
+    (apply append
+      (map (lambda (elt)
+            (cond ((symbol? elt)
+                    (let* ((str (symbol->string elt))
+                           (split (regex:split str "_"))
+                           (num (if (and (not (null? (cdr split)))
+                                         (number? (string->atom (cadr split))))
+                                    (string->atom (cadr split))
+                                    #f))
+                           (val (cond ((equal? (car split) "") (string->symbol "_"))
+                                      ((number? (string->atom (car split))) (string->number (car split)))
+                                      (else (string->symbol (car split))))))
+                      (if num 
+                          (make-list num val)
+                          (list val))))
+                  ((list? elt) (if (= (length elt) 1) elt (list elt)))
+                  (else (list elt))))
+           lst))))
+
+(define rmap_helper
+  (lambda (beats func beat dur . args)
+    (let* ((lst (rmap_helper_lst_sym_transform (car args)))
+           (pos (modulo beat beats))
+           (one_beat (/ beats (length lst)))
+           (lst_positions (range 0 (+ pos beats) one_beat))
+           (nextpos (+ pos dur))
+           (idx 0)
+           (f (lambda (old new)
+                (set! idx (+ idx 1))
+                (if (and (>= new pos) (< new nextpos))
+                    (cons (cons new idx) old)
+                    old)))
+           (newlst (foldl f '() lst_positions)))
+      (map (lambda (t)
+              (let* ((tmpargs (map (lambda (l) 
+                                     (if (list? l)
+                                         (set! l (rmap_helper_lst_sym_transform l)) 
+                                         (set! l (list l)))
+                                     (if (< (length l) (cdr t))
+                                         (list-ref l (modulo (- (cdr t) 1) (length l)))
+                                         (list-ref l (- (cdr t) 1))))
+                                   args))
+                     (targs (map (lambda (l) (if (vector? l) (vector->list l) l)) tmpargs)))
+                (if (list? (car tmpargs))
+                    (apply rmap_helper one_beat func (+ beat (- (car t) pos)) one_beat targs)
+                    (if (not (and (symbol? (car tmpargs)) (equal? (car tmpargs) '_)))
+                        (apply callback (*metro* (+ beat (- (car t) pos))) func (+ beat (- (car t) pos)) targs)))))
+           newlst))))
+
+;; rhythm map
+;; rmap expects f to take beat + length(lsts) args.
+(define-macro (rmap beats f . lsts)
+  `(rmap_helper ,beats ,f beat dur ,@lsts))
+
+;;
+;; example usage
+;;
+
+;; (define test
+;;   (lambda (beat dur)
+;;     (rmap 4 (lambda (beat p r)
+;;               (play pad p 80 r))
+;;             `(60 70 80)
+;;             `(1 0.5 0.2))
+;;     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
+;;
+;; (test (*metro* 'get-beat 4) 1/4)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; 'in place' looping based on rmap
+;;
+(define-macro (rmap-loop-runner name tagtime run beats expr . lsts)
+  (let ((f `(lambda ,(cons 'beat (map (lambda (x) 
+                                        (string->symbol (string-append "@" (number->string x)))) 
+                                      (range 1 (+ 1 (length lsts)))))
+                    ,expr))
+        (running? (closure? name)))
+    (if (equal? run 'modify) (println 'Modifying: name))
+    (begin (eval `(define ,name 
+                   (lambda (beat dur) 
+                      (set! ,tagtime (now))
+                      (rmap ,beats ,f ,@lsts)
+                      (if ,(if (equal? run 'stop) #t #f)
+                          (begin (println 'Stopping_: ',name) 
+                                 (eval '(define ,name #f) (interaction-environment))
+                                 #f)
+                          (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur) 
+                                    ,(if (> beats 1) 1/2 (/ beats 2))))))
+                (interaction-environment))
+            (if (equal? run 'start)
+                (eval `(begin (println 'Starting_: ',name) 
+                              (,name (*metro* 'get-beat 4) (if (> ,beats 1) 1/2 (/ ,beats 2))))
+                       (interaction-environment))))))
+
+;; start or modify looper
+(define-macro (:> tag . args)
+  (let ((tagtime (string->symbol (string-append (symbol->string tag) "_tagtime"))))
+    (if (not (defined? tagtime)) (eval `(define ,tagtime (now)) (interaction-environment)))
+    (if (< (eval tagtime) (- (now) (* 2 *second*)))
+        (eval `(define ,tag #f) (interaction-environment)))
+    (if (and (defined? tag) (closure? (eval tag)))
+        `(rmap-loop-runner ,tag ,tagtime modify ,@args)  
+        `(rmap-loop-runner ,tag ,tagtime start ,@args))))
+
+;; stop looper
+(define-macro (:| tag . args) 
+  (let ((tagtime (string->symbol (string-append (symbol->string tag) "_tagtime"))))       
+    (if (defined? tag)
+        (begin (callback (+ (now) *second*) eval `(define ,tag #f) (interaction-environment))
+              `(rmap-loop-runner ,tag ,tagtime stop ,@args)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; additional helpers
+
+(define-macro (rmap-repeat num expr)
+  `(make-list-with-proc ,num (lambda (x) ,expr)))
+
+(define R rmap-repeat)
+
+
+;;
+;; 
+;; example usage
+;;
+;;
+
+;; start A
+;; 
+;; (:> A 8 (println '-> @1) `(1 2_2 _2 (3 4) _ #(5 6)))
+
+;; modify A
+;;
+;; (:> A 8 (println '-> @1 ': @2) `(1 2_2 _2 (3 4) _ #(5 6)) `(a b))
+
+;; stop A
+;;
+;; (:| A 8 (println '-> @1 ': @2) `(1 2_2 _2 (3 4) _ #(5 6)) `(a b))
+

@@ -12,6 +12,10 @@
 
 (sys:load "libs/external/instruments_ext.xtm")
 
+;; load looper
+
+(sys:load "./libs/core/looper.xtm")
+
 ;; make bass, lead, riff and pad
 (make-instrument bass analogue)
 (make-instrument lead analogue)
@@ -321,21 +325,23 @@
 
 (define whiter-shade
   (lambda (beat dur)
-    (playp 32 0 pad 0 `(e4 ,@(R __ 7) __ d4 c4 b3 c4 d4 e4 c4
-                          a4 ,@(R __ 5) b4 c5 (f4 e4) f4 ,@(R __ 4) d4 __
-                          b4 ,@(R __ 5) c5 d5 (g4 f4) g4 ,@(R __ 3) f4 e4 f4
-                          f4 e4 d4 c4 a3 b3 c4 d4 b3 c4 d4 e4 f4 e4 f4 d4)
-           80
-           `(9/2 ,@(R 0 7) 0 ,@(R 1/2 7)
-                 3 ,@(R 0 5) 1/2 1/2 (1/4 1/4) 2 ,@(R 0 4) 1 0
-                 3 ,@(R 0 5) 1/2 1/2 (1/4 1/4) 2 ,@(R 0 3) 1/2 1/2 1/2
-                 ,@(R 1/2 16)))
-    (playp 32 0 pad -12 `(c4 b3 a3 g3 f4 e4 d4 c4 g4 f4 e4 d4 c4 f4 g4 b3)
-           80 2)
+    ;; melody
+    (rmap 32 (lambda (beat p r)
+               (play pad (eval p) 80 r))
+        `(e4 _8 d4 c4 b3 c4 d4 e4 c4
+          a4 _5 b4 c5 (f4 e4) f4 _4 d4 _
+          b4 _5 c5 d5 (g4 f4) g4 _3 f4 e4 f4
+          f4 e4 d4 c4 a3 b3 c4 d4 b3 c4 d4 e4 f4 e4 f4 d4)
+        `(9/2 _8 1/2_7
+          3 _5 1/2 1/2 (1/4 1/4) 2 _4 1 _
+          3 _5 1/2 1/2 (1/4 1/4) 2 _3 1/2_3
+          1/2_16))
+    ;; bassline
+    (rmap 32 (lambda (beat p) (play pad (+ (eval p) -12) 80 2))
+        `(c4 b3 a3 g3 f4 e4 d4 c4 g4 f4 e4 d4 c4 f4 g4 b3))
     (callback (*metro* (+ beat (* .5 dur))) 'whiter-shade (+ beat dur) dur)))
-
+ 
 (whiter-shade (*metro* 'get-beat 4) 1/4)
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -348,19 +354,19 @@
 
 (*metro* 'set-tempo 125.0)
 
-(define drwho
-  (lambda (beat dur)
-    ;; (println (* 1.0 (modulo beat 32)))    
-    (onbeat? 1 8 (play pad 60 80 10))
-    (playp 8 0 bass 0 `(,@(R `(e3 __ e3) 4) ,@(R `(b2 __ b2) 3) (b2 c3 d3)) (cosr 100 20 2) 0.5)
-    (playp 32 0 lead 0 `((b4 b4 b4 d5)
-                         (b4 b4 b4 __)
-                         (b4 g4 g4 b3 d4 (d4 __ c4) b3 (b3 __ a3))
-                         (b3 b3 b3 (b3 c4 d4) b3 __ b3 c5))
-           (cosr 110 10 3) 2.5)
-    (callback (*metro* (+ beat (* .5 dur))) 'drwho (+ beat dur) dur)))
+; (define drwho
+;   (lambda (beat dur)
+;     ;; (println (* 1.0 (modulo beat 32)))    
+;     (onbeat? 1 8 (play pad 60 80 10))
+;     (playp 8 0 bass 0 `(,@(R `(e3 __ e3) 4) ,@(R `(b2 __ b2) 3) (b2 c3 d3)) (cosr 100 20 2) 0.5)
+;     (playp 32 0 lead 0 `((b4 b4 b4 d5)
+;                          (b4 b4 b4 __)
+;                          (b4 g4 g4 b3 d4 (d4 __ c4) b3 (b3 __ a3))
+;                          (b3 b3 b3 (b3 c4 d4) b3 __ b3 c5))
+;            (cosr 110 10 3) 2.5)
+;     (callback (*metro* (+ beat (* .5 dur))) 'drwho (+ beat dur) dur)))
 
-(drwho (*metro* 'get-beat 4) 1/4)
+; (drwho (*metro* 'get-beat 4) 1/4)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -377,25 +383,25 @@
 ;; tempo
 (*metro* 'set-tempo 125.0)
 
-(define oxygene
-  (lambda (beat dur)
-    ;; (println (* 1.0 (modulo beat 32)))    
-    (onbeat? 1 8 (play pad 60 80 10))
-    (playp 32 0 riff 24 `(,@(R `(48 48 48) 16)
-                          ,@(R `(50 50 50) 8)
-                          ,@(R `(48 48 48) 8))
-           (R `(90 70 70) 32) 1/4)
-    (playp 32 0 bass `(,@(R `((60 __ 60) (58 __ 60) (__ __ 55) (58 __ 55)) 4)
-                       ,@(R `((62 __ 62) (60 __ 62) (__ __ 57) (60 __ 57)) 2)
-                       ,@(R `((65 __ 65) (63 __ 60) (__ __ 65) (63 __ 60)) 2))
-           (cosr 80 20 2) 1/4)    
-    (playp 32 0 lead 12 `(,@(R `(72 (__ __ 67) (63 __ 67) (__ __ 60) ,@(R __ 4)) 2)
-                          ,@(R `(70 (__ __ 69) (67 __ 69) (__ __ 62) ,@(R __ 4)) 1)
-                          ,(R `((69 __ 67) (65 __ 60) __ __) 2))
-           (cosr 80 20 2) (* 2.0 dur))
-    (callback (*metro* (+ beat (* .5 dur))) 'oxygene (+ beat dur) dur)))
+; (define oxygene
+;   (lambda (beat dur)
+;     ;; (println (* 1.0 (modulo beat 32)))    
+;     (onbeat? 1 8 (play pad 60 80 10))
+;     (playp 32 0 riff 24 `(,@(R `(48 48 48) 16)
+;                           ,@(R `(50 50 50) 8)
+;                           ,@(R `(48 48 48) 8))
+;            (R `(90 70 70) 32) 1/4)
+;     (playp 32 0 bass `(,@(R `((60 __ 60) (58 __ 60) (__ __ 55) (58 __ 55)) 4)
+;                        ,@(R `((62 __ 62) (60 __ 62) (__ __ 57) (60 __ 57)) 2)
+;                        ,@(R `((65 __ 65) (63 __ 60) (__ __ 65) (63 __ 60)) 2))
+;            (cosr 80 20 2) 1/4)    
+;     (playp 32 0 lead 12 `(,@(R `(72 (__ __ 67) (63 __ 67) (__ __ 60) ,@(R __ 4)) 2)
+;                           ,@(R `(70 (__ __ 69) (67 __ 69) (__ __ 62) ,@(R __ 4)) 1)
+;                           ,(R `((69 __ 67) (65 __ 60) __ __) 2))
+;            (cosr 80 20 2) (* 2.0 dur))
+;     (callback (*metro* (+ beat (* .5 dur))) 'oxygene (+ beat dur) dur)))
 
-(oxygene (*metro* 'get-beat 4) 1/4)
+; (oxygene (*metro* 'get-beat 4) 1/4)
 
 
 
