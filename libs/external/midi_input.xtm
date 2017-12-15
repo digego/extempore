@@ -183,8 +183,8 @@
 
 
 ;; first off create a native 'clock' scheduler
-;; update rate of 200hz
-(bind-val clock_sched [void]* (clock_scheduler 200.0))
+;; update rate of 400hz
+(bind-val clock_sched [void]* (clock_scheduler 400.0))
 
 (pm_initialize)
 (pm_print_devices)
@@ -215,7 +215,7 @@
 
 ;; by default don't print non note/cc MIDI messages
 (bind-func midi_msg
-  (lambda (timestamp:i32 type:i32 a:i32 b:i32 chan:i32)
+  (lambda (timestamp:i32 type:i32 a:i32 b:i32 chan:i32 msg:i32)
     ;; (println "MIDIMSG: " type a b chan)
     void))
 
@@ -264,16 +264,17 @@
                                (Pm_Message_Type msg)
                                (Pm_Message_Data1 msg)
                                (Pm_Message_Data2 msg)
-                               (Pm_Message_Channel msg))))
+                               (Pm_Message_Channel msg)
+                               msg)))
               void)
             void)
           void))))
 
-;; poll for midi messages at 100hz
+;; poll for midi messages at 400hz
 (bind-func midi_input_polling
-  (lambda (time)
+  (lambda (time:double)
     (midi_read_msg)
-    (sched clock_sched (+ time 0.01) midi_input_polling:[void,double]*)))
+    (sched clock_sched (+ time 0.0025) midi_input_polling:[void,double]*)))
 
 (xtmX (midi_input_polling (+ (clock_sched.time) 1.0)))
 
