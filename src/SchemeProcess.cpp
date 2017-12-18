@@ -228,9 +228,9 @@ void* SchemeProcess::taskImpl()
 #endif
     while(!m_running) {
     }
-    loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/scheme.xtm", UNIV::EXTEMPORE_PATH);
+    loadFile("runtime/llvmti.xtm", UNIV::EXTEMPORE_PATH);
+    loadFile("runtime/llvmir.xtm", UNIV::EXTEMPORE_PATH);
     m_libsLoaded = true;
 #ifdef _WIN32
     Sleep(2000);

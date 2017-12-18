@@ -215,7 +215,7 @@ static llvm::Module* jitCompile(const std::string& String)
     static std::unordered_set<std::string> sInlineSyms;
     if (sInlineString.empty()) {
         {
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
+            std::ifstream inStream(UNIV::EXTEMPORE_PATH + "/runtime/bitcode.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             sInlineString = inString.str();
@@ -223,7 +223,7 @@ static llvm::Module* jitCompile(const std::string& String)
         std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         {
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
+            std::ifstream inStream(UNIV::EXTEMPORE_PATH + "/runtime/inline.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             std::string tString = inString.str();
@@ -240,7 +240,7 @@ static llvm::Module* jitCompile(const std::string& String)
                 std::string bitcode;
                 llvm::raw_string_ostream bitstream(sInlineBitcode);
                 llvm::WriteBitcodeToFile(newModule.get(), bitstream);
-                std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
+                std::ifstream inStream(UNIV::EXTEMPORE_PATH + "/runtime/inline.ll");
                 std::stringstream inString;
                 inString << inStream.rdbuf();
                 sInlineString = inString.str();

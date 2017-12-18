@@ -15,11 +15,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # option wrangling #
 ####################
 
-# share directory
-
-# if -DEXT_SHARE_DIR=/path/to/share-dir is provided at the command
-# line it will override these values
-
 # packaging (binary distribution)
 
 if(PACKAGE)
@@ -450,16 +445,8 @@ target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
 # compiler options
 
 if(PACKAGE)
-  target_compile_definitions(extempore
-    PRIVATE -DEXT_SHARE_DIR=".")
   target_compile_options(extempore
     PRIVATE -mtune=generic)
-elseif(${EXT_SHARE_DIR})
-  target_compile_definitions(extempore
-    PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
-else()
-  target_compile_definitions(extempore
-    PRIVATE -DEXT_SHARE_DIR="${CMAKE_SOURCE_DIR}")
 endif()
 
 # platform-specific config

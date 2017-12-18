@@ -512,19 +512,19 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
         return result;
 }
 
-const char* sys_sharedir(){
-  return extemp::UNIV::SHARE_DIR.c_str();
+const char* sys_extempore_path(){
+  return extemp::UNIV::EXTEMPORE_PATH.c_str();
 }
 
 char* sys_slurp_file(const char* fname)
 {
     std::string filename(fname);
-    std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + filename);
 
-    // check raw path first, then prepend SHARE_DIR
+    // check raw path first, then prepend EXTEMPORE_PATH
     std::FILE *fp = std::fopen(filename.c_str(), "rb");
     if (!fp) {
-      fp = std::fopen(sharedir_filename.c_str(), "rb");
+      std::string extempore_path_filename(extemp::UNIV::EXTEMPORE_PATH + "/" + filename);
+      fp = std::fopen(extempore_path_filename.c_str(), "rb");
     }
 
   if(fp){
@@ -559,7 +559,7 @@ namespace extemp
 namespace UNIV
 {
 
-std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
+std::string EXTEMPORE_PATH;
 uint32_t NUM_FRAMES = 128;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;

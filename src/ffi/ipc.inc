@@ -3,7 +3,7 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
 {
     std::string proc_name(string_value(pair_car(Args)));
     int port = ivalue(pair_cadr(Args));
-    SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
+    SchemeProcess* sp = new SchemeProcess(UNIV::EXTEMPORE_PATH, proc_name, port, 0);
     sp->start();
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
     if (repl->connectToProcessAtHostname("localhost", port)) {

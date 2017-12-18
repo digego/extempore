@@ -828,7 +828,7 @@ void initLLVM()
             EE->updateGlobalMapping("mk_string", (uint64_t)&mk_string);
             EE->updateGlobalMapping("cptr_value", (uint64_t)&cptr_value);
             EE->updateGlobalMapping("mk_cptr", (uint64_t)&mk_cptr);
-      EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
+      EE->updateGlobalMapping("sys_extempore_path", (uint64_t)&sys_extempore_path);
       EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
       extemp::EXTLLVM::EE->finalizeObject();
       return;

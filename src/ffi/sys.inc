@@ -19,9 +19,9 @@ static pointer platform(scheme* Scheme, pointer Args)
 #endif
 }
 
-static pointer getShareDir(scheme* Scheme, pointer Args)
+static pointer getExtemporePath(scheme* Scheme, pointer Args)
 {
-    return mk_string(Scheme, UNIV::SHARE_DIR.c_str());
+    return mk_string(Scheme, UNIV::EXTEMPORE_PATH.c_str());
 }
 
 static pointer cmdarg(scheme* Scheme, pointer Args)
@@ -38,7 +38,7 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
 #ifdef _WIN32
     // set up the DLL load path
     SetDllDirectory(""); // Plug "binary planting" security hole.
-    if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str())) {
+    if (!SetDllDirectory((extemp::UNIV::EXTEMPORE_PATH + "/libs/aot-cache").c_str())) {
         std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
     }
     void* lib_handle = LoadLibraryA(string_value(pair_car(Args)));
@@ -95,12 +95,12 @@ static pointer makeCptr(scheme* Scheme, pointer Args)
 static pointer slurpFile(scheme* Scheme, pointer Args)
 {
     std::string filename(string_value(pair_car(Args)));
-    std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
+    std::string extempore_path_filename(UNIV::EXTEMPORE_PATH + "/" + filename);
 
-    // check raw path first, then prepend SHARE_DIR
+    // check raw path first, then prepend EXTEMPORE_PATH
     std::FILE *fp = std::fopen(filename.c_str(), "rb");
     if (!fp) {
-      fp = std::fopen(sharedir_filename.c_str(), "rb");
+      fp = std::fopen(extempore_path_filename.c_str(), "rb");
     }
     if (fp) {
         std::string contents;
@@ -229,7 +229,7 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
         { "sys:pointer-size", &pointerSize }, \
         { "sys:mcjit-enabled", &mcjitEnabled }, \
         { "sys:platform", &platform }, \
-        { "sys:share-dir", &getShareDir }, \
+        { "sys:share-dir", &getExtemporePath }, \
         { "sys:cmdarg", &cmdarg }, \
         { "sys:open-dylib", &openDynamicLib }, \
         { "sys:close-dylib", &closeDynamicLib }, \

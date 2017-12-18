@@ -119,7 +119,7 @@ declare i32 @system(i8*) nounwind
 declare i8* @getenv(i8*) nounwind
 declare i32 @setenv(i8*, i8*, i32) nounwind
 declare i32 @unsetenv(i8*) nounwind
-declare i8* @sys_sharedir() nounwind
+declare i8* @sys_extempore_path() nounwind
 declare i8* @sys_slurp_file(i8*) nounwind
 
 ;;

@@ -120,7 +120,7 @@ void sig_handler(int Signo)
 
 #endif
 
-enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
+enum { OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
@@ -131,8 +131,6 @@ enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
-    { OPT_SHAREDIR,       "--runtime",       SO_REQ_SEP    },
-    { OPT_SHAREDIR,       "--sharedir",      SO_REQ_SEP    },
     { OPT_NOBASE,         "--nobase",        SO_NONE       },
     { OPT_SAMPLERATE,     "--samplerate",    SO_REQ_SEP    },
     { OPT_FRAMES,         "--frames",        SO_REQ_SEP    },
@@ -160,6 +158,13 @@ CSimpleOptA::SOption g_rgOptions[] = {
 
 int main(int argc, char** argv)
 {
+    // set up the Extempore path
+    const char *path = std::getenv("EXTEMPORE_PATH");
+    if(!path){
+      path = ".";
+    }
+    extemp::UNIV::EXTEMPORE_PATH = std::string(path);
+
     std::string initexpr;
     std::string host("localhost");
     std::string primary_name("primary");
@@ -187,9 +192,6 @@ int main(int argc, char** argv)
     while (args.Next()) {
         if (args.LastError() == SO_SUCCESS) {
             switch(args.OptionId()) {
-            case OPT_SHAREDIR:
-                extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
-                break;
             case OPT_SAMPLERATE:
                 extemp::UNIV::SAMPLE_RATE = atoi(args.OptionArg());
                 break;
@@ -291,8 +293,6 @@ int main(int argc, char** argv)
                 std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
                 std::cout << "            --port: port for primary process [7099]" << std::endl;
                 std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
-                std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
-                std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "           --nobase: don't load base lib on startup" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
                 std::cout << "          --frames: attempts to force frames [128]" << std::endl;
@@ -378,13 +378,13 @@ int main(int argc, char** argv)
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
     bool startup_ok = true;
-    extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
+    extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::EXTEMPORE_PATH, utility_name, utility_port, 0);
     startup_ok &= utility->start();
     extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
     utility_repl->connectToProcessAtHostname(host, utility_port);
 
 #ifndef SUBSUME_PRIMARY // if not subsume primary (i.e. primary NOT on thread 0)
-    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+    primary = new extemp::SchemeProcess(extemp::UNIV::EXTEMPORE_PATH, primary_name, primary_port, 0, initexpr);
     startup_ok &= primary->start();
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
@@ -408,7 +408,7 @@ int main(int argc, char** argv)
 #endif
     }      
 #else
-    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+    primary = new extemp::SchemeProcess(extemp::UNIV::EXTEMPORE_PATH, primary_name, primary_port, 0, initexpr);
 
     // need to connect to primary from alternate thread (can be short lived simply puts repl on heap)
     extemp::EXTThread* replthread = new extemp::EXTThread(extempore_primary_repl_delayed_connect,primary);

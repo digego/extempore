@@ -100,7 +100,7 @@ EXPORT char* base64_encode(const unsigned char *data,size_t input_length,size_t 
 EXPORT unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
 EXPORT char* cname_encode(char *data,size_t input_length,size_t *output_length);
 EXPORT char* cname_decode(char *data,size_t input_length,size_t *output_length);
-const char* sys_sharedir();
+const char* sys_extempore_path();
 char* sys_slurp_file(const char* fname);
 int register_for_window_events();
 
@@ -112,7 +112,7 @@ namespace extemp
 namespace UNIV
 {
 
-extern std::string SHARE_DIR;
+extern std::string EXTEMPORE_PATH;
 EXPORT uint32_t CHANNELS;
 EXPORT uint32_t IN_CHANNELS;
 EXPORT uint32_t SAMPLE_RATE;
