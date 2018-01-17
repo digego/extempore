@@ -745,6 +745,32 @@ Scheme)"
               (if (= (tref (Pm_GetDeviceInfo i) 4) 1)
                   (println "  device id" i ":" (Pm_GetDeviceInfo i)))))))))
 
+(bind-func pm_input_device_with_name
+  "return device ID for input device with NAME
+
+returns -1 if no input device with that name is found"
+  (lambda (name:i8*)
+    (let ((ndev (Pm_CountDevices))
+          (dev -1))
+      (doloop (i ndev)
+        (if (and (= (strncmp (tref (Pm_GetDeviceInfo i) 2) name 1024) 0)
+                 (= (tref (Pm_GetDeviceInfo i) 3) 1))
+            (set! dev i)))
+      dev)))
+
+(bind-func pm_output_device_with_name
+  "return device ID for output device with NAME
+
+returns -1 if no output device with that name is found"
+  (lambda (name)
+    (let ((ndev (Pm_CountDevices))
+          (dev -1))
+      (doloop (i ndev)
+        (if (and (= (strncmp (tref (Pm_GetDeviceInfo i) 2) name 1024) 0)
+                 (= (tref (Pm_GetDeviceInfo i) 4) 1))
+            (set! dev i)))
+      dev)))
+
 (bind-func pm_current_time_in_ms
   "return current time in ms - required for the portmidi API
 
