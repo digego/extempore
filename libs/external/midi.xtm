@@ -1,4 +1,4 @@
-;;; midi_input.xtm -- a 'simple' wrapper for portmidi input
+;;; midi.xtm -- a little wrapper for portmidi
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
@@ -18,6 +18,21 @@
 ;; NOTE: this lib automatically converts note-on velocity 0 into note-off.
 ;; i.e. you will not see note-on msg with a velocity 0.
 ;;
+
+
+;; main things to know
+;;
+;; (print_midi_devices)
+;; (set_midi_in idx)
+;; (set_midi_out idx)
+;;
+;; midi listener overloads
+;; midi_note_on
+;; midi_note_off
+;; midi_cc
+;; midi_msg
+;; 
+
 
 
 ;;; Code:
@@ -189,14 +204,29 @@
 (pm_initialize)
 (pm_print_devices)
 
+(bind-func print_midi_devices
+  (lambda ()
+    (pm_print_devices)))
+
+;; start with a  default output stream
+(bind-val midi_out PmStream* (pm_create_output_stream (pm_default_out)))
+
+;; OVERRIDE default midi out
+(bind-func set_midi_out
+  (lambda (idx)
+     (set! midi_out (pm_create_output_stream idx))
+     midi_out))
+
+(println "MIDIIN: " (pm_default_in) "MIDIOUT:" (pm_default_out))
+
 ;; start with a default midi stream
-(bind-val midi_in PmStream* (pm_create_input_stream 0))
+(bind-val midi_in PmStream* (pm_create_input_stream (pm_default_in)))
 
 ;; OVERRIDE default midi in
 (bind-func set_midi_in
   (lambda (idx)
      (set! midi_in (pm_create_input_stream idx))
-     void))
+     midi_in))
 
 (bind-func midi_note_on
   (lambda (timestamp:i32 pitch:i32 volume:i32 chan:i32)
