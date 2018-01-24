@@ -414,7 +414,7 @@ add_executable(extempore src/Extempore.cpp
   )
 
 if(MSVC)
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_SOURCE_DIR}/src/extempore.def")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_SOURCE_DIR}/src/extempore.def")
 endif()
 
 target_include_directories(extempore PRIVATE include)
@@ -467,9 +467,9 @@ endif()
 if(UNIX)
   target_compile_definitions(extempore
     PRIVATE -D_GNU_SOURCE
-	  PRIVATE -D__STDC_CONSTANT_MACROS
-	  PRIVATE -D__STDC_FORMAT_MACROS
-	  PRIVATE -D__STDC_LIMIT_MACROS)
+    PRIVATE -D__STDC_CONSTANT_MACROS
+    PRIVATE -D__STDC_FORMAT_MACROS
+    PRIVATE -D__STDC_LIMIT_MACROS)
   target_compile_options(extempore
     PRIVATE -std=c++11
     PRIVATE -fvisibility-inlines-hidden
