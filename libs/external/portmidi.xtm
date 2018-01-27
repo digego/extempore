@@ -825,6 +825,33 @@ output device(s)
 (bind-func PmEvent_cc_p
   (lambda (event:PmEvent*)
     (= (& (tref event 0) #xF0) MIDI_CONTROL_CHANGE)))
+                                                             
+                                                             
+;; start with a  default output stream
+(bind-val midi_out PmStream*) ;;(pm_create_output_stream (pm_default_out)))
+
+;; OVERRIDE default midi out
+(bind-func set_midi_out
+  (lambda (idx)
+     (set! midi_out (pm_create_output_stream idx))
+     midi_out))
+
+;; start with a default midi stream
+(bind-val midi_in PmStream*) ;; (pm_create_input_stream (pm_default_in)))
+
+;; OVERRIDE default midi in
+(bind-func set_midi_in
+  (lambda (idx)
+     (set! midi_in (pm_create_input_stream idx))
+     midi_in))
+
+(bind-func print_midi_devices
+  (lambda ()
+    (pm_print_devices)))
+                                              
+(bind-func start_midi
+  (lambda ()
+    (pm_initialize)))
 
 ;; scheme helper functions
 
@@ -833,6 +860,11 @@ output device(s)
    (lambda (time device pitch velocity duration channel)
      (callback time 'pm_send device *midi-note-on* channel pitch velocity)
      (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
+                                              
+(impc:aot:do-or-emit
+ (define send-midi-cc
+   (lambda (time device cc val channel)
+     (callback time 'pm_send device *midi-cc* channel cc val))))
 
 ;; homophonic playnote
 (impc:aot:do-or-emit
@@ -860,6 +892,19 @@ output device(s)
                         (real->integer ,(car (cdddr args)))
                         (*metro* 'dur ,(cadr (cdddr args)))
                         (real->integer , (cadr (cddddr args)))))))
+                                              
+(impc:aot:do-or-emit                                                                                            
+  (define-macro (mcc . args)
+    (if (symbol? (car args))
+        `(send-midi-cc (*metro* beat) ,(car args)
+                        (real->integer ,(cadr args))
+                        (real->integer ,(caddr args))
+                        (real->integer ,(car (cdddr args))))
+        `(send-midi-cc (*metro* (+ beat ,(car args))) ,(cadr args)
+                        (real->integer ,(caddr args))
+                        (real->integer ,(car (cdddr args)))
+                        (real->integer ,(car (cddddr args)))))))
+
 
 (impc:aot:do-or-emit
  (define-macro (mplayob o b . args)
@@ -872,7 +917,7 @@ output device(s)
    `(if (member (modulo beat ,b) ,l)
         (mplay ,@args)
         #f)))
-
+                                                             
 ;; ;; uncomment if you want to use play instead of mplay
 ;; (impc:aot:do-or-emit
 ;;  (define-macro (play . args)
