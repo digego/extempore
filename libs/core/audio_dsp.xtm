@@ -30,10 +30,10 @@
 (define *xtmlib-audio_dsp-loaded* #f)
 
 (impc:aot:suppress-aot-do
- (sys:load "libs/core/math.xtm")
+ (sys:load "libs/core/rational.xtm")
  (sys:load "libs/core/audiobuffer.xtm"))
 (impc:aot:insert-forms
- (sys:load "libs/core/math.xtm" 'quiet)
+ (sys:load "libs/core/rational.xtm" 'quiet)
  (sys:load "libs/core/audiobuffer.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudio_dsp")
@@ -164,6 +164,20 @@
     (pow 10. (/ x 20.))))
 
 
+;; so we don't need to import math.xtm
+;; simple (non vectorised) sum
+(bind-func calc_vsum
+  (lambda (buf:SAMPLE* len:i64)
+    (let ((sum 0.0) (i 0))
+      (dotimes (i len)
+        (set! sum (+ sum (pref buf i))))
+      sum)))
+
+(bind-func calc_vmean
+  (lambda (buf:SAMPLE* len:i64)
+    (/ (calc_vsum buf len) (convert len SAMPLE))))
+
+
 ;; root mean squared (mono passthrough)
 ;; grab current rms value from val:
 ;;
@@ -181,7 +195,7 @@
         (pset! d (% t FRAMES) (* x x))
         (set! t (+ t 1))
         (if (= 0 (% t FRAMES))
-            (set! db (+ 3.0 (amp2db (sqrt (vmean d FRAMES))))))
+            (set! db (+ 3.0 (amp2db (sqrt (calc_vmean d FRAMES))))))
         x))))
 
 ;; rms
@@ -204,8 +218,8 @@
                    ;;(printf "left %f\n" (ftod left))
                    (if (= 0 (% t lgth))
                        (begin
-                         (set! left (+ 3.0 (amp2db (sqrt (vmean dl lgth)))))
-                         (set! right (+ 3.0 (amp2db (sqrt (vmean dr lgth)))))))
+                         (set! left (+ 3.0 (amp2db (sqrt (calc_vmean dl lgth)))))
+                         (set! right (+ 3.0 (amp2db (sqrt (calc_vmean dr lgth)))))))
                    void)
             (begin (pset! dr (% t lgth) (* x x))
                    void))
