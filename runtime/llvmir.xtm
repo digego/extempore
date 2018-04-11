@@ -997,7 +997,9 @@
             (impc:ir:type? (impc:ir:get-type-from-str type)))
         (cond ((null? type) #f)
               ((and (number? type)
-                    (< type 1001)) #t)
+                    ;; (or (< type 0) (< (modulo type *impc:ir:pointer*) *impc:ir:closure*)) ;; this should be true but is actually more trouble than it's worth at this stage
+                    (< type 1001))
+               #t)
               ((and (list? type)
                     (number? (car type))
                     (or (impc:ir:closure? type)
@@ -2418,10 +2420,36 @@
 
 
 ;; THIS VERSION DOESN'T COPY ANYTHING!
+;; (define impc:ir:compiler:set!
+;;   (lambda (ast types)
+;;     (let* ((os (make-string 0))
+;;            (t (if (assoc-strcmp (cadr ast) types) (cdr (assoc-strcmp (cadr ast) types)) #f))
+;;            (s2 (if t
+;;                    (impc:ir:compiler (caddr ast) types t)
+;;                    (impc:ir:compiler (caddr ast) types)))
+;;            (vv (impc:ir:gname))
+;;            (type (impc:ir:get-type-from-str (cadr vv))))
+;;       (emit "; do set!\n" os)
+;;       (emit s2 os)
+;;       (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
+;;           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+;;                                (symbol->string (cadr ast)) "\n") os)
+;;           (if (member (cadr ast) *impc:ir:sym-name-stack*)
+;;               (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+;;                                    (symbol->string (cadr ast)) "Ptr\n") os)
+;;               (impc:compiler:print-missing-identifier-error (cadr ast) 'variable)))
+;;       ;; ir:gname should be vv
+;;       (impc:ir:strip-space os))))
+
 (define impc:ir:compiler:set!
   (lambda (ast types)
-    (let* ((os (make-string 0))
-           (t (if (assoc-strcmp (cadr ast) types) (cdr (assoc-strcmp (cadr ast) types)) #f))
+    (let* ((os (make-string 0))           
+           (global? (impc:ti:globalvar-exists? (symbol->string (cadr ast)))) ;; are we are setting a global variable?
+           (gtype (if global? (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string (cadr ast)))) #f))
+           (t (if global? gtype
+                  (if (assoc-strcmp (cadr ast) types)
+                      (cdr (assoc-strcmp (cadr ast) types))
+                      #f)))
            (s2 (if t
                    (impc:ir:compiler (caddr ast) types t)
                    (impc:ir:compiler (caddr ast) types)))
@@ -2429,7 +2457,7 @@
            (type (impc:ir:get-type-from-str (cadr vv))))
       (emit "; do set!\n" os)
       (emit s2 os)
-      (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
+      (if global? ;; (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
                                (symbol->string (cadr ast)) "\n") os)
           (if (member (cadr ast) *impc:ir:sym-name-stack*)

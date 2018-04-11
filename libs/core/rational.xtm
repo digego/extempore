@@ -1,0 +1,511 @@
+
+(sys:load "libs/aot-cache/rational.xtm" 'quiet)
+(sys:load-preload-check 'rational)
+(define *xtmlib-rational-loaded* #f)
+
+(impc:aot:suppress-aot-do (sys:load "libs/base/base.xtm"))
+(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmrational")
+
+;;;;;;;;;;;;;;
+;; Rational ;;
+;;;;;;;;;;;;;;
+
+;; xtlang's rational number type and helper functions
+
+(bind-type Rational <i64,i64> (printer? . #f))
+
+(bind-func Rat
+  (lambda (a b)
+    (if (< b 0)
+        (begin (set! a (* -1 a))
+               (set! b (* -1 b))))
+    (let ((r:Rational* (salloc)))
+      (tset! r 0 a)
+      (tset! r 1 b)
+      (pref r 0))))
+
+(bind-func Rational_greatest_common_divisor
+  (lambda (m:i64 n:i64)
+    (if (and (= m 0) (= n 0))
+        -1
+        (let ((r 0))
+          (if (< m 0) (set! m (* m -1)))
+          (if (< n 0) (set! n (* n -1)))
+          (while (not (= n 0))
+            (set! r (% m n))
+            (set! m n)
+            (set! n r))
+          m))))
+
+(bind-func Rational_reduce
+  (lambda (a:Rational)
+    (let ((gcd (Rational_greatest_common_divisor (tref a 0)
+                                            (tref a 1))))
+      (Rat (/ (tref a 0) gcd)
+           (/ (tref a 1) gcd)))))
+
+(bind-func print
+  (lambda (a:Rational)
+    (let ((reduced (Rational_reduce a)))
+      (printf "%lld/%lld" (tref reduced 0) (tref reduced 1))) void))
+
+;; conversion
+
+(bind-func rtod
+  (lambda (a:Rational)
+    (/ (i64tod (tref a 0)) (i64tod (tref a 1)))))
+
+(bind-func rtof
+  (lambda (a:Rational)
+    (/ (i64tof (tref a 0)) (i64tof (tref a 1)))))
+
+(bind-func rtoi64
+  (lambda (a:Rational)
+    (dtoi64 (rtod a))))
+
+(bind-func rtoi32
+  (lambda (a:Rational)
+    (dtoi32 (rtod a))))
+
+(bind-func rtoi16
+  (lambda (a:Rational)
+    (dtoi16 (rtod a))))
+
+(bind-func rtoi8
+  (lambda (a:Rational)
+    (dtoi8 (rtod a))))
+
+(bind-func rtoi1
+  (lambda (a:Rational)
+    (dtoi1 (rtod a))))
+
+;; rational multiplication
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:Rational)
+    (Rational_reduce
+     (Rat (* (tref a 0) (tref b 0))
+          (* (tref a 1) (tref b 1))))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:i64)
+    (Rat (* (tref a 0) b) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (b:i64 a:Rational)
+    (Rat (* (tref a 0) b) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:i32)
+    (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (b:i32 a:Rational)
+    (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:i8)
+    (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (b:i8 a:Rational)
+    (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:i1)
+    (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (b:i1 a:Rational)
+    (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:double)
+    (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
+
+(bind-func xtm_multiplication
+  (lambda (b:double a:Rational)
+    (* b (/ (convert (tref a 0) double) (convert (tref a 1) double)))))
+
+(bind-func xtm_multiplication
+  (lambda (a:Rational b:float)
+    (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
+
+(bind-func xtm_multiplication
+  (lambda (b:float a:Rational)
+    (* b (/ (convert (tref a 0) float) (convert (tref a 1) float)))))
+
+;; rational division
+
+(bind-func xtm_division
+  (lambda (a:Rational b:Rational)
+    (Rational_reduce
+     (Rat (* (tref a 0) (tref b 1))
+          (* (tref a 1) (tref b 0))))))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:i64)
+    (Rat (* (tref a 0) b) (* (tref a 1) 1))))
+
+(bind-func xtm_division
+  (lambda (a:i64 b:Rational)
+    (Rat (* (tref b 1) a) (* (tref b 0) 1))))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:i32)
+    (Rat (* (tref a 0) (i32toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_division
+  (lambda (a:i32 b:Rational)
+    (Rat (* (tref b 1) (i32toi64 a)) (* (tref b 0) 1))))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:i8)
+    (Rat (* (tref a 0) (i8toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_division
+  (lambda (a:i8 b:Rational)
+    (Rat (* (tref b 1) (i8toi64 a)) (* (tref b 0) 1))))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:i1)
+    (Rat (* (tref a 0) (i1toi64 b)) (* (tref a 1) 1))))
+
+(bind-func xtm_division
+  (lambda (a:i1 b:Rational)
+    (Rat (* (tref b 1) (i1toi64 a)) (* (tref b 0) 1))))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:double)
+    (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_division
+  (lambda (b:double a:Rational)
+    (/ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_division
+  (lambda (a:Rational b:float)
+    (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func xtm_division
+  (lambda (b:float a:Rational)
+    (/ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+;; Rational addition
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:Rational)
+    (let ((denom_a (tref a 1))
+          (denom_b (tref b 1)))
+      (Rational_reduce
+       (Rat (+ (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+            (* denom_a denom_b))))))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:i64)
+    (Rat (+ (tref a 0) (* (tref a 1) b)) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (b:i64 a:Rational)
+    (Rat (+ (tref a 0) (* (tref a 1) b)) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:i32)
+    (Rat (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (b:i32 a:Rational)
+    (Rat (+ (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:i8)
+    (Rat (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (b:i8 a:Rational)
+    (Rat (+ (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:i1)
+    (Rat (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (b:i1 a:Rational)
+    (Rat (+ (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:double)
+    (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_addition
+  (lambda (b:double a:Rational)
+    (+ (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_addition
+  (lambda (a:Rational b:float)
+    (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func xtm_addition
+  (lambda (b:float a:Rational)
+    (+ (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+;; Rational subtraction
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:Rational)
+    (let ((denom_a (tref a 1))
+          (denom_b (tref b 1)))
+      (Rational_reduce
+       (Rat (- (* (tref a 0) denom_b) (* (tref b 0) denom_a))
+            (* denom_a denom_b))))))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:i64)
+    (Rat (- (tref a 0) (* (tref a 1) b)) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (b:i64 a:Rational)
+    (Rat (- (tref a 0) (* (tref a 1) b)) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:i32)
+    (Rat (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (b:i32 a:Rational)
+    (Rat (- (tref a 0) (* (tref a 1) (i32toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:i8)
+    (Rat (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (b:i8 a:Rational)
+    (Rat (- (tref a 0) (* (tref a 1) (i8toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:i1)
+    (Rat (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (b:i1 a:Rational)
+    (Rat (- (tref a 0) (* (tref a 1) (i1toi64 b))) (tref a 1))))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:double)
+    (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_subtraction
+  (lambda (b:double a:Rational)
+    (- (/ (convert (tref a 0) double) (convert (tref a 1) double)) b)))
+
+(bind-func xtm_subtraction
+  (lambda (a:Rational b:float)
+    (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+(bind-func xtm_subtraction
+  (lambda (b:float a:Rational)
+    (- (/ (convert (tref a 0) float) (convert (tref a 1) float)) b)))
+
+;; Rational equality
+
+(bind-func xtm_equal
+  (lambda (a:Rational b:Rational)
+    (let ((reduced_a (Rational_reduce a))
+          (reduced_b (Rational_reduce b)))
+      (and (= (tref reduced_a 0)
+              (tref reduced_b 0))
+           (= (tref reduced_a 1)
+              (tref reduced_b 1))))))
+
+(bind-func xtm_equal
+  (lambda (a:Rational b:i64)
+    (xtm_equal:[i1,Rational,Rational]* a (Rat b 1))))
+
+(bind-func xtm_equal
+  (lambda (b:i64 a:Rational)
+    (xtm_equal:[i1,Rational,Rational]* (Rat b 1) a)))
+
+(bind-func xtm_equal
+  (lambda (a:Rational b:i32)
+    (xtm_equal:[i1,Rational,Rational]* a (Rat (i32toi64 b) 1))))
+
+(bind-func xtm_equal
+  (lambda (b:i32 a:Rational)
+    (xtm_equal:[i1,Rational,Rational]* (Rat (i32toi64 b) 1) a)))
+
+(bind-func xtm_equal
+  (lambda (a:Rational b:i8)
+    (xtm_equal:[i1,Rational,Rational]* a (Rat (i8toi64 b) 1))))
+
+(bind-func xtm_equal
+  (lambda (b:i8 a:Rational)
+    (xtm_equal:[i1,Rational,Rational]* (Rat (i8toi64 b) 1) a)))
+
+(bind-func xtm_equal
+  (lambda (a:Rational b:i1)
+    (xtm_equal:[i1,Rational,Rational]* a (Rat (i1toi64 b) 1))))
+
+(bind-func xtm_equal
+  (lambda (b:i1 a:Rational)
+    (xtm_equal:[i1,Rational,Rational]* (Rat (i1toi64 b) 1) a)))
+
+;; Rational inequality
+
+(bind-func xtm_notequal
+  (lambda (a:Rational b:Rational)
+    (let ((reduced_a (Rational_reduce a))
+          (reduced_b (Rational_reduce b)))
+      (or (<> (tref reduced_a 0)
+              (tref reduced_b 0))
+          (<> (tref reduced_a 1)
+              (tref reduced_b 1))))))
+
+(bind-func xtm_notequal
+  (lambda (a:Rational b:i64)
+    (xtm_notequal:[i1,Rational,Rational]* a (Rat b 1))))
+
+(bind-func xtm_notequal
+  (lambda (b:i64 a:Rational)
+    (xtm_notequal:[i1,Rational,Rational]* (Rat b 1) a)))
+
+(bind-func xtm_notequal
+  (lambda (a:Rational b:i32)
+    (xtm_notequal:[i1,Rational,Rational]* a (Rat (i32toi64 b) 1))))
+
+(bind-func xtm_notequal
+  (lambda (b:i32 a:Rational)
+    (xtm_notequal:[i1,Rational,Rational]* (Rat (i32toi64 b) 1) a)))
+
+(bind-func xtm_notequal
+  (lambda (a:Rational b:i8)
+    (xtm_notequal:[i1,Rational,Rational]* a (Rat (i8toi64 b) 1))))
+
+(bind-func xtm_notequal
+  (lambda (b:i8 a:Rational)
+    (xtm_notequal:[i1,Rational,Rational]* (Rat (i8toi64 b) 1) a)))
+
+(bind-func xtm_notequal
+  (lambda (a:Rational b:i1)
+    (xtm_notequal:[i1,Rational,Rational]* a (Rat (i1toi64 b) 1))))
+
+(bind-func xtm_notequal
+  (lambda (b:i1 a:Rational)
+    (xtm_notequal:[i1,Rational,Rational]* (Rat (i1toi64 b) 1) a)))
+
+;; Rational lessthan
+
+(bind-func xtm_lessthan
+  (lambda (a:Rational b:Rational)
+    (< (* (tref a 0) (tref b 1))
+       (* (tref b 0) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (a:Rational b:i64)
+    (< (tref a 0) (* b (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (b:i64 a:Rational)
+    (< (tref a 0) (* b (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (a:Rational b:i32)
+    (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (b:i32 a:Rational)
+    (< (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (a:Rational b:i8)
+    (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (b:i8 a:Rational)
+    (< (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (a:Rational b:i1)
+    (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-func xtm_lessthan
+  (lambda (b:i1 a:Rational)
+    (< (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+;; Rational greaterthan
+
+(bind-func xtm_greaterthan
+  (lambda (a:Rational b:Rational)
+    (> (* (tref a 0) (tref b 1))
+       (* (tref b 0) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (a:Rational b:i64)
+    (> (tref a 0) (* b (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (b:i64 a:Rational)
+    (> (tref a 0) (* b (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (a:Rational b:i32)
+    (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (b:i32 a:Rational)
+    (> (tref a 0) (* (i32toi64 b) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (a:Rational b:i8)
+    (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (b:i8 a:Rational)
+    (> (tref a 0) (* (i8toi64 b) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (a:Rational b:i1)
+    (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+(bind-func xtm_greaterthan
+  (lambda (b:i1 a:Rational)
+    (> (tref a 0) (* (i1toi64 b) (tref a 1)))))
+
+;; rational modulo
+
+(bind-func xtm_modulo
+  (lambda (a:Rational b:Rational)
+    (let ((c (/ a b))
+          (n (Rat (% (tref c 0) (tref c 1)) (tref c 1))))
+      (* b n))))
+
+(bind-func xtm_modulo
+  (lambda (a:Rational b:i64)
+    (xtm_modulo:[Rational,Rational,Rational]* a (Rat b 1))))
+
+(bind-func xtm_modulo
+  (lambda (a:i64 b:Rational)
+    (xtm_modulo:[Rational,Rational,Rational]* (Rat a 1) b)))
+
+(bind-func xtm_modulo
+  (lambda (a:Rational b:i32)
+    (xtm_modulo:[Rational,Rational,Rational]* a (Rat (i32toi64 b) 1))))
+
+(bind-func xtm_modulo
+  (lambda (a:i32 b:Rational)
+    (xtm_modulo:[Rational,Rational,Rational]* (Rat (i32toi64 a) 1) b)))
+
+(bind-func xtm_modulo
+  (lambda (a:Rational b:i8)
+    (xtm_modulo:[Rational,Rational,Rational]* a (Rat (i8toi64 b) 1))))
+
+(bind-func xtm_modulo
+  (lambda (a:i8 b:Rational)
+    (xtm_modulo:[Rational,Rational,Rational]* (Rat (i8toi64 a) 1) b)))
+
+;; end libs/core/math.xtm
+
+(define *xtmlib-rational-loaded* #t)
+(impc:aot:insert-footer "xtmrational")

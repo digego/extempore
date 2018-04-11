@@ -11,8 +11,18 @@
 
 ;;; Code:
 
-(sys:load "libs/core/math.xtm")
-(sys:load "libs/core/xthread.xtm")
+(sys:load "libs/aot-cache/scheduler.xtm" 'quiet)
+(sys:load-preload-check 'scheduler)
+(define *xtmlib-scheduler-loaded* #f)
+
+(impc:aot:suppress-aot-do (sys:load "libs/core/rational.xtm"))
+(impc:aot:suppress-aot-do (sys:load "libs/core/xthread.xtm"))
+
+(impc:aot:insert-forms (sys:load "libs/core/rational.xtm"))
+(impc:aot:insert-forms (sys:load "libs/core/xthread.xtm"))
+
+(impc:aot:insert-header "xtmscheduler")
+
 
 (bind-type SchedEvt <!a,i8*,SchedEvt*,SchedEvt*>)
 
@@ -103,7 +113,7 @@
           (err 0)
           (i (/ 1.0 hz))
           (f (lambda ()
-               (spawn (lambda ()
+              (spawn (lambda ()
                         (set! scheduler (scheduler_init evtlist ft))
                         (set! time (clock_clock))
                         (while (> running 0)
@@ -112,7 +122,7 @@
                           (set! time (+ time i))
                           void)
                         (println "exiting scheduler")))
-               void)))
+              void)))
       (f)
       f)))
 
@@ -129,7 +139,7 @@
           (time 0.0)
           (i (Rat 1 (dtoi64 hz)))
           (f (lambda ()
-               (spawn (lambda ()
+              (spawn (lambda ()
                         (set! scheduler (scheduler_init evtlist ft))
                         (set! time (clock_clock))
                         (while (> running 0)
@@ -139,7 +149,7 @@
                           (set! time (+ time (rtod i)))
                           void)
                         (println "exiting scheduler")))
-               void)))
+              void)))
       (f)
       f)))
 
@@ -195,3 +205,6 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define *xtmlib-scheduler-loaded* #t)
+(impc:aot:insert-footer "xtmscheduler")
