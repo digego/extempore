@@ -1226,8 +1226,8 @@
           (lpf2beta:SAMPLE* (lpf2.m_dBeta))
           (lpf3beta:SAMPLE* (lpf3.m_dBeta))
           (lpf4beta:SAMPLE* (lpf4.m_dBeta))
-          (feedback 0.0)
-          (saturation 0.0)
+          (feedback:SAMPLE 0.01)
+          (saturation:SAMPLE 1.0)
           (T (/ 1.0 SRs))
           (g:SAMPLE 0.0)
           (G:SAMPLE 0.0)
@@ -1268,6 +1268,7 @@
         (set! dSigma (+ (lpf1output) (lpf2output) (lpf3output) (lpf4output)))
         (set! in (* in (+ 1.0 m_dK)))
         (set! dU (* (- in (* m_dK dSigma)) m_dAlpha_0))
+        (set! dU (tanh (* saturation dU)))
         ;; cascade filters
         (set! dlpf1 (lpf1 dU feedback))
         (set! dlpf2 (lpf2 dlpf1 feedback))

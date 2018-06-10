@@ -3,6 +3,8 @@
 ;; rhythm map + looper
 ;; 
 
+(define *RMAP_HELPER_CALLBACK_OFFSET* 1024) 
+
 (define rmap_helper_lst_sym_transform
   (lambda (lst)
     (define prev '())
@@ -89,7 +91,9 @@
                 (if (or (list? (car tmpargs)) (pair? (car tmpargs)))
                     (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat targs)
                     (if (not (and (symbol? (car tmpargs)) (equal? (car tmpargs) '_)))
-                        (apply callback (*metro* (+ beat (- (car t) pos))) func (+ beat (- (car t) pos)) one_beat targs)))))
+                        (apply callback 
+                               (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*) 
+                               func (+ beat (- (car t) pos)) one_beat targs)))))
            newlst))))
 
 ;; rhythm map
@@ -132,7 +136,7 @@
                           (begin (println 'Stopping_: ',name) 
                                  (eval '(define ,name #f) (interaction-environment))
                                  #f)
-                          (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur) 
+                          (callback (*metro* (+ beat (* .75 dur))) ',name (+ beat dur) 
                                     ,(if (> beats 1) 1/2 (/ beats 2))))))
                 (interaction-environment))
             (if (equal? run 'start)
