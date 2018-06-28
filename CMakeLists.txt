@@ -603,21 +603,23 @@ else(WIN32)
   macro(aotcompile_lib libfile group) # deps are optional, and go at the end
     get_filename_component(basename ${libfile} NAME_WE)
     set(targetname aot_${basename})
+    set(filename ${CMAKE_SOURCE_DIR}/libs/aot-cache/xtm${basename}.so)
     if(PACKAGE)
-      add_custom_target(${targetname}
+      add_custom_command (OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
-      add_custom_target(${targetname}
+      add_custom_command(OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
+    add_custom_target(${targetname}
+      DEPENDS ${filename} extempore)
     set_target_properties(${targetname} PROPERTIES FOLDER AOT)
-    add_dependencies(${targetname} extempore)
     if(NOT ${group} STREQUAL "core")
       add_dependencies(${targetname} external_shlibs_${group})
       add_dependencies(aot_external_${group} ${targetname})
