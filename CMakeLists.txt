@@ -298,7 +298,9 @@ endif()
 # if you need to build LLVM by hand, the command will be something like
 # cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
 
-if(BUILD_LLVM)
+if(NOT BUILD_LLVM)
+  add_custom_target(LLVM)
+else()
   include(ExternalProject)
   find_program(PATCH_PROGRAM patch)
 
@@ -603,21 +605,23 @@ else(WIN32)
   macro(aotcompile_lib libfile group) # deps are optional, and go at the end
     get_filename_component(basename ${libfile} NAME_WE)
     set(targetname aot_${basename})
+    set(filename ${CMAKE_SOURCE_DIR}/libs/aot-cache/xtm${basename}.so)
     if(PACKAGE)
-      add_custom_target(${targetname}
+      add_custom_command (OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     else(PACKAGE)
-      add_custom_target(${targetname}
+      add_custom_command(OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         VERBATIM)
     endif(PACKAGE)
+    add_custom_target(${targetname}
+      DEPENDS ${filename} extempore)
     set_target_properties(${targetname} PROPERTIES FOLDER AOT)
-    add_dependencies(${targetname} extempore)
     if(NOT ${group} STREQUAL "core")
       add_dependencies(${targetname} external_shlibs_${group})
       add_dependencies(aot_external_${group} ${targetname})
