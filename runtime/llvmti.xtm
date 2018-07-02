@@ -3821,8 +3821,10 @@ e.g.
                              (cddr ast)))
        (pop_zone)
        (llvm_destroy_zone_after_delay znew
-                                      (+ (- ,(car ast) (llvm_now))
-                                         (* ,*au:samplerate* 10)))
+                                      (+ (clamp (- ,(car ast) (llvm_now)) 
+                                                0  ;; can't be less than now
+                                                (+ (llvm_now) (* SR 60 60))) ;; can't be greater than 1hr
+                                         (* SR 10))) ;; 10 second buffer
        void)))
 
 (define (impc:ti:multicref args)
