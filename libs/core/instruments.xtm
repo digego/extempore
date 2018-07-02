@@ -753,6 +753,23 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note amp_env |4,float|))))
 
+(bind-func get_amp_env_attack
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 0)))
+
+(bind-func get_amp_env_decay
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 1)))
+
+(bind-func get_amp_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 2)))
+
+(bind-func get_amp_env_release
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 3)))
+
+
 (bind-func set_mod_env
   (lambda (inst:i8* a:float d s r)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
@@ -764,6 +781,22 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note mod_env |4,float|))))
 
+(bind-func get_mod_env_attack
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 0)))
+
+(bind-func get_mod_env_decay
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 1)))
+
+(bind-func get_mod_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 2)))
+
+(bind-func get_mod_env_release
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 3)))
+
 (bind-func set_filter_env
   (lambda (inst:i8* a:float d s r)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
@@ -774,6 +807,22 @@
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note filter_env |4,float|))))
+
+(bind-func get_filter_env_attack
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 0)))
+
+(bind-func get_filter_env_decay
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 1)))
+
+(bind-func get_filter_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 2)))
+
+(bind-func get_filter_env_release
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 3)))
 
 (bind-func set_filter_env_amt
   (lambda (inst:i8* val:float)
@@ -796,6 +845,15 @@
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note pitch_env |2,float|))))
+
+(bind-func get_pitch_env_attack
+  (lambda (inst:i8*)
+    (aref (get_pitch_env inst) 0)))
+
+(bind-func get_pitch_env_decay
+  (lambda (inst:i8*)
+    (aref (get_pitch_env inst) 1)))
+
 
 (bind-func set_pitch_env_amt
   (lambda (inst:i8* val:float)
@@ -985,6 +1043,31 @@
              (aref mod_attack_slope lfo_num)
              (aref mod_decay_slope lfo_num)))))
 
+(bind-func get_lfo_ad_attack
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack (cref fx mod_attack |4,float|*)))
+      (aref mod_attack lfo_num))))
+
+(bind-func get_lfo_ad_decay
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay (cref fx mod_decay |4,float|*)))
+      (aref mod_decay lfo_num))))
+
+(bind-func get_lfo_ad_attack_slope
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack_slope (cref fx mod_attack_slope |4,float|*)))
+        (aref mod_attack_slope lfo_num))))
+
+(bind-func get_lfo_ad_decay_slope
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
+      (aref mod_decay_slope lfo_num))))
+
+
 (bind-func set_lfo
   (lambda (inst:i8* lfo_num:i32 amp:float frq:float)
     (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
@@ -1001,6 +1084,20 @@
           (mod_frq (cref fx mod_frq |4,float|*)))
       (array (aref mod_amp lfo_num)
              (aref mod_frq lfo_num)))))
+
+(bind-func get_lfo_attack
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aref mod_amp lfo_num))))
+
+(bind-func get_lfo_decay
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aref mod_frq lfo_num))))
 
 (bind-func set_lfo_type
   (lambda (inst:i8* lfo_num:i32 type:i32)
@@ -2056,7 +2153,7 @@
       ;; oscillators
       ;;
       ;; amplitude of osc 1
-      (set_osc1_amp inst 0.3)
+      (set_osc1_amp inst 0.5)
       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
       (set_osc1_wave inst PARAM_SAW)
       ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
@@ -2127,7 +2224,7 @@
       ;; i.e. (+ cutoff (* amplitude value))
       (set_filter_env_follow_amp inst 0.0)
       ;; pitch envelope attack and decay only in ms
-      (set_pitch_env inst 1.0 1.0)
+      (set_pitch_env inst 0.0 0.0)
       ;; the amount of pitch envelope to apply as a ratio of the note frequency
       ;; i.e. a value of 1.0 will add 1 tune to current pitch
       ;;      a value of 0.5 will subtract 1 tune 
@@ -2136,12 +2233,12 @@
       ;; delay
       ;;
       ;; delay time in ms
-      (set_delay_time_left inst 50.0)
-      (set_delay_time_right inst 50.0)
+      (set_delay_time_left inst 0.0)
+      (set_delay_time_right inst 0.0)
       ;; delay amt (gain) 0.0-1.0
       (set_delay_mix inst 0.0)
       ;; delay fb
-      (set_delay_fb inst 0.5)
+      (set_delay_fb inst 0.0)
       ;; delay damping (cutoff frq)
       (set_delay_frq inst 12000.0)
       ;; delay resonance
