@@ -506,12 +506,11 @@ into any further sexp arguments."
   "generic \"catch-all\" zcopy"
   (lambda (x fromz toz)
     (if (llvm_ptr_in_zone fromz (convert x))
-        (let ((size (llvm_zone_ptr_size (convert x)))
-              (newdat (convert (llvm_zone_malloc (llvm_peek_zone_stack) size))))
+        (let ((size (obj-size x 1)) ;; get size of x with 1 level of dereference
+              (newdat (convert (llvm_zone_malloc toz size))))
           (memcpy (convert newdat) (convert x) size)
           newdat)
         x)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xtlang strings

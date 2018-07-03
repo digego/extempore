@@ -367,7 +367,7 @@ void* SchemeProcess::taskImpl()
             case SchemeTask::Type::EXTEMPORE_CALLBACK:
                 {
                     auto s(reinterpret_cast<_llvm_callback_struct_*>(task.getPtr()));
-                    s->fptr(s->dat);
+                    s->fptr(s->dat, s->zone);
                 }
                 break;
             default:

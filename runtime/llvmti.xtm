@@ -3813,18 +3813,13 @@ e.g.
 (define impc:ti:callback
   (lambda (ast)
     `(let ((zold (llvm_peek_zone_stack))
-           (znew (push_new_zone (* 1024 4))))
+           (znew (create_zone (* 1024 4))))
        (llvm_callback ,(car ast)
                       ,(cadr ast)
+                      znew
                       ,@(map (lambda (x)
                                (impc:ti:first-transform `(zcopy ,x zold znew) #t))
                              (cddr ast)))
-       (pop_zone)
-       (llvm_destroy_zone_after_delay znew
-                                      (+ (clamp (- ,(car ast) (llvm_now)) 
-                                                0  ;; can't be less than now
-                                                (+ (llvm_now) (* SR 60 60))) ;; can't be greater than 1hr
-                                         (* SR 10))) ;; 10 second buffer
        void)))
 
 (define (impc:ti:multicref args)
@@ -7344,7 +7339,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:callback-check
   (lambda (ast vars kts request?)
-    ;; (println 'callback-check 'ast: ast 'vars: vars 'request: request?)
     (let ((ftype (map impc:ir:get-type-from-str
                       (let ((ags (impc:ti:get-closure-arg-types (symbol->string (caddr ast)))))
                         (if ags ags '())))))
@@ -7867,6 +7861,10 @@ xtlang's `let' syntax is the same as Scheme"
         request?)))
 
 (define impc:ti:num-of-elts-check
+  (lambda (ast vars kts request?)
+    *impc:ir:si64*))
+
+(define impc:ti:obj-size-check
   (lambda (ast vars kts request?)
     *impc:ir:si64*))
 
@@ -8577,6 +8575,7 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) (member (car ast) '(zone-alloc))) (impc:ti:zone-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(num-of-elts))) (impc:ti:num-of-elts-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(obj-size))) (impc:ti:obj-size-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(ref))) (impc:ti:ref-check ast vars kts request?))                    
           ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
@@ -9747,7 +9746,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                 (string-append ", " (impc:ir:get-type-str a)))
                                               (cddr stub-type)))
                                   "}*")))
-             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat) alwaysinline nounwind {\n"
+             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat, %mzone* %inzone) alwaysinline nounwind {\n"
                                                                                       "entry:\n"
                                                                                       (if (null? cb-struct-type)
                                                                                           "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
@@ -9762,8 +9761,10 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 (make-list-with-proc (- (length stub-type) 1)
                                                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                                      "%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
-                                                                                      "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      ;"%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
+                                                                                      ;"%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      "call ccc void @llvm_push_zone_stack(%mzone* %inzone)\n"
+                                                                                      "%_impz = bitcast %mzone* %inzone to i8*\n"
                                                                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"
                                                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
@@ -9786,7 +9787,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 (make-list-with-proc (length (cdr stub-type))
                                                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                                                       ")\n"
-                                                                                      "call ccc %mzone* @llvm_pop_zone_stack()\n"
+                                                                                      "%_nowoldzone = call ccc %mzone* @llvm_pop_zone_stack()\n"
+                                                                                      "call ccc void @llvm_zone_destroy(%mzone* %_nowoldzone)\n"
                                                                                       "ret void\n"
                                                                                       "}\n\n")))
              (scheme-stub-valid? #t)
@@ -10348,6 +10350,7 @@ xtlang's `let' syntax is the same as Scheme"
                                 a (range (length a)))))
            (zcopy_body (if generic #f
                            (map (lambda (a b c)
+                                  (define aa a)
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
@@ -10361,9 +10364,9 @@ xtlang's `let' syntax is the same as Scheme"
                                       (if (and (impc:ir:pointer? a)
                                                (= 1 (impc:ir:get-ptr-depth a)))
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
-                                               (let ((newptr (zalloc (llvm_zone_ptr_size (cast (tref x ,c) i8*)))))
+                                               (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
                                                  (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
-                                                         (llvm_zone_ptr_size (cast (tref x ,c) i8*)))
+                                                         ,(impc:ir:get-type-size (impc:ir:pointer-- a)))
                                                  (tset! obj ,b newptr))
                                                (tset! obj ,b (tref x ,c)))
                                           `(begin
@@ -10455,9 +10458,13 @@ xtlang's `let' syntax is the same as Scheme"
                    (interaction-environment))
              (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
                       (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
-                        (let ((obj (zalloc)))
-                          ,@zcopy_body
-                          obj)))
+                        (if (llvm_ptr_in_zone fromz (cast x i8*))
+                            (begin (push_zone toz)
+                              (let ((obj (zalloc)))
+                                 ,@zcopy_body
+                                 (pop_zone)
+                                 obj))
+                            x)))
                    (interaction-environment)))))
       ;; (println 'dc-out: name)
       #t)))
