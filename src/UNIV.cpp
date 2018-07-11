@@ -560,7 +560,7 @@ namespace UNIV
 {
 
 std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
-uint32_t NUM_FRAMES = 128;
+uint32_t NUM_FRAMES = 1024;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;
 uint32_t SAMPLE_RATE = 44100;

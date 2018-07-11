@@ -295,7 +295,7 @@ int main(int argc, char** argv)
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "           --nobase: don't load base lib on startup" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
-                std::cout << "          --frames: attempts to force frames [128]" << std::endl;
+                std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
                 std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
                 std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
