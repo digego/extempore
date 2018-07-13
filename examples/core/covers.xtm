@@ -22,8 +22,6 @@
 (make-instrument riff analogue)
 (make-instrument pad analogue)
 
-(define R repeat)
-
 (bind-func dsp:DSP
   (lambda (in time chan dat)
     (cond ((< chan 2)
@@ -326,16 +324,17 @@
 (define whiter-shade
   (lambda (beat dur)
     ;; melody
-    (rmap 32 (lambda (beat p r)
-               (play pad (eval p) 80 r))
-        `(e4 _8 d4 c4 b3 c4 d4 e4 c4
-          a4 _5 b4 c5 (f4 e4) f4 _4 d4 _
-          b4 _5 c5 d5 (g4 f4) g4 _3 f4 e4 f4
-          f4 e4 d4 c4 a3 b3 c4 d4 b3 c4 d4 e4 f4 e4 f4 d4)
-        `(9/2 _8 1/2_7
-          3 _5 1/2 1/2 (1/4 1/4) 2 _4 1 _
-          3 _5 1/2 1/2 (1/4 1/4) 2 _3 1/2_3
-          1/2_16))
+    (rmap 32 0 (lambda (beat dur note length)
+                 (play pad note 80 (/ length 2)))
+          `(e4 _*8 d4 c4 b3 c4 d4 e4 c4
+            a4 _*5 b4 c5 (f4 e4) f4 _*4 d4 _
+            b4 _*5 c5 d5 (g4 f4) g4 _*3 f4 e4 f4
+            f4 e4 d4 c4 a3 b3 c4 d4 b3 c4 d4 e4 f4 e4 f4 d4)
+          `(9  _*8 1  1  1  1  1  1  1
+            6  _*5 1  1  1       5  _*4 2 _
+            6  _*5 1  1  1       4  _*3 1  1  1  1
+            1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1))
+
     ;; bassline
     (rmap 32 (lambda (beat p) (play pad (+ (eval p) -12) 80 2))
         `(c4 b3 a3 g3 f4 e4 d4 c4 g4 f4 e4 d4 c4 f4 g4 b3))
