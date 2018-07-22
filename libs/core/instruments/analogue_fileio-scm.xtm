@@ -1,0 +1,277 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Analogue synth file IO
+;;
+;; scheme variant
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; SCHEME TEXT VARIANT SHOULD BE PREFERRED
+
+;;
+;; SCHEME text variant
+;; 
+
+(define analogue-save-state
+  (let ((i 0) (j 0)
+        (dict '()))
+    (lambda (inst filename)
+      ;;
+      ;; oscillators
+      ;;
+      ;; amplitude of osc
+      (set! dict (cons (cons 'osc1_amp (get_osc1_amp inst)) dict))
+       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc1_wave (get_osc1_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc1_tune (get_osc1_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc1_pw (get_osc1_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc1_pan (get_osc1_pan inst)) dict))
+
+      ;; amplitude of osc 2
+      (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
+      ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc2_wave (get_osc2_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc2_tune (get_osc2_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc2_pw (get_osc2_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc2_pan (get_osc2_pan inst)) dict))
+      
+      ;; amplitude of osc 3
+      (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc3_wave (get_osc3_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc3_tune (get_osc3_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc3_pw (get_osc3_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc3_pan (get_osc3_pan inst)) dict))
+      
+      ;; amplitude of osc 4
+      (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc4_wave (get_osc4_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc4_tune (get_osc4_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc4_pw (get_osc4_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc4_pan (get_osc4_pan inst)) dict))
+      
+      ;; sub oscilltor amp (two tunes under sine wave)
+      (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
+      ;; noise (PARAM_WHITE or PARAM_PINK)
+      (set! dict (cons (cons 'noise_type (get_noise_type inst)) dict))
+      
+      ;; noise amplitude
+      (set! dict (cons (cons 'noise_amp (get_noise_amp inst)) dict))
+      ;;
+      ;; filters
+      ;;
+      ;; lpf filter cutoff frq in hz
+      (set! dict (cons (cons 'filter_frq (get_filter_frq inst)) dict))
+      ;; lpf filter resonance (0.0-1.0)
+      (set! dict (cons (cons 'filter_res (get_filter_res inst)) dict))
+      ;; hpf cutoff frequency
+      (set! dict (cons (cons 'hpf_frq (get_hpf_frq inst)) dict))
+    
+      ;;
+      ;; envelopes
+      ;;
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'amp_env_attack (get_amp_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'amp_env_decay (get_amp_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'amp_env_sustain (get_amp_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'amp_env_release (get_amp_env_release inst)) dict)) ;; release
+    
+      ;; filter (LPF) adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'filter_env_attack (get_filter_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'filter_env_decay (get_filter_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'filter_env_sustain (get_filter_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'filter_env_release (get_filter_env_release inst)) dict)) ;; release
+
+      ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
+      ;; this envelope is summed to the current filter_frq
+      (set! dict (cons (cons 'filter_env_amt (get_filter_env_amt inst)) dict))
+
+      ;; follow note frequency as a percentage of the note frequency
+      ;; i.e. (+ cutoff (* frequency value))
+      (set! dict (cons (cons 'filter_env_follow_frq (get_filter_env_follow_frq inst)) dict))
+      ;; follow note amplitude as a frequency related to the note amplitude
+      ;; i.e. (+ cutoff (* amplitude value))
+      (set! dict (cons (cons 'filter_env_follow_amp (get_filter_env_follow_amp inst)) dict))
+      ;; pitch envelope attack and decay only in ms
+      (set! dict (cons (cons 'pitch_env_attack (get_pitch_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'pitch_env_decay (get_pitch_env_decay inst)) dict)) ;; decay
+      ;; the amount of pitch envelope to apply as a ratio of the note frequency
+      ;; i.e. a value of 1.0 will add 1 tune to current pitch
+      ;;      a value of 0.5 will subtract 1 tune
+      (set! dict (cons (cons 'pitch_env_amt (get_pitch_env_amt inst)) dict))
+      ;;
+      ;; delay
+      ;;
+      ;; delay time in ms
+      (set! dict (cons (cons 'delay_time_left (get_delay_time_left inst)) dict))
+      (set! dict (cons (cons 'delay_time_right (get_delay_time_right inst)) dict))
+      ;; delay amt (gain) 0.0-1.0
+      (set! dict (cons (cons 'delay_mix (get_delay_mix inst)) dict))
+      ;; delay fb
+      (set! dict (cons (cons 'delay_fb (get_delay_fb inst)) dict))
+      ;; delay damping (cutoff frq)
+      (set! dict (cons (cons 'delay_frq (get_delay_frq inst)) dict))
+      ;; delay resonance
+      (set! dict (cons (cons 'delay_res (get_delay_res inst)) dict))
+      ;;
+      ;; reverb 
+      ;;
+      ;; reverb_mix 0.0-1.0 0.0 is dry 1.0 is wet
+      (set! dict (cons (cons 'reverb_mix (get_reverb_mix inst)) dict))
+      ;; reverb size (room size) 0.0-1.0 - 1.0 is large
+      (set! dict (cons (cons 'reverb_size (get_reverb_size inst)) dict))
+      ;; reverb predelay in ms (up to 2 seconds)
+      (set! dict (cons (cons 'reverb_predelay (get_reverb_predelay inst)) dict))
+      ;; reverb absorbtion 0.0-1.0
+      (set! dict (cons (cons 'reverb_absorb (get_reverb_absorb inst)) dict))
+      ;;
+      ;; flanger
+      ;;
+      (set! dict (cons (cons 'flanger_mix (get_flanger_mix inst)) dict))
+      ;; the low mark (time in ms) for the flanger
+      (set! dict (cons (cons 'flanger_low (get_flanger_low inst)) dict))
+      ;; the high mark (time in ms) for the flanger
+      (set! dict (cons (cons 'flanger_high (get_flanger_high inst)) dict))
+      ;; the rate (in hz) of the flanger
+      (set! dict (cons (cons 'flanger_rate (get_flanger_rate inst)) dict))
+      ;; any feedback -1.0 - 1.0
+      (set! dict (cons (cons 'flanger_fb (get_flanger_fb inst)) dict))
+      ;;
+      ;; panning
+      ;;
+      ;; see pan_c in audio_dsp for detailed info
+      ;; about the values for pos and width
+      ;; for channels > 2
+      ;;
+      ;; pan pos 0.0-1.0 (assuming stereo)
+      (set! dict (cons (cons 'pan_pos (get_pan_pos inst)) dict))
+      ;; pan width 1.0
+      (set! dict (cons (cons 'pan_width (get_pan_width inst)) dict))
+      ;;
+      ;; gain
+      ;;
+      (set! dict (cons (cons 'gain (get_gain inst)) dict))
+      ;;
+      ;; portamento (in millis)
+      (set! dict (cons (cons 'portamento (get_portamento inst)) dict))
+      ;;
+      ;; set max polyphony
+      ;; (set! dict 59 (cons (get_polyphonic inst)))
+      ;;
+      ;; lfos
+      ;;
+      ;; attack, decay, attack slope, decay slope
+      ;; attack ins ms, decay in ms, attack & decay slopes -1.0 log
+      ;; and 1.0 exp (0.0 is linear)
+      (set! dict (cons (cons 'lfo1_ad_attack (get_lfo_ad_attack inst 0)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo1_ad_decay (get_lfo_ad_decay inst 0)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo1_ad_attack_slope (get_lfo_ad_attack_slope inst 0)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo1_ad_decay_slope (get_lfo_ad_decay_slope inst 0)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo2_ad_attack (get_lfo_ad_attack inst 1)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo2_ad_decay (get_lfo_ad_decay inst 1)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo2_ad_attack_slope (get_lfo_ad_attack_slope inst 1)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo2_ad_decay_slope (get_lfo_ad_decay_slope inst 1)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo3_ad_attack (get_lfo_ad_attack inst 2)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo3_ad_decay (get_lfo_ad_decay inst 2)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo3_ad_attack_slope (get_lfo_ad_attack_slope inst 2)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo3_ad_decay_slope (get_lfo_ad_decay_slope inst 2)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo4_ad_attack (get_lfo_ad_attack inst 3)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo4_ad_decay (get_lfo_ad_decay inst 3)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo4_ad_attack_slope (get_lfo_ad_attack_slope inst 3)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo4_ad_decay_slope (get_lfo_ad_decay_slope inst 3)) dict)) ;; decay slope
+
+      ;; set amp frq
+      (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
+      
+      ;; set LFO type
+      (set! dict (cons (cons 'lfo1_type (get_lfo_type inst PARAM_LFO1)) dict))
+      (set! dict (cons (cons 'lfo2_type (get_lfo_type inst PARAM_LFO2)) dict))
+      (set! dict (cons (cons 'lfo3_type (get_lfo_type inst PARAM_LFO3)) dict))
+      (set! dict (cons (cons 'lfo4_type (get_lfo_type inst PARAM_LFO4)) dict))
+      ;;
+      ;; mod matrix
+      ;;
+      ;; reset mod matrix - turn everything off
+      (define modvec (make-vector (* 4 32) 0.0))
+      (dotimes (i 4)   ;; 4 modulation sources
+        (dotimes (j 32) ;; 32 modulation targets
+          (vector-set! modvec (+ (* i 32) j) (get_mod_matrix inst i j))))
+      (set! dict (cons (cons 'mod_matrix (vector->list modvec)) dict))
+    
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'mod_env_release (get_mod_env_release inst)) dict)) ;; release
+  
+      ;; filter saturation
+      (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))  
+      
+      ;; (println dict) 
+      (define out (open-output-file filename))
+      (write (reverse dict) out)
+      (close-output-port out)  
+      (println 'done)  
+      #t)))
+
+(define analogue-load-state
+  (lambda (inst filename)
+    (let* ((filein (open-input-file filename))
+           (data (read filein)))
+        (for-each (lambda (x)
+               (define tag (symbol->string (car x)))
+               ;; we need a couple of special cases
+               (cond ((string=? tag "mod_matrix")
+                      (for-each (lambda (y i)
+                                  (println 'set_mod_matrix 'inst (real->integer (/ i 32.0)) (modulo i 32) y)
+                                  (set_mod_matrix inst (real->integer (/ i 32.0)) (modulo i 32) y))
+                                (cdr x)
+                                (range 0 (* 4 32))))
+                     ((string=? (substring tag 0 3) "lfo")
+                      (if (regex:match? tag "_ad_")
+                          (let* ((res (regex:matched tag "^lfo([0-9])_ad_(.*)$"))
+                                 (name (string->symbol (string-append "set_lfo_ad_" (caddr res))))
+                                 (num (string->number (cadr res)))
+                                 (expr `(,name inst ,num ,(cdr x))))
+                            (println 'calling expr)
+                            (eval expr))
+                          (let* ((res (regex:matched tag "^lfo([0-9])_(.*)$"))
+                                 (name (string->symbol (string-append "set_lfo_" (caddr res))))
+                                 (num (string->number (cadr res)))
+                                 (expr `(,name inst ,num ,(cdr x))))
+                            (println expr)
+                            (eval expr))))
+                     (else 
+                       (let* ((fname (string->symbol (string-append "set_" tag)))
+                             (expr `(,fname inst ,(cdr x))))
+                         (println 'calling expr)
+                         (eval expr)))))
+             data)
+        (close-input-port filein)
+        (println 'finished 'loading filename))))

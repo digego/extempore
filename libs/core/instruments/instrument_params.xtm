@@ -1,0 +1,1138 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; GLOBAL INSTRUMENT STUFF
+;;
+;; Where possible new instruments should
+;; always try to use the 'standards' below.
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-val PARAM_SINE enum 0)
+(bind-val PARAM_SAW enum 1)
+(bind-val PARAM_PULSE enum 2)
+(bind-val PARAM_TRI enum 3)
+(bind-val PARAM_AD enum 4)
+(bind-val PARAM_CONST enum 5)
+(bind-val PARAM_WHITE enum 0)
+(bind-val PARAM_PINK enum 1)
+
+;; filter types
+(bind-val PARAM_LPF enum 0)
+(bind-val PARAM_BPF enum 1)
+(bind-val PARAM_HPF enum 2)
+(bind-val PARAM_Notch enum 3)
+(bind-val PARAM_Peak enum 4)
+(bind-val PARAM_APF enum 5)
+
+;; modulation sources
+(bind-val PARAM_LFO1 enum 0)
+(bind-val PARAM_LFO2 enum 1)
+(bind-val PARAM_LFO3 enum 2)
+(bind-val PARAM_LFO4 enum 3)
+
+;; modulation destinations (note)
+(bind-val PARAM_OSC1_AMP enum 0)
+(bind-val PARAM_OSC1_FRQ enum 1)
+(bind-val PARAM_OSC1_PW enum 2)
+(bind-val PARAM_OSC1_PAN enum 3)
+(bind-val PARAM_OSC2_AMP enum 4)
+(bind-val PARAM_OSC2_FRQ enum 5)
+(bind-val PARAM_OSC2_PW enum 6)
+(bind-val PARAM_OSC2_PAN enum 7)
+(bind-val PARAM_OSC3_AMP enum 8)
+(bind-val PARAM_OSC3_FRQ enum 9)
+(bind-val PARAM_OSC3_PW enum 10)
+(bind-val PARAM_OSC3_PAN enum 11)
+(bind-val PARAM_OSC4_AMP enum 12)
+(bind-val PARAM_OSC4_FRQ enum 13)
+(bind-val PARAM_OSC4_PW enum 14)
+(bind-val PARAM_OSC4_PAN enum 15)
+(bind-val PARAM_NOISE_AMP enum 16)
+(bind-val PARAM_FILTER_FRQ enum 17)
+(bind-val PARAM_FILTER_RES enum 18)
+
+;; modulation destinations (fx)
+(bind-val PARAM_PAN_WIDTH enum 19)
+(bind-val PARAM_PAN_POS enum 20) 
+(bind-val PARAM_DELAY_TIME_LEFT enum 21)
+(bind-val PARAM_DELAY_TIME_RIGHT enum 22)
+(bind-val PARAM_DELAY_FB enum 23) ;; feedback
+(bind-val PARAM_REVERB_SIZE enum 24)
+(bind-val PARAM_REVERB_PREDELAY enum 25)
+(bind-val PARAM_REVERB_ABSORB enum 26)
+(bind-val PARAM_REVERB_MIX enum 27)
+(bind-val PARAM_FLANGER_LOW enum 28)
+(bind-val PARAM_FLANGER_HIGH enum 29)
+(bind-val PARAM_FLANGER_RATE enum 30)
+(bind-val PARAM_FLANGER_FB enum 31)
+
+
+
+;;
+;; stops all active notes on instrument
+;;
+(bind-func stop_running
+  (lambda (inst:i8*)
+    (let ((notes (cref (cast inst [void]*) notes NoteData**))
+          (i 0))
+      (dotimes (i MAXPOLYPHONY)
+        (pset! notes i (NoteData i 0 0.0 0.0 0 1.0 #f 0 (cast (create_zone (* 10 1024))))))
+      void)))
+
+;;
+;; sets the number of voices for this instrument
+;;
+(bind-func set_polyphony
+  (lambda (inst:i8* val:i64)
+    (stop_running inst) ;; force a stop on all notes before changing poly count
+    (if (and (> val 0) (< val (+ 1 MAXPOLYPHONY)))
+        (begin (cset! (cast inst [void]*) poly val i64)
+               void)
+        (begin (println "Invalid argument, must be greater than 0 and less than MAXPOLYPHONY")
+               void))
+    void))
+
+(bind-func set_monophonic
+  (lambda (inst:i8*)
+    (stop_running inst)  ;; force a stop on all notes before changing poly count
+    (cset! (cast inst [void]*) poly 1 i64)
+    void))
+
+(bind-func set_polyphonic
+  (lambda (inst:i8*)
+    (stop_running inst)  ;; force a stop on all notes before changing poly count
+    (cset! (cast inst [void]*) poly MAXPOLYPHONY i64)
+    void))
+
+
+(bind-func active_notes
+  (lambda (inst:i8*)
+    (let ((val (cref (cast inst [void]*) numactive i64)))
+      (println "Instrument has" val "active notes")
+      void)))
+
+;;
+;; note kernel params for ALL instruments
+;;
+
+;; time in milliseconds to glide between note frequencies
+(bind-func set_portamento
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note portamento val float)
+      void)))
+
+(bind-func get_portamento
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note portamento float))))
+
+;; only effects monophonic (i.e. 1 note polyphony)
+;; if legato is #t then don't retrigger adsr's
+(bind-func set_legato
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note legato (if (= val 0) #f #t) i1)
+      void)))
+
+(bind-func get_legato
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note legato i1))))
+
+(bind-func set_osc1_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc1_pan val float)
+      void)))
+
+(bind-func get_osc1_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc1_pan float))))
+
+(bind-func set_osc1_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc1_amp val float)
+      void)))
+
+(bind-func get_osc1_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc1_amp float))))
+
+(bind-func set_osc1_tune
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note tune1 val float)
+      void)))
+
+(bind-func get_osc1_tune
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note tune1 float))))
+
+(bind-func set_osc1_pw
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pw1 val float)
+      void)))
+
+(bind-func get_osc1_pw
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pw1 float))))
+
+(bind-func set_osc1_wave
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc1_wave val i32)
+      void)))
+
+(bind-func get_osc1_wave
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc1_wave i32))))
+
+(bind-func set_osc2_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc2_pan val float)
+      void)))
+
+(bind-func get_osc2_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc2_pan float))))
+
+(bind-func set_osc2_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc2_amp val float)
+      void)))
+
+(bind-func get_osc2_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc2_amp float))))
+
+(bind-func set_osc2_tune
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note tune2 val float)
+      void)))
+
+(bind-func get_osc2_tune
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note tune2 float))))
+
+(bind-func set_osc2_pw
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pw2 val float)
+      void)))
+
+(bind-func get_osc2_pw
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pw2 float))))
+
+(bind-func set_osc2_wave
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc2_wave val i32)
+      void)))
+
+(bind-func get_osc2_wave
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc2_wave i32))))
+
+(bind-func set_osc3_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc3_pan val float)
+      void)))
+
+(bind-func get_osc3_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc3_pan float))))
+
+(bind-func set_osc3_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc3_amp val float)
+      void)))
+
+(bind-func get_osc3_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc3_amp float))))
+
+(bind-func set_osc3_tune
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note tune3 val float)
+      void)))
+
+(bind-func get_osc3_tune
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note tune3 float))))
+
+(bind-func set_osc3_pw
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pw3 val float)
+      void)))
+
+(bind-func get_osc3_pw
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pw3 float))))
+
+(bind-func set_osc3_wave
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc3_wave val i32)
+      void)))
+
+(bind-func get_osc3_wave
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc3_wave i32))))
+
+(bind-func set_osc4_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_pan val float)
+      void)))
+
+(bind-func get_osc4_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc4_pan float))))
+
+(bind-func set_osc4_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_amp val float)
+      void)))
+
+(bind-func get_osc4_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc4_amp float))))
+
+(bind-func set_osc4_tune
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note tune4 val float)
+      void)))
+
+(bind-func get_osc4_tune
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note tune4 float))))
+
+(bind-func set_osc4_pw
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pw4 val float)
+      void)))
+
+(bind-func get_osc4_pw
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pw4 float))))
+
+(bind-func set_osc4_wave
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc4_wave val i32)
+      void)))
+
+(bind-func get_osc4_wave
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc4_wave i32))))
+
+(bind-func set_sub_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note sub_pan val float)
+      void)))
+
+(bind-func get_sub_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note sub_pan float))))
+
+(bind-func set_sub_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note sub_amp val float)
+      void)))
+
+(bind-func get_sub_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note sub_amp float))))
+
+(bind-func set_noise_pan
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note noise_pan val float)
+      void)))
+
+(bind-func get_noise_pan
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note noise_pan float))))
+
+(bind-func set_noise_type
+  (lambda (inst:i8* val:i32)  
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note noise val enum)
+      void)))
+
+(bind-func get_noise_type
+  (lambda (inst:i8*)  
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note noise enum))))
+
+(bind-func set_noise_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note noise_amp val float)
+      void)))
+
+(bind-func get_noise_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note noise_amp float))))
+
+(bind-func set_cutoff
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_frq val float)
+      void)))
+
+(bind-func get_cutoff
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note filter_frq float))))
+
+(bind-func set_filter_cutoff
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_frq val float)
+      void)))
+
+(bind-func get_filter_cutoff
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note filter_frq float))))
+
+(bind-func set_filter_frq (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
+(bind-func get_filter_frq (lambda (inst:i8*) (get_filter_cutoff inst)))
+
+(bind-func set_lpf_frq (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
+(bind-func get_lpf_frq (lambda (inst:i8*) (get_filter_cutoff inst)))
+
+(bind-func set_lpf_cutoff (lambda (inst:i8* val:float) (set_filter_cutoff inst val)))
+(bind-func get_lpf_cutoff (lambda (inst:i8*) (get_filter_cutoff inst)))
+
+(bind-func set_filter_type
+  (lambda (inst:i8* val:i32)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_type (convert val i64) i64)
+      void)))
+
+(bind-func get_filter_type
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (i64toi32 (cref note filter_type i64)))))
+
+(bind-func set_filter_res
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note reso val float)
+      void)))
+
+(bind-func get_filter_res
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note reso float))))
+
+(bind-func set_lpf_res
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note reso val float)
+      void)))
+
+(bind-func get_lpf_res
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note reso float))))
+
+(bind-func set_amp_env
+  (lambda (inst:i8* a:float d s r)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note amp_env (array a d s r) |4,float|)
+      void)))
+
+(bind-func get_amp_env
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note amp_env |4,float|))))
+
+(bind-func get_amp_env_attack
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 0)))
+
+(bind-func set_amp_env_attack
+  (lambda (inst:i8* a:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_amp_env inst)))
+      (aset! (ref env) 0 a)
+      (cset! note amp_env env |4,float|)
+      void)))
+
+(bind-func get_amp_env_decay
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 1)))
+
+(bind-func set_amp_env_decay
+  (lambda (inst:i8* d:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_amp_env inst)))
+      (aset! (ref env) 1 d)
+      (cset! note amp_env env |4,float|)
+      void)))
+
+(bind-func get_amp_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 2)))
+
+(bind-func set_amp_env_sustain
+  (lambda (inst:i8* s:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_amp_env inst)))
+      (aset! (ref env) 2 s)
+      (cset! note amp_env env |4,float|)
+      void)))
+  
+(bind-func get_amp_env_release
+  (lambda (inst:i8*)
+    (aref (get_amp_env inst) 3)))
+
+(bind-func set_amp_env_release
+  (lambda (inst:i8* r:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_amp_env inst)))
+      (aset! (ref env) 3 r)
+      (cset! note amp_env env |4,float|)
+      void)))
+
+(bind-func set_mod_env
+  (lambda (inst:i8* a:float d s r)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note mod_env (array a d s r) |4,float|)
+      void)))
+
+(bind-func get_mod_env
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note mod_env |4,float|))))
+
+(bind-func get_mod_env_attack
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 0)))
+
+(bind-func set_mod_env_attack
+  (lambda (inst:i8* a:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_mod_env inst)))
+      (aset! (ref env) 0 a)
+      (cset! note mod_env env |4,float|)
+      void)))
+
+(bind-func get_mod_env_decay
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 1)))
+
+(bind-func set_mod_env_decay
+  (lambda (inst:i8* d:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_mod_env inst)))
+      (aset! (ref env) 1 d)
+      (cset! note mod_env env |4,float|)
+      void)))
+
+(bind-func get_mod_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 2)))
+
+(bind-func set_mod_env_sustain
+  (lambda (inst:i8* s:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_mod_env inst)))
+      (aset! (ref env) 2 s)
+      (cset! note mod_env env |4,float|)
+      void)))
+
+(bind-func get_mod_env_release
+  (lambda (inst:i8*)
+    (aref (get_mod_env inst) 3)))
+
+(bind-func set_mod_env_release
+  (lambda (inst:i8* r:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_mod_env inst)))
+      (aset! (ref env) 3 r)
+      (cset! note mod_env env |4,float|)
+      void)))
+
+(bind-func set_filter_env
+  (lambda (inst:i8* a:float d s r)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_env (array a d s r) |4,float|)
+      void)))
+
+(bind-func get_filter_env
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note filter_env |4,float|))))
+
+(bind-func get_filter_env_attack
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 0)))
+
+(bind-func set_filter_env_attack
+  (lambda (inst:i8* a:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_filter_env inst)))
+      (aset! (ref env) 0 a)
+      (cset! note filter_env env |4,float|)
+      void)))
+
+(bind-func get_filter_env_decay
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 1)))
+
+(bind-func set_filter_env_decay
+  (lambda (inst:i8* d:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_filter_env inst)))
+      (aset! (ref env) 1 d)
+      (cset! note filter_env env |4,float|)
+      void)))
+
+(bind-func get_filter_env_sustain
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 2)))
+
+(bind-func set_filter_env_sustain
+  (lambda (inst:i8* s:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_filter_env inst)))
+      (aset! (ref env) 2 s)
+      (cset! note filter_env env |4,float|)
+      void)))
+
+(bind-func get_filter_env_release
+  (lambda (inst:i8*)
+    (aref (get_filter_env inst) 3)))
+
+(bind-func set_filter_env_release
+  (lambda (inst:i8* r:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_filter_env inst)))
+      (aset! (ref env) 3 r)
+      (cset! note filter_env env |4,float|)
+      void)))
+
+(bind-func set_filter_env_amt
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_env_amt val float)
+      void)))
+
+(bind-func get_filter_env_amt
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note filter_env_amt float))))
+
+(bind-func set_pitch_env
+  (lambda (inst:i8* a:float d)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pitch_env (array a d) |2,float|)
+      void)))
+
+(bind-func get_pitch_env
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pitch_env |2,float|))))
+
+(bind-func get_pitch_env_attack
+  (lambda (inst:i8*)
+    (aref (get_pitch_env inst) 0)))
+
+(bind-func set_pitch_env_attack
+  (lambda (inst:i8* a:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_pitch_env inst)))
+      (aset! (ref env) 0 a)
+      (cset! note pitch_env env |2,float|)
+      void)))
+
+(bind-func get_pitch_env_decay
+  (lambda (inst:i8*)
+    (aref (get_pitch_env inst) 1)))
+
+(bind-func set_pitch_env_decay
+  (lambda (inst:i8* d:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (env (get_pitch_env inst)))
+      (aset! (ref env) 1 d)
+      (cset! note pitch_env env |2,float|)
+      void)))
+
+(bind-func set_pitch_env_amt
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note pitch_env_amt val float)
+      void)))
+
+(bind-func get_pitch_env_amt
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note pitch_env_amt float))))
+
+(bind-func set_filter_env_follow_frq
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note follow_frq val float)
+      void)))
+
+(bind-func get_filter_env_follow_frq
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note follow_frq float))))
+
+(bind-func set_filter_env_follow_amp
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note follow_amp val float)
+      void)))
+
+(bind-func get_filter_env_follow_amp
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note follow_amp float))))
+
+;; filter drive
+(bind-func set_filter_drive
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_saturation val float)
+      void)))
+
+(bind-func get_filter_drive
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note filter_saturation float))))
+
+
+
+;;
+;; fx kernel params for ALL instruments
+;;
+
+(bind-func set_gain
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect gain val float)
+      void)))
+
+(bind-func get_gain
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect gain float))))
+
+(bind-func set_hpf_frq
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect hpf_frq val float)
+      void)))
+
+(bind-func get_hpf_frq
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect hpf_frq float))))
+
+(bind-func set_delay_time
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_time_left val float)
+      (cset! effect delay_time_right val float)      
+      void)))
+
+(bind-func get_delay_time
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (array (cref effect delay_time_left float)
+             (cref effect delay_time_right float)))))
+
+(bind-func set_delay_time_left
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_time_left val float)
+      void)))
+
+(bind-func get_delay_time_left
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_time_left float))))
+
+(bind-func set_delay_time_right
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_time_right val float)
+      void)))
+
+(bind-func get_delay_time_right
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_time_right float))))
+
+(bind-func set_delay_mix
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_mix val float)
+      void)))
+
+(bind-func get_delay_mix
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_mix float))))
+
+(bind-func set_delay_fb
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_fb val float)
+      void)))
+
+(bind-func get_delay_fb
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_fb float))))
+
+(bind-func set_delay_frq
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_frq val float)
+      void)))
+
+(bind-func get_delay_frq
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_frq float))))
+
+(bind-func set_delay_res
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_res val float)
+      void)))
+
+(bind-func get_delay_res
+  (lambda (inst:i8*)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect delay_res float))))
+
+(bind-func set_overdrive_amt
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect overdrive_amt val float)
+      void)))
+
+(bind-func get_overdrive_amt
+  (lambda (inst:i8* val:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref effect overdrive_amt float))))
+
+(bind-func set_lfo_ad
+  (lambda (inst:i8* lfo_num:i32 attack:float decay:float a_slope:float d_slope:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack (cref fx mod_attack |4,float|*))
+          (mod_decay (cref fx mod_decay |4,float|*))
+          (mod_attack_slope (cref fx mod_attack_slope |4,float|*))
+          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
+      (aset! mod_attack lfo_num attack)
+      (aset! mod_decay lfo_num decay)
+      (aset! mod_attack_slope lfo_num a_slope)
+      (aset! mod_decay_slope lfo_num d_slope)
+      void)))
+
+(bind-func get_lfo_ad
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack (cref fx mod_attack |4,float|*))
+          (mod_decay (cref fx mod_decay |4,float|*))
+          (mod_attack_slope (cref fx mod_attack_slope |4,float|*))
+          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
+      (array (aref mod_attack lfo_num)
+             (aref mod_decay lfo_num)
+             (aref mod_attack_slope lfo_num)
+             (aref mod_decay_slope lfo_num)))))
+
+(bind-func get_lfo_ad_attack
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack (cref fx mod_attack |4,float|*)))
+      (aref mod_attack lfo_num))))
+
+(bind-func get_lfo_ad_decay
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay (cref fx mod_decay |4,float|*)))
+      (aref mod_decay lfo_num))))
+
+(bind-func get_lfo_ad_attack_slope
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack_slope (cref fx mod_attack_slope |4,float|*)))
+        (aref mod_attack_slope lfo_num))))
+
+(bind-func get_lfo_ad_decay_slope
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
+      (aref mod_decay_slope lfo_num))))
+
+(bind-func set_lfo_ad_attack
+  (lambda (inst:i8* lfo_num:i32 attack:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack (cref fx mod_attack |4,float|*)))
+      (aset! mod_attack lfo_num attack))))
+
+(bind-func set_lfo_ad_decay
+  (lambda (inst:i8* lfo_num:i32 decay:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay (cref fx mod_decay |4,float|*)))
+      (aset! mod_decay lfo_num decay))))
+
+(bind-func set_lfo_ad_attack_slope
+  (lambda (inst:i8* lfo_num:i32 slope:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_attack_slope (cref fx mod_attack_slope |4,float|*)))
+        (aset! mod_attack_slope lfo_num slope))))
+
+(bind-func set_lfo_ad_decay_slope
+  (lambda (inst:i8* lfo_num:i32 slope:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
+      (aset! mod_decay_slope lfo_num slope))))
+
+
+(bind-func set_lfo
+  (lambda (inst:i8* lfo_num:i32 amp:float frq:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aset! mod_amp lfo_num amp)
+      (aset! mod_frq lfo_num frq)
+      void)))
+
+(bind-func get_lfo
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (array (aref mod_amp lfo_num)
+             (aref mod_frq lfo_num)))))
+
+(bind-func get_lfo_attack
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aref mod_amp lfo_num))))
+
+(bind-func set_lfo_attack
+  (lambda (inst:i8* lfo_num:i32 attack:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aset! mod_amp lfo_num attack))))
+
+(bind-func get_lfo_decay
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aref mod_frq lfo_num))))
+
+(bind-func set_lfo_decay
+  (lambda (inst:i8* lfo_num:i32 decay:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_amp (cref fx mod_amp |4,float|*))
+          (mod_frq (cref fx mod_frq |4,float|*)))
+      (aset! mod_frq lfo_num decay))))
+
+(bind-func set_lfo_type
+  (lambda (inst:i8* lfo_num:i32 type:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (lfo_types (cref fx lfo_types |4,i32|*)))
+      (aset! lfo_types lfo_num type)
+      void)))
+
+(bind-func get_lfo_type
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (lfo_types (cref fx lfo_types |4,i32|*)))
+      (aref lfo_types lfo_num))))
+
+(bind-func set_pan_width
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx pan_width val float)
+      void)))
+
+(bind-func get_pan_width
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx pan_width float))))
+
+(bind-func set_pan_pos
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx pan_pos val float)
+      void)))
+
+(bind-func get_pan_pos
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx pan_pos float))))
+
+(bind-func set_reverb_mix
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx reverb_mix val float)
+      void)))
+
+(bind-func get_reverb_mix
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx reverb_mix float))))
+
+(bind-func set_reverb_size
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx reverb_size val float)
+      void)))
+
+(bind-func get_reverb_size
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx reverb_size float))))
+
+(bind-func set_reverb_absorb
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx reverb_absorb val float)
+      void)))
+
+(bind-func get_reverb_absorb
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx reverb_absorb float))))
+
+(bind-func set_reverb_predelay
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx reverb_predelay val float)
+      void)))
+
+(bind-func get_reverb_predelay
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx reverb_predelay float))))
+
+(bind-func set_flanger_mix
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_mix val float)
+      void)))
+
+(bind-func get_flanger_mix
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx flanger_mix float))))
+
+(bind-func set_flanger_low
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_low val float)
+      void)))
+
+(bind-func get_flanger_low
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx flanger_low float))))
+
+(bind-func set_flanger_high
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_high val float)
+      void)))
+
+(bind-func get_flanger_high
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx flanger_high float))))
+
+(bind-func set_flanger_rate
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_rate val float)
+      void)))
+
+(bind-func get_flanger_rate
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx flanger_rate float))))
+
+(bind-func set_flanger_fb
+  (lambda (inst:i8* val:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! fx flanger_fb val float)
+      void)))
+
+(bind-func get_flanger_fb
+  (lambda (inst:i8*)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cref fx flanger_fb float))))
+
+
+;; modulation matrix
+
+(bind-func set_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum value:float)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aset! (aref-ptr mod_matrix src) dst value))
+      value)))
+
+(bind-func get_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum)
+    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aref (aref-ptr mod_matrix src) dst)
+          0.0))))

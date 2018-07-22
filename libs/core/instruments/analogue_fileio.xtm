@@ -1,0 +1,770 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Analogue synth file IO
+;;
+;; binary and text variants
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; SCHEME TEXT VARIANT SHOULD BE PREFERRED
+;;
+
+;; XTLANG binary variants
+;;
+(bind-func analogue_load_state
+  (let ((i 0) (j 0))
+    (lambda (inst:i8* data:|512,i32|*)
+      ;;
+      ;; oscillators
+      ;;
+      ;; amplitude of osc 1
+      (set_osc1_amp inst (unswap32f (aref data 0)))
+      ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set_osc1_wave inst (unswap32i (aref data 1)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc1_tune inst (unswap32f (aref data 2)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set_osc1_pw inst (unswap32f (aref data 3)))
+      ;; stereo pan (default is 0.5)
+      (set_osc1_pan inst (unswap32f (aref data 4)))
+
+      ;; amplitude of osc 2
+      (set_osc2_amp inst (unswap32f (aref data 5)))
+      ;; waveform of osc (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set_osc2_wave inst (unswap32i (aref data 6)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc2_tune inst (unswap32f (aref data 7)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set_osc2_pw inst (unswap32f (aref data 8)))
+      ;; stereo pan (default is 0.5)
+      (set_osc2_pan inst (unswap32f (aref data 9)))
+
+      ;; amplitude of osc 3
+      (set_osc3_amp inst (unswap32f (aref data 10)))
+      ;; waveform of osc (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set_osc3_wave inst (unswap32i (aref data 11)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc3_tune inst (unswap32f (aref data 12)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set_osc3_pw inst (unswap32f (aref data 13)))
+      ;; stereo pan (default is 0.5)
+      (set_osc3_pan inst (unswap32f (aref data 14)))
+
+      ;; amplitude of osc 4
+      (set_osc4_amp inst (unswap32f (aref data 15)))
+      ;; waveform of osc (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set_osc4_wave inst (unswap32i (aref data 16)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set_osc4_tune inst (unswap32f (aref data 17)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set_osc4_pw inst (unswap32f (aref data 18)))
+      ;; stereo pan (default is 0.5)
+      (set_osc4_pan inst (unswap32f (aref data 19)))
+
+
+      ;; sub oscilltor amp (two tunes under sine wave)
+      (set_sub_amp inst (unswap32f (aref data 20)))
+      ;; noise (PARAM_WHITE or PARAM_PINK)
+      (set_noise_type inst (unswap32i (aref data 21)))
+      ;; noise amplitude
+      (set_noise_amp inst (unswap32f (aref data 22)))
+      ;;
+      ;; filters
+      ;;
+      ;; lpf filter cutoff frq in hz
+      (set_filter_frq inst (unswap32f (aref data 23)))
+      ;; lpf filter resonance (0.0-1.0)
+      (set_filter_res inst (unswap32f (aref data 24)))
+      ;; hpf cutoff frequency
+      (set_hpf_frq inst (unswap32f (aref data 25)))
+      ;;
+      ;; envelopes
+      ;;
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set_amp_env inst
+                   (unswap32f (aref data 26))
+                   (unswap32f (aref data 27))
+                   (unswap32f (aref data 28))
+                   (unswap32f (aref data 29)))
+      ;; filter (LPF) adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set_filter_env inst
+                      (unswap32f (aref data 30))
+                      (unswap32f (aref data 31))
+                      (unswap32f (aref data 32))
+                      (unswap32f (aref data 33)))
+      ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
+      ;; this envelope is summed to the current filter_frq
+      (set_filter_env_amt inst (unswap32f (aref data 34)))
+      ;; follow note frequency as a percentage of the note frequency
+      ;; i.e. (+ cutoff (* frequency value))
+      (set_filter_env_follow_frq inst (unswap32f (aref data 35)))
+      ;; follow note amplitude as a frequency related to the note amplitude
+      ;; i.e. (+ cutoff (* amplitude value))
+      (set_filter_env_follow_amp inst (unswap32f (aref data 36)))
+      ;; pitch envelope attack and decay only in ms
+      (set_pitch_env inst (unswap32f (aref data 37)) (unswap32f (aref data 38)))
+      ;; the amount of pitch envelope to apply as a ratio of the note frequency
+      ;; i.e. a value of 1.0 will add 1 tune to current pitch
+      ;;      a value of 0.5 will subtract 1 tune 
+      (set_pitch_env_amt inst (unswap32f (aref data 39)))
+      ;;
+      ;; delay
+      ;;
+      ;; delay time in ms
+      (set_delay_time_left inst (unswap32f (aref data 40)))
+      (set_delay_time_right inst (unswap32f (aref data 41)))
+      ;; delay amt (gain) 0.0-1.0
+      (set_delay_mix inst (unswap32f (aref data 42)))
+      ;; delay fb
+      (set_delay_fb inst (unswap32f (aref data 43)))
+      ;; delay damping (cutoff frq)
+      (set_delay_frq inst (unswap32f (aref data 44)))
+      ;; delay resonance
+      (set_delay_res inst (unswap32f (aref data 45)))
+      ;;
+      ;; reverb 
+      ;;
+      ;; reverb_mix 0.0-1.0 0.0 is dry 1.0 is wet
+      (set_reverb_mix inst (unswap32f (aref data 46)))
+      ;; reverb size (room size) 0.0-1.0 - 1.0 is large
+      (set_reverb_size inst (unswap32f (aref data 47)))
+      ;; reverb predelay in ms (up to 2 seconds)
+      (set_reverb_predelay inst (unswap32f (aref data 48)))
+      ;; reverb absorbtion 0.0-1.0
+      (set_reverb_absorb inst (unswap32f (aref data 49)))
+      ;;
+      ;; flanger
+      ;;
+      (set_flanger_mix inst (unswap32f (aref data 50)))
+      ;; the low mark (time in ms) for the flanger
+      (set_flanger_low inst (unswap32f (aref data 51)))
+      ;; the high mark (time in ms) for the flanger
+      (set_flanger_high inst (unswap32f (aref data 52)))
+      ;; the rate (in hz) of the flanger
+      (set_flanger_rate inst (unswap32f (aref data 53)))
+      ;; any feedback -1.0 - 1.0
+      (set_flanger_fb inst (unswap32f (aref data 54)))
+      ;;
+      ;; panning
+      ;;
+      ;; see pan_c in audio_dsp for detailed info
+      ;; about the values for pos and width
+      ;; for channels > 2
+      ;;
+      ;; pan pos 0.0-1.0 (assuming stereo)
+      (set_pan_pos inst (unswap32f (aref data 55)))
+      ;; pan width 1.0
+      (set_pan_width inst (unswap32f (aref data 56)))
+      ;;
+      ;; gain
+      ;;
+      (set_gain inst (unswap32f (aref data 57)))
+      ;;
+      ;; portamento (in millis)
+      (set_portamento inst (unswap32f (aref data 58)))
+      ;;
+      ;; set max polyphony
+      (set_polyphonic inst)
+      ;;
+      ;; lfos
+      ;;
+      ;; attack, decay, attack slope, decay slope
+      ;; attack ins ms, decay in ms, attack & decay slopes -1.0 log
+      ;; and 1.0 exp (0.0 is linear)
+      (set_lfo_ad inst PARAM_LFO1
+                  (unswap32f (aref data 59))
+                  (unswap32f (aref data 60))
+                  (unswap32f (aref data 61))
+                  (unswap32f (aref data 62)))
+
+      (set_lfo_ad inst PARAM_LFO2
+                  (unswap32f (aref data 63))
+                  (unswap32f (aref data 64))
+                  (unswap32f (aref data 65))
+                  (unswap32f (aref data 66)))
+
+      (set_lfo_ad inst PARAM_LFO3
+                  (unswap32f (aref data 67))
+                  (unswap32f (aref data 68))
+                  (unswap32f (aref data 69))
+                  (unswap32f (aref data 70)))
+
+      (set_lfo_ad inst PARAM_LFO4
+                  (unswap32f (aref data 71))
+                  (unswap32f (aref data 72))
+                  (unswap32f (aref data 73))
+                  (unswap32f (aref data 74)))      
+
+      ;; set amp frq      
+      (set_lfo inst PARAM_LFO1
+               (unswap32f (aref data 75))
+               (unswap32f (aref data 76)))
+
+      (set_lfo inst PARAM_LFO2
+               (unswap32f (aref data 77))
+               (unswap32f (aref data 78)))
+
+      (set_lfo inst PARAM_LFO3
+               (unswap32f (aref data 79))
+               (unswap32f (aref data 80)))
+
+      (set_lfo inst PARAM_LFO4
+               (unswap32f (aref data 81))
+               (unswap32f (aref data 82)))
+      
+      ;; set LFO type
+      (set_lfo_type inst PARAM_LFO1 (unswap32i (aref data 83)))
+      (set_lfo_type inst PARAM_LFO2 (unswap32i (aref data 84)))
+      (set_lfo_type inst PARAM_LFO3 (unswap32i (aref data 85)))
+      (set_lfo_type inst PARAM_LFO4 (unswap32i (aref data 86)))
+      ;;
+      ;; mod matrix
+      ;;
+      ;; reset mod matrix - turn everything off
+      (dotimes (i 4)   ;; 4 modulation sources
+        (doloop (j 32) ;; 32 modulation targets
+          (set_mod_matrix inst i j (unswap32f (aref data (+ 87 (* i 32) j))))))
+      
+      ;; mod_env 
+      (set_mod_env inst
+              (unswap32f (aref data 220))
+              (unswap32f (aref data 221))
+              (unswap32f (aref data 222))
+              (unswap32f (aref data 223)))
+      
+      ;; filter saturation
+      (set_filter_drive inst (unswap32f (aref data 224)))
+
+      ;; doneat
+      (println "Analogue Synthesizer Load preset!")
+      void)))
+
+
+(bind-func analogue_save_state
+  (let ((i 0) (j 0)
+        (data:|512,i32|* (halloc))
+        (idx:i64 0))
+    (lambda (inst:i8*)
+      ;;
+      ;; oscillators
+      ;;
+      ;; amplitude of osc
+      (aset! data 0 (swap32f (get_osc1_amp inst)))
+       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (aset! data 1 (swap32i (get_osc1_wave inst)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (aset! data 2 (swap32f (get_osc1_tune inst)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (aset! data 3 (swap32f (get_osc1_pw inst)))
+      ;; stereo pan (default is 0.5)
+      (aset! data 4 (swap32f (get_osc1_pan inst)))
+      
+      ;; amplitude of osc 2
+      (aset! data 5 (swap32f (get_osc2_amp inst)))
+      ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (aset! data 6 (swap32i (get_osc2_wave inst)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (aset! data 7 (swap32f (get_osc2_tune inst)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (aset! data 8 (swap32f (get_osc2_pw inst)))
+      ;; stereo pan (default is 0.5)
+      (aset! data 9 (swap32f (get_osc2_pan inst)))
+      
+      ;; amplitude of osc 3
+      (aset! data 10 (swap32f (get_osc3_amp inst)))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (aset! data 11 (swap32i (get_osc3_wave inst)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (aset! data 12 (swap32f (get_osc3_tune inst)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (aset! data 13 (swap32f (get_osc3_pw inst)))
+      ;; stereo pan (default is 0.5)
+      (aset! data 14 (swap32f (get_osc3_pan inst)))
+      
+      ;; amplitude of osc 4
+      (aset! data 15 (swap32f (get_osc4_amp inst)))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (aset! data 16 (swap32i (get_osc4_wave inst)))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (aset! data 17 (swap32f (get_osc4_tune inst)))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (aset! data 18 (swap32f (get_osc4_pw inst)))
+      ;; stereo pan (default is 0.5)
+      (aset! data 19 (swap32f (get_osc4_pan inst)))
+      
+      ;; sub oscilltor amp (two tunes under sine wave)
+      (aset! data 20 (swap32f (get_sub_amp inst)))
+      ;; noise (PARAM_WHITE or PARAM_PINK)
+      (aset! data 21 (swap32i (get_noise_type inst)))
+      
+      ;; noise amplitude
+      (aset! data 22 (swap32f (get_noise_amp inst)))
+      ;;
+      ;; filters
+      ;;
+      ;; lpf filter cutoff frq in hz
+      (aset! data 23 (swap32f (get_filter_frq inst)))
+      ;; lpf filter resonance (0.0-1.0)
+      (aset! data 24 (swap32f (get_filter_res inst)))
+      ;; hpf cutoff frequency
+      (aset! data 25 (swap32f (get_hpf_frq inst)))
+
+      ;;
+      ;; envelopes
+      ;;
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (let ((arr (get_amp_env inst))) ;; 10.0 10.0 0.6 50.0)
+        (aset! data 26 (swap32f (aref arr 0))) ;; attack
+        (aset! data 27 (swap32f (aref arr 1))) ;; decay
+        (aset! data 28 (swap32f (aref arr 2))) ;; sustain
+        (aset! data 29 (swap32f (aref arr 3)))) ;; release
+
+      ;; filter (LPF) adsr envelope (adr in ms) (sus [0.0-1.0])
+      (let ((arr (get_filter_env inst)))
+        (aset! data 30 (swap32f (aref arr 0))) ;; attack
+        (aset! data 31 (swap32f (aref arr 1))) ;; decay
+        (aset! data 32 (swap32f (aref arr 2))) ;; sustain
+        (aset! data 33 (swap32f (aref arr 3)))) ;; release
+                
+      ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
+      ;; this envelope is summed to the current filter_frq
+      (aset! data 34 (swap32f (get_filter_env_amt inst)))
+
+      ;; follow note frequency as a percentage of the note frequency
+      ;; i.e. (+ cutoff (* frequency value))
+      (aset! data 35 (swap32f (get_filter_env_follow_frq inst)))
+      ;; follow note amplitude as a frequency related to the note amplitude
+      ;; i.e. (+ cutoff (* amplitude value))
+      (aset! data 36 (swap32f (get_filter_env_follow_amp inst)))
+      ;; pitch envelope attack and decay only in ms
+      (let ((arr (get_pitch_env inst)))
+        (aset! data 37 (swap32f (aref arr 0))) ;; attack
+        (aset! data 38 (swap32f (aref arr 1)))) ;; decay
+      ;; the amount of pitch envelope to apply as a ratio of the note frequency
+      ;; i.e. a value of 1.0 will add 1 tune to current pitch
+      ;;      a value of 0.5 will subtract 1 tune
+      (aset! data 39 (swap32f (get_pitch_env_amt inst)))
+      ;;
+      ;; delay
+      ;;
+      ;; delay time in ms
+      (aset! data 40 (swap32f (get_delay_time_left inst)))
+      (aset! data 41 (swap32f (get_delay_time_right inst)))
+      ;; delay amt (gain) 0.0-1.0
+      (aset! data 42 (swap32f (get_delay_mix inst)))
+      ;; delay fb
+      (aset! data 43 (swap32f (get_delay_fb inst)))
+      ;; delay damping (cutoff frq)
+      (aset! data 44 (swap32f (get_delay_frq inst)))
+      ;; delay resonance
+      (aset! data 45 (swap32f (get_delay_res inst)))
+      ;;
+      ;; reverb 
+      ;;
+      ;; reverb_mix 0.0-1.0 0.0 is dry 1.0 is wet
+      (aset! data 46 (swap32f (get_reverb_mix inst)))
+      ;; reverb size (room size) 0.0-1.0 - 1.0 is large
+      (aset! data 47 (swap32f (get_reverb_size inst)))
+      ;; reverb predelay in ms (up to 2 seconds)
+      (aset! data 48 (swap32f (get_reverb_predelay inst)))
+      ;; reverb absorbtion 0.0-1.0
+      (aset! data 49 (swap32f (get_reverb_absorb inst)))
+      ;;
+      ;; flanger
+      ;;
+      (aset! data 50 (swap32f (get_flanger_mix inst)))
+      ;; the low mark (time in ms) for the flanger
+      (aset! data 51 (swap32f (get_flanger_low inst)))
+      ;; the high mark (time in ms) for the flanger
+      (aset! data 52 (swap32f (get_flanger_high inst)))
+      ;; the rate (in hz) of the flanger
+      (aset! data 53 (swap32f (get_flanger_rate inst)))
+      ;; any feedback -1.0 - 1.0
+      (aset! data 54 (swap32f (get_flanger_fb inst)))
+      ;;
+      ;; panning
+      ;;
+      ;; see pan_c in audio_dsp for detailed info
+      ;; about the values for pos and width
+      ;; for channels > 2
+      ;;
+      ;; pan pos 0.0-1.0 (assuming stereo)
+      (aset! data 55 (swap32f (get_pan_pos inst)))
+      ;; pan width 1.0
+      (aset! data 56 (swap32f (get_pan_width inst)))
+      ;;
+      ;; gain
+      ;;
+      (aset! data 57 (swap32f (get_gain inst)))
+      ;;
+      ;; portamento (in millis)
+      (aset! data 58 (swap32f (get_portamento inst)))
+      ;;
+      ;; set max polyphony
+      ;; (aset! data 59 (swap32f (get_polyphonic inst)))
+      ;;
+      ;; lfos
+      ;;
+      ;; attack, decay, attack slope, decay slope
+      ;; attack ins ms, decay in ms, attack & decay slopes -1.0 log
+      ;; and 1.0 exp (0.0 is linear)
+      (let ((arr:|4,float| (get_lfo_ad inst PARAM_LFO1)))
+        (aset! data 59 (swap32f (aref arr 0))) ;; attack
+        (aset! data 60 (swap32f (aref arr 1))) ;; decay
+        (aset! data 61 (swap32f (aref arr 2))) ;; attack slope
+        (aset! data 62 (swap32f (aref arr 3)))) ;; decay slope
+
+      (let ((arr:|4,float| (get_lfo_ad inst PARAM_LFO2)))
+        (aset! data 63 (swap32f (aref arr 0))) ;; attack
+        (aset! data 64 (swap32f (aref arr 1))) ;; decay
+        (aset! data 65 (swap32f (aref arr 2))) ;; attack slope
+        (aset! data 66 (swap32f (aref arr 3)))) ;; decay slope        
+
+      (let ((arr:|4,float| (get_lfo_ad inst PARAM_LFO3)))
+        (aset! data 67 (swap32f (aref arr 0))) ;; attack
+        (aset! data 68 (swap32f (aref arr 1))) ;; decay
+        (aset! data 69 (swap32f (aref arr 2))) ;; attack slope
+        (aset! data 70 (swap32f (aref arr 3)))) ;; decay slope        
+
+      (let ((arr:|4,float| (get_lfo_ad inst PARAM_LFO4)))
+        (aset! data 71 (swap32f (aref arr 0))) ;; attack
+        (aset! data 72 (swap32f (aref arr 1))) ;; decay
+        (aset! data 73 (swap32f (aref arr 2))) ;; attack slope
+        (aset! data 74 (swap32f (aref arr 3)))) ;; decay slope
+
+      ;; set amp frq
+      (let ((arr:|2,float| (get_lfo inst PARAM_LFO1)))
+        (aset! data 75 (swap32f (aref arr 0))) ;; attack
+        (aset! data 76 (swap32f (aref arr 1)))) ;; decay
+
+      (let ((arr:|2,float| (get_lfo inst PARAM_LFO2)))
+        (aset! data 77 (swap32f (aref arr 0))) ;; attack
+        (aset! data 78 (swap32f (aref arr 1)))) ;; decay
+
+      (let ((arr:|2,float| (get_lfo inst PARAM_LFO3)))
+        (aset! data 79 (swap32f (aref arr 0))) ;; attack
+        (aset! data 80 (swap32f (aref arr 1)))) ;; decay
+
+      (let ((arr:|2,float| (get_lfo inst PARAM_LFO4)))
+        (aset! data 81 (swap32f (aref arr 0))) ;; attack
+        (aset! data 82 (swap32f (aref arr 1)))) ;; decay
+      
+      ;; set LFO type
+      (aset! data 83 (swap32i (get_lfo_type inst PARAM_LFO1)))
+      (aset! data 84 (swap32i (get_lfo_type inst PARAM_LFO2)))
+      (aset! data 85 (swap32i (get_lfo_type inst PARAM_LFO3)))
+      (aset! data 86 (swap32i (get_lfo_type inst PARAM_LFO4)))
+      ;;
+      ;; mod matrix
+      ;;
+      ;; reset mod matrix - turn everything off
+      (dotimes (i 4)   ;; 4 modulation sources
+        (doloop (j 32) ;; 32 modulation targets
+          (aset! data (+ (* i 32) j 87) (swap32f (get_mod_matrix inst i j)))))  
+    
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (let ((arr (get_mod_env inst))) ;; 10.0 10.0 0.6 50.0)
+        (aset! data 220 (swap32f (aref arr 0))) ;; attack
+        (aset! data 221 (swap32f (aref arr 1))) ;; decay
+        (aset! data 222 (swap32f (aref arr 2))) ;; sustain
+        (aset! data 223 (swap32f (aref arr 3)))) ;; release
+  
+      ;; filter saturation
+      (aset! data 224 (swap32f (get_filter_drive inst)))    
+  
+      data)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func synth_write_file
+  (lambda (fname dat size)
+    (let ((fptr (fopen fname "wb")))
+        (fwrite dat size 1 fptr)
+        (fclose fptr))))
+
+(bind-func synth_load_file
+  (lambda (fname size)
+    (let ((fptr (fopen fname "rb"))
+          (dat:i8* (halloc size)))
+        (fread dat size 1 fptr)
+        (fclose fptr)
+        dat)))
+
+(bind-func save_synth
+  (lambda (synth:i8* fname)
+    (let ((dat (analogue_save_state (cast synth i8*))))
+     (synth_write_file fname (cast dat i8*) 2048)
+      void)))
+
+(bind-func load_synth
+  (lambda (synth:i8* fname)
+    (let ((dat (synth_load_file fname 2048)))
+      (analogue_load_state synth (cast dat |512,i32|*))
+      void)))
+
+;;
+;; SCHEME text variant
+;; 
+(define analogue-save-state
+  (let ((i 0) (j 0)
+        (dict '()))
+    (lambda (inst filename)
+      ;;
+      ;; oscillators
+      ;;
+      ;; amplitude of osc
+      (set! dict (cons (cons 'osc1_amp (get_osc1_amp inst)) dict))
+       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc1_wave (get_osc1_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc1_tune (get_osc1_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc1_pw (get_osc1_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc1_pan (get_osc1_pan inst)) dict))
+
+      ;; amplitude of osc 2
+      (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
+      ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc2_wave (get_osc2_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc2_tune (get_osc2_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc2_pw (get_osc2_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc2_pan (get_osc2_pan inst)) dict))
+      
+      ;; amplitude of osc 3
+      (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc3_wave (get_osc3_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc3_tune (get_osc3_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc3_pw (get_osc3_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc3_pan (get_osc3_pan inst)) dict))
+      
+      ;; amplitude of osc 4
+      (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      (set! dict (cons (cons 'osc4_wave (get_osc4_wave inst)) dict))
+      ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
+      (set! dict (cons (cons 'osc4_tune (get_osc4_tune inst)) dict))
+      ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+      (set! dict (cons (cons 'osc4_pw (get_osc4_pw inst)) dict))
+      ;; stereo pan (default is 0.5)
+      (set! dict (cons (cons 'osc4_pan (get_osc4_pan inst)) dict))
+      
+      ;; sub oscilltor amp (two tunes under sine wave)
+      (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
+      ;; noise (PARAM_WHITE or PARAM_PINK)
+      (set! dict (cons (cons 'noise_type (get_noise_type inst)) dict))
+      
+      ;; noise amplitude
+      (set! dict (cons (cons 'noise_amp (get_noise_amp inst)) dict))
+      ;;
+      ;; filters
+      ;;
+      ;; lpf filter cutoff frq in hz
+      (set! dict (cons (cons 'filter_frq (get_filter_frq inst)) dict))
+      ;; lpf filter resonance (0.0-1.0)
+      (set! dict (cons (cons 'filter_res (get_filter_res inst)) dict))
+      ;; hpf cutoff frequency
+      (set! dict (cons (cons 'hpf_frq (get_hpf_frq inst)) dict))
+    
+      ;;
+      ;; envelopes
+      ;;
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'amp_env_attack (get_amp_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'amp_env_decay (get_amp_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'amp_env_sustain (get_amp_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'amp_env_release (get_amp_env_release inst)) dict)) ;; release
+    
+      ;; filter (LPF) adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'filter_env_attack (get_filter_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'filter_env_decay (get_filter_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'filter_env_sustain (get_filter_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'filter_env_release (get_filter_env_release inst)) dict)) ;; release
+
+      ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
+      ;; this envelope is summed to the current filter_frq
+      (set! dict (cons (cons 'filter_env_amt (get_filter_env_amt inst)) dict))
+
+      ;; follow note frequency as a percentage of the note frequency
+      ;; i.e. (+ cutoff (* frequency value))
+      (set! dict (cons (cons 'filter_env_follow_frq (get_filter_env_follow_frq inst)) dict))
+      ;; follow note amplitude as a frequency related to the note amplitude
+      ;; i.e. (+ cutoff (* amplitude value))
+      (set! dict (cons (cons 'filter_env_follow_amp (get_filter_env_follow_amp inst)) dict))
+      ;; pitch envelope attack and decay only in ms
+      (set! dict (cons (cons 'pitch_env_attack (get_pitch_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'pitch_env_decay (get_pitch_env_decay inst)) dict)) ;; decay
+      ;; the amount of pitch envelope to apply as a ratio of the note frequency
+      ;; i.e. a value of 1.0 will add 1 tune to current pitch
+      ;;      a value of 0.5 will subtract 1 tune
+      (set! dict (cons (cons 'pitch_env_amt (get_pitch_env_amt inst)) dict))
+      ;;
+      ;; delay
+      ;;
+      ;; delay time in ms
+      (set! dict (cons (cons 'delay_time_left (get_delay_time_left inst)) dict))
+      (set! dict (cons (cons 'delay_time_right (get_delay_time_right inst)) dict))
+      ;; delay amt (gain) 0.0-1.0
+      (set! dict (cons (cons 'delay_mix (get_delay_mix inst)) dict))
+      ;; delay fb
+      (set! dict (cons (cons 'delay_fb (get_delay_fb inst)) dict))
+      ;; delay damping (cutoff frq)
+      (set! dict (cons (cons 'delay_frq (get_delay_frq inst)) dict))
+      ;; delay resonance
+      (set! dict (cons (cons 'delay_res (get_delay_res inst)) dict))
+      ;;
+      ;; reverb 
+      ;;
+      ;; reverb_mix 0.0-1.0 0.0 is dry 1.0 is wet
+      (set! dict (cons (cons 'reverb_mix (get_reverb_mix inst)) dict))
+      ;; reverb size (room size) 0.0-1.0 - 1.0 is large
+      (set! dict (cons (cons 'reverb_size (get_reverb_size inst)) dict))
+      ;; reverb predelay in ms (up to 2 seconds)
+      (set! dict (cons (cons 'reverb_predelay (get_reverb_predelay inst)) dict))
+      ;; reverb absorbtion 0.0-1.0
+      (set! dict (cons (cons 'reverb_absorb (get_reverb_absorb inst)) dict))
+      ;;
+      ;; flanger
+      ;;
+      (set! dict (cons (cons 'flanger_mix (get_flanger_mix inst)) dict))
+      ;; the low mark (time in ms) for the flanger
+      (set! dict (cons (cons 'flanger_low (get_flanger_low inst)) dict))
+      ;; the high mark (time in ms) for the flanger
+      (set! dict (cons (cons 'flanger_high (get_flanger_high inst)) dict))
+      ;; the rate (in hz) of the flanger
+      (set! dict (cons (cons 'flanger_rate (get_flanger_rate inst)) dict))
+      ;; any feedback -1.0 - 1.0
+      (set! dict (cons (cons 'flanger_fb (get_flanger_fb inst)) dict))
+      ;;
+      ;; panning
+      ;;
+      ;; see pan_c in audio_dsp for detailed info
+      ;; about the values for pos and width
+      ;; for channels > 2
+      ;;
+      ;; pan pos 0.0-1.0 (assuming stereo)
+      (set! dict (cons (cons 'pan_pos (get_pan_pos inst)) dict))
+      ;; pan width 1.0
+      (set! dict (cons (cons 'pan_width (get_pan_width inst)) dict))
+      ;;
+      ;; gain
+      ;;
+      (set! dict (cons (cons 'gain (get_gain inst)) dict))
+      ;;
+      ;; portamento (in millis)
+      (set! dict (cons (cons 'portamento (get_portamento inst)) dict))
+      ;;
+      ;; set max polyphony
+      ;; (set! dict 59 (cons (get_polyphonic inst)))
+      ;;
+      ;; lfos
+      ;;
+      ;; attack, decay, attack slope, decay slope
+      ;; attack ins ms, decay in ms, attack & decay slopes -1.0 log
+      ;; and 1.0 exp (0.0 is linear)
+      (set! dict (cons (cons 'lfo1_ad_attack (get_lfo_ad_attack inst 0)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo1_ad_decay (get_lfo_ad_decay inst 0)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo1_ad_attack_slope (get_lfo_ad_attack_slope inst 0)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo1_ad_decay_slope (get_lfo_ad_decay_slope inst 0)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo2_ad_attack (get_lfo_ad_attack inst 1)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo2_ad_decay (get_lfo_ad_decay inst 1)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo2_ad_attack_slope (get_lfo_ad_attack_slope inst 1)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo2_ad_decay_slope (get_lfo_ad_decay_slope inst 1)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo3_ad_attack (get_lfo_ad_attack inst 2)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo3_ad_decay (get_lfo_ad_decay inst 2)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo3_ad_attack_slope (get_lfo_ad_attack_slope inst 2)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo3_ad_decay_slope (get_lfo_ad_decay_slope inst 2)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo4_ad_attack (get_lfo_ad_attack inst 3)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo4_ad_decay (get_lfo_ad_decay inst 3)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo4_ad_attack_slope (get_lfo_ad_attack_slope inst 3)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo4_ad_decay_slope (get_lfo_ad_decay_slope inst 3)) dict)) ;; decay slope
+
+      ;; set amp frq
+      (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+
+      (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
+      
+      ;; set LFO type
+      (set! dict (cons (cons 'lfo1_type (get_lfo_type inst PARAM_LFO1)) dict))
+      (set! dict (cons (cons 'lfo2_type (get_lfo_type inst PARAM_LFO2)) dict))
+      (set! dict (cons (cons 'lfo3_type (get_lfo_type inst PARAM_LFO3)) dict))
+      (set! dict (cons (cons 'lfo4_type (get_lfo_type inst PARAM_LFO4)) dict))
+      ;;
+      ;; mod matrix
+      ;;
+      ;; reset mod matrix - turn everything off
+      (define modvec (make-vector (* 4 32) 0.0))
+      (dotimes (i 4)   ;; 4 modulation sources
+        (dotimes (j 32) ;; 32 modulation targets
+          (vector-set! modvec (+ (* i 32) j) (get_mod_matrix inst i j))))
+      (set! dict (cons (cons 'mod_matrix (vector->list modvec)) dict))
+    
+      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
+      (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
+      (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
+      (set! dict (cons (cons 'mod_env_release (get_mod_env_release inst)) dict)) ;; release
+  
+      ;; filter saturation
+      (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))  
+      
+      ;; (println dict) 
+      (define out (open-output-file filename))
+      (write (reverse dict) out)
+      (close-output-port out)  
+      (println 'done)  
+      #t)))
+
+(define analogue-load-state
+  (lambda (inst filename)
+    (let* ((filein (open-input-file filename))
+           (data (read filein)))
+        (for-each (lambda (x)
+               (define tag (symbol->string (car x)))
+               ;; we need a couple of special cases
+               (cond ((string=? tag "mod_matrix")
+                      (for-each (lambda (y i)
+                                  (println 'set_mod_matrix 'inst (real->integer (/ i 32.0)) (modulo i 32) y)
+                                  (set_mod_matrix inst (real->integer (/ i 32.0)) (modulo i 32) y))
+                                (cdr x)
+                                (range 0 (* 4 32))))
+                     ((string=? (substring tag 0 3) "lfo")
+                      (if (regex:match? tag "_ad_")
+                          (let* ((res (regex:matched tag "^lfo([0-9])_ad_(.*)$"))
+                                 (name (string->symbol (string-append "set_lfo_ad_" (caddr res))))
+                                 (num (string->number (cadr res)))
+                                 (expr `(,name inst ,num ,(cdr x))))
+                            (println 'calling expr)
+                            (eval expr))
+                          (let* ((res (regex:matched tag "^lfo([0-9])_(.*)$"))
+                                 (name (string->symbol (string-append "set_lfo_" (caddr res))))
+                                 (num (string->number (cadr res)))
+                                 (expr `(,name inst ,num ,(cdr x))))
+                            (println expr)
+                            (eval expr))))
+                     (else 
+                       (let* ((fname (string->symbol (string-append "set_" tag)))
+                             (expr `(,fname inst ,(cdr x))))
+                         (println 'calling expr)
+                         (eval expr)))))
+             data)
+        (close-input-port filein)
+        (println 'finished 'loading filename))))

@@ -1,0 +1,76 @@
+;; A simple FM synth
+;;
+;; instrument responds to params
+;;
+;; set_gain
+;; set_amp_env
+;; set_delay_fb
+;; set_delay_mix
+;; set_filter_res
+;;
+
+;; You can push I higher than 1.0
+;; But only when H is low
+;;
+(bind-func fmsynth_note
+  (lambda ()
+    (let ((amp_env:|4,float| (array 10.0:f 50.0 0.6 200.0)))
+      (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
+        (let (;; (gate:SAMPLE 1.0)
+              (starttime (note_starttime data))
+              (frequency (note_frequency data))
+              (amplitude (note_amplitude data))     
+              (duration (note_duration data))
+              (a (aref amp_env 0))
+              (d (aref amp_env 1))
+              (s (aref amp_env 2))
+              (r (aref amp_env 3))
+              (release (convert (* SRs (convert (/ (aref amp_env 3) 1000.0))) i64))
+              (o1 (osc_c 0.0))
+              (o2 (osc_c 0.0))
+              (env (adsr_c))
+              (eamp 0.0:f)
+              (I (if (> nargs 0) (pref dargs 0) 0.1)) ;; modulation index (generally 0.0-1.0)
+              (H (if (> nargs 1) (pref dargs 1) 10.0)) ;; harmonicity ratio (whole numbers 1.0 - 20.0)
+              (out:SAMPLE 0.0))
+          (lambda (time:i64 chan:i64) ; infreq:SAMPLE inamp:SAMPLE)
+            (if (= chan 0)
+                (begin
+                  (if (> (- time starttime) duration) (note_gate data 0.0))
+                  (set! eamp (env chan (note_gate data) a d s r))
+                  (if (> (- time starttime) (+ duration release)) (note_active data #f))
+                  (set! out (o1 (* (/ 5.0 (log frequency)) (* eamp amplitude))
+                                (+ frequency
+                                   (o2 (* (* H frequency) I)
+                                       (* H frequency)))))))
+            (* 1.0 out)))))))
+
+;; fx kernel
+;;
+(bind-func fmsynth_fx
+  (lambda ()
+    (let ((notekernel:NOTE_KERNEL null)
+          (o1 (osc_c 0.0))
+          (o2 (osc_c (* 0.5 SPI)))
+          (cl (chorus_c 0.0))
+          (cr (chorus_c 0.314))
+          (del1 (delay_c (convert (/ (convert SAMPLE_RATE double) 2.0))))
+          (del2 (delay_c (convert (/ (convert SAMPLE_RATE double) 3.0))))
+          (lpfl (lpf_c))
+          (lpfr (lpf_c))
+          (reso 0.4)
+          (cwet 0.5)
+          (cfb 0.5)
+          (gain 1.0)
+          (delay_mix 0.5)
+          (delay_fb 0.5))
+      (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+        (cond ((= chan 0)
+               (* gain (lpfl (del1 (cl in 1.0 cwet cfb) delay_mix delay_fb)
+                             (+ 8000.0 (o1 6000.0 0.3333))
+                             reso)))
+              ((= chan 1)
+               (* gain (lpfr (del2 (cr in 1.0 cwet cfb) delay_mix delay_fb)
+                             (+ 8000.0 (o2 6000.0 0.2))
+                             reso)))
+              (else 0.0))))))

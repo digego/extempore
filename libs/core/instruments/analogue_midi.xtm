@@ -1,0 +1,598 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; modulation sources
+
+;; (bind-val PARAM_LFO1 enum 0)
+;; (bind-val PARAM_LFO2 enum 1)
+;; (bind-val PARAM_LFO3 enum 2)
+;; (bind-val PARAM_LFO4 enum 3)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; modulation destinations (note)
+
+;; (bind-val PARAM_OSC1_AMP enum 0)
+;; (bind-val PARAM_OSC1_FRQ enum 1)
+;; (bind-val PARAM_OSC1_PW enum 2)
+;; (bind-val PARAM_OSC1_PAN enum 3)
+;; (bind-val PARAM_OSC2_AMP enum 4)
+;; (bind-val PARAM_OSC2_FRQ enum 5)
+;; (bind-val PARAM_OSC2_PW enum 6)
+;; (bind-val PARAM_OSC2_PAN enum 7)
+;; (bind-val PARAM_OSC3_AMP enum 8)
+;; (bind-val PARAM_OSC3_FRQ enum 9)
+;; (bind-val PARAM_OSC3_PW enum 10)
+;; (bind-val PARAM_OSC3_PAN enum 11)
+;; (bind-val PARAM_OSC4_AMP enum 12)
+;; (bind-val PARAM_OSC4_FRQ enum 13)
+;; (bind-val PARAM_OSC4_PW enum 14)
+;; (bind-val PARAM_OSC4_PAN enum 15)
+;; (bind-val PARAM_NOISE_AMP enum 16)
+;; (bind-val PARAM_FILTER_FRQ enum 17)
+;; (bind-val PARAM_FILTER_RES enum 18)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; modulation destinations (fx)
+
+;; (bind-val PARAM_PAN_WIDTH enum 19)
+;; (bind-val PARAM_PAN_POS enum 20) 
+;; (bind-val PARAM_DELAY_TIME_LEFT enum 21)
+;; (bind-val PARAM_DELAY_TIME_RIGHT enum 22)
+;; (bind-val PARAM_DELAY_FB enum 23) ;; feedback
+;; (bind-val PARAM_REVERB_SIZE enum 24)
+;; (bind-val PARAM_REVERB_PREDELAY enum 25)
+;; (bind-val PARAM_REVERB_ABSORB enum 26)
+;; (bind-val PARAM_REVERB_MIX enum 27)
+;; (bind-val PARAM_FLANGER_LOW enum 28)
+;; (bind-val PARAM_FLANGER_HIGH enum 29)
+;; (bind-val PARAM_FLANGER_RATE enum 30)
+;; (bind-val PARAM_FLANGER_FB enum 31)
+
+
+;; cc_offsets------------------
+;; osc1: 0
+;; osc2: 8
+;; osc3: 16
+;; osc4: 24
+;; subnoise: 32
+;; filter: 36
+;; amp_pitch_env 40
+;; filter_env: 48
+;; delay: 56
+;; reverb: 60
+;; matrix: 64
+;; main: 68
+;; lfo1: 72
+;; lfo2: 80
+;; lfo3: 88
+;; lfo4: 96
+
+
+;; extras: 104 - things that came later :(
+
+;; filter saturation 104.
+
+
+
+(bind-func get_waveform
+  (lambda (value:i32)
+    (cond ((= value 0) PARAM_SINE)
+          ((= value 1) PARAM_SAW)
+          ((= value 2) PARAM_PULSE)
+          ((= value 3) PARAM_TRI)
+          ((= value 4) PARAM_AD)
+          (else PARAM_SINE)))) ;; default to SINE
+
+(bind-func get_noisetype
+  (lambda (value:i32)
+    (cond ((= value 0) PARAM_WHITE)
+          ((= value 1) PARAM_PINK)
+          (else PARAM_WHITE))))
+
+(bind-func get_filtertype
+  (lambda (value:i32)
+    (cond ((= value 0) 1:i32) ;; 12db
+          ((= value 1) 2:i32) ;; 24db
+          (else 2:i32)))) ;; 24 db
+
+(bind-func frq_from_val
+  (lambda (val:float)
+    (clamp (dtof (pow 32.0 (+ (* (ftod val) 2.0) 1.0))) 0.0 22000.0)))
+
+(bind-func octave_from_val
+  (lambda (val:float)
+    (dtof (pow 2.0 (- (* (ftod val) 4.0) 1.0)))))
+
+
+(bind-func osc1_cc
+  (let ((val 0.0:f)
+        (osc-octave 0)
+        (osc-tune 1.0)
+        (osc-octave-value 1.0))    
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'osc1_cc cc value)       
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
+             (set_osc1_amp inst val))
+            ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+             (set_osc1_wave inst (get_waveform value)))
+            ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+             (set_osc1_pw inst val))              
+            ((= cc (+ offset 3)) ;; frequency shift of osc - tuning - 2.0 up
+             ;; tune 0.5 down tune etc..
+             (set! osc-tune (+ 1.0 (+ -0.15 (* val 0.3))))
+             (set_osc1_tune inst (* osc-octave-value osc-tune)))
+            ((= cc (+ offset 4))
+             (set! osc-octave (- (clamp value 61 70) 64))
+             (set! osc-octave-value (octave_from_val val))
+             (set_osc1_tune inst (* osc-octave-value osc-tune))
+             void)              
+            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
+             (set_osc1_pan inst val))))))
+
+(bind-func osc2_cc
+  (let ((val 0.0:f)
+        (osc-octave 0)
+        (osc-tune 1.0)
+        (osc-octave-value 1.0))    
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'osc2_cc cc value)      
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
+             (set_osc2_amp inst val))
+            ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+             (set_osc2_wave inst (get_waveform value)))
+            ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+             (set_osc2_pw inst val))              
+            ((= cc (+ offset 3)) ;; frequency shift of osc - tuning - 2.0 up
+             ;; tune 0.5 down tune etc..
+             (set! osc-tune (+ 1.0 (+ -0.2 (* val 0.4))))
+             (set_osc2_tune inst (* osc-octave-value osc-tune)))
+            ((= cc (+ offset 4))
+             (set! osc-octave (- (clamp value 61 70) 64))
+             (set! osc-octave-value (octave_from_val val))
+             (set_osc2_tune inst (* osc-octave-value osc-tune))
+             ;; (println 'v osc2-octave 'v2 osc2-octave-value)
+             void)              
+            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
+             (set_osc2_pan inst val))))))
+
+(bind-func osc3_cc
+  (let ((val 0.0:f)
+        (osc-octave 0)
+        (osc-tune 1.0)
+        (osc-octave-value 1.0))    
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'osc3_cc cc value)      
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
+             (set_osc3_amp inst val))
+            ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+             (set_osc3_wave inst (get_waveform value)))
+            ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+             (set_osc3_pw inst val))              
+            ((= cc (+ offset 3)) ;; frequency shift of osc - tuning - 2.0 up
+             ;; tune 0.5 down tune etc..
+             (set! osc-tune (+ 1.0 (+ -0.2 (* val 0.4))))
+             (set_osc3_tune inst (* osc-octave-value osc-tune)))
+            ((= cc (+ offset 4))
+             (set! osc-octave (- (clamp value 61 70) 64))
+             (set! osc-octave-value (octave_from_val val))
+             (set_osc3_tune inst (* osc-octave-value osc-tune))
+             ;; (println 'v osc3-octave 'v2 osc3-octave-value)
+             void)              
+            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
+             (set_osc3_pan inst val))))))
+
+(bind-func osc4_cc
+  (let ((val 0.0:f)
+        (osc-octave 0)
+        (osc-tune 1.0)
+        (osc-octave-value 1.0))    
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'osc4_cc cc value)                        
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
+             (set_osc4_amp inst val))
+            ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+             (set_osc4_wave inst (get_waveform value)))
+            ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
+             (set_osc4_pw inst val))              
+            ((= cc (+ offset 3)) ;; frequency shift of osc - tuning - 2.0 up
+             ;; tune 0.5 down tune etc..
+             (set! osc-tune (+ 1.0 (+ -0.2 (* val 0.4))))
+             (set_osc4_tune inst (* osc-octave-value osc-tune)))
+            ((= cc (+ offset 4))
+             (set! osc-octave (- (clamp value 61 70) 64))
+             (set! osc-octave-value (octave_from_val val))
+             (set_osc4_tune inst (* osc-octave-value osc-tune))
+             ;; (println 'v osc4-octave 'v2 osc4-octave-value)
+             void)              
+            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
+             (set_osc4_pan inst val))))))
+ 
+(bind-func sub_noise_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'sub_noise_cc cc value)                        
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amplitude of sub osc
+             (set_sub_amp inst (* 2.0 val)))
+            ((= cc (+ offset 1)) ;; noise amp
+             (set_noise_amp inst (* 2.0 val)))
+            ((= cc (+ offset 2)) ;; noise type
+             (set_noise_type inst (get_noisetype value)))
+            ((= cc (+ offset 3)) ;; filter type
+             (set_filter_type inst (get_filtertype value)))))))
+
+(bind-func filter_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;;(println 'filter_cc cc value)                  
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; lpf frq
+             (set_filter_frq inst (frq_from_val val)))
+            ((= cc (+ offset 1)) ;; lpf res
+             (set_filter_res inst val))
+            ((= cc (+ offset 2)) ;; hpf frq
+             (set_hpf_frq inst (frq_from_val val)))
+            ((= cc (+ offset 3)) ;; filter drive/saturation
+             (set_filter_drive inst (+ 1.0 (* 3.0 val))))))))
+
+(bind-func amp_pitch_env_cc
+  (let ((val 0.0:f)
+        (envlgth 10.0:f)
+        (ampenv (vector_ref 0.0:f 0.0:f 1.0:f 0.0:f))
+        (penv (vector_ref 0.0:f 0.0:f)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'amp_pitch_env_cc cc value)                  
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; amp env attack
+             (vset! ampenv 0 (* val 127.0))
+             (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))
+            ((= cc (+ offset 1)) ;; amp env decay
+             (vset! ampenv 1 (* val 127.0))
+             (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))             
+            ((= cc (+ offset 2)) ;; amp env sustain
+             (vset! ampenv 2 val)
+             (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))                          
+            ((= cc (+ offset 3)) ;; amp env release
+             (vset! ampenv 3 (* val 127.0 10.0))
+             (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))                          
+            ((= cc (+ offset 4))
+             (set! envlgth (* 127.0 val))
+             (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))                                       
+            ((= cc (+ offset 5)) ;; pitch env attack
+             (vset! penv 0 (* val 500.0))
+             (set_pitch_env inst (vref penv 0) (vref penv 1)))
+            ((= cc (+ offset 6)) ;; pitch env decay
+             (vset! penv 1 (* val 500.0))
+             (set_pitch_env inst (vref penv 0) (vref penv 1)))
+            ((= cc (+ offset 7)) ;; pitch env amt
+             (set_pitch_env_amt inst val))))))
+
+
+(bind-func filter_env_cc
+  (let ((val 0.0:f)
+        (envlgth 10.0:f)        
+        (fenv (vector_ref 0.0:f 0.0 1.0 0.0)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'filter_cc cc value)                  
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; filter env attack
+             (vset! fenv 0 (* val 127.0))
+             (set_filter_env inst (* envlgth (vref fenv 0)) (* envlgth (vref fenv 1)) (vref fenv 2) (* envlgth (vref fenv 3))))
+            ((= cc (+ offset 1)) ;; filter env decay
+             (vset! fenv 1 (* val 127.0))
+             (set_filter_env inst (* envlgth (vref fenv 0)) (* envlgth (vref fenv 1)) (vref fenv 2) (* envlgth (vref fenv 3))))
+            ((= cc (+ offset 2)) ;; filter env sustain
+             (vset! fenv 2 val)
+             (set_filter_env inst (* envlgth (vref fenv 0)) (* envlgth (vref fenv 1)) (vref fenv 2) (* envlgth (vref fenv 3))))
+            ((= cc (+ offset 3)) ;; filter env release
+             (vset! fenv 3 (* val 127.0 10.0))
+             (set_filter_env inst (* envlgth (vref fenv 0)) (* envlgth (vref fenv 1)) (vref fenv 2) (* envlgth (vref fenv 3))))
+            ((= cc (+ offset 4))
+             (set! envlgth (* 127.0 val))
+             (set_filter_env inst (* envlgth (vref fenv 0)) (* envlgth (vref fenv 1)) (vref fenv 2) (* envlgth (vref fenv 3))))
+            ((= cc (+ offset 5)) ;; filter env amt (frq)
+             (set_filter_env_amt inst (frq_from_val val)))
+            ((= cc (+ offset 6)) ;; follow note frq (%) i.e. (+ cutoff (* frequency value))
+             (set_filter_env_follow_frq inst val))
+            ((= cc (+ offset 7)) ;; follow amp i.e. (+ cutoff (* amplitude value))
+             (set_filter_env_follow_amp inst val))))))
+
+
+
+(bind-func delay_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'delay_cc cc value)                  
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; delay time left ms
+             (set_delay_time_left inst (* val 2000.0)))
+            ((= cc (+ offset 1)) ;; delay time right ms
+             (set_delay_time_right inst (* val 2000.0)))
+            ((= cc (+ offset 2)) ;; delay mix
+             (set_delay_mix inst val))
+            ((= cc (+ offset 3)) ;; delay fb
+             (set_delay_fb inst val))))))
+            ;; ((= cc (+ offset 4)) ;; delay res
+            ;;  (set_delay_res inst val))
+            ;; ((= cc (+ offset 5)) ;; delay damping frq
+            ;;  (set_delay_frq inst (frq_from_val val)))))))
+
+
+
+(bind-func reverb_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'reverb_cc cc value)      
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; reverb mix
+             (set_reverb_mix inst val))
+            ((= cc (+ offset 1)) ;; room size
+             (set_reverb_size inst val))
+            ((= cc (+ offset 2)) ;; predelay (ms)
+             (set_reverb_predelay inst (* val 500.0)))
+            ((= cc (+ offset 3)) ;; absorbtion
+             (set_reverb_absorb inst val))))))
+             
+
+(bind-func flanger_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'flanger_cc cc value)            
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; flanger mix
+             (set_flanger_mix inst val))
+            ((= cc (+ offset 1)) ;; low mark in ms
+             (set_flanger_low inst (* 0.1 val)))
+            ((= cc (+ offset 2)) ;; high mark in ms
+             (set_flanger_high inst (* 50.0 val)))
+            ((= cc (+ offset 3)) ;; flanger rate
+             (set_flanger_rate inst val))
+            ((= cc (+ offset 4)) ;; flanger feedback
+             (set_flanger_fb inst val))))))
+
+
+(bind-func lfo1_cc
+  (let ((val 0.0:f)
+        (amp 1.0)
+        (frq 1.0)
+        (envlgth 2.0)
+        (lfoenv (vector_ref 10.0:f 10.0 0.0 0.0)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'lfo1_cc cc value)            
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; env attack
+             (vset! lfoenv 0 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO1 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 1)) ;; env decay
+             (vset! lfoenv 1 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO1 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 2)) ;; env attack slope
+             (vset! lfoenv 2 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO1 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 3)) ;; env decay slope
+             (vset! lfoenv 3 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO1 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 4)) ;; env length
+             (set! envlgth (* val 8.0))
+             (set_lfo inst PARAM_LFO1 amp (* envlgth frq))
+             (set_lfo_ad inst PARAM_LFO1 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 5)) ;; lfo amp
+             (set! amp val)
+             (set_lfo inst PARAM_LFO1 amp frq))
+            ((= cc (+ offset 6)) ;; lfo frq
+             (set! frq (clamp (* val 10.0) 0.05 20.0))
+             (set_lfo inst PARAM_LFO1 amp (* envlgth frq)))
+            ((= cc (+ offset 7)) ;; lfo type
+             (set_lfo_type inst PARAM_LFO1 (get_waveform value)))))))
+
+(bind-func lfo2_cc
+  (let ((val 0.0:f)
+        (amp 1.0)
+        (frq 1.0)
+        (envlgth 2.0)
+        (lfoenv (vector_ref 10.0:f 10.0 0.0 0.0)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'lfo2_cc cc value)            
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; env attack
+             (vset! lfoenv 0 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO2 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 1)) ;; env decay
+             (vset! lfoenv 1 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO2 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 2)) ;; env attack slope
+             (vset! lfoenv 2 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO2 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 3)) ;; env decay slope
+             (vset! lfoenv 3 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO2 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 4)) ;; env length
+             (set! envlgth (* val 8.0))
+             (set_lfo inst PARAM_LFO2 amp (* envlgth frq))
+             (set_lfo_ad inst PARAM_LFO2 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 5)) ;; lfo amp
+             (set! amp val)
+             (set_lfo inst PARAM_LFO2 amp frq))
+            ((= cc (+ offset 6)) ;; lfo frq
+             (set! frq (clamp (* val 10.0) 0.05 20.0))
+             (set_lfo inst PARAM_LFO2 amp (* envlgth frq)))
+            ((= cc (+ offset 7)) ;; lfo type
+             (set_lfo_type inst PARAM_LFO2 (get_waveform value)))))))
+
+(bind-func lfo3_cc
+  (let ((val 0.0:f)
+        (amp 1.0)
+        (frq 1.0)
+        (envlgth 2.0)
+        (lfoenv (vector_ref 10.0:f 10.0 0.0 0.0)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'lfo3_cc cc value)            
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; env attack
+             (vset! lfoenv 0 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO3 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 1)) ;; env decay
+             (vset! lfoenv 1 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO3 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 2)) ;; env attack slope
+             (vset! lfoenv 2 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO3 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 3)) ;; env decay slope
+             (vset! lfoenv 3 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO3 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 4)) ;; env length
+             (set! envlgth (* val 8.0))
+             (set_lfo inst PARAM_LFO3 amp (* envlgth frq))
+             (set_lfo_ad inst PARAM_LFO3 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 5)) ;; lfo amp
+             (set! amp val)
+             (set_lfo inst PARAM_LFO3 amp frq))
+            ((= cc (+ offset 6)) ;; lfo frq
+             (set! frq (clamp (* val 10.0) 0.05 20.0))
+             (set_lfo inst PARAM_LFO3 amp (* envlgth frq)))
+            ((= cc (+ offset 7)) ;; lfo type
+             (set_lfo_type inst PARAM_LFO3 (get_waveform value)))))))
+
+(bind-func lfo4_cc
+  (let ((val 0.0:f)
+        (amp 1.0)
+        (frq 1.0)
+        (envlgth 2.0)
+        (lfoenv (vector_ref 10.0:f 10.0 0.0 0.0)))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'lfo4_cc cc value)            
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; env attack
+             (vset! lfoenv 0 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO4 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 1)) ;; env decay
+             (vset! lfoenv 1 (* val 1000.0))
+             (set_lfo_ad inst PARAM_LFO4 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 2)) ;; env attack slope
+             (vset! lfoenv 2 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO4 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 3)) ;; env decay slope
+             (vset! lfoenv 3 (- (* val 2.0) 1.0))
+             (set_lfo_ad inst PARAM_LFO4 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 4)) ;; env length
+             (set! envlgth (* val 8.0))
+             (set_lfo inst PARAM_LFO4 amp (* envlgth frq))
+             (set_lfo_ad inst PARAM_LFO4 (* envlgth (vref lfoenv 0)) (* envlgth (vref lfoenv 1)) (vref lfoenv 2) (vref lfoenv 3)))
+            ((= cc (+ offset 5)) ;; lfo amp
+             (set! amp val)
+             (set_lfo inst PARAM_LFO4 amp frq))
+            ((= cc (+ offset 6)) ;; lfo frq
+             (set! frq (clamp (* val 10.0) 0.05 20.0))
+             (set_lfo inst PARAM_LFO4 amp (* envlgth frq)))
+            ((= cc (+ offset 7)) ;; lfo type
+             (set_lfo_type inst PARAM_LFO4 (get_waveform value)))))))
+
+
+
+(bind-func matrix_cc
+  (let ((val 0.0:f)
+        (source 0)  ;; of 4
+        (target 0)) ;; of 32
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'matrix_cc cc value)      
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; mod source
+             (set! source value)
+             void)
+            ((= cc (+ offset 1)) ;; mod target
+             (set! target value)
+             void)
+            ((= cc (+ offset 2)) ;; set amt of modulation
+             ;; (println 'setting source target val)
+             (set_mod_matrix inst (% source 4) (% target 32) val)
+             void)))))
+
+
+(bind-func main_cc
+  (let ((val 0.0:f))
+    (lambda (inst offset:i32 cc:i32 value:i32)
+      ;; (println 'main_cc cc value)
+      (set! val (/ (i32tof value) 127.0))
+      (cond ((= cc (+ offset 0)) ;; pan pos
+             (set_pan_pos inst val))
+            ;; ((= cc (+ offset 1)) ;; pan width
+            ;;  (set_pan_width inst val))
+            ((= cc (+ offset 1)) ;; gain
+             (set_gain inst (* val 4.0)))
+            ((= cc (+ offset 2)) ;; portamento (ms)
+             (set_portamento inst (* val 100.0)))
+            ((= cc (+ offset 3)) ;;
+             (if (= value 127)
+                 (analogue_reset inst))
+             void)))))
+
+(bind-func extras_cc
+  (let ((val 0.0:f))
+    (lambda (inst:i8* offset:i32 cc:i32 value:i32)
+      ;; (println 'extras_cc cc value)
+      (set! val (/ (i32tof value) 127.0))
+      ;; nothing yet!
+      void)))
+
+
+
+(bind-func analogue_cc
+  (let ((osc1 0) (osc1l 8:i32) ;; 6 params
+        (osc2 (+ osc1 osc1l)) (osc2l 8:i32) ;; 6 params
+        (osc3 (+ osc2 osc2l)) (osc3l 8:i32) ;; 6 params
+        (osc4 (+ osc3 osc3l)) (osc4l 8:i32) ;; 6 params
+        (subnoise (+ osc4 osc4l)) (subnoisel 4:i32) ;; 3 params        
+        (filter (+ subnoise subnoisel)) (filterl 4:i32) ;; 4 params        
+        (amp_pitch_env (+ filter filterl)) (amp_pitch_envl 8:i32) ;; 7 params
+        (filter_env (+ amp_pitch_env amp_pitch_envl)) (filter_envl 8:i32)    ;; 7 params
+        (delay (+ filter_env filter_envl)) (delayl 4:i32) ;; 4 params
+        (reverb (+ delay delayl)) (reverbl 4:i32) ;; 4 params
+        ;; (flanger (+ reverb reverbl)) (flangerl 5:i32) ;; 5 params
+        (matrix (+ reverb reverbl)) (matrixl 4:i32) ;; 3 params
+        (main (+ matrix matrixl)) (mainl 4:i32) ;; 4 params        
+        (lfo1 (+ main mainl)) (lfo1l 8:i32) ;; 7 params
+        (lfo2 (+ lfo1 lfo1l)) (lfo2l 8:i32) ;; 7 params
+        (lfo3 (+ lfo2 lfo2l)) (lfo3l 8:i32) ;; 7 params
+        (lfo4 (+ lfo3 lfo3l)) (lfo4l 8:i32) ;; 7 params
+        (extras (+ lfo4 lfo4l))) ;; everything else!
+    (println 'cc_offsets------------------)
+    (println 'osc1: osc1)
+    (println 'osc2: osc2)
+    (println 'osc3: osc3)
+    (println 'osc4: osc4)
+    (println 'subnoise: subnoise)
+    (println 'filter: filter)
+    (println 'amp_pitch_env amp_pitch_env)
+    (println 'filter_env: filter_env)
+    (println 'delay: delay)
+    (println 'reverb: reverb)
+    (println 'matrix: matrix)
+    (println 'main: main)    
+    (println 'lfo1: lfo1)
+    (println 'lfo2: lfo2)
+    (println 'lfo3: lfo3)
+    (println 'lfo4: lfo4)
+    (println 'extras: extras)
+    (lambda (inst cc:i32 value:i32)
+      (let ((val:float (/ (i32tof value) 127.0)))
+        (cond ((< cc osc2) (osc1_cc inst osc1 cc value))  ;; OSC 1
+              ((< cc osc3) (osc2_cc inst osc2 cc value))  ;; OSC 2
+              ((< cc osc4) (osc3_cc inst osc3 cc value))  ;; OSC 3
+              ((< cc subnoise) (osc4_cc inst osc4 cc value))  ;; OSC 4
+              ((< cc filter) (sub_noise_cc inst subnoise cc value)) ;; sub osc and noise
+              ((< cc amp_pitch_env) (filter_cc inst filter cc value)) ;; filter
+              ((< cc filter_env) (amp_pitch_env_cc inst amp_pitch_env cc value)) ;; amp_pitch_env
+              ((< cc delay) (filter_env_cc inst filter_env cc value)) ;; filter_env
+              ((< cc reverb) (delay_cc inst delay cc value)) ;; delay
+              ((< cc matrix) (reverb_cc inst reverb cc value)) ;; reverb              
+              ((< cc main) (matrix_cc inst matrix cc value)) ;; matrix
+              ((< cc lfo1) (main_cc inst main cc value)) ;; main master stuff
+              ((< cc lfo2) (lfo1_cc inst lfo1 cc value)) ;; lfo1
+              ((< cc lfo3) (lfo2_cc inst lfo2 cc value)) ;; lfo2
+              ((< cc lfo4) (lfo3_cc inst lfo3 cc value)) ;; lfo3
+              ((< cc extras) (lfo4_cc inst lfo4 cc value)) ;; lfo4
+              (else (extras_cc inst extras cc value))))))) ;; extras
+
+
