@@ -13,18 +13,13 @@
 ;; create a midi device
 (define *midi-out* (midi_out_create_default))
 
-;; print the available ports
-($
- (doloop (i (rtmidi_get_port_count MIDI_OUT))
-   (printf "%d: %s\n" i (rtmidi_get_port_name MIDI_OUT i))))
-
 ;; open a port
 (midi_open_port *midi-out* 0 "Extempore MIDI out")
 
 ;; trigger some notes (requires a listening MIDI host at the "other end")
 (define midi-test-loop
   (lambda (beat dur)
-    (mplay *midi-out* (cosr 80 10 5/3) 80 (* 0.99) 1)
-    (callback (*metro* (+ beat (* .5 dur))) 'midi-test-loop (+ beat dur) dur)))
+    (mplay *midi-out* (cosr 68 5 5/3) 80 2 1)
+    (callback (*metro* (+ beat (* .5 dur))) 'midi-test-loop (+ beat dur) 4)))
 
 (midi-test-loop (*metro* 'get-beat 4) 1/4)
