@@ -82,3 +82,27 @@
                              (real->integer ,(car (cdddr args)))
                              (*metro* 'dur ,(cadr (cdddr args)))
                              (real->integer , (cadr (cddddr args)))))))
+
+(impc:aot:do-or-emit
+ (define-macro (mcc . args)
+   (if (symbol? (car args))
+       `(send-midi-cc (*metro* beat) ,(car args)
+                      (real->integer ,(cadr args))
+                      (real->integer ,(caddr args))
+                      (real->integer ,(car (cdddr args))))
+       `(send-midi-cc (*metro* (+ beat ,(car args))) ,(cadr args)
+                      (real->integer ,(caddr args))
+                      (real->integer ,(car (cdddr args)))
+                      (real->integer ,(car (cddddr args)))))))
+
+(impc:aot:do-or-emit
+ (define-macro (mplayob o b . args)
+   `(if (= 0 (modulo (+ ,o beat) ,b))
+        (mplay ,@args)
+        #f)))
+
+(impc:aot:do-or-emit
+ (define-macro (mplayobs l b . args)
+   `(if (member (modulo beat ,b) ,l)
+        (mplay ,@args)
+        #f)))
