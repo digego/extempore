@@ -886,16 +886,18 @@ output device(s)
              (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
 
 ;; A midi-specific play macro
-
+(impc:aot:do-or-emit
+  (define *midioffset* 0))
+                                              
 (impc:aot:do-or-emit
  (define-macro (mplay . args)
    (if (symbol? (car args))
-       `(play-midi-note (*metro* beat) ,(car args)
+       `(play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
                         (real->integer ,(cadr args))
                         (real->integer ,(caddr args))
                         (*metro* 'dur ,(car (cdddr args)))
                         (real->integer , (car (cddddr args))))
-       `(play-midi-note (*metro* (+ beat ,(car args))) ,(cadr args)
+       `(play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
                         (real->integer ,(caddr args))
                         (real->integer ,(car (cdddr args)))
                         (*metro* 'dur ,(cadr (cdddr args)))
@@ -904,11 +906,11 @@ output device(s)
 (impc:aot:do-or-emit                                                                                            
   (define-macro (mcc . args)
     (if (symbol? (car args))
-        `(send-midi-cc (*metro* beat) ,(car args)
+        `(send-midi-cc (+ (*metro* beat) *midioffset*) ,(car args)
                         (real->integer ,(cadr args))
                         (real->integer ,(caddr args))
                         (real->integer ,(car (cdddr args))))
-        `(send-midi-cc (*metro* (+ beat ,(car args))) ,(cadr args)
+        `(send-midi-cc (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
                         (real->integer ,(caddr args))
                         (real->integer ,(car (cdddr args)))
                         (real->integer ,(car (cddddr args)))))))

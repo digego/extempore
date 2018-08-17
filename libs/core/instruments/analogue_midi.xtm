@@ -70,22 +70,31 @@
 
 ;; filter saturation 104.
 
-
-
 (bind-func get_waveform
   (lambda (value:i32)
     (cond ((= value 0) PARAM_SINE)
           ((= value 1) PARAM_SAW)
           ((= value 2) PARAM_PULSE)
           ((= value 3) PARAM_TRI)
-          ((= value 4) PARAM_AD)
           (else PARAM_SINE)))) ;; default to SINE
+
+(bind-func get_lfo_waveform
+  (lambda (value:i32)
+    (cond ((= value 0) PARAM_SINE)
+          ((= value 1) PARAM_SAW)
+          ((= value 2) PARAM_PULSE)
+          ((= value 3) PARAM_TRI)
+          ((= value 4) PARAM_AD)
+          ((= value 5) PARAM_CONST)
+          ((= value 6) PARAM_RANDOM)
+          (else PARAM_SINE)))) ;; default to SINE
+
 
 (bind-func get_noisetype
   (lambda (value:i32)
     (cond ((= value 0) PARAM_WHITE)
           ((= value 1) PARAM_PINK)
-          (else PARAM_WHITE))))
+          (else PARAM_PINK))))
 
 (bind-func get_filtertype
   (lambda (value:i32)
@@ -125,8 +134,8 @@
              (set! osc-octave-value (octave_from_val val))
              (set_osc1_tune inst (* osc-octave-value osc-tune))
              void)              
-            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
-             (set_osc1_pan inst val))))))
+            ((= cc (+ offset 5)) ;; phase (default is 0.0)
+             (set_osc1_phase inst val))))))
 
 (bind-func osc2_cc
   (let ((val 0.0:f)
@@ -152,8 +161,8 @@
              (set_osc2_tune inst (* osc-octave-value osc-tune))
              ;; (println 'v osc2-octave 'v2 osc2-octave-value)
              void)              
-            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
-             (set_osc2_pan inst val))))))
+            ((= cc (+ offset 5)) ;; phase (default is 0.0)
+             (set_osc2_phase inst val))))))
 
 (bind-func osc3_cc
   (let ((val 0.0:f)
@@ -179,8 +188,8 @@
              (set_osc3_tune inst (* osc-octave-value osc-tune))
              ;; (println 'v osc3-octave 'v2 osc3-octave-value)
              void)              
-            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
-             (set_osc3_pan inst val))))))
+            ((= cc (+ offset 5)) ;; stereo pan (default is 0.0)
+             (set_osc3_phase inst val))))))
 
 (bind-func osc4_cc
   (let ((val 0.0:f)
@@ -206,8 +215,8 @@
              (set_osc4_tune inst (* osc-octave-value osc-tune))
              ;; (println 'v osc4-octave 'v2 osc4-octave-value)
              void)              
-            ((= cc (+ offset 5)) ;; stereo pan (default is 0.5)
-             (set_osc4_pan inst val))))))
+            ((= cc (+ offset 5)) ;; phase (default is 0.0)
+             (set_osc4_phase inst val))))))
  
 (bind-func sub_noise_cc
   (let ((val 0.0:f))
@@ -261,13 +270,13 @@
              (set! envlgth (* 127.0 val))
              (set_amp_env inst (* envlgth (vref ampenv 0)) (* envlgth (vref ampenv 1)) (vref ampenv 2) (* envlgth (vref ampenv 3))))                                       
             ((= cc (+ offset 5)) ;; pitch env attack
-             (vset! penv 0 (* val 500.0))
+             (vset! penv 0 (* val 1000.0))
              (set_pitch_env inst (vref penv 0) (vref penv 1)))
             ((= cc (+ offset 6)) ;; pitch env decay
-             (vset! penv 1 (* val 500.0))
+             (vset! penv 1 (* val 1000.0))
              (set_pitch_env inst (vref penv 0) (vref penv 1)))
             ((= cc (+ offset 7)) ;; pitch env amt
-             (set_pitch_env_amt inst val))))))
+             (set_pitch_env_amt inst (- (* 2.0 val) 1.0)))))))
 
 
 (bind-func filter_env_cc
@@ -385,7 +394,7 @@
              (set! frq (clamp (* val 10.0) 0.05 20.0))
              (set_lfo inst PARAM_LFO1 amp (* envlgth frq)))
             ((= cc (+ offset 7)) ;; lfo type
-             (set_lfo_type inst PARAM_LFO1 (get_waveform value)))))))
+             (set_lfo_type inst PARAM_LFO1 (get_lfo_waveform value)))))))
 
 (bind-func lfo2_cc
   (let ((val 0.0:f)
@@ -419,7 +428,7 @@
              (set! frq (clamp (* val 10.0) 0.05 20.0))
              (set_lfo inst PARAM_LFO2 amp (* envlgth frq)))
             ((= cc (+ offset 7)) ;; lfo type
-             (set_lfo_type inst PARAM_LFO2 (get_waveform value)))))))
+             (set_lfo_type inst PARAM_LFO2 (get_lfo_waveform value)))))))
 
 (bind-func lfo3_cc
   (let ((val 0.0:f)
@@ -453,7 +462,7 @@
              (set! frq (clamp (* val 10.0) 0.05 20.0))
              (set_lfo inst PARAM_LFO3 amp (* envlgth frq)))
             ((= cc (+ offset 7)) ;; lfo type
-             (set_lfo_type inst PARAM_LFO3 (get_waveform value)))))))
+             (set_lfo_type inst PARAM_LFO3 (get_lfo_waveform value)))))))
 
 (bind-func lfo4_cc
   (let ((val 0.0:f)
@@ -487,7 +496,7 @@
              (set! frq (clamp (* val 10.0) 0.05 20.0))
              (set_lfo inst PARAM_LFO4 amp (* envlgth frq)))
             ((= cc (+ offset 7)) ;; lfo type
-             (set_lfo_type inst PARAM_LFO4 (get_waveform value)))))))
+             (set_lfo_type inst PARAM_LFO4 (get_lfo_waveform value)))))))
 
 
 
