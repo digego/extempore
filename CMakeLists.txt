@@ -302,18 +302,12 @@ if(NOT BUILD_LLVM)
   add_custom_target(LLVM)
 else()
   include(ExternalProject)
-  find_program(PATCH_PROGRAM patch)
-
-  if(NOT PATCH_PROGRAM)
-    message(WARNING "Cannot find \"patch.exe\", which is required to patch LLVM")
-  endif()
 
   if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
-      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
+	  URL http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz
+      URL_MD5 f6d26841a445461a12126c1953b1a74b
       CMAKE_ARGS
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
@@ -332,9 +326,8 @@ else()
   else()
     ExternalProject_Add(LLVM
       PREFIX llvm
-      URL http://www.llvm.org/releases/3.8.0/llvm-3.8.0.src.tar.xz
-      URL_MD5 07a7a74f3c6bd65de4702bf941b511a0
-      PATCH_COMMAND patch -p0 < ${CMAKE_SOURCE_DIR}/extras/extempore-llvm-3.8.0.patch
+	  URL http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz
+      URL_MD5 f6d26841a445461a12126c1953b1a74b
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
