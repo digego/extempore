@@ -1,0 +1,586 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; a simple drum synthesizer for extempore
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;
+;; finished helpfer functions onto notes and fx
+;;         
+
+;; KICK
+;; 2 * SINE
+
+
+;; pitch1 (0), phase1 (1), pw1 (2), pitch1 (3), phase1 (4), pw1 (5), amp_decay (6), pitch_decay (7), pitch_amt (8), noise (9)
+;; cof1 (10), res1 (11), ftype1 (12), cof2 (13), res2 (14), ftype2(15) amp(16)
+
+
+; (bind-func set_kick_adv
+;   (lambda (inst:i8* amp:float p1:float phase1:float p2:float phase2:float decay:float pdecay:float pamp:float)
+;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+;           (kick (cref note kick |17,SAMPLE|*)))
+;       (aset! kick 0 p1)
+;       (aset! kick 1 phase1)
+;       (aset! kick 3 p2)
+;       (aset! kick 4 phase2)
+;       (aset! kick 6 decay)
+;       (aset! kick 7 pdecay)
+;       (aset! kick 8 pamp)
+;       (aset! kick 16 amp)
+;       void)))
+
+; (bind-func set_kick
+;   (lambda (inst:i8* amp:float p1:float p2:float decay:float pdecay:float pamp:float)
+;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+;           (kick (cref note kick |17,SAMPLE|*)))
+;       (aset! kick 0 p1)
+;       (aset! kick 3 p2)
+;       (aset! kick 6 decay)
+;       (aset! kick 7 pdecay)
+;       (aset! kick 8 pamp)
+;       (aset! kick 16 amp)
+;       void)))
+
+; (bind-func set_snare_adv
+;   (lambda (inst:i8* amp:float p1:float phase1:float p2:float phase2:float decay:float pdecay:float pamp:float noise:float)
+;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+;           (snare (cref note snare |17,SAMPLE|*)))
+;       (aset! snare 0 p1)
+;       (aset! snare 1 phase1)
+;       (aset! snare 3 p2)
+;       (aset! snare 4 phase2)
+;       (aset! snare 6 decay)
+;       (aset! snare 7 pdecay)
+;       (aset! snare 8 pamp)
+;       (aset! snare 9 noise)
+;       (aset! snare 16 amp)
+;       void)))
+
+; (bind-func set_snare
+;   (lambda (inst:i8* amp:float pitch:float decay:float noise:float)
+;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+;           (snare (cref note snare |17,SAMPLE|*)))
+;       (aset! snare 3 pitch)
+;       (aset! snare 6 decay)
+;       (aset! snare 9 noise)
+;       (aset! snare 16 amp)
+;       void)))
+
+; (bind-func set_cym_adv
+;   (lambda (inst:i8* amp:float p1:float phase1:float pw1:float p2:float phase2:float pw2:float decay:float pdecay:float pamp:float noise:float f1type:i64 f1co:float f1res:float f2type:i64 f2co:float f2res:float)
+;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+;           (cym (cref note cym |16,SAMPLE|*)))
+;       (aset! cym 0 p1)
+;       (aset! cym 1 phase1)
+;       (aset! cym 2 pw1)
+;       (aset! cym 3 p2)
+;       (aset! cym 4 phase2)
+;       (aset! cym 5 pw2)
+;       (aset! cym 6 decay)
+;       (aset! cym 7 pdecay)
+;       (aset! cym 8 pamp)
+;       (aset! cym 9 noise)
+;       (aset! cym 10 f1co)
+;       (aset! cym 11 f1res)
+;       (aset! cym 12 (i64tof f1type))
+;       (aset! cym 13 f2co)
+;       (aset! cym 14 f2res)
+;       (aset! cym 15 (i64tof f2type))
+;       (aset! cym 16 amp)
+;       void)))
+
+(bind-func set_dlogue
+  (lambda (inst:i8* gain:float pan:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect gain gain float)
+      (cset! effect pan_pos pan float)
+      void)))
+
+;; 
+(bind-val DL_NOFILTER i64 -1)
+(bind-val DL_LPF i64 0)
+(bind-val DL_BPF i64 1)
+(bind-val DL_HPF i64 2)
+(bind-val DL_NOTCH i64 3)
+(bind-val DL_PEAK i64 4)
+(bind-val DL_AP i64 5)
+
+;; reverb flanger and delay same as analogue
+
+(bind-type DLOGUE_PART <float,float,float,float,float,float,float,float,float,float,float,float,i64,float,float,i64,float,float,float,float,float,float,float,float,float,float> (constructor . #f) (printer . #f))
+  
+;; oscs 1 & 2 -> setting pw to anything greater than 0.0 is PULSE osc1_wave otherwise SINE
+(bind-func dl_osc1_pitch (lambda (x:DLOGUE_PART*) (tref x 0)))
+(bind-func dl_osc1_pitch (lambda (x:DLOGUE_PART* v:float) (tset! x 0 v)))
+(bind-func dl_osc1_amp (lambda (x:DLOGUE_PART*) (tref x 1)))
+(bind-func dl_osc1_amp (lambda (x:DLOGUE_PART* v:float) (tset! x 1 v)))
+(bind-func dl_osc1_phase (lambda (x:DLOGUE_PART*) (tref x 2)))
+(bind-func dl_osc1_phase (lambda (x:DLOGUE_PART* v:float) (tset! x 2 v)))
+(bind-func dl_osc1_pw (lambda (x:DLOGUE_PART*) (tref x 3)))
+(bind-func dl_osc1_pw (lambda (x:DLOGUE_PART* v:float) (tset! x 3 v)))
+(bind-func dl_osc2_pitch (lambda (x:DLOGUE_PART*) (tref x 4)))
+(bind-func dl_osc2_pitch (lambda (x:DLOGUE_PART* v:float) (tset! x 4 v)))
+(bind-func dl_osc2_amp (lambda (x:DLOGUE_PART*) (tref x 5)))
+(bind-func dl_osc2_amp (lambda (x:DLOGUE_PART* v:float) (tset! x 5 v)))
+(bind-func dl_osc2_phase (lambda (x:DLOGUE_PART*) (tref x 6)))
+(bind-func dl_osc2_phase (lambda (x:DLOGUE_PART* v:float) (tset! x 6 v)))
+(bind-func dl_osc2_pw (lambda (x:DLOGUE_PART*) (tref x 7)))
+(bind-func dl_osc2_pw (lambda (x:DLOGUE_PART* v:float) (tset! x 7 v)))
+;; amp envelope decay
+(bind-func dl_amp_decay (lambda (x:DLOGUE_PART*) (tref x 8)))
+(bind-func dl_amp_decay (lambda (x:DLOGUE_PART* v:float) (tset! x 8 v)))
+(bind-func dl_amp_decay_dur (lambda (x:DLOGUE_PART*) (tref x 22)))
+(bind-func dl_amp_decay_dur (lambda (x:DLOGUE_PART* v:float) (tset! x 22 v)))
+;; pitch envelope decay & amt
+(bind-func dl_pitch_decay (lambda (x:DLOGUE_PART*) (tref x 9)))
+(bind-func dl_pitch_decay (lambda (x:DLOGUE_PART* v:float) (tset! x 9 v)))
+(bind-func dl_pitch_amt (lambda (x:DLOGUE_PART*) (tref x 10)))
+(bind-func dl_pitch_amt (lambda (x:DLOGUE_PART* v:float) (tset! x 10 v)))
+;; noise
+(bind-func dl_noise_amp (lambda (x:DLOGUE_PART*) (tref x 11)))
+(bind-func dl_noise_amp (lambda (x:DLOGUE_PART* v:float) (tset! x 11 v)))
+;; filters
+(bind-func dl_filter1_type (lambda (x:DLOGUE_PART*) (tref x 12)))
+(bind-func dl_filter1_type (lambda (x:DLOGUE_PART* v:i64) (tset! x 12 v)))
+(bind-func dl_filter1_frq (lambda (x:DLOGUE_PART*) (tref x 13)))
+(bind-func dl_filter1_frq (lambda (x:DLOGUE_PART* v:float) (tset! x 13 v)))
+(bind-func dl_filter1_frq_scale (lambda (x:DLOGUE_PART*) (tref x 23)))
+(bind-func dl_filter1_frq_scale (lambda (x:DLOGUE_PART* v:float) (tset! x 23 v)))
+(bind-func dl_filter1_res (lambda (x:DLOGUE_PART*) (tref x 14)))
+(bind-func dl_filter1_res (lambda (x:DLOGUE_PART* v:float) (tset! x 14 v)))
+(bind-func dl_filter2_type (lambda (x:DLOGUE_PART*) (tref x 15)))
+(bind-func dl_filter2_type (lambda (x:DLOGUE_PART* v:i64) (tset! x 15 v)))
+(bind-func dl_filter2_frq (lambda (x:DLOGUE_PART*) (tref x 16)))
+(bind-func dl_filter2_frq (lambda (x:DLOGUE_PART* v:float) (tset! x 16 v)))
+(bind-func dl_filter2_frq_scale (lambda (x:DLOGUE_PART*) (tref x 24)))
+(bind-func dl_filter2_frq_scale (lambda (x:DLOGUE_PART* v:float) (tset! x 24 v)))
+(bind-func dl_filter2_res (lambda (x:DLOGUE_PART*) (tref x 17)))
+(bind-func dl_filter2_res (lambda (x:DLOGUE_PART* v:float) (tset! x 17 v)))
+;; amplitude of part
+(bind-func dl_part_amp (lambda (x:DLOGUE_PART*) (tref x 18)))
+(bind-func dl_part_amp (lambda (x:DLOGUE_PART* v:float) (tset! x 18 v)))
+;; base frq offset
+(bind-func dl_base_frq (lambda (x:DLOGUE_PART*) (tref x 19)))
+(bind-func dl_base_frq (lambda (x:DLOGUE_PART* v:float) (tset! x 19 v)))
+(bind-func dl_base_frq_scale (lambda (x:DLOGUE_PART*) (tref x 20)))
+(bind-func dl_base_frq_scale (lambda (x:DLOGUE_PART* v:float) (tset! x 20 v)))
+;; fm stuff
+(bind-func dl_fm_h (lambda (x:DLOGUE_PART*) (tref x 20)))
+(bind-func dl_fm_h (lambda (x:DLOGUE_PART* v:float) (tset! x 20 v)))
+(bind-func dl_fm_idx (lambda (x:DLOGUE_PART*) (tref x 21)))
+(bind-func dl_fm_idx (lambda (x:DLOGUE_PART* v:float) (tset! x 21 v)))
+
+
+;; an open drum sound
+;; kicks, toms etc..
+(bind-func default_drum
+  (lambda (part:DLOGUE_PART* frq)
+    (dl_osc1_pitch part 1.0)
+    (dl_osc1_amp part 0.5)
+    (dl_osc1_phase part 0.0)
+    (dl_osc1_pw part 0.0)
+    (dl_osc2_pitch part 1.1182)
+    (dl_osc2_amp part 0.5)
+    (dl_osc2_phase part 0.0)
+    (dl_osc2_pw part 0.0)
+    ;; amp envelope decay
+    (dl_amp_decay part 500.0)
+    (dl_amp_decay_dur part 0.0)
+    ;; pitch envelope decay & amt
+    (dl_pitch_decay part 1.0)
+    (dl_pitch_amt part 10.0)
+    ;; noise
+    (dl_noise_amp part 0.0)
+    ;; filters
+    (dl_filter1_type part DL_NOFILTER)
+    (dl_filter1_frq part 0.0)
+    (dl_filter1_frq_scale part 0.0)
+    (dl_filter1_res part 0.0)
+    (dl_filter2_type part DL_NOFILTER)
+    (dl_filter2_frq part 0.0)
+    (dl_filter2_frq_scale part 0.0)
+    (dl_filter2_res part 0.0)
+    ;; amplitude of part
+    (dl_part_amp part 2.0)
+    ;; base frq offset
+    (dl_base_frq part frq) ;; in hz
+    (dl_base_frq_scale part 2.0) ;; over 2 octaves
+    ;; fm
+    (dl_fm_h part 0.0)
+    (dl_fm_idx part 0.0)
+    void))
+
+(bind-func default_snare
+  (lambda (part:DLOGUE_PART* frq)
+    (dl_osc1_pitch part 1.94)
+    (dl_osc1_amp part 0.5)
+    (dl_osc1_phase part 0.0)
+    (dl_osc1_pw part 0.0)
+    (dl_osc2_pitch part 1.93)
+    (dl_osc2_amp part 0.5)
+    (dl_osc2_phase part 0.0)
+    (dl_osc2_pw part 0.0)
+    ;; amp envelope decay
+    (dl_amp_decay part 400.0)
+    (dl_amp_decay_dur part 0.0)
+    ;; pitch envelope decay & amt
+    (dl_pitch_decay part 10.0)
+    (dl_pitch_amt part 3.5)
+    ;; noise
+    (dl_noise_amp part 0.3)
+    ;; filters
+    (dl_filter1_type part DL_NOFILTER)
+    (dl_filter1_frq part 0.0)
+    (dl_filter1_frq_scale part 0.0)
+    (dl_filter1_res part 0.0)
+    (dl_filter2_type part DL_NOFILTER)
+    (dl_filter2_frq part 0.0)
+    (dl_filter2_frq_scale part 0.0)
+    (dl_filter2_res part 0.0)
+    ;; amplitude of part
+    (dl_part_amp part 2.0)
+    ;; base frq offset
+    (dl_base_frq part frq) ;; in hz
+    (dl_base_frq_scale part 2.0) ;; over 2 octaves
+    ;; fm
+    (dl_fm_h part 0.0)
+    (dl_fm_idx part 0.0)
+    void))
+
+(bind-func default_cym
+  (lambda (part:DLOGUE_PART* decay)
+    (dl_osc1_pitch part 1.19)
+    (dl_osc1_amp part 0.5)
+    (dl_osc1_phase part 0.35)
+    (dl_osc1_pw part 0.11)
+    (dl_osc2_pitch part 1.5)
+    (dl_osc2_amp part 0.5)
+    (dl_osc2_phase part 0.13)
+    (dl_osc2_pw part 0.0)
+    ;; amp envelope decay
+    (dl_amp_decay part decay)
+    (dl_amp_decay_dur part 0.0)
+    ;; pitch envelope decay & amt
+    (dl_pitch_decay part 10.0)
+    (dl_pitch_amt part 5.0)
+    ;; noise
+    (dl_noise_amp part 0.2)
+    ;; filters
+    (dl_filter1_type part DL_LPF)
+    (dl_filter1_frq part 7500.0)
+    (dl_filter1_frq_scale part 0.0)
+    (dl_filter1_res part 0.2)
+    (dl_filter2_type part DL_BPF)
+    (dl_filter2_frq part 7900.0)
+    (dl_filter2_frq_scale part 0.0)
+    (dl_filter2_res part 0.9)
+    ;; amplitude of part
+    (dl_part_amp part 2.0)
+    ;; base frq offset
+    (dl_base_frq part 200.0) ;; in hz
+    (dl_base_frq_scale part 2.0) ;; over 2 octaves
+    ;; fm    
+    (dl_fm_h part 0.0)
+    (dl_fm_idx part 0.0)
+    void))
+
+
+(bind-func dlogue_note
+  (lambda ()
+    (let ((MILLISEC (* .001 SRs))
+          (KIT_CONFIGS:|12,DLOGUE_PART|* (alloc)))
+      (default_drum (aref-ptr KIT_CONFIGS 0) 70.0) ;; kick
+      (default_drum (aref-ptr KIT_CONFIGS 1) 70.0) ;; kick
+      (default_snare (aref-ptr KIT_CONFIGS 2) 130.0) ;; snare
+      (default_cym (aref-ptr KIT_CONFIGS 3) 300.0) ;; closed      
+      (default_cym (aref-ptr KIT_CONFIGS 4) 800.0) ;; open     
+      (default_drum (aref-ptr KIT_CONFIGS 5) 120.0) ;; low tom     
+      (default_drum (aref-ptr KIT_CONFIGS 6) 170.0) ;; mid tom     
+      (default_drum (aref-ptr KIT_CONFIGS 7) 210.0) ;; high tom     
+      (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
+        (let ((starttime:i64 (note_starttime data))
+              (midifrq:SAMPLE (frq2midi (note_frequency data)))
+              (partnum:i64 (ftoi64 (/ midifrq 12.0)))
+              (config:DLOGUE_PART* (aref-ptr KIT_CONFIGS partnum))
+              (notetime:i64 starttime)
+              (frequency:SAMPLE (+ (dl_base_frq config) 
+                                   (* (dl_base_frq config) 
+                                      (dl_base_frq_scale config) (/ (% midifrq 12.0) 12.0))))
+              ;; (llllll (begin (println 'part: partnum 'frq: frequency 'amp: (dl_part_amp config)) 1:i64))
+              (amplitude:SAMPLE (note_amplitude data))
+              (gate:SAMPLE (note_gate data))
+              (target_amp:SAMPLE amplitude)
+              (newampinc:SAMPLE 0.0)
+              (duration:i64 (note_duration data))
+              (new_note_timer:i64 0)
+              (FM_H:SAMPLE (dl_fm_h config))
+              (FM_I:SAMPLE (dl_fm_idx config))
+              (FM:i1 (if (or (> FM_H 0.0) (> FM_I 0.0)) #t #f))
+              ;;;;;;;;;;;;;;
+              (amp_env:|4,SAMPLE| (array 0.0:f (+ (dl_amp_decay config) (* (dl_amp_decay_dur config) MILLISEC (i64tof duration))) 0.0 0.0))
+              ;; (filter_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
+              (pitch_env:|2,SAMPLE| (array 0.0:f (dl_pitch_decay config)))
+              (pitch_env_amt:SAMPLE (dl_pitch_amt config))
+              (oldfreq 440.0:f) ;; ??
+              (tune1:SAMPLE (dl_osc1_pitch config))
+              (tune2:SAMPLE (dl_osc2_pitch config))
+              (pw1:SAMPLE (dl_osc1_pw config))
+              (pw2:SAMPLE (dl_osc2_pw config))        
+              (osc1_wave:enum (if (> pw1 0.0) PARAM_PULSE PARAM_SINE))
+              (osc2_wave:enum (if (> pw2 0.0) PARAM_PULSE PARAM_SINE))
+              (noise:enum PARAM_WHITE) ;; white
+              (noise_amp:SAMPLE (dl_noise_amp config))
+              (osc1_amp:SAMPLE 0.5)
+              (osc2_amp:SAMPLE 0.5)
+              (osc_phase_slop 0.01)
+              (osc1_phase:SAMPLE (* osc_phase_slop .1 (random)))
+              (osc2_phase:SAMPLE (* osc_phase_slop .1 (random)))
+              (filter1_type:i64 (dl_filter1_type config)) ;; NOFILTER(-1), lpf(0), band(1), high(2), notch(3), peak(4) allpass(5)
+              (filter2_type:i64 (dl_filter2_type config)) ;; NOFILTER(-1), lpf(0), band(1), high(2), notch(3), peak(4) allpass(5)
+              ; (follow_frq 0.0)
+              ; (follow_amp 0.0)
+              (filter1_frq:SAMPLE (+ (dl_filter1_frq config)
+                                     (* (dl_filter1_frq config) 
+                                        (dl_filter1_frq_scale config) (/ (% midifrq 12.0) 12.0))))
+              (filter2_frq:SAMPLE (+ (dl_filter2_frq config)
+                                     (* (dl_filter2_frq config) 
+                                        (dl_filter2_frq_scale config) (/ (% midifrq 12.0) 12.0))))
+              (filter1_res:SAMPLE (dl_filter1_res config))
+              (filter2_res:SAMPLE (dl_filter2_res config))
+              ;;;;;;;;;;;;;
+              (frq 0.0)
+              (adsr1 (adsr_c))
+              ;; (adsr2 (adsr_c))
+              (adsr3 (adsr_c))
+              (adsr1_val 0.0)
+              ;; (adsr2_val 0.0)
+              (adsr3_val 0.0)
+              ;; (gate:SAMPLE 1.0)
+              (amp:SAMPLE 0.0)
+              (cof:SAMPLE 0.0)
+              (amp_attack (aref amp_env 0))
+              (amp_decay (aref amp_env 1))
+              (amp_sustain (aref amp_env 2))
+              (amp_release (+ 3.0 (aref amp_env 3))) ;; a 3ms release minimum 
+              (amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
+              (reltime:i64 0)
+              (pitch_attack (aref pitch_env 0))
+              (pitch_decay (aref pitch_env 1))
+              (f1 (svf_c))
+              (f2 (svf_c))
+              (f_out:|6,SAMPLE|* (alloc))
+              (_osc1_phase (+ osc1_phase (* osc_phase_slop .1 (random))))
+              (_osc2_phase (+ osc2_phase (* osc_phase_slop .1 (random))))
+              (sin1 (osc_c _osc1_phase))
+              (sin2 (osc_c _osc2_phase))
+              (pulse1 (blpulse_c _osc1_phase #f))
+              (pulse2 (blpulse_c _osc2_phase #f))
+              (osc1_out:SAMPLE 0.0)
+              (osc2_out:SAMPLE 0.0)
+              (zero:SAMPLE 0.0)
+              (white (white_c))
+              (pink (pink_c))
+              (noise_out 0.0)
+              (main_out 0.0:f))
+          (lambda (time:i64 chan:i64)
+            (if (= chan 0) 
+                (begin
+                  (set! notetime (tref data 7)) ;; look for voice steeling
+                  ;; this for voice steeling
+                  (if (and (<> starttime notetime) (>= time notetime))
+                    (begin
+                        (set! amplitude (note_amplitude data)) ;; reset envelopes
+                        (retrigger_adsr adsr1) 
+                        ;; (retrigger_adsr adsr2) 
+                        (retrigger_adsr adsr3) 
+                        (set! starttime (tref data 7)) ;(note_starttime data))
+                        (set! reltime 0)
+                        (set! gate 1.0) ;(note_gate data))
+                        (set! duration (note_duration data))))
+                  ;; voice steeling done
+                  (if (and (> gate 0.5) (> (- time starttime) duration)) (set! gate 0.0))
+                  (set! adsr1_val (adsr1 chan gate amp_attack amp_decay amp_sustain amp_release))
+                  ;; (set! adsr2_val (adsr2 chan gate filter_attack filter_decay filter_sustain filter_release))
+                  (set! adsr3_val (adsr3 chan gate pitch_attack pitch_decay 0.0 0.0))
+                  (set! amp (* amplitude (dl_part_amp config) adsr1_val))
+                  (set! frq (+ frequency (* pitch_env_amt frequency adsr3_val) 0.0))
+                  (if (< frq 10.0) (set! frq 10.0))
+                  ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
+                  (if (< gate 0.1) (set! reltime (+ reltime 1)))
+                  (if (> reltime amp_release_samples)
+                      (begin
+                        (note_active data #f)))
+                  (if (FM)
+                      (begin (set! osc2_out 0.0)
+                            (set! osc1_out 
+                                  (sin1 (* (/ 5.0 (log frq)) osc1_amp)
+                                      (+ frq
+                                        (sin2 (* (* FM_H frq) FM_I)
+                                            (* FM_H frq))))))
+                      (begin
+                        (if (> osc1_amp 0.001)
+                            (set! osc1_out (* osc1_amp
+                                              (cond ((= osc1_wave PARAM_SINE) (sin1 1.0 (* tune1 frq)))
+                                                    ((= osc1_wave PARAM_PULSE) (pulse1 1.0 (* tune1 frq) pw1))
+                                                    (else zero))))
+                            (set! osc1_out 0.0))
+                        (if (> osc2_amp 0.001)
+                            (set! osc2_out (* osc2_amp
+                                              (cond ((= osc2_wave PARAM_SINE) (sin2 1.0 (* tune2 frq)))
+                                                    ((= osc2_wave PARAM_PULSE) (pulse2 1.0 (* tune2 frq) pw1))
+                                                    (else zero))))
+                            (set! osc2_out 0.0))))
+                  (if (> noise_amp 0.001)
+                      (if (= noise PARAM_WHITE)
+                          (set! noise_out (* noise_amp (white)))
+                          (set! noise_out (* noise_amp (pink))))
+                      (set! noise_out 0.0))
+                  (set! main_out (+ osc1_out osc2_out noise_out))
+                  (if (> filter1_type DL_NOFILTER) 
+                      (begin 
+                        (f1 main_out filter1_frq filter1_res f_out)
+                        (set! main_out (aref f_out filter1_type))))  
+                  (if (> filter2_type DL_NOFILTER) 
+                      (begin 
+                        (f2 main_out filter2_frq filter2_res f_out)
+                        (set! main_out (aref f_out filter2_type))))
+                  (set! main_out (* amp main_out))))
+            main_out))))))
+
+;; FX
+(bind-func dlogue_fx
+  (let ((MILLISEC (* .001 SRf))
+        (CHANSF (i32tof CHANNELS)))
+    (lambda ()
+      (let ((notekernel:NOTE_KERNEL null)           
+            (mod_amp:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+            (mod_frq:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+            (mod_attack:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
+            (mod_decay:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0))
+            (mod_attack_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
+            (mod_decay_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0))
+            (mods:|32,SAMPLE|* (alloc))
+            (mod_matrix:|4,|32,SAMPLE||* (alloc))
+            (tmpmod:|32,SAMPLE|* null)
+            (lfos:|4,|7,[SAMPLE,i64,i64]*||* (alloc))
+            (lfo_types:|4,i32|* (alloc))
+            (hpf (hpf_c))
+            (hpfR (hpf_c))
+            (hpf_frq 20001.0)
+            (dly (comb_lpf_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
+            (delay_time_left 50.0) ;; in ms
+            (delay_time_right 50.0) ;; in ms
+            (delay_in 1.0)
+            (delay_mix 0.0)
+            (delay_fb 0.5)
+            (delay_frq 12000.0)
+            (delay_res 0.0)
+            (rev (reverb_st_c))
+            (reverb_mix 0.0)
+            (reverb_predelay 40.0) ;; in ms
+            (reverb_size 0.3)
+            (reverb_absorb 0.45)
+            (pan (pan_c (i32toi64 CHANNELS)))
+            (pan_pos 0.5)          
+            (pan_width 1.0)
+            (flanger (flanger_st_c))
+            (flanger_low 0.1) ;; in ms
+            (flanger_high 4.0) ;; in ms
+            (flanger_rate 0.127287)
+            (flanger_fb 0.25)
+            (flanger_mix 0.0)
+            (overdrive (overdrive_c))
+            (overdrive_amt 0.5) ;; always use some overdrive
+            (out:SAMPLE 0.0)
+            (i:i64 0) (j:i64 0)
+            (tmp 0.0)
+            (fxout 0.0)
+            (gain 2.0))
+        (dotimes (i 4)
+          (aset! lfo_types i PARAM_SINE)
+          (aset! lfos i
+                 (array (let ((osc (osc_c 0.0)))
+                          (lambda (chan:i64 idx:i64)
+                            (osc (aref mod_amp idx)
+                                 (aref mod_frq idx))))
+                        (let ((osc (saw_c 0.0)))
+                          (lambda (chan:i64 idx:i64)
+                            (osc (aref mod_amp idx)
+                                 (aref mod_frq idx))))
+                        (let ((osc (pulse_c 0.0)))
+                          (lambda (chan:i64 idx:i64)
+                            (osc (aref mod_amp idx)
+                                 (aref mod_frq idx)
+                                 0.5)))
+                        (let ((osc (tri_c 0.0)))
+                          (lambda (chan:i64 idx:i64)
+                            (osc (aref mod_amp idx)
+                                 (aref mod_frq idx))))
+                        (let ((osc (ad_c)))
+                          (cset! osc cycle #t i1)
+                          (lambda (chan:i64 idx:i64)
+                            (osc chan 1.0
+                                 (aref mod_attack idx)
+                                 (aref mod_decay idx)
+                                 (aref mod_attack_slope idx)
+                                 (aref mod_decay_slope idx))))
+                        (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant
+                        (let ((cnt 0)
+                              (rem:float (* (aref mod_amp i) (random)))) ;; random S & H 
+                          (lambda (chan:i64 idx:i64) 
+                            (if (and (= chan 0 ) 
+                                     (= (% cnt (ftoi64 (/ SRf (aref mod_frq idx)))) 0))
+                                (begin 
+                                  (set! cnt (+ cnt 1)) 
+                                  (set! rem (* (aref mod_amp idx) (random)))))
+                            rem)) ;; random S & H
+                        ))) ;; constant
+        (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+          ;; calc mod matrix changes
+          (begin
+            ;; (if (= mods null) (set! mods (notekernel.mods:|32,SAMPLE|*)))
+            (memset (cast mods i8*) 0 128) ;(size_of mods))
+            (dotimes (i 4)
+              (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
+              (set! tmpmod (aref-ptr mod_matrix i))
+              (dotimes (j 32) (aset! mods j (+ (aref mods j) (* tmp (aref tmpmod j)))))
+              void))
+          (set! out in)
+          (set! out (overdrive out overdrive_amt))
+          (if (< hpf_frq 20000.0)
+              (set! out (hpf out hpf_frq 0.0)))
+          ;; apply FX to both channels 1 and 2
+          (set! tmp (+ pan_pos (aref mods PARAM_PAN_POS)))
+          (if (> tmp CHANSF) (set! tmp (- tmp CHANSF)))
+          ;; always with the panning!
+          (set! fxout (pan chan out
+                           (+ pan_width (aref mods PARAM_PAN_WIDTH))
+                           tmp))
+          (if (> flanger_mix 0.001)
+              (set! fxout (flanger chan fxout
+                                   1.0 flanger_mix
+                                   (+ flanger_low 0.0) ;(aref mods PARAM_FLANGER_LOW)))
+                                   (+ flanger_high 0.0) ;(aref mods PARAM_FLANGER_HIGH)))
+                                   (+ flanger_rate 0.0) ;(aref mods PARAM_FLANGER_RATE))
+                                   (+ flanger_fb 0.0)))) ;;(aref mods PARAM_FLANGER_FB)))))
+          (if (> delay_mix 0.001)
+              (set! fxout (dly chan fxout
+                               (if (= chan 0)
+                                   (* MILLISEC (+ delay_time_left (aref mods PARAM_DELAY_TIME_LEFT)))
+                                   (* MILLISEC (+ delay_time_right (aref mods PARAM_DELAY_TIME_RIGHT))))
+                               delay_in
+                               delay_mix
+                               (+ delay_fb (aref mods PARAM_DELAY_FB))
+                               delay_frq
+                               delay_res)))
+          (if (> reverb_mix 0.001)
+              (set! fxout (rev chan fxout
+                               (+ reverb_size (aref mods PARAM_REVERB_SIZE))
+                               (+ reverb_predelay (aref mods PARAM_REVERB_PREDELAY))
+                               (+ reverb_absorb (aref mods PARAM_REVERB_ABSORB))
+                               (+ reverb_mix (aref mods PARAM_REVERB_MIX)))))
+          (* gain fxout))))))
+
+
