@@ -3,101 +3,7 @@
 ;; a simple drum synthesizer for extempore
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;;
-;; finished helpfer functions onto notes and fx
-;;         
-
-;; KICK
-;; 2 * SINE
-
-
-;; pitch1 (0), phase1 (1), pw1 (2), pitch1 (3), phase1 (4), pw1 (5), amp_decay (6), pitch_decay (7), pitch_amt (8), noise (9)
-;; cof1 (10), res1 (11), ftype1 (12), cof2 (13), res2 (14), ftype2(15) amp(16)
-
-
-; (bind-func set_kick_adv
-;   (lambda (inst:i8* amp:float p1:float phase1:float p2:float phase2:float decay:float pdecay:float pamp:float)
-;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
-;           (kick (cref note kick |17,SAMPLE|*)))
-;       (aset! kick 0 p1)
-;       (aset! kick 1 phase1)
-;       (aset! kick 3 p2)
-;       (aset! kick 4 phase2)
-;       (aset! kick 6 decay)
-;       (aset! kick 7 pdecay)
-;       (aset! kick 8 pamp)
-;       (aset! kick 16 amp)
-;       void)))
-
-; (bind-func set_kick
-;   (lambda (inst:i8* amp:float p1:float p2:float decay:float pdecay:float pamp:float)
-;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
-;           (kick (cref note kick |17,SAMPLE|*)))
-;       (aset! kick 0 p1)
-;       (aset! kick 3 p2)
-;       (aset! kick 6 decay)
-;       (aset! kick 7 pdecay)
-;       (aset! kick 8 pamp)
-;       (aset! kick 16 amp)
-;       void)))
-
-; (bind-func set_snare_adv
-;   (lambda (inst:i8* amp:float p1:float phase1:float p2:float phase2:float decay:float pdecay:float pamp:float noise:float)
-;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
-;           (snare (cref note snare |17,SAMPLE|*)))
-;       (aset! snare 0 p1)
-;       (aset! snare 1 phase1)
-;       (aset! snare 3 p2)
-;       (aset! snare 4 phase2)
-;       (aset! snare 6 decay)
-;       (aset! snare 7 pdecay)
-;       (aset! snare 8 pamp)
-;       (aset! snare 9 noise)
-;       (aset! snare 16 amp)
-;       void)))
-
-; (bind-func set_snare
-;   (lambda (inst:i8* amp:float pitch:float decay:float noise:float)
-;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
-;           (snare (cref note snare |17,SAMPLE|*)))
-;       (aset! snare 3 pitch)
-;       (aset! snare 6 decay)
-;       (aset! snare 9 noise)
-;       (aset! snare 16 amp)
-;       void)))
-
-; (bind-func set_cym_adv
-;   (lambda (inst:i8* amp:float p1:float phase1:float pw1:float p2:float phase2:float pw2:float decay:float pdecay:float pamp:float noise:float f1type:i64 f1co:float f1res:float f2type:i64 f2co:float f2res:float)
-;     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
-;           (cym (cref note cym |16,SAMPLE|*)))
-;       (aset! cym 0 p1)
-;       (aset! cym 1 phase1)
-;       (aset! cym 2 pw1)
-;       (aset! cym 3 p2)
-;       (aset! cym 4 phase2)
-;       (aset! cym 5 pw2)
-;       (aset! cym 6 decay)
-;       (aset! cym 7 pdecay)
-;       (aset! cym 8 pamp)
-;       (aset! cym 9 noise)
-;       (aset! cym 10 f1co)
-;       (aset! cym 11 f1res)
-;       (aset! cym 12 (i64tof f1type))
-;       (aset! cym 13 f2co)
-;       (aset! cym 14 f2res)
-;       (aset! cym 15 (i64tof f2type))
-;       (aset! cym 16 amp)
-;       void)))
-
-(bind-func set_dlogue
-  (lambda (inst:i8* gain:float pan:float)
-    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
-      (cset! effect gain gain float)
-      (cset! effect pan_pos pan float)
-      void)))
-
+       
 ;; 
 (bind-val DL_NOFILTER i64 -1)
 (bind-val DL_LPF i64 0)
@@ -583,4 +489,79 @@
                                (+ reverb_mix (aref mods PARAM_REVERB_MIX)))))
           (* gain fxout))))))
 
+
+(bind-func set_dl_osc
+  (lambda (inst:i8* part:i64 oscnum pitch amp phase pw)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config:DLOGUE_PART* (aref-ptr configs (clamp part 0 11))))
+      (if (= oscnum 2)
+          (begin
+            (dl_osc2_pitch config (clamp pitch 0.0 12000.0))
+            (dl_osc2_amp config (clamp amp 0.0 3.0))
+            (dl_osc2_phase config phase)
+            (dl_osc2_pw config (clamp pw 0.0 1.0)))
+          (begin
+            (dl_osc1_pitch config (clamp pitch 0.0 12000.0))
+            (dl_osc1_amp config (clamp amp 0.0 3.0))
+            (dl_osc1_phase config phase)
+            (dl_osc1_pw config (clamp pw 0.0 1.0))))
+      void)))
+
+(bind-func set_dl_filter
+  (lambda (inst:i8* part filter_num type frq res scale)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config (aref-ptr configs (clamp part 0 11))))
+      (if (= filter_num 2)
+          (begin
+            (dl_filter2_type config (clamp type -1 5))
+            (dl_filter2_frq config (clamp frq 0.0 18000.0))
+            (dl_filter2_frq_scale config scale)
+            (dl_filter2_res config (clamp res 0.0 1.0)))
+          (begin
+            (dl_filter1_type config (clamp type -1 5))
+            (dl_filter1_frq config (clamp frq 0.0 18000.0))
+            (dl_filter1_frq_scale config scale)
+            (dl_filter1_res config (clamp res 0.0 1.0))))
+      void)))
+
+(bind-func set_dl_envs
+  (lambda (inst:i8* part decay decay_dur pitch_decay pitch_decay_amt)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config (aref-ptr configs (clamp part 0 11))))
+      (dl_amp_decay config decay)
+      (dl_amp_decay_dur config decay_dur)
+      ;; pitch envelope decay & amt
+      (dl_pitch_decay config pitch_decay)
+      (dl_pitch_amt config pitch_decay_amt)
+      void)))
+
+(bind-func set_dl_core
+  (lambda (inst:i8* part amp noise frq frqscale)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config (aref-ptr configs (clamp part 0 11))))
+      (dl_part_amp config (clamp amp 0.0 4.0))
+      (dl_noise_amp config (clamp noise 0.0 2.0))
+      (dl_base_frq config (clamp frq 0.0 12000.0))
+      (dl_base_frq_scale config frqscale)
+      void)))
+
+(bind-func set_dl_fm
+  (lambda (inst:i8* part fm_h fm_idx)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config (aref-ptr configs (clamp part 0 11))))
+      (dl_fm_h config fm_h)
+      (dl_fm_idx config fm_idx)
+      void)))
+
+(bind-func set_dl_main
+  (lambda (inst:i8* gain:float pan:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect gain (clamp gain 0.0 5.0) float)
+      (cset! effect pan_pos pan float)
+      void)))
 
