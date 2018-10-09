@@ -1,8 +1,76 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; OK let's start a basic pattern to get
+;; some noise happening.
+(:> A 4 0 (play syn1 @1 80 dur) (zip (scale 3 8) (rot -2 (rev (scale 4 8)))))
+
+;; first step is to introduce
+;; second detuned oscillator
+;; see above for params of set_osc 
+(set_osc syn1 2 0.4 PARAM_SAW 1.003228 0.0 0.0)
+
+;; next let's play with the amp envelope
+;; let's add some wah
+;; attack,decay and release are in milliseconds
+;; sustain is 0.0-1.0
+(set_amp_env syn1 60.0 100.0 0.6 100.0)
+
+;; let's bring in the filter
+(set_filter syn1 3500.0 0.1 1.0 12 0.0 0.0 0.0)
+;; add some filter envelope
+;; you will not hear this until we add below
+(set_filter_env syn1 40.0 100.0 0.5 100.0)
+;; now 'add' the envelope to the filter cutoff
+(set_filter syn1 0.0 0.3 0.5 12 3500.0 0.1 0.0)
+
+;; add a sub octave (again with a little detune)
+(set_osc syn1 3 0.3 PARAM_SINE 0.497 0.0 0.0)
+
+;; add some 'chorus'
+;; fatten up and add some breadth
+(set_flanger syn1 0.2 5.0 8.0 0.129323 0.0)
+;; and a little stereo delay
+(set_delay syn1 0.2 (/ 500.0 6) (/ 500.0 4) 0.7 5000.0 0.0)
+
+;; and bring up the overall gain
+(set_main syn1 3.0 0.5 0.0 LEGATO_OFF)
+
+;; and now add a second pattern to 'sweep' the filter
+(:> B 4 0 (set_filter_env syn1 40.0 100.0 (trir 0.0 1.0 1/32) 100.0) (nof 16 0))
+
+;; finally get a little dirty?
+(set_filter syn1 0.0 0.3 3.0 12 3500.0 0.15 0.0)
+
+;; a little reverb to finish!
+(set_reverb syn1 0.3 0.5 75.0 0.1)
+
+;; save our strange little instrument for posterity!
+(analogue-save-state syn1 "weirdo.xtm")
+
+;; load into syn2!
+(analogue-load-state syn2 "weirdo.xtm")
+
+;; now we have two weirdo's!
+(:> C 16 0 (play syn2 (+ 24 @1) 80 dur) (zip (scale 3 8) (rot -2 (rev (scale 4 8)))))
+
+;; let's 'clean' syn2
+(set_filter syn2 2000.0 0.2 0.0 24 5000.0 0.15 0.0)
+
+;; we can now change syn2 without effecting syn1
+
+;; let's make syn2 monophonic!
+(set_polyphony syn2 1)
+;; and add a pitch glide! (80ms glide)
+(set_main syn2 4.0 0.5 80.0 LEGATO_ON)
+
+;; and finally let's crank the delay on syn2
+(set_delay syn2 0.7 (/ 2000.0 6) (/ 2000.0 4) 0.5 5000.0 0.0)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; MOST (not all) of the parameters available to the 'analogue' synth
 ;;;
-
-;; set everything to defaults!
 
 ;; MAIN:
 ;; portamento only in overlapping monophonic playback
@@ -42,52 +110,3 @@
 (set_noise_amp syn1 0.0)
 ;; inst PARAM_PINK | PARAM_WHITE
 (set_noise_type syn1 PARAM_PINK)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; OK let's start a basic pattern to get
-;; some noise happening.
-(:> A 4 0 (play syn1 @1 80 dur) (zip (scale 3 8) (rot -2 (rev (scale 4 8)))))
-
-;; first classic step is to introduce
-;; second detuned oscillator
-;; see above for params of set_osc 
-(set_osc syn1 2 0.4 PARAM_SAW 1.004928 0.0 0.0)
-
-;; next let's play with the amp envelope
-;; let's add some wah
-(set_amp_env syn1 60.0 100.0 0.8 100.0)
-
-;; let's bring in the filter
-(set_filter syn1 5000.0 0.2 1.0 12 0.0 0.0 0.0)
-;; add some filter envelope
-;; you will not hear this until we add below
-(set_filter_env syn1 40.0 100.0 0.5 100.0)
-;; now 'add' the envelope to the filter cutoff
-(set_filter syn1 0.0 0.3 0.5 12 3500.0 0.1 0.0)
-
-;; add a sub octave 
-(set_osc syn1 3 0.4 PARAM_SINE 0.499928 0.0 0.0)
-
-;; add some 'chorus'
-;; fatten up and add some breadth
-(set_flanger syn1 0.4 5.0 8.0 0.129323 0.0)
-;; and a little stereo delay
-(set_delay syn1 0.2 (/ 500.0 6) (/ 500.0 4) 0.6 5000.0 0.0)
-
-;; and bring up the overall gain
-(set_main syn1 3.0 0.5 100.0 LEGATO_ON)
-
-;; and now add a second pattern to 'sweep' the filter
-(:> B 4 0 (set_filter_env syn1 40.0 100.0 (trir 0.0 1.0 1/64) 100.0) (nof 16 0))
-
-;; finally get a little dirty?
-(set_filter syn1 0.0 0.45 3.0 12 3500.0 0.15 0.0)
-
-;; four on the floor!
-(:> C 4 -1 (play samp1 @1 110 dur) `(bd4 #(bd4 sn) bd4 #(bd4 sn)))
-(:> D 4 0 (play samp1 @1 (cosr 110 20 (random '(7/5 2))) dur) (jumble `(,@(nof 8 'ch) ,@(nof 4 'ch3) ,@(nof 4 'ch2))))
-
-;; a little reverb to finish!
-(main_reverb 1 0.1) ;; syn1
-(main_reverb 4 0.1) ;; samp1

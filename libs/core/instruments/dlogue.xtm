@@ -495,17 +495,17 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*))
           (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
           (config:DLOGUE_PART* (aref-ptr configs (clamp part 0 11))))
-      (if (= oscnum 2)
+      (if (= oscnum 1)
           (begin
-            (dl_osc2_pitch config (clamp pitch 0.0 12000.0))
-            (dl_osc2_amp config (clamp amp 0.0 3.0))
-            (dl_osc2_phase config phase)
-            (dl_osc2_pw config (clamp pw 0.0 1.0)))
-          (begin
-            (dl_osc1_pitch config (clamp pitch 0.0 12000.0))
+            (dl_osc1_pitch config (clamp pitch 0.0 8.0))
             (dl_osc1_amp config (clamp amp 0.0 3.0))
             (dl_osc1_phase config phase)
-            (dl_osc1_pw config (clamp pw 0.0 1.0))))
+            (dl_osc1_pw config (clamp pw 0.0 1.0)))
+          (begin
+            (dl_osc2_pitch config (clamp pitch 0.0 8.0))
+            (dl_osc2_amp config (clamp amp 0.0 3.0))
+            (dl_osc2_phase config phase)
+            (dl_osc2_pw config (clamp pw 0.0 1.0))))
       void)))
 
 (bind-func set_dl_filter
@@ -565,3 +565,16 @@
       (cset! effect pan_pos pan float)
       void)))
 
+;; most common settings in 1 place (minus filters)
+(bind-func set_dl_drum
+  (lambda (inst:i8* part decay frq tune noise pitchamt pitchdecay)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*))
+          (configs (cref note KIT_CONFIGS |12,DLOGUE_PART|*))
+          (config (aref-ptr configs (clamp part 0 11))))
+      (dl_amp_decay config decay)
+      (dl_base_frq config (clamp frq 0.0 12000.0))
+      (dl_noise_amp config (clamp noise 0.0 2.0))
+      (dl_osc2_pitch config (clamp tune 0.0 8.0))
+      (dl_pitch_amt config pitchamt)
+      (dl_pitch_decay config pitchdecay)
+      void)))
