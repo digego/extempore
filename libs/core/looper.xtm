@@ -5,57 +5,6 @@
 
 (define *RMAP_HELPER_CALLBACK_OFFSET* 2048) 
 
-; (define rmap_helper_lst_sym_transform
-;   (lambda (loopcnt lst)
-;     (define prev '())
-;     (define mult #f)
-;     (if (atom? lst) (set! lst (list lst)))
-;     (if (and (= (length lst) 1) (null? (car lst))) (set! lst `(_)))
-;     (apply append '()
-;       (map (lambda (elt next)
-;             ;; (println 'lc loopcnt 'elt elt)
-;             (cond (mult
-;                     (set! mult #f)
-;                     (let* ((num (eval elt))
-;                            (val prev))
-;                       (if (number? num)
-;                           (make-list (- num 1) val)
-;                           '())))
-;                   ((and (symbol? elt)
-;                         (regex:match? (symbol->string elt) "\\*"))
-;                     (let* ((str (symbol->string elt))
-;                            (split (regex:split str "\\*"))
-;                            (num (if (and (not (null? (cdr split)))
-;                                          (number? (string->atom (cadr split))))
-;                                     (string->atom (cadr split))
-;                                     #f))
-;                            (val (cond ((equal? (car split) "") prev)
-;                                       ((number? (string->atom (car split))) (string->number (car split)))
-;                                       (else (string->symbol (car split))))))
-;                       (set! prev val)
-;                       ;; (if (and num (not (vector? val)) (atom? val)) (set! num (+ (eval num) 1)))
-;                       (if num 
-;                           (make-list (eval num) val)
-;                           (begin (set! mult #t)
-;                                  '()))))
-;                   ((and (vector? elt) (symbol? next))
-;                     (set! prev elt) 
-;                     (if (regex:match? (symbol->string next) "\\*")
-;                         '()
-;                         (list elt)))
-;                   ((list? elt) 
-;                    (set! prev elt) 
-;                    (if (and (symbol? next)
-;                             (regex:match? (symbol->string next) "\\*"))
-;                        '()
-;                        (if (= (length elt) 1) 
-;                            elt 
-;                            (list elt))))
-;                   (else (set! prev elt) (list elt))))
-;            lst
-;            (append (cdr lst) '(0))))))
-
-
 ;; this function is for mananing symbols inside a pattern _ for rest etc..
 (define rmap_helper_lst_sym_transform
   (lambda (lst)
@@ -199,31 +148,3 @@
           `(if (= 0 (modulo loopcnt ,m)) ,(car args) ,(cadr args)))
         (else 
           `(if (= 0 (modulo (+ ,(car args) loopcnt) ,m)) ,(cadr args) ,(caddr args)))))
-
-
-; (define-macro (rmap-repeat num expr)
-;   `(make-list-with-proc ,(eval num) (lambda (idx) ,expr)))
-
-; (define R rmap-repeat)
-
-; (define Rnd random)
-
-
-;;
-;; 
-;; example usage
-;;
-;;
-
-;; start A
-;; 
-;; (:> A 8 0 (println '-> @1) `(1 2*2 _2 (3 4) _ #(5 6)))
-
-;; modify A
-;;
-;; (:> A 8 0 (println '-> @1 ': @2) `(1 2*2 _2 (3 4) _ #(5 6)) `(a b))
-
-;; stop A
-;;
-;; (:| A 8 0 (println '-> @1 ': @2) `(1 2*2 _2 (3 4) _ #(5 6)) `(a b))
-
