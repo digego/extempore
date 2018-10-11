@@ -12,10 +12,13 @@
 ;; SCHEME text variant
 ;; 
 
+(define analogue-reset (lambda (inst) (analogue_reset inst)))
+
 (define analogue-save-state
   (let ((i 0) (j 0)
         (dict '()))
     (lambda (inst filename)
+      (set! dict '())
       ;;
       ;; oscillators
       ;;
@@ -28,7 +31,7 @@
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set! dict (cons (cons 'osc1_pw (get_osc1_pw inst)) dict))
       ;; stereo pan (default is 0.5)
-      (set! dict (cons (cons 'osc1_pan (get_osc1_pan inst)) dict))
+      (set! dict (cons (cons 'osc1_phase (get_osc1_phase inst)) dict))
 
       ;; amplitude of osc 2
       (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
@@ -39,7 +42,7 @@
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set! dict (cons (cons 'osc2_pw (get_osc2_pw inst)) dict))
       ;; stereo pan (default is 0.5)
-      (set! dict (cons (cons 'osc2_pan (get_osc2_pan inst)) dict))
+      (set! dict (cons (cons 'osc2_phase (get_osc2_phase inst)) dict))
       
       ;; amplitude of osc 3
       (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
@@ -50,7 +53,7 @@
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set! dict (cons (cons 'osc3_pw (get_osc3_pw inst)) dict))
       ;; stereo pan (default is 0.5)
-      (set! dict (cons (cons 'osc3_pan (get_osc3_pan inst)) dict))
+      (set! dict (cons (cons 'osc3_phase (get_osc3_phase inst)) dict))
       
       ;; amplitude of osc 4
       (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
@@ -61,7 +64,7 @@
       ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
       (set! dict (cons (cons 'osc4_pw (get_osc4_pw inst)) dict))
       ;; stereo pan (default is 0.5)
-      (set! dict (cons (cons 'osc4_pan (get_osc4_pan inst)) dict))
+      (set! dict (cons (cons 'osc4_phase (get_osc4_phase inst)) dict))
       
       ;; sub oscilltor amp (two tunes under sine wave)
       (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
@@ -98,6 +101,9 @@
       ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
       ;; this envelope is summed to the current filter_frq
       (set! dict (cons (cons 'filter_env_amt (get_filter_env_amt inst)) dict))
+      
+      ;; 12 or 24 db slope?
+      (set! dict (cons (cons 'filter_type (get_filter_type inst)) dict))
 
       ;; follow note frequency as a percentage of the note frequency
       ;; i.e. (+ cutoff (* frequency value))
@@ -169,7 +175,7 @@
       (set! dict (cons (cons 'portamento (get_portamento inst)) dict))
       ;;
       ;; set max polyphony
-      ;; (set! dict 59 (cons (get_polyphonic inst)))
+      (set! dict (cons (cons 'polyphony (get_polyphony inst)) dict))
       ;;
       ;; lfos
       ;;
@@ -224,7 +230,8 @@
           (vector-set! modvec (+ (* i 32) j) (get_mod_matrix inst i j))))
       (set! dict (cons (cons 'mod_matrix (vector->list modvec)) dict))
     
-      ;; main amplitude adsr envelope (adr in ms) (sus [0.0-1.0])
+      ;; modulation dadsr envelope (dadr in ms) (sus [0.0-1.0])
+      (set! dict (cons (cons 'mod_env_delay (get_mod_env_delay inst)) dict)) ;; delay
       (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
       (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
       (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
@@ -233,7 +240,12 @@
       ;; filter saturation
       (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))  
       
+      ;; osc slop
+      (set! dict (cons (cons 'osc_slop (get_osc_slop inst)) dict))
+      (set! dict (cons (cons 'osc_phase_slop (get_osc_phase_slop inst)) dict))
+      
       ;; (println dict) 
+      (analogue_remove_file filename)
       (define out (open-output-file filename))
       (write (reverse dict) out)
       (close-output-port out)  

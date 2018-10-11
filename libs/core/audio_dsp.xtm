@@ -1176,28 +1176,22 @@
           (m_dDelta 0.0)    ;; FB in
           (m_dEpsilon 0.0)  ;; FB out
           (m_da0 1.0)       ;; input gain
-          (m_dFeedback:SAMPLE 0.0) ;; feedback coeff from S
           (m_dZ1 0.0)       ;; z-1 register
           (vn 0.0)          ;; fn
           (xn:SAMPLE 0.0)
-          (feedbackOutput (lambda () (* (pref m_dBeta 0) (+ m_dZ1 (* m_dFeedback m_dDelta)))))
+          (feedbackOutput:SAMPLE* (alloc 1)) ;; (lambda () (* (pref m_dBeta 0) (+ m_dZ1 (* m_dFeedback m_dDelta)))))
           (lpf 0.0)
-          (hpf 0.0)
-          (oldfrq 0.0)
-          (T (/ 1.0 SRs))
-          (halfT (/ T 2.0)))
+          (hpf 0.0))
       (lambda (x:SAMPLE fb)
-        (set! m_dFeedback fb)
+        ;; (set! m_dFeedback fb)
+        (pset! feedbackOutput 0 (* (pref m_dBeta 0) (+ m_dZ1 (* fb m_dDelta))))
         ;; for diode filter support
-        (set! xn (+ (* x m_dGamma) m_dFeedback (* m_dEpsilon (feedbackOutput))))
+        (set! xn (+ (* x m_dGamma) fb (* m_dEpsilon (pref feedbackOutput 0))))
         (set! vn (* (- (* m_da0 xn) m_dZ1) (pref m_dAlpha 0)))
         (set! lpf (+ vn m_dZ1))
         (set! m_dZ1 (+ vn lpf))
         (set! hpf (- xn lpf))
-        (if (= type HPF1) hpf
-            (if (= type LPF1) lpf
-                x)))))) ;; not a valid filter simply return input
-
+        (if (= type HPF1) hpf lpf)))))
 
 ;; type is LPF4, LPF2, BPF4, BPF2, HPF4, HPF2 
 ;; rate is the minimum number of samples to allow between frq/res updates
@@ -1214,10 +1208,10 @@
           (lpf2 (va_onepole LPF1))
           (lpf3 (va_onepole LPF1))
           (lpf4 (va_onepole LPF1))
-          (lpf1output:[SAMPLE]* (lpf1.feedbackOutput))
-          (lpf2output:[SAMPLE]* (lpf2.feedbackOutput))
-          (lpf3output:[SAMPLE]* (lpf3.feedbackOutput))
-          (lpf4output:[SAMPLE]* (lpf4.feedbackOutput))
+          (lpf1output:SAMPLE* (lpf1.feedbackOutput))
+          (lpf2output:SAMPLE* (lpf2.feedbackOutput))
+          (lpf3output:SAMPLE* (lpf3.feedbackOutput))
+          (lpf4output:SAMPLE* (lpf4.feedbackOutput))
           (lpf1alpha:SAMPLE* (lpf1.m_dAlpha))
           (lpf2alpha:SAMPLE* (lpf2.m_dAlpha))
           (lpf3alpha:SAMPLE* (lpf3.m_dAlpha))
@@ -1265,7 +1259,7 @@
                    (pset! lpf4beta 0 (/ 1.0 (+ 1.0 g)))
                    (set! m_dGamma (* G G G G))
                    (set! m_dAlpha_0 (/ 1.0 (+ 1.0 (* m_dK m_dGamma))))))
-        (set! dSigma (+ (lpf1output) (lpf2output) (lpf3output) (lpf4output)))
+        (set! dSigma (+ (pref lpf1output 0) (pref lpf2output 0) (pref lpf3output 0) (pref lpf4output 0)))
         (set! in (* in (+ 1.0 m_dK)))
         (set! dU (* (- in (* m_dK dSigma)) m_dAlpha_0))
         (set! dU (tanh (* saturation dU)))
@@ -1274,9 +1268,9 @@
         (set! dlpf2 (lpf2 dlpf1 feedback))
         (set! dlpf3 (lpf3 dlpf2 feedback))
         (set! dlpf4 (lpf4 dlpf3 feedback))
-        ;; (println "1:" dlpf)
         ;; filter type
         (+ (* m_dA dU) (* m_dB dlpf1) (* m_dC dlpf2) (* m_dD dlpf3) (* m_dE dlpf4))))))
+
 
 
 ;; http://www.cytomic.com/files/dsp/SvfLinearTrapOptimised2.pdf
@@ -3345,7 +3339,7 @@ but v1 and v2 can be computed in parallel"
             (begin
               (if retrigger
                   (begin (set! retrigger #f)
-                         (set! out 0.0)
+                         ;; (set! out 0.0)
                          (set! state env_attack)))
               (if (<> a old_a)
                   (begin
@@ -3401,9 +3395,116 @@ but v1 and v2 can be computed in parallel"
             out)))))
 
 
+;; adsr with initial delay in ms
+(bind-func dadsr_c 
+  (lambda ()
+    (let ((calcCoef (lambda (rate:float targetRatio:float)
+                      (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
+                                              targetRatio)))
+                              rate))))
+          (retrigger #f)          
+          (targetRatioA 0.3)          
+          (targetRatioDR 0.0001)
+          (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4) (env_predelay 5)
+          (state env_idle)
+          (attackRate 0.0)
+          (attackCoef 0.0)
+          (attackBase 0.0)
+          (decayRate 0.0)
+          (decayCoef 0.0)
+          (decayBase 0.0)
+          (sustainLevel 0.0)
+          (releaseRate 0.0)
+          (releaseCoef 0.0)
+          (releaseBase 0.0)
+          (delay 0:i64)
+          (old_g 0.0)
+          (old_a -1.0)
+          (old_d -1.0)
+          (old_s -1.0)
+          (old_r -1.0)
+          (out 0.0))
+      (lambda (chan:i64 g:SAMPLE del a d s r)
+        (if (= chan 0)
+            (begin
+              (if retrigger
+                  (begin (set! retrigger #f)
+                         ;; (set! out 0.0)
+                         (set! state env_attack)))
+              (if (<> a old_a)
+                  (begin
+                    (set! old_a a)
+                    (set! attackRate (* a SRf 0.001))
+                    (set! attackCoef (calcCoef attackRate targetRatioA))
+                    (set! attackBase (* (+ 1.0 targetRatioA) (- 1.0 attackCoef)))))
+              (if (<> d old_d)
+                  (begin
+                    (set! old_d d)
+                    (set! decayRate (* d SRf 0.001))
+                    (set! decayCoef (calcCoef decayRate targetRatioDR))
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))
+              (if (<> s old_s)
+                  (begin
+                    (set! old_s s)
+                    (set! sustainLevel s)
+                    (set! decayBase (* (- sustainLevel targetRatioDR) (- 1.0 decayCoef)))))        
+              (if (<> r old_r)
+                  (begin
+                    (set! old_r r)
+                    (set! releaseRate (* r SRf 0.001))
+                    (set! releaseCoef (calcCoef releaseRate targetRatioDR))
+                    (set! releaseBase (* -1.0 targetRatioDR (- 1.0 releaseCoef)))))
+              (if (<> g old_g)
+                  (if (> g 0.1)
+                      (cond ((> del 0.00001) 
+                               (set! state env_predelay) 
+                               (set! delay (ftoi64 (* del SRf 0.001))))
+                            ((> a 0.00001) (set! state env_attack))
+                            ((> d 0.00001) (set! out 1.0) (set! state env_decay))
+                            (else (set! out sustainLevel) (set! state env_sustain)))
+                      (set! state env_release)))
+              (set! old_g g)
+              (cond ((= state env_idle) 
+                      out)
+                    ((= state env_predelay)
+                      (set! delay (- delay 1))
+                      (if (<= delay 0)
+                          (cond ((> a 0.00001) (set! state env_attack))
+                                ((> d 0.00001) (set! out 1.0) (set! state env_decay))
+                                (else (set! out sustainLevel) (set! state env_sustain))))
+                      out)
+                    ((= state env_attack)
+                     (set! out (+ attackBase (* out attackCoef)))
+                     (if (>= out 1.0)
+                         (begin (set! out 1.0)
+                                (set! state env_decay)))
+                     out)
+                    ((= state env_decay)
+                     (set! out (+ decayBase (* out decayCoef)))
+                     (if (<= out sustainLevel)
+                         (begin (set! out sustainLevel)
+                                (set! state env_sustain)))
+                     out)
+                    ((= state env_sustain) out)
+                    ((= state env_release)
+                     (set! out (+ releaseBase (* out releaseCoef)))
+                     (if (<= out 0.0)
+                         (begin (set! out 0.0)
+                                (set! state env_idle)))
+                     out)))
+            out)))))
+
+
+
+
 (bind-func retrigger_adsr
   (lambda (adsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
     (cset! adsr retrigger #t i1) ;; 1 == env_attack
+    void))
+
+(bind-func retrigger_dadsr
+  (lambda (dadsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
+    (cset! dadsr retrigger #t i1) ;; 1 == env_attack
     void))
 
 

@@ -1,0 +1,28 @@
+;; Basic
+;;
+;; an example of the most basic instrument possible
+;; simply plays back a sine wave
+;;
+(bind-func basic_note
+  (lambda ()
+    (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
+      (let ((starttime (note_starttime data))  ;; start time
+            (frequency (note_frequency data))  ;; you'll probably want the note frequency (in hz)
+            (amplitude (note_amplitude data))  ;; you'll probably want the note amplitude (0.0-1.0)
+            (duration (note_duration data))   ;; you'll probably need the duration (in samples)
+            (osc (osc_mc_c 0.0)))
+        (lambda (time:i64 chan:i64)
+           ;; you are responsible for stopping a note by setting note_running to #f!
+          (if (> (- time starttime) duration) (note_active data #f))
+          (osc chan amplitude frequency))))))
+
+;; simple fx for basic (adds a stereo delay)
+(bind-func basic_fx
+  (lambda ()
+    (let ((notekernel:NOTE_KERNEL null)
+          (gain 1.0)
+          (dly (delay_st_c (ftoi64 (* SRf 0.333)) (ftoi64 (* SRf 0.25)))))
+      (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
+        (if (< chan 2)
+            (* gain (dly chan in 0.5 0.5))
+            0.0)))))

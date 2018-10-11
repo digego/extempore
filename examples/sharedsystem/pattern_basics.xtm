@@ -1,0 +1,76 @@
+;; patterns are just lists.
+;; we give this pattern 'player object' the name 'A'
+(:> A 4 0 (play syn1 @1 80 dur) (list 60 63 67 72))
+
+;; you can re-evaluate :> at any time to update
+;; a 'player object' 
+;; evaluate below to reverse the 'A' pattern
+(:> A 4 0 (play syn1 @1 80 dur) (reverse (list 60 63 67 72)))
+
+;; you can stop a pattern at any time by evaluating with :|
+(:| A 4 0 (play syn1 @1 80 dur) (reverse (list 60 63 67 72)))
+
+;; re-start the same pattern again but 
+;; this time using note pitch symbols
+(:> A 4 0 (play syn1 @1 80 dur) (list 'c4 'eb4 'g4 'c5))
+
+;; it's usually more convenient to use quasiquote: `
+(:> A 4 0 (play syn1 @1 80 dur) `(c4 eb4 g4 c5))
+
+;; groupings form sub patterns of length equal
+;; to their higher position
+;; here (c4 d4) takes the space of 1 beat
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) eb4 g4 c5))
+
+;; extempore patterns are just lists!
+;; you can manipulate them using standard functions 
+;; but to call the function inside a quasiquoted list
+;; you will first need to unquote: , the function
+(:> A 4 0 (play syn1 @1 80 dur) `(,(nof 2 `(c4 d4)) eb4 g4 c5))
+
+;; nof is for number of repeats
+;; (nof 2 '(c4 d4)) => ((c4 d4) (c4 d4))
+;; this is the more 'traditional' full form
+;; note that we now need to quote all of the symbols 'c4 'd4 etc..
+;; you might find this full form style easier when starting out
+(:> A 4 0 (play syn1 @1 80 dur) (list (nof 2 (list 'c4 'd4)) 'eb4 'g4 'c5))
+
+;; you can you can nest subgroups
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) eb4 (g4 (a4 bb4)) c5))
+
+;; you can use '_' for rests
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) _ (g4 (a4 bb4)) c5))
+
+;; the 'special' LC symbol provides the current loop count
+;; this can be used to provide loop number variants
+;; play eb4 every 2nd time through the pattern
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) ,(if (= (% LC 2) 0) '_ eb4) (g4 (a4 bb4)) c5))
+
+;; this is so common that a special orbit operator is provided
+;; here orb plays eb4 only every 2nd time through the pattern
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) ,(orb 2 eb4) (g4 (a4 bb4)) c5))
+
+;; orb can also take a fail case, a fallthrough case
+;; here pattern plays f4 twice and eb4 once
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) ,(orb 3 eb4 f4) (g4 (a4 bb4)) c5))
+
+;; you can use standard scheme vectors for polyphony
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 d4) ,(orb 3 eb4 f4) #(c4 eb3 g4) #(f4 ab4 c5)))
+
+;; and again in full form
+(:> A 4 0 (play syn1 @1 80 dur) (list (list 'c4 'd4) (orb 3 'eb4 'f4) (vector 'c4 'eb3 'g4) (vector 'f4 'ab4 'c5)))
+
+;; vectors can also be subgrouped
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 f4) (#(c4 eb4) #(d4 bb4 d5) #(f4 ab4 c5 f5))))
+
+;; sometimes you would like to move through a series of patterns
+(:> A 4 0 (play syn1 @1 80 dur) `((c4 f4) (#(c4 eb4) #(d4 bb4 d5) #(f4 ab4 c5 f5))))
+
+;; this plays one pattern after the other 
+(:> A 4 0 (play syn1 @1 80 dur) (cycle LC 1 '(c4 d4 eb4 f4) '(eb4 f4 g4 a4)))
+
+;; delay the transitions to 2 complete cycles
+(:> A 4 0 (play syn1 @1 80 dur) (cycle LC 2 '(c4 d4 eb4 f4) '(eb4 f4 g4 a4)))
+
+;; delay the transitions to 3 cycles etc..
+(:> A 4 0 (play syn1 @1 80 dur) (cycle LC 3 '(c4 d4 eb4 f4) '(eb4 f4 g4 a4)))

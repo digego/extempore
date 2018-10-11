@@ -34,7 +34,8 @@
 (bind-val MAXPOLYPHONY i64 32)
 
 ;; Structure for init values of each note
-;; idx(0) start(1) freq(2) amp(3) dur(4) gate(5) active(6) refcnt(7) zone(8)
+;; re-starttime is for voicesteeling
+;; idx(0) start(1) freq(2) amp(3) dur(4) gate(5) active(6) re-starttime(7) zone(8)
 (bind-type NoteData <i64,i64,SAMPLE,SAMPLE,i64,SAMPLE,i1,i64,i8*>)
 
 (bind-func note_idx (lambda (data:NoteData*) (tref data 0)))
@@ -46,18 +47,39 @@
 (bind-func note_gate (lambda (data:NoteData* value) (tset! data 5 value)))
 (bind-func note_active (lambda (data:NoteData*) (tref data 6)))
 (bind-func note_active (lambda (data:NoteData* value) (tset! data 6 value)))
-(bind-func note_refcnt (lambda (data:NoteData*) (tref data 7)))
-(bind-func note_ref_inc (lambda (data:NoteData*) (tset! data 7 (+ 1 (tref data 7)))))
-(bind-func note_ref_dec (lambda (data:NoteData*) (let ((v (- (tref data 7) 1)))
-                                              (if (< v 0)
-                                                  (tset! data 7 0)
-                                                  (tset! data 7 v)))))
+(bind-func note_restarttime (lambda (data:NoteData*) (tref data 7)))
 (bind-func note_zone (lambda (data:NoteData*) (cast (tref data 8) mzone*)))
 
 (bind-alias INSTRUMENT [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
 (bind-alias NOTE_KERNEL [[SAMPLE,i64,i64]*,NoteData*,i64,SAMPLE*]*)
 (bind-alias FX_KERNEL [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
 
+
+; (bind-func instrument_find_note
+;   (lambda (notes:NoteData** lgth)
+;     (let ((idx 0)
+;           (i 0)
+;           (old (note_starttime (pref notes 0)))
+;           (active #f)
+;           (starttime 0)
+;           (go #t))
+;       (while (= #t go)
+;         (set! starttime (note_starttime (pref notes i)))
+;         ;; this refcnt reset is a temporary bugfix - there is a more fundemental problem with refcnt in make_instrument
+;         (if (and (not (note_active (pref notes i)))
+;                  (> (note_refcnt (pref notes i)) 0))
+;             (tset! (pref notes i) 7 0))
+;         (if (and (< starttime old) (< (note_refcnt (pref notes i)) 1))
+;             (begin (set! old starttime) (set! idx i)))
+;         (set! active (note_active (pref notes i)))
+;         (if (and (not active) (< (note_refcnt (pref notes i)) 1)) 
+;             (begin (set! idx i) (set! go #f)))
+;         ;; (println '-- i (note_active (pref notes i)) (note_refcnt (pref notes i)))
+;         (set! i (+ i 1))
+;         (if (= i lgth) (set! go #f))
+;         void)
+;       ;; (println "note:" idx (note_active (pref notes idx)) (note_refcnt (pref notes idx)))
+;       (pref notes idx))))
 
 (bind-func instrument_find_note
   (lambda (notes:NoteData** lgth)
@@ -69,14 +91,10 @@
           (go #t))
       (while (= #t go)
         (set! starttime (note_starttime (pref notes i)))
-        ;; this refcnt reset is a temporary bugfix - there is a more fundemental problem with refcnt in make_instrument
-        (if (and (not (note_active (pref notes i)))
-                 (> (note_refcnt (pref notes i)) 0))
-            (tset! (pref notes i) 7 0))
-        (if (and (< starttime old) (< (note_refcnt (pref notes i)) 1))
+        (if (< starttime old)
             (begin (set! old starttime) (set! idx i)))
         (set! active (note_active (pref notes i)))
-        (if (and (not active) (< (note_refcnt (pref notes i)) 1)) 
+        (if (not active)
             (begin (set! idx i) (set! go #f)))
         ;; (println '-- i (note_active (pref notes i)) (note_refcnt (pref notes i)))
         (set! i (+ i 1))
@@ -121,35 +139,24 @@
                              (zone (note_zone free_note)))
                          (if (null? free_note)
                              null
-                             (if (or (note_active free_note)
-                                     (> (note_refcnt free_note) 0))
+                             (if (or (note_active free_note) #f) ;; (> (note_refcnt free_note) 0))
                                  (begin ;; resuse existing kernel
-                                   (set! note_event_b (pref-ptr note_events note_event_in_idx))
-                                   (tfill! note_event_b start freq amp dur free_note)
-                                   (note_ref_inc free_note) ;; increment note refcnt
                                    ;; (println "A idx:" (note_idx free_note) start freq amp dur)
-                                   (set! note_event_out_time_b #x0FFFFFFFFFFFFFFF)
-                                   (dotimes (j note_event_buf)
-                                     (set! note_event_b (pref-ptr note_events j))
-                                     (if (< (tref note_event_b 0) note_event_out_time_b)
-                                         (begin (set! note_event_out_time_b (tref note_event_b 0))
-                                                (set! note_event_out_idx_b j))))
-                                   (set! note_event_out_time note_event_out_time_b)
-                                   (set! note_event_out_idx note_event_out_idx_b)
-                                   ;; (println "Next new event is:" note_event_out_time note_event_out_idx)
-                                   (set! note_event_in_idx (% (+ 1 note_event_in_idx) note_event_buf))
-                                   (tset! free_note 1 start)
+                                   (set! kernel (pref kernels (note_idx free_note)))
+                                   (tset! free_note 2 freq)
+                                   (tset! free_note 3 amp)
+                                   (tset! free_note 4 dur)
+                                   (tset! free_note 5 1.0)
+                                   (tset! free_note 7 start)
+                                   (cset! (cast kernel [void]*) data free_note NoteData*)
                                    ;; existing kernel is still in use!
                                    free_note)
                                  (begin ;; create new kernel
                                    ;; (println "B idx:" (note_idx free_note) start freq amp dur)
                                    (reset_zone zone)
                                    (push_zone zone)
-                                   ;; refcnt should already be 0!! (otherwise we shouldn't get here!)
-                                   (if (> (note_refcnt free_note) 0)
-                                       (println "ERROR: note with refcnt > 0 should'nt get here!"))
                                    ;; initialize kernel with active set to #f
-                                   (tfill! free_note idx start freq amp dur 1.0 #f 0 (cast zone i8*))
+                                   (tfill! free_note idx start freq amp dur 1.0 #f start (cast zone i8*))
                                    ;; init new kernel
                                    (pset! kernels idx (note_kernel free_note nargs dargs))
                                    ;; activate to true once kernel is valid
@@ -167,34 +174,6 @@
       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
         (set! out 0.0)
         (set! tmp_active 0)
-        (if (> time note_event_out_time)
-            (begin
-              ;; (println "HIT with new event:" note_event_out_time note_event_out_idx)
-              (set! note_event_c (pref-ptr note_events note_event_out_idx))
-              (set! note_event_note (tref note_event_c 4)) ;(instrument_find_note notes poly))
-              (if (not (null? note_event_note))
-                  (begin
-                    (tset! note_event_note 1 (tref note_event_c 0))
-                    (tset! note_event_note 2 (tref note_event_c 1))
-                    (tset! note_event_note 3 (tref note_event_c 2))
-                    (tset! note_event_note 4 (tref note_event_c 3))
-                    (tset! note_event_note 5 1.0)
-                    (tset! note_event_note 6 #t)
-                    (note_ref_dec note_event_note)
-                    ;; (println "C:" note_event_note)
-                    void))
-              (tset! note_event_c 0 #x0FFFFFFFFFFFFFFF)
-              (tset! note_event_c 4 null)
-              (set! note_event_out_time_c #x0FFFFFFFFFFFFFFF)
-              (dotimes (k note_event_buf)
-                (set! note_event_c (pref-ptr note_events k))
-                (if (< (tref note_event_c 0) note_event_out_time_c)
-                    (begin (set! note_event_out_time_c (tref note_event_c 0))
-                           (set! note_event_out_idx_c k))))
-              (set! note_event_out_time note_event_out_time_c)
-              (set! note_event_out_idx note_event_out_idx_c)
-              ;; (println "Next new event will be:" note_event_out_time note_event_out_idx)
-              void))
         (dotimes (k poly) ;; sum all active notes
           (set! note (pref notes k))
           (set! starttime (tref note 1)) ;; tref (faster)
@@ -202,12 +181,11 @@
               (begin void) ;(tset! note 1 #x0FFFFFFFFFFFFFFF) void) ;; (pset! kernels k nullkernel) void)
               (begin (set! tmp_active (+ tmp_active 1)) void))
           (set! kernel (pref kernels k))
-          (if (and (> time starttime) (tref note 6)) ; (not (null? kernel)))
+          (if (and (>= time starttime) (tref note 6)) ; (not (null? kernel)))
               (set! out (+ out (* 0.2 (kernel time chan))))))
         (set! numactive tmp_active)
         (effect_kernel out time chan dat)))))
-
-                       
+               
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -276,13 +254,7 @@
 ;; load instruments (and build into aot)
 (sys:load "libs/core/instruments/fmsynth.xtm")
 (sys:load "libs/core/instruments/analogue.xtm")
-(sys:load "libs/core/instruments/analogue_fileio-scm.xtm")
-
-;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
- (sys:load "libs/core/instruments/analogue_fileio-scm.xtm"))
-
-
+(sys:load "libs/core/instruments/dlogue.xtm")
 
 (impc:aot:insert-footer "xtminstruments")
 

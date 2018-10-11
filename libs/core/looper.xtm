@@ -3,65 +3,33 @@
 ;; rhythm map + looper
 ;; 
 
-(define *RMAP_HELPER_CALLBACK_OFFSET* 1024) 
+(define *RMAP_HELPER_CALLBACK_OFFSET* 2048) 
 
+;; this function is for mananing symbols inside a pattern _ for rest etc..
 (define rmap_helper_lst_sym_transform
   (lambda (lst)
-    (define prev '())
-    (define mult #f)
     (if (atom? lst) (set! lst (list lst)))
     (if (and (= (length lst) 1) (null? (car lst))) (set! lst `(_)))
     (apply append '()
       (map (lambda (elt next)
-            (cond (mult
-                    (set! mult #f)
-                    (let* ((num (eval elt))
-                           (val prev))
-                      (if (number? num)
-                          (make-list num val)
-                          '())))
-                  ((and (symbol? elt)
-                        (regex:match? (symbol->string elt) "\\*"))
-                    (let* ((str (symbol->string elt))
-                           (split (regex:split str "\\*"))
-                           (num (if (and (not (null? (cdr split)))
-                                         (number? (string->atom (cadr split))))
-                                    (string->atom (cadr split))
-                                    #f))
-                           (val (cond ((equal? (car split) "") prev)
-                                      ((number? (string->atom (car split))) (string->number (car split)))
-                                      (else (string->symbol (car split))))))
-                      (set! prev val)
-                      ;; (if (and num (not (vector? val)) (atom? val)) (set! num (+ (eval num) 1)))
-                      (if num 
-                          (make-list (eval num) val)
-                          (begin (set! mult #t)
-                                 '()))))
-                  ((and (vector? elt) (symbol? next))
-                    (set! prev elt) 
-                    (if (regex:match? (symbol->string next) "\\*")
-                        '()
-                        (list elt)))
+            (cond ((and (vector? elt) (symbol? next))
+                    (list elt))
                   ((list? elt) 
-                   (set! prev elt) 
-                   (if (and (symbol? next)
-                            (regex:match? (symbol->string next) "\\*"))
-                       '()
-                       (if (= (length elt) 1) 
-                           elt 
-                           (list elt))))
-                  (else (set! prev elt) (list elt))))
+                   (if (= (length elt) 1) 
+                       elt 
+                       (list elt)))
+                  (else (list elt))))
            lst
            (append (cdr lst) '(0))))))
 
 (define rmap_helper
-  (lambda (beats offset func beat dur . args)
+  (lambda (beats offset func beat dur loopcnt looppos . args)
     (let* ((lst (rmap_helper_lst_sym_transform (if (list? (car args)) 
                                                    (car args)
                                                    (if (pair? (car args)) 
                                                        (car (car args)) 
                                                        '(_ _ _ _)))))
-           (pos (modulo (- beat offset) beats))
+           (pos (modulo (- looppos offset) beats)) ;;(modulo (- beat offset) beats))
            (one_beat (/ beats (length lst)))
            (lst_positions (range 0 (+ pos beats) one_beat))
            (nextpos (+ pos dur))
@@ -84,22 +52,23 @@
                                          (list-ref l (- (cdr t) 1))))
                                    args))
                      (targs (map (lambda (l) 
-                                    (cond ((vector? l) (vector->list l))
+                                    (cond ((vector? l) (map (lambda (x) (eval x)) (vector->list l)))
                                           ((and (symbol? l) (not (equal? l '_))) (eval l))
                                           (else l)))
                                  tmpargs)))
                 (if (or (list? (car tmpargs)) (pair? (car tmpargs)))
-                    (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat targs)
+                    (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs)
                     (if (not (and (symbol? (car tmpargs)) (equal? (car tmpargs) '_)))
                         (apply callback 
                                (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*) 
-                               func (+ beat (- (car t) pos)) one_beat targs)))))
+                               func (+ beat (- (car t) pos)) one_beat 
+                               loopcnt targs)))))
            newlst))))
 
 ;; rhythm map
 ;; rmap expects f to take beat + dur + length(lsts) args.
-(define-macro (rmap beats offset f . lsts)
-  `(rmap_helper ,beats ,offset ,f beat dur ,@lsts))
+(define-macro (rmap beats offset f loopcnt looppos . lsts)
+  `(rmap_helper ,beats ,offset ,f beat dur ,loopcnt ,looppos ,@lsts))
 
 ;;
 ;; example usage
@@ -120,28 +89,35 @@
 ;;
 ;; 'in place' looping based on rmap
 ;;
-(define-macro (rmap-loop-runner name tagtime run beatsexpr offset expr . lsts)
-  (let ((f `(lambda ,(cons 'beat (cons 'dur (map (lambda (x) 
+(define-macro (rmap-loop-runner name tagtime run beatsexpr offsetexpr expr . lsts)
+  (let* ((loopcnt 0)
+        (f `(lambda ,(cons 'beat (cons 'dur (cons 'loop (map (lambda (x) 
                                               (string->symbol (string-append "@" (number->string x)))) 
-                                            (range 1 (+ 1 (length lsts))))))
+                                            (range 1 (+ 1 (length lsts)))))))
                     ,expr))
         (beats (eval beatsexpr))
+        (offset (eval offsetexpr))
         (running? (closure? name)))
     (if (equal? run 'modify) (println 'Modifying: name))
     (begin (eval `(define ,name 
-                   (lambda (beat dur) 
+                   (lambda (beat totaldur loopcnt dur) 
+                      (define beats ,beatsexpr)
+                      (define offset ,offsetexpr)
+                      (define LC loopcnt)
                       (set! ,tagtime (now))
-                      (rmap ,beatsexpr ,offset ,f ,@lsts)
+                      (rmap beats offset ,f loopcnt totaldur ,@lsts)
                       (if ,(if (equal? run 'stop) #t #f)
                           (begin (println 'Stopping_: ',name) 
                                  (eval '(define ,name #f) (interaction-environment))
                                  #f)
-                          (callback (*metro* (+ beat (* .75 dur))) ',name (+ beat dur) 
+                          (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur) 
+                                    (if (= (+ totaldur dur) beats) 0 (+ totaldur dur))
+                                    (if (= (+ totaldur dur) beats) (+ loopcnt 1) loopcnt)
                                     ,(if (> beats 1) 1/2 (/ beats 2))))))
                 (interaction-environment))
             (if (equal? run 'start)
                 (eval `(begin (println 'Starting_: ',name) 
-                              (,name (*metro* 'get-beat 4) (if (> ,beats 1) 1/2 (/ ,beats 2))))
+                              (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
                        (interaction-environment))))))
 
 ;; start or modify looper
@@ -165,29 +141,10 @@
 ;;
 ;; additional helpers
 
-(define-macro (rmap-repeat num expr)
-  `(make-list-with-proc ,(eval num) (lambda (idx) ,expr)))
-
-(define R rmap-repeat)
-
-(define Rnd random)
-
-
-;;
-;; 
-;; example usage
-;;
-;;
-
-;; start A
-;; 
-;; (:> A 8 0 (println '-> @1) `(1 2*2 _2 (3 4) _ #(5 6)))
-
-;; modify A
-;;
-;; (:> A 8 0 (println '-> @1 ': @2) `(1 2*2 _2 (3 4) _ #(5 6)) `(a b))
-
-;; stop A
-;;
-;; (:| A 8 0 (println '-> @1 ': @2) `(1 2*2 _2 (3 4) _ #(5 6)) `(a b))
-
+(define-macro (orbit m . args)
+  (cond ((= (length args) 1)
+          `(if (= 0 (modulo loopcnt ,m)) ,(car args) '_))
+        ((= (length args) 2)
+          `(if (= 0 (modulo loopcnt ,m)) ,(car args) ,(cadr args)))
+        (else 
+          `(if (= 0 (modulo (+ ,(car args) loopcnt) ,m)) ,(cadr args) ,(caddr args)))))

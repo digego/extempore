@@ -38,6 +38,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <xmmintrin.h>
+#include <regex>
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -529,14 +530,16 @@ AudioDevice::~AudioDevice()
 
 static int findDevice(const std::string& Name)
 {
+    std::regex rgx(Name);
+    std::cmatch m;
     int numDevices(Pa_GetDeviceCount());
     for (unsigned i = 0; i < numDevices; ++i) {
-        if (Name == Pa_GetDeviceInfo(i)->name) {
+        if (std::regex_search(Pa_GetDeviceInfo(i)->name, m, rgx)) {
             return i;
         }
     }
     ascii_error();
-    printf("\n*** Can't find named device: %s\n", Name.c_str());
+    printf("\n*** Can't find device matching regex: %s\n", Name.c_str());
     ascii_normal();
     fflush(stdout);
     std::_Exit(1);

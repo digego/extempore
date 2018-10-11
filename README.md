@@ -45,7 +45,7 @@ Check out these videos:
 
 # Docs & Community
 
-Extempore documentation can be found at http://digego.github.io/extempore/index.html
+Extempore documentation can be found at https://extemporelang.github.io/docs/
 
 You can also join the Extempore community:
 

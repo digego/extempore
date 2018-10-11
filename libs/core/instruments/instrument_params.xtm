@@ -13,6 +13,7 @@
 (bind-val PARAM_TRI enum 3)
 (bind-val PARAM_AD enum 4)
 (bind-val PARAM_CONST enum 5)
+(bind-val PARAM_RANDOM enum 6)
 (bind-val PARAM_WHITE enum 0)
 (bind-val PARAM_PINK enum 1)
 
@@ -34,19 +35,19 @@
 (bind-val PARAM_OSC1_AMP enum 0)
 (bind-val PARAM_OSC1_FRQ enum 1)
 (bind-val PARAM_OSC1_PW enum 2)
-(bind-val PARAM_OSC1_PAN enum 3)
+(bind-val PARAM_OSC1_PHASE enum 3)
 (bind-val PARAM_OSC2_AMP enum 4)
 (bind-val PARAM_OSC2_FRQ enum 5)
 (bind-val PARAM_OSC2_PW enum 6)
-(bind-val PARAM_OSC2_PAN enum 7)
+(bind-val PARAM_OSC2_PHASE enum 7)
 (bind-val PARAM_OSC3_AMP enum 8)
 (bind-val PARAM_OSC3_FRQ enum 9)
 (bind-val PARAM_OSC3_PW enum 10)
-(bind-val PARAM_OSC3_PAN enum 11)
+(bind-val PARAM_OSC3_PHASE enum 11)
 (bind-val PARAM_OSC4_AMP enum 12)
 (bind-val PARAM_OSC4_FRQ enum 13)
 (bind-val PARAM_OSC4_PW enum 14)
-(bind-val PARAM_OSC4_PAN enum 15)
+(bind-val PARAM_OSC4_PHASE enum 15)
 (bind-val PARAM_NOISE_AMP enum 16)
 (bind-val PARAM_FILTER_FRQ enum 17)
 (bind-val PARAM_FILTER_RES enum 18)
@@ -92,6 +93,10 @@
                void))
     void))
 
+(bind-func get_polyphony
+  (lambda (inst:i8*)
+    (cref (cast inst [void]*) poly i64)))
+
 (bind-func set_monophonic
   (lambda (inst:i8*)
     (stop_running inst)  ;; force a stop on all notes before changing poly count
@@ -103,7 +108,6 @@
     (stop_running inst)  ;; force a stop on all notes before changing poly count
     (cset! (cast inst [void]*) poly MAXPOLYPHONY i64)
     void))
-
 
 (bind-func active_notes
   (lambda (inst:i8*)
@@ -140,16 +144,16 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note legato i1))))
 
-(bind-func set_osc1_pan
+(bind-func set_osc1_phase
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note osc1_pan val float)
+      (cset! note osc1_phase val float)
       void)))
 
-(bind-func get_osc1_pan
+(bind-func get_osc1_phase
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note osc1_pan float))))
+      (cref note osc1_phase float))))
 
 (bind-func set_osc1_amp
   (lambda (inst:i8* val:float)
@@ -195,16 +199,16 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note osc1_wave i32))))
 
-(bind-func set_osc2_pan
+(bind-func set_osc2_phase
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note osc2_pan val float)
+      (cset! note osc2_phase val float)
       void)))
 
-(bind-func get_osc2_pan
+(bind-func get_osc2_phase
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note osc2_pan float))))
+      (cref note osc2_phase float))))
 
 (bind-func set_osc2_amp
   (lambda (inst:i8* val:float)
@@ -250,16 +254,16 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note osc2_wave i32))))
 
-(bind-func set_osc3_pan
+(bind-func set_osc3_phase
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note osc3_pan val float)
+      (cset! note osc3_phase val float)
       void)))
 
-(bind-func get_osc3_pan
+(bind-func get_osc3_phase
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note osc3_pan float))))
+      (cref note osc3_phase float))))
 
 (bind-func set_osc3_amp
   (lambda (inst:i8* val:float)
@@ -305,16 +309,16 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note osc3_wave i32))))
 
-(bind-func set_osc4_pan
+(bind-func set_osc4_phase
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note osc4_pan val float)
+      (cset! note osc4_phase val float)
       void)))
 
-(bind-func get_osc4_pan
+(bind-func get_osc4_phase
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note osc4_pan float))))
+      (cref note osc4_phase float))))
 
 (bind-func set_osc4_amp
   (lambda (inst:i8* val:float)
@@ -360,16 +364,27 @@
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note osc4_wave i32))))
 
-(bind-func set_sub_pan
+(bind-func set_osc_slop
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note sub_pan val float)
+      (cset! note osc_slop val float)
       void)))
 
-(bind-func get_sub_pan
+(bind-func get_osc_slop
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note sub_pan float))))
+      (cref note osc_slop float))))
+
+(bind-func set_osc_phase_slop
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note osc_phase_slop val float)
+      void)))
+
+(bind-func get_osc_phase_slop
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note osc_phase_slop float))))
 
 (bind-func set_sub_amp
   (lambda (inst:i8* val:float)
@@ -381,17 +396,6 @@
   (lambda (inst:i8*)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
       (cref note sub_amp float))))
-
-(bind-func set_noise_pan
-  (lambda (inst:i8* val:float)
-    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note noise_pan val float)
-      void)))
-
-(bind-func get_noise_pan
-  (lambda (inst:i8*)
-    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cref note noise_pan float))))
 
 (bind-func set_noise_type
   (lambda (inst:i8* val:i32)  
@@ -536,6 +540,17 @@
           (env (get_amp_env inst)))
       (aset! (ref env) 3 r)
       (cset! note amp_env env |4,float|)
+      void)))
+
+(bind-func get_mod_env_delay
+  (lambda (inst:i8*)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cref note mod_env_delay float))))
+
+(bind-func set_mod_env_delay
+  (lambda (inst:i8* val:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note mod_env_delay val float)
       void)))
 
 (bind-func set_mod_env
@@ -739,7 +754,7 @@
 (bind-func set_filter_drive
   (lambda (inst:i8* val:float)
     (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
-      (cset! note filter_saturation val float)
+      (cset! note filter_saturation (clamp (+ 1.0 val) 1.0 3.0) float)
       void)))
 
 (bind-func get_filter_drive
@@ -1136,3 +1151,93 @@
       (if (< dst 32)
           (aref (aref-ptr mod_matrix src) dst)
           0.0))))
+
+
+;;; some higher level combined options
+
+;; generic osc set
+(bind-func set_osc
+  (lambda (inst:i8* osc_num:i64 gain:float wave:i32 tune:float pw:float phase:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cond ((= osc_num 1)
+             (cset! note osc1_amp gain float)
+             (cset! note osc1_wave wave i32)
+             (cset! note tune1 tune float)
+             (cset! note pw1 pw float)
+             (cset! note osc1_phase phase float)
+             void)
+            ((= osc_num 2)
+             (cset! note osc2_amp gain float)
+             (cset! note osc2_wave wave i32)
+             (cset! note tune2 tune float)
+             (cset! note pw2 pw float)
+             (cset! note osc2_phase phase float)
+             void)
+            ((= osc_num 3)
+             (cset! note osc3_amp gain float)
+             (cset! note osc3_wave wave i32)
+             (cset! note tune3 tune float)
+             (cset! note pw3 pw float)
+             (cset! note osc3_phase phase float)
+             void)
+            ((= osc_num 4)
+             (cset! note osc4_amp gain float)
+             (cset! note osc4_wave wave i32)
+             (cset! note tune4 tune float)
+             (cset! note pw4 pw float)
+             (cset! note osc4_phase phase float)
+             void)
+            (else (println "bad osc num 1-4") void)))))
+
+(bind-func set_filter
+  (lambda (inst:i8* frq:float res:float drive:float type:i64 envamt:float trackfrq:float trackamp:float)
+    (let ((note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! note filter_frq frq float)
+      (cset! note reso (clamp res 0.0 1.0) float)
+      (cset! note filter_saturation (clamp drive 0.0 2.5) float)
+      (cset! note filter_type (if (= type 12) 1 2) i64)
+      (cset! note filter_env_amt envamt float)
+      (cset! note follow_frq trackfrq float)
+      (cset! note follow_amp trackamp float)
+      void)))
+
+(bind-func set_delay
+  (lambda (inst:i8* mix:float left:float right:float fb:float lpf_frq:float lpf_res:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect delay_mix mix float)
+      (cset! effect delay_time_left left float)
+      (cset! effect delay_time_right right float)      
+      (cset! effect delay_fb (clamp fb 0.0 1.0) float)
+      (cset! effect delay_frq (clamp lpf_frq 10.0 19000.0) float)
+      (cset! effect delay_res (clamp lpf_res 0.0 1.0) float)
+      void)))
+
+(bind-func set_reverb
+  (lambda (inst:i8* mix:float size:float predel:float absorb:float )
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect reverb_mix mix float)
+      (cset! effect reverb_size (clamp size 0.0 1.0) float)
+      (cset! effect reverb_predelay size float)
+      (cset! effect reverb_absorb (clamp absorb 0.0 1.0) float)      
+      void)))
+
+;; min and max in ms
+(bind-func set_flanger
+  (lambda (inst:i8* mix:float min:float max:float rate:float fb:float)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*)))
+      (cset! effect flanger_mix mix float)
+      (cset! effect flanger_low (clamp min 0.05 2000.0)  float)
+      (cset! effect flanger_high (clamp max 0.1 2000.0) float)
+      (cset! effect flanger_rate rate float)      
+      (cset! effect flanger_fb (clamp fb 0.0 1.0) float)      
+      void)))
+
+(bind-func set_main
+  (lambda (inst:i8* gain:float pan:float portamento:float legato:i32)
+    (let ((effect (cref (cast inst [void]*) effect_kernel [void]*))
+          (note (cref (cast inst [void]*) note_kernel [void]*)))
+      (cset! effect gain gain float)
+      (cset! effect pan_pos pan float)
+      (cset! note portamento portamento float)
+      (cset! note legato (if (= legato 0) #f #t) i1)
+      void)))
