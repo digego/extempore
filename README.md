@@ -52,9 +52,14 @@ You can also join the Extempore community:
 - [Extempore google group](http://groups.google.com/group/extemporelang)
 - [Extempore mailing list](mailto:extemporelang@googlegroups.com)
 
+# Cite Extempore
+
+[Extempore: The design, implementation and application of a cyber-physical programming language](https://openresearch-repository.anu.edu.au/handle/1885/144603)
+[Systems level liveness with extempore](https://dl.acm.org/citation.cfm?id=3133858)
+
 # Licence
 
-Copyright (c) 2011-2017, Andrew Sorensen
+Copyright (c) 2011-2018, Andrew Sorensen
 
 All rights reserved.
 
