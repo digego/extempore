@@ -74,3 +74,21 @@
 
 ;; delay the transitions to 3 cycles etc..
 (:> A 4 0 (play syn1 @1 80 dur) (cycle LC 3 '(c4 d4 eb4 f4) '(eb4 f4 g4 a4)))
+
+;; you can also 'hold' patterns
+;; to 'hold' a pattern you need to create a 'pattern holder' 
+(define h1 (holder))
+
+;; you can then specify how many loops you want to hold the pattern for
+;; in this case let's hold the jumbled list for 4 loops before changing
+(:> A 4 0 (play syn1 @1 80 dur) `(,(hold h1 4 (jumble `(c4 d4 eb4 f4)))))
+
+;; you can use as many holders as you like!
+;; things get more interesting when you introducing multiple holders
+(define h2 (holder))
+
+;; we'll keep h1 and add h2 into the mix extending the pattern a little
+;; now the first 'phrase' and second 'phrase' change at different rates
+(:> A 4 0 (play syn1 @1 80 dur) 
+  `(,(hold h1 4 (jumble `(c4 d4 eb4 f4)))
+    ,(hold h2 2 (jumble `(c3 d3 eb3 f3)))))
