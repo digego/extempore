@@ -295,13 +295,13 @@
 ;; arg 2: upper bound (exclusive)
 ;; arg 3: pitch class
 ;;
-;; returns -1 if no valid pitch is possible
+;; returns #f if no valid pitch is possible
 ;;
 (define pc:random
   (lambda (lower upper pc)
-    (if (null? pc) -1
+    (if (null? pc) #f
         (let ((choices (filter (lambda (x) (pc:? x pc)) (range lower upper))))
-          (if (null? choices) -1
+          (if (null? choices) #f
               (random choices))))))
 
 
@@ -375,7 +375,7 @@
       (let loop ((i 1)
                  (lst pc))
          (if (null? lst)
-             (begin (print-notification "pitch not in pc") -1)
+             (begin (print-notification "pitch not in pc") #f)
              (if (= (car lst) (modulo value 12))
                  i
                  (loop (+ i 1) (cdr lst)))))))
