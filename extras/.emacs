@@ -64,7 +64,7 @@
 
 ;; add/remove any packages you like here
 (dolist (package
-         '(ido-ubiquitous
+         '(ido-completing-read+
            magit
            markdown-mode
            smex

@@ -104,6 +104,8 @@
                       (define beats ,beatsexpr)
                       (define offset ,offsetexpr)
                       (define LC loopcnt)
+                      (define LP totaldur)
+                      (define LL beats)
                       (set! ,tagtime (now))
                       (rmap beats offset ,f loopcnt totaldur ,@lsts)
                       (if ,(if (equal? run 'stop) #t #f)
@@ -148,3 +150,18 @@
           `(if (= 0 (modulo loopcnt ,m)) ,(car args) ,(cadr args)))
         (else 
           `(if (= 0 (modulo (+ ,(car args) loopcnt) ,m)) ,(cadr args) ,(caddr args)))))
+
+(define holder
+  (lambda ()
+    (let ((cache '()))
+      (lambda (lc expr LC LP LL)
+        (if (null? cache) (set! cache expr))
+        (if (and (= (modulo LP LL) 0)
+                 (= (modulo LC lc) 0))
+            (set! cache expr))
+        cache))))
+    
+(define-macro (hold h pos expr)
+  (let* ((localpos (modulo pos 1))
+        (num (- pos localpos)))
+    `(,h ,num ,expr LC LP LL)))
