@@ -692,11 +692,17 @@ if(UNIX)
     # build with as few deps as we can get away with
     ExternalProject_Add(sndfile
       PREFIX libsndfile
-      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-      INSTALL_COMMAND make install
-      BUILD_IN_SOURCE ON)
+	  URL https://github.com/erikd/libsndfile/archive/b4bd397ca74f4c72b9cabaae66fef0c3d5a8c527.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+	  # libsndfile config
+	  -DBUILD_PROGRAMS=OFF
+	  -DBUILD_EXAMPLES=OFF
+	  -DENABLE_COMPATIBLE_LIBSNDFILE_NAME=ON # although perhaps we don't want this?
+	  )
     set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
@@ -837,13 +843,21 @@ if(WIN32)
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
-    # aargh! sndfile on Windows still requires sh, sed, etc. and
-    # doesn't work. so we'll just grab the pre-built one manually. for
-    # the moment I've just hosted the (unmodified) libsndfile binaries
-    # (a bit of a hack), but you can get an installer from
-    # http://www.mega-nerd.com/libsndfile/#Download
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+    # build with as few deps as we can get away with
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+	  URL https://github.com/erikd/libsndfile/archive/b4bd397ca74f4c72b9cabaae66fef0c3d5a8c527.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+	  # libsndfile config
+	  -DBUILD_PROGRAMS=OFF
+	  -DBUILD_EXAMPLES=OFF
+	  -DENABLE_COMPATIBLE_LIBSNDFILE_NAME=ON # although perhaps we don't want this?
+	  )
+    set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   endif(EXTERNAL_SHLIBS_AUDIO)
 
