@@ -449,7 +449,7 @@ if(PACKAGE)
     PRIVATE -DEXT_SHARE_DIR=".")
   target_compile_options(extempore
     PRIVATE -mtune=generic)
-elseif(${EXT_SHARE_DIR})
+elseif(EXT_SHARE_DIR)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
 else()
