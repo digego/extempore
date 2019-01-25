@@ -630,6 +630,7 @@ else(WIN32)
   add_custom_target(aot_core)
   aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
   aotcompile_lib(libs/core/math.xtm core base)
+  aotcompile_lib(libs/core/rational.xtm core base)
   aotcompile_lib(libs/core/audiobuffer.xtm core base)
   aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
   aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
