@@ -716,7 +716,7 @@
 
 (define impc:ir:get-closure-type-from-str
   (lambda (string-type)
-    (impc:ir:get-function-type-from-str (regex:replace string-type "\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}" "$1"))))
+    (impc:ir:get-function-type-from-str (regex:replace string-type "^\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}.*$" "$1"))))
 
 
 (define impc:ir:get-function-type-from-str
@@ -756,7 +756,7 @@
             ((and (regex:match? base "^\\<.* x .*\\>\\**$")
                   (not (string-contains? base ",")))
              (cons (+ offset *impc:ir:vector*) (impc:ir:get-vector-type-from-str string-type)))
-            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*$")
+            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*\\)\\**}$")
              (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
                                         ;((regex:match? base "\\<?\\{.*\\}\\>?\\**")
             ((regex:match? base "^\\<?\\{.*\\}\\>?\\**$")
