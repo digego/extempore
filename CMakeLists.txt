@@ -449,7 +449,7 @@ if(PACKAGE)
     PRIVATE -DEXT_SHARE_DIR=".")
   target_compile_options(extempore
     PRIVATE -mtune=generic)
-elseif(${EXT_SHARE_DIR})
+elseif(EXT_SHARE_DIR)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
 else()
@@ -591,61 +591,49 @@ if(WIN32)
 else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but
-  # allows us to do AOT compilation in parallel
+  # allows us to do AOT compilation in parallell
 
   set(EXTEMPORE_AOT_COMPILE_PORT 17099)
-  set(AOT_DIR ${CMAKE_SOURCE_DIR}/libs/aot-cache)
 
-  function(aotcompile_lib libfile group) # deps are optional, and go at the end
+  macro(aotcompile_lib libfile group) # deps are optional, and go at the end
     get_filename_component(basename ${libfile} NAME_WE)
     set(targetname aot_${basename})
-    set(filename ${AOT_DIR}/xtm${basename}.so)
-
-    set(file_deps ${libfile})
-    set(target_deps)
-    foreach(dep ${ARGN})
-      set(file_deps ${file_deps} ${AOT_DIR}/xtm${dep}.so)
-      set(target_deps ${target_deps} aot_${dep})
-    endforeach()
-
+    set(filename ${CMAKE_SOURCE_DIR}/libs/aot-cache/xtm${basename}.so)
     if(PACKAGE)
       add_custom_command (OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --mcpu=generic --attr=none --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        DEPENDS ${file_deps}
         VERBATIM)
     else(PACKAGE)
       add_custom_command(OUTPUT ${filename}
         COMMAND extempore --nobase --noaudio --port=${EXTEMPORE_AOT_COMPILE_PORT}
         --eval "(impc:aot:compile-xtm-file \"${libfile}\")"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        DEPENDS ${file_deps}
         VERBATIM)
     endif(PACKAGE)
-
     add_custom_target(${targetname}
-      DEPENDS ${filename} ${target_deps} extempore)
-
+      DEPENDS ${filename} extempore)
     set_target_properties(${targetname} PROPERTIES FOLDER AOT)
-
     if(NOT ${group} STREQUAL "core")
       add_dependencies(${targetname} external_shlibs_${group})
       add_dependencies(aot_external_${group} ${targetname})
     endif()
-
+    foreach(dep ${ARGN})
+      add_dependencies(${targetname} aot_${dep})
+    endforeach()
     # decrement port number by 2
     math(EXPR EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT} - 2")
-    set(EXTEMPORE_AOT_COMPILE_PORT "${EXTEMPORE_AOT_COMPILE_PORT}" PARENT_SCOPE)
-  endfunction(aotcompile_lib)
+  endmacro(aotcompile_lib)
 
   # core
   add_custom_target(aot_core)
   aotcompile_lib(libs/base/base.xtm core) # no lib dependency for base.xtm
   aotcompile_lib(libs/core/math.xtm core base)
+  aotcompile_lib(libs/core/rational.xtm core base)
   aotcompile_lib(libs/core/audiobuffer.xtm core base)
-  aotcompile_lib(libs/core/audio_dsp.xtm core base math audiobuffer)
-  aotcompile_lib(libs/core/instruments.xtm core base math audio_dsp)
+  aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
+  aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
 
   set_target_properties(aot_core PROPERTIES FOLDER AOT)
   add_dependencies(aot_core extempore)
