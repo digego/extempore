@@ -28,7 +28,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/fft.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/fft.xtm" 'quiet))
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
@@ -49,7 +49,13 @@
         ((string=? (sys:platform) "Linux")
          "libkiss_fft.so")
         ((string=? (sys:platform) "Windows")
-         "kiss_fft.dll")))
+         "kiss_fft.dll"))
+  "xtmfft")
+
+;; import ll MUST come after bind-dylib
+(impc:aot:import-ll "xtmfft")
+
+
 
 (bind-alias kiss_fft_scalar float)
 (bind-alias kiss_fft_cpx Complexf)
@@ -172,6 +178,7 @@
 ;;  output timedata has nfft scalar points
 (bind-lib libkiss_fft kiss_fftri [void,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
 
+
 ;; complex input
 
 ;; this config for FORWARD FFT ONLY!
@@ -182,11 +189,13 @@
 (bind-func fft
   "calculate the FFT of an input signal"
   (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
-    (let ((config:kiss_fft_cfg (kiss_fft_alloc
-                                (i64toi32 len)
-                                0 null null)))
+    (println "calling into fft!!")
+    (let ((config:kiss_fft_cfg (kiss_fft_alloc (i64toi32 len) 0 null null)))
+      (printf "established config %p:%p:%p\n" config in out)
       (kiss_fft config in out)
+      (printf "called kiss_fft %p:%p:%p\n" config in out)
       (free config)
+      (printf "freed config %p:%p:%p\n" config in out)
       void)))
 
 (bind-func fft

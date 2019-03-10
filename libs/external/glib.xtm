@@ -11,7 +11,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/glib.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glib.xtm" 'quiet))
 (sys:load-preload-check 'glib)
 (define *xtmlib-glib-loaded* #f)
 
@@ -28,7 +28,11 @@
         ((string=? (sys:platform) "Linux")
          (list "libglib-2.0.so" "libglib-2.0.so.0"))
         ((string=? (sys:platform) "Windows")
-         "libglib-2.0-0.dll")))
+         "libglib-2.0-0.dll"))
+  "xtmglib")
+
+(impc:aot:import-ll "xtmglib")
+
 
 (bind-alias GRegex i8*) ;; GRegex in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GMatchInfo i8*) ;; GMatchInfo in GLib is actually an opaque struct (not pointer to struct)

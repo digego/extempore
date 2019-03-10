@@ -62,7 +62,7 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/portaudio.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/portaudio.xtm" 'quiet))
 (sys:load-preload-check 'portaudio)
 (define *xtmlib-portaudio-loaded* #f)
 
@@ -75,7 +75,10 @@
 (bind-dylib libportaudio
   (cond ((string=? (sys:platform) "OSX") "libportaudio.dylib")
         ((string=? (sys:platform) "Linux") "libportaudio.so")
-        ((string=? (sys:platform) "Windows") "libportaudio.dll")))
+        ((string=? (sys:platform) "Windows") "libportaudio.dll"))
+  "xtmportaudio")
+
+(impc:aot:import-ll "xtmportaudio")
 
 ;; /** Retrieve the release number of the currently running PortAudio build,
 ;;  eg 1900.

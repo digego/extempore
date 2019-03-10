@@ -53,6 +53,11 @@
 (define *impc:compiler:print-ast* #f)
 (define *impc:compiler:print-work-names #f) ;; this prints test__498 for example (i.e. closure bodies)
 (define *impc:compiler:verbose* #f)
+(define *impc:compiler:with-cache* #t)
+(define *impc:compiler:aot:dll* #t) ;; aot cache to dll (#t) or to llvm bitcode (#f)
+(define *impc:compiler:global-module-name* #f) 
+
+(define *impc:compile:scheme-stubs* #t) ;; compile scheme stubs - on/off
 
 (define *impc:compiler:print-raw-llvm* #f)
 
@@ -1282,8 +1287,8 @@
     ("atol" . #((213 2 108) "" ())) ;; libc
     ("audio_clock_base" . #((213 0) "" ())) ;; xtlang
     ("audio_clock_now" . #((213 0) "" ())) ;; xtlang
-    ("base64_decode" . #((213 108 108 2 2) "" ())) ;; xtlang
-    ("base64_encode" . #((213 108 108 2 2) "" ())) ;; xtlang
+    ("base64_decode" . #((213 108 108 2 102) "" ())) ;; xtlang
+    ("base64_encode" . #((213 108 108 2 102) "" ())) ;; xtlang
     ("calloc" . #((213 108 2 2) "" ())) ;; libc
     ("cbrt" . #((213 0 0) "" ())) ;; libm
     ("cbrtf" . #((213 1 1) "" ())) ;; libm
@@ -1291,8 +1296,8 @@
 ;;    ("check_address_type" . #((213 10 108 "%clsvar*" 108) "" ())) ;;internal
     ("clearerr" . #((213 -1 108) "" ())) ;; libc
     ("clock_clock" . #((213 0) "" ())) ;; xtlang
-    ("cname_decode" . #((213 108 108 2 2) "" ())) ;; xtlang
-    ("cname_encode" . #((213 108 108 2 2) "" ())) ;; xtlang
+    ("cname_decode" . #((213 108 108 2 102) "" ())) ;; xtlang
+    ("cname_encode" . #((213 108 108 2 102) "" ())) ;; xtlang
     ("copysign" . #((213 0 0 0) "" ())) ;; libm
     ("copysignf" . #((213 1 1 1) "" ())) ;; libm
     ("cosh" . #((213 0 0) "" ())) ;; libm
@@ -2654,6 +2659,8 @@
 (define *impc:aot:current-output-port* #f)
 (define *impc:aot:current-lib-name* "xtmdylib")
 (define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
+(define *impc:aot:win-link-libraries-exe* '(".\\libs\\builds\\extempore.lib"))
+
 (define *impc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
@@ -2722,7 +2729,7 @@
         (begin
           (write
            (list
-            'bind-lib-type
+            (if *impc:compiler:aot:dll* 'bind-lib-type 'register-lib-type)
             (string->symbol *impc:aot:current-lib-name*)
             (string->symbol name)
             (string->symbol (impc:ir:pretty-print-type type))
@@ -2736,7 +2743,7 @@
         (begin
           (write
            (list
-            'bind-lib-func
+            (if *impc:compiler:aot:dll* 'bind-lib-func 'register-lib-func)
             (string->symbol *impc:aot:current-lib-name*)
             (string->symbol name)
             (string->symbol (impc:ir:pretty-print-type type))
@@ -2749,6 +2756,8 @@
 (define impc:aot:insert-nativefunc-binding-details
   (lambda (lib-name func-name type docstring)
     (if (and (output-port? *impc:aot:current-output-port*)
+             ;; ignore if not dll
+             ;; *impc:compiler:aot:dll*
              ;; ignore the binding if we're just binding something
              ;; from an Extempore AOT-compiled library
              (not (and (>= (string-length (atom->string lib-name)) 3)
@@ -2777,7 +2786,7 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'bind-lib-val
+           (list (if *impc:compiler:aot:dll* 'bind-lib-val 'register-lib-val)
                  (string->symbol library)
                  (string->symbol name)
                  (string->symbol (impc:ir:pretty-print-type type))
@@ -2790,7 +2799,7 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'bind-ext-val
+           (list (if *impc:compiler:aot:dll* 'bind-ext-val 'register-ext-val)
                  (string->symbol name)
                  (string->symbol (impc:ir:pretty-print-type type))
                  docstring)
@@ -2798,8 +2807,9 @@
           (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-load-dylib-details
-  (lambda (library lib-path)
-    (if (output-port? *impc:aot:current-output-port*)
+  (lambda (library lib-path . args)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             #t) ;*impc:compiler:aot:dll*)
         (begin
           (write
            (list 'bind-dylib library `(list ,@lib-path))
@@ -2812,7 +2822,13 @@
                          " dynamic library - perhaps you can install it through your package manager?\n")
                   (error "")))
            *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)
+          (if (and (not (null? args)) (string? (car args))) 
+              (begin
+                (write (list 'bind-external-dylib-declarations (symbol->string library) (car args))
+                       *impc:aot:current-output-port*)
+                (newline  *impc:aot:current-output-port*)))
+          ))))
 
 ;; don't need specialised ones for these:
 
@@ -2873,6 +2889,96 @@
          ;; whatever happens, set the port back to the original value
          (set! *impc:aot:current-output-port* aot-compilation-port))
        (begin ,@forms)))
+
+(define impc:aot:compile-exe
+  (lambda (module-name module)
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
+      (let* ((platform (sys:platform))
+             (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
+             (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj"))) ; could skip .o (straight to .so)
+             (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/builds/")))
+             (output-exe-path (string-append output-dir module-name
+                                               (cond ((string=? platform "Linux") "")
+                                                     ((string=? platform "OSX") "")
+                                                     ((string=? platform "Windows") ".exe"))))
+             (link-libs (if (string=? platform "Windows")
+                            *impc:aot:win-link-libraries-exe*
+                            '()))
+             (optimize-compiles? #t)
+             (llc-command
+              (unix-or-Windows (string-append
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                                " -filetype=obj "
+                                (if (and (string=? (sys:platform) "OSX")
+                                         (sys:cmdarg "mcpu")
+                                         (not (string=? (sys:cmdarg "mcpu") "")))
+                                    (string-append "-mcpu="
+                                                   (sys:cmdarg "mcpu")
+                                                   " ")
+                                    "")
+                                bc-path " -o " asm-path)
+                               (string-append
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                                " -filetype=obj -mtriple=x86_64-pc-win32 "
+                                bc-path)))
+             (link-command
+              (unix-or-Windows (string-append
+                                (cond ((string=? platform "Linux")
+                                       (string-append "gcc "
+                                                      (if optimize-compiles? "-O3 -g" "-g -O0")
+                                                      ""))
+                                      ((string=? platform "OSX")
+                                       (string-append "clang "
+                                                      (if optimize-compiles? "-O3" "-g -O0")
+                                                      "")))
+                                asm-path
+                                " -o " output-exe-path)
+                               (string-append
+                                "call link"
+                                ;; (sanitize-platform-path (sys:share-dir))
+                                ;; "\\extras\\ms_build_vars.bat && link"
+                                ;; " /FORCE:UNRESOLVED "
+                                " /LIBPATH:\"C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.16.27023/lib/x64\""
+                                " /LIBPATH:\"C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/SDK/ScopeCppSDK/SDK/lib\""
+                                " /MACHINE:x64"
+                                " /SUBSYSTEM:CONSOLE"
+                                " /OUT:" output-exe-path
+                                " " (string-join link-libs " ")
+                                ;; (string-append tmp-dir module-name ".lib ")
+                                " msvcrt.lib legacy_stdio_definitions.lib "
+                                asm-path))))
+        (print "Using llc " llc-path "...\n\n")
+        (begin
+          (print-with-colors 'black 'yellow #t (print " Exporting executable "))
+          (print "\n  " bc-path "\n\n"))
+        ;; make sure tmp-dir exists
+        (sys:command (string-append (unix-or-Windows "mkdir " "md ") tmp-dir))
+        ;; (sys:command (string-append "rm " bc-path " " asm-path " " output-shlib-path))
+        (llvm:export-module module bc-path)
+        (let ((llc-res 0)
+              (linker-res 0))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
+            (print "\n  " llc-command "\n\n"))
+          (set! llc-res (sys:command llc-command))
+          (if (<> llc-res 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "llc command failed with exit code " llc-res "\n"))
+                     (quit 1)))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Compiling native executable "))
+            (print "\n  " link-command "\n\n"))
+          (set! linker-res (sys:command link-command))
+          (if (<> linker-res 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "linking failed with exit code " linker-res "\n"))
+                     (quit 1))
+              (begin
+                (print-with-colors 'black 'green #t (print " Succesfully compiled "))
+                (print "\n  " output-exe-path "\n\n"))))))))
 
 (define impc:aot:compile-module
   (lambda (module-name module)
@@ -2968,26 +3074,39 @@
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
-          (display (string-append "(bind-dylib " libname " \"" libname
-                                  (cond ((string=? (sys:platform) "Linux") ".so\")\n")
-                                        ((string=? (sys:platform) "Windows") ".dll\")\n")
-                                        ((string=? (sys:platform) "OSX") ".dylib\")\n")))
+          (display (string-append "\n(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
+                          libname "))\n(print \" library... \")\n")
                    *impc:aot:current-output-port*)
-          (write
-           `(if (not ,(string->symbol libname))
-                (begin
-                  (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
-                  (print ": could not load the AOT-compilied " ,libname
-                         " dynamic library\n")
-                  (error "")))
-           *impc:aot:current-output-port*)
-          (display (string-append "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
-                                  libname "))\n(print \" library... \")\n")
-                   *impc:aot:current-output-port*)
+          (if *impc:compiler:aot:dll*
+              (begin
+                (display (string-append "(bind-dylib " libname " \"" libname
+                                        (cond ((string=? (sys:platform) "Linux") ".so\")\n")
+                                              ((string=? (sys:platform) "Windows") ".dll\")\n")
+                                              ((string=? (sys:platform) "OSX") ".dylib\")\n")))
+                        *impc:aot:current-output-port*)
+                (write
+                `(if (not ,(string->symbol libname))
+                      (begin
+                        (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                        (print ": could not load the AOT-compilied " ,libname
+                              " dynamic library\n")
+                        (error "")))
+                 *impc:aot:current-output-port*)
+                (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
+                                  "(impc:compiler:flush-jit-compilation-queue)\n")
+                   *impc:aot:current-output-port*)))))))
+
+(define impc:aot:import-ll
+  (lambda (libname)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             (not *impc:compiler:aot:dll*))
+        (begin
+          (write `(llvm:compile-ir (sys:slurp-file ,(string-append "libs/aot-cache/" libname ".ll")))
+                  *impc:aot:current-output-port*)
           (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
                                   "(impc:compiler:flush-jit-compilation-queue)\n")
                    *impc:aot:current-output-port*)))))
@@ -2998,9 +3117,9 @@
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
                    *impc:aot:current-output-port*)
-          (display (string-append "(print \" in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
+          (display (string-append "(print \" in\" (- (clock:clock) *xtmlib-" (substring libname 3) "-loaded*) \"seconds\\n\")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
                    *impc:aot:current-output-port*)))))
@@ -3009,7 +3128,7 @@
   (lambda (start-time)
     (print-with-colors 'yellow 'default #t
                        (print "Total compile time: "))
-    (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
+    (print (- (clock:clock) start-time) "seconds\n\n")
     (print-with-colors 'black 'blue #t (print " Types "))
     (print "\n  " (length *impc:ti:typealias-cache*))
     (print-with-colors 'cyan 'default #f (print " type aliases\n"))
@@ -3052,9 +3171,155 @@
 (if (string=? (sys:platform) "Windows")
     (Windows-add-libdir-to-PATH))
 
-(define impc:aot:compile-xtm-file
+(define impc:aot:compile-xtm-exe
+  (lambda (file-path)
+    (let* ((start-time (clock:clock))
+           (file-no-extension (filename-strip-extension file-path))
+           (aot-compilation-file (string-append file-no-extension ".exe"))
+           (in-file-port (open-input-file (sanitize-platform-path file-path))))
+      (set! *impc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
+      (set! *impc:aot:func-defs-in-mod* '())
+      (if (impc:aot:currently-compiling?)
+          (begin
+            (llvm:optimize #t); // should this be restored later?
+            ;; this is the 'success' branch
+            (set! *impc:aot:current-lib-name* file-no-extension)
+            ;; (impc:aot:insert-header libname-no-extension)
+            ;; turn off scheme stubs!
+            (set! *impc:compile:scheme-stubs* #f)
+            ;; turn off aot-cache loading
+            (set! *impc:compiler:with-cache* #f)
+            (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+            (println file-path)
+            (println)
+            (sys:load file-path)
+            (println)
+            (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) *impc:ti:closure-cache*)))
+            (llvm:compile-ir 
+              (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
+              all-closure-setters
+              ;; "call void @test22_adhoc_W2kzMl0_setter();\n"
+              ;; "call void @run_adhoc_W2kzMixpMzIsaTgqKl0_setter();\n"
+              "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
+              ret i32 %res;
+            }"))
+            (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+            (println file-path)
+            (println)
+            ;; turn back on scheme stubs
+            (set! *impc:compile:scheme-stubs* #t)
+            ;; turn back on cache loading
+            (set! *impc:compiler:with-cache* #t)
+            (begin
+              (println)
+              (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+              (print "\n"))
+            (let ((module (impc:compiler:flush-jit-compilation-queue)))
+              (if (not module)
+                  (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
+                (impc:aot:compile-exe file-no-extension module))
+            (set! *impc:aot:current-output-port* #f) 
+            ;; (close-port *impc:aot:current-output-port*)
+            (quit 0))
+          (begin
+            (begin (print-with-colors 'black 'red #t (print " Error "))
+              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
+              (quit 2)))))))
+
+;; 
+;; any 'declare' (external declarations) found in an llvm ll 'lib file'
+;; must belong to a single DLL specified BEFORE the aot header in main library file
+;;
+(define bind-external-dylib-declarations
+  (lambda (libname ll-file-path)
+    (for-each (lambda (m)
+                (let* ((res (regex:matched m "declare cc 0.*@([^(]*).*nounwind"))
+                       (result (eval `(llvm:bind-symbol ,(string->symbol libname) ,(cadr res)))))
+                  (if (not result) (println "Error binding " res " to " libname " in declaration from " ll-file-path))))
+         (regex:match-all (sys:slurp-file (string-append "libs/aot-cache/" ll-file-path ".ll")) "declare cc 0.*@([^(]*).*nounwind"))
+    #t))
+
+;; aot compile llvm bitcode (bc)
+(define impc:aot:compile-xtm-ll
   (lambda (lib-path)
-    (let ((start-time (now))
+    (set! *impc:compiler:aot:dll* #f)
+    (let ((start-time (clock:clock))
+          (in-file-port (or
+                         (open-input-file (sanitize-platform-path lib-path))
+                         (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
+      (if (not in-file-port)
+          (begin (print-with-colors 'black 'red #t
+                                    (print "Error:"))
+                 (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
+          (let* ((res (close-port in-file-port))
+                 (libname (sanitize-platform-path (filename-from-path lib-path)))
+                 (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
+                 (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
+                 (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
+            (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
+                (begin (print "AOT-compilation file not written ")
+                       (close-port *impc:aot:current-output-port*)
+                       (set! *impc:aot:current-output-port* #f))
+                (begin
+                  ;; if the preload check passes, create aot-cache dir
+                  ;; if it doesn't exist
+                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
+                  ;; remove old AOT file if present
+                  (if (file-exists? aot-compilation-file-path)
+                      (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))
+                  ;; remove old LL file if present
+                  (if (file-exists? ll-path)
+                      (sys:command (string-append (unix-or-Windows "rm " "DEL ") ll-path)))
+                  ;; open output file, ready for writing
+                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *impc:aot:func-defs-in-mod* '())
+                  (if (impc:aot:currently-compiling?)
+                      (begin
+                        (llvm:optimize #t); // should this be restored later?
+                        ;; this is the 'success' branch
+                        (set! *impc:aot:current-lib-name* libname-no-extension)
+                        ;; module name for globals
+                        (set! *impc:compiler:global-module-name* libname-no-extension)
+                        ;; (impc:aot:insert-header libname-no-extension)
+                        (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+                        (println lib-path)
+                        (println)
+                        (sys:load lib-path)
+                        (println)
+                        (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+                        (println lib-path)
+                        (println)
+                        (begin
+                          (println)
+                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+                          (print "\n"))
+                        (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
+                        ; (call-with-output-file ll-path
+                        ;   (lambda (output-port)
+                        ;     (display *impc:compiler:queued-llvm-ir-string* output-port)))
+                        (close-port *impc:aot:current-output-port*)
+                        (set! *impc:compiler:global-module-name* #f)
+                        (set! *impc:aot:current-lib-name* "xtmdylib")
+                        (if  *impc:aot:current-output-port*
+                             (begin (set! *impc:aot:current-output-port* #f)
+                                    (print "Successfully wrote file to ")
+                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
+                                    (impc:aot:print-compilation-details start-time)
+                                    (quit 0))
+                             (begin (print-with-colors 'black 'red #t (print " Error "))
+                                    (print "\n\nsomething went wrong in writing the output file ")
+                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                                    (quit 1))))
+                      (begin (print-with-colors 'black 'red #t (print " Error "))
+                             (print "\n\ncannot write file at " aot-compilation-file-path "\n")
+                             (quit 2))))))))))
+
+
+(define impc:aot:compile-xtm-dll
+  (lambda (lib-path)
+    (set! *impc:compiler:aot:dll* #t)
+    (let ((start-time (clock:clock))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
                          (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
@@ -3116,11 +3381,15 @@
                                     (print "\n\nsomething went wrong in writing the output file ")
                                     (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
                                     (quit 1))))
-                      (begin (print-with-colors 'black 'red #t
-                                                (print " Error "))
+                      (begin (print-with-colors 'black 'red #t (print " Error "))
                              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (quit 2))))))))))
 
+(define impc:aot:compile-xtm-file
+  (lambda (lib-path . dll)
+    (if (and (not (null? dll)) (car dll))
+        (impc:aot:compile-xtm-dll lib-path)
+        (impc:aot:compile-xtm-ll lib-path))))    
 
 (define icr:new-zone
   (lambda args
@@ -10010,7 +10279,8 @@ xtlang's `let' syntax is the same as Scheme"
         (if (and *impc:compile* compile-stub?)
             (begin (impc:compiler:queue-ir-for-compilation stub-ir)
                    (impc:compiler:queue-ir-for-compilation native-ir)
-                   (if scheme-stub-valid? (impc:compiler:queue-ir-for-compilation scheme-stub-ir) #t)))
+                   (if (and scheme-stub-valid? *impc:compile:scheme-stubs*) 
+                       (impc:compiler:queue-ir-for-compilation scheme-stub-ir) #t)))
         (if *impc:compiler:print*
             (println '----------------------------compiling 'callback----------------------------------->))
         (if *impc:compiler:print* (print-full-nq callback-ir))
@@ -10728,15 +10998,26 @@ xtlang's `let' syntax is the same as Scheme"
       (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
       (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
       (impc:compiler:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
-
+  
 (impc:ti:register-new-builtin
  "bind-ext-val"
  ""
  "bind an external global variable"
  '(variable-name type optional-value optional-docstring))
 
+(define-macro (register-ext-val symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      ; (llvm:compile-ir
+      ;   (string-append "@" ,(symbol->string symname) " = external global " (impc:ir:get-type-str type-list)))
+      (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
+      (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+      (impc:compiler:print-binding-details-to-log "register-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
-  ;; (println 'poly: poly_sym implementation_sym)
   (if (impc:ti:genericfunc-exists? implementation_sym)
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
   (if (not (impc:ti:closure-or-nativefunc-exists? (symbol->string implementation_sym)))
@@ -10815,11 +11096,11 @@ xtlang's `let' syntax is the same as Scheme"
             (print " dynamic library\n")
             (error ""))))))
 
-(define-macro (bind-dylib library lib-path)
+(define-macro (bind-dylib library lib-path . args)
   (let ((path (eval lib-path)))
     (if (string? path)
         (set! path (list path)))
-    (impc:aot:insert-load-dylib-details library path)
+    (apply impc:aot:insert-load-dylib-details library path args)
     `(impc:ti:bind-dylib ',library ',path)))
 
 (impc:ti:register-new-builtin
@@ -10856,35 +11137,40 @@ e.g.
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib
   (lambda (library symname type calling-convention docstring)
-    (if (not (eval library))
-        (impc:compiler:print-compiler-error
-         (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
-        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-               (ir-string (string-append "declare "
-                                         "cc " (atom->string calling-convention)
-                                         " "
-                                         (impc:ir:get-type-str (car ctype))
-                                         " @"
-                                         (symbol->string symname)
-                                         "("
-                                         (if (null? (cdr ctype))
-                                             ""
-                                             (apply string-append
-                                                    (impc:ir:get-type-str (cadr ctype))
-                                                    (map (lambda (v)
-                                                           (string-append "," (impc:ir:get-type-str v)))
-                                                         (cddr ctype))))
-                                         ") nounwind")))
-          (if (and (llvm:compile-ir ir-string)
-                   (llvm:bind-symbol (eval library) (symbol->string symname)))
-              (begin
-                (if (output-port? *impc:aot:current-output-port*)
-                    (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
-                           (newline *impc:aot:current-output-port*)))
-                (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
-                (impc:compiler:print-lib-binding-details-to-log library symname type)
-                (impc:aot:insert-nativefunc-binding-details library symname type docstring))
-              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
+    (if (llvm:get-function (symbol->string symname)) ;; if already bound!
+        (begin
+          (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+          (impc:compiler:print-lib-binding-details-to-log library symname type)
+          (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+        (if (not (eval library))
+            (impc:compiler:print-compiler-error
+              (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+            (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+                  (ir-string (string-append "declare "
+                                            "cc " (atom->string calling-convention)
+                                            " "
+                                            (impc:ir:get-type-str (car ctype))
+                                            " @"
+                                            (symbol->string symname)
+                                            "("
+                                            (if (null? (cdr ctype))
+                                                ""
+                                                (apply string-append
+                                                        (impc:ir:get-type-str (cadr ctype))
+                                                        (map (lambda (v)
+                                                              (string-append "," (impc:ir:get-type-str v)))
+                                                            (cddr ctype))))
+                                            ") nounwind")))
+              (if (and (llvm:compile-ir ir-string)
+                      (llvm:bind-symbol (eval library) (symbol->string symname)))
+                  (begin
+                    (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
+                        (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*)))
+                    (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                    (impc:compiler:print-lib-binding-details-to-log library symname type)
+                    (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+                  (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname)))))))))
 
 (define-macro (unbind-func symname)
   `(begin
@@ -10910,6 +11196,15 @@ e.g.
                                            ',(impc:ir:get-type-from-pretty-str typestr namestr)
                                            ,docstring)
            (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
+  
+(define-macro (register-lib-type library name type docstring)
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type)))
+    `(impc:ti:register-new-namedtype ,namestr
+                                      ',(impc:ir:get-type-from-pretty-str typestr namestr)
+                                      ,docstring)))
+
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
@@ -10947,6 +11242,20 @@ e.g.
                                                  ,(symbol->string type))
      (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
                                                ,zone-size)))
+  
+(define-macro (register-lib-func library symname type zone-size docstring body)
+  `(begin
+     ;; bind scheme function
+     (impc:ti:register-new-closure ,(symbol->string symname)
+                                   (impc:ir:get-type-from-pretty-str ,(symbol->string type))
+                                   ,zone-size
+                                   ,docstring
+                                   ,body)
+     (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                 ,(symbol->string symname)
+                                                 ,(symbol->string type))
+     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname) ,zone-size)))
+
 
 (define-macro (bind-lib-val library symname type . docstring)
   `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
@@ -10973,6 +11282,24 @@ e.g.
                                                             ,(symbol->string symname)
                                                             " from library "
                                                             ,(symbol->string library))))))
+
+(define-macro (register-lib-val library symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      (begin
+           (impc:ti:register-new-globalvar ,(symbol->string symname)
+                                           type-list
+                                           ds)
+           (impc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                      ,(symbol->string symname)
+                                                      ,(symbol->string type)
+                                                      ds)
+           (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                       ,(symbol->string symname)
+                                                       ,(symbol->string type)))))
 
 ;; THIS IS A HELPER FUNCTION
 ;;

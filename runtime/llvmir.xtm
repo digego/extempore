@@ -1242,12 +1242,16 @@
 (define impc:ir:make-const-string
   (lambda (ast)
     (let* ((os (make-string 0))
-           (lgthstr (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
-           (lgth (number->string (+ (string-length lgthstr) 1)))
+           (lgthstr1 (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
+           (lgthstr2 (if (and *impc:aot:current-output-port* (not *impc:compiler:aot:dll*)) 
+                         (regex:replace-all lgthstr1 "[\n]" "x") ;(if (string=? (sys:platform) "Windows") "xx" "x"))
+                         lgthstr1))
+           (lgth (number->string (+ (string-length lgthstr2) 1))) ;; unix & windows above just used to determine string length
            (strtyp (string-append "[" lgth " x i8]*"))
-           (strname (string-append "@gs" (if #f ;;(< (string-length ast) 1024)
-                                             (cname-encode ast)
-                                             (number->string *impc:ir:gstrcnt*))))
+           (strname (string-append "@gs" (if (string? *impc:compiler:global-module-name*) *impc:compiler:global-module-name* "") 
+                                   (if #f ;;(< (string-length ast) 1024)
+                                       (cname-encode ast)
+                                       (number->string *impc:ir:gstrcnt*))))
            (strsym '()))
       (if (not (llvm:get-llvm-alias ast))
           (let ((compile-str (string-append strname

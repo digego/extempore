@@ -10,7 +10,7 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/nanomsg.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/nanomsg.xtm" 'quiet))
 (sys:load-preload-check 'nanomsg)
 (define *xtmlib-nanomsg-loaded* #f)
 
@@ -28,7 +28,11 @@
         ((string=? (sys:platform) "Linux")
          "libnanomsg.so")
         ((string=? (sys:platform) "Windows")
-         "libnanomsg.dll")))
+         "libnanomsg.dll"))
+  "xtmnanomsg")
+
+(impc:aot:import-ll "xtmnanomsg")
+
 
 ;; /******************************************************************************/
 ;; /*  ABI versioning support.                                                   */

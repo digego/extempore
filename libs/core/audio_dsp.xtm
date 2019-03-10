@@ -25,7 +25,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/audio_dsp.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audio_dsp.xtm" 'quiet))
 (sys:load-preload-check 'audio_dsp)
 (define *xtmlib-audio_dsp-loaded* #f)
 
@@ -37,6 +37,7 @@
  (sys:load "libs/core/audiobuffer.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudio_dsp")
+(impc:aot:import-ll "xtmaudio_dsp")
 
 (bind-func print_audio_state
   (lambda ()
@@ -740,7 +741,25 @@
           (set! out (* out -1.0)))
       out)))
 
-(sys:load "libs/core/bleptables.xtm")
+;; (sys:load "libs/core/bleptables.xtm")
+
+(bind-val BLEPTable |4096,double|* (halloc (* 4096 8)))
+(bind-val fBLEPTable |4096,float|* (halloc (* 4096 4)))
+(bind-val BLEPTable_8_BLKHAR |4096,double|* (halloc (* 4096 8)))
+(bind-val fBLEPTable_8_BLKHAR |4096,float|* (halloc (* 4096 4)))
+
+(bind-func load_blep_tables_from_blob
+  (lambda (fname:i8*)
+    (let ((fptr (fopen fname "rb")))
+      (fread (convert BLEPTable) (* 4096 8) 1 fptr)
+      (fread (convert fBLEPTable) (* 4096 4) 1 fptr)
+      (fread (convert BLEPTable_8_BLKHAR) (* 4096 8) 1 fptr)
+      (fread (convert fBLEPTable_8_BLKHAR) (* 4096 4) 1 fptr)
+      (fclose fptr)
+      void)))
+
+(impc:aot:do-or-emit
+  ($ (load_blep_tables_from_blob "libs/core/bleptables.dump")))
 
 (bind-func LinTerp
   (lambda (x1:SAMPLE x2 y1 y2 x)

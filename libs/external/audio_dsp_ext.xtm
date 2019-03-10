@@ -18,7 +18,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet))
 (sys:load-preload-check 'audio_dsp_ext)
 (define *xtmlib-audio_dsp_ext-loaded* #f)
 
@@ -30,6 +30,7 @@
  (sys:load "libs/external/sndfile.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudio_dsp_ext")
+(impc:aot:import-ll "xtmaudio_dsp_ext")
 
 ;; are we using float or double precision complex numbers for our
 ;; samples?

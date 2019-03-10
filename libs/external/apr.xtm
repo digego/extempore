@@ -29,7 +29,7 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/apr.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/apr.xtm" 'quiet))
 (sys:load-preload-check 'apr)
 (define *xtmlib-apr-loaded* #f)
 
@@ -45,7 +45,10 @@
          (list "libapr-1.0.dylib"
                "/usr/local/opt/apr/libexec/lib/libapr-1.0.dylib"))
         ((string=? (sys:platform) "Linux") "libapr.so")
-        ((string=? (sys:platform) "Windows") "libapr-1.dll")))
+        ((string=? (sys:platform) "Windows") "libapr-1.dll"))
+  "xtmapr")
+
+(impc:aot:import-ll "xtmapr")
 
 (bind-alias apr_status_t i32) ;; int
 (bind-alias apr_time_t i64)

@@ -241,13 +241,18 @@ void* SchemeProcess::taskImpl()
     if (m_name == "primary") {
         EXTMonitor::ScopedLock lock(m_guard);
         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
-                new std::string("(sys:compile-init-ll)"), "file_init",
-                    SchemeTask::Type::LOCAL_PROCESS_STRING));
+            new std::string("(sys:compile-init-ll)"), "file_init",
+                SchemeTask::Type::LOCAL_PROCESS_STRING));
+
         if (extemp::UNIV::EXT_LOADBASE) {
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
                     new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"), "file_init",
                         SchemeTask::Type::LOCAL_PROCESS_STRING));
-        }
+        } /* else {
+            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+                    new std::string("(sys:compile-init-ll)"), "file_init",
+                        SchemeTask::Type::LOCAL_PROCESS_STRING));
+        } */
         if (!m_initExpr.empty()) {
             ascii_text_color(0, 5, 10);
             printf("\nEvaluating expression: ");

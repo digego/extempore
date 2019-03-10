@@ -10,7 +10,7 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/opencl.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/opencl.xtm" 'quiet))
 (sys:load-preload-check 'opencl)
 (define *xtmlib-opencl-loaded* #f)
 
@@ -27,7 +27,11 @@
         ((string=? (sys:platform) "Linux")
          "libcl.so")
         ((string=? (sys:platform) "Windows")
-         "libcl.dll")))
+         "libcl.dll"))
+  "xtmopencl")
+
+
+(impc:aot:import-ll "xtmopencl")
 
 ;;;;;;;;;;;;;;;;;;;
 ;; cl_platform.h ;;

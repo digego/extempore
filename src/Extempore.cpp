@@ -120,7 +120,7 @@ void sig_handler(int Signo)
 
 #endif
 
-enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
+enum { OPT_COMPILE_STR, OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
@@ -131,6 +131,7 @@ enum { OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
+    { OPT_COMPILE_STR,    "--compile",       SO_REQ_SEP    },
     { OPT_SHAREDIR,       "--runtime",       SO_REQ_SEP    },
     { OPT_SHAREDIR,       "--sharedir",      SO_REQ_SEP    },
     { OPT_NOBASE,         "--nobase",        SO_NONE       },
@@ -158,7 +159,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     SO_END_OF_OPTIONS
 };
 
-int main(int argc, char** argv)
+EXPORT int extempore_init(int argc, char** argv)
 {
     std::string initexpr;
     std::string host("localhost");
@@ -187,6 +188,20 @@ int main(int argc, char** argv)
     while (args.Next()) {
         if (args.LastError() == SO_SUCCESS) {
             switch(args.OptionId()) {
+            case OPT_COMPILE_STR:
+				{
+					size_t start_pos = 0;
+					std::string str(args.OptionArg());
+					std::string from("\\");
+					std::string to("\\\\");
+					while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+						str.replace(start_pos, from.length(), to);
+						start_pos += to.length();
+					}
+					extemp::UNIV::EXT_LOADBASE = false; // never load base when compiling
+					initexpr = std::string("(impc:aot:compile-xtm-exe \"") + str + std::string("\")");
+				}
+                break;
             case OPT_SHAREDIR:
                 extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
                 break;
@@ -215,6 +230,7 @@ int main(int argc, char** argv)
                         str.replace(start_pos, from.length(), to);
                         start_pos += to.length();
                     }
+					extemp::UNIV::EXT_LOADBASE = false; // never load base when compiling
                     initexpr = std::string("(sys:load \"") + str + std::string("\")");
                 }
                 break;
@@ -293,7 +309,7 @@ int main(int argc, char** argv)
                 std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
                 std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
-                std::cout << "           --nobase: don't load base lib on startup" << std::endl;
+                std::cout << "          --nobase: don't load base lib on startup" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
                 std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
@@ -308,6 +324,7 @@ int main(int argc, char** argv)
                 std::cout << "            --arch: the target architecture [current host]" << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
                 std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
+				std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
                 std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
                 std::_Exit(0);
             }
@@ -332,7 +349,7 @@ int main(int argc, char** argv)
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_default();
-    std::cout << "Andrew Sorensen (c) 2010-2016" << std::endl;
+    std::cout << "Andrew Sorensen (c) 2010-2019" << std::endl;
     std::cout << "andrew@moso.com.au, @digego" << std::endl;
     std::cout << std::endl;
     ascii_default();
@@ -360,8 +377,11 @@ int main(int argc, char** argv)
         dev->start();
     } else {
 #ifdef _WIN32
-        printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
-        exit(1);
+        //printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
+        //exit(1);
+        if (extemp::UNIV::TIME_DIVISION == 1) {
+            extemp::UNIV::TIME_DIVISION = 4;
+        }
 #else
         // don't need this anymore, but we do need timediv to be > 1
         if (extemp::UNIV::TIME_DIVISION == 1) {
@@ -418,4 +438,8 @@ int main(int argc, char** argv)
     primary->start(true); // this will not return
 #endif // end SUBSUME_PRIMARY
     return 0;
+}
+
+int main(int argc, char** argv) {
+    return extempore_init(argc, argv);
 }

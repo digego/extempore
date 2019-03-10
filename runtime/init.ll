@@ -47,10 +47,10 @@ declare i8* @rreplace(i8*,i8*,i8*,i8*)
 
 ;; base64 stuff
 ;; i64's here should be size_t !!!
-declare i8* @base64_encode(i8*,i64,i64)
-declare i8* @base64_decode(i8*,i64,i64)
-declare i8* @cname_encode(i8*,i64,i64)
-declare i8* @cname_decode(i8*,i64,i64)
+declare i8* @base64_encode(i8*,i64,i64*)
+declare i8* @base64_decode(i8*,i64,i64*)
+declare i8* @cname_encode(i8*,i64,i64*)
+declare i8* @cname_decode(i8*,i64,i64*)
 
 declare double @clock_clock()
 declare double @audio_clock_base()

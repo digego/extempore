@@ -38,7 +38,7 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/sndfile.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/sndfile.xtm" 'quiet))
 (sys:load-preload-check 'sndfile)
 (define *xtmlib-sndfile-loaded* #f)
 
@@ -51,7 +51,10 @@
 (bind-dylib libsndfile
   (cond ((string=? (sys:platform) "OSX") "libsndfile.dylib")
         ((string=? (sys:platform) "Linux") "libsndfile.so")
-        ((string=? (sys:platform) "Windows") "libsndfile-1.dll")))
+        ((string=? (sys:platform) "Windows") "libsndfile-1.dll"))
+  "xtmsndfile")
+
+(impc:aot:import-ll "xtmsndfile")
 
 ;; /* The following file types can be read and written.
 ;; ** A file type would consist of a major type (ie SF_FORMAT_WAV) bitwise

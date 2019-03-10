@@ -33,8 +33,9 @@
 
 ;; load samples 
 ;; (load-samples samp1 "assets/samples/808/")
+(println "load samples")
 (load-samples samp1 "assets/samples/piano/")
-
+(println "loaded samples")
 ;; 
 ;; setup multicore dsp playback
 ;;
@@ -164,8 +165,8 @@
 ;         0.0)))
 
 (bind-func dspmt:DSPMT
-  (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
-                              "assets/ir/minsterr.aif"))
+  (let (;(reverb (creverb_st_c "assets/ir/minsterl.aif"
+        ;                      "assets/ir/minsterr.aif"))
         (r1 0.0)
         (r2 0.0)
         (r3 0.0)
@@ -175,14 +176,14 @@
         (gain 2.0)
         (rmix 1.0))
     (lambda (in time chan dat)
-      (if (> rmix 0.001)
-          (set! rev (reverb chan 
-                        (+ (* r1 (pref in 0))
-                           (* r2 (pref in 1))
-                           (* r3 (pref in 2))
-                           (* r4 (pref in 3))
-                           (* r5 (pref in 4)))
-                        0.0 1.0)))
+      ; (if (> rmix 0.001)
+      ;     (set! rev (reverb chan 
+      ;                   (+ (* r1 (pref in 0))
+      ;                      (* r2 (pref in 1))
+      ;                      (* r3 (pref in 2))
+      ;                      (* r4 (pref in 3))
+      ;                      (* r5 (pref in 4)))
+      ;                   0.0 1.0)))
       (+  (* rmix rev)
           (* gain
             (+ (pref in 0)
@@ -288,7 +289,7 @@
 ;; setup MIDI
 ;; 
 
-(load "examples/sharedsystem/midisetup.xtm")
+(sys:load "examples/sharedsystem/midisetup.xtm")
 
 ;; override midi_cc for analogue chans  1, 2 and 3
 (bind-func midi_cc

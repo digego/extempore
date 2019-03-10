@@ -155,6 +155,7 @@ namespace extemp
 {
 
 AudioDevice AudioDevice::SINGLETON;
+// AudioDevice* AudioDevice::SINGLETON = NULL;
 
 double AudioDevice::REALTIME = 0.0;
 double AudioDevice::CLOCKBASE = 0.0;
