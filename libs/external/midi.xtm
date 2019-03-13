@@ -34,7 +34,7 @@
 
 (if *impc:compiler:with-cache* (sys:load "libs/aot-cache/midi.xtm" 'quiet))
 (sys:load-preload-check 'midi)
-(define *xtmlib-midi-loaded* #f)
+(define *xtmlib-midi-loaded* #t)
 
 (impc:aot:suppress-aot-do (sys:load "libs/core/scheduler.xtm"))
 (impc:aot:suppress-aot-do (sys:load "libs/external/portmidi.xtm"))
@@ -49,7 +49,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
 ;; midi event queue
 
-(bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double>)
+(bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double> (printer? . #f))
 (bind-func get_midi_evt_type (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) -1 (tref obj 0))))
 (bind-func get_midi_evt_a (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 1))))
 (bind-func get_midi_evt_b (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 2))))
@@ -307,18 +307,17 @@
               (else #f))))
     (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur)))
 
-
-;; startup
-
-(pm_initialize)
-(pm_print_devices)
-
-; (impc:aot:do-or-emit
-;   ($ (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
-
 (bind-func start_midi_scheduler
   (lambda ()     
     (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
+
+;; startup
+(impc:aot:do-or-emit
+  (begin (pm_initialize)
+         (pm_print_devices)))
+
+; (impc:aot:do-or-emit
+;   ($ (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 (define *xtmlib-midi-loaded* #t)
 

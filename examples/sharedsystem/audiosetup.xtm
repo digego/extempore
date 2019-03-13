@@ -14,7 +14,7 @@
 (sys:load "libs/external/audio_dsp_ext.xtm")
 ; (sys:load "libs/external/midi.xtm")
 ; (sys:load "libs/core/looper.xtm")
-(sys:load "libs/core/instruments/analogue_midi.xtm")
+; (sys:load "libs/core/instruments/analogue_midi.xtm")
 ; (sys:load "libs/core/pc_ivl.xtm")
 
 
@@ -165,8 +165,8 @@
 ;         0.0)))
 
 (bind-func dspmt:DSPMT
-  (let (;(reverb (creverb_st_c "assets/ir/minsterl.aif"
-        ;                      "assets/ir/minsterr.aif"))
+  (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
+                              "assets/ir/minsterr.aif"))
         (r1 0.0)
         (r2 0.0)
         (r3 0.0)
@@ -176,14 +176,14 @@
         (gain 2.0)
         (rmix 1.0))
     (lambda (in time chan dat)
-      ; (if (> rmix 0.001)
-      ;     (set! rev (reverb chan 
-      ;                   (+ (* r1 (pref in 0))
-      ;                      (* r2 (pref in 1))
-      ;                      (* r3 (pref in 2))
-      ;                      (* r4 (pref in 3))
-      ;                      (* r5 (pref in 4)))
-      ;                   0.0 1.0)))
+      (if (> rmix 0.001)
+          (set! rev (reverb chan 
+                        (+ (* r1 (pref in 0))
+                           (* r2 (pref in 1))
+                           (* r3 (pref in 2))
+                           (* r4 (pref in 3))
+                           (* r5 (pref in 4)))
+                        0.0 1.0)))
       (+  (* rmix rev)
           (* gain
             (+ (pref in 0)

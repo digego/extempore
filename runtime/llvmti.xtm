@@ -3074,7 +3074,9 @@
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (clock:clock))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* #t)\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
@@ -3117,9 +3119,9 @@
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
                    *impc:aot:current-output-port*)
-          (display (string-append "(print \" in\" (- (clock:clock) *xtmlib-" (substring libname 3) "-loaded*) \"seconds\\n\")\n")
+          (display (string-append "(print \" in\" (- (clock:clock) *xtmlib-" (substring libname 3) "-loaded-timer*) \"seconds\\n\")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (clock:clock))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
                    *impc:aot:current-output-port*)))))
@@ -3244,6 +3246,7 @@
   (lambda (lib-path)
     (set! *impc:compiler:aot:dll* #f)
     (let ((start-time (clock:clock))
+          (llas-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llvm-as")))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
                          (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
@@ -3256,6 +3259,7 @@
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
                  (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
+                 (bc-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".bc")))
                  (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
@@ -3295,9 +3299,8 @@
                           (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
                           (print "\n"))
                         (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
-                        ; (call-with-output-file ll-path
-                        ;   (lambda (output-port)
-                        ;     (display *impc:compiler:queued-llvm-ir-string* output-port)))
+                        ;; this won't be straight forward without linking in all relevant ll files :(
+                        ;; (sys:command (string-append llas-path " " ll-path " -o " bc-path))
                         (close-port *impc:aot:current-output-port*)
                         (set! *impc:compiler:global-module-name* #f)
                         (set! *impc:aot:current-lib-name* "xtmdylib")
@@ -11327,7 +11330,7 @@ e.g.
                 (sys:pop-memzone))
               (begin
                 (error)
-              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))))
+                (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))))
 
 (define impc:ti:create-scm-wrapper?
   (lambda (func-name)

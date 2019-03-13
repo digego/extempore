@@ -565,25 +565,27 @@
         (lfo2 (+ lfo1 lfo1l)) (lfo2l 8:i32) ;; 7 params
         (lfo3 (+ lfo2 lfo2l)) (lfo3l 8:i32) ;; 7 params
         (lfo4 (+ lfo3 lfo3l)) (lfo4l 8:i32) ;; 7 params
-        (extras (+ lfo4 lfo4l))) ;; everything else!
-    (println 'cc_offsets------------------)
-    (println 'osc1: osc1)
-    (println 'osc2: osc2)
-    (println 'osc3: osc3)
-    (println 'osc4: osc4)
-    (println 'subnoise: subnoise)
-    (println 'filter: filter)
-    (println 'amp_pitch_env amp_pitch_env)
-    (println 'filter_env: filter_env)
-    (println 'delay: delay)
-    (println 'reverb: reverb)
-    (println 'matrix: matrix)
-    (println 'main: main)    
-    (println 'lfo1: lfo1)
-    (println 'lfo2: lfo2)
-    (println 'lfo3: lfo3)
-    (println 'lfo4: lfo4)
-    (println 'extras: extras)
+        (extras (+ lfo4 lfo4l)) ;; everything else!
+        (print_offsets (lambda ()
+                        (println 'cc_offsets------------------)
+                        (println 'osc1: osc1)
+                        (println 'osc2: osc2)
+                        (println 'osc3: osc3)
+                        (println 'osc4: osc4)
+                        (println 'subnoise: subnoise)
+                        (println 'filter: filter)
+                        (println 'amp_pitch_env amp_pitch_env)
+                        (println 'filter_env: filter_env)
+                        (println 'delay: delay)
+                        (println 'reverb: reverb)
+                        (println 'matrix: matrix)
+                        (println 'main: main)    
+                        (println 'lfo1: lfo1)
+                        (println 'lfo2: lfo2)
+                        (println 'lfo3: lfo3)
+                        (println 'lfo4: lfo4)
+                        (println 'extras: extras)
+                         void)))
     (lambda (inst cc:i32 value:i32)
       (let ((val:float (/ (i32tof value) 127.0)))
         (cond ((< cc osc2) (osc1_cc inst osc1 cc value))  ;; OSC 1
@@ -604,4 +606,7 @@
               ((< cc extras) (lfo4_cc inst lfo4 cc value)) ;; lfo4
               (else (extras_cc inst extras cc value))))))) ;; extras
 
-
+(bind-func print_cc_offsets
+  (lambda ()
+    ((analogue_cc.print_offsets:[void]*))
+    void))
