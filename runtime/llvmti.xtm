@@ -2891,7 +2891,7 @@
        (begin ,@forms)))
 
 (define impc:aot:compile-exe
-  (lambda (module-name module)
+  (lambda (module-name module libs)
     (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
@@ -2946,7 +2946,7 @@
                                 " /MACHINE:x64"
                                 " /SUBSYSTEM:CONSOLE"
                                 " /OUT:" output-exe-path
-                                " " (string-join link-libs " ")
+                                " " (string-join link-libs " ") " " libs ;; " .\\libs\\builds\\xtmcv.lib"
                                 ;; (string-append tmp-dir module-name ".lib ")
                                 " msvcrt.lib legacy_stdio_definitions.lib "
                                 asm-path))))
@@ -3176,6 +3176,7 @@
 (define impc:aot:compile-xtm-exe
   (lambda (file-path)
     (let* ((start-time (clock:clock))
+           (libs (if (sys:cmdarg "link") (sys:cmdarg "link") ""))
            (file-no-extension (filename-strip-extension file-path))
            (aot-compilation-file (string-append file-no-extension ".exe"))
            (in-file-port (open-input-file (sanitize-platform-path file-path))))
@@ -3196,7 +3197,8 @@
             (println)
             (sys:load file-path)
             (println)
-            (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) *impc:ti:closure-cache*)))
+            (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) 
+                                                                  (reverse *impc:ti:closure-cache*)))) ;; reverse - make sure we initialize function in correct order!
             (llvm:compile-ir 
               (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
               all-closure-setters
@@ -3219,7 +3221,7 @@
             (let ((module (impc:compiler:flush-jit-compilation-queue)))
               (if (not module)
                   (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                (impc:aot:compile-exe file-no-extension module))
+                (impc:aot:compile-exe file-no-extension module libs))
             (set! *impc:aot:current-output-port* #f) 
             ;; (close-port *impc:aot:current-output-port*)
             (quit 0))
