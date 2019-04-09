@@ -126,7 +126,7 @@ elseif(WIN32)
   endif()
   set(EXTEMPORE_SYSTEM_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
 else()
-  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - OSX, Linux & Windows only.")
+  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - macOS, Linux & Windows only.")
 endif()
 
 ########
@@ -197,7 +197,7 @@ target_include_directories(portaudio
 # platform-specific
 
 if(APPLE)
-  # use CoreAudio on OSX
+  # use CoreAudio on macOS
   target_sources(portaudio
     PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core.c
     PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.c
@@ -485,11 +485,11 @@ if(WIN32)
     PROPERTIES
     COMPILE_FLAGS "/EHsc")
 
-elseif(APPLE) # OSX
+elseif(APPLE) # macOS
   # use clang++ by default
   set(CMAKE_C_COMPILER clang)
   set(CMAKE_CXX_COMPILER clang++)
-  # tell the compiler about the few ObjC++ source files on OSX
+  # tell the compiler about the few ObjC++ source files on macOS
   set_source_files_properties(
     src/Extempore.cpp
     src/SchemeFFI.cpp

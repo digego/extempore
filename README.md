@@ -20,11 +20,11 @@ LLVM). So, if you've got a C++ compiler (for `gcc`, version 4.9 or
 later is required), git and CMake, here are some one-liner build
 commands:
 
-On **Linux/OSX**:
+On **Linux/macOS**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make && sudo make install
     
-On **Linux/OSX with JACK**:
+On **Linux/macOS with JACK**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -DJACK=ON .. && make && sudo make install
     
