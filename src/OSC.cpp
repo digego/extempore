@@ -231,7 +231,7 @@ uint32_t unswap32i(uint32_t a)
 ///////////////////////////////////////////////////////////////
 
 
-#define _OSC_DEBUG_
+//#define _OSC_DEBUG_
 
 namespace extemp {
 
@@ -885,7 +885,7 @@ namespace extemp {
       }
 
 #ifdef _OSC_DEBUG_
-    //std::cout << "GET OSC STRING = " << *str << std::endl;
+			std::cout << "GET OSC STRING = " << *str << std::endl;
 #endif
     return str_cnt;
   }
