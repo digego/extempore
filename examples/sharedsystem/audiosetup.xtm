@@ -1,0 +1,304 @@
+;;
+;; possible cmd line args:
+;;
+;;  .\extempore.exe --device-name="Primary Sound Driver" --channels=2 --midiin="UFX Midi Port 2" --midiout="Maschine MK3 EXT MIDI" --run .\examples\sharedsystem\audiosetup.xtm 
+;;
+
+;;
+;; Load libraries
+;;
+
+;; audio setup includes midisetup
+
+(sys:load "libs/external/instruments_ext.xtm")
+(sys:load "libs/external/audio_dsp_ext.xtm")
+; (sys:load "libs/external/midi.xtm")
+; (sys:load "libs/core/looper.xtm")
+(sys:load "libs/core/instruments/analogue_midi.xtm")
+; (sys:load "libs/core/pc_ivl.xtm")
+
+
+;;
+;; construct instruments
+;;
+;; you might like to replace analogue with analogueLite
+;; if you are having performance problems
+;;
+(make-instrument syn1 analogue)
+(make-instrument syn2 analogue)
+(make-instrument syn3 analogue) 
+(make-instrument kit dlogue)
+;; (make-instrument samp1 sampler)
+(make-instrument samp1 sampler)
+
+;; load samples 
+;; (load-samples samp1 "assets/samples/808/")
+(load-samples samp1 "assets/samples/piano/")
+
+;; 
+;; setup multicore dsp playback
+;;
+(bind-func dsp1:DSP
+  (let ((load 0.0)
+        (total 0.0)
+        (tmp 0.0)
+        (out 0.0)
+        (second SR))
+    (lambda (in time chan dat)
+      (if (< chan 2)
+          (begin
+            (set! tmp (clock_clock))
+            (set! out (syn1 in time chan dat))
+            (set! total (+ total (- (clock_clock) tmp)))
+            (if (and (= (% time second) 0) (= chan 0))
+                (begin 
+                  (set! load total)
+                  (set! total 0.0)))
+            out)
+          0.0))))
+
+(bind-func dsp2:DSP
+  (let ((load 0.0)
+        (total 0.0)
+        (tmp 0.0)
+        (out 0.0)
+        (second SR))
+    (lambda (in time chan dat)
+      (if (< chan 2)
+          (begin
+            (set! tmp (clock_clock))
+            (set! out (syn2 in time chan dat))
+            (set! total (+ total (- (clock_clock) tmp)))
+            (if (and (= (% time second) 0) (= chan 0))
+                (begin 
+                  (set! load total)
+                  (set! total 0.0)))
+            out)
+          0.0))))
+
+(bind-func dsp3:DSP
+  (let ((load 0.0)
+        (total 0.0)
+        (tmp 0.0)
+        (out 0.0)
+        (second SR))
+    (lambda (in time chan dat)
+      (if (< chan 2)
+          (begin
+            (set! tmp (clock_clock))
+            (set! out (syn3 in time chan dat))
+            (set! total (+ total (- (clock_clock) tmp)))
+            (if (and (= (% time second) 0) (= chan 0))
+                (begin 
+                  (set! load total)
+                  (set! total 0.0)))
+            out)
+          0.0))))
+
+(bind-func dsp4:DSP
+  (let ((load 0.0)
+        (total 0.0)
+        (tmp 0.0)
+        (out 0.0)
+        (second SR))
+    (lambda (in time chan dat)
+      (if (< chan 2)
+          (begin
+            (set! tmp (clock_clock))
+            (set! out (kit in time chan dat))
+            (set! total (+ total (- (clock_clock) tmp)))
+            (if (and (= (% time second) 0) (= chan 0))
+                (begin 
+                  (set! load total)
+                  (set! total 0.0)))
+            out)
+          0.0))))
+
+(bind-func dsp5:DSP
+  (let ((load 0.0)
+        (total 0.0)
+        (tmp 0.0)
+        (out 0.0)
+        (second SR))
+    (lambda (in time chan dat)
+      (if (< chan 2)
+          (begin
+            (set! tmp (clock_clock))
+            (set! out (samp1 in time chan dat))
+            (set! total (+ total (- (clock_clock) tmp)))
+            (if (and (= (% time second) 0) (= chan 0))
+                (begin 
+                  (set! load total)
+                  (set! total 0.0)))
+            out)
+          0.0))))
+
+; (bind-func dsp1:DSP
+;   (lambda (in time chan dat)
+;     (if (< chan 2)
+;         (syn1 in time chan dat)
+;         0.0)))
+
+; (bind-func dsp2:DSP
+;   (lambda (in time chan dat)
+;     (if (< chan 2)
+;         (syn2 in time chan dat)
+;         0.0)))
+
+; (bind-func dsp3:DSP
+;   (lambda (in time chan dat)
+;     (if (< chan 2)
+;         (syn3 in time chan dat)
+;         0.0)))
+
+; (bind-func dsp4:DSP
+;   (lambda (in time chan dat)
+;     (if (< chan 2)
+;         (samp1 in time chan dat)
+;         0.0)))
+
+; (bind-func dsp5:DSP
+;   (lambda (in time chan dat)
+;     (if (< chan 2)
+;         (samp2 in time chan dat)
+;         0.0)))
+
+(bind-func dspmt:DSPMT
+  (let ((reverb (creverb_st_c "assets/ir/minsterl.aif"
+                              "assets/ir/minsterr.aif"))
+        (r1 0.0)
+        (r2 0.0)
+        (r3 0.0)
+        (r4 0.0)
+        (r5 0.0)
+        (rev 0.0)
+        (gain 2.0)
+        (rmix 1.0))
+    (lambda (in time chan dat)
+      (if (> rmix 0.001)
+          (set! rev (reverb chan 
+                        (+ (* r1 (pref in 0))
+                           (* r2 (pref in 1))
+                           (* r3 (pref in 2))
+                           (* r4 (pref in 3))
+                           (* r5 (pref in 4)))
+                        0.0 1.0)))
+      (+  (* rmix rev)
+          (* gain
+            (+ (pref in 0)
+               (pref in 1)     
+               (pref in 2)
+               (* 2.0 (pref in 3))
+               (* 2.0 (pref in 4))))))))
+
+(dsp:set! #f dspmt dsp1 dsp2 dsp3 dsp4 dsp5)
+
+(bind-func dsp_load
+  (lambda ()
+    (println '1: (dsp1.load:double)
+             '2: (dsp2.load:double)
+             '3: (dsp3.load:double)
+             '4: (dsp4.load:double)
+             '5: (dsp5.load:double))
+    void))
+
+;; if chan is -1 set global reverb mix 
+(bind-func main_reverb
+  (lambda (input:i64 amt:float)
+    (cond ((= input 0) (dspmt.rmix (clamp amt 0.0:f 2.0:f)))
+          ((= input 1) (dspmt.r1 (clamp amt 0.0:f 2.0:f)))
+          ((= input 2) (dspmt.r2 (clamp amt 0.0:f 2.0:f)))
+          ((= input 3) (dspmt.r3 (clamp amt 0.0:f 2.0:f)))
+          ((= input 4) (dspmt.r4 (clamp amt 0.0:f 2.0:f)))          
+          ((= input 5) (dspmt.r5 (clamp amt 0.0:f 2.0:f))))
+    void))
+  
+(bind-func main_gain
+  (lambda (amt:float)
+    (dspmt.gain:float (clamp amt 0.0:f 4.0:f))))
+
+
+;; analogue defaults
+(define PARAM_SINE 0)
+(define PARAM_SAW 1)
+(define PARAM_PULSE 2)
+(define PARAM_TRI 3)
+(define PARAM_AD 4)
+(define PARAM_CONST 5)
+(define PARAM_RANDOM 6)
+(define PARAM_WHITE 0)
+(define PARAM_PINK 1)
+
+;; filter types
+(define PARAM_LPF 0)
+(define PARAM_BPF 1)
+(define PARAM_HPF 2)
+(define PARAM_Notch 3)
+(define PARAM_Peak 4)
+(define PARAM_APF 5)
+
+;; modulation sources
+(define PARAM_LFO1 0)
+(define PARAM_LFO2 1)
+(define PARAM_LFO3 2)
+(define PARAM_LFO4 3)
+
+;; modulation destinations (note)
+(define PARAM_OSC1_AMP 0)
+(define PARAM_OSC1_FRQ 1)
+(define PARAM_OSC1_PW 2)
+(define PARAM_OSC1_PHASE 3)
+(define PARAM_OSC2_AMP 4)
+(define PARAM_OSC2_FRQ 5)
+(define PARAM_OSC2_PW 6)
+(define PARAM_OSC2_PHASE 7)
+(define PARAM_OSC3_AMP 8)
+(define PARAM_OSC3_FRQ 9)
+(define PARAM_OSC3_PW 10)
+(define PARAM_OSC3_PHASE 11)
+(define PARAM_OSC4_AMP 12)
+(define PARAM_OSC4_FRQ 13)
+(define PARAM_OSC4_PW 14)
+(define PARAM_OSC4_PHASE 15)
+(define PARAM_NOISE_AMP 16)
+(define PARAM_FILTER_FRQ 17)
+(define PARAM_FILTER_RES 18)
+
+;; modulation destinations (fx)
+(define PARAM_PAN_WIDTH 19)
+(define PARAM_PAN_POS 20) 
+(define PARAM_DELAY_TIME_LEFT 21)
+(define PARAM_DELAY_TIME_RIGHT 22)
+(define PARAM_DELAY_FB 23) ;; feedback
+(define PARAM_REVERB_SIZE 24)
+(define PARAM_REVERB_PREDELAY 25)
+(define PARAM_REVERB_ABSORB 26)
+(define PARAM_REVERB_MIX 27)
+(define PARAM_FLANGER_LOW 28)
+(define PARAM_FLANGER_HIGH 29)
+(define PARAM_FLANGER_RATE 30)
+(define PARAM_FLANGER_FB 31)
+
+(define LEGATO_ON 1)
+(define LEGATO_OFF 0)
+
+(println "Finished Audio Setup")
+
+;;
+;; setup MIDI
+;; 
+
+(load "examples/sharedsystem/midisetup.xtm")
+
+;; override midi_cc for analogue chans  1, 2 and 3
+(bind-func midi_cc
+  (lambda (timestamp:i32 controller:i32 value:i32 chan:i32)
+    (aset! MCC_ARR controller (/ (i32tof value) 127.0))
+    (println "MIDI_CC:" controller (aref MCC_ARR controller) chan)
+    (if (= chan 0) (analogue_cc (cast syn1) controller value))
+    (if (= chan 1) (analogue_cc (cast syn2) controller value))
+    (if (= chan 2) (analogue_cc (cast syn3) controller value))
+    void))
+
+
+(println "Finished loading!")

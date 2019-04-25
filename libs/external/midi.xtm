@@ -1,0 +1,332 @@
+;;; midi.xtm -- a little wrapper for portmidi
+
+;; Author: Andrew Sorensen
+;; Keywords: extempore
+;; Required dylibs: portmidi
+
+;;; Commentary:
+
+;; Simple MIDI input loads the default MIDI input device on startup
+;; It also prints the available devices on startup
+;; To change from the default MIDI input simply call (set_midi_in *devicenum*)
+;;
+;; By default MIDI_NOTE_ON, MIDI_NOTE_OFF and MIDI_CONTROL_CHANGE messages
+;; are printed to the log.
+;; To start doing something with these messages, override
+;; midi_note_on, midi_note_off, midi_cc
+;;
+;; NOTE: this lib automatically converts note-on velocity 0 into note-off.
+;; i.e. you will not see note-on msg with a velocity 0.
+;;
+
+
+;; main things to know
+;;
+;; (print_midi_devices)
+;; (set_midi_in idx)
+;; (set_midi_out idx)
+;;
+;; midi listener overloads
+;; midi_note_on
+;; midi_note_off
+;; midi_cc
+;; midi_msg
+
+(sys:load "libs/aot-cache/midi.xtm" 'quiet)
+(sys:load-preload-check 'midi)
+(define *xtmlib-midi-loaded* #f)
+
+(impc:aot:suppress-aot-do (sys:load "libs/core/scheduler.xtm"))
+(impc:aot:suppress-aot-do (sys:load "libs/external/portmidi.xtm"))
+
+(impc:aot:insert-forms (sys:load "libs/core/scheduler.xtm" 'quiet))
+(impc:aot:insert-forms (sys:load "libs/external/portmidi.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmmidi")
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
+;; midi event queue
+
+(bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double>)
+(bind-func get_midi_evt_type (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) -1 (tref obj 0))))
+(bind-func get_midi_evt_a (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 1))))
+(bind-func get_midi_evt_b (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 2))))
+(bind-func get_midi_evt_channel (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) -1 (tref obj 3))))
+(bind-func get_midi_evt_timestamp (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) -1 (tref obj 4))))
+(bind-func get_midi_evt_clocktime (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0.0 (tref obj 5))))
+
+;; overload print
+(impc:aot:do-or-emit
+  (bind-func print:[void,XTM_MIDI_EVT*]*
+    (lambda (obj)
+      (if (null? obj)
+          (printout "<NULL_MIDI_MSG>")
+          (cond ((= (get_midi_evt_type obj) MIDI_NOTE_ON)
+                (printout "<NOTE-ON  pitch: " (get_midi_evt_a obj)
+                          " volume:" (get_midi_evt_b obj)
+                          " chan:" (get_midi_evt_channel obj)
+                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
+                ((= (get_midi_evt_type obj) MIDI_NOTE_OFF)
+                (printout "<NOTE-OFF  pitch:" (get_midi_evt_a obj)
+                          " volume:" (get_midi_evt_b obj)
+                          " chan:" (get_midi_evt_channel obj)
+                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
+                ((= (get_midi_evt_type obj) MIDI_CONTROL_CHANGE)
+                (printout "<MIDI-CC byte1:" (get_midi_evt_a obj)
+                          " byte2:" (get_midi_evt_b obj)
+                          " chan:" (get_midi_evt_channel obj)
+                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
+                (else (printout "<UNKNOWN_MIDI_MSG>")))) ;; shouldn't get here
+      void)))
+
+(bind-val XTM_MIDI_EVENT_QUEUE_SIZE i64 1000)
+(bind-val XTM_MIDI_EVENT_QUEUE |1000,XTM_MIDI_EVT|)
+(bind-val XTM_MIDI_CC_QUEUEING i1 #t) ;; set to false to ignore CC events
+
+(bind-func enqueue_midi_event
+  (let ((tail 0) (head 0))
+    (lambda (msg timestamp)
+      (tfill! (aref-ptr XTM_MIDI_EVENT_QUEUE (% tail XTM_MIDI_EVENT_QUEUE_SIZE))
+              (Pm_Message_Type msg) (Pm_Message_Data1 msg) (Pm_Message_Data2 msg) (Pm_Message_Channel msg)
+              timestamp (clock_clock))
+      (set! tail (+ tail 1))
+      #t)))
+
+(bind-func dequeue_midi_event
+  (let ((head 0) (tail 0))
+    (lambda ()
+      (set! tail (enqueue_midi_event.tail:i64))
+      (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
+          (begin (println "Warning: MIDI overrun (head:" head "tail:" tail ") events dropped")
+                 (set! head tail)))
+      (if (< head tail)
+          (let ((res (aref-ptr XTM_MIDI_EVENT_QUEUE (% head XTM_MIDI_EVENT_QUEUE_SIZE))))
+            (set! head (+ head 1))
+            res)
+          null)))) ;; underrun
+
+(bind-func available_midi_events
+  (lambda ()
+    (let ((head (dequeue_midi_event.head:i64))
+          (tail (enqueue_midi_event.tail:i64)))
+      (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
+          (begin (println "Warning: MIDI overrun - dropping old events")
+                 (dequeue_midi_event.head:i64 tail)
+                 0)
+          (- tail head)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;; Some helpful functions for using MIDI devices by name ;;;
+(bind-func midi_input_port_id:[i32,i8*]*
+  (lambda (port_name)
+    (let* ((n:i32 (Pm_CountDevices))
+           (loop:[i32,i32]*
+            (lambda (i:i32)
+              (cond
+               ((and (<= (i64toi32 0) i) (< i n))
+                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                       (name:i8* (tref info 2))
+                       (input:bool (= (i64toi32 1) (tref info 3)))
+                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                  (cond
+                   ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
+                   (else
+                    (loop (+ i (i64toi32 1)))))))
+               (else
+                (printf "No MIDI input port found with name %s\n" port_name)
+                (i64toi32 -1))))))
+        (loop (i64toi32 0)))))
+                  
+
+(bind-func midi_output_port_id:[i32,i8*]*
+  (lambda (port_name)
+    (let* ((n:i32 (Pm_CountDevices))
+           (loop:[i32,i32]*
+            (lambda (i:i32)
+              (cond
+               ((and (<= (i64toi32 0) i) (< i n))
+                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                       (name:i8* (tref info 2))
+                       (output:bool (= (i64toi32 1) (tref info 4)))
+                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                  (cond
+                   ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
+                   (else
+                    (loop (+ i (i64toi32 1)))))))
+               (else
+                (printf "No MIDI output port found with name %s\n" port_name)
+                (i64toi32 -1))))))
+        (loop (i64toi32 0)))))
+
+
+; (bind-func print_midi_devices
+;   (lambda ()
+;     (pm_print_devices)))
+
+; (bind-val midi_out PmStream*) ;;(pm_create_output_stream (pm_default_out)))
+
+; (bind-func set_midi_out
+;   (lambda (idx)
+;      (set! midi_out (pm_create_output_stream idx))
+;      midi_out))
+
+; (bind-val midi_in PmStream*) ;; (pm_create_input_stream (pm_default_in)))
+
+; (bind-func set_midi_in
+;   (lambda (idx)
+;      (set! midi_in (pm_create_input_stream idx))
+;      midi_in))
+
+(bind-func midi_note_on
+  (lambda (timestamp:i32 pitch:i32 volume:i32 chan:i32)
+    (println "NOTE_ON :" pitch volume chan "timestamp:" timestamp)
+    void))
+
+(bind-func midi_note_off
+  (lambda (timestamp:i32 pitch:i32 volume:i32 chan:i32)
+    (println "NOTE_OFF:" pitch volume chan "timestamp:" timestamp)
+    void))
+
+(bind-func midi_cc
+  (lambda (timestamp:i32 controller:i32 value:i32 chan:i32)
+    (println "MIDI_CC :" controller value chan "timestamp:" timestamp)
+    void))
+
+;; by default don't print non note/cc MIDI messages
+(bind-func midi_msg
+  (lambda (timestamp:i32 type:i32 a:i32 b:i32 chan:i32 msg:i32)
+    ;; (println "MIDIMSG: " type a b chan)
+    void))
+
+(bind-func midi_read_msg
+  (let ((buffer_length 1024)
+        (input_buffer:PmEvent* (zalloc buffer_length))
+        (msg:PmMessage 0)
+        (timestamp:i32 0)
+        (read_count 0)
+        (i:i32 0))
+    (lambda ()
+      (set! read_count 0)
+      ;; if you have more than one midi input device, you should call
+      ;; Pm_Read on all your devices here
+      (set! read_count (Pm_Read midi_in input_buffer buffer_length))
+      (if (> read_count 0)
+          (begin
+            (dotimes (i read_count)
+              (set! msg (tref (pref-ptr input_buffer i) 0))
+              (set! timestamp (tref (pref-ptr input_buffer i) 1))
+              (cond ((= (Pm_Message_Type msg) MIDI_NOTE_ON)
+                     (enqueue_midi_event msg timestamp)
+                     (if (= (Pm_Message_Data2 msg) 0)
+                         (midi_note_off timestamp
+                                        (Pm_Message_Data1 msg)
+                                        (Pm_Message_Data2 msg)
+                                        (Pm_Message_Channel msg))
+                         (midi_note_on timestamp
+                                       (Pm_Message_Data1 msg)
+                                       (Pm_Message_Data2 msg)
+                                       (Pm_Message_Channel msg))))
+                    ((= (Pm_Message_Type msg) MIDI_NOTE_OFF)
+                     (enqueue_midi_event msg timestamp)                     
+                     (midi_note_off timestamp
+                                    (Pm_Message_Data1 msg)
+                                    (Pm_Message_Data2 msg)
+                                    (Pm_Message_Channel msg)))
+                    ((= (Pm_Message_Type msg) MIDI_CONTROL_CHANGE)
+                     (if XTM_MIDI_CC_QUEUEING (enqueue_midi_event msg timestamp))                         
+                     (midi_cc timestamp
+                              (Pm_Message_Data1 msg)
+                              (Pm_Message_Data2 msg)
+                              (Pm_Message_Channel msg)))
+                    (else
+                     (midi_msg timestamp
+                               (Pm_Message_Type msg)
+                               (Pm_Message_Data1 msg)
+                               (Pm_Message_Data2 msg)
+                               (Pm_Message_Channel msg)
+                               msg)))
+              void)
+            void)
+          void))))
+
+;; first off create a native 'clock' scheduler
+;; update rate of 400hz
+(impc:aot:do-or-emit
+  (bind-val midi_clock_sched [void]*)) ;;(clock_scheduler 400.0))
+
+;; poll for midi messages at 400hz
+(impc:aot:do-or-emit
+  (bind-func midi_input_polling
+    (lambda (time:double)
+      (midi_read_msg)
+      (sched midi_clock_sched (+ time 0.0025) midi_input_polling:[void,double]*))))
+
+(impc:aot:do-or-emit
+  ($$ (let ((sched (clock_scheduler 400.0)))
+        (set! midi_clock_sched sched)
+        1:i64)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 
+;; Scheme listener code
+;;
+
+(impc:aot:do-or-emit
+  (define *run-scheme-midi-listener* #t))
+
+;; should be redefined to 'do' something
+(impc:aot:do-or-emit
+  (define midi-note-on
+    (lambda (timestamp pitch volume chan)
+      (println "note-on:" pitch volume chan "timestamp:" timestamp))))
+
+;; should be redefined to 'do' something
+(impc:aot:do-or-emit
+  (define midi-note-off
+    (lambda (timestamp pitch volume chan)
+      (println "note-off:" pitch volume chan "timestamp:" timestamp))))
+
+;; should be redefined to 'do' something
+(impc:aot:do-or-emit
+  (define midi-cc
+    (lambda (timestamp controller value chan)
+      (println "midi-cc:" controller value chan "timestamp:" timestamp))))
+
+;; scheme midi event listener
+(impc:aot:do-or-emit
+  (define scheme-midi-listener
+    (lambda (beat dur)
+      (dotimes (i (available_midi_events))
+        (let* ((evt (dequeue_midi_event))
+              (type (get_midi_evt_type evt))
+              (a (get_midi_evt_a evt))
+              (b (get_midi_evt_b evt))
+              (chan (get_midi_evt_channel evt))
+              (timestamp (get_midi_evt_timestamp evt)))
+          (cond ((= type #x90)
+                (midi-note-on timestamp a b chan))
+                ((= type #x80)
+                (midi-note-off timestamp a b chan))
+                ((= type #xB0)
+                (midi-cc timestamp a b chan)) 
+                (else #f))))
+      (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur))))
+
+
+;; startup
+
+(impc:aot:do-or-emit
+  (begin
+    (pm_initialize)
+    (pm_print_devices)))
+
+(impc:aot:do-or-emit
+  (xtmX (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
+
+
+(define *xtmlib-midi-loaded* #t)
+
+(impc:aot:insert-footer "xtmmidi")

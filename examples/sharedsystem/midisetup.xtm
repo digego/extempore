@@ -1,0 +1,166 @@
+;;
+;; possible cmd line args:
+;;
+;;  .\extempore.exe --device-name="Primary Sound Driver" --channels=2 --midiin="UFX Midi Port 2" --midiout="Maschine MK3 EXT MIDI" --run .\examples\sharedsystem\midisetup.xtm 
+;;
+
+;;
+;; Load libraries
+;;
+
+;; midisetup is included in audiosetup but can be run standalone for quicker load times
+
+;; (sys:load "libs/external/instruments_ext.xtm")
+;; (sys:load "libs/external/audio_dsp_ext.xtm")
+(sys:load "libs/external/midi.xtm")
+(sys:load "libs/core/looper.xtm")
+(sys:load "libs/core/pc_ivl.xtm")
+
+
+;;
+;; setup MIDI
+;; 
+
+(println 'MIDIIN (sys:cmdarg "midiin") 'MIDIOUT (sys:cmdarg "midiout"))
+(set_midi_in (pm_input_device_with_name (sys:cmdarg "midiin")))
+(define *min* (get_midi_in))
+(set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
+(define *mout* (get_midi_out))
+
+(bind-val MCC_ARR |127,float|)
+
+(bind-func MCC
+  (lambda (idx)
+    (aref MCC_ARR idx)))
+
+(bind-func midi_note_on
+  (lambda (timestamp:i32 pitch:i32 volume:i32 chan:i32)
+    ;; (println "NOTE_ON :" pitch volume chan "timestamp:" timestamp)
+    void))
+
+(bind-func midi_note_off
+  (lambda (timestamp:i32 pitch:i32 volume:i32 chan:i32)
+    ;; (println "NOTE_OFF:" pitch volume chan "timestamp:" timestamp)
+    void))
+
+(bind-func midi_cc
+  (lambda (timestamp:i32 controller:i32 value:i32 chan:i32)
+    ;; (println "MIDI_CC :" controller value chan "timestamp:" timestamp)
+    void))
+
+
+
+;;
+;; short forms and helper functions
+;;
+
+                   
+;; short forms for convenience
+(define bd 36) ;; bass drum
+(define bd2 53)
+(define bd3 59)
+(define bd4 65)
+(define rs 37) ;; rim shot
+(define sn 38) ;; snare
+(define sn2 62)
+(define cl 39) ;; clap
+(define lt 41) ;; low tom
+(define ch 42) ;; closed hat
+(define ch2 44) 
+(define ch3 60) 
+(define mt 43) ;; mid tom
+(define mt2 47) 
+(define ht 45) ;; high tom
+(define ht2 48) 
+(define oh 46) ;; open hat
+(define rc 49) ;; ride cymbol
+(define rc2 55) 
+(define rc3 64) 
+(define wb 50) ;; wood block
+(define wb2 63) 
+(define ma 51) ;; maraccas
+(define ma2 52) 
+(define cb 61) ;; cow bell
+;; 
+(define *root* 0) ;; root
+(define *chord* '(36 60 63 67)) ;; chord
+(define *scale* (pc:scale 0 'aeolian)) ;; scale
+
+(define scale
+  (lambda (octave num . args)
+    (let ((skip (if (null? args) 1 (car args))))
+      (map (lambda (x) (pc:relative (+ 12 (car *scale*) (* 12 octave)) (* skip x) *scale*)) (range 0 num)))))
+
+(define qnt (lambda (x . args) 
+            (pc:quantize x (if (null? args) *scale*
+                               (map (lambda (x) 
+                                      (modulo x 12)) 
+                                    (car args))))))
+(define orb orbit)
+
+;; cycle will usually use LC 
+;; LC is an internal symbol defined
+;; for Loop Count.
+;; cycles elongates the time between changes
+;; i.e. (cycle LC 1 '(60 63 67) '(58 62 65))
+(define (cycle cnt cycles . args)
+  (list-ref args (modulo (floor (/ cnt cycles)) (length args))))
+
+;; (define mod orbit)
+(define % modulo)
+(define rot (lambda (x lst) (rotate lst x)))
+(define rnd random)
+(define rng range)
+(define rev reverse)
+(define zip (lambda (a b) (flatten (map (lambda (x y) (list x y)) a b))))
+
+(define vec list->vector)
+;; add pedal value a to list of notes b
+;; basically zip value a into list b
+(define pedal 
+  (lambda (a b) 
+    (flatten (map (lambda (x) 
+                    (if (list? a) 
+                        (list x b)
+                        (list a x)))
+                  (if (list? a) a b)))))
+(define ped pedal)
+;; forexample (nlst 8 (+ bd idx))
+;; number of (numof -> nof)
+(define-macro (nof num body)
+  `(make-list-with-proc ,num (lambda (idx) ,body)))
+
+;; item as position
+(define nth (lambda (at lst) (list-ref lst at)))
+;; last num of lst           
+(define last (lambda (num lst) (cl:last lst num)))
+;; take first num of lst
+(define take (lambda (num lst) (cl:butnthcdr num lst)))
+;; take num at
+(define sub (lambda (num at lst) (cl:butnthcdr num (cl:nthcdr at lst))))
+
+(define id (lambda (x) x))
+(define union cl:union)
+(define intersection cl:intersection)
+(define difference cl:set-difference)
+;; remove all duplicates from lst
+(define unique cl:remove-duplicates)
+
+(define filter
+  (lambda (pred lst)
+    (foldr (lambda (x acc)
+	            (if (apply pred (list x)) (cons x acc) acc))
+	   (list)
+	   lst)))
+
+;; skip by m with a lst rotation of r
+;; for example: (skip 2 -1 (scale 8))
+(define skip
+  (lambda (m r lst) 
+    (map cadr
+      (filter (lambda (y) (= 0 (modulo (car y) m)))
+        (map (lambda (x y) (list x y))
+          (range 0 (length lst)) (rotate lst r))))))
+
+
+(println "Finished MIDI setup")

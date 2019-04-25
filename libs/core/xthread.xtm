@@ -4,6 +4,16 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(sys:load "libs/aot-cache/xthread.xtm" 'quiet)
+(sys:load-preload-check 'xthread)
+(define *xtmlib-xthread-loaded* #f)
+
+(impc:aot:suppress-aot-do (sys:load "libs/base/base.xtm"))
+(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmxthread")
+
+
 (bind-func thread_native_call
   (lambda (f:i8*)
     (let ((f2:[void]* (cast f)))
@@ -132,3 +142,5 @@
          ;;(printf "syncd %d threads\n" ,ijk)
          ,final))))
 
+(define *xtmlib-xthread-loaded* #t)
+(impc:aot:insert-footer "xtmxthread")

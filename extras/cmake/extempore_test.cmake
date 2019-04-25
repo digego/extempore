@@ -46,7 +46,7 @@ elseif(WIN32)
   string(REGEX MATCH "[0-9]+" EXTEMPORE_SYSTEM_VERSION ${EXTEMPORE_SYSTEM_VERSION})
   set(EXTEMPORE_SYSTEM_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
 else()
-  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - OSX, Linux & Windows only.")
+  message(FATAL_ERROR "Sorry, Extempore isn't supported on this platform - macOS, Linux & Windows only.")
 endif()
 
 set(CTEST_BUILD_NAME "${EXTEMPORE_SYSTEM_NAME}-${EXTEMPORE_SYSTEM_VERSION}-${EXTEMPORE_SYSTEM_ARCHITECTURE}")

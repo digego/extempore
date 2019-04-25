@@ -40,7 +40,7 @@
         (parser (if (> (length args) 1) (cadr args) 'parse-sample-names))
         (midioffset (if (> (length args) 2) (caddr args) 0)))
     `(let ((cnt 0)
-           (file-list (sys:directory-list ,(sys:expand-path path))))
+           (file-list (sys:directory-list (sys:expand-path ,path))))
        (for-each (lambda (samp-data)
                    (if samp-data
                        (begin
@@ -48,7 +48,7 @@
                          (set-sampler-index ,sampler
                                             (if (string=? (sys:platform) "Windows")
                                                 (car samp-data)
-                                                (string-append ,(sys:expand-path path) "/" (car samp-data)))
+                                                (string-append (sys:expand-path ,path) "/" (car samp-data)))
                                             (+ ,midioffset (cadr samp-data))
                                             (caddr samp-data)
                                             (cadddr samp-data)

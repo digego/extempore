@@ -20,11 +20,11 @@ LLVM). So, if you've got a C++ compiler (for `gcc`, version 4.9 or
 later is required), git and CMake, here are some one-liner build
 commands:
 
-On **Linux/OSX**:
+On **Linux/macOS**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make && sudo make install
     
-On **Linux/OSX with JACK**:
+On **Linux/macOS with JACK**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -DJACK=ON .. && make && sudo make install
     
@@ -45,16 +45,21 @@ Check out these videos:
 
 # Docs & Community
 
-Extempore documentation can be found at http://digego.github.io/extempore/index.html
+Extempore documentation can be found at https://extemporelang.github.io/docs/
 
 You can also join the Extempore community:
 
 - [Extempore google group](http://groups.google.com/group/extemporelang)
 - [Extempore mailing list](mailto:extemporelang@googlegroups.com)
 
+# Cite Extempore
+
+- [Extempore: The design, implementation and application of a cyber-physical programming language](https://openresearch-repository.anu.edu.au/handle/1885/144603)
+- [Systems level liveness with extempore](https://dl.acm.org/citation.cfm?id=3133858)
+
 # Licence
 
-Copyright (c) 2011-2017, Andrew Sorensen
+Copyright (c) 2011-2018, Andrew Sorensen
 
 All rights reserved.
 

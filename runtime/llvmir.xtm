@@ -716,7 +716,7 @@
 
 (define impc:ir:get-closure-type-from-str
   (lambda (string-type)
-    (impc:ir:get-function-type-from-str (regex:replace string-type "\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}" "$1"))))
+    (impc:ir:get-function-type-from-str (regex:replace string-type "^\\{\\s?i8\\*,\\s?i8\\*,(.*)\\}.*$" "$1"))))
 
 
 (define impc:ir:get-function-type-from-str
@@ -756,7 +756,7 @@
             ((and (regex:match? base "^\\<.* x .*\\>\\**$")
                   (not (string-contains? base ",")))
              (cons (+ offset *impc:ir:vector*) (impc:ir:get-vector-type-from-str string-type)))
-            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*$")
+            ((regex:match? base "^\\{\\s?i8\\*,\\s?i8\\*.*\\)\\**}$")
              (cons (+ offset *impc:ir:closure*) (impc:ir:get-closure-type-from-str string-type)))
                                         ;((regex:match? base "\\<?\\{.*\\}\\>?\\**")
             ((regex:match? base "^\\<?\\{.*\\}\\>?\\**$")
@@ -997,7 +997,9 @@
             (impc:ir:type? (impc:ir:get-type-from-str type)))
         (cond ((null? type) #f)
               ((and (number? type)
-                    (< type 1001)) #t)
+                    ;; (or (< type 0) (< (modulo type *impc:ir:pointer*) *impc:ir:closure*)) ;; this should be true but is actually more trouble than it's worth at this stage
+                    (< type 1001))
+               #t)
               ((and (list? type)
                     (number? (car type))
                     (or (impc:ir:closure? type)
@@ -2418,10 +2420,36 @@
 
 
 ;; THIS VERSION DOESN'T COPY ANYTHING!
+;; (define impc:ir:compiler:set!
+;;   (lambda (ast types)
+;;     (let* ((os (make-string 0))
+;;            (t (if (assoc-strcmp (cadr ast) types) (cdr (assoc-strcmp (cadr ast) types)) #f))
+;;            (s2 (if t
+;;                    (impc:ir:compiler (caddr ast) types t)
+;;                    (impc:ir:compiler (caddr ast) types)))
+;;            (vv (impc:ir:gname))
+;;            (type (impc:ir:get-type-from-str (cadr vv))))
+;;       (emit "; do set!\n" os)
+;;       (emit s2 os)
+;;       (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
+;;           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
+;;                                (symbol->string (cadr ast)) "\n") os)
+;;           (if (member (cadr ast) *impc:ir:sym-name-stack*)
+;;               (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
+;;                                    (symbol->string (cadr ast)) "Ptr\n") os)
+;;               (impc:compiler:print-missing-identifier-error (cadr ast) 'variable)))
+;;       ;; ir:gname should be vv
+;;       (impc:ir:strip-space os))))
+
 (define impc:ir:compiler:set!
   (lambda (ast types)
-    (let* ((os (make-string 0))
-           (t (if (assoc-strcmp (cadr ast) types) (cdr (assoc-strcmp (cadr ast) types)) #f))
+    (let* ((os (make-string 0))           
+           (global? (impc:ti:globalvar-exists? (symbol->string (cadr ast)))) ;; are we are setting a global variable?
+           (gtype (if global? (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string (cadr ast)))) #f))
+           (t (if global? gtype
+                  (if (assoc-strcmp (cadr ast) types)
+                      (cdr (assoc-strcmp (cadr ast) types))
+                      #f)))
            (s2 (if t
                    (impc:ir:compiler (caddr ast) types t)
                    (impc:ir:compiler (caddr ast) types)))
@@ -2429,7 +2457,7 @@
            (type (impc:ir:get-type-from-str (cadr vv))))
       (emit "; do set!\n" os)
       (emit s2 os)
-      (if (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
+      (if global? ;; (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
                                (symbol->string (cadr ast)) "\n") os)
           (if (member (cadr ast) *impc:ir:sym-name-stack*)
@@ -2850,6 +2878,23 @@
           (impc:compiler:print-compiler-error "num-of-elts must take a variable of array or vector type not: " (cdr ast)))
       (impc:ir:gname (number->string (cadr (cdr t))) "i64")
       "")))
+
+;; returns the size of the object (first argument)
+;; optional second argument is a dereference object 
+;; which should be an number starting at 0 (for no dereference) and increasing for each level of dereference...
+;; returns the size as an i64
+(define impc:ir:compiler:obj-size
+  (lambda (ast types)
+    (let* ((d (if (null? (cddr ast)) 0 (caddr ast)))
+           (t (assoc-strcmp (cadr ast) types)))
+       (if (null? t)
+            (impc:compiler:print-compiler-error "first argument to obj-size must be a valid variable"))
+       (if (not (integer? d))
+            (impc:compiler:print-compiler-error "second argument to obj-size must be an integer number of dereferences"))
+       (if (= d 0)
+           (impc:ir:gname (number->string (impc:ir:get-type-size (cdr t))) "i64")
+           (impc:ir:gname (number->string (impc:ir:get-type-size (impc:ir:pointer-- (cdr t) d))) "i64"))
+       "")))
 
 (define impc:ir:compiler:ref
   (lambda (ast types)
@@ -3853,7 +3898,6 @@
     (let* ((os (make-string 0))
            (timestr (impc:ir:compiler (cadr ast) types))
            (time (impc:ir:gname))
-                                        ;(farg '())
            (fname (symbol->string (caddr ast)))
            (ftypes (if (assoc-strcmp (caddr ast) types)
                        (map (lambda (a) (impc:ir:get-type-str a)) (cddr (assoc-strcmp (caddr ast) types)))
@@ -3861,19 +3905,21 @@
            (callback_func_name_str (impc:ir:compiler (string-append fname "_callback") types))
            (callback_func_name (impc:ir:gname))
            (closure_db_call (llvm:get-function (string-append fname "_callback")))
-           (astargs (cdddr ast))
+           (cbzonestr (impc:ir:compiler (cadddr ast) types))
+           (cbzone (impc:ir:gname))
+           (astargs (cddddr ast))
            (args (map (lambda (a hint)
                         (cons (impc:ir:compiler a types (impc:ir:get-type-from-str hint)) (impc:ir:gname)))
                       astargs
                       (cdr ftypes)))
-           (struct_type1 (string-append "{ void(i8*)*, i8*}*"))
+           (struct_type1 (string-append "{ void(i8*, %mzone*)*, i8*, %mzone*}*"))
            (struct_type2 (if (null? args)
                              ""
                              (string-append "{ " (cadr (cdr (car args)))
                                             (apply string-append  ;; void ptr first to hold "_callback" function
                                                    (map (lambda (a) (string-append ", " (cadr (cdr a)))) (cdr args)))
                                             "}*")))
-           (total_size1 (* (/ (sys:pointer-size) 8) 2))
+           (total_size1 (* (/ (sys:pointer-size) 8) 3))
            ;; this is the last usage of impc:ir:get-type-size in llvmir.xtm - need to get rid of it as well
            (total_size2 (apply + (map (lambda (a) (impc:ir:get-type-size (cadr (cdr a)))) args))))
       (if (not (impc:ir:fixed-point? (cadr time)))
@@ -3894,9 +3940,10 @@
       (emit callback_func_name_str os)
 
       (emit (impc:ir:gname "funcptr_ptr" "i8*") " = call ccc i8* @llvm_get_function_ptr(i8* " (car callback_func_name) ")\n" os)
-      (emit (impc:ir:gname "funcptr" "void(i8*)*") " = bitcast i8* " (car (impc:ir:gname "funcptr_ptr")) " to void(i8*)*\n" os)
+      (emit (impc:ir:gname "funcptr" "void(i8*, %mzone*)*") " = bitcast i8* " (car (impc:ir:gname "funcptr_ptr")) " to void(i8*, %mzone*)*\n" os)
+          
+      (emit cbzonestr os)
 
-                                        ;(set! farg (cons "" (impc:ir:gname "funcptr")))
       (emit (apply string-append (map (lambda (a n)
                                         (string-append (car a)
                                                        (impc:ir:gname "ptr" (string-append (cadr (cdr a)) "*")) " = getelementptr "
@@ -3908,8 +3955,8 @@
                                       (make-list-with-proc (length args) (lambda (i) i))))
             os)
 
-      ;; now add both {fptr and struct2} to struct1
-      (emit (impc:ir:gname "ptr" "void(i8*)**") " = getelementptr " (impc:ir:pointer-- struct_type1) ", " struct_type1 " "
+      ;; now add both {fptr, struct2 and the mzone} to struct1
+      (emit (impc:ir:gname "ptr" "void(i8*, %mzone*)**") " = getelementptr " (impc:ir:pointer-- struct_type1) ", " struct_type1 " "
             (car (impc:ir:gname "struct1_")) ", i32 0, i32 0\n"
             "store " (cadr (impc:ir:gname "funcptr")) " " (car (impc:ir:gname "funcptr")) ", "
             (cadr (impc:ir:gname "ptr")) " " (car (impc:ir:gname "ptr")) "\n"
@@ -3917,6 +3964,11 @@
       (emit (impc:ir:gname "ptr" "i8**") " = getelementptr " (impc:ir:pointer-- struct_type1) ", "  struct_type1 " "
             (car (impc:ir:gname "struct1_")) ", i32 0, i32 1\n"
             "store " (cadr (impc:ir:gname "dat2_")) " " (car (impc:ir:gname "dat2_")) ", "
+            (cadr (impc:ir:gname "ptr")) " " (car (impc:ir:gname "ptr")) "\n"
+            os)
+      (emit (impc:ir:gname "ptr" "%mzone**") " = getelementptr " (impc:ir:pointer-- struct_type1) ", "  struct_type1 " "
+            (car (impc:ir:gname "struct1_")) ", i32 0, i32 2\n"
+            "store " (cadr cbzone) " " (car cbzone) ", "
             (cadr (impc:ir:gname "ptr")) " " (car (impc:ir:gname "ptr")) "\n"
             os)
 
@@ -4220,6 +4272,8 @@
                     (impc:ir:compiler:stack-alloc ast types hint?))
                    ((equal? (car ast) 'num-of-elts)
                     (impc:ir:compiler:num-of-elts ast types))
+                   ((equal? (car ast) 'obj-size)
+                    (impc:ir:compiler:obj-size ast types))
                    ((equal? (car ast) 'ref)
                     (impc:ir:compiler:ref ast types))
                    ((equal? (car ast) 'make-tuple)

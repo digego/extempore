@@ -295,15 +295,15 @@ int main(int argc, char** argv)
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "           --nobase: don't load base lib on startup" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
-                std::cout << "          --frames: attempts to force frames [128]" << std::endl;
+                std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
                 std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
                 std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
                 std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
                 std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
                 std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
-                std::cout << "     --device-name: the name of the audio device to use (output or duplex) (overrides index)" << std::endl;
-                std::cout << "   --indevice-name: the name of the audio input device to use (overrides index)" << std::endl;
+                std::cout << "     --device-name: a regex to match the name of the audio device to use (output or duplex) (overrides index)" << std::endl;
+                std::cout << "   --indevice-name: a regex to match the namd of the audio input device to use (overrides index)" << std::endl;
                 std::cout << "         --latency: attempts to force audio output latency" << std::endl;
                 std::cout << "            --arch: the target architecture [current host]" << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;

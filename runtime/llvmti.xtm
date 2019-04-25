@@ -399,7 +399,7 @@
                        'default #t (print "Type Error"))
 
     (if (not (null? name))
-        (begin (print " in ")
+        (begin (print " with ")
                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t
                                   (print  (car name)))
                (print ",")))
@@ -2922,9 +2922,9 @@
                                 asm-path
                                 " -o " output-shlib-path)
                                (string-append
-                                "call "
-                                (sanitize-platform-path (sys:share-dir))
-                                "\\extras\\ms_build_vars.bat && link"
+                                "call link"
+                                ;; (sanitize-platform-path (sys:share-dir))
+                                ;; "\\extras\\ms_build_vars.bat && link"
                                 ;; " /FORCE:UNRESOLVED "
                                 " /MACHINE:x64 /DLL"
                                 " /OUT:" output-shlib-path
@@ -3813,16 +3813,13 @@ e.g.
 (define impc:ti:callback
   (lambda (ast)
     `(let ((zold (llvm_peek_zone_stack))
-           (znew (push_new_zone (* 1024 4))))
+           (znew (create_zone (* 1024 4))))
        (llvm_callback ,(car ast)
                       ,(cadr ast)
+                      znew
                       ,@(map (lambda (x)
                                (impc:ti:first-transform `(zcopy ,x zold znew) #t))
                              (cddr ast)))
-       (pop_zone)
-       (llvm_destroy_zone_after_delay znew
-                                      (+ (- ,(car ast) (llvm_now))
-                                         (* ,*au:samplerate* 10)))
        void)))
 
 (define (impc:ti:multicref args)
@@ -6511,7 +6508,41 @@ Continue executing `body' forms until `test-expression' returns #f"
              ;; was made when initially seeding 'vars'
              ;; so ... at this point we check and inject missing arg types into vars
              ;;
+             ;; (for-each (lambda (a)
+             ;;             (if (regex:match? a "^([a-zA-Z]|!)")
+             ;;                 (if (and (not (assoc-strcmp (string->symbol (string-append a "##" (number->string gnum))) vars))
+             ;;                          (regex:match? a "(:|!|{)"))
+             ;;                     (let ((newsymm (string->symbol (string-append a "##" (number->string gnum))))
+             ;;                           (all-syms (cl:remove-duplicates (map (lambda (aa)
+             ;;                                                                  (string->symbol (string-append aa "##" (number->string gnum))))
+             ;;                                                                (regex:match-all a "![^,}>\\]]*")))))
+             ;;                       ;; (println 'all all-syms 'new newsymm)
+             ;;                       (set! all-syms (remove (symbol->string newsymm) all-syms))
+             ;;                       ;; (println 'adding_p newsymm 'gnum gnum) ;newsym newsymm)
+             ;;                       ;; add newsym
+             ;;                       (set-cdr! vars (cons (list newsymm) (cdr vars)))
+             ;;                       ;; add all-syms
+             ;;                       (for-each (lambda (x)
+             ;;                                   (if (and (not (assoc-strcmp x vars))
+             ;;                                            (regex:match? (symbol->string x) "^([a-zA-Z]|!)"))
+             ;;                                       (begin
+             ;;                                         ;; (println 'adding_sub x 'gnum gnum)
+             ;;                                         (set-cdr! vars (cons (list x) (cdr vars)))
+             ;;                                         ;;(set! vars (cons (list (string->symbol x)) vars))
+             ;;                                         )))
+             ;;                                 all-syms)))))
+             ;;           (impc:ir:get-pretty-closure-arg-strings (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
+
+          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+             ;; it is possible for some generic types to be missed from 'vars'
+             ;; due to the fact that a different gpoly (overridden generic) choice
+             ;; was made when initially seeding 'vars'
+             ;; so ... at this point we check and inject missing
+             ;; generic bang types into vars
+             ;;
+             ;; this for things like Point:<!ga_130,!ga_130> 
              (for-each (lambda (a)
+                         ;; (println 'a a)
                          (if (regex:match? a "^([a-zA-Z]|!)")
                              (if (and (not (assoc-strcmp (string->symbol (string-append a "##" (number->string gnum))) vars))
                                       (regex:match? a "(:|!|{)"))
@@ -6519,22 +6550,26 @@ Continue executing `body' forms until `test-expression' returns #f"
                                        (all-syms (cl:remove-duplicates (map (lambda (aa)
                                                                               (string->symbol (string-append aa "##" (number->string gnum))))
                                                                             (regex:match-all a "![^,}>\\]]*")))))
-                                   ;; (println 'all all-syms 'new newsymm)
                                    (set! all-syms (remove (symbol->string newsymm) all-syms))
-                                   ;; (println 'adding_p newsymm 'gnum gnum) ;newsym newsymm)
-                                   ;; add newsym
-                                   (set-cdr! vars (cons (list newsymm) (cdr vars)))
-                                   ;; add all-syms
-                                   (for-each (lambda (x)
-                                               (if (and (not (assoc-strcmp x vars))
-                                                        (regex:match? (symbol->string x) "^([a-zA-Z]|!)"))
-                                                   (begin
-                                                     ;; (println 'adding_sub x 'gnum gnum)
-                                                     (set-cdr! vars (cons (list x) (cdr vars)))
-                                                     ;;(set! vars (cons (list (string->symbol x)) vars))
-                                                     )))
-                                             all-syms)))))
-                       (impc:ir:get-pretty-closure-arg-strings (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
+                                   ;; (println 'adding_p newsymm 'gnum gnum)
+                                   (set-cdr! vars (cons (list newsymm) (cdr vars)))))))
+                       (impc:ir:get-pretty-closure-arg-strings
+                        (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
+             ;; this for the subs of above (i.e. !ga_130)
+             (for-each (lambda (a)
+                         (let ((vs (cl:remove-duplicates (regex:match-all a "(![a-zA-Z0-9]*_[0-9]*)"))))
+                           (for-each (lambda (x)
+                                       (set! x (string->symbol (string-append x "##" (atom->string gnum))))
+                                       (if (not (assoc-strcmp x vars))
+                                           (begin
+                                             ;; (println 'no 'match 'for x 'in 'vars 'so 'adding 'it)
+                                             (set-cdr! vars
+                                                       (cons (list x) (cdr vars))))))
+                                     vs)))
+                       (impc:ir:get-pretty-closure-arg-strings
+                        (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
+             ;;;;;;;;;;;;;;;;             
+             
 
              (if (<> (length (cdr gpoly-type))
                      (length ast))
@@ -7304,7 +7339,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:callback-check
   (lambda (ast vars kts request?)
-    ;; (println 'callback-check 'ast: ast 'vars: vars 'request: request?)
     (let ((ftype (map impc:ir:get-type-from-str
                       (let ((ags (impc:ti:get-closure-arg-types (symbol->string (caddr ast)))))
                         (if ags ags '())))))
@@ -7830,11 +7864,15 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts request?)
     *impc:ir:si64*))
 
+(define impc:ti:obj-size-check
+  (lambda (ast vars kts request?)
+    *impc:ir:si64*))
+
 (define impc:ti:ref-check
   (lambda (ast vars kts request?)
     (if (not (assoc-strcmp (cadr ast) vars))
         (impc:compiler:print-compiler-error "no valid local variable found in call to ref" ast))
-    (impc:ir:pointer++ (cadr (assoc-strcmp (cadr ast) vars)))))
+    (list (impc:ir:pointer++ (cadr (assoc-strcmp (cadr ast) vars))))))
 
 (define impc:ti:make-tuple-check
   (lambda (ast vars kts request?)
@@ -8403,26 +8441,55 @@ xtlang's `let' syntax is the same as Scheme"
     (impc:ti:type-check (cadr ast) vars kts #f)
     (list (caddr ast))))
 
+;; (define impc:ti:closure-in-first-position
+;;   (lambda (ast vars kts request?)
+;;     ;; first check return type of car ast (which will be a closure)
+;;     ;; then check against it's arg types
+;;     (let ((type (impc:ti:type-check (car ast) vars kts request?)))
+;;       (if (null? type)
+;;           (impc:compiler:print-bad-type-error "unknown-type" ast))
+;;       (if (not (impc:ir:type? type))
+;;           (set! type (car type)))
+;;       (if (not (list? type))
+;;           (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type type) ast))
+;;       (if (<> (length (cddr type)) (length (cdr ast)))
+;;           (impc:compiler:print-bad-arity-error ast))
+;;       (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
+;;           (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car type)) ast)
+;;           (begin (map (lambda (a b)
+;;                         (impc:ti:type-check b vars kts a))
+;;                       (cddr type)
+;;                       (cdr ast))
+;;                  (cadr type))))))
+
 (define impc:ti:closure-in-first-position
   (lambda (ast vars kts request?)
+    ;; (println 'ast ast 'request? request?)
     ;; first check return type of car ast (which will be a closure)
     ;; then check against it's arg types
     (let ((type (impc:ti:type-check (car ast) vars kts request?)))
-      (if (null? type)
-          (impc:compiler:print-bad-type-error "unknown-type" ast))
-      (if (not (impc:ir:type? type))
+      (if (and (not (impc:ir:closure? type))
+               (list? type)
+               (impc:ir:closure? (car type)))
           (set! type (car type)))
-      (if (not (list? type))
-          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type type) ast))
-      (if (<> (length (cddr type)) (length (cdr ast)))
-          (impc:compiler:print-bad-arity-error ast))
-      (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
-          (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car type)) ast)
-          (begin (map (lambda (a b)
-                        (impc:ti:type-check b vars kts a))
-                      (cddr type)
-                      (cdr ast))
-                 (cadr type))))))
+      (if (not (impc:ir:type? type))
+          '(()) ;;(list *impc:ir:notype*)
+          (begin
+            (if (null? type)
+                (impc:compiler:print-bad-type-error "unknown-type" ast))
+            (if (not (list? type))
+                (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type type) ast))
+            (if (<> (length (cddr type)) (length (cdr ast)))
+                (impc:compiler:print-bad-arity-error ast))
+            (if (<> (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (car type))
+                (impc:compiler:print-bad-type-error (impc:ir:pretty-print-type (car type)) ast)
+                (begin (map (lambda (a b)
+                              (impc:ti:type-check b vars kts a))
+                            (cddr type)
+                            (cdr ast))
+                       (cadr type))))))))
+
+
 
 
 (define *impc:ti:type-check:calls* 0)
@@ -8508,6 +8575,7 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (list? ast) (member (car ast) '(zone-alloc))) (impc:ti:zone-alloc-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(make-tuple))) (impc:ti:make-tuple-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(num-of-elts))) (impc:ti:num-of-elts-check ast vars kts request?))
+          ((and (list? ast) (member (car ast) '(obj-size))) (impc:ti:obj-size-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(ref))) (impc:ti:ref-check ast vars kts request?))                    
           ((and (list? ast) (member (car ast) '(tuple-set!))) (impc:ti:tuple-set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(tuple-ref))) (impc:ti:tuple-ref-check ast vars kts request?))
@@ -9331,8 +9399,9 @@ xtlang's `let' syntax is the same as Scheme"
                                                       (not (equal? (cdr (assoc-strcmp (caar types) (cdr types)))
                                                                    (cdr (car types)))))
                                                  (impc:compiler:print-type-mismatch-error
-                                                  (assoc-strcmp (caar types) (cdr types))
-                                                  (car types))
+                                                  (cdar types)
+                                                  (cdr (assoc-strcmp (caar types) (cdr types)))
+                                                  (caar types))
                                                  (loop (cdr types))))))
                (fullyqualified (cl:remove-if-not (lambda (t) (impc:ir:type? (cdr t))) checked-for-duplicates)))
           ;; return fully qualified types
@@ -9677,7 +9746,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                 (string-append ", " (impc:ir:get-type-str a)))
                                               (cddr stub-type)))
                                   "}*")))
-             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat) alwaysinline nounwind {\n"
+             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat, %mzone* %inzone) alwaysinline nounwind {\n"
                                                                                       "entry:\n"
                                                                                       (if (null? cb-struct-type)
                                                                                           "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
@@ -9692,8 +9761,10 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 (make-list-with-proc (- (length stub-type) 1)
                                                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                                      "%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
-                                                                                      "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      ;"%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
+                                                                                      ;"%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      "call ccc void @llvm_push_zone_stack(%mzone* %inzone)\n"
+                                                                                      "%_impz = bitcast %mzone* %inzone to i8*\n"
                                                                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"
                                                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
@@ -9716,7 +9787,8 @@ xtlang's `let' syntax is the same as Scheme"
                                                                                                                 (make-list-with-proc (length (cdr stub-type))
                                                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
                                                                                       ")\n"
-                                                                                      "call ccc %mzone* @llvm_pop_zone_stack()\n"
+                                                                                      "%_nowoldzone = call ccc %mzone* @llvm_pop_zone_stack()\n"
+                                                                                      "call ccc void @llvm_zone_destroy(%mzone* %_nowoldzone)\n"
                                                                                       "ret void\n"
                                                                                       "}\n\n")))
              (scheme-stub-valid? #t)
@@ -10278,6 +10350,7 @@ xtlang's `let' syntax is the same as Scheme"
                                 a (range (length a)))))
            (zcopy_body (if generic #f
                            (map (lambda (a b c)
+                                  (define aa a)
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
@@ -10291,9 +10364,9 @@ xtlang's `let' syntax is the same as Scheme"
                                       (if (and (impc:ir:pointer? a)
                                                (= 1 (impc:ir:get-ptr-depth a)))
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
-                                               (let ((newptr (zalloc (llvm_zone_ptr_size (cast (tref x ,c) i8*)))))
+                                               (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
                                                  (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
-                                                         (llvm_zone_ptr_size (cast (tref x ,c) i8*)))
+                                                         ,(impc:ir:get-type-size (impc:ir:pointer-- a)))
                                                  (tset! obj ,b newptr))
                                                (tset! obj ,b (tref x ,c)))
                                           `(begin
@@ -10385,9 +10458,13 @@ xtlang's `let' syntax is the same as Scheme"
                    (interaction-environment))
              (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
                       (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
-                        (let ((obj (zalloc)))
-                          ,@zcopy_body
-                          obj)))
+                        (if (llvm_ptr_in_zone fromz (cast x i8*))
+                            (begin (push_zone toz)
+                              (let ((obj (zalloc)))
+                                 ,@zcopy_body
+                                 (pop_zone)
+                                 obj))
+                            x)))
                    (interaction-environment)))))
       ;; (println 'dc-out: name)
       #t)))
@@ -11186,7 +11263,8 @@ e.g.
                            `(let ((s:i8* (halloc 2)))
                               ,@expr
                               s)
-                           `(letz ((s:String* (sprintln (begin ,@expr)))
+                           `(letz ((res (begin ,@expr))
+                                   (s:String* (toString res))
                                    (lgth (+ 1 (tref s 0)))
                                    (oldcs (tref s 1))
                                    (newcs:i8* (halloc lgth)))
@@ -11742,6 +11820,13 @@ e.g.
                         ((t:closure? x)
                          (= (- (length x) 2) num))
                         (else (= num 1)))))
+
+;; closure with number of args
+(define t:closure-size? (lambda (f num)                                 
+                          (if (string? f) (set! f (impc:ir:get-type-from-pretty-str f)))
+                          (and (impc:ir:closure? f)
+                               (t:elts? f num))))
+
 
 ;; named type check strips pointers!
 ;; (you can use t:pointer? fo

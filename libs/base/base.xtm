@@ -506,12 +506,11 @@ into any further sexp arguments."
   "generic \"catch-all\" zcopy"
   (lambda (x fromz toz)
     (if (llvm_ptr_in_zone fromz (convert x))
-        (let ((size (llvm_zone_ptr_size (convert x)))
-              (newdat (convert (llvm_zone_malloc (llvm_peek_zone_stack) size))))
+        (let ((size (obj-size x 1)) ;; get size of x with 1 level of dereference
+              (newdat (convert (llvm_zone_malloc toz size))))
           (memcpy (convert newdat) (convert x) size)
           newdat)
         x)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; xtlang strings
@@ -741,8 +740,8 @@ If both strings are null an empty String will be returned
           ;; column-major indexing closure
           (s1cstr (cstring s1))
           (s1len:size_t (length s1))
-          (s2cstr (cstring s1))
-          (s2len:size_t (length s1))
+          (s2cstr (cstring s2))
+          (s2len:size_t (length s2))
           (row:i64* (salloc (+ s1len 1)))
           (prev_row:i64* (salloc (+ s1len 1)))
           (min3 (lambda (a:i64 b c)
@@ -959,6 +958,12 @@ If both strings are null an empty String will be returned
 
 (bind-func toString
   (lambda (x:i8)
+    (let ((s:i8* (salloc 256)))
+      (sprintf s "%d" x)
+      (String s))))
+
+(bind-func toString
+  (lambda (x:i16)
     (let ((s:i8* (salloc 256)))
       (sprintf s "%d" x)
       (String s))))
