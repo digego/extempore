@@ -885,7 +885,7 @@ namespace extemp {
       }
 
 #ifdef _OSC_DEBUG_
-    std::cout << "GET OSC STRING = " << *str << std::endl;
+			std::cout << "GET OSC STRING = " << *str << std::endl;
 #endif
     return str_cnt;
   }
