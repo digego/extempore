@@ -2074,6 +2074,99 @@ column-major (the same as OpenGL)
   (lambda (f:[double,double]* xmin xmax)
     (nintegrate:[double,[double,double]*,double,double,i64]* f xmin xmax 501)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; perlin noise function ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func fade
+  (lambda (t)
+    (* t t t (+ (* t (- (* t 6.) 15.)) 10.))))
+
+(bind-func grad
+  (lambda (hash:i64 x:double y:double z:double)
+    (set! hash (bitwise-and hash 15))
+    (cond
+     ((= hash 0) (+ x y))
+     ((= hash 1) (+ (- 0. x) y))
+     ((= hash 2) (- x y))
+     ((= hash 3) (- (- 0. x) y))
+     ((= hash 4) (+ x z))
+     ((= hash 5) (+ (- 0. x) z))
+     ((= hash 6) (- x z))
+     ((= hash 7) (- (- 0. x) z))
+     ((= hash 8) (+ y z))
+     ((= hash 9) (+ (- 0. y) z))
+     ((= hash 10) (- y z))
+     ((= hash 11) (- (- 0. y) z))
+     ((= hash 12) (+ y x))
+     ((= hash 13) (+ (- 0. y) z))
+     ((= hash 14) (- y x))
+     ((= hash 15) (- (- 0. y) z))
+     (else 0.))))
+
+(bind-func lerp
+  (lambda (a:double b:double x:double)
+    (+ a (* x (- b a)))))
+
+(bind-func perlin
+  (let ((permutation:|256,i64|* (alloc))
+        (p:|512,i64|* (alloc))
+        (i:i64 0)
+        (xi:i64 0)
+        (yi:i64 0)
+        (zi:i64 0)
+        (xf:double 0.)
+        (yf:double 0.)
+        (zf:double 0.)
+        (u:double 0.)
+        (v:double 0.)
+        (w:double 0.)
+        (aaa:i64 0)
+        (aba:i64 0)
+        (aab:i64 0)
+        (abb:i64 0)
+        (baa:i64 0)
+        (bba:i64 0)
+        (bab:i64 0)
+        (bbb:i64 0)
+        (x1:double 0.)
+        (x2:double 0.)
+        (y1:double 0.)
+        (y2:double 0.))
+    (afill! permutation 151 160 137 91 90 15 131 13 201 95 96 53 194 233 7 225 140 36 103 30 69 142 8 99 37 240 21 10 23 190 6 148 247 120 234 75 0 26 197 62 94 252 219 203 117 35 11 32 57 177 33 88 237 149 56 87 174 20 125 136 171 168 68 175 74 165 71 134 139 48 27 166 77 146 158 231 83 111 229 122 60 211 133 230 220 105 92 41 55 46 245 40 244 102 143 54 65 25 63 161 1 216 80 73 209 76 132 187 208 89 18 169 200 196 135 130 116 188 159 86 164 100 109 198 173 186 3 64 52 217 226 250 124 123 5 202 38 147 118 126 255 82 85 212 207 206 59 227 47 16 58 17 182 189 28 42 223 183 170 213 119 248 152 2 44 154 163 70 221 153 101 155 167 43 172 9 129 22 39 253 19 98 108 110 79 113 224 232 178 185 112 104 218 246 97 228 251 34 242 193 238 210 144 12 191 179 162 241 81 51 145 235 249 14 239 107 49 192 214 31 181 199 106 157 184 84 204 176 115 121 50 45 127 4 150 254 138 236 205 93 222 114 67 29 24 72 243 141 128 195 78 66 215 61 156 180)
+    (dotimes (i 0 256)
+      (aset! p i (aref permutation i))
+      (aset! p (+ i 256) (aref permutation i)))
+    (lambda (x:double y:double z:double)
+      (set! xi (bitwise-and (dtoi64 x) 255))
+      (set! yi (bitwise-and (dtoi64 y) 255))
+      (set! zi (bitwise-and (dtoi64 z) 255))
+      (set! xf (- x (i64tod (dtoi64 x))))
+      (set! yf (- y (i64tod (dtoi64 y))))
+      (set! zf (- z (i64tod (dtoi64 z))))
+      (set! u (fade xf))
+      (set! v (fade yf))
+      (set! w (fade zf))
+
+      (set! aaa (aref p (+ (aref p (+ (aref p xi) yi)) zi)))
+      (set! aba (aref p (+ (aref p (+ (aref p xi) (+ yi 1))) zi)))
+      (set! aab (aref p (+ (aref p (+ (aref p xi) yi)) (+ zi 1))))
+      (set! abb (aref p (+ (aref p (+ (aref p xi) (+ yi 1))) (+ zi 1))))
+      (set! baa (aref p (+ (aref p (+ (aref p (+ xi 1)) yi)) zi)))
+      (set! bba (aref p (+ (aref p (+ (aref p (+ xi 1)) (+ yi 1))) zi)))
+      (set! bab (aref p (+ (aref p (+ (aref p (+ xi 1)) yi)) (+ zi 1))))
+      (set! bbb (aref p (+ (aref p (+ (aref p (+ xi 1)) (+ yi 1))) (+ zi 1))))
+
+      (set! x1 (lerp (grad aaa xf yf zf) (grad baa (- xf 1.) yf zf) u))
+      (set! x2 (lerp (grad aba xf (- yf 1.) zf) (grad bba (- xf 1.) (- yf 1.) zf) u))
+      (set! y1 (lerp x1 x2 v))
+
+      (set! x1 (lerp (grad aab xf yf (- zf 1.)) (grad bab (- xf 1.) yf (- zf 1.)) u))
+      (set! x2 (lerp (grad abb xf (- yf 1.) (- zf 1.)) (grad bbb (- xf 1.) (- yf 1.) (- zf 1.)) u))
+      (set! y2 (lerp x1 x2 v))
+
+      (/ (+ (lerp y1 y2 w) 1.) 2.))))
+
 
 ;; end libs/core/math.xtm
 
