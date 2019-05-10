@@ -659,7 +659,7 @@ if(UNIX)
 
     ExternalProject_Add(portmidi
       PREFIX portmidi
-      URL https://github.com/extemporelang/portmidi/archive/master.zip
+      URL https://github.com/extemporelang/portmidi/archive/8602f548f71daf5ef638b2f7d224753400cb2158.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -727,7 +727,7 @@ if(UNIX)
 
     ExternalProject_Add(stb_image
       PREFIX stb_image
-      URL https://github.com/extemporelang/stb/archive/master.zip
+      URL https://github.com/extemporelang/stb/archive/152a250a702bf28951bb0220d63bc0c99830c498.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -807,7 +807,7 @@ if(WIN32)
 
     ExternalProject_Add(portmidi
       PREFIX portmidi
-      URL https://github.com/extemporelang/portmidi/archive/master.zip
+      URL https://github.com/extemporelang/portmidi/archive/8602f548f71daf5ef638b2f7d224753400cb2158.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -852,7 +852,7 @@ if(WIN32)
 
     ExternalProject_Add(stb_image
       PREFIX stb_image
-      URL https://github.com/extemporelang/stb/archive/master.zip
+      URL https://github.com/extemporelang/stb/archive/152a250a702bf28951bb0220d63bc0c99830c498.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
