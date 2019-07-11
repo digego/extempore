@@ -706,17 +706,9 @@ if(UNIX)
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     # build with as few deps as we can get away with
-    # ExternalProject_Add(sndfile
-    #   PREFIX libsndfile
-    #   URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-    #   CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-    #   BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-    #   INSTALL_COMMAND make install
-    #   BUILD_IN_SOURCE ON)
-    # set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     ExternalProject_Add(sndfile
-    PREFIX sndfile
+    PREFIX libsndfile
     URL https://github.com/erikd/libsndfile/archive/master.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -724,9 +716,9 @@ if(UNIX)
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
     -DENABLE_CPACK=OFF
-    -DENABLE_PACKAGE_CONFIG=OFF 
+    -DENABLE_PACKAGE_CONFIG=OFF
     -DBUILD_SHARED_LIBS=ON)
-  set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
+    set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
     set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
@@ -742,7 +734,7 @@ if(UNIX)
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy sndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
