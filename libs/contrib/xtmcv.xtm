@@ -224,7 +224,6 @@
     (let ((mat (Mat_Region (tref in 0) rect)))
       (zone_cleanup (Mat_Close mat))
       (ocv_Mat mat))))
-
 ;;
 ;; opencv mat clone
 ;;
@@ -235,6 +234,15 @@
     (let ((mat (Mat_Clone (tref in 0))))
       (zone_cleanup (Mat_Close mat))
       (ocv_Mat mat))))
+
+;;
+;; Mat absolute difference
+;;
+(bind-lib cvlib Mat_AbsDiff [void,ocv_MatT,ocv_MatT,ocv_MatT]*)
+(bind-func ocv_absdiff
+  (lambda (in1:ocv_Mat* in2:ocv_Mat* out:ocv_Mat*)
+    (Mat_AbsDiff (tref in1 0) (tref in2 0) (tref out 0))
+    void))
 
 ;;
 ;; opencv mat copy
@@ -561,6 +569,31 @@
     (if (null? args)
         (ocv_resize2 img size)
         (apply ocv_resize1 img size args))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; IMG processing
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib cvlib Blur [void,ocv_MatT,ocv_MatT,ocv_Size]*)
+
+(bind-func ocv_blur
+  "Blur image
+  "
+  (lambda (img:ocv_Mat* size:ocv_Size)
+    (let ((out (Mat_New)))
+      (Blur (tref img 0) out size)
+      (ocv_Mat out))))
+
+(bind-func ocv_blur
+  "Blur image
+  "
+  (lambda (img:ocv_Mat* out:ocv_Mat* size:ocv_Size)
+    (Blur (tref img 0) (tref out 0) size)
+    out))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
