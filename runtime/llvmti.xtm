@@ -9811,6 +9811,116 @@ xtlang's `let' syntax is the same as Scheme"
                   (impc:ti:get-global-var-types (cdr ast)))
             #f))))
 
+
+(define make_static_scheme_wrapper_ir
+  (lambda (symname-string closure-type)
+    (let* ((stub-type (impc:ir:get-closure-type-from-str closure-type))
+           (scheme-stub-valid? #t)
+          (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
+          (ir (string-append "define dllexport ccc i8* "
+          " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+          "{\nentry:\n"
+          (apply string-append
+                  (map (lambda (t n idx)
+                        (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                        (cond ((and (not (number? t))
+                                                    (not (impc:ir:pointer? t)))
+                                              (set! scheme-stub-valid? #f)
+                                              "")
+                                              ((or (not (number? t))
+                                                  (not (or (impc:ir:number? t)
+                                                            (impc:ir:void? t))))
+                                              (if (and (number? t)
+                                                        (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
+                                                  (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                  (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
+                                              ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                (impc:ti:scm_rt_check_string n symname-string)
+                                                                                n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                              (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))
+                      (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
+          (if (impc:ir:void? (car stub-type)) "" "%result = ")
+              "call ccc " (impc:ir:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
+
+          (string-join
+                  (map (lambda (t n)
+                        (string-append (impc:ir:get-type-str t) " " n))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
+          ")\n"
+          
+          (let* ((t (car stub-type)))
+            (cond ((and (not (number? t))
+                        (not (impc:ir:pointer? t)))
+                    (set! scheme-stub-valid? #f)
+                    "")
+                  ((or (not (number? t))
+                        (not (or (impc:ir:number? t)
+                                (impc:ir:void? t))))
+                    (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+                                  "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                  ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                  ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                  ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                  ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                  ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                  (else (impc:compiler:print-compiler-error "return type error in scheme stub"))))
+
+          "ret i8* %res\n"
+          "}\n\n"))))
+      (if scheme-stub-valid? ir #f))))
+
+
 (define *impc:ti:adhoc-cnt* 0)
 
 (define impc:ti:run
@@ -9989,14 +10099,29 @@ xtlang's `let' syntax is the same as Scheme"
       ;;
       ;; now compile ir to x86 and make stub code
       (if static ;; static function or normal closure?
-          (let* ((closure-type (cadr (impc:ir:gname))))
+          (let* ((closure-type (cadr (impc:ir:gname)))
+                 ;; compile scheme_ir specifically for static functions
+                 (scheme_ir (make_static_scheme_wrapper_ir (symbol->string symname) closure-type)))
             (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-str closure-type) "" '())
+            (if (string? scheme_ir) (llvm:compile-ir scheme_ir))
             (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
                 (begin ;; (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
                        (impc:aot:insert-static-binding-details symname (string->symbol (impc:ir:pretty-print-type closure-type)))
-                       ;; (newline *impc:aot:current-output-port*)
-                       (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) symname (impc:ir:pretty-print-type closure-type))))
-                       ;; (impc:aot:insert-nativefunc-binding-details library symname type docstring)))
+                       (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) symname (impc:ir:pretty-print-type closure-type))
+                       ;; scheme stub always has type i8* i8* i8*
+                       (if (string? scheme_ir)
+                           (begin
+                             (impc:aot:insert-static-binding-details (string->symbol (string-append (symbol->string symname) "_scheme")) (string->symbol "[i8*,i8*,i8*]*"))
+                              ;; (newline *impc:aot:current-output-port*)
+                              ;  (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) 
+                              ;                                                   (string->symbol (string-append (symbol->string symname) "_scheme")) 
+                              ;                                                   (string->symbol "[i8*,i8*,i8*]*"))
+                              (write `(mk-ff ,(symbol->string symname) (llvm:get-function-pointer ,(string-append (symbol->string symname) "_scheme"))) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*))))
+                (begin
+                  (if (string? scheme_ir) 
+                      (mk-ff (symbol->string symname) (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme"))))))
+            ;; (impc:aot:insert-nativefunc-binding-details library symname type docstring)))
             (impc:compiler:print-bind-func-details-to-log
                       "Compiled:"
                       symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
