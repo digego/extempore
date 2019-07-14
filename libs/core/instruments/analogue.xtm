@@ -315,9 +315,9 @@
                   ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
                   (if (< gate 0.1) (set! reltime (+ reltime 1)))
                   (if (> reltime amp_release_samples)
-                      (begin
-                        ;; (println "NOTE OFF!" data)
-                        (note_active data #f)))
+                      (if (< amp 0.01)
+                          (note_active data #f) ;; stop note if amp less than 0.01
+                          (begin (set! amplitude (- amplitude 0.01)) #t))) ;; otherwise decrease amplitude over max 100 samples
                   ;; setup mod sources
                   (if (> osc1_amp 0.001)
                       (set! osc1_out (* (+ osc1_amp (* adsr4_val (aref mods PARAM_OSC1_AMP)))

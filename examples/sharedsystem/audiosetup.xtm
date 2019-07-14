@@ -194,13 +194,19 @@
 
 (dsp:set! #f dspmt dsp1 dsp2 dsp3 dsp4 dsp5)
 
+(bind-func active_notes
+  (lambda (inst:i8*)
+    (let ((val (cref (cast inst [void]*) numactive i64)))
+      (convert val i32))))
+
 (bind-func dsp_load
   (lambda ()
-    (println '1: (dsp1.load:double)
-             '2: (dsp2.load:double)
-             '3: (dsp3.load:double)
-             '4: (dsp4.load:double)
-             '5: (dsp5.load:double))
+    (printf "\r1:[%2.0f%% n:%d] 2:[%2.0f%% n:%d] 3:[%2.0f%% n:%d] 4:[%2.0f%% n:%d] 5:[%2.0f%% n/a]" 
+            (* 100.0 (dsp1.load:double)) (active_notes (cast syn1 i8*))
+            (* 100.0 (dsp2.load:double)) (active_notes (cast syn2 i8*))
+            (* 100.0 (dsp3.load:double)) (active_notes (cast syn3 i8*))
+            (* 100.0 (dsp4.load:double)) (active_notes (cast kit i8*))
+            (* 100.0 (dsp5.load:double)))
     void))
 
 ;; if chan is -1 set global reverb mix 
@@ -293,32 +299,39 @@
 
 (bind-func get_analogue_synth_cc_name
   (let ((string_names (array_ref
-      "osc1: gain" "osc1: wave shape" "osc1: pulse width" "osc1: fine tune" "osc1: course tune" "osc1: pan (deprecated)" "n/a" "n/a"
-      "osc2: gain" "osc2: wave shape" "osc2: pulse width" "osc2: fine tune" "osc2: course tune" "osc2: pan (deprecated)" "n/a" "n/a"
-      "osc3: gain" "osc3: wave shape" "osc3: pulse width" "osc3: fine tune" "osc3: course tune" "osc3: pan (deprecated)" "n/a" "n/a"
-      "osc3: gain" "osc4: wave shape" "osc4: pulse width" "osc4: fine tune" "osc4: course tune" "osc4: pan (deprecated)" "n/a" "n/a"
-      "sub: gain" "noise: gain" "noise: white/pink" "lpf: 12/24 db" "lpf: cutoff" "lpf: resonance" "hfp: cutoff" "lpf: overdrive"
+      "osc1: gain" "osc1: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc1: pulse width" "osc1: fine tune" "osc1: course tune" "osc1: pan (deprecated)" "n/a" "n/a"
+      "osc2: gain" "osc2: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc2: pulse width" "osc2: fine tune" "osc2: course tune" "osc2: pan (deprecated)" "n/a" "n/a"
+      "osc3: gain" "osc3: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc3: pulse width" "osc3: fine tune" "osc3: course tune" "osc3: pan (deprecated)" "n/a" "n/a"
+      "osc3: gain" "osc4: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc4: pulse width" "osc4: fine tune" "osc4: course tune" "osc4: pan (deprecated)" "n/a" "n/a"
+      "sub: gain" "noise: gain" "noise: white/pink (0:white 1:pink)" "lpf: 12/24 db (0:12 1:24)" "lpf: cutoff" "lpf: resonance" "hfp: cutoff" "lpf: overdrive"
       "amp env: attack" "amp env: decay" "amp env: sustain" "amp env: release" "amp env: length multiplier" "pitch env: attack" "pitch env: decay" "pitch env: range"
       "filter env: attack" "filter env: decay" "filter env: sustain" "filter env: release" "filter env: length multiplier" "filter env: frequency range" "filter env: track pitch amount" "filter env: track amplitude amount"
       "delay: left" "delay: right" "delay: mix" "delay: feedback" "reverb: mix" "reverb: room size" "reverb: pre-delay" "reverb: absorb"
-      "mod matrix: source" "mod matrix: target" "mod matrix: amount" "n/a" "global: pan" "global: gain" "global: portamento" "reset (if val === 127)"
-      "lfo1: attack" "lfo1: decay" "lfo1: attack curve" "lfo1: decay curve" "lfo1: length" "lfo1: amplitude" "lfo1: frequency" "lfo1: wave" 
-      "lfo2: attack" "lfo2: decay" "lfo2: attack curve" "lfo2: decay curve" "lfo2: length" "lfo2: amplitude" "lfo2: frequency" "lfo2: wave" 
-      "lfo3: attack" "lfo3: decay" "lfo3: attack curve" "lfo3: decay curve" "lfo3: length" "lfo3: amplitude" "lfo3: frequency" "lfo3: wave" 
-      "lfo4: attack" "lfo4: decay" "lfo4: attack curve" "lfo4: decay curve" "lfo4: length" "lfo4: amplitude" "lfo4: frequency" "lfo4: wave")))
+      "flanger: mix" "flanger: lo/ms" "flanger: lo/scale" "flanger: hi/ms" "flanger: hi/scale" "flanger: rate" "flanger: fb" "n/a"
+      "global: pan" "global: gain" "global: portamento" "reset (if val === 127)"
+      "matrix: source" "matrix: target" "matrix: amt" "n/a"
+      "lfo1: attack" "lfo1: decay" "lfo1: attack curve" "lfo1: decay curve" "lfo1: length" "lfo1: amplitude" "lfo1: frequency" "lfo1: wave")))
     (lambda (cc:i32)
-      (aref string_names cc))))  
+      (if (> cc 88)
+          "<no cc for analogue synth>"
+          (aref string_names cc)))))
 
 ;; override midi_cc for analogue chans  1, 2 and 3
 (bind-func midi_cc
   (lambda (timestamp:i32 controller:i32 value:i32 chan:i32)
     (aset! MCC_ARR controller (/ (i32tof value) 127.0))
     (if (< chan 3)
-        (printf "MIDI_CC: %d %f %d (analogue synth %s)\n" controller (ftod (aref MCC_ARR controller)) chan (get_analogue_synth_cc_name controller))
-        (printf "MIDI_CC: %d %f %d\n" controller (ftod (aref MCC_ARR controller)) chan))
-    (if (= chan 0) (analogue_cc (cast syn1) controller value))
-    (if (= chan 1) (analogue_cc (cast syn2) controller value))
-    (if (= chan 2) (analogue_cc (cast syn3) controller value))
+        (printf "\rMIDI_CC: %d %f %d (%s) %s" controller (ftod (aref MCC_ARR controller)) chan (get_analogue_synth_cc_name controller)
+                "                                                           \r") ;; ugly but can't get vt100 codes working on windows :(
+        (printf "MIDI_CC: %d %f %d\r" controller (ftod (aref MCC_ARR controller)) chan))
+    (if (= chan 0) (analogue_cc (cast syn1) 0 controller value))
+    (if (= chan 1) (analogue_cc (cast syn2) 1 controller value))
+    (if (= chan 2) (analogue_cc (cast syn3) 2 controller value))
     void))
 
-(println "Finished loading!")
+(println 'Finished 'loading!)
+(println)
+(println)
+
+(:> DSP_LOAD 4 1/2 (dsp_load) (list 1))
+  
