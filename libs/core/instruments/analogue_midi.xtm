@@ -76,6 +76,7 @@
           ((= value 1) PARAM_SAW)
           ((= value 2) PARAM_PULSE)
           ((= value 3) PARAM_TRI)
+          ((= value 4) PARAM_WT) ;; wavetable
           (else PARAM_SINE)))) ;; default to SINE
 
 (bind-func get_lfo_waveform
@@ -84,9 +85,10 @@
           ((= value 1) PARAM_SAW)
           ((= value 2) PARAM_PULSE)
           ((= value 3) PARAM_TRI)
-          ((= value 4) PARAM_AD)
-          ((= value 5) PARAM_CONST)
-          ((= value 6) PARAM_RANDOM)
+          ((= value 4) PARAM_WT)
+          ((= value 5) PARAM_AD)
+          ((= value 6) PARAM_CONST)
+          ((= value 7) PARAM_RANDOM)
           (else PARAM_SINE)))) ;; default to SINE
 
 
@@ -125,7 +127,7 @@
         (set! val (/ (i32tof value) 127.0))
         (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
                (set_osc1_amp inst val))
-              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
                (set_osc1_wave inst (get_waveform value)))
               ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
                (set_osc1_pw inst val))
@@ -152,7 +154,7 @@
         (set! val (/ (i32tof value) 127.0))
         (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
                (set_osc2_amp inst val))
-              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
                (set_osc2_wave inst (get_waveform value)))
               ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
                (set_osc2_pw inst val))
@@ -180,7 +182,7 @@
         (set! val (/ (i32tof value) 127.0))
         (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
                (set_osc3_amp inst val))
-              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
                (set_osc3_wave inst (get_waveform value)))
               ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
                (set_osc3_pw inst val))
@@ -208,7 +210,7 @@
         (set! val (/ (i32tof value) 127.0))
         (cond ((= cc (+ offset 0)) ;; amplitude of osc 1
                (set_osc4_amp inst val))
-              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+              ((= cc (+ offset 1)) ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
                (set_osc4_wave inst (get_waveform value)))
               ((= cc (+ offset 2)) ;; pulse width (for PARAM_PULSE wave) 0.0-1.0 (0.5 is square)
                (set_osc4_pw inst val))
@@ -288,7 +290,6 @@
               ((= cc (+ offset 7)) ;; pitch env amt
                (set_pitch_env_amt inst (- (* 2.0 val) 1.0))))))))
 
-
 (bind-func filter_env_cc
   (lambda ()
     (let ((val 0.0:f)
@@ -319,8 +320,6 @@
               ((= cc (+ offset 7)) ;; follow amp i.e. (+ cutoff (* amplitude value))
                (set_filter_env_follow_amp inst val)))))))
 
-
-
 (bind-func delay_cc
   (lambda ()
     (let ((val 0.0:f))
@@ -336,8 +335,6 @@
               ((= cc (+ offset 3)) ;; delay fb
                (set_delay_fb inst val)))))))
 
-
-
 (bind-func reverb_cc
   (lambda ()
     (let ((val 0.0:f))
@@ -351,8 +348,7 @@
               ((= cc (+ offset 2)) ;; predelay (ms)
                (set_reverb_predelay inst (* val 500.0)))
               ((= cc (+ offset 3)) ;; absorbtion
-               (set_reverb_absorb inst val)))))))
-
+               (set_reverb_absorb inst (+ 0.5 (* 0.5 val)))))))))
 
 (bind-func flanger_cc
   (lambda ()
@@ -381,7 +377,6 @@
                (set_flanger_rate inst (* 0.25 val)))
               ((= cc (+ offset 6)) ;; flanger feedback
                (set_flanger_fb inst (* 0.999 val))))))))
-
 
 (bind-func lfo1_cc
   (lambda ()
@@ -523,7 +518,6 @@
               ((= cc (+ offset 7)) ;; lfo type
                (set_lfo_type inst PARAM_LFO4 (get_lfo_waveform value))))))))
 
-
 (bind-func matrix_cc
   (lambda ()
     (let ((val 0.0:f)
@@ -542,7 +536,6 @@
                ;; (println 'setting source target val)
                (set_mod_matrix inst (% source 4) (% target 32) val)
                void))))))
-
 
 (bind-func main_cc
   (lambda ()
