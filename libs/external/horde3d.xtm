@@ -11,7 +11,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/horde3d.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/horde3d.xtm" 'quiet))
 (sys:load-preload-check 'horde3d)
 
 (impc:aot:suppress-aot-do
@@ -19,6 +19,8 @@
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 ;; set the path to the Horde3D directory
+
+(impc:aot:insert-header "xtmhorde3d")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib hordelib
@@ -29,9 +31,9 @@
         ((string=? (sys:platform) "Windows")
          "Horde3D.dll")))
 
-(impc:aot:insert-header "xtmhorde3d")
+(impc:aot:import-ll "xtmhorde3d")
 
-(define *xtmlib-horde3d-loaded* #f)
+(define *xtmlib-horde3d-loaded* #t)
 
 (define new-horde #t)
 

@@ -9,9 +9,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/udis86.xtm")
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/udis86.xtm"))
 (sys:load-preload-check 'udis86)
-(define *xtmlib-udis86-loaded* #f)
+(define *xtmlib-udis86-loaded* #t)
 
 (impc:aot:insert-header "xtmudis86")
 
@@ -23,6 +23,8 @@
          "libudis86.so")
         ((string=? (sys:platform) "Windows")
          "libudis86.dll")))
+
+(impc:aot:import-ll "xtmudis86")
 
 (bind-type ud_operand <i32,i8,i32,i32,i8,i8,i64,i64,i8> #f)
                                         ;<[i32,ud*],i8*,size_t,size_t,i8,size_t,|64,i8|,i32,[void,ud*],i64,|64,i8|,i8*,size_t,size_t,|128,i8|,[i8*,ud*,i64,i64*]*,i8,i64,i8,i32,|3,ud_operand|,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8,i8*,i8*,i8*> #f)

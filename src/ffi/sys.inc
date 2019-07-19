@@ -114,6 +114,21 @@ static pointer slurpFile(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
+static pointer dumpStringToFile(scheme* Scheme, pointer Args)
+{
+    std::string filename(string_value(pair_car(Args)));
+    std::string dumpstr(string_value(pair_cadr(Args)));
+
+    std::FILE *fp = std::fopen(filename.c_str(), "wb");
+    if (fp) {
+        std::fwrite(dumpstr.data(), 1, dumpstr.length(), fp);
+        std::fclose(fp);
+        return Scheme->T;
+    }
+    return Scheme->F;
+}
+
+
 static pointer dirlist(scheme* Scheme, pointer Args)
 {
 #ifdef _WIN32
@@ -236,6 +251,7 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
         { "sys:symbol-cptr", &symbol_pointer }, \
         { "sys:make-cptr", &makeCptr }, \
         { "sys:slurp-file", &slurpFile }, \
+        { "sys:dump-string-to-file", &dumpStringToFile }, \
         { "sys:directory-list", &dirlist }, \
         { "sys:expand-path", &pathExpansion }, \
         { "sys:command", &command }, \

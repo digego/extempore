@@ -18,9 +18,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/nanovg.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/nanovg.xtm" 'quiet))
 (sys:load-preload-check 'nanovg)
-(define *xtmlib-nanovg-loaded* #f)
+(define *xtmlib-nanovg-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -38,7 +38,11 @@
         ((string=? (sys:platform) "Linux")
          "libnanovg.so")
         ((string=? (sys:platform) "Windows")
-         "nanovg.dll")))
+         "nanovg.dll"))
+  "xtmnanovg")
+
+
+(impc:aot:import-ll "xtmnanovg")
 
 ;;;;;;;;;;;;;;
 ;; nanovg.h ;;

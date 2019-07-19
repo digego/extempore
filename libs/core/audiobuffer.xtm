@@ -1,8 +1,7 @@
-;;; audiobuffer.xtm -- dealing with audio files
+;;; audiobuffer.xtm
 
-;; Author: Ben Swift
+;; Author: Ben Swift, Andrew Sorensen
 ;; Keywords: extempore
-;; Required dylibs: libsndfile
 
 ;;; Commentary:
 
@@ -10,9 +9,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/audiobuffer.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audiobuffer.xtm" 'quiet))
 (sys:load-preload-check 'audiobuffer)
-(define *xtmlib-audiobuffer-loaded* #f)
+(define *xtmlib-audiobuffer-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -20,6 +19,23 @@
  (sys:load "libs/base/base.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudiobuffer")
+(impc:aot:import-ll "xtmaudiobuffer")
+
+;; two little helpers to keep this independent from audio_dsp
+
+(bind-func static hermite_interp_local
+  (lambda (fractional y1:SAMPLE x0 x1 x2)
+    (let ((c (* 0.5 (- x1 y1)))
+          (v (- x0 x1))
+          (w (+ c v))
+          (a (+ w v (* (- x2 x0) 0.5)))
+          (b (+ w a)))
+      (+ (* (+ (* (- (* a fractional) b) fractional) c) fractional) x0))))
+
+(bind-func static midi2frq_local
+  (lambda (pitch:SAMPLE)
+    (if (<= pitch 0.0) 0.0
+        (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; AudioBuffer type ;;
@@ -33,18 +49,20 @@
 ;; 5 samplerate
 ;; 6 loop start
 ;; 7 loop frames
+;; 8 root pitch (as midi #)
+;; 9 phase (for wavetable operations)
 
-(bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,double,i64,i64> (printer? . #f))
+(bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,double,i64,i64,i64,double> (printer? . #f))
 
 (bind-func AudioBuffer
   (lambda (frames chans)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
-      (AudioBuffer_z (String "") 0 frames chans dat (convert SAMPLE_RATE) 0 0))))
+      (AudioBuffer_z (String "") 0 frames chans dat (convert SAMPLE_RATE) 0 0 60 0.0))))
 
 (bind-func AudioBuffer
   (lambda (frames chans samplerate)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
-      (AudioBuffer_z (String "") 0 frames chans dat samplerate 0 0))))
+      (AudioBuffer_z (String "") 0 frames chans dat samplerate 0 0 60 0.0))))
 
 (bind-func print
   "specialised print function for AudioBuffer*"
@@ -59,7 +77,9 @@
           data: %p
     samplerate: %f
     loop_start: %lld
-   loop_frames: %lld>"
+   loop_frames: %lld
+      root_frq: %lld
+         phase: %f>"
                 ab
                 (tref (tref ab 0) 1)
                 (tref ab 1)
@@ -68,7 +88,9 @@
                 (tref ab 4)
                 (tref ab 5)
                 (tref ab 6)
-                (tref ab 7)))
+                (tref ab 7)
+                (tref ab 8)
+                (tref ab 9)))
     void))
 
 
@@ -86,7 +108,9 @@
           data: %p
     samplerate: %f
     loop_start: %lld
-   loop_frames: %lld>"
+   loop_frames: %lld
+      root_frq: %lld
+         phase: %f>"
                    ab
                    (tref ab 0)
                    (tref ab 1)
@@ -95,82 +119,120 @@
                    (tref ab 4)
                    (tref ab 5)
                    (tref ab 6)
-                   (tref ab 7)))
+                   (tref ab 7)
+                   (tref ab 8)
+                   (tref ab 9)))
       (Str str))))
 
 ;; getters/setters
 
-(bind-func AudioBuffer_filepath
+(bind-func static AudioBuffer_filepath
   (lambda (ab:AudioBuffer*)
     (tref ab 0)))
 
-(bind-func AudioBuffer_set_filepath
+(bind-func static AudioBuffer_set_filepath
   (lambda (ab:AudioBuffer* filepath)
     (tset! ab 0 filepath)))
 
-(bind-func AudioBuffer_playhead
+(bind-func static AudioBuffer_playhead
   (lambda (ab:AudioBuffer*)
     (tref ab 1)))
 
-(bind-func AudioBuffer_set_playhead
+(bind-func static AudioBuffer_set_playhead
   (lambda (ab:AudioBuffer* playhead)
     (tset! ab 1 playhead)))
 
-(bind-func AudioBuffer_frames
+(bind-func static AudioBuffer_frames
   (lambda (ab:AudioBuffer*)
     (tref ab 2)))
 
-(bind-func AudioBuffer_set_frames
+(bind-func static AudioBuffer_set_frames
   (lambda (ab:AudioBuffer* frames)
     (tset! ab 2 frames)))
 
-(bind-func AudioBuffer_channels
+(bind-func static AudioBuffer_channels
   (lambda (ab:AudioBuffer*)
     (tref ab 3)))
 
-(bind-func AudioBuffer_set_channels
+(bind-func static AudioBuffer_set_channels
   (lambda (ab:AudioBuffer* channels)
     (tset! ab 3 channels)))
 
-(bind-func AudioBuffer_data
+(bind-func static AudioBuffer_data
   (lambda (ab:AudioBuffer*)
     (tref ab 4)))
 
-(bind-func AudioBuffer_set_data
+(bind-func AudioBuffer_data_b64
+  (lambda (ab:AudioBuffer*)
+    (let ((b64size:i64 0)
+          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4)))
+      (String (base64_encode (cast (tref ab 4) i8*) datsize (ref b64size))))))
+
+(bind-func AudioBuffer_data_b64_cstring
+  (lambda (ab:AudioBuffer*)
+    (let ((b64size:i64 0)
+          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4)))
+      (base64_encode (cast (tref ab 4) i8*) datsize (ref b64size)))))
+
+(bind-func static AudioBuffer_set_data
   (lambda (ab:AudioBuffer* data)
     (tset! ab 4 data)))
 
-(bind-func AudioBuffer_samplerate
+(bind-func AudioBuffer_set_data_b64
+  (lambda (ab:AudioBuffer* b64:String*)
+    (let ((size:i64 0)
+          (out:i8* (base64_decode (cstring b64) (length b64) (ref size))))
+      (if (<= size (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4))
+          (begin (memcpy (cast (AudioBuffer_data ab)) out size) void)
+          (begin (println "error: AudioBuffer must be at least " size " bytes." ) void)))))
+
+(bind-func static AudioBuffer_samplerate
   (lambda (ab:AudioBuffer*)
     (tref ab 5)))
 
-(bind-func AudioBuffer_set_samplerate
+(bind-func static AudioBuffer_set_samplerate
   (lambda (ab:AudioBuffer* samplerate)
     (tset! ab 5 samplerate)))
 
-(bind-func AudioBuffer_loop_start
+(bind-func static AudioBuffer_loop_start
   (lambda (ab:AudioBuffer*)
     (tref ab 6)))
 
-(bind-func AudioBuffer_set_loop_start
+(bind-func static AudioBuffer_set_loop_start
   (lambda (ab:AudioBuffer* loop_start)
     (tset! ab 6 loop_start)))
 
-(bind-func AudioBuffer_loop_frames
+(bind-func static AudioBuffer_loop_frames
   (lambda (ab:AudioBuffer*)
     (tref ab 7)))
 
-(bind-func AudioBuffer_set_loop_frames
+(bind-func static AudioBuffer_set_loop_frames
   (lambda (ab:AudioBuffer* loop_frames)
     (tset! ab 7 loop_frames)))
 
-(bind-func AudioBuffer_num_samples
+(bind-func static AudioBuffer_root_pitch
+  (lambda (ab:AudioBuffer*)
+    (tref ab 8)))
+
+(bind-func static AudioBuffer_set_root_pitch
+  (lambda (ab:AudioBuffer* root_pitch)
+    (tset! ab 8 root_pitch)))
+
+(bind-func static AudioBuffer_phase
+  (lambda (ab:AudioBuffer*)
+    (tref ab 9)))
+
+(bind-func static AudioBuffer_set_phase
+  (lambda (ab:AudioBuffer* phase)
+    (tset! ab 9 phase)))
+
+(bind-func static AudioBuffer_num_samples
   "get the total number of samples (* frames channels) from an Audiobuffer"
   (lambda (ab:AudioBuffer*)
     (* (AudioBuffer_frames ab)
        (AudioBuffer_channels ab))))
 
-(bind-func AudioBuffer_seek
+(bind-func static AudioBuffer_seek
   (lambda (ab:AudioBuffer* seek_to)
     (if (< seek_to 0)
         (begin
@@ -182,7 +244,7 @@
 
 ;; "peek" doesn't advance the playhead, "read" does
 
-(bind-func AudioBuffer_peek
+(bind-func static AudioBuffer_peek
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
       (if (< ph (AudioBuffer_frames ab))
@@ -190,7 +252,7 @@
                 (+ (* ph (AudioBuffer_channels ab)) chan))
           0.0))))
 
-(bind-func AudioBuffer_peek_looped
+(bind-func static AudioBuffer_peek_looped
   (lambda (ab:AudioBuffer* chan)
     (let ((ph (AudioBuffer_playhead ab)))
       (pref (AudioBuffer_data ab)
@@ -232,19 +294,155 @@
         (pref (AudioBuffer_data ab)
               (+ (* frame (AudioBuffer_channels ab)) chan)))))
 
-(bind-func AudioBuffer_ptr
+(bind-func static AudioBuffer_ptr
   "returns a pointer into the buffer"
   (lambda (ab:AudioBuffer* frame chan)
-    (pref-ptr (AudioBuffer_data ab)
-              (+ (* frame (AudioBuffer_channels ab)) chan))))
+    (if (< frame 0) (set! frame (llabs frame)))
+    (if (< frame (AudioBuffer_frames ab))
+        (pref-ptr (AudioBuffer_data ab)
+          (+ (* frame (AudioBuffer_channels ab)) chan))
+        (pref-ptr (AudioBuffer_data ab)
+          (+ (* (% frame (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
 
-(bind-func playbuf
-  (lambda (ab:AudioBuffer* chan)
-    (AudioBuffer_read_looped ab chan)))
+;; no pulsewidth, faster but no segments or mixing
+(bind-func AudioBuffer_read_interp
+  (lambda (buffer:AudioBuffer* freq:SAMPLE chan:i64)
+    (let ((channels:i64 (AudioBuffer_channels buffer))
+          (frames (AudioBuffer_frames buffer))
+          (looplgth (AudioBuffer_loop_frames buffer))
+          (loopstart (AudioBuffer_loop_start buffer))
+          (oneshot (= looplgth 0))       
+          (segments (if oneshot 0 (/ frames looplgth)))
+          (phase:double (AudioBuffer_phase buffer))
+          (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
+          (pos:double phase)
+          (lgth:i64 (if oneshot
+                    (- (- frames 1) loopstart)
+                    (clamp looplgth
+                           0
+                           (- frames loopstart))))
+          (lgthf:double (convert lgth))
+          (dat (AudioBuffer_ptr buffer (clamp loopstart 0 (- frames looplgth)) chan))
+          (y1 0.0)
+          (y1pos:i64 (* channels (convert (floor (% (- pos rate) lgthf)))))
+          (x0 0.0)
+          (x0pos:i64 (* channels (convert (floor pos))))
+          (x1 0.0)
+          (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
+          (x2 0.0)
+          (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
+      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping) 
+          (begin
+            (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (pref dat y1pos)))
+            (set! x0 (pref dat x0pos))
+            (set! x1 (pref dat x1pos))
+            (set! x2 (pref dat x2pos)) 
+            (if (= chan 0) ;; increment phase
+                (AudioBuffer_set_phase buffer 
+                                      (if oneshot 
+                                          (+ pos rate) 
+                                          (% (+ pos rate) lgthf))))
+            ;; return interpolated result
+            (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
-(bind-func loopbuf
-  (lambda (ab:AudioBuffer* chan)
-    (AudioBuffer_read_looped ab chan)))
+
+;; where pw is between 0.0 - 1.0 
+;; and chooses between 'segments' of the audio file
+;; where a segment is 1 * looplgth samples long
+;; the number of segments is then frames / looplgth
+(bind-func AudioBuffer_read_interp_pw
+  (lambda (buffer:AudioBuffer* freq:SAMPLE chan:i64 pw:float)
+    (set! pw (* pw 0.9999999))
+    (let ((channels:i64 (AudioBuffer_channels buffer))
+          (frames (AudioBuffer_frames buffer))
+          (looplgth (AudioBuffer_loop_frames buffer))
+          (loopstart (AudioBuffer_loop_start buffer))
+          (oneshot (= looplgth 0))       
+          (segments (if oneshot 0 (/ frames looplgth)))
+          (phase:double (AudioBuffer_phase buffer))
+          (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
+          (pos:double phase)
+          (lgth:i64 (if oneshot
+                      (- (- frames 1) loopstart)
+                      (clamp looplgth
+                            0
+                            (- frames loopstart))))
+          (lgthf:double (convert lgth))
+          (offset (* (convert (floor (* pw (convert segments)))) looplgth))
+          (mix (% (* pw (convert segments)) 1.0))
+          (dat1 (AudioBuffer_ptr buffer offset chan))
+          (dat2 (AudioBuffer_ptr buffer (% (+ offset looplgth) frames) chan))
+          (dy1 0.0) (dx0 0.0) (dx1 0.0) (dx2 0.0)
+          (y1 0.0) (x0 0.0) (x1 0.0) (x2 0.0)
+          (y1pos:i64 (* channels (convert (floor (% (- pos rate) lgthf)))))
+          (x0pos:i64 (* channels (convert (floor pos))))
+          (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
+          (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
+      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping) 
+          (begin
+            (set! dy1 (- (pref dat2 y1pos) (pref dat1 y1pos)))
+            (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (+ (pref dat1 y1pos) (* dy1 mix))))
+            (set! dx0 (- (pref dat2 x0pos) (pref dat1 x0pos)))
+            (set! x0 (+ (pref dat1 x0pos) (* dx0 mix)))
+            (set! dx1 (- (pref dat2 x1pos) (pref dat1 x1pos)))
+            (set! x1 (+ (pref dat1 x1pos) (* dx1 mix)))
+            (set! dx2 (- (pref dat2 x2pos) (pref dat1 x2pos)))
+            (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
+            (if (= chan 0) ;; increment phase
+                (AudioBuffer_set_phase buffer 
+                                      (if oneshot 
+                                          (+ pos rate) 
+                                          (% (+ pos rate) lgthf))))
+            ;; return interpolated result
+            (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
+
+;; where mix is 0.0-1.0 and mixes between buf1 and buf2
+(bind-func AudioBuffer_read_interp_mix
+  (lambda (buffer:AudioBuffer* buffer2:AudioBuffer* freq:SAMPLE chan:i64 mix:float)
+    (let ((channels:i64 (AudioBuffer_channels buffer))
+          (frames (AudioBuffer_frames buffer))
+          (looplgth (AudioBuffer_loop_frames buffer))
+          (loopstart (AudioBuffer_loop_start buffer))
+          (oneshot (= looplgth 0))       
+          (segments (if oneshot 0 (/ frames looplgth)))
+          (phase:double (AudioBuffer_phase buffer))
+          (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
+          (pos:double phase)
+          (lgth:i64 (if oneshot
+                    (- (- frames 1) loopstart)
+                    (clamp looplgth
+                           0
+                           (- frames loopstart))))
+          (lgthf:double (convert lgth))
+          (dat1 (AudioBuffer_ptr buffer (clamp loopstart 0 (- frames looplgth)) chan))
+          (dat2 (AudioBuffer_ptr buffer2 (clamp loopstart 0 (- frames looplgth)) chan))
+          (dy1 0.0) (dx0 0.0) (dx1 0.0) (dx2 0.0)
+          (y1 0.0)
+          (y1pos:i64 (* channels (convert (floor (% (- pos rate) lgthf)))))
+          (x0 0.0)
+          (x0pos:i64 (* channels (convert (floor pos))))
+          (x1 0.0)
+          (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
+          (x2 0.0)
+          (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
+      (set! mix (fabs mix))
+      (if (> pos lgthf) 0.0
+          (begin
+            (set! dy1 (- (pref dat2 y1pos) (pref dat1 y1pos)))
+            (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (+ (pref dat1 y1pos) (* dy1 mix))))
+            (set! dx0 (- (pref dat2 x0pos) (pref dat1 x0pos)))
+            (set! x0 (+ (pref dat1 x0pos) (* dx0 mix)))
+            (set! dx1 (- (pref dat2 x1pos) (pref dat1 x1pos)))
+            (set! x1 (+ (pref dat1 x1pos) (* dx1 mix)))
+            (set! dx2 (- (pref dat2 x2pos) (pref dat1 x2pos)))
+            (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
+            (if (= chan 0) ;; increment phase
+                (AudioBuffer_set_phase buffer 
+                                      (if oneshot 
+                                          (+ pos rate) 
+                                          (% (+ pos rate) lgthf))))
+            ;; return interpolated result
+            (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -261,12 +459,12 @@
 ;; AIFFs are big-endian, so need some helper functions for
 ;; byte-swapping
 
-(bind-func swapi16
+(bind-func static swapi16
   (lambda (x:i16)
     (bor (>> x 8)
          (<< x 8))))
 
-(bind-func swapi32
+(bind-func static swapi32
   (lambda (x:i32)
     (bor (bor (& (>> x 24) #xff)           ;; move byte 3 to byte 0
               (& (<< x 8) #xff0000))       ;; move byte 1 to byte 2
@@ -590,6 +788,101 @@
            (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
            null))))
 
+(bind-func AudioBuffer_malloc
+  (lambda (frames chans samplerate)
+    (let ((dat:SAMPLE* (alloc (* frames chans))))
+      (AudioBuffer_h (String "") 0 frames chans dat samplerate 0 0 60 0.0))))
+
+;; AudioBuffer created with b64 is always malloc'd 
+;; and expected to live for the duration of the session
+(bind-func AudioBuffer
+  (lambda (frames chans samplerate phase root loopstart loopframes b64:String*)
+    (let ((ab (AudioBuffer_malloc frames chans samplerate)))
+      (AudioBuffer_set_phase ab phase)
+      (AudioBuffer_set_root_pitch ab root)
+      (AudioBuffer_set_loop_start ab loopstart)
+      (AudioBuffer_set_loop_frames ab loopframes)
+      (AudioBuffer_set_data_b64 ab b64)
+      ab)))
+
+(bind-func AudioBuffer_cstring
+  (lambda (frames chans samplerate phase root loopstart loopframes b64:i8*)
+    (let ((ab (AudioBuffer_malloc frames chans samplerate)))
+      (AudioBuffer_set_phase ab phase)
+      (AudioBuffer_set_root_pitch ab root)
+      (AudioBuffer_set_loop_start ab loopstart)
+      (AudioBuffer_set_loop_frames ab loopframes)
+      (AudioBuffer_set_data_b64 ab (String b64))
+      ab)))
+
+;; copy audiobuffer
+(bind-func AudioBuffer
+  (lambda (in:AudioBuffer*)
+    (let ((size (* (AudioBuffer_frames in) (AudioBuffer_channels in)))
+          (dat:SAMPLE* (alloc size))
+          (olddat:SAMPLE* (AudioBuffer_data in)))
+      (memcpy (cast dat) (cast olddat) (* size 4))
+      (AudioBuffer_z 
+        (AudioBuffer_filepath in) 
+        (AudioBuffer_playhead in)
+        (AudioBuffer_frames in)
+        (AudioBuffer_channels in)
+        dat
+        (AudioBuffer_samplerate in)
+        (AudioBuffer_loop_start in)
+        (AudioBuffer_loop_frames in)
+        (AudioBuffer_root_pitch in)
+        (AudioBuffer_phase in)))))
+
+;; a 'new' AudioBuffer with shared audio buffer
+(bind-func AudioBuffer_shared_data
+  (lambda (ab:AudioBuffer*)
+    (AudioBuffer_z (String "") 
+                   0 
+                   (AudioBuffer_frames ab)
+                   (AudioBuffer_channels ab)
+                   (AudioBuffer_data ab) 
+                   (AudioBuffer_samplerate ab)
+                   (AudioBuffer_loop_start ab)
+                   (AudioBuffer_loop_frames ab)
+                   (AudioBuffer_root_pitch ab)
+                   0.0)))
+
+;; single channel wavetable oscillator
+(bind-func wt_c
+  (lambda (buffer:AudioBuffer*)
+    (let ((wt (AudioBuffer_shared_data buffer)))
+      (lambda (amp freq)
+        (* amp (AudioBuffer_read_interp wt freq 0))))))
+
+;; multi channel wavetable oscillator
+(bind-func wt_mc_c
+  (lambda (buffer:AudioBuffer*)
+    (let ((wt (AudioBuffer_shared_data buffer)))
+      (lambda (chan amp freq)
+        (* amp (AudioBuffer_read_interp wt freq chan))))))
+
+(bind-func static playbuf
+  (lambda (ab:AudioBuffer* chan)
+    (AudioBuffer_read_looped ab chan)))
+
+(bind-func static loopbuf
+  (lambda (ab:AudioBuffer* chan)
+    (AudioBuffer_read_looped ab chan)))
+
+(bind-func AudioBuffer_concat
+  (lambda (ab1:AudioBuffer* ab2:AudioBuffer*)
+    (if (or (<> (AudioBuffer_samplerate ab1) (AudioBuffer_samplerate ab2))
+            (<> (AudioBuffer_channels ab1) (AudioBuffer_channels ab2)))
+        (begin (println "Error: cannot concat incompatible audiobuffers") null) ;; return null on error!
+        (let ((new (AudioBuffer (+ (AudioBuffer_frames ab1) (AudioBuffer_frames ab2))
+                                (AudioBuffer_channels ab1)
+                                (AudioBuffer_samplerate ab1)))
+              (dat1 (AudioBuffer_ptr new 0 0))
+              (dat2 (AudioBuffer_ptr new (AudioBuffer_frames ab1) 0)))
+          (memcpy (cast dat1) (cast (AudioBuffer_ptr ab1 0 0)) (* (AudioBuffer_frames ab1) (AudioBuffer_channels ab1) 4))
+          (memcpy (cast dat2) (cast (AudioBuffer_ptr ab2 0 0)) (* (AudioBuffer_frames ab2) (AudioBuffer_channels ab2) 4))
+          new))))
 
 (impc:aot:insert-footer "xtmaudiobuffer")
 (define *xtmlib-audiobuffer-loaded* #t)

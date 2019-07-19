@@ -412,10 +412,10 @@ namespace extemp {
     OSC* osc = (OSC*) obj_p;
     while(true) {
 #ifdef EXT_BOOST
-      boost::asio::ip::udp::endpoint sender;
+      std::experimental::net::ip::udp::endpoint sender;
       long bytes_read = 0;
       try{
-        bytes_read = osc->getSocketFD()->receive_from(boost::asio::buffer(osc->getMessageData(),20000), sender); //*osc->getClientAddress());
+        bytes_read = osc->getSocketFD()->receive_from(std::experimental::net::buffer(osc->getMessageData(),20000), sender); //*osc->getClientAddress());
       }catch(std::exception& e){
         std::cout << "OSC Message Receive Exception: " << e.what() << std::endl;
         exit(1);
@@ -825,9 +825,9 @@ namespace extemp {
   OSC::OSC() : threadOSC(&osc_mesg_callback, this, "OSC"), message_length(0), started(false)
   {
 #ifdef EXT_BOOST
-    io_service = new boost::asio::io_service;
-    osc_address = new boost::asio::ip::udp::endpoint();
-    osc_client_address = new boost::asio::ip::udp::endpoint();
+    io_service = new std::experimental::net::io_context;
+    osc_address = new std::experimental::net::ip::udp::endpoint();
+    osc_client_address = new std::experimental::net::ip::udp::endpoint();
 #endif
     send_from_serverfd = 1; // default to true!
     msg_include_netaddr = 0;
@@ -1031,7 +1031,7 @@ namespace extemp {
     do {
       cnt++;
 #ifdef EXT_BOOST
-      message_length = socket->receive_from(boost::asio::buffer(message_data, 256), *osc_client_address);
+      message_length = socket->receive_from(std::experimental::net::buffer(message_data, 256), *osc_client_address);
 #else
       message_length = recvfrom(socket_fd, message_data, 256, 0, (struct sockaddr*)&osc_client_address, (socklen_t *) &osc_client_address_size);
 #endif
@@ -1110,14 +1110,14 @@ namespace extemp {
     char* ptr;
 
 #ifdef EXT_BOOST
-    boost::asio::ip::udp::resolver::iterator end;
-    boost::asio::ip::udp::resolver resolver(*io_service);
+    //std::experimental::net::ip::udp::resolver::iterator end;
+    std::experimental::net::ip::udp::resolver resolver(*io_service);
     std::stringstream ss;
     ss << port;
-    boost::asio::ip::udp::resolver::query newQuery(boost::asio::ip::udp::v4(),host, ss.str());
-    boost::asio::ip::udp::resolver::iterator iter = resolver.resolve(newQuery);
-
-    boost::asio::ip::udp::endpoint sa = *iter;
+    std::experimental::net::ip::udp::resolver::results_type res = resolver.resolve(std::experimental::net::ip::udp::v4(), host, ss.str());
+	  auto iter = res.begin();
+	  auto end = res.end();
+    std::experimental::net::ip::udp::endpoint sa = *iter;
 #else
     struct sockaddr_in sa;
     struct hostent* hen; /* host-to-IP translation */
@@ -1139,7 +1139,7 @@ namespace extemp {
 
 
 #ifdef EXT_BOOST
-    boost::asio::ip::udp::socket* fd = 0;
+    std::experimental::net::ip::udp::socket* fd = 0;
     if(OSC::I(_sc)->send_from_serverfd) {
       fd = OSC::I(_sc)->getSocketFD(); //  getSendFD();
     }
@@ -1179,12 +1179,12 @@ namespace extemp {
 #ifdef EXT_BOOST
     int err = 0;
     if(OSC::I(_sc)->send_from_serverfd) {
-      err = fd->send_to(boost::asio::buffer(message, length), sa);
+      err = fd->send_to(std::experimental::net::buffer(message, length), sa);
     }else{
-      boost::asio::io_service service;
-      boost::asio::ip::udp::socket socket(service);
-      socket.open(boost::asio::ip::udp::v4());
-      socket.send_to(boost::asio::buffer(message, length), sa);
+      std::experimental::net::io_context service;
+      std::experimental::net::ip::udp::socket socket(service);
+      socket.open(std::experimental::net::ip::udp::v4());
+      socket.send_to(std::experimental::net::buffer(message, length), sa);
     }
 #else
     int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
@@ -1295,14 +1295,13 @@ namespace extemp {
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
 #ifdef EXT_BOOST
-      boost::asio::ip::udp::endpoint* osc_address = osc->getAddress();
+      std::experimental::net::ip::udp::endpoint* osc_address = osc->getAddress();
       int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
       osc_address->port(port);
 
       try{
-        boost::asio::ip::udp::socket* sock = new boost::asio::ip::udp::socket(*osc->getIOService()); //(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        sock->open(boost::asio::ip::udp::v4());
-        //boost::asio::socket_base::non_blocking_io command(true);
+        std::experimental::net::ip::udp::socket* sock = new std::experimental::net::ip::udp::socket(*osc->getIOService()); //(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        sock->open(std::experimental::net::ip::udp::v4());
         //sock->io_control(command);
         sock->bind(*osc_address);
 

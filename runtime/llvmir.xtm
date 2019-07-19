@@ -1242,12 +1242,16 @@
 (define impc:ir:make-const-string
   (lambda (ast)
     (let* ((os (make-string 0))
-           (lgthstr (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
-           (lgth (number->string (+ (string-length lgthstr) 1)))
+           (lgthstr1 (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
+           (lgthstr2 (if (and *impc:aot:current-output-port* (not *impc:compiler:aot:dll*)) 
+                         (regex:replace-all lgthstr1 "[\n]" "x") ;(if (string=? (sys:platform) "Windows") "xx" "x"))
+                         lgthstr1))
+           (lgth (number->string (+ (string-length lgthstr2) 1))) ;; unix & windows above just used to determine string length
            (strtyp (string-append "[" lgth " x i8]*"))
-           (strname (string-append "@gs" (if #f ;;(< (string-length ast) 1024)
-                                             (cname-encode ast)
-                                             (number->string *impc:ir:gstrcnt*))))
+           (strname (string-append "@gs" (if (string? *impc:compiler:global-module-name*) *impc:compiler:global-module-name* "") 
+                                   (if #f ;;(< (string-length ast) 1024)
+                                       (cname-encode ast)
+                                       (number->string *impc:ir:gstrcnt*))))
            (strsym '()))
       (if (not (llvm:get-llvm-alias ast))
           (let ((compile-str (string-append strname
@@ -1508,6 +1512,100 @@
       (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
       (define body-str (impc:ir:compiler code types))
       (define result (impc:ir:gname))
+      ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
+      (if (not (null? (car *impc:ir:ls_var*)))
+          (begin (emit "; promote local stack var allocations\n" os)
+                 (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+                       (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+                       os)
+                 (map (lambda (v)
+                        (if *WINDOWS_ALLOC_BUG*
+                            (begin
+                              (emit (impc:ir:gname "lspvar" "i8*") " = call i8* @llvm_zone_malloc("
+                                    "%mzone* " (car (impc:ir:gname "zone")) ", "
+                                    *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr v))) ")\n" os)
+                                   (emit (car v) " = bitcast " (cadr (impc:ir:gname "lspvar")) " " (car (impc:ir:gname "lspvar")) " to " (impc:ir:get-type-str (cdr v)) "*\n" os))
+                            (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
+                      (car *impc:ir:ls_var*))))
+      (set! *impc:ir:ls_var* (cdr *impc:ir:ls_var*))
+      (set! *impc:ir:sym-name-stack* (list-tail *impc:ir:sym-name-stack* (length args)))
+      ;; (println 'compout: *impc:ir:sym-name-stack*)
+      (emit "\n" os)
+      (emit body-str os)
+      ;; return whole static function signature (not just return of function sig)
+      (impc:ir:gname "result" (car result) (cadr result))
+      ;;(emit (impc:ir:compiler code types) os)
+      ;;(emit  "ret " (impc:ir:get-type-str rettype) " " (car (impc:ir:gname)) "\n" os)
+      (emit "}" os)
+      (impc:ir:strip-space os))))
+
+
+(define impc:ir:compile:make-static
+  (lambda (ast types)
+    ;;(println 'ast: ast)
+    (let* ((os (make-string 0))
+           (name (list-ref ast 2))
+           (allocate-mem? (list-ref ast 1))
+           (rettype (list-ref ast 3))
+           (result '())
+           (fulltype (cdr (assoc-strcmp (string->symbol name) types)))
+           (env (list-ref ast 4))
+           (args (list-ref ast 5))
+           (mynewtype (string-append (impc:ir:get-type-str rettype) " (" (string-join (map (lambda (x) (impc:ir:get-type-str (cdr x))) args) ", ") ")*"))
+           (code (list-ref ast 6)))
+      ; (println 'making-static--------------------------------------> )
+      ; (println 'name: name)
+      ; (println 'allocate: allocate-mem?)
+      ; (println 'fulltype: fulltype)
+      ; (println 'rettype: rettype)
+      ; (println 'env: env)
+      ; (println 'args: args)
+      ; (println 'code: code)
+      ; (println 'mynewtype: mynewtype)
+      ; (println 'newtype2 (impc:ir:pretty-print-type mynewtype))
+                
+      ;; first we make the function code
+      ;; define fastcc function with return type
+      (emit  "define dllexport ccc " (impc:ir:get-type-str rettype) " @" name "(" os)
+      (if (not (null? args)) (emit (impc:ir:make-arglist-str args #t) os))
+      ;; close off function opening
+      (emit ") nounwind inlinehint {\n" os)
+      (emit "entry:\n" os)
+
+      ;; mem zone  
+      (emit (impc:ir:gname "zone" "%mzone*") " = call ccc %mzone* @llvm_peek_zone_stack()\n" os)
+      (emit "%_impz = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
+      (emit "%_impzPtr = alloca i8*\n" os)
+      (emit "store i8* %_impz, i8** %_impzPtr\n" os)
+
+      ;; next we pull the function arguments
+      (emit "\n; setup arguments\n" os)
+      (dotimes (i (length args))
+        (let* ((a (list-ref args i)))
+          (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
+          (if (> allocate-mem? 0)
+              (begin ;; (println 'yes: allocate-mem? 'mem: ast)
+                ;; figure out type size
+                (cond ((= allocate-mem? 1)
+                       (emit "%dat_" (symbol->string (car a)) " = call i8* @malloc("
+                             *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os))
+                      ((and (= allocate-mem? 2) (not *WINDOWS_ALLOC_BUG*))
+                       (emit "%dat_" (symbol->string (car a)) " = alloca i8, "
+                             *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ", align 16\n" os))
+                      (else
+                       (emit "%dat_" (symbol->string (car a)) " = call i8* @llvm_zone_malloc("
+                             "%mzone* " (car (impc:ir:gname "zone")) ", "
+                             *impc:ir:size_t_str* " " (number->string (impc:ir:get-type-size (cdr a))) ")\n" os)))
+                (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (impc:ir:get-type-str (cdr a)) "*\n" os))
+              (emit  "%" (symbol->string (car a)) "Ptr = alloca " (impc:ir:get-type-str (cdr a)) "\n" os))
+          (emit (string-append "store " (impc:ir:get-type-str (cdr a)) " %" (symbol->string (car a))
+                               ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+      (emit "\n" os)
+      ;; compile body
+      ;; (println '_compin: *impc:ir:sym-name-stack*)
+      (set! *impc:ir:ls_var* (cons (list) *impc:ir:ls_var*))
+      (define body-str (impc:ir:compiler code types))
+      (define result (impc:ir:gname))
                                         ;(println '*impc:ir:ls_var* *impc:ir:ls_var*)
       (if (not (null? (car *impc:ir:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
@@ -1528,11 +1626,13 @@
       ;; (println 'compout: *impc:ir:sym-name-stack*)
       (emit "\n" os)
       (emit body-str os)
-      (impc:ir:gname "result" (car result) (cadr result))
+          
+      (impc:ir:gname "result" (impc:ir:get-type-str fulltype))  ;; (car result) (cadr result))
       ;;(emit (impc:ir:compiler code types) os)
       ;;(emit  "ret " (impc:ir:get-type-str rettype) " " (car (impc:ir:gname)) "\n" os)
       (emit "}" os)
       (impc:ir:strip-space os))))
+
 
 
 (define impc:ir:compile:make-env
@@ -4192,6 +4292,18 @@
                     (string-append (impc:ir:gname "null" (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?))))
                                    " = bitcast i8* null to " (if (null? hint?) "i8*" (impc:ir:get-type-str (car hint?)))
                                    "\n"))
+                   ((member (car ast) '(__make-static))
+                    (let* ((fstr (impc:ir:compile:make-static ast types)))
+                      ;; compile function
+                      (if *impc:compiler:print* (println '------------------------------compiling---------------------------->))
+                      (if *impc:compiler:print* (print-full-nq fstr))
+                      (if *impc:compile*
+                          (begin (llvm:remove-function (caddr ast))
+                                 (if (not (llvm:compile-ir fstr))
+                                     (if *impc:compiler:verbose*
+                                         (impc:compiler:print-compiler-error "compiler failed on " fstr)
+                                         (impc:compiler:print-compiler-error "compiler failed")))))
+                      fstr))
                    ((member (car ast) '(__make-closure __make-closure-z __make-closure-h __make-closure-s))
                     (let* (;(str-pair (impc:ir:compile:make-closure ast types))
                                         ;(fstr (car str-pair))

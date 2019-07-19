@@ -14,6 +14,19 @@
 
 (define analogue-reset (lambda (inst) (analogue_reset inst)))
 
+(define get_wt_expr
+  (lambda (wt)
+    (let ((b64str (cptr->string (AudioBuffer_data_b64_cstring wt))))
+    `(AudioBuffer_cstring
+      ,(AudioBuffer_frames wt)
+      ,(AudioBuffer_channels wt)
+      ,(AudioBuffer_samplerate wt)
+      0.0 ;; phase
+      ,(AudioBuffer_root_pitch wt) 
+      ,(AudioBuffer_loop_start wt)
+      ,(AudioBuffer_loop_frames wt)
+      ,b64str))))
+    
 (define analogue-save-state
   (let ((i 0) (j 0)
         (dict '()))
@@ -24,7 +37,7 @@
       ;;
       ;; amplitude of osc
       (set! dict (cons (cons 'osc1_amp (get_osc1_amp inst)) dict))
-       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+       ;; waveform of osc 1 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
       (set! dict (cons (cons 'osc1_wave (get_osc1_wave inst)) dict))
       ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
       (set! dict (cons (cons 'osc1_tune (get_osc1_tune inst)) dict))
@@ -32,10 +45,14 @@
       (set! dict (cons (cons 'osc1_pw (get_osc1_pw inst)) dict))
       ;; stereo pan (default is 0.5)
       (set! dict (cons (cons 'osc1_phase (get_osc1_phase inst)) dict))
-
+      ;; if osc1 is a wavetable then store the wavetable
+      (if (= (get_osc1_wave inst) PARAM_WT)
+          (let ((wt (get_osc1_wt inst)))
+            (set! dict (cons (cons 'osc1_wt (get_wt_expr wt)) dict))))
+                             
       ;; amplitude of osc 2
       (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
-      ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
       (set! dict (cons (cons 'osc2_wave (get_osc2_wave inst)) dict))
       ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
       (set! dict (cons (cons 'osc2_tune (get_osc2_tune inst)) dict))
@@ -43,10 +60,14 @@
       (set! dict (cons (cons 'osc2_pw (get_osc2_pw inst)) dict))
       ;; stereo pan (default is 0.5)
       (set! dict (cons (cons 'osc2_phase (get_osc2_phase inst)) dict))
+      ;; if osc2 is a wavetable then store the wavetable
+      (if (= (get_osc2_wave inst) PARAM_WT)
+          (let ((wt (get_osc2_wt inst)))
+            (set! dict (cons (list 'osc2_wt (get_wt_expr wt)) dict))))
       
       ;; amplitude of osc 3
       (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
-      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
       (set! dict (cons (cons 'osc3_wave (get_osc3_wave inst)) dict))
       ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
       (set! dict (cons (cons 'osc3_tune (get_osc3_tune inst)) dict))
@@ -54,10 +75,14 @@
       (set! dict (cons (cons 'osc3_pw (get_osc3_pw inst)) dict))
       ;; stereo pan (default is 0.5)
       (set! dict (cons (cons 'osc3_phase (get_osc3_phase inst)) dict))
-      
+      ;; if osc3 is a wavetable then store the wavetable
+      (if (= (get_osc3_wave inst) PARAM_WT)
+          (let ((wt (get_osc3_wt inst)))
+            (set! dict (cons (list 'osc3_wt (get_wt_expr wt)) dict))))
+  
       ;; amplitude of osc 4
       (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
-      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI)
+      ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
       (set! dict (cons (cons 'osc4_wave (get_osc4_wave inst)) dict))
       ;; frequency shift of osc - tuning - 2.0 up tune 0.5 down tune etc..
       (set! dict (cons (cons 'osc4_tune (get_osc4_tune inst)) dict))
@@ -65,6 +90,10 @@
       (set! dict (cons (cons 'osc4_pw (get_osc4_pw inst)) dict))
       ;; stereo pan (default is 0.5)
       (set! dict (cons (cons 'osc4_phase (get_osc4_phase inst)) dict))
+      ;; if osc2 is a wavetable then store the wavetable
+      (if (= (get_osc4_wave inst) PARAM_WT)
+          (let ((wt (get_osc4_wt inst)))
+            (set! dict (cons (list 'osc4_wt (get_wt_expr wt)) dict))))
       
       ;; sub oscilltor amp (two tunes under sine wave)
       (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
@@ -203,17 +232,29 @@
       (set! dict (cons (cons 'lfo4_ad_decay_slope (get_lfo_ad_decay_slope inst 3)) dict)) ;; decay slope
 
       ;; set amp frq
-      (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo1_amp (get_lfo_amp inst 0)) dict))
+      (set! dict (cons (cons 'lfo1_frq (get_lfo_frq inst 0)) dict))
 
-      (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo2_amp (get_lfo_amp inst 1)) dict))
+      (set! dict (cons (cons 'lfo2_frq (get_lfo_frq inst 1)) dict))
+      
+      (set! dict (cons (cons 'lfo3_amp (get_lfo_amp inst 2)) dict))
+      (set! dict (cons (cons 'lfo3_frq (get_lfo_frq inst 2)) dict))
+      
+      (set! dict (cons (cons 'lfo4_amp (get_lfo_amp inst 3)) dict))
+      (set! dict (cons (cons 'lfo4_frq (get_lfo_frq inst 3)) dict))
 
-      (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+      ; (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
 
-      (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
+      ; (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+
+      ; (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+
+      ; (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
       
       ;; set LFO type
       (set! dict (cons (cons 'lfo1_type (get_lfo_type inst PARAM_LFO1)) dict))
@@ -261,7 +302,7 @@
                ;; we need a couple of special cases
                (cond ((string=? tag "mod_matrix")
                       (for-each (lambda (y i)
-                                  (println 'set_mod_matrix 'inst (real->integer (/ i 32.0)) (modulo i 32) y)
+                                  ;; (println 'set_mod_matrix 'inst (real->integer (/ i 32.0)) (modulo i 32) y)
                                   (set_mod_matrix inst (real->integer (/ i 32.0)) (modulo i 32) y))
                                 (cdr x)
                                 (range 0 (* 4 32))))
@@ -269,20 +310,20 @@
                       (if (regex:match? tag "_ad_")
                           (let* ((res (regex:matched tag "^lfo([0-9])_ad_(.*)$"))
                                  (name (string->symbol (string-append "set_lfo_ad_" (caddr res))))
-                                 (num (string->number (cadr res)))
+                                 (num (- (string->number (cadr res)) 1))
                                  (expr `(,name inst ,num ,(cdr x))))
-                            (println 'calling expr)
+                            ;; (println 'calling expr)
                             (eval expr))
                           (let* ((res (regex:matched tag "^lfo([0-9])_(.*)$"))
                                  (name (string->symbol (string-append "set_lfo_" (caddr res))))
-                                 (num (string->number (cadr res)))
+                                 (num (- (string->number (cadr res)) 1))
                                  (expr `(,name inst ,num ,(cdr x))))
-                            (println expr)
+                            ;; (println expr)
                             (eval expr))))
                      (else 
                        (let* ((fname (string->symbol (string-append "set_" tag)))
                              (expr `(,fname inst ,(cdr x))))
-                         (println 'calling expr)
+                         ;; (println 'calling expr)
                          (eval expr)))))
              data)
         (close-input-port filein)

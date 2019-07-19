@@ -12,9 +12,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/glfw3.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glfw3.xtm" 'quiet))
 (sys:load-preload-check 'glfw3)
-(define *xtmlib-glfw3-loaded* #f)
+(define *xtmlib-glfw3-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -27,7 +27,10 @@
   (cond ((string=? (sys:platform) "OSX")
          (list "libglfw.dylib" "libglfw3.dylib" "libglfw.3.dylib"))
         ((string=? (sys:platform) "Linux") "libglfw.so")
-        ((string=? (sys:platform) "Windows") "glfw3.dll")))
+        ((string=? (sys:platform) "Windows") "glfw3.dll"))
+  "xtmglfw3")
+
+(impc:aot:import-ll "xtmglfw3")
 
 ;; opaque pointers
 (bind-alias GLFWmonitor i8)

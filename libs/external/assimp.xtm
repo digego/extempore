@@ -9,9 +9,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/assimp.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/assimp.xtm" 'quiet))
 (sys:load-preload-check 'assimp)
-(define *xtmlib-assimp-loaded* #f)
+(define *xtmlib-assimp-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/external/stb_image.xtm")
@@ -29,7 +29,10 @@
         ((string=? (sys:platform) "Linux")
          "libassimp.so")
         ((string=? (sys:platform) "Windows")
-         (list "assimp-vc130-mt.dll" "assimp.dll"))))
+         (list "assimp-vc130-mt.dll" "assimp.dll")))
+  "xtmassimp")
+
+(impc:aot:import-ll "xtmassimp")
 
 (bind-func ai_load_ogl_texture
   (lambda (filename tex_id:i32)

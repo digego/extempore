@@ -21,10 +21,10 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/glcore-getprocaddress.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcore-getprocaddress.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-glcore-getprocaddress-loaded* #f)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-glcore-getprocaddress-loaded* #t)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -39,6 +39,8 @@
          "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
+
+(impc:aot:import-ll "xtmglcore-getprocaddress")
 
 (sys:load "libs/external/gl/gl-getprocaddress.xtm")
 

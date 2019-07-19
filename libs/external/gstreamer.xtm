@@ -11,7 +11,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/gstreamer.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/gstreamer.xtm" 'quiet))
 (sys:load-preload-check 'gstreamer)
 
 (impc:aot:suppress-aot-do
@@ -21,8 +21,7 @@
  (sys:load "libs/base/base.xtm" 'quiet)
  (sys:load "libs/external/glib.xtm" 'quiet))
 
-;; make sure that glib is loaded
-
+(impc:aot:insert-header "xtmgstreamer")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib gstlib
@@ -31,9 +30,9 @@
         ((string=? (sys:platform) "Linux")
          "libgstreamer-1.0.so")))
 
-(impc:aot:insert-header "xtmgstreamer")
+(impc:aot:import-ll "xtmgstreamer")
 
-(define *xtmlib-gstreamer-loaded* #f)
+(define *xtmlib-gstreamer-loaded* #t)
 
 (bind-alias GstState i32)
 (bind-val GST_STATE_VOID_PENDING i32 0)

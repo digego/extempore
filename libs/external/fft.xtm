@@ -28,7 +28,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/fft.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/fft.xtm" 'quiet))
 (sys:load-preload-check 'fft)
 (define *xtmlib-fft-loaded* #f)
 
@@ -49,7 +49,13 @@
         ((string=? (sys:platform) "Linux")
          "libkiss_fft.so")
         ((string=? (sys:platform) "Windows")
-         "kiss_fft.dll")))
+         "kiss_fft.dll"))
+  "xtmfft")
+
+;; import ll MUST come after bind-dylib
+(impc:aot:import-ll "xtmfft")
+
+
 
 (bind-alias kiss_fft_scalar float)
 (bind-alias kiss_fft_cpx Complexf)
@@ -172,83 +178,130 @@
 ;;  output timedata has nfft scalar points
 (bind-lib libkiss_fft kiss_fftri [void,kiss_fftr_cfg,kiss_fft_cpx*,kiss_fft_scalar*]*)
 
+
 ;; complex input
 
 ;; this config for FORWARD FFT ONLY!
-(bind-func fft_config
-  (lambda (len:i64)
-    (kiss_fft_alloc (i64toi32 len) 0 null null)))
+; (bind-func fft_config_h:[kiss_fft_cfg,i64]*
+;   (lambda (len)
+;     (let ((sz:i64 0)
+;           (res (kiss_fft_alloc (i64toi32 len) 0 null (ref sz)))
+;           (config:i8* (halloc sz)))
+;     (kiss_fft_alloc (i64toi32 len) 0 config (ref sz))
+;     (convert config))))
+
+(bind-type FFT_Config <kiss_fft_cfg>)
+
+(bind-func fft_config:[FFT_Config*,i64]*
+  (lambda (len)
+    (let ((sz:i64 0)
+          (findSize (kiss_fft_alloc (i64toi32 len) 0 null (ref sz)))
+          (config:i8* (alloc sz))
+          (res:kiss_fft_cfg (kiss_fft_alloc (i64toi32 len) 0 config (ref sz))))
+      (if (null? res) (println "error constructing fft config!"))
+      (FFT_Config res))))
+
+(bind-type FFTR_Config <kiss_fftr_cfg>)
+
+;; fftr config (real config) not the same as cpx config above!
+(bind-func fftr_config:[FFTR_Config*,i64]*
+  (lambda (len)
+    (let ((sz:i64 0)
+          (findSize (kiss_fftr_alloc (i64toi32 len) 0 null (ref sz)))
+          (config:i8* (alloc sz))
+          (res:kiss_fft_cfg (kiss_fftr_alloc (i64toi32 len) 0 config (ref sz))))
+      (if (null? res) (println "error constructing fftr config!"))
+      (FFTR_Config res))))
+    
+; (bind-func fft
+;   "calculate the FFT of an input signal"
+;   (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
+;     (let ((config:kiss_fft_cfg (fft_config_h len)))
+;       (kiss_fft config in out)
+;       (free config)
+;       void)))
 
 (bind-func fft
   "calculate the FFT of an input signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
-    (let ((config:kiss_fft_cfg (kiss_fft_alloc
-                                (i64toi32 len)
-                                0 null null)))
-      (kiss_fft config in out)
-      (free config)
-      void)))
-
-(bind-func fft
-  "calculate the FFT of an input signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:kiss_fft_cfg)
-    (kiss_fft config in out)
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:FFT_Config*)
+    (kiss_fft (tref config 0) in out)
     void))
 
 ;; real-valued input
 
-(bind-func fft
-  "calculate the FFT of a real-valued input signal"
-  (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* len:i64)
-    (let ((config:kiss_fftr_cfg (kiss_fftr_alloc
-                                 (i64toi32 len)
-                                 0 null null)))
-      (kiss_fftr config in out)
-      (free config)
-      void)))
+; (bind-func fft
+;   "calculate the FFT of a real-valued input signal"
+;   (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* len:i64)
+;     (let ((config (fft_config_h len)))
+;       (kiss_fftr config in out)
+;       (free config)
+;       void)))
 
 (bind-func fft
   "calculate the FFT of a real-valued input signal"
-  (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* config:kiss_fft_cfg)
-    (kiss_fftr config in out)
+  (lambda (in:kiss_fft_scalar* out:kiss_fft_cpx* config:FFTR_Config*)
+    (kiss_fftr (tref config 0) in out)
     void))
 
 
 ;; this config for INVERSE FFT ONLY!
-(bind-func ffti_config
-  (lambda (len:i64)
-    (kiss_fft_alloc (i64toi32 len) 1 null null)))
+; (bind-func ifft_config_h:[kiss_fft_cfg,i64]*
+;   (lambda (len)
+;     (let ((sz:i64 0)
+;           (res (kiss_fft_alloc (i64toi32 len) 1 null (ref sz)))
+;           (config:i8* (halloc sz)))
+;     (kiss_fft_alloc (i64toi32 len) 1 config (ref sz))
+;     (convert config))))
+
+(bind-type IFFT_Config <kiss_fft_cfg>)
+
+(bind-func ifft_config:[IFFT_Config*,i64]*
+  (lambda (len)
+    (let ((sz:i64 0)
+          (findSize (kiss_fft_alloc (i64toi32 len) 1 null (ref sz)))
+          (config:i8* (alloc sz))
+          (res (kiss_fft_alloc (i64toi32 len) 1 config (ref sz))))
+      (if (null? res) (println "error constructing ifft config!"))
+      (IFFT_Config res))))
+
+(bind-type IFFTR_Config <kiss_fftr_cfg>)
+
+;; ifftr config (real config) not the same as cpx config above!
+(bind-func ifftr_config:[IFFTR_Config*,i64]*
+  (lambda (len)
+    (let ((sz:i64 0)
+          (findSize (kiss_fftr_alloc (i64toi32 len) 1 null (ref sz)))
+          (config:i8* (alloc sz))
+          (res (kiss_fftr_alloc (i64toi32 len) 1 config (ref sz))))
+      (if (null? res) (println "error constructing ifftr config!"))
+      (IFFTR_Config res))))
+
+; (bind-func ifft
+;   "calculate the inverse FFT of a signal"
+;   (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
+;     (let ((config (ifft_config_h len)))
+;       (kiss_fft config in out)
+;       (free config)
+;       void)))
 
 (bind-func ifft
   "calculate the inverse FFT of a signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)
-    (let ((config:kiss_fft_cfg (kiss_fft_alloc
-                                    (i64toi32 len)
-                                    1 null null)))
-      (kiss_fft config in out)
-      (free config)
-      void)))
-
-(bind-func ifft
-  "calculate the inverse FFT of a signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:kiss_fft_cfg)
-    (kiss_fft config in out)
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* config:IFFT_Config*)
+    (kiss_fft (tref config 0) in out)
     void))
 
-(bind-func ifft
-  "calculate the FFT of a real-valued input signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* len:i64)
-    (let ((config:kiss_fftr_cfg (kiss_fftr_alloc
-                                     (i64toi32 len)
-                                     1 null null)))
-      (kiss_fftri config in out)
-      (free config)
-      void)))
+; (bind-func ifft
+;   "calculate the FFT of a real-valued input signal"
+;   (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* len:i64)
+;     (let ((config (ifft_config_h len)))
+;       (kiss_fftri config in out)
+;       (free config)
+;       void)))
 
 (bind-func ifft
   "calculate the FFT of a real-valued input signal"
-  (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* config:kiss_fft_cfg)
-    (kiss_fftri config in out)
+  (lambda (in:kiss_fft_cpx* out:kiss_fft_scalar* config:IFFTR_Config*)
+    (kiss_fftri (tref config 0) in out)
     void))
 
 (define *xtmlib-fft-loaded* #t)

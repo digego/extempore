@@ -18,12 +18,14 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/jansson.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/jansson.xtm" 'quiet))
 (sys:load-preload-check 'jansson)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmjansson")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libjansson
@@ -34,9 +36,9 @@
         ((string=? (sys:platform) "Windows")
          "libjansson.dll")))
 
-(define *xtmlib-jansson-loaded* #f)
+(define *xtmlib-jansson-loaded* #t)
 
-(impc:aot:insert-header "xtmjansson")
+(impc:aot:import-ll "xtmjansson")
 
 ;; the json_type enums
 (bind-val JSON_OBJECT enum 0)

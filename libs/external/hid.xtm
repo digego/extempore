@@ -9,12 +9,14 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/hid.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/hid.xtm" 'quiet))
 (sys:load-preload-check 'libhid)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmhid")
 
 ;; lib assimp
 (bind-dylib libhid
@@ -25,9 +27,9 @@
         ((string=? (sys:platform) "Windows")
          "libhid.dll")))
 
-(impc:aot:insert-header "xtmhid")
+(impc:aot:import-ll "xtmhid")
 
-(define *xtmlib-hid-loaded* #f)
+(define *xtmlib-hid-loaded* #t)
 
 (bind-type HIDNode <i16,i16>)
 (bind-type HIDPath <i8,|10,HIDNode|>)

@@ -17,9 +17,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/instruments_ext.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/instruments_ext.xtm" 'quiet))
 (sys:load-preload-check 'instruments_ext)
-(define *xtmlib-instruments_ext-loaded* #f)
+(define *xtmlib-instruments_ext-loaded* #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -34,6 +34,7 @@
 (impc:aot:insert-forms (sys:load "libs/external/sndfile.xtm" 'quiet))
 
 (impc:aot:insert-header "xtminstruments_ext")
+(impc:aot:import-ll "xtminstruments_ext")
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!

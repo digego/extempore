@@ -2447,6 +2447,7 @@ static pointer readstrexp(scheme *sc) {
     for (;;) {
         c=inchar(sc);
         if(c==EOF || p-sc->strbuff>sizeof(sc->strbuff)-1) {
+            printf("String exceeded string buffer size or reached EOF\n");
             return sc->F;
         }
         switch(state) {
@@ -2508,6 +2509,7 @@ static pointer readstrexp(scheme *sc) {
                     state=st_ok;
                 }
             } else {
+                printf("Error parsing string state(x1 or x2) at character(%c)\n", c);
                 return sc->F;
             }
             break;

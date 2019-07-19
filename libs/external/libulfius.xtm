@@ -8,12 +8,14 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/libulfius.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/libulfius.xtm" 'quiet))
 (sys:load-preload-check 'ulfius)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmulfius")
 
 ;; set up the current dylib name and path (for AOT compilatio)
 (bind-dylib libulfius
@@ -22,9 +24,10 @@
         ((string=? (sys:platform) "Linux")
          "libulfius.so")
         ((string=? (sys:platform) "Windows")
-         "ulfius_dll.dll")))
+         "ulfius_dll.dll"))
+  "xtmulfius")
 
-(impc:aot:insert-header "xtmulfius")
+(impc:aot:import-ll "xtmulfius")
 
 (define *xtmlib-ulfius-loaded* #t)
 

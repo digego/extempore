@@ -19,10 +19,10 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/glcore-glew.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcore-glew.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-glcore-glew-loaded* #f)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-glcore-glew-loaded* #t)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -40,6 +40,8 @@
          "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
+
+(impc:aot:import-ll "xtmglcore-glew")
 
 (define glwrapper-arg-list-symbols
   (lambda (arity)

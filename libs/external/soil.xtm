@@ -11,9 +11,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/soil.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/soil.xtm" 'quiet))
 (sys:load-preload-check 'soil)
-(define *xtmlib-soil-loaded* #f)
+(define *xtmlib-soil-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -32,7 +32,11 @@
         ((string=? (sys:platform) "Linux")
          "libSOIL.so")
         ((string=? (sys:platform) "Windows")
-         "SOIL.dll")))
+         "SOIL.dll"))
+  "xtmsoil")
+
+(impc:aot:import-ll "xtmsoil")
+
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
 (bind-lib libsoil SOIL_load_OGL_texture_from_memory [i32,i8*,i32,i32,i32,i32]*)

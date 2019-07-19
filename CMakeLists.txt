@@ -159,6 +159,28 @@ if(PACKAGE)
     PRIVATE -mtune=generic)
 endif()
 
+#################
+# networking-ts #
+#################
+
+# file(GLOB_RECURSE networking-ts_SRC
+#   "src/networking-ts-impl/include/*.hpp"
+#   "src/networking-ts-impl/include/*.cpp"
+# )
+
+# add_library(networking-ts STATIC ${networking-ts_SRC})
+
+# target_include_directories(networking-ts
+#   PRIVATE src/networking-ts-impl/include
+# )
+
+# SET_TARGET_PROPERTIES(networking-ts PROPERTIES LINKER_LANGUAGE CXX)
+
+# if(PACKAGE)
+#   target_compile_options(networking-ts
+#     PRIVATE -mtune=generic)
+# endif()
+
 #############
 # portaudio #
 #############
@@ -364,29 +386,29 @@ endforeach()
 #########
 
 # *must* have Boost on Windows
-if(WIN32)
-  set(BOOST ON)
-  if(NOT BOOST_DIR)
-    # if BOOST_DIR has been set elsewhere, assume it's all present and
-    # correct and go with that. Otherwise, download boost with nuget
-    # commandline tool and stick it in ${CMAKE_SOURCE_DIR}/boost
-    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
-    # check nuget commandline tool is installed
-    find_program(NUGET nuget)
-    if(NOT NUGET)
-      message(FATAL "Cannot find nuget command line tool.\nEither install it with e.g. choco install nuget.commandline, or get boost some other way and set the -DBOOST_DIR variable")
-    else()
-      if(NOT IS_DIRECTORY ${BOOST_DIR})
-        # if directory exists, assume this step has already been done
-        message(STATUS "Downloading boost components into ${CMAKE_SOURCE_DIR}/boost with \"nuget install\"")
-        file(MAKE_DIRECTORY ${BOOST_DIR})
-        execute_process(
-          COMMAND ${NUGET} install -Version 1.59 boost-vc140
-          WORKING_DIRECTORY ${BOOST_DIR})
-      endif()
-    endif()
-  endif()
-endif()
+# if(WIN32)
+#   set(BOOST ON)
+#   if(NOT BOOST_DIR)
+#     # if BOOST_DIR has been set elsewhere, assume it's all present and
+#     # correct and go with that. Otherwise, download boost with nuget
+#     # commandline tool and stick it in ${CMAKE_SOURCE_DIR}/boost
+#     set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
+#     # check nuget commandline tool is installed
+#     find_program(NUGET nuget)
+#     if(NOT NUGET)
+#       message(FATAL "Cannot find nuget command line tool.\nEither install it with e.g. choco install nuget.commandline, or get boost some other way and set the -DBOOST_DIR variable")
+#     else()
+#       if(NOT IS_DIRECTORY ${BOOST_DIR})
+#         # if directory exists, assume this step has already been done
+#         message(STATUS "Downloading boost components into ${CMAKE_SOURCE_DIR}/boost with \"nuget install\"")
+#         file(MAKE_DIRECTORY ${BOOST_DIR})
+#         execute_process(
+#           COMMAND ${NUGET} install -Version 1.59 boost-vc140
+#           WORKING_DIRECTORY ${BOOST_DIR})
+#       endif()
+#     endif()
+#   endif()
+# endif()
 
 #############
 # extempore #
@@ -430,6 +452,11 @@ if(BUILD_LLVM)
     add_dependencies(extempore LLVM)
   endif()
 endif()
+
+if(WIN32)
+  target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
+endif()
+
 
 target_include_directories(extempore
   PRIVATE src/pcre
@@ -512,6 +539,7 @@ endif()
 # on Windows, put the created extempore.exe straight into the source
 # directory, and the .lib file into libs/platform-shlibs
 if(WIN32)
+  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   set_target_properties(extempore
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
@@ -522,16 +550,16 @@ if(WIN32)
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
 endif()
 
-if(BOOST)
-  target_include_directories(extempore
-    PRIVATE ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
-  target_compile_definitions(extempore
-    PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
-  target_link_libraries(extempore
-    PRIVATE ${BOOST_DIR}/boost_date_time-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
-    PRIVATE ${BOOST_DIR}/boost_regex-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
-    PRIVATE ${BOOST_DIR}/boost_system-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_system-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib)
-endif()
+# if(BOOST)
+#   target_include_directories(extempore
+#     PRIVATE ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
+#   target_compile_definitions(extempore
+#     PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
+#   target_link_libraries(extempore
+#     PRIVATE ${BOOST_DIR}/boost_date_time-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
+#     PRIVATE ${BOOST_DIR}/boost_regex-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
+#     PRIVATE ${BOOST_DIR}/boost_system-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_system-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib)
+# endif()
 
 ##########
 # assets #
@@ -678,13 +706,18 @@ if(UNIX)
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     # build with as few deps as we can get away with
+
     ExternalProject_Add(sndfile
-      PREFIX libsndfile
-      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-      INSTALL_COMMAND make install
-      BUILD_IN_SOURCE ON)
+    PREFIX libsndfile
+    URL https://github.com/erikd/libsndfile/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+    -DENABLE_CPACK=OFF
+    -DENABLE_PACKAGE_CONFIG=OFF
+    -DBUILD_SHARED_LIBS=ON)
     set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
@@ -830,8 +863,22 @@ if(WIN32)
     # the moment I've just hosted the (unmodified) libsndfile binaries
     # (a bit of a hack), but you can get an installer from
     # http://www.mega-nerd.com/libsndfile/#Download
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+
+    ExternalProject_Add(sndfile
+    PREFIX sndfile
+    URL https://github.com/erikd/libsndfile/archive/master.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+    -DENABLE_CPACK=OFF
+    -DENABLE_PACKAGE_CONFIG=OFF 
+    -DBUILD_SHARED_LIBS=ON)
+  set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
+
+    #file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
+    #file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
 
   endif(EXTERNAL_SHLIBS_AUDIO)
 
@@ -902,6 +949,8 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -938,6 +987,8 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 

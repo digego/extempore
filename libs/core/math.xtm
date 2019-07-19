@@ -22,15 +22,16 @@
 
 ;; lib-loading config
 
-(sys:load "libs/aot-cache/math.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/math.xtm" 'quiet))
 (sys:load-preload-check 'math)
-(define *xtmlib-math-loaded* #f)
+(define *xtmlib-math-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmmath")
+(impc:aot:import-ll "xtmmath")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; "vector" data arrays ;;

@@ -11,9 +11,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/scheduler.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/scheduler.xtm" 'quiet))
 (sys:load-preload-check 'scheduler)
-(define *xtmlib-scheduler-loaded* #f)
+(define *xtmlib-scheduler-loaded* #t)
 
 (impc:aot:suppress-aot-do (sys:load "libs/core/rational.xtm"))
 (impc:aot:suppress-aot-do (sys:load "libs/core/xthread.xtm"))
@@ -22,6 +22,7 @@
 (impc:aot:insert-forms (sys:load "libs/core/xthread.xtm"))
 
 (impc:aot:insert-header "xtmscheduler")
+(impc:aot:import-ll "xtmscheduler")
 
 
 (bind-type SchedEvt <!a,i8*,SchedEvt*,SchedEvt*>)

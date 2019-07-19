@@ -9,9 +9,9 @@
 ;; 
 
 ;;; Code:
-(sys:load "libs/aot-cache/opengl.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/opengl.xtm" 'quiet))
 (sys:load-preload-check 'opengl)
-(define *xtmlib-opengl-loaded* #f)
+(define *xtmlib-opengl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/math.xtm")
@@ -25,7 +25,6 @@
 (impc:aot:insert-forms (sys:load "libs/external/glext.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmopengl")
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load GL
@@ -41,7 +40,8 @@
         (else
          (begin (print-with-colors 'red 'default #f (print "Error"))
                 (print ": unknown platform ")
-                (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+                (print-with-colors 'yellow 'default #f (print (sys:platform))))))
+  "xtmopengl")
 
 ;; if on windows also check for Gl32.dll			  
 (if (not libgl) 
@@ -51,6 +51,9 @@
                        (eq? #f libgl))
                    (print-error "Error loading opengl library")))	   
         (sys:load-escape "Error loading opengl library")))
+
+(impc:aot:import-ll "xtmopengl")
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; missing opengl constants

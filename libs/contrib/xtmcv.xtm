@@ -177,7 +177,7 @@
 (bind-lib cvlib Mat_DataPtr [void,ocv_MatT,i8**,i32*]*)
 (bind-lib cvlib Mat_NewFromBytes [ocv_MatT,i32,i32,i32,i8*]*)
 
-(bind-type ocv_Mat <ocv_MatT,i32> (constructor . #f) (printer . #f))
+(bind-type ocv_Mat <ocv_MatT,i32> (constructor? . #f) (printer? . #f))
 (bind-type ocv_Mats <ocv_Mat*,i32>)
 
 (bind-func ocv_Mat:[ocv_Mat*,ocv_MatT]*
@@ -224,7 +224,6 @@
     (let ((mat (Mat_Region (tref in 0) rect)))
       (zone_cleanup (Mat_Close mat))
       (ocv_Mat mat))))
-
 ;;
 ;; opencv mat clone
 ;;
@@ -235,6 +234,15 @@
     (let ((mat (Mat_Clone (tref in 0))))
       (zone_cleanup (Mat_Close mat))
       (ocv_Mat mat))))
+
+;;
+;; Mat absolute difference
+;;
+(bind-lib cvlib Mat_AbsDiff [void,ocv_MatT,ocv_MatT,ocv_MatT]*)
+(bind-func ocv_absdiff
+  (lambda (in1:ocv_Mat* in2:ocv_Mat* out:ocv_Mat*)
+    (Mat_AbsDiff (tref in1 0) (tref in2 0) (tref out 0))
+    void))
 
 ;;
 ;; opencv mat copy
@@ -564,6 +572,31 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
+;; IMG processing
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib cvlib Blur [void,ocv_MatT,ocv_MatT,ocv_Size]*)
+
+(bind-func ocv_blur
+  "Blur image
+  "
+  (lambda (img:ocv_Mat* size:ocv_Size)
+    (let ((out (Mat_New)))
+      (Blur (tref img 0) out size)
+      (ocv_Mat out))))
+
+(bind-func ocv_blur
+  "Blur image
+  "
+  (lambda (img:ocv_Mat* out:ocv_Mat* size:ocv_Size)
+    (Blur (tref img 0) (tref out 0) size)
+    out))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
 ;; OpenCV HighGUI module
 ;;
 
@@ -836,7 +869,7 @@
 (bind-lib cvlib VideoWriter_New [ocv_VideoWriterA]*)
 (bind-lib cvlib VideoWriter_Open [void,ocv_VideoWriterA,i8*,i8*,double,i32,i32,i1]*)
 
-(bind-type ocv_VideoWriter <ocv_VideoWriterA,i32> (constructor . #f) (printer . #f))
+(bind-type ocv_VideoWriter <ocv_VideoWriterA,i32> (constructor? . #f) (printer? . #f))
 
 (bind-func ocv_VideoWriter:[ocv_VideoWriter*,ocv_VideoWriterA]*
   (lambda (in)
@@ -912,7 +945,7 @@
 (bind-lib cvlib VideoCapture_Open [void,ocv_VideoCaptureA,i8*])
 (bind-lib cvlib VideoCapture_OpenDevice [void,ocv_VideoCaptureA,i32])
 
-(bind-type ocv_VideoCapture <ocv_VideoCaptureA,i32> (constructor . #f) (printer . #f))
+(bind-type ocv_VideoCapture <ocv_VideoCaptureA,i32> (constructor? . #f) (printer? . #f))
 
 (bind-func ocv_VideoCapture:[ocv_VideoCapture*,ocv_VideoCaptureA]*
   (lambda (in)

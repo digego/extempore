@@ -11,9 +11,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/portmidi.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/portmidi.xtm" 'quiet))
 (sys:load-preload-check 'portmidi)
-(define *xtmlib-portmidi-loaded* #f)
+(define *xtmlib-portmidi-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -28,7 +28,10 @@
         ((string=? (sys:platform) "Linux")
          "libportmidi.so")
         ((string=? (sys:platform) "Windows")
-         "portmidi.dll")))
+         "portmidi.dll"))
+  "xtmportmidi")
+
+(impc:aot:import-ll "xtmportmidi")
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; begin portmidi.h ;;

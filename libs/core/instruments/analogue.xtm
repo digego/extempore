@@ -173,7 +173,7 @@
           (pw4:SAMPLE 0.5)                  
           (noise:enum PARAM_WHITE) ;; white
           (noise_amp:SAMPLE 0.0)
-          (osc1_amp:SAMPLE 0.4)
+          (osc1_amp:SAMPLE 0.25)
           (osc2_amp:SAMPLE 0.0)
           (osc3_amp:SAMPLE 0.0)
           (osc4_amp:SAMPLE 0.0)
@@ -182,6 +182,10 @@
           (osc2_phase:SAMPLE (* osc_phase_slop .1 (random)))
           (osc3_phase:SAMPLE (* osc_phase_slop .1 (random)))
           (osc4_phase:SAMPLE (* osc_phase_slop .1 (random)))
+          (osc1_wt:AudioBuffer* DefaultWaveTable)
+          (osc2_wt:AudioBuffer* DefaultWaveTable)
+          (osc3_wt:AudioBuffer* DefaultWaveTable)
+          (osc4_wt:AudioBuffer* DefaultWaveTable)
           (osc_slop:SAMPLE 0.0)
           (sub_amp:SAMPLE 0.0) 
           (mods:|32,SAMPLE|* (alloc))
@@ -263,6 +267,10 @@
               (tri2 (bltri_c _osc2_phase))
               (tri3 (bltri_c _osc3_phase))
               (tri4 (bltri_c _osc4_phase))
+              (wt1 (AudioBuffer_shared_data osc1_wt))
+              (wt2 (AudioBuffer_shared_data osc2_wt))
+              (wt3 (AudioBuffer_shared_data osc3_wt))
+              (wt4 (AudioBuffer_shared_data osc4_wt))
               (osc1_out:SAMPLE 0.0)
               (osc2_out:SAMPLE 0.0)
               (osc3_out:SAMPLE 0.0)
@@ -272,7 +280,7 @@
               (pink (pink_c))
               (sub_out 0.0)
               (noise_out 0.0)
-              (subosc (osc_c 0.0))              
+              (subosc (osc_c 0.0))          
               (main_out 0.0:f))
           (if (= 0 performance_profile) (filter.saturation (clamp filter_saturation 1.0:f 3.0:f)))
           (lambda (time:i64 chan:i64)
@@ -292,6 +300,10 @@
                         (set! target_frq (note_frequency data))
                         (set! glideinc (/ (- target_frq frequency) (* portamento 0.001 SRf)))
                         (if (< portamento 0.001) (set! frequency target_frq))
+                        (AudioBuffer_set_phase wt1 0.0)
+                        (AudioBuffer_set_phase wt2 0.0)
+                        (AudioBuffer_set_phase wt3 0.0)
+                        (AudioBuffer_set_phase wt4 0.0)
                         (set! reltime 0)
                         (set! gate 1.0) ;(note_gate data))
                         (set! duration (note_duration data))))
@@ -315,9 +327,9 @@
                   ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
                   (if (< gate 0.1) (set! reltime (+ reltime 1)))
                   (if (> reltime amp_release_samples)
-                      (begin
-                        ;; (println "NOTE OFF!" data)
-                        (note_active data #f)))
+                      (if (< amp 0.01)
+                          (note_active data #f) ;; stop note if amp less than 0.01
+                          (begin (set! amplitude (- amplitude 0.01)) #t))) ;; otherwise decrease amplitude over max 100 samples
                   ;; setup mod sources
                   (if (> osc1_amp 0.001)
                       (set! osc1_out (* (+ osc1_amp (* adsr4_val (aref mods PARAM_OSC1_AMP)))
@@ -327,6 +339,10 @@
                                                                               (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
                                                                        (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
                                               ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))))
+                                              ((= osc1_wave 4) (AudioBuffer_read_interp_pw wt1
+                                                                  (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
+                                                                  0
+                                                                  (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
                                               (else zero))))
                       (set! osc1_out 0.0))
                   (if (> osc2_amp 0.001)
@@ -336,6 +352,10 @@
                                               ((= osc2_wave 2) (pulse2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
                                                                        (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
                                               ((= osc2_wave 3) (tri2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))))
+                                              ((= osc2_wave 4) (AudioBuffer_read_interp_pw wt2
+                                                                  (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
+                                                                  0
+                                                                  (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))                                                                                        
                                               (else zero))))
                       (set! osc2_out 0.0))
                   (if (> osc3_amp 0.001)
@@ -345,6 +365,10 @@
                                               ((= osc3_wave 2) (pulse3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
                                                                        (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
                                               ((= osc3_wave 3) (tri3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))))
+                                              ((= osc3_wave 4) (AudioBuffer_read_interp_pw wt3
+                                                                  (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
+                                                                  0
+                                                                  (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
                                               (else zero))))
                       (set! osc3_out 0.0))
                   (if (> osc4_amp 0.001)
@@ -354,6 +378,10 @@
                                               ((= osc4_wave 2) (pulse4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
                                                                        (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
                                               ((= osc4_wave 3) (tri4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))))
+                                              ((= osc4_wave 4) (AudioBuffer_read_interp_pw wt4
+                                                                  (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
+                                                                  0
+                                                                  (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
                                               (else zero))))
                       (set! osc4_out 0.0))
                   (if (> sub_amp 0.001)
@@ -395,14 +423,14 @@
             (hpf (hpf_c))
             (hpfR (hpf_c))
             (hpf_frq 20001.0)
-            (dly (comb_lpf_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
+            (dly (comb_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
             (delay_time_left 50.0) ;; in ms
             (delay_time_right 50.0) ;; in ms
             (delay_in 1.0)
             (delay_mix 0.0)
             (delay_fb 0.5)
-            (delay_frq 12000.0)
-            (delay_res 0.0)
+            (delay_frq:SAMPLE 12000.0)
+            (delay_res:SAMPLE 0.0)
             (rev (reverb_st_c))
             (reverb_mix 0.0)
             (reverb_predelay 40.0) ;; in ms
@@ -498,9 +526,7 @@
                                    (* MILLISEC (+ delay_time_right (aref mods PARAM_DELAY_TIME_RIGHT))))
                                delay_in
                                delay_mix
-                               (+ delay_fb (aref mods PARAM_DELAY_FB))
-                               delay_frq
-                               delay_res)))
+                               (+ delay_fb (aref mods PARAM_DELAY_FB)))))
           (if (> reverb_mix 0.001)
               (set! fxout (rev chan fxout
                                (+ reverb_size (aref mods PARAM_REVERB_SIZE))

@@ -15,7 +15,7 @@
 
 ;; reverb flanger and delay same as analogue
 
-(bind-type DLOGUE_PART <float,float,float,float,float,float,float,float,float,float,float,float,i64,float,float,i64,float,float,float,float,float,float,float,float,float,float> (constructor . #f) (printer . #f))
+(bind-type DLOGUE_PART <float,float,float,float,float,float,float,float,float,float,float,float,i64,float,float,i64,float,float,float,float,float,float,float,float,float,float> (constructor? . #f) (printer? . #f))
   
 ;; oscs 1 & 2 -> setting pw to anything greater than 0.0 is PULSE osc1_wave otherwise SINE
 (bind-func dl_osc1_pitch (lambda (x:DLOGUE_PART*) (tref x 0)))
@@ -375,14 +375,14 @@
             (hpf (hpf_c))
             (hpfR (hpf_c))
             (hpf_frq 20001.0)
-            (dly (comb_lpf_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
+            (dly (comb_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
             (delay_time_left 50.0) ;; in ms
             (delay_time_right 50.0) ;; in ms
             (delay_in 1.0)
             (delay_mix 0.0)
             (delay_fb 0.5)
-            (delay_frq 12000.0)
-            (delay_res 0.0)
+            (delay_frq:SAMPLE 12000.0)
+            (delay_res:SAMPLE 0.0)
             (rev (reverb_st_c))
             (reverb_mix 0.0)
             (reverb_predelay 40.0) ;; in ms
@@ -478,9 +478,7 @@
                                    (* MILLISEC (+ delay_time_right (aref mods PARAM_DELAY_TIME_RIGHT))))
                                delay_in
                                delay_mix
-                               (+ delay_fb (aref mods PARAM_DELAY_FB))
-                               delay_frq
-                               delay_res)))
+                               (+ delay_fb (aref mods PARAM_DELAY_FB)))))
           (if (> reverb_mix 0.001)
               (set! fxout (rev chan fxout
                                (+ reverb_size (aref mods PARAM_REVERB_SIZE))

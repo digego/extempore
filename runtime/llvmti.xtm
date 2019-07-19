@@ -53,6 +53,11 @@
 (define *impc:compiler:print-ast* #f)
 (define *impc:compiler:print-work-names #f) ;; this prints test__498 for example (i.e. closure bodies)
 (define *impc:compiler:verbose* #f)
+(define *impc:compiler:with-cache* #t)
+(define *impc:compiler:aot:dll* #t) ;; aot cache to dll (#t) or to llvm bitcode (#f)
+(define *impc:compiler:global-module-name* #f) 
+
+(define *impc:compile:scheme-stubs* #t) ;; compile scheme stubs - on/off
 
 (define *impc:compiler:print-raw-llvm* #f)
 
@@ -679,18 +684,15 @@
           (println)))))
 
 (define impc:compiler:print-bind-func-details-to-log
-  (lambda (lead-string symname type zone-size)
+  (lambda (lead-string symname type zone-size . args)
     (if (equal? *impc:compiler:message:level* 'high)
         (begin
           (print lead-string " ")
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
           (print-with-colors *impc:compiler:pretty-print-type-color* 'default #f  (print type))
-          ;; (print " zone size: ")
-          ;; (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f
-          ;;                    (print zone-size))
-          ;; (if (= zone-size *impc:default-zone-size*)
-          ;;     (print " (default)"))
+          (if (= (length args) 1)
+              (print-with-colors *impc:compiler:pretty-print-code-color* 'default #f (print " " (car args))))
           (println)))))
 
 (define impc:compiler:print-lib-binding-details-to-log
@@ -1282,8 +1284,8 @@
     ("atol" . #((213 2 108) "" ())) ;; libc
     ("audio_clock_base" . #((213 0) "" ())) ;; xtlang
     ("audio_clock_now" . #((213 0) "" ())) ;; xtlang
-    ("base64_decode" . #((213 108 108 2 2) "" ())) ;; xtlang
-    ("base64_encode" . #((213 108 108 2 2) "" ())) ;; xtlang
+    ("base64_decode" . #((213 108 108 2 102) "" ())) ;; xtlang
+    ("base64_encode" . #((213 108 108 2 102) "" ())) ;; xtlang
     ("calloc" . #((213 108 2 2) "" ())) ;; libc
     ("cbrt" . #((213 0 0) "" ())) ;; libm
     ("cbrtf" . #((213 1 1) "" ())) ;; libm
@@ -1291,8 +1293,8 @@
 ;;    ("check_address_type" . #((213 10 108 "%clsvar*" 108) "" ())) ;;internal
     ("clearerr" . #((213 -1 108) "" ())) ;; libc
     ("clock_clock" . #((213 0) "" ())) ;; xtlang
-    ("cname_decode" . #((213 108 108 2 2) "" ())) ;; xtlang
-    ("cname_encode" . #((213 108 108 2 2) "" ())) ;; xtlang
+    ("cname_decode" . #((213 108 108 2 102) "" ())) ;; xtlang
+    ("cname_encode" . #((213 108 108 2 102) "" ())) ;; xtlang
     ("copysign" . #((213 0 0 0) "" ())) ;; libm
     ("copysignf" . #((213 1 1 1) "" ())) ;; libm
     ("cosh" . #((213 0 0) "" ())) ;; libm
@@ -1793,8 +1795,10 @@
 
 (define impc:ti:get-closure-or-nativefunc-type
   (lambda (closure-or-nativefunc-name)
-    (or (impc:ti:get-closure-type closure-or-nativefunc-name)
-        (impc:ti:get-nativefunc-type closure-or-nativefunc-name))))
+    (let ((res (impc:ti:get-closure-type closure-or-nativefunc-name))) ;; can be #f or NIL :(
+      (if (or (not res) (null? res)) ;;  if not a closure must be native!
+          (impc:ti:get-nativefunc-type closure-or-nativefunc-name)
+          res))))
 
 (define impc:ti:closure-or-nativefunc-exists?
   (lambda (closure-or-nativefunc-name)
@@ -1803,8 +1807,10 @@
 
 (define impc:ti:get-closure-or-nativefunc-arg-types
   (lambda (closure-or-nativefunc-name)
-    (or (impc:ti:get-closure-arg-types closure-or-nativefunc-name)
-        (impc:ti:get-nativefunc-arg-types closure-or-nativefunc-name))))
+    (let ((res (impc:ti:get-closure-arg-types closure-or-nativefunc-name)))
+      (if (or (not res) (null? res))
+          (impc:ti:get-nativefunc-arg-types closure-or-nativefunc-name)
+          res))))
 
 (define impc:ti:get-closure-or-nativefunc-docstring
   (lambda (closure-or-nativefunc-name)
@@ -2654,6 +2660,8 @@
 (define *impc:aot:current-output-port* #f)
 (define *impc:aot:current-lib-name* "xtmdylib")
 (define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
+(define *impc:aot:win-link-libraries-exe* '(".\\libs\\builds\\extempore.lib"))
+
 (define *impc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
@@ -2722,7 +2730,7 @@
         (begin
           (write
            (list
-            'bind-lib-type
+            (if *impc:compiler:aot:dll* 'bind-lib-type 'register-lib-type)
             (string->symbol *impc:aot:current-lib-name*)
             (string->symbol name)
             (string->symbol (impc:ir:pretty-print-type type))
@@ -2736,7 +2744,7 @@
         (begin
           (write
            (list
-            'bind-lib-func
+            (if *impc:compiler:aot:dll* 'bind-lib-func 'register-lib-func)
             (string->symbol *impc:aot:current-lib-name*)
             (string->symbol name)
             (string->symbol (impc:ir:pretty-print-type type))
@@ -2746,9 +2754,19 @@
            *impc:aot:current-output-port*)
           (newline *impc:aot:current-output-port*)))))
 
+(define impc:aot:insert-static-binding-details
+  (lambda (name type)
+    (if (output-port? *impc:aot:current-output-port*)
+        (begin
+          (write (list 'bind-lib (string->symbol *impc:aot:current-lib-name*) name type) 
+                 *impc:aot:current-output-port*)
+          (newline *impc:aot:current-output-port*)))))
+
 (define impc:aot:insert-nativefunc-binding-details
   (lambda (lib-name func-name type docstring)
     (if (and (output-port? *impc:aot:current-output-port*)
+             ;; ignore if not dll
+             ;; *impc:compiler:aot:dll*
              ;; ignore the binding if we're just binding something
              ;; from an Extempore AOT-compiled library
              (not (and (>= (string-length (atom->string lib-name)) 3)
@@ -2777,7 +2795,7 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'bind-lib-val
+           (list (if *impc:compiler:aot:dll* 'bind-lib-val 'register-lib-val)
                  (string->symbol library)
                  (string->symbol name)
                  (string->symbol (impc:ir:pretty-print-type type))
@@ -2790,7 +2808,7 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list 'bind-ext-val
+           (list (if *impc:compiler:aot:dll* 'bind-ext-val 'register-ext-val)
                  (string->symbol name)
                  (string->symbol (impc:ir:pretty-print-type type))
                  docstring)
@@ -2798,8 +2816,9 @@
           (newline *impc:aot:current-output-port*)))))
 
 (define impc:aot:insert-load-dylib-details
-  (lambda (library lib-path)
-    (if (output-port? *impc:aot:current-output-port*)
+  (lambda (library lib-path . args)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             #t) ;*impc:compiler:aot:dll*)
         (begin
           (write
            (list 'bind-dylib library `(list ,@lib-path))
@@ -2812,7 +2831,13 @@
                          " dynamic library - perhaps you can install it through your package manager?\n")
                   (error "")))
            *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+          (newline *impc:aot:current-output-port*)
+          (if (and (not (null? args)) (string? (car args))) 
+              (begin
+                (write (list 'bind-external-dylib-declarations (symbol->string library) (car args))
+                       *impc:aot:current-output-port*)
+                (newline  *impc:aot:current-output-port*)))
+          ))))
 
 ;; don't need specialised ones for these:
 
@@ -2873,6 +2898,96 @@
          ;; whatever happens, set the port back to the original value
          (set! *impc:aot:current-output-port* aot-compilation-port))
        (begin ,@forms)))
+
+(define impc:aot:compile-exe
+  (lambda (module-name module libs)
+    (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
+      (let* ((platform (sys:platform))
+             (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
+             (bc-path (string-append tmp-dir module-name (unix-or-Windows ".bc" ".ll")))
+             (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj"))) ; could skip .o (straight to .so)
+             (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/builds/")))
+             (output-exe-path (string-append output-dir module-name
+                                               (cond ((string=? platform "Linux") "")
+                                                     ((string=? platform "OSX") "")
+                                                     ((string=? platform "Windows") ".exe"))))
+             (link-libs (if (string=? platform "Windows")
+                            *impc:aot:win-link-libraries-exe*
+                            '()))
+             (optimize-compiles? #t)
+             (llc-command
+              (unix-or-Windows (string-append
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                                " -filetype=obj "
+                                (if (and (string=? (sys:platform) "OSX")
+                                         (sys:cmdarg "mcpu")
+                                         (not (string=? (sys:cmdarg "mcpu") "")))
+                                    (string-append "-mcpu="
+                                                   (sys:cmdarg "mcpu")
+                                                   " ")
+                                    "")
+                                bc-path " -o " asm-path)
+                               (string-append
+                                llc-path
+                                (if optimize-compiles? " -O3 -tailcallopt" "-O0")
+                                " -filetype=obj -mtriple=x86_64-pc-win32 "
+                                bc-path)))
+             (link-command
+              (unix-or-Windows (string-append
+                                (cond ((string=? platform "Linux")
+                                       (string-append "gcc "
+                                                      (if optimize-compiles? "-O3 -g" "-g -O0")
+                                                      ""))
+                                      ((string=? platform "OSX")
+                                       (string-append "clang "
+                                                      (if optimize-compiles? "-O3" "-g -O0")
+                                                      "")))
+                                asm-path
+                                " -o " output-exe-path)
+                               (string-append
+                                "call link"
+                                ;; (sanitize-platform-path (sys:share-dir))
+                                ;; "\\extras\\ms_build_vars.bat && link"
+                                ;; " /FORCE:UNRESOLVED "
+                                " /LIBPATH:\"C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/VC/Tools/MSVC/14.16.27023/lib/x64\""
+                                " /LIBPATH:\"C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/SDK/ScopeCppSDK/SDK/lib\""
+                                " /MACHINE:x64"
+                                " /SUBSYSTEM:CONSOLE"
+                                " /OUT:" output-exe-path
+                                " " (string-join link-libs " ") " " libs ;; " .\\libs\\builds\\xtmcv.lib"
+                                ;; (string-append tmp-dir module-name ".lib ")
+                                " msvcrt.lib legacy_stdio_definitions.lib "
+                                asm-path))))
+        (print "Using llc " llc-path "...\n\n")
+        (begin
+          (print-with-colors 'black 'yellow #t (print " Exporting executable "))
+          (print "\n  " bc-path "\n\n"))
+        ;; make sure tmp-dir exists
+        (sys:command (string-append (unix-or-Windows "mkdir " "md ") tmp-dir))
+        ;; (sys:command (string-append "rm " bc-path " " asm-path " " output-shlib-path))
+        (llvm:export-module module bc-path)
+        (let ((llc-res 0)
+              (linker-res 0))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Generating assembly from LLVM bitcode "))
+            (print "\n  " llc-command "\n\n"))
+          (set! llc-res (sys:command llc-command))
+          (if (<> llc-res 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "llc command failed with exit code " llc-res "\n"))
+                     (quit 1)))
+          (begin
+            (print-with-colors 'black 'yellow #t (print " Compiling native executable "))
+            (print "\n  " link-command "\n\n"))
+          (set! linker-res (sys:command link-command))
+          (if (<> linker-res 0)
+              (begin (print-with-colors 'red 'default #t
+                                        (print "linking failed with exit code " linker-res "\n"))
+                     (quit 1))
+              (begin
+                (print-with-colors 'black 'green #t (print " Succesfully compiled "))
+                (print "\n  " output-exe-path "\n\n"))))))))
 
 (define impc:aot:compile-module
   (lambda (module-name module)
@@ -2968,26 +3083,41 @@
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* #t)\n")
+                   *impc:aot:current-output-port*)
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
                    *impc:aot:current-output-port*)
-          (display (string-append "(bind-dylib " libname " \"" libname
-                                  (cond ((string=? (sys:platform) "Linux") ".so\")\n")
-                                        ((string=? (sys:platform) "Windows") ".dll\")\n")
-                                        ((string=? (sys:platform) "OSX") ".dylib\")\n")))
+          (display (string-append "\n(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
+                          libname "))\n(print \" library... \")\n")
                    *impc:aot:current-output-port*)
-          (write
-           `(if (not ,(string->symbol libname))
-                (begin
-                  (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
-                  (print ": could not load the AOT-compilied " ,libname
-                         " dynamic library\n")
-                  (error "")))
-           *impc:aot:current-output-port*)
-          (display (string-append "(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
-                                  libname "))\n(print \" library... \")\n")
-                   *impc:aot:current-output-port*)
+          (if *impc:compiler:aot:dll*
+              (begin
+                (display (string-append "(bind-dylib " libname " \"" libname
+                                        (cond ((string=? (sys:platform) "Linux") ".so\")\n")
+                                              ((string=? (sys:platform) "Windows") ".dll\")\n")
+                                              ((string=? (sys:platform) "OSX") ".dylib\")\n")))
+                        *impc:aot:current-output-port*)
+                (write
+                `(if (not ,(string->symbol libname))
+                      (begin
+                        (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                        (print ": could not load the AOT-compilied " ,libname
+                              " dynamic library\n")
+                        (error "")))
+                 *impc:aot:current-output-port*)
+                (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
+                                  "(impc:compiler:flush-jit-compilation-queue)\n")
+                   *impc:aot:current-output-port*)))))))
+
+(define impc:aot:import-ll
+  (lambda (libname)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             (not *impc:compiler:aot:dll*))
+        (begin
+          (write `(llvm:compile-ir (sys:slurp-file ,(string-append "libs/aot-cache/" libname ".ll")))
+                  *impc:aot:current-output-port*)
           (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
                                   "(impc:compiler:flush-jit-compilation-queue)\n")
                    *impc:aot:current-output-port*)))))
@@ -2998,9 +3128,9 @@
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
                    *impc:aot:current-output-port*)
-          (display (string-append "(print \" in\" (* 1.0 (/ (- (now) *xtmlib-" (substring libname 3) "-loaded*) *second*)) \"seconds\\n\")\n")
+          (display (string-append "(print \" in\" (- (clock:clock) *xtmlib-" (substring libname 3) "-loaded-timer*) \"seconds\\n\")\n")
                    *impc:aot:current-output-port*)
-          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* (now))\n")
+          (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
                    *impc:aot:current-output-port*)
           (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
                    *impc:aot:current-output-port*)))))
@@ -3009,7 +3139,7 @@
   (lambda (start-time)
     (print-with-colors 'yellow 'default #t
                        (print "Total compile time: "))
-    (print (* 1.0 (/ (- (now) start-time) *minute*)) "minutes\n\n")
+    (print (- (clock:clock) start-time) "seconds\n\n")
     (print-with-colors 'black 'blue #t (print " Types "))
     (print "\n  " (length *impc:ti:typealias-cache*))
     (print-with-colors 'cyan 'default #f (print " type aliases\n"))
@@ -3052,9 +3182,158 @@
 (if (string=? (sys:platform) "Windows")
     (Windows-add-libdir-to-PATH))
 
-(define impc:aot:compile-xtm-file
+(define impc:aot:compile-xtm-exe
+  (lambda (file-path)
+    (let* ((start-time (clock:clock))
+           (libs (if (sys:cmdarg "link") (sys:cmdarg "link") ""))
+           (file-no-extension (filename-strip-extension file-path))
+           (aot-compilation-file (string-append file-no-extension ".exe"))
+           (in-file-port (open-input-file (sanitize-platform-path file-path))))
+      (set! *impc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
+      (set! *impc:aot:func-defs-in-mod* '())
+      (if (impc:aot:currently-compiling?)
+          (begin
+            (llvm:optimize #t); // should this be restored later?
+            ;; this is the 'success' branch
+            (set! *impc:aot:current-lib-name* file-no-extension)
+            ;; (impc:aot:insert-header libname-no-extension)
+            ;; turn off scheme stubs!
+            (set! *impc:compile:scheme-stubs* #f)
+            ;; turn off aot-cache loading
+            (set! *impc:compiler:with-cache* #f)
+            (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+            (println file-path)
+            (println)
+            (sys:load file-path)
+            (println)
+            (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) 
+                                                                  (reverse *impc:ti:closure-cache*)))) ;; reverse - make sure we initialize function in correct order!
+            (llvm:compile-ir 
+              (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
+              all-closure-setters
+              ;; "call void @test22_adhoc_W2kzMl0_setter();\n"
+              ;; "call void @run_adhoc_W2kzMixpMzIsaTgqKl0_setter();\n"
+              "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
+              ret i32 %res;
+            }"))
+            (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+            (println file-path)
+            (println)
+            ;; turn back on scheme stubs
+            (set! *impc:compile:scheme-stubs* #t)
+            ;; turn back on cache loading
+            (set! *impc:compiler:with-cache* #t)
+            (begin
+              (println)
+              (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+              (print "\n"))
+            (let ((module (impc:compiler:flush-jit-compilation-queue)))
+              (if (not module)
+                  (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
+                (impc:aot:compile-exe file-no-extension module libs))
+            (set! *impc:aot:current-output-port* #f) 
+            ;; (close-port *impc:aot:current-output-port*)
+            (quit 0))
+          (begin
+            (begin (print-with-colors 'black 'red #t (print " Error "))
+              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
+              (quit 2)))))))
+
+;; 
+;; any 'declare' (external declarations) found in an llvm ll 'lib file'
+;; must belong to a single DLL specified BEFORE the aot header in main library file
+;;
+(define bind-external-dylib-declarations
+  (lambda (libname ll-file-path)
+    (for-each (lambda (m)
+                (let* ((res (regex:matched m "declare cc 0.*@([^(]*).*nounwind"))
+                       (result (eval `(llvm:bind-symbol ,(string->symbol libname) ,(cadr res)))))
+                  (if (not result) (println "Error binding " res " to " libname " in declaration from " ll-file-path))))
+         (regex:match-all (sys:slurp-file (string-append "libs/aot-cache/" ll-file-path ".ll")) "declare cc 0.*@([^(]*).*nounwind"))
+    #t))
+
+;; aot compile llvm bitcode (bc)
+(define impc:aot:compile-xtm-ll
   (lambda (lib-path)
-    (let ((start-time (now))
+    (set! *impc:compiler:aot:dll* #f)
+    (let ((start-time (clock:clock))
+          (llas-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llvm-as")))
+          (in-file-port (or
+                         (open-input-file (sanitize-platform-path lib-path))
+                         (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
+      (if (not in-file-port)
+          (begin (print-with-colors 'black 'red #t
+                                    (print "Error:"))
+                 (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
+          (let* ((res (close-port in-file-port))
+                 (libname (sanitize-platform-path (filename-from-path lib-path)))
+                 (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
+                 (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
+                 (bc-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".bc")))
+                 (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
+            (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
+                (begin (print "AOT-compilation file not written ")
+                       (close-port *impc:aot:current-output-port*)
+                       (set! *impc:aot:current-output-port* #f))
+                (begin
+                  ;; if the preload check passes, create aot-cache dir
+                  ;; if it doesn't exist
+                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
+                  ;; remove old AOT file if present
+                  (if (file-exists? aot-compilation-file-path)
+                      (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))
+                  ;; remove old LL file if present
+                  (if (file-exists? ll-path)
+                      (sys:command (string-append (unix-or-Windows "rm " "DEL ") ll-path)))
+                  ;; open output file, ready for writing
+                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *impc:aot:func-defs-in-mod* '())
+                  (if (impc:aot:currently-compiling?)
+                      (begin
+                        (llvm:optimize #t); // should this be restored later?
+                        ;; this is the 'success' branch
+                        (set! *impc:aot:current-lib-name* libname-no-extension)
+                        ;; module name for globals
+                        (set! *impc:compiler:global-module-name* libname-no-extension)
+                        ;; (impc:aot:insert-header libname-no-extension)
+                        (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+                        (println lib-path)
+                        (println)
+                        (sys:load lib-path)
+                        (println)
+                        (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+                        (println lib-path)
+                        (println)
+                        (begin
+                          (println)
+                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
+                          (print "\n"))
+                        (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
+                        ;; this won't be straight forward without linking in all relevant ll files :(
+                        ;; (sys:command (string-append llas-path " " ll-path " -o " bc-path))
+                        (close-port *impc:aot:current-output-port*)
+                        (set! *impc:compiler:global-module-name* #f)
+                        (set! *impc:aot:current-lib-name* "xtmdylib")
+                        (if  *impc:aot:current-output-port*
+                             (begin (set! *impc:aot:current-output-port* #f)
+                                    (print "Successfully wrote file to ")
+                                    (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
+                                    (impc:aot:print-compilation-details start-time)
+                                    (quit 0))
+                             (begin (print-with-colors 'black 'red #t (print " Error "))
+                                    (print "\n\nsomething went wrong in writing the output file ")
+                                    (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                                    (quit 1))))
+                      (begin (print-with-colors 'black 'red #t (print " Error "))
+                             (print "\n\ncannot write file at " aot-compilation-file-path "\n")
+                             (quit 2))))))))))
+
+
+(define impc:aot:compile-xtm-dll
+  (lambda (lib-path)
+    (set! *impc:compiler:aot:dll* #t)
+    (let ((start-time (clock:clock))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
                          (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
@@ -3116,11 +3395,15 @@
                                     (print "\n\nsomething went wrong in writing the output file ")
                                     (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
                                     (quit 1))))
-                      (begin (print-with-colors 'black 'red #t
-                                                (print " Error "))
+                      (begin (print-with-colors 'black 'red #t (print " Error "))
                              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (quit 2))))))))))
 
+(define impc:aot:compile-xtm-file
+  (lambda (lib-path . dll)
+    (if (and (not (null? dll)) (car dll))
+        (impc:aot:compile-xtm-dll lib-path)
+        (impc:aot:compile-xtm-ll lib-path))))    
 
 (define icr:new-zone
   (lambda args
@@ -8818,7 +9101,7 @@ xtlang's `let' syntax is the same as Scheme"
 ;;
 (define impc:ti:add-types-to-source-atom
   (lambda (symname ast types envvars . prev)
-    ;; (println 'symname: symname 'ast: ast)
+    ;; (println 'symname: symname 'ast: ast 'envvars: envvars)
     (cond ((and (symbol? ast)
                 (not (string-contains? (symbol->string ast) ":"))
                 (impc:ti:polyfunc-exists? (symbol->string ast)))
@@ -8861,7 +9144,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                            code))
                          ;; (println 'spec-compile1: pfunc 'code: code)
                          (set! code `(let ((,pfunc ,code)) ,pfunc))
-                         (impc:ti:run pfunc code *impc:default-zone-size* #f (cons pfunc (string->symbol (cadr p))))
+                         (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol (cadr p))))
                          (impc:ti:register-new-polyfunc (car p)
                                                         (symbol->string pfunc)
                                                         (impc:ir:get-type-from-pretty-str (cadr p))
@@ -8912,7 +9195,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                      code))
                    ;; (println 'spec-compile2: pfunc 'code: code)
                    (set! code `(let ((,pfunc ,code)) ,pfunc))
-                   (impc:ti:run pfunc code *impc:default-zone-size* #f (cons pfunc (string->symbol ptype)))
+                   (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol ptype)))
                    (impc:ti:register-new-polyfunc n1
                                                   (symbol->string pfunc)
                                                   (impc:ir:get-type-from-pretty-str ptype)
@@ -9045,7 +9328,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                          code))
                        ;; (println 'spec-compile3: pfunc 'code: code)
                        (set! code `(let ((,pfunc ,code)) ,pfunc))
-                       (impc:ti:run pfunc code *impc:default-zone-size* #f (cons pfunc (string->symbol type)))
+                       (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol type)))
                        (impc:ti:register-new-polyfunc (symbol->string polyname)
                                                       (symbol->string pfunc)
                                                       (impc:ir:get-type-from-pretty-str type)
@@ -9528,11 +9811,121 @@ xtlang's `let' syntax is the same as Scheme"
                   (impc:ti:get-global-var-types (cdr ast)))
             #f))))
 
+
+(define make_static_scheme_wrapper_ir
+  (lambda (symname-string closure-type)
+    (let* ((stub-type (impc:ir:get-closure-type-from-str closure-type))
+           (scheme-stub-valid? #t)
+          (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
+          (ir (string-append "define dllexport ccc i8* "
+          " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+          "{\nentry:\n"
+          (apply string-append
+                  (map (lambda (t n idx)
+                        (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                        (cond ((and (not (number? t))
+                                                    (not (impc:ir:pointer? t)))
+                                              (set! scheme-stub-valid? #f)
+                                              "")
+                                              ((or (not (number? t))
+                                                  (not (or (impc:ir:number? t)
+                                                            (impc:ir:void? t))))
+                                              (if (and (number? t)
+                                                        (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
+                                                  (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                  (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
+                                              ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                (impc:ti:scm_rt_check_string n symname-string)
+                                                                                n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                              (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))
+                      (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
+          (if (impc:ir:void? (car stub-type)) "" "%result = ")
+              "call ccc " (impc:ir:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
+
+          (string-join
+                  (map (lambda (t n)
+                        (string-append (impc:ir:get-type-str t) " " n))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
+          ")\n"
+          
+          (let* ((t (car stub-type)))
+            (cond ((and (not (number? t))
+                        (not (impc:ir:pointer? t)))
+                    (set! scheme-stub-valid? #f)
+                    "")
+                  ((or (not (number? t))
+                        (not (or (impc:ir:number? t)
+                                (impc:ir:void? t))))
+                    (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+                                  "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                  ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                  ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                  ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                  ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                  ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                  (else (impc:compiler:print-compiler-error "return type error in scheme stub"))))
+
+          "ret i8* %res\n"
+          "}\n\n"))))
+      (if scheme-stub-valid? ir #f))))
+
+
 (define *impc:ti:adhoc-cnt* 0)
 
 (define impc:ti:run
-  (lambda (symname code zone-size poly . args)
-    ;; (println '-----------> 'impc:ti:run: symname 'poly: poly)
+  (lambda (symname code zone-size poly static . args)
+    ;; (println '-----------> 'impc:ti:run: symname 'poly: poly 'static: static)
     ;; (println 'code: code)
     ;; (println 'args: args)
     (set! *impc:ir:sym-name-stack* '())
@@ -9554,7 +9947,7 @@ xtlang's `let' syntax is the same as Scheme"
               (set! args (replace-all args (list (cons adhoc-poly-name symname)))))
           (set! code (replace-all code (list (cons adhoc-poly-name symname))))))
     ;; don't want type checking to find existing native versions!
-    (if *impc:compile*
+    (if (and *impc:compile* (not static))
         (begin
           (llvm:erase-function (string-append (symbol->string symname) "_setter"))
           (llvm:erase-function (string-append (symbol->string symname) "_maker"))))
@@ -9652,9 +10045,22 @@ xtlang's `let' syntax is the same as Scheme"
             (set! symname-string new)
             (set! newast (impc:ti:add-types-to-source symname t6 (cl:tree-copy types) (list))))
           (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list))))
+          
+      ;; 
+      ;; modify code for static functions
+      ;; 
+      (if static 
+          (let* ((code (cdr (cadar (caddr newast))))
+                 (env (caar (caddr newast)))
+                 (num (car code))
+                 (name (cadr code))
+                 (n2 (regex:split name "__"))
+                 (body (cddr code)))
+            ;; first strip the environment! (i.e. static not closure!) 
+            (set! body (remove-all '_x_x_ (replace-all body `((,env . _x_x_)))))
+            ;; then replace make-closure with make-static (at the top level)
+            (set! newast (apply list '__make-static num (car n2) body))))
 
-      ;; (println 'newast:)
-      ;; (println newast)
       ;; (println 'newtypes:)
       ;; (for-each (lambda (t) (println t)) types)
 
@@ -9692,7 +10098,36 @@ xtlang's `let' syntax is the same as Scheme"
       (define fstr (impc:ir:compiler newast types))
       ;;
       ;; now compile ir to x86 and make stub code
-      (let* ((closure-type (cadr (impc:ir:gname)))
+      (if static ;; static function or normal closure?
+          (let* ((closure-type (cadr (impc:ir:gname)))
+                 ;; compile scheme_ir specifically for static functions
+                 (scheme_ir (make_static_scheme_wrapper_ir (symbol->string symname) closure-type)))
+            (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-str closure-type) "" '())
+            (if (string? scheme_ir) (llvm:compile-ir scheme_ir))
+            (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
+                (begin ;; (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                       (impc:aot:insert-static-binding-details symname (string->symbol (impc:ir:pretty-print-type closure-type)))
+                       (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) symname (impc:ir:pretty-print-type closure-type))
+                       ;; scheme stub always has type i8* i8* i8*
+                       (if (string? scheme_ir)
+                           (begin
+                             (impc:aot:insert-static-binding-details (string->symbol (string-append (symbol->string symname) "_scheme")) (string->symbol "[i8*,i8*,i8*]*"))
+                              ;; (newline *impc:aot:current-output-port*)
+                              ;  (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) 
+                              ;                                                   (string->symbol (string-append (symbol->string symname) "_scheme")) 
+                              ;                                                   (string->symbol "[i8*,i8*,i8*]*"))
+                              (write `(mk-ff ,(symbol->string symname) (llvm:get-function-pointer ,(string-append (symbol->string symname) "_scheme"))) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*))))
+                (begin
+                  (if (string? scheme_ir) 
+                      (mk-ff (symbol->string symname) (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme"))))))
+            ;; (impc:aot:insert-nativefunc-binding-details library symname type docstring)))
+            (impc:compiler:print-bind-func-details-to-log
+                      "Compiled:"
+                      symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
+                      (impc:ir:pretty-print-type closure-type)
+                      0 "[static]"))
+          (let* ((closure-type (cadr (impc:ir:gname))) ;; normal closure
              (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
              (compile-stub? (not (impc:ti:closure-exists? symname-string)))
              (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
@@ -10010,7 +10445,8 @@ xtlang's `let' syntax is the same as Scheme"
         (if (and *impc:compile* compile-stub?)
             (begin (impc:compiler:queue-ir-for-compilation stub-ir)
                    (impc:compiler:queue-ir-for-compilation native-ir)
-                   (if scheme-stub-valid? (impc:compiler:queue-ir-for-compilation scheme-stub-ir) #t)))
+                   (if (and scheme-stub-valid? *impc:compile:scheme-stubs*) 
+                       (impc:compiler:queue-ir-for-compilation scheme-stub-ir) #t)))
         (if *impc:compiler:print*
             (println '----------------------------compiling 'callback----------------------------------->))
         (if *impc:compiler:print* (print-full-nq callback-ir))
@@ -10070,8 +10506,7 @@ xtlang's `let' syntax is the same as Scheme"
                       symname
                       (impc:ir:pretty-print-type closure-type)
                       zone-size)))))
-        symname-string))))
-        ;; (cadr (impc:ir:gname))))))
+        symname-string)))))
 
 (define-macro (xtm-closure-doc name)
   `(let ((docstring (impc:ti:get-closure-docstring ,name))
@@ -10085,6 +10520,96 @@ xtlang's `let' syntax is the same as Scheme"
                  (list '() '() (cdr form))
                  #f)))))
 
+(define-macro (define-static symname . args)
+  (let ((types (cdr (reverse args)))
+        (expr (car (reverse args)))
+        (aot_sexpr '()))
+    (if (regex:match? (symbol->string symname) ":")
+        (let ((sres (regex:type-split (symbol->string symname) ":")))
+          (set! symname (string->symbol (car sres)))
+          (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
+    ;; (print-full symname 'types: types 'e: expr 'args: args)
+    `(let* ((newname (impc:ti:run ',symname
+                                  '(let ((,symname ,expr)) ,symname)
+                                  0
+                                  #f
+                                  #t
+                                  ,@(if (null? types)
+                                        '()
+                                        (map (lambda (k) (list 'quote k)) types)))))
+        newname)))
+
+(define-macro (bind-static . args)
+  (if (string? (cadr args))
+      (if (not (equal? (caaddr args) 'lambda))
+        (impc:compiler:print-compiler-error "static functions cannot be closures!"))
+      (if (not (equal? (caadr args) 'lambda))
+        (impc:compiler:print-compiler-error "static functions cannot be closures!")))
+  ;; if aot and func already exists then bomb out
+  (if (and (output-port? *impc:aot:current-output-port*)
+           (impc:ti:closure-exists? (symbol->string (car args))))
+      (begin ;; (impc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
+             #t)
+      ;; if doc-string exists!
+      (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
+            (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
+            (poly (if (boolean? (cadr args)) (cadr args) #t))
+            (docstring (if (string? (cadr args))
+                           (cadr args)
+                           (if (and (not (null? (cddr args))) (string? (caddr args)))
+                               (caddr args)
+                               "")))
+            ;; closure body is always in last position, preceeded by zone
+            ;; size and/or docstring
+            (closure-body (car (reverse args))))
+        ;; strip docstring
+        (set! args (cl:remove-if string? args))
+        ;; strip poly
+        (set! args (cl:remove-if boolean? args))
+        (if (impc:ti:polyfunc-exists? (car args))
+            (impc:compiler:print-already-bound-error (car args) " static function"))
+        ;; (if (impc:ti:genericfunc-exists? (car args))
+        ;;     (impc:compiler:print-already-bound-error (car args) "generic closure"))
+        (if (regex:match? (symbol->string (car args)) ":")
+            (let* ((res (regex:type-split (symbol->string (car args)) ":"))
+                   (name (car res))
+                   (type1 (cadr res))
+                   (type (if (char=? (string-ref type1 0) #\[)
+                             (if (= (impc:ir:get-ptr-depth type1) 1)
+                                 type1
+                                 (impc:compiler:print-bad-type-error type1 "must be a closure pointer"))
+                             (if (impc:ti:typealias-exists? type1)
+                                 (impc:ti:get-typealias-type-pretty type1)
+                                 (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-static"))))
+                   (ags (impc:ir:get-pretty-closure-arg-strings type))
+                   ;; expand all non-explict generic types
+                   ;; i.e. expand list* into list:<!a,list*>*
+                   (expand-polys (map (lambda (k)
+                                        (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                            (impc:ir:pointer++
+                                             (string-append (impc:ir:get-base-type k) ":"
+                                                            (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
+                                             (impc:ir:get-ptr-depth k))
+                                            k))
+                                      ags))
+                   (newtype (string-append "[" (string-join expand-polys ",") "]*"))
+                   (newnametype (string->symbol (string-append name ":" newtype))))
+              ;; (println 'oldargs: args)
+              ;; (println 'newargs: (cons newnametype (cdr args)))
+              (if (impc:ti:bang-type? newtype)
+                  (begin
+                    (impc:compiler:print-compiler-error "static functions cannot be generic!"))
+                  (begin
+                    (if (impc:ti:closure-or-nativefunc-exists? func-name)
+                        (impc:compiler:print-compiler-error "static functions cannot be redefined!")
+                        (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+                    `(eval '(define-static ,(car args) ,@(cdr args)) (interaction-environment)))))
+            (begin
+              (if ;; (impc:ti:closure-exists? func-name)
+                  (impc:ti:closure-or-nativefunc-exists? func-name)
+                  (impc:compiler:print-compiler-error "static functions cannot be redefined!")
+                  (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+              `(eval '(define-static ,(car args) ,@(cdr args)) (interaction-environment)))))))
 
 (define-macro (definec symname poly . args)
   (let ((zone-size *impc:default-zone-size*))
@@ -10103,6 +10628,7 @@ xtlang's `let' syntax is the same as Scheme"
                                     '(let ((,symname ,expr)) ,symname)
                                     ,zone-size
                                     ,poly
+                                    #f
                                     ,@(if (null? types)
                                           '()
                                           (map (lambda (k) (list 'quote k)) types)))))
@@ -10111,11 +10637,8 @@ xtlang's `let' syntax is the same as Scheme"
          ;; (impc:ti:create-scheme-wrapper (symbol->string ',symname)))))))
          (impc:ti:initialize-closure-with-new-zone newname *impc:default-zone-size*)
          (impc:ti:create-scheme-wrapper newname)))))
-
-
-(define-macro (bind-func . args)
-  (if (list? (car args))
-      (impc:compiler:print-compiler-error "bind-func requires a name!"))
+      
+(define-macro (bind-closure . args)
   ;; if aot and func already exists then bomb out
   (if (and (output-port? *impc:aot:current-output-port*)
            (impc:ti:closure-exists? (symbol->string (car args))))
@@ -10187,6 +10710,21 @@ xtlang's `let' syntax is the same as Scheme"
                     (impc:ti:set-closure-body func-name closure-body))
                   (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
               `(eval '(definec ,(car args) ,poly ,@(cdr args)) (interaction-environment)))))))
+
+(define-macro (bind-func . args)
+  (if (< (length args) 2)
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (and (= (length args) 2) (not (symbol? (car args))) (not (or (string? (cadr args)) (list? (cadr args)))))
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (and (= (length args) 3) 
+           (not (symbol? (car args))) 
+           (not (symbol? (cadr args))) 
+           (not (or (string? (caddr args)) 
+                    (list (caddr args)))))
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (equal? (car args) 'static)
+      `(bind-static ,@(cdr args))
+      `(bind-closure ,@args)))
 
 
 (impc:ti:register-new-builtin
@@ -10728,27 +11266,40 @@ xtlang's `let' syntax is the same as Scheme"
       (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
       (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
       (impc:compiler:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
-
+  
 (impc:ti:register-new-builtin
  "bind-ext-val"
  ""
  "bind an external global variable"
  '(variable-name type optional-value optional-docstring))
 
+(define-macro (register-ext-val symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      ; (llvm:compile-ir
+      ;   (string-append "@" ,(symbol->string symname) " = external global " (impc:ir:get-type-str type-list)))
+      (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
+      (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+      (impc:compiler:print-binding-details-to-log "register-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
-  ;; (println 'poly: poly_sym implementation_sym)
   (if (impc:ti:genericfunc-exists? implementation_sym)
       (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
   (if (not (impc:ti:closure-or-nativefunc-exists? (symbol->string implementation_sym)))
       (impc:compiler:print-missing-identifier-error implementation_sym 'closure))
   (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
-    ;;(set! type (impc:ir:get-type-from-pretty-str (symbol->string type)))
     (if type
         `(begin
            (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
            (impc:ti:create-scheme-wrapper (symbol->string ',implementation_sym))
            (if (not (regex:match? ,(symbol->string implementation_sym) "(_adhoc_|_poly_)"))
-               (impc:compiler:print-polying-details-to-log "PolyFunc:" ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ,(impc:ir:pretty-print-type type))))
+               (impc:compiler:print-polying-details-to-log "PolyFunc:" 
+                                                           ,(symbol->string poly_sym) 
+                                                           ,(symbol->string implementation_sym) 
+                                                           ,(impc:ir:pretty-print-type type))))
         `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
 
 (impc:ti:register-new-builtin
@@ -10815,11 +11366,11 @@ xtlang's `let' syntax is the same as Scheme"
             (print " dynamic library\n")
             (error ""))))))
 
-(define-macro (bind-dylib library lib-path)
+(define-macro (bind-dylib library lib-path . args)
   (let ((path (eval lib-path)))
     (if (string? path)
         (set! path (list path)))
-    (impc:aot:insert-load-dylib-details library path)
+    (apply impc:aot:insert-load-dylib-details library path args)
     `(impc:ti:bind-dylib ',library ',path)))
 
 (impc:ti:register-new-builtin
@@ -10856,35 +11407,40 @@ e.g.
 ;; this was previously called __dynamic-bind
 (define impc:ti:bind-lib
   (lambda (library symname type calling-convention docstring)
-    (if (not (eval library))
-        (impc:compiler:print-compiler-error
-         (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
-        (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
-               (ir-string (string-append "declare "
-                                         "cc " (atom->string calling-convention)
-                                         " "
-                                         (impc:ir:get-type-str (car ctype))
-                                         " @"
-                                         (symbol->string symname)
-                                         "("
-                                         (if (null? (cdr ctype))
-                                             ""
-                                             (apply string-append
-                                                    (impc:ir:get-type-str (cadr ctype))
-                                                    (map (lambda (v)
-                                                           (string-append "," (impc:ir:get-type-str v)))
-                                                         (cddr ctype))))
-                                         ") nounwind")))
-          (if (and (llvm:compile-ir ir-string)
-                   (llvm:bind-symbol (eval library) (symbol->string symname)))
-              (begin
-                (if (output-port? *impc:aot:current-output-port*)
-                    (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
-                           (newline *impc:aot:current-output-port*)))
-                (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
-                (impc:compiler:print-lib-binding-details-to-log library symname type)
-                (impc:aot:insert-nativefunc-binding-details library symname type docstring))
-              (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname))))))))
+    (if (llvm:get-function (symbol->string symname)) ;; if already bound!
+        (begin
+          (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+          (impc:compiler:print-lib-binding-details-to-log library symname type)
+          (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+        (if (not (eval library))
+            (impc:compiler:print-compiler-error
+              (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+            (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+                  (ir-string (string-append "declare "
+                                            "cc " (atom->string calling-convention)
+                                            " "
+                                            (impc:ir:get-type-str (car ctype))
+                                            " @"
+                                            (symbol->string symname)
+                                            "("
+                                            (if (null? (cdr ctype))
+                                                ""
+                                                (apply string-append
+                                                        (impc:ir:get-type-str (cadr ctype))
+                                                        (map (lambda (v)
+                                                              (string-append "," (impc:ir:get-type-str v)))
+                                                            (cddr ctype))))
+                                            ") nounwind")))
+              (if (and (llvm:compile-ir ir-string)
+                      (llvm:bind-symbol (eval library) (symbol->string symname)))
+                  (begin
+                    (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
+                        (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*)))
+                    (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                    (impc:compiler:print-lib-binding-details-to-log library symname type)
+                    (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+                  (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname)))))))))
 
 (define-macro (unbind-func symname)
   `(begin
@@ -10910,6 +11466,15 @@ e.g.
                                            ',(impc:ir:get-type-from-pretty-str typestr namestr)
                                            ,docstring)
            (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
+  
+(define-macro (register-lib-type library name type docstring)
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type)))
+    `(impc:ti:register-new-namedtype ,namestr
+                                      ',(impc:ir:get-type-from-pretty-str typestr namestr)
+                                      ,docstring)))
+
 
 ;;; this here for binding to CLOSURE in dylib
 ;;
@@ -10947,6 +11512,20 @@ e.g.
                                                  ,(symbol->string type))
      (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
                                                ,zone-size)))
+  
+(define-macro (register-lib-func library symname type zone-size docstring body)
+  `(begin
+     ;; bind scheme function
+     (impc:ti:register-new-closure ,(symbol->string symname)
+                                   (impc:ir:get-type-from-pretty-str ,(symbol->string type))
+                                   ,zone-size
+                                   ,docstring
+                                   ,body)
+     (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                 ,(symbol->string symname)
+                                                 ,(symbol->string type))
+     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname) ,zone-size)))
+
 
 (define-macro (bind-lib-val library symname type . docstring)
   `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
@@ -10974,6 +11553,24 @@ e.g.
                                                             " from library "
                                                             ,(symbol->string library))))))
 
+(define-macro (register-lib-val library symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      (begin
+           (impc:ti:register-new-globalvar ,(symbol->string symname)
+                                           type-list
+                                           ds)
+           (impc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                      ,(symbol->string symname)
+                                                      ,(symbol->string type)
+                                                      ds)
+           (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                       ,(symbol->string symname)
+                                                       ,(symbol->string type)))))
+
 ;; THIS IS A HELPER FUNCTION
 ;;
 ;; returns a (bind-lib-xtm) form for the named function
@@ -11000,7 +11597,7 @@ e.g.
                 (sys:pop-memzone))
               (begin
                 (error)
-              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))))
+                (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))))
 
 (define impc:ti:create-scm-wrapper?
   (lambda (func-name)
@@ -11145,7 +11742,7 @@ e.g.
                                                        ""
                                                        code))
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (impc:ti:run pfunc code *impc:default-zone-size* #f (cons pfunc (string->symbol t)))
+                     (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol t)))
                      (impc:ti:register-new-polyfunc sym
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)
@@ -11235,7 +11832,7 @@ e.g.
                                                        ""
                                                        code))
                      (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (impc:ti:run pfunc code *impc:default-zone-size* #f (cons pfunc (string->symbol t)))
+                     (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol t)))
                      (impc:ti:register-new-polyfunc sym
                                                     (symbol->string pfunc)
                                                     (impc:ir:get-type-from-pretty-str t)

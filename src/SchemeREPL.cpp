@@ -88,7 +88,7 @@ void SchemeREPL::writeString(std::string&& String)
     while (true) {
         int lth = (length > 1024) ? 1024 : length;
 #ifdef EXT_BOOST
-        int chars_written = m_serverSocket->write_some(boost::asio::buffer(b, lth));
+        int chars_written = m_serverSocket->write_some(std::experimental::net::buffer(b, lth));
 #else
         int chars_written = write(m_serverSocket, b, lth);
 #endif
@@ -122,15 +122,14 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     /* Address resolution stage */
 
 #ifdef EXT_BOOST
-    boost::asio::ip::tcp::resolver::iterator end;
-    boost::asio::io_service service;
-    boost::asio::ip::tcp::resolver resolver(service);
+    std::experimental::net::io_context context;
+    std::experimental::net::ip::tcp::resolver resolver(context);
     std::stringstream ss;
     ss << port;
-    boost::asio::ip::tcp::resolver::query newQuery(boost::asio::ip::tcp::v4(),hostname, ss.str());
-    boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(newQuery);
-
-    boost::asio::ip::tcp::endpoint ep = *iter;
+	std::experimental::net::ip::tcp::resolver::results_type res = resolver.resolve(std::experimental::net::ip::tcp::v4(), hostname, ss.str());
+	auto iter = res.begin();
+	auto end = res.end();
+    std::experimental::net::ip::tcp::endpoint ep = *iter;
     //std::cout << "resolved: " << ep << std::endl << std::flush;
     if(iter == end) {
 #else
@@ -150,10 +149,10 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 #endif
 
 #ifdef EXT_BOOST
-    m_serverIoService = new boost::asio::io_service;
+    m_serverIoService = new std::experimental::net::io_context;
     try {
-        m_serverSocket = new boost::asio::ip::tcp::socket(*m_serverIoService);
-        m_serverSocket->open(boost::asio::ip::tcp::v4());
+        m_serverSocket = new std::experimental::net::ip::tcp::socket(*m_serverIoService);
+        m_serverSocket->open(std::experimental::net::ip::tcp::v4());
         m_serverSocket->connect(ep);
     } catch(std::exception& e){
         ascii_error();
@@ -161,7 +160,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         ascii_default();
         return false;
     }
-    rc = m_serverSocket->read_some(boost::asio::buffer(m_buf, sizeof(m_buf)));
+    rc = m_serverSocket->read_some(std::experimental::net::buffer(m_buf, sizeof(m_buf)));
 #else
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;

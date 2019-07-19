@@ -9,7 +9,7 @@
 ;;
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/bullet.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/bullet.xtm" 'quiet))
 (sys:load-preload-check 'bullet)
 
 (impc:aot:suppress-aot-do
@@ -17,6 +17,8 @@
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 ;;; Code:
+
+(impc:aot:insert-header "xtmbullet")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib bulletlib
@@ -31,9 +33,9 @@
                 (print ": unknown platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
-(impc:aot:insert-header "xtmbullet")
+(impc:aot:import-ll "xtmbullet")
 
-(define *xtmlib-bullet-loaded* #f)
+(define *xtmlib-bullet-loaded* #t)
 
 (define _extended_bullet #t)
 

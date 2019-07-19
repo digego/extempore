@@ -1,7 +1,7 @@
 ;; lib-loading config
-(sys:load "libs/aot-cache/glext.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glext.xtm" 'quiet))
 (sys:load-preload-check 'glext)
-(define *xtmlib-glext-loaded* #f)
+(define *xtmlib-glext-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -16,7 +16,10 @@
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")
         ((string=? (sys:platform) "Windows")
-         "glext.dll")))
+         "glext.dll"))
+  "xtmglext")
+
+(impc:aot:import-ll "xtmglext")
 
 
 (bind-lib libglext glActiveTexture [void,i32]*)

@@ -22,10 +22,10 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/glcore-directbind.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcore-directbind.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-glcore-directbind-loaded* #f)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-glcore-directbind-loaded* #t)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -40,6 +40,8 @@
          "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
+
+(impc:aot:import-ll "xtmglcore-directbind")
 
 ;; this version doesn't really do anything, bit in the getprocaddress
 ;; OpenGL code path it's important, so having it here allows us to

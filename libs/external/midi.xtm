@@ -32,9 +32,9 @@
 ;; midi_cc
 ;; midi_msg
 
-(sys:load "libs/aot-cache/midi.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/midi.xtm" 'quiet))
 (sys:load-preload-check 'midi)
-(define *xtmlib-midi-loaded* #f)
+(define *xtmlib-midi-loaded* #t)
 
 (impc:aot:suppress-aot-do (sys:load "libs/core/scheduler.xtm"))
 (impc:aot:suppress-aot-do (sys:load "libs/external/portmidi.xtm"))
@@ -43,12 +43,13 @@
 (impc:aot:insert-forms (sys:load "libs/external/portmidi.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmmidi")
+(impc:aot:import-ll "xtmmidi")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
 ;; midi event queue
 
-(bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double>)
+(bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double> (printer? . #f))
 (bind-func get_midi_evt_type (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) -1 (tref obj 0))))
 (bind-func get_midi_evt_a (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 1))))
 (bind-func get_midi_evt_b (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0 (tref obj 2))))
@@ -57,28 +58,27 @@
 (bind-func get_midi_evt_clocktime (lambda (obj:XTM_MIDI_EVT*) (if (null? obj) 0.0 (tref obj 5))))
 
 ;; overload print
-(impc:aot:do-or-emit
-  (bind-func print:[void,XTM_MIDI_EVT*]*
-    (lambda (obj)
-      (if (null? obj)
-          (printout "<NULL_MIDI_MSG>")
-          (cond ((= (get_midi_evt_type obj) MIDI_NOTE_ON)
-                (printout "<NOTE-ON  pitch: " (get_midi_evt_a obj)
-                          " volume:" (get_midi_evt_b obj)
-                          " chan:" (get_midi_evt_channel obj)
-                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
-                ((= (get_midi_evt_type obj) MIDI_NOTE_OFF)
-                (printout "<NOTE-OFF  pitch:" (get_midi_evt_a obj)
-                          " volume:" (get_midi_evt_b obj)
-                          " chan:" (get_midi_evt_channel obj)
-                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
-                ((= (get_midi_evt_type obj) MIDI_CONTROL_CHANGE)
-                (printout "<MIDI-CC byte1:" (get_midi_evt_a obj)
-                          " byte2:" (get_midi_evt_b obj)
-                          " chan:" (get_midi_evt_channel obj)
-                          " timestamp:" (get_midi_evt_timestamp obj) ">"))
-                (else (printout "<UNKNOWN_MIDI_MSG>")))) ;; shouldn't get here
-      void)))
+(bind-func print:[void,XTM_MIDI_EVT*]*
+  (lambda (obj)
+    (if (null? obj)
+        (printout "<NULL_MIDI_MSG>")
+        (cond ((= (get_midi_evt_type obj) MIDI_NOTE_ON)
+              (printout "<NOTE-ON  pitch: " (get_midi_evt_a obj)
+                        " volume:" (get_midi_evt_b obj)
+                        " chan:" (get_midi_evt_channel obj)
+                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+              ((= (get_midi_evt_type obj) MIDI_NOTE_OFF)
+              (printout "<NOTE-OFF  pitch:" (get_midi_evt_a obj)
+                        " volume:" (get_midi_evt_b obj)
+                        " chan:" (get_midi_evt_channel obj)
+                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+              ((= (get_midi_evt_type obj) MIDI_CONTROL_CHANGE)
+              (printout "<MIDI-CC byte1:" (get_midi_evt_a obj)
+                        " byte2:" (get_midi_evt_b obj)
+                        " chan:" (get_midi_evt_channel obj)
+                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+              (else (printout "<UNKNOWN_MIDI_MSG>")))) ;; shouldn't get here
+    void))
 
 (bind-val XTM_MIDI_EVENT_QUEUE_SIZE i64 1000)
 (bind-val XTM_MIDI_EVENT_QUEUE |1000,XTM_MIDI_EVT|)
@@ -254,78 +254,70 @@
 
 ;; first off create a native 'clock' scheduler
 ;; update rate of 400hz
-(impc:aot:do-or-emit
-  (bind-val midi_clock_sched [void]*)) ;;(clock_scheduler 400.0))
+(bind-val midi_clock_sched [void]*) ;;(clock_scheduler 400.0))
 
 ;; poll for midi messages at 400hz
-(impc:aot:do-or-emit
-  (bind-func midi_input_polling
-    (lambda (time:double)
-      (midi_read_msg)
-      (sched midi_clock_sched (+ time 0.0025) midi_input_polling:[void,double]*))))
+(bind-func midi_input_polling
+  (lambda (time:double)
+    (midi_read_msg)
+    (sched midi_clock_sched (+ time 0.0025) midi_input_polling:[void,double]*)))
 
-(impc:aot:do-or-emit
-  ($$ (let ((sched (clock_scheduler 400.0)))
-        (set! midi_clock_sched sched)
-        1:i64)))
+($$ (let ((sched (clock_scheduler 400.0)))
+      (set! midi_clock_sched sched)
+      1:i64))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 
 ;; Scheme listener code
 ;;
 
-(impc:aot:do-or-emit
-  (define *run-scheme-midi-listener* #t))
+(define *run-scheme-midi-listener* #t)
 
 ;; should be redefined to 'do' something
-(impc:aot:do-or-emit
-  (define midi-note-on
-    (lambda (timestamp pitch volume chan)
-      (println "note-on:" pitch volume chan "timestamp:" timestamp))))
+(define midi-note-on
+  (lambda (timestamp pitch volume chan)
+    (println "note-on:" pitch volume chan "timestamp:" timestamp)))
 
 ;; should be redefined to 'do' something
-(impc:aot:do-or-emit
-  (define midi-note-off
-    (lambda (timestamp pitch volume chan)
-      (println "note-off:" pitch volume chan "timestamp:" timestamp))))
+(define midi-note-off
+  (lambda (timestamp pitch volume chan)
+    (println "note-off:" pitch volume chan "timestamp:" timestamp)))
 
 ;; should be redefined to 'do' something
-(impc:aot:do-or-emit
-  (define midi-cc
-    (lambda (timestamp controller value chan)
-      (println "midi-cc:" controller value chan "timestamp:" timestamp))))
+(define midi-cc
+  (lambda (timestamp controller value chan)
+    (println "midi-cc:" controller value chan "timestamp:" timestamp)))
 
 ;; scheme midi event listener
-(impc:aot:do-or-emit
-  (define scheme-midi-listener
-    (lambda (beat dur)
-      (dotimes (i (available_midi_events))
-        (let* ((evt (dequeue_midi_event))
-              (type (get_midi_evt_type evt))
-              (a (get_midi_evt_a evt))
-              (b (get_midi_evt_b evt))
-              (chan (get_midi_evt_channel evt))
-              (timestamp (get_midi_evt_timestamp evt)))
-          (cond ((= type #x90)
-                (midi-note-on timestamp a b chan))
-                ((= type #x80)
-                (midi-note-off timestamp a b chan))
-                ((= type #xB0)
-                (midi-cc timestamp a b chan)) 
-                (else #f))))
-      (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur))))
+(define scheme-midi-listener
+  (lambda (beat dur)
+    (dotimes (i (available_midi_events))
+      (let* ((evt (dequeue_midi_event))
+            (type (get_midi_evt_type evt))
+            (a (get_midi_evt_a evt))
+            (b (get_midi_evt_b evt))
+            (chan (get_midi_evt_channel evt))
+            (timestamp (get_midi_evt_timestamp evt)))
+        (cond ((= type #x90)
+              (midi-note-on timestamp a b chan))
+              ((= type #x80)
+              (midi-note-off timestamp a b chan))
+              ((= type #xB0)
+              (midi-cc timestamp a b chan)) 
+              (else #f))))
+    (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur)))
 
+(bind-func start_midi_scheduler
+  (lambda ()     
+    (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 ;; startup
-
 (impc:aot:do-or-emit
-  (begin
-    (pm_initialize)
-    (pm_print_devices)))
+  (begin (pm_initialize)
+         (pm_print_devices)))
 
-(impc:aot:do-or-emit
-  (xtmX (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
-
+; (impc:aot:do-or-emit
+;   ($ (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 (define *xtmlib-midi-loaded* #t)
 

@@ -16,16 +16,19 @@
 (sys:load "libs/core/looper.xtm")
 (sys:load "libs/core/pc_ivl.xtm")
 
-
 ;;
 ;; setup MIDI
 ;; 
 
-(println 'MIDIIN (sys:cmdarg "midiin") 'MIDIOUT (sys:cmdarg "midiout"))
+;; start midi 'xtlang' scheduler
+;; (start_midi_scheduler)
+
 (set_midi_in (pm_input_device_with_name (sys:cmdarg "midiin")))
 (define *min* (get_midi_in))
 (set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
 (define *mout* (get_midi_out))
+(println 'MIDIIN (sys:cmdarg "midiin") 'is *min*)
+(println 'MIDIOUT (sys:cmdarg "midiout") 'is *mout*)
 
 (bind-val MCC_ARR |127,float|)
 
@@ -48,7 +51,8 @@
     ;; (println "MIDI_CC :" controller value chan "timestamp:" timestamp)
     void))
 
-
+;; start up midi 'xtlang' scheduler
+(start_midi_scheduler)
 
 ;;
 ;; short forms and helper functions
