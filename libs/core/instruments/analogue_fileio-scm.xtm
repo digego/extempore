@@ -232,17 +232,29 @@
       (set! dict (cons (cons 'lfo4_ad_decay_slope (get_lfo_ad_decay_slope inst 3)) dict)) ;; decay slope
 
       ;; set amp frq
-      (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo1_amp (get_lfo_amp inst 0)) dict))
+      (set! dict (cons (cons 'lfo1_frq (get_lfo_frq inst 0)) dict))
 
-      (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo2_amp (get_lfo_amp inst 1)) dict))
+      (set! dict (cons (cons 'lfo2_frq (get_lfo_frq inst 1)) dict))
+      
+      (set! dict (cons (cons 'lfo3_amp (get_lfo_amp inst 2)) dict))
+      (set! dict (cons (cons 'lfo3_frq (get_lfo_frq inst 2)) dict))
+      
+      (set! dict (cons (cons 'lfo4_amp (get_lfo_amp inst 3)) dict))
+      (set! dict (cons (cons 'lfo4_frq (get_lfo_frq inst 3)) dict))
 
-      (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+      ; (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
 
-      (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
-      (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
+      ; (set! dict (cons (cons 'lfo2_attack (get_lfo_attack inst 1)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo2_decay (get_lfo_decay inst 1)) dict)) ;; decay
+
+      ; (set! dict (cons (cons 'lfo3_attack (get_lfo_attack inst 2)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo3_decay (get_lfo_decay inst 2)) dict)) ;; decay
+
+      ; (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
+      ; (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
       
       ;; set LFO type
       (set! dict (cons (cons 'lfo1_type (get_lfo_type inst PARAM_LFO1)) dict))
@@ -298,13 +310,13 @@
                       (if (regex:match? tag "_ad_")
                           (let* ((res (regex:matched tag "^lfo([0-9])_ad_(.*)$"))
                                  (name (string->symbol (string-append "set_lfo_ad_" (caddr res))))
-                                 (num (string->number (cadr res)))
+                                 (num (- (string->number (cadr res)) 1))
                                  (expr `(,name inst ,num ,(cdr x))))
                             ;; (println 'calling expr)
                             (eval expr))
                           (let* ((res (regex:matched tag "^lfo([0-9])_(.*)$"))
                                  (name (string->symbol (string-append "set_lfo_" (caddr res))))
-                                 (num (string->number (cadr res)))
+                                 (num (- (string->number (cadr res)) 1))
                                  (expr `(,name inst ,num ,(cdr x))))
                             ;; (println expr)
                             (eval expr))))

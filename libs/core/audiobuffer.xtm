@@ -297,10 +297,14 @@
 (bind-func static AudioBuffer_ptr
   "returns a pointer into the buffer"
   (lambda (ab:AudioBuffer* frame chan)
-    (pref-ptr (AudioBuffer_data ab)
-              (+ (* frame (AudioBuffer_channels ab)) chan))))
+    (if (< frame 0) (set! frame (llabs frame)))
+    (if (< frame (AudioBuffer_frames ab))
+        (pref-ptr (AudioBuffer_data ab)
+          (+ (* frame (AudioBuffer_channels ab)) chan))
+        (pref-ptr (AudioBuffer_data ab)
+          (+ (* (% frame (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
 
-
+;; no pulsewidth, faster but no segments or mixing
 (bind-func AudioBuffer_read_interp
   (lambda (buffer:AudioBuffer* freq:SAMPLE chan:i64)
     (let ((channels:i64 (AudioBuffer_channels buffer))
@@ -341,14 +345,14 @@
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
-;; where multi is between 0.0-1.0 
+
+;; where pw is between 0.0 - 1.0 
 ;; and chooses between 'segments' of the audio file
 ;; where a segment is 1 * looplgth samples long
 ;; the number of segments is then frames / looplgth
-;; multi changes beteen segments by moving the 
-;; loopstart point forward or backward by looplgths
-(bind-func AudioBuffer_read_interp_multi
-  (lambda (buffer:AudioBuffer* freq:SAMPLE chan:i64 multi:float)
+(bind-func AudioBuffer_read_interp_pw
+  (lambda (buffer:AudioBuffer* freq:SAMPLE chan:i64 pw:float)
+    (set! pw (* pw 0.9999999))
     (let ((channels:i64 (AudioBuffer_channels buffer))
           (frames (AudioBuffer_frames buffer))
           (looplgth (AudioBuffer_loop_frames buffer))
@@ -364,23 +368,26 @@
                             0
                             (- frames loopstart))))
           (lgthf:double (convert lgth))
-          (dat (begin
-                 (if (< pos 1.0) (AudioBuffer_set_loop_start buffer (* looplgth (convert (floor (* multi 0.999 (convert segments)))))))
-                 (AudioBuffer_ptr buffer (clamp loopstart 0 (- frames looplgth)) chan)))
-          (y1 0.0)
+          (offset (* (convert (floor (* pw (convert segments)))) looplgth))
+          (mix (% (* pw (convert segments)) 1.0))
+          (dat1 (AudioBuffer_ptr buffer offset chan))
+          (dat2 (AudioBuffer_ptr buffer (% (+ offset looplgth) frames) chan))
+          (dy1 0.0) (dx0 0.0) (dx1 0.0) (dx2 0.0)
+          (y1 0.0) (x0 0.0) (x1 0.0) (x2 0.0)
           (y1pos:i64 (* channels (convert (floor (% (- pos rate) lgthf)))))
-          (x0 0.0)
           (x0pos:i64 (* channels (convert (floor pos))))
-          (x1 0.0)
           (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
-          (x2 0.0)
           (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
       (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping) 
           (begin
-            (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (pref dat y1pos)))
-            (set! x0 (pref dat x0pos))
-            (set! x1 (pref dat x1pos))
-            (set! x2 (pref dat x2pos)) 
+            (set! dy1 (- (pref dat2 y1pos) (pref dat1 y1pos)))
+            (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (+ (pref dat1 y1pos) (* dy1 mix))))
+            (set! dx0 (- (pref dat2 x0pos) (pref dat1 x0pos)))
+            (set! x0 (+ (pref dat1 x0pos) (* dx0 mix)))
+            (set! dx1 (- (pref dat2 x1pos) (pref dat1 x1pos)))
+            (set! x1 (+ (pref dat1 x1pos) (* dx1 mix)))
+            (set! dx2 (- (pref dat2 x2pos) (pref dat1 x2pos)))
+            (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
             (if (= chan 0) ;; increment phase
                 (AudioBuffer_set_phase buffer 
                                       (if oneshot 
