@@ -2900,7 +2900,7 @@
        (begin ,@forms)))
 
 (define impc:aot:compile-exe
-  (lambda (module-name module libs)
+  (lambda (module-name module libs asdll?)
     (let* ((llc-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llc"))))
       (let* ((platform (sys:platform))
              (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
@@ -2910,7 +2910,7 @@
              (output-exe-path (string-append output-dir module-name
                                                (cond ((string=? platform "Linux") "")
                                                      ((string=? platform "OSX") "")
-                                                     ((string=? platform "Windows") ".exe"))))
+                                                     ((string=? platform "Windows") (if asdll? ".dll" ".exe")))))
              (link-libs (if (string=? platform "Windows")
                             *impc:aot:win-link-libraries-exe*
                             '()))
@@ -2947,6 +2947,7 @@
                                 " -o " output-exe-path)
                                (string-append
                                 "call link"
+                                (if asdll? " /DLL" "")
                                 ;; (sanitize-platform-path (sys:share-dir))
                                 ;; "\\extras\\ms_build_vars.bat && link"
                                 ;; " /FORCE:UNRESOLVED "
@@ -3186,7 +3187,8 @@
   (lambda (file-path)
     (let* ((start-time (clock:clock))
            (libs (if (sys:cmdarg "link") (sys:cmdarg "link") ""))
-           (file-no-extension (filename-strip-extension file-path))
+           (asdll? (if (sys:cmdarg "dll") #t #f))
+           (file-no-extension (filename-strip-extension (filename-from-path file-path)))
            (aot-compilation-file (string-append file-no-extension ".exe"))
            (in-file-port (open-input-file (sanitize-platform-path file-path))))
       (set! *impc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
@@ -3208,14 +3210,15 @@
             (println)
             (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) 
                                                                   (reverse *impc:ti:closure-cache*)))) ;; reverse - make sure we initialize function in correct order!
-            (llvm:compile-ir 
-              (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
-              all-closure-setters
-              ;; "call void @test22_adhoc_W2kzMl0_setter();\n"
-              ;; "call void @run_adhoc_W2kzMixpMzIsaTgqKl0_setter();\n"
-              "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
-              ret i32 %res;
-            }"))
+            (if (not asdll?) 
+              (llvm:compile-ir 
+                (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
+                all-closure-setters
+                ;; "call void @test22_adhoc_W2kzMl0_setter();\n"
+                ;; "call void @run_adhoc_W2kzMixpMzIsaTgqKl0_setter();\n"
+                "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
+                ret i32 %res;
+              }")))
             (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
             (println file-path)
             (println)
@@ -3230,7 +3233,7 @@
             (let ((module (impc:compiler:flush-jit-compilation-queue)))
               (if (not module)
                   (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                (impc:aot:compile-exe file-no-extension module libs))
+                (impc:aot:compile-exe file-no-extension module libs asdll?))
             (set! *impc:aot:current-output-port* #f) 
             ;; (close-port *impc:aot:current-output-port*)
             (quit 0))
