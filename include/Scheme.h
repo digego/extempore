@@ -169,38 +169,38 @@ pointer reverse(scheme *sc, pointer a);
 pointer reverse_in_place(scheme *sc, pointer term, pointer list);
 pointer append(scheme *sc, pointer a, pointer b);
 pointer assoc_strcmp(scheme *sc, pointer key, pointer alist, bool all = false);
-char *string_value(pointer p);
+EXPORT char *string_value(pointer p);
 EXPORT pointer list_ref(scheme* sc, int pos, pointer a);
 int eqv(pointer a, pointer b);
-pointer mk_vector(scheme *sc, int len);
-void fill_vector(scheme* sc, pointer vec, pointer obj);
+EXPORT pointer mk_vector(scheme *sc, int len);
+EXPORT void fill_vector(scheme* sc, pointer vec, pointer obj);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer a);
 int scheme_init(scheme* sc);
 
 typedef pointer (*foreign_func)(scheme *, pointer);
 
 pointer _cons(scheme *sc, pointer a, pointer b, int immutable);
-pointer mk_integer(scheme *sc, long long num);
-pointer mk_i64(scheme *sc, long long num);
-pointer mk_i32(scheme *sc, int num);
-pointer mk_i16(scheme *sc, short num);
-pointer mk_i8(scheme *sc, char num);
-pointer mk_i1(scheme *sc, bool num);
-pointer mk_real(scheme *sc, double num);
-pointer mk_double(scheme *sc, double num);
-pointer mk_float(scheme *sc, float num);
+EXPORT pointer mk_integer(scheme *sc, long long num);
+EXPORT pointer mk_i64(scheme *sc, long long num);
+EXPORT pointer mk_i32(scheme *sc, int num);
+EXPORT pointer mk_i16(scheme *sc, short num);
+EXPORT pointer mk_i8(scheme *sc, char num);
+EXPORT pointer mk_i1(scheme *sc, bool num);
+EXPORT pointer mk_real(scheme *sc, double num);
+EXPORT pointer mk_double(scheme *sc, double num);
+EXPORT pointer mk_float(scheme *sc, float num);
 
-pointer mk_rational(scheme *sc, long long n, long long d);
-pointer mk_symbol(scheme *sc, const char *name);
-pointer gensym(scheme *sc);
+EXPORT pointer mk_rational(scheme *sc, long long n, long long d);
+EXPORT pointer mk_symbol(scheme *sc, const char *name);
+EXPORT pointer gensym(scheme *sc);
 //pointer rungc(scheme* sc, pointer a, pointer b);
-pointer mk_string(scheme *sc, const char *str);
-pointer mk_counted_string(scheme *sc, const char *str, int len);
-pointer mk_character(scheme *sc, int c);
-pointer mk_foreign_func(scheme *sc, foreign_func f);
-pointer mk_cptr(scheme* sc, void* p);
+EXPORT pointer mk_string(scheme *sc, const char *str);
+EXPORT pointer mk_counted_string(scheme *sc, const char *str, int len);
+EXPORT pointer mk_character(scheme *sc, int c);
+EXPORT pointer mk_foreign_func(scheme *sc, foreign_func f);
+EXPORT pointer mk_cptr(scheme* sc, void* p);
 void putstr(scheme *sc, const char *s);
-int pointer_type(pointer);
+EXPORT int pointer_type(pointer);
 void treadmill_print(scheme* sc, char* title);
 
 void scheme_define(scheme *sc, pointer env, pointer symbol, pointer value);
@@ -208,46 +208,46 @@ pointer cons(scheme *sc, pointer a, pointer b);
 pointer immutable_cons(scheme *sc, pointer a, pointer b);
 void putcharacter(scheme *sc, int c);
 
-char* string_value(pointer p);
-int is_number(pointer p);
-double r64value(pointer p);
-float r32value(pointer p);
-int is_rational(pointer p);
-int is_character(pointer p);
-long long charvalue(pointer p);
-int is_vector(pointer p);
+EXPORT char* string_value(pointer p);
+EXPORT int is_number(pointer p);
+EXPORT double r64value(pointer p);
+EXPORT float r32value(pointer p);
+EXPORT int is_rational(pointer p);
+EXPORT int is_character(pointer p);
+EXPORT long long charvalue(pointer p);
+EXPORT int is_vector(pointer p);
 long long vector_length(pointer vec);
 void fill_vector(scheme* sc, pointer vec, pointer elem);
 pointer vector_elem(pointer vec, int ielem);
 pointer set_vector_elem(scheme* sc, pointer vec, int ielem, pointer newel);
-int is_port(pointer p);
+EXPORT int is_port(pointer p);
 
 pointer pair_car(pointer p);
 pointer pair_cdr(pointer p);
 pointer set_car(scheme* sc, pointer p, pointer q);
 pointer set_cdr(scheme* sc, pointer p, pointer q);
 
-int is_symbol(pointer Ptr);
-char* symname(pointer p);
+EXPORT int is_symbol(pointer Ptr);
+EXPORT char* symname(pointer p);
 
-int is_syntax(pointer p);
-int is_proc(pointer p);
-int is_foreign(pointer p);
+EXPORT int is_syntax(pointer p);
+EXPORT int is_proc(pointer p);
+EXPORT int is_foreign(pointer p);
 EXPORT void* cptr_value(pointer p);
-char* syntaxname(pointer p);
-int is_closure(pointer p);
-int is_macro(pointer p);
+EXPORT char* syntaxname(pointer p);
+EXPORT int is_closure(pointer p);
+EXPORT int is_macro(pointer p);
 pointer closure_code(pointer p);
 pointer closure_env(pointer p);
 
-int is_continuation(pointer p);
-int is_promise(pointer p);
-int is_environment(pointer p);
+EXPORT int is_continuation(pointer p);
+EXPORT int is_promise(pointer p);
+EXPORT int is_environment(pointer p);
 int is_immutable(pointer p);
 void setimmutable(pointer p);
 
 void load_file(scheme *sc, FILE *fin);
-void load_string(scheme *sc, const char *input);
+EXPORT void load_string(scheme *sc, const char *input);
 
 enum scheme_types {
     T_STRING = 1,
@@ -386,26 +386,26 @@ inline pointer set_vector_elem(scheme* Scheme, pointer Vector, int Index, pointe
 
 inline auto typeflag(pointer Ptr) -> decltype(cell::_flag)& { return Ptr->_flag; }
 inline auto type(pointer Ptr) -> decltype(cell::_flag) { return typeflag(Ptr) & T_MASKTYPE; }
-inline int pointer_type(pointer Ptr) { return type(Ptr); }
-inline int is_string(pointer Ptr) { return type(Ptr) == T_STRING; }
-inline int is_character(pointer Ptr) { return type(Ptr) == T_CHARACTER; }
-inline int is_vector(pointer Ptr) { return type(Ptr) == T_VECTOR; }
-inline int is_number(pointer Ptr) { return type(Ptr) == T_NUMBER; }
-inline int is_symbol(pointer Ptr) { return type(Ptr) == T_SYMBOL; }
-inline int is_port(pointer Ptr) { return type(Ptr) == T_PORT; }
-inline int is_pair(pointer Ptr) { return type(Ptr) == T_PAIR; }
-inline int is_environment(pointer Ptr) { return type(Ptr) == T_ENVIRONMENT; }
-inline int is_proc(pointer Ptr) { return type(Ptr) == T_PROC; }
-inline int is_foreign(pointer Ptr) { return type(Ptr) == T_FOREIGN; }
-inline int is_cptr(pointer Ptr) { return type(Ptr) == T_CPTR; }
-inline int is_cptr_or_str(pointer Ptr) { return is_cptr(Ptr) || is_string(Ptr); }
-inline int is_syntax(pointer Ptr) { return typeflag(Ptr) & T_SYNTAX; }
+EXPORT inline int pointer_type(pointer Ptr) { return type(Ptr); }
+EXPORT inline int is_string(pointer Ptr) { return type(Ptr) == T_STRING; }
+EXPORT inline int is_character(pointer Ptr) { return type(Ptr) == T_CHARACTER; }
+EXPORT inline int is_vector(pointer Ptr) { return type(Ptr) == T_VECTOR; }
+EXPORT inline int is_number(pointer Ptr) { return type(Ptr) == T_NUMBER; }
+EXPORT inline int is_symbol(pointer Ptr) { return type(Ptr) == T_SYMBOL; }
+EXPORT inline int is_port(pointer Ptr) { return type(Ptr) == T_PORT; }
+EXPORT inline int is_pair(pointer Ptr) { return type(Ptr) == T_PAIR; }
+EXPORT inline int is_environment(pointer Ptr) { return type(Ptr) == T_ENVIRONMENT; }
+EXPORT inline int is_proc(pointer Ptr) { return type(Ptr) == T_PROC; }
+EXPORT inline int is_foreign(pointer Ptr) { return type(Ptr) == T_FOREIGN; }
+EXPORT inline int is_cptr(pointer Ptr) { return type(Ptr) == T_CPTR; }
+EXPORT inline int is_cptr_or_str(pointer Ptr) { return is_cptr(Ptr) || is_string(Ptr); }
+EXPORT inline int is_syntax(pointer Ptr) { return typeflag(Ptr) & T_SYNTAX; }
 
-extern inline int is_integer(pointer Ptr) { return Ptr->_object._number.num_type == T_INTEGER; }
-extern inline int is_real(pointer Ptr) { return is_number(Ptr); }
-extern inline int is_rational(pointer Ptr) { return Ptr->_object._number.num_type == T_RATIONAL; }
-extern inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
-extern inline auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
+EXPORT inline int is_integer(pointer Ptr) { return Ptr->_object._number.num_type == T_INTEGER; }
+EXPORT inline int is_real(pointer Ptr) { return is_number(Ptr); }
+EXPORT inline int is_rational(pointer Ptr) { return Ptr->_object._number.num_type == T_RATIONAL; }
+EXPORT inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
+EXPORT inline auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
 
 class ScmRuntimeError {
 public:

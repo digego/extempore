@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.1) # we use target_sources()
 option(BOOST "use boost library" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
+option(DYLIB "build extempore as a dynamic library" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
@@ -14,6 +15,14 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 ####################
 # option wrangling #
 ####################
+
+if(DYLIB) 
+  set(EXTERNAL_SHLIBS_AUDIO OFF)
+  set(EXTERNAL_SHLIBS_GRAPHICS OFF)
+  set(EXTERNAL_SHLIBS OFF)
+  message(STATUS "Building Extempore as a dynamic library")
+  message(STATUS "Building without external dependencies")
+endif()
 
 # share directory
 
@@ -416,19 +425,35 @@ endforeach()
 
 # source files
 
-add_executable(extempore src/Extempore.cpp
-  src/AudioDevice.cpp
-  src/EXTLLVM.cpp
-  src/EXTThread.cpp
-  src/Extempore.cpp
-  src/OSC.cpp
-  src/Scheme.cpp
-  src/SchemeFFI.cpp
-  src/SchemeProcess.cpp
-  src/SchemeREPL.cpp
-  src/TaskScheduler.cpp
-  src/UNIV.cpp
+if (DYLIB)
+  add_library(extempore SHARED src/Extempore.cpp
+    src/AudioDevice.cpp
+    src/EXTLLVM.cpp
+    src/EXTThread.cpp
+    src/Extempore.cpp
+    src/OSC.cpp
+    src/Scheme.cpp
+    src/SchemeFFI.cpp
+    src/SchemeProcess.cpp
+    src/SchemeREPL.cpp
+    src/TaskScheduler.cpp
+    src/UNIV.cpp
   )
+else()
+  add_executable(extempore src/Extempore.cpp
+    src/AudioDevice.cpp
+    src/EXTLLVM.cpp
+    src/EXTThread.cpp
+    src/Extempore.cpp
+    src/OSC.cpp
+    src/Scheme.cpp
+    src/SchemeFFI.cpp
+    src/SchemeProcess.cpp
+    src/SchemeREPL.cpp
+    src/TaskScheduler.cpp
+    src/UNIV.cpp
+    )
+endif()
 
 if(MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_SOURCE_DIR}/src/extempore.def")

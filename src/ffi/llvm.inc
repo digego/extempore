@@ -213,8 +213,10 @@ static pointer erase_function(scheme* Scheme, pointer Args)
     if (!func) {
         return Scheme->F;
     }
-    func->deleteBody();
-    func->eraseFromParent();
+    func->dropAllReferences();
+    func->removeFromParent();
+    //func->deleteBody();
+    //func->eraseFromParent();
     return Scheme->T;
 }
 
@@ -405,6 +407,17 @@ static pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
                 printf("\n---------------------------------------------------\n%s", ss.str().c_str());
             }
         }
+    }
+    return Scheme->T;
+}
+
+static pointer llvm_print_all_modules(scheme* Scheme, pointer Args) // TODO
+{
+    for (auto module : EXTLLVM::getModules()) {
+        std::string str;
+        llvm::raw_string_ostream ss(str);
+        ss << *module;
+        printf("\n---------------------------------------------------\n%s", ss.str().c_str());
     }
     return Scheme->T;
 }
@@ -613,7 +626,7 @@ static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
         { "llvm:count-set", &llvm_count_set }, \
         { "llvm:count++", &llvm_count_inc }, \
         { "llvm:call-closure", &callClosure }, \
-        { "llvm:print", &printLLVMModule }, \
+        { "llvm:print", &llvm_print_all_modules }, \
         { "llvm:print-function", &printLLVMFunction }, \
         { "llvm:print-all-closures", &llvm_print_all_closures }, \
         { "llvm:print-closure", &llvm_print_closure }, \

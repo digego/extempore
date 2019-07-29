@@ -761,6 +761,11 @@
 ;; language builtins
 ;; -----------------
 ;;
+
+;; need to fill this out! :(
+(define *impc:reserved-keywords* 
+  '("cat" "if" "list" "define" "letz" "memzone" "beginz" "let" "zone_cleanup" ">=" "<=" "and" "quote" "list" "strln" "strj" "sprintln" "println" "printout" "afill!" "pfill!" "tfill!" "or" "free" "not" "cond" "cset!" "cref" "refcheck" "doloop" "dotimes" "while" "now" "aref" "&" "bor" "&" "<<" ">>" "~" "else" "null" "pset!" "pref" "pref-ptr" "vset!" "vref" "tref" "tref-ptr" "alloc" "salloc" "halloc" "zalloc" "randomf" "void" "#t" "#f")) ;; etc..
+
 (define *impc:ti:builtin-cache* '(;; math operators
                                   ("+" . #("[!v,!v,!v...]*" "addition operator: overload xtm_addition to add support for new types" (arg1 arg2...)))
                                   ("-" . #("[!v,!v,!v...]*" "subtraction operator: overload xtm_subtraction to add support for new types" (arg1 arg2...)))
@@ -3204,13 +3209,28 @@
             ;; turn off aot-cache loading
             (set! *impc:compiler:with-cache* #f)
             (print-with-colors 'cyan 'black #t (print "Started compiling: "))
-            (println file-path)
+            (if asdll? ;; need to preregister init function
+                (impc:ti:register-new-nativefunc 
+                     (string-append file-no-extension "_init") 
+                     (impc:ir:get-type-from-pretty-str "[void]*") "" '()))
             (println)
             (sys:load file-path)
             (println)
-            (define all-closure-setters (apply string-append (map (lambda (x) (string-append "call void @" (car x) "_setter();\n")) 
-                                                                  (reverse *impc:ti:closure-cache*)))) ;; reverse - make sure we initialize function in correct order!
-            (if (not asdll?) 
+            ;; static functions don't get a _setter()
+            (define remove-all-static-functions
+              (lambda (lst)
+                (filter (lambda (x) (impc:ir:type? (vector-ref (cdr x) 0))) lst)))
+            (define all-closure-setters 
+              (apply string-append 
+                     (map (lambda (x) 
+                            (string-append "call void @" (car x) "_setter();\n"))
+                          (reverse (remove-all-static-functions *impc:ti:closure-cache*))))) ;; reverse - make sure we initialize function in correct order!
+            (if asdll?
+              (llvm:compile-ir
+                (string-append "define dllexport void @" file-no-extension "_init() {\n"
+                all-closure-setters
+                "ret void;
+              }"))
               (llvm:compile-ir 
                 (string-append "define i32 @main(i32 %args, i8** %argv) {\n"
                 all-closure-setters
@@ -10122,7 +10142,8 @@ xtlang's `let' syntax is the same as Scheme"
                               (write `(mk-ff ,(symbol->string symname) (llvm:get-function-pointer ,(string-append (symbol->string symname) "_scheme"))) *impc:aot:current-output-port*)
                               (newline *impc:aot:current-output-port*))))
                 (begin
-                  (if (string? scheme_ir) 
+                  (if (and (string? scheme_ir) 
+                           (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme")))
                       (mk-ff (symbol->string symname) (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme"))))))
             ;; (impc:aot:insert-nativefunc-binding-details library symname type docstring)))
             (impc:compiler:print-bind-func-details-to-log
@@ -10565,6 +10586,8 @@ xtlang's `let' syntax is the same as Scheme"
             ;; closure body is always in last position, preceeded by zone
             ;; size and/or docstring
             (closure-body (car (reverse args))))
+        (if (member func-name *impc:reserved-keywords*)
+            (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
         ;; strip docstring
         (set! args (cl:remove-if string? args))
         ;; strip poly
@@ -10659,6 +10682,8 @@ xtlang's `let' syntax is the same as Scheme"
             ;; closure body is always in last position, preceeded by zone
             ;; size and/or docstring
             (closure-body (car (reverse args))))
+        (if (member func-name *impc:reserved-keywords*)
+          (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
         ;; strip docstring
         (set! args (cl:remove-if string? args))
         ;; strip poly
