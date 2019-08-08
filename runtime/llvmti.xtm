@@ -5639,6 +5639,7 @@ Continue executing `body' forms until `test-expression' returns #f"
             (equal? t #f)
             (and (list? t)
                  (equal? sym (car t)))
+            (impc:ti:nativefunc-exists? (symbol->string sym)) ;; native funcs already have a type
             (equal? sym t))
         'exit
         (begin ;; (println 'update-var:> sym 'in: vars 'with: t 'kts: kts)
@@ -5917,6 +5918,8 @@ Continue executing `body' forms until `test-expression' returns #f"
              (list (impc:ti:type-unify (cdr (assoc-strcmp ast vars)) vars))))
           ((impc:ti:globalvar-exists? (symbol->string ast))
            (list (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string ast)))))
+          ((impc:ti:nativefunc-exists? (symbol->string ast))
+           (list (impc:ti:get-nativefunc-type (symbol->string ast))))
           (else
            (if (and (symbol? ast)
                     (impc:ti:genericfunc-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))

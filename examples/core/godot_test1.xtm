@@ -1,0 +1,162 @@
+;; 
+;; compile a trivial native dynamic library
+;;
+;; a godot native script plugin
+;;
+;; ./extempore.exe --compile=./examples/core/godot_test1.xtm -dll
+;; 
+
+(sys:load "libs/contrib/libgodot.xtm")
+
+;; open this dll
+(bind-func static godot_gdnative_init
+  (lambda (options:godot_gdnative_init_options*)
+    (printf "XTL godot_gdnative_init\n")
+    ;; this is the xtlang init (not a godot init just to be confusing)
+    ;; it's name 'godot_test1'_init is based off the xtm file name
+    (godot_test1_init) 
+    (printf "GDNATIVE_EXT_NATIVESCRIPT = %d\n" GDNATIVE_EXT_NATIVESCRIPT)
+    (let ((api (tref options 7))
+          (extensions:godot_gdnative_api_struct** (tref api 4))
+          (num (tref api 3))
+          (i 0:i32))
+      (set! gdnative_api api)
+      (printf "The gdnative_api is set to [%p]\n" gdnative_api)
+      (dotimes (i num)
+        (if (= (tref (pref extensions i) 0) GDNATIVE_EXT_NATIVESCRIPT)
+            (set! nativescript_api (cast (pref extensions i) godot_gdnative_ext_nativescript_api_struct*))))
+      (printf "The nativescript api is set to [%p]\n" nativescript_api)
+      void)))
+
+;; close this dll
+(bind-func static godot_gdnative_terminate
+  (lambda (options:godot_gdnative_terminate_options)
+    (printf "XTL godot_gdnative_terminate\n")
+    (set! gdnative_api null)
+    (set! nativescript_api null)))
+
+(bind-func static simple_constructor
+  (lambda (instance:godot_object* method_data:i8*)
+    (printf "XTL simple_constructor -> instance:%p method_data:%p\n" (cast instance i8*) method_data)
+    (let ((user_data:i8* (godot_alloc 256)))
+      (strcpy user_data "Hello From Extempore!")
+      user_data)))
+
+(bind-func static simple_destructor
+  (lambda (instance:godot_object* method_data:i8* user_data:i8*)
+    (printf "XTL simple_destructor -> instance:%p method_data:%p user_data:%p\n" (cast instance i8*) method_data user_data)
+    (godot_free user_data)))
+
+(bind-func static simple_get_data
+  (lambda (instance:godot_object* method_data:i8* user_data:i8* num_args:i32 args:godot_variant**)
+    (printf "XTL simple_get_data -> instance:%p method_data:i8* user_data:i8* num_args:%d args:%p\n" (cast instance i8*) method_data user_data num_args (cast args i8*))
+    (let ((data:godot_string* (salloc))
+          (ret:godot_variant* (alloc)))
+      (godot_string_new data)
+      (godot_string_parse_utf8 data user_data)
+      (godot_variant_new_string ret data)
+      (godot_string_destroy data)
+      (pref ret 0))))
+
+(bind-func static simple_get_color
+  (lambda (instance:godot_object* method_data:i8* user_data:i8* num_args:i32 args:godot_variant**)
+    (printf "XTL simple_get_color -> instance:%p method_data:i8* user_data:i8* num_args:%d args:%p\n" (cast instance i8*) method_data user_data num_args (cast args i8*))
+    (let ((color:godot_color* (salloc))
+          (ret:godot_variant* (salloc)))
+      (godot_color_new_rgb color (random) (random) (random))
+      (godot_variant_new_color ret color)
+      (pref ret 0))))
+
+(bind-func static simple_process
+  (lambda (instance:godot_object* method_data:i8* user_data:i8* num_args:i32 args:godot_variant**)
+    (printf "XTL simple_process -> instance:%p method_data:i8* user_data:i8* num_args:%d args:%p\n" (cast instance i8*) method_data user_data num_args (cast args i8*))
+    (let ((delta:godot_variant* (pref args 0))
+          (ret:godot_variant* (salloc)))
+      (println "extempore processing " (godot_variant_as_real delta))
+      (godot_variant_new_int ret 1)
+      (pref ret 0))))
+
+
+(bind-func static godot_nativescript_init
+  (lambda (handle:i8*)
+    (let ((a:godot_instance_create_func* (halloc))
+          (b:godot_instance_destroy_func* (halloc))
+          (c:godot_method_attributes* (halloc))
+          (d:godot_instance_method* (halloc))
+          (e:godot_instance_method* (halloc))
+          (f:godot_instance_method* (halloc)))
+      (tset! a 0 (cast simple_constructor))
+      (tset! b 0 (cast simple_destructor))
+      (register_class handle "SIMPLE" "Reference" a b)
+      (tset! c 0 GODOT_METHOD_RPC_MODE_DISABLED)
+      (tset! d 0 (cast simple_get_data))
+      (register_method handle "SIMPLE" "get_data" c d)
+      (tset! e 0 (cast simple_get_color))
+      (register_method handle "SIMPLE" "get_color" c e)
+      (tset! f 0 (cast simple_process))
+      (register_method handle "SIMPLE" "xtproc" c f)
+      void)))
+
+;; 
+;; YOU WILL ALSO NEED TO WRITE an appropriate gdnlib file
+;; below is a minimal working example
+;;
+
+; [general]
+
+; singleton=false
+; load_once=true
+; symbol_prefix="godot_"
+; reloadable=true
+
+; [entry]
+
+; Windows.64="res://bin/godot_test1.dll"
+
+; [dependencies]
+
+; X11.64=[]
+; Windows.64=["res://bin/extempore.dll"]
+; OSX.64=[]
+
+
+
+
+
+
+
+; Doing this is extremely convoluted, because the C interface is mainly designed
+; to be wrapped by language bindings rather than used directly in game code. I'll
+; describe the basic steps to calling any method on a godot_object like a Node,
+; but it's obviously much easier with C++:
+
+; I'm assuming you already set up a simple project with a godot_gdnative_init
+; function, like in the official C simple demo. You only need to save the
+; api_struct pointer in a global variable like the first line of the function here
+; - you don't need anything else relating to NativeScript yet.
+
+; Get the godot_method_bind pointer for the method you want:
+
+; godot_method_bind *get_node = api_struct->godot_method_bind_get_method("Node", "get_node");
+; Prepare storage for an array of Variant arguments and an error code:
+
+; godot_variant path;
+; godot_variant* args[1]; // an array of 1 pointer, in C's insane syntax
+; godot_variant_call_error error;
+; Put your godot_node_path in the one argument:
+
+; api_struct->godot_variant_new_node_path(&path, &some_node_path);
+; args[0] = &path;
+; Finally, call the method:
+
+; godot_variant ret = api_struct->godot_method_bind_call(get_node,some_node_object, args, 1, &error); 
+
+; The two things you need to destroy by
+; yourself are path and ret (using godot_variant_destroy). Probably also
+; some_node_path, but that depends on your code. The MethodBind and
+; some_node_object are just pointers and don't need to be destroyed. (Btw, manual
+; memory management is one of the main reasons not to use C without bindings. All
+; of Godot's core value types and any godot_objects derived from Reference require
+; RAII.)
+
+;; maybe try ("Control", "set_position") instead of ("Node", "get_node") which should take a Vector3?
