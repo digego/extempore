@@ -119,76 +119,96 @@
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_PLANE_SIZE];
 ; } godot_plane;
-(bind-type godot_plane <|16,i8|> (constructor . #f))
+(bind-type godot_plane <|16,i8|> (constructor? . #f))
 
 ; #define GODOT_BASIS_SIZE 36
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_BASIS_SIZE];
 ; } godot_basis;
-(bind-type godot_basis <|36,i8|> (constructor . #f))
+(bind-type godot_basis <|36,i8|> (constructor? . #f))
 
 ; #define GODOT_AABB_SIZE  24
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_AABB_SIZE];
 ; } godot_aabb;          
-(bind-type godot_aabb <|24,i8|> (constructor . #f))
+(bind-type godot_aabb <|24,i8|> (constructor? . #f))
 
 ; #define GODOT_QUAT_SIZE 16
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_QUAT_SIZE];
 ; } godot_quat;
-(bind-type godot_quat <|16,i8|> (constructor . #f))
+(bind-type godot_quat <|16,i8|> (constructor? . #f))
 
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[16];
 ; } godot_rect2;
-(bind-type godot_rect2 <|16,i8|> (constructor . #f))
+(bind-type godot_rect2 <|16,i8|> (constructor? . #f))
 
 ; #define GODOT_TRANSFORM_SIZE 48
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_TRANSFORM_SIZE];
 ; } godot_transform;
-(bind-type godot_transform <|48,i8|> (constructor . #f))
+(bind-type godot_transform <|48,i8|> (constructor? . #f))
 
 ; #define GODOT_TRANSFORM2D_SIZE 24
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_TRANSFORM2D_SIZE];
 ; } godot_transform2d;
-(bind-type godot_transform2d <|24,i8|> (constructor . #f))
+(bind-type godot_transform2d <|24,i8|> (constructor? . #f))
 
 ; #define GODOT_VECTOR2_SIZE 8
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_VECTOR2_SIZE];
 ; } godot_vector2;
-(bind-type godot_vector2 <|8,i8|> (constructor . #f))
+(bind-type godot_vector2 <|8,i8|> (constructor? . #f))
 
 ; #define GODOT_VECTOR3_SIZE 12
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_VECTOR3_SIZE];
 ; } godot_vector3;
-(bind-type godot_vector3 <|12,i8|> (constructor . #f))
+(bind-type godot_vector3 <|12,i8|> (constructor? . #f))
 
 ; #define GODOT_COLOR_SIZE 16
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_COLOR_SIZE];
 ; } godot_color;          
-(bind-type godot_color <|16,i8|> (constructor . #f))
+(bind-type godot_color <|16,i8|> (constructor? . #f))
 
+
+; #define GODOT_STRING_SIZE sizeof(void *)
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_STRING_SIZE];
 ; } godot_string;
-(bind-type godot_string <|8,i8|> (constructor . #f))
+(bind-type godot_string <|8,i8|> (constructor? . #f) (printer? . #f))
+
+(bind-func print:[void,godot_string*]*
+  (lambda (str)
+    (printf "<godot_string:%s>" (cast str i8*))
+    void))
+
+; #define GODOT_CHAR_STRING_SIZE sizeof(void *)
+; typedef struct {
+; 	uint8_t _dont_touch_that[GODOT_CHAR_STRING_SIZE];
+; } godot_string;
+(bind-type godot_char_string <|8,i8|> (constructor? . #f))
 
 ; #define GODOT_NODE_PATH_SIZE sizeof(void *)
 ; typedef struct {
 ; 	uint8_t _dont_touch_that[GODOT_NODE_PATH_SIZE];
 ; } godot_node_path;
-(bind-type godot_node_path <|8,i8|> (constructor . #f))
+(bind-type godot_node_path <|8,i8|> (constructor? . #f))
 
 ;typedef struct {
 ;	uint8_t _dont_touch_that[GODOT_VARIANT_SIZE];
 ;} godot_variant;
-(bind-type godot_variant <|24,i8|> (constructor . #f))
+(bind-type godot_variant <|24,i8|> (constructor? . #f))
+
+; #define GODOT_ARRAY_SIZE sizeof(void *)
+;typedef struct {
+;	uint8_t _dont_touch_that[GODOT_ARRAY_SIZE];
+;} godot_array;
+(bind-type godot_array <|8,i8|> (constructor? . #f))
+
           
 ;; opaque pointer?
 (bind-alias godot_method_bind i8)
@@ -198,7 +218,7 @@
 ; 	int argument;
 ; 	godot_variant_type expected;
 ; } godot_variant_call_error;
-(bind-type godot_variant_call_error <godot_variant_call_error_error,i32,godot_variant_type> (constructor . #f))
+(bind-type godot_variant_call_error <godot_variant_call_error_error,i32,godot_variant_type> (constructor? . #f))
                     
 ; typedef struct {
 ; 	godot_method_rpc_mode rpc_type;
@@ -226,7 +246,7 @@
 ; 	const godot_gdnative_api_struct *next;
 ; };
 (bind-type godot_gdnative_api_struct <i32,godot_gdnative_api_version,godot_gdnative_api_struct*>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 ; typedef struct godot_gdnative_core_api_struct {
 ; 	unsigned int type;
 ; 	godot_gdnative_api_version version;
@@ -236,7 +256,7 @@
 ;   ... + 744 api calls which we'll reference from an i8* array :(
 ; }
 (bind-type godot_gdnative_core_api_struct <i32,godot_gdnative_api_version,godot_gdnative_api_struct*,i32,godot_gdnative_api_struct**,|744,i8*|>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 
 ; typedef struct {
 ; 	godot_bool in_editor;
@@ -250,7 +270,7 @@
 ; 	const godot_string *active_library_path;
 ; } godot_gdnative_init_options;
 (bind-type godot_gdnative_init_options <godot_bool,i64,i64,i64,i8*,i8*,godot_object,godot_gdnative_core_api_struct*,godot_string*>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 
 ; typedef struct godot_gdnative_ext_nativescript_api_struct {
 ; 	unsigned int type;
@@ -265,7 +285,7 @@
 ; } godot_gdnative_ext_nativescript_api_struct;
 
 (bind-type godot_gdnative_ext_nativescript_api_struct <i32,godot_gdnative_api_version,godot_gdnative_api_struct*,i8*,i8*,i8*,i8*,i8*,i8*>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 
 ; typedef struct {
 ; 	// instance pointer, method_data - return user data
@@ -274,7 +294,7 @@
 ; 	GDCALLINGCONV void (*free_func)(void *);
 ; } godot_instance_create_func;
 (bind-type godot_instance_create_func <i8*,i8*,i8*,|13,i8*|>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 
 ; typedef struct {
 ; 	// instance pointer, method data, user data
@@ -283,7 +303,7 @@
 ; 	GDCALLINGCONV void (*free_func)(void *);
 ; } godot_instance_destroy_func;
 (bind-type godot_instance_destroy_func <i8*,i8*,i8*,|13,i8*|>
-           (constructor . #f) (printer . #f))
+           (constructor? . #f) (printer . #f))
 
 ; 	void (*godot_nativescript_register_class)(void *p_gdnative_handle, const char *p_name, const char *p_base, godot_instance_create_func p_create_func, godot_instance_destroy_func p_destroy_func);
 
@@ -356,6 +376,88 @@
     (let ((apicall:[void,godot_color*,godot_real]* (cast (aref (tref gdnative_api 5) 3))))
       (fptrcall apicall in r))))
 
+;; 24
+;;	void (*godot_vector2_new)(godot_vector2 *r_dest, const godot_real p_x, const godot_real p_y);
+(bind-func godot_vector2_new
+  (lambda (r_dest:godot_vector2* x:godot_real y:godot_real)
+    (printf "XTL godot_vector2_new\n")
+    (let ((apicall:[void,godot_vector2*,godot_real,godot_real]* (cast (aref (tref gdnative_api 5) 24))))
+      (fptrcall apicall r_dest x y))))
+
+;; 57
+;;	void (*godot_vector2_set_x)(godot_vector2 *p_self, const godot_real p_x);
+(bind-func godot_vector2_set_x
+  (lambda (r_dest:godot_vector2* x:godot_real)
+    (printf "XTL godot_vector2_set_x\n")
+    (let ((apicall:[void,godot_vector2*,godot_real]* (cast (aref (tref gdnative_api 5) 57))))
+      (fptrcall apicall r_dest x))))
+	
+;; 58
+;; void (*godot_vector2_set_y)(godot_vector2 *p_self, const godot_real p_y);
+(bind-func godot_vector2_set_y
+  (lambda (r_dest:godot_vector2* y:godot_real)
+    (printf "XTL godot_vector2_set_y\n")
+    (let ((apicall:[void,godot_vector2*,godot_real]* (cast (aref (tref gdnative_api 5) 58))))
+      (fptrcall apicall r_dest y))))
+
+
+;; 118
+;; void (*godot_vector3_new)(godot_vector3 *r_dest, const godot_real p_x, const godot_real p_y, const godot_real p_z);
+(bind-func godot_vector3_new
+  (lambda (r_dest:godot_vector3* x:godot_real y:godot_real z:godot_real)
+    (printf "XTL godot_vector3_new\n")
+    (let ((apicall:[void,godot_vector3*,godot_real,godot_real,godot_real]* (cast (aref (tref gdnative_api 5) 118))))
+      (fptrcall apicall r_dest x y z))))
+
+;; 323
+;; void (*godot_array_new)(godot_array *r_dest);
+(bind-func godot_array_new
+  (lambda (r_dest:godot_array*)
+    (printf "XTL godot_array_new -> dest:%p\n" r_dest)
+    (let ((apicall:[void,godot_array*]* (cast (aref (tref gdnative_api 5) 323))))
+      (fptrcall apicall r_dest))))
+
+;; 333
+;; godot_variant (*godot_array_get)(const godot_array *p_self, const godot_int p_idx);
+(bind-func godot_array_get
+  (lambda (self:godot_array* idx:godot_int)
+    (printf "XTL godot_array_get -> self:%p idx:%lld\n" self idx)
+    (let ((apicall:[godot_variant,godot_array*,godot_int]* (cast (aref (tref gdnative_api 5) 333))))
+      (fptrcall apicall self idx))))
+
+;; 336	
+;; void (*godot_array_append)(godot_array *p_self, const godot_variant *p_value);
+(bind-func godot_array_append
+  (lambda (self:godot_array* var:godot_variant*)
+    (printf "XTL godot_array_append -> self:%p var:%p\n" self var)
+    (let ((apicall:[void,godot_array*,godot_variant*]* (cast (aref (tref gdnative_api 5) 336))))
+      (fptrcall apicall self var))))
+
+;; 337	
+;; void (*godot_array_clear)(godot_array *p_self);
+(bind-func godot_array_clear
+  (lambda (self:godot_array*)
+    (printf "XTL godot_array_clear -> self:%p\n" self)
+    (let ((apicall:[void,godot_array*]* (cast (aref (tref gdnative_api 5) 337))))
+      (fptrcall apicall self))))
+
+;; 356
+;; godot_int (*godot_array_size)(const godot_array *p_self);
+(bind-func godot_array_size
+  (lambda (self:godot_array*)
+    (printf "XTL godot_array_size -> self:%p\n" self)
+    (let ((apicall:[godot_int,godot_array*]* (cast (aref (tref gdnative_api 5) 356))))
+      (fptrcall apicall self))))
+
+;; 361
+;; void (*godot_array_destroy)(godot_array *p_self);
+(bind-func godot_array_destroy
+  (lambda (self:godot_array*)
+    (printf "XTL godot_array_destroy -> self:%p\n" self)
+    (let ((apicall:[void,godot_array*]* (cast (aref (tref gdnative_api 5) 361))))
+      (fptrcall apicall self))))
+
+
 ;; 381
 ;; void (*godot_node_path_new)(godot_node_path *r_dest, const godot_string *p_from);
 (bind-func godot_node_path_new
@@ -371,6 +473,30 @@
     (printf "XTL godot_node_path_destroy -> dest:%p\n" r_dest)
     (let ((apicall:[void,godot_node_path*]* (cast (aref (tref gdnative_api 5) 383))))
       (fptrcall apicall r_dest))))
+
+;; 507
+;; godot_variant_type (*godot_variant_get_type)(const godot_variant *p_v);
+(bind-func godot_variant_get_type
+  (lambda (r_dest:godot_variant*)
+    (printf "XTL godot_variant_get_type -> rdesg:%p\n" r_dest)
+    (let ((apicall:[godot_variant_type,godot_variant*]* (cast (aref (tref gdnative_api 5) 507))))
+      (fptrcall apicall r_dest))))
+
+;; 509
+;; void (*godot_variant_new_nil)(godot_variant *r_dest);
+(bind-func godot_variant_new_nil
+  (lambda (r_dest:godot_variant*)
+    (printf "XTL godot_variant_new_nil -> rdesg:%p\n" r_dest)
+    (let ((apicall:[void,godot_variant*]* (cast (aref (tref gdnative_api 5) 509))))
+      (fptrcall apicall r_dest))))
+
+;; 510	
+;; void (*godot_variant_new_bool)(godot_variant *r_dest, const godot_bool p_b);
+(bind-func godot_variant_new_bool
+  (lambda (r_dest:godot_variant* var:godot_bool)
+    (printf "XTL godot_variant_new_int -> rdesg:%p var:%d\n" r_dest var)
+    (let ((apicall:[void,godot_variant*,godot_bool]* (cast (aref (tref gdnative_api 5) 510))))
+      (fptrcall apicall r_dest var))))
 
 ;; 512
 ;; void (*godot_variant_new_int)(godot_variant *r_dest, const int64_t p_i);
@@ -509,6 +635,15 @@
     (let ((apicall:[godot_string,godot_variant*]* (cast (aref (tref gdnative_api 5) 541))))
       (fptrcall apicall in))))
 
+;; 554
+;; godot_object *(*godot_variant_as_object)(const godot_variant *p_self);
+(bind-func godot_variant_as_object
+  (lambda (in:godot_variant*)
+    (printf "XTL godot_variant_as_object -> variant:%p\n" in)
+    (let ((apicall:[godot_object*,godot_variant*]* (cast (aref (tref gdnative_api 5) 554))))
+      (fptrcall apicall in))))
+
+
 ;; 574
 ;; void (*godot_string_new)(godot_string *r_dest);
 (bind-func godot_string_new
@@ -516,6 +651,21 @@
     (printf "XTL godot_string_new -> gstr:%p\n" str)
     (let ((apicall:[void,godot_string*]* (cast (aref (tref gdnative_api 5) 574))))
       (fptrcall apicall str))))
+
+;; 676
+;; godot_char_string (*godot_string_ascii)(const godot_string *p_self);
+(bind-func godot_string_ascii
+  (lambda (str:godot_string*)
+    (printf "XTL godot_string_ascii -> gstr:%p\n" str)
+    (let ((apicall:[i8*,godot_string*]* (cast (aref (tref gdnative_api 5) 676))))
+      (fptrcall apicall str))))
+
+;; 677	
+;; godot_char_string (*godot_string_ascii_extended)(const godot_string *p_self);
+
+;; 678	
+;; godot_char_string (*godot_string_utf8)(const godot_string *p_self);
+
 
 ;; 679
 ;; godot_bool (*godot_string_parse_utf8)(godot_string *p_self, const char *p_utf8);
@@ -533,28 +683,40 @@
     (let ((apicall:[void,godot_string*]* (cast (aref (tref gdnative_api 5) 721))))
       (fptrcall apicall self))))
 
+;; 731
+;; godot_object *(*godot_global_get_singleton)(char *p_name);
+(bind-func godot_global_get_singleton
+  (lambda (name:i8*)
+    (printf "XTL godot_global_get_singleton: %s\n" name)
+    (let ((apicall:[godot_object*,i8*]* (cast (aref (tref gdnative_api 5) 731))))
+      (fptrcall apicall name))))
+
 ;; 732
 ;; godot_method_bind *(*godot_method_bind_get_method)(const char *p_classname, const char *p_methodname);
 (bind-func godot_method_bind_get_method
   (lambda (classname:i8* methodname:i8*)
     (printf "XTL godot_method_bind\n")
     (let ((apicall:[godot_method_bind*,i8*,i8*]* (cast (aref (tref gdnative_api 5) 732))))
-      (fptrcall apicall classname methodname))))
+      (printf "xtl method_bind apicall:%p\n" apicall)
+      (let ((res (fptrcall apicall classname methodname)))
+        (printf "xtl method bind res:%p\n" res)
+        res))))
 
 ;; 733
 ;; void (*godot_method_bind_ptrcall)(godot_method_bind *p_method_bind, godot_object *p_instance, const void **p_args, void *p_ret);
 (bind-func godot_method_bind_ptrcall
-  (lambda (fptr:godot_method_bind* instance:godot_object* args:i8** ret:i8*)
-    (printf "XTL godot_method_bind\n")
+  (lambda (mb:godot_method_bind* instance:godot_object* c_args:i8** ret:i8*) ;; was i8**, i8*
+    (printf "XTL godot_method_bind_ptrcall\n")
     (let ((apicall:[void,godot_method_bind*,godot_object*,i8**,i8*]* (cast (aref (tref gdnative_api 5) 733))))
-      (fptrcall apicall fptr instance args ret))))
+      (fptrcall apicall mb instance c_args ret)
+      void)))
 
-;; 744
+;; 734
 ;; godot_variant (*godot_method_bind_call)(godot_method_bind *p_method_bind, godot_object *p_instance, const godot_variant **p_args, const int p_arg_count, godot_variant_call_error *p_call_error);
 (bind-func godot_method_bind_call
   (lambda (fptr:godot_method_bind* instance:godot_object* args:godot_variant** arg_count:i32 err:godot_variant_call_error*)
-    (printf "XTL godot_method_bind\n")
-    (let ((apicall:[godot_variant*,godot_method_bind*,godot_object*,godot_variant**,i32,godot_variant_call_error*]* (cast (aref (tref gdnative_api 5) 734))))
+    (printf "XTL godot_method_bind_call method:%p instance:%p args:%p arg_cnt:%d err:%p\n" fptr instance args arg_count err)
+    (let ((apicall:[godot_variant,godot_method_bind*,godot_object*,godot_variant**,i32,godot_variant_call_error*]* (cast (aref (tref gdnative_api 5) 734))))
       (fptrcall apicall fptr instance args arg_count err))))
 
 ;; 738
