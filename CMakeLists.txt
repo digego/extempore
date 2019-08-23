@@ -597,6 +597,10 @@ add_custom_target(assets
   COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
   COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
 
+if(PACKAGE)
+  add_dependencies(extempore assets)
+endif()
+
 ###########
 # install #
 ###########
