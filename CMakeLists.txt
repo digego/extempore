@@ -17,7 +17,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # option wrangling #
 ####################
 
-if(DYLIB) 
+if(DYLIB)
   set(EXTERNAL_SHLIBS_AUDIO OFF)
   set(EXTERNAL_SHLIBS_GRAPHICS OFF)
   set(EXTERNAL_SHLIBS OFF)
