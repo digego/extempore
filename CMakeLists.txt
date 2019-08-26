@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
+project(Extempore VERSION 0.7.9)
 
 option(BOOST "use boost library" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
@@ -62,8 +63,6 @@ if(EXTERNAL_SHLIBS)
     message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
   endif()
 endif()
-
-project(Extempore VERSION 0.7.9)
 
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
