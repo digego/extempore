@@ -647,7 +647,7 @@ if(WIN32)
 else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but
-  # allows us to do AOT compilation in parallell
+  # allows us to do AOT compilation in parallel
 
   set(EXTEMPORE_AOT_COMPILE_PORT 17099)
 
