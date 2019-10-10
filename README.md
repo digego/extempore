@@ -1,4 +1,4 @@
-# Extempore [![Build Status](https://travis-ci.org/JimKuhn/extempore.svg?branch=master)](https://travis-ci.org/JimKuhn/extempore)
+# Extempore
 
 A programming environment for cyberphysical programming.
 
