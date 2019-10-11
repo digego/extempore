@@ -7,29 +7,6 @@
 (define *midi-channel-pressure* 13)     ;; value, ignored
 (define *midi-pitch-bend* 14)           ;; lsb (7 bits), msb (7 bits)
 
-(define *midi-in-device* #f)
-(define *midi-out-device* #f)
-
-(define midi-register-events
-  (lambda ()
-    (set! *midi-in-device* (midi_new_indevice))
-    (midi_register_device *midi-in-device* "midi_default_callback")
-    (set! *midi-out-device* (midi_new_outdevice))))
-
-;; (midi-register-events)
-
-(define midi-deregister-events
-  (lambda ()
-    (midi_delete_indevice *midi-in-device*)
-    (set! *midi-in-device* #f)
-    (midi_delete_outdevice *midi-out-device*)
-    (set! *midi-out-device* #f)
-    (print "Deregstered Extempore MIDI input/output devices.\n")))
-
-;; test sending & recieving midi
-;; (midi_send (midi_new_outdevice) *midi-note-on* 0 60 80 0)
-;; (midi_send (midi_new_outdevice) *midi-note-off* 0 66 80 0)
-
 (define play-midi-note
   (lambda (time device pitch velocity duration channel)
     (callback time 'midi_send device *midi-note-on* channel pitch velocity)
@@ -46,18 +23,6 @@
 	    (callback (+ time dur) 'midi_send device *midi-note-off* channel pitch velocity))))))
 
 ;; A midi-specific play macro
-
-;; (define-macro (mplay args)
-;;   (if (not (symbol? (cadr args)))
-;;       (if (> (length args) 6)
-;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-;;                       ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))
-;;           `(play-midi-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))))
-;;       (if (> (length args) 7)
-;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-;;                       (*metro* 'dur ,(car (cdr (cddddr args)))) ,(car (cddr (cddddr args))) ,(car (cdddr (cddddr args))))
-;;           `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-;;                       (*metro* 'dur ,(car (cdr (cddddr args))) ,(car (cddr (cddddr args))))))))
 
 (define-macro (mplay . args)
   (if (symbol? (car args))
@@ -80,23 +45,3 @@
   `(if (member (modulo beat ,b) ,l)
        (mplay ,@args)
        #f))
-
-
-;; uncomment if you want to use play instead of mplay
-;;
-;; (macro (play args)
-;;   (if (symbol? (cadr args))
-;;       `(play-midi-note (*metro* beat) ,(cadr args)
-;;                   (real->integer ,(caddr args))
-;;                   (real->integer ,(cadddr args))
-;;                   (*metro* 'dur ,(car (cddddr args))) 0)
-;;       `(play-midi-note (*metro* (+ beat ,(cadr args))) ,(caddr args)
-;;                   (real->integer ,(cadddr args))
-;;                   (real->integer ,(car (cddddr args)))
-;;                   (*metro* 'dur ,(cadr (cddddr args))) 0)))
-
-
-;; (let ((beat (*metro* 'get-beat 1)))
-;;   (mplay midiout 60. 70.8 1.0))
-
-;; (play-midi-note (now) *midi-in-device* 72 20 10000 0)
