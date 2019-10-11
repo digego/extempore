@@ -58,16 +58,16 @@
 ;; and send a stream of control messages
 ;; ($ (midi_send *midi-out* 11 0 8 90))
 
+;; send and process random control change messages (for testing)
 (bind-func test
   (lambda ()
     (rtmidi_send midi_out MIDI_CC 0 1 (i64toi8 (random 128)))
     (rtmidi_process_message midi_in)))
 
-;; stream control change message back out!
+;; now, run it in a loop
 (define loop
   (lambda (beat dur)
     (test)
     (callback (*metro* (+ beat (* .5 dur))) 'loop (+ beat dur) dur)))
 
 (loop (*metro* 'get-beat 4) 1/4)
-
