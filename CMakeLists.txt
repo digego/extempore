@@ -660,6 +660,16 @@ if(UNIX)
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(portmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
+    ExternalProject_Add(rtmidi
+      PREFIX rtmidi
+      URL https://github.com/thestk/rtmidi/archive/0514bce2a294565baa7a699da35cb60282591252.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(rtmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
+
     ExternalProject_Add(kiss_fft
       PREFIX kiss_fft
       URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
@@ -696,9 +706,10 @@ if(UNIX)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy librtmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
@@ -814,6 +825,16 @@ if(WIN32)
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(portmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
+    ExternalProject_Add(rtmidi
+      PREFIX rtmidi
+      URL https://github.com/thestk/rtmidi/archive/0514bce2a294565baa7a699da35cb60282591252.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(rtmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
+
     ExternalProject_Add(kiss_fft
       PREFIX kiss_fft
       URL https://github.com/extemporelang/kiss_fft/archive/1.3.0.zip
@@ -909,10 +930,12 @@ if(WIN32)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
@@ -947,10 +970,12 @@ if(WIN32)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
