@@ -693,7 +693,8 @@ if(UNIX)
     -DCMAKE_INSTALL_LIBDIR=lib
     -DENABLE_CPACK=OFF
     -DENABLE_PACKAGE_CONFIG=OFF
-    -DBUILD_SHARED_LIBS=ON)
+    -DBUILD_SHARED_LIBS=ON
+    -DBUILD_PROGRAMS=OFF)
     set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
