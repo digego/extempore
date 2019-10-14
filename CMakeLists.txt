@@ -684,17 +684,17 @@ if(UNIX)
 
     ExternalProject_Add(sndfile
     PREFIX libsndfile
-    URL https://github.com/erikd/libsndfile/archive/master.zip
+    URL https://github.com/erikd/libsndfile/archive/ae64caf9b5946d365971c550875000342e763de6.zip
     CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
     -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
     -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
-    -DCMAKE_INSTALL_LIBDIR=lib
+    -DBUILD_PROGRAMS=OFF
+    -DBUILD_EXAMPLES=OFF
+    -DBUILD_TESTING=OFF
     -DENABLE_CPACK=OFF
-    -DENABLE_PACKAGE_CONFIG=OFF
-    -DBUILD_SHARED_LIBS=ON
-    -DBUILD_PROGRAMS=OFF)
+    -DENABLE_PACKAGE_CONFIG=OFF)
     set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
@@ -846,27 +846,20 @@ if(WIN32)
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
-    # aargh! sndfile on Windows still requires sh, sed, etc. and
-    # doesn't work. so we'll just grab the pre-built one manually. for
-    # the moment I've just hosted the (unmodified) libsndfile binaries
-    # (a bit of a hack), but you can get an installer from
-    # http://www.mega-nerd.com/libsndfile/#Download
-
     ExternalProject_Add(sndfile
-    PREFIX sndfile
-    URL https://github.com/erikd/libsndfile/archive/master.zip
-    CMAKE_ARGS
-    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
-    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
-    -DENABLE_CPACK=OFF
-    -DENABLE_PACKAGE_CONFIG=OFF 
-    -DBUILD_SHARED_LIBS=ON)
-  set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
-
-    #file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    #file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+      PREFIX libsndfile
+      URL https://github.com/erikd/libsndfile/archive/ae64caf9b5946d365971c550875000342e763de6.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+      -DBUILD_PROGRAMS=OFF
+      -DBUILD_EXAMPLES=OFF
+      -DBUILD_TESTING=OFF
+      -DENABLE_CPACK=OFF
+      -DENABLE_PACKAGE_CONFIG=OFF)
+    set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   endif(EXTERNAL_SHLIBS_AUDIO)
 
