@@ -400,7 +400,15 @@
             (set! val (+ val step)))
           (reverse result)))))
 
+;; keep it tail recursive!
 (bind-func append:[List{!a}*,List{!a}*,List{!a}*]*
+  (let ((f (lambda (a b)
+             (if (null? a) b
+                 (f (cdr a) (cons (car a) b))))))
+    (lambda (as bs)
+      (f (reverse as) bs))))
+
+(bind-func append_destructive:[List{!a}*,List{!a}*,List{!a}*]*
   (lambda (a b)
     (if (null? a) b
         (begin
@@ -563,7 +571,7 @@
               (tset! (car dict) 1 value)
               oldval)
             (if (null? (cdr dict))
-                (begin (append dict (list (Pair key value)))
+                (begin (append_destructive dict (list (Pair key value)))
                        (convert null))
                 (dict_set (cdr dict) key value))))))
 
@@ -580,7 +588,7 @@
               (tset! (car dict) 1 newval)
               oldval)
             (if (null? (cdr dict))
-                (begin (append dict (list (Pair key (update_fn (convert null)))))
+                (begin (append_destructive dict (list (Pair key (update_fn (convert null)))))
                        (convert null))
                 (dict_update (cdr dict) key update_fn))))))
 
