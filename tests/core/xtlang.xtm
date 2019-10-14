@@ -810,7 +810,7 @@
               (callback (+ time 1000) callback-test (+ time 22050) (+ count 1))))
 
          (callback-test (now) 0))
-
+        
 ;; compiling this will stop the callbacks
 ;;
 ;; of course we need to keep the type
@@ -820,8 +820,27 @@
             (lambda (time:i64 count:i64)
               void))
 
-         (callback-test))
+         (callback-test (now) 0))
+         
+(bind-func callback-test2-helper
+  (lambda (x:i64)
+    (println "callback test2 helper: " x)))
+         
+(xtmtest '(bind-func callback-test2
+            (lambda (time:i64 count:i64)
+              (printf "time: %lld:%lld\n" time count)
+              (callback (+ time 20000) callback-test2-helper 555)
+              (callback (+ time 40000) callback-test2 (+ time 40000) (+ count 1))))
+         
+         (callback-test2 (now) 0))
 
+(xtmtest '(bind-func callback-test2
+            (lambda (time:i64 count:i64)
+              void))
+
+         (callback-test2 (now) 0))
+         
+         
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; some memzone tests

@@ -7648,9 +7648,11 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:callback-check
   (lambda (ast vars kts request?)
-    (let ((ftype (map impc:ir:get-type-from-str
+    (let* ((cbType (impc:ti:type-check (caddr ast) vars kts '()))
+           (ftypeA (map impc:ir:get-type-from-str
                       (let ((ags (impc:ti:get-closure-arg-types (symbol->string (caddr ast)))))
-                        (if ags ags '())))))
+                        (if ags ags '()))))
+           (ftype (if (null? ftypeA) cbType (cons 213 ftypeA))))
       (if *impc:ti:print-sub-checks* (println 'ftype:> 'ast: ast 'type: ftype))
       (impc:ti:type-check (cadr ast) vars kts *impc:ir:si64*)
       (if (null? ftype)
@@ -7669,7 +7671,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (impc:compiler:print-compiler-error "bad arity in call" ast))
                  (if (and (assoc (caddr ast) vars)
                           (null? (cdr (assoc (caddr ast) vars))))
-                     (impc:ti:update-var (caddr ast) vars kts (cons 213 ftype)))
+                     (impc:ti:update-var (caddr ast) vars kts ftype))
                  ;; we don't care what we get back
                  (for-each (lambda (a t)
                              (if (symbol? a) (impc:ti:update-var a vars kts t))
