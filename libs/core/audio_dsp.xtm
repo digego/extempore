@@ -455,12 +455,15 @@
 (bind-func static load_blep_tables_from_blob
   (lambda (fname:i8*)
     (let ((fptr (fopen fname "rb")))
-      (fread (convert BLEPTable) (* 4096 8) 1 fptr)
-      (fread (convert fBLEPTable) (* 4096 4) 1 fptr)
-      (fread (convert BLEPTable_8_BLKHAR) (* 4096 8) 1 fptr)
-      (fread (convert fBLEPTable_8_BLKHAR) (* 4096 4) 1 fptr)
-      (fclose fptr)
-      void)))
+      (if (null? fptr)
+          (begin (println "Failed to open bleptables.dump") void)
+          (begin
+            (fread (convert BLEPTable) (* 4096 8) 1 fptr)
+            (fread (convert fBLEPTable) (* 4096 4) 1 fptr)
+            (fread (convert BLEPTable_8_BLKHAR) (* 4096 8) 1 fptr)
+            (fread (convert fBLEPTable_8_BLKHAR) (* 4096 4) 1 fptr)
+            (fclose fptr)
+            void)))))
 
 (impc:aot:do-or-emit
   ($ (load_blep_tables_from_blob "libs/core/bleptables.dump")))
