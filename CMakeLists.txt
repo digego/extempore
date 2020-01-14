@@ -664,6 +664,7 @@ if(UNIX)
       PREFIX rtmidi
       URL https://github.com/thestk/rtmidi/archive/0514bce2a294565baa7a699da35cb60282591252.zip
       CMAKE_ARGS
+	  -DRTMIDI_BUILD_TESTING=OFF
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
@@ -831,6 +832,7 @@ if(WIN32)
       PREFIX rtmidi
       URL https://github.com/thestk/rtmidi/archive/0514bce2a294565baa7a699da35cb60282591252.zip
       CMAKE_ARGS
+	  -DRTMIDI_BUILD_TESTING=OFF
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
