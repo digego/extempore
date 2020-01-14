@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
-project(Extempore VERSION 0.7.9)
+project(Extempore VERSION 0.8.0)
 
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
