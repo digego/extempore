@@ -939,8 +939,8 @@ if(WIN32)
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
