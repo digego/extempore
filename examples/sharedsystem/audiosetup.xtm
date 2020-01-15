@@ -290,6 +290,41 @@
 (define LEGATO_ON 1)
 (define LEGATO_OFF 0)
 
+
+;; helpers for controlling the analogue synth from a MIDI controller
+;; if you want to use these, make sure examples/sharedsystem/midisetup.xtm is loaded first
+(bind-func get_analogue_synth_cc_name
+  (let ((string_names (array_ref
+      "osc1: gain" "osc1: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc1: pulse width" "osc1: fine tune" "osc1: course tune" "osc1: pan (deprecated)" "n/a" "n/a"
+      "osc2: gain" "osc2: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc2: pulse width" "osc2: fine tune" "osc2: course tune" "osc2: pan (deprecated)" "n/a" "n/a"
+      "osc3: gain" "osc3: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc3: pulse width" "osc3: fine tune" "osc3: course tune" "osc3: pan (deprecated)" "n/a" "n/a"
+      "osc3: gain" "osc4: wave shape 0:sin 1:saw 2:sqr 3:tri" "osc4: pulse width" "osc4: fine tune" "osc4: course tune" "osc4: pan (deprecated)" "n/a" "n/a"
+      "sub: gain" "noise: gain" "noise: white/pink (0:white 1:pink)" "lpf: 12/24 db (0:12 1:24)" "lpf: cutoff" "lpf: resonance" "hfp: cutoff" "lpf: overdrive"
+      "amp env: attack" "amp env: decay" "amp env: sustain" "amp env: release" "amp env: length multiplier" "pitch env: attack" "pitch env: decay" "pitch env: range"
+      "filter env: attack" "filter env: decay" "filter env: sustain" "filter env: release" "filter env: length multiplier" "filter env: frequency range" "filter env: track pitch amount" "filter env: track amplitude amount"
+      "delay: left" "delay: right" "delay: mix" "delay: feedback" "reverb: mix" "reverb: room size" "reverb: pre-delay" "reverb: absorb"
+      "flanger: mix" "flanger: lo/ms" "flanger: lo/scale" "flanger: hi/ms" "flanger: hi/scale" "flanger: rate" "flanger: fb" "n/a"
+      "global: pan" "global: gain" "global: portamento" "reset (if val === 127)"
+      "matrix: source" "matrix: target" "matrix: amt" "n/a"
+      "lfo1: attack" "lfo1: decay" "lfo1: attack curve" "lfo1: decay curve" "lfo1: length" "lfo1: amplitude" "lfo1: frequency" "lfo1: wave")))
+    (lambda (cc:i32)
+      (if (> cc 88)
+          "<no cc for analogue synth>"
+          (aref string_names cc)))))
+
+;; override midi_cc for analogue chans  1, 2 and 3
+(bind-func midi_cc
+  (lambda (timestamp:i32 controller:i32 value:i32 chan:i32)
+    (aset! MCC_ARR controller (/ (i32tof value) 127.0))
+    (if (< chan 3)
+        (printf "\rMIDI_CC: %d %f %d (%s) %s" controller (ftod (aref MCC_ARR controller)) chan (get_analogue_synth_cc_name controller)
+                "                                                           \r") ;; ugly but can't get vt100 codes working on windows :(
+        (printf "MIDI_CC: %d %f %d\r" controller (ftod (aref MCC_ARR controller)) chan))
+    (if (= chan 0) (analogue_cc (cast syn1) 0 controller value))
+    (if (= chan 1) (analogue_cc (cast syn2) 1 controller value))
+    (if (= chan 2) (analogue_cc (cast syn3) 2 controller value))
+    void))
+
 (println "Finished Audio Setup")
 
 (println 'Finished 'loading!)
