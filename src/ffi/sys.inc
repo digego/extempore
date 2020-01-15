@@ -215,6 +215,31 @@ static pointer commandOutput(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
+static pointer getEnv(scheme* Scheme, pointer Args)
+{
+  const char* varname = string_value(pair_car(Args));
+
+#ifdef _WIN32
+  char outbuf[8192]; // oughtta be enough for anyone
+  size_t varsize;
+
+  int res = getenv_s(&varsize, outbuf, 8192, varname);
+
+  if (res == 0){
+	return mk_string(Scheme, outbuf);
+  }else{
+    return Scheme->F;
+  }
+#else
+  char* value = getenv(varname);
+  if (value != NULL){
+	return mk_string(Scheme, value);
+  }else{
+    return Scheme->F;
+  }
+#endif
+}
+
 static pointer setEnv(scheme* Scheme, pointer Args)
 {
     char* var = string_value(pair_car(Args));
@@ -256,6 +281,7 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
         { "sys:expand-path", &pathExpansion }, \
         { "sys:command", &command }, \
         { "sys:command-output", &commandOutput }, \
-        { "sys:set-env", &setEnv }, \
+        { "sys:get-env", &getEnv }, \
+        { "sys:set-env", &setEnv },						   \
         { "sys:set-default-timeout", &setDefaultTimeout }, \
         { "sys:get-default-timeout", &getDefaultTimeout }
