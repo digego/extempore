@@ -16,18 +16,24 @@
 (sys:load "libs/core/looper.xtm")
 (sys:load "libs/core/pc_ivl.xtm")
 
-(if (and (sys:cmdarg "midiin")
-         (sys:cmdarg "midiout"))
+(if (sys:cmdarg "midiin")
     (begin
       (set_midi_in (pm_input_device_with_name (sys:cmdarg "midiin")))
       (define *min* (get_midi_in))
-      (set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
-      (define *mout* (get_midi_out))
       (println 'MIDIIN '*min* (sys:cmdarg "midiin") 'is *min*)
       (println 'MIDIOUT '*mout* (sys:cmdarg "midiout") 'is *mout*))
     (print-with-colors
      'yellow 'default #t
-     (print "no midiin or midiout CLI args specified, skipping midi device setup\n")))
+     (print "no --midiin CLI arg specified, no midi input device configured\n")))
+
+(if (sys:cmdarg "midiout")
+    (begin
+      (set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
+      (define *mout* (get_midi_out))
+      (println 'MIDIOUT '*mout* (sys:cmdarg "midiout") 'is *mout*))
+    (print-with-colors
+     'yellow 'default #t
+     (print "no --midiout CLI arg specified, no midi output device configured\n")))
 
 (bind-val MCC_ARR |127,float|)
 
