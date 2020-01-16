@@ -16,24 +16,109 @@
 (sys:load "libs/core/looper.xtm")
 (sys:load "libs/external/midi.xtm")
 
-(if (sys:cmdarg "midiin")
-    (begin
-      (set_midi_in (pm_input_device_with_name (sys:cmdarg "midiin")))
-      (define *min* (get_midi_in))
-      (println 'MIDIIN '*min* (sys:cmdarg "midiin") 'is *min*)
-      (println 'MIDIOUT '*mout* (sys:cmdarg "midiout") 'is *mout*))
-    (print-with-colors
-     'yellow 'default #t
-     (print "no --midiin CLI arg specified, no midi input device configured\n")))
+;; a couple more "wrapper" bind funcs so we can access info about the midi
+;; devices in scheme
 
-(if (sys:cmdarg "midiout")
-    (begin
-      (set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
-      (define *mout* (get_midi_out))
-      (println 'MIDIOUT '*mout* (sys:cmdarg "midiout") 'is *mout*))
-    (print-with-colors
-     'yellow 'default #t
-     (print "no --midiout CLI arg specified, no midi output device configured\n")))
+;; perhaps this stuff should go in the main portmidi library - will leave it
+;; here for now
+
+(bind-func pm_device_with_id
+  "return pointer to device info struct"
+  (lambda (id)
+    (Pm_GetDeviceInfo id)))
+
+(bind-func pm_device_name
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          "" ;; "empty" name
+          (tref dev_info 2)))))
+
+(bind-func pm_device_input_p
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          0 ;; false if the device ID doesn't exist
+          (tref dev_info 3)))))
+
+(bind-func pm_device_output_p
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          0 ;; false if the device ID doesn't exist
+          (tref dev_info 4)))))
+
+(bind-func pm_count_devices
+  (lambda ()
+    (Pm_CountDevices)))
+
+;; helper for doing regex-based matching of device names
+(define get-midi-device-names-alist
+  (lambda ()
+    (make-list-with-proc
+     (pm_count_devices)
+     (lambda (id) (cons id (cptr->string (pm_device_name id)))))))
+
+(define get-midi-input-device-names-alist
+  (lambda ()
+    (filter (lambda (dev) (= 1 (pm_device_input_p (car dev))))
+            (get-midi-device-names-alist))))
+
+(define get-midi-output-device-names-alist
+  (lambda ()
+    (filter (lambda (dev) (= 1 (pm_device_output_p (car dev))))
+            (get-midi-device-names-alist))))
+
+(define *min* #f)
+(define *mout* #f)
+
+;; initialise the midi in/out devices based on either the --midiin/--midiout CLI
+;; params or (alternately) the EXT_MIDI_{IN,OUT}_DEVICE_NAME environment
+;; variables
+
+;; this now uses regex-matching on midi device name - this both more convenient
+;; than having to get the exact string right, and also consistent with the
+;; "select audio device" behaviour
+
+;;;;;;;;;;;;;;;;;
+;; midi output ;;
+;;;;;;;;;;;;;;;;;
+
+(let* ((midi-out-device-name (or (sys:cmdarg "midiout")
+                                 (sys:get-env "EXT_MIDI_OUT_DEVICE_NAME")
+                                 #f))
+       (matching-devices (filter (lambda (dev) (regex:match? (cdr dev) midi-out-device-name))
+                                 (get-midi-output-device-names-alist))))
+  (if (null? matching-devices)
+
+      (print-with-colors
+       'yellow 'default #t
+       (print "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified:\nno midi output device configured\n"))
+
+      (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+        (set_midi_out (car device))
+        (set! *mout* (get_midi_out))
+        (println 'midiout '*mout* (cptr->string (pm_device_name (car device))) 'is *mout*))))
+
+;;;;;;;;;;;;;;;;;
+;; midi input ;;
+;;;;;;;;;;;;;;;;;
+
+(let* ((midi-in-device-name (or (sys:cmdarg "midiin")
+                                 (sys:get-env "EXT_MIDI_IN_DEVICE_NAME")
+                                 #f))
+       (matching-devices (filter (lambda (dev) (regex:match? (cdr dev) midi-in-device-name))
+                                 (get-midi-input-device-names-alist))))
+  (if (null? matching-devices)
+
+      (print-with-colors
+       'yellow 'default #t
+       (print "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified:\nno midi input device configured\n"))
+
+      (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+        (set_midi_in (car device))
+        (set! *min* (get_midi_in))
+        (println 'midiin '*min* (cptr->string (pm_device_name (car device))) 'is *min*))))
 
 (bind-val MCC_ARR |127,float|)
 
