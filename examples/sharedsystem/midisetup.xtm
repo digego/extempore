@@ -91,16 +91,26 @@
                                  #f))
        (matching-devices (filter (lambda (dev) (regex:match? (cdr dev) midi-out-device-name))
                                  (get-midi-output-device-names-alist))))
-  (if (null? matching-devices)
-
-      (print-with-colors
-       'yellow 'default #t
-       (print "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified:\nno midi output device configured\n"))
-
-      (let ((device (car matching-devices))) ;; pick the first one with name matching regex
-        (set_midi_out (car device))
-        (set! *mout* (get_midi_out))
-        (println 'midiout '*mout* (cptr->string (pm_device_name (car device))) 'is *mout*))))
+  (cond ((not midi-out-device-name)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified\n"
+                  "No midi output device configured\n")))
+         (print-with-colors
+          'yellow 'default #t
+          (print "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified:\nno midi output device configured\n")))
+        ((null? matching-devices)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no MIDI output device fount matching regex '" midi-out-device-name "'\n"
+                  "No midi output device configured\n"))))
+        (else
+         (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+           (set_midi_out (car device))
+           (set! *mout* (get_midi_out))
+           (println 'midiout '*mout* (cptr->string (pm_device_name (car device))) 'is *mout*)))))
 
 ;;;;;;;;;;;;;;;;;
 ;; midi input ;;
@@ -111,16 +121,26 @@
                                  #f))
        (matching-devices (filter (lambda (dev) (regex:match? (cdr dev) midi-in-device-name))
                                  (get-midi-input-device-names-alist))))
-  (if (null? matching-devices)
-
-      (print-with-colors
-       'yellow 'default #t
-       (print "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified:\nno midi input device configured\n"))
-
-      (let ((device (car matching-devices))) ;; pick the first one with name matching regex
-        (set_midi_in (car device))
-        (set! *min* (get_midi_in))
-        (println 'midiin '*min* (cptr->string (pm_device_name (car device))) 'is *min*))))
+  (cond ((not midi-in-device-name)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified\n"
+                  "No midi input device configured\n")))
+         (print-with-colors
+          'yellow 'default #t
+          (print "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified:\nno midi input device configured\n")))
+        ((null? matching-devices)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no MIDI input device fount matching regex '" midi-in-device-name "'\n"
+                  "No midi input device configured\n"))))
+        (else
+         (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+           (set_midi_in (car device))
+           (set! *min* (get_midi_in))
+           (println 'midiin '*min* (cptr->string (pm_device_name (car device))) 'is *min*)))))
 
 (bind-val MCC_ARR |127,float|)
 
