@@ -194,18 +194,21 @@
                                 (modulo pitch 12))
                               (car args))))))
 
-(define-macro (orbit m . args)
-  (cond ((= (length args) 1)
-         `(if (= 0 (modulo loopcnt ,m)) ,(car args) '_))
-        ((= (length args) 2)
-         `(if (= 0 (modulo loopcnt ,m)) ,(car args) ,(cadr args)))
-        (else
-         `(if (= 0 (modulo (+ ,(car args) loopcnt) ,m)) ,(cadr args) ,(caddr args)))))
+;; orbit will usually use LC - an internal (to the looper macro) symbol defined
+;; for loop count
 
+;; if 3rd argument is present, that's the "default" case (when loop count
+;; *isn't* congruent to 0 mod m)
+(define orbit
+  (lambda (loopcnt m . args)
+    (if (= 0 (modulo loopcnt m))
+        (car args) ;; yes, play the 'orbit' case
+        (if (null? args) '_) (cadr args)) ;; play the 'default' case
+    ))
 
-;; cycle will usually use LC
-;; LC is an internal symbol defined
-;; for Loop Count.
+;; cycle will usually use LC - an internal (to the looper macro) symbol defined
+;; for loop count
+
 ;; cycles elongates the time between changes
 ;; i.e. (cycle LC 1 '(60 63 67) '(58 62 65))
 (define (cycle cnt cycles . args)
