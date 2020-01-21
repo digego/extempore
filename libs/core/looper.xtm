@@ -98,7 +98,11 @@
          (beats (eval beatsexpr))
          (offset (eval offsetexpr))
          (running? (closure? name)))
-    (if (equal? run 'modify) (println 'Modifying: name))
+    (if (equal? run 'modify)
+        (begin
+          (print-with-colors 'blue 'default #t (print "pattern "))
+          (print-with-colors 'yellow 'default #f (print "modifying "))
+          (println name)))
     (begin (eval `(define ,name
                     (lambda (beat totaldur loopcnt dur)
                       (define beats ,beatsexpr)
@@ -109,17 +113,23 @@
                       (set! ,tagtime (now))
                       (rmap beats offset ,f loopcnt totaldur ,@lsts)
                       (if ,(if (equal? run 'stop) #t #f)
-                          (begin (println 'Stopping_: ',name)
-                                 (eval '(define ,name #f) (interaction-environment))
-                                 #f)
+                          (begin
+                            (print-with-colors 'blue 'default #t (print "pattern "))
+                            (print-with-colors 'red 'default #f (print "stopping  "))
+                            (println ',name)
+                            (eval '(define ,name #f) (interaction-environment))
+                            #f)
                           (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur)
                                     (if (= (+ totaldur dur) beats) 0 (+ totaldur dur))
                                     (if (= (+ totaldur dur) beats) (+ loopcnt 1) loopcnt)
                                     ,(if (> beats 1) 1/2 (/ beats 2))))))
                  (interaction-environment))
            (if (equal? run 'start)
-               (eval `(begin (println 'Starting_: ',name)
-                             (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
+               (eval `(begin
+                        (print-with-colors 'blue 'default #t (print "pattern "))
+                        (print-with-colors 'green 'default #f (print "starting  "))
+                        (println ',name)
+                        (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
                      (interaction-environment))))))
 
 ;; start or modify looper
