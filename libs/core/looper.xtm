@@ -53,16 +53,24 @@
                                   args))
                     (targs (map (lambda (l)
                                   (cond ((vector? l) (map (lambda (x) (eval x)) (vector->list l)))
-                                        ((and (symbol? l) (not (equal? l '_))) (eval l))
+                                        ((and (symbol? l) (not (member l '(_ |)))) (eval l))
                                         (else l)))
                                 tmpargs)))
-               (if (or (list? (car tmpargs)) (pair? (car tmpargs)))
-                   (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs)
-                   (if (not (and (symbol? (car tmpargs)) (equal? (car tmpargs) '_)))
-                       (apply callback
-                              (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
-                              func (+ beat (- (car t) pos)) one_beat
-                              loopcnt targs)))))
+               (cond
+                ((or (list? (car tmpargs)) (pair? (car tmpargs)))
+                 (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
+                ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
+                (else
+                 ;; this is a messy expression, but it just counts the number of
+                 ;; '| symbols *after* the current value, and adds them to the
+                 ;; duration
+                 (let ((note-dur (* one_beat
+                                   (+ 1 (length (take-while (lambda (x) (equal? x '|))
+                                                        (cl:nthcdr (cdr t) (car args))))))))
+                   (apply callback
+                          (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                          func (+ beat (- (car t) pos)) note-dur
+                          loopcnt targs))))))
            newlst))))
 
 ;; rhythm map
