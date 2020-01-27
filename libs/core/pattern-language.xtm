@@ -264,15 +264,15 @@
                 (cdr undst))))))
 
 (define euclid
-  (lambda (n k . args)
+  (lambda (k n . args)
     (let ((one-val (if (null? args) 1 (car args)))
           (zero-val (if (< (length args) 2) '_ (cadr args))))
-      (cond ((<= n 0) (repeat k zero-val))
-            ((>= n k) (repeat k one-val))
+      (cond ((<= k 0) (repeat n zero-val))
+            ((>= k n) (repeat n one-val))
             (else
              (let loop ((groups (euclid-distribute-zeros
-                                 (list (repeat n (list one-val))
-                                       (repeat (- k n) (list zero-val))))))
+                                 (list (repeat k (list one-val))
+                                       (repeat (- n k) (list zero-val))))))
                (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
                    (flatten groups)
                    (loop (euclid-distribute-zeros groups)))))))))
