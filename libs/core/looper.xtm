@@ -264,16 +264,17 @@
 
 (define euclid
   (lambda (n k . args)
-    (define val (if (null? args) 1 (car args)))
-    (cond ((<= n 0) (repeat k '_))
-          ((>= n k) (repeat k val))
-          (else
-           (let loop ((groups (euclid-distribute-zeros
-                               (list (repeat n (list val))
-                                     (repeat (- k n) '(_))))))
-             (if (or (= (length groups) 1) (member (cadr groups) '(_)))
-                 (flatten groups)
-                 (loop (euclid-distribute-zeros groups))))))))
+    (let ((one-val (if (null? args) 1 (car args)))
+          (zero-val (if (< (length args) 2) '_ (cadr args))))
+      (cond ((<= n 0) (repeat k zero-val))
+            ((>= n k) (repeat k one-val))
+            (else
+             (let loop ((groups (euclid-distribute-zeros
+                                 (list (repeat n (list one-val))
+                                       (repeat (- k n) (list zero-val))))))
+               (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
+                   (flatten groups)
+                   (loop (euclid-distribute-zeros groups)))))))))
 
 ;; number of (numof -> nof)
 (define-macro (nof num body)
