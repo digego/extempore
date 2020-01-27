@@ -246,6 +246,35 @@
                         (list a x)))
                   (if (list? a) a b)))))
 
+;; euclidean rhythms
+;; written by Ben in recursive Scheme; Kernighan's lever probably applies
+
+(define euclid-distribute-zeros
+  (lambda (dst-undst)
+    (let loop ((out '())
+               (dst (car dst-undst))
+               (undst (cadr dst-undst)))
+      (if (or (null? dst) (null? undst))
+          (append (list (reverse out))
+                  (if (null? dst) '() (list dst))
+                  (if (null? undst) '() (list undst)))
+          (loop (cons (append (car dst) (car undst)) out)
+                (cdr dst)
+                (cdr undst))))))
+
+(define euclid
+  (lambda (n k . args)
+    (define val (if (null? args) 1 (car args)))
+    (cond ((<= n 0) (repeat k '_))
+          ((>= n k) (repeat k val))
+          (else
+           (let loop ((groups (euclid-distribute-zeros
+                               (list (repeat n (list val))
+                                     (repeat (- k n) '(_))))))
+             (if (or (= (length groups) 1) (member (cadr groups) '(_)))
+                 (flatten groups)
+                 (loop (euclid-distribute-zeros groups))))))))
+
 ;; number of (numof -> nof)
 (define-macro (nof num body)
   `(make-list-with-proc ,num (lambda (idx) ,body)))
