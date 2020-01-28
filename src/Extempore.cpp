@@ -349,7 +349,7 @@ EXPORT int extempore_init(int argc, char** argv)
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_default();
-    std::cout << "Andrew Sorensen (c) 2010-2019" << std::endl;
+    std::cout << "Andrew Sorensen (c) 2010-2020" << std::endl;
     std::cout << "andrew@moso.com.au, @digego" << std::endl;
     std::cout << std::endl;
     ascii_default();
