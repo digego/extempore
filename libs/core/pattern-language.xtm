@@ -198,10 +198,16 @@
 (define *chord* '(36 60 63 67)) ;; chord
 (define *scale* (pc:scale 0 'aeolian)) ;; scale
 
+;; scale, qnt and rel take an optional *scale* argument
 (define scale
   (lambda (octave num . args)
-    (let ((skip (if (null? args) 1 (car args))))
-      (map (lambda (x) (pc:relative (+ 12 (car *scale*) (* 12 octave)) (* skip x) *scale*)) (range 0 num)))))
+    (let ((scale (if (null? args) *scale*
+                     (map (lambda (pitch)
+                            (modulo pitch 12))
+                          (car args)))))
+      (map (lambda (x)
+             (pc:relative (+ 12 (car scale) (* 12 octave)) x scale))
+           (range 0 num)))))
 
 (define qnt
   (lambda (pitch . args)
