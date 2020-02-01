@@ -1,4 +1,3 @@
-
 ;; multilight.xtm
 ;;
 ;; opengl example using 100% shader pipeline
@@ -86,10 +85,10 @@
         (view_matrix:float* (alloc 16))
         (projection_matrix:float* (alloc 16))
         (mata:float* (alloc 4))
-        (matd:float* (alloc 4))        
+        (matd:float* (alloc 4))
         (mats:float* (alloc 4))
         (_angle:float* (alloc 10))
-        (_power:float* (alloc 10))        
+        (_power:float* (alloc 10))
         (_spotpos:float* (alloc (* lights 4)))
         (spotpos:float* null)
         (_spottgt:float* (alloc (* lights 4)))
@@ -101,31 +100,31 @@
         (_ambient_light:float* (alloc (* lights 4))))
     ;; warm for light 1!
     (pfill! (pref-ptr _ambient_light 0) 1.0 0.8 0.5 1.0)
-    (pfill! (pref-ptr _specular_light 0) 1.0 1.0 1.0 1.0) 
+    (pfill! (pref-ptr _specular_light 0) 1.0 1.0 1.0 1.0)
     (pfill! (pref-ptr _diffuse_light 0) 1.0 0.8 0.5 1.0)
     ;; red for light 2!
     (pfill! (pref-ptr _ambient_light 4) 0.0 0.0 0.0 1.0)
-    (pfill! (pref-ptr _specular_light 4) 1.0 0.0 0.0 1.0) 
+    (pfill! (pref-ptr _specular_light 4) 1.0 0.0 0.0 1.0)
     (pfill! (pref-ptr _diffuse_light 4) 1.0 0.1 0.0 1.0)
     ;; green for light 3!
     (pfill! (pref-ptr _ambient_light 8) 0.0 0.0 0.0 1.0)
-    (pfill! (pref-ptr _specular_light 8) 0.0 1.0 0.0 1.0) 
+    (pfill! (pref-ptr _specular_light 8) 0.0 1.0 0.0 1.0)
     (pfill! (pref-ptr _diffuse_light 8) 0.1 1.0 0.0 1.0)
     ;; camera always up and pointing to centre
     (pfill! target 0.0 0.0 0.0 1.0) ;; position vector gets w==1.0
     (pfill! up 0.0 1.0 0.0 0.0) ;; direction vector gets w==0.0
     (lambda (model1:xtm_node* model2:xtm_node* model3:xtm_node* degree:double)
-      ;; setup rotating spot light 
+      ;; setup rotating spot light
       (pfill! (pref-ptr _spottgt 0)
               (dtof (* 5.0 (cos (* degree .05))))
               -1.7
               (+ 11.0 (dtof (* 5.0 (sin (* degree .05)))))
               1.0)
-      (pfill! (pref-ptr _spotpos 0) 0.0 -2.8 11.0 1.0)      
+      (pfill! (pref-ptr _spotpos 0) 0.0 -2.8 11.0 1.0)
       ;; (pfill! (pref-ptr _spotpos 0) (+ .5 (dtof (* 8.0 (cos (* degree 0.05))))) 1.0 20.0 1.0)
       ;; setup second light as fixed
       ;; (pfill! (pref-ptr _spottgt 4) (+ .5 (dtof (* 10.0 (cos (* degree 0.05))))) 0.0 -1.0 1.0)
-      ;; (pfill! (pref-ptr _spotpos 4) (+ .5 (dtof (* 10.0 (cos (* degree 0.05))))) 2.0 20.0 1.0)      
+      ;; (pfill! (pref-ptr _spotpos 4) (+ .5 (dtof (* 10.0 (cos (* degree 0.05))))) 2.0 20.0 1.0)
       (pfill! (pref-ptr _spottgt 4) -3.0 0.0 0.0 1.0)
       (pfill! (pref-ptr _spotpos 4) 8.0 4.0 -2.0 1.0)
       (pfill! (pref-ptr _spottgt 8) -1.0 0.0 -1.0 1.0)
@@ -160,12 +159,12 @@
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
 
       (pset! _angle 0 40.0)
-      (pset! _power 0 60.0) ;; 60      
+      (pset! _power 0 60.0) ;; 60
       (pset! _angle 1 60.0)
-      (pset! _power 1 40.0) ;; 40 
+      (pset! _power 1 40.0) ;; 40
       (pset! _angle 2 60.0)
       (pset! _power 2 60.0) ;; 60
-      
+
       (dotimes (i lights)
         (set! light_view_matrix (pref-ptr _light_view_matrix (* i 16)))
         (set! spottgt (pref-ptr _spottgt (* i 4)))
@@ -189,28 +188,28 @@
         (assimp_draw_model model2 simpleshader model_matrix light_view_matrix projection_matrix lights _light_view_matrix)
         (assimp_draw_model model1 simpleshader model_matrix light_view_matrix projection_matrix
                             lights _light_view_matrix))
-      
+
       ;; turn everything FBO
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
-      
+
       ;;
       ;; Finally we render the scene to the window
       ;; using the FBO depth buffer as a shadow map
-      ;;      
+      ;;
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
-      (glUseProgram shadowshader)      
+      (glUseProgram shadowshader)
       ;; clear main framebuffer
       (glClearColor 0.0 0.0 0.0 1.0)
-      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))           
-      
+      (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+
       ;; setup shadowmap textures
-      ;;(set! fbo (get-fbo)) ;; get fbo for this lights shadow      
+      ;;(set! fbo (get-fbo)) ;; get fbo for this lights shadow
       (glActiveTexture GL_TEXTURE0) ;; texture unit 0 for shadowMap
       (glBindTexture GL_TEXTURE_2D (tref fbo 2))
-      
-      (glUniform1i (glGetUniformLocation shadowshader "shadowMap") 0)      
+
+      (glUniform1i (glGetUniformLocation shadowshader "shadowMap") 0)
       ;; setup light
       (shader_update_lights shadowshader lights _spotpos _spottgt
                             _angle _power ;;30.0 30.0
@@ -221,35 +220,35 @@
       (shader_update_camera shadowshader eye target)
       (dotimes (i lights)
         (fill_view_matrix (pref-ptr _light_view_matrix (* i 16))
-                          (pref-ptr _spotpos (* i 4)) (pref-ptr _spottgt (* i 4)) up)) ;; lights view matrix      
+                          (pref-ptr _spotpos (* i 4)) (pref-ptr _spottgt (* i 4)) up)) ;; lights view matrix
       (shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       ;; draw scene
       (glViewport 0 0 (ftoi32 (* 1.0 width)) (ftoi32 (* 1.0 height))) ;; window size
       (glDisable GL_CULL_FACE) ;; turn face culling off
       (fill_identity_matrix model_matrix)
       (translate_matrix model_matrix -3.0 -2.9 -1.0)
-      (scale_matrix model_matrix 1.5 1.5 1.5)      
+      (scale_matrix model_matrix 1.5 1.5 1.5)
       (shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       (assimp_draw_model model3 shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
-      (fill_identity_matrix model_matrix) ;; reset model matrix 
+      (fill_identity_matrix model_matrix) ;; reset model matrix
       (shader_update_matrices_lvs shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       (assimp_draw_model model2 shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
       (assimp_draw_model model1 shadowshader model_matrix view_matrix projection_matrix lights _light_view_matrix)
-      
+
       ;; turn everything off again.
       (glActiveTexture GL_TEXTURE0)
       (glBindTexture GL_TEXTURE_2D 0)
-      
+
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
 
-      (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0      
+      (glDisable GL_TEXTURE_2D) ;; unbind texture unit 0
       ;; turn off texture 2d
       ;; (glDisable GL_TEXTURE_2D)
 
       ;; print errors?
       (gl_print_error)
-      
+
       void)))
 
 

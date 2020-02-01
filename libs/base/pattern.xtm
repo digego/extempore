@@ -132,7 +132,7 @@
   (matcher:make
    'single
    (lambda (datum sofar success)
-     
+
      (let lp
          ((datum datum)
           (sofar sofar)
@@ -159,7 +159,7 @@
                                (lp (list-tail datum n)
                                    result
                                    (cdr subpatterns)))))
-                               
+
                       (else
                        (println ";" type)
                        (error "Uknown matcher type"))))))))
@@ -218,7 +218,7 @@
                       (lambda (result)
                         (cdr-proc (cdr datum) result success)))))
      (no-dups (append (matcher:variables car-pattern)
-                      (matcher:variables cdr-pattern))))))                              
+                      (matcher:variables cdr-pattern))))))
 
 
 
@@ -245,7 +245,7 @@
 (define (predicate-var? datum)
   (and (list? datum)
        (> (length datum) 1)
-       (eqv? (first datum) '?)))       
+       (eqv? (first datum) '?)))
 
 ;;@ignore
 ;; ??<name>
@@ -350,7 +350,7 @@
 ;; True if c{pattern} matches c{datum}, false otherwise.
 (define (p:matches? pattern datum)
   (p:if-matches pattern datum (constant #t) (constant #f)))
-            
+
 
 
 
@@ -389,7 +389,7 @@
              (cons (cons `(,mr (p:assert-match ,(list 'quasiquote pattern) ,datum))
                          (car next-bindings))
                    (append bindings (cdr next-bindings))))))))
-           
+
 
 ;; Matches patterns against datums, and executes c{body} in an environment
 ;; with pattern variables bound. For example, here's how
@@ -410,7 +410,7 @@
 ;;
 ;; (vector-add vec1 vec2)
 ;; ;Value 86: (4 . 6)
-;;</pre> 
+;;</pre>
 ;; @args ({(pattern datum)}) body
 (define-syntax plet
   (er-macro-transformer
@@ -418,18 +418,18 @@
      (let ((pattern-pairs (cadr expr))    ; pattern-pairs := {(pattern_i datum_i)}
            (body          (cddr expr)))   ; body of the plet (everything after pattern-pairs)
        (cond ((null? pattern-pairs) `(let () ,@body)) ; no patterns to match, i.e. (plet () body)
-             
-             (else ; at least one pattern to match              
+
+             (else ; at least one pattern to match
               (let ((bindings (plet-make-bindings pattern-pairs rename)))
                 `(let ,(car bindings)
                    (let ,(cdr bindings)
                      ,@body)))))))))
-                                   
+
 
 
 
 ;; Like c{plet}, but each subsequent pattern-datum pair is evaluated in an environment
-;; with all previous matches bound. 
+;; with all previous matches bound.
 ;; <pre>
 #|
 (plet* ((p1 d1)
@@ -464,7 +464,7 @@
               `(plet ,(list (car pattern-pairs))
                      (plet* ,(cdr pattern-pairs)
                             ,@body))))))))
-             
+
 
 ;; @ignore
 ;; True if c{obj} is a procedure that dispatches
@@ -551,8 +551,8 @@
                           (zip patterns (range 0 (length patterns))))
                     ,@body))
             ,@predicates))))))
-             
-                                   
+
+
 
 ;; @args datum {(pattern {expression})}
 ;; Looks for the first c{pattern} that matches c{datum}, and executes
@@ -592,7 +592,3 @@
          (pcase  datum)))
     ((pcase datum)
      #!unspecific)))
-
-
-
-

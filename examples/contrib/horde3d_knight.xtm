@@ -10,7 +10,7 @@
 ;; Knight example that comes with Horde3D.
 ;;
 ;; Also demonstrates running opengl rendering in secondary process
-;; 
+;;
 ;; NOTE!:
 ;; a) You will need to load the horde3d.xtm to bind to Horde3D
 ;; b) You will need to change the resource path to match your system!
@@ -43,7 +43,7 @@
   ;; some of the shaders in the graphics pipeline use older glsl
   ;; versions, so we need a "compatibility" graphics context
   (begin
-    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))    
+    (glfwSetErrorCallback (convert (get_native_fptr glfw_error_callback)))
     ;;(glfw_init_and_create_interaction_compatibility_window width height)))
     (glfw_init_and_create_fullscreen_compatibility_window)))
 
@@ -93,19 +93,19 @@
 
 (bind-func h3d_init
   (let ((hand -1)
-	(matRes -1)
-	(envRes -1)
-	(knightRes -1)
-	(knightAnim1Res -1)
-	(knightAnim2Res -1)
-	(particleSysRes -1)
-	)
+  (matRes -1)
+  (envRes -1)
+  (knightRes -1)
+  (knightAnim1Res -1)
+  (knightAnim2Res -1)
+  (particleSysRes -1)
+  )
     (lambda ()
       (if (h3dInit)
-	  (printf "Successfully Inited Horde3D\n")
-	  (begin (h3dutDumpMessages)
-		 (printf "Failed to init Horde3D\n")))
-      
+    (printf "Successfully Inited Horde3D\n")
+    (begin (h3dutDumpMessages)
+     (printf "Failed to init Horde3D\n")))
+
       ;; set options
       (h3dSetOption H3DOptions_LoadTextures 1.0)
       (h3dSetOption H3DOptions_TexCompression 0.0)
@@ -116,7 +116,7 @@
       ;; set resources
       (set! _hdrPipeRes (h3dAddResource H3DResTypes_Pipeline "pipelines/hdr.pipeline.xml" 0))
       (set! _forwardPipeRes (h3dAddResource H3DResTypes_Pipeline "pipelines/forward.pipeline.xml" 0))
-      
+
       (set! envRes (h3dAddResource H3DResTypes_SceneGraph "models/sphere/sphere.scene.xml" 0))
       (set! knightRes (h3dAddResource H3DResTypes_SceneGraph "models/knight/knight.scene.xml" 0))
       (set! knightAnim1Res (h3dAddResource H3DResTypes_Animation "animations/knight_order.anim" 0))
@@ -125,25 +125,25 @@
 
       ;; load resources: you might need to change this for your system
       (if (h3dutLoadResourcesFromDisk resources_path)
-      	  (printf "succesfully loaded resouces\n")
-      	  (printf "failed to load resources\n"))
+          (printf "succesfully loaded resouces\n")
+          (printf "failed to load resources\n"))
 
       ;; log any errors to Horde3D_Log.html
-      (h3dutDumpMessages)                  
+      (h3dutDumpMessages)
 
       ;; add camera
       (set! _cam (h3dAddCameraNode H3DRootNode "Camera" _hdrPipeRes))
       ;; add environment
       (set! env (h3dAddNodes H3DRootNode envRes))
       (h3dSetNodeTransform env 0.0 -20.0 0.0
-      			       0.0  0.0  0.0
-      			       20.0 20.0 20.0)
-      
+                   0.0  0.0  0.0
+                   20.0 20.0 20.0)
+
       ;; add knight
       (set! Knight (h3dAddNodes H3DRootNode knightRes))
       (h3dSetNodeTransform Knight 0.0 0.0   0.0
-      			           0.0 180.0 0.0
-      				   0.1 0.1   0.1)
+                       0.0 180.0 0.0
+                 0.1 0.1   0.1)
       (h3dSetupModelAnimStage Knight 0 knightAnim1Res 0 "" #f)
       (h3dSetupModelAnimStage Knight 1 knightAnim2Res 0 "" #f)
 
@@ -152,16 +152,16 @@
       (set! hand (h3dGetNodeFindResult 0))
       (set! _particleSys (h3dAddNodes hand particleSysRes))
       (h3dSetNodeTransform _particleSys 0.0  40.0 0.0
-      			                90.0 0.0  0.0
-      					1.0  1.0  1.0)
+                            90.0 0.0  0.0
+                1.0  1.0  1.0)
       ;; attached 2nd particle system to root node
       ;; (set! _particleSys2 (h3dAddNodes H3DRootNode particleSysRes))
-      
+
       ;; add light source
       (set! light (h3dAddLightNode H3DRootNode "Light1" 0 "LIGHTING" "SHADOWMAP"))
       (h3dSetNodeTransform light 0.0   15.0 10.0
-      			         -60.0 0.0  0.0
-      				 1.0   1.0  1.0)
+                     -60.0 0.0  0.0
+               1.0   1.0  1.0)
       (h3dSetNodeParamF light H3DLight_RadiusF 0 30.0)
       (h3dSetNodeParamF light H3DLight_FovF 0 90.0)
       (h3dSetNodeParamI light H3DLight_ShadowMapCountI 1)
@@ -170,9 +170,9 @@
       (h3dSetNodeParamF light H3DLight_ColorF3 1 0.8)
       (h3dSetNodeParamF light H3DLight_ColorF3 2 0.7)
       (h3dSetNodeParamF light H3DLight_ColorMultiplierF 0 1.0)
-      
+
       (resize (convert width) (convert height))
-      
+
       1)))
 
 (bind-val Head i8* "Bip01_Head")
@@ -189,14 +189,14 @@
 ;; (bind-func model_anim
 ;;   (lambda (_at:double)
 ;;     (rotate-joint Knight
-;;                   "Bip01_Neck"                    
+;;                   "Bip01_Neck"
 ;;                   0.0
 ;;                   (+ 10.0 (dtof (* 30.0 (cos (* 2/1 3.141592 _at)))))
 ;;                   0.0)
 ;;     (rotate-joint Knight
 ;;                   "Bip01_Spine2"
-;;                   (dtof (* 30.0 (sin (* 1/2 PI _at))))                    
-;;                   0.0 
+;;                   (dtof (* 30.0 (sin (* 1/2 PI _at))))
+;;                   0.0
 ;;                   (dtof (* 50.0 (cos (* 1/2 PI _at)))))
 ;;     void))
 
@@ -214,15 +214,15 @@
       (h3dSetOption H3DOptions_DebugViewMode 0.0)
       (h3dSetOption H3DOptions_WireframeMode 0.0)
       (set! _at (+ _at 0.025))
-      
+
       (let ((cnt (h3dFindNodes _particleSys "" H3DNodeTypes_Emitter))
             (i 0))
-      	(dotimes (i cnt)
-      	  (h3dUpdateEmitter (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
-      
-      (h3dUpdateModel Knight 1)                                                
+        (dotimes (i cnt)
+          (h3dUpdateEmitter (h3dGetNodeFindResult i) (/ 1.0 _curFPS))))
+
+      (h3dUpdateModel Knight 1)
       (h3dSetModelAnimParams Knight 0 (* (dtof (* 0.5 _at)) 24.0) 24.0) ;_weight)
-      
+
       (model_update (dtof _at))
 
       (h3dSetNodeTransform light
@@ -242,7 +242,7 @@
       (h3dRender _cam)
       (h3dFinalizeFrame)
       (h3dClearOverlays)
-      (h3dutDumpMessages)      
+      (h3dutDumpMessages)
       1)))
 
 
@@ -251,7 +251,7 @@
   (lambda (beat dur)
     (set! dur 1/16)
     ;; (if (< (*metro* beat) (now))
-    ;; 	(println 'opengl-test-behind (- (*metro* beat) (now))))
+    ;;  (println 'opengl-test-behind (- (*metro* beat) (now))))
     (mainLoop beat)
     (glfw_poll_events)
     (glfw_swap_buffers (get_window))
@@ -270,7 +270,7 @@
 
 ;; setup new process
 ;; (let ((proc "opengl"))
-;;   (ipc:new proc 7095)  
+;;   (ipc:new proc 7095)
 ;;   (sys:sleep 11025)
 ;;   (ipc:bind-func proc 'mainLoop)
 ;;   (ipc:bind-func proc 'h3d_init)
@@ -278,4 +278,3 @@
 ;;   (ipc:define proc 'opengl-test opengl-test)
 ;;   (ipc:define proc 'start start)
 ;;   (ipc:call-async proc 'start))
-

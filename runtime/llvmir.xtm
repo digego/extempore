@@ -317,7 +317,7 @@
 
 (define impc:ir:get-type-from-pretty-str
   (lambda (string-type . args)
-    ;; (println 'pretty-string-type-in string-type)   
+    ;; (println 'pretty-string-type-in string-type)
     (let ((res (apply impc:ir:get-type-from-pretty-str-rec string-type args)))
       ;; (println 'pretty-string-type string-type 'to res)
       res)))
@@ -405,7 +405,7 @@
                      ;;               (string=? (car p) (car args))))
                      ;;     (println "I *think* I'm a reified type!" (car p) " with:" p " and: " args))
                      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                     
+
                      ;; (println '------ 'p p 'gtype-all gtype-all)
                      ;; (println 'type-all type-all)
                      ;; (println 'hitmarck gtype-all type-all)
@@ -464,7 +464,7 @@
                     (tup (impc:ir:get-pretty-tuple-arg-strings argstr))
                     (max (impc:ti:maximize-generic-type base)))
                ;; if base does not exist as a
-               ;; (println 'base base 'p p 'argstr argstr 'args args)               
+               ;; (println 'base base 'p p 'argstr argstr 'args args)
                (if (not (or (impc:ti:namedtype-exists? (car p))
                             (impc:ti:generictype-exists? (car p))
                             (and (not (null? args))
@@ -475,7 +475,7 @@
                ;; (if (not (string-contains? argstr "!")) ;; if no bangs present we can reify
                ;;     (println "I *think* I'm a reified type!" p " with:" argstr " tup:" tup 'max: max 'st: string-type))
                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-               ;; (println 'bingo----> p) 
+               ;; (println 'bingo----> p)
                ;; I want the follow two lines but ... :(
                (if (not (string-contains? argstr "!")) ;; I don't what this one :( I want the next two :)
                ;; (if (and (not (string-contains? argstr "!")) ;; if no bangs present we can reify
@@ -1222,8 +1222,8 @@
     (let* ((os (make-string 0))
            (cnt 0))
       (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
-      	    (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-      	    os)
+            (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+            os)
                                         ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
       (emit (impc:ir:gname "string" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
             (car (impc:ir:gname "zone")) ", i64 " (number->string (+ 1 (string-length ast))) ")\n" os)
@@ -1243,12 +1243,12 @@
   (lambda (ast)
     (let* ((os (make-string 0))
            (lgthstr1 (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
-           (lgthstr2 (if (and *impc:aot:current-output-port* (not *impc:compiler:aot:dll*)) 
+           (lgthstr2 (if (and *impc:aot:current-output-port* (not *impc:compiler:aot:dll*))
                          (regex:replace-all lgthstr1 "[\n]" "x") ;(if (string=? (sys:platform) "Windows") "xx" "x"))
                          lgthstr1))
            (lgth (number->string (+ (string-length lgthstr2) 1))) ;; unix & windows above just used to determine string length
            (strtyp (string-append "[" lgth " x i8]*"))
-           (strname (string-append "@gs" (if (string? *impc:compiler:global-module-name*) *impc:compiler:global-module-name* "") 
+           (strname (string-append "@gs" (if (string? *impc:compiler:global-module-name*) *impc:compiler:global-module-name* "")
                                    (if #f ;;(< (string-length ast) 1024)
                                        (cname-encode ast)
                                        (number->string *impc:ir:gstrcnt*))))
@@ -1563,7 +1563,7 @@
       ; (println 'code: code)
       ; (println 'mynewtype: mynewtype)
       ; (println 'newtype2 (impc:ir:pretty-print-type mynewtype))
-                
+
       ;; first we make the function code
       ;; define fastcc function with return type
       (emit  "define dllexport ccc " (impc:ir:get-type-str rettype) " @" name "(" os)
@@ -1572,7 +1572,7 @@
       (emit ") nounwind inlinehint {\n" os)
       (emit "entry:\n" os)
 
-      ;; mem zone  
+      ;; mem zone
       (emit (impc:ir:gname "zone" "%mzone*") " = call ccc %mzone* @llvm_peek_zone_stack()\n" os)
       (emit "%_impz = bitcast %mzone* " (car (impc:ir:gname "zone")) " to i8*\n" os)
       (emit "%_impzPtr = alloca i8*\n" os)
@@ -1626,7 +1626,7 @@
       ;; (println 'compout: *impc:ir:sym-name-stack*)
       (emit "\n" os)
       (emit body-str os)
-          
+
       (impc:ir:gname "result" (impc:ir:get-type-str fulltype))  ;; (car result) (cadr result))
       ;;(emit (impc:ir:compiler code types) os)
       ;;(emit  "ret " (impc:ir:get-type-str rettype) " " (car (impc:ir:gname)) "\n" os)
@@ -1696,8 +1696,8 @@
 
                                         ;(emit "call ccc void @llvm_print_i32(i32 333)\n" os)
                      ;; (if (pair? value)
-                     ;; 	 (emit (car value) os)
-                     ;; 	 (emit value os))
+                     ;;    (emit (car value) os)
+                     ;;    (emit value os))
                      (list symstr typestr value e)))
                  (caddr ast))))
                                         ;(emit "call ccc void @llvm_print_i32(i32 444)\n" os)
@@ -2543,7 +2543,7 @@
 
 (define impc:ir:compiler:set!
   (lambda (ast types)
-    (let* ((os (make-string 0))           
+    (let* ((os (make-string 0))
            (global? (impc:ti:globalvar-exists? (symbol->string (cadr ast)))) ;; are we are setting a global variable?
            (gtype (if global? (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string (cadr ast)))) #f))
            (t (if global? gtype
@@ -2701,7 +2701,7 @@
       (if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
           (impc:compiler:print-bad-type-error-with-ast (cadr ttype) "aset! must take a pointer to an array" ast)
                                         ;(begin (emit (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = insertvalue "
-                                        ;		  (cadr var) " " (car var) ", " (cadr val) " " (car val) ", " (car idx) "\n" os))
+                                        ;     (cadr var) " " (car var) ", " (cadr val) " " (car val) ", " (car idx) "\n" os))
           (begin (emit (impc:ir:gname "val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
                        " = getelementptr " (impc:ir:pointer-- (cadr var)) ", " (cadr var) " " (car var)
                        ", i32 0, " (cadr idx) " " (car idx) "\n" os)
@@ -2980,7 +2980,7 @@
       "")))
 
 ;; returns the size of the object (first argument)
-;; optional second argument is a dereference object 
+;; optional second argument is a dereference object
 ;; which should be an number starting at 0 (for no dereference) and increasing for each level of dereference...
 ;; returns the size as an i64
 (define impc:ir:compiler:obj-size
@@ -3034,8 +3034,8 @@
              (typesize (number->string (impc:ir:get-type-size tt))))
         ;;(impc:ir:convert-from-pretty-types (car hint?)))))
         ;; (tt (if (null? (cddr ast))
-        ;; 	     (impc:ir:pointer-- (impc:ir:convert-from-pretty-types (car hint?)))
-        ;; 	     (impc:ir:convert-from-pretty-types (caddr ast)))))
+        ;;       (impc:ir:pointer-- (impc:ir:convert-from-pretty-types (car hint?)))
+        ;;       (impc:ir:convert-from-pretty-types (caddr ast)))))
         (if (not (impc:ir:fixed-point? t))
             (impc:compiler:print-bad-type-error-with-ast (impc:ir:get-type-str t) "alloc size must be an integer" ast))
         (emit idx-str os)
@@ -3099,7 +3099,7 @@
         (if (not (impc:ir:fixed-point? t))
             (impc:compiler:print-bad-type-error (impc:ir:get-type-str t) "alloc size must be an integer"))
         (emit idx-str os)
-	      ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         (if (not (member t (list *impc:ir:si64* *impc:ir:ui64*)))
             (begin (emit (string-append (impc:ir:gname "tmp" "i64") " = zext " (impc:ir:get-type-str t) " "
                                         (car idx) " to i64\n") os)
@@ -3163,7 +3163,7 @@
             (impc:ir:compiler:zone-alloc-without-size ast types hint?)
             (impc:ir:compiler:zone-alloc-with-size ast types hint?))
         (if (= (length ast) 1)
-          	(impc:ir:compiler:stack-alloc-without-size ast types hint?)
+            (impc:ir:compiler:stack-alloc-without-size ast types hint?)
             (impc:ir:compiler:stack-alloc-with-size ast types hint?)))))
 
 
@@ -3232,15 +3232,15 @@
       ;; do a check for recursive type!
       ;; PROBABLY DON'T NEED THIS NOW WE HAVE NAMED TYPES?
       ;; (if (and (atom? element-type)
-      ;; 	  (< element-type -1))
+      ;;    (< element-type -1))
       ;;     (let* ((tuples-ptr-depth (floor (/ (car tuple-type) (* 1 *impc:ir:pointer*))))
-      ;; 	    (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
-      ;; 	    (tt tuple-type))
+      ;;      (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
+      ;;      (tt tuple-type))
       ;;       (dotimes (i ptr-depth)
-      ;; 	 (set! tt (impc:ir:pointer++ tt)))
+      ;;   (set! tt (impc:ir:pointer++ tt)))
       ;;       (set! ttstr (impc:ir:get-type-str tt))))
       ;; this code here to support basic type recursion (only depth \2)
-	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (if (> (impc:ir:get-ptr-depth tuple-type) 1)
           (impc:compiler:print-bad-type-error tuple-type "trying to ref from a tuple pointer" ast)
           (if (< (impc:ir:get-ptr-depth tuple-type) 1)
@@ -3285,15 +3285,15 @@
       ;; do a check for recursive type!
       ;; PROBABLY DON'T NEED THIS NOW WE HAVE NAMED TYPES?
       ;; (if (and (atom? element-type)
-      ;; 	  (< element-type -1))
+      ;;    (< element-type -1))
       ;;     (let ((tuples-ptr-depth (floor (/ (car tuple-type) (* 1 *impc:ir:pointer*))))
-      ;; 	   (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
-      ;; 	   (tt tuple-type))
+      ;;     (ptr-depth (- (floor (/ element-type (* -1 *impc:ir:pointer*))) tuples-ptr-depth))
+      ;;     (tt tuple-type))
       ;;       (dotimes (i ptr-depth)
-      ;; 	 (set! tt (impc:ir:pointer++ tt)))
+      ;;   (set! tt (impc:ir:pointer++ tt)))
       ;;       (set! ttstr (impc:ir:get-type-str tt))))
       ;; this code here to support basic type recursion (only depth \2)
-	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       (if (<> (impc:ir:get-ptr-depth tuple-type) 1)
           (impc:compiler:print-bad-type-error-with-ast tuple-type "bad tuple type" ast))
       (emit (string-append (impc:ir:gname "val" (string-append ttstr "*")) " = getelementptr "
@@ -3722,19 +3722,19 @@
         ;; ;; if vector math operations then copy the result into a new
         ;; ;; vector pointer (zone allocated)
         ;; (if (impc:ir:vector? (cadr aval))
-        ;; 	(let* ((mathval (impc:ir:gname "val"))
-        ;; 	       (mathtype (impc:ir:get-type-from-str (cadr mathval)))
-        ;; 	       (zallocsize (impc:ir:get-type-size mathtype)))
-        ;; 	  (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
-        ;; 		(impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
-        ;; 		os)
-        ;; 	  (emit (impc:ir:gname "newdat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
-        ;; 		(car (impc:ir:gname "zone")) ", i64 " (number->string zallocsize) ")\n" os)
-        ;; 	  (emit (impc:ir:gname "oldvect" (string-append (cadr mathval) "*")) " = alloca " (cadr mathval) "\n" os)
-        ;; 	  (emit "store " (cadr mathval) " " (car mathval) ", " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) "\n" os)
-        ;; 	  (emit (impc:ir:gname "olddat" "i8*") " = bitcast " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) " to i8*\n" os)
-        ;; 	  (emit "call i8* @memcpy(i8* " (car (impc:ir:gname "newdat")) ", i8* " (car (impc:ir:gname "olddat")) ", i64 " (number->string zallocsize) ")\n" os)
-        ;; 	  (emit (impc:ir:gname "newvect" (string-append (cadr mathval) "*")) " = bitcast i8* " (car (impc:ir:gname "newdat")) " to " (string-append (cadr mathval) "*") "\n" os)))
+        ;;  (let* ((mathval (impc:ir:gname "val"))
+        ;;         (mathtype (impc:ir:get-type-from-str (cadr mathval)))
+        ;;         (zallocsize (impc:ir:get-type-size mathtype)))
+        ;;    (emit (impc:ir:gname "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+        ;;    (impc:ir:gname "zone" "%mzone*") " = bitcast i8* " (car (impc:ir:gname "tzone")) " to %mzone*\n"
+        ;;    os)
+        ;;    (emit (impc:ir:gname "newdat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
+        ;;    (car (impc:ir:gname "zone")) ", i64 " (number->string zallocsize) ")\n" os)
+        ;;    (emit (impc:ir:gname "oldvect" (string-append (cadr mathval) "*")) " = alloca " (cadr mathval) "\n" os)
+        ;;    (emit "store " (cadr mathval) " " (car mathval) ", " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) "\n" os)
+        ;;    (emit (impc:ir:gname "olddat" "i8*") " = bitcast " (cadr (impc:ir:gname "oldvect")) " " (car (impc:ir:gname "oldvect")) " to i8*\n" os)
+        ;;    (emit "call i8* @memcpy(i8* " (car (impc:ir:gname "newdat")) ", i8* " (car (impc:ir:gname "olddat")) ", i64 " (number->string zallocsize) ")\n" os)
+        ;;    (emit (impc:ir:gname "newvect" (string-append (cadr mathval) "*")) " = bitcast i8* " (car (impc:ir:gname "newdat")) " to " (string-append (cadr mathval) "*") "\n" os)))
         (impc:ir:strip-space os)))))
 
 
@@ -3980,8 +3980,8 @@
                  (impc:ir:strip-space os))
           ;; finally append %ifptr alloca to front of string
                                         ;(string-append "\n; alloca if pointer\n"
-                                        ;		   "%ifptr" num " = alloca " (cadr a) "\n"
-                                        ;		   (impc:ir:strip-space os)))
+                                        ;      "%ifptr" num " = alloca " (cadr a) "\n"
+                                        ;      (impc:ir:strip-space os)))
           (impc:ir:strip-space os)))))
 
 
@@ -4041,7 +4041,7 @@
 
       (emit (impc:ir:gname "funcptr_ptr" "i8*") " = call ccc i8* @llvm_get_function_ptr(i8* " (car callback_func_name) ")\n" os)
       (emit (impc:ir:gname "funcptr" "void(i8*, %mzone*)*") " = bitcast i8* " (car (impc:ir:gname "funcptr_ptr")) " to void(i8*, %mzone*)*\n" os)
-          
+
       (emit cbzonestr os)
 
       (emit (apply string-append (map (lambda (a n)
@@ -4466,4 +4466,3 @@
              (let ((a (impc:ir:compiler (car ast) types))
                    (b (impc:ir:compiler (cdr ast) types)))
                (string-append a b)))))))
-

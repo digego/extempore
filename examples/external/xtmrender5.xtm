@@ -1,4 +1,3 @@
-
 ;; xtmrender.xtm
 ;;
 ;; using the default xtm OpenGL pipeline
@@ -71,31 +70,31 @@
   (lambda (frame shader m v p data)
     (xtm_light_pos 1 0.0 5.0 15.0)
     (xtm_light_tgt 1 0.0 0.0 0.0) ;; was 2
-    (xtm_light_up 1 0.0 1.0 0.0)        
+    (xtm_light_up 1 0.0 1.0 0.0)
     (xtm_light_diffuse 1 1.0 0.9 0.7 1.0)
     (xtm_light_ambient 1 0.0 0.0 0.0 1.0)
-    (xtm_light_specular 1 1.0 1.0 1.0 1.0)    
+    (xtm_light_specular 1 1.0 1.0 1.0 1.0)
     (xtm_light_power 1 10.0)
     (xtm_light_angle 1 60.0)
-    
+
     (xtm_light_pos 2 5.0 5.0 15.0)
     (xtm_light_tgt 2 1.0 0.0 0.0) ;; was 2
-    (xtm_light_up 2 0.0 1.0 0.0)        
+    (xtm_light_up 2 0.0 1.0 0.0)
     (xtm_light_diffuse 2 1.0 0.3 0.6 1.0)
     (xtm_light_ambient 2 0.0 0.0 0.0 1.0)
-    (xtm_light_specular 2 1.0 1.0 1.0 1.0)    
+    (xtm_light_specular 2 1.0 1.0 1.0 1.0)
     (xtm_light_power 2 10.0)
     (xtm_light_angle 2 60.0)
 
     (xtm_light_pos 3 -10.0 5.0 10.0)
     (xtm_light_tgt 3 0.0 0.0 -5.0)
-    (xtm_light_up 3 0.0 1.0 0.0)        
+    (xtm_light_up 3 0.0 1.0 0.0)
     (xtm_light_diffuse 3 0.3 1.0 0.6 1.0)
     (xtm_light_specular 3 1.0 1.0 1.0 1.0)
-    (xtm_light_ambient 3 0.0 0.0 0.0 1.0)    
+    (xtm_light_ambient 3 0.0 0.0 0.0 1.0)
     (xtm_light_power 3 10.0)
     (xtm_light_angle 3 60.0)
-    
+
     (xtm_camera_pos 0.0 3.0 15.0)
     (xtm_camera_tgt 3.0 2.0 0.0)
     (xtm_camera_up 0.0 1.0 0.0)
@@ -108,11 +107,11 @@
     (let ((nodes:XTMModel** (cast data XTMModel**)))
       (rotate_matrix m (* .00005 (i64tof (now))) 0.0 1.0 0.0)
       (translate_matrix m 2.0 -1.9 0.0)
-      (scale_matrix m 1.5 1.5 1.5)      
+      (scale_matrix m 1.5 1.5 1.5)
       ;; (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 0) shader m v p)
       (fill_identity_matrix m)
-      ;; (xtm_update_matrices shader m v p)      
+      ;; (xtm_update_matrices shader m v p)
       (xtm_draw_model (pref nodes 1) shader m v p)
       (xtm_draw_model (pref nodes 2) shader m v p)
       void)))
@@ -130,25 +129,25 @@
         (nvgResetTransform vg)
         (nvgFillColor vg black)
         (nvgStrokeColor vg black)
-        (nvgStrokeWidth vg 2.0)        
-        (nvgBeginPath vg)       
+        (nvgStrokeWidth vg 2.0)
+        (nvgBeginPath vg)
         (nvgRect vg 50. 500. 411. 230.0)
         (nvgStroke vg)
         (nvgBeginPath vg)
-        (nvgRect vg 50. 680. 411. 50.0)        
+        (nvgRect vg 50. 680. 411. 50.0)
         (nvgFill vg)
         (nvgBeginPath vg)
-        (nvgFillColor vg white)        
+        (nvgFillColor vg white)
         (nvg_draw_text vg text r face 40.0:f)
         (nvgFill vg)
         (nvgEndFrame vg)
         void))))
 
-;; for 2d overlays etc.. 
+;; for 2d overlays etc..
 (bind-func postrender:XTMRENDERCB
   (let ((uvmat:float* (alloc 16))
         (pcopy (alloc 16)))
-    (lambda (frame shader m v p data)      
+    (lambda (frame shader m v p data)
       ;; in postrender we are responible for drawing the render_fbo!!
       ;; i.e. the actual scene!
       (xtm_draw_tex xtm_render_quad_shader (colour_tex (xtm_render_fbo)) m v p)
@@ -156,15 +155,15 @@
       (mcopy p 4 4 pcopy)
       ;; add picture in picture
       ;; first scale and translate the PIP to a size and location on screen
-      (scale_matrix pcopy 0.4 0.3 0.5) ;; flip the image (and possibly resize?)      
-      (translate_matrix pcopy -0.5 -0.6 0.0) ;; move the image somewhere?      
+      (scale_matrix pcopy 0.4 0.3 0.5) ;; flip the image (and possibly resize?)
+      (translate_matrix pcopy -0.5 -0.6 0.0) ;; move the image somewhere?
       ;; second uvmap translate/scale to zoom into peppino (i.e. zoom into fbo)
       (fill_identity_matrix uvmat)
       (scale_matrix uvmat 0.2 0.2 1.0)
-      (translate_matrix uvmat .4 .45 0.0)      
+      (translate_matrix uvmat .4 .45 0.0)
       ;; next setup blending for transparent draw
       (glEnable GL_BLEND)  ;; add for blending
-      (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)      
+      (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
       ;; finally draw the render_fbo again with a 0.7 alpha
       (xtm_draw_tex xtm_render_quad_shader (colour_tex (xtm_render_fbo)) uvmat #f 0.7 m v pcopy)
       ;; Finally use nano vg to draw some white text with a black background

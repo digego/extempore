@@ -3,8 +3,8 @@
 ;; a simple drum synthesizer for extempore
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-       
-;; 
+
+;;
 (bind-val DL_NOFILTER i64 -1)
 (bind-val DL_LPF i64 0)
 (bind-val DL_BPF i64 1)
@@ -16,7 +16,7 @@
 ;; reverb flanger and delay same as analogue
 
 (bind-type DLOGUE_PART <float,float,float,float,float,float,float,float,float,float,float,float,i64,float,float,i64,float,float,float,float,float,float,float,float,float,float> (constructor? . #f) (printer? . #f))
-  
+
 ;; oscs 1 & 2 -> setting pw to anything greater than 0.0 is PULSE osc1_wave otherwise SINE
 (bind-func dl_osc1_pitch (lambda (x:DLOGUE_PART*) (tref x 0)))
 (bind-func dl_osc1_pitch (lambda (x:DLOGUE_PART* v:float) (tset! x 0 v)))
@@ -187,7 +187,7 @@
     ;; base frq offset
     (dl_base_frq part 200.0) ;; in hz
     (dl_base_frq_scale part 2.0) ;; over 2 octaves
-    ;; fm    
+    ;; fm
     (dl_fm_h part 0.0)
     (dl_fm_idx part 0.0)
     void))
@@ -200,19 +200,19 @@
       (default_drum (aref-ptr KIT_CONFIGS 0) 70.0) ;; kick
       (default_drum (aref-ptr KIT_CONFIGS 1) 70.0) ;; kick
       (default_snare (aref-ptr KIT_CONFIGS 2) 130.0) ;; snare
-      (default_cym (aref-ptr KIT_CONFIGS 3) 300.0) ;; closed      
-      (default_cym (aref-ptr KIT_CONFIGS 4) 800.0) ;; open     
-      (default_drum (aref-ptr KIT_CONFIGS 5) 120.0) ;; low tom     
-      (default_drum (aref-ptr KIT_CONFIGS 6) 170.0) ;; mid tom     
-      (default_drum (aref-ptr KIT_CONFIGS 7) 210.0) ;; high tom     
+      (default_cym (aref-ptr KIT_CONFIGS 3) 300.0) ;; closed
+      (default_cym (aref-ptr KIT_CONFIGS 4) 800.0) ;; open
+      (default_drum (aref-ptr KIT_CONFIGS 5) 120.0) ;; low tom
+      (default_drum (aref-ptr KIT_CONFIGS 6) 170.0) ;; mid tom
+      (default_drum (aref-ptr KIT_CONFIGS 7) 210.0) ;; high tom
       (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
         (let ((starttime:i64 (note_starttime data))
               (midifrq:SAMPLE (frq2midi (note_frequency data)))
               (partnum:i64 (ftoi64 (/ midifrq 12.0)))
               (config:DLOGUE_PART* (aref-ptr KIT_CONFIGS partnum))
               (notetime:i64 starttime)
-              (frequency:SAMPLE (+ (dl_base_frq config) 
-                                   (* (dl_base_frq config) 
+              (frequency:SAMPLE (+ (dl_base_frq config)
+                                   (* (dl_base_frq config)
                                       (dl_base_frq_scale config) (/ (% midifrq 12.0) 12.0))))
               ;; (llllll (begin (println 'part: partnum 'frq: frequency 'amp: (dl_part_amp config)) 1:i64))
               (amplitude:SAMPLE (note_amplitude data))
@@ -233,7 +233,7 @@
               (tune1:SAMPLE (dl_osc1_pitch config))
               (tune2:SAMPLE (dl_osc2_pitch config))
               (pw1:SAMPLE (dl_osc1_pw config))
-              (pw2:SAMPLE (dl_osc2_pw config))        
+              (pw2:SAMPLE (dl_osc2_pw config))
               (osc1_wave:enum (if (> pw1 0.0) PARAM_PULSE PARAM_SINE))
               (osc2_wave:enum (if (> pw2 0.0) PARAM_PULSE PARAM_SINE))
               (noise:enum PARAM_WHITE) ;; white
@@ -248,10 +248,10 @@
               ; (follow_frq 0.0)
               ; (follow_amp 0.0)
               (filter1_frq:SAMPLE (+ (dl_filter1_frq config)
-                                     (* (dl_filter1_frq config) 
+                                     (* (dl_filter1_frq config)
                                         (dl_filter1_frq_scale config) (/ (% midifrq 12.0) 12.0))))
               (filter2_frq:SAMPLE (+ (dl_filter2_frq config)
-                                     (* (dl_filter2_frq config) 
+                                     (* (dl_filter2_frq config)
                                         (dl_filter2_frq_scale config) (/ (% midifrq 12.0) 12.0))))
               (filter1_res:SAMPLE (dl_filter1_res config))
               (filter2_res:SAMPLE (dl_filter2_res config))
@@ -269,7 +269,7 @@
               (amp_attack (aref amp_env 0))
               (amp_decay (aref amp_env 1))
               (amp_sustain (aref amp_env 2))
-              (amp_release (+ 3.0 (aref amp_env 3))) ;; a 3ms release minimum 
+              (amp_release (+ 3.0 (aref amp_env 3))) ;; a 3ms release minimum
               (amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
               (reltime:i64 0)
               (pitch_attack (aref pitch_env 0))
@@ -291,16 +291,16 @@
               (noise_out 0.0)
               (main_out 0.0:f))
           (lambda (time:i64 chan:i64)
-            (if (= chan 0) 
+            (if (= chan 0)
                 (begin
                   (set! notetime (tref data 7)) ;; look for voice steeling
                   ;; this for voice steeling
                   (if (and (<> starttime notetime) (>= time notetime))
                     (begin
                         (set! amplitude (note_amplitude data)) ;; reset envelopes
-                        (retrigger_adsr adsr1) 
-                        ;; (retrigger_adsr adsr2) 
-                        (retrigger_adsr adsr3) 
+                        (retrigger_adsr adsr1)
+                        ;; (retrigger_adsr adsr2)
+                        (retrigger_adsr adsr3)
                         (set! starttime (tref data 7)) ;(note_starttime data))
                         (set! reltime 0)
                         (set! gate 1.0) ;(note_gate data))
@@ -320,7 +320,7 @@
                         (note_active data #f)))
                   (if (FM)
                       (begin (set! osc2_out 0.0)
-                            (set! osc1_out 
+                            (set! osc1_out
                                   (sin1 (* (/ 5.0 (log frq)) osc1_amp)
                                       (+ frq
                                         (sin2 (* (* FM_H frq) FM_I)
@@ -344,12 +344,12 @@
                           (set! noise_out (* noise_amp (pink))))
                       (set! noise_out 0.0))
                   (set! main_out (+ osc1_out osc2_out noise_out))
-                  (if (> filter1_type DL_NOFILTER) 
-                      (begin 
+                  (if (> filter1_type DL_NOFILTER)
+                      (begin
                         (f1 main_out filter1_frq filter1_res f_out)
-                        (set! main_out (aref f_out filter1_type))))  
-                  (if (> filter2_type DL_NOFILTER) 
-                      (begin 
+                        (set! main_out (aref f_out filter1_type))))
+                  (if (> filter2_type DL_NOFILTER)
+                      (begin
                         (f2 main_out filter2_frq filter2_res f_out)
                         (set! main_out (aref f_out filter2_type))))
                   (set! main_out (* amp main_out))))
@@ -360,7 +360,7 @@
   (let ((MILLISEC (* .001 SRf))
         (CHANSF (i32tof CHANNELS)))
     (lambda ()
-      (let ((notekernel:NOTE_KERNEL null)           
+      (let ((notekernel:NOTE_KERNEL null)
             (mod_amp:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
             (mod_frq:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
             (mod_attack:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
@@ -375,7 +375,7 @@
             (hpf (hpf_c))
             (hpfR (hpf_c))
             (hpf_frq 20001.0)
-            (dly (comb_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay     
+            (dly (comb_mc_c (i32toi64 CHANNELS) (* SR 120))) ;; max 120 sec delay
             (delay_time_left 50.0) ;; in ms
             (delay_time_right 50.0) ;; in ms
             (delay_in 1.0)
@@ -389,7 +389,7 @@
             (reverb_size 0.3)
             (reverb_absorb 0.45)
             (pan (pan_c (i32toi64 CHANNELS)))
-            (pan_pos 0.5)          
+            (pan_pos 0.5)
             (pan_width 1.0)
             (flanger (flanger_st_c))
             (flanger_low 0.1) ;; in ms
@@ -434,12 +434,12 @@
                                  (aref mod_decay_slope idx))))
                         (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant
                         (let ((cnt 0)
-                              (rem:float (* (aref mod_amp i) (random)))) ;; random S & H 
-                          (lambda (chan:i64 idx:i64) 
-                            (if (and (= chan 0 ) 
+                              (rem:float (* (aref mod_amp i) (random)))) ;; random S & H
+                          (lambda (chan:i64 idx:i64)
+                            (if (and (= chan 0 )
                                      (= (% cnt (ftoi64 (/ SRf (aref mod_frq idx)))) 0))
-                                (begin 
-                                  (set! cnt (+ cnt 1)) 
+                                (begin
+                                  (set! cnt (+ cnt 1))
                                   (set! rem (* (aref mod_amp idx) (random)))))
                             rem)) ;; random S & H
                         ))) ;; constant

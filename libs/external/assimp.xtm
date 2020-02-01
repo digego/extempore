@@ -151,7 +151,7 @@
 (bind-val aiTextureType_DISPLACEMENT enum #x9)
 (bind-val aiTextureType_LIGHTMAP enum #xA)
 (bind-val aiTextureType_REFLECTION enum #xB)
-(bind-val aiTextureType_UNKNOWN enum #xC) 
+(bind-val aiTextureType_UNKNOWN enum #xC)
 
 (bind-type aiString <size_t,|1024,i8|> (printer? . #f))
 ;;(llvm:compile "%aiString = type {i64, |1024xi8|}
@@ -221,7 +221,7 @@
 (bind-lib libassimp aiGetMaterialString [i32,aiMaterial*,i8*,i32,i32,aiString*]*)
 (bind-lib libassimp aiGetMaterialFloatArray [i32,aiMaterial*,i8*,i32,i32,float*,i32*]*)
 (bind-lib libassimp aiGetMaterialIntegerArray [i32,aiMaterial*,i8*,i32,i32,i32*,i32*]*)
-;; aiReturn (aiMaterial* mat, aiTextureType type, uint index, aiString* path, aiTextureMapping* mapping, uint* uvindex, float* blend, aiTextureOp* op, aiTextureMapMode* mapmode, uint* flags) 
+;; aiReturn (aiMaterial* mat, aiTextureType type, uint index, aiString* path, aiTextureMapping* mapping, uint* uvindex, float* blend, aiTextureOp* op, aiTextureMapMode* mapmode, uint* flags)
 (bind-lib libassimp aiGetMaterialTexture [i32,aiMaterial*,i32,i32,aiString*,i32*,i32*,float*,i32*,i32*,i32*]*)
 ;; uint (aiMaterial* mat,i32 type)
 (bind-lib libassimp aiGetMaterialTextureCount [i32,aiMaterial*,i32]*)
@@ -293,7 +293,7 @@
 ;; GL_POINTS GL_LINES GL_TRIANGLE GL_QUADS or GL_POLYGON
 (bind-func ai_build_mesh_vbo
   (lambda (vao:VAO* mesh:aiMesh* xmesh:XTMMesh* modes:i32*)
-    ;; (printf "... mesh vbo\n")    
+    ;; (printf "... mesh vbo\n")
     (let ((i:i32 0) (j:i32 0) (k:i64 0)
           (vbodata:float* null)
           (max_active_bones:i32 0) ;; most active bones on any 1 vertex
@@ -323,7 +323,7 @@
       ;; precalc the total number of positions required
       ;; this is the total number of faces * the total number of
       ;; indexes per face
-      (dotimes (i num_faces)        
+      (dotimes (i num_faces)
         (set! face (pref-ptr faces i))
         (set! positions (+ positions (convert (tref face 0))))
         (set! indicies (tref face 1))
@@ -387,14 +387,14 @@
                       ))))
       (if (<> (+ 1 position_cnt) positions)
           (printf "Error: positions:%ld <> position_cnt:%ld" positions (+ position_cnt 1)))
-      (pset! modes 0 GL_TRIANGLES) ;;  face_mode)      
+      (pset! modes 0 GL_TRIANGLES) ;;  face_mode)
       ;; do bones!
       (dotimes (i num_bones)
         ;; do bones!
         (let ((bone:aiBone* (pref bones i))
               (xbone:XTMBone* (pref-ptr meshbones i))
               (num_weights:i32 (tref bone 1))
-              (weights:aiVertexWeight* (tref bone 2))              
+              (weights:aiVertexWeight* (tref bone 2))
               (weight:aiVertexWeight* null)
               (offsetmat:aiMatrix4x4* (tref-ptr bone 3))
               (xoffsetmat:float* (halloc 16))
@@ -447,7 +447,7 @@
         (set! idat (cast (pref-ptr vbodata (* k vbostride)) i32*))
         (dotimes (i num_bones)
           (set! tmp (+ tmp (pref dat i))))
-        ;; (println "vertidx:" k "vid:" (pref idat 0) "bones:" (pref idat 1) "total-weight:" tmp))        
+        ;; (println "vertidx:" k "vid:" (pref idat 0) "bones:" (pref idat 1) "total-weight:" tmp))
         (if (and (> tmp 0.01)
                  (< tmp 0.95))
             (println "Error weight for vert:" k "bones:" (pref idat 1) "total:" tmp)
@@ -496,13 +496,13 @@
                   (println tex)
                   ;; (set! texid (ai_load_ogl_texture_from_buffer texdata datasize 0))
                   void)
-                (begin 
+                (begin
                   (memset s2 0 lgth)
                   (memcpy s2 dir (strlen dir))
                   (memcpy (pref-ptr s2 (strlen dir)) s1 (tref texfile 0))
                   (println 'load-texture-from-file: (Str s2))
                   (set! tex (Texture (Str s2)))
-                  (update tex)                  
+                  (update tex)
                   (println tex)
                   ;; (set! texid (ai_load_ogl_texture s2 0))
                   void))))
@@ -525,7 +525,7 @@
       ;;             (println text)
       ;;             ;; (set! texid (ai_load_ogl_texture_from_buffer texdata datasize 0))
       ;;             void)
-      ;;           (begin 
+      ;;           (begin
       ;;             (memset s2 0 lgth)
       ;;             (memcpy s2 dir (strlen dir))
       ;;             (memcpy (pref-ptr s2 (strlen dir)) s1 (tref texfile 0))
@@ -538,7 +538,7 @@
 (bind-func ai_build_mesh
   (lambda (scene:aiScene* mesh:aiMesh* xmesh:XTMMesh* dir:i8*)
     ;; (printf "\tBuild Mesh\n")
-    (let ((facemode:i32* (salloc)) 
+    (let ((facemode:i32* (salloc))
           (vbo:VBO* null)
           (vao:VAO* (VAO))
           (color:aiColor4D* (salloc))
@@ -550,11 +550,11 @@
           (material_index (tref mesh 13))
           (material (pref (tref scene 5) material_index))
           ;; (texid 0)
-          (diffuse_tex:Texture* null) 
-          (normal_tex:Texture* null)  
+          (diffuse_tex:Texture* null)
+          (normal_tex:Texture* null)
           (specular_tex:Texture* null)
           (height_tex:Texture* null)
-          (texfile:aiString* (salloc))          
+          (texfile:aiString* (salloc))
           (name:aiString* (tref-ptr mesh 14)))
       (set! vbo (ai_build_mesh_vbo vao mesh xmesh facemode))
       (tset! xmesh 0 vbo)
@@ -570,12 +570,12 @@
       (if (= (aiGetMaterialColor material "$clr.diffuse" 0 0 color) 0)
           (ai_color4_to_float4 color diffuse))
       (tset! xmesh 2 diffuse)
-      (if (= (aiGetMaterialColor material "$clr.ambient" 0 0 color) 0)          
+      (if (= (aiGetMaterialColor material "$clr.ambient" 0 0 color) 0)
           (ai_color4_to_float4 color ambient))
-      (tset! xmesh 3 ambient)      
+      (tset! xmesh 3 ambient)
       (if (= (aiGetMaterialColor material "$clr.specular" 0 0 color) 0)
           (ai_color4_to_float4 color specular))
-      (tset! xmesh 4 specular)            
+      (tset! xmesh 4 specular)
       (if (= (aiGetMaterialColor material "$clr.emissive" 0 0 color) 0)
           (ai_color4_to_float4 color emissive))
       (tset! xmesh 5 emissive)
@@ -588,7 +588,7 @@
       (tset! xmesh 8 (pref facemode 0))
       (tset! xmesh 9 (elements vbo))
       (tset! xmesh 10 vao)
-      (tset! xmesh 11 (Str (cast (tref-ptr name 1) i8*)))      
+      (tset! xmesh 11 (Str (cast (tref-ptr name 1) i8*)))
       void)))
 
 ;; returns the scenes top level node as XTMModel*
@@ -603,10 +603,10 @@
           (namelgth (tref ain 0))
           (name:i8* (halloc (+ 1 namelgth)))
           (numchildren:i32 (tref node 3))
-          (children:aiNode** (tref node 4))          
+          (children:aiNode** (tref node 4))
           (_children:XTMModel* (halloc (+ 1 numchildren)))
           (nummeshes:i32 (tref node 5))
-          (meshes:aiMesh** (tref scene 3))          
+          (meshes:aiMesh** (tref scene 3))
           (_meshes:XTMMesh* (halloc (+ 1 nummeshes)))
           (transmat:float* (halloc 16)))
       (memset name 0 (+ namelgth 1))
@@ -615,7 +615,7 @@
           (println "Node:" (Str name) "Parent:" (Str "") "Children:" numchildren "ptr:" (cast node i8*))
           (begin
             (memset pname 0 (+ pnamelgth 1))
-            (memcpy pname (cast (tref-ptr aipn 1) i8*) pnamelgth)            
+            (memcpy pname (cast (tref-ptr aipn 1) i8*) pnamelgth)
             (println "Node:" (Str name) "Parent:" (Str pname) "Children:" numchildren "ptr:" (cast node i8*))))
       ;;(printf "Build node:%s:%p children(%d)  meshes(%d)\n" name _node numchildren nummeshes)
       (tset! _node 0 (Str name))
@@ -707,12 +707,12 @@
           void)))))
 
 ;; returns the scenes top level node as XTMModel*
-(bind-func ai_build_scene  
+(bind-func ai_build_scene
   (lambda (scene:aiScene* dir:i8*)
     (printf "Embedded textures: %d\n" (tref scene 8))
     (let ((root:XTMModel* (halloc)))
       (ai_build_node scene (tref scene 1) root null dir)
-      (ai_build_animation scene root)            
+      (ai_build_animation scene root)
       root)))
 
 ;; where post is any post processing required
@@ -752,7 +752,7 @@
     (let ((i 0)
           (desc:aiExportFormatDesc* null)
           (cnt (aiGetExportFormatCount)))
-      (printf "**************************\n")      
+      (printf "**************************\n")
       (dotimes (i cnt)
         (set! desc (aiGetExportFormatDescription i))
         (printf "------\nid(%s):ext(%s)\n%s\n" (tref desc 0) (tref desc 2) (tref desc 1)))

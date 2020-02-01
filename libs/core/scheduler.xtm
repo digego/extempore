@@ -1,4 +1,4 @@
-;; schedule.xtm -- rudimenary xtlang 'native' scheduling 
+;; schedule.xtm -- rudimenary xtlang 'native' scheduling
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
@@ -39,7 +39,7 @@
           (prev:SchedEvt* null))
       (lambda (time)
         (set! cnt 0)
-        (mutex_lock mutex)                                 
+        (mutex_lock mutex)
         (set! element evtlist)
         (while (and (not (null? element))
                     (<= (tref element 0) time))
@@ -47,7 +47,7 @@
           (set! fp (cast (llvm_get_function_ptr (tref element 1))))
           ;; (println "exec: " time ":" (tref element 0))
           (fptrcall fp (tref element 0)) ; (tref element 2))
-          (set! next (tref element 3))          
+          (set! next (tref element 3))
           (set! prev (tref element 2))
           (if (null? prev)
               (set! evtlist next)
@@ -86,7 +86,7 @@
           (begin
             (set! next (tref evtlist 3)) ;; get next from previous
             (set! new (SchedEvt_h time fname evtlist next))
-            (tset! evtlist 3 new) ;; make us next of previous            
+            (tset! evtlist 3 new) ;; make us next of previous
             (if (not (null? next)) (tset! next 2 new)) ;; set us to previous of next
             void))
       (if (= (thread_equal_self (scheduler.thread)) 0)
@@ -172,7 +172,7 @@
         (time 0.0)
         (err 0)
         (i (/ 1.0 hz)))
-    (lambda ()      
+    (lambda ()
       (set! scheduler (scheduler_init evtlist ft))
       (set! time (clock_clock))
       (while (> running 0)

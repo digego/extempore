@@ -52,15 +52,15 @@
 
 ;; @ingroup API
 ;; @param vendor_id The Vendor ID (VID) of the types of device
-;; 	to open.
+;;  to open.
 ;; @param product_id The Product ID (PID) of the types of
-;; 	device to open.
+;;  device to open.
 
 ;;   @returns
-;;   	This function returns a pointer to a linked list of type
-;;   	struct #hid_device, containing information about the HID devices
-;;   	attached to the system, or NULL in the case of failure. Free
-;;   	this linked list by calling hid_free_enumeration().
+;;    This function returns a pointer to a linked list of type
+;;    struct #hid_device, containing information about the HID devices
+;;    attached to the system, or NULL in the case of failure. Free
+;;    this linked list by calling hid_free_enumeration().
 
 ;; use #x0 #x0 for all devices
 (bind-lib libhidapi hid_enumerate [hid_device_info*,i16,i16]*)
@@ -76,11 +76,11 @@
 ;; @param vendor_id The Vendor ID (VID) of the device to open.
 ;; @param product_id The Product ID (PID) of the device to open.
 ;; @param serial_number The Serial Number of the device to open
-;; 	               (Optionally NULL).
+;;                 (Optionally NULL).
 
 ;; @returns
-;; 	This function returns a pointer to a #hid_device object on
-;; 	success or NULL on failure.
+;;  This function returns a pointer to a #hid_device object on
+;;  success or NULL on failure.
 (bind-lib libhidapi hid_open [hid_device*,i16,i16,i8*]*)
 
 ;; @brief Open a HID device by its path name.
@@ -93,8 +93,8 @@
 ;;   @param path The path name of the device to open
 
 ;; @returns
-;; 	This function returns a pointer to a #hid_device object on
-;; 	success or NULL on failure.
+;;  This function returns a pointer to a #hid_device object on
+;;  success or NULL on failure.
 (bind-lib libhidapi hid_open_path [hid_device*,i8*]*)
 
 ;; @brief Write an Output report to a HID device.
@@ -116,12 +116,12 @@
 ;; @ingroup API
 ;; @param device A device handle returned from hid_open().
 ;; @param data The data to send, including the report number as
-;; 	the first byte.
+;;  the first byte.
 ;; @param length The length in bytes of the data to send.
 
 ;; @returns
-;; 	This function returns the actual number of bytes written and
-;; 	-1 on error.
+;;  This function returns the actual number of bytes written and
+;;  -1 on error.
 (bind-lib libhidapi hid_write [i32,hid_device*,i8*,size_t]*)
 
 
@@ -135,14 +135,14 @@
 ;; @param device A device handle returned from hid_open().
 ;; @param data A buffer to put the read data into.
 ;; @param length The number of bytes to read. For devices with
-;; 	multiple reports, make sure to read an extra byte for
-;; 	the report number.
+;;  multiple reports, make sure to read an extra byte for
+;;  the report number.
 ;; @param milliseconds timeout in milliseconds or -1 for blocking wait.
 
 ;; @returns
-;; 	This function returns the actual number of bytes read and
-;; 	-1 on error. If no packet was available to be read within
-;; 	the timeout period, this function returns 0.
+;;  This function returns the actual number of bytes read and
+;;  -1 on error. If no packet was available to be read within
+;;  the timeout period, this function returns 0.
 (bind-lib libhidapi hid_read_timeout [i32,hid_device*,i16,size_t,i32]*)
 
 ;; @brief Read an Input report from a HID device.
@@ -155,13 +155,13 @@
 ;; @param device A device handle returned from hid_open().
 ;; @param data A buffer to put the read data into.
 ;; @param length The number of bytes to read. For devices with
-;; 	multiple reports, make sure to read an extra byte for
-;; 	the report number.
+;;  multiple reports, make sure to read an extra byte for
+;;  the report number.
 
 ;; @returns
-;; 	This function returns the actual number of bytes read and
-;; 	-1 on error. If no packet was available to be read and
-;; 	the handle is in non-blocking mode, this function returns 0.
+;;  This function returns the actual number of bytes read and
+;;  -1 on error. If no packet was available to be read and
+;;  the handle is in non-blocking mode, this function returns 0.
 (bind-lib libhidapi hid_read [i32,hid_device*,i8*,size_t]*)
 
 ;; @brief Set the device handle to be non-blocking.
@@ -180,7 +180,7 @@
 ;;  - 0 to disable nonblocking.
 
 ;; @returns
-;; 	This function returns 0 on success and -1 on error.
+;;  This function returns 0 on success and -1 on error.
 (bind-lib libhidapi hid_set_nonblocking [i32,hid_device*,i32]*)
 
 ;; @brief Send a Feature report to the device.
@@ -201,13 +201,13 @@
 ;; @ingroup API
 ;; @param device A device handle returned from hid_open().
 ;; @param data The data to send, including the report number as
-;; 	the first byte.
+;;  the first byte.
 ;; @param length The length in bytes of the data to send, including
-;; 	the report number.
+;;  the report number.
 
 ;; @returns
-;; 	This function returns the actual number of bytes written and
-;; 	-1 on error.
+;;  This function returns the actual number of bytes written and
+;;  -1 on error.
 (bind-lib libhidapi hid_send_feature_report [i32,hid_device*,i8*,size_t]*)
 
 ;; @brief Get a feature report from a HID device.
@@ -221,17 +221,17 @@
 ;; @ingroup API
 ;; @param device A device handle returned from hid_open().
 ;; @param data A buffer to put the read data into, including
-;; 	the Report ID. Set the first byte of @p data[] to the
-;; 	Report ID of the report to be read, or set it to zero
-;; 	if your device does not use numbered reports.
+;;  the Report ID. Set the first byte of @p data[] to the
+;;  Report ID of the report to be read, or set it to zero
+;;  if your device does not use numbered reports.
 ;; @param length The number of bytes to read, including an
-;; 	extra byte for the report ID. The buffer can be longer
-;; 	than the actual report.
+;;  extra byte for the report ID. The buffer can be longer
+;;  than the actual report.
 
 ;; @returns
-;; 	This function returns the number of bytes read plus
-;; 	one for the report ID (which is still in the first
-;; 	byte), or -1 on error.
+;;  This function returns the number of bytes read plus
+;;  one for the report ID (which is still in the first
+;;  byte), or -1 on error.
 (bind-lib libhidapi hid_get_feature_report [i32,hid_device*,i8*,size_t]*)
 
 ;; @brief Close a HID device
@@ -269,8 +269,8 @@
 ;; @param device A device handle returned from hid_open().
 
 ;; @returns
-;; 	This function returns a string containing the last error
-;; 	which occurred or NULL if none has occurred.
+;;  This function returns a string containing the last error
+;;  which occurred or NULL if none has occurred.
 (bind-lib libhidapi hid_error [wchar_t*,hid_device*]*)
 
 (define *xtmlib-hidapi-loaded* #t)

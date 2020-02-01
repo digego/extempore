@@ -10,7 +10,7 @@
 
 ;;
 ;; SCHEME text variant
-;; 
+;;
 
 (define analogue-reset (lambda (inst) (analogue_reset inst)))
 
@@ -22,11 +22,11 @@
       ,(AudioBuffer_channels wt)
       ,(AudioBuffer_samplerate wt)
       0.0 ;; phase
-      ,(AudioBuffer_root_pitch wt) 
+      ,(AudioBuffer_root_pitch wt)
       ,(AudioBuffer_loop_start wt)
       ,(AudioBuffer_loop_frames wt)
       ,b64str))))
-    
+
 (define analogue-save-state
   (let ((i 0) (j 0)
         (dict '()))
@@ -49,7 +49,7 @@
       (if (= (get_osc1_wave inst) PARAM_WT)
           (let ((wt (get_osc1_wt inst)))
             (set! dict (cons (cons 'osc1_wt (get_wt_expr wt)) dict))))
-                             
+
       ;; amplitude of osc 2
       (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
       ;; waveform of osc 2 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
@@ -64,7 +64,7 @@
       (if (= (get_osc2_wave inst) PARAM_WT)
           (let ((wt (get_osc2_wt inst)))
             (set! dict (cons (list 'osc2_wt (get_wt_expr wt)) dict))))
-      
+
       ;; amplitude of osc 3
       (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
       ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
@@ -79,7 +79,7 @@
       (if (= (get_osc3_wave inst) PARAM_WT)
           (let ((wt (get_osc3_wt inst)))
             (set! dict (cons (list 'osc3_wt (get_wt_expr wt)) dict))))
-  
+
       ;; amplitude of osc 4
       (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
       ;; waveform of osc 3 (PARAM_SINE,PARAM_SAW,PARAM_PULSE,PARAM_TRI,PARAM_WT)
@@ -94,12 +94,12 @@
       (if (= (get_osc4_wave inst) PARAM_WT)
           (let ((wt (get_osc4_wt inst)))
             (set! dict (cons (list 'osc4_wt (get_wt_expr wt)) dict))))
-      
+
       ;; sub oscilltor amp (two tunes under sine wave)
       (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
       ;; noise (PARAM_WHITE or PARAM_PINK)
       (set! dict (cons (cons 'noise_type (get_noise_type inst)) dict))
-      
+
       ;; noise amplitude
       (set! dict (cons (cons 'noise_amp (get_noise_amp inst)) dict))
       ;;
@@ -111,7 +111,7 @@
       (set! dict (cons (cons 'filter_res (get_filter_res inst)) dict))
       ;; hpf cutoff frequency
       (set! dict (cons (cons 'hpf_frq (get_hpf_frq inst)) dict))
-    
+
       ;;
       ;; envelopes
       ;;
@@ -120,7 +120,7 @@
       (set! dict (cons (cons 'amp_env_decay (get_amp_env_decay inst)) dict)) ;; decay
       (set! dict (cons (cons 'amp_env_sustain (get_amp_env_sustain inst)) dict)) ;; sustain
       (set! dict (cons (cons 'amp_env_release (get_amp_env_release inst)) dict)) ;; release
-    
+
       ;; filter (LPF) adsr envelope (adr in ms) (sus [0.0-1.0])
       (set! dict (cons (cons 'filter_env_attack (get_filter_env_attack inst)) dict)) ;; attack
       (set! dict (cons (cons 'filter_env_decay (get_filter_env_decay inst)) dict)) ;; decay
@@ -130,7 +130,7 @@
       ;; the amount of filter envelope to apply in hz 0.0 - 20000.0
       ;; this envelope is summed to the current filter_frq
       (set! dict (cons (cons 'filter_env_amt (get_filter_env_amt inst)) dict))
-      
+
       ;; 12 or 24 db slope?
       (set! dict (cons (cons 'filter_type (get_filter_type inst)) dict))
 
@@ -162,7 +162,7 @@
       ;; delay resonance
       (set! dict (cons (cons 'delay_res (get_delay_res inst)) dict))
       ;;
-      ;; reverb 
+      ;; reverb
       ;;
       ;; reverb_mix 0.0-1.0 0.0 is dry 1.0 is wet
       (set! dict (cons (cons 'reverb_mix (get_reverb_mix inst)) dict))
@@ -237,10 +237,10 @@
 
       (set! dict (cons (cons 'lfo2_amp (get_lfo_amp inst 1)) dict))
       (set! dict (cons (cons 'lfo2_frq (get_lfo_frq inst 1)) dict))
-      
+
       (set! dict (cons (cons 'lfo3_amp (get_lfo_amp inst 2)) dict))
       (set! dict (cons (cons 'lfo3_frq (get_lfo_frq inst 2)) dict))
-      
+
       (set! dict (cons (cons 'lfo4_amp (get_lfo_amp inst 3)) dict))
       (set! dict (cons (cons 'lfo4_frq (get_lfo_frq inst 3)) dict))
 
@@ -255,7 +255,7 @@
 
       ; (set! dict (cons (cons 'lfo4_attack (get_lfo_attack inst 3)) dict)) ;; attack
       ; (set! dict (cons (cons 'lfo4_decay (get_lfo_decay inst 3)) dict)) ;; decay
-      
+
       ;; set LFO type
       (set! dict (cons (cons 'lfo1_type (get_lfo_type inst PARAM_LFO1)) dict))
       (set! dict (cons (cons 'lfo2_type (get_lfo_type inst PARAM_LFO2)) dict))
@@ -270,27 +270,27 @@
         (dotimes (j 32) ;; 32 modulation targets
           (vector-set! modvec (+ (* i 32) j) (get_mod_matrix inst i j))))
       (set! dict (cons (cons 'mod_matrix (vector->list modvec)) dict))
-    
+
       ;; modulation dadsr envelope (dadr in ms) (sus [0.0-1.0])
       (set! dict (cons (cons 'mod_env_delay (get_mod_env_delay inst)) dict)) ;; delay
       (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
       (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
       (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
       (set! dict (cons (cons 'mod_env_release (get_mod_env_release inst)) dict)) ;; release
-  
+
       ;; filter saturation
-      (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))  
-      
+      (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))
+
       ;; osc slop
       (set! dict (cons (cons 'osc_slop (get_osc_slop inst)) dict))
       (set! dict (cons (cons 'osc_phase_slop (get_osc_phase_slop inst)) dict))
-      
-      ;; (println dict) 
+
+      ;; (println dict)
       (analogue_remove_file filename)
       (define out (open-output-file filename))
       (write (reverse dict) out)
-      (close-output-port out)  
-      (println 'done)  
+      (close-output-port out)
+      (println 'done)
       #t)))
 
 (define analogue-load-state

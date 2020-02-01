@@ -17,10 +17,10 @@
 
 (bind-func my_simple_fm_inst
   (lambda ()
-    (let ((freq 440.0) (newfreq 440.0) ;; frequency           
-          (amp 1.0) (newamp 1.0)       ;; amplitude          
+    (let ((freq 440.0) (newfreq 440.0) ;; frequency
+          (amp 1.0) (newamp 1.0)       ;; amplitude
           (a 10.0) (b 0.1) ;; fm params (midi cc 21 & 22)
-          (attack 100.0) (decay 200.0) (sustain 0.75) (release 200.0) 
+          (attack 100.0) (decay 200.0) (sustain 0.75) (release 200.0)
           (gate 0.0)      ;; gate (as per analogue synth)
           (pitch:i32 0)   ;; to help with note off
           (glide 0.001:f) ;; frequency glide amount (midi cc 23)
@@ -56,12 +56,12 @@
 
 (bind-func midi_note_on
   (lambda (pitch:i32 vol:i32 chan:i32)
-    (if (< (dsp.inst1.adsr.out:float) 0.05)  
+    (if (< (dsp.inst1.adsr.out:float) 0.05)
         (begin
           (dsp.inst1.freq:float (midi2frq (i32tof pitch)))
           (dsp.inst1.amp:float (/ (i32tof vol) 127.0))))
     (dsp.inst1.newfreq:float (midi2frq (i32tof pitch)))
-    (dsp.inst1.newamp:float (/ (i32tof vol) 127.0))   
+    (dsp.inst1.newamp:float (/ (i32tof vol) 127.0))
     (dsp.inst1.pitch:i32 pitch)
     (dsp.inst1.gate:float 1.0)
     void))

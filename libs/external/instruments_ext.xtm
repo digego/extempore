@@ -67,7 +67,7 @@
             (aset! (aref-ptr samples_channels bank) index (convert channels))
             (aset! (aref-ptr samples bank) index adat)
             (sf_close audiofile)
-            (if (not (null? olddat)) (free olddat))            
+            (if (not (null? olddat)) (free olddat))
             1)
           (begin
             (sf_close audiofile)
@@ -78,7 +78,7 @@
   (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* index:i64 bank:i32)
     (let ((samples:|20,|128,SAMPLE*||* (inst.samples))
           (samples_channels:|20,|128,i64||* (inst.samples_channels))
-          (samples_length:|20,|128,i64||* (inst.samples_length))          
+          (samples_length:|20,|128,i64||* (inst.samples_length))
           (olddat (if (<> 0 (aref (aref-ptr samples_length bank) index))
                       (bitcast (aref (aref-ptr samples bank) index) i8*)
                       null)))
@@ -104,7 +104,7 @@
 ;; faster but noisy
 (bind-func sampler_note_linear
   (lambda ()
-    (let ((amp_env:|4,float| (array 10.0:f 50.0 0.6 200.0)))    
+    (let ((amp_env:|4,float| (array 10.0:f 50.0 0.6 200.0)))
       (lambda (data:NoteData* samples:|128,SAMPLE*|* samples_length:|128,i64|* samples_offsets:|128,i64|* samples_channels:|128,i64|* index:i64 nargs:i64 dargs)
         (let ((starttime (note_starttime data))
               (freq (note_frequency data))
@@ -113,7 +113,7 @@
               (gate 1.0:f)
               (pan:SAMPLE (if (> nargs 1) (pref dargs 1) 0.5)) ;; first darg is bank
               (offset:SAMPLE (if (> nargs 2) (pref dargs 2) 0.0))
-              (rev:i1 (if (> nargs 3) (if (> (pref dargs 3) 0.01) #t #f) #f))              
+              (rev:i1 (if (> nargs 3) (if (> (pref dargs 3) 0.01) #t #f) #f))
               (a (aref amp_env 0))
               (d (aref amp_env 1))
               (s (aref amp_env 2))
@@ -126,7 +126,7 @@
               (idx_freq (convert (midi2frq (convert index))))
               (phase:double (convert (+ offset (convert (aref samples_offsets index)))))) ;; phase unit is audio frames
           (if (and rev (< phase 0.01))
-              (set! phase (convert (- (aref samples_length index) 10))))      
+              (set! phase (convert (- (aref samples_length index) 10))))
           (lambda (time:i64 chan:i64)
             (if (= chan 0)
                 (begin
@@ -142,7 +142,7 @@
                                       (set! phase (- phase rate))
                                       (set! phase (+ phase rate)))
                                   phase))
-                  (posi:i64 (convert (floor pos))) 
+                  (posi:i64 (convert (floor pos)))
                   (posx (+ (* posi 2) chan))
                   (lgth:i64 (convert (- (aref samples_length index) 10)))
                   (dat (aref samples index)))
@@ -299,7 +299,7 @@
           (reverb_size 0.3)
           (reverb_absorb 0.45)
           (pan (pan_c (i32toi64 CHANNELS)))
-          (pan_pos 0.5)          
+          (pan_pos 0.5)
           (pan_width 1.0)
           (gain 2.0)
           (out 0.0))
@@ -327,7 +327,7 @@
       (aset! (aref-ptr samples_channels bank) index (convert channels))
       (aset! (aref-ptr samples bank) index adat)
       (aset! (aref-ptr offsets bank) index (AudioBuffer_loop_start buf))
-      (aset! (aref-ptr samples_length bank) index num)          
+      (aset! (aref-ptr samples_length bank) index num)
       1)))
 
 

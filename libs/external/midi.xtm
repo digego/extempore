@@ -46,7 +46,7 @@
 (impc:aot:import-ll "xtmmidi")
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; midi event queue
 
 (bind-type XTM_MIDI_EVT <i32,i32,i32,i32,i32,double> (printer? . #f))
@@ -139,7 +139,7 @@
                 (printf "No MIDI input port found with name %s\n" port_name)
                 (i64toi32 -1))))))
         (loop (i64toi32 0)))))
-                  
+
 
 (bind-func midi_output_port_id:[i32,i8*]*
   (lambda (port_name)
@@ -230,13 +230,13 @@
                                        (Pm_Message_Data2 msg)
                                        (Pm_Message_Channel msg))))
                     ((= (Pm_Message_Type msg) MIDI_NOTE_OFF)
-                     (enqueue_midi_event msg timestamp)                     
+                     (enqueue_midi_event msg timestamp)
                      (midi_note_off timestamp
                                     (Pm_Message_Data1 msg)
                                     (Pm_Message_Data2 msg)
                                     (Pm_Message_Channel msg)))
                     ((= (Pm_Message_Type msg) MIDI_CONTROL_CHANGE)
-                     (if XTM_MIDI_CC_QUEUEING (enqueue_midi_event msg timestamp))                         
+                     (if XTM_MIDI_CC_QUEUEING (enqueue_midi_event msg timestamp))
                      (midi_cc timestamp
                               (Pm_Message_Data1 msg)
                               (Pm_Message_Data2 msg)
@@ -267,7 +267,7 @@
       1:i64))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; 
+;;
 ;; Scheme listener code
 ;;
 
@@ -303,12 +303,12 @@
               ((= type #x80)
               (midi-note-off timestamp a b chan))
               ((= type #xB0)
-              (midi-cc timestamp a b chan)) 
+              (midi-cc timestamp a b chan))
               (else #f))))
     (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur)))
 
 (bind-func start_midi_scheduler
-  (lambda ()     
+  (lambda ()
     (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 ;; startup

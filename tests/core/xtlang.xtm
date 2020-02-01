@@ -78,21 +78,21 @@
                     (b 6))
                 (array a b)
                 void)))
-         
+
          (i64-array-lit-test))
 
 (xtmtest '(bind-func float-array-lit-test
             (lambda ()
               (array 1.0:f 2.0 3.0 4.0 5.0)
               void))
-         
+
          (float-array-lit-test))
 
 (xtmtest '(bind-func float-ref-array-lit-test
             (lambda ()
               (let ((a (array 1.0:f 2.0 3.0)))
                 (aref a 2))))
-         
+
          (float-ref-array-lit-test) 3.0)
 
 (xtmtest '(bind-func tuple-lit-test
@@ -111,7 +111,7 @@
                     (c (tuple a b a)))
                 (tref c 1))))
 
-         (tuple-ref-lit-test) 5.0) 
+         (tuple-ref-lit-test) 5.0)
 
 (xtmtest '(bind-func closure-test1
             (let ((power 0))
@@ -218,7 +218,7 @@
                         (tail_opt_test (- n 1))))))
 
              (tail_opt_test 200)))
-    
+
 (println 'A 'segfault 'here 'incidates 'that 'tail-call-optimizations 'are 'not 'working!)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -232,7 +232,7 @@
               (let ((buf:i8* (salloc len)))
                 (doloop (i len)
                   (pref buf i)))))
-         
+
          (dotimes_inf_test 10))
 
 
@@ -245,7 +245,7 @@
             (lambda ()
               (let ((a 5)
                     (b (lambda (x) (* x x)))
-                    (c (lambda (y) (* y y))))          
+                    (c (lambda (y) (* y y))))
                 (c (b a)))))
 
          (infer_lambdas_test))
@@ -367,8 +367,8 @@
 (bind-func array-test2
    (lambda (v:|5,i64|*)
       (let ((f (lambda (x)
-		  (* (array-ref v 2) x))))
-	f)))
+      (* (array-ref v 2) x))))
+  f)))
 
 (bind-func array-test3
   (lambda (v:|5,[i64,i64]*|*)
@@ -416,33 +416,33 @@
 (bind-func envelope-segments
   (lambda (points:double* num-of-points:i64)
     (let ((lines:[double,double]** (zone-alloc num-of-points))
-	  (k 0))
+    (k 0))
       (dotimes (k num-of-points)
-	(let* ((idx (* k 2))
-	       (x1 (pointer-ref points (+ idx 0)))
-	       (y1 (pointer-ref points (+ idx 1)))
-	       (x2 (pointer-ref points (+ idx 2)))
-	       (y2 (pointer-ref points (+ idx 3)))
-	       (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
-	       (c (- y2 (* m x2)))
-	       (l (lambda (time) (+ (* m time) c))))
-	  (pointer-set! lines k l)))
+  (let* ((idx (* k 2))
+         (x1 (pointer-ref points (+ idx 0)))
+         (y1 (pointer-ref points (+ idx 1)))
+         (x2 (pointer-ref points (+ idx 2)))
+         (y2 (pointer-ref points (+ idx 3)))
+         (m (if (= 0.0 (- x2 x1)) 0.0 (/ (- y2 y1) (- x2 x1))))
+         (c (- y2 (* m x2)))
+         (l (lambda (time) (+ (* m time) c))))
+    (pointer-set! lines k l)))
       lines)))
 
 (bind-func make-envelope
    (lambda (points:double* num-of-points)
       (let ((klines:[double,double]** (envelope-segments points num-of-points))
-	    (line-length num-of-points))
-	 (lambda (time)
-	    (let ((res -1.0)
-		  (k:i64 0))
-	       (dotimes (k num-of-points)
-		  (let ((line (pointer-ref klines k))
-			(time-point (pointer-ref points (* k 2))))
-		     (if (or (= time time-point)
-			     (< time-point time))
-			 (set! res (line time)))))
-	       res)))))
+      (line-length num-of-points))
+   (lambda (time)
+      (let ((res -1.0)
+      (k:i64 0))
+         (dotimes (k num-of-points)
+      (let ((line (pointer-ref klines k))
+      (time-point (pointer-ref points (* k 2))))
+         (if (or (= time time-point)
+           (< time-point time))
+       (set! res (line time)))))
+         res)))))
 
 ;; make a convenience wrapper
 (xtmtest '(bind-func env-wrap
@@ -810,7 +810,7 @@
               (callback (+ time 1000) callback-test (+ time 22050) (+ count 1))))
 
          (callback-test (now) 0))
-        
+
 ;; compiling this will stop the callbacks
 ;;
 ;; of course we need to keep the type
@@ -821,17 +821,17 @@
               void))
 
          (callback-test (now) 0))
-         
+
 (bind-func callback-test2-helper
   (lambda (x:i64)
     (println "callback test2 helper: " x)))
-         
+
 (xtmtest '(bind-func callback-test2
             (lambda (time:i64 count:i64)
               (printf "time: %lld:%lld\n" time count)
               (callback (+ time 20000) callback-test2-helper 555)
               (callback (+ time 40000) callback-test2 (+ time 40000) (+ count 1))))
-         
+
          (callback-test2 (now) 0))
 
 (xtmtest '(bind-func callback-test2
@@ -839,8 +839,8 @@
               void))
 
          (callback-test2 (now) 0))
-         
-         
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; some memzone tests
@@ -1013,16 +1013,16 @@
 ;; (bind-func vector-test1
 ;;   (lambda ()
 ;;     (let ((v1:/4,float/* (alloc))
-;; 	  (v2:/4,float/* (alloc))
-;; 	  (v3:/4,float/* (alloc)))
+;;    (v2:/4,float/* (alloc))
+;;    (v3:/4,float/* (alloc)))
 ;;       (vfill! v1 4.0 3.0 2.0 1.0)
 ;;       (vfill! v2 1.0 2.0 3.0 4.0)
 ;;       (vfill! v3 5.0 5.0 5.0 5.0)
 ;;       (let ((v4 (* v1 v2))
-;; 	    (v5 (> v3 v4))) ;; unforunately vector conditionals don't work!
-;; 	(printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))
-;; 	(printf "cmp:%d:%d:%d:%d\n" (i1toi32 (vref v5 0)) (i1toi32 (vref v5 1)) (i1toi32 (vref v5 2)) (i1toi32 (vref v5 3)))
-;; 	void))))
+;;      (v5 (> v3 v4))) ;; unforunately vector conditionals don't work!
+;;  (printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))
+;;  (printf "cmp:%d:%d:%d:%d\n" (i1toi32 (vref v5 0)) (i1toi32 (vref v5 1)) (i1toi32 (vref v5 2)) (i1toi32 (vref v5 3)))
+;;  void))))
 
 ;; (test-xtfunc (vector-test1))
 
@@ -1068,16 +1068,16 @@
 
 (bind-func vcosf4
   (let ((p:/4,float/* (alloc))
-	(b:/4,float/* (alloc))
-	(c:/4,float/* (alloc))
-	(d:/4,float/* (alloc))
-	(f1:/4,float/* (alloc))
-	(f2:/4,float/* (alloc))
-	(i:i32 0)
-	(p_ 0.225)
-	(d_ (dtof (/ 3.1415 2.0)))
-	(b_ (dtof (/ 4.0 3.1415)))
-	(c_ (dtof (/ -4.0 (* 3.1415 3.1415)))))
+  (b:/4,float/* (alloc))
+  (c:/4,float/* (alloc))
+  (d:/4,float/* (alloc))
+  (f1:/4,float/* (alloc))
+  (f2:/4,float/* (alloc))
+  (i:i32 0)
+  (p_ 0.225)
+  (d_ (dtof (/ 3.1415 2.0)))
+  (b_ (dtof (/ 4.0 3.1415)))
+  (c_ (dtof (/ -4.0 (* 3.1415 3.1415)))))
     (dotimes (i 4)
       (vset! p i p_) (vset! b i b_) (vset! c i c_) (vset! d i d_))
     (lambda (x:/4,float/)
@@ -1086,9 +1086,9 @@
       ;; no SIMD for abs yet!
       (dotimes (i 4) (vset! f1 i (fabs (vref x i))))
       (let ((y (+ (* b x) (* c x f1))))
-	;; no SIMD for abs yet!
-	(dotimes (i 4) (vset! f2 i (fabs (vref y i))))
-	(+ (* p (- (* y f2) y)) y)))))
+  ;; no SIMD for abs yet!
+  (dotimes (i 4) (vset! f2 i (fabs (vref y i))))
+  (+ (* p (- (* y f2) y)) y)))))
 
 
 (xtmtest '(bind-func vector-test4
@@ -1212,7 +1212,7 @@
             (lambda ()
               (GlobalInc 5)))
          (ginc) 7)
-                       
+
 
 ;; new xtlang macros
 
@@ -1264,7 +1264,7 @@
 ;; closure ref/set checks
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest 
+(xtmtest
  '(bind-func lvl1
     (let ((lvl2
            (let ((lvl3
@@ -1272,7 +1272,7 @@
                     (lambda (x:double) (+ 1 2)))))
              (lambda (y:|4,float|*) (+ 3 4)))))
       (lambda () (+ 5 6))))
- 
+
  (xtmX (begin
          (lvl1.lvl2.lvl3.x:i64 128)
          (lvl1.lvl2.lvl3.x:i64))) 128)
@@ -1319,7 +1319,7 @@
     (lambda ()
       (let ((a1:<float,Symbol*,i64>* (tuple_ref 5.0:f 'fred 1:i64)))
         a1)))
- 
+
  (xtmX (begin (t1_test) 1)))
 
 (xtmtest
@@ -1327,7 +1327,7 @@
     (lambda ()
       (let ((a1:<float,Symbol*,i64> (tuple 5.0:f 'fred 1:i64)))
         a1)))
- 
+
  (xtmX (begin (t2_test) 1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

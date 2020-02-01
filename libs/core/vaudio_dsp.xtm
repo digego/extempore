@@ -107,16 +107,16 @@
   (let ((phase 0))
     (lambda ()
       (let ((u1 (random))
-	    (u2 (random))
-	    (v1 (- (* 2.0 u1) 1.0))
-	    (v2 (- (* 2.0 u2) 1.0))
-	    (s (+ (* v1 v1) (* v2 v2))))
-	(if (= phase 0)
-	    (if (or (> s 1.0) (= s 0.0) (= s 1.0))
-		(dsp_randn)
-		(* v1 (sqrt (/ (* -2.0 (log s)) s))))
-	    (begin (set! phase (- 1 phase))
-		   (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
+      (u2 (random))
+      (v1 (- (* 2.0 u1) 1.0))
+      (v2 (- (* 2.0 u2) 1.0))
+      (s (+ (* v1 v1) (* v2 v2))))
+  (if (= phase 0)
+      (if (or (> s 1.0) (= s 0.0) (= s 1.0))
+    (dsp_randn)
+    (* v1 (sqrt (/ (* -2.0 (log s)) s))))
+      (begin (set! phase (- 1 phase))
+       (* v2 (sqrt (/ (* -2.0 (log s)) s)))))))))
 
 ;; high limit
 ;; low limit
@@ -124,17 +124,17 @@
 (bind-func range_limit
   (lambda (h:double l:double v:double)
     (if (< v l) l
-	(if (> v h) h
-	    v))))
+  (if (> v h) h
+      v))))
 
 
 ;; x values must fall within the range -PI ... PI
 (bind-func _sin
   (let ((i 0)
         (p (v4val 0.225))
-	(b (v4val (/ 4.0 PIf)))
+  (b (v4val (/ 4.0 PIf)))
         (y:/4,float/* (zalloc))
-	(c (v4val (/ -4.0 (* PIf PIf)))))
+  (c (v4val (/ -4.0 (* PIf PIf)))))
     (lambda (x:/4,float/*)
       (pset! y 0 (+ (* b x) (* c x (v4fabsf x))))
       (pset! y 0 (+ (* p (- (* y (v4fabsf y)) y)) y))
@@ -144,8 +144,8 @@
 ;;   (lambda (phase)
 ;;     (lambda (amp freq)
 ;;       (let ((inc (* TWOPI (/ freq SAMPLERATE))))
-;; 	(set! phase (+ phase inc))
-;; 	(* amp (sin phase))))))
+;;  (set! phase (+ phase inc))
+;;  (* amp (sin phase))))))
 
 
 (bind-func oscv_c

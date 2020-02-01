@@ -311,7 +311,7 @@
           (frames (AudioBuffer_frames buffer))
           (looplgth (AudioBuffer_loop_frames buffer))
           (loopstart (AudioBuffer_loop_start buffer))
-          (oneshot (= looplgth 0))       
+          (oneshot (= looplgth 0))
           (segments (if oneshot 0 (/ frames looplgth)))
           (phase:double (AudioBuffer_phase buffer))
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
@@ -331,22 +331,22 @@
           (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
           (x2 0.0)
           (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
-      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping) 
+      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping)
           (begin
             (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (pref dat y1pos)))
             (set! x0 (pref dat x0pos))
             (set! x1 (pref dat x1pos))
-            (set! x2 (pref dat x2pos)) 
+            (set! x2 (pref dat x2pos))
             (if (= chan 0) ;; increment phase
-                (AudioBuffer_set_phase buffer 
-                                      (if oneshot 
-                                          (+ pos rate) 
+                (AudioBuffer_set_phase buffer
+                                      (if oneshot
+                                          (+ pos rate)
                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
 
-;; where pw is between 0.0 - 1.0 
+;; where pw is between 0.0 - 1.0
 ;; and chooses between 'segments' of the audio file
 ;; where a segment is 1 * looplgth samples long
 ;; the number of segments is then frames / looplgth
@@ -357,7 +357,7 @@
           (frames (AudioBuffer_frames buffer))
           (looplgth (AudioBuffer_loop_frames buffer))
           (loopstart (AudioBuffer_loop_start buffer))
-          (oneshot (= looplgth 0))       
+          (oneshot (= looplgth 0))
           (segments (if oneshot 0 (/ frames looplgth)))
           (phase:double (AudioBuffer_phase buffer))
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
@@ -378,7 +378,7 @@
           (x0pos:i64 (* channels (convert (floor pos))))
           (x1pos:i64 (* channels (convert (floor (% (+ pos rate) lgthf)))))
           (x2pos:i64 (* channels (convert (floor (% (+ pos rate rate) lgthf))))))
-      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping) 
+      (if (> pos lgthf) 0.0 ;; return silence when past the end (shouldn't happen if looping)
           (begin
             (set! dy1 (- (pref dat2 y1pos) (pref dat1 y1pos)))
             (set! y1 (if (and oneshot (< x0pos 1)) 0.0 (+ (pref dat1 y1pos) (* dy1 mix))))
@@ -389,9 +389,9 @@
             (set! dx2 (- (pref dat2 x2pos) (pref dat1 x2pos)))
             (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
             (if (= chan 0) ;; increment phase
-                (AudioBuffer_set_phase buffer 
-                                      (if oneshot 
-                                          (+ pos rate) 
+                (AudioBuffer_set_phase buffer
+                                      (if oneshot
+                                          (+ pos rate)
                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
@@ -403,7 +403,7 @@
           (frames (AudioBuffer_frames buffer))
           (looplgth (AudioBuffer_loop_frames buffer))
           (loopstart (AudioBuffer_loop_start buffer))
-          (oneshot (= looplgth 0))       
+          (oneshot (= looplgth 0))
           (segments (if oneshot 0 (/ frames looplgth)))
           (phase:double (AudioBuffer_phase buffer))
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
@@ -437,9 +437,9 @@
             (set! dx2 (- (pref dat2 x2pos) (pref dat1 x2pos)))
             (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
             (if (= chan 0) ;; increment phase
-                (AudioBuffer_set_phase buffer 
-                                      (if oneshot 
-                                          (+ pos rate) 
+                (AudioBuffer_set_phase buffer
+                                      (if oneshot
+                                          (+ pos rate)
                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
@@ -793,7 +793,7 @@
     (let ((dat:SAMPLE* (alloc (* frames chans))))
       (AudioBuffer_h (String "") 0 frames chans dat samplerate 0 0 60 0.0))))
 
-;; AudioBuffer created with b64 is always malloc'd 
+;; AudioBuffer created with b64 is always malloc'd
 ;; and expected to live for the duration of the session
 (bind-func AudioBuffer
   (lambda (frames chans samplerate phase root loopstart loopframes b64:String*)
@@ -822,8 +822,8 @@
           (dat:SAMPLE* (alloc size))
           (olddat:SAMPLE* (AudioBuffer_data in)))
       (memcpy (cast dat) (cast olddat) (* size 4))
-      (AudioBuffer_z 
-        (AudioBuffer_filepath in) 
+      (AudioBuffer_z
+        (AudioBuffer_filepath in)
         (AudioBuffer_playhead in)
         (AudioBuffer_frames in)
         (AudioBuffer_channels in)
@@ -837,11 +837,11 @@
 ;; a 'new' AudioBuffer with shared audio buffer
 (bind-func AudioBuffer_shared_data
   (lambda (ab:AudioBuffer*)
-    (AudioBuffer_z (String "") 
-                   0 
+    (AudioBuffer_z (String "")
+                   0
                    (AudioBuffer_frames ab)
                    (AudioBuffer_channels ab)
-                   (AudioBuffer_data ab) 
+                   (AudioBuffer_data ab)
                    (AudioBuffer_samplerate ab)
                    (AudioBuffer_loop_start ab)
                    (AudioBuffer_loop_frames ab)

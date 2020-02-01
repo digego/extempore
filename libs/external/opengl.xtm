@@ -6,7 +6,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 (if *impc:compiler:with-cache* (sys:load "libs/aot-cache/opengl.xtm" 'quiet))
@@ -43,13 +43,13 @@
                 (print-with-colors 'yellow 'default #f (print (sys:platform))))))
   "xtmopengl")
 
-;; if on windows also check for Gl32.dll			  
-(if (not libgl) 
+;; if on windows also check for Gl32.dll
+(if (not libgl)
     (if (string=? "Windows" (sys:platform))
         (begin (set! libgl (impc:ti:bind-dylib 'libgl "Gl32.dll"))
                (if (or (null? libgl)
                        (eq? #f libgl))
-                   (print-error "Error loading opengl library")))	   
+                   (print-error "Error loading opengl library")))
         (sys:load-escape "Error loading opengl library")))
 
 (impc:aot:import-ll "xtmopengl")
@@ -117,15 +117,15 @@
 (bind-lib libglu gluLookAt [void,double,double,double,double,double,double,double,double,double]*)
 (bind-lib libglu gluOrtho2D [void,double,double,double,double]*)
 (bind-lib libglu gluPerspective [void,double,double,double,double]*)
-(bind-lib libglu gluErrorString [i8*,i32]*)			   
+(bind-lib libglu gluErrorString [i8*,i32]*)
 
 (bind-func gl_setup
   (lambda ()
     (glEnable GL_LIGHTING)
     (glEnable GL_LIGHT0)
     (let ((diffuse:float* (halloc 4))
-	  (specular:float* (halloc 4))
-	  (position:float* (halloc 4)))
+    (specular:float* (halloc 4))
+    (position:float* (halloc 4)))
       (pset! diffuse 0 1.0)
       (pset! diffuse 1 1.0)
       (pset! diffuse 2 1.0)
@@ -187,7 +187,7 @@
 (bind-func fbo_create_texture_rect
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+    (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       ;;(glRenderbufferStorage GL_RENDERBUFFER GL_RGBA16F width height)
@@ -210,7 +210,7 @@
 (bind-func fbo_create_depth_buffer_rect
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+    (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       ;; (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
@@ -233,7 +233,7 @@
 (bind-func fbo_create_texture
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+    (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       (glRenderbufferStorage GL_RENDERBUFFER GL_RGBA8 width height)
@@ -254,7 +254,7 @@
 (bind-func fbo_create_depth_buffer
   (lambda (width height)
     (let ((id:i32* (salloc))
-	  (tex:i32* (salloc)))
+    (tex:i32* (salloc)))
       (glGenRenderbuffers 1 id)
       (glBindRenderbuffer GL_RENDERBUFFER (pref id 0))
       (glRenderbufferStorage GL_RENDERBUFFER GL_DEPTH_COMPONENT32 width height)
@@ -308,9 +308,9 @@
 (bind-func create_fbo_rect
   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
     (let ((texid:i32 0)
-	  (depthid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:E_fbo* (halloc))) ;; heap alloc
+    (depthid:i32 0)
+    (fboid:i32* (salloc))
+    (fbo:E_fbo* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -324,8 +324,8 @@
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_TEXTURE_RECTANGLE_ARB depthid 0)
       (tfill! fbo (pref fboid 0) texid depthid width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null E_fbo*))))
+  (if (<> status GL_FRAMEBUFFER_COMPLETE)
+      (set! fbo (cast null E_fbo*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       ;; unbind the frame buffer
@@ -338,19 +338,19 @@
 (bind-func create_fbo_no_depth_rect
   (lambda (width:i32 height:i32 _texid:i32)
     (let ((texid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:E_fbo* (halloc))) ;; heap alloc
+    (fboid:i32* (salloc))
+    (fbo:E_fbo* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
       (if (> _texid 0) (set! texid _texid))
-      (set! texid (fbo_create_texture_rect width height))      
+      (set! texid (fbo_create_texture_rect width height))
       ;; Attach the texture texid to the color buffer of our fbo
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_RECTANGLE_ARB texid 0)
       (tfill! fbo (pref fboid 0) texid -1 width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null E_fbo*))))
+  (if (<> status GL_FRAMEBUFFER_COMPLETE)
+      (set! fbo (cast null E_fbo*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear GL_COLOR_BUFFER_BIT)
       ;; unbind the frame buffer
@@ -363,10 +363,10 @@
 ;; if _texid is greater than 0 then use existing _texid
 (bind-func create_fbo
   (lambda (width:i32 height:i32 _texid:i32 _depthid:i32)
-    (let ((texid:i32 0) 
-	  (depthid:i32 0) 
-	  (fboid:i32* (salloc))
-	  (fbo:E_fbo* (halloc))) ;; heap alloc
+    (let ((texid:i32 0)
+    (depthid:i32 0)
+    (fboid:i32* (salloc))
+    (fbo:E_fbo* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -381,7 +381,7 @@
       (tfill! fbo (pref fboid 0) texid depthid width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER))
             (err:i32 (glGetError)))
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
+  (if (<> status GL_FRAMEBUFFER_COMPLETE)
             (if (<> err GL_NO_ERROR)
                 (begin (printf "GL ERR: FRAMEBUFFER err: %d\n" err)
                        (set! fbo (cast null E_fbo*))
@@ -403,8 +403,8 @@
 (bind-func create_fbo_no_depth
   (lambda (width:i32 height:i32 _texid:i32)
     (let ((texid:i32 0)
-	  (fboid:i32* (salloc))
-	  (fbo:E_fbo* (halloc))) ;; heap alloc
+    (fboid:i32* (salloc))
+    (fbo:E_fbo* (halloc))) ;; heap alloc
       (glGenFramebuffers 1 fboid)
       ;; bind the fbo
       (glBindFramebuffer GL_FRAMEBUFFER (pref fboid 0))
@@ -414,9 +414,9 @@
       (glFramebufferTexture2D GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D texid 0)
       (tfill! fbo (pref fboid 0) texid -1 width height)
       (let ((status:i32 (glCheckFramebufferStatus GL_FRAMEBUFFER)))
-	(printf "fb status %d\n" status)
-	(if (<> status GL_FRAMEBUFFER_COMPLETE)
-	    (set! fbo (cast null E_fbo*))))
+  (printf "fb status %d\n" status)
+  (if (<> status GL_FRAMEBUFFER_COMPLETE)
+      (set! fbo (cast null E_fbo*))))
       (glClearColor 0.0 1.0 0.0 1.0)
       (glClear GL_COLOR_BUFFER_BIT)
       ;; unbind the frame buffer
@@ -429,7 +429,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Shader helpers
-;; 
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; a couple of shader helper functions
@@ -491,17 +491,17 @@
 (bind-func create_shader_xtm
   (lambda (vsource:i8* fsource:i8*)
     (let ((fshader (glCreateShader GL_FRAGMENT_SHADER))
-	  (vshader (glCreateShader GL_VERTEX_SHADER))
-	  (fcode:|1,i8*|* (salloc 1))
-	  (vcode:|1,i8*|* (salloc 1))
-	  (program (glCreateProgram))
-	  (temp:i32* (salloc 1)))
+    (vshader (glCreateShader GL_VERTEX_SHADER))
+    (fcode:|1,i8*|* (salloc 1))
+    (vcode:|1,i8*|* (salloc 1))
+    (program (glCreateProgram))
+    (temp:i32* (salloc 1)))
       (pset! fcode 0 fsource)
-      (pset! vcode 0 vsource)      
+      (pset! vcode 0 vsource)
       (glShaderSource fshader 1 (cast fcode i8**) (bitcast null i32*))
       (glShaderSource vshader 1 (cast vcode i8**) (bitcast null i32*))
       (glCompileShader fshader)
-      (glCompileShader vshader)   
+      (glCompileShader vshader)
       (glAttachShader program fshader)
       (glAttachShader program vshader)
       (glBindAttribLocation program 0 "xtmVertex")
@@ -515,7 +515,7 @@
       program)))
 
 
-	  
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  GL DRAWING STUFF (deprecated use cairo)
@@ -530,8 +530,8 @@
       (glLineWidth 3.0)
       (glBegin GL_LINE_LOOP)
       (dotimes (k 90.0)
-	(let ((angle:double (/ (* k 2.0 PI) 90.0)))
-	  (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
+  (let ((angle:double (/ (* k 2.0 PI) 90.0)))
+    (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
       (glEnd))))
 
 (bind-func circle_whole
@@ -539,57 +539,57 @@
     (let ((k 0.0))
       (glBegin GL_TRIANGLE_FAN)
       (dotimes (k 90.0)
-	(let ((angle:double (/ (* k 2.0 PI) 90.0)))
-	  (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
+  (let ((angle:double (/ (* k 2.0 PI) 90.0)))
+    (glVertex2d (+ x (* (cos angle) radius)) (+ y (* (sin angle) radius)))))
       (glEnd))))
 
 (bind-func cube_whole
   (let ((dlist -1))
     (lambda ()
       (if (> dlist -1)
-	  (begin (glCallList dlist) 1)
-	  (begin (set! dlist (glGenLists 1))
-		 (glNewList dlist (+ GL_COMPILE 1))
-		 (glBegin GL_QUADS)
-		 ;; Front face
-		 (glNormal3d 0.0 0.0 1.0)
-		 (glVertex3d 0.0 0.0  1.0)
-		 (glVertex3d 1.0 0.0  1.0)
-		 (glVertex3d 1.0  1.0  1.0)
-		 (glVertex3d 0.0  1.0  1.0)
-		 ;; Back face
-		 (glNormal3d 0.0 0.0 -1.0)
-		 (glVertex3d 0.0 0.0 0.0)
-		 (glVertex3d 0.0  1.0 0.0)
-		 (glVertex3d 1.0  1.0 0.0)
-		 (glVertex3d 1.0 0.0 0.0)
-		 ;; Top face
-		 (glNormal3d 0.0 1.0 0.0)
-		 (glVertex3d 0.0  1.0 0.0)
-		 (glVertex3d 0.0  1.0  1.0)
-		 (glVertex3d 1.0  1.0  1.0)
-		 (glVertex3d 1.0  1.0 0.0)
-		 ;; Bottom face
-		 (glNormal3d 0.0 -1.0 0.0)
-		 (glVertex3d 0.0 0.0 0.0)
-		 (glVertex3d 1.0 0.0 0.0)
-		 (glVertex3d 1.0 0.0  1.0)
-		 (glVertex3d 0.0 0.0  1.0)
-		 ;; Right face
-		 (glNormal3d 1.0 0.0 0.0)
-		 (glVertex3d 1.0 0.0 0.0)
-		 (glVertex3d 1.0  1.0 0.0)
-		 (glVertex3d 1.0  1.0  1.0)
-		 (glVertex3d 1.0 0.0  1.0)
-		 ;; Left face
-		 (glNormal3d -1.0 0.0 0.0)
-		 (glVertex3d 0.0 0.0 0.0)
-		 (glVertex3d 0.0 0.0  1.0)
-		 (glVertex3d 0.0  1.0  1.0)
-		 (glVertex3d 0.0  1.0 0.0)
-		 (glEnd)
-		 (glEndList)
-		 1)))))
+    (begin (glCallList dlist) 1)
+    (begin (set! dlist (glGenLists 1))
+     (glNewList dlist (+ GL_COMPILE 1))
+     (glBegin GL_QUADS)
+     ;; Front face
+     (glNormal3d 0.0 0.0 1.0)
+     (glVertex3d 0.0 0.0  1.0)
+     (glVertex3d 1.0 0.0  1.0)
+     (glVertex3d 1.0  1.0  1.0)
+     (glVertex3d 0.0  1.0  1.0)
+     ;; Back face
+     (glNormal3d 0.0 0.0 -1.0)
+     (glVertex3d 0.0 0.0 0.0)
+     (glVertex3d 0.0  1.0 0.0)
+     (glVertex3d 1.0  1.0 0.0)
+     (glVertex3d 1.0 0.0 0.0)
+     ;; Top face
+     (glNormal3d 0.0 1.0 0.0)
+     (glVertex3d 0.0  1.0 0.0)
+     (glVertex3d 0.0  1.0  1.0)
+     (glVertex3d 1.0  1.0  1.0)
+     (glVertex3d 1.0  1.0 0.0)
+     ;; Bottom face
+     (glNormal3d 0.0 -1.0 0.0)
+     (glVertex3d 0.0 0.0 0.0)
+     (glVertex3d 1.0 0.0 0.0)
+     (glVertex3d 1.0 0.0  1.0)
+     (glVertex3d 0.0 0.0  1.0)
+     ;; Right face
+     (glNormal3d 1.0 0.0 0.0)
+     (glVertex3d 1.0 0.0 0.0)
+     (glVertex3d 1.0  1.0 0.0)
+     (glVertex3d 1.0  1.0  1.0)
+     (glVertex3d 1.0 0.0  1.0)
+     ;; Left face
+     (glNormal3d -1.0 0.0 0.0)
+     (glVertex3d 0.0 0.0 0.0)
+     (glVertex3d 0.0 0.0  1.0)
+     (glVertex3d 0.0  1.0  1.0)
+     (glVertex3d 0.0  1.0 0.0)
+     (glEnd)
+     (glEndList)
+     1)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -653,7 +653,7 @@
           (c-1 (- 1.0 c))
           (s (sin alpha))
           (mat2:float* (salloc 16))
-          (mat3:float* (salloc 16))          
+          (mat3:float* (salloc 16))
           (vec1:float* (salloc 3)) ;; axis to rotate around (normalized)
           (vec2:float* (salloc 3))) ;; axis to rotate around (normalized)
       (pfill! vec1 x y z)
@@ -731,7 +731,7 @@
             (vx:float* (salloc 3))
             (i 0)
             (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))          
+            (mtmp1:float* (salloc 16))
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
         (vsub vEye vTarget 3 vtmp1)
@@ -763,7 +763,7 @@
             (vx:float* (salloc 3))
             (i 0)
             (mat:float* (salloc 16))
-            (mtmp1:float* (salloc 16))          
+            (mtmp1:float* (salloc 16))
             (vtmp1:float* (salloc 3))
             (vtmp2:float* (salloc 3)))
         (vnorm vDir 3 vz)

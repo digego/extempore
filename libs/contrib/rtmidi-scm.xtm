@@ -17,23 +17,23 @@
   (let ((notes (make-vector 127 0)))
     (lambda (time device pitch velocity duration channel)
       (if (> time (vector-ref notes pitch))
-	  (let ((dur (- duration (* 2 *au:block-size*))))
-	    (vector-set! notes pitch (+ time dur))
-	    (callback time 'midi_send device *midi-note-on* channel pitch velocity)
-	    (callback (+ time dur) 'midi_send device *midi-note-off* channel pitch velocity))))))
+    (let ((dur (- duration (* 2 *au:block-size*))))
+      (vector-set! notes pitch (+ time dur))
+      (callback time 'midi_send device *midi-note-on* channel pitch velocity)
+      (callback (+ time dur) 'midi_send device *midi-note-off* channel pitch velocity))))))
 
 ;; A midi-specific play macro
 
 (define-macro (mplay . args)
   (if (symbol? (car args))
       `(play-midi-note (*metro* beat) ,(car args)
-		       (real->integer ,(cadr args))
-		       (real->integer ,(caddr args))
-		       (*metro* 'dur ,(car (cdddr args))) 0)
+           (real->integer ,(cadr args))
+           (real->integer ,(caddr args))
+           (*metro* 'dur ,(car (cdddr args))) 0)
       `(play-midi-note (*metro* (+ beat ,(car args))) ,(cadr args)
-		       (real->integer ,(caddr args))
-		       (real->integer ,(car (cdddr args)))
-		       (*metro* 'dur ,(cadr (cdddr args))) 0)))
+           (real->integer ,(caddr args))
+           (real->integer ,(car (cdddr args)))
+           (*metro* 'dur ,(cadr (cdddr args))) 0)))
 
 
 (define-macro (mplayob o b . args)

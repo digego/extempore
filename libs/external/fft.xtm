@@ -63,7 +63,7 @@
 (bind-alias kiss_fft_cfg i8*)
 
 ;;  kiss_fft_alloc
-;;  
+;;
 ;;  Initialize a FFT (or IFFT) algorithm's cfg/state buffer.
 ;;
 ;;  typical usage:      kiss_fft_cfg mycfg=kiss_fft_alloc(1024,0,NULL,NULL);
@@ -73,19 +73,19 @@
 ;;
 ;;  If lenmem is NULL, then kiss_fft_alloc will allocate a cfg buffer using malloc.
 ;;  The returned value should be free()d when done to avoid memory leaks.
-;;  
+;;
 ;;  The state can be placed in a user supplied buffer 'mem':
 ;;  If lenmem is not NULL and mem is not NULL and *lenmem is large enough,
 ;;      then the function places the cfg in mem and the size used in *lenmem
 ;;      and returns mem.
-;;  
+;;
 ;;  If lenmem is not NULL and ( mem is NULL or *lenmem is not large enough),
-;;      then the function returns NULL and places the minimum cfg 
+;;      then the function returns NULL and places the minimum cfg
 ;;      buffer size in *lenmem.
 (bind-lib libkiss_fft kiss_fft_alloc [kiss_fft_cfg,i32,i32,i8*,size_t*]*)
 
 ;;  kiss_fft(cfg,in_out_buf)
-;;  
+;;
 ;;  Perform an FFT on a complex input buffer.
 ;;  for a forward FFT,
 ;;  fin should be  f[0] , f[1] , ... ,f[nfft-1]
@@ -97,32 +97,32 @@
 ;;  A more generic version of the above function. It reads its input from every Nth sample.
 (bind-lib libkiss_fft kiss_fft_stride [void,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*,i32]*)
 
-;;  Cleans up some memory that gets managed internally. Not necessary to call, but it might clean up 
+;;  Cleans up some memory that gets managed internally. Not necessary to call, but it might clean up
 ;;  your compiler output to call this before you exit.
 (bind-lib libkiss_fft kiss_fft_cleanup [void]*)
-	
+
 ;;  Returns the smallest integer k, such that k>=n and k has only "fast" factors (2,3,5)
 (bind-lib libkiss_fft kiss_fft_next_fast_size [i32,i32]*)
 
 ;; KFC -- Kiss FFT Cache
 
-;; Not needing to deal with kiss_fft_alloc and a config 
+;; Not needing to deal with kiss_fft_alloc and a config
 ;; object may be handy for a lot of programs.
 
-;; KFC uses the underlying KISS FFT functions, but caches the config object. 
-;; The first time kfc_fft or kfc_ifft for a given FFT size, the cfg 
-;; object is created for it.  All subsequent calls use the cached 
+;; KFC uses the underlying KISS FFT functions, but caches the config object.
+;; The first time kfc_fft or kfc_ifft for a given FFT size, the cfg
+;; object is created for it.  All subsequent calls use the cached
 ;; configuration object.
 
 ;; NOTE:
-;; You should probably not use this if your program will be using a lot 
+;; You should probably not use this if your program will be using a lot
 ;; of various sizes of FFTs.  There is a linear search through the
 ;; cached objects.  If you are only using one or two FFT sizes, this
-;; will be negligible. Otherwise, you may want to use another method 
+;; will be negligible. Otherwise, you may want to use another method
 ;; of managing the cfg objects.
- 
-;;  There is no automated cleanup of the cached objects.  This could lead 
-;; to large memory usage in a program that uses a lot of *DIFFERENT* 
+
+;;  There is no automated cleanup of the cached objects.  This could lead
+;; to large memory usage in a program that uses a lot of *DIFFERENT*
 ;; sized FFTs.  If you want to force all cached cfg objects to be freed,
 ;; call kfc_cleanup.
 
@@ -136,20 +136,20 @@
 ;; /*free all cached objects*/
 (bind-lib libkiss_fft kfc_cleanup [void]*)
 
-;; tools/kiss_fftnd.h 
+;; tools/kiss_fftnd.h
 
 (bind-alias kiss_fftnd_cfg i8*)
 
 (bind-lib libkiss_fft kiss_fftnd_alloc [kiss_fftnd_cfg,i32*,i32,i32,i8*,size_t*]*)
 (bind-lib libkiss_fft kiss_fftnd [void,kiss_fftnd_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
 
-;; tools/kiss_fftndr.h 
+;; tools/kiss_fftndr.h
 
 (bind-alias kiss_fftndr_cfg i8*)
 
 ;;  dims[0] must be even
 
-;;  If you don't care to allocate space, use mem = lenmem = NULL 
+;;  If you don't care to allocate space, use mem = lenmem = NULL
 (bind-lib libkiss_fft kiss_fftndr_alloc [kiss_fftndr_cfg,i32*,i32,i32,i8*,size_t*]*)
 
 ;;  input timedata has dims[0] X dims[1] X ... X  dims[ndims-1] scalar points
@@ -166,7 +166,7 @@
 (bind-alias kiss_fftr_cfg i8*)
 
 ;;  nfft must be even
-;;  If you don't care to allocate space, use mem = lenmem = NULL 
+;;  If you don't care to allocate space, use mem = lenmem = NULL
 (bind-lib libkiss_fft kiss_fftr_alloc [kiss_fftr_cfg,i32,i32,i8*,size_t*]*)
 
 
@@ -212,7 +212,7 @@
           (res:kiss_fft_cfg (kiss_fftr_alloc (i64toi32 len) 0 config (ref sz))))
       (if (null? res) (println "error constructing fftr config!"))
       (FFTR_Config res))))
-    
+
 ; (bind-func fft
 ;   "calculate the FFT of an input signal"
 ;   (lambda (in:kiss_fft_cpx* out:kiss_fft_cpx* len:i64)

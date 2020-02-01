@@ -80,7 +80,7 @@
               (track (cond ((= state TrackingState_NotTracked) "NotTracked")
                            ((= state TrackingState_Inferred) "Inferred")
                            ((= state TrackingState_Tracked) "Tracked")
-                           (else "Err")))                           
+                           (else "Err")))
               (name (cond ((= type JointType_SpineBase) "SpineBase")
                           ((= type JointType_SpineMid) "SpineMid")
                           ((= type JointType_Neck) "Neck   ")
@@ -118,19 +118,19 @@
 (bind-lib libkinect2 kinect_body_to_screen [void,XTM_Kinect_Sensor*,CameraSpacePoint*,XTM_Point2d*,i32,i32]*)
 
 (bind-func kinect_start
-	(lambda ()
-		(kinect_init_sensor)))
+  (lambda ()
+    (kinect_init_sensor)))
 
 (bind-func kinect_stop
-	(lambda (sensor)
-		(kinect_close_sensor sensor)))
+  (lambda (sensor)
+    (kinect_close_sensor sensor)))
 
 (bind-func kinect_update_body
   (let ((hands:i32* (alloc (* 6 2)))
         (ids:i64* (alloc 6))
         (points:XTM_Point2d* (alloc (* 6 25)))
         (joints:Joint* (alloc (* 6 25))))
-    (lambda (sensor width height) 
+    (lambda (sensor width height)
       (let ((res (kinect_get_joints sensor ids joints hands points width height)))
         (if (< res 0)
             (println "NO DATA AVAILABLE"))
@@ -139,7 +139,7 @@
 (bind-func kinect_get_tracked:[i64*]*
   (lambda ()
     (kinect_update_body.ids)))
-  
+
 (bind-func kinect_get_joint_pos
   (lambda (id:i64 joint_id:i32 pos:CameraSpacePoint*)
     (let ((joints:Joint* (kinect_update_body.joints))
@@ -206,7 +206,7 @@
           (joints:Joint* (kinect_update_body.joints)))
       (doloop (k 6)
         (if (>= (pref ids k) 0)
-            (begin                      
+            (begin
               (println "----------------------------")
               (println "Body ID: " (pref ids k))
               (println "Body Idx: " k)
@@ -217,52 +217,52 @@
                          "\tx:" (tref (pref-ptr points (+ (* k 25) i)) 0)
                          "y:" (tref (pref-ptr points (+ (* k 25) i)) 1))))))
       void)))
-      
+
 
 (impc:aot:insert-footer "xtmkinect2")
 (define *xtmlib-kinect2-loaded* #t)
 
-;; (bind-func send-skeleton-osc  
+;; (bind-func send-skeleton-osc
 ;;   (let ((skel-frame:NUI_SKELETON_FRAME* (zalloc))
-;; 	(pos:double* (zalloc 100))
-;; 	(buf:i8* (halloc 8000))
-;; 	(data:float* (halloc (* 20 4)))) ;; 20 Vector4's
+;;  (pos:double* (zalloc 100))
+;;  (buf:i8* (halloc 8000))
+;;  (data:float* (halloc (* 20 4)))) ;; 20 Vector4's
 ;;     (lambda (addy port)
 ;;       (kinect_get_skeleton 100 skel-frame)
 ;;       (kinect-smooth-params skel-frame 0.5 0.5 0.5 0.05 0.04)
 ;;       (let ((skels:|6,NUI_SKELETON_DATA|* (tref-ptr skel-frame 5))
-;; 	    (i 0))
-;; 	(dotimes (i 6)
-;; 	  (let ((skel-data:NUI_SKELETON_DATA* (aref-ptr skels i))
-;; 		(state (tref skel-data 0))
-;; 		(position:Vector4* (tref-ptr skel-data 4))
-;; 		(positions:|20,Vector4|* (tref-ptr skel-data 5)))
-;; 	    (if (= state 2)
-;; 		(let ((address:i8* (salloc 15))
-;; 		      (types ",b")
-;; 		      (addressl 16)
-;; 		      (typesl 4)
-;; 		      (datal 320)
-;; 		      (length (+ addressl typesl 4 datal)))
-;; 		  ;(printf "sending %d:%f\n" i (ftod (tref (aref-ptr positions 0) 0)))
-;; 		  ;; setup address
-;; 		  (memset address 0 15)
-;; 		  (strcat address "/kinect/skel/")
-;; 		  (strcat address (extitoa i))
-;; 		  ;; clear message
-;; 		  (memset buf 0 (+ length 1))
-;; 		  ;; copy address into message
-;; 		  (strcpy (pref-ptr buf 0) address)
-;; 		  ;; copy types into message
-;; 		  (strcpy (pref-ptr buf addressl) types)
-;; 		  ;; copy blob size into message
-;; 		  (pset! (bitcast (pref-ptr buf (+ addressl typesl)) i32*)
-;; 			 0 (i64toi32 datal))
-;; 		  ;; copy blob data into message
-;; 		  (memcpy (pref-ptr buf (+ addressl typesl 4))
-;; 			  (bitcast positions i8*) datal)
-;; 		  ;; send message
-;; 		  (llvm_send_udp addy port buf (i64toi32 length)))))))))) 
+;;      (i 0))
+;;  (dotimes (i 6)
+;;    (let ((skel-data:NUI_SKELETON_DATA* (aref-ptr skels i))
+;;    (state (tref skel-data 0))
+;;    (position:Vector4* (tref-ptr skel-data 4))
+;;    (positions:|20,Vector4|* (tref-ptr skel-data 5)))
+;;      (if (= state 2)
+;;    (let ((address:i8* (salloc 15))
+;;          (types ",b")
+;;          (addressl 16)
+;;          (typesl 4)
+;;          (datal 320)
+;;          (length (+ addressl typesl 4 datal)))
+;;      ;(printf "sending %d:%f\n" i (ftod (tref (aref-ptr positions 0) 0)))
+;;      ;; setup address
+;;      (memset address 0 15)
+;;      (strcat address "/kinect/skel/")
+;;      (strcat address (extitoa i))
+;;      ;; clear message
+;;      (memset buf 0 (+ length 1))
+;;      ;; copy address into message
+;;      (strcpy (pref-ptr buf 0) address)
+;;      ;; copy types into message
+;;      (strcpy (pref-ptr buf addressl) types)
+;;      ;; copy blob size into message
+;;      (pset! (bitcast (pref-ptr buf (+ addressl typesl)) i32*)
+;;       0 (i64toi32 datal))
+;;      ;; copy blob data into message
+;;      (memcpy (pref-ptr buf (+ addressl typesl 4))
+;;        (bitcast positions i8*) datal)
+;;      ;; send message
+;;      (llvm_send_udp addy port buf (i64toi32 length))))))))))
 
 
 ;; (bind-val _skeletons_ |6,|20,Vector4||* (* 6 (* 20 4 4)))
@@ -271,17 +271,16 @@
 ;; (bind-func receive-skel-osc
 ;;   (lambda (address:i8* types:i8* args:i8* size:i32)
 ;;     (if (= (strncmp address "/kinect/skel" 12) 0)
-;; 	(let ((skel-num (- (i8toi64 (pref address 13)) 48))
-;; 	      (positions (pref-ptr args 4))
-;; 	      (posarg (bitcast positions |20,Vector4|*))
-;; 	      (i 0) (k 0)
-;; 	      (skel (aref-ptr _skeletons_ skel-num)))
-;; 	  ;(printf "receiving %d:%f\n" skel-num (ftod (tref (aref-ptr posarg 0) 0)))
-;; 	  (dotimes (i 20)
-;; 	    (let ((v4p (aref-ptr posarg i)))
-;; 	      (tfill! (aref-ptr skel i) (tref v4p 0) (tref v4p 1) (tref v4p 2) (tref v4p 3))))
-;; 	  ;(memcpy skel positions (* 20 4 4))
-;; 	  (aset! _skeletons-alive_ skel-num 1)
-;; 	  1)
-;; 	1)))
-
+;;  (let ((skel-num (- (i8toi64 (pref address 13)) 48))
+;;        (positions (pref-ptr args 4))
+;;        (posarg (bitcast positions |20,Vector4|*))
+;;        (i 0) (k 0)
+;;        (skel (aref-ptr _skeletons_ skel-num)))
+;;    ;(printf "receiving %d:%f\n" skel-num (ftod (tref (aref-ptr posarg 0) 0)))
+;;    (dotimes (i 20)
+;;      (let ((v4p (aref-ptr posarg i)))
+;;        (tfill! (aref-ptr skel i) (tref v4p 0) (tref v4p 1) (tref v4p 2) (tref v4p 3))))
+;;    ;(memcpy skel positions (* 20 4 4))
+;;    (aset! _skeletons-alive_ skel-num 1)
+;;    1)
+;;  1)))

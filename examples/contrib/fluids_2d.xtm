@@ -158,7 +158,7 @@
                             (i64tod N))))
           (pset! p (+ (+ i 1) (* (+ j 1) N)) 0.0)
           1))
-      
+
       (fluid_set_boundary 0 div Ny N)
       (fluid_set_boundary 0 p Ny N)
       (fluid_lin_solve 0 p div 1.0 6.0 iter Ny N)
@@ -181,7 +181,7 @@
 
       (fluid_set_boundary 1 velocx Ny N)
       (fluid_set_boundary 2 velocy Ny N)
-      
+
       1)))
 
 (bind-func fluid_advect
@@ -206,7 +206,7 @@
           (set! tmp2 (* dty (pref velocy (+ (+ i 1) (* (+ j 1) N)))))
           (set! x (- ifloat tmp1))
           (set! y (- jfloat tmp2))
-          
+
           (if (< x 0.5) (set! x 0.5))
           (if (> x (+ Nfloat 0.5)) (set! x (+ Nfloat 0.5)))
           (set! i0 (floor x))
@@ -222,7 +222,7 @@
           (set! t0 (- 1.0 t1))
 
           (set! i0i (dtoi64 i0))
-          (set! i1i (dtoi64 i1))	      
+          (set! i1i (dtoi64 i1))
           (set! j0i (dtoi64 j0))
           (set! j1i (dtoi64 j1))
 
@@ -231,16 +231,16 @@
                              (* t1 (pref d0 (+ i0i (* j1i N))))))
                     (* s1 (+ (* t0 (pref d0 (+ i1i (* j0i N))))
                              (* t1 (pref d0 (+ i1i (* j1i N))))))))))
-      
+
       (fluid_set_boundary b d Ny N))))
 
 (bind-func fluid_step_cube
   (lambda (cube:fluidcube*)
     (let ((N (tref cube 0))
           (Ny (tref cube 10))
-          (dt (tref cube 1))	  
+          (dt (tref cube 1))
           (diff (tref cube 2))
-          (visc (tref cube 3))	  
+          (visc (tref cube 3))
           (s (tref cube 4))
           (k 0)
           (iter 7)
@@ -253,10 +253,10 @@
           (time (now)))
       (fluid_diffuse 1 Vx0 Vx visc dt iter Ny N)
       (fluid_diffuse 2 Vy0 Vy visc dt iter Ny N)
-      
+
       (dotimes (k (* Ny N))
-      	(pset! Vx k 0.0)
-      	(pset! Vy k 0.0))
+        (pset! Vx k 0.0)
+        (pset! Vy k 0.0))
 
       (fluid_project Vx0 Vy0 Vx Vy iter Ny N)
 
@@ -264,20 +264,20 @@
       (fluid_advect 2 Vy Vy0 Vx0 Vy0 dt Ny N)
 
       (dotimes (kk (* Ny N))
-      	(pset! Vx0 kk 0.0)
-      	(pset! Vy0 kk 0.0))      
-      
+        (pset! Vx0 kk 0.0)
+        (pset! Vy0 kk 0.0))
+
       (fluid_project Vx Vy Vx0 Vy0 iter Ny N)
 
       (fluid_diffuse 0 s density diff dt iter Ny N)
-      (fluid_advect 0 density s Vx Vy dt Ny N)      
+      (fluid_advect 0 density s Vx Vy dt Ny N)
 
       ;; (printf "time: %lld:%lld\n" (now) (- (now) time))
       cube)))
 
 (bind-func get_fluid_cube
   ;;  (let ((cube (fluid_cube_create 322 182 0.0002 0.00002 0.05)))    ; test
-  (let ((cube (fluid_cube_create CUBE_W CUBE_H 0.0002 0.00002 0.05)))    ; test               
+  (let ((cube (fluid_cube_create CUBE_W CUBE_H 0.0002 0.00002 0.05)))    ; test
     (lambda ()
       cube)))
 
@@ -316,7 +316,7 @@
 ;; OPENGL DRAWING STUFF!
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
- 
+
 (bind-func add_density
   (lambda (x:i64 y:i64 amount:double)
     (let ((cube (get_fluid_cube)))
@@ -367,7 +367,7 @@
           (coloursf (cast colours float*))
           (densities (tref cube 5))
           (ii:i64 0)
-          (jj:i64 0)	    
+          (jj:i64 0)
           (Vx (tref cube 6))
           (Vy (tref cube 7))
           (size_x (tref cube 0))
@@ -389,7 +389,7 @@
           (pset! coloursf (+ 0 (* 4 cnt)) (* cvar red))
           (pset! coloursf (+ 1 (* 4 cnt)) (* cvar green))
           (pset! coloursf (+ 2 (* 4 cnt)) (* cvar blue))
-          ;; (pset! coloursf (+ 2 (* 4 cnt)) (* cvar blue)) ;(* cvar (- 1.0 blue)))	              
+          ;; (pset! coloursf (+ 2 (* 4 cnt)) (* cvar blue)) ;(* cvar (- 1.0 blue)))
           (pset! coloursf (+ 3 (* 4 cnt)) cvar) ;1.0)
           (set! cnt (+ cnt 1))))
       (update vert_vbo)
@@ -430,7 +430,7 @@
 
 (bind-func burners
   (let ((rnds:double* (alloc 10000)) (k 0))
-    (dotimes (k 10000) (pset! rnds k (random)))  
+    (dotimes (k 10000) (pset! rnds k (random)))
     (lambda (time:double)
       (let ((i 0) (j 0) (k 0) (tup (tuple 0:i64 0:i64))
             (offx 100) (offy 0))
@@ -451,7 +451,7 @@
         ;;               (* 0.5 (cos (* time .0027)))
         ;;               (* 0.5 (sin (* time .013))))
         void))))
-      
+
 
 ;; (bind-func burners
 ;;   (let ((rnds:double* (alloc 10000)) (k 0))
@@ -508,10 +508,10 @@
     void))
 
 (bind-func gl_draw_loop
-  (lambda (time:i64 delta_t:double)    
+  (lambda (time:i64 delta_t:double)
     (burners (i64tod time))
     (set! StepNum (+ StepNum 1))
-    (update_data_points)    
+    (update_data_points)
     (xtm_render null null trans:XTMRENDERCB null null) ;(cast models i8*))
     ;; swap buffers
     (glfwPollEvents)

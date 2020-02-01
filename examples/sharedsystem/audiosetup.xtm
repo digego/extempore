@@ -23,17 +23,17 @@
 ;;
 (make-instrument syn1 analogue)
 (make-instrument syn2 analogue)
-(make-instrument syn3 analogue) 
+(make-instrument syn3 analogue)
 (make-instrument kit dlogue)
 ;; (make-instrument samp1 sampler)
 (make-instrument samp1 sampler)
 
-;; load samples 
+;; load samples
 ;; (load-samples samp1 "assets/samples/808/")
 (println "load samples")
 (load-samples samp1 "assets/samples/piano/")
 (println "loaded samples")
-;; 
+;;
 ;; setup multicore dsp playback
 ;;
 (bind-func dsp1:DSP
@@ -49,7 +49,7 @@
             (set! out (syn1 in time chan dat))
             (set! total (+ total (- (clock_clock) tmp)))
             (if (and (= (% time second) 0) (= chan 0))
-                (begin 
+                (begin
                   (set! load total)
                   (set! total 0.0)))
             out)
@@ -68,7 +68,7 @@
             (set! out (syn2 in time chan dat))
             (set! total (+ total (- (clock_clock) tmp)))
             (if (and (= (% time second) 0) (= chan 0))
-                (begin 
+                (begin
                   (set! load total)
                   (set! total 0.0)))
             out)
@@ -87,7 +87,7 @@
             (set! out (syn3 in time chan dat))
             (set! total (+ total (- (clock_clock) tmp)))
             (if (and (= (% time second) 0) (= chan 0))
-                (begin 
+                (begin
                   (set! load total)
                   (set! total 0.0)))
             out)
@@ -106,7 +106,7 @@
             (set! out (kit in time chan dat))
             (set! total (+ total (- (clock_clock) tmp)))
             (if (and (= (% time second) 0) (= chan 0))
-                (begin 
+                (begin
                   (set! load total)
                   (set! total 0.0)))
             out)
@@ -125,7 +125,7 @@
             (set! out (samp1 in time chan dat))
             (set! total (+ total (- (clock_clock) tmp)))
             (if (and (= (% time second) 0) (= chan 0))
-                (begin 
+                (begin
                   (set! load total)
                   (set! total 0.0)))
             out)
@@ -174,7 +174,7 @@
         (rmix 1.0))
     (lambda (in time chan dat)
       (if (> rmix 0.001)
-          (set! rev (reverb chan 
+          (set! rev (reverb chan
                         (+ (* r1 (pref in 0))
                            (* r2 (pref in 1))
                            (* r3 (pref in 2))
@@ -184,7 +184,7 @@
       (+  (* rmix rev)
           (* gain
             (+ (pref in 0)
-               (pref in 1)     
+               (pref in 1)
                (pref in 2)
                (* 2.0 (pref in 3))
                (* 2.0 (pref in 4))))))))
@@ -207,17 +207,17 @@
             (* 100.0 (dsp5.load:double)))
     void))
 
-;; if chan is -1 set global reverb mix 
+;; if chan is -1 set global reverb mix
 (bind-func main_reverb
   (lambda (input:i64 amt:float)
     (cond ((= input 0) (dspmt.rmix (clamp amt 0.0:f 2.0:f)))
           ((= input 1) (dspmt.r1 (clamp amt 0.0:f 2.0:f)))
           ((= input 2) (dspmt.r2 (clamp amt 0.0:f 2.0:f)))
           ((= input 3) (dspmt.r3 (clamp amt 0.0:f 2.0:f)))
-          ((= input 4) (dspmt.r4 (clamp amt 0.0:f 2.0:f)))          
+          ((= input 4) (dspmt.r4 (clamp amt 0.0:f 2.0:f)))
           ((= input 5) (dspmt.r5 (clamp amt 0.0:f 2.0:f))))
     void))
-  
+
 (bind-func main_gain
   (lambda (amt:float)
     (dspmt.gain:float (clamp amt 0.0:f 4.0:f))))
@@ -272,7 +272,7 @@
 
 ;; modulation destinations (fx)
 (define PARAM_PAN_WIDTH 19)
-(define PARAM_PAN_POS 20) 
+(define PARAM_PAN_POS 20)
 (define PARAM_DELAY_TIME_LEFT 21)
 (define PARAM_DELAY_TIME_RIGHT 22)
 (define PARAM_DELAY_FB 23) ;; feedback

@@ -161,7 +161,7 @@
       (glBindBuffer GL_ARRAY_BUFFER (id vbo))
       (glBufferData GL_ARRAY_BUFFER (size vbo) (data vbo) usage)
       (gl_print_error "Error setting VBO data")
-      (glBindBuffer GL_ARRAY_BUFFER 0)      
+      (glBindBuffer GL_ARRAY_BUFFER 0)
       ;(printf "Created ") (print vbo) (printf "\n")
       (zone_cleanup (glDeleteBuffers 1 (tref-ptr vbo 0))
                     (gl_print_error "Error deleting VBO"))
@@ -331,7 +331,7 @@
               (glEnableVertexAttribArray (+ index 2))
               (glVertexAttribPointer (+ index 2) 4 type GL_FALSE (* stride component_size)
                                      (pref-ptr (cast null GLvoid*) (* component_size (+ offset 8))))
-              (glEnableVertexAttribArray (+ index 3))                            
+              (glEnableVertexAttribArray (+ index 3))
               (glVertexAttribPointer (+ index 3) 4 type GL_FALSE (* stride component_size)
                                      (pref-ptr (cast null GLvoid*) (* component_size (+ offset 12)))))
             (begin
@@ -355,7 +355,7 @@
       (glBindBuffer GL_ARRAY_BUFFER 0)
       (if (and instance_attr (<> size 16))
           (begin (glVertexAttribDivisor index 1)
-                 (gl_print_error "Error setting VAO attribute divisor")))       
+                 (gl_print_error "Error setting VAO attribute divisor")))
       (if (and instance_attr (= size 16))
           (begin (glVertexAttribDivisor (+ index 0) 1)
                  (glVertexAttribDivisor (+ index 1) 1)
@@ -386,7 +386,7 @@
     (set_attribute:[void,VAO*,VBO*,i32,i32,i32,GLsizei,i32,i1]* vao vbo (type vbo) index size 0 0 instance_attr)))
 
 (bind-func draw
-  (let ((i 0))  
+  (let ((i 0))
     (lambda (vao:VAO* draw_mode:i32 first_element:i32 count:i32 instances:i32)
       ;; (println 'draw: vao draw_mode first_element count)
       (glBindVertexArray (id vao))
@@ -395,11 +395,11 @@
         (if (aref (attribs vao) i)
             (begin ;; (println 'enable-attrib-list i)
               (glEnableVertexAttribArray i))))
-      (gl_print_error "Error enablling attrib arrays in VAO!")                            
+      (gl_print_error "Error enablling attrib arrays in VAO!")
       (if (> instances 0)
           (glDrawArraysInstanced draw_mode first_element count instances)
           (glDrawArrays draw_mode first_element count))
-      (gl_print_error "Error drawing VAO!")                            
+      (gl_print_error "Error drawing VAO!")
       (dotimes (i 16)
         (if (aref (attribs vao) i)
             (begin ;; (println 'disable-attrib-list i)
@@ -505,7 +505,7 @@
           (printf "<TEX: id:%d type:%d width:%d height:%d>" (id tex) (type tex) (width tex) (height tex)))
       (String s))))
 
-;; helper 
+;; helper
 
 (bind-func free_image
   (lambda (tex:Texture*)
@@ -513,7 +513,7 @@
         (free (tref tex 4)))
     (tset! tex 1 0)
     (tset! tex 2 0)
-    (tset! tex 3 0)    
+    (tset! tex 3 0)
     void))
 
 ;; helpers
@@ -561,7 +561,7 @@
           (top_data (stbi_load (cstring top) (pref-ptr wp 2) (pref-ptr hp 2) (pref-ptr cp 2) 4))
           (bottom_data (stbi_load (cstring bottom) (pref-ptr wp 3) (pref-ptr hp 3) (pref-ptr cp 3) 4))
           (left_data (stbi_load (cstring left) (pref-ptr wp 4) (pref-ptr hp 4) (pref-ptr cp 4) 4))
-          (right_data (stbi_load (cstring right) (pref-ptr wp 5) (pref-ptr hp 5) (pref-ptr cp 5) 4))     
+          (right_data (stbi_load (cstring right) (pref-ptr wp 5) (pref-ptr hp 5) (pref-ptr cp 5) 4))
           (w:i32 (pref wp 0))
           (h:i32 (pref hp 0))
           (c:i32 (pref cp 0))
@@ -577,7 +577,7 @@
                  (set! front_data null)))
       (if (<> (/ hpt 6) h)
           (begin (println "Bad cube map!  All 6 images must have the same height!" h)
-                 (set! front_data null)))          
+                 (set! front_data null)))
       (if (<> (/ cpt 6) c)
           (begin (println "Bad cube map!  All 6 images must have the same number of components" c)
                  (set! front_data null)))
@@ -638,11 +638,11 @@
                       comp
                       (data tex) (* (width tex) comp 1))
       void)))
-    
+
 
 
 ;; texture from existing data (no copy) with type
-;; (bind-func Texture 
+;; (bind-func Texture
 ;;   (lambda (width:i32 height:i32 comp:i32 type:i32 data:i8*)
 ;;     (let ((tex (Texture:[Texture*,i32]* type)))
 ;;       (tset! tex 2 width)
@@ -656,7 +656,7 @@
   (lambda (tex:Texture*)
     (glActiveTexture GL_TEXTURE0)
     (glBindTexture GL_TEXTURE_CUBE_MAP (id tex))
-    (gl_print_error "error binding texture cube data")        
+    (gl_print_error "error binding texture cube data")
     ;; front
     (glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0
                   (if (= (type tex) GL_BGRA) GL_RGBA (type tex)) ;; this is internal type
@@ -720,14 +720,14 @@
     ;; (println "start bind cube")
     (glActiveTexture (+ GL_TEXTURE0 active))
     (glBindTexture GL_TEXTURE_CUBE_MAP (id tex))
-    (gl_print_error "error binding texture cube data")    
+    (gl_print_error "error binding texture cube data")
     (cond ((or (= (type tex) GL_RGBA)
                (= (type tex) GL_BGRA))
            (begin
              ;; set some parameters
              (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE)
              (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE)
-             (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_R GL_CLAMP_TO_EDGE)             
+             (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_R GL_CLAMP_TO_EDGE)
              (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MIN_FILTER GL_LINEAR)
              (glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MAG_FILTER GL_LINEAR)
              1))
@@ -758,7 +758,7 @@
     (glBindTexture GL_TEXTURE_2D (id tex))
     (cond ((or (= (type tex) GL_RGBA)
                (= (type tex) GL_RGB)
-               (= (type tex) GL_BGR)               
+               (= (type tex) GL_BGR)
                (= (type tex) GL_BGRA))
            (begin
              ;; set some parameters
@@ -767,7 +767,7 @@
              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_LINEAR)
              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_LINEAR)
              1))
-          ((= (type tex) GL_DEPTH_COMPONENT)           
+          ((= (type tex) GL_DEPTH_COMPONENT)
            (begin
              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
              (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
@@ -796,7 +796,7 @@
 
 (bind-func unbind_cube
   (lambda (tex:Texture* active:i32)
-    (glActiveTexture (+ GL_TEXTURE0 active))    
+    (glActiveTexture (+ GL_TEXTURE0 active))
     (glBindTexture GL_TEXTURE_CUBE_MAP 0)
     (gl_print_error "couldn't unbind texture")
     void))
@@ -851,7 +851,7 @@
       tex)))
 
 ;; texture from existing data (no copy)
-(bind-func Texture 
+(bind-func Texture
   (lambda (width:i32 height:i32 comp:i32 data:i8*)
     (let ((tex (cond ((= comp 1)
                       (Texture:[Texture*,i32]* GL_DEPTH_COMPONENT))
@@ -1004,7 +1004,7 @@
           (glAttachShader (id program) (id frag))
           (glLinkProgram (id program))
           (gl_print_error "Error making shader program!")
-          (println 'ShaderProgram: program)          
+          (println 'ShaderProgram: program)
           program))))
 
 ;; these ones are handy when you want to create a new shader program
@@ -1025,7 +1025,7 @@
     (let ((vert (Shader vsource GL_VERTEX_SHADER))
           (geom (Shader gsource GL_GEOMETRY_SHADER))
           (frag (Shader fsource GL_FRAGMENT_SHADER)))
-      (gl_print_error "Error compiling Shaders") 
+      (gl_print_error "Error compiling Shaders")
       (if (or (null? vert) (null? geom) (null? frag))
           null
           (ShaderProgram:[ShaderProgram*,String*,Shader*,Shader*,Shader*]* name vert geom frag)))))

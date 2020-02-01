@@ -10,7 +10,7 @@
 ;;
 ;; requires dynamic lib from xtmcv project:
 ;; https://github.com/extemporelang/xtmcv
-;; 
+;;
 
 ;;; Code:
 
@@ -63,7 +63,7 @@
 
 ;; where depth is one of the above
 ;; and cn is the number of
-;; for example: RGB colour would be: 
+;; for example: RGB colour would be:
 ;; CV_8U * 3 = (CV_MAKE_TYPE CV_8U 3) = 16
 (bind-func CV_MAKE_TYPE
   (lambda (depth:i32 cn:i32)
@@ -103,7 +103,7 @@
 (bind-lib cvlib toByteArray [ocv_ByteArrayT,i8*,i32]*)
 (bind-lib cvlib ByteArray_Release [void,ocv_ByteArrayT]*)
 
-(bind-alias ocv_RectT i8*) ;; x, y, w, h 
+(bind-alias ocv_RectT i8*) ;; x, y, w, h
 (bind-lib cvlib toRect [ocv_RectT,i32,i32,i32,i32]*)
 (bind-lib cvlib Rect_Release [void,ocv_RectT]*)
 
@@ -148,7 +148,7 @@
 (bind-type ocv_RawData <i32,i32,ocv_ByteArray>)
 (bind-type ocv_Point <i32,i32>)
 (bind-type ocv_Points <ocv_Point*,i32>)
-(bind-type ocv_Contour <ocv_Point*,i32>) 
+(bind-type ocv_Contour <ocv_Point*,i32>)
 (bind-type ocv_Contours <ocv_Contour*,i32>)
 (bind-type ocv_Rect <i32,i32,i32,i32>)
 (bind-type ocv_Rects <ocv_Rect*,i32>)
@@ -185,7 +185,7 @@
     (let ((obj (alloc)))
       (tfill! obj in OCV_XTM_Mat_T)
       obj)))
-  
+
 (bind-func ocv_Mat
   (lambda (rows:i32 cols:i32 type:i32)
     (let ((mat (Mat_NewWithSize rows cols type)))
@@ -299,7 +299,7 @@
 ;;
 
 ;;
-;; ColorConversionCodes 
+;; ColorConversionCodes
 ;;
 (bind-val ocv_COLOR_BGR2BGRA i32 0)
 (bind-val ocv_COLOR_RGB2RGBA i32 ocv_COLOR_BGR2BGRA)
@@ -515,7 +515,7 @@
 ;;
 (bind-lib cvlib CvtColor [void,ocv_MatT,ocv_MatT,i32]*)
 
-(bind-func ocv_cvtColor 
+(bind-func ocv_cvtColor
   "Convert color
   "
   (lambda (img:ocv_Mat* code:i32)
@@ -535,7 +535,7 @@
 
 ;;
 ;; ocv_puttext
-;; 
+;;
 (bind-lib cvlib PutText [void,ocv_MatT,i8*,ocv_PointT,i32,double,ocv_ScalarT,i32])
 
 (bind-func ocv_puttext
@@ -564,7 +564,7 @@
 
 (bind-func ocv_resize1 (lambda (img:ocv_Mat* size fx fy interp) (ocv_resize img size fx fy interp)))
 (bind-func ocv_resize2 (lambda (img:ocv_Mat* size) (ocv_resize img size)))
-(define ocv_resize 
+(define ocv_resize
   (lambda (img size args)
     (if (null? args)
         (ocv_resize2 img size)
@@ -607,11 +607,11 @@
 (bind-val ocv_WINDOW_FREERATIO i32 #x00000100)
 (bind-val ocv_WINDOW_KEEPRATIO i32 #x00000000)
 
-(bind-val ocv_WND_PROP_FULLSCREEN i32 0) 
-(bind-val ocv_WND_PROP_AUTOSIZE i32 1) 
-(bind-val ocv_WND_PROP_ASPECT_RATIO i32 2) 
-(bind-val ocv_WND_PROP_OPENGL i32 3) 
-(bind-val ocv_WND_PROP_VISIBLE i32 4) 
+(bind-val ocv_WND_PROP_FULLSCREEN i32 0)
+(bind-val ocv_WND_PROP_AUTOSIZE i32 1)
+(bind-val ocv_WND_PROP_ASPECT_RATIO i32 2)
+(bind-val ocv_WND_PROP_OPENGL i32 3)
+(bind-val ocv_WND_PROP_VISIBLE i32 4)
 
 (bind-lib cvlib Window_IMShow [void,i8*,ocv_MatT]*)
 (bind-lib cvlib Window_New [void,i8*,i32]*)
@@ -621,7 +621,7 @@
 (bind-lib cvlib Window_Move [void,i8*,i32,i32]*)
 
 ;;
-;; ocv_namedWindow 
+;; ocv_namedWindow
 ;;
 
 (bind-func ocv_namedWindow
@@ -644,7 +644,7 @@
 (bind-func ocv_namedWindow2 (lambda (name:i8* flags:i32) (ocv_namedWindow (Str name) flags)))
 (define ocv_namedWindow
   (lambda (name . args)
-    (if (null? args) 
+    (if (null? args)
         (ocv_namedWindow1 name)
         (ocv_namedWindow2 name (car args)))))
 
@@ -654,7 +654,7 @@
 
 (bind-func ocv_close
   "Closes a window
-  
+
   @param name - window name
   @return void"
   (lambda (name:String*)
@@ -692,7 +692,7 @@
 (bind-func ocv_waitKey
     "Delay in ms - if '0' then wait indefinitely for a key press"
     "otherwise if greater than 0 wait at most delay milliseconds"
-    
+
     "@param delay - time in milliseconds to wait for keypress"
     "@return an ascii key value or -1 of delay was reached"
   (lambda (delay:i32)
@@ -719,7 +719,7 @@
 (bind-val ocv_IMREAD_REDUCED_GRAYSCALE_4 i32 32)
 (bind-val ocv_IMREAD_REDUCED_COLOR_4 i32 33)
 (bind-val ocv_IMREAD_REDUCED_GRAYSCALE_8 i32 64)
-(bind-val ocv_IMREAD_REDUCED_COLOR_8 i32 65) 
+(bind-val ocv_IMREAD_REDUCED_COLOR_8 i32 65)
 
 ;;
 ;; Image Write Flags
@@ -734,9 +734,9 @@
 (bind-val ocv_IMWRITE_PNG_STRATEGY i32 17)
 (bind-val ocv_IMWRITE_PNG_BILEVEL i32 18)
 (bind-val ocv_IMWRITE_PXM_BINARY i32 32)
-(bind-val ocv_IMWRITE_WEBP_QUALITY i32 64) 
-(bind-val ocv_IMWRITE_TIFF_RESUNIT i32 256) 
-(bind-val ocv_IMWRITE_TIFF_XDPI i32 257) 
+(bind-val ocv_IMWRITE_WEBP_QUALITY i32 64)
+(bind-val ocv_IMWRITE_TIFF_RESUNIT i32 256)
+(bind-val ocv_IMWRITE_TIFF_XDPI i32 257)
 (bind-val ocv_IMWRITE_TIFF_YDPI i32 258)
 
 ;;
@@ -746,7 +746,7 @@
 (bind-val ocv_IMWRITE_PNG_STRATEGY_FILTERED i32 1)
 (bind-val ocv_IMWRITE_PNG_STRATEGY_HUFFMAN_ONLY i32 2)
 (bind-val ocv_IMWRITE_PNG_STRATEGY_RLE i32 3)
-(bind-val ocv_IMWRITE_PNG_STRATEGY_FIXED i32 4) 
+(bind-val ocv_IMWRITE_PNG_STRATEGY_FIXED i32 4)
 
 ;;
 ;; ocv_imread
@@ -759,16 +759,16 @@
       (zone_cleanup (Mat_Close mat))
       (ocv_Mat mat))))
 
-(bind-func ocv_imread 
-  (lambda (filename:String*) 
+(bind-func ocv_imread
+  (lambda (filename:String*)
     (ocv_imread:[ocv_Mat*,String*,i32]* filename ocv_IMREAD_COLOR)))
-  
+
 ;; override scheme wrapper
 (bind-func ocv_imread1 (lambda (name:i8*) (ocv_imread (Str name))))
 (bind-func ocv_imread2 (lambda (name:i8* flags:i32) (ocv_imread (Str name) flags)))
 (define ocv_imread
   (lambda (name . args)
-    (if (null? args) 
+    (if (null? args)
         (ocv_imread1 name)
         (ocv_imread2 name (car args)))))
 
@@ -789,10 +789,10 @@
 ;; override scheme wrapper
 (bind-func ocv_imwrite1 (lambda (name:i8* img) (ocv_imwrite (Str name) img)))
 (bind-func ocv_imwrite2 (lambda (name:i8* img flags) (ocv_imwrite (Str name) img (pref flags 0))))
-  
+
 (define ocv_imwrite
   (lambda (name img . args)
-    (if (null? args) 
+    (if (null? args)
         (ocv_imwrite1 name img)
         (ocv_imwrite2 name img (car args)))))
 
@@ -815,52 +815,52 @@
 
 ;;
 ;; ocv_VideoCaptureProperties
-;; 
-(bind-val ocv_CAP_PROP_POS_MSEC i32 0) 
-(bind-val ocv_CAP_PROP_POS_FRAMES i32 1) 
-(bind-val ocv_CAP_PROP_POS_AVI_RATIO i32 2) 
-(bind-val ocv_CAP_PROP_FRAME_WIDTH i32 3) 
-(bind-val ocv_CAP_PROP_FRAME_HEIGHT i32 4) 
-(bind-val ocv_CAP_PROP_FPS i32 5) 
-(bind-val ocv_CAP_PROP_FOURCC i32 6) 
-(bind-val ocv_CAP_PROP_FRAME_COUNT i32 7) 
-(bind-val ocv_CAP_PROP_FORMAT i32 8) 
-(bind-val ocv_CAP_PROP_MODE i32 9) 
-(bind-val ocv_CAP_PROP_BRIGHTNESS i32 10) 
-(bind-val ocv_CAP_PROP_CONTRAST i32 11) 
-(bind-val ocv_CAP_PROP_SATURATION i32 12) 
-(bind-val ocv_CAP_PROP_HUE i32 13) 
-(bind-val ocv_CAP_PROP_GAIN i32 14) 
-(bind-val ocv_CAP_PROP_EXPOSURE i32 15) 
-(bind-val ocv_CAP_PROP_CONVERT_RGB i32 16) 
-(bind-val ocv_CAP_PROP_WHITE_BALANCE_BLUE_U i32 17) 
-(bind-val ocv_CAP_PROP_RECTIFICATION i32 18) 
-(bind-val ocv_CAP_PROP_MONOCHROME i32 19) 
-(bind-val ocv_CAP_PROP_SHARPNESS i32 20) 
-(bind-val ocv_CAP_PROP_AUTO_EXPOSURE i32 21) 
-(bind-val ocv_CAP_PROP_GAMMA i32 22) 
-(bind-val ocv_CAP_PROP_TEMPERATURE i32 23) 
-(bind-val ocv_CAP_PROP_TRIGGER i32 24) 
-(bind-val ocv_CAP_PROP_TRIGGER_DELAY i32 25) 
-(bind-val ocv_CAP_PROP_WHITE_BALANCE_RED_V i32 26) 
-(bind-val ocv_CAP_PROP_ZOOM i32 27) 
-(bind-val ocv_CAP_PROP_FOCUS i32 28) 
-(bind-val ocv_CAP_PROP_GUID i32 29) 
-(bind-val ocv_CAP_PROP_ISO_SPEED i32 30) 
-(bind-val ocv_CAP_PROP_BACKLIGHT i32 32) 
-(bind-val ocv_CAP_PROP_PAN i32 33) 
-(bind-val ocv_CAP_PROP_TILT i32 34) 
-(bind-val ocv_CAP_PROP_ROLL i32 35) 
-(bind-val ocv_CAP_PROP_IRIS i32 36) 
-(bind-val ocv_CAP_PROP_SETTINGS i32 37) 
-(bind-val ocv_CAP_PROP_BUFFERSIZE i32 38) 
-(bind-val ocv_CAP_PROP_AUTOFOCUS i32 39) 
-(bind-val ocv_CAP_PROP_SAR_NUM i32 40) 
-(bind-val ocv_CAP_PROP_SAR_DEN i32 41) 
-(bind-val ocv_CAP_PROP_BACKEND i32 42) 
-(bind-val ocv_CAP_PROP_CHANNEL i32 43) 
-(bind-val ocv_CAP_PROP_AUTO_WB i32 44) 
-(bind-val ocv_CAP_PROP_WB_TEMPERATURE i32 45) 
+;;
+(bind-val ocv_CAP_PROP_POS_MSEC i32 0)
+(bind-val ocv_CAP_PROP_POS_FRAMES i32 1)
+(bind-val ocv_CAP_PROP_POS_AVI_RATIO i32 2)
+(bind-val ocv_CAP_PROP_FRAME_WIDTH i32 3)
+(bind-val ocv_CAP_PROP_FRAME_HEIGHT i32 4)
+(bind-val ocv_CAP_PROP_FPS i32 5)
+(bind-val ocv_CAP_PROP_FOURCC i32 6)
+(bind-val ocv_CAP_PROP_FRAME_COUNT i32 7)
+(bind-val ocv_CAP_PROP_FORMAT i32 8)
+(bind-val ocv_CAP_PROP_MODE i32 9)
+(bind-val ocv_CAP_PROP_BRIGHTNESS i32 10)
+(bind-val ocv_CAP_PROP_CONTRAST i32 11)
+(bind-val ocv_CAP_PROP_SATURATION i32 12)
+(bind-val ocv_CAP_PROP_HUE i32 13)
+(bind-val ocv_CAP_PROP_GAIN i32 14)
+(bind-val ocv_CAP_PROP_EXPOSURE i32 15)
+(bind-val ocv_CAP_PROP_CONVERT_RGB i32 16)
+(bind-val ocv_CAP_PROP_WHITE_BALANCE_BLUE_U i32 17)
+(bind-val ocv_CAP_PROP_RECTIFICATION i32 18)
+(bind-val ocv_CAP_PROP_MONOCHROME i32 19)
+(bind-val ocv_CAP_PROP_SHARPNESS i32 20)
+(bind-val ocv_CAP_PROP_AUTO_EXPOSURE i32 21)
+(bind-val ocv_CAP_PROP_GAMMA i32 22)
+(bind-val ocv_CAP_PROP_TEMPERATURE i32 23)
+(bind-val ocv_CAP_PROP_TRIGGER i32 24)
+(bind-val ocv_CAP_PROP_TRIGGER_DELAY i32 25)
+(bind-val ocv_CAP_PROP_WHITE_BALANCE_RED_V i32 26)
+(bind-val ocv_CAP_PROP_ZOOM i32 27)
+(bind-val ocv_CAP_PROP_FOCUS i32 28)
+(bind-val ocv_CAP_PROP_GUID i32 29)
+(bind-val ocv_CAP_PROP_ISO_SPEED i32 30)
+(bind-val ocv_CAP_PROP_BACKLIGHT i32 32)
+(bind-val ocv_CAP_PROP_PAN i32 33)
+(bind-val ocv_CAP_PROP_TILT i32 34)
+(bind-val ocv_CAP_PROP_ROLL i32 35)
+(bind-val ocv_CAP_PROP_IRIS i32 36)
+(bind-val ocv_CAP_PROP_SETTINGS i32 37)
+(bind-val ocv_CAP_PROP_BUFFERSIZE i32 38)
+(bind-val ocv_CAP_PROP_AUTOFOCUS i32 39)
+(bind-val ocv_CAP_PROP_SAR_NUM i32 40)
+(bind-val ocv_CAP_PROP_SAR_DEN i32 41)
+(bind-val ocv_CAP_PROP_BACKEND i32 42)
+(bind-val ocv_CAP_PROP_CHANNEL i32 43)
+(bind-val ocv_CAP_PROP_AUTO_WB i32 44)
+(bind-val ocv_CAP_PROP_WB_TEMPERATURE i32 45)
 
 ;;
 ;; ocv_VideoWriter
@@ -879,13 +879,13 @@
 
 (bind-func ocv_VideoWriter
   "Return an OpenCV VideoWriter object
-  
+
   @param name - filename to write video too
   @param fourcc - the video fourcc (e.g. 'MJPG' or 'MP4V')
   @param fps - fps of video output
   @param width
   @param height
-  @param isColour - colour output? 
+  @param isColour - colour output?
   @return opaque video writer structure - you can check ocv_IsOpened to see if the writer was opened succesfully"
   (lambda (name:String* fourcc:String* fps:double width:i32 height:i32 isColour:i1)
     (let ((vw (VideoWriter_New)))
@@ -893,11 +893,11 @@
       (ocv_VideoWriter:[ocv_VideoWriter*,ocv_VideoWriterA]* vw))))
 
 ;; override scheme wrapper
-(bind-func ocv_VideoWriter1 
+(bind-func ocv_VideoWriter1
   (lambda (name:i8* fourcc:i8* fps:double width:i32 height:i32 isColour:i1)
     (ocv_VideoWriter (Str name) (Str fourcc) fps width height isColour)))
 
-(define ocv_VideoWriter 
+(define ocv_VideoWriter
   (lambda (name fourcc fps width height isColour)
     (ocv_VideoWriter1 name fourcc fps width height isColour)))
 
@@ -911,7 +911,7 @@
     (VideoWriter_IsOpened (tref vw 0))))
 
 ;;
-;; ocv_VideoWriter_Write 
+;; ocv_VideoWriter_Write
 ;;
 (bind-lib cvlib VideoWriter_Write [void,ocv_VideoWriterA,ocv_MatT]*)
 
@@ -924,18 +924,18 @@
     (VideoWriter_Write (tref vw 0) (tref img 0))))
 
 ;;
-;; ocv_VideoWriter_Close 
+;; ocv_VideoWriter_Close
 ;;
 (bind-lib cvlib VideoWriter_Close [void,ocv_VideoWriterA]*)
 
 (bind-func ocv_close
   "close the open video writer, which should save file to disk
-  
+
   @param vw - video writer to Closes
   @return void"
   (lambda (vw:ocv_VideoWriter*)
     (VideoWriter_Close (tref vw 0))))
-  
+
 
 ;;
 ;; ocv_VideoCapture
@@ -954,9 +954,9 @@
       obj)))
 
 (bind-func ocv_VideoCapture
-  "Return an OpenCV 4 VideoCapture Object. 
+  "Return an OpenCV 4 VideoCapture Object.
   Object is automatically destroyed upon exiting memory zone!
-    
+
   @param uri - the video file to read from
   @returns Opaque VideoCapture"
   (lambda (uri:String*)
@@ -965,7 +965,7 @@
       (ocv_VideoCapture:[ocv_VideoCapture*,i8*]* vc))))
 
 (bind-func ocv_VideoCapture
-  "Return an OpenCV VideoCapture Object. 
+  "Return an OpenCV VideoCapture Object.
   Object is automatically destroyed upon exiting memory zone!
 
   @param id - a video camera to read from, indexed from 0
@@ -980,7 +980,7 @@
 (bind-func ocv_VideoCapture2 (lambda (id:i32) (ocv_VideoCapture id)))
 (define ocv_VideoCapture
   (lambda (arg)
-    (if (string? arg) 
+    (if (string? arg)
         (ocv_VideoCapture1 arg)
         (ocv_VideoCapture2 arg))))
 
@@ -993,9 +993,9 @@
   "Returns an OpenCV Mat Object
   note that Mat maybe empty if no image available
   check with call to ocv_MatEmpty
-  
+
   @param vc - an OpenCV video capture object
-  @returns an image - maybe empty (destroyed on zone exit)" 
+  @returns an image - maybe empty (destroyed on zone exit)"
   (lambda (vc:ocv_VideoCapture*)
     (let ((mat (Mat_New))
           (res (VideoCapture_Read (tref vc 0) mat)))
@@ -1006,19 +1006,19 @@
   "Returns an OpenCV Mat Object
   note that Mat maybe empty if no image available
   check with call to ocv_MatEmpty
-  
+
   @param vc - an OpenCV video capture object
-  @returns mat - return 'modified' input mat" 
-  (lambda (vc:ocv_VideoCapture* mat:ocv_Mat*) 
+  @returns mat - return 'modified' input mat"
+  (lambda (vc:ocv_VideoCapture* mat:ocv_Mat*)
     (VideoCapture_Read (tref vc 0) (tref mat 0))
     mat))
-  
+
 ;; override scheme wrapper
 (bind-func ocv_read1 (lambda (vc:ocv_VideoCapture*) (ocv_read vc)))
 (bind-func ocv_read2 (lambda  (vc:ocv_VideoCapture* mat:ocv_Mat*) (ocv_read vc mat)))
 (define ocv_read
   (lambda (vc . args)
-    (if (null? args) 
+    (if (null? args)
         (ocv_read1 vc)
         (ocv_read2 vc (car args)))))
 
@@ -1030,13 +1030,13 @@
 
 (bind-func ocv_close
   "Close video capture
-  
+
   @param vc - video capture object to close
   @return void"
   (lambda (vc:ocv_VideoCapture*)
     (VideoCapture_Close (tref vc 0))))
 
-    
+
 ;;
 ;; ocv_VideoCapture_Set
 ;;
@@ -1045,7 +1045,7 @@
 (bind-func ocv_set
   (lambda (vc:ocv_VideoCapture* prop param)
     (VideoCapture_Set (tref vc 0) prop param)))
-  
+
 ;;
 ;; ocv_VideoCapture_Get
 ;;
@@ -1054,7 +1054,7 @@
 (bind-func ocv_get
   (lambda (vc:ocv_VideoCapture* prop)
     (VideoCapture_Get (tref vc 0) prop)))
-  
+
 ;;
 ;; ocv_VideoCapture_Grab
 ;;
@@ -1100,7 +1100,7 @@
     (if (string? obj)
         (ocv_scheme_release_window obj)
         (ocv_scheme_release_object obj))))
- 
+
 ;;
 ;; ocv_isopen
 ;;
