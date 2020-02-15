@@ -554,8 +554,6 @@ else()
   install(DIRECTORY assets runtime libs examples tests
     DESTINATION extempore
     PATTERN ".DS_Store" EXCLUDE)
-  install(FILES extras/.emacs extras/extempore.el extras/extempore.vim
-    DESTINATION extempore/extras)
 endif()
 
 ###################
