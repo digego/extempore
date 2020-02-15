@@ -1134,7 +1134,7 @@ if(APPLE)
 elseif(UNIX)
   set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-linux)
 elseif(WIN32)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-win)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-windows)
 endif()
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (https://extemporelang.github.io)")
