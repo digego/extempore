@@ -1132,11 +1132,11 @@ string(TIMESTAMP EXTEMPORE_BUILD_DATE "%Y%m%d")
 
 # give the zipball a nice name on each platform
 if(APPLE)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-macOS)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-macOS)
 elseif(UNIX)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-linux)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-linux)
 elseif(WIN32)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-win)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-win)
 endif()
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
