@@ -1142,7 +1142,7 @@ endif()
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
 
 if(APPLE)
-  set(CPACK_GENERATOR DragNDrop)
+  set(CPACK_GENERATOR ZIP)
 elseif(UNIX AND NOT APPLE)
   set(CPACK_GENERATOR TGZ)
 elseif(WIN32)
