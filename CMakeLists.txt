@@ -550,9 +550,9 @@ if(NOT PACKAGE)
 else()
   install(TARGETS extempore
     RUNTIME
-    DESTINATION extempore)
+    DESTINATION ".")
   install(DIRECTORY assets runtime libs examples tests
-    DESTINATION extempore
+    DESTINATION "."
     PATTERN ".DS_Store" EXCLUDE)
 endif()
 
