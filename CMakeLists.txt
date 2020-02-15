@@ -1139,7 +1139,7 @@ elseif(WIN32)
   set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-win)
 endif()
 
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (https://extemporelang.github.io)")
 
 if(APPLE)
   set(CPACK_GENERATOR ZIP)
