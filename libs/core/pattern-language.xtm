@@ -23,6 +23,15 @@
                 lst
                 (append (cdr lst) '(0))))))
 
+(define pattern_special_atoms '(_ |))
+
+(define count-specials
+  (lambda (lst t char)
+    (length (take-while (lambda (x) (equal? x char))
+                        (cl:nthcdr (min (cdr t)
+                                        (length lst))
+                                   lst)))))
+
 (define rmap_helper
   (lambda (beats offset func beat dur loopcnt looppos . args)
     (let* ((lst (rmap_helper_lst_sym_transform (if (list? (car args))
@@ -54,20 +63,25 @@
                                   args))
                     (targs (map (lambda (l)
                                   (cond ((vector? l) (map (lambda (x) (eval x)) (vector->list l)))
-                                        ((and (symbol? l) (not (member l '(_ |)))) (eval l))
+                                        ((and (symbol? l) (not (member l pattern_special_atoms)))
+                                         (let ((ll (eval l (interaction-environment))))
+                                           (cond
+                                            ((procedure? ll)
+                                             (eval `(,ll) (interaction-environment)))
+                                            (else
+                                             ll))))
                                         (else l)))
                                 tmpargs)))
                (cond
                 ((or (list? (car tmpargs)) (pair? (car tmpargs)))
                  (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
-                ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
+                ((member (car tmpargs) pattern_special_atoms) #f) ;; skip these symbols
                 (else
                  ;; this is a messy expression, but it just counts the number of
                  ;; '| symbols *after* the current value, and adds them to the
                  ;; duration
-                 (let ((note-dur (* one_beat
-                                   (+ 1 (length (take-while (lambda (x) (equal? x '|))
-                                                            (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
+                 (let ((note-dur (+ one_beat
+                                    (* one_beat (count-specials (car args) t '|)))))
                    (apply callback
                           (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
                           func (+ beat (- (car t) pos)) note-dur
@@ -259,6 +273,81 @@
                         (list x b)
                         (list a x)))
                   (if (list? a) a b)))))
+
+;; Some .abc style note functions. The plain names are quantised to the
+;; current *scale* by rmap_helper. Capitalised note names are in octave 3,
+;; lowercase names in octave 4. In full .abc lower or higher octaves can be
+;; specified by tacking , or ' respectively onto the low/high note names, but
+;; I'm lazy.
+
+;; Quantised notes
+(define (a) (qnt a4))
+(define (b) (qnt b4))
+(define (c) (qnt c4))
+(define (d) (qnt d4))
+(define (e) (qnt e4))
+(define (f) (qnt f4))
+(define (g) (qnt g4))
+
+(define (A) (qnt a3))
+(define (B) (qnt b3))
+(define (C) (qnt c3))
+(define (D) (qnt d3))
+(define (E) (qnt e3))
+(define (F) (qnt f3))
+(define (G) (qnt g3))
+
+;; sharpened notes; these aren't quantised
+(define (^a) a#4)
+(define (^b) b#4)
+(define (^c) c#4)
+(define (^d) d#4)
+(define (^e) e#4)
+(define (^f) f#4)
+(define (^g) g#4)
+
+(define (^A) a#3)
+(define (^B) b#3)
+(define (^C) c#3)
+(define (^D) d#3)
+(define (^E) e#3)
+(define (^F) f#3)
+(define (^G) g#3)
+
+;; flattened notes. Not quantised
+(define (_a) ab4)
+(define (_b) bb4)
+(define (_c) cb4)
+(define (_d) db4)
+(define (_e) eb4)
+(define (_f) fb4)
+(define (_g) gb4)
+
+(define (_A) ab3)
+(define (_B) bb3)
+(define (_C) cb3)
+(define (_D) db3)
+(define (_E) eb3)
+(define (_F) fb3)
+(define (_G) gb3)
+
+;; Naturals, again not quantised
+(define (=a) a3)
+(define (=b) b3)
+(define (=c) c3)
+(define (=d) d3)
+(define (=e) e3)
+(define (=f) f3)
+(define (=g) g3)
+
+(define (=A) a4)
+(define (=B) b4)
+(define (=C) c4)
+(define (=D) d4)
+(define (=E) e4)
+(define (=F) f4)
+(define (=G) g4)
+
 
 ;; euclidean rhythms
 ;; written by Ben in recursive Scheme; Kernighan's aphorism probably applies
