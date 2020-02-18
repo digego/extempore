@@ -1270,9 +1270,11 @@ namespace extemp {
     // should we use native callback?
     if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
       if (pair_cdddr(args) != _sc->NIL && pair_cadddr(args) == _sc->T) {
-        osc->setNativeUDP( (int(*)(char*,int)) cptr_value(pair_caddr(args)));        
+        osc->setNativeUDP( (int(*)(char*,int)) cptr_value(pair_caddr(args)));
+        osc->setNativeOSC(NULL);
       }else{        
         osc->setNativeOSC( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
+        osc->setNativeUDP(NULL);
       }
     }else{
       osc->setNativeOSC(NULL);
