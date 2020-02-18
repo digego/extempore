@@ -217,27 +217,14 @@ static pointer commandOutput(scheme* Scheme, pointer Args)
 
 static pointer getEnv(scheme* Scheme, pointer Args)
 {
-  const char* varname = string_value(pair_car(Args));
+  const char* var = string_value(pair_car(Args));
+  const char* val = std::getenv(var);
 
-#ifdef _WIN32
-  char outbuf[8192]; // oughtta be enough for anyone
-  size_t varsize;
-
-  int res = getenv_s(&varsize, outbuf, 8192, varname);
-
-  if (res == 0){
-	return mk_string(Scheme, outbuf);
+  if (val != NULL){
+	return mk_string(Scheme, val);
   }else{
     return Scheme->F;
   }
-#else
-  char* value = getenv(varname);
-  if (value != NULL){
-	return mk_string(Scheme, value);
-  }else{
-    return Scheme->F;
-  }
-#endif
 }
 
 static pointer setEnv(scheme* Scheme, pointer Args)

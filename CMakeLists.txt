@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
-project(Extempore VERSION 0.8.1)
+project(Extempore VERSION 0.8.3)
 
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
@@ -550,12 +550,10 @@ if(NOT PACKAGE)
 else()
   install(TARGETS extempore
     RUNTIME
-    DESTINATION extempore)
+    DESTINATION ".")
   install(DIRECTORY assets runtime libs examples tests
-    DESTINATION extempore
+    DESTINATION "."
     PATTERN ".DS_Store" EXCLUDE)
-  install(FILES extras/.emacs extras/extempore.el extras/extempore.vim
-    DESTINATION extempore/extras)
 endif()
 
 ###################
@@ -1132,17 +1130,17 @@ string(TIMESTAMP EXTEMPORE_BUILD_DATE "%Y%m%d")
 
 # give the zipball a nice name on each platform
 if(APPLE)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-osx10.9+)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-macOS)
 elseif(UNIX)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-${EXTEMPORE_SYSTEM_NAME})
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-linux)
 elseif(WIN32)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-win${EXTEMPORE_SYSTEM_VERSION})
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-windows)
 endif()
 
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (https://extemporelang.github.io)")
 
 if(APPLE)
-  set(CPACK_GENERATOR DragNDrop)
+  set(CPACK_GENERATOR ZIP)
 elseif(UNIX AND NOT APPLE)
   set(CPACK_GENERATOR TGZ)
 elseif(WIN32)
