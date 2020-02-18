@@ -1,0 +1,32 @@
+;;
+;; The Robots
+;;
+;; Kraftwerk
+;;
+
+(sys:load "examples/sharedsystem/setup.xtm")
+
+;; load in some presets (same as the Oxygene ones)
+
+(analogue-load-preset syn1 "examples/sharedsystem/presets/oxyarp.xtmpreset")
+(analogue-load-preset syn2 "examples/sharedsystem/presets/oxylead.xtmpreset")
+
+;; to start, let's set the global variables which define the "default" root & scale
+
+(begin
+  (set! *scale* (pc:scale 0 'aeolian))
+  (set! *root* 60))
+
+(:> robot-bass 4 0 (play syn1 (rel *root* @1) 70 dur)
+    `(0 0 -1 -1 0 0 -1 -1 0 0 _ _ 2 2 _ _))
+
+(:> robot-accomp 4 0 (play syn1 (rel (+ *root* 12) @1) 70 dur)
+    (orb LC 2 `(0 -1 0 -1 0 0 2 _)))
+
+(:> robot-lead 4 0 (play syn2 (rel (+ *root* 24) @1) 70 dur)
+    (orb (+ LC 1) 2 `(2 _ 3 6 4 _ _ _)))
+
+;; when you're ready, try modifying the global variables again
+(begin
+  (set! *scale* (pc:scale 5 'aeolian))
+  (set! *root* 53))

@@ -13,12 +13,14 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/drawtext.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/drawtext.xtm" 'quiet))
 (sys:load-preload-check 'drawtext)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmdrawtext")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libdrawtext
@@ -29,9 +31,7 @@
         ((string=? (sys:platform) "Windows")
          "libdrawtext.dll")))
 
-(impc:aot:insert-header "xtmdrawtext")
-
-(define *xtmlib-drawtext-loaded* #f)
+(define *xtmlib-drawtext-loaded* #t)
 
 (bind-alias dtx_font i8)
 (bind-alias dtx_glyphmap i8)
@@ -167,7 +167,7 @@
 ;; Converts a unicode code-point to a utf-8 character by filling in
 ;; the buffer passed at the second argument, and returns the number of
 ;; bytes taken by that utf-8 character.
-;; 
+;;
 ;; It's valid to pass a null buffer pointer, in which case only the
 ;; byte count is returned (useful to figure out how much memory to
 ;; allocate for a buffer).

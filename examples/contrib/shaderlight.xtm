@@ -65,12 +65,12 @@
       (pfill! mats 0.5 0.5 0.5 1.0)
       (shader_update_material shader mata matd mats 50.0)
       ;; backwall
-      (mcopy model 4 4 tmp_matrix)          
+      (mcopy model 4 4 tmp_matrix)
       (translate_matrix model -5.0 -2.0 -5.0)
       (scale_matrix model 10.0 10.0 0.01)
       (shader_update_matrices shader model view projection)
       (cube_whole)
-      (mcopy tmp_matrix 4 4 model)                    
+      (mcopy tmp_matrix 4 4 model)
       ;; floor
       (mcopy model 4 4 tmp_matrix)
       (translate_matrix model -5.0 -2.0 -5.0)
@@ -97,15 +97,15 @@
     (lambda (degree:double)
       ;; setup stuff for render
       (glViewport 0 0 (ftoi32 (* 1.0 width)) (ftoi32 (* 1.0 height)))
-      (glEnable GL_DEPTH_TEST)      
-      (glUseProgram lightshader) ;; turn shader on                       
+      (glEnable GL_DEPTH_TEST)
+      (glUseProgram lightshader) ;; turn shader on
       ;; light is on a slow dolly back and forth
       (pfill! spottgt (+ .5 (dtof (* 3.0 (cos (* degree .05))))) 1.0 0.0 1.0)
       (pfill! spotpos (+ .5 (dtof (* 3.0 (cos (* degree .05))))) 1.0 10.0 1.0)
       ;; setup lights colour
       (pfill! a 1.0 1.0 1.0 1.0)
       (pfill! s 1.0 1.0 1.0 1.0)
-      (pfill! d 1.0 1.0 1.0 1.0)      
+      (pfill! d 1.0 1.0 1.0 1.0)
       ;; camera 'eye' moves all around
       ;; but always looks to 'target' centre
       ;; camera 'eye' moves all around
@@ -121,8 +121,8 @@
       (fill_projection_matrix projection_matrix 35.0 (/ width height) 0.1 10.0)
       (fill_view_matrix view_matrix eye target up)
       (fill_identity_matrix model_matrix)
-      (shader_update_light lightshader spotpos spottgt 45.0 30.0 a d s)                  
-      (shader_update_camera lightshader eye target)      
+      (shader_update_light lightshader spotpos spottgt 45.0 30.0 a d s)
+      (shader_update_camera lightshader eye target)
       ;; draw scene
       (shader_update_matrices lightshader model_matrix view_matrix projection_matrix)
       (glClearColor 0.0 0.0 0.0 1.0)
@@ -131,8 +131,8 @@
       (glUseProgram 0) ;; turn shader off
       void)))
 
-;; standard impromptu callback 
-(define opengl-loop  
+;; standard impromptu callback
+(define opengl-loop
   (lambda (degree)
     (gl_print_error)
     (gl_render degree)
@@ -140,4 +140,3 @@
     (callback (+ (now) 1000) 'opengl-loop (+ degree .5))))
 
 (opengl-loop 70.0)
-

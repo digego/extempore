@@ -39,7 +39,7 @@
       (astra_initialize)
       (println '[open]: (astra_streamset_open "device/default" (ref sensor)))
       (println '[create 'reader]: (astra_reader_create sensor (ref reader)))
-      
+
       ;;; depth stream
       ; (println '[fetch 'depthstream]: (astra_reader_get_depthstream reader (ref depthstream)))
       ; (println '[available]: (astra_depthstream_is_available depthstream (ref available)))
@@ -51,7 +51,7 @@
       (println '[available]: (astra_colorstream_is_available colorstream (ref available)))
       (println "is available" available)
       ;; (println '[start 'color 'stream]: (astra_stream_start colorstream))
-      
+
       ;;; set color mode example
       ; (tfill! mode 0 640 480 ASTRA_PIXEL_FORMAT_RGB888 30)
       ; (println '[set 'mode]: (astra_imagestream_set_mode colorstream (convert mode)))
@@ -61,13 +61,13 @@
       ; (println '[available]: (astra_bodystream_is_available bodystream (ref available)))
       ; (println "is available" available)
       ; (println '[start 'depth 'stream]: (astra_stream_start depthstream))
-      
+
       ;;; color body stream
       (println '[fetch 'colorbodystream]: (astra_reader_get_colorizedbodystream reader (ref colorbodystream)))
       (println '[available]: (astra_colorizedbodystream_is_available colorbodystream (ref available)))
       (println "is available" available)
       (println '[start 'color 'body 'stream]: (astra_stream_start colorbodystream))
-      
+
       ;;; hand stream
       (println '[fetch 'handstream]: (astra_reader_get_handstream reader (ref handstream)))
       (println '[available]: (astra_handstream_is_available handstream (ref available)))
@@ -112,9 +112,9 @@
                   (point (ocv_Point_val 0 0))
                   (foundHand #f)
                   (scalar (ocv_Scalar_val 0.0 255.0 0.0 0.0)))
-              (tfill! (ref rect) 
-                      (clamp (- 320 (/ sizesqr 2)) 0 (- 640 sizesqr)) 
-                      (clamp (- 240 (/ sizesqr 2)) 0 (- 480 sizesqr)) 
+              (tfill! (ref rect)
+                      (clamp (- 320 (/ sizesqr 2)) 0 (- 640 sizesqr))
+                      (clamp (- 240 (/ sizesqr 2)) 0 (- 480 sizesqr))
                       sizesqr sizesqr)
               (tfill! (ref point) 20 60)
               (dotimes (i numhands)
@@ -122,8 +122,8 @@
                 (if (and (> (tref hand 0) 0) (= (tref hand 1) 2))
                     (begin
                       (set! num (+ num 1))
-                      (tfill! (ref rect) 
-                              (clamp (- (tref (tref hand 2) 0) (/ sizesqr 2)) 0 (- 640 sizesqr)) 
+                      (tfill! (ref rect)
+                              (clamp (- (tref (tref hand 2) 0) (/ sizesqr 2)) 0 (- 640 sizesqr))
                               (clamp (- (tref (tref hand 2) 1) (- (/ sizesqr 2) 5)) 0 (- 480 sizesqr))
                               sizesqr sizesqr)
                       (set! foundHand #t)
@@ -140,7 +140,7 @@
                   (ocv_puttext img mlres (convert (ref point)) 0 2.0 (convert (ref scalar)) 2)
                   (ocv_puttext img "None" (convert (ref point)) 0 2.0 (convert (ref scalar)) 2))
               ;; (println "draw image to screen")
-              (ocv_write vid img)              
+              (ocv_write vid img)
               (ocv_imshow 'Body' img)))
         void))))
 
@@ -176,12 +176,12 @@
       ; (printf "reader %p\n" reader)
       ; (println "astra update" res)
       ; (println "open frame " res2)
-      (if (= res2 ASTRA_STATUS_SUCCESS)      
+      (if (= res2 ASTRA_STATUS_SUCCESS)
           (begin
             (set! res (astra_frame_get_handframe frame (ref handFrame)))
             (set! numhands (get_hand_data handFrame hands #f))
             ; (set! res (astra_frame_get_colorframe frame (ref colorFrame)))
-            ; (println "color" res) 
+            ; (println "color" res)
             (set! res (astra_frame_get_colorizedbodyframe frame (ref colorBodyFrame)))
             ;; (println "colorbody" res)
             (draw_color_body_frame_with_hands colorBodyFrame hands numhands mlres vid #f)
@@ -193,14 +193,14 @@
             (ocv_waitKey 1)
             (println "Fail!" res2)))
       void)))
-      
+
 (bind-func astra_stop
   (lambda (astra:AstraCtx*)
     (let ((sensor (astra_sensor astra))
           (reader (astra_reader astra)))
         (println '[close 'reader]: (astra_reader_destroy (ref sensor)))
         (println '[close 'stream]: (astra_streamset_close (ref reader)))
-        
+
         (astra_terminate)
         (println "DONE!")
         void)))
@@ -214,7 +214,7 @@
       (sys:load "data/res.txt")
       ;; (println 'resval resval (now))
       (set! all (append (cdr all) (list resval)))
-      (if (and (string=? (car all) (caddr all)) 
+      (if (and (string=? (car all) (caddr all))
                (string=? (car all) (cadr all)))
           (set! handstate (car all)))
       (astra_readX astra handstate vw 100)

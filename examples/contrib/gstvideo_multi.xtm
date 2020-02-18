@@ -62,7 +62,7 @@
     (set! vplay2 #f)
     (set! sampledata2dirty #f)
     (set! sampledata2 (malloc (* 3 600 400)))
-    (set! vplay3 #f)    
+    (set! vplay3 #f)
     (set! sampledata3dirty #f)
     (set! sampledata3 (malloc (* 3 600 400)))
     (set! vplay4 #f)
@@ -85,27 +85,27 @@
 (bind-func playbin_bus_call:GstBusFunc
   (lambda (bus msg data)
     (let ((playz (tref (cast data userdata*) 1))
-	  (msgtype (tref msg 1))
-	  (time (tref msg 2))
+    (msgtype (tref msg 1))
+    (time (tref msg 2))
           (seq (tref msg 4)))
       (cond ((<> (& GST_MESSAGE_EOS msgtype) 0)
              ;; (printf "END OF STREAM!\n")
              (gst_element_set_state playz GST_STATE_NULL)
              (gst_object_unref (cast playz gpointer)) ;; does playz release sink?
              (free data)
-	     1)
-	    ((<> (& GST_MESSAGE_ERROR msgtype) 0)
-	     (let ((debug:|1,i8*|* (alloc))
-		   (error:|1,GError*|* (alloc)))
-	       (gst_message_parse_error msg (cast error GError**) (cast debug i8**))
-	       (g_free (pref debug 0))
-	       (printf "GstError: %s\n" (tref (pref error 0) 2))
-	       (g_error_free (pref error 0))
-	       1))
+       1)
+      ((<> (& GST_MESSAGE_ERROR msgtype) 0)
+       (let ((debug:|1,i8*|* (alloc))
+       (error:|1,GError*|* (alloc)))
+         (gst_message_parse_error msg (cast error GError**) (cast debug i8**))
+         (g_free (pref debug 0))
+         (printf "GstError: %s\n" (tref (pref error 0) 2))
+         (g_error_free (pref error 0))
+         1))
             ((<> (& msgtype GST_MESSAGE_WARNING) 0)
              (printf "WARNING: %s\n" (gst_message_type_get_name msgtype))
              1)
-	    (else
+      (else
              ;; (printf "MSG: %d:%s\n" msgtype (gst_message_type_get_name msgtype))
              1))
       1)))
@@ -118,7 +118,7 @@
           (gv (gst_structure_get_value st "framerate"))
           (num (gst_value_get_fraction_numerator gv))
           (denom (gst_value_get_fraction_denominator gv))
-          (playz (tref (cast data userdata*) 1))          
+          (playz (tref (cast data userdata*) 1))
           (quad (tref (cast data userdata*) 0)))
       (cond ((= quad 1) (set! vplay1 #t))
             ((= quad 2) (set! vplay2 #t))
@@ -160,7 +160,7 @@
             ((= quad 2) (set! vplay2 #f) (set! sampledata2dirty #f))
             ((= quad 3) (set! vplay3 #f) (set! sampledata3dirty #f))
             ((= quad 4) (set! vplay4 #f) (set! sampledata4dirty #f)))
-      (printf "Finished Decoding[%d]!\n" quad)            
+      (printf "Finished Decoding[%d]!\n" quad)
       void)))
 
 ;; path must be a valid URI to media
@@ -181,7 +181,7 @@
               (gv:GValue* (halloc)))
           ;; Listen for messages on the playbin pipeline bus.
           (gst_bus_add_watch bus (cast (llvm_get_function_ptr "playbin_bus_call_native") GstBusFunc) (cast data gpointer))
-          (gst_object_unref bus)          
+          (gst_object_unref bus)
           ;;(printf "playz(%p) sinkz(%p) bus(%p) bin(%p)\n" playz sinkz bus appBin)
           ;; force video decode to RGB 600x400
           (gst_app_sink_set_caps (cast sinkz i8*) caps)
@@ -204,9 +204,9 @@
           ;; URI to load media from
           (g_value_unset gv)
           (g_value_init gv G_TYPE_STRING)
-          (g_value_set_string gv path)      
+          (g_value_set_string gv path)
           (g_object_set_property (cast playz GObject*) "uri" gv)
-          ;; start decoding the media!          
+          ;; start decoding the media!
           (let ((res (gst_element_set_state playz GST_STATE_PLAYING)))
             (if (or (= res 1) (= res 2))
                 (begin (printf "Start Decoding[%d]\n" (tref data 0)) #t)
@@ -238,7 +238,7 @@
 (bind-func post:XTMRENDERCB
   (lambda (frame shader m v p data)
     (fill_orthographic_matrix p -1.0 1.0 -1.0 1.0 -1.0 1.0)
-    (fill_identity_matrix v)            
+    (fill_identity_matrix v)
     (fill_identity_matrix m)
     (scale_matrix m 1.0 -1.0 0.0) ;; flip
     (translate_matrix m -0.5 -0.5 0.0)
@@ -266,7 +266,7 @@
     (xtm_render null null null post null)
     void))
 
-;; standard impromptu callbacks 
+;; standard impromptu callbacks
 (define opengl-loop
   (lambda (time dur degree)
     (if (= (modulo time 12000) 0)
@@ -307,4 +307,3 @@
 ;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")
 ;; (xtm_play "file:///Users/sorensen/Movies/stp_model.mov")
 ;; (xtm_play "file:///Users/sorensen/Movies/cave.mov")
-

@@ -41,6 +41,7 @@
   (lambda (time:i64 delta_t:double degree)
     (glClear GL_COLOR_BUFFER_BIT)
     (gl_draw degree)
+    (glfwPollEvents)
     (glfwSwapBuffers window)
     (let ((next_time (+ time (convert (* 44100. delta_t)))))
       (callback next_time gl_draw_loop next_time delta_t (+ degree 1.)))))
@@ -109,16 +110,16 @@ float noise(in vec3 x) {
 float fbm(in vec3 p) {
    float f = 0.0;
    f += 0.5000*noise(p);
-   p *= 2.02; 
+   p *= 2.02;
    f += 0.2500*noise(p);
-   p *= 2.03; 
+   p *= 2.03;
    f += 0.1250*noise(p);
-   p *= 2.01; 
+   p *= 2.01;
    f += 0.0625*noise(p);
    return f/0.9375;
 }
 
-float torusShape( in vec3 p, in vec2 t, in mat4 trans) {   
+float torusShape( in vec3 p, in vec2 t, in mat4 trans) {
    vec3 p2 = vec3(trans*vec4(p,1.0));
    vec2 q = vec2( length(p2.xz)-t.x, p2.y);
    return length(q) - t.y;
@@ -210,7 +211,7 @@ void main() {
    // we interect the ray with the 3d scene
    vec2 t = intersect(ro, rd);
 
-   // we draw a white to black gradient by default   
+   // we draw a white to black gradient by default
    vec3 col = vec3(0.0,0.0,1.0-uv.y);
 
    // otherwise overide black with colour!!
@@ -253,7 +254,7 @@ void main() {
 
      // add specular from light1
      col += 0.5*spe1;
-     // add specular from light2 
+     // add specular from light2
      col += 0.5*spe2;
    }
    fragColor = vec4(col,1.0);

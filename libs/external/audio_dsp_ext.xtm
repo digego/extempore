@@ -18,9 +18,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet))
 (sys:load-preload-check 'audio_dsp_ext)
-(define *xtmlib-audio_dsp_ext-loaded* #f)
+(define *xtmlib-audio_dsp_ext-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/external/fft.xtm")
@@ -30,6 +30,7 @@
  (sys:load "libs/external/sndfile.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmaudio_dsp_ext")
+(impc:aot:import-ll "xtmaudio_dsp_ext")
 
 ;; are we using float or double precision complex numbers for our
 ;; samples?
@@ -56,7 +57,7 @@
           (segments (/ n r))
           (pad_offset (dtoi64 (- (* .5 (i64tod k)) (* .5 (i64tod n)))))
           (padbuf (cast (pref-ptr pad pad_offset) i8*))
-          (fftcfg (fft_config k))
+          (f_fftr:FFTR_Config* (fftr_config k))
           (n2 (* n 2)) (nhalf (/ n 2)) (i 0) (idx (- segments 1)) (t 0) (t2 0))
       (lambda (x)
         (if (= t2 0)
@@ -68,7 +69,7 @@
               ;; apply windowing function
               (window_hamming (cast padbuf SAMPLE*) n)
               ;; forward fft (pad is padbuf)
-              (fft pad (convert spectrum) k)
+              (fft pad (convert spectrum) f_fftr)
               ;; inc index
               (set! idx (% (+ idx 1) segments))
               ))
@@ -116,6 +117,10 @@
           (aorb:i1 #t)        ;; #t for a #f for b
           (irtaila:SAMPLE* (zalloc len)) ;; buffer ir tail
           (irtailb:SAMPLE* (zalloc len))
+          (f_fft:FFT_Config* (fft_config padlgth)) ;; forward complex
+          (i_fft:IFFT_Config* (ifft_config padlgth)) ;; inverse complex
+          (f_fftr:FFTR_Config* (fftr_config padlgth)) ;; forward real
+          (i_fftr:IFFTR_Config* (ifftr_config padlgth)) ;; inverse real
           (drya:SAMPLE* (zalloc padlgth)) ;; buffer input signal
           (dryb:SAMPLE* (zalloc padlgth))
           (t1:i64 0) (i:i64 0) (out:SAMPLE 0.0) (j:i64 0)
@@ -130,7 +135,7 @@
         (memset (cast A i8*) 0 (convert (* 8 padlgth))) ;; zero pad, assumes Complexf (8 bytes per struct)
         (sf_read_file_into_buffer filename output (* i len) len #f)
         (Complex_bufferize output A len)
-        (fft A (pref-ptr irs (* i padlgth)) padlgth))
+        (fft A (pref-ptr irs (* i padlgth)) f_fft))
       (lambda (in:SAMPLE dry:SAMPLE wet:SAMPLE)
         (set! t2 (clock_clock))
         ;; store 'input' data which is 'ahead of out' by len samples
@@ -148,7 +153,7 @@
             (let ((_fft:SComplex* (pref-ptr ffts (* po padlgth)))
                   (_ir:SComplex* null))
               ;; forward FFT of incoming signal
-              (fft (if aorb drya dryb) B padlgth)
+              (fft (if aorb drya dryb) B f_fftr)
               ;; store FFT to use 'now' and also for 'delayed' use
               (memcpy (cast _fft i8*) (cast B i8*) (convert (* padlgth 8)))
               ;; run convolution over all partions
@@ -160,7 +165,7 @@
                 (Complex_multiplication_bybuf _fft _ir A padlgth)
                 (Complex_addition_bybuf A B B padlgth))
               ;; after convolution is complete back to time domain!
-              (ifft B a padlgth)
+              (ifft B a i_fftr)
               (let ((scale:SAMPLE (/ 1.0 (convert (* len parts))))
                     (tail (if aorb irtaila irtailb)))
                 (dotimes (i len)
@@ -198,7 +203,5 @@
   (lambda (pathl pathr)
     (creverb_st_c:[[float,i64,float,float,float]*,i8*,i8*,i64]* pathl pathr (* (convert FRAMES) 4))))
 
-
-(define *xtmlib-audio_dsp_ext-loaded* #t)
-
 (impc:aot:insert-footer "xtmaudio_dsp_ext")
+(define *xtmlib-audio_dsp_ext-loaded* #t)

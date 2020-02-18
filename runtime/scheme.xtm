@@ -45,26 +45,26 @@
 
 (define-macro (print-with-colors fg bg bold . body)
   `(let ((colors '((black . 0)
-		   (red . 1)
-		   (green . 2)
-		   (yellow . 3)
-		   (blue . 4)
-		   (magenta . 5)
-		   (cyan . 6)
-		   (white . 7)
-		   (default . 9)
-		   (none . 9))))
+       (red . 1)
+       (green . 2)
+       (yellow . 3)
+       (blue . 4)
+       (magenta . 5)
+       (cyan . 6)
+       (white . 7)
+       (default . 9)
+       (none . 9))))
      (ascii-print-color (if ,bold 1 0)
-			(cdr (assoc ,fg colors))
-			(cdr (assoc ,bg colors)))
+      (cdr (assoc ,fg colors))
+      (cdr (assoc ,bg colors)))
      ,@body
      ;; return colors to normal
      (ascii-print-color 0 7 9)))
 
 (define print-error
-	(lambda args
-		(apply pprint-error args)
-		(error "")))
+  (lambda args
+    (apply pprint-error args)
+    (error "")))
 
 ;;
 ;; GENERAL UTILITY FUNCTIONS AND VARS
@@ -73,20 +73,20 @@
 (define remove-all
    (lambda (obj lst)
       (cond ((null? lst)
-	     '())
-	    ((list? (car lst))
-	     (cons (remove-all obj (car lst))
-		   (remove-all obj (cdr lst))))
-	    ((equal? obj (car lst))
-	     (remove-all obj (cdr lst)))
-	    (else (cons (car lst) (remove-all obj (cdr lst)))))))
+       '())
+      ((list? (car lst))
+       (cons (remove-all obj (car lst))
+       (remove-all obj (cdr lst))))
+      ((equal? obj (car lst))
+       (remove-all obj (cdr lst)))
+      (else (cons (car lst) (remove-all obj (cdr lst)))))))
 
 
 (define (tree-copy tree)
   (let loop ((tree tree))
     (if (pair? tree)
-	(cons (loop (car tree)) (loop (cdr tree)))
-	tree)))
+  (cons (loop (car tree)) (loop (cdr tree)))
+  tree)))
 
 (define (tree-member mem tree)
   (if (member #t
@@ -101,21 +101,21 @@
 (define remove-first
    (lambda (obj lst)
       (if (member obj lst)
-	  (let loop ((new '())
-		     (lstb lst))
-	     (if (equal? (car lstb) obj)
-		 (append new (cdr lstb))
-		 (loop (append new (list (car lstb))) (cdr lstb))))
-	  lst)))
+    (let loop ((new '())
+         (lstb lst))
+       (if (equal? (car lstb) obj)
+     (append new (cdr lstb))
+     (loop (append new (list (car lstb))) (cdr lstb))))
+    lst)))
 
 (define get-named-arg
    (lambda (name args . default-value)
       (let ((value (member name args)))
-	 (if value
-	     (cadr value)
-	     (if (null? default-value)
-			     '()
-				 (car default-value))))))
+   (if value
+       (cadr value)
+       (if (null? default-value)
+           '()
+         (car default-value))))))
 
 
 (define replace-all
@@ -140,21 +140,21 @@
 (define replace-first
    (lambda (obj-a obj-b  lst)
       (if (member obj-a lst)
-	  (let loop ((new '())
-		     (lstb lst))
-	     (if (equal? (car lstb) obj-a)
-		 (append new (list obj-b) (cdr lstb))
-		 (loop (append new (list (car lstb))) (cdr lstb))))
-	  lst)))
+    (let loop ((new '())
+         (lstb lst))
+       (if (equal? (car lstb) obj-a)
+     (append new (list obj-b) (cdr lstb))
+     (loop (append new (list (car lstb))) (cdr lstb))))
+    lst)))
 
 
 (define-macro (dotimes init . body)
    `(if (<= ,(cadr init) 0)
-	'()
-	(let uri1834ck ((,(car init) 0))
-	   ,@body
-	   (if (< ,(car init) (- ,(cadr init) 1))
-	       (uri1834ck (+ ,(car init) 1))))))
+  '()
+  (let uri1834ck ((,(car init) 0))
+     ,@body
+     (if (< ,(car init) (- ,(cadr init) 1))
+         (uri1834ck (+ ,(car init) 1))))))
 
 ;; Deprectateded because of symbol leak.  see above.
 ;;(define-macro (dotimes init . body)
@@ -165,44 +165,51 @@
 (define-macro (dotill predicate expression . args)
    (let ((max-iterations (if (null? args) 100000000 (car args))))
       `(let impsym38479k ((cnt 0))
-	  (let ((value ,expression))
-	     (if ,predicate
-		 value
-		 (if (> cnt ,max-iterations)
-		     (begin (print-notification "Dropping out after max-iterations")
-			    'failed)
-		     (impsym38479k (+ cnt 1))))))))
+    (let ((value ,expression))
+       (if ,predicate
+     value
+     (if (> cnt ,max-iterations)
+         (begin (print-notification "Dropping out after max-iterations")
+          'failed)
+         (impsym38479k (+ cnt 1))))))))
 
 (define make-vector-with-proc
    (lambda (num func)
       (let ((new-vector (make-vector num)))
-	 (do ((i 0 (+ i 1)))
-	     ((= i num) new-vector)
-	    (vector-set! new-vector i (func i))))))
+   (do ((i 0 (+ i 1)))
+       ((= i num) new-vector)
+      (vector-set! new-vector i (func i))))))
 
 (define (make-list lth obj)
   (let loop ((i lth)
-	     (lst '()))
+       (lst '()))
      (if (< i 1)
-	 lst
-		 (loop (- i 1) (cons obj lst)))))
+   lst
+     (loop (- i 1) (cons obj lst)))))
 
 (define (make-list-with-proc lth func)
    (if (< lth 1)
        '()
        (let loop ((i 0)
-		  (lst '()))
-	  (if (>= i lth)
-	      (reverse lst)
-	      (loop (+ i 1) (cons (func i) lst))))))
+      (lst '()))
+    (if (>= i lth)
+        (reverse lst)
+        (loop (+ i 1) (cons (func i) lst))))))
+
+(define repeat
+  (lambda (n val)
+    (let loop ((i n) (out '()))
+      (if (<= i 0)
+          out
+          (loop (- i 1) (cons val out))))))
 
 (define (weighted-selection . args)
    (let ((rand (random)))
       (let loop ((lst args)
-		 (count 0))
-	 (if (< rand (+ count (caar lst)))
-	     (cdar lst)
-	     (loop (cdr lst) (+ count (caar lst)))))))
+     (count 0))
+   (if (< rand (+ count (caar lst)))
+       (cdar lst)
+       (loop (cdr lst) (+ count (caar lst)))))))
 
 (define (random . args)
   (cond ((< (length args) 1)
@@ -222,7 +229,7 @@
 (define impromptu_envs '())
 
 (define (callback-adapter sym . args)
-	(apply (eval sym) args))
+  (apply (eval sym) args))
 
 ;; send tasks for normal standard task execution
 (define (call-cpp . args)
@@ -235,9 +242,9 @@
 ;; send tasks for normal execution as callback tasks
 (define (callback time func . args)
   (let ((payload (if (symbol? func)
-		     (cons callback-adapter (cons func args))
-					 (cons func args))))
-	(call-cpp-at-time time 2 *callback* payload (current-environment))))
+         (cons callback-adapter (cons func args))
+           (cons func args))))
+  (call-cpp-at-time time 2 *callback* payload (current-environment))))
 
 ;; alias for callback
 (define schedule callback)
@@ -264,46 +271,46 @@
 (define clock:offset-from-server
    (lambda (server-proc local-proc)
       (let* ((t1 (clock:clock))
-	     (t2 (ipc:call server-proc local-proc 'clock:clock))
-	     (t3 t2)
-	     (t4 (clock:clock))
-	     (msg-delay (- (- t4 t1) (- t2 t3)))
-	     (time-offset (/ (+ (- t2 t1) (- t3 t4)) 2)))
-	 time-offset)))
+       (t2 (ipc:call server-proc local-proc 'clock:clock))
+       (t3 t2)
+       (t4 (clock:clock))
+       (msg-delay (- (- t4 t1) (- t2 t3)))
+       (time-offset (/ (+ (- t2 t1) (- t3 t4)) 2)))
+   time-offset)))
 
 (define clock:sync-adjust
    (lambda (server-proc local-proc samples wait-time . args)
       (let loop ((i samples)
-		 (lst '()))
-	 (sys:sleep wait-time)
-	 (if (> i 0)
-	     (loop (- i 1)
-		   (cons (clock:offset-from-server server-proc local-proc) lst))
-	     (let* ((l1 (cddr (cl:sort lst <))) ;; remove bottom 2
-		    (l2 (cddr (reverse l1)))) ;; remote top 2
-	       ;; check tolerance of return
-	       (if (> (math:std-deviation l2)
-		      (if (null? args) 0.0005 (car args)))
-		   (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
-			  (print-notification "clock times: " lst))
-		   (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
-			  (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
+     (lst '()))
+   (sys:sleep wait-time)
+   (if (> i 0)
+       (loop (- i 1)
+       (cons (clock:offset-from-server server-proc local-proc) lst))
+       (let* ((l1 (cddr (cl:sort lst <))) ;; remove bottom 2
+        (l2 (cddr (reverse l1)))) ;; remote top 2
+         ;; check tolerance of return
+         (if (> (math:std-deviation l2)
+          (if (null? args) 0.0005 (car args)))
+       (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
+        (print-notification "clock times: " lst))
+       (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
+        (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
 
 
 (define -clock:metro-from-host-
    (lambda ()
       (let ((mark (*metro* 'get-mark)))
-	 (list (*metro* 'get-tempo)
-	       (car mark)
-	       (samples->clock (cdr mark))))))
+   (list (*metro* 'get-tempo)
+         (car mark)
+         (samples->clock (cdr mark))))))
 
 
 (define clock:update-metro
    (lambda (server-process local-process)
       (let ((res (ipc:call server-process local-process '-clock:metro-from-host-)))
-	 (set! *metro* (make-metro (car res)
-				   (cons (cadr res)
-					 (clock->samples (caddr res))))))))
+   (set! *metro* (make-metro (car res)
+           (cons (cadr res)
+           (clock->samples (caddr res))))))))
 
 
 
@@ -311,18 +318,18 @@
    (lambda (server-process local-process)
       (clock:sync-adjust server-process local-process 5 500 .005)
       (let ((res (ipc:call server-process local-process '-clock:metro-from-host-)))
-	 (set! *metro* (make-metro (car res)
-				   (cons (clock->samples (cadr res))
-					 (caddr res)))))))
+   (set! *metro* (make-metro (car res)
+           (cons (clock->samples (cadr res))
+           (caddr res)))))))
 
 
 (define -clock:metro-from-host-
    (lambda ()
       (let ((mark (*metro* 'get-mark)))
-	 (println 'mark-remote: mark 'time: (samples->clock (car mark)))
-	 (list (*metro* 'get-tempo)
-	       (samples->clock (car mark))
-	       (cdr mark)))))
+   (println 'mark-remote: mark 'time: (samples->clock (car mark)))
+   (list (*metro* 'get-tempo)
+         (samples->clock (car mark))
+         (cdr mark)))))
 
 
 
@@ -330,19 +337,19 @@
 (define samples->clock
    (lambda (time)
       (let* ((c (clock:ad:clock))
-	     (t1 (car c))
-	     (t2 (cdr c)))
-	 (+ t2 (/ (- time t1) *samplerate*)))))
+       (t1 (car c))
+       (t2 (cdr c)))
+   (+ t2 (/ (- time t1) *samplerate*)))))
 
 
 ;; convert from clock to audio samples
 (define clock->samples
    (lambda (time)
       (let* ((t1 (clock:clock))
-	     (t2 (clock:ad:clock))
-	     (t3 (round (+ (+ (car t2) (* (- time t1) *samplerate*))
-			   (* (- t1 (cdr t2)) *samplerate*)))))
-	 (real->integer t3))))
+       (t2 (clock:ad:clock))
+       (t3 (round (+ (+ (car t2) (* (- time t1) *samplerate*))
+         (* (- t1 (cdr t2)) *samplerate*)))))
+   (real->integer t3))))
 
 
 (define (io:osc:send time host-address osc-address . args)
@@ -360,16 +367,16 @@
 (define math:variance
    (lambda (lst)
       (let ((m (math:mean lst)))
-	 (let loop ((l lst)
-		    (v 0))
-	    (if (null? l)
-		(/ v (length lst))
-		(let ((var (- (car l) m)))
-		   (loop (cdr l) (+ v (* var var)))))))))
+   (let loop ((l lst)
+        (v 0))
+      (if (null? l)
+    (/ v (length lst))
+    (let ((var (- (car l) m)))
+       (loop (cdr l) (+ v (* var var)))))))))
 
 (define (string->sexpr str)
    (let* ((port (open-input-string str))
-	  (res (read port)))
+    (res (read port)))
       (close-port port)
       res))
 
@@ -458,35 +465,35 @@
 (define make-rhythm
    (lambda (beats tactus syncopation rhythm-list)
       (define beats-divisible-by-rlst
-	 (lambda (dur)
-	    (member 0 (map (lambda (r) (modulo dur r)) rhythm-list))))
+   (lambda (dur)
+      (member 0 (map (lambda (r) (modulo dur r)) rhythm-list))))
       (set! rhythm-list (cl:sort rhythm-list >))
       (if (not (= 0 (modulo beats tactus)))
-	  (begin (print-error "Tactus must be a subdivision of beats") '())
-	  (if #f ;(not (beats-divisible-by-rlst beats))
-	      (begin (println "Impossible rhythm-list selection") '())
-	      (let loop ((rl '())
-			 (cnt 0))
-		 (if (null? rl) (list (random rhythm-list)))
-		 (let ((sum (apply + rl)))
-		    (cond ((> cnt 500)
-			   (print-error "Could not make valid rhythm")
-			   '())
-			  ((> sum beats)
-			   (loop (cdr rl) (+ cnt 1)))
-			  ((not (beats-divisible-by-rlst (- beats sum)))
-			   (loop (cdr rl) (+ cnt 1)))
-			  ((>= (car rhythm-list) (- beats sum))
-			   (cond ((= sum beats)
-				  (reverse rl))
-				 ((member (- beats sum) rhythm-list)
-				  (reverse (cons (car (member (- beats sum) rhythm-list)) rl)))
-				 (else (loop (cons (random rhythm-list) rl) (+ cnt 1)))))
-			  (else (if (= 0 (modulo sum tactus))
-				    (loop (cons (random rhythm-list) rl) (+ cnt 1))
-				    (if (> (random) (+ .05 syncopation))
-					(loop (cons (car rl) rl) (+ cnt 1))
-					(loop (cons (random rhythm-list) rl) (+ cnt 1))))))))))))
+    (begin (print-error "Tactus must be a subdivision of beats") '())
+    (if #f ;(not (beats-divisible-by-rlst beats))
+        (begin (println "Impossible rhythm-list selection") '())
+        (let loop ((rl '())
+       (cnt 0))
+     (if (null? rl) (list (random rhythm-list)))
+     (let ((sum (apply + rl)))
+        (cond ((> cnt 500)
+         (print-error "Could not make valid rhythm")
+         '())
+        ((> sum beats)
+         (loop (cdr rl) (+ cnt 1)))
+        ((not (beats-divisible-by-rlst (- beats sum)))
+         (loop (cdr rl) (+ cnt 1)))
+        ((>= (car rhythm-list) (- beats sum))
+         (cond ((= sum beats)
+          (reverse rl))
+         ((member (- beats sum) rhythm-list)
+          (reverse (cons (car (member (- beats sum) rhythm-list)) rl)))
+         (else (loop (cons (random rhythm-list) rl) (+ cnt 1)))))
+        (else (if (= 0 (modulo sum tactus))
+            (loop (cons (random rhythm-list) rl) (+ cnt 1))
+            (if (> (random) (+ .05 syncopation))
+          (loop (cons (car rl) rl) (+ cnt 1))
+          (loop (cons (random rhythm-list) rl) (+ cnt 1))))))))))))
 
 
 
@@ -497,15 +504,15 @@
 (define make-timeline
    (lambda (timeline)
       (if (null? timeline)
-	  '()
-	  (lambda (time)
-	     (if (pair? time)
-		 (set! timeline (append timeline (list time)))
-		 (let loop ((lst (reverse timeline)))
-		    (cond ((null? lst) '())
-			  ((>= time (caar lst))
-			   (cdar lst))
-			  (else (loop (cdr lst))))))))))
+    '()
+    (lambda (time)
+       (if (pair? time)
+     (set! timeline (append timeline (list time)))
+     (let loop ((lst (reverse timeline)))
+        (cond ((null? lst) '())
+        ((>= time (caar lst))
+         (cdar lst))
+        (else (loop (cdr lst))))))))))
 
 
 
@@ -522,17 +529,17 @@
 (define make-metre
    (lambda (metre base)
       (let ((metre-length (apply + metre)))
-	 (lambda (time . beat)
-	    (let ((b (let loop ((qtime (modulo (/ time base) metre-length))
-				(lst metre)
-				(valuea (car metre))
-				(valueb 0))
-			(if (< qtime valuea)
-			    (+ 1.0 (- qtime valueb))
-			    (loop qtime (cdr lst) (+ valuea (cadr lst)) (+ valueb (car lst)))))))
-	       (if (null? beat)
-		   b
-		   (if (= (car beat) b) #t #f)))))))
+   (lambda (time . beat)
+      (let ((b (let loop ((qtime (modulo (/ time base) metre-length))
+        (lst metre)
+        (valuea (car metre))
+        (valueb 0))
+      (if (< qtime valuea)
+          (+ 1.0 (- qtime valueb))
+          (loop qtime (cdr lst) (+ valuea (cadr lst)) (+ valueb (car lst)))))))
+         (if (null? beat)
+       b
+       (if (= (car beat) b) #t #f)))))))
 
 
 ;; creates a metronome object
@@ -650,16 +657,16 @@
 (define sys:wait
    (lambda (until-time)
       (call/cc (lambda (cont)
-		  (callback until-time cont #t)
-		  (*sys:toplevel-continuation* 0)
-		  #t))))
+      (callback until-time cont #t)
+      (*sys:toplevel-continuation* 0)
+      #t))))
 
 (define sys:sleep
    (lambda (duration)
       (call/cc (lambda (cont)
-		  (callback (+ (now) duration) cont #t)
-		  (*sys:toplevel-continuation* 0)
-		  #t))))
+      (callback (+ (now) duration) cont #t)
+      (*sys:toplevel-continuation* 0)
+      #t))))
 
 
 ;; synchronous IPC
@@ -671,17 +678,17 @@
    (lambda (local-name remote-name)
      (let ((res (assoc *impc:remote-process-name-map* local-name)))
        (if res
-	   (set-cdr! res remote-name)
-	   (set! *impc:remote-process-name-map*
-		 (cons (cons local-name remote-name)
-		       *impc:remote-process-name-map*))))))
+     (set-cdr! res remote-name)
+     (set! *impc:remote-process-name-map*
+     (cons (cons local-name remote-name)
+           *impc:remote-process-name-map*))))))
 
 (define ipc:proc-name-with-mapping
    (lambda ()
      (let ((pair (assoc *impc:remote-process-name-map* (ipc:get-process-name))))
        (if pair
-	   (car pair)
-	   (ipc:get-process-name)))))
+     (car pair)
+     (ipc:get-process-name)))))
 
 (define *ipc:active-label-buffer-size* 1000)
 (define *ipc:active-labels* (make-vector *ipc:active-label-buffer-size* '()))
@@ -691,7 +698,7 @@
    (lambda (id . args)
      (let ((k (vector-ref *ipc:active-labels* id)))
        (if (null? k)
-	   (println "Error: bad process? Have you given your local process a name on the remote host?"))
+     (println "Error: bad process? Have you given your local process a name on the remote host?"))
        (vector-set! *ipc:active-labels* id '())
        (apply k args))))
 
@@ -802,40 +809,40 @@
 (define delete-at-index
    (lambda (k lst)
       (cond ((or (null? lst)
-		 (< k 0))
-	     lst)
-	    ((= k 0)
-	     (cdr lst))
-	    ((>= k (length lst))
-	     lst)
-	    (else (set-cdr! (cl:nthcdr (- k 1) lst)
-			    (cl:nthcdr (+ k 1) lst))
-		  lst))))
+     (< k 0))
+       lst)
+      ((= k 0)
+       (cdr lst))
+      ((>= k (length lst))
+       lst)
+      (else (set-cdr! (cl:nthcdr (- k 1) lst)
+          (cl:nthcdr (+ k 1) lst))
+      lst))))
 
 ; insert into list at index
 (define insert-at-index
    (lambda (k lst obj)
       (cond ((or (null? lst)
-		 (< k 0))
-	     lst)
-	    ((= k 0)
-	     (cons obj lst))
-	    ((> k (length lst))
-	     lst)
-	    (else (set-cdr! (cl:nthcdr (- k 1) lst)
-			    (cons obj (cl:nthcdr k lst)))
-		  lst))))
+     (< k 0))
+       lst)
+      ((= k 0)
+       (cons obj lst))
+      ((> k (length lst))
+       lst)
+      (else (set-cdr! (cl:nthcdr (- k 1) lst)
+          (cons obj (cl:nthcdr k lst)))
+      lst))))
 
 ; change list item at index
 (define change-at-index
    (lambda (k lst obj)
       (cond ((or (null? lst)
-		 (< k 0))
-	     lst)
-	    ((>= k (length lst))
-	     lst)
-	    (else (set-car! (cl:nthcdr k lst) obj)
-		  lst))))
+     (< k 0))
+       lst)
+      ((>= k (length lst))
+       lst)
+      (else (set-car! (cl:nthcdr k lst) obj)
+      lst))))
 
 (define (foldr func end lst)
   (if (null? lst)
@@ -856,63 +863,63 @@
 (define jumble
    (lambda (lst)
       (let loop ((lstb '())
-		 (lsta (map (lambda (val) val) lst)))
-	 (if (null? lsta)
-	     lstb
-	     (let* ((rand (random (length lsta)))
-		    (val (list-ref lsta rand)))
-		(loop (cons val lstb) (delete-at-index rand lsta)))))))
+     (lsta (map (lambda (val) val) lst)))
+   (if (null? lsta)
+       lstb
+       (let* ((rand (random (length lsta)))
+        (val (list-ref lsta rand)))
+    (loop (cons val lstb) (delete-at-index rand lsta)))))))
 
 ;; rotate list
 (define rotate
    (lambda (lst amt)
       (let loop ((l (if (> amt 0) (reverse lst) lst))
-		 (cnt (abs amt)))
-	 (if (<= cnt 0)
-	     (if (> amt 0) (reverse l) l)
-	     (loop (append (cdr l) (list (car l)))
-		   (- cnt 1))))))
+     (cnt (abs amt)))
+   (if (<= cnt 0)
+       (if (> amt 0) (reverse l) l)
+       (loop (append (cdr l) (list (car l)))
+       (- cnt 1))))))
 
 
 (define make-bezier
    (lambda (x1 y1 x2 y2 cx1 cy1 cx2 cy2)
       (let* ((xc (* 3 (- cx1 x1)))
-	     (xb (- (* 3 (- cx2 cx1)) xc))
-	     (xa (- x2 x1 (* 3 (- cx2 cx1))))
-	     (yc (* 3 (- cy1 y1)))
-	     (yb (- (* 3 (- cy2 cy1)) yc))
-	     (ya (- y2 y1 (* 3 (- cy2 cy1)))))
-	 (lambda (t)
-	    (cons (+ (* xa t t t)
-		     (* xb t t)
-		     (* xc t)
-		     x1)
-		  (+ (* ya t t t)
-		     (* yb t t)
-		     (* yc t)
-		     y1))))))
+       (xb (- (* 3 (- cx2 cx1)) xc))
+       (xa (- x2 x1 (* 3 (- cx2 cx1))))
+       (yc (* 3 (- cy1 y1)))
+       (yb (- (* 3 (- cy2 cy1)) yc))
+       (ya (- y2 y1 (* 3 (- cy2 cy1)))))
+   (lambda (t)
+      (cons (+ (* xa t t t)
+         (* xb t t)
+         (* xc t)
+         x1)
+      (+ (* ya t t t)
+         (* yb t t)
+         (* yc t)
+         y1))))))
 
 (define list-head
    (lambda (lst k)
       (if (< k 1)
-	  '()
-	  (cons (car lst) (list-head (cdr lst) (- k 1))))))
+    '()
+    (cons (car lst) (list-head (cdr lst) (- k 1))))))
 
 
 ;; flatten down to a list of lists
 (define (flatten-1 list)
    (cond ((null? list) '())
-	 ((and (list? (car list))
-	       (list? (car (car list))))
-	  (append (flatten-1 (car list)) (flatten-1 (cdr list))))
-	 (else (cons (car list) (flatten-1 (cdr list))))))
+   ((and (list? (car list))
+         (list? (car (car list))))
+    (append (flatten-1 (car list)) (flatten-1 (cdr list))))
+   (else (cons (car list) (flatten-1 (cdr list))))))
 
 
 ;; flatten down to a list of atoms
 (define (flatten list)
    (cond ((null? list) '())
-	 ((list? (car list)) (append (flatten (car list)) (flatten (cdr list))))
-	 (else (cons (car list) (flatten (cdr list))))))
+   ((list? (car list)) (append (flatten (car list)) (flatten (cdr list))))
+   (else (cons (car list) (flatten (cdr list))))))
 
 
 ;; return all permutations of set
@@ -920,18 +927,18 @@
 (define permutations
    (lambda (set size)
       (if (null? set)
-	  '(())
-	  (letrec ((f1 (lambda (s)
-			  (map (lambda (e)
-				  (f2 (list e) (cl:remove e s)))
-			       s)))
-		   (f2 (lambda (e s)
-			  (if (= (length e) size)
-			      e
-			      (map (lambda (e2)
-				      (f2 (append e (list e2)) (cl:remove e2 s)))
-				   s)))))
-	     (flatten-1 (f1 set))))))
+    '(())
+    (letrec ((f1 (lambda (s)
+        (map (lambda (e)
+          (f2 (list e) (cl:remove e s)))
+             s)))
+       (f2 (lambda (e s)
+        (if (= (length e) size)
+            e
+            (map (lambda (e2)
+              (f2 (append e (list e2)) (cl:remove e2 s)))
+           s)))))
+       (flatten-1 (f1 set))))))
 
 
 
@@ -940,19 +947,19 @@
 (define combinations
    (lambda (s size)
       (if (< (length s) size)
-	  '()
-	  (letrec ((f1 (lambda (h t)
-			  (if (= (length h) size)
-			      (reverse h)
-			      (let loop ((e (car t))
-					 (l (cdr t)))
-				 (if (null? l)
-				     (if (< (length h) (- size 1)) '()
-					 (reverse (list* e h)))
-				     (list (f1 (list* e h) l)
-					   (loop (car l) (cdr l)))))))))
-	     (cl:remove '() (flatten-1 (append (f1 (list (car s)) (cdr s))
-					       (combinations (cdr s) size))))))))
+    '()
+    (letrec ((f1 (lambda (h t)
+        (if (= (length h) size)
+            (reverse h)
+            (let loop ((e (car t))
+           (l (cdr t)))
+         (if (null? l)
+             (if (< (length h) (- size 1)) '()
+           (reverse (list* e h)))
+             (list (f1 (list* e h) l)
+             (loop (car l) (cdr l)))))))))
+       (cl:remove '() (flatten-1 (append (f1 (list (car s)) (cdr s))
+                 (combinations (cdr s) size))))))))
 
 
 ;; return all combinations of set
@@ -960,28 +967,28 @@
 (define combinations
   (lambda (s size)
      (if (= 0 size) '()
-	(flatten-1 (map (lambda (x)
-			   (let ((res (combinations (list-tail s (+ 1 (cl:position x s))) (- size 1))))
-			      (if (null? res) (list x)
-				  (map (lambda (y)
-					  (if (list? y) (list* x y) (list x y)))
-				       (flatten-1 res)))))
-			(list-head s (- (length s) ( - size 1))))))))
+  (flatten-1 (map (lambda (x)
+         (let ((res (combinations (list-tail s (+ 1 (cl:position x s))) (- size 1))))
+            (if (null? res) (list x)
+          (map (lambda (y)
+            (if (list? y) (list* x y) (list x y)))
+               (flatten-1 res)))))
+      (list-head s (- (length s) ( - size 1))))))))
 
 
 ;; USE multi-set-combination (below) to access this function
 (define multi-list-combination-2
   (lambda args
     (if (null? args)
-	args
-	(flatten-1 (map (lambda (k)
-			  (let ((r (apply multi-list-combination-2 (cdr args))))
-			    (if (null? r)
-				k
-				(map (lambda (j)
-				       (list k j))
-				     r))))
-			(car args))))))
+  args
+  (flatten-1 (map (lambda (k)
+        (let ((r (apply multi-list-combination-2 (cdr args))))
+          (if (null? r)
+        k
+        (map (lambda (j)
+               (list k j))
+             r))))
+      (car args))))))
 
 
 ;; combine multiple ordered lists into combinations
@@ -997,16 +1004,16 @@
 (define factorial
    (lambda (x)
       (if (< x 0)
-	  (print-error 'Factorial 'does 'not 'accept 'negative 'numbers)
-	  (if (<= x 1) 1
-	      (* x (factorial (- x 1)))))))
+    (print-error 'Factorial 'does 'not 'accept 'negative 'numbers)
+    (if (<= x 1) 1
+        (* x (factorial (- x 1)))))))
 
 
 (define range-limit
    (lambda (value min max)
       (cond ((< value min) min)
-	    ((> value max) max)
-	    (else value))))
+      ((> value max) max)
+      (else value))))
 
 (define limit-range range-limit)
 
@@ -1075,55 +1082,55 @@
 (define list-position
    (lambda (obj lst)
       (let loop ((i 0) (lst lst))
-	 (if (null? lst) #f
-	     (if (eqv? (car lst) obj) i
-		 (loop (+ i 1) (cdr lst)))))))
+   (if (null? lst) #f
+       (if (eqv? (car lst) obj) i
+     (loop (+ i 1) (cdr lst)))))))
 
 
 
 (define-macro (defstruct s . ff)
    (let ((ss (symbol->string s)) (n (length ff)))
       (let* ((n1 (+ n 1))
-	     (vv (make-vector n1)))
-	 (let loop ((i 1) (ff ff))
-	    (if (<= i n)
-		(let ((f (car ff)))
-		   (vector-set! vv i (if (pair? f) (cadr f) '(if #f #f)))
-		   (loop (+ i 1) (cdr ff)))))
-	 (let ((ff (map (lambda (f) (if (pair? f) (car f) f)) ff)))
-	    `(begin (define ,(string->symbol (string-append "make" "-" ss))
-		       (lambda fvfv
-			  (let ((st (make-vector ,n1)) (ff ',ff))
-			     (vector-set! st 0 ',s)
-			     ,@(let loop ((i 1) (r '()))
-				  (if (>= i n1) r
-				      (loop (+ i 1)
-					    (cons `(vector-set! st ,i
-								,
-								(vector-ref vv i))
-						  r))))
-			     (let loop ((fvfv fvfv))
-				(if (not (null? fvfv))
-				    (begin  (vector-set! st
-							 (+ (list-position (car fvfv) ff)
-							    1)
-							 (cadr fvfv))
-					    (loop (cddr fvfv)))))
-			     st)))
-		    ,@(let loop ((i 1) (procs '()))
-			 (if (>= i n1) procs
-			     (loop (+ i 1)
-				   (let ((f (symbol->string (list-ref ff (- i 1)))))
-				      (cons `(define ,(string->symbol (string-append ss "." f))
-						(lambda (x) (vector-ref x ,i)))
-					    (cons `(define ,(string->symbol (string-append "set!" ss "." f))
-						      (lambda (x v)
-							 (vector-set! x ,i v)))
-						  procs))))))
-		    (define ,(string->symbol (string-append ss "?"))
-		       (lambda (x)
-			  (and (vector? x)
-			       (eqv? (vector-ref x 0) ',s)))))))))
+       (vv (make-vector n1)))
+   (let loop ((i 1) (ff ff))
+      (if (<= i n)
+    (let ((f (car ff)))
+       (vector-set! vv i (if (pair? f) (cadr f) '(if #f #f)))
+       (loop (+ i 1) (cdr ff)))))
+   (let ((ff (map (lambda (f) (if (pair? f) (car f) f)) ff)))
+      `(begin (define ,(string->symbol (string-append "make" "-" ss))
+           (lambda fvfv
+        (let ((st (make-vector ,n1)) (ff ',ff))
+           (vector-set! st 0 ',s)
+           ,@(let loop ((i 1) (r '()))
+          (if (>= i n1) r
+              (loop (+ i 1)
+              (cons `(vector-set! st ,i
+                ,
+                (vector-ref vv i))
+              r))))
+           (let loop ((fvfv fvfv))
+        (if (not (null? fvfv))
+            (begin  (vector-set! st
+               (+ (list-position (car fvfv) ff)
+                  1)
+               (cadr fvfv))
+              (loop (cddr fvfv)))))
+           st)))
+        ,@(let loop ((i 1) (procs '()))
+       (if (>= i n1) procs
+           (loop (+ i 1)
+           (let ((f (symbol->string (list-ref ff (- i 1)))))
+              (cons `(define ,(string->symbol (string-append ss "." f))
+            (lambda (x) (vector-ref x ,i)))
+              (cons `(define ,(string->symbol (string-append "set!" ss "." f))
+                  (lambda (x v)
+               (vector-set! x ,i v)))
+              procs))))))
+        (define ,(string->symbol (string-append ss "?"))
+           (lambda (x)
+        (and (vector? x)
+             (eqv? (vector-ref x 0) ',s)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1141,8 +1148,8 @@
 (define sys:livecoding-error-hook?
    (lambda (on?)
       (if on?
-	  (set! *error-hook* '())
-	  (set! *error-hook* throw))))
+    (set! *error-hook* '())
+    (set! *error-hook* throw))))
 
 ;; this for buffered version
 (define _dsp:set!
@@ -1263,13 +1270,13 @@
 ;; with precedence to first lst
 (define cl:assoc-union
   (letrec ((onion (lambda (lst1 lst2)
-		     (if (null? lst1)
-			 lst2
-			 (onion (cdr lst1) (cl:assoc-adjoin (car lst1) lst2))))))
+         (if (null? lst1)
+       lst2
+       (onion (cdr lst1) (cl:assoc-adjoin (car lst1) lst2))))))
      (lambda (lst1 lst2)
-	(cond ((null? lst1) lst2)
-	      ((null? lst2) lst1)
-	      (else (onion (reverse lst2) lst1))))))
+  (cond ((null? lst1) lst2)
+        ((null? lst2) lst1)
+        (else (onion (reverse lst2) lst1))))))
 
 
 ;;; Some tail-recursive optimizations made by
@@ -1288,8 +1295,8 @@
 (define (cl:tree-copy tree)
   (let loop ((tree tree))
     (if (pair? tree)
-	(cons (loop (car tree)) (loop (cdr tree)))
-	tree)))
+  (cons (loop (car tree)) (loop (cdr tree)))
+  tree)))
 
 ;@
 (define (cl:copy-list lst) (append lst '()))
@@ -1298,52 +1305,52 @@
 ;@
 (define cl:union
   (letrec ((onion
-	    (lambda (lst1 lst2)
-	      (if (null? lst1)
-		  lst2
-		  (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
+      (lambda (lst1 lst2)
+        (if (null? lst1)
+      lst2
+      (onion (cdr lst1) (cl:adjoin (car lst1) lst2))))))
     (lambda (lst1 lst2)
       (cond ((null? lst1) lst2)
-	    ((null? lst2) lst1)
-	    ((null? (cdr lst1)) (cl:adjoin (car lst1) lst2))
-	    ((null? (cdr lst2)) (cl:adjoin (car lst2) lst1))
-	    ((< (length lst2) (length lst1)) (onion (reverse lst2) lst1))
-	    (else (onion (reverse lst1) lst2))))))
+      ((null? lst2) lst1)
+      ((null? (cdr lst1)) (cl:adjoin (car lst1) lst2))
+      ((null? (cdr lst2)) (cl:adjoin (car lst2) lst1))
+      ((< (length lst2) (length lst1)) (onion (reverse lst2) lst1))
+      (else (onion (reverse lst1) lst2))))))
 ;@
 (define (cl:intersection lst1 lst2)
    (if (null? lst2)
        lst2
        (let build-intersection ((lst1 lst1)
-				(result '()))
-	  (cond ((null? lst1)
-		 (if (null? result)
-		     '()
-		     (reverse result)))
-		((member (car lst1) lst2)
-		 (build-intersection (cdr lst1) (cons (car lst1) result)))
-		(else (build-intersection (cdr lst1) result))))))
+        (result '()))
+    (cond ((null? lst1)
+     (if (null? result)
+         '()
+         (reverse result)))
+    ((member (car lst1) lst2)
+     (build-intersection (cdr lst1) (cons (car lst1) result)))
+    (else (build-intersection (cdr lst1) result))))))
 ;@
 (define (cl:set-difference lst1 lst2)
   (if (null? lst2)
       lst1
       (let build-difference ((lst1 lst1)
-			     (result '()))
-	(cond ((null? lst1) (reverse result))
-	      ((member (car lst1) lst2) (build-difference (cdr lst1) result))
-	      (else (build-difference (cdr lst1) (cons (car lst1) result)))))))
+           (result '()))
+  (cond ((null? lst1) (reverse result))
+        ((member (car lst1) lst2) (build-difference (cdr lst1) result))
+        (else (build-difference (cdr lst1) (cons (car lst1) result)))))))
 ;@
 (define (cl:subset? lst1 lst2)
   (or (eq? lst1 lst2)
       (let loop ((lst1 lst1))
-	(or (null? lst1)
-	    (and (member (car lst1) lst2)
-		 (loop (cdr lst1)))))))
+  (or (null? lst1)
+      (and (member (car lst1) lst2)
+     (loop (cdr lst1)))))))
 ;@
 (define (cl:position obj lst)
   (define pos (lambda (n lst)
-		(cond ((null? lst) #f)
-		      ((equal? obj (car lst)) n)
-		      (else (pos (+ 1 n) (cdr lst))))))
+    (cond ((null? lst) #f)
+          ((equal? obj (car lst)) n)
+          (else (pos (+ 1 n) (cdr lst))))))
   (pos 0 lst))
 ;@
 (define (cl:reduce-init pred? init lst)
@@ -1353,28 +1360,28 @@
 ;@
 (define (cl:reduce pred? lst)
   (cond ((null? lst) lst)
-	((null? (cdr lst)) (car lst))
-	(else (cl:reduce-init pred? (car lst) (cdr lst)))))
+  ((null? (cdr lst)) (car lst))
+  (else (cl:reduce-init pred? (car lst) (cdr lst)))))
 ;@
 (define (cl:some pred lst . rest)
   (cond ((null? rest)
-	 (let mapf ((lst lst))
-	   (and (not (null? lst))
-		(or (pred (car lst)) (mapf (cdr lst))))))
-	(else (let mapf ((lst lst) (rest rest))
-		(and (not (null? lst))
-		     (or (apply pred (car lst) (map car rest))
-			 (mapf (cdr lst) (map cdr rest))))))))
+   (let mapf ((lst lst))
+     (and (not (null? lst))
+    (or (pred (car lst)) (mapf (cdr lst))))))
+  (else (let mapf ((lst lst) (rest rest))
+    (and (not (null? lst))
+         (or (apply pred (car lst) (map car rest))
+       (mapf (cdr lst) (map cdr rest))))))))
 ;@
 (define (cl:every pred lst . rest)
   (cond ((null? rest)
-	 (let mapf ((lst lst))
-	   (or (null? lst)
-	       (and (pred (car lst)) (mapf (cdr lst))))))
-	(else (let mapf ((lst lst) (rest rest))
-		(or (null? lst)
-		    (and (apply pred (car lst) (map car rest))
-			 (mapf (cdr lst) (map cdr rest))))))))
+   (let mapf ((lst lst))
+     (or (null? lst)
+         (and (pred (car lst)) (mapf (cdr lst))))))
+  (else (let mapf ((lst lst) (rest rest))
+    (or (null? lst)
+        (and (apply pred (car lst) (map car rest))
+       (mapf (cdr lst) (map cdr rest))))))))
 ;@
 (define (cl:notany pred . ls) (not (apply cl:some pred ls)))
 ;@
@@ -1386,88 +1393,88 @@
     ((0)
      (lambda (obj)
        (and (list? obj)
-	    (cl:every predicate obj))))
+      (cl:every predicate obj))))
     ((1)
      (set! bound (car bound))
      (cond ((negative? bound)
-	    (set! bound (- bound))
-	    (lambda (obj)
-	      (and (list? obj)
-		   (<= bound (length obj))
-		   (cl:every predicate obj))))
-	   (else
-	    (lambda (obj)
-	      (and (list? obj)
-		   (<= (length obj) bound)
-		   (cl:every predicate obj))))))
+      (set! bound (- bound))
+      (lambda (obj)
+        (and (list? obj)
+       (<= bound (length obj))
+       (cl:every predicate obj))))
+     (else
+      (lambda (obj)
+        (and (list? obj)
+       (<= (length obj) bound)
+       (cl:every predicate obj))))))
     ((2)
      (let ((low (car bound))
-	   (high (cadr bound)))
+     (high (cadr bound)))
        (cond ((or (negative? low) (negative? high)) (errout))
-	     ((< high low)
-	      (set! high (car bound))
-	      (set! low (cadr bound))))
+       ((< high low)
+        (set! high (car bound))
+        (set! low (cadr bound))))
        (lambda (obj)
-	 (and (list? obj)
-	      (<= low (length obj) high)
-	      (cl:every predicate obj)))))
+   (and (list? obj)
+        (<= low (length obj) high)
+        (cl:every predicate obj)))))
     (else (errout))))
 ;@
 (define (cl:find-if pred? lst)
   (cond ((null? lst) #f)
-	((pred? (car lst)) (car lst))
-	(else (cl:find-if pred? (cdr lst)))))
+  ((pred? (car lst)) (car lst))
+  (else (cl:find-if pred? (cdr lst)))))
 ;@
 (define (cl:member-if pred? lst)
   (cond ((null? lst) #f)
-	((pred? (car lst)) lst)
-	(else (cl:member-if pred? (cdr lst)))))
+  ((pred? (car lst)) lst)
+  (else (cl:member-if pred? (cdr lst)))))
 ;@
 (define (cl:remove obj lst)
   (define head (list '*head*))
   (let remove ((lst lst)
-	       (tail head))
+         (tail head))
     (cond ((null? lst))
-	  ((eqv? obj (car lst)) (remove (cdr lst) tail))
-	  (else
-	   (set-cdr! tail (list (car lst)))
-	   (remove (cdr lst) (cdr tail)))))
+    ((eqv? obj (car lst)) (remove (cdr lst) tail))
+    (else
+     (set-cdr! tail (list (car lst)))
+     (remove (cdr lst) (cdr tail)))))
   (cdr head))
 ;@
 (define (cl:remove-if pred? lst)
   (let remove-if ((lst lst)
-		  (result '()))
+      (result '()))
     (cond ((null? lst) (reverse result))
-	  ((pred? (car lst)) (remove-if (cdr lst) result))
-	  (else (remove-if (cdr lst) (cons (car lst) result))))))
+    ((pred? (car lst)) (remove-if (cdr lst) result))
+    (else (remove-if (cdr lst) (cons (car lst) result))))))
 ;@
 (define (cl:remove-if-not pred? lst)
   (let remove-if-not ((lst lst)
-		      (result '()))
+          (result '()))
     (cond ((null? lst) (reverse result))
-	  ((pred? (car lst)) (remove-if-not (cdr lst) (cons (car lst) result)))
-	  (else (remove-if-not (cdr lst) result)))))
+    ((pred? (car lst)) (remove-if-not (cdr lst) (cons (car lst) result)))
+    (else (remove-if-not (cdr lst) result)))))
 ;@
 (define cl:nconc
       (lambda args
-	(cond ((null? args) '())
-	      ((null? (cdr args)) (car args))
-	      ((null? (car args)) (apply cl:nconc (cdr args)))
-	      (else
-	       (set-cdr! (last-pair (car args))
-			 (apply cl:nconc (cdr args)))
-	       (car args)))))
+  (cond ((null? args) '())
+        ((null? (cdr args)) (car args))
+        ((null? (car args)) (apply cl:nconc (cdr args)))
+        (else
+         (set-cdr! (last-pair (car args))
+       (apply cl:nconc (cdr args)))
+         (car args)))))
 
 ;;;@ From: hugh@ear.mit.edu (Hugh Secker-Walker)
 (define (cl:nreverse rev-it)
 ;;; Reverse order of elements of LIST by mutating cdrs.
   (cond ((null? rev-it) rev-it)
-	((not (list? rev-it))
-	 (slib:error "nreverse: Not a list in arg1" rev-it))
-	(else (do ((reved '() rev-it)
-		   (rev-cdr (cdr rev-it) (cdr rev-cdr))
-		   (rev-it rev-it rev-cdr))
-		  ((begin (set-cdr! rev-it reved) (null? rev-cdr)) rev-it)))))
+  ((not (list? rev-it))
+   (slib:error "nreverse: Not a list in arg1" rev-it))
+  (else (do ((reved '() rev-it)
+       (rev-cdr (cdr rev-it) (cdr rev-cdr))
+       (rev-it rev-it rev-cdr))
+      ((begin (set-cdr! rev-it reved) (null? rev-cdr)) rev-it)))))
 ;@
 (define (cl:last lst n)
   (cl:nthcdr (- (length lst) n) lst))
@@ -1480,42 +1487,42 @@
 ;@
 (define (cl:butnthcdr k lst)
   (cond ((negative? k) lst) ;(slib:error "negative argument to butnthcdr" k)
-					; SIMSYNCH FIFO8 uses negative k.
-	((or (zero? k) (null? lst)) '())
-	(else (let ((ans (list (car lst))))
-		(do ((lst (cdr lst) (cdr lst))
-		     (tail ans (cdr tail))
-		     (k (+ -2 k) (+ -1 k)))
-		    ((or (negative? k) (null? lst)) ans)
-		  (set-cdr! tail (list (car lst))))))))
+          ; SIMSYNCH FIFO8 uses negative k.
+  ((or (zero? k) (null? lst)) '())
+  (else (let ((ans (list (car lst))))
+    (do ((lst (cdr lst) (cdr lst))
+         (tail ans (cdr tail))
+         (k (+ -2 k) (+ -1 k)))
+        ((or (negative? k) (null? lst)) ans)
+      (set-cdr! tail (list (car lst))))))))
 
 ;;;; CONDITIONALS
 ;@
 (define (cl:and? . args)
   (cond ((null? args) #t)
-	((car args) (apply cl:and? (cdr args)))
-	(else #f)))
+  ((car args) (apply cl:and? (cdr args)))
+  (else #f)))
 ;@
 (define (cl:or? . args)
   (cond ((null? args) #f)
-	((car args) #t)
-	(else (apply cl:or? (cdr args)))))
+  ((car args) #t)
+  (else (apply cl:or? (cdr args)))))
 
 ;;;@ Checks to see if a list has any duplicate MEMBERs.
 (define (cl:has-duplicates? lst)
   (cond ((null? lst) #f)
-	((member (car lst) (cdr lst)) #t)
-	(else (cl:has-duplicates? (cdr lst)))))
+  ((member (car lst) (cdr lst)) #t)
+  (else (cl:has-duplicates? (cdr lst)))))
 
 
 ;;;@ remove duplicates of MEMBERs of a list
 (define cl:remove-duplicates
    (letrec ((rem-dup  (lambda (lst nlst)
-			 (cond ((null? lst) (if (null? nlst) nlst (reverse nlst)))
-			       ((member (car lst) nlst) (rem-dup (cdr lst) nlst))
-			       (else (rem-dup (cdr lst) (cons (car lst) nlst)))))))
+       (cond ((null? lst) (if (null? nlst) nlst (reverse nlst)))
+             ((member (car lst) nlst) (rem-dup (cdr lst) nlst))
+             (else (rem-dup (cdr lst) (cons (car lst) nlst)))))))
       (lambda (lst)
-	 (rem-dup lst '()))))
+   (rem-dup lst '()))))
 
 ;;;@ keep only MEMBERs of a list which occur more than once
 (define cl:duplicates
@@ -1532,13 +1539,13 @@
 ;@
 (define cl:list*
   (letrec ((list*1 (lambda (obj)
-		     (if (null? (cdr obj))
-			 (car obj)
-			 (cons (car obj) (list*1 (cdr obj)))))))
+         (if (null? (cdr obj))
+       (car obj)
+       (cons (car obj) (list*1 (cdr obj)))))))
     (lambda (obj1 . obj2)
       (if (null? obj2)
-	  obj1
-	  (cons obj1 (list*1 obj2))))))
+    obj1
+    (cons obj1 (list*1 obj2))))))
 ;@
 (define (cl:atom? obj)
   (not (pair? obj)))
@@ -1546,26 +1553,26 @@
 (define (cl:delete obj lst)
   (let delete ((lst lst))
     (cond ((null? lst) '())
-	  ((equal? obj (car lst)) (delete (cdr lst)))
-	  (else
-	   (set-cdr! lst (delete (cdr lst)))
-	   lst))))
+    ((equal? obj (car lst)) (delete (cdr lst)))
+    (else
+     (set-cdr! lst (delete (cdr lst)))
+     lst))))
 ;@
 (define (cl:delete-if pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
-	  ((pred (car lst)) (delete-if (cdr lst)))
-	  (else
-	   (set-cdr! lst (delete-if (cdr lst)))
-	   lst))))
+    ((pred (car lst)) (delete-if (cdr lst)))
+    (else
+     (set-cdr! lst (delete-if (cdr lst)))
+     lst))))
 ;@
 (define (cl:delete-if-not pred lst)
   (let delete-if ((lst lst))
     (cond ((null? lst) '())
-	  ((not (pred (car lst))) (delete-if (cdr lst)))
-	  (else
-	   (set-cdr! lst (delete-if (cdr lst)))
-	   lst))))
+    ((not (pred (car lst))) (delete-if (cdr lst)))
+    (else
+     (set-cdr! lst (delete-if (cdr lst)))
+     lst))))
 
 ;;;;;;;;;;;;;;
 ;; sort.xtm ;;
@@ -1590,10 +1597,10 @@
 ;@
 (define (cl:sorted? seq less?)
   (cond ((null? seq) #t)
-	(else (let loop ((last (car seq)) (next (cdr seq)))
-	   (or (null? next)
-	       (and (not (less? (car next) last))
-		    (loop (car next) (cdr next))))))))
+  (else (let loop ((last (car seq)) (next (cdr seq)))
+     (or (null? next)
+         (and (not (less? (car next) last))
+        (loop (car next) (cdr next))))))))
 
 ;;; (cl:merge a b less?)
 ;;; takes two lists a and b such that (sorted? a less?) and (sorted? b less?)
@@ -1603,18 +1610,18 @@
 ;@
 (define (cl:merge a b less?)
   (cond ((null? a) b)
-	((null? b) a)
-	(else (let loop ((x (car a)) (a (cdr a)) (y (car b)) (b (cdr b)))
-		;; The loop handles the merging of non-empty lists.  It has
-		;; been written this way to save testing and car/cdring.
-		(if (less? y x)
-		    (if (null? b)
-			(cons y (cons x a))
-			(cons y (loop x a (car b) (cdr b))))
-		    ;; x <= y
-		    (if (null? a)
-			(cons x (cons y b))
-			(cons x (loop (car a) (cdr a) y b))))))))
+  ((null? b) a)
+  (else (let loop ((x (car a)) (a (cdr a)) (y (car b)) (b (cdr b)))
+    ;; The loop handles the merging of non-empty lists.  It has
+    ;; been written this way to save testing and car/cdring.
+    (if (less? y x)
+        (if (null? b)
+      (cons y (cons x a))
+      (cons y (loop x a (car b) (cdr b))))
+        ;; x <= y
+        (if (null? a)
+      (cons x (cons y b))
+      (cons x (loop (car a) (cdr a) y b))))))))
 
 ;;; (cl:merge! a b less?)
 ;;; takes two sorted lists a and b and smashes their cdr fields to form a
@@ -1624,26 +1631,26 @@
 (define (cl:merge! a b less?)
   (define (loop r a b)
     (if (less? (car b) (car a))
-	(begin (set-cdr! r b)
-	  (if (null? (cdr b))
-	      (set-cdr! b a)
-	      (loop b a (cdr b))))
-	;; (car a) <= (car b)
-	(begin (set-cdr! r a)
-	  (if (null? (cdr a))
-	      (set-cdr! a b)
-	      (loop a (cdr a) b)))))
+  (begin (set-cdr! r b)
+    (if (null? (cdr b))
+        (set-cdr! b a)
+        (loop b a (cdr b))))
+  ;; (car a) <= (car b)
+  (begin (set-cdr! r a)
+    (if (null? (cdr a))
+        (set-cdr! a b)
+        (loop a (cdr a) b)))))
   (cond ((null? a) b)
-	((null? b) a)
-	((less? (car b) (car a))
-	 (if (null? (cdr b))
-	     (set-cdr! b a)
-	     (loop b a (cdr b)))
-	 b)
-	(else (if (null? (cdr a))
-	     (set-cdr! a b)
-	     (loop a (cdr a) b))
-	 a)))
+  ((null? b) a)
+  ((less? (car b) (car a))
+   (if (null? (cdr b))
+       (set-cdr! b a)
+       (loop b a (cdr b)))
+   b)
+  (else (if (null? (cdr a))
+       (set-cdr! a b)
+       (loop a (cdr a) b))
+   a)))
 
 ;;; (cl:sort! sequence less?)
 ;;; sorts the list, array, or string sequence destructively.  It uses
@@ -1654,27 +1661,27 @@
 (define (cl:sort! seq less?)
   (define (step n)
     (cond ((> n 2)
-	   (let* ((j (quotient n 2))
-		  (a (step j))
-		  (k (- n j))
-		  (b (step k)))
-	     (cl:merge! a b less?)))
-	  ((= n 2)
-	   (let ((x (car seq))
-		 (y (cadr seq))
-		 (p seq))
-	     (set! seq (cddr seq))
-	     (cond ((less? y x)
-		    (set-car! p y)
-		    (set-car! (cdr p) x)))
-	     (set-cdr! (cdr p) '())
-	     p))
-	  ((= n 1)
-	   (let ((p seq))
-	     (set! seq (cdr seq))
-	     (set-cdr! p '())
-	     p))
-	  (else '())))
+     (let* ((j (quotient n 2))
+      (a (step j))
+      (k (- n j))
+      (b (step k)))
+       (cl:merge! a b less?)))
+    ((= n 2)
+     (let ((x (car seq))
+     (y (cadr seq))
+     (p seq))
+       (set! seq (cddr seq))
+       (cond ((less? y x)
+        (set-car! p y)
+        (set-car! (cdr p) x)))
+       (set-cdr! (cdr p) '())
+       p))
+    ((= n 1)
+     (let ((p seq))
+       (set! seq (cdr seq))
+       (set-cdr! p '())
+       p))
+    (else '())))
    (step (length seq)))
 
 ;;; (cl:sort sequence less?)
@@ -1686,10 +1693,10 @@
 ;@
 (define (cl:sort seq less?)
   (cond ((vector? seq)
-	 (list->vector (cl:sort! (vector->list seq) less?)))
-	((string? seq)
-	 (list->string (cl:sort! (string->list seq) less?)))
-	(else (cl:sort! (append seq '()) less?))))
+   (list->vector (cl:sort! (vector->list seq) less?)))
+  ((string? seq)
+   (list->string (cl:sort! (string->list seq) less?)))
+  (else (cl:sort! (append seq '()) less?))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Load which safely breaks on calling sys:load-escape
@@ -1796,13 +1803,13 @@
 (define range
   (lambda args
     (cond ((= (length args) 1)
-	   (make-list-with-proc (car args)  (lambda (i) i)))
-	  ((= (length args) 2)
-	   (make-list-with-proc (- (cadr args) (car args)) (lambda (i) (+ (car args) i))))
-	  ((= (length args) 3)
-	   (make-list-with-proc (/ (- (cadr args) (car args)) (caddr args))
-				(lambda (i) (+ (car args) (* i (caddr args))))))
-	  (else (println 'bad 'range!) '()))))
+     (make-list-with-proc (car args)  (lambda (i) i)))
+    ((= (length args) 2)
+     (make-list-with-proc (- (cadr args) (car args)) (lambda (i) (+ (car args) i))))
+    ((= (length args) 3)
+     (make-list-with-proc (/ (- (cadr args) (car args)) (caddr args))
+        (lambda (i) (+ (car args) (* i (caddr args))))))
+    (else (println 'bad 'range!) '()))))
 
 ;; (define-macro (inc x y)
 ;;   `(set! ,x (+ ,x ,y)))

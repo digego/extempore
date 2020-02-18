@@ -1,0 +1,25 @@
+;;
+;; compile a trivial native console app
+;;
+;;  ./extempore.exe --compile=./examples/core/native_app.xtm
+;;
+;; after a successful compilation you should find native_app.exe in libs/builds/
+;;
+;; ./libs/builds/native_app.exe hello native extempore
+;;
+
+(sys:load "libs/base/base.xtm")
+
+(bind-func printYourArgs
+  (lambda (idx:i32 str:i8*)
+    (printf "argument[%d]: %s\n" idx str)
+    void))
+
+(bind-func run
+  (lambda (args:i32 argv:i8**)
+    (println '-------------------------------)
+    (if (> args 1)
+        (doloop (i (- args 1)) (printYourArgs i (pref argv (+ i 1)))))
+    (println 'Done)
+    (println)
+    0:i32))

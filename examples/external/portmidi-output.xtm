@@ -24,16 +24,16 @@
 ;; that device id to create an output stream (which we will send our
 ;; midi output from). If the device id is some number other than 1,
 ;; change it here:
-(define *midi-out* (pm_create_output_stream 1))
+(define *mout* (pm_create_output_stream 1))
 
 ;; now, let's send a midi message with the usual arguments
 
-;;              time  stream     pitch          velocity       duration channel
-(play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100    0)
+;;              time  stream pitch          velocity       duration channel
+(play-midi-note (now) *mout* (random 60 72) (random 60 90) 44100    0)
 
 (define midi-loop
   (lambda (beat dur)
-    (mplay *midi-out* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur 0)
+    (mplay *mout* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur 0)
     (callback (*metro* (+ beat (* .5 dur))) 'midi-loop (+ beat dur) dur)))
 
 (midi-loop (*metro* 'get-beat 4) 1/4)

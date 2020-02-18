@@ -11,9 +11,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/glib.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glib.xtm" 'quiet))
 (sys:load-preload-check 'glib)
-(define *xtmlib-glib-loaded* #f)
+(define *xtmlib-glib-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -28,7 +28,11 @@
         ((string=? (sys:platform) "Linux")
          (list "libglib-2.0.so" "libglib-2.0.so.0"))
         ((string=? (sys:platform) "Windows")
-         "libglib-2.0-0.dll")))
+         "libglib-2.0-0.dll"))
+  "xtmglib")
+
+(impc:aot:import-ll "xtmglib")
+
 
 (bind-alias GRegex i8*) ;; GRegex in GLib is actually an opaque struct (not pointer to struct)
 (bind-alias GMatchInfo i8*) ;; GMatchInfo in GLib is actually an opaque struct (not pointer to struct)
@@ -90,7 +94,7 @@
       (bind-lib libglib g_get_real_name_utf8 [gchar*]*)
       (bind-lib libglib g_get_host_name [gchar*]*)
       (bind-lib libglib g_get_home_dir_utf8 [gchar*]*)
-      (bind-lib libglib g_get_current_dir_utf8 [gchar*]*)            
+      (bind-lib libglib g_get_current_dir_utf8 [gchar*]*)
       ;(bind-lib g gglib_get_environ [gchar**]*)
       (bind-lib libglib g_getenv_utf8 [gchar*,gchar*]*)
       (bind-lib libglib g_setenv_utf8 [gboolean,gchar*]*)
@@ -101,7 +105,7 @@
       (bind-lib libglib g_get_real_name [gchar*]*)
       (bind-lib libglib g_get_host_name [gchar*]*)
       (bind-lib libglib g_get_home_dir [gchar*]*)
-      (bind-lib libglib g_get_current_dir [gchar*]*)      
+      (bind-lib libglib g_get_current_dir [gchar*]*)
       (bind-lib libglib g_get_environ [gchar**]*)
       (bind-lib libglib g_getenv [gchar*,gchar*]*)
       (bind-lib libglib g_setenv [gboolean,gchar*]*)
@@ -286,7 +290,7 @@
 ;; (bind-lib libgio g_inet_address_new_from_string [GInetAddress*,gchar*]*)
 ;; (bind-lib libgio g_inet_address_to_string [gchar*,GInetAddress*]*)
 
-;; 
+;;
 ;; where '2' is the G_TYPE_FUNDAMENTAL_SHIFT
 ;;
 (bind-func g_type_fundamental
@@ -645,7 +649,7 @@
 
 (bind-func sys_g_rename
   (lambda (old new)
-    (g_rename old new)))  
+    (g_rename old new)))
 
 (bind-func sys_g_remove
   (lambda (path)

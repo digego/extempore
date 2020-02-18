@@ -46,7 +46,15 @@
 
 
 #ifdef EXT_BOOST
-#include <boost/asio.hpp>
+// #include <boost/asio.hpp>
+#include <experimental/buffer>
+#include <experimental/executor>
+#include <experimental/internet>
+#include <experimental/io_context>
+#include <experimental/net>
+#include <experimental/netfwd>
+#include <experimental/socket>
+#include <experimental/timer>
 #else
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -107,19 +115,19 @@ namespace extemp {
 	static pointer send_from_server_socket(scheme* _sc, pointer args);		
 	static pointer set_msg_include_netaddr(scheme* _sc, pointer args);
 #ifdef EXT_BOOST
-	boost::asio::ip::udp::endpoint* getAddress() { return osc_address; }
-	boost::asio::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
+	std::experimental::net::ip::udp::endpoint* getAddress() { return osc_address; }
+	std::experimental::net::ip::udp::endpoint* getClientAddress() { return osc_client_address; }
 	int* getClientAddressSize() { return &osc_client_address_size; }
 	void setClientAddressSize(int addr_size) { osc_client_address_size = addr_size; }
 	int getConnectionType() { return conn_type; }
 	void setConnectionType(int type) { conn_type = type; }
 	char* getMessageData() { return message_data; }
 	int getMessageLength() { return message_length; }
-	boost::asio::ip::udp::socket* getSendFD() { return send_socket; }
-	void setSendFD(boost::asio::ip::udp::socket* fd) { send_socket = fd; }
-	void setSocket(boost::asio::ip::udp::socket* soc) { socket = soc; }
-	boost::asio::ip::udp::socket* getSocketFD() { return socket; }
-	boost::asio::io_service* getIOService() { return io_service; }
+	std::experimental::net::ip::udp::socket* getSendFD() { return send_socket; }
+	void setSendFD(std::experimental::net::ip::udp::socket* fd) { send_socket = fd; }
+	void setSocket(std::experimental::net::ip::udp::socket* soc) { socket = soc; }
+	std::experimental::net::ip::udp::socket* getSocketFD() { return socket; }
+	std::experimental::net::io_context* getIOService() { return io_service; }
 #else       
 	struct sockaddr_in* getAddress() { return &osc_address; }
 	struct sockaddr_in* getClientAddress() { return &osc_client_address; }
@@ -156,11 +164,11 @@ namespace extemp {
       static OSC* singleton;
       EXTThread threadOSC;
 #ifdef EXT_BOOST
-	boost::asio::ip::udp::socket* socket;
-	boost::asio::ip::udp::socket* send_socket;
-	boost::asio::ip::udp::endpoint* osc_address;
-	boost::asio::ip::udp::endpoint* osc_client_address;
-	boost::asio::io_service* io_service;
+	std::experimental::net::ip::udp::socket* socket;
+	std::experimental::net::ip::udp::socket* send_socket;
+	std::experimental::net::ip::udp::endpoint* osc_address;
+	std::experimental::net::ip::udp::endpoint* osc_client_address;
+	std::experimental::net::io_context* io_service;
 #else
         int socket_fd;
 	int send_socket_fd;

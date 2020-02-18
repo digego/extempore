@@ -29,9 +29,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/apr.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/apr.xtm" 'quiet))
 (sys:load-preload-check 'apr)
-(define *xtmlib-apr-loaded* #f)
+(define *xtmlib-apr-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -45,7 +45,10 @@
          (list "libapr-1.0.dylib"
                "/usr/local/opt/apr/libexec/lib/libapr-1.0.dylib"))
         ((string=? (sys:platform) "Linux") "libapr.so")
-        ((string=? (sys:platform) "Windows") "libapr-1.dll")))
+        ((string=? (sys:platform) "Windows") "libapr-1.dll"))
+  "xtmapr")
+
+(impc:aot:import-ll "xtmapr")
 
 (bind-alias apr_status_t i32) ;; int
 (bind-alias apr_time_t i64)
@@ -1362,8 +1365,8 @@ filename           : %s
 (bind-val APR_FOPEN_TRUNCATE i32 #x00010)
                                       ;;    to 0 length */
 (bind-val APR_FOPEN_BINARY i32 #x00020)
-				   ;;       (This flag is ignored on UNIX
-					 ;; because it has no meaning)*/
+           ;;       (This flag is ignored on UNIX
+           ;; because it has no meaning)*/
 (bind-val APR_FOPEN_EXCL i32 #x00040)
                                       ;;    and file exists. */
 (bind-val APR_FOPEN_BUFFERED i32 #x00080)
@@ -1377,9 +1380,9 @@ filename           : %s
                                       ;;    process/machines */
 (bind-val APR_FOPEN_NOCLEANUP i32 #x00800)
            ;;                               when the file is opened. The
-					 ;; apr_os_file_t handle in apr_file_t
-					 ;; will not be closed when the pool
-					 ;; is destroyed. */
+           ;; apr_os_file_t handle in apr_file_t
+           ;; will not be closed when the pool
+           ;; is destroyed. */
 (bind-val APR_FOPEN_SENDFILE_ENABLED i32 #x01000)
                                            ;;   file should support
                                            ;;   apr_socket_sendfile operation */

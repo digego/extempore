@@ -9,7 +9,7 @@
 ;;
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/bullet.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/bullet.xtm" 'quiet))
 (sys:load-preload-check 'bullet)
 
 (impc:aot:suppress-aot-do
@@ -17,6 +17,8 @@
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 ;;; Code:
+
+(impc:aot:insert-header "xtmbullet")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib bulletlib
@@ -31,9 +33,9 @@
                 (print ": unknown platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
 
-(impc:aot:insert-header "xtmbullet")
+(impc:aot:import-ll "xtmbullet")
 
-(define *xtmlib-bullet-loaded* #f)
+(define *xtmlib-bullet-loaded* #t)
 
 (define _extended_bullet #t)
 
@@ -68,7 +70,7 @@
 
 (bind-lib bulletlib plCreateDynamicsWorld [plDynamicsWorldHandle,plPhysicsSdkHandle]*)
 (bind-lib bulletlib plDeleteDynamicsWorld [void,plDynamicsWorldHandle]*)
-(if _extended_bullet    
+(if _extended_bullet
     (bind-lib bulletlib plSetGravity [void,plDynamicsWorldHandle,plReal*]*))
 (bind-lib bulletlib plStepSimulation [void,plDynamicsWorldHandle,plReal,i32,plReal]*)
 
@@ -87,7 +89,7 @@
 (if _extended_bullet
     (begin
       (bind-lib bulletlib plAddHinge [void,plDynamicsWorldHandle,plHingeConstraintHandle]*)
-      (bind-lib bulletlib plRemoveHinge [void,plDynamicsWorldHandle,plHingeConstraintHandle]*)      
+      (bind-lib bulletlib plRemoveHinge [void,plDynamicsWorldHandle,plHingeConstraintHandle]*)
       (bind-lib bulletlib plSetActivationState [void,plRigidBodyHandle,i32]*)
       (bind-lib bulletlib plSetRestitution [void,plRigidBodyHandle,float]*)
       (bind-lib bulletlib plSetDeactivationTime [void,plRigidBodyHandle,float]*)))

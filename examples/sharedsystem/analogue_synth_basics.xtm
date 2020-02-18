@@ -1,12 +1,12 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; OK let's start a basic pattern to get
-;; some noise happening.
+;; first, load the sharedsystem audio infrastructure
+(sys:load "examples/sharedsystem/setup.xtm")
+
+;; let's start a basic pattern to get some noise happening.
 (:> A 4 0 (play syn1 @1 80 dur) (zip (scale 3 8) (rot -2 (rev (scale 4 8)))))
 
 ;; first step is to introduce
 ;; second detuned oscillator
-;; see above for params of set_osc 
+;; see above for params of set_osc
 (set_osc syn1 2 0.4 PARAM_SAW 1.003228 0.0 0.0)
 
 ;; next let's play with the amp envelope
@@ -45,10 +45,10 @@
 (set_reverb syn1 0.3 0.5 75.0 0.1)
 
 ;; save our strange little instrument for posterity!
-(analogue-save-state syn1 "weirdo.xtm")
+(analogue-save-preset syn1 "weirdo.xtmpreset")
 
 ;; load into syn2!
-(analogue-load-state syn2 "weirdo.xtm")
+(analogue-load-preset syn2 "weirdo.xtmpreset")
 
 ;; now we have two weirdo's!
 (:> C 16 0 (play syn2 (+ 24 @1) 80 dur) (zip (scale 3 8) (rot -2 (rev (scale 4 8)))))
@@ -84,20 +84,20 @@
 ;; inst, osc#(1-4), gain(0.0-2.0), wave(PARAM_(SAW|TRI|PULSE|TRI)), tuning(0.0-16.0), pulse width(0.0-1.0), phase(0.0-1.0)
 (set_osc syn1 1 0.5 PARAM_SAW 1.0 0.0 0.0)
 
-;; ENVELOPES: 
+;; ENVELOPES:
 ;; inst, attack(ms), decay(ms), sustain(0.0-1.0), release(ms)
 (set_amp_env syn1 0.0 0.0 1.0 0.0)
 (set_filter_env syn1 0.0 0.0 1.0 0.0)
 
-;; LOW PASS FILTER: 
+;; LOW PASS FILTER:
 ;; inst, frq(hz), resonance(0.0-1.0), drive(0.0-3.0), db slope(12|24), amount of envelope(hz), track frq(0.0-1.0), track env(0.0-1.0)
 (set_filter syn1 18000.0 0.0 0.0 24 0.0 0.0 0.0)
 
-;; DELAY: 
+;; DELAY:
 ;; inst, mix(0.0-1.0), left-delay(ms), right-delay(ms), feedback(0.0-1.0), lpf cutoff(hz), lpf Q(0.0-1.0)
 (set_delay syn1 0.0 (/ 1000.0 5) (/ 1000.0 7) 0.5 18000.0 0.0)
 
-;; REVERB: 
+;; REVERB:
 ;; inst, mix(0.0-1.0), size(0.0-1.0), pre delay(ms), absorb(0.0-1.0)
 (set_reverb syn1 0.0 0.2 75.0 0.1)
 

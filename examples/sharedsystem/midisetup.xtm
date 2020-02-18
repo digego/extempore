@@ -1,31 +1,141 @@
-;;
-;; possible cmd line args:
-;;
-;;  .\extempore.exe --device-name="Primary Sound Driver" --channels=2 --midiin="UFX Midi Port 2" --midiout="Maschine MK3 EXT MIDI" --run .\examples\sharedsystem\midisetup.xtm 
-;;
+;;; sharedsystem/midisetup.xtm -- initialise sharedsystem MIDI
 
-;;
-;; Load libraries
-;;
+;;; Commentary:
 
-;; midisetup is included in audiosetup but can be run standalone for quicker load times
+;; this sets up a MIDI input and output device and sets up a polling loop &
+;; xtlang handler function for receiving MIDI input
+
+;; for info on how to load the sharedsystem, see examples/sharedsystem/setup.xtm
+
+;; if you *really* don't want to load the audio stuff, you can just load this
+;; file on its own
+
+;;; Code:
 
 ;; (sys:load "libs/external/instruments_ext.xtm")
 ;; (sys:load "libs/external/audio_dsp_ext.xtm")
+(sys:load "libs/core/pattern-language.xtm")
 (sys:load "libs/external/midi.xtm")
-(sys:load "libs/core/looper.xtm")
-(sys:load "libs/core/pc_ivl.xtm")
 
+;; a couple more "wrapper" bind funcs so we can access info about the midi
+;; devices in scheme
 
-;;
-;; setup MIDI
-;; 
+;; perhaps this stuff should go in the main portmidi library - will leave it
+;; here for now
 
-(println 'MIDIIN (sys:cmdarg "midiin") 'MIDIOUT (sys:cmdarg "midiout"))
-(set_midi_in (pm_input_device_with_name (sys:cmdarg "midiin")))
-(define *min* (get_midi_in))
-(set_midi_out (pm_output_device_with_name (sys:cmdarg "midiout")))
-(define *mout* (get_midi_out))
+(bind-func pm_device_with_id
+  "return pointer to device info struct"
+  (lambda (id)
+    (Pm_GetDeviceInfo id)))
+
+(bind-func pm_device_name
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          "" ;; "empty" name
+          (tref dev_info 2)))))
+
+(bind-func pm_device_input_p
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          0 ;; false if the device ID doesn't exist
+          (tref dev_info 3)))))
+
+(bind-func pm_device_output_p
+  (lambda (device_id)
+    (let ((dev_info (Pm_GetDeviceInfo device_id)))
+      (if (null? dev_info)
+          0 ;; false if the device ID doesn't exist
+          (tref dev_info 4)))))
+
+(bind-func pm_count_devices
+  (lambda ()
+    (Pm_CountDevices)))
+
+;; helper for doing regex-based matching of device names
+(define get-midi-device-names-alist
+  (lambda ()
+    (make-list-with-proc
+     (pm_count_devices)
+     (lambda (id) (cons id (cptr->string (pm_device_name id)))))))
+
+(define get-midi-input-device-names-alist
+  (lambda ()
+    (filter (lambda (dev) (= 1 (pm_device_input_p (car dev))))
+            (get-midi-device-names-alist))))
+
+(define get-midi-output-device-names-alist
+  (lambda ()
+    (filter (lambda (dev) (= 1 (pm_device_output_p (car dev))))
+            (get-midi-device-names-alist))))
+
+(define *min* #f)
+(define *mout* #f)
+
+;; initialise the midi in/out devices based on either the --midiin/--midiout CLI
+;; params or (alternately) the EXT_MIDI_{IN,OUT}_DEVICE_NAME environment
+;; variables
+
+;; this now uses regex-matching on midi device name - this both more convenient
+;; than having to get the exact string right, and also consistent with the
+;; "select audio device" behaviour
+
+;;;;;;;;;;;;;;;;;
+;; midi output ;;
+;;;;;;;;;;;;;;;;;
+
+(let* ((midi-out-device-name (or (sys:cmdarg "midiout")
+                                 (sys:get-env "EXT_MIDI_OUT_DEVICE_NAME")
+                                 #f))
+       (matching-devices (and midi-out-device-name
+                              (filter (lambda (dev) (regex:match? (cdr dev) midi-out-device-name))
+                                      (get-midi-output-device-names-alist)))))
+  (cond ((not midi-out-device-name)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified\n"
+                  "No midi output device configured\n"))))
+        ((null? matching-devices)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no MIDI output device fount matching regex '" midi-out-device-name "'\n"
+                  "No midi output device configured\n"))))
+        (else
+         (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+           (set_midi_out (car device))
+           (set! *mout* (get_midi_out))
+           (println 'midiout '*mout* (cptr->string (pm_device_name (car device))) 'is *mout*)))))
+
+;;;;;;;;;;;;;;;;;
+;; midi input ;;
+;;;;;;;;;;;;;;;;;
+
+(let* ((midi-in-device-name (or (sys:cmdarg "midiin")
+                                 (sys:get-env "EXT_MIDI_IN_DEVICE_NAME")
+                                 #f))
+       (matching-devices (and midi-in-device-name
+                              (filter (lambda (dev) (regex:match? (cdr dev) midi-in-device-name))
+                                      (get-midi-input-device-names-alist)))))
+  (cond ((not midi-in-device-name)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified\n"
+                  "No midi input device configured\n"))))
+        ((null? matching-devices)
+         (print-with-colors
+          'yellow 'default #t
+          (print (string-append
+                  "Warning: no MIDI input device fount matching regex '" midi-in-device-name "'\n"
+                  "No midi input device configured\n"))))
+        (else
+         (let ((device (car matching-devices))) ;; pick the first one with name matching regex
+           (set_midi_in (car device))
+           (set! *min* (get_midi_in))
+           (println 'midiin '*min* (cptr->string (pm_device_name (car device))) 'is *min*)))))
 
 (bind-val MCC_ARR |127,float|)
 
@@ -48,119 +158,9 @@
     ;; (println "MIDI_CC :" controller value chan "timestamp:" timestamp)
     void))
 
+;; if there's a midi input device, start up midi 'xtlang' scheduler
+(if *min* (start_midi_scheduler))
 
-
-;;
-;; short forms and helper functions
-;;
-
-                   
-;; short forms for convenience
-(define bd 36) ;; bass drum
-(define bd2 53)
-(define bd3 59)
-(define bd4 65)
-(define rs 37) ;; rim shot
-(define sn 38) ;; snare
-(define sn2 62)
-(define cl 39) ;; clap
-(define lt 41) ;; low tom
-(define ch 42) ;; closed hat
-(define ch2 44) 
-(define ch3 60) 
-(define mt 43) ;; mid tom
-(define mt2 47) 
-(define ht 45) ;; high tom
-(define ht2 48) 
-(define oh 46) ;; open hat
-(define rc 49) ;; ride cymbol
-(define rc2 55) 
-(define rc3 64) 
-(define wb 50) ;; wood block
-(define wb2 63) 
-(define ma 51) ;; maraccas
-(define ma2 52) 
-(define cb 61) ;; cow bell
-;; 
-(define *root* 0) ;; root
-(define *chord* '(36 60 63 67)) ;; chord
-(define *scale* (pc:scale 0 'aeolian)) ;; scale
-
-(define scale
-  (lambda (octave num . args)
-    (let ((skip (if (null? args) 1 (car args))))
-      (map (lambda (x) (pc:relative (+ 12 (car *scale*) (* 12 octave)) (* skip x) *scale*)) (range 0 num)))))
-
-(define qnt (lambda (x . args) 
-            (pc:quantize x (if (null? args) *scale*
-                               (map (lambda (x) 
-                                      (modulo x 12)) 
-                                    (car args))))))
-(define orb orbit)
-
-;; cycle will usually use LC 
-;; LC is an internal symbol defined
-;; for Loop Count.
-;; cycles elongates the time between changes
-;; i.e. (cycle LC 1 '(60 63 67) '(58 62 65))
-(define (cycle cnt cycles . args)
-  (list-ref args (modulo (floor (/ cnt cycles)) (length args))))
-
-;; (define mod orbit)
-(define % modulo)
-(define rot (lambda (x lst) (rotate lst x)))
-(define rnd random)
-(define rng range)
-(define rev reverse)
-(define zip (lambda (a b) (flatten (map (lambda (x y) (list x y)) a b))))
-
-(define vec list->vector)
-;; add pedal value a to list of notes b
-;; basically zip value a into list b
-(define pedal 
-  (lambda (a b) 
-    (flatten (map (lambda (x) 
-                    (if (list? a) 
-                        (list x b)
-                        (list a x)))
-                  (if (list? a) a b)))))
-(define ped pedal)
-;; forexample (nlst 8 (+ bd idx))
-;; number of (numof -> nof)
-(define-macro (nof num body)
-  `(make-list-with-proc ,num (lambda (idx) ,body)))
-
-;; item as position
-(define nth (lambda (at lst) (list-ref lst at)))
-;; last num of lst           
-(define last (lambda (num lst) (cl:last lst num)))
-;; take first num of lst
-(define take (lambda (num lst) (cl:butnthcdr num lst)))
-;; take num at
-(define sub (lambda (num at lst) (cl:butnthcdr num (cl:nthcdr at lst))))
-
-(define id (lambda (x) x))
-(define union cl:union)
-(define intersection cl:intersection)
-(define difference cl:set-difference)
-;; remove all duplicates from lst
-(define unique cl:remove-duplicates)
-
-(define filter
-  (lambda (pred lst)
-    (foldr (lambda (x acc)
-	            (if (apply pred (list x)) (cons x acc) acc))
-	   (list)
-	   lst)))
-
-;; skip by m with a lst rotation of r
-;; for example: (skip 2 -1 (scale 8))
-(define skip
-  (lambda (m r lst) 
-    (map cadr
-      (filter (lambda (y) (= 0 (modulo (car y) m)))
-        (map (lambda (x y) (list x y))
-          (range 0 (length lst)) (rotate lst r))))))
-
-
-(println "Finished MIDI setup")
+(print-with-colors
+ 'green 'default #t
+ (print "sharedsystem MIDI setup complete\n"))

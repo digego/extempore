@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
+project(Extempore VERSION 0.8.1)
 
-option(BOOST "use boost library" OFF)
 option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
+option(DYLIB "build extempore as a dynamic library" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
@@ -14,6 +15,14 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 ####################
 # option wrangling #
 ####################
+
+if(DYLIB)
+  set(EXTERNAL_SHLIBS_AUDIO OFF)
+  set(EXTERNAL_SHLIBS_GRAPHICS OFF)
+  set(EXTERNAL_SHLIBS OFF)
+  message(STATUS "Building Extempore as a dynamic library")
+  message(STATUS "Building without external dependencies")
+endif()
 
 # share directory
 
@@ -53,8 +62,6 @@ if(EXTERNAL_SHLIBS)
     message(STATUS "compiler flags for packaging:\nC    ${EXT_DEPS_C_FLAGS}\nCXX  ${EXT_DEPS_CXX_FLAGS}")
   endif()
 endif()
-
-project(Extempore VERSION 0.7.9)
 
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
@@ -359,54 +366,41 @@ foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   list(APPEND LLVM_LIBRARIES ${LLVM_LIB_FULLPATH})
 endforeach()
 
-#########
-# Boost #
-#########
-
-# *must* have Boost on Windows
-if(WIN32)
-  set(BOOST ON)
-  if(NOT BOOST_DIR)
-    # if BOOST_DIR has been set elsewhere, assume it's all present and
-    # correct and go with that. Otherwise, download boost with nuget
-    # commandline tool and stick it in ${CMAKE_SOURCE_DIR}/boost
-    set(BOOST_DIR ${CMAKE_SOURCE_DIR}/boost)
-    # check nuget commandline tool is installed
-    find_program(NUGET nuget)
-    if(NOT NUGET)
-      message(FATAL "Cannot find nuget command line tool.\nEither install it with e.g. choco install nuget.commandline, or get boost some other way and set the -DBOOST_DIR variable")
-    else()
-      if(NOT IS_DIRECTORY ${BOOST_DIR})
-        # if directory exists, assume this step has already been done
-        message(STATUS "Downloading boost components into ${CMAKE_SOURCE_DIR}/boost with \"nuget install\"")
-        file(MAKE_DIRECTORY ${BOOST_DIR})
-        execute_process(
-          COMMAND ${NUGET} install -Version 1.59 boost-vc140
-          WORKING_DIRECTORY ${BOOST_DIR})
-      endif()
-    endif()
-  endif()
-endif()
-
 #############
 # extempore #
 #############
 
 # source files
 
-add_executable(extempore src/Extempore.cpp
-  src/AudioDevice.cpp
-  src/EXTLLVM.cpp
-  src/EXTThread.cpp
-  src/Extempore.cpp
-  src/OSC.cpp
-  src/Scheme.cpp
-  src/SchemeFFI.cpp
-  src/SchemeProcess.cpp
-  src/SchemeREPL.cpp
-  src/TaskScheduler.cpp
-  src/UNIV.cpp
+if (DYLIB)
+  add_library(extempore SHARED src/Extempore.cpp
+    src/AudioDevice.cpp
+    src/EXTLLVM.cpp
+    src/EXTThread.cpp
+    src/Extempore.cpp
+    src/OSC.cpp
+    src/Scheme.cpp
+    src/SchemeFFI.cpp
+    src/SchemeProcess.cpp
+    src/SchemeREPL.cpp
+    src/TaskScheduler.cpp
+    src/UNIV.cpp
   )
+else()
+  add_executable(extempore src/Extempore.cpp
+    src/AudioDevice.cpp
+    src/EXTLLVM.cpp
+    src/EXTThread.cpp
+    src/Extempore.cpp
+    src/OSC.cpp
+    src/Scheme.cpp
+    src/SchemeFFI.cpp
+    src/SchemeProcess.cpp
+    src/SchemeREPL.cpp
+    src/TaskScheduler.cpp
+    src/UNIV.cpp
+    )
+endif()
 
 if(MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_SOURCE_DIR}/src/extempore.def")
@@ -430,6 +424,11 @@ if(BUILD_LLVM)
     add_dependencies(extempore LLVM)
   endif()
 endif()
+
+if(WIN32)
+  target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
+endif()
+
 
 target_include_directories(extempore
   PRIVATE src/pcre
@@ -512,6 +511,7 @@ endif()
 # on Windows, put the created extempore.exe straight into the source
 # directory, and the .lib file into libs/platform-shlibs
 if(WIN32)
+  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   set_target_properties(extempore
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}
@@ -520,17 +520,6 @@ if(WIN32)
     LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}
     ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/libs/platform-shlibs
     ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/libs/platform-shlibs)
-endif()
-
-if(BOOST)
-  target_include_directories(extempore
-    PRIVATE ${BOOST_DIR}/boost.1.59.0.0/lib/native/include)
-  target_compile_definitions(extempore
-    PRIVATE -DEXT_BOOST -DBOOST_EXCEPTION_DISABLE)
-  target_link_libraries(extempore
-    PRIVATE ${BOOST_DIR}/boost_date_time-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_date_time-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
-    PRIVATE ${BOOST_DIR}/boost_regex-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_regex-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib
-    PRIVATE ${BOOST_DIR}/boost_system-vc140.1.59.0.0/lib/native/address-model-64/lib/libboost_system-vc140-mt$<$<CONFIG:Debug>:-gd>-1_59.lib)
 endif()
 
 ##########
@@ -543,6 +532,10 @@ add_custom_target(assets
   COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
   COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
   COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
+
+if(PACKAGE)
+  add_dependencies(extempore assets)
+endif()
 
 ###########
 # install #
@@ -591,7 +584,7 @@ if(WIN32)
 else(WIN32)
 
   # this approach requires specifying the inter-lib dependencies by hand, but
-  # allows us to do AOT compilation in parallell
+  # allows us to do AOT compilation in parallel
 
   set(EXTEMPORE_AOT_COMPILE_PORT 17099)
 
@@ -659,13 +652,24 @@ if(UNIX)
 
     ExternalProject_Add(portmidi
       PREFIX portmidi
-      URL https://github.com/extemporelang/portmidi/archive/master.zip
+      URL https://github.com/extemporelang/portmidi/archive/8602f548f71daf5ef638b2f7d224753400cb2158.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(portmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
+
+    ExternalProject_Add(rtmidi
+      PREFIX rtmidi
+      URL https://github.com/thestk/rtmidi/archive/0b5d67c0f738aa2b0f3e658d26c638434ee518f8.zip
+      CMAKE_ARGS
+      -DRTMIDI_BUILD_TESTING=OFF
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(rtmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     ExternalProject_Add(kiss_fft
       PREFIX kiss_fft
@@ -678,13 +682,21 @@ if(UNIX)
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     # build with as few deps as we can get away with
+
     ExternalProject_Add(sndfile
-      PREFIX libsndfile
-      URL http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz
-      CONFIGURE_COMMAND sh configure --prefix=${EXT_DEPS_INSTALL_DIR} --disable-static --disable-cpu-clip --disable-external-libs --disable-sqlite --disable-octave
-      BUILD_COMMAND $(MAKE) CFLAGS=${EXT_DEPS_C_FLAGS}
-      INSTALL_COMMAND make install
-      BUILD_IN_SOURCE ON)
+    PREFIX libsndfile
+    URL https://github.com/erikd/libsndfile/archive/ae64caf9b5946d365971c550875000342e763de6.zip
+    CMAKE_ARGS
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+    -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+    -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+    -DBUILD_SHARED_LIBS=ON
+    -DBUILD_PROGRAMS=OFF
+    -DBUILD_EXAMPLES=OFF
+    -DBUILD_TESTING=OFF
+    -DENABLE_CPACK=OFF
+    -DENABLE_PACKAGE_CONFIG=OFF)
     set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     add_custom_target(aot_external_audio ALL)
@@ -697,10 +709,11 @@ if(UNIX)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving shared libs into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy librtmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
@@ -714,7 +727,7 @@ if(UNIX)
 
     ExternalProject_Add(nanovg
       PREFIX nanovg
-      URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
+      URL https://github.com/extemporelang/nanovg/archive/3c60175fcc2e5fe305b04355cdce35d499c80310.tar.gz
       CMAKE_ARGS
       -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -727,7 +740,7 @@ if(UNIX)
 
     ExternalProject_Add(stb_image
       PREFIX stb_image
-      URL https://github.com/extemporelang/stb/archive/master.zip
+      URL https://github.com/extemporelang/stb/archive/152a250a702bf28951bb0220d63bc0c99830c498.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -785,9 +798,9 @@ if(UNIX)
       DEPENDS LLVM assimp glfw3 stb_image nanovg
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
     set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -807,13 +820,27 @@ if(WIN32)
 
     ExternalProject_Add(portmidi
       PREFIX portmidi
-      URL https://github.com/extemporelang/portmidi/archive/master.zip
+      URL https://github.com/extemporelang/portmidi/archive/8602f548f71daf5ef638b2f7d224753400cb2158.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(portmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
+
+    ExternalProject_Add(rtmidi
+      PREFIX rtmidi
+      URL https://github.com/thestk/rtmidi/archive/0b5d67c0f738aa2b0f3e658d26c638434ee518f8.zip
+      CMAKE_ARGS
+      -DRTMIDI_BUILD_TESTING=OFF
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+	  # these are necessary because RTMidi's CMake config is a law unto itself
+      -DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}
+      -DCMAKE_INSTALL_BINDIR=${EXT_DEPS_INSTALL_DIR})
+    set_target_properties(rtmidi PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
     ExternalProject_Add(kiss_fft
       PREFIX kiss_fft
@@ -825,13 +852,21 @@ if(WIN32)
       -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR})
     set_target_properties(kiss_fft PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
-    # aargh! sndfile on Windows still requires sh, sed, etc. and
-    # doesn't work. so we'll just grab the pre-built one manually. for
-    # the moment I've just hosted the (unmodified) libsndfile binaries
-    # (a bit of a hack), but you can get an installer from
-    # http://www.mega-nerd.com/libsndfile/#Download
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.dll ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.dll)
-    file(DOWNLOAD http://extempore.moso.com.au/extras/libsndfile-1.lib ${EXT_PLATFORM_SHLIBS_DIR}/libsndfile-1.lib)
+    ExternalProject_Add(sndfile
+      PREFIX libsndfile
+      URL https://github.com/erikd/libsndfile/archive/ae64caf9b5946d365971c550875000342e763de6.zip
+      CMAKE_ARGS
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+      -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+      -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
+      -DBUILD_SHARED_LIBS=ON
+      -DBUILD_PROGRAMS=OFF
+      -DBUILD_EXAMPLES=OFF
+      -DBUILD_TESTING=OFF
+      -DENABLE_CPACK=OFF
+      -DENABLE_PACKAGE_CONFIG=OFF)
+    set_target_properties(sndfile PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
   endif(EXTERNAL_SHLIBS_AUDIO)
 
@@ -839,7 +874,7 @@ if(WIN32)
 
     ExternalProject_Add(nanovg
       PREFIX nanovg
-      URL https://github.com/extemporelang/nanovg/archive/9d9232e338dd2c368924abe65d6885ae57d61e80.tar.gz
+      URL https://github.com/extemporelang/nanovg/archive/3c60175fcc2e5fe305b04355cdce35d499c80310.tar.gz
       CMAKE_ARGS
       -DEXTEMPORE_LIB_PATH=${CMAKE_SOURCE_DIR}/libs/platform-shlibs/extempore.lib
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -852,7 +887,7 @@ if(WIN32)
 
     ExternalProject_Add(stb_image
       PREFIX stb_image
-      URL https://github.com/extemporelang/stb/archive/master.zip
+      URL https://github.com/extemporelang/stb/archive/152a250a702bf28951bb0220d63bc0c99830c498.zip
       CMAKE_ARGS
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
@@ -896,12 +931,16 @@ if(WIN32)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -910,14 +949,14 @@ if(WIN32)
       DEPENDS LLVM assimp glfw3 stb_image nanovg
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      # glfw3 has different base names for the .dll and .lib, so fix that
+      # note that glfw3 has different base names for the .dll and .lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -932,12 +971,16 @@ if(WIN32)
 
     add_custom_target(external_shlibs_audio
       COMMENT "moving .dll and .lib files into ${EXT_PLATFORM_SHLIBS_DIR}"
-      DEPENDS LLVM sndfile kiss_fft portmidi
+      DEPENDS LLVM sndfile kiss_fft portmidi rtmidi
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -954,14 +997,14 @@ if(WIN32)
       DEPENDS LLVM assimp glfw3 stb_image nanovg
       COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
-      # glfw3 has different base names for the .dll and .lib, so fix that
+      # note that glfw3 has different base names for the .dll and .lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
       COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
       WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
     set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
 
@@ -1085,14 +1128,15 @@ set(CPACK_PACKAGE_CONTACT "Ben Swift")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+string(TIMESTAMP EXTEMPORE_BUILD_DATE "%Y%m%d")
 
 # give the zipball a nice name on each platform
 if(APPLE)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-osx10.9+)
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-osx10.9+)
 elseif(UNIX)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_SYSTEM_NAME})
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-${EXTEMPORE_SYSTEM_NAME})
 elseif(WIN32)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-win${EXTEMPORE_SYSTEM_VERSION})
+  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-${EXTEMPORE_BUILD_DATE}-win${EXTEMPORE_SYSTEM_VERSION})
 endif()
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (http://extempore.moso.com.au)")

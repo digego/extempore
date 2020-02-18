@@ -1,6 +1,6 @@
-(sys:load "libs/aot-cache/gl-test.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/gl-test.xtm" 'quiet))
 (sys:load-preload-check 'gl-test)
-(define *xtmlib-gl-test-loaded* #f)
+(define *xtmlib-gl-test-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -10,6 +10,7 @@
  (sys:load "libs/external/gl/glcore-getprocaddress.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmgl-test")
+(impc:aot:import-ll "xtmgl-test")
 
 (bind-func gl_cp
   (lambda ()

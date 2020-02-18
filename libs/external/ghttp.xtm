@@ -14,7 +14,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/ghttp.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/ghttp.xtm" 'quiet))
 (sys:load-preload-check 'ghttp)
 
 (impc:aot:suppress-aot-do
@@ -22,6 +22,8 @@
  (sys:load "libs/external/jansson.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 (impc:aot:insert-forms (sys:load "libs/external/jansson.xtm"))
+
+(impc:aot:insert-header "xtmghttp")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libghttp
@@ -32,9 +34,9 @@
         ((string=? (sys:platform) "Windows")
          "libghttp.dll")))
 
-(impc:aot:insert-header "xtmghttp")
+(impc:aot:import-ll "xtmghttp")
 
-(define *xtmlib-ghttp-loaded* #f)
+(define *xtmlib-ghttp-loaded* #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; ghttp_constants.h ;;
@@ -291,15 +293,15 @@
 
 (bind-lib libghttp ghttp_reason_phrase [i8*,ghttp_request*]*)
 
-;; /* Set your username/password pair 
+;; /* Set your username/password pair
 ;;  */
 
 (bind-lib libghttp ghttp_set_authinfo [i32,ghttp_request*,i8*,i8*]*)
-		   
+
 
 ;; /* Set your username/password pair for proxy
 ;;  */
- 
+
 (bind-lib libghttp ghttp_set_proxy_authinfo [i32,ghttp_request*,i8*,i8*]*)
 
 ;; some helpful xtlang functions

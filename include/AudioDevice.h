@@ -91,6 +91,7 @@ private:
     bool       m_zeroLatency;
     bool       m_toggle;
 
+    //static AudioDevice* SINGLETON;
     static AudioDevice SINGLETON;
 private:
     bool WrapperSet() const {
@@ -172,7 +173,13 @@ public:
 
     PaStream* getPaStream() { return stream; }
 
-    static AudioDevice* I() { return &SINGLETON; }
+    static AudioDevice* I() { 
+        // if (!SINGLETON) {
+        //     SINGLETON = new AudioDevice();
+        // }
+        // return SINGLETON;
+        return &SINGLETON;
+    }
 
     static double getCPULoad();
     static void printDevices();

@@ -23,10 +23,10 @@
 
 ;; Constants
 
-(sys:load "libs/aot-cache/glcompat-getprocaddress.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcompat-getprocaddress.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-glcompat-getprocaddress-loaded* #f)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-glcompat-getprocaddress-loaded* #t)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -42,7 +42,10 @@
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
 
+(impc:aot:import-ll "xtmglcompat-getprocaddress")
+
 (sys:load "libs/external/gl/gl-getprocaddress.xtm")
+
 
 ;; gltypes.h
 

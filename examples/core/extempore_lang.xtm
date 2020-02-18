@@ -13,11 +13,11 @@
 ;;; Code:
 
 ;; multiple a * 5
-;; note that type infercing works out the type 
+;; note that type infercing works out the type
 ;; of "a" and then using the inferred type
 ;; also works out the type of my-test-1
 ;; (i.e. argument type and return type)
-;; 
+;;
 ;; integer literals default to 64 bit integers
 (bind-func my-test-1
   (lambda (a)
@@ -29,9 +29,9 @@
 ;; The square brackets define a closure type
 ;; The first type within the square braces is
 ;; the return type of the function (i64 for 64bit integer)
-;; Any remaining types are function arguments 
+;; Any remaining types are function arguments
 ;; in this case another i64 (for 64bit integer)
-;; 
+;;
 ;; All closures are pointers.  Pointer types are
 ;; represented (as in "C") with a "*" which trails
 ;; the base type.
@@ -69,15 +69,15 @@
 ;; as it was before.  This is important because we are
 ;; NOT allowed to change an existing compiled closures
 ;; type signature.
-;; 
+;;
 ;; So we CANNOT do this
 
                                         ;(bind-func my-test-1
                                         ;   (lambda (a)
                                         ;      (/ a 5.0)))
 
-;; Just remember that you are not currently allowed to redefine an 
-;; existing function to a new definition that requres a different type signature.  
+;; Just remember that you are not currently allowed to redefine an
+;; existing function to a new definition that requres a different type signature.
 ;; This is to protect against the situation where you have allready compiled
 ;; code which requires the current signature.
 
@@ -116,7 +116,7 @@
 ;; let's try to make a generic incrementor
 ;;
 ;; here we run into trouble
-;; because the type inferencer cannot infer a valid type 
+;; because the type inferencer cannot infer a valid type
 ;; for i or inc because there are no numberic literals
 ;; to help in the validation process
 
@@ -131,7 +131,7 @@
 ;; on doubles or integers - who knows?
 ;; So the type inferencer justifiably complains
 ;;
-;; What can we do about this ... 
+;; What can we do about this ...
 ;; we need to help the compiler out by providing
 ;; some explicit type information
 ;;
@@ -161,7 +161,7 @@
 ;; therefore my-inc-maker.
 
 ;; now we have a different problem.
-;; if we call my-inc-maker we expect to be 
+;; if we call my-inc-maker we expect to be
 ;; returned a closure.  However Scheme does not
 ;; know anything about Extempore Lang closure types and therefore
 ;; has no way of using the returned data.
@@ -184,8 +184,8 @@
 ;; to appropriate data (i.e. appropriate for the function be
 ;; called in Extempore Lang).
 
-;; So let's build a function that excepts a closure returned from 
-;; my-inc-maker as an argument, as well as a suitable operand, and 
+;; So let's build a function that excepts a closure returned from
+;; my-inc-maker as an argument, as well as a suitable operand, and
 ;; apply the closure.
 
 ;; f is our incoming closure
@@ -209,7 +209,7 @@
 
 ;; so we need to type f properly
 (bind-func my-inc-maker-wrapper
-  (lambda (f:[i64,i64]* x)      
+  (lambda (f:[i64,i64]* x)
     (f x)))
 
 ;; ok so now we can call my-inc-maker
@@ -223,7 +223,7 @@
 (println (my-inc-maker-wrapper myf 1)) ; 2
 (println (my-inc-maker-wrapper myf 1)) ; 3 etc..
 
-;; of course the wrapper is only required if you 
+;; of course the wrapper is only required if you
 ;; need interaction with the scheme world.
 ;; otherwise you just call my-inc-maker directly
 
@@ -258,7 +258,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; a simple tuple example
-;; 
+;;
 ;; tuple types are represented as <type,type,type>*
 ;;
 
@@ -276,9 +276,9 @@
 
 ;; here's another tuple example
 ;; note that my-test-7's return type is inferred
-;; by the tuple-reference index 
+;; by the tuple-reference index
 ;; (i.e. i64 being tuple index 0)
-(bind-func my-test-7 
+(bind-func my-test-7
   (lambda ()
     (let ((a:<i64,double>* (alloc)) ; returns pointer to type <i64,double>
           (b 37)
@@ -291,8 +291,8 @@
       (printf "tuple:2 %lld::%f\n" (tuple-ref a 0) (tuple-ref a 1))
       (tuple-ref a 0)))) ;; return first element which is i64
 
-;; should be 64 as we return the 
-;; first element of the tuple 
+;; should be 64 as we return the
+;; first element of the tuple
 (println (my-test-7)) ; 77
 
 
@@ -434,14 +434,14 @@
           res)))))
 
 
-;; make a convenience wrapper 
+;; make a convenience wrapper
 (bind-func env-wrap
   (let ((points 3)
         (data:double* (zalloc (* points 2))))
     (pointer-set! data 0 0.0) ;; point data
-    (pset! data 1 0.0)      
+    (pset! data 1 0.0)
     (pset! data 2 2.0)
-    (pset! data 3 1.0)      
+    (pset! data 3 1.0)
     (pset! data 4 4.0)
     (pset! data 5 0.0)
     (let ((f (envelope_c data points)))
@@ -470,13 +470,13 @@
 ;; (f.a:i32)
 ;; would return the 32bit integer symbol 'a'
 ;; from the closure 'f'
-;; 
+;;
 ;; To set an environment slot you just
 ;; add a value of the correct type
 ;; for example
 ;; (f.a:i32 565)
 ;; would set 'a' in 'f' to 565
-;; 
+;;
 ;; let's create a closure that capture's 'a'
 
 
@@ -496,7 +496,7 @@
 ;; once normally
 ;; then we directly set the closures 'a' binding
 ;; then call again
-;; 
+;;
 (bind-func my-test15
   (lambda (x:i32)
     (my-test14)
@@ -547,7 +547,7 @@
       (t1.f:[i64,i64]* (lambda (x:i64) (* x x)))
       ;; square of 5
       (printf "%lld:%lld\n" (t1 5) (t2 5))
-      ;; cube of 5 
+      ;; cube of 5
       (t2.f:[i64,i64]* (lambda (y:i64) (* y y y)))
       (printf "%lld:%lld\n" (t1 5) (t2 5)))))
 
@@ -667,7 +667,7 @@
 ;; a pointer).
 ;;
 ;; an array is made up of a size and a type
-;; |32,i64| is an array of 32 elements of type i64 
+;; |32,i64| is an array of 32 elements of type i64
 ;;
 
 (bind-type tuple-with-array <double,|32,|4,i32||,float>)
@@ -676,7 +676,7 @@
   (lambda ()
     (let ((tup:tuple-with-array* (stack-alloc))
           (t2:|32,i64|* (stack-alloc)))
-      (aset! t2 0 9)      
+      (aset! t2 0 9)
       (tset! tup 2 5.5)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 0 0)
       (aset! (aref-ptr (tref-ptr tup 1) 0) 1 1)
@@ -894,7 +894,7 @@
           (i 0))
       (dotimes (i 10) (printf "%lld:%f\n" i (aref v i))))))
 
-;; should print all 0.0's  
+;; should print all 0.0's
 (test37)
 
 
@@ -993,7 +993,7 @@
       (enqueue myqueue (aref stuff 4))
       (printf "dequeue 6: %lld\n" (dequeue myqueue))
       (printf "dequeue 7: %lld\n" (dequeue myqueue))
-      (printf "dequeue 8: %lld\n" (dequeue myqueue))      
+      (printf "dequeue 8: %lld\n" (dequeue myqueue))
       1)))
 
 (queue_test)
@@ -1034,15 +1034,15 @@
 ;; ;; number of processes and then blocks waiting
 ;; ;; until it receives 'n' results.
 (println 'result:
-	 (ipc:map procs 'work
-		      '(1 2 3 4 5)))
+   (ipc:map procs 'work
+          '(1 2 3 4 5)))
 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Ad-Hoc Polymorphism
-;; 
+;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; extempore supports ad-hoc polymorphism
@@ -1107,14 +1107,14 @@
 
 (bind-func vtest
   (lambda ()
-    (let ((v1:/4,float/* (alloc)) 
+    (let ((v1:/4,float/* (alloc))
           (v2:/4,float/* (alloc))
           (v3:/4,float/* (alloc)))
       (vfill! v1 4.0 3.0 2.0 1.0)
       (vfill! v2 1.0 2.0 3.0 4.0)
-      (vfill! v3 5.0 5.0 5.0 5.0)       
+      (vfill! v3 5.0 5.0 5.0 5.0)
       (let ((v4 (* v1 v2)))
-        (printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))	
+        (printf "mul:%f:%f:%f:%f\n" (ftod (vref v4 0)) (ftod (vref v4 1)) (ftod (vref v4 2)) (ftod (vref v4 3)))
         void))))
 
 (vtest)
@@ -1190,7 +1190,7 @@
     (let ((a:/4,float/* (alloc)))
       (vfill! a 0.1 0.2 0.3 0.4)
       (let ((b (vsinf4 (pref a 0)))
-            (c (vcosf4 (pref a 0))))	       
+            (c (vcosf4 (pref a 0))))
         (printf "precision inaccuracy is expected:\n")
         (printf " sin:\t%f,%f,%f,%f\n"
                 (ftod (sin 0.1))
@@ -1245,7 +1245,7 @@
   (let ((iters:i64 80000000)
         (i:i64 0)
         (a:float* (halloc iters))
-        (b:float* (halloc iters))        
+        (b:float* (halloc iters))
         (c:float* (halloc iters)))
     (dotimes (i iters)
       (pset! a i (i64tof i))
@@ -1291,4 +1291,3 @@
 (let ((t (clock:clock)))
   (vtest_c)
   (println 'Vec 'Test 'C '-> 'Seconds (list (- (clock:clock) t))))
-

@@ -17,9 +17,9 @@
 
 ;; Constants
 
-(sys:load "libs/aot-cache/glcompat-directbind.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcompat-directbind.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -38,6 +38,9 @@
          (begin (print-with-colors 'red 'default #f (print "Error"))
                 (print ": unknown platform ")
                 (print-with-colors 'yellow 'default #f (print (sys:platform)))))))
+
+(impc:aot:import-ll "xtmglcompat-directbind")
+
 
 ;; gltypes.h
 

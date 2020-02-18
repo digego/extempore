@@ -1,4 +1,3 @@
-
 ;; shadowmap.xtm
 ;;
 ;; opengl example using 100% shader pipeline
@@ -70,7 +69,7 @@
 ;; which is NOT very safe!!
 (bind-func get-fbo
   (let ((fbo (create_fbo (ftoi32 (* 2.0 width)) (ftoi32 (* 2.0 height)) 0 0)))
-    (gl_print_error)    
+    (gl_print_error)
     (lambda ()
       fbo)))
 
@@ -86,7 +85,7 @@
         (view_matrix:float* (alloc 16))
         (projection_matrix:float* (alloc 16))
         (mata:float* (alloc 4))
-        (matd:float* (alloc 4))        
+        (matd:float* (alloc 4))
         (mats:float* (alloc 4))
         (spotpos:float* (alloc 4))
         (spottgt:float* (alloc 4))
@@ -97,7 +96,7 @@
         (a1:float* (alloc 4)))
     ;; white light!
     (pfill! a1 1.0 1.0 1.0 1.0)
-    (pfill! s1 1.0 1.0 1.0 1.0) 
+    (pfill! s1 1.0 1.0 1.0 1.0)
     (pfill! d1 1.0 1.0 1.0 1.0)
     ;; camera always up and pointing to centre
     (pfill! target 0.0 0.0 0.0 1.0) ;; position vector gets w==1.0
@@ -107,7 +106,7 @@
       (set! fbo (get-fbo))
       ;; setup light on a slow dolly back and forth
       (pfill! spottgt (+ .5 (dtof (* 5.0 (cos (* degree .05))))) 0.0 -1.0 1.0)
-      (pfill! spotpos (+ .5 (dtof (* 5.0 (cos (* degree .05))))) 2.0 20.0 1.0) 
+      (pfill! spotpos (+ .5 (dtof (* 5.0 (cos (* degree .05))))) 2.0 20.0 1.0)
       ;; set eye position (looking at target)
       (pfill! eye
               (dtof (* 5.0 (cos (* .01 degree))))
@@ -119,38 +118,38 @@
 
       ;; make sure a few opengl settings are enabled
       (glShadeModel GL_SMOOTH)
-      (glEnable GL_DEPTH_TEST)            
+      (glEnable GL_DEPTH_TEST)
       (glEnable GL_TEXTURE_2D)
-      
+
       ;;
       ;; Now we render the Scene into An FBO
       ;; this first pass is from the lights
       ;; perspective (i.e. Light provides ViewMatrix)
       ;; We really only care about the depth buffer here
       ;;
-      
+
       ;; bind framebuffer to write depth info into
       (glBindFramebuffer GL_FRAMEBUFFER (tref fbo 0))
       (glUseProgram simpleshader)
-      ;; setup matrices      
+      ;; setup matrices
       (fill_view_matrix light_view_matrix spotpos spottgt up)
       (fill_identity_matrix model_matrix)
       (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
       ;; draw scene
       (glViewport 0 0 (ftoi32 (* 2.0 width)) (ftoi32 (* 2.0 height))) ;; shadow map is big!
       (glEnable GL_CULL_FACE) ;; face culling ON for shadowmapping
-      (glCullFace GL_FRONT)      
+      (glCullFace GL_FRONT)
       (glClearColor 0.0 0.0 0.0 1.0)
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (fill_identity_matrix model_matrix)
       (translate_matrix model_matrix -3.0 -2.9 -1.0)
       (scale_matrix model_matrix 1.5 1.5 1.5)
-      (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)      
+      (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
       (assimp_draw_model model3 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)
       (fill_identity_matrix model_matrix)
-      (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)            
+      (shader_update_matrices simpleshader model_matrix light_view_matrix projection_matrix)
       (assimp_draw_model model2 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)
-      (assimp_draw_model model1 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)            
+      (assimp_draw_model model1 simpleshader model_matrix light_view_matrix projection_matrix 1 light_view_matrix)
       ;; turn everything off
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
@@ -158,7 +157,7 @@
       ;;
       ;; Finally we render the scene to the window
       ;; using the FBO depth buffer as a shadow map
-      ;;      
+      ;;
       ;; make sure we are not writing to a framebuffer!
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram shadowshader)
@@ -172,7 +171,7 @@
       (fill_view_matrix view_matrix eye target up) ;; cameras view matrix
       (fill_view_matrix light_view_matrix spotpos spottgt up) ;; lights view matrix
       (fill_identity_matrix model_matrix) ;; reset model matrix
-      (shader_update_camera shadowshader eye target)      
+      (shader_update_camera shadowshader eye target)
       (shader_update_matrices_lv shadowshader model_matrix view_matrix projection_matrix light_view_matrix)
       ;; draw scene
       (glViewport 0 0 (ftoi32 (* 1.0 width)) (ftoi32 (* 1.0 height))) ;; window is small
@@ -181,26 +180,26 @@
       (glClear (+ GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
       (fill_identity_matrix model_matrix)
       (translate_matrix model_matrix -3.0 -2.9 -1.0)
-      (scale_matrix model_matrix 1.5 1.5 1.5)      
+      (scale_matrix model_matrix 1.5 1.5 1.5)
       (shader_update_matrices_lv shadowshader model_matrix view_matrix projection_matrix light_view_matrix)
       (assimp_draw_model model3 shadowshader model_matrix view_matrix projection_matrix 1 light_view_matrix)
       (fill_identity_matrix model_matrix) ;; reset model matrix
       (shader_update_matrices_lv shadowshader model_matrix view_matrix projection_matrix light_view_matrix)
       (assimp_draw_model model2 shadowshader model_matrix view_matrix projection_matrix 1 light_view_matrix)
       (assimp_draw_model model1 shadowshader model_matrix view_matrix projection_matrix 1 light_view_matrix)
-      
+
       ;; turn everything off again.
       (glActiveTexture GL_TEXTURE0)
       (glBindTexture GL_TEXTURE_2D 0) ;; unbind texture unit 0
       (glBindFramebuffer GL_FRAMEBUFFER 0)
       (glUseProgram 0)
-      
+
       ;; turn off texture 2d
       (glDisable GL_TEXTURE_2D)
 
       ;; print errors?
       (gl_print_error)
-      
+
       void)))
 
 

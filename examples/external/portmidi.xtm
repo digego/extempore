@@ -22,8 +22,8 @@
 ;; midi_out), but by passing the appropriate device index arguments to
 ;; pm_create_input_stream and pm_create_output_stream you can create
 ;; as many as you like
-(define *midi-in* (pm_create_input_stream (pm_default_in)))
-(define *midi-out* (pm_create_output_stream (pm_default_out)))
+(define *min* (pm_create_input_stream (pm_default_in)))
+(define *mout* (pm_create_output_stream (pm_default_out)))
 
 (bind-func midi_read_loop
   "a callback loop to call Pm_Read on a midi input stream
@@ -58,15 +58,15 @@ like."
         (callback next_time midi_read_loop input_stream next_time delta_t)))))
 
 ;; start the read loop
-(midi_read_loop *midi-in* (now) 0.01) ;; 100Hz
+(midi_read_loop *min* (now) 0.01) ;; 100Hz
 
 ;; Scheme MIDI I/O
 
-(play-midi-note (now) *midi-out* (random 60 72) (random 60 90) 44100 0)
+(play-midi-note (now) *mout* (random 60 72) (random 60 90) 44100 0)
 
 (define midi-loop
   (lambda (beat dur)
-    (mplay *midi-out* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur 0)
+    (mplay *mout* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur 0)
     (callback (*metro* (+ beat (* .5 dur))) 'midi-loop (+ beat dur) dur)))
 
 (midi-loop (*metro* 'get-beat 4) 1/4)

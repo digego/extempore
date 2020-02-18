@@ -125,7 +125,7 @@
                  (r3 (cat (Str "(/ ")
                           (cas_expand_term (trim r1)) (Str " ")
                           (cas_expand_term (trim r2)) (Str ")"))))
-             r3))    
+             r3))
           ((regex_match "[^(]\\*" t)
            (let ((r1 (regex_replace "^(.*)([^(])(\\*)(.*)$" t "$1$2"))
                  (r2 (regex_replace "^(.*)([^(])(\\*)(.*)$" t "$4"))
@@ -134,7 +134,7 @@
                           (cas_expand_term (trim r2)) (Str ")"))))
              ;; (println "multi:" r1 r2 r3)
              r3))
-          ((regex_match "e\\^" t)           
+          ((regex_match "e\\^" t)
            (let ((p (regex_split "e\\^" t)))
              (cat (Str "(exp ") (cas_expand_term (trim (nth p 1))) (Str ")"))))
           ((regex_match "\\^" t)
@@ -148,7 +148,7 @@
 
 (bind-func cas_parse_terms
   (lambda (ein:String*)
-    ;; (println "Parse:" ein)    
+    ;; (println "Parse:" ein)
     (set! cas_cntterms 0)
     (let ((e (replace ein "ln" "log"))
           (m1 (find_sexprs e))
@@ -192,7 +192,7 @@
       res)))
 
 (bind-func multi_replace_all
-  (lambda (s:String* pairs) 
+  (lambda (s:String* pairs)
     (let ((res (map (lambda (x:List{String*}*)
                       (set! s (replace_all (cstring s)
                                            (cstring (nth x 0))
@@ -260,7 +260,7 @@
 (bind-macro (icas . args)
   (let* ((a (regex:replace-all (if (list? (car args))
                                    (cas-xtm-to-string (car args))
-                                   (sexpr->string args))                                         
+                                   (sexpr->string args))
                                "{" "\("))
          (b (regex:replace-all a "}" "\)"))
          (c b) ; (string-append "simplify(" b ")"))
@@ -374,4 +374,3 @@
 (bind-macro (linsolve es vs) (xtmcas 'linsolve es vs))
 
 (bind-macro (linsolve_d es vs) (xtmcas 'linsolve es vs))
-

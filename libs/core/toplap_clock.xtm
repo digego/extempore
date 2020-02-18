@@ -28,7 +28,7 @@
 ;; master?
 (define *master* #f)
 ;; master ip (something valid to start with)
-(define *masterip* "127.0.0.1") ;; 
+(define *masterip* "127.0.0.1") ;;
 (define *oldmasterip* "127.0.0.1") ;; something valid
 ;; the time of the last stream message
 ;; from the current master
@@ -66,7 +66,7 @@
 (io:osc:netaddress? #t)
 
 (define sync-server-receive
-  (lambda (timestamp address srcip srcport . args)    
+  (lambda (timestamp address srcip srcport . args)
     (cond ((string=? address "/clock/election/q")
            ;; someone has asked for an election!
            ;; if we have a higher election-val OR we are allready the master
@@ -76,7 +76,7 @@
                      (> *election-val* election-val))
                  (io:osc:send (now) (cons srcip srcport) "/clock/election/r"))))
           ((string=? address "/clock/election/r")
-           ;; if we receive an election reply 
+           ;; if we receive an election reply
            ;; then we are definitely NOT the master
            ;; also don't try for re-election again
            ;; for AT LEAST 5 seconds!
@@ -113,7 +113,7 @@
           ((string=? address "/clock/master/q")
            ;; if current master send reponse
            ;; srcport need not be same as *toplap-port*
-           (if *master* 
+           (if *master*
                (io:osc:send (now) (cons srcip srcport) "/clock/master/r")))
           ((string=? address "/clock/master/r")
            ;; if we get a message it must be from master
@@ -132,7 +132,7 @@
                  (io:osc:send (now) *toplap-sync-broadcast* "/clock/cycle/update"
                               beat-n beat-d cycle))))
           ((string=? address "/clock/cycle/update")
-           (apply io:osc:send (now) *toplap-clock-server* "/clock/cycle/update" args))          
+           (apply io:osc:send (now) *toplap-clock-server* "/clock/cycle/update" args))
           ((string=? address "/clock/bpm/set")
            ;; bpm changes are sent to master only (i.e. not broadcast)
            ;; to ensure that we don't have the problem where some
@@ -149,14 +149,14 @@
           ((string=? address "/clock/bpm/update")
            (apply io:osc:send (now) *toplap-clock-server* "/clock/bpm/update" args))
           (else (println 'bad 'osc 'message: address)))))
-  
+
 
 (define clock-server-receive
   (lambda (timestamp address srcip srcport . args)
     (cond ((string=? address "/clock/bpm/set")
            (apply io:osc:send (now) *toplap-sync-server* "/clock/bpm/set" args))
           ((string=? address "/clock/bpm/update") ;; bpm/update may come from SYNC!
-           ;; pass update to client 
+           ;; pass update to client
            (apply io:osc:send (now) *toplap-clock-client* "/clock/bpm/update" args)
            ;; and also apply locally in case client is not extempore!
            (let ((time (join-clock-time (car args) (cadr args)))
@@ -188,7 +188,7 @@
           ((string=? address "/clock/state/q")
            (let* ((bpmmark (*metro* 'get-mark))
                   (bpmtime (split-clock-time (car mark)))
-                  (bpm-beat (cdr mark))  
+                  (bpm-beat (cdr mark))
                   (bpm (*metro* 'get-tempo))
                   (cycle (*metro* 'get-cycle))
                   (cycle-beat (*metro* 'get-cycle-mark)))
@@ -305,7 +305,7 @@
 
 ;; we DON'T start the clock-server automatically
 ;; in case someone wants to run an external clock server
-(define clock-runsync  
+(define clock-runsync
   (lambda ()
     (io:osc:start-server *toplap-clock-server-port* "clock-server-receive")
     (io:osc:start-server *toplap-sync-port* "clock-sync-receive")
@@ -323,7 +323,7 @@
   (lambda (time beat bpm)
     (let ((t (split-clock-time (samples->clock time))))
       (io:osc:send (now) *toplap-clock-server* "/clock/bpm/set"
-                   (car t) (cdr t) 
+                   (car t) (cdr t)
                    (rational->n beat) (rational->d beat) bpm))))
 
 (define clock-set-cycle

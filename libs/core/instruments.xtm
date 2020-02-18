@@ -14,16 +14,17 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/instruments.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/instruments.xtm" 'quiet))
 (sys:load-preload-check 'instruments)
 
-(define *xtmlib-instruments-loaded* #f)
+(define *xtmlib-instruments-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/core/audio_dsp.xtm"))
 (impc:aot:insert-forms (sys:load "libs/core/audio_dsp.xtm" 'quiet))
 
 (impc:aot:insert-header "xtminstruments")
+(impc:aot:import-ll "xtminstruments")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -38,48 +39,25 @@
 ;; idx(0) start(1) freq(2) amp(3) dur(4) gate(5) active(6) re-starttime(7) zone(8)
 (bind-type NoteData <i64,i64,SAMPLE,SAMPLE,i64,SAMPLE,i1,i64,i8*>)
 
-(bind-func note_idx (lambda (data:NoteData*) (tref data 0)))
-(bind-func note_starttime (lambda (data:NoteData*) (tref data 1)))
-(bind-func note_frequency (lambda (data:NoteData*) (tref data 2)))
-(bind-func note_amplitude (lambda (data:NoteData*) (tref data 3)))
-(bind-func note_duration (lambda (data:NoteData*) (tref data 4)))
-(bind-func note_gate (lambda (data:NoteData*) (tref data 5)))
-(bind-func note_gate (lambda (data:NoteData* value) (tset! data 5 value)))
-(bind-func note_active (lambda (data:NoteData*) (tref data 6)))
-(bind-func note_active (lambda (data:NoteData* value) (tset! data 6 value)))
-(bind-func note_restarttime (lambda (data:NoteData*) (tref data 7)))
-(bind-func note_zone (lambda (data:NoteData*) (cast (tref data 8) mzone*)))
+(bind-func static note_idx (lambda (data:NoteData*) (tref data 0)))
+(bind-func static note_starttime (lambda (data:NoteData*) (tref data 1)))
+(bind-func static note_frequency (lambda (data:NoteData*) (tref data 2)))
+(bind-func static note_amplitude (lambda (data:NoteData*) (tref data 3)))
+(bind-func static note_duration (lambda (data:NoteData*) (tref data 4)))
+(bind-func static note_gate_get (lambda (data:NoteData*) (tref data 5)))
+(bind-func static note_gate_set (lambda (data:NoteData* value) (tset! data 5 value)))
+(bind-poly note_gate note_gate_get)
+(bind-poly note_gate note_gate_set)
+(bind-func static note_active_get (lambda (data:NoteData*) (tref data 6)))
+(bind-func static note_active_set (lambda (data:NoteData* value) (tset! data 6 value)))
+(bind-poly note_active note_active_get)
+(bind-poly note_active note_active_set)
+(bind-func static note_restarttime (lambda (data:NoteData*) (tref data 7)))
+(bind-func static note_zone (lambda (data:NoteData*) (cast (tref data 8) mzone*)))
 
 (bind-alias INSTRUMENT [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
 (bind-alias NOTE_KERNEL [[SAMPLE,i64,i64]*,NoteData*,i64,SAMPLE*]*)
 (bind-alias FX_KERNEL [SAMPLE,SAMPLE,i64,i64,SAMPLE*]*)
-
-
-; (bind-func instrument_find_note
-;   (lambda (notes:NoteData** lgth)
-;     (let ((idx 0)
-;           (i 0)
-;           (old (note_starttime (pref notes 0)))
-;           (active #f)
-;           (starttime 0)
-;           (go #t))
-;       (while (= #t go)
-;         (set! starttime (note_starttime (pref notes i)))
-;         ;; this refcnt reset is a temporary bugfix - there is a more fundemental problem with refcnt in make_instrument
-;         (if (and (not (note_active (pref notes i)))
-;                  (> (note_refcnt (pref notes i)) 0))
-;             (tset! (pref notes i) 7 0))
-;         (if (and (< starttime old) (< (note_refcnt (pref notes i)) 1))
-;             (begin (set! old starttime) (set! idx i)))
-;         (set! active (note_active (pref notes i)))
-;         (if (and (not active) (< (note_refcnt (pref notes i)) 1)) 
-;             (begin (set! idx i) (set! go #f)))
-;         ;; (println '-- i (note_active (pref notes i)) (note_refcnt (pref notes i)))
-;         (set! i (+ i 1))
-;         (if (= i lgth) (set! go #f))
-;         void)
-;       ;; (println "note:" idx (note_active (pref notes idx)) (note_refcnt (pref notes idx)))
-;       (pref notes idx))))
 
 (bind-func instrument_find_note
   (lambda (notes:NoteData** lgth)
@@ -109,26 +87,26 @@
     (effect_kernel.notekernel:NOTE_KERNEL note_kernel)
     (let* ((maxpoly:i64 MAXPOLYPHONY)
            (tmp_active:i64 0)
-           (numactive:i64 0)           
+           (numactive:i64 0)
            (poly:i64 maxpoly)
            (notes:NoteData** (zalloc poly))
            (note_event_buf:i64 10)
            (note_events:<i64,SAMPLE,SAMPLE,i64,NoteData*>* (alloc note_event_buf))
            (note_event:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)
-           (note_event_b:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)           
-           (note_event_c:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)           
+           (note_event_b:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)
+           (note_event_c:<i64,SAMPLE,SAMPLE,i64,NoteData*>* null)
            (note_event_in_idx:i64 0)
            (note_event_out_idx:i64 0)
            (note_event_out_idx_b:i64 0)
            (note_event_out_idx_c:i64 0)
            (note_event_out_time:i64 #x0FFFFFFFFFFFFFFF)
-           (note_event_out_time_b:i64 #x0FFFFFFFFFFFFFFF)           
-           (note_event_out_time_c:i64 #x0FFFFFFFFFFFFFFF)           
+           (note_event_out_time_b:i64 #x0FFFFFFFFFFFFFFF)
+           (note_event_out_time_c:i64 #x0FFFFFFFFFFFFFFF)
            (note_event_note:NoteData* null)
-           (note:NoteData* null)           
+           (note:NoteData* null)
            (kernels:[SAMPLE,i64,i64]** (zalloc poly))
            (kernel:[SAMPLE,i64,i64]* null)
-           (nullkernel:[SAMPLE,i64,i64]* null)           
+           (nullkernel:[SAMPLE,i64,i64]* null)
            (starttime:i64 0)
            (out:SAMPLE 0.0)
            (zzone:mzone* null)
@@ -165,7 +143,7 @@
                                    free_note)))))))
       ;; init note events
       (dotimes (i 10)
-        (tfill! (pref-ptr note_events i) #x0FFFFFFFFFFFFFFF 0.0 0.0 0 null))      
+        (tfill! (pref-ptr note_events i) #x0FFFFFFFFFFFFFFF 0.0 0.0 0 null))
       ;; init notes
       (dotimes (i poly)
         (pset! kernels i (cast null))
@@ -185,7 +163,7 @@
               (set! out (+ out (* 0.2 (kernel time chan))))))
         (set! numactive tmp_active)
         (effect_kernel out time chan dat)))))
-               
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -253,8 +231,10 @@
 
 ;; load instruments (and build into aot)
 (sys:load "libs/core/instruments/fmsynth.xtm")
+(sys:load "libs/core/instruments/wavetables.xtm")
 (sys:load "libs/core/instruments/analogue.xtm")
 (sys:load "libs/core/instruments/dlogue.xtm")
+(sys:load "libs/core/instruments/analogue_midi.xtm")
 
 (impc:aot:insert-footer "xtminstruments")
 

@@ -1,19 +1,19 @@
-# Extempore [![Build Status](https://travis-ci.org/JimKuhn/extempore.svg?branch=master)](https://travis-ci.org/JimKuhn/extempore)
+# Extempore
 
 A programming environment for cyberphysical programming.
 
-# Getting started
+## Getting started
 
 To get started, you can either download a binary release or build
 Extempore from source yourself.
 
-## Download a pre-built binary
+### Download a pre-built binary
 
 Download a
 [binary release](https://github.com/digego/extempore/releases), unzip
 it and run `extempore.exe` from inside the `extempore` folder.
 
-## Build from source
+### Build from source
 
 This will download and build all the dependencies you need (including
 LLVM). So, if you've got a C++ compiler (for `gcc`, version 4.9 or
@@ -32,7 +32,7 @@ On **Windows**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
-# See Extempore in action
+## See Extempore in action
 
 Check out these videos:
 
@@ -43,7 +43,7 @@ Check out these videos:
 - [An *old* Graphics Demo](https://vimeo.com/37293927)
 - [A Programmer's Guide to Western Music](https://www.youtube.com/watch?v=xpSYWd_aIiI)
 
-# Docs & Community
+## Docs & Community
 
 Extempore documentation can be found at https://extemporelang.github.io/docs/
 
@@ -52,12 +52,12 @@ You can also join the Extempore community:
 - [Extempore google group](http://groups.google.com/group/extemporelang)
 - [Extempore mailing list](mailto:extemporelang@googlegroups.com)
 
-# Cite Extempore
+## Cite Extempore
 
 - [Extempore: The design, implementation and application of a cyber-physical programming language](https://openresearch-repository.anu.edu.au/handle/1885/144603)
 - [Systems level liveness with extempore](https://dl.acm.org/citation.cfm?id=3133858)
 
-# Licence
+## Licence
 
 Copyright (c) 2011-2018, Andrew Sorensen
 

@@ -39,7 +39,15 @@
 #include <unordered_map>
 
 #ifdef EXT_BOOST
-#include <boost/asio.hpp>
+//#include <boost/asio.hpp>
+#include <experimental/buffer>
+#include <experimental/executor>
+#include <experimental/internet>
+#include <experimental/io_context>
+#include <experimental/net>
+#include <experimental/netfwd>
+#include <experimental/socket>
+#include <experimental/timer>
 #endif
 
 namespace extemp {
@@ -55,8 +63,8 @@ private:
     std::string                   m_title;
     SchemeProcess*                m_process;
 #ifdef EXT_BOOST
-    boost::asio::ip::tcp::socket* m_serverSocket;
-    boost::asio::io_service*      m_serverIoService;
+    std::experimental::net::ip::tcp::socket* m_serverSocket;
+    std::experimental::net::io_context*      m_serverIoService;
 #else
     int                           m_serverSocket;
 #endif

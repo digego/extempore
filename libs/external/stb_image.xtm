@@ -11,9 +11,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/stb_image.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/stb_image.xtm" 'quiet))
 (sys:load-preload-check 'stb_image)
-(define *xtmlib-stb_image-loaded* #f)
+(define *xtmlib-stb_image-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -28,7 +28,11 @@
         ((string=? (sys:platform) "Linux")
          "libstb_image.so")
         ((string=? (sys:platform) "Windows")
-         "stb_image.dll")))
+         "stb_image.dll"))
+  "xtmstb_image")
+
+
+(impc:aot:import-ll "xtmstb_image")
 
 ;;;;;;;;;;;;;;;;;
 ;; stb_image.h ;;
@@ -132,7 +136,7 @@
 
 (bind-lib libstb_image stbir_resize_float [i32,float*,i32,i32,i32,float*,i32,i32,i32,i32]*)
 
-;; The following functions interpret image data as gamma-corrected sRGB. 
+;; The following functions interpret image data as gamma-corrected sRGB.
 ;; Specify STBIR_ALPHA_CHANNEL_NONE if you have no alpha channel,
 ;; or otherwise provide the index of the alpha channel. Flags value
 ;; of 0 will probably do the right thing if you're not sure what

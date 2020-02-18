@@ -1,0 +1,36 @@
+;;
+;; Oxygene (part 4)
+;;
+;; Jean Michel-Jarre
+;;
+
+(sys:load "examples/sharedsystem/setup.xtm")
+
+(*metro* 'set-tempo 125.0)
+
+(analogue-load-preset syn1 "examples/sharedsystem/presets/oxyarp.xtmpreset")
+(analogue-load-preset syn2 "examples/sharedsystem/presets/oxybass.xtmpreset")
+(analogue-load-preset syn3 "examples/sharedsystem/presets/oxylead.xtmpreset")
+
+(main_reverb 1 0.0)
+(main_reverb 2 0.0)
+(main_reverb 3 0.0)
+
+(:> RIFF 32 0
+  (play syn1 (+ 12 @1) @2 1/4)
+  `(,@(nof 16 '(48 48 48))
+    ,@(nof 8 '(50 50 50))
+    ,@(nof 8 '(48 48 48)))
+  `(,@(nof 32 '(75 55 55))))
+
+(:> BASS 32 0
+    (play syn2 (+ 12 @1) (cosr 75 10 2) 1/4)
+   `(,@(nof 4 `((60 _ 60) (58 _ 60) (_ _ 55) (58 _ 55)))
+     ,@(nof 2 `((62 _ 62) (60 _ 62) (_ _ 57) (60 _ 57)))
+     ,@(nof 2 `((65 _ 65) (63 _ 60) (_ _ 65) (63 _ 60)))))
+
+(:> LEAD 32 0
+  (play syn3 (+ 12 @1) (cosr 60 10 2) 1/4)
+  `(,@(nof 2 `(72 (_ _ 67) (63 _ 67) (_ _ 60) _ _ _ _))
+    ,@(nof 1 `(70 (_ _ 69) (67 _ 69) (_ _ 62) _ _ _ _))
+    ,(nof 2 `((69 _ 67) (65 _ 60) _ _))))

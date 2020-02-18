@@ -1,0 +1,49 @@
+;;
+;; compile a trivial native dynamic library
+;;
+;;  ./extempore.exe --dll --compile=./examples/core/native_dll.xtm
+;;
+;; --dll specifies that output should be a shared library
+;;
+;; after a successful compilation you should find native_dll.dll in libs/builds/
+;;
+;; NB: it is very important that after you load the dll
+;; and before you call any other functions in the dll
+;; that you call the native_dll_init() function
+;; this makes sure extempores top level closures are setup
+;;
+;; the "native_dll_init" function is named based on your xtm filename
+;; i.e. "name"+init
+;; e.g. compiling a file called mylib.xtm would result
+;; in an init of mylib_init()
+
+;; this is NOT a standard C call site
+;; so don't try calling this from C
+(bind-func xtlangClosure
+  (let ((inc 0))
+    (lambda (x:i64)
+      (set! inc (+ inc 1))
+      (+ x inc))))
+
+;; this IS a standard C call site
+;; you can bind and call this
+(bind-func static plusInc
+  (lambda (a:i64)
+    (xtlangClosure a)))
+
+;; before you can call any static
+;; function that calls a closure
+;; you will need "initialize the dll"
+;; extempore automagically builds you
+;; a function called native_dll_init
+;; which is exported can be called normally
+;; do this FIRST after loading the dll
+;;
+;; sometimes though you'll need to expose
+;; a named function (i.e. a plugin arch)
+;; for those occurences you can "name"
+;; the init function by simply wrapping
+;; it as below
+(bind-func my_plugin_calls_this_on_load
+  (lambda ()
+    (native_dll_init)))

@@ -22,10 +22,10 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/glcore-directbind.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glcore-directbind.xtm" 'quiet))
 (sys:load-preload-check 'gl)
-(define *xtmlib-glcore-directbind-loaded* #f)
-(define *xtmlib-gl-loaded* #f)
+(define *xtmlib-glcore-directbind-loaded* #t)
+(define *xtmlib-gl-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -40,6 +40,8 @@
          "opengl32.dll")
         ((string=? (sys:platform) "OSX")
          "/System/Library/Frameworks/OpenGL.framework/OpenGL")))
+
+(impc:aot:import-ll "xtmglcore-directbind")
 
 ;; this version doesn't really do anything, bit in the getprocaddress
 ;; OpenGL code path it's important, so having it here allows us to
@@ -86,7 +88,7 @@
 ;; ** included as <GL/glcorearb.h>.
 ;; **
 ;; ** glcorearb.h includes only APIs in the latest OpenGL core profile
-;; ** implementation together with APIs in newer ARB extensions which 
+;; ** implementation together with APIs in newer ARB extensions which
 ;; ** can be supported by the core profile. It does not, and never will
 ;; ** include functionality removed from the core profile, such as
 ;; ** fixed-function vertex and fragment processing.

@@ -11,9 +11,9 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/soil.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/soil.xtm" 'quiet))
 (sys:load-preload-check 'soil)
-(define *xtmlib-soil-loaded* #f)
+(define *xtmlib-soil-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -32,7 +32,11 @@
         ((string=? (sys:platform) "Linux")
          "libSOIL.so")
         ((string=? (sys:platform) "Windows")
-         "SOIL.dll")))
+         "SOIL.dll"))
+  "xtmsoil")
+
+(impc:aot:import-ll "xtmsoil")
+
 
 (bind-lib libsoil SOIL_load_OGL_texture [i32,i8*,i32,i32,i32]*)
 (bind-lib libsoil SOIL_load_OGL_texture_from_memory [i32,i8*,i32,i32,i32,i32]*)
@@ -73,19 +77,19 @@
 
 ;; id of 0 means Create new texture
 ;; id > 0 means load image into existing texture
-;; returns texture 
+;; returns texture
 (bind-func gl_load_image_rect
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y SOIL_FLAG_TEXTURE_RECTANGLE))))
       (if (= texid 0)
-	  (printf "Error loading: %s\n" path))
+    (printf "Error loading: %s\n" path))
       texid)))
 
 (bind-func gl_load_image
   (lambda (path id)
     (let ((texid (SOIL_load_OGL_texture path SOIL_LOAD_AUTO id (+ SOIL_FLAG_MIPMAPS SOIL_FLAG_INVERT_Y))))
       (if (= texid 0)
-	  (printf "Error loading: %s\n" path))
+    (printf "Error loading: %s\n" path))
       texid)))
 
 ;; get texture height
@@ -93,7 +97,7 @@
 (bind-func gl_tex_height
   (lambda (tex)
     (glDisable GL_TEXTURE_RECTANGLE_ARB)
-    (glEnable GL_TEXTURE_2D)    
+    (glEnable GL_TEXTURE_2D)
     (glBindTexture GL_TEXTURE_2D tex)
     (let ((v:|1,i32|* (salloc)))
       (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT (cast v))
@@ -106,12 +110,12 @@
 (bind-func gl_tex_width
   (lambda (tex)
     (glDisable GL_TEXTURE_RECTANGLE_ARB)
-    (glEnable GL_TEXTURE_2D)    
+    (glEnable GL_TEXTURE_2D)
     (glBindTexture GL_TEXTURE_2D tex)
     (let ((v:|1,i32|* (salloc)))
       (glGetTexLevelParameteriv GL_TEXTURE_2D 0 GL_TEXTURE_WIDTH (cast v))
       (glDisable GL_TEXTURE_2D)
-      (glBindTexture GL_TEXTURE_2D 0)      
+      (glBindTexture GL_TEXTURE_2D 0)
       (aref v 0))))
 
 ;; get texture-width
@@ -119,12 +123,12 @@
 (bind-func gl_tex_width_rect
   (lambda (tex)
     (glDisable GL_TEXTURE_2D)
-    (glEnable GL_TEXTURE_RECTANGLE_ARB)    
+    (glEnable GL_TEXTURE_RECTANGLE_ARB)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
     (let ((v:|1,i32|* (salloc)))
       (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_WIDTH (cast v))
       (glDisable GL_TEXTURE_RECTANGLE_ARB)
-      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)      
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       (aref v 0))))
 
 ;; get texture height
@@ -132,12 +136,12 @@
 (bind-func gl_tex_height_rect
   (lambda (tex)
     (glDisable GL_TEXTURE_2D)
-    (glEnable GL_TEXTURE_RECTANGLE_ARB)    
+    (glEnable GL_TEXTURE_RECTANGLE_ARB)
     (glBindTexture GL_TEXTURE_RECTANGLE_ARB tex)
     (let ((v:|1,i32|* (salloc)))
       (glGetTexLevelParameteriv GL_TEXTURE_RECTANGLE_ARB 0 GL_TEXTURE_HEIGHT (cast v))
       (glDisable GL_TEXTURE_RECTANGLE_ARB)
-      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)            
+      (glBindTexture GL_TEXTURE_RECTANGLE_ARB 0)
       (aref v 0))))
 
 
@@ -157,15 +161,15 @@
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA) ;GL_RGBA)
-			  (else GL_RGBA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
+        width height
+        0
+        (cond ((= channels 1) GL_RED)
+        ((= channels 3) GL_RGB)
+        ((= channels 4) GL_RGBA) ;GL_RGBA)
+        (else GL_RGBA))
+        type
+        ; GL_FLOAT; GL_UNSIGNED_BYTE
+        data)
       (pref tex 0))))
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
@@ -183,15 +187,15 @@
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D GL_TEXTURE_2D 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA) ;GL_RGBA)
-			  (else GL_RGBA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
+        width height
+        0
+        (cond ((= channels 1) GL_RED)
+        ((= channels 3) GL_RGB)
+        ((= channels 4) GL_RGBA) ;GL_RGBA)
+        (else GL_RGBA))
+        type
+        ; GL_FLOAT; GL_UNSIGNED_BYTE
+        data)
       (pref tex 0))))
 
 
@@ -211,15 +215,15 @@
       (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D textype 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_RGB)
-			  ((= channels 4) GL_RGBA) ;GL_RGBA)
-			  (else GL_RGBA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
+        width height
+        0
+        (cond ((= channels 1) GL_RED)
+        ((= channels 3) GL_RGB)
+        ((= channels 4) GL_RGBA) ;GL_RGBA)
+        (else GL_RGBA))
+        type
+        ; GL_FLOAT; GL_UNSIGNED_BYTE
+        data)
       (pref tex 0))))
 
 
@@ -239,15 +243,15 @@
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri GL_TEXTURE_RECTANGLE_ARB GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D GL_TEXTURE_RECTANGLE_ARB 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_BGR)
-			  ((= channels 4) GL_BGRA) ;GL_RGBA)
-			  (else GL_BGRA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
+        width height
+        0
+        (cond ((= channels 1) GL_RED)
+        ((= channels 3) GL_BGR)
+        ((= channels 4) GL_BGRA) ;GL_RGBA)
+        (else GL_BGRA))
+        type
+        ; GL_FLOAT; GL_UNSIGNED_BYTE
+        data)
       (pref tex 0))))
 
 ;; where type is GL_UNSIGNED_BYTE GL_FLOAT GL_SHORT etc..
@@ -266,15 +270,15 @@
       (glTexParameteri textype GL_TEXTURE_MAG_FILTER GL_NEAREST)
       (glTexParameteri textype GL_TEXTURE_MIN_FILTER GL_NEAREST)
       (glTexImage2D textype 0 channels ;GL_RGBA
-		    width height
-		    0
-		    (cond ((= channels 1) GL_RED)
-			  ((= channels 3) GL_BGR)
-			  ((= channels 4) GL_BGRA) ;GL_RGBA)
-			  (else GL_BGRA))
-		    type
-		    ; GL_FLOAT; GL_UNSIGNED_BYTE
-		    data)
+        width height
+        0
+        (cond ((= channels 1) GL_RED)
+        ((= channels 3) GL_BGR)
+        ((= channels 4) GL_BGRA) ;GL_RGBA)
+        (else GL_BGRA))
+        type
+        ; GL_FLOAT; GL_UNSIGNED_BYTE
+        data)
       (pref tex 0))))
 
 

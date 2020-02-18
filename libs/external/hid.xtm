@@ -9,12 +9,14 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/hid.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/hid.xtm" 'quiet))
 (sys:load-preload-check 'libhid)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmhid")
 
 ;; lib assimp
 (bind-dylib libhid
@@ -25,9 +27,9 @@
         ((string=? (sys:platform) "Windows")
          "libhid.dll")))
 
-(impc:aot:insert-header "xtmhid")
+(impc:aot:import-ll "xtmhid")
 
-(define *xtmlib-hid-loaded* #f)
+(define *xtmlib-hid-loaded* #t)
 
 (bind-type HIDNode <i16,i16>)
 (bind-type HIDPath <i8,|10,HIDNode|>)
@@ -40,10 +42,10 @@
 ;;   uchar   ReportID;         /*!< Report ID, (from incoming report) ???        */
 ;;   uchar   Offset;           /*!< Offset of data in report                     */
 ;;   uchar   Size;             /*!< Size of data in bit                          */
-                            
+
 ;;   uchar   Type;             /*!< Type : FEATURE / INPUT / OUTPUT              */
 ;;   uchar   Attribute;        /*!< Report field attribute                       */
-                            
+
 ;;   ulong   Unit;             /*!< HID Unit                                     */
 ;;   char    UnitExp;          /*!< Unit exponent                                */
 
@@ -130,7 +132,7 @@
 ;;   HID_DEBUG_TRACES = 0x8,	//!< Verbose tracing of functions
 ;;   HID_DEBUG_ASSERTS = 0x10,	//!< Assertions for sanity checking
 ;;   HID_DEBUG_NOTRACES = HID_DEBUG_ERRORS | HID_DEBUG_WARNINGS | HID_DEBUG_NOTICES | HID_DEBUG_ASSERTS,
-;; 				//!< This is what you probably want to start with while developing with libhid
+;;        //!< This is what you probably want to start with while developing with libhid
 ;;   HID_DEBUG_ALL = HID_DEBUG_ERRORS | HID_DEBUG_WARNINGS | HID_DEBUG_NOTICES | HID_DEBUG_TRACES | HID_DEBUG_ASSERTS
 ;; } HIDDebugLevel;
 

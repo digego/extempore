@@ -11,9 +11,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/portmidi.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/portmidi.xtm" 'quiet))
 (sys:load-preload-check 'portmidi)
-(define *xtmlib-portmidi-loaded* #f)
+(define *xtmlib-portmidi-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
@@ -28,7 +28,10 @@
         ((string=? (sys:platform) "Linux")
          "libportmidi.so")
         ((string=? (sys:platform) "Windows")
-         "portmidi.dll")))
+         "portmidi.dll"))
+  "xtmportmidi")
+
+(impc:aot:import-ll "xtmportmidi")
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; begin portmidi.h ;;
@@ -826,8 +829,9 @@ output device(s)
   (lambda (event:PmEvent*)
     (= (& (tref event 0) #xF0) MIDI_CONTROL_CHANGE)))
 
+;; here are some defaults (globalvars); handy for use with the shared system
 
-;; start with a  default output stream
+;; define a default output stream globalvar
 (bind-val midi_out PmStream*) ;;(pm_create_output_stream (pm_default_out)))
 
 ;; OVERRIDE default midi out
@@ -888,7 +892,7 @@ output device(s)
 ;; A midi-specific play macro
 (impc:aot:do-or-emit
   (define *midioffset* 0))
-                                              
+
 (impc:aot:do-or-emit
  (define-macro (mplay . args)
    (if (symbol? (car args))
@@ -912,7 +916,7 @@ output device(s)
                                 (real->integer ,(car (cdddr args)))
                                 (*metro* 'dur ,(cadr (cdddr args)))
                                 (real->integer , (cadr (cddddr args)))))
-                  ,(caddr args))                  
+                  ,(caddr args))
               (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
                                 (real->integer ,(caddr args))
                                 (real->integer ,(car (cdddr args)))

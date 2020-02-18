@@ -90,7 +90,15 @@
 #endif
 
 #ifdef EXT_BOOST
-#include <boost/asio.hpp>
+//#include <boost/asio.hpp>
+#include <experimental/buffer>
+#include <experimental/executor>
+#include <experimental/internet>
+#include <experimental/io_context>
+#include <experimental/net>
+#include <experimental/netfwd>
+#include <experimental/socket>
+#include <experimental/timer>
 #else
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -208,7 +216,7 @@ EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
       return 1;
     }
     //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
-    memcpy(ptr2, ptr1, size1);
+    std::memcpy(ptr2, ptr1, size1);
     return 0;
 }
 
@@ -248,15 +256,18 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
   int length = message_length;
 
 #ifdef EXT_BOOST // TODO: This should use WinSock on Windows
-  boost::asio::io_service io_service;
-  boost::asio::ip::udp::resolver::iterator end;
-  boost::asio::ip::udp::resolver resolver(io_service);
+  std::experimental::net::io_context context;
+  // std::experimental::net::ip::udp::resolver::iterator end;
+  std::experimental::net::ip::udp::resolver resolver(context);
   std::stringstream ss;
   ss << port;
-  boost::asio::ip::udp::resolver::query newQuery(boost::asio::ip::udp::v4(),host, ss.str());
-  boost::asio::ip::udp::resolver::iterator iter = resolver.resolve(newQuery);
+  // std::experimental::net::ip::udp::resolver::query newQuery(boost::asio::ip::udp::v4(),host, ss.str());
+  std::experimental::net::ip::udp::resolver::results_type res = resolver.resolve(std::experimental::net::ip::udp::v4(), host, ss.str());
+  auto iter = res.begin();
+  auto end = res.end();
+  std::experimental::net::ip::udp::endpoint sa = *iter;
 
-  boost::asio::ip::udp::endpoint sa = *iter;
+  //boost::asio::ip::udp::endpoint sa = *iter;
 #else
   struct sockaddr_in sa;
   struct hostent* hen; /* host-to-IP translation */
@@ -277,17 +288,17 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
 
 
 #ifdef EXT_BOOST
-  boost::asio::ip::udp::socket* fd = 0;
+  std::experimental::net::ip::udp::socket* fd = 0;
 #else
   int fd = 0;
 #endif
 
 #ifdef EXT_BOOST
   int err = 0;
-  boost::asio::io_service service;
-  boost::asio::ip::udp::socket socket(service);
-  socket.open(boost::asio::ip::udp::v4());
-  socket.send_to(boost::asio::buffer(message, length), sa);
+  std::experimental::net::io_context service;
+  std::experimental::net::ip::udp::socket socket(service);
+  socket.open(std::experimental::net::ip::udp::v4());
+  socket.send_to(std::experimental::net::buffer(message, length), sa);
 #else
   fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
@@ -558,7 +569,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   }
   if(!rsplit((char*)":",tmp, (char*) vname,(char*) tname)) {
     tname[0] = '\0';
-    memcpy(vname, tmp, 256);
+    std::memcpy(vname, tmp, 256);
   }
   strcat(c,fname);
   strcat(c,d);

@@ -13,12 +13,14 @@
 ;;; Code:
 
 ;; lib-loading config
-(sys:load "libs/aot-cache/cairo.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/cairo.xtm" 'quiet))
 (sys:load-preload-check 'cairo)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmcairo")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libcairo
@@ -29,9 +31,7 @@
         ((string=? (sys:platform) "Windows")
          "libcairo-2.dll")))
 
-(impc:aot:insert-header "xtmcairo")
-
-(define *xtmlib-cairo-loaded* #f)
+(define *xtmlib-cairo-loaded* #t)
 
 ;; complex structs with i8 name cheat (i.e. must be pointers)
 (bind-alias cairo_t i8)
@@ -131,8 +131,8 @@
 
 ;; enum cairo_content_t
 (bind-alias cairo_content_t i32)
-(bind-val    CAIRO_CONTENT_COLOR i32 4096)	
-(bind-val    CAIRO_CONTENT_ALPHA i32 8192)	
+(bind-val    CAIRO_CONTENT_COLOR i32 4096)
+(bind-val    CAIRO_CONTENT_ALPHA i32 8192)
 (bind-val    CAIRO_CONTENT_COLOR_ALPHA i32 12288)
 
 
@@ -272,7 +272,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; types 
+;; types
 (bind-type cairo_rectangle_t <double,double,double,double>)
 (bind-type cairo_rectangle_list_t <cairo_status_t,cairo_rectangle_t*,i32>)
 (bind-type cairo_glyph_t <i64,double,double>)

@@ -9,7 +9,7 @@
 ;;
 
 ;;; Code:
- 
+
 (define fullscreen #t)
 (define width 1920.0)
 (define height 1200.0)
@@ -39,7 +39,7 @@
       (if (<> (gst_app_sink_is_eos (cast sink GstAppSink*)) 0)
           (begin
             (printf "Finished Streaming! Try another video!\n")
-            (gst_element_set_state playz GST_STATE_NULL)      
+            (gst_element_set_state playz GST_STATE_NULL)
             (gst_object_unref (cast playz gpointer))
             (set! vplay #f)
             void)
@@ -73,7 +73,7 @@
   (lambda (path)
     (gst_init null null)
     (if vplay
-        (begin (printf "Wait to finish the running video first!\n") 1)               
+        (begin (printf "Wait to finish the running video first!\n") 1)
         (let ((playz (gst_element_factory_make "playbin" "play"))
               (sinkz (gst_element_factory_make "appsink" "app_sink"))
               (bus (gst_pipeline_get_bus (cast playz GstPipeline*)))
@@ -92,7 +92,7 @@
           ;; URI to load media from
           (g_value_unset gv)
           (g_value_init gv G_TYPE_STRING)
-          (g_value_set_string gv path)      
+          (g_value_set_string gv path)
           (g_object_set_property (cast playz GObject*) "uri" gv)
           ;; start decoding the media!
           (gst_element_set_state playz GST_STATE_PLAYING)
@@ -170,7 +170,7 @@
 (bind-func post:XTMRENDERCB
   (lambda (frame shader m v p data)
     (fill_orthographic_matrix p -1.0 1.0 -1.0 1.0 -1.0 1.0)
-    (fill_identity_matrix v)            
+    (fill_identity_matrix v)
     (fill_identity_matrix m)
     (if vplay ;; if movies playing display it!
         (begin (scale_matrix m 2.0 -2.0 0.0)

@@ -22,9 +22,9 @@
 
 ;;; Code:
 
-(sys:load "libs/aot-cache/system.xtm" 'quiet)
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/system.xtm" 'quiet))
 (sys:load-preload-check 'system)
-(define *xtmlib-system-loaded* #f)
+(define *xtmlib-system-loaded* #t)
 
 (impc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
@@ -34,6 +34,7 @@
  (sys:load "libs/external/apr.xtm" 'quiet))
 
 (impc:aot:insert-header "xtmsystem")
+(impc:aot:import-ll "xtmsystem")
 
 ;; file IO
 

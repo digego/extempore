@@ -46,10 +46,10 @@
         (j:i32 0)
         (nxp:i32 0)
         (nxps:i32 0)
-        
+
         (eps:float 0.0)
         (epsmax:float 0.0)
-        
+
         (a:float* null)
         (b:float* null)
         (c:float* null)
@@ -94,7 +94,7 @@
           ;; /* nxps = size of actual data, if nx is not an exact multiple of nvp */
           (set! nxps (if (> 0:i32 (* (- nx nxp) idproc)) 0 (* (- nx nxp) idproc)))
           (set! nxps (if (< nxp nxps) nxp nxps))
-   
+
           ;; /* First execute on Host in C: a = b + c */
           (if (= idproc 0)
               (cadd a b c nx))
@@ -102,7 +102,7 @@
           ;; /* Copy data for mpi */
           (vscatter b p_b nx nxp)
           (vscatter c p_c nx nxp)
-          
+
           ;; /* Execute with mpi: g_a = g_b + g_c */
           (mpadd p_a p_b p_c nxps)
           ;; /* Copy data from mpi: d = g_a */

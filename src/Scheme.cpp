@@ -378,12 +378,12 @@ EXPORT bool i1value(scheme* _sc, pointer p)
     return p == _sc->T;
 }
 
-double r64value(pointer p)
+EXPORT double r64value(pointer p)
 {
     return rvalue(p);
 }
 
-float r32value(pointer p)
+EXPORT float r32value(pointer p)
 {
     return rvalue(p);
 }
@@ -395,7 +395,7 @@ float r32value(pointer p)
 #define set_real(p)           (p)->_object._number.num_type = T_REAL;
 #define set_rational(p)       (p)->_object._number.num_type = T_RATIONAL;
 
-long long charvalue(pointer p)
+EXPORT long long charvalue(pointer p)
 {
     //if(!is_character(p)) _Error_1(sc, "Attempting to return a character from a non-character obj", p, sc->code->_debugger->_size);//[NSException raise:@"IncorrectSchemeOBJ" format:@"Attempting to return a character from a non-character obj"];
     return ivalue_unchecked(p);
@@ -587,12 +587,12 @@ static long binary_decode(const char *s);
 static inline pointer get_cell(scheme *sc, pointer a, pointer b);
 static pointer _get_cell(scheme *sc, pointer a, pointer b);
 static void finalize_cell(scheme *sc, pointer a);
-static pointer mk_number(scheme *sc, const num& n);
-static pointer mk_empty_string(scheme *sc, int len, char fill);
-static char *store_string(scheme *sc, int len, const char *str, char fill);
+EXPORT pointer mk_number(scheme *sc, const num& n);
+EXPORT pointer mk_empty_string(scheme *sc, int len, char fill);
+EXPORT char *store_string(scheme *sc, int len, const char *str, char fill);
 static pointer mk_atom(scheme *sc, char *q);
 static pointer mk_sharp_const(scheme *sc, char *name);
-static pointer mk_port(scheme *sc, port *p);
+EXPORT pointer mk_port(scheme *sc, port *p);
 static pointer port_from_filename(scheme *sc, const char *fn, int prop);
 static pointer port_from_file(scheme *sc, FILE *, int prop);
 static pointer port_from_string(scheme *sc, char *start, char *past_the_end, int prop);
@@ -1214,7 +1214,7 @@ static pointer oblist_all_symbols(scheme *sc)
     return ob_list;
 }
 
-static pointer mk_port(scheme *sc, port *p) {
+EXPORT pointer mk_port(scheme *sc, port *p) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = T_PORT|T_ATOM;
@@ -1222,7 +1222,7 @@ static pointer mk_port(scheme *sc, port *p) {
     return (x);
 }
 
-pointer mk_foreign_func(scheme *sc, foreign_func f) {
+EXPORT pointer mk_foreign_func(scheme *sc, foreign_func f) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = (T_FOREIGN | T_ATOM);
@@ -1230,7 +1230,7 @@ pointer mk_foreign_func(scheme *sc, foreign_func f) {
     return (x);
 }
 
-pointer mk_cptr(scheme *sc, void* p) {
+EXPORT pointer mk_cptr(scheme *sc, void* p) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = (T_CPTR | T_ATOM);
@@ -1240,7 +1240,7 @@ pointer mk_cptr(scheme *sc, void* p) {
 
 int retained = 0;
 
-pointer mk_character(scheme *sc, int c) {
+EXPORT pointer mk_character(scheme *sc, int c) {
     pointer x = get_cell(sc,sc->NIL, sc->NIL);
 
     typeflag(x) = (T_CHARACTER | T_ATOM);
@@ -1250,7 +1250,7 @@ pointer mk_character(scheme *sc, int c) {
 }
 
 /* get number atom (integer) */
-pointer mk_integer(scheme* Scheme, long long Num) {
+EXPORT pointer mk_integer(scheme* Scheme, long long Num) {
     pointer x = get_cell(Scheme, Scheme->NIL, Scheme->NIL);
     //std::cout << "NUM: " << Num << " :: " << sizeof(long) << " :: " << sizeof(int) << std::endl;
     typeflag(x) = T_NUMBER | T_ATOM;
@@ -1260,27 +1260,27 @@ pointer mk_integer(scheme* Scheme, long long Num) {
     return x;
 }
 
-pointer mk_i64(scheme *sc, long long num) {
+EXPORT pointer mk_i64(scheme *sc, long long num) {
     return mk_integer(sc, num);
 }
 
-pointer mk_i32(scheme *sc, int num) {
+EXPORT pointer mk_i32(scheme *sc, int num) {
     return mk_integer(sc, num);
 }
 
-pointer mk_i16(scheme *sc, short num) {
+EXPORT pointer mk_i16(scheme *sc, short num) {
     return mk_integer(sc, (int)num);
 }
 
-pointer mk_i8(scheme *sc, char num) {
+EXPORT pointer mk_i8(scheme *sc, char num) {
     return mk_integer(sc, num);
 }
 
-pointer mk_i1(scheme *sc, bool num) {
+EXPORT pointer mk_i1(scheme *sc, bool num) {
     return mk_integer(sc, num);
 }
 
-pointer mk_real(scheme *sc, double n) {
+EXPORT pointer mk_real(scheme *sc, double n) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = (T_NUMBER | T_ATOM);
@@ -1289,11 +1289,11 @@ pointer mk_real(scheme *sc, double n) {
     return (x);
 }
 
-pointer mk_double(scheme* sc, double n) {
+EXPORT pointer mk_double(scheme* sc, double n) {
     return mk_real(sc, n);
 }
 
-pointer mk_float(scheme* sc, float n) {
+EXPORT pointer mk_float(scheme* sc, float n) {
     return mk_real(sc, (double) n);
 }
 
@@ -1307,7 +1307,7 @@ int64_t gcd(int64_t a, int64_t b)
     return a;
 }
 
-pointer mk_rational(scheme *sc, long long n, long long d) {
+EXPORT pointer mk_rational(scheme *sc, long long n, long long d) {
     if(d==0) {
         _Error_1(sc,"Cannot make rational with 0 denominator",sc->NIL,sc->code->_size);
         return sc->NIL;
@@ -1331,7 +1331,7 @@ pointer mk_rational(scheme *sc, long long n, long long d) {
     return (x);
 }
 
-static pointer mk_number(scheme *sc, const num& n) {
+EXPORT pointer mk_number(scheme *sc, const num& n) {
     if (likely(n.num_type == T_INTEGER)) {
         return mk_integer(sc, n.value.ivalue);
     }
@@ -1345,7 +1345,7 @@ static pointer mk_number(scheme *sc, const num& n) {
 }
 
 /* allocate name to string area */
-static char* store_string(scheme *sc, int len_str, const char *str, char fill)
+EXPORT char* store_string(scheme *sc, int len_str, const char *str, char fill)
 {
     auto q = reinterpret_cast<char*>(sc->malloc(len_str + 1));
     if (unlikely(!q)) {
@@ -1362,12 +1362,12 @@ static char* store_string(scheme *sc, int len_str, const char *str, char fill)
 }
 
 /* get new string */
-pointer mk_string(scheme *sc, const char *str) {
+EXPORT pointer mk_string(scheme *sc, const char *str) {
     if(str == 0) str = "";
     return mk_counted_string(sc,str,strlen(str));
 }
 
-pointer mk_counted_string(scheme *sc, const char *str, int len) {
+EXPORT pointer mk_counted_string(scheme *sc, const char *str, int len) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     strvalue(x) = store_string(sc,len,str,0);
@@ -1376,7 +1376,7 @@ pointer mk_counted_string(scheme *sc, const char *str, int len) {
     return (x);
 }
 
-static pointer mk_empty_string(scheme *sc, int len, char fill) {
+EXPORT pointer mk_empty_string(scheme *sc, int len, char fill) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     strvalue(x) = store_string(sc,len,0,fill);
@@ -1385,7 +1385,7 @@ static pointer mk_empty_string(scheme *sc, int len, char fill) {
     return (x);
 }
 
-pointer mk_vector(scheme *sc, int len) {
+EXPORT pointer mk_vector(scheme *sc, int len) {
     pointer x = get_cell(sc, sc->NIL, sc->NIL);
 
     typeflag(x) = (T_VECTOR | T_ATOM);
@@ -1401,7 +1401,7 @@ pointer mk_vector(scheme *sc, int len) {
     return x;
 }
 
-/* static*/ void fill_vector(scheme* sc, pointer vec, pointer obj) {
+EXPORT void fill_vector(scheme* sc, pointer vec, pointer obj) {
     int i;
     int num = vec->_size;
     pointer* cptr = (pointer*) vec->_object._cptr;
@@ -1419,7 +1419,7 @@ pointer mk_vector(scheme *sc, int len) {
 }
 
 /* get new symbol */
-pointer mk_symbol(scheme *sc, const char *name) {
+EXPORT pointer mk_symbol(scheme *sc, const char *name) {
 //
 //       if(sc->inport != sc->NIL && sc->inport->_object._port->kind&port_string) {
 //               int position = 0;
@@ -2447,6 +2447,7 @@ static pointer readstrexp(scheme *sc) {
     for (;;) {
         c=inchar(sc);
         if(c==EOF || p-sc->strbuff>sizeof(sc->strbuff)-1) {
+            printf("String exceeded string buffer size or reached EOF\n");
             return sc->F;
         }
         switch(state) {
@@ -2508,6 +2509,7 @@ static pointer readstrexp(scheme *sc) {
                     state=st_ok;
                 }
             } else {
+                printf("Error parsing string state(x1 or x2) at character(%c)\n", c);
                 return sc->F;
             }
             break;

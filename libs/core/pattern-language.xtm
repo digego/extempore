@@ -1,0 +1,364 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Extempore pattern language
+;; https://extemporelang.github.io/docs/guides/pattern-language/
+;;
+
+(define *RMAP_HELPER_CALLBACK_OFFSET* 2048)
+
+;; this function is for mananing symbols inside a pattern _ for rest etc..
+(define rmap_helper_lst_sym_transform
+  (lambda (lst)
+    (if (atom? lst) (set! lst (list lst)))
+    (if (and (= (length lst) 1) (null? (car lst))) (set! lst `(_)))
+    (apply append '()
+           (map (lambda (elt next)
+                  (cond ((and (vector? elt) (symbol? next))
+                         (list elt))
+                        ((list? elt)
+                         (if (= (length elt) 1)
+                             elt
+                             (list elt)))
+                        (else (list elt))))
+                lst
+                (append (cdr lst) '(0))))))
+
+(define rmap_helper
+  (lambda (beats offset func beat dur loopcnt looppos . args)
+    (let* ((lst (rmap_helper_lst_sym_transform (if (list? (car args))
+                                                   (car args)
+                                                   (if (pair? (car args))
+                                                       (caar args)
+                                                       '(_ _ _ _)))))
+           (pos (modulo (- looppos offset) beats)) ;;(modulo (- beat offset) beats))
+           (one_beat (/ beats (length lst)))
+           (lst_positions (range 0 (+ pos beats) one_beat))
+           (nextpos (+ pos dur))
+           (idx 0)
+           (f (lambda (old new)
+                (set! idx (+ idx 1))
+                (if (and (>= new pos) (< new nextpos))
+                    (cons (cons new idx) old)
+                    old)))
+           (newlst (foldl f '() lst_positions)))
+      (map (lambda (t)
+             (let* ((tmpargs (map (lambda (l)
+                                    (if (list? l)
+                                        (set! l (rmap_helper_lst_sym_transform l))
+                                        (if (pair? l)
+                                            (set! l ((eval (cdr l)) (rmap_helper_lst_sym_transform (car l))))
+                                            (set! l (list l))))
+                                    (if (< (length l) (cdr t))
+                                        (list-ref l (modulo (- (cdr t) 1) (length l)))
+                                        (list-ref l (- (cdr t) 1))))
+                                  args))
+                    (targs (map (lambda (l)
+                                  (cond ((vector? l) (map (lambda (x) (eval x)) (vector->list l)))
+                                        ((and (symbol? l) (not (member l '(_ |)))) (eval l))
+                                        (else l)))
+                                tmpargs)))
+               (cond
+                ((or (list? (car tmpargs)) (pair? (car tmpargs)))
+                 (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
+                ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
+                (else
+                 ;; this is a messy expression, but it just counts the number of
+                 ;; '| symbols *after* the current value, and adds them to the
+                 ;; duration
+                 (let ((note-dur (* one_beat
+                                   (+ 1 (length (take-while (lambda (x) (equal? x '|))
+                                                            (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
+                   (apply callback
+                          (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                          func (+ beat (- (car t) pos)) note-dur
+                          loopcnt targs))))))
+           newlst))))
+
+;; rhythm map
+;; rmap expects f to take beat + dur + length(lsts) args.
+(define-macro (rmap beats offset f loopcnt looppos . lsts)
+  `(rmap_helper ,beats ,offset ,f beat dur ,loopcnt ,looppos ,@lsts))
+
+;;
+;; example usage
+;;
+
+;; (define test
+;;   (lambda (beat dur)
+;;     (rmap 4 0 (lambda (beat dur p r)
+;;                 (play pad p 80 r))
+;;               `(60 70 80)
+;;               `(1 0.5 0.2))
+;;     (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
+;;
+;; (test (*metro* 'get-beat 4) 1/4)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; 'in place' looping based on rmap
+;;
+(define-macro (rmap-loop-runner name tagtime run beatsexpr offsetexpr expr . lsts)
+  (let* ((loopcnt 0)
+         (f `(lambda ,(cons 'beat (cons 'dur (cons 'loop (map (lambda (x)
+                                                                (string->symbol (string-append "@" (number->string x))))
+                                                              (range 1 (+ 1 (length lsts)))))))
+                     ,expr))
+         (beats (eval beatsexpr))
+         (offset (eval offsetexpr))
+         (running? (closure? name)))
+    (if (equal? run 'modify)
+        (begin
+          (print-with-colors 'blue 'default #t (print "pattern "))
+          (print-with-colors 'yellow 'default #f (print "modifying "))
+          (println name)))
+    (begin (eval `(define ,name
+                    (lambda (beat totaldur loopcnt dur)
+                      (define beats ,beatsexpr)
+                      (define offset ,offsetexpr)
+                      (define LC loopcnt)
+                      (define LP totaldur)
+                      (define LL beats)
+                      (set! ,tagtime (now))
+                      (rmap beats offset ,f loopcnt totaldur ,@lsts)
+                      (if ,(if (equal? run 'stop) #t #f)
+                          (begin
+                            (print-with-colors 'blue 'default #t (print "pattern "))
+                            (print-with-colors 'red 'default #f (print "stopping  "))
+                            (println ',name)
+                            (eval '(define ,name #f) (interaction-environment))
+                            #f)
+                          (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur)
+                                    (if (= (+ totaldur dur) beats) 0 (+ totaldur dur))
+                                    (if (= (+ totaldur dur) beats) (+ loopcnt 1) loopcnt)
+                                    ,(if (> beats 1) 1/2 (/ beats 2))))))
+                 (interaction-environment))
+           (if (equal? run 'start)
+               (eval `(begin
+                        (print-with-colors 'blue 'default #t (print "pattern "))
+                        (print-with-colors 'green 'default #f (print "starting  "))
+                        (println ',name)
+                        (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
+                     (interaction-environment))))))
+
+;; start or modify looper
+(define-macro (:> tag . args)
+  (let ((tagtime (string->symbol (string-append (symbol->string tag) "_tagtime"))))
+    (if (not (defined? tagtime)) (eval `(define ,tagtime (now)) (interaction-environment)))
+    (if (< (eval tagtime) (- (now) (* 2 *second*)))
+        (eval `(define ,tag #f) (interaction-environment)))
+    (if (and (defined? tag) (closure? (eval tag)))
+        `(rmap-loop-runner ,tag ,tagtime modify ,@args)
+        `(rmap-loop-runner ,tag ,tagtime start ,@args))))
+
+;; stop looper
+(define-macro (:| tag . args)
+  (let ((tagtime (string->symbol (string-append (symbol->string tag) "_tagtime"))))
+    (if (defined? tag)
+        (begin (callback (+ (now) *second*) eval `(define ,tag #f) (interaction-environment))
+               `(rmap-loop-runner ,tag ,tagtime stop ,@args)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; additional helpers
+
+;; short forms for convenience
+(define bd 36) ;; bass drum
+(define bd2 53)
+(define bd3 59)
+(define bd4 65)
+(define rs 37) ;; rim shot
+(define sn 38) ;; snare
+(define sn2 62)
+(define cl 39) ;; clap
+(define lt 41) ;; low tom
+(define ch 42) ;; closed hat
+(define ch2 44)
+(define ch3 60)
+(define mt 43) ;; mid tom
+(define mt2 47)
+(define ht 45) ;; high tom
+(define ht2 48)
+(define oh 46) ;; open hat
+(define rc 49) ;; ride cymbol
+(define rc2 55)
+(define rc3 64)
+(define wb 50) ;; wood block
+(define wb2 63)
+(define ma 51) ;; maraccas
+(define ma2 52)
+(define cb 61) ;; cow bell
+
+;; ok, here's some pitch class helpers
+
+(sys:load "libs/core/pc_ivl.xtm")
+
+;; global variables harmony/melody variables
+(define *root* 0) ;; root
+(define *chord* '(36 60 63 67)) ;; chord
+(define *scale* (pc:scale 0 'aeolian)) ;; scale
+
+;; scale, qnt and rel take an optional *scale* argument
+(define scale
+  (lambda (octave num . args)
+    (let ((scale (if (null? args) *scale*
+                     (map (lambda (pitch)
+                            (modulo pitch 12))
+                          (car args)))))
+      (map (lambda (x)
+             (pc:relative (+ 12 (car scale) (* 12 octave)) x scale))
+           (range 0 num)))))
+
+(define qnt
+  (lambda (pitch . args)
+    (pc:quantize pitch (if (null? args) *scale*
+                       (map (lambda (pitch)
+                              (modulo pitch 12))
+                            (car args))))))
+
+(define rel
+  (lambda (pitch i . args)
+    (pc:relative pitch i (if (null? args) *scale*
+                         (map (lambda (pitch)
+                                (modulo pitch 12))
+                              (car args))))))
+
+;; always requires type, will default to *root* if second arg not provided
+(define chrd
+  (lambda (type . args)
+    (pc:chord (if (null? args) *root*
+                  (modulo (car args) 12))
+              type)))
+
+;; orbit will usually use LC - an internal (to the looper macro) symbol defined
+;; for loop count
+
+;; if 3rd argument is present, that's the "default" case (when loop count
+;; *isn't* congruent to 0 mod m)
+(define orbit
+  (lambda (loopcnt m val . args)
+    (if (= 0 (modulo loopcnt m))
+        val ;; return the value; this is the 'orbit' case
+        (if (null? args) '_ (car args))) ;; return '_ (non-orbit case)
+    ))
+
+;; cycle will usually use LC - an internal (to the looper macro) symbol defined
+;; for loop count
+
+;; cycles elongates the time between changes
+;; i.e. (cycle LC 1 '(60 63 67) '(58 62 65))
+(define (cycle cnt cycles . args)
+  (list-ref args (modulo (floor (/ cnt cycles)) (length args))))
+
+;; add pedal value a to list of notes b
+;; basically zip value a into list b
+(define pedal
+  (lambda (a b)
+    (flatten (map (lambda (x)
+                    (if (list? a)
+                        (list x b)
+                        (list a x)))
+                  (if (list? a) a b)))))
+
+;; euclidean rhythms
+;; written by Ben in recursive Scheme; Kernighan's aphorism probably applies
+
+(define euclid-distribute-zeros
+  (lambda (dst-undst)
+    (let loop ((out '())
+               (dst (car dst-undst))
+               (undst (cadr dst-undst)))
+      (if (or (null? dst) (null? undst))
+          (append (list (reverse out))
+                  (if (null? dst) '() (list dst))
+                  (if (null? undst) '() (list undst)))
+          (loop (cons (append (car dst) (car undst)) out)
+                (cdr dst)
+                (cdr undst))))))
+
+(define euclid
+  (lambda (k n . args)
+    (let ((one-val (if (null? args) 1 (car args)))
+          (zero-val (if (< (length args) 2) '_ (cadr args))))
+      (cond ((<= k 0) (repeat n zero-val))
+            ((>= k n) (repeat n one-val))
+            (else
+             (let loop ((groups (euclid-distribute-zeros
+                                 (list (repeat k (list one-val))
+                                       (repeat (- n k) (list zero-val))))))
+               (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
+                   (flatten groups)
+                   (loop (euclid-distribute-zeros groups)))))))))
+
+;; number of (numof -> nof)
+(define-macro (nof num body)
+  `(make-list-with-proc ,num (lambda (idx) ,body)))
+
+;; item as position
+(define nth (lambda (at lst) (list-ref lst at)))
+;; last num of lst
+(define last (lambda (num lst) (cl:last lst num)))
+;; take first num of lst
+(define take (lambda (num lst) (cl:butnthcdr num lst)))
+;; sublist: take 'num' elements starting at position 'at'
+(define sub (lambda (num at lst) (cl:butnthcdr num (cl:nthcdr at lst))))
+
+(define filter
+  (lambda (pred lst)
+    (foldr (lambda (x acc)
+             (if (apply pred (list x)) (cons x acc) acc))
+           (list)
+           lst)))
+
+;; return first N of list for which predicate is truthy
+(define take-while
+  (lambda (pred lst)
+    (let loop ((ret '())
+               (remaining lst))
+      (cond
+       ((null? remaining) (reverse ret))
+       ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
+       (else (reverse ret))))))
+
+;; skip by m with a lst rotation of r
+;; for example: (skip 2 -1 (scale 3 8))
+(define skip
+  (lambda (m r lst)
+    (map cadr
+         (filter (lambda (y) (= 0 (modulo (car y) m)))
+                 (map (lambda (x y) (list x y))
+                      (range 0 (length lst)) (rotate lst r))))))
+
+(define holder
+  (lambda ()
+    (let ((cache '()))
+      (lambda (lc expr LC LP LL)
+        (if (null? cache) (set! cache expr))
+        (if (and (= (modulo LP LL) 0)
+                 (= (modulo LC lc) 0))
+            (set! cache expr))
+        cache))))
+
+(define-macro (hold h pos expr)
+  (let* ((localpos (modulo pos 1))
+         (num (- pos localpos)))
+    `(,h ,num ,expr LC LP LL)))
+
+;; finally, some *really* concise aliases
+
+(define % modulo)
+(define orb orbit)
+(define rot (lambda (x lst) (rotate lst x)))
+(define rnd random)
+(define rng range)
+(define rev reverse)
+(define vec list->vector)
+(define zip (lambda (a b) (flatten (map (lambda (x y) (list x y)) a b))))
+(define ped pedal)
+
+(define id (lambda (x) x))
+(define union cl:union)
+(define intersection cl:intersection)
+(define difference cl:set-difference)
+;; remove all duplicates from lst
+(define unique cl:remove-duplicates)

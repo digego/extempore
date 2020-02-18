@@ -272,7 +272,7 @@ EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_
     return decoded_data;
 }
 
-bool rmatch(char* regex, const char* str)
+EXPORT bool rmatch(char* regex, const char* str)
 {
   //  char* data = char* strstring_value(pair_car(args));
   // char* pattern = string_value(pair_cadr(args));
@@ -352,7 +352,7 @@ bool rmatch(char* regex, const char* str)
 // }
 
 
-int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
+EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
     {
   char* data = str;
   char* pattern = regex;
@@ -403,7 +403,7 @@ int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
   return 0;
 }
 
-bool rsplit(const char* regex, const char* str, char* a, char* b)
+EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
 { // TODO: harmonize with FFI
   int length = strlen(str);
   pcre *re;
@@ -440,7 +440,7 @@ bool rsplit(const char* regex, const char* str, char* a, char* b)
 
 
 // returns char* result
-char* rreplace(char* regex, char* str, char* replacement, char* result) {
+EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
 
   char* data = str; //string_value(pair_car(args));
         char* pattern = regex; //string_value(pair_cadr(args));
@@ -512,11 +512,11 @@ char* rreplace(char* regex, char* str, char* replacement, char* result) {
         return result;
 }
 
-const char* sys_sharedir(){
+EXPORT const char* sys_sharedir(){
   return extemp::UNIV::SHARE_DIR.c_str();
 }
 
-char* sys_slurp_file(const char* fname)
+EXPORT char* sys_slurp_file(const char* fname)
 {
     std::string filename(fname);
     std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + filename);
@@ -541,7 +541,7 @@ char* sys_slurp_file(const char* fname)
   return NULL;
 }
 
-int register_for_window_events()
+EXPORT int register_for_window_events()
 {
 #ifdef __APPLE__
   // to give Extempore it's own dock icon, etc
