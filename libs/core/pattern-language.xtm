@@ -23,14 +23,114 @@
                 lst
                 (append (cdr lst) '(0))))))
 
-(define pattern_special_atoms '(_ |))
+(define pattern_atom_duration
+  (lambda (atm)
+    (cond ((eq? '| atm) 1)
+          ((eq? '+ atm) 1/2)
+          ((eq? '- atm) -1/2)
+          (else 1))))
 
-(define count-specials
+(define rmap_pattern_length
+  (lambda (lst)
+    (apply + (map pattern_atom_duration lst))))
+
+(define (modify_duration_by dur lst)
+  (let ((modifiers (take-while is_modifier? lst)))
+    (foldl (lambda (d m)
+                 (cond ((eq? '| m) (+ d dur))
+                       ((eq? '+ m) (* 3/2 d))
+                       ((eq? '- m) (* 1/2 d))))
+           dur modifiers)))
+
+(define skip_leading_modifiers
+  (lambda (lists)
+    (map (lambda (l) (drop-while is_modifier? l))
+         lists)))
+
+
+(define pattern_special_atoms '(_ | + -))
+(define pattern_modifiers '(+ - |))
+
+
+(define is_special?
+  (lambda (atom) (member atom pattern_special_atoms)))
+
+(define is_modifier?
+  (lambda (atom) (member atom pattern_modifiers)))
+
+(define count_specials
   (lambda (lst t char)
     (length (take-while (lambda (x) (equal? x char))
                         (cl:nthcdr (min (cdr t)
                                         (length lst))
                                    lst)))))
+
+(define event_locations
+  (lambda (base-duration lst)
+    (let loop ((res '())
+               (l lst)
+               (list-pos 1)
+               (total-dur 0))
+      (if (null? l) (reverse res)
+          (let* ((evt (car l))
+                 (modifiers (take-while is_modifier? (cdr l)))
+                 (next-l-pos (+ 1 (length modifiers)))
+                 (elapsed (+ total-dur (modify_duration_by base-duration modifiers))))
+            (loop (cons (cons total-dur list-pos) res)
+                  (cl:nthcdr next-l-pos l)
+                  (+ list-pos next-l-pos)
+                  elapsed))))))
+
+(define count_specials
+  (lambda (lst t char)
+    (length (take-while (lambda (x) (equal? x char))
+                        (cl:nthcdr (min (cdr t)
+                                        (length lst))
+                                   lst)))))
+
+
+(define evaluate_event
+  (lambda (evt)
+    (cond ((vector? evt) (map (lambda (x) (eval x (interaction-environment)))
+                              (vector->list l)))
+          ((and (symbol? evt) (not (is_special? evt)))
+           (let ((ll (eval evt (interaction-environment))))
+             (if (procedure? ll)
+                 (eval `(,ll) (interaction-environment))
+                 (else ll))))
+          evt)))
+
+
+(define make_tmpargs
+  (lambda (t args)
+    (map (lambda (l)
+           (if (list? l)
+               (set! l (rmap_helper_lst_sym_transform l))
+               (if (pair? l)
+                   (set! l  ((eval (cdr l)) (rmap_helper_lst_sym_transform (car l))))
+                   (set! l  (list l))))
+           (if (< (length l) (cdr t))
+               (list-ref l (modulo (- (cdr t) 1) (length l)))
+               (list-ref l (- (cdr t) 1))))
+         args)))
+
+(define make_targs
+  (lambda (tmpargs)
+    (reverse
+     (foldl (lambda (acc l)
+              (cond
+               ((vector? l) (cons (map (lambda (x) (eval x)) (vector->list l)) acc))
+               ((and (symbol? l) (not (is_special? l)))
+                (let ((ll (eval l (interaction-environment))))
+                  (cons (cond
+                         ((procedure? ll)
+                          (eval `(,ll) (interaction-environment)))
+                         (else
+                          ll))
+                        acc)))
+               (else (cons l acc))))
+            '() tmpargs))))
+
 
 (define rmap_helper
   (lambda (beats offset func beat dur loopcnt looppos . args)
@@ -40,38 +140,19 @@
                                                        (caar args)
                                                        '(_ _ _ _)))))
            (pos (modulo (- looppos offset) beats)) ;;(modulo (- beat offset) beats))
-           (one_beat (/ beats (length lst)))
-           (lst_positions (range 0 (+ pos beats) one_beat))
+           (one_beat (/ beats (rmap_pattern_length lst)))
            (nextpos (+ pos dur))
-           (idx 0)
            (f (lambda (old new)
-                (set! idx (+ idx 1))
-                (if (and (>= new pos) (< new nextpos))
-                    (cons (cons new idx) old)
-                    old)))
-           (newlst (foldl f '() lst_positions)))
+                (let ((newpos (car new))
+                      (idx (cdr new)))
+                  (if (and (>= newpos pos) (< newpos nextpos))
+                      (cons new old)
+                      old))))
+           (newlst (foldl f '() (event_locations one_beat lst)))
+           )
       (map (lambda (t)
-             (let* ((tmpargs (map (lambda (l)
-                                    (if (list? l)
-                                        (set! l (rmap_helper_lst_sym_transform l))
-                                        (if (pair? l)
-                                            (set! l ((eval (cdr l)) (rmap_helper_lst_sym_transform (car l))))
-                                            (set! l (list l))))
-                                    (if (< (length l) (cdr t))
-                                        (list-ref l (modulo (- (cdr t) 1) (length l)))
-                                        (list-ref l (- (cdr t) 1))))
-                                  args))
-                    (targs (map (lambda (l)
-                                  (cond ((vector? l) (map (lambda (x) (eval x)) (vector->list l)))
-                                        ((and (symbol? l) (not (member l pattern_special_atoms)))
-                                         (let ((ll (eval l (interaction-environment))))
-                                           (cond
-                                            ((procedure? ll)
-                                             (eval `(,ll) (interaction-environment)))
-                                            (else
-                                             ll))))
-                                        (else l)))
-                                tmpargs)))
+             (let* ((tmpargs (make_tmpargs t args))
+                    (targs (make_targs tmpargs)))
                (cond
                 ((or (list? (car tmpargs)) (pair? (car tmpargs)))
                  (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
@@ -80,10 +161,10 @@
                  ;; this is a messy expression, but it just counts the number of
                  ;; '| symbols *after* the current value, and adds them to the
                  ;; duration
-                 (let ((note-dur (+ one_beat
-                                    (* one_beat (count-specials (car args) t '|)))))
+                 (let ((note-dur (modify_duration_by one_beat (cl:nthcdr (min (cdr t) (length lst))
+                                                                         lst))))
                    (apply callback
-                          (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                          (- (*metro* (+ beat (- (car t) pos))) (* 2  *RMAP_HELPER_CALLBACK_OFFSET*))
                           func (+ beat (- (car t) pos)) note-dur
                           loopcnt targs))))))
            newlst))))
@@ -128,6 +209,7 @@
           (println name)))
     (begin (eval `(define ,name
                     (lambda (beat totaldur loopcnt dur)
+                      (println `(f ,beat ,totaldur ,loopcnt ,dur))
                       (define beats ,beatsexpr)
                       (define offset ,offsetexpr)
                       (define LC loopcnt)
@@ -408,6 +490,14 @@
        ((null? remaining) (reverse ret))
        ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
        (else (reverse ret))))))
+
+(define drop-while
+  (lambda (pred lst)
+    (let loop ((ret lst))
+      (cond ((null? ret))
+            ((pred (car ret)) (loop (cdr ret)))
+            (else ret)))))
+
 
 ;; skip by m with a lst rotation of r
 ;; for example: (skip 2 -1 (scale 3 8))
