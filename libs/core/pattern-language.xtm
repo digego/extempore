@@ -75,8 +75,9 @@
           (let* ((evt (car l))
                  (modifiers (take-while is_modifier? (cdr l)))
                  (next-l-pos (+ 1 (length modifiers)))
-                 (elapsed (+ total-dur (modify_duration_by base-duration modifiers))))
-            (loop (cons (cons total-dur list-pos) res)
+                 (duration (modify_duration_by base-duration modifiers))
+                 (elapsed (+ total-dur duration)))
+            (loop (cons (cons total-dur (cons duration list-pos)) res)
                   (cl:nthcdr next-l-pos l)
                   (+ list-pos next-l-pos)
                   elapsed))))))
@@ -109,9 +110,9 @@
                (if (pair? l)
                    (set! l  ((eval (cdr l)) (rmap_helper_lst_sym_transform (car l))))
                    (set! l  (list l))))
-           (if (< (length l) (cdr t))
-               (list-ref l (modulo (- (cdr t) 1) (length l)))
-               (list-ref l (- (cdr t) 1))))
+           (if (< (length l) (cddr t))
+               (list-ref l (modulo (- (cddr t) 1) (length l)))
+               (list-ref l (- (cddr t) 1))))
          args)))
 
 (define make_targs
@@ -131,6 +132,12 @@
                (else (cons l acc))))
             '() tmpargs))))
 
+(define is_position_between?
+  (lambda (startpos endpos)
+    (lambda (pos-cell)
+      (let ((pos (car pos-cell)))
+        (and (>= pos startpos)
+             (< pos endpos))))))
 
 (define rmap_helper
   (lambda (beats offset func beat dur loopcnt looppos . args)
@@ -142,31 +149,23 @@
            (pos (modulo (- looppos offset) beats)) ;;(modulo (- beat offset) beats))
            (one_beat (/ beats (rmap_pattern_length lst)))
            (nextpos (+ pos dur))
-           (f (lambda (old new)
-                (let ((newpos (car new))
-                      (idx (cdr new)))
-                  (if (and (>= newpos pos) (< newpos nextpos))
-                      (cons new old)
-                      old))))
-           (newlst (foldl f '() (event_locations one_beat lst)))
-           )
+           (newlst  (filter (is_position_between? pos nextpos)
+                            (event_locations one_beat lst))))
+
       (map (lambda (t)
              (let* ((tmpargs (make_tmpargs t args))
-                    (targs (make_targs tmpargs)))
+                    (targs (make_targs tmpargs))
+                    (current-dur (cadr t))
+                    )
                (cond
                 ((or (list? (car tmpargs)) (pair? (car tmpargs)))
-                 (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
+                 (apply rmap_helper current-dur offset func (+ beat (- (car t) pos)) current-dur loopcnt (+ looppos (- (car t) pos)) targs))
                 ((member (car tmpargs) pattern_special_atoms) #f) ;; skip these symbols
                 (else
-                 ;; this is a messy expression, but it just counts the number of
-                 ;; '| symbols *after* the current value, and adds them to the
-                 ;; duration
-                 (let ((note-dur (modify_duration_by one_beat (cl:nthcdr (min (cdr t) (length lst))
-                                                                         lst))))
-                   (apply callback
-                          (- (*metro* (+ beat (- (car t) pos))) (* 2  *RMAP_HELPER_CALLBACK_OFFSET*))
-                          func (+ beat (- (car t) pos)) note-dur
-                          loopcnt targs))))))
+                 (apply callback
+                        (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                        func (+ beat (- (car t) pos)) current-dur
+                        loopcnt targs)))))
            newlst))))
 
 ;; rhythm map
