@@ -528,9 +528,10 @@ endif()
 
 add_custom_target(assets
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  COMMAND curl -o assets.tar.gz -L https://api.github.com/repos/extemporelang/extempore-assets/tarball/master
-  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tar.gz
-  COMMAND ${CMAKE_COMMAND} -E rm assets.tar.gz
+  # this is all a bit gross (and non-portable) but it's necessary because GH
+  # won't give us a predictable filename for the enclosing folder in the archive
+  COMMAND mkdir assets
+  COMMAND curl -L https://api.github.com/repos/extemporelang/extempore-assets/tarball/master | tar xz -C assets --strip=1
   COMMENT "Downloading assets from https://github.com/extemporelang/extempore-assets")
 
 if(PACKAGE)
