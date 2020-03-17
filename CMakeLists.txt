@@ -528,10 +528,10 @@ endif()
 
 add_custom_target(assets
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  COMMAND curl -O http://extempore.moso.com.au/extras/assets.tgz
-  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tgz
-  COMMAND ${CMAKE_COMMAND} -E remove assets.tgz
-  COMMENT "Downloading assets from http://extempore.moso.com.au/extras/assets.tgz")
+  COMMAND curl -o assets.tar.gz -L https://api.github.com/repos/extemporelang/extempore-assets/tarball/master
+  COMMAND ${CMAKE_COMMAND} -E tar xf assets.tar.gz
+  COMMAND ${CMAKE_COMMAND} -E remove assets.tar.gz
+  COMMENT "Downloading assets from https://github.com/extemporelang/extempore-assets")
 
 if(PACKAGE)
   add_dependencies(extempore assets)
