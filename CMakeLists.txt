@@ -5,6 +5,7 @@ option(ASIO "use the ASIO Portaudio backend" OFF)
 option(JACK "use the Jack Portaudio backend" OFF)
 option(DYLIB "build extempore as a dynamic library" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
+option(ASSETS "download multimedia assets (approx 500MB)" OFF)
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
@@ -534,7 +535,7 @@ add_custom_target(assets
   COMMAND curl -L https://api.github.com/repos/extemporelang/extempore-assets/tarball/master | tar xz -C assets --strip=1
   COMMENT "Downloading assets from https://github.com/extemporelang/extempore-assets")
 
-if(PACKAGE)
+if(ASSETS OR PACKAGE)
   add_dependencies(extempore assets)
 endif()
 
