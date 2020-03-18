@@ -20,10 +20,10 @@
            (< index 128))
       (set_sample_data_ inst
                         fname
-                        (real->integer ,index)
-                        (real->integer ,offset)
-                        (real->integer ,lgth)
-                        (real->integer ,bank)
+                        (real->integer index)
+                        (real->integer offset)
+                        (real->integer lgth)
+                        (real->integer bank)
                         (if (> print? 0) 1 0))))
 
 ;; TODO - rename this to sampler-load-single or something (but check with SB
@@ -45,20 +45,28 @@
 ;; defaults: bank 0, parser sampler-parse-filename
 (define (load-sampler sampler path . args)
   (let ((bank (if (> (length args) 0) (car args) 0))
-        (filename-parser (if (> (length args) 1) (cadr args) sampler-parse-filename)))
+        (filename-parser (if (> (length args) 1) (cadr args) sampler-parse-filename))
+        (cnt 0))
     (for-each (lambda (filename)
-                (let ((samp-data (filename-parser filename)))
-                  (sampler-populate-slot sampler
-                                         (unix-or-Windows (string-append (sys:expand-path path) "/" (car samp-data))
-                                                          (car samp-data))
-                                         (cadr samp-data)
-                                         (caddr samp-data)
-                                         (cadddr samp-data)
-                                         bank
-                                         0)))
+                ;; skip hidden files... if you're using samples with hidden
+                ;; filenames then I don't know what's wrong with you
+                (if (not (regex:match? filename "^\\."))
+                    ;; otherwise try and parse it with the filename-parser fn
+                    (let ((samp-data (filename-parser filename)))
+                      (if samp-data
+                          (begin
+                            (sampler-populate-slot sampler
+                                                   (unix-or-Windows (string-append (sys:expand-path path) "/" (car samp-data))
+                                                                    (car samp-data))
+                                                   (cadr samp-data)
+                                                   (caddr samp-data)
+                                                   (cadddr samp-data)
+                                                   bank
+                                                   0)
+                            (set! cnt (+ cnt 1)))))))
               (sys:directory-list (sys:expand-path path)))
     (ascii-print-color 0 6 9)
-    (print 'Loaded 'files 'into 'bank#: bank)
+    (print 'Loaded cnt 'files 'into 'bank#: bank)
     (ascii-print-color 0 7 9)
     (println)))
 
@@ -94,7 +102,7 @@
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
 (define sampler-parse-midinote-filename
   (lambda (filename)
-    (let ((result (regex:matched filename "^([0-9]+)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+    (let ((result (regex:matched filename "^([0-9]+)\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
       (if (null? result)
           #f
           (list filename (string->number (cadr result)) 0 0)))))
@@ -104,7 +112,7 @@
 ;; matched) then supply a different parser function
 (define sampler-parse-spn-filename
   (lambda (filename)
-    (let ((result (regex:matched filename  "([abcdefgABCDEFG][#b]?-?[0-9]).*\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+    (let ((result (regex:matched filename  "([abcdefgABCDEFG][#b]?-?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
       (if (null? result)
           #f
           (list filename (scientific-pitch-notation-to-midi-number (cadr result)) 0 0)))))
