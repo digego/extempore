@@ -4,21 +4,34 @@ A programming environment for cyberphysical programming.
 
 ## Getting started
 
-To get started, you can either download a binary release or build
-Extempore from source yourself.
+To get started, you can either download a binary release or build Extempore from
+source yourself.
 
-### Download a pre-built binary
+### The easy way
 
-Download a
-[binary release](https://github.com/digego/extempore/releases), unzip
-it and run `extempore.exe` from inside the `extempore` folder.
+Download [VSCode](https://code.visualstudio.com/), install the Extempore
+extension and then use the _Extempore: Download binary_ command to do the rest.
+
+For more details, head to the [Quickstart
+page](https://extemporelang.github.io/docs/overview/quickstart/) in Extempore's
+online docs.
+
+### The slightly harder way
+
+Download the latest [binary
+release](https://github.com/digego/extempore/releases) for your platform, unzip
+it and run `extempore` (`extempore.exe` on Windows) from inside the `extempore`
+folder.
+
+Then, [set up your text editor of
+choice](https://extemporelang.github.io/docs/guides/editor-support/) and away
+you go.
 
 ### Build from source
 
-This will download and build all the dependencies you need (including
-LLVM). So, if you've got a C++ compiler (for `gcc`, version 4.9 or
-later is required), git and CMake, here are some one-liner build
-commands:
+This will download and build all the dependencies you need (including LLVM). So,
+if you've got a C++ compiler (for `gcc`, version 4.9 or later is required), git
+and CMake, here are some one-liner build commands:
 
 On **Linux/macOS**:
 
@@ -32,6 +45,18 @@ On **Windows**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
+#### Other build-from-source notes
+
+- if you want to download the Extempore binary assets as well (required for some
+  of the examples, but a ~300MB downloaded) then add the `-DASSETS=ON` CMake
+  option to the above build commands
+
+- the `install` target will build both the `extempore` binary executable and
+  AOT-compile the standard library (for faster startup)
+
+- on Linux the JACK configuration is not as well tested as the default (ALSA)
+  one (patches welcome)
+
 ## See Extempore in action
 
 Check out these videos:
@@ -42,6 +67,7 @@ Check out these videos:
 - [The Physics Playroom - interactive installation](https://vimeo.com/58239256)
 - [An *old* Graphics Demo](https://vimeo.com/37293927)
 - [A Programmer's Guide to Western Music](https://www.youtube.com/watch?v=xpSYWd_aIiI)
+- [Ben's livecoding gig videos](https://benswift.me/livecoding/)
 
 ## Docs & Community
 
@@ -51,6 +77,8 @@ You can also join the Extempore community:
 
 - [Extempore google group](http://groups.google.com/group/extemporelang)
 - [Extempore mailing list](mailto:extemporelang@googlegroups.com)
+- [#extempore on chat.toplap.org](https://chat.toplap.org/home) (although not as
+  well-monitored as the mailing list)
 
 ## Cite Extempore
 
