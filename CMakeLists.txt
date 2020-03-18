@@ -35,7 +35,8 @@ endif()
 if(PACKAGE)
   # this needs to be set before project() is called
   set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
-  message(STATUS "Building Extempore for binary distribution")
+  set(ASSETS ON) # necessary for packaging
+  message(STATUS "Building Extempore for binary distribution (assets directory will be downloaded)")
 endif()
 
 # LLVM
@@ -535,7 +536,7 @@ add_custom_target(assets
   COMMAND curl -L https://api.github.com/repos/extemporelang/extempore-assets/tarball/master | tar xz -C assets --strip=1
   COMMENT "Downloading assets from https://github.com/extemporelang/extempore-assets")
 
-if(ASSETS OR PACKAGE)
+if(ASSETS)
   add_dependencies(extempore assets)
 endif()
 
