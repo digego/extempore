@@ -211,7 +211,7 @@ static pointer printError(scheme* Scheme, pointer Args)
   ascii_error();
   printf("ERROR:");
   ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true).c_str());
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
   fflush(stdout);
   return Scheme->T;
 }
@@ -221,7 +221,7 @@ static pointer printInfo(scheme* Scheme, pointer Args)
   ascii_info();
   printf("INFO:");
   ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true).c_str());
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
   fflush(stdout);
   return Scheme->T;
 }
@@ -231,7 +231,7 @@ static pointer printWarn(scheme* Scheme, pointer Args)
   ascii_warning();
   printf("WARN:");
   ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true).c_str());
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
   fflush(stdout);
   return Scheme->T;
 }
