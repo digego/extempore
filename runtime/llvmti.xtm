@@ -3143,26 +3143,14 @@
 
 (define impc:aot:print-compilation-details
   (lambda (start-time)
-    (print-with-colors 'yellow 'default #t
-                       (print "Total compile time: "))
-    (print (- (clock:clock) start-time) "seconds\n\n")
-    (print-with-colors 'black 'blue #t (print " Types "))
-    (print "\n  " (length *impc:ti:typealias-cache*))
-    (print-with-colors 'cyan 'default #f (print " type aliases\n"))
-    (print "  " (length *impc:ti:generictype-cache*))
-    (print-with-colors 'cyan 'default #f (print " named types\n"))
-    (print "  " (length *impc:ti:namedtype-cache*))
-    (print-with-colors 'cyan 'default #f (print " generic\n"))
-    (print "  " (length *impc:ti:polytype-cache*))
-    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))
-
-    (print-with-colors 'black 'blue #t (print " Closures "))
-    (print "\n  " (length *impc:ti:closure-cache*))
-    (print-with-colors 'cyan 'default #f (print " top-level closures\n"))
-    (print "  " (length *impc:ti:genericfunc-cache*))
-    (print-with-colors 'cyan 'default #f (print " generics\n"))
-    (print "  " (length *impc:ti:polyfunc-cache*))
-    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
+    (log-info "Total compile time: " (- (clock:clock) start-time) "seconds")
+    (log-info "type aliases:" (length *impc:ti:typealias-cache*))
+    (log-info "named types:" (length *impc:ti:namedtype-cache*))
+    (log-info "generic types:" (length *impc:ti:generictype-cache*))
+    (log-info "type specialisations:" (length *impc:ti:polytype-cache*))
+    (log-info "top-level closures:" (length *impc:ti:closure-cache*))
+    (log-info "generic functions:" (length *impc:ti:genericfunc-cache*))
+    (log-info "function specialisations:" (length *impc:ti:polyfunc-cache*))))
 
 (define-macro (unix-or-Windows unix-expr win-expr)
   (if (string=? (sys:platform) "Windows")
@@ -3208,7 +3196,7 @@
             (set! *impc:compile:scheme-stubs* #f)
             ;; turn off aot-cache loading
             (set! *impc:compiler:with-cache* #f)
-            (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+            (log-info "Started compiling: ")
             (if asdll? ;; need to preregister init function
                 (impc:ti:register-new-nativefunc
                      (string-append file-no-extension "_init")
@@ -3239,17 +3227,13 @@
                 "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
                 ret i32 %res;
               }")))
-            (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+            (log-info "Finished compiling:" file-path)
             (println file-path)
-            (println)
             ;; turn back on scheme stubs
             (set! *impc:compile:scheme-stubs* #t)
             ;; turn back on cache loading
             (set! *impc:compiler:with-cache* #t)
-            (begin
-              (println)
-              (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
-              (print "\n"))
+            (log-info "JIT-compiling IR...")
             (let ((module (impc:compiler:flush-jit-compilation-queue)))
               (if (not module)
                   (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
@@ -3320,18 +3304,10 @@
                         ;; module name for globals
                         (set! *impc:compiler:global-module-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
-                        (print-with-colors 'cyan 'black #t (print "Started compiling: "))
-                        (println lib-path)
-                        (println)
+                        (log-info "started compiling" lib-path)
                         (sys:load lib-path)
-                        (println)
-                        (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
-                        (println lib-path)
-                        (println)
-                        (begin
-                          (println)
-                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
-                          (print "\n"))
+                        (log-info "finished compiling" lib-path)
+                        (log-info "JIT-compiling IR...")
                         (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
                         ;; this won't be straight forward without linking in all relevant ll files :(
                         ;; (sys:command (string-append llas-path " " ll-path " -o " bc-path))
