@@ -221,6 +221,6 @@ inline void ascii_default() { ascii_text_color(false, 9, 9); }
 inline void ascii_normal() { ascii_text_color(false, 7, 9); }
 inline void ascii_error() { ascii_text_color(true, 1, 9); }
 inline void ascii_warning() { ascii_text_color(true, 3, 9); }
-inline void ascii_info() { ascii_text_color(true, 6, 9); }
+inline void ascii_info() { ascii_text_color(true, 4, 9); }
 
 #endif
