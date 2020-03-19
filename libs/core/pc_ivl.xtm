@@ -292,7 +292,7 @@
          (cond ((pc:? (+ pitch offset) pc) (+ pitch offset))
                ((pc:? (- pitch offset) pc) (- pitch offset))
                ((< offset 7) (loop (+ offset 1) pitch))
-               (else (print-notification "no pc value to quantize to" pitch pc)
+               (else (log-info "no pc value to quantize to" pitch pc)
                      #f)))))
 
 ;; quantize pc
@@ -310,7 +310,7 @@
          (cond ((pc:? (- pitch offset) pc) (- pitch offset))
                ((pc:? (+ pitch offset) pc) (+ pitch offset))
                ((< offset 7) (loop (+ offset 1) pitch))
-               (else (print-notification "no pc value to quantize to" pitch pc)
+               (else (log-info "no pc value to quantize to" pitch pc)
                      #f)))))
 
 
@@ -401,7 +401,7 @@
       (let loop ((i 1)
                  (lst pc))
          (if (null? lst)
-             (begin (print-notification "pitch not in pc") #f)
+             (begin (log-info "pitch not in pc") #f)
              (if (= (car lst) (modulo value 12))
                  i
                  (loop (+ i 1) (cdr lst)))))))
@@ -487,7 +487,7 @@
              (if (null? l)
                  (reverse (cons current newlst))
                  (loop (cdr l) (modulo (+ current (car l)) 12) (cons current newlst))))
-          (begin (print-notification "Scale type not found." *pc:scales*) #f))))
+          (begin (log-info "Scale type not found." *pc:scales*) #f))))
 
 
 ;; returns a chord following basic diatonic harmony rules
@@ -520,7 +520,7 @@
                 (if (null? l)
                     (reverse newlst)
                     (loop (cdr l) (cons (modulo (+ (car l) root) 12) newlst))))
-             (begin (print-notification "Chord type not found." type) #f)))))
+             (begin (log-info "Chord type not found." type) #f)))))
 
 
 ;; returns chord options for root in maj-min key of pc

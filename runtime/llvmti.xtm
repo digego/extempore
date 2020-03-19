@@ -3439,7 +3439,7 @@
     (if (equal? *impc:zone* zone)
         (set! *impc:zone* (sys:default-mzone)))
     (if (equal? zone (sys:default-mzone))
-        (print-notification "You are not allowed to destroy the default zone")
+        (log-info "You are not allowed to destroy the default zone")
         (sys:destrop-mzone zone))))
 
 (define icr:set-zone
@@ -6408,7 +6408,7 @@ Continue executing `body' forms until `test-expression' returns #f"
         (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
          (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
          (set! subcheck #f)))
-         ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
+         ;;(log-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
 
        ;; GCHANGE
        ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
@@ -6660,7 +6660,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                 #f)
               (begin ;; (println 'hit-recursion-limit)
                 ;; (println 'vars vars)
-                (print-error 'Compiler 'Error: 'hit 'generics 'recursion 'limit 'request req?)
+                (log-error 'Compiler 'Error: 'hit 'generics 'recursion 'limit 'request req?)
                 #f)))
       ;; (if (not (equal? gpoly-type (car grtype)))
       ;;     (begin (println 'RET: gpoly-type '-> grtype)
@@ -7911,7 +7911,7 @@ xtlang's `let' syntax is the same as Scheme"
           (set! t b))
       ;; return intersection of b and c
       (if (null? t)
-          t ;;(print-error 'Compiler 'Error: 'cannot 'unify 'then b 'and 'else c 'in ast) ;(map (lambda (v) (impc:ir:get-type-str v)) b) 'and 'else (map (lambda (v) (impc:ir:get-type-str v)) c) 'clauses 'in ast)
+          t ;;(log-error 'Compiler 'Error: 'cannot 'unify 'then b 'and 'else c 'in ast) ;(map (lambda (v) (impc:ir:get-type-str v)) b) 'and 'else (map (lambda (v) (impc:ir:get-type-str v)) c) 'clauses 'in ast)
           t))))
 
 
@@ -8835,7 +8835,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                  ((eq? (car ast) '/) "xtm_division##")
                                                                  ((eq? (car ast) '-) "xtm_subtraction##")
                                                                  ((eq? (car ast) '%) "xtm_modulo##")
-                                                                 (else (print-error "Error in math overloading")))
+                                                                 (else (log-error "Error in math overloading")))
                                                            (number->string *unique-polynum*)))))
                      (insert-at-index 1 vars (list m))
                      (set-car! ast m)
@@ -8850,7 +8850,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                  ((eq? (car ast) '>) "xtm_greaterthan##")
                                                                  ((eq? (car ast) '=) "xtm_equal##")
                                                                  ((eq? (car ast) '<>) "xtm_notequal##")
-                                                                 (else (print-error "Error in math overloading")))
+                                                                 (else (log-error "Error in math overloading")))
                                                            (number->string *unique-polynum*)))))
                      (insert-at-index 1 vars (list m))
                      (set-car! ast m)
@@ -10112,7 +10112,7 @@ xtlang's `let' syntax is the same as Scheme"
                                  (map (lambda (x) (impc:ir:get-type-from-str x))
                                       (impc:ti:get-closure-arg-types symname-string))))
            (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
-                                        ;(print-error "stop")
+                                        ;(log-error "stop")
       (if *impc:compiler:print-ast* (println '---------------------------------))
       (if *impc:compiler:print-ast* (println 'types: types))
                                         ;(println 'ctypes: converted-types)
@@ -10787,7 +10787,7 @@ xtlang's `let' syntax is the same as Scheme"
               (begin (ipc:call procname 'bind-func-ipc
                                (string->symbol (vector-ref (car polytypes) 0)))
                      (ipc:define procname symname (eval symname)))
-              (print-error "Not a monomorphic xtlang function:" symname))))))
+              (log-error "Not a monomorphic xtlang function:" symname))))))
 
 (define ipc:load
   (lambda (process-name file)
