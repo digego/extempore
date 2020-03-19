@@ -2,6 +2,8 @@
 
 A programming environment for cyberphysical programming.
 
+[![Build status](https://badge.buildkite.com/1c333a08100a9d083983b6c816e6f0163158e0f7f61da8490a.svg)](https://buildkite.com/extemporelang/tests)
+
 ## Getting started
 
 To get started, you can either download a binary release or build Extempore from
