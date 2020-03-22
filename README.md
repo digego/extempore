@@ -37,15 +37,15 @@ and CMake, here are some one-liner build commands:
 
 On **Linux/macOS**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake .. && make && sudo make install
+    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake .. && make && sudo make install
     
 On **Linux/macOS with JACK**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -DJACK=ON .. && make && sudo make install
+    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -DJACK=ON .. && make && sudo make install
     
 On **Windows**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 15 2017 Win64" .. && cmake --build . --target ALL_BUILD --config Release
+    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -G"Visual Studio 15 2017 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
 #### Other build-from-source notes
 
