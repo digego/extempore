@@ -45,7 +45,7 @@ On **Linux/macOS with JACK**:
     
 On **Windows**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 14 2015 Win64" .. && cmake --build . --target ALL_BUILD --config Release
+    git clone https://github.com/digego/extempore && mkdir extempore/cmake-build && cd extempore/cmake-build && cmake -G"Visual Studio 15 2017 Win64" .. && cmake --build . --target ALL_BUILD --config Release
 
 #### Other build-from-source notes
 
