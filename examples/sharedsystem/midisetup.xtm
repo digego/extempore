@@ -92,17 +92,11 @@
                               (filter (lambda (dev) (regex:match? (cdr dev) midi-out-device-name))
                                       (get-midi-output-device-names-alist)))))
   (cond ((not midi-out-device-name)
-         (print-with-colors
-          'yellow 'default #t
-          (print (string-append
-                  "Warning: no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified\n"
-                  "No midi output device configured\n"))))
+         (log-warn "no --midiout CLI arg or EXT_MIDI_OUT_DEVICE_NAME env var specified")
+         (log-warn "No midi output device configured"))
         ((null? matching-devices)
-         (print-with-colors
-          'yellow 'default #t
-          (print (string-append
-                  "Warning: no MIDI output device found matching regex '" midi-out-device-name "'\n"
-                  "No midi output device configured\n"))))
+         (log-warn "no MIDI output device found matching regex" midi-out-device-name)
+         (log-warn "No midi output device configured"))
         (else
          (let ((device (car matching-devices))) ;; pick the first one with name matching regex
            (set_midi_out (car device))
@@ -120,17 +114,11 @@
                               (filter (lambda (dev) (regex:match? (cdr dev) midi-in-device-name))
                                       (get-midi-input-device-names-alist)))))
   (cond ((not midi-in-device-name)
-         (print-with-colors
-          'yellow 'default #t
-          (print (string-append
-                  "Warning: no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified\n"
-                  "No midi input device configured\n"))))
+         (log-warn "no --midiin CLI arg or EXT_MIDI_IN_DEVICE_NAME env var specified")
+         (log-warn "No midi input device configured\n"))
         ((null? matching-devices)
-         (print-with-colors
-          'yellow 'default #t
-          (print (string-append
-                  "Warning: no MIDI input device found matching regex '" midi-in-device-name "'\n"
-                  "No midi input device configured\n"))))
+         (log-warn "Warning: no MIDI input device found matching regex" midi-in-device-name)
+         (log-warn "No midi input device configured"))
         (else
          (let ((device (car matching-devices))) ;; pick the first one with name matching regex
            (set_midi_in (car device))
@@ -159,8 +147,9 @@
     void))
 
 ;; if there's a midi input device, start up midi 'xtlang' scheduler
-(if *min* (start_midi_scheduler))
+(if *min*
+    (begin
+      (start_midi_scheduler)
+      (log-info "started MIDI scheduler with *min*" *min*)))
 
-(print-with-colors
- 'green 'default #t
- (print "sharedsystem MIDI setup complete\n"))
+(log-info "sharedsystem MIDI setup complete")
