@@ -550,7 +550,7 @@ else()
   install(TARGETS extempore
     RUNTIME
     DESTINATION ".")
-  install(DIRECTORY assets runtime libs examples tests
+  install(DIRECTORY runtime libs examples tests
     DESTINATION "."
     PATTERN ".DS_Store" EXCLUDE)
 endif()
