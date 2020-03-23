@@ -20,4 +20,6 @@ if(EXISTS ${CMAKE_BINARY_DIR}/assets)
 endif()
 
 # rename the folder to just "assets"
-file(RENAME "extemporelang-extempore-assets-${ASSETS_GIT_REF}" assets)
+file(RENAME
+  ${CMAKE_BINARY_DIR}/extemporelang-extempore-assets-${ASSETS_GIT_REF}
+  ${CMAKE_BINARY_DIR}/assets)

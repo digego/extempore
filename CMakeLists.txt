@@ -535,7 +535,7 @@ add_custom_target(assets
 if(ASSETS)
   add_dependencies(extempore assets)
   # add an install target as well
-  install(DIRECTORY assets DESTINATION ${CMAKE_SOURCE_DIR})
+  install(DIRECTORY ${CMAKE_BINARY_DIR}/assets DESTINATION ${CMAKE_SOURCE_DIR})
 endif()
 
 ###########
