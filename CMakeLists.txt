@@ -6,6 +6,7 @@ option(JACK "use the Jack Portaudio backend" OFF)
 option(DYLIB "build extempore as a dynamic library" OFF)
 option(PACKAGE "set up install targets for packaging" OFF)
 option(ASSETS "download multimedia assets (approx 500MB)" OFF)
+option(BUILD_TESTS "build test targets (including examples)" ON)
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
@@ -1029,8 +1030,6 @@ endif()
 #########
 # tests #
 #########
-
-option(BUILD_TESTS "build test targets (including examples)" ON)
 
 if(BUILD_TESTS)
 
