@@ -12,7 +12,12 @@ file(DOWNLOAD
 # untar it with CMake's built-in untar command
 execute_process(COMMAND ${CMAKE_COMMAND} -E tar xz ${ASSETS_DOWNLOAD_PATH})
 
+# if there's a previously downloaded assets file in in your build directory (or
+# wherever you're running cmake) then remove it
+# NOTE: this is bad for in-tree builds. probably should add a warning or something.
+if(EXISTS ${CMAKE_BINARY_DIR}/assets)
+  file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/assets)
+endif()
+
 # rename the folder to just "assets"
 file(RENAME "extemporelang-extempore-assets-${ASSETS_GIT_REF}" assets)
-
-install(DIRECTORY assets DESTINATION ${CMAKE_SOURCE_DIR})
