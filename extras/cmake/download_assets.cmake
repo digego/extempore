@@ -12,8 +12,12 @@ file(DOWNLOAD
 # untar it with CMake's built-in untar command
 execute_process(COMMAND ${CMAKE_COMMAND} -E tar xz ${ASSETS_DOWNLOAD_PATH})
 
+message(WARNING "this operation will replace your ${CMAKE_SOURCE_DIR}/assets directory with the latest assets folder from GitHub")
+# remove an existing assets dir if present
+file(REMOVE_RECURSE ${CMAKE_SOURCE_DIR}/assets)
+
 # rename the folder to just "assets"
-file(RENAME "extemporelang-extempore-assets-${ASSETS_GIT_REF}" assets)
+file(RENAME "extemporelang-extempore-assets-${ASSETS_GIT_REF}" ${CMAKE_SOURCE_DIR}/assets)
 
 # remove the compressed file at the end
 file(REMOVE ${ASSETS_DOWNLOAD_PATH})
