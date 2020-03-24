@@ -535,8 +535,6 @@ add_custom_target(assets
 
 if(ASSETS)
   add_dependencies(extempore assets)
-  # add an install target as well
-  install(DIRECTORY ${CMAKE_BINARY_DIR}/assets DESTINATION ${CMAKE_SOURCE_DIR})
 endif()
 
 ###########
@@ -553,7 +551,7 @@ else()
   install(TARGETS extempore
     RUNTIME
     DESTINATION ".")
-  install(DIRECTORY runtime libs examples tests
+  install(DIRECTORY assets runtime libs examples tests
     DESTINATION "."
     PATTERN ".DS_Store" EXCLUDE)
 endif()
