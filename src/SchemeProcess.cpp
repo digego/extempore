@@ -164,7 +164,6 @@ bool SchemeProcess::start(bool subsume)
     address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
     if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
         std::cout << "Error binding extempore address to socket" << std::endl;
-        //[NativeScheme::LOGVIEW error:[[NSString alloc] initWithString:@"Error binding to socket 7010. Is Impromptu already running? Close any open Impromptu instances and restart"]];
         m_running = false;
         return false;
     }
