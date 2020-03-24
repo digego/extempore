@@ -206,7 +206,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 	ascii_info();
     printf("INFO:");
 	ascii_default();
-	std::cout << " client: connected to " << m_title <<" process at " << hostname << ":" << port << std::endl;
+	std::cout << " client: connected to server " << m_title << " process at " << hostname << ":" << port << std::endl;
     m_connected = true;
     return true;
 }

@@ -438,7 +438,7 @@ void* SchemeProcess::serverImpl()
 			ascii_info();
 			printf("INFO:");
 			ascii_default();
-			std::cout << " server: accepted new client connection to " << m_name << " process" << std::endl;
+			std::cout << " server: accepted new connection to " << m_name << " process" << std::endl;
             clientSockets.push_back(res);
             inStrings[res].clear();
             std::string outString;
