@@ -423,10 +423,10 @@ void* SchemeProcess::serverImpl()
             }
             numFds = int(res) + 1;
             FD_SET(res, &readFds); //add new socket to the FD_SET
-            ascii_warning();
-            printf("New Client Connection\n");
-            ascii_normal();
-            fflush(stdout);
+			ascii_info();
+			printf("INFO:");
+			ascii_default();
+			std::cout << " server: accepted new client connection" << std::endl;
             clientSockets.push_back(res);
             inStrings[res].clear();
             std::string outString;

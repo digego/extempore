@@ -64,13 +64,10 @@ std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_title(Title), m_process(Process),
         m_serverSocket(0), m_connected(false), m_active(true), m_writeLock("repl_lock")
 {
-    ascii_default();
-    printf("\nStarting ");
     ascii_info();
-    printf("%s", m_title.c_str());
-    ascii_default();
-    printf(" process\n");
-    ascii_default();
+	printf("INFO:");
+	ascii_default();
+	std::cout << " starting " << m_title << " process..." << std::endl;
     m_writeLock.init();
     sm_repls[m_title] = this;
 }
@@ -115,10 +112,14 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     struct sockaddr_in sa;
     struct hostent* hen; /* host-to-IP translation */
 #endif
-    printf("Trying to connect to ");
-    printf("'%s'",hostname.c_str());
-    printf(" on port ");
-    printf("%d\n",port);
+	// this whole "trying to connect" print-out is just confusing to newcomers
+	// I'd delete it, but SB likes to leave these comments in :)
+
+    // printf("Trying to connect to ");
+    // printf("'%s'",hostname.c_str());
+    // printf(" on port ");
+    // printf("%d\n",port);
+
     /* Address resolution stage */
 
 #ifdef EXT_BOOST
@@ -196,14 +197,16 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 #endif
     if (!rc) {
         this->closeREPL();
-        printf("Could not connect to port %d. Make sure don't have any other instances of impromptu running and that no other app is using this port!",port);
+		ascii_warning();
+		printf("WARN:");
+		ascii_default();
+		std::cout << " could not connect to port " << port << " (port is in use by another process)" << std::endl;
         return false;
     }
-    ascii_text_color(1,2,10);
-    printf("Successfully");
-    ascii_default();
-    printf(" connected to remote process\n");
-    fflush(NULL);
+	ascii_info();
+    printf("INFO:");
+	ascii_default();
+	std::cout << " client: connected to Extempore process at " << hostname << ":" << port << std::endl;
     m_connected = true;
     return true;
 }
