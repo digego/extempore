@@ -447,22 +447,25 @@
 
 ;; (sys:load "libs/core/bleptables.xtm")
 
-(bind-val BLEPTable |4096,double|* (halloc (* 4096 8)))
-(bind-val fBLEPTable |4096,float|* (halloc (* 4096 4)))
-(bind-val BLEPTable_8_BLKHAR |4096,double|* (halloc (* 4096 8)))
-(bind-val fBLEPTable_8_BLKHAR |4096,float|* (halloc (* 4096 4)))
+(bind-val BLEPTable |4096,double|*)
+(bind-val fBLEPTable |4096,float|*)
+(bind-val BLEPTable_8_BLKHAR |4096,double|*)
+(bind-val fBLEPTable_8_BLKHAR |4096,float|*)
 
 (bind-func static load_blep_tables_from_blob
   (lambda (fname:i8*)
-    (let ((fptr (fopen fname "rb")))
-      (if (null? fptr)
+    (let ((data (sys_slurp_file fname)) ;; data will be heap-allocated
+          (offset 0))
+      (if (null? data)
           (begin (println "Failed to open bleptable dump file") void)
           (begin
-            (fread (convert BLEPTable) (* 4096 8) 1 fptr)
-            (fread (convert fBLEPTable) (* 4096 4) 1 fptr)
-            (fread (convert BLEPTable_8_BLKHAR) (* 4096 8) 1 fptr)
-            (fread (convert fBLEPTable_8_BLKHAR) (* 4096 4) 1 fptr)
-            (fclose fptr)
+            (set! BLEPTable (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 8)))
+            (set! fBLEPTable (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 4)))
+            (set! BLEPTable_8_BLKHAR (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 8)))
+            (set! fBLEPTable_8_BLKHAR (convert (pref-ptr data offset)))
             void)))))
 
 (impc:aot:do-or-emit
