@@ -391,10 +391,11 @@ EXPORT int extempore_init(int argc, char** argv)
     }
     ascii_normal();
 #ifdef SUBSUME_PRIMARY
-    ascii_info();
-    std::cout << std::endl << "Primary on Thread 0" << std::endl;
-    ascii_normal();
-#endif    
+    std::cout << "Primary        : ";
+	ascii_info();
+	std::cout << "thread 0" << std::endl;
+    ascii_default();
+#endif
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
     bool startup_ok = true;
@@ -411,10 +412,9 @@ EXPORT int extempore_init(int argc, char** argv)
     //std::cout << "primary started:" << std::endl << std::flush;    
     if (!startup_ok) {
         ascii_error();
-        printf("Error");
+        printf("ERROR:");
         ascii_default();
-        printf(": processes failed to start. Exiting...\n");
-        fflush(NULL);
+		std::cout << " one or more processes failed to start, exiting." << std::endl;
         exit(1);
     }
     while (true) {

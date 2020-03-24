@@ -200,13 +200,13 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 		ascii_warning();
 		printf("WARN:");
 		ascii_default();
-		std::cout << " could not connect to port " << port << " (port is in use by another process)" << std::endl;
+		std::cout << " could not connect " << m_title << " process to port " << port << " (port is in use by another process)" << std::endl;
         return false;
     }
 	ascii_info();
     printf("INFO:");
 	ascii_default();
-	std::cout << " client: connected to Extempore process at " << hostname << ":" << port << std::endl;
+	std::cout << " client: connected to " << m_title <<" process at " << hostname << ":" << port << std::endl;
     m_connected = true;
     return true;
 }
