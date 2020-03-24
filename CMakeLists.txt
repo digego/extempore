@@ -1013,16 +1013,11 @@ if(WIN32)
 endif(WIN32)
 
 if(APPLE)
-  # this should work on Mojave and before - on Catalina it's a whole different
-  # signing system (which needs to be tackled ASAP)
-  add_custom_target(codesign
-	COMMAND codesign --force --deep --sign - $<TARGET_FILE:extempore>
-	COMMENT "sign the extempore binary so that you can connect to the running process in the presence of the macOS firewall")
-  add_dependencies(codesign extempore)
-  # add codesign as a dep for aot_core, since that's the first target where
-  # you'll see the "do you want to allow extempore to accept incoming
-  # connections" dialog box
-  add_dependencies(aot_core codesign)
+  # this should work on macOS Mojave and earlier, but not on Catalina - that's a
+  # whole different signing system (which needs to be tackled ASAP)
+  add_custom_command(TARGET extempore POST_BUILD
+	COMMENT "signing the $<TARGET_FILE:extempore> binary (to avoid annoying firewall pop-ups)"
+	COMMAND codesign --force --deep --sign - $<TARGET_FILE:extempore>)
 endif()
 
 #########
