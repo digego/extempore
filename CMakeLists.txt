@@ -530,8 +530,11 @@ endif()
 ##########
 
 add_custom_target(assets
-  COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/extras/cmake/download_assets.cmake
-  COMMENT "Downloading assets from https://github.com/extemporelang/extempore-assets")
+  COMMAND
+  ${CMAKE_COMMAND}
+  -DASSETS_PATH=${CMAKE_SOURCE_DIR}/assets
+  -DASSETS_GIT_REF=0c9f32c
+  -P ${CMAKE_SOURCE_DIR}/extras/cmake/download_assets.cmake)
 
 if(ASSETS)
   add_dependencies(extempore assets)
