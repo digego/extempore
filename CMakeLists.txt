@@ -79,11 +79,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-if(NOT LLVM_BUILD_TYPE)
-  message(STATUS "Building 'Release' LLVM configuration")
-  set(LLVM_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
-endif()
-
 # # set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_HOME_DIRECTORY}")
 # set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/extras/cmake CACHE PATH
 #   "path to Extempore's cmake modules")
@@ -321,7 +316,7 @@ else()
       CMAKE_ARGS
       -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DLLVM_INCLUDE_UTILS=OFF
@@ -340,7 +335,7 @@ else()
       URL_MD5 f6d26841a445461a12126c1953b1a74b
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${LLVM_BUILD_TYPE}
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
       -DLLVM_INCLUDE_UTILS=OFF
@@ -355,7 +350,7 @@ else()
     add_custom_target(LLVM_install
       COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
       DEPENDS LLVM
-      COMMAND ${CMAKE_COMMAND} -DBUILD_TYPE=${LLVM_BUILD_TYPE} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
+      COMMAND ${CMAKE_COMMAND} -DBUILD_TYPE=${CMAKE_BUILD_TYPE} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
   else()
     ExternalProject_Add_StepTargets(LLVM install)
   endif()
