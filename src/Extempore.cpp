@@ -376,18 +376,10 @@ EXPORT int extempore_init(int argc, char** argv)
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
     } else {
-#ifdef _WIN32
-        //printf("Sorry, the \"noaudio\" dummy device isn't yet supported on Windows.\n");
-        //exit(1);
-        if (extemp::UNIV::TIME_DIVISION == 1) {
-            extemp::UNIV::TIME_DIVISION = 4;
-        }
-#else
-        // don't need this anymore, but we do need timediv to be > 1
-        if (extemp::UNIV::TIME_DIVISION == 1) {
-            extemp::UNIV::TIME_DIVISION = 4;
-        }
-#endif
+	  // don't need this anymore, but we do need timediv to be > 1
+	  if (extemp::UNIV::TIME_DIVISION == 1) {
+		extemp::UNIV::TIME_DIVISION = 4;
+	  }
     }
     ascii_normal();
 #ifdef SUBSUME_PRIMARY
