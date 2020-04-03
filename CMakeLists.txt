@@ -1030,7 +1030,7 @@ if(BUILD_TESTS)
 
   macro(extempore_add_test testfile label)
     add_test(NAME ${testfile}
-      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
+      COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
     set_tests_properties(${testfile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -1041,7 +1041,7 @@ if(BUILD_TESTS)
 
   macro(extempore_add_example_as_test examplefile timeout label)
     add_test(NAME ${examplefile}
-      COMMAND extempore --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})")
+      COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})")
     set_tests_properties(${examplefile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
