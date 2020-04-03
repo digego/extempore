@@ -1,0 +1,30 @@
+name: build & test
+
+on: [push]
+
+jobs:
+  build-ubuntu:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: mkdir build && cd build && cmake -DASSETS=ON ..
+    - name: build
+      run: cmake --build build
+    - name: test
+      run: cd build && ctest --label-exclude graphics
+
+  build-windows:
+
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: mkdir build && cd build && cmake -G"Visual Studio 15 2017 Win64" -DASSETS=ON ..
+    - name: build
+      run: cmake --build build --config Debug
+    - name: test
+      run: cd build && ctest --build-config Release --label-exclude graphics
