@@ -3,30 +3,21 @@ name: build & test
 on: [push]
 
 jobs:
-  build-ubuntu:
+  build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     
     steps:
     - uses: actions/checkout@v2
-    - name: deps
+    - if: ${{ matrix.os == ubuntu-latest }}
+      name: deps
       run: sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
-    - name: configure
-      run: mkdir build && cd build && cmake -DASSETS=ON ..
-    - name: build
-      run: cmake --build build
-    - name: test
-      run: cd build && ctest --label-exclude graphics
-
-  build-windows:
-
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v2
     - name: configure
       run: mkdir build && cd build && cmake -DASSETS=ON ..
     - name: build
       run: cmake --build build --config Debug
     - name: test
-      run: cd build && ctest --build-config Debug --label-exclude graphics
+      run: cd build && ctest --build-config Debug --label core
