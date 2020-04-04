@@ -1,0 +1,54 @@
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: build & upload release binary
+
+jobs:
+  build:
+    name: upload release zipfile
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2016, windows-latest]
+      fail-fast: false
+
+    steps:
+      # note - some of these copied from the build-and-test.yml action - in the
+      # future we could package the common steps up into a separate asset...
+
+      - uses: actions/checkout@v2
+
+      - if: matrix.os == 'ubuntu-latest'
+        name: deps
+        run: sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+
+      - name: configure
+        run: mkdir build && cd build && cmake -DPACKAGE=ON ..
+
+      - name: build
+        run: cmake --build build --config Release --target package
+
+      - name: create release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: upload release asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: "build/*.zip" # not sure if this actually supports globbing
+          asset_name: Extempore-binary-${{ matrix-os }}.zip
+          asset_content_type: application/zip
