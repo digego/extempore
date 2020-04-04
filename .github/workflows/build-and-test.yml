@@ -8,9 +8,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
       fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2016, windows-latest]
+      include:
+        - os: windows-2016
+          cmake-generator: -G "Visual Studio 15 2017" -A x64
+        - os: windows-latest
+          cmake-generator: -G "Visual Studio 16 2019" -A x64
     
     steps:
       - uses: actions/checkout@v2
@@ -19,15 +24,8 @@ jobs:
         name: deps
         run: sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
 
-        # windows
-      - if: contains(matrix.os, 'windows')
-        name: configure
-        run: mkdir build && cd build && cmake -DASSETS=ON cmake -G "Visual Studio 16 2019" -A x64 ..
-
-        # linux/macOS
-      - if: "!contains(matrix.os, 'windows')"
-        name: configure
-        run: mkdir build && cd build && cmake -DASSETS=ON ..
+      - name: configure
+        run: mkdir build && cd build && cmake -DASSETS=ON cmake ${{matrix.cmake-generator }} ..
 
       - name: build
         run: cmake --build build --config Debug
