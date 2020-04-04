@@ -349,8 +349,9 @@ else()
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
   endif()
   if(WIN32)
+	# This is necessary to get CMake on Windows to install LLVM (needed to build
+	# Extempore) before the Extempore install step
     add_custom_target(LLVM_install
-      COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
       DEPENDS LLVM
       COMMAND ${CMAKE_COMMAND} -DBUILD_TYPE=${CMAKE_BUILD_TYPE} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
   else()
