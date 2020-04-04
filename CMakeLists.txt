@@ -351,10 +351,8 @@ else()
       COMMENT "This is necessary to get CMake to install LLVM (needed to build Extempore) before the Extempore install step"
       DEPENDS LLVM
       COMMAND ${CMAKE_COMMAND} -DBUILD_TYPE=${CMAKE_BUILD_TYPE} -P ${CMAKE_BINARY_DIR}/llvm/src/LLVM-build/cmake_install.cmake)
-	add_dependencies(extempore LLVM_install)
   else()
     ExternalProject_Add_StepTargets(LLVM install)
-	add_dependencies(extempore LLVM)
   endif()
 endif()
 
@@ -416,6 +414,14 @@ endif()
 # dependencies
 
 add_dependencies(extempore pcre portaudio)
+
+if(BUILD_LLVM)
+  if(WIN32)
+    add_dependencies(extempore LLVM_install)
+  else()
+    add_dependencies(extempore LLVM)
+  endif()
+endif()
 
 if(WIN32)
   target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
