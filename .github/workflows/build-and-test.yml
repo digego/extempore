@@ -14,12 +14,23 @@ jobs:
     
     steps:
       - uses: actions/checkout@v2
+
       - if: matrix.os == 'ubuntu-latest'
         name: deps
         run: sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
-      - name: configure
+
+        # windows
+      - if: contains(matrix.os, 'windows')
+        name: configure
+        run: mkdir build && cd build && cmake -DASSETS=ON cmake -G "Visual Studio 16 2019" -A x64 ..
+
+        # linux/macOS
+      - if: !contains(matrix.os, 'windows')
+        name: configure
         run: mkdir build && cd build && cmake -DASSETS=ON ..
+
       - name: build
         run: cmake --build build --config Debug
+
       - name: test
         run: cd build && ctest --build-config Debug --label-regex libs-core
