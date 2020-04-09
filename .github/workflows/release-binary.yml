@@ -9,12 +9,16 @@ name: build & upload release binary
 jobs:
   build:
     name: upload release zipfile
-
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-2016, windows-latest]
-      fail-fast: false
+        include:
+          - os: windows-2016
+            cmake-generator: -G "Visual Studio 15 2017" -A x64
+          - os: windows-latest
+            cmake-generator: -G "Visual Studio 16 2019" -A x64
 
     steps:
       # note - some of these copied from the build-and-test.yml action - in the
@@ -22,12 +26,12 @@ jobs:
 
       - uses: actions/checkout@v2
 
-      - if: matrix.os == 'ubuntu-latest'
+      - if: contains(matrix.os, 'ubuntu')
         name: deps
         run: sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
 
       - name: configure
-        run: mkdir build && cd build && cmake -DPACKAGE=ON ..
+        run: mkdir build && cd build && cmake ${{ matrix.cmake-generator }} -DPACKAGE=ON ..
 
       - name: build
         run: cmake --build build --config Release --target package
@@ -42,6 +46,7 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+
       - name: upload release asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
