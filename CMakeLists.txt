@@ -1141,24 +1141,11 @@ set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 string(TIMESTAMP EXTEMPORE_BUILD_DATE "%Y%m%d")
 
-# give the zipball a nice name on each platform
-if(APPLE)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-macOS)
-elseif(UNIX)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-linux)
-elseif(WIN32)
-  set(CPACK_PACKAGE_FILE_NAME Extempore-${PROJECT_VERSION}-windows)
-endif()
+# zipball will be called Extempore-package.zip
+set(CPACK_PACKAGE_FILE_NAME Extempore-package)
+set(CPACK_GENERATOR ZIP)
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (https://extemporelang.github.io)")
 
-if(APPLE)
-  set(CPACK_GENERATOR ZIP)
-elseif(UNIX AND NOT APPLE)
-  set(CPACK_GENERATOR TGZ)
-elseif(WIN32)
-  set(CPACK_GENERATOR ZIP)
-  # set(CPACK_GENERATOR NSIS64)
-endif()
 
 include(CPack)
