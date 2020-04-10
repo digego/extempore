@@ -90,7 +90,7 @@ You can also join the Extempore community:
 
 ## Licence
 
-Copyright (c) 2011-2018, Andrew Sorensen
+Copyright (c) 2011-2020, Andrew Sorensen
 
 All rights reserved.
 
