@@ -43,9 +43,10 @@ On **Linux/macOS with JACK**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -DJACK=ON .. && make && sudo make install
     
-On **Windows**:
+On **Windows** (if you're using VS2017---adjust as necessary for your VS
+version):
 
-    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -G"Visual Studio 15 2017 Win64" .. && cmake --build . --target INSTALL --config Release
+    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -G "Visual Studio 15 2017" -A x64 .. && cmake --build . --target INSTALL --config Release
 
 #### Other build-from-source notes
 
