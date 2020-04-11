@@ -478,7 +478,13 @@ endif()
 if(WIN32)
   target_compile_definitions(extempore
     PRIVATE -DPCRE_STATIC
-    PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+    PRIVATE -D_CRT_SECURE_NO_WARNINGS
+	# NOTE: this next define is necessary because VS2019 deprecated the std::tr2
+	# namespace, but setting CXX_STANDARD to c++17 (required for "normal"
+	# std::filesystem) breaks a bunch of LLVM 3.8. So, when we finally upgrade
+	# LLVM, we should switch to std::filesystem, but for now let's just hold our
+	# nose and do this.
+	PRIVATE -D_SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING)
   set_source_files_properties(
     PROPERTIES
     COMPILE_FLAGS "/EHsc")
