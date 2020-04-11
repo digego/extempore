@@ -2,7 +2,7 @@
 
 A programming environment for cyberphysical programming.
 
-[![Build status](https://badge.buildkite.com/1c333a08100a9d083983b6c816e6f0163158e0f7f61da8490a.svg)](https://buildkite.com/extemporelang/tests)
+![build & test](https://github.com/digego/extempore/workflows/build%20&%20test/badge.svg)
 
 ## Getting started
 
