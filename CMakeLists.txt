@@ -314,7 +314,6 @@ else()
 	  URL http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz
       URL_MD5 600ee9a94d2e104f53be739568f3508e
       CMAKE_ARGS
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
       -DLLVM_TARGETS_TO_BUILD=X86
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
