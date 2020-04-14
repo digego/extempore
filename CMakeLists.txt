@@ -35,7 +35,7 @@ endif()
 
 if(PACKAGE)
   # this needs to be set before project() is called
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.9)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
   set(ASSETS ON) # necessary for packaging
   message(STATUS "Building Extempore for binary distribution (assets directory will be downloaded)")
 endif()
