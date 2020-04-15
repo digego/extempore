@@ -6,26 +6,6 @@ on:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  create-release:
-    name: create a new Extempore release on GitHub
-    runs-on: ubuntu-latest # or any other OS, doesn't matter
-    timeout-minutes: 5
-    steps:
-      # to get the tag name
-      - id: tag-name
-        uses: olegtarasov/get-tag@v2
-
-      - id: create-release-step
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ steps.tag-name.outputs.tag }}
-          draft:  ${{ endsWith(github.ref, '-draft') }}
-          prerelease: ${{ endsWith(github.ref, '-pre') }}
-
-
   build:
     name: build & upload the zipfile to the GitHub releases page
     needs: create-release
