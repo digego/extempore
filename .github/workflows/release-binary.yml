@@ -35,24 +35,19 @@ jobs:
           path: upload-url
 
 
-
   build:
     name: build & upload the zipfile to the GitHub releases page
     needs: create-release
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         os:
-          # - ubuntu-16.04
           - ubuntu-latest
           - macos-latest
-          # - windows-2016
           - windows-latest
         include:
-          # - os: windows-2016
-          #   cmake-generator: -G "Visual Studio 15 2017" -A x64
           - os: windows-latest
             cmake-generator: -G "Visual Studio 16 2019" -A x64
 
@@ -67,9 +62,7 @@ jobs:
         run: mkdir build && cd build && cmake ${{ matrix.cmake-generator }} -DPACKAGE=ON ..
 
       - name: build
-        shell: bash
-        run: |
-          echo "test content" > build/Extempore-package.txt
+        run: cmake --build build --config Release --target package
 
       # these next two steps are necessary to pass the upload url from a step in
       # one job to a step in another
@@ -94,6 +87,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.slurp-upload-url.outputs.upload-url }}
-          asset_path: "build/Extempore-package.txt"
+          asset_path: "build/Extempore-package.zip"
           asset_name: Extempore-${{ steps.tag-name.outputs.tag }}-${{ matrix.os }}.zip
-          asset_content_type: text/plain
+          asset_content_type: application/zip
