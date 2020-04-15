@@ -25,15 +25,6 @@ jobs:
           draft:  ${{ endsWith(github.ref, '-draft') }}
           prerelease: ${{ endsWith(github.ref, '-pre') }}
 
-      - name: write release URL artifact
-        run: echo '${{ steps.create-release-step.outputs.upload_url }}' > upload-url
-
-      - name: store GH release upload URL
-        uses: actions/upload-artifact@v1
-        with:
-          name: upload-url
-          path: upload-url
-
 
   build:
     name: build & upload the zipfile to the GitHub releases page
@@ -64,29 +55,15 @@ jobs:
       - name: build
         run: cmake --build build --config Release --target package
 
-      # these next two steps are necessary to pass the upload url from a step in
-      # one job to a step in another
-      # https://help.github.com/en/actions/configuring-and-managing-workflows/persisting-workflow-data-using-artifacts
-      - name: retrieve release URL artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: upload-url
-
-      - name: slurp upload URL from artifact file
-        id: slurp-upload-url
-        run: echo "::set-output name=upload-url::`cat upload-url/upload-url`"
-        shell: bash # for cat, basically
-
       # to get the tag name
       - id: tag-name
         uses: olegtarasov/get-tag@v2
 
-      - name: upload release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: upload binaries to release
+        uses: svenstaro/upload-release-action@v1-release
         with:
-          upload_url: ${{ steps.slurp-upload-url.outputs.upload-url }}
-          asset_path: "build/Extempore-package.zip"
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/Extempore-package.zip
           asset_name: Extempore-${{ steps.tag-name.outputs.tag }}-${{ matrix.os }}.zip
-          asset_content_type: application/zip
+          tag: ${{ github.ref }}
+          overwrite: true
