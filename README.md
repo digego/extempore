@@ -2,8 +2,9 @@
 
 A programming environment for cyberphysical programming.
 
-![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
-![Build & run tests](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg)
+![`master` branch: build & test](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg?branch=master)
+
+![Latest release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
 ## Getting started
 
