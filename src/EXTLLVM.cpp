@@ -737,8 +737,15 @@ void initLLVM()
         llvm::StringMap<bool> HostFeatures;
         llvm::sys::getHostCPUFeatures(HostFeatures);
         for (auto& feature : HostFeatures) {
-            std::string att = feature.getValue() ? feature.getKey().str() : std::string("-") + feature.getKey().str();
-            lattrs.append(1, att);
+		  std::string featureName = feature.getKey().str();
+		  // temporarily disable all AVX512-related codegen because it
+		  // causes crashes on this old version of LLVM - see GH #378 for
+		  // more details.
+		  if (feature.getValue() && featureName.compare(0, 6, "avx512")){
+			lattrs.append(1, featureName);
+		  }else{
+			lattrs.append(1, std::string("-") + featureName);
+		  }
         }
     }
     llvm::TargetMachine* tm = factory.selectTarget(triple, "", cpu, lattrs);
