@@ -8,9 +8,6 @@ A programming environment for cyberphysical programming.
 
 ## Getting started
 
-To get started, you can either download a binary release or build Extempore from
-source yourself.
-
 ### The easy way
 
 Download [VSCode](https://code.visualstudio.com/), install the Extempore
@@ -20,7 +17,7 @@ For more details, head to the [Quickstart
 page](https://extemporelang.github.io/docs/overview/quickstart/) in Extempore's
 online docs.
 
-### The slightly harder way
+### The slightly harder way (for those who don't want to use VSCode)
 
 Download the latest [binary
 release](https://github.com/digego/extempore/releases) for your platform, unzip
@@ -51,6 +48,14 @@ version):
     git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -G "Visual Studio 15 2017" -A x64 .. && cmake --build . --target INSTALL --config Release
 
 #### Other build-from-source notes
+
+- the Extempore build is [automatically
+  tested](https://github.com/digego/extempore/actions?query=workflow%3A%22Build+%26+run+tests%22)
+  on Ubuntu (LTS versions back to 16.04), macOS (latest only) and Windows
+  (Server 2016 & 2019), so if you're on one of those platforms (or similar)
+  these steps should just work---if you're on a different distro/version then
+  things will still proabaly work, but you might have to modify some of the
+  steps
 
 - if you want to download the Extempore binary assets as well (required for some
   of the examples, but a ~300MB downloaded) then add the `-DASSETS=ON` CMake
