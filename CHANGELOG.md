@@ -9,13 +9,7 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ### Removed
 
-- out of date guff, including long-deprecated and non-working AOT
-  compilation scripts, the old `extempore.el` (just use MELPA)
-
 ### Changed
-
-- assets bundle updated, moved to GH (rather than just being a tarball on
-  <https://moso.com.au>)
 
 ## v0.8
 
@@ -27,12 +21,18 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ### Removed
 
+- out of date guff, including long-deprecated and non-working AOT
+  compilation scripts, the old `extempore.el` (just use MELPA)
+
 ### Changed
 
 - changed the way that AOT-compilation works - no longer generating the LLVM IR
   then shelling out to `llc` to compile them at build time to produce a dll, but
   instead writing the LLVM IR out to `*.ll` files in `libs/aot-cache/` and
   loading them on demand
+
+- assets bundle updated, moved to GH (rather than just being a tarball on
+  <https://moso.com.au>)
 
 ## v0.60
 
