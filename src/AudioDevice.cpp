@@ -621,8 +621,8 @@ void AudioDevice::start()
             TaskScheduler::I());
     if (err != paNoError) {
         ascii_error();
-        std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
+        std::cout << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
+        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
         exit(1);
     }
@@ -632,7 +632,7 @@ void AudioDevice::start()
     if(err != paNoError) {
         ascii_error();
         std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
+        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
         exit(1);
     }
