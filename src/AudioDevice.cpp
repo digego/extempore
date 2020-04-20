@@ -634,7 +634,7 @@ void AudioDevice::start()
         std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
         std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
-      exit(1);
+        exit(1);
     }
 
     m_started = true;
