@@ -510,7 +510,7 @@ AudioDevice::AudioDevice(): m_started(false), buffer(0), m_dsp_closure(nullptr),
 
 AudioDevice::~AudioDevice()
 {
-    if (!UNIV::AUDIO_NONE) {
+    if (stream && !UNIV::AUDIO_NONE) {
         PaError err;
         err = Pa_StopStream(stream);
         if (err != paNoError) {
