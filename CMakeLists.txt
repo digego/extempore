@@ -1136,8 +1136,8 @@ set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 string(TIMESTAMP EXTEMPORE_BUILD_DATE "%Y%m%d")
 
-# zipball will be called Extempore-package.zip
-set(CPACK_PACKAGE_FILE_NAME Extempore-package)
+# zipball will be called extempore.zip
+set(CPACK_PACKAGE_FILE_NAME extempore)
 set(CPACK_GENERATOR ZIP)
 
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Extempore programming environment (https://extemporelang.github.io)")
