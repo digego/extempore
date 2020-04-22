@@ -39,7 +39,7 @@
 
 #include <stdio.h>         /* Basic I/O routines          */
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 // nothing
 #else
 #include <sys/types.h>     /* standard system types       */
@@ -84,7 +84,7 @@ void SchemeREPL::writeString(std::string&& String)
     const char* b = String.c_str();
     while (true) {
         int lth = (length > 1024) ? 1024 : length;
-#ifdef EXT_BOOST
+#ifdef _WIN32
         int chars_written = m_serverSocket->write_some(std::experimental::net::buffer(b, lth));
 #else
         int chars_written = write(m_serverSocket, b, lth);
@@ -106,12 +106,6 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         return false;
     }
     int rc;
-#ifdef EXT_BOOST
-    // do nothing for boost
-#else
-    struct sockaddr_in sa;
-    struct hostent* hen; /* host-to-IP translation */
-#endif
 	// this whole "trying to connect" print-out is just confusing to newcomers
 	// I'd delete it, but SB likes to leave these comments in :)
 
@@ -122,7 +116,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 
     /* Address resolution stage */
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
     std::experimental::net::io_context context;
     std::experimental::net::ip::tcp::resolver resolver(context);
     std::stringstream ss;
@@ -134,6 +128,8 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     //std::cout << "resolved: " << ep << std::endl << std::flush;
     if(iter == end) {
 #else
+	struct sockaddr_in sa;
+	struct hostent* hen; /* host-to-IP translation */
     hen = gethostbyname(hostname.c_str());
     if (!hen) {
 #endif
@@ -149,7 +145,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     sleep(1);
 #endif
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
     m_serverIoService = new std::experimental::net::io_context;
     try {
         m_serverSocket = new std::experimental::net::ip::tcp::socket(*m_serverIoService);
@@ -214,7 +210,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 void SchemeREPL::closeREPL()
 {
     m_active = false;
-#ifdef EXT_BOOST
+#ifdef _WIN32
     m_serverSocket->close();
     delete m_serverSocket;
     delete m_serverIoService;

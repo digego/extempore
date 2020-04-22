@@ -513,7 +513,6 @@ endif()
 # on Windows, put the created extempore.exe straight into the source
 # directory, and the .lib file into libs/platform-shlibs
 if(WIN32)
-  target_compile_definitions(extempore PRIVATE -DEXT_BOOST)
   set_target_properties(extempore
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}

@@ -1675,7 +1675,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
         std::cout << "TREADMILL: FLIP SPINNING" << std::endl << std::flush;
 #endif
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 #else
         usleep(50);
@@ -1969,7 +1969,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
         }catch( ... ) {
             std::cout << "ERROR: SENDING NOTIFICATION TO SCANNER THREAD" << std::endl << std::flush;
         }
-#ifdef EXT_BOOST
+#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 #else
         usleep(50);
@@ -2109,14 +2109,14 @@ static void* treadmill_scanner(void* obj)
 
            }
          sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
-#ifdef EXT_BOOST
+#ifdef _WIN32
          std::this_thread::sleep_for(std::chrono::microseconds(500));
 #else
          usleep(500);
 #endif
          sc->mutex->lock(); // But lock again after sleep!
        }
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #else
        sc->Treadmill_Guard->lock();
 #endif
@@ -2136,7 +2136,7 @@ static void* treadmill_scanner(void* obj)
        std::cout << "WAKING UP SCANNER" << std::endl << std::flush;
 #endif
        sc->mutex->lock();
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #else
        sc->Treadmill_Guard->unlock();
 #endif

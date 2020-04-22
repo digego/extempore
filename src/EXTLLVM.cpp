@@ -89,8 +89,7 @@
 #include <sys/syscall.h>
 #endif
 
-#ifdef EXT_BOOST
-//#include <boost/asio.hpp>
+#ifdef _WIN32
 #include <experimental/buffer>
 #include <experimental/executor>
 #include <experimental/internet>
@@ -112,11 +111,7 @@
 #ifdef _WIN32
 #include <chrono>
 #include <thread>
-#elif EXT_BOOST
-#include <thread>
-#endif
-
-#ifndef _WIN32
+#else
 #include <unistd.h>
 #endif
 
@@ -255,19 +250,17 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
 {
   int length = message_length;
 
-#ifdef EXT_BOOST // TODO: This should use WinSock on Windows
+#ifdef _WIN32 // TODO: This should use WinSock on Windows
   std::experimental::net::io_context context;
   // std::experimental::net::ip::udp::resolver::iterator end;
   std::experimental::net::ip::udp::resolver resolver(context);
   std::stringstream ss;
   ss << port;
-  // std::experimental::net::ip::udp::resolver::query newQuery(boost::asio::ip::udp::v4(),host, ss.str());
   std::experimental::net::ip::udp::resolver::results_type res = resolver.resolve(std::experimental::net::ip::udp::v4(), host, ss.str());
   auto iter = res.begin();
   auto end = res.end();
   std::experimental::net::ip::udp::endpoint sa = *iter;
 
-  //boost::asio::ip::udp::endpoint sa = *iter;
 #else
   struct sockaddr_in sa;
   struct hostent* hen; /* host-to-IP translation */
@@ -287,13 +280,13 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
 #endif
 
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
   std::experimental::net::ip::udp::socket* fd = 0;
 #else
   int fd = 0;
 #endif
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
   int err = 0;
   std::experimental::net::io_context service;
   std::experimental::net::ip::udp::socket socket(service);

@@ -68,7 +68,7 @@
 
 // this is an aribrary maximum
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <thread>
 #endif
 

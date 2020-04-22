@@ -45,7 +45,7 @@
 #endif
 #include <stdlib.h>
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <thread>
 #include <chrono>
 #else
@@ -411,7 +411,7 @@ namespace extemp {
   {
     OSC* osc = (OSC*) obj_p;
     while(true) {
-#ifdef EXT_BOOST
+#ifdef _WIN32
       std::experimental::net::ip::udp::endpoint sender;
       long bytes_read = 0;
       try{
@@ -496,7 +496,7 @@ namespace extemp {
         }
         char reply[256];
         memset(reply,0,256);
-#ifdef EXT_BOOST
+#ifdef _WIN32
         std::string caller = osc->getClientAddress()->address().to_string();
 #else
         std::string caller(inet_ntoa((*osc->getClientAddress()).sin_addr));
@@ -504,7 +504,7 @@ namespace extemp {
         //osc->getCallback()(address,typetags,args,(bytes_read - (typetags_length + address_length)),reply,&reply_length,&caller);
         //if(reply_length > 0) sendto(osc->getSocketFD(), reply, reply_length, 0, (struct sockaddr*)osc->getClientAddress(), osc->sizeOfClientAddress());
       }else{
-#ifdef EXT_BOOST
+#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(1000));
 #else
         usleep(1000);
@@ -514,18 +514,11 @@ namespace extemp {
     return NULL;
   }
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
   void* tcp_osc_server_thread(void* obj_p)
   {
     // seed rng for process
     // UNIV::initRand();
-
-    // SchemeProcess* scm = (SchemeProcess*) obj_p;
-    // boost::asio::io_service* io_service = scm->getIOService();
-    // boost::asio::io_service::work work(*io_service);
-    // while(true){
-    //   io_service->run();
-    // }
     return NULL;
   }
 #else
@@ -626,7 +619,7 @@ namespace extemp {
       }
       char reply[256];
       memset(reply,0,256);
-#ifdef EXT_BOOST
+#ifdef _WIN32
       std::string caller = osc->getClientAddress()->address().to_string();
 #else
       std::string caller(inet_ntoa(client_address.sin_addr));
@@ -824,7 +817,7 @@ namespace extemp {
 
   OSC::OSC() : threadOSC(&osc_mesg_callback, this, "OSC"), message_length(0), started(false)
   {
-#ifdef EXT_BOOST
+#ifdef _WIN32
     io_service = new std::experimental::net::io_context;
     osc_address = new std::experimental::net::ip::udp::endpoint();
     osc_client_address = new std::experimental::net::ip::udp::endpoint();
@@ -1030,7 +1023,7 @@ namespace extemp {
     int cnt = -1;
     do {
       cnt++;
-#ifdef EXT_BOOST
+#ifdef _WIN32
       message_length = socket->receive_from(std::experimental::net::buffer(message_data, 256), *osc_client_address);
 #else
       message_length = recvfrom(socket_fd, message_data, 256, 0, (struct sockaddr*)&osc_client_address, (socklen_t *) &osc_client_address_size);
@@ -1109,7 +1102,7 @@ namespace extemp {
     int ret = 0;
     char* ptr;
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
     //std::experimental::net::ip::udp::resolver::iterator end;
     std::experimental::net::ip::udp::resolver resolver(*io_service);
     std::stringstream ss;
@@ -1138,7 +1131,7 @@ namespace extemp {
 #endif
 
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
     std::experimental::net::ip::udp::socket* fd = 0;
     if(OSC::I(_sc)->send_from_serverfd) {
       fd = OSC::I(_sc)->getSocketFD(); //  getSendFD();
@@ -1176,7 +1169,7 @@ namespace extemp {
     std::cout << "SENDING MSG: " << message << "  of size: " << length << std::endl;
 #endif
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
     int err = 0;
     if(OSC::I(_sc)->send_from_serverfd) {
       err = fd->send_to(std::experimental::net::buffer(message, length), sa);
@@ -1296,7 +1289,7 @@ namespace extemp {
       SchemeProcess* scm = _sc->m_process;
       scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
       std::experimental::net::ip::udp::endpoint* osc_address = osc->getAddress();
       int port = ivalue(pair_car(args)); // [[[imp::NativeScheme::RESOURCES getPreferencesDictionary] valueForKey:@"osc_port"] intValue];
       osc_address->port(port);
@@ -1362,9 +1355,7 @@ namespace extemp {
       // scm->start();
       // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
-#ifdef EXT_BOOST
-    // todo insert boost TCP-OSC stuff here
-#else
+#ifndef _WIN32
       int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
       if(socket_fd == -1) {
         std::cout << "Error opening TCP-OSC socket" << std::endl;
