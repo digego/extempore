@@ -38,10 +38,6 @@ On **Linux/macOS**:
 
     git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake .. && make && sudo make install
     
-On **Linux/macOS with JACK**:
-
-    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -DJACK=ON .. && make && sudo make install
-    
 On **Windows** (if you're using VS2017---adjust as necessary for your VS
 version):
 
@@ -63,9 +59,6 @@ version):
 
 - the `install` target will build both the `extempore` binary executable and
   AOT-compile the standard library (for faster startup)
-
-- on Linux the JACK configuration is not as well tested as the default (ALSA)
-  one (patches welcome)
 
 ## See Extempore in action
 
