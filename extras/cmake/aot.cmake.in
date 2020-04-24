@@ -17,20 +17,11 @@ set(AOT_LIBS
 
 foreach(aot-lib ${AOT_LIBS})
   message(STATUS "AOT-compiling ${aot-lib}")
-  if(PACKAGE)
-    # pass --attr=none when packaging
-    execute_process(
-      COMMAND ./extempore --nobase --attr=none --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\")"
-      WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
-      TIMEOUT 900 # 15 minutes
-      RESULT_VARIABLE aot_retval)
-  else(PACKAGE)
-    execute_process(
-      COMMAND ./extempore --nobase --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\")"
-      WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
-      TIMEOUT 900 # 15 minutes
-      RESULT_VARIABLE aot_retval)
-  endif(PACKAGE)
+  execute_process(
+	COMMAND ./extempore --nobase --noaudio --port 17099 --eval "(impc:aot:compile-xtm-file \"${aot-lib}\")"
+	WORKING_DIRECTORY @CMAKE_SOURCE_DIR@
+	TIMEOUT 900 # 15 minutes
+	RESULT_VARIABLE aot_retval)
   # return code on windows are a problem at the moment :(
   #if(NOT "${aot_retval}" STREQUAL 0)
   #  message(FATAL_ERROR "Problem compiling ${aot-lib} error: ${aot_retval}")
