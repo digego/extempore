@@ -53,7 +53,7 @@
           (num (if (= 0 lgth)
                    (- (tref info 0) offset)
                    lgth)))
-      (if (<> null audiofile)
+      (if (not (null? audiofile))
           (let ((adat:SAMPLE* (halloc (* num channels)))
                 (samples:|20,|128,SAMPLE*||* (inst.samples))
                 (samples_channels:|20,|128,i64||* (inst.samples_channels))
@@ -70,8 +70,8 @@
             (if (not (null? olddat)) (free olddat))
             1)
           (begin
+            (printf "libsndfile error: could not read audio file at '%s' (%s)\n" filename (sf_strerror audiofile))
             (sf_close audiofile)
-            (printf "%s\n" (sf_strerror audiofile))
             0)))))
 
 (bind-func clear_sample_data_
