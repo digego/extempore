@@ -1,15 +1,18 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 project(Extempore VERSION 0.8.6)
 
-option(ASIO "use the ASIO Portaudio backend" OFF)
-option(JACK "use the Jack Portaudio backend" OFF)
-option(DYLIB "build extempore as a dynamic library" OFF)
-option(PACKAGE "set up install targets for packaging" OFF)
 option(ASSETS "download multimedia assets (approx 500MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
+option(PACKAGE "set up install targets for packaging" OFF)
+
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
+
+# optional audio backends (see INSTALL.md)
+option(ASIO "use the ASIO Portaudio backend" OFF)
+option(JACK "use the Jack Portaudio backend" OFF)
+option(DYLIB "build extempore as a dynamic library" OFF)
 
 ## this is useful because we can group targets together (e.g. all the AOT libs)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
