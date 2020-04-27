@@ -4,7 +4,7 @@
 
 ![Latest release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
-A programming environment for cyberphysical programming.
+A programming environment for cyberphysical programming (Linux/macOS/Windows).
 
 ## Getting started
 
@@ -49,7 +49,7 @@ for many of the examples, but adds a ~300MB download to build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
 
-If you have problems, check out the platform-specific build notes in `BUILDING.md`.
+For more information, check out `BUILDING.md`.
 
 ## See Extempore in action
 
