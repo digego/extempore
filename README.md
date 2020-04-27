@@ -45,7 +45,7 @@ version):
 
 If you have problems, check out the platform-specific build notes below.
 
-### Build options
+#### Build options
 
 If you're using the CMake GUI, then these will appear as checkboxes/drop-down
 menus. If you're using CMake from the CLI, then remember that you specify
@@ -74,7 +74,7 @@ Here are a few of the more interesting CMake options:
   portable binary. This option also adds a `package` target to the
   makefile/solution, which can be used to actually generate the zipfile/dmg/deb.
 
-### Build targets
+#### Build targets
 
 The default target will build Extempore, all the dependencies, and AOT-compile
 the standard library (for faster startup). However, in other situations the
@@ -94,9 +94,9 @@ following targets might come in handy:
   (it's pretty big, so make sure you're on an internet connection where you
   don't mind downloading a bunch of data)
 
-### Platform-specific notes
+#### Platform-specific notes
 
-#### macOS
+##### macOS
 
 On **macOS 10.14** (Mojave) Apple removed some of the system OpenGL headers,
 which means that some of Extempore's dependencies (e.g. nanovg) won't build.
@@ -106,7 +106,7 @@ has more details, but if you just want a one-liner to fix it, it's
 
     sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /
 
-#### Linux
+##### Linux
 
 Extempore is built & tested on Ubuntu, but is also known to work with Debian,
 Fedora, Arch, and also inside a docker container.
@@ -116,7 +116,7 @@ package manager. For example, on Ubuntu 20.04:
 
     sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
 
-#### Windows
+##### Windows
 
 Extempore is built & tested on Windows 10 with Visual Studio v15 (2017) and
 Visual Studio v16 (2019). If you don't already have VS installed, you can
