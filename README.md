@@ -59,6 +59,13 @@ Check out these videos:
 - [A Programmer's Guide to Western Music](https://www.youtube.com/watch?v=xpSYWd_aIiI)
 - [Ben's livecoding gig videos](https://benswift.me/livecoding/)
 
+## Contributors
+
+The Extempore core team is [Andrew Sorensen](https://github.com/digego) & [Ben
+Swift](https://github.com/benswift), although many others have made
+contributions as well ([see the full
+list](https://github.com/digego/extempore/graphs/contributors)).
+
 ## Docs & Community
 
 Extempore documentation can be found at https://extemporelang.github.io/docs/
