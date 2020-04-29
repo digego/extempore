@@ -1,8 +1,4 @@
-# Extempore
-
-![`master` branch: build & test](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg?branch=master)
-
-![Latest release](https://github.com/digego/extempore/workflows/Release/badge.svg)
+# Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
 A programming environment for cyberphysical programming (Linux/macOS/Windows).
 
