@@ -471,7 +471,7 @@ void* SchemeProcess::serverImpl()
                         FD_CLR(sock, &readFds);
                         inStrings.erase(sock);
                         ascii_info();
-						printf("ERROR:");
+						printf("INFO:");
                         ascii_default();
                         std::cout << " server: client disconnected" << std::endl;
                         clientSockets.erase(clientSockets.begin() + index);
