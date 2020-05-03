@@ -17,16 +17,15 @@ For platform-specific deps, see "Platform-specific notes" below.
 See the top of `CMakeLists.txt` for all the available build options.
 
 The most relevant option for new Extempore users is the `ASSETS` option. It's
-off by default, but if set to `ON` the Extempore build process will download the
-assets e.g. sound files, 3D model files which are referenced in the examples
-(these asset files live in a [separate
-repo](https://github.com/extemporelang/extempore-assets)).
+off by default, but if set to `ON` the Extempore build process will download a
+bunch of assets (e.g. sound files, 3D model files) which are necessary to run
+many of the Extempore examples. These asset files live in a [separate
+repo](https://github.com/extemporelang/extempore-assets).
 
-It's off by default because it's pretty big (~300MB) download, so make sure
-you're on an internet connection where you don't mind downloading a bunch of
-data. If you don't set `-DASSETS=ON` at build time that's ok---CMake will still
-create an `assets` target which you can "build" afterwards to downoad the assets
-and move them into place.
+This option is off by default because it's a pretty big (~300MB) download. If
+you don't set `-DASSETS=ON` at build time that's ok---CMake will still create an
+`assets` target which you can "build" afterwards to downoad the assets and move
+them into place.
 
 ## Targets
 
