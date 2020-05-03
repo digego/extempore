@@ -16,6 +16,18 @@ For platform-specific deps, see "Platform-specific notes" below.
 
 See the top of `CMakeLists.txt` for all the available build options.
 
+The most relevant option for new Extempore users is the `ASSETS` option. It's
+off by default, but if set to `ON` the Extempore build process will download the
+assets e.g. sound files, 3D model files which are referenced in the examples
+(these asset files live in a [separate
+repo](https://github.com/extemporelang/extempore-assets)).
+
+It's off by default because it's pretty big (~300MB) download, so make sure
+you're on an internet connection where you don't mind downloading a bunch of
+data. If you don't set `-DASSETS=ON` at build time that's ok---CMake will still
+create an `assets` target which you can "build" afterwards to downoad the assets
+and move them into place.
+
 ## Targets
 
 The default target will build Extempore, all the dependencies, and AOT-compile
@@ -30,11 +42,6 @@ following targets might come in handy:
   i.e. the pure-xtlang libraries with no external C library dependencies
 
 - the `clean_aot` target will remove all AOT-compiled files
-
-- the `assets` target won't build anything per. se., but it will download the
-  assets e.g. sound files, 3D model files which are referenced in the examples
-  (it's pretty big, so make sure you're on an internet connection where you
-  don't mind downloading a bunch of data)
 
 ## Platform-specific notes
 
@@ -80,10 +87,7 @@ On Ubuntu 18.04-20.04 you can get the required deps with:
 
 #### Arch
 
-There's an [AUR package](https://aur.archlinux.org/packages/extempore-git/) but
-it's currently out-of-date; [@Lapin0t](https://github.com/Lapin0t/extempore-aur)
-has updated the [build script](https://github.com/Lapin0t/extempore-aur) (March
-2020) which _might_ help, ymmv.
+There's an [AUR package](https://aur.archlinux.org/packages/extempore-git/)
 
 ### Windows
 

@@ -26,6 +26,8 @@ you go.
 
 ### Build from source
 
+**For more information**, check out [BUILDING.md](./BUILDING.md).
+
 Extempore's CMake build process downloads and build all the dependencies you
 need (including LLVM). So, if you've got a C++ compiler, git and CMake, here are
 some one-liner build commands:
@@ -44,8 +46,6 @@ _Note:_ in the above one-liners the `ASSETS` build-time option (boolean, default
 for many of the examples, but adds a ~300MB download to build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
-
-For more information, check out `BUILDING.md`.
 
 ## See Extempore in action
 
