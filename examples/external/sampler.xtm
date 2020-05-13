@@ -6,20 +6,22 @@
 
 ;;; Commentary:
 
-;; NOTE at the moment compiling in a secondary thread is a little
-;; flaky. I'm working on this so in the mean time you'll just have to
-;; put up with the audio delays while compiling
+;; the paths to the sound files used in this example assume that you have the
+;; extempore-assets (https://github.com/extemporelang/extempore-assets), which
+;; you'll have automatically if you downladed a binary release. If you build
+;; from source, you can either download the assets using the "assets" target in
+;; whichever build system (e.g. make) you used to build Extempore, or you can
+;; just use your own samples and change the paths accordingly.
 
 ;;; Code:
 
-;; First, load the library where the sampler infrastructure is
-;; located.  Have a look at this file in your editor to see how the
-;; sampler works.
+;; load the library where the sampler infrastructure is located - you can have a
+;; look at this file in your editor to see how the sampler works
 
 (sys:load "libs/external/instruments_ext.xtm")
 
-;; Now define the sampler instrument and DSP callback function (in
-;; this case, it just calls the sampler closure)
+;; define the sampler instrument and DSP callback function (in this case, it
+;; just calls the sampler closure you just bound with "make-instrument")
 
 (make-instrument sampler sampler)
 
@@ -31,27 +33,30 @@
 
 (dsp:set! dsp)
 
-;; Find a stereo audio file of some kind (not mp3 or aac)
-;; ogg, wav or aif should all be fine
+;; now you'll need an uncompressed stereo audio file of some kind (not mp3 or
+;; aac) - ogg, wav or aiff should all be fine
 
-;; then load up a few excerpts from the file
-;; set-sampler-index takes 7 arguments:
-;; 1) the instrument to load into (in the example above, it's 'sampler')
-;; 2) the audio file to load from
-;; 3) an index (from 0-127) to load into. This should be the base
-;; frequency of the sample, e.g. a middle C sample should be loaded into 60.
-;; 4) an offset in samples (frames without channels)
-;; 5) a duration or length in samples to read
+;; the main function for loading audio data into the sampler is
+;; sampler-populate-slot, which takes 7 arguments:
+
+;; 1) the instrument to load the sample into (in the following example, it's 'sampler')
+;; 2) the audio file containing the audio data
+;; 3) an index (from 0-127) for the slot to load the sample data into. For
+;;    pitched sounds, this should probably be related to the midi note number of
+;;    the audio in the file, e.g. a middle C sample should be loaded into slot 60
+;; 4) an offset in samples (e.g. if you want playback to start somewhere other than
+;;    the start of the file this shouldn't be 0)
+;; 5) a duration or length in samples to read (if you want the whole sound file, use 0)
 ;; 6) a 'sample bank' index (starting from 0)
-;; 7) a flag (0 or 1) indicating whether or not to print info about the sample
+;; 7) a flag (0 or 1) indicating whether or not to print info about the sample as it's loaded
 
 ;; first let's just read in one sample
-;; we'll choose an index of 60 - the midi note number for middle C
+;; we'll choose slot 60 - the midi note number for middle C
 ;; make sure your audio file is long enough for the params below!!
-(set-sampler-index sampler "assets/samples/xmas_carol.wav" 60 0 0 0 1)
+(sampler-populate-slot sampler "assets/samples/xmas_carol.wav" 60 0 0 0 1)
 
-;; playing back at 60 should playback without pitch shift
-(play-note (now) sampler 60 120 (* 44100 15))  ;; play 15 seconds
+;; playing back slot (pitch) 60 should playback without pitch shift
+(play-note (now) sampler 60 120 (* 44100 15)) ;; play 15 seconds
 
 ;; anything else will pitch shift
 ;; floating point is OK
@@ -70,16 +75,16 @@
 ;; (loop (*metro* 'get-beat 4) 8)
 
 ;; Now let's load a 'whole instrument' from a directory of samples!
-(load-sampler sampler "assets/samples/piano/")
+(load-sampler sampler "assets/samples/salamander-piano/mf/")
 
-;; the final two arguments (offset and length) are zero, meaning that
-;; the samper should use an offset of zero and the full length of the
-;; sample (the 'default' behaviour)
+;; the final two arguments (offset and length) are zero, meaning that the
+;; sampler should use an offset of zero and the full length of the sample (the
+;; 'default' behaviour)
 
 ;; There are other parse-filename functions provided in the
-;; libs/external/instruments_ext.xtm file.  If you're having trouble, see
-;; if you can use (or adapt) one of those to make sense of the
-;; filenames you're trying to load into the sampler.
+;; libs/external/instruments_ext-scm.xtm file. If you're having trouble, see if
+;; you can use (or adapt) one of those to make sense of the filenames you're
+;; trying to load into the sampler.
 
 ;; Now, back to making music: loop2 requires pc_ivl-lib
 (sys:load "libs/core/pc_ivl.xtm")

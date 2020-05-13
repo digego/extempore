@@ -61,9 +61,17 @@
      ;; return colors to normal
      (ascii-print-color 0 7 9)))
 
-(define print-error
+(define log-info
   (lambda args
-    (apply pprint-error args)
+    (apply print-info args)))
+
+(define log-warn
+  (lambda args
+    (apply print-warn args)))
+
+(define log-error
+  (lambda args
+    (apply print-error args)
     (error "")))
 
 ;;
@@ -169,7 +177,7 @@
        (if ,predicate
      value
      (if (> cnt ,max-iterations)
-         (begin (print-notification "Dropping out after max-iterations")
+         (begin (log-info "Dropping out after max-iterations")
           'failed)
          (impsym38479k (+ cnt 1))))))))
 
@@ -291,9 +299,9 @@
          ;; check tolerance of return
          (if (> (math:std-deviation l2)
           (if (null? args) 0.0005 (car args)))
-       (begin (print-notification "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
-        (print-notification "clock times: " lst))
-       (begin (print-notification 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
+       (begin (log-info "clock sync outside tolerance - making no time adjustment: " (math:std-deviation l2))
+        (log-info "clock times: " lst))
+       (begin (log-info 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
         (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
 
 
@@ -469,7 +477,7 @@
       (member 0 (map (lambda (r) (modulo dur r)) rhythm-list))))
       (set! rhythm-list (cl:sort rhythm-list >))
       (if (not (= 0 (modulo beats tactus)))
-    (begin (print-error "Tactus must be a subdivision of beats") '())
+    (begin (log-error "Tactus must be a subdivision of beats") '())
     (if #f ;(not (beats-divisible-by-rlst beats))
         (begin (println "Impossible rhythm-list selection") '())
         (let loop ((rl '())
@@ -477,7 +485,7 @@
      (if (null? rl) (list (random rhythm-list)))
      (let ((sum (apply + rl)))
         (cond ((> cnt 500)
-         (print-error "Could not make valid rhythm")
+         (log-error "Could not make valid rhythm")
          '())
         ((> sum beats)
          (loop (cdr rl) (+ cnt 1)))
@@ -799,7 +807,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (io:osc:receive time address . args)
-   (print-notification 'override 'io:osc:receive 'to 'handle 'osc 'events:)
+   (log-info 'override 'io:osc:receive 'to 'handle 'osc 'events:)
    (println time address args))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1004,7 +1012,7 @@
 (define factorial
    (lambda (x)
       (if (< x 0)
-    (print-error 'Factorial 'does 'not 'accept 'negative 'numbers)
+    (log-error 'Factorial 'does 'not 'accept 'negative 'numbers)
     (if (<= x 1) 1
         (* x (factorial (- x 1)))))))
 
@@ -1159,7 +1167,7 @@
            (ft (impc:ti:get-closure-arg-types nn))
            (ct (if ft
                    (map (lambda (x) (impc:ir:get-type-from-str x)) ft)
-                   (print-error 'Function name 'does 'not 'exist 'or 'is 'not 'compiled))))
+                   (log-error 'Function name 'does 'not 'exist 'or 'is 'not 'compiled))))
       (cond ((equal? ct (list *impc:ir:void*
                               (+ *impc:ir:float* *impc:ir:pointer*)
                               (+ *impc:ir:float* *impc:ir:pointer*)
@@ -1217,7 +1225,7 @@
                (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
              (sys:init-mt-audio-buf (length args) zerolatency?)
              )
-            (else (print-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
+            (else (log-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
 
 (define-macro (dsp:set! . names)
   (let ((zerolatency (if (boolean? (car names))
@@ -1796,7 +1804,7 @@
 ;; load, then wait 10s and quit
 (define sys:load-then-quit
   (lambda (filename delay-in-sec)
-    (and
+    (begin
      (sys:load filename)
      (callback (+ (now) (* *second* delay-in-sec)) quit 0))))
 

@@ -1,180 +1,124 @@
-;; passing a length of 0 will read the whole file
-(define-macro (set-sampler-index inst fname index offset lgth bank print?)
-  `(let* ((native ,inst))
-     (if (and (cptr? native)
-              (> ,index 0)
-              (< ,index 128))
-         (set_sample_data_ native
-                           ,fname
-                           (real->integer ,index)
-                           (real->integer ,offset)
-                           (real->integer ,lgth)
-                           (real->integer ,bank)
-                           ,(if (> print? 0) 1 0)))))
+;;; instruments_ext-scm.xtm -- scheme helper functions for loading & playing samplers
 
+;; Author: Anderw Sorensen, Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libsndfile
 
-(define-macro (load-sample inst fname index . bank)
+;;; Commentary:
+
+;; A note on terms:
+
+;; a "sampler" is the instrument
+;; a "slot" is a single sound file (for playback with "play")
+;; a "bank" is a group of (up to 128) "slots" in a given sampler instrument
+
+;;; Code:
+
+(define (sampler-populate-slot inst filename index offset lgth bank print?)
+  (if (and (cptr? inst)
+           (> index 0)
+           (< index 128))
+      (set_sample_data_ inst
+                        filename
+                        (real->integer index)
+                        (real->integer offset)
+                        (real->integer lgth)
+                        (real->integer bank)
+                        (if (> print? 0) 1 0))))
+
+;; TODO - rename this to sampler-load-single or something (but check with SB
+;; first that it's not gonna break his stuff in the middle of a gig)
+(define (load-sample inst filename index . bank)
   (if (null? bank)
-      `(set-sampler-index ,inst ,fname ,index 0 0 0 0)
-      `(set-sampler-index ,inst ,fname ,index 0 0 ,(car bank) 0)))
+      (sampler-populate-slot inst filename index 0 0 0 0)
+      (sampler-populate-slot inst filename index 0 0 (car bank) 0)))
 
-;; (set-sample-offset sampler 60 50000)
+;; (sampler-set-slot-offset sampler 60 50000)
 ;; this would offset the sample at index 60 by 50000 samples
-(define-macro (set-sample-offset inst index offset)
-  `(let ((native ,inst)) ;;(llvm:get-native-closure ,(impc:ti:get-mono-name (symbol->string inst)))))
-     (if (cptr? native)
-         (set_sample_offset_ native
-                             (real->integer ,index)
-                             (real->integer ,offset)))))
+(define (sampler-set-slot-offset inst index offset)
+  (if (cptr? inst)
+      (set_sample_offset_ inst
+                          (real->integer ,index)
+                          (real->integer ,offset))))
 
 ;; must be stereo samples of type wav aif or ogg
-(define-macro (load-sampler sampler path . args)
+;; defaults: bank 0, parser sampler-parse-filename
+(define (load-sampler sampler path . args)
   (let ((bank (if (> (length args) 0) (car args) 0))
-        (parser (if (> (length args) 1) (cadr args) 'parse-sample-names))
-        (midioffset (if (> (length args) 2) (caddr args) 0)))
-    `(let ((cnt 0)
-           (file-list (sys:directory-list (sys:expand-path ,path))))
-       (for-each (lambda (samp-data)
-                   (if samp-data
-                       (begin
-                         (set! cnt (+ cnt 1))
-                         (set-sampler-index ,sampler
-                                            (if (string=? (sys:platform) "Windows")
-                                                (car samp-data)
-                                                (string-append (sys:expand-path ,path) "/" (car samp-data)))
-                                            (+ ,midioffset (cadr samp-data))
-                                            (caddr samp-data)
-                                            (cadddr samp-data)
-                                            ,bank
-                                            0))))
-                 (,parser file-list))
-       (ascii-print-color 0 6 9)
-       (print 'Loaded cnt 'files 'into 'bank#: ,bank)
-       (ascii-print-color 0 7 9)
-       (println)
-       )))
+        (filename-parser (if (> (length args) 1) (cadr args) sampler-parse-filename))
+        (cnt 0))
+    (for-each (lambda (filename)
+                ;; skip hidden files... if you're using samples with hidden
+                ;; filenames then I don't know what's wrong with you
+                (if (not (regex:match? filename "^\\."))
+                    ;; otherwise try and parse it with the filename-parser fn
+                    (let ((samp-data (filename-parser filename)))
+                      (if samp-data
+                          (begin
+                            (sampler-populate-slot sampler
+                                                   (unix-or-Windows (string-append (sys:expand-path path) "/" (car samp-data))
+                                                                    (car samp-data))
+                                                   (cadr samp-data)
+                                                   (caddr samp-data)
+                                                   (cadddr samp-data)
+                                                   bank
+                                                   0)
+                            (set! cnt (+ cnt 1)))))))
+              (sys:directory-list (sys:expand-path path)))
+    (log-info 'Loaded cnt 'files 'into 'bank bank)))
 
-(define load-samples load-sampler)
+(define (clear-sampler sampler . args)
+  (let ((bank (if (> (length args) 0) (car args) 0))
+        (cnt 0))
+    (dotimes (i 128)
+      (if (> (clear_sample_data_ native (real->integer i) (real->integer bank)) 0)
+          (set! cnt (+ cnt 1))))
+    (log-info 'Cleared cnt 'slots 'from 'bank#: ,bank)
+    (println)
+    #t))
 
-(define-macro (clear-sampler sampler . args)
-  (let ((bank (if (> (length args) 0) (car args) 0)))
-    `(let ((native ,sampler) ;(llvm:get-native-closure ,(impc:ti:get-mono-name (symbol->string sampler))))
-           (cnt 0))
-       (dotimes (i 128)
-         (if (> (clear_sample_data_ native (real->integer i) (real->integer ,bank)) 0)
-             (set! cnt (+ cnt 1))))
-       (ascii-print-color 0 6 9)
-       (print 'Cleared cnt 'slots 'from 'bank#: ,bank)
-       (ascii-print-color 0 7 9)
-       (println)
-       #t)))
+;; here are a couple of parser functions which might be useful:
 
-
-
-;; as a start, here are a couple of parser functions which might be useful:
-
-(define note-name-to-midi-number
+;; https://en.wikipedia.org/wiki/Scientific_pitch_notation
+;; e.g. Eb3.aiff -> E flat 3 (which is midi note 51)
+(define scientific-pitch-notation-to-midi-number
   (lambda (name)
-    (let ((result (regex:matched name "([abcdefgABCDEFG])([#b])?(-?[0-9])")))
-        (if (null? result)
-            #f
-            (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
-                  (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
-                        ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
-              (+ offset pc
-                 (cond ((string=? (caddr result) "#") 1)
-                       ((string=? (caddr result) "b") -1)
-                       (else 0))))))))
+    (let ((result (regex:matched name "^([abcdefgABCDEFG])([#b])?(-?[0-9])$")))
+      (if (null? result)
+          #f
+          (let ((offset (+ 12 (* (string->number (cadddr result)) 12)))
+                (pc (case (modulo (- (modulo (char->integer (car (string->list (cadr result)))) 16) 3) 7)
+                      ((0) 0) ((1) 2) ((2) 4) ((3) 5) ((4) 7) ((5) 9) ((6) 11))))
+            (+ offset pc
+               (cond ((string=? (caddr result) "#") 1)
+                     ((string=? (caddr result) "b") -1)
+                     (else 0))))))))
 
 ;; this will match e.g. 60.aiff (where 60 is the midi note number)
-(define parse-sample-names-1
-  (lambda (file-list)
-    (map (lambda (fname)
-           (let ((result (regex:matched fname "([0-9]*)\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
-             (if (null? result)
-                 (begin (if (not (regex:match? fname "^\\."))
-                            (println 'Error: 'cannot 'parse 'filename: fname))
-                        #f)
-                 (list fname                          ; filename
-                       (string->number (cadr result)) ; midi note number
-                       0                              ; offset
-                       0))))                          ; length (0 for whole sample)
-         file-list)))
+(define sampler-parse-midinote-filename
+  (lambda (filename)
+    (let ((result (regex:matched filename "([0-9]+?)\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+      (if (null? result)
+          #f
+          (list filename (string->number (cadr result)) 0 0)))))
 
-;; this will match e.g. Eb3.aiff (representing E flat 3)
-(define parse-sample-names-2
-  (lambda (file-list)
-    (map (lambda (fname)
-           (let ((result (regex:matched fname "^.*?[-_[:space:]]([abcdefgABCDEFG][#b]?[0-9])[^0-9A-Za-z].*(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
-             ;; (println fname ":" result)
-             (if (null? result)
-                 (begin
-                   (if (not (regex:match? fname "^\\."))
-                       (begin
-                         (println 'Error: 'cannot 'parse 'filename: fname)
-                         (println 'Regex-result: result)))
-                   #f)
-                 (list fname                                    ; filename
-                       (note-name-to-midi-number (cadr result)) ; midi note number
-                       0                                        ; offset
-                       0))))                                    ; length (0 for whole sample)
-         file-list)))
+;; match the first pitch (in scientific pitch notation) in the filename if you
+;; need more subtlety (e.g. if there are multiple patterns which might be
+;; matched) then supply a different parser function
+(define sampler-parse-spn-filename
+  (lambda (filename)
+    (let ((result (regex:matched filename  "([abcdefgABCDEFG][#b]?-?[0-9]).*\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")))
+      (if (null? result)
+          #f
+          (list filename (scientific-pitch-notation-to-midi-number (cadr result)) 0 0)))))
 
-(define parse-sample-names
-  (lambda (file-list)
-    (map (lambda (fname)
-           (if (regex:match? fname "([0-9][0-9][0-9]*)\\.(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
-               (car (parse-sample-names-1 (list fname)))
-               (if (regex:match? fname "^.*?[-_[:space:]]([abcdefgABCDEFG][#b]?[0-9])[^0-9A-Za-z].*(wav|WAV|aif|AIF|aiff|AIFF|ogg|OGG)$")
-                   (car (parse-sample-names-2 (list fname)))
-                   #f)))
-         file-list)))
-
-
-
-;; for the MIS piano samples (mf loudness only), avaliable from
-;; http://theremin.music.uiowa.edu/MISpiano.html
-(define parse-MIS-piano-mf
-  (lambda (file-list)
-    (map (lambda (samp-data)
-           (if (and samp-data
-                    (regex:match? (car samp-data) ".*\.mf\..*"))
-               samp-data
-               #f))
-         (parse-sample-names-2 file-list))))
-
-(define parse-MIS-piano-ff
-  (lambda (file-list)
-    (map (lambda (samp-data)
-           (if (and samp-data
-                    (regex:match? (car samp-data) ".*\.ff\..*"))
-               samp-data
-               #f))
-         (parse-sample-names-2 file-list))))
-
-
-;; for NI Akoustik piano samples
-;; Stein-R(A-1)-V(077)-dB(3129)-T(ML)-M(22)-P(1956-04-01).WAV
-(define parse-NI-piano-pp
-  (lambda (file-list)
-    (let loop ((unparsed-files file-list)
-               (samp-data-list '())
-               (loaded-notes '()))
-      (if (null? unparsed-files)
-          samp-data-list
-          (let ((result (regex:matched (car unparsed-files)
-                                       ".*-R\\(([ABCDEFG][#b]?-?[0-9])\\)-.*-M\\(([0-9]*)\\)-.*")))
-            (if (null? result)
-                (loop (cdr unparsed-files) samp-data-list loaded-notes)
-                (if (member (cadr result) loaded-notes)
-                    (loop (cdr unparsed-files) samp-data-list loaded-notes)
-                    (loop (cdr unparsed-files)
-                          (cons (list (car unparsed-files)
-                                      (+ 12 (note-name-to-midi-number (cadr result)))
-                                      0 0)
-                                samp-data-list)
-                          (cons (cadr result) loaded-notes)))))))))
-
+;; the "default" one, will try a few common naming conventions, and bail out
+;; otherwise
+(define sampler-parse-filename
+  (lambda (filename)
+    (or (sampler-parse-midinote-filename filename)
+        (sampler-parse-spn-filename filename)
+        #f)))
 
 ;; General MIDI drum note numbers
 
@@ -278,4 +222,3 @@
     ("open-triangle" . 81)
     ("mute-surdo" . 86)
     ("open-surdo" . 87)))
-

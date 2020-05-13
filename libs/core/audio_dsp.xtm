@@ -334,7 +334,7 @@
 (bind-func saw_c
   (lambda (mod inverted:i1)
     (let ((inc:float 0.0) (absinc 0.0:f) (out 0.0)
-          (rising (if inverted #t #f))
+          (rising (if inverted 1 0))
           (inv (if inverted -1.0 1.0)))
       (lambda (amp:float frq:float)
         (set! inc (/ frq SRs))
@@ -350,7 +350,7 @@
 
 (bind-func saw_c
   (lambda (mod)
-    (saw_c:[[float,float,float]*,float,i1]* mod #f)))
+    (saw_c:[[float,float,float]*,float,i1]* mod 0)))
 
 (bind-func saw_mc_c
   (lambda (mod inverted)
@@ -363,7 +363,7 @@
 
 (bind-func saw_mc_c
   (lambda (mod)
-    (saw_mc_c:[[float,i64,float,float]*,float,i1]* mod #f)))
+    (saw_mc_c:[[float,i64,float,float]*,float,i1]* mod 0)))
 
 
 ;; simple pulsewave
@@ -447,22 +447,25 @@
 
 ;; (sys:load "libs/core/bleptables.xtm")
 
-(bind-val BLEPTable |4096,double|* (halloc (* 4096 8)))
-(bind-val fBLEPTable |4096,float|* (halloc (* 4096 4)))
-(bind-val BLEPTable_8_BLKHAR |4096,double|* (halloc (* 4096 8)))
-(bind-val fBLEPTable_8_BLKHAR |4096,float|* (halloc (* 4096 4)))
+(bind-val BLEPTable |4096,double|*)
+(bind-val fBLEPTable |4096,float|*)
+(bind-val BLEPTable_8_BLKHAR |4096,double|*)
+(bind-val fBLEPTable_8_BLKHAR |4096,float|*)
 
 (bind-func static load_blep_tables_from_blob
   (lambda (fname:i8*)
-    (let ((fptr (fopen fname "rb")))
-      (if (null? fptr)
-          (begin (println "Failed to open bleptables.dump") void)
+    (let ((data (sys_slurp_file fname)) ;; data will be heap-allocated
+          (offset 0))
+      (if (null? data)
+          (begin (println "Failed to open bleptable dump file") void)
           (begin
-            (fread (convert BLEPTable) (* 4096 8) 1 fptr)
-            (fread (convert fBLEPTable) (* 4096 4) 1 fptr)
-            (fread (convert BLEPTable_8_BLKHAR) (* 4096 8) 1 fptr)
-            (fread (convert fBLEPTable_8_BLKHAR) (* 4096 4) 1 fptr)
-            (fclose fptr)
+            (set! BLEPTable (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 8)))
+            (set! fBLEPTable (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 4)))
+            (set! BLEPTable_8_BLKHAR (convert (pref-ptr data offset)))
+            (set! offset (+ offset (* 4096 8)))
+            (set! fBLEPTable_8_BLKHAR (convert (pref-ptr data offset)))
             void)))))
 
 (impc:aot:do-or-emit
@@ -482,7 +485,7 @@
 (bind-func static blep_n
   (lambda (table:SAMPLE* tablelen:SAMPLE mod:SAMPLE inc:SAMPLE height:SAMPLE rising:i1 num_points:SAMPLE interp:i1)
     (let ((blep 0.0) (t 0.0) (table_centre (- (/ tablelen 2.0) 1.0))
-          (doright #t) (frac 0.0)
+          (doright:i1 1) (frac 0.0)
           (i:i64 1) (idx 0.0))
       ;; left side
       (while (<= i (convert num_points))
@@ -508,7 +511,7 @@
               (if (not rising)
                   (set! blep (* blep -1.0)))
               (set! blep (* blep height))
-              (set! doright #f)
+              (set! doright 0)
               (set! i (convert num_points))))
         (set! i (+ i 1)))
       ;; reset for right side or done?
@@ -557,7 +560,7 @@
 ;; (bind-func blsaw_c
 ;;   (lambda (mod inverted:i1)
 ;;     (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
-;;           (rising (if inverted #t #f))
+;;           (rising (if inverted 1 0))
 ;;           (inv (if inverted -1.0 1.0)))
 ;;       (lambda (amp:float frq:float)
 ;;         (set! inc (/ frq SRs))
@@ -589,7 +592,7 @@
 (bind-func blsaw_c
   (lambda (mod inverted:i1 highcpu:i1)
     (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
-          (rising (if inverted #t #f))
+          (rising (if inverted 1 0))
           (inv (if inverted -1.0 1.0)))
       (lambda (amp:float frq:float)
         (set! inc (/ frq SRs))
@@ -601,7 +604,7 @@
             (set! mod (+ mod 1.0)))
         (set! blep
               (if highcpu
-                  (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 rising 4.0 #f)
+                  (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 rising 4.0 0)
                   (poly_blep mod (fabs inc) 1.0 rising)))
         (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
         (set! mod (+ mod inc)) ;; update mod
@@ -609,11 +612,11 @@
 
 (bind-func blsaw_c
   (lambda (mod inverted)
-    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod inverted #f)))
+    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod inverted 0)))
 
 (bind-func blsaw_c
   (lambda (mod)
-    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod #f #f)))
+    (blsaw_c:[[float,float,float]*,float,i1,i1]* mod 0 0)))
 
 (bind-func blsaw_mc_c
   (lambda (mod inverted highcpu)
@@ -626,11 +629,11 @@
 
 (bind-func blsaw_mc_c
   (lambda (mod inverted)
-    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod inverted #f)))
+    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod inverted 0)))
 
 (bind-func blsaw_mc_c
   (lambda (mod)
-    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod #f #f)))
+    (blsaw_mc_c:[[float,i64,float,float]*,float,i1,i1]* mod 0 0)))
 
 ;;;;;;;;;;;; pulse waves
 
@@ -713,7 +716,7 @@
             (set! mod (+ mod 1.0)))
         ;; saw 1
         ;; inline polyblep
-        (set! blep (poly_blep mod (fabs inc) 1.0 #f))
+        (set! blep (poly_blep mod (fabs inc) 1.0 0))
         (set! saw1 (+ blep (- (* mod 2.0) 1.0)))
         ;; saw 2
         ;; first calc offset for saw2 based on pw
@@ -728,7 +731,7 @@
             (set! mod2 (+ mod2 1.0)))
         ;; saw 2
         ;; inline polyblep
-        (set! blep (poly_blep mod2 (fabs inc) 1.0 #f))
+        (set! blep (poly_blep mod2 (fabs inc) 1.0 0))
         (set! saw2 (+ blep (- (* mod2 2.0) 1.0)))
         ;; subtract 180 out of phase
         (set! out (- (* 0.5 saw1) (* 0.5 saw2)))
@@ -760,8 +763,8 @@
             (set! mod (+ mod 1.0)))
         ;; saw 1
         (set! blep (if highcpu
-                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 #f 4.0 #f)
-                       (poly_blep mod (fabs inc) 1.0 #f)))
+                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 0 4.0 0)
+                       (poly_blep mod (fabs inc) 1.0 0)))
         (set! saw1 (+ blep (- (* mod 2.0) 1.0)))
         ;; saw 2
         ;; first calc offset for saw2 based on pw
@@ -776,8 +779,8 @@
             (set! mod2 (+ mod2 1.0)))
         ;; now calc saw 2
         (set! blep (if highcpu
-                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod2 (fabs inc) 1.0 #f 4.0 #f)
-                       (poly_blep mod2 (fabs inc) 1.0 #f)))
+                       (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod2 (fabs inc) 1.0 0 4.0 0)
+                       (poly_blep mod2 (fabs inc) 1.0 0)))
         (set! saw2 (+ blep (- (* mod2 2.0) 1.0)))
         ;; subtract 180 out of phase
         (set! out (- (* 0.5 saw1) (* 0.5 saw2)))
@@ -792,7 +795,7 @@
 ;; mod is phase (0.0-1.0)
 (bind-func blpulse_c
   (lambda (mod)
-    (blpulse_c:[[float,float,float,float]*,float,i1]* mod #f)))
+    (blpulse_c:[[float,float,float,float]*,float,i1]* mod 0)))
 
 
 ;;;;;;;;;;;;; triangle waves
@@ -2200,7 +2203,7 @@ but v1 and v2 can be computed in parallel"
                  (= chan 0))
             (begin
               (set! iotn 0)
-              (aset! active gidx #t)
+              (aset! active gidx 1)
               (aset! lengths gidx (+ dlo (* (- dhi dlo) (random))))
               (aset! amps gidx (+ alo (* (- ahi alo) (random))))
               (aset! panning gidx (+ plo (* (- phi plo) (random))))
@@ -2219,7 +2222,7 @@ but v1 and v2 can be computed in parallel"
         (set! cnt (+ cnt 1))
         (set! out 0.0)
         (dotimes (i 200)
-          (if (= #t (aref active i))
+          (if (= 1:i1 (aref active i))
               (begin
                 (set! idx (+ (aref startidx i)
                              chan
@@ -2235,7 +2238,7 @@ but v1 and v2 can be computed in parallel"
                       (aset! durations i (- (aref durations i) (aref rates i)))))
                 (if (< (aref durations i) 8.0)
                     (begin
-                      (aset! active i #f)
+                      (aset! active i 0)
                       void)
                     void))))
         (+ (* (- 1.0 wet) in)
@@ -2285,7 +2288,7 @@ but v1 and v2 can be computed in parallel"
                  (= chan 0))
             (begin
               (set! iotn 0)
-              (aset! active gidx #t)
+              (aset! active gidx 1)
               (aset! lengths gidx (+ dlo (* (- dhi dlo) (random))))
               (aset! amps gidx (+ alo (* (- ahi alo) (random))))
               (aset! panning gidx (+ plo (* (- phi plo) (random))))
@@ -2304,7 +2307,7 @@ but v1 and v2 can be computed in parallel"
         (set! cnt (+ cnt 1))
         (set! out 0.0)
         (dotimes (i 200)
-          (if (= #t (aref active i))
+          (if (= 1:i1 (aref active i))
               (begin
                 (set! idx (+ (aref startidx i)
                              chan
@@ -2324,7 +2327,7 @@ but v1 and v2 can be computed in parallel"
                       (aset! durations i (- (aref durations i) (aref rates i)))))
                 (if (< (aref durations i) 8.0)
                     (begin
-                      (aset! active i #f)
+                      (aset! active i 0)
                       void)
                     void))))
         (+ (* (- 1.0 wet) in)
@@ -3006,7 +3009,7 @@ but v1 and v2 can be computed in parallel"
           (out:SAMPLE 0.0)
           (time:SAMPLE 0.0)
           (aa 0.0) (dd 0.0)
-          (cycle:i1 #f)
+          (cycle:i1 0)
           (inc1 0.0) (inc2 0.0) (inc3 0.0))
       (lambda (chan:i64 g a d ela eld)
         (if (<> chan 0)
@@ -3087,7 +3090,7 @@ but v1 and v2 can be computed in parallel"
                       (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
                                               targetRatio)))
                               rate))))
-          (retrigger #f)
+          (retrigger:i1 0)
           (targetRatioA 0.3)
           (targetRatioDR 0.0001)
           (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4)
@@ -3112,7 +3115,7 @@ but v1 and v2 can be computed in parallel"
         (if (= chan 0)
             (begin
               (if retrigger
-                  (begin (set! retrigger #f)
+                  (begin (set! retrigger 0)
                          ;; (set! out 0.0)
                          (set! state env_attack)))
               (if (<> a old_a)
@@ -3176,7 +3179,7 @@ but v1 and v2 can be computed in parallel"
                       (exp (/ (* -1.0 (log (/ (+ 1.0 targetRatio)
                                               targetRatio)))
                               rate))))
-          (retrigger #f)
+          (retrigger:i1 0)
           (targetRatioA 0.3)
           (targetRatioDR 0.0001)
           (env_idle 0) (env_attack 1) (env_decay 2) (env_sustain 3) (env_release 4) (env_predelay 5)
@@ -3202,7 +3205,7 @@ but v1 and v2 can be computed in parallel"
         (if (= chan 0)
             (begin
               (if retrigger
-                  (begin (set! retrigger #f)
+                  (begin (set! retrigger 0)
                          ;; (set! out 0.0)
                          (set! state env_attack)))
               (if (<> a old_a)
@@ -3273,12 +3276,12 @@ but v1 and v2 can be computed in parallel"
 
 (bind-func static retrigger_adsr
   (lambda (adsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
-    (cset! adsr retrigger #t i1) ;; 1 == env_attack
+    (cset! adsr retrigger 1 i1) ;; 1 == env_attack
     void))
 
 (bind-func static retrigger_dadsr
   (lambda (dadsr:[SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*)
-    (cset! dadsr retrigger #t i1) ;; 1 == env_attack
+    (cset! dadsr retrigger 1 i1) ;; 1 == env_attack
     void))
 
 

@@ -38,8 +38,7 @@
 #include <string>
 #include <unordered_map>
 
-#ifdef EXT_BOOST
-//#include <boost/asio.hpp>
+#ifdef _WIN32
 #include <experimental/buffer>
 #include <experimental/executor>
 #include <experimental/internet>
@@ -62,7 +61,7 @@ private:
 private:
     std::string                   m_title;
     SchemeProcess*                m_process;
-#ifdef EXT_BOOST
+#ifdef _WIN32
     std::experimental::net::ip::tcp::socket* m_serverSocket;
     std::experimental::net::io_context*      m_serverIoService;
 #else

@@ -133,13 +133,19 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
             SCHEME_OUTPORT_STRING_LENGTH - 1);
     FILE* initscm = fopen((m_loadPath + "runtime/init.xtm").c_str(), "r");
     if (!initscm) {
-        std::cout << "ERROR: Could not locate file: init.xtm" << std::endl << "Exiting system!!" << std::endl;
+ 	    ascii_error();
+		printf("ERROR:");
+		ascii_normal();
+        std::cout << " could not locate file init.xtm, exiting." << std::endl;
         exit(1);
     }
     scheme_load_file(m_scheme, initscm);
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (m_serverSocket < 0) {
-        std::cout << "Error opening extempore socket" << std::endl;
+	    ascii_error();
+		printf("ERROR:");
+		ascii_normal();
+        std::cout << " could not open Extempore socket" << std::endl;
         return;
     }
     int flag = 1;
@@ -163,13 +169,18 @@ bool SchemeProcess::start(bool subsume)
     address.sin_port = htons(m_serverPort);
     address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
     if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
-        std::cout << "Error binding extempore address to socket" << std::endl;
-        //[NativeScheme::LOGVIEW error:[[NSString alloc] initWithString:@"Error binding to socket 7010. Is Impromptu already running? Close any open Impromptu instances and restart"]];
+		ascii_error();
+		printf("ERROR:");
+		ascii_normal();
+        std::cout << " server: could not bind server socket on port " << m_serverPort << std::endl;
         m_running = false;
         return false;
     }
     if (listen(m_serverSocket, 5) < 0) {
-        std::cout << "Problem listening to extempore socket" << std::endl;
+	    ascii_error();
+		printf("ERROR:");
+		ascii_normal();
+        std::cout << " problem listening to extempore socket" << std::endl;
         m_running = false;
         return false;
     }
@@ -424,10 +435,10 @@ void* SchemeProcess::serverImpl()
             }
             numFds = int(res) + 1;
             FD_SET(res, &readFds); //add new socket to the FD_SET
-            ascii_warning();
-            printf("New Client Connection\n");
-            ascii_normal();
-            fflush(stdout);
+			ascii_info();
+			printf("INFO:");
+			ascii_default();
+			std::cout << " server: accepted new connection to " << m_name << " process" << std::endl;
             clientSockets.push_back(res);
             inStrings[res].clear();
             std::string outString;
@@ -459,17 +470,19 @@ void* SchemeProcess::serverImpl()
                     if (unlikely(!res)) { //close the socket
                         FD_CLR(sock, &readFds);
                         inStrings.erase(sock);
-                        ascii_warning();
-                        std::cout << "Close Client Socket" << std::endl;
-                        ascii_normal();
+                        ascii_info();
+						printf("INFO:");
+                        ascii_default();
+                        std::cout << " server: client disconnected" << std::endl;
                         clientSockets.erase(clientSockets.begin() + index);
                         closesocket(sock);
                         --index;
                         break;
                     } else if (unlikely(res < 0)) {
                         ascii_error();
-                        printf("Error with socket read from extempore process %s", strerror(errno));
-                        ascii_normal();
+						printf("ERROR:");
+						ascii_default();
+						std::cout << " in socket read from extempore process " << strerror(errno) << std::endl;
                         break;
                     }
                     auto& string(inStrings[sock]);
@@ -481,7 +494,9 @@ void* SchemeProcess::serverImpl()
                     }
                     if (unlikely(j > 1024 *10)) {
                         ascii_error();
-                        printf("Error reading eval string from server socket. No terminator received before 10MB limit.\n");
+						printf("ERROR:");
+						ascii_default();
+                        std::cout << " eval string too large (no terminator received before 10MB limit)" << std::endl;
                         ascii_normal();
                         string.clear();
                         break;

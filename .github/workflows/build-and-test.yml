@@ -1,0 +1,42 @@
+name: Build & run tests
+
+on: push
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-16.04
+          - ubuntu-latest
+          - macos-latest
+          - windows-2016
+          - windows-latest
+        config:
+          - Release
+        include:
+          - os: windows-2016
+            cmake-generator: -G "Visual Studio 15 2017" -A x64
+          - os: windows-latest
+            cmake-generator: -G "Visual Studio 16 2019" -A x64
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - if: contains(matrix.os, 'ubuntu')
+        name: deps
+        run: |
+          sudo apt update
+          sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+
+      - name: configure
+        run: mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
+
+      - name: build
+        run: cmake --build build --config ${{ matrix.config }}
+
+      - name: test
+        run: cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core

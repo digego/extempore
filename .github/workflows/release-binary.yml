@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build:
+    name: build & upload the zipfile to the GitHub releases page
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-16.04
+          - ubuntu-latest
+          - macos-latest
+          - windows-2016
+          - windows-latest
+        include:
+          - os: windows-2016
+            cmake-generator: -G "Visual Studio 15 2017" -A x64
+          - os: windows-latest
+            cmake-generator: -G "Visual Studio 16 2019" -A x64
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - if: contains(matrix.os, 'ubuntu')
+        name: deps
+        run: |
+          sudo apt update
+          sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+
+      - name: configure
+        run: mkdir build && cd build && cmake ${{ matrix.cmake-generator }} -DPACKAGE=ON ..
+
+      - name: build
+        run: cmake --build build --config Release --target package
+
+      - id: tag-name
+        name: get git tag name
+        uses: olegtarasov/get-tag@v2
+
+      - name: upload zipfile to release
+        uses: svenstaro/upload-release-action@v1-release
+        with:
+          repo_token: ${{ secrets.EXTEMPORE_RELEASE_TOKEN }}
+          file: build/extempore.zip
+          asset_name: extempore-${{ steps.tag-name.outputs.tag }}-${{ matrix.os }}.zip
+          tag: ${{ github.ref }}
+          overwrite: true

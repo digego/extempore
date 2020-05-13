@@ -47,7 +47,7 @@
 #include <mach/thread_act.h>
 #endif
 
-#define _EXTTHREAD_DEBUG_
+// #define _EXTTHREAD_DEBUG_
 
 namespace extemp
 {

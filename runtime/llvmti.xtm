@@ -3143,26 +3143,14 @@
 
 (define impc:aot:print-compilation-details
   (lambda (start-time)
-    (print-with-colors 'yellow 'default #t
-                       (print "Total compile time: "))
-    (print (- (clock:clock) start-time) "seconds\n\n")
-    (print-with-colors 'black 'blue #t (print " Types "))
-    (print "\n  " (length *impc:ti:typealias-cache*))
-    (print-with-colors 'cyan 'default #f (print " type aliases\n"))
-    (print "  " (length *impc:ti:generictype-cache*))
-    (print-with-colors 'cyan 'default #f (print " named types\n"))
-    (print "  " (length *impc:ti:namedtype-cache*))
-    (print-with-colors 'cyan 'default #f (print " generic\n"))
-    (print "  " (length *impc:ti:polytype-cache*))
-    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))
-
-    (print-with-colors 'black 'blue #t (print " Closures "))
-    (print "\n  " (length *impc:ti:closure-cache*))
-    (print-with-colors 'cyan 'default #f (print " top-level closures\n"))
-    (print "  " (length *impc:ti:genericfunc-cache*))
-    (print-with-colors 'cyan 'default #f (print " generics\n"))
-    (print "  " (length *impc:ti:polyfunc-cache*))
-    (print-with-colors 'cyan 'default #f (print " specializations\n\n"))))
+    (log-info "Total compile time:" (real->integer (- (clock:clock) start-time)) "seconds")
+    (log-info "type aliases:" (length *impc:ti:typealias-cache*))
+    (log-info "named types:" (length *impc:ti:namedtype-cache*))
+    (log-info "generic types:" (length *impc:ti:generictype-cache*))
+    (log-info "type specialisations:" (length *impc:ti:polytype-cache*))
+    (log-info "top-level closures:" (length *impc:ti:closure-cache*))
+    (log-info "generic functions:" (length *impc:ti:genericfunc-cache*))
+    (log-info "function specialisations:" (length *impc:ti:polyfunc-cache*))))
 
 (define-macro (unix-or-Windows unix-expr win-expr)
   (if (string=? (sys:platform) "Windows")
@@ -3208,7 +3196,7 @@
             (set! *impc:compile:scheme-stubs* #f)
             ;; turn off aot-cache loading
             (set! *impc:compiler:with-cache* #f)
-            (print-with-colors 'cyan 'black #t (print "Started compiling: "))
+            (log-info "Started compiling: ")
             (if asdll? ;; need to preregister init function
                 (impc:ti:register-new-nativefunc
                      (string-append file-no-extension "_init")
@@ -3239,17 +3227,13 @@
                 "%res = call i32 @run_adhoc_W2kzMixpMzIsaTgqKl0_native(i32 %args, i8** %argv);
                 ret i32 %res;
               }")))
-            (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
+            (log-info "Finished compiling:" file-path)
             (println file-path)
-            (println)
             ;; turn back on scheme stubs
             (set! *impc:compile:scheme-stubs* #t)
             ;; turn back on cache loading
             (set! *impc:compiler:with-cache* #t)
-            (begin
-              (println)
-              (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
-              (print "\n"))
+            (log-info "JIT-compiling IR...")
             (let ((module (impc:compiler:flush-jit-compilation-queue)))
               (if (not module)
                   (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
@@ -3320,18 +3304,10 @@
                         ;; module name for globals
                         (set! *impc:compiler:global-module-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
-                        (print-with-colors 'cyan 'black #t (print "Started compiling: "))
-                        (println lib-path)
-                        (println)
+                        (log-info "started compiling" lib-path)
                         (sys:load lib-path)
-                        (println)
-                        (print-with-colors 'cyan 'black #t (print "Finished compiling: "))
-                        (println lib-path)
-                        (println)
-                        (begin
-                          (println)
-                          (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
-                          (print "\n"))
+                        (log-info "finished compiling" lib-path)
+                        (log-info "JIT-compiling IR...")
                         (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
                         ;; this won't be straight forward without linking in all relevant ll files :(
                         ;; (sys:command (string-append llas-path " " ll-path " -o " bc-path))
@@ -3439,7 +3415,7 @@
     (if (equal? *impc:zone* zone)
         (set! *impc:zone* (sys:default-mzone)))
     (if (equal? zone (sys:default-mzone))
-        (print-notification "You are not allowed to destroy the default zone")
+        (log-info "You are not allowed to destroy the default zone")
         (sys:destrop-mzone zone))))
 
 (define icr:set-zone
@@ -6408,7 +6384,7 @@ Continue executing `body' forms until `test-expression' returns #f"
         (= (length gt) (length (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))))
          (set! tt (impc:ir:get-type-from-str (llvm:get-named-type (car tt))))
          (set! subcheck #f)))
-         ;;(print-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
+         ;;(log-error 'Compiler 'Error: 'type 'mismatch 'in 'generics gt '- tt)))
 
        ;; GCHANGE
        ;; we might be able to update-vars based by matching our request 'gt vs our result 'tt
@@ -6660,7 +6636,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                 #f)
               (begin ;; (println 'hit-recursion-limit)
                 ;; (println 'vars vars)
-                (print-error 'Compiler 'Error: 'hit 'generics 'recursion 'limit 'request req?)
+                (log-error 'Compiler 'Error: 'hit 'generics 'recursion 'limit 'request req?)
                 #f)))
       ;; (if (not (equal? gpoly-type (car grtype)))
       ;;     (begin (println 'RET: gpoly-type '-> grtype)
@@ -7911,7 +7887,7 @@ xtlang's `let' syntax is the same as Scheme"
           (set! t b))
       ;; return intersection of b and c
       (if (null? t)
-          t ;;(print-error 'Compiler 'Error: 'cannot 'unify 'then b 'and 'else c 'in ast) ;(map (lambda (v) (impc:ir:get-type-str v)) b) 'and 'else (map (lambda (v) (impc:ir:get-type-str v)) c) 'clauses 'in ast)
+          t ;;(log-error 'Compiler 'Error: 'cannot 'unify 'then b 'and 'else c 'in ast) ;(map (lambda (v) (impc:ir:get-type-str v)) b) 'and 'else (map (lambda (v) (impc:ir:get-type-str v)) c) 'clauses 'in ast)
           t))))
 
 
@@ -8835,7 +8811,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                  ((eq? (car ast) '/) "xtm_division##")
                                                                  ((eq? (car ast) '-) "xtm_subtraction##")
                                                                  ((eq? (car ast) '%) "xtm_modulo##")
-                                                                 (else (print-error "Error in math overloading")))
+                                                                 (else (log-error "Error in math overloading")))
                                                            (number->string *unique-polynum*)))))
                      (insert-at-index 1 vars (list m))
                      (set-car! ast m)
@@ -8850,7 +8826,7 @@ xtlang's `let' syntax is the same as Scheme"
                                                                  ((eq? (car ast) '>) "xtm_greaterthan##")
                                                                  ((eq? (car ast) '=) "xtm_equal##")
                                                                  ((eq? (car ast) '<>) "xtm_notequal##")
-                                                                 (else (print-error "Error in math overloading")))
+                                                                 (else (log-error "Error in math overloading")))
                                                            (number->string *unique-polynum*)))))
                      (insert-at-index 1 vars (list m))
                      (set-car! ast m)
@@ -10112,7 +10088,7 @@ xtlang's `let' syntax is the same as Scheme"
                                  (map (lambda (x) (impc:ir:get-type-from-str x))
                                       (impc:ti:get-closure-arg-types symname-string))))
            (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
-                                        ;(print-error "stop")
+                                        ;(log-error "stop")
       (if *impc:compiler:print-ast* (println '---------------------------------))
       (if *impc:compiler:print-ast* (println 'types: types))
                                         ;(println 'ctypes: converted-types)
@@ -10787,7 +10763,7 @@ xtlang's `let' syntax is the same as Scheme"
               (begin (ipc:call procname 'bind-func-ipc
                                (string->symbol (vector-ref (car polytypes) 0)))
                      (ipc:define procname symname (eval symname)))
-              (print-error "Not a monomorphic xtlang function:" symname))))))
+              (log-error "Not a monomorphic xtlang function:" symname))))))
 
 (define ipc:load
   (lambda (process-name file)

@@ -5,11 +5,11 @@
 
 ;;; Commentary:
 
-;; Simplest possible OSC example
+;; simple OSC examples in both Scheme and xtlang
 
 ;;; Code:
 
-;; start three osc servers
+;; start two osc servers
 (io:osc:start-server 7009 "osc-receive-7009")
 (io:osc:start-server 7019 "osc-receive-7019")
 
@@ -38,7 +38,7 @@
 ;;
 ;; by default all extempore osc ints and floats
 ;; are 32bit (i.e. not 64bit)
-;; finally, osc messages are bit endian
+;; finally, osc messages are big endian
 ;; so you'll likely need to swap your arguments
 (bind-func osc_receive_7020
   (lambda (address:i8* types:i8* args:i8*)
@@ -51,7 +51,7 @@
 ;; define a sending address
 (define addy3 (cons "localhost" 7020))
 
-;; start server pointing to native wrapper around osc_receive_7020 closure
+;; start another server pointing to native wrapper around osc_receive_7020 closure
 (io:osc:start-server 7020
                      (impc:ti:get-mono-name osc_receive_7020)
                      (llvm:get-function-pointer

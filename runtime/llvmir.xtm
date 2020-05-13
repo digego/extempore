@@ -1896,7 +1896,7 @@
            (closure (impc:ir:gname))
            (type-str (impc:ir:compiler (if (null? (cadddr ast))
                                            (if (null? hint?)
-                                               (print-error 'Compiler 'Error: 'could 'not 'discern 'ref 'type 'for
+                                               (log-error 'Compiler 'Error: 'could 'not 'discern 'ref 'type 'for
                                                             (string-append (symbol->string (cadr ast)) "." (caddr ast))
                                                             'please 'provide 'explicit 'type 'i.e. '(f.name:<type>))
                                                (impc:ir:get-type-str (car hint?)))
@@ -2167,7 +2167,7 @@
                   str))
             (if (number? (car args))
                 (if (<> (abs (car args)) 1)
-                    (print-error "Only allowed 1 or -1 in impc:ir:gname")
+                    (log-error "Only allowed 1 or -1 in impc:ir:gname")
                     (if (< (car args) 0)
                         (begin (impc:ir:addtodict "current"
                                                   (impc:ir:getname "previous")
@@ -2179,7 +2179,7 @@
                 (if (impc:ir:getname (car args))
                     (begin (list (impc:ir:getname (car args))
                                  (impc:ir:gettype (car args))))
-                    (print-error "Could not locate name " (car args) "in impc:ir:gname")))))))
+                    (log-error "Could not locate name " (car args) "in impc:ir:gname")))))))
 
 
 (define impc:ir:compile:eval-var
@@ -2421,7 +2421,7 @@
       (if (not (equal? (cdr (assoc-strcmp (caar ast) types))
                        (impc:ir:get-type-from-str (cadr num))))
 
-          ;; (print-error 'Compiler 'Error: 'type 'conflict 'in 'dotimes: iterator-type (cadr num) ': (car ast))
+          ;; (log-error 'Compiler 'Error: 'type 'conflict 'in 'dotimes: iterator-type (cadr num) ': (car ast))
           (impc:compiler:print-type-mismatch-error iterator-type (cadr num) (car ast)))
 
       (if (and start-value?
@@ -2627,7 +2627,7 @@
       (emit var-str os)
       (emit "; array ref\n" os)
       (if (not (impc:ir:pointer? ttype)) ;; must be an array if we're not a pointer
-          ;; (print-error 'Compiler 'Error: 'array-ref 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr var))
+          ;; (log-error 'Compiler 'Error: 'array-ref 'must 'take 'a 'pointer 'to 'an 'array 'not (cadr var))
           (emit (string-append (impc:ir:gname "val" (impc:ir:get-type-str (caddr ttype))) " = extractvalue "
                                (cadr var) " " (car var) ", " (car idx) "\n") os)
           (begin (emit (string-append (impc:ir:gname "_val" (string-append (impc:ir:get-type-str (caddr ttype)) "*"))
@@ -2942,11 +2942,11 @@
           (if (or (not (impc:ir:vector? _at))
                   (not (impc:ir:vector? _bt))
                   (<> (cadr _at) (cadr _bt)))
-              (print-error 'Compiler 'Error: 'Shuffle 'Type 'Mismatch: _at 'and _bt 'must 'be 'same 'type 'vectors)))
+              (log-error 'Compiler 'Error: 'Shuffle 'Type 'Mismatch: _at 'and _bt 'must 'be 'same 'type 'vectors)))
       ;; total shuffle elements must match vector length
       (if (<> (length (cdddr ast))
               (cadr _at))
-          (print-error 'Compiler 'Error: 'Number 'of 'shuffle 'elements 'must 'match 'vector 'size: (cadr _at)))
+          (log-error 'Compiler 'Error: 'Number 'of 'shuffle 'elements 'must 'match 'vector 'size: (cadr _at)))
       ;; type tests done
       (emit "; shuffle vector\n" os)
       (emit a-str os)
@@ -4200,7 +4200,7 @@
       ;;            (emit (impc:ir:gname "fptr" ftypestr) " = load " (impc:ir:pointer-- (cadr (impc:ir:gname "fptr_"))) ", " (cadr (impc:ir:gname "fptr_")) " " (car (impc:ir:gname "fptr_")) "\n" os))
       ;;     (if (= (impc:ir:get-ptr-depth ftypes) 1)
       ;;         (emit (impc:ir:gname "fptr" ftypestr) " = bitcast " (cadr fptr) " " (car fptr) " to " ftypestr "\n" os)
-      ;;         (print-error 'Compiler 'Error: 'bad 'function 'ptr 'type 'in ast 'type: ftypestr)))
+      ;;         (log-error 'Compiler 'Error: 'bad 'function 'ptr 'type 'in ast 'type: ftypestr)))
       (emit (string-append (if (impc:ir:void? (cadr ftypes))
                                (begin (impc:ir:gname "res" "void") "")
                                (string-append (impc:ir:gname "res" (impc:ir:get-type-str (cadr ftypes))) " = "))
@@ -4422,7 +4422,7 @@
                         (impc:ir:compiler:cmp (cl:position (car ast) '(> < <> =)) ast types)))
                    ((member (car ast) '(+ - * / %))
                     (if (<> (length ast) 3)
-                        (print-error 'Compiler 'Error: ast 'bad 'arity))
+                        (log-error 'Compiler 'Error: ast 'bad 'arity))
                     (if (not (null? hint?))
                         (impc:ir:compiler:math (cl:position (car ast) '(+ - * / %)) ast types (car hint?))
                         (impc:ir:compiler:math (cl:position (car ast) '(+ - * / %)) ast types)))

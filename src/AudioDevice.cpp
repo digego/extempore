@@ -68,7 +68,7 @@
 
 // this is an aribrary maximum
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <thread>
 #endif
 
@@ -510,7 +510,7 @@ AudioDevice::AudioDevice(): m_started(false), buffer(0), m_dsp_closure(nullptr),
 
 AudioDevice::~AudioDevice()
 {
-    if (!UNIV::AUDIO_NONE) {
+    if (stream && !UNIV::AUDIO_NONE) {
         PaError err;
         err = Pa_StopStream(stream);
         if (err != paNoError) {
@@ -621,8 +621,8 @@ void AudioDevice::start()
             TaskScheduler::I());
     if (err != paNoError) {
         ascii_error();
-        std::cerr << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
+        std::cout << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
+        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
         exit(1);
     }
@@ -632,9 +632,9 @@ void AudioDevice::start()
     if(err != paNoError) {
         ascii_error();
         std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
-        std::cerr << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
+        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
-      exit(1);
+        exit(1);
     }
 
     m_started = true;

@@ -36,7 +36,7 @@
 #ifndef EXT_CONDITION
 #define EXT_CONDITION
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <condition_variable>
 #else
 #include "pthread.h"
@@ -51,7 +51,7 @@ class EXTCondition
 {
 private:
     bool                        m_initialised;
-#ifdef EXT_BOOST
+#ifdef _WIN32
     std::condition_variable_any m_cond;
 #else
     pthread_cond_t              m_cond;

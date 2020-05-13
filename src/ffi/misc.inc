@@ -208,20 +208,32 @@ static pointer printFullNoQuotes(scheme* Scheme, pointer Args)
 
 static pointer printError(scheme* Scheme, pointer Args)
 {
-    ascii_error();
-    printf("%s\n", extractCell(Scheme, Args, true).c_str());
-    ascii_normal();
-    fflush(stdout);
-    return Scheme->T;
+  ascii_error();
+  printf("ERROR:");
+  ascii_normal();
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+  fflush(stdout);
+  return Scheme->T;
 }
 
-static pointer printNotification(scheme* Scheme, pointer Args)
+static pointer printInfo(scheme* Scheme, pointer Args)
 {
-    ascii_warning();
-    printf("%s\n", extractCell(Scheme, Args).c_str());
-    ascii_normal();
-    fflush(stdout);
-    return Scheme->T;
+  ascii_info();
+  printf("INFO:");
+  ascii_normal();
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+  fflush(stdout);
+  return Scheme->T;
+}
+
+static pointer printWarn(scheme* Scheme, pointer Args)
+{
+  ascii_warning();
+  printf("WARN:");
+  ascii_normal();
+  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+  fflush(stdout);
+  return Scheme->T;
 }
 
 static pointer getClosureEnv(scheme* Scheme, pointer Args)
@@ -308,8 +320,9 @@ static pointer string_contains(scheme* Scheme, pointer Args)
         { "print", &print_no_new_line }, \
         { "print-full", &printFull }, \
         { "print-full-nq", &printFullNoQuotes }, \
-        { "pprint-error", &printError }, \
-        { "print-notification", &printNotification }, \
+        { "print-error", &printError }, \
+        { "print-info", &printInfo }, \
+        { "print-warn", &printWarn },			   \
         { "get-closure-env", &getClosureEnv }, \
         { "mk-ff", &scmAddForeignFunc }, \
         { "impc:ir:getname", &impcirGetName }, \

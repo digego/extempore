@@ -13,9 +13,9 @@
 
 (xtmtest '(bind-func test_fft
             (lambda (fft_length printq)
-              (let ((signal:kiss_fft_scalar* (zalloc fft_length))
-                    (in:kiss_fft_cpx* (zalloc fft_length))
-                    (out:kiss_fft_cpx* (zalloc fft_length))
+              (let ((signal:kiss_fft_scalar* (alloc fft_length))
+                    (in:kiss_fft_cpx* (alloc fft_length))
+                    (out:kiss_fft_cpx* (alloc fft_length))
                     (i 0)
                     (residual 0.))
                 ;; fill signal buffer with noise
@@ -27,13 +27,13 @@
                       (printf "in[%lld] = %f+%fi\n" i
                               (ftod (tref (pref-ptr in i) 0))
                               (ftod (tref (pref-ptr in i) 1)))))
-                (fft in out fft_length)
+                (fft in out (fft_config fft_length))
                 (if (= printq 1)
                     (dotimes (i fft_length)
                       (printf "out[%lld] = %f+%fi\n" i
                               (ftod (tref (pref-ptr out i) 0))
                               (ftod (tref (pref-ptr out i) 1)))))
-                (ifft out in fft_length)
+                (ifft out in (ifft_config fft_length))
                 (dotimes (i fft_length)
                   (set! residual (+ residual (- (tref (pref-ptr in i) 0)
                                                 (pref signal i)))))
@@ -41,7 +41,7 @@
                 (printf "Average residual = %f\n" (ftod residual))
                 (if (< residual (* 0.00001 (convert fft_length float))) 0 1))))
 
-         (test_fft 4096 0)
+         (test_fft (real->integer 4096) 0)
          0)
 
 (xtmtest-result (test_fft 4 0) 0)
@@ -64,13 +64,13 @@
                 (if (= printq 1)
                     (dotimes (i fft_length)
                       (printf "in[%lld] = %f+%fi\n" i (ftod (pref in i)) (ftod (pref in i)))))
-                (fft in out fft_length)
+                (fft in out (fftr_config fft_length))
                 (if (= printq 1)
                     (dotimes (i (+ 1 (/ fft_length 2)))
                       (printf "out[%lld] = %f+%fi\n" i
                               (ftod (tref (pref-ptr out i) 0))
                               (ftod (tref (pref-ptr out i) 1)))))
-                (ifft out in fft_length)
+                (ifft out in (ifftr_config fft_length))
                 (dotimes (i (+ 1 (/ fft_length 2)))
                   (set! residual (+ residual (- (pref in i) (pref signal i)))))
                 (set! residual (/ residual (i64tof fft_length)))

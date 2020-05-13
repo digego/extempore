@@ -36,7 +36,7 @@
 #ifndef EXT_MUTEX
 #define EXT_MUTEX
 
-#ifdef EXT_BOOST
+#ifdef _WIN32
 #include <mutex>
 #else
 #include "pthread.h"
