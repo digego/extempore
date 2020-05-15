@@ -516,7 +516,7 @@ into any further sexp arguments."
 ;; xtlang strings
 
 ;;
-(bind-type String <size_t,i8*> (printer? . #f)
+(bind-type String <size_t,i8*> (printer? . #f) (copy? . #f)
   "xtlang's string type
 
 Tuple contains <string_length,pointer_to_data>
@@ -528,7 +528,7 @@ Second item in tuple is a char* c-style string ")
 ;; easy String dataconstructors from c strings
 
 ;; zone alloc'ed versions
-
+            
 (bind-func String
   "Create an xtlang String type from a c string (char array)
 
@@ -549,6 +549,39 @@ Allocation size will be (+ (strlen cstr) 1)
 (bind-func Str
   (lambda (cstr:i8*)
     (String cstr)))
+
+;; strings need dedicated zcopy 
+;; so need to override default
+(bind-func zcopy:[String*,String*,mzone*,mzone*]*
+  (lambda (x fromz toz)
+    (if (llvm_ptr_in_zone fromz (cast x i8*))
+        (begin (push_zone toz)
+          (let ((obj (zalloc)))
+            (begin 
+              (tset! obj 0 (tref x 0)))
+            (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*)) 
+                (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
+                  (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1)) 
+                  (tset! obj 1 newptr))
+                (tset! obj 1 (tref x 1)))
+            (pop_zone)
+            obj))
+        x)))
+
+(bind-func hcopy:[String*,String*]*
+  (lambda (x)
+    (let ((size (tref x 0))
+          (obj:String* (halloc))
+          (s:i8* (halloc (+ size 1))))
+      (strcpy s (cast (tref x 1) i8*))
+      (tfill! obj size s)
+      obj)))
+
+(bind-func hfree:[void,String*]*
+  (lambda (x)
+    (free (tref x 1))
+    (free x)
+    void))    
 
 (bind-func String_h
   "Create an xtlang String type from a c string (char array)
@@ -1030,7 +1063,7 @@ If both strings are null an empty String will be returned
 ;; XTLang symbols
 
 ;;
-(bind-type Symbol <size_t,i8*> (printer? . #f)
+(bind-type Symbol <size_t,i8*> (printer? . #f) (copy? . #f)
   "xtlang's symbol type
 
 Tuple contains <symbol_length,characters>
@@ -1123,6 +1156,39 @@ Use via the polymorphic Str function
     (let ((len (length str))
           (new_str (Symbol_z len (cstring str))))
       new_str)))
+
+;; symbols need dedicated zcopy 
+;; so need to override default
+(bind-func zcopy:[Symbol*,Symbol*,mzone*,mzone*]*
+  (lambda (x fromz toz)
+    (if (llvm_ptr_in_zone fromz (cast x i8*))
+        (begin (push_zone toz)
+          (let ((obj (zalloc)))
+            (begin 
+              (tset! obj 0 (tref x 0)))
+            (if (llvm_ptr_in_zone fromz (cast (tref x 1) i8*)) 
+                (let ((newptr:i8* (zalloc (+ 1 (tref x 0)))))
+                  (strcpy newptr (cast (tref x 1) i8*)) ; (+ (tref x 0) 1)) 
+                  (tset! obj 1 newptr))
+                (tset! obj 1 (tref x 1)))
+            (pop_zone)
+            obj))
+        x)))
+
+(bind-func hcopy:[Symbol*,Symbol*]*
+  (lambda (x)
+    (let ((size (tref x 0))
+          (obj:Symbol* (halloc))
+          (s:i8* (halloc (+ size 1))))
+      (strcpy s (cast (tref x 1) i8*))
+      (tfill! obj size s)
+      obj)))
+
+(bind-func hfree:[void,Symbol*]*
+  (lambda (x)
+    (free (tref x 1))
+    (free x)
+    void))    
 
 (bind-func equal
   "Equality test for Symbol
