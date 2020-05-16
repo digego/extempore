@@ -99,17 +99,22 @@
             (eval ,form (interaction-environment))
             (xtmtest-update-test-result func-sym 'correct 'compile-only #t #t))))
 
-(define-macro (xtmtest-result call expected-result)
-  `(let ((evaluation-environment (current-environment))
-         (func-sym (quote ,(car call))))
-     (print-with-colors 'cyan 'default #t (print "xtmtest "))
-     (print-with-colors 'black 'cyan #t (print "" func-sym ""))
-     (println)
-     (catch (xtmtest-update-test-result func-sym ',call 'compile #f #f)
-            (let ((result (eval ',call evaluation-environment)))
-              (if (equal? ,expected-result result)
-                  (xtmtest-update-test-result func-sym 'correct ',call ,expected-result result)
-                  (xtmtest-update-test-result func-sym 'incorrect ',call ,expected-result result))))))
+(define (xtmtest-result-body call expected-result extra)
+  (let ((prefix (if (null? extra) "" (format "~a: " (car extra)))))
+    `(let ((evaluation-environment (current-environment))
+           (test-name (format "~a ~a" ,prefix ',(if (pair? call) (car call) call))))
+       (print-with-colors 'cyan 'default #t (print "xtmtest "))
+       (print-with-colors 'black 'cyan #t (print "" test-name ))
+       (println)
+       (catch (xtmtest-update-test-result test-name ',call 'compile #f #f)
+              (let ((result (eval ',call evaluation-environment)))
+                (if (equal? ,expected-result result)
+                    (xtmtest-update-test-result ',prefix 'correct ',call ,expected-result result)
+                    (xtmtest-update-test-result ',prefix 'incorrect ',call ,expected-result result))))))  )
+
+(define-macro (xtmtest-result call expected-result . extra)
+  (xtmtest-result-body call expected-result extra))
+
 
 (define xtmtest-print-results
   (lambda ()
@@ -179,3 +184,28 @@
                            0)))
           ;; if not quitting, set the timeout back
           (sys:set-default-timeout timeout)))))
+
+;;; xmttest-with-fixture
+
+(define (xtmtest-with-fixture-body name fixture tests)
+  `(let ((fixture-environment ((lambda () (current-environment)))))
+     (let ((suite-name ',name))
+       (print-with-colors 'cyan 'default #t (print "xtmtest "))
+       (print-with-colors 'black 'cyan #t (print "" suite-name))
+       (println)
+       (eval `(begin
+                (define-macro (is? call expected-result . args)
+                  (xtmtest-result-body call
+                                       expected-result
+                                       (list (if (not (null? args))
+                                                 (format "~a.~a" ',suite-name (car args))
+                                                 (format "~a.is?" ',suite-name))))))
+             fixture-environment)
+       (catch (xtmtest-update-test-result suite-name 'no-compile ',fixture #f #f)
+              (eval ',fixture fixture-environment)
+              (eval '(begin ,@tests) fixture-environment)))))
+
+
+(define-macro (xtmtest-with-fixture name fixture . tests)
+  (xtmtest-with-fixture-body name fixture tests))
+
