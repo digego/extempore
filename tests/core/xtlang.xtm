@@ -13,66 +13,66 @@
 
 ;; bit twiddling
 
-(xtmtest '(bind-func test_bit_twiddle_1
+(xtmtest (bind-func test_bit_twiddle_1
             (lambda ()
               (bitwise-and 65535 255 15 1)))
 
          (test_bit_twiddle_1) 1)
 
-(xtmtest '(bind-func test_bit_twiddle_2
+(xtmtest (bind-func test_bit_twiddle_2
             (lambda ()
               (bitwise-not -1)))
 
          (test_bit_twiddle_2) 0)
 
-(xtmtest '(bind-func test_bit_twiddle_3
+(xtmtest (bind-func test_bit_twiddle_3
             (lambda ()
               (bitwise-not 0)))
 
          (test_bit_twiddle_3) -1)
 
-(xtmtest '(bind-func test_bit_twiddle_4
+(xtmtest (bind-func test_bit_twiddle_4
             (lambda ()
               (bitwise-shift-right 65535 8)
               (bitwise-shift-right 65535 4 4)))
 
          (test_bit_twiddle_4) 255)
 
-(xtmtest '(bind-func test_bit_twiddle_5
+(xtmtest (bind-func test_bit_twiddle_5
             (lambda ()
               (bitwise-shift-left (bitwise-shift-right 65535 8) 4 4)))
 
          (test_bit_twiddle_5) 65280)
 
-(xtmtest '(bind-func test_bit_twiddle_6
+(xtmtest (bind-func test_bit_twiddle_6
             (lambda ()
               (bitwise-and (bitwise-or (bitwise-eor 21844 65534) (bitwise-eor 43690 65534)) 1)))
 
          (test_bit_twiddle_6) 0)
 
 ;; integer literals default to 64 bit integers
-(xtmtest '(bind-func int-literal-test
+(xtmtest (bind-func int-literal-test
             (lambda (a)
               (* a 5)))
 
          (int-literal-test 6) 30)
 
 ;; float literals default to doubles
-(xtmtest '(bind-func float-literal-test
+(xtmtest (bind-func float-literal-test
             (lambda (a)
               (* a 5.0)))
 
          (float-literal-test 6.0) 30.0)
 
 ;; you are free to recompile an existing closure
-(xtmtest '(bind-func int-literal-test
+(xtmtest (bind-func int-literal-test
             (lambda (a)
               (/ a 5)))
 
          (int-literal-test 30))
 
 ;; array literals tests
-(xtmtest '(bind-func i64-array-lit-test
+(xtmtest (bind-func i64-array-lit-test
             (lambda ()
               (let ((a 5)
                     (b 6))
@@ -81,21 +81,21 @@
 
          (i64-array-lit-test))
 
-(xtmtest '(bind-func float-array-lit-test
+(xtmtest (bind-func float-array-lit-test
             (lambda ()
               (array 1.0:f 2.0 3.0 4.0 5.0)
               void))
 
          (float-array-lit-test))
 
-(xtmtest '(bind-func float-ref-array-lit-test
+(xtmtest (bind-func float-ref-array-lit-test
             (lambda ()
               (let ((a (array 1.0:f 2.0 3.0)))
                 (aref a 2))))
 
          (float-ref-array-lit-test) 3.0)
 
-(xtmtest '(bind-func tuple-lit-test
+(xtmtest (bind-func tuple-lit-test
             (lambda ()
               (let ((a 5:i64)
                     (b 5.0:double))
@@ -104,7 +104,7 @@
 
          (tuple-lit-test))
 
-(xtmtest '(bind-func tuple-ref-lit-test
+(xtmtest (bind-func tuple-ref-lit-test
             (lambda ()
               (let ((a 5:i64)
                     (b 5.0:double)
@@ -113,7 +113,7 @@
 
          (tuple-ref-lit-test) 5.0)
 
-(xtmtest '(bind-func closure-test1
+(xtmtest (bind-func closure-test1
             (let ((power 0))
               (lambda (x)
                 (set! power (+ power 1)) ;; set! for closure mutation as per scheme
@@ -121,14 +121,14 @@
 
          (closure-test1 2))
 
-(xtmtest '(bind-func closure-returns-closure-test
+(xtmtest (bind-func closure-returns-closure-test
             (lambda ()
               (lambda (x)
                 (* x 3))))
 
          (closure-returns-closure-test))
 
-(xtmtest '(bind-func incrementer-test1
+(xtmtest (bind-func incrementer-test1
             (lambda (i:i64)
               (lambda (incr)
                 (set! i (+ i incr))
@@ -139,7 +139,7 @@
 (define myf (incrementer-test1 0))
 
 ;; so we need to type f properly
-(xtmtest '(bind-func incrementer-test2
+(xtmtest (bind-func incrementer-test2
             (lambda (f:[i64,i64]* x)
               (f x)))
          (incrementer-test2 myf 1) 1)
@@ -155,7 +155,7 @@
 ;; otherwise you just call my-inc-maker directly
 
 ;; this avoids the wrapper completely
-(xtmtest '(bind-func incrementer-test3
+(xtmtest (bind-func incrementer-test3
             (let ((f (incrementer-test1 0)))
               (lambda ()
                 (f 1))))
@@ -171,7 +171,7 @@
 ;; function definitions.
 
 ;; do a little 16bit test
-(xtmtest '(bind-func bitsize-sixteen
+(xtmtest (bind-func bitsize-sixteen
             (lambda (a:i16)
               (dtoi16 (* (i16tod a) 5.0))))
 
@@ -179,7 +179,7 @@
 
 ;; while loop test
 
-(xtmtest '(bind-func test_while_loop_1
+(xtmtest (bind-func test_while_loop_1
             (lambda ()
               (let ((count 0))
                 (while (< count 5)
@@ -194,7 +194,7 @@
 ;; Closures can be recursive
 ;;
 
-(xtmtest '(bind-func recursive-closure-test
+(xtmtest (bind-func recursive-closure-test
             (lambda (a)
               (if (< a 1)
                   (printf "done\n")
@@ -210,7 +210,7 @@
 
 ;; CANNOT RUN THIS TEST ON WINDOWS (i.e. no salloc)!
 (if (not (equal? (sys:platform) "Windows"))
-    (xtmtest '(bind-func tail_opt_test
+    (xtmtest (bind-func tail_opt_test
                 (lambda (n:i64)
                   (let ((a:float* (salloc 8000)))
                     (if (= n 0)
@@ -227,7 +227,7 @@
 ;;
 
 ;; this for type inference check only
-(xtmtest '(bind-func dotimes_inf_test
+(xtmtest (bind-func dotimes_inf_test
             (lambda (len)
               (let ((buf:i8* (salloc len)))
                 (doloop (i len)
@@ -241,7 +241,7 @@
 ;; some anon lambda tests
 ;;
 
-(xtmtest '(bind-func infer_lambdas_test
+(xtmtest (bind-func infer_lambdas_test
             (lambda ()
               (let ((a 5)
                     (b (lambda (x) (* x x)))
@@ -258,7 +258,7 @@
 ;;
 
 ;; make and return a simple tuple
-(xtmtest '(bind-func tuple-test1
+(xtmtest (bind-func tuple-test1
             (lambda ()
               (let ((t:<i64,double,i32>* (alloc)))
                 t)))
@@ -274,7 +274,7 @@
 ;; note that my-test-7's return type is inferred
 ;; by the tuple-reference index
 ;; (i.e. i64 being tuple index 0)
-(xtmtest '(bind-func tuple-test2
+(xtmtest (bind-func tuple-test2
             (lambda ()
               (let ((a:<i64,double>* (alloc)) ; returns pointer to type <i64,double>
                     (b 37)
@@ -300,7 +300,7 @@
 ;; _ (underscore) means don't attempt
 ;; to match against this position in
 ;; the tuple (i.e. skip)
-(xtmtest '(bind-func tuple-bind-test
+(xtmtest (bind-func tuple-bind-test
             (lambda ()
               (let ((t1:<i32,float,<i32,float>*,double>* (alloc))
                     (t2:<i32,float>* (alloc))
@@ -316,7 +316,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some array code with *casting*
 ;; this function returns void
-(xtmtest '(bind-func array-test1
+(xtmtest (bind-func array-test1
             (lambda ()
               (let ((v1:|5,float|* (alloc))
                     (v2:|5,float|* (alloc))
@@ -375,7 +375,7 @@
     (let ((ff (aref v 0))) ; aref alias for array-ref
       (ff 5))))
 
-(xtmtest '(bind-func array-test4
+(xtmtest (bind-func array-test4
             (lambda ()
               (let ((v:|5,[i64,i64]*|* (alloc)) ;; make an array of closures!
                     (vv:|5,i64|* (alloc)))
@@ -389,7 +389,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; some conditionals
 
-(xtmtest '(bind-func cond-test1
+(xtmtest (bind-func cond-test1
             (lambda (x:i64 y)
               (if (> x y)
                   x
@@ -398,7 +398,7 @@
          (cond-test1 12 13))
 
 ;; returns boolean true
-(xtmtest '(bind-func cond-test2
+(xtmtest (bind-func cond-test2
             (lambda (x:i64)
               (cond ((= x 1) (printf "A\n"))
                     ((= x 2) (printf "B\n"))
@@ -445,7 +445,7 @@
          res)))))
 
 ;; make a convenience wrapper
-(xtmtest '(bind-func env-wrap
+(xtmtest (bind-func env-wrap
             (let* ((points 3)
                    (data:double* (zone-alloc (* points 2))))
               (pointer-set! data 0 0.0) ;; point data
@@ -489,7 +489,7 @@
 ;; let's create a closure that capture's 'a'
 
 
-(xtmtest '(bind-func dot-access-test1
+(xtmtest (bind-func dot-access-test1
             (let ((a:i32 6))
               (lambda ()
                 (printf "a:%d\n" a)
@@ -502,7 +502,7 @@
 ;; then we directly set the closures 'a' binding
 ;; then call again
 ;;
-(xtmtest '(bind-func dot-access-test2
+(xtmtest (bind-func dot-access-test2
             (lambda (x:i32)
               (dot-access-test1)
               (dot-access-test1.a:i32 x)
@@ -512,14 +512,14 @@
 
 ;; of course this works just as well for
 ;; non-global closures
-(xtmtest '(bind-func dot-access-test3
+(xtmtest (bind-func dot-access-test3
             (lambda (a:i32)
               (let ((f (lambda ()
                          (* 3 a))))
                 f)))
          (dot-access-test3 1))
 
-(xtmtest '(bind-func dot-access-test4
+(xtmtest (bind-func dot-access-test4
             (lambda ()
               (let ((f (dot-access-test3 5)))
                 (f.a:i32 7)
@@ -529,7 +529,7 @@
          21)
 
 ;; and you can get and set closures also!
-(xtmtest '(bind-func dot-access-test5
+(xtmtest (bind-func dot-access-test5
             (lambda ()
               (let ((f (lambda (x:i64) x)))
                 (lambda (z)
@@ -537,7 +537,7 @@
 
          (dot-access-test5))
 
-(xtmtest '(bind-func dot-access-test6
+(xtmtest (bind-func dot-access-test6
             (lambda ()
               (let ((t1 (dot-access-test5))
                     (t2 (dot-access-test5)))
@@ -574,7 +574,7 @@
 ;; end of the function call.  You can
 ;; stack allocate (stack-alloc)
 ;; any valid type  (i64 for example)
-(xtmtest '(bind-func salloc-test
+(xtmtest (bind-func salloc-test
             (lambda ()
               (let ((point:vec3* (stack-alloc)))
                 (tset! point 0 0.0)
@@ -587,7 +587,7 @@
 ;; all named types have 2 default constructors
 ;; name (zone alloation) + name_h (heap allocation)
 ;; and a default print poly
-(xtmtest '(bind-func data-constructor-test
+(xtmtest (bind-func data-constructor-test
             (lambda ()
               (let ((v1 (vec3 1.0 2.0 3.0))
                     (v2 (vec3_h 4.0 5.0 6.0)))
@@ -609,7 +609,7 @@
 
 ;; This allows you to do things like create an array
 ;; with an offset
-(xtmtest '(bind-func aref-ptr-test
+(xtmtest (bind-func aref-ptr-test
             (lambda ()
               (let ((arr:|32,i64|* (alloc))
                     (arroff (aref-ptr arr 16))
@@ -636,7 +636,7 @@
 
 (bind-type tuple-with-array <double,|32,|4,i32||,float>)
 
-(xtmtest '(bind-func array-test5
+(xtmtest (bind-func array-test5
             (lambda ()
               (let ((tup:tuple-with-array* (stack-alloc))
                     (t2:|32,i64|* (stack-alloc)))
@@ -663,7 +663,7 @@
 
 ;; increment g_var_a by inc
 ;; and return new value of g_var_a
-(xtmtest '(bind-func global_var_test1
+(xtmtest (bind-func global_var_test1
             (lambda (incr)
               (set! g_var_a (+ g_var_a incr))
               g_var_a))
@@ -674,7 +674,7 @@
 (bind-val g_var_b double 5.5)
 (bind-val g_var_c i1 0)
 
-(xtmtest '(bind-func global_var_test1b
+(xtmtest (bind-func global_var_test1b
             (lambda ()
               (* g_var_b (if g_var_c 1.0 4.0))))
 
@@ -684,7 +684,7 @@
 
 (bind-val g_cstring i8* "Jiblet.")
 
-(xtmtest '(bind-func test_g_cstring
+(xtmtest (bind-func test_g_cstring
             (lambda ()
               (let ((i 0))
                 (dotimes (i 7)
@@ -693,7 +693,7 @@
 
          (test_g_cstring))
 
-(xtmtest '(bind-func test_g_cstring1
+(xtmtest (bind-func test_g_cstring1
             (lambda ()
               (let ((test_cstring "Niblot.")
                     (i 0)
@@ -718,7 +718,7 @@
 (bind-val g_tuple1 <i64,i64>)
 (bind-val g_tuple2 <double,double>)
 
-(xtmtest '(bind-func test_g_tuple
+(xtmtest (bind-func test_g_tuple
             (lambda ()
               (tfill! g_tuple1 1 4)
               (tfill! g_tuple2 4.0 1.0)
@@ -734,7 +734,7 @@
 
 ;; if we just loop over and print the values in each array
 
-(xtmtest '(bind-func test_g_array11
+(xtmtest (bind-func test_g_array11
             (lambda ()
               (let ((i 0))
                 (dotimes (i 10)
@@ -745,7 +745,7 @@
 
 ;; but if we loop over and set some values into the arrays
 
-(xtmtest '(bind-func test_g_array2
+(xtmtest (bind-func test_g_array2
             (lambda ()
               (let ((i 0))
                 (dotimes (i 10)
@@ -762,7 +762,7 @@
 
 (bind-val g_array3 |100000000,i64|)
 
-(xtmtest '(bind-func test_g_array3
+(xtmtest (bind-func test_g_array3
             (lambda ()
               (let ((i 0))
                 (dotimes (i 100000000)
@@ -777,7 +777,7 @@
 
 (bind-val g_ptr0 double* 10)
 
-(xtmtest '(bind-func test_g_ptr0
+(xtmtest (bind-func test_g_ptr0
             (lambda ()
               (let ((total 0.0)
                     (i 0))
@@ -791,7 +791,7 @@
 (bind-val g_ptr1 |4,i32|* 2)
 (bind-val g_ptr2 <i64,double>* 4)
 
-(xtmtest '(bind-func test_g_ptr1
+(xtmtest (bind-func test_g_ptr1
             (lambda ()
               (afill! g_ptr1 11 66 35 81)
               (tset! g_ptr2 1 35.0)
@@ -804,7 +804,7 @@
 ;;
 ;; Callbacks
 
-(xtmtest '(bind-func callback-test
+(xtmtest (bind-func callback-test
             (lambda (time:i64 count:i64)
               (printf "time: %lld:%lld\n" time count)
               (callback (+ time 1000) callback-test (+ time 22050) (+ count 1))))
@@ -816,7 +816,7 @@
 ;; of course we need to keep the type
 ;; signature the same [void,i64,i64]*
 ;;
-(xtmtest '(bind-func callback-test
+(xtmtest (bind-func callback-test
             (lambda (time:i64 count:i64)
               void))
 
@@ -826,7 +826,7 @@
   (lambda (x:i64)
     (println "callback test2 helper: " x)))
 
-(xtmtest '(bind-func callback-test2
+(xtmtest (bind-func callback-test2
             (lambda (time:i64 count:i64)
               (printf "time: %lld:%lld\n" time count)
               (callback (+ time 20000) callback-test2-helper 555)
@@ -834,7 +834,7 @@
 
          (callback-test2 (now) 0))
 
-(xtmtest '(bind-func callback-test2
+(xtmtest (bind-func callback-test2
             (lambda (time:i64 count:i64)
               void))
 
@@ -845,7 +845,7 @@
 ;;
 ;; some memzone tests
 
-(xtmtest '(bind-func memzone-test1
+(xtmtest (bind-func memzone-test1
             (lambda ()
               (let ((b:|5,double|* (zalloc)))
                 (aset! b 0
@@ -859,7 +859,7 @@
 
          (memzone-test1) 3.5)
 
-(xtmtest '(bind-func memzone-test2
+(xtmtest (bind-func memzone-test2
             (lambda ()
               (memzone 1024
                 (let ((k:|15,double|* (zalloc))
@@ -874,7 +874,7 @@
 
          (memzone-test2))
 
-(xtmtest '(bind-func memzone-test3
+(xtmtest (bind-func memzone-test3
             (lambda ()
               (let ((v (memzone-test2))
                     (i 0))
@@ -882,7 +882,7 @@
 
          (memzone-test3)) ;; should print all 0.0's
 
-(xtmtest '(bind-func memzone-test4
+(xtmtest (bind-func memzone-test4
             (lambda ()
               (memzone 1024 (* 44100 10)
                        (let ((a:|5,double|* (alloc)))
@@ -901,7 +901,7 @@
 ;;  same amount or whatever new amount you have allocated for closure
 ;;  compilation)
 ;;
-(xtmtest '(bind-func closure-zalloc-test 1000000
+(xtmtest (bind-func closure-zalloc-test 1000000
             (let ((k:|100000,double|* (zalloc)))
               (lambda ()
                 (aset! k 0 1.0)
@@ -949,7 +949,7 @@
 ;; (bind-poly testprint poly-test5)
 ;; (bind-poly testprint poly-test6)
 
-(xtmtest '(bind-func poly-test7
+(xtmtest (bind-func poly-test7
             (lambda ()
               (testprint "extempore's")
               (testprint "extempore's" "polymorphism")
@@ -972,13 +972,13 @@
 
 ;; specialize on [i64,double]*
 ;;
-(xtmtest '(bind-func poly-test10:[i64,double]*
+(xtmtest (bind-func poly-test10:[i64,double]*
             (lambda (a)
               (+ 1 (sqrd a))))
          (poly-test10 5.0))
 
 ;; specialize on [double,doube]*
-(xtmtest '(bind-func poly-test11:[double,double]*
+(xtmtest (bind-func poly-test11:[double,double]*
             (lambda (a)
               (+ 1.0 (sqrd a))))
 
@@ -995,7 +995,7 @@
       (zone_cleanup (println "Clean up before leaving zone!"))
       tmp2)))
 
-(xtmtest '(bind-func cleanup-test
+(xtmtest (bind-func cleanup-test
             (lambda ()
               (letz ((tmp:i8* (alloc 8))
                      (t2 (MyLittleCleanupTest)))
@@ -1034,7 +1034,7 @@
       (vfill! v2 2.0 2.5 2.25 2.125)
       (* v1 v2))))
 
-(xtmtest '(bind-func vector-test3
+(xtmtest (bind-func vector-test3
             (lambda ()
               (let ((a (vector-test2)))
                 (printf "%f:%f:%f:%f\n"
@@ -1091,7 +1091,7 @@
   (+ (* p (- (* y f2) y)) y)))))
 
 
-(xtmtest '(bind-func vector-test4
+(xtmtest (bind-func vector-test4
             (lambda ()
               (let ((a:/4,float/* (alloc)))
                 (vfill! a 0.1 0.2 0.3 0.4)
@@ -1141,7 +1141,7 @@
 ;; (bind-poly print print_v4f64)
 
 (xtmtest
- '(bind-func vector-test5:[/4,float/]*
+ (bind-func vector-test5:[/4,float/]*
     (lambda ()
       (* (vector 1.0 2.0 3.0 4.0)
          (vector 2.0 2.0 2.0 2.0))))
@@ -1149,7 +1149,7 @@
  (call-as-xtlang (println (vector-test5))))
 
 (xtmtest
- '(bind-func vector-test6:[/4,float/]*
+ (bind-func vector-test6:[/4,float/]*
     (lambda ()
       (* (vector 1.0 2.0 3.0 4.0)
          2.0)))
@@ -1157,28 +1157,28 @@
  (call-as-xtlang (println (vector-test6))))
 
 (xtmtest
- '(bind-func vector-test7:[/4,double/]*
+ (bind-func vector-test7:[/4,double/]*
    (lambda ()
      (cos (vector 0.0 1.0 2.0 3.0))))
 
  (call-as-xtlang (println (vector-test7))))
 
 (xtmtest
- '(bind-func vector-test8:[/4,double/]*
+ (bind-func vector-test8:[/4,double/]*
    (lambda ()
      (cos 2.0)))
 
  (call-as-xtlang (println (vector-test8))))
 
 (xtmtest
- '(bind-func vector-test9:[/4,double/]*
+ (bind-func vector-test9:[/4,double/]*
     (lambda ()
       (* (cos 2.0) (log (vector 1.0 2.0 3.0 4.0)))))
 
  (call-as-xtlang (println (vector-test9))))
 
 (xtmtest
- '(bind-func vector-test10:[/4,double/]*
+ (bind-func vector-test10:[/4,double/]*
    (lambda ()
      (pow (vector 1.0 2.0 3.0 4.0)
           (vector 1.0 2.0 3.0 4.0))))
@@ -1186,7 +1186,7 @@
  (call-as-xtlang (println (vector-test10))))
 
 (xtmtest
- '(bind-func vector-test11:[/4,double/]*
+ (bind-func vector-test11:[/4,double/]*
     (lambda ()
       (pow (vector 1.0 2.0 3.0 4.0)
            2.0)))
@@ -1208,7 +1208,7 @@
 
 (bind-val GlobalInc [i64,i64]* (testinc 2))
 
-(xtmtest '(bind-func ginc
+(xtmtest (bind-func ginc
             (lambda ()
               (GlobalInc 5)))
          (ginc) 7)
@@ -1217,20 +1217,20 @@
 ;; new xtlang macros
 
 (xtmtest
- '(bind-func test_inc_macro
+ (bind-func test_inc_macro
     (lambda ()
       (let ((x 3))
         (inc x 10))))
  (test_inc_macro) 13)
 
-(xtmtest '(bind-func test_thread_first1
+(xtmtest (bind-func test_thread_first1
             (lambda ()
               (-> "this string is 33 characters long"
                   (strlen)
                   )))
          (test_thread_first1) 33)
 
-(xtmtest '(bind-func test_thread_first2
+(xtmtest (bind-func test_thread_first2
             (lambda ()
               (-> 1
                   (+ 2)
@@ -1241,7 +1241,7 @@
 
 (sys:load "libs/core/adt.xtm")
 
-(xtmtest '(bind-func test_thread_last1
+(xtmtest (bind-func test_thread_last1
             (lambda ()
               (->> (list 1 2 3)
                    (map (lambda (x) (+ x 1)))
@@ -1250,7 +1250,7 @@
                    )))
          (test_thread_last1) 2)
 
-(xtmtest '(bind-func test_thread_last2
+(xtmtest (bind-func test_thread_last2
             (lambda ()
               (->> 1
                   (+ 2)
@@ -1265,7 +1265,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (xtmtest
- '(bind-func lvl1
+ (bind-func lvl1
     (let ((lvl2
            (let ((lvl3
                   (let ((x 5))
@@ -1283,7 +1283,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (xtmtest
- '(bind-func a1_test
+ (bind-func a1_test
     (lambda ()
       (let ((a1:|4,float|* (array_ref 5.0:f 6.0 7.0 8.0)))
         a1)))
@@ -1291,7 +1291,7 @@
  (xtmX (begin (a1_test) 1)))
 
 (xtmtest
- '(bind-func a2_test
+ (bind-func a2_test
     (lambda ()
       (let ((a1:|4,float| (array 5.0:f 6.0 7.0 8.0)))
         a1)))
@@ -1299,7 +1299,7 @@
  (xtmX (begin (a2_test) 1)))
 
 (xtmtest
- '(bind-func v1_test
+ (bind-func v1_test
     (lambda ()
       (let ((a1:/4,float/* (vector_ref 5.0:f 6.0 7.0 8.0)))
         a1)))
@@ -1307,7 +1307,7 @@
  (xtmX (begin (v1_test) 1)))
 
 (xtmtest
- '(bind-func v2_test
+ (bind-func v2_test
     (lambda ()
       (let ((a1:/4,float/ (vector 5.0:f 6.0 7.0 8.0)))
         a1)))
@@ -1315,7 +1315,7 @@
  (xtmX (begin (v2_test) 1)))
 
 (xtmtest
- '(bind-func t1_test
+ (bind-func t1_test
     (lambda ()
       (let ((a1:<float,Symbol*,i64>* (tuple_ref 5.0:f 'fred 1:i64)))
         a1)))
@@ -1323,7 +1323,7 @@
  (xtmX (begin (t1_test) 1)))
 
 (xtmtest
- '(bind-func t2_test
+ (bind-func t2_test
     (lambda ()
       (let ((a1:<float,Symbol*,i64> (tuple 5.0:f 'fred 1:i64)))
         a1)))
