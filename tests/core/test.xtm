@@ -1,0 +1,23 @@
+;;; tests/test.txt -- test the test library
+
+
+(xtmtest-with-fixture base
+  (begin
+    (define target 'outer)
+    (define-macro (target-macro) ''outer))
+
+  (xtmtest-with-fixture cleanliness
+    (define target 'inner)
+
+    (is? (eq? target 'inner) #t)
+    (is? target 'inner))
+
+  (is? (eq? target 'outer) #t)
+  (xtmtest-with-fixture macrocheck
+                        (define-macro (target-macro) ''inner)
+                        (is? (target-macro) 'inner))
+
+  (is? (target-macro) 'outer))
+
+
+
