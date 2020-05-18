@@ -3,13 +3,24 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## v0.9 [unreleased]
+## v0.8.4
 
 ### Added
 
 ### Removed
 
 ### Changed
+
+- A bunch of refactoring in `libs/core/instruments-scm.xtm`, mostly around
+  naming consistency but also in the way that the optional "parser" function
+  argument to `load-sampler` (which maps filenames to sample slots). In
+  particular, the parser function used to have to map a list of filenames to a
+  list of "parsed" slots/banks, but now just maps a single filename to a single
+  slot/bank (see [the
+  docs](https://extemporelang.github.io/docs/guides/sampler/), which have been
+  updated to reflect the new behaviour). In general if you had some existing
+  sample loading code (pre v0.8.4) and it's now broken then have a look to see
+  if that's the problem.
 
 ## v0.8
 
