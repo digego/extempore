@@ -1047,7 +1047,7 @@ if(BUILD_TESTS)
 
   macro(extempore_add_example_as_test examplefile timeout label)
     add_test(NAME ${examplefile}
-      COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\" ${timeout})")
+      COMMAND extempore --noaudio --term nocolor --port=${EXTEMPORE_TEST_PORT} --eval "(sys:load-then-quit \"${examplefile}\")")
     set_tests_properties(${examplefile}
       PROPERTIES
       WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
