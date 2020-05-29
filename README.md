@@ -9,6 +9,11 @@ A programming environment for cyberphysical programming (Linux/macOS/Windows).
 Download [VSCode](https://code.visualstudio.com/), install the Extempore
 extension and then use the _Extempore: Download binary_ command to do the rest.
 
+**Note**: Extempore's binary releases are [built
+automatically](https://github.com/digego/extempore/actions?query=workflow%3ARelease)
+for Windows, macOS and Linux (Linux release are built on Ubuntu, on other
+distros YMMV).
+
 For more details, head to the [Quickstart
 page](https://extemporelang.github.io/docs/overview/quickstart/) in Extempore's
 online docs.
