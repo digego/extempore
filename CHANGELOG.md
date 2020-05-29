@@ -3,6 +3,16 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.8.7
+
+### Removed
+
+- removed support for ogg/flac in libsndfile (since the current binary release
+  is broken on platforms without e.g. libvorbis). In the future we should
+  provide a CMake option to allow users to control this behaviour, but it's
+  turned off in 0.8.7 because it's a pretty bad experience for novice users to
+  have it Extempore crash inscrutably anytime libsndfile is loaded
+
 ## v0.8.4
 
 ### Added
