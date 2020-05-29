@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
-project(Extempore VERSION 0.8.6)
+project(Extempore VERSION 0.8.7)
 
 option(ASSETS "download multimedia assets (approx 500MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
