@@ -5,6 +5,10 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ## v0.8.7
 
+### Added
+
+- more detailed build instructions (including `BUILDING.md`)
+
 ### Removed
 
 - removed support for ogg/flac in libsndfile (since the current binary release
@@ -12,6 +16,10 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
   provide a CMake option to allow users to control this behaviour, but it's
   turned off in 0.8.7 because it's a pretty bad experience for novice users to
   have it Extempore crash inscrutably anytime libsndfile is loaded
+
+### Changed
+
+- some changes to the testing infrastructure (thanks @pcawley)
 
 ## v0.8.4
 
