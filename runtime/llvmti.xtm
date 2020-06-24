@@ -1325,6 +1325,7 @@
     ("exit" . #((213 -1 4) "" ())) ;; libc
     ("expm1" . #((213 0 0) "" ())) ;; libm
     ("expm1f" . #((213 1 1) "" ())) ;; libm
+    ("extempore_init" . #((213 4 4 208))) ;; libextempore
     ("extitoa" . #((213 108 2) "" ())) ;; xtlang (for kinect only?)
     ("fclose" . #((213 4 108) "" ())) ;; libc
     ("fdim" . #((213 0 0 0) "" ())) ;; libm
@@ -2666,6 +2667,7 @@
 (define *impc:aot:current-lib-name* "xtmdylib")
 (define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *impc:aot:win-link-libraries-exe* '(".\\libs\\builds\\extempore.lib"))
+(define *impc:aot:unix-link-libraries-exe* '("-lextempore"))
 
 (define *impc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
@@ -2918,13 +2920,13 @@
                                                      ((string=? platform "Windows") (if asdll? ".dll" ".exe")))))
              (link-libs (if (string=? platform "Windows")
                             *impc:aot:win-link-libraries-exe*
-                            '()))
+                            *impc:aot:unix-link-libraries-exe*))
              (optimize-compiles? #t)
              (llc-command
               (unix-or-Windows (string-append
                                 llc-path
                                 (if optimize-compiles? " -O3 -tailcallopt" "-O0")
-                                " -filetype=obj "
+                                " -relocation-model=pic -filetype=obj "
                                 (if (and (string=? (sys:platform) "OSX")
                                          (sys:cmdarg "mcpu")
                                          (not (string=? (sys:cmdarg "mcpu") "")))
@@ -2941,15 +2943,15 @@
              (link-command
               (unix-or-Windows (string-append
                                 (cond ((string=? platform "Linux")
-                                       (string-append "gcc "
-                                                      (if optimize-compiles? "-O3 -g" "-g -O0")
+                                       (string-append "gcc -Llibs/platform-shlibs "
+                                                      (if optimize-compiles? "-O3 -g " "-g -O0 ")
                                                       ""))
                                       ((string=? platform "OSX")
                                        (string-append "clang "
                                                       (if optimize-compiles? "-O3" "-g -O0")
                                                       "")))
                                 asm-path
-                                " -o " output-exe-path)
+                                " -o " output-exe-path " " (string-join link-libs " "))
                                (string-append
                                 "call link"
                                 (if asdll? " /DLL" "")

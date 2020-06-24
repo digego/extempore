@@ -573,3 +573,4 @@ declare i32 @get_address_offset(i64, %clsvar*) nounwind
 declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
 declare i1 @check_address_exists(i64, %clsvar*) nounwind
 
+declare i32 @extempore_init(i32, i8**) nounwind
