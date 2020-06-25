@@ -2667,7 +2667,7 @@
 (define *impc:aot:current-lib-name* "xtmdylib")
 (define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *impc:aot:win-link-libraries-exe* '(".\\libs\\builds\\extempore.lib"))
-(define *impc:aot:unix-link-libraries-exe* '("-lextempore"))
+(define *impc:aot:unix-link-libraries-exe* '("-lextempore -lm"))
 
 (define *impc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
@@ -2915,7 +2915,7 @@
              (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj"))) ; could skip .o (straight to .so)
              (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/builds/")))
              (output-exe-path (string-append output-dir module-name
-                                               (cond ((string=? platform "Linux") "")
+                                               (cond ((string=? platform "Linux") (if asdll? ".so" ""))
                                                      ((string=? platform "OSX") "")
                                                      ((string=? platform "Windows") (if asdll? ".dll" ".exe")))))
              (link-libs (if (string=? platform "Windows")
@@ -2944,6 +2944,7 @@
               (unix-or-Windows (string-append
                                 (cond ((string=? platform "Linux")
                                        (string-append "gcc -Llibs/platform-shlibs "
+                                                      (if asdll? "-shared -fPIC " "")
                                                       (if optimize-compiles? "-O3 -g " "-g -O0 ")
                                                       ""))
                                       ((string=? platform "OSX")
