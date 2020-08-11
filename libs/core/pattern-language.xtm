@@ -199,14 +199,29 @@
 (define *scale* (pc:scale 0 'aeolian)) ;; scale
 
 ;; scale, qnt and rel take an optional *scale* argument
+(define get-scale-stepsize
+  (lambda (args)
+    (cond ((null? args) 1)
+          ((number? (car args)) (car args))
+          ((null? (cdr args)) 1)
+          ((number? (cadr args)) (cadr args))
+          (else 1))))
+
+(define get-scale-scale
+  (lambda (args)
+    (map (lambda (pitch) (modulo pitch 12))
+         (cond ((null? args) *scale*)
+               ((list? (car args)) (car args))
+               ((null? (cdr args)) *scale*)
+               ((list? (cadr args)) (cadr args))
+               (else *scale*)))))
+
 (define scale
   (lambda (octave num . args)
-    (let ((scale (if (null? args) *scale*
-                     (map (lambda (pitch)
-                            (modulo pitch 12))
-                          (car args)))))
+    (let ((stepsize (get-scale-stepsize args)) 
+          (scale (get-scale-scale args)))
       (map (lambda (x)
-             (pc:relative (+ 12 (car scale) (* 12 octave)) x scale))
+             (pc:relative (+ 12 (car scale) (* 12 octave)) (* x stepsize) scale))
            (range 0 num)))))
 
 (define qnt
