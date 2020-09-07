@@ -76,6 +76,7 @@
 (define *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)
 
 (define *impc:ti:implicit-adhoc-compiles* #t)
+(define *impc:ti:suppress-ir-generation* #f)
 
 (define suppress-compiler-messages
   (lambda (bool)
@@ -11508,12 +11509,17 @@ e.g.
            (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
 
 (define-macro (register-lib-type library name type docstring)
+  (if (impc:aot:currently-compiling?) 
+      (set! *impc:ti:suppress-ir-generation* #t)
+      (set! *impc:ti:suppress-ir-generation* #f))
   (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
-    `(impc:ti:register-new-namedtype ,namestr
+    `(begin 
+       (impc:ti:register-new-namedtype ,namestr
                                       ',(impc:ir:get-type-from-pretty-str typestr namestr)
-                                      ,docstring)))
+                                      ,docstring)
+       (set! *impc:ti:suppress-ir-generation* #f))))
 
 
 ;;; this here for binding to CLOSURE in dylib

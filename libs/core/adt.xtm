@@ -5,12 +5,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; lib-loading config
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/adt.xtm" 'quiet))
 (sys:load-preload-check 'adt)
 (define *xtmlib-adt-loaded* #t)
 
-(impc:aot:suppress-aot-do
- (sys:load "libs/base/base.xtm"))
+(impc:aot:suppress-aot-do (sys:load "libs/base/base.xtm"))
 (impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmadt")
+(impc:aot:import-ll "xtmadt")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -859,3 +862,5 @@
       (dotimes (i n)
         (set! s (cat2 s (nth lst i))))
       s)))
+
+(impc:aot:insert-footer "xtmadt")
