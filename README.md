@@ -68,9 +68,9 @@ Check out these videos:
 
 The Extempore core team is [Andrew Sorensen](https://github.com/digego) & [Ben
 Swift](https://github.com/benswift). [Jim Kuhn](https://github.com/JimKuhn)
-contributed significant performance improvements, which are not
-reflected in the commit logs, but for which we are extremely grateful.  Many
-others have also contributed to Extempore's ongoing development ([see the full
+contributed significant performance improvements, which are not reflected in the
+commit logs, but for which we are extremely grateful.  Many others have
+contributed to Extempore's development ([see the full
 list](https://github.com/digego/extempore/graphs/contributors)).
 
 ## Docs & Community
