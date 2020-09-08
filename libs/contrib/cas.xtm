@@ -33,21 +33,21 @@
     (cond ((atom? e) (atom->string e))
           ((list? e)
            (cond ((string=? "*" (atom->string (car e)))
-                  (string-append "{"
+                  (string-append "("
                                  (string-join
-                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "*") "}"))
+                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "*") ")"))
                  ((string=? "+" (atom->string (car e)))
-                  (string-append "{"
+                  (string-append "("
                                  (string-join
-                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "+") "}"))
+                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "+") ")"))
                  ((string=? "/" (atom->string (car e)))
-                  (string-append "{"
+                  (string-append "("
                                  (string-join
-                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "/") "}"))
+                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "/") ")"))
                  ((string=? "-" (atom->string (car e)))
-                  (string-append "{"
+                  (string-append "("
                                  (string-join
-                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "-") "}"))
+                                  (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "-") ")"))
                  ((string=? "=" (atom->string (car e)))
                   (string-join
                    (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) "="))
@@ -64,10 +64,10 @@
                   (string-append (cas-xtm-to-string (cadr e)) "^" (cas-xtm-to-string (caddr e))))
                  (else
                   (string-append (atom->string (car e))
-                                 "{"
+                                 "("
                                  (string-join
                                   (map (lambda (x) (cas-xtm-to-string x)) (cdr e)) ",")
-                                 "}"))))
+                                 ")"))))
           (else e))))
 
 (bind-macro (xtm2cas expr)
@@ -220,15 +220,10 @@
            res)))))
 
 
-(bind-func cas2xtmi8
-  (lambda (e)
-    (cstring (cas2xtm e))))
-
 (bind-func cas2xtm_scm
-  (lambda (e)
-    (let ((res (cas2xtm:[String*,String*]* (Str e))))
+  (lambda (cstr)
+    (let ((res (cas2xtm:[String*,String*]* (Str cstr))))
       (cstring res))))
-
 
 (bind-func caspp
   (let ((cnt 0))
@@ -247,15 +242,31 @@
 (bind-func casppon
   (lambda (s:i8*)
     (caspp s 1)))
+  
+; (define-macro (cas . args)
+;   (let* ((a (regex:replace-all (if (list? (car args))
+;                                    (cas-xtm-to-string (car args))
+;                                    (sexpr->string args))
+;                                "{" "\("))
+;          (b (regex:replace-all a "}" "\)")))
+;     (println 'incasb b)
+;     `(cptr->string (casppon ,b))))
 
+; (define-macro (casq . args)
+;   (let* ((a (regex:replace-all (if (list? (car args))
+;                                    (cas-xtm-to-string (car args))
+;                                    (sexpr->string args))
+;                                "{" "\("))
+;          (b (regex:replace-all a "}" "\)")))
+;     `(cptr->string (casppoff ,b))))
+  
 (define-macro (cas . args)
-  (let* ((a (regex:replace-all (if (list? (car args))
-                                   (cas-xtm-to-string (car args))
-                                   (sexpr->string args))
-                               "{" "\("))
-         (b (regex:replace-all a "}" "\)")))
-    `(cptr->string (casppon ,b))))
+  `(cptr->string (casppon ,(sexpr->string args))))
 
+(define-macro (casq . args)
+  `(cptr->string (casppoff ,(sexpr->string args))))
+
+  
 ;; inlined cas for inlining 'pure' giac code into xtlang
 (bind-macro (icas . args)
   (let* ((a (regex:replace-all (if (list? (car args))
@@ -272,13 +283,13 @@
 (define (scmcas name e . args)
   (let* ((a (cas-xtm-to-string `(,name ,e ,@args)))
          (b (regex:replace-all a "}" "\)"))
-         (c (regex:replace-all b "{" "\("))
+         (c (regex:replace-all b "{" "\("))            
          (xx (cptr->string (casppoff c)))
          (res1 (cptr->string (cas2xtm_scm xx)))
          (res2 (regex:replace-all res1 "([0-9]*)\\.0*\\:double" "$1"))
          (res3 (regex:replace-all res2 "\\:double" "0"))
          (res (string->sexpr res2)))
-    ;; (println 'a: a 'r1 res1 'res: res)
+    (println 'cas: a 'sexpr: res1 'result: res)
     (if (equal? (car res) 'vector)
         (cons 'vector
               (map (lambda (x)
@@ -302,9 +313,52 @@
          (res1 (cptr->string (cas2xtm_scm (cptr->string (casppoff c))))))
     (string->sexpr res1)))
 
+(define (cas2sexpr . args)
+  (list 'quote (scmcas 'eval (apply string-append (map (lambda (x) 
+                                                         (if (string? x) 
+                                                             x
+                                                            (sexpr->string x))) 
+                                                       args)))))
 
+(define (sexpr2cas args)
+  (let* ((a (cas-xtm-to-string args))
+         (b (regex:replace-all a "}" "\)"))
+         (c (regex:replace-all b "{" "\("))
+         (res (cptr->string (casppoff c))))
+    res))
+             
+;; substitution
+(define-macro (subst e . args)
+  (if (list? e)
+      (list 'quote (apply scmcas 'subst e args))
+      (list 'quote (apply scmcas 'subst (eval e) args))))
+             
+(define (subste e . args)
+  (list 'quote (apply scmcas 'subst e args)))
+              
+(bind-macro (subst e . args) (apply xtmcas 'subst e args))
+
+;; permutations
+(define-macro (perm n p)
+  (list 'quote (scmcas 'perm n p)))
+              
+(bind-macro (perm n p) (xtmcas 'perm n p))
+
+;; combination
+(define-macro (comb n p)
+  (list 'quote (scmcas 'comb n p)))
+              
+(bind-macro (comb n p) (xtmcas 'comb n p))
+
+(define-macro (binomial n p a)
+  (list 'quote (scmcas 'binomial n p a)))
+              
+(bind-macro (binomial n p a) (xtmcas 'binomial n p a))
+       
 (define-macro (simplify e)
-  (list 'quote (scmcas 'simplify e)))
+  (if (list? e)
+      (list 'quote (scmcas 'simplify e)))
+      (list 'quote (scmcas 'simplify (eval e))))
 
 (bind-macro (simplify e) (xtmcas 'simplify e))
 

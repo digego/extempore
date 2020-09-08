@@ -13,14 +13,32 @@
 
 (sys:load "libs/contrib/cas.xtm")
 
-(cas coeff{3*x^2+2*x+7})
-(cas degree{3*y^2+2*y+7,y})
-(cas degree{3*x^2+2*x})
+;; try some computer algebra expressions
+(cas coeff( (3*x^2) + (2*x + 7)))
+(cas degree(3*y^2+2*y+7, y))
+(cas degree(3*x^2+2*x))
+(cas diff(x^3+y^2,x)) ;; with respect to x
+(cas diff(x^3+y^2,y)) ;; with respect to y
+(cas a^b+1|a=x+5,b=6) ;; substitution
+(cas a^b+1 | a= x+5, b=6) ;; substitution
+(cas x1:=55) ;; assignment
+(cas x1 * x1)
+(cas purge(x1)) ;; clear assignment
+(cas x1 * x1) ;; no longer assigned becomes symbolic
+
+;; quiet cas outputs as string (i.e. no logging)
+(println (casq a^b + 1/2))
+;; convert cas expression (as a string) to sexpr
+(println (cas2sexpr "a^b + 1/2"))
+;; convert sexpr to cas expression (as string)
+(println (sexpr2cas '(+ (pow a b) (/ 1 2))))
+;; should get back what we put in (mathematically - not necessarily identical)
+(println (cas2sexpr (sexpr2cas '(+ -1.0 (pow a b) (/ 1 2)))))
 
 ;; factor
 (println (factor (- (pow x 4) 1)))
 
-;; solve
+;; solve (has two results so returns vector of two)
 (println (solve (= (- (pow x 2) 3) 0) x))
 
 ;; simplify
@@ -88,7 +106,6 @@
 ;;
 ;; the *resulting* expression of the CAS command
 ;; is directly inlined into the code before compilation
-
 
 ;; for example f1 and f2 are identical
 (bind-func f1
