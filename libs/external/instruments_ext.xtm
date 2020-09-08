@@ -248,28 +248,33 @@
                                      (< v closest))
                                 (begin (set! new_idx idxi)
                                        (set! closest v) 0))))
-                        (if (null? free_note)
-                            null
-                            (if (note_active free_note)
-                                (begin
-                                  ;; existing kernel is still in use!
-                                  ;; simply update note details (i.e. data) and keep on truckin!
-                                  (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
-                                  free_note)
-                                (begin ;; new kernel required!
-                                  (reset_zone zone)
-                                  (push_zone zone)
-                                  (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
-                                  (pset! kernels idx (note_kernel free_note
-                                                                  (aref-ptr samples bank)
-                                                                  (aref-ptr samples_length bank)
-                                                                  (aref-ptr samples_offsets bank)
-                                                                  (aref-ptr samples_channels bank)
-                                                                  new_idx
-                                                                  nargs
-                                                                  dargs))
-                                  (pop_zone)
-                                  free_note)))))))
+                        (if (or (< (- (aref (aref-ptr samples_length bank) new_idx) 10) 1)
+                                (null? (aref (aref-ptr samples bank) new_idx)))
+                            (begin 
+                              (println 'No 'samples 'loaded 'in 'bank bank) 
+                              null)
+                            (if (null? free_note)
+                                null
+                                (if (note_active free_note)
+                                    (begin
+                                      ;; existing kernel is still in use!
+                                      ;; simply update note details (i.e. data) and keep on truckin!
+                                      (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
+                                      free_note)
+                                    (begin ;; new kernel required!
+                                      (reset_zone zone)
+                                      (push_zone zone)
+                                      (tfill! free_note idx start freq amp dur 1.0 #t 0 (cast zone))
+                                      (pset! kernels idx (note_kernel free_note
+                                                                      (aref-ptr samples bank)
+                                                                      (aref-ptr samples_length bank)
+                                                                      (aref-ptr samples_offsets bank)
+                                                                      (aref-ptr samples_channels bank)
+                                                                      new_idx
+                                                                      nargs
+                                                                      dargs))
+                                      (pop_zone)
+                                      free_note))))))))
       (dotimes (k 128)
         (dotimes (i 20) ;20 banks
           (aset! (aref-ptr samples_offsets i) k 0)
