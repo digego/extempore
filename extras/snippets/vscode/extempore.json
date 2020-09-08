@@ -1,0 +1,111 @@
+{
+
+	"simple loop": {
+		"prefix": ":>",
+		"body": [
+			"(:> ${1:NAME} ${2:4} ${3:0} ${0:(println @1)} ${4:`(60 63 67 72)})"
+		],
+		"description": "Simply loop descriptor"
+	}, 
+	"analogue main": {
+		"prefix": "anam",
+		"body": [
+			"(set_main ${1:inst} ${0:gain} ${2:pan} ${3:poly} ${4:portamento} ${5:LEGATO_ON})"
+		],
+		"description": "analogue main settings"
+	},
+	"analogue osc": {
+		"prefix": "anao",
+		"body": [
+			"(set_osc ${1:inst} ${2:num} ${0:gain} ${3:PARAM_SAW} ${4:tune} ${5:pw} ${6:phase})"
+		],
+		"description": "osc settings"
+	},
+	"analogue filter": {
+		"prefix": "anaf",
+		"body": [
+			"(set_filter ${1:inst} ${0:frq} ${2:res} ${3:drive} ${4:db} ${5:envamt} ${6:trackfrq} ${7:trackamp})"
+		],
+		"description": "filter settings"
+	},
+	"analogue delay": {
+		"prefix": "anad",
+		"body": [
+			"(set_delay ${1:inst} ${0:mix} ${2:left} ${3:right} ${4:fb} ${5:18000.0} ${6:0.0})"
+		],
+		"description": "delay settings"
+	},
+	"analogue reverb": {
+		"prefix": "anar",
+		"body": [
+			"(set_reverb ${1:inst} ${0:mix} ${2:size} ${3:predel} ${4:absorb})"
+		],
+		"description": "reverb settings"
+	},
+	"analogue flanger": {
+		"prefix": "anafl",
+		"body": [
+			"(set_flanger ${1:inst} ${0:mix} ${2:min_del} ${3:max_del} ${4:rate} ${5:fb})"
+		],
+		"description": "flanger settings"
+	},
+	"analogue_amp_envelope": {
+		"prefix": "anaae",
+		"body": [
+			"(set_amp_env ${1:inst} ${2:10.0} ${0:50.0} ${4:0.7} ${5:100.0})"
+		],
+		"description": "amplitude envelope"
+	},
+	"analogue_filter_envelope": {
+		"prefix": "anafe",
+		"body": [
+			"(set_filter_env ${1:inst} ${2:10.0} ${0:50.0} ${3:0.5} ${4:100.0})"
+		],
+		"description": "filter envelope"
+	},
+	"analogue synth: ": {
+		"prefix": "analogue",
+		"body": [
+			";; MOST (not all) of the parameters available to the 'analogue' synth",
+			"",
+			";; MAIN:",
+			";; portamento only in overlapping monophonic playback",
+			";; inst, gain(0.0-3.0), pan(0.0-1.0), portamento(ms), legato(LEGATO_ON/LEGATO_OFF)",
+			"(set_main syn1 2.0 0.5 100.0 LEGATO_ON)",
+			"(set_polyphony syn1 16) ;; (1-32), 1 for mono synth", 
+			"",
+			";; OSCILLATORS: * 4",
+			";; where tuning is a frequency(hz) relation to incoming pitch",
+			";; i.e. 1.0 is no change, 0.5 is octave below, 2.0 is octave above, 1.0029237 is a slight detune etc.",
+			";; inst, osc#(1-4), gain(0.0-2.0), wave(PARAM_(SAW|TRI|PULSE|TRI)), tuning(0.0-16.0), pulse width(0.0-1.0), phase(0.0-1.0)",
+			"(set_osc syn1 1 0.5 PARAM_SAW 1.0 0.0 0.0)",
+			"",
+			";; ENVELOPES: ",
+			";; inst, attack(ms), decay(ms), sustain(0.0-1.0), release(ms)",
+			"(set_amp_env syn1 10.0 50.0 0.5 100.0)",
+			"(set_filter_env syn1 0.0 0.0 1.0 0.0)",
+			"",
+			";; LOW PASS FILTER: ",
+			";; inst, frq(hz), resonance(0.0-1.0), drive(0.0-3.0), db slope(12|24), amount of envelope(hz), track frq(0.0-1.0), track env(0.0-1.0)",
+			"(set_filter syn1 1000.0 0.2 2.0 24 1000.0 0.0 0.0)",
+			"",
+			";; DELAY: ",
+			";; inst, mix(0.0-1.0), left-delay(ms), right-delay(ms), feedback(0.0-1.0), lpf cutoff(hz), lpf Q(0.0-1.0)",
+			"(set_delay syn1 0.3 (/ *samplerate* 5) (/ *samplerate* 7) 0.5 18000.0 0.0)",
+			"",
+			";; REVERB: ",
+			";; inst, mix(0.0-1.0), size(0.0-1.0), pre delay(ms), absorb(0.0-1.0)",
+			"(set_reverb syn1 0.5 0.2 75.0 0.1)",
+			"",
+			";; FLANGER:",
+			";; inst, mix(0.0-1.0), low delay(ms), high delay(ms), rate(hz), feedback(0.0-1.0)", 
+			"(set_flanger syn1 0.5 5.0 8.0 0.123 0.0)",
+			"",
+			";; NOISE:",
+			";; inst, gain(0.0-1.0+)",
+			"(set_noise_amp syn1 0.5)",
+			";; inst PARAM_PINK | PARAM_WHITE",
+			"(set_noise_type syn1 PARAM_PINK)",
+		]
+	}
+}
