@@ -449,7 +449,7 @@ EXPORT closure_address_table* get_address_table(const char* name, closure_addres
       if(strcmp(table->name,name)) return table;
       table = table->next;
     }
-  printf("Unable to locate %s in closure environment a\n",name);
+  // printf("Unable to locate %s in closure environment a\n",name);
   return 0;
 }
 
@@ -464,7 +464,7 @@ EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table)
       }
       table = table->next;
     }
-    printf("Unable to locate %" PRIu64 " in closure environment b\n",id);
+    // printf("Unable to locate %" PRIu64 " in closure environment b\n",id);
     return 0;
 }
 
@@ -493,7 +493,7 @@ EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const 
       }
       table = table->next;
     }
-  printf("Unable to locate id in closure environment type: %s d\n",type);
+  // printf("Unable to locate id in closure environment type: %s d\n",type);
   return 0;
 }
 
@@ -540,7 +540,7 @@ static char* get_address_type(uint64_t id, closure_address_table* table)
         }
         table = table->next;
     }
-    printf("Unable to locate id in closure environment c\n");
+    // printf("Unable to locate id in closure environment c\n");
     return nullptr;
 }
 
