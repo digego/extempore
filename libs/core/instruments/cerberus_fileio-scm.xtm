@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; Analogue synth file IO
+;; cerberus synth file IO
 ;;
 ;; scheme variant
 ;;
@@ -12,9 +12,9 @@
 ;; SCHEME text variant
 ;;
 
-(define analogue-reset (lambda (inst) (analogue_reset inst)))
+(define cerberus-reset (lambda (inst) (cerberus_reset inst)))
 
-(define get_wt_expr
+(define cerberus_get_wt_expr
   (lambda (wt)
     (let ((b64str (cptr->string (AudioBuffer_data_b64_cstring wt))))
     `(AudioBuffer_cstring
@@ -27,7 +27,7 @@
       ,(AudioBuffer_loop_frames wt)
       ,b64str))))
 
-(define analogue-save-preset
+(define cerberus-save-preset
   (let ((i 0) (j 0)
         (dict '()))
     (lambda (inst filename)
@@ -48,7 +48,7 @@
       ;; if osc1 is a wavetable then store the wavetable
       (if (= (get_osc1_wave inst) PARAM_WT)
           (let ((wt (get_osc1_wt inst)))
-            (set! dict (cons (cons 'osc1_wt (get_wt_expr wt)) dict))))
+            (set! dict (cons (cons 'osc1_wt (cerberus_get_wt_expr wt)) dict))))
 
       ;; amplitude of osc 2
       (set! dict (cons (cons 'osc2_amp (get_osc2_amp inst)) dict))
@@ -63,7 +63,7 @@
       ;; if osc2 is a wavetable then store the wavetable
       (if (= (get_osc2_wave inst) PARAM_WT)
           (let ((wt (get_osc2_wt inst)))
-            (set! dict (cons (list 'osc2_wt (get_wt_expr wt)) dict))))
+            (set! dict (cons (list 'osc2_wt (cerberus_get_wt_expr wt)) dict))))
 
       ;; amplitude of osc 3
       (set! dict (cons (cons 'osc3_amp (get_osc3_amp inst)) dict))
@@ -78,7 +78,7 @@
       ;; if osc3 is a wavetable then store the wavetable
       (if (= (get_osc3_wave inst) PARAM_WT)
           (let ((wt (get_osc3_wt inst)))
-            (set! dict (cons (list 'osc3_wt (get_wt_expr wt)) dict))))
+            (set! dict (cons (list 'osc3_wt (cerberus_get_wt_expr wt)) dict))))
 
       ;; amplitude of osc 4
       (set! dict (cons (cons 'osc4_amp (get_osc4_amp inst)) dict))
@@ -93,7 +93,7 @@
       ;; if osc2 is a wavetable then store the wavetable
       (if (= (get_osc4_wave inst) PARAM_WT)
           (let ((wt (get_osc4_wt inst)))
-            (set! dict (cons (list 'osc4_wt (get_wt_expr wt)) dict))))
+            (set! dict (cons (list 'osc4_wt (cerberus_get_wt_expr wt)) dict))))
 
       ;; sub oscilltor amp (two tunes under sine wave)
       (set! dict (cons (cons 'sub_amp (get_sub_amp inst)) dict))
@@ -231,18 +231,66 @@
       (set! dict (cons (cons 'lfo4_ad_attack_slope (get_lfo_ad_attack_slope inst 3)) dict)) ;; attack slope
       (set! dict (cons (cons 'lfo4_ad_decay_slope (get_lfo_ad_decay_slope inst 3)) dict)) ;; decay slope
 
+      (set! dict (cons (cons 'lfo5_ad_attack (get_lfo_ad_attack inst 4)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo5_ad_decay (get_lfo_ad_decay inst 4)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo5_ad_attack_slope (get_lfo_ad_attack_slope inst 4)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo5_ad_decay_slope (get_lfo_ad_decay_slope inst 4)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo6_ad_attack (get_lfo_ad_attack inst 5)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo6_ad_decay (get_lfo_ad_decay inst 5)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo6_ad_attack_slope (get_lfo_ad_attack_slope inst 5)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo6_ad_decay_slope (get_lfo_ad_decay_slope inst 5)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo7_ad_attack (get_lfo_ad_attack inst 6)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo7_ad_decay (get_lfo_ad_decay inst 6)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo7_ad_attack_slope (get_lfo_ad_attack_slope inst 6)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo7_ad_decay_slope (get_lfo_ad_decay_slope inst 6)) dict)) ;; decay slope
+
+      (set! dict (cons (cons 'lfo8_ad_attack (get_lfo_ad_attack inst 7)) dict)) ;; attack
+      (set! dict (cons (cons 'lfo8_ad_decay (get_lfo_ad_decay inst 7)) dict)) ;; decay
+      (set! dict (cons (cons 'lfo8_ad_attack_slope (get_lfo_ad_attack_slope inst 7)) dict)) ;; attack slope
+      (set! dict (cons (cons 'lfo8_ad_decay_slope (get_lfo_ad_decay_slope inst 7)) dict)) ;; decay slope
+
       ;; set amp frq
       (set! dict (cons (cons 'lfo1_amp (get_lfo_amp inst 0)) dict))
       (set! dict (cons (cons 'lfo1_frq (get_lfo_frq inst 0)) dict))
+      (set! dict (cons (cons 'lfo1_phase (get_lfo_phase inst 0)) dict))
+      (set! dict (cons (cons 'lfo1_options (get_lfo_options inst 0)) dict))
 
       (set! dict (cons (cons 'lfo2_amp (get_lfo_amp inst 1)) dict))
       (set! dict (cons (cons 'lfo2_frq (get_lfo_frq inst 1)) dict))
+      (set! dict (cons (cons 'lfo2_phase (get_lfo_phase inst 1)) dict))
+      (set! dict (cons (cons 'lfo2_options (get_lfo_options inst 1)) dict))
 
       (set! dict (cons (cons 'lfo3_amp (get_lfo_amp inst 2)) dict))
       (set! dict (cons (cons 'lfo3_frq (get_lfo_frq inst 2)) dict))
+      (set! dict (cons (cons 'lfo3_phase (get_lfo_phase inst 2)) dict))
+      (set! dict (cons (cons 'lfo3_options (get_lfo_options inst 2)) dict))
 
       (set! dict (cons (cons 'lfo4_amp (get_lfo_amp inst 3)) dict))
       (set! dict (cons (cons 'lfo4_frq (get_lfo_frq inst 3)) dict))
+      (set! dict (cons (cons 'lfo4_phase (get_lfo_phase inst 3)) dict))
+      (set! dict (cons (cons 'lfo4_options (get_lfo_options inst 3)) dict))
+
+      (set! dict (cons (cons 'lfo5_amp (get_lfo_amp inst 4)) dict))
+      (set! dict (cons (cons 'lfo5_frq (get_lfo_frq inst 4)) dict))
+      (set! dict (cons (cons 'lfo5_phase (get_lfo_phase inst 4)) dict))
+      (set! dict (cons (cons 'lfo5_options (get_lfo_options inst 4)) dict))
+
+      (set! dict (cons (cons 'lfo6_amp (get_lfo_amp inst 5)) dict))
+      (set! dict (cons (cons 'lfo6_frq (get_lfo_frq inst 5)) dict))
+      (set! dict (cons (cons 'lfo6_phase (get_lfo_phase inst 5)) dict))
+      (set! dict (cons (cons 'lfo6_options (get_lfo_options inst 5)) dict))
+
+      (set! dict (cons (cons 'lfo7_amp (get_lfo_amp inst 6)) dict))
+      (set! dict (cons (cons 'lfo7_frq (get_lfo_frq inst 6)) dict))
+      (set! dict (cons (cons 'lfo7_phase (get_lfo_phase inst 6)) dict))
+      (set! dict (cons (cons 'lfo7_options (get_lfo_options inst 6)) dict))
+
+      (set! dict (cons (cons 'lfo8_amp (get_lfo_amp inst 7)) dict))
+      (set! dict (cons (cons 'lfo8_frq (get_lfo_frq inst 7)) dict))
+      (set! dict (cons (cons 'lfo8_phase (get_lfo_phase inst 7)) dict))
+      (set! dict (cons (cons 'lfo8_options (get_lfo_options inst 7)) dict))
 
       ; (set! dict (cons (cons 'lfo1_attack (get_lfo_attack inst 0)) dict)) ;; attack
       ; (set! dict (cons (cons 'lfo1_decay (get_lfo_decay inst 0)) dict)) ;; decay
@@ -261,22 +309,27 @@
       (set! dict (cons (cons 'lfo2_type (get_lfo_type inst PARAM_LFO2)) dict))
       (set! dict (cons (cons 'lfo3_type (get_lfo_type inst PARAM_LFO3)) dict))
       (set! dict (cons (cons 'lfo4_type (get_lfo_type inst PARAM_LFO4)) dict))
+      (set! dict (cons (cons 'lfo5_type (get_lfo_type inst PARAM_LFO5)) dict))
+      (set! dict (cons (cons 'lfo6_type (get_lfo_type inst PARAM_LFO6)) dict))
+      (set! dict (cons (cons 'lfo7_type (get_lfo_type inst PARAM_LFO7)) dict))
+      (set! dict (cons (cons 'lfo8_type (get_lfo_type inst PARAM_LFO8)) dict))
+
       ;;
       ;; mod matrix
       ;;
       ;; reset mod matrix - turn everything off
       (define modvec (make-vector (* 4 32) 0.0))
-      (dotimes (i 4)   ;; 4 modulation sources
+      (dotimes (i 8)   ;; 8 modulation sources
         (dotimes (j 32) ;; 32 modulation targets
           (vector-set! modvec (+ (* i 32) j) (get_mod_matrix inst i j))))
       (set! dict (cons (cons 'mod_matrix (vector->list modvec)) dict))
 
       ;; modulation dadsr envelope (dadr in ms) (sus [0.0-1.0])
-      (set! dict (cons (cons 'mod_env_delay (get_mod_env_delay inst)) dict)) ;; delay
-      (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
-      (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
-      (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
-      (set! dict (cons (cons 'mod_env_release (get_mod_env_release inst)) dict)) ;; release
+      ; (set! dict (cons (cons 'mod_env_delay (get_mod_env_delay inst)) dict)) ;; delay
+      ; (set! dict (cons (cons 'mod_env_attack (get_mod_env_attack inst)) dict)) ;; attack
+      ; (set! dict (cons (cons 'mod_env_decay (get_mod_env_decay inst)) dict)) ;; decay
+      ; (set! dict (cons (cons 'mod_env_sustain (get_mod_env_sustain inst)) dict)) ;; sustain
+      ; (set! dict (cons (cons 'mod_env_release (get_mod_env_release inst)) dict)) ;; release
 
       ;; filter saturation
       (set! dict (cons (cons 'filter_drive (get_filter_drive inst)) dict))
@@ -286,20 +339,20 @@
       (set! dict (cons (cons 'osc_phase_slop (get_osc_phase_slop inst)) dict))
 
       ;; (println dict)
-      (analogue_remove_file filename)
+      (cerberus_remove_file filename)
       (define out (open-output-file filename))
       (write (reverse dict) out)
       (close-output-port out)
       (println 'done)
       #t)))
 
-(define analogue-load-preset
+(define cerberus-load-preset
   (lambda (inst filename)
     (let* ((filein (or (open-input-file filename)
                        (open-input-file (string-append (sys:share-dir) "/" filename)))))
       (if (input-port? filein)
           (begin
-            (analogue-reset inst)
+            (cerberus-reset inst)
             (for-each (lambda (x)
                         (define tag (symbol->string (car x)))
                         ;; we need a couple of special cases
@@ -334,5 +387,5 @@
           (println 'Error 'opening 'file filename)))))
 
 ;; compatibility aliases
-(define analogue-load-state analogue-load-preset)
-(define analogue-save-state analogue-save-preset)
+(define cerberus-load-state cerberus-load-preset)
+(define cerberus-save-state cerberus-save-preset)

@@ -11,8 +11,8 @@
 (bind-val PARAM_SAW enum 1)
 (bind-val PARAM_PULSE enum 2)
 (bind-val PARAM_TRI enum 3)
-(bind-val PARAM_WT enum 4)
-(bind-val PARAM_AD enum 5)
+(bind-val PARAM_AD enum 4)
+(bind-val PARAM_WT enum 5)
 (bind-val PARAM_CONST enum 6)
 (bind-val PARAM_RANDOM enum 7)
 (bind-val PARAM_WHITE enum 0)
@@ -31,6 +31,10 @@
 (bind-val PARAM_LFO2 enum 1)
 (bind-val PARAM_LFO3 enum 2)
 (bind-val PARAM_LFO4 enum 3)
+(bind-val PARAM_LFO5 enum 4)
+(bind-val PARAM_LFO6 enum 5)
+(bind-val PARAM_LFO7 enum 4)
+(bind-val PARAM_LFO8 enum 5)
 
 ;; modulation destinations (note)
 (bind-val PARAM_OSC1_AMP enum 0)
@@ -926,28 +930,32 @@
 
 (bind-func static set_lfo_ad
   (lambda (inst:i8* lfo_num:i32 attack:float decay:float a_slope:float d_slope:float)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_attack (cref fx mod_attack |4,float|*))
-          (mod_decay (cref fx mod_decay |4,float|*))
-          (mod_attack_slope (cref fx mod_attack_slope |4,float|*))
-          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
-      (aset! mod_attack lfo_num attack)
-      (aset! mod_decay lfo_num decay)
-      (aset! mod_attack_slope lfo_num a_slope)
-      (aset! mod_decay_slope lfo_num d_slope)
+    (let ((krl (if (< lfo_num 4) 
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))                
+          (mod_attack (cref krl mod_attack |4,float|*))
+          (mod_decay (cref krl mod_decay |4,float|*))
+          (mod_attack_slope (cref krl mod_attack_slope |4,float|*))
+          (mod_decay_slope (cref krl mod_decay_slope |4,float|*)))
+      (aset! mod_attack (% lfo_num 4) attack)
+      (aset! mod_decay (% lfo_num 4) decay)
+      (aset! mod_attack_slope (% lfo_num 4) a_slope)
+      (aset! mod_decay_slope (% lfo_num 4) d_slope)
       void)))
 
 (bind-func static get_lfo_ad
   (lambda (inst:i8* lfo_num:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_attack (cref fx mod_attack |4,float|*))
-          (mod_decay (cref fx mod_decay |4,float|*))
-          (mod_attack_slope (cref fx mod_attack_slope |4,float|*))
-          (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
-      (array (aref mod_attack lfo_num)
-             (aref mod_decay lfo_num)
-             (aref mod_attack_slope lfo_num)
-             (aref mod_decay_slope lfo_num)))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_attack (cref krl mod_attack |4,float|*))
+          (mod_decay (cref krl mod_decay |4,float|*))
+          (mod_attack_slope (cref krl mod_attack_slope |4,float|*))
+          (mod_decay_slope (cref krl mod_decay_slope |4,float|*)))
+      (array (aref mod_attack (% lfo_num 4))
+             (aref mod_decay (% lfo_num 4))
+             (aref mod_attack_slope (% lfo_num 4))
+             (aref mod_decay_slope (% lfo_num 4))))))
 
 (bind-func static get_lfo_ad_attack
   (lambda (inst:i8* lfo_num:i32)
@@ -997,60 +1005,115 @@
           (mod_decay_slope (cref fx mod_decay_slope |4,float|*)))
       (aset! mod_decay_slope lfo_num slope))))
 
-
 (bind-func static set_lfo
-  (lambda (inst:i8* lfo_num:i32 amp:float frq:float)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_amp (cref fx mod_amp |4,float|*))
-          (mod_frq (cref fx mod_frq |4,float|*)))
-      (aset! mod_amp lfo_num amp)
-      (aset! mod_frq lfo_num frq)
+  (lambda (inst:i8* lfo_num:i32 amp:float frq:float phase:float options:i32)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_options (cref krl mod_options |4,i32|*))
+          (mod_phase (cref krl mod_phase |4,float|*))
+          (mod_amp (cref krl mod_amp |4,float|*))
+          (mod_frq (cref krl mod_frq |4,float|*)))
+      (aset! mod_amp (% lfo_num 4) amp)
+      (aset! mod_frq (% lfo_num 4) frq)
+      (aset! mod_phase (% lfo_num 4) phase)
+      (aset! mod_options (% lfo_num 4) options)
       void)))
 
-(bind-func static get_lfo
-  (lambda (inst:i8* lfo_num:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_amp (cref fx mod_amp |4,float|*))
-          (mod_frq (cref fx mod_frq |4,float|*)))
-      (array (aref mod_amp lfo_num)
-             (aref mod_frq lfo_num)))))
+; (bind-func static get_lfo
+;   (lambda (inst:i8* lfo_num:i32)
+;     (let ((krl (if (< lfo_num 4)
+;                   (cref (cast inst [void]*) effect_kernel [void]*)
+;                   (cref (cast inst [void]*) note_kernel [void]*)))
+;           (mod_options (cref krl mod_options |4,i32|*))
+;           (mod_phase (cref krl mod_phase |4,float|*))
+;           (mod_amp (cref krl mod_amp |4,float|*))
+;           (mod_frq (cref krl mod_frq |4,float|*)))
+;       (array (aref mod_amp (% lfo_num 4))
+;              (aref mod_frq (% lfo_num 4))
+;              (aref mod_phase (% lfo_num 4))
+;              (aref mod_options (% lfo_num 4))))))
 
 (bind-func static get_lfo_amp
   (lambda (inst:i8* lfo_num:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_amp (cref fx mod_amp |4,float|*)))
-      (aref mod_amp lfo_num))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_amp (cref krl mod_amp |4,float|*)))
+      (aref mod_amp (% lfo_num 4)))))
 
 (bind-func static set_lfo_amp
   (lambda (inst:i8* lfo_num:i32 amp:float)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_amp (cref fx mod_amp |4,float|*)))
-      (aset! mod_amp lfo_num amp))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_amp (cref krl mod_amp |4,float|*)))
+      (aset! mod_amp (% lfo_num 4) amp))))
 
 (bind-func static get_lfo_frq
   (lambda (inst:i8* lfo_num:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_frq (cref fx mod_frq |4,float|*)))
-      (aref mod_frq lfo_num))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_frq (cref krl mod_frq |4,float|*)))
+      (aref mod_frq (% lfo_num 4)))))
 
 (bind-func static set_lfo_frq
   (lambda (inst:i8* lfo_num:i32 frq:float)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_frq (cref fx mod_frq |4,float|*)))
-      (aset! mod_frq lfo_num frq))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_frq (cref krl mod_frq |4,float|*)))
+      (aset! mod_frq (% lfo_num 4) frq))))
+
+(bind-func static get_lfo_phase
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_phase (cref krl mod_phase |4,float|*)))
+      (aref mod_phase (% lfo_num 4)))))
+
+(bind-func static set_lfo_phase
+  (lambda (inst:i8* lfo_num:i32 phase:float)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_phase (cref krl mod_phase |4,float|*)))
+      (aset! mod_phase (% lfo_num 4) phase))))
+
+(bind-func static get_lfo_options
+  (lambda (inst:i8* lfo_num:i32)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_options (cref krl mod_options |4,i32|*)))
+      (aref mod_options (% lfo_num 4)))))
+
+(bind-func static set_lfo_options
+  (lambda (inst:i8* lfo_num:i32 options:i32)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (mod_options (cref krl mod_options |4,i32|*)))
+      (aset! mod_options (% lfo_num 4) options))))
 
 (bind-func static set_lfo_type
   (lambda (inst:i8* lfo_num:i32 type:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (lfo_types (cref fx lfo_types |4,i32|*)))
-      (aset! lfo_types lfo_num type)
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*)
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (lfo_types (cref krl lfo_types |4,i32|*)))
+      (aset! lfo_types (% lfo_num 4) type)
       void)))
 
 (bind-func static get_lfo_type
   (lambda (inst:i8* lfo_num:i32)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (lfo_types (cref fx lfo_types |4,i32|*)))
-      (aref lfo_types lfo_num))))
+    (let ((krl (if (< lfo_num 4)
+                   (cref (cast inst [void]*) effect_kernel [void]*) 
+                   (cref (cast inst [void]*) note_kernel [void]*)))
+          (lfo_types (cref krl lfo_types |4,i32|*)))
+      (aref lfo_types (% lfo_num 4)))))
 
 (bind-func static set_pan_width
   (lambda (inst:i8* val:float)
@@ -1176,22 +1239,51 @@
 
 ;; modulation matrix
 
-(bind-func set_mod_matrix
+(bind-func cerberus_set_mod_matrix
   (lambda (inst:i8* src:enum dst:enum value:float)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+    (let ((krl (cref (cast inst [void]*) note_kernel [void]*))
+          (mod_matrix (krl.mod_matrix:|8,|32,SAMPLE||*)))
       (if (< dst 32)
           (aset! (aref-ptr mod_matrix src) dst value))
       value)))
 
-(bind-func get_mod_matrix
+(bind-func cerberus_get_mod_matrix
   (lambda (inst:i8* src:enum dst:enum)
-    (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
-          (mod_matrix (fx.mod_matrix:|4,|32,SAMPLE||*)))
+    (let ((krl (cref (cast inst [void]*) note_kernel [void]*))
+          (mod_matrix (krl.mod_matrix:|8,|32,SAMPLE||*)))
       (if (< dst 32)
           (aref (aref-ptr mod_matrix src) dst)
           0.0))))
 
+(bind-func analogue_set_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum value:float)
+    (let ((krl (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (krl.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aset! (aref-ptr mod_matrix src) dst value))
+      value)))
+
+(bind-func analogue_get_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum)
+    (let ((krl (cref (cast inst [void]*) effect_kernel [void]*))
+          (mod_matrix (krl.mod_matrix:|4,|32,SAMPLE||*)))
+      (if (< dst 32)
+          (aref (aref-ptr mod_matrix src) dst)
+          0.0))))
+
+(bind-func set_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum value:float)
+    (let ((name (cref (cast inst [void]*) name String*)))
+      (if (equal name 'Cerberus')
+          (cerberus_set_mod_matrix inst src dst value)
+          (analogue_set_mod_matrix inst src dst value)))))
+          
+(bind-func get_mod_matrix
+  (lambda (inst:i8* src:enum dst:enum)
+    (let ((name (cref (cast inst [void]*) name String*)))
+      (if (equal name 'Cerberus')
+          (cerberus_get_mod_matrix inst src dst)
+          (analogue_get_mod_matrix inst src dst)))))
 
 ;;; some higher level combined options
 

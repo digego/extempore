@@ -5,77 +5,77 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; helper function for file io
-(bind-func analogue_remove_file
+(bind-func cerberus_remove_file
   (lambda (f)
     (remove f)))
 
 ;; sin, tri and saw with ignored pw (i.e. 3rd) argument
 ;; this is to match pulse which requires pw
-(bind-func oscXAnalogue_c
-  (lambda (phase)
-    (set! phase (- (* phase STWOPI) SPI))
-    (let ((t (/ STWOPI SAMPLERATE)))
-      (lambda (amp:float freq:float nothing:float)
-        (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
-        (if (> phase SPI) (set! phase (- phase STWOPI)))
-        (* amp (parabolicSineHP phase))))))
+; (bind-func oscXAnalogue_c
+;   (lambda (phase)
+;     (set! phase (- (* phase STWOPI) SPI))
+;     (let ((t (/ STWOPI SAMPLERATE)))
+;       (lambda (amp:float freq:float nothing:float)
+;         (set! phase (+ phase (* t (clamp freq (- 0.0 SRs) SRs))))
+;         (if (> phase SPI) (set! phase (- phase STWOPI)))
+;         (* amp (parabolicSineHP phase))))))
 
-(bind-func bltriXAnalogue_c
-  (lambda (mod:float)
-    (let ((sawout:float 0.0) (sqrout 0.0) (inc 0.0)
-          (out:float 0.0)
-          (sqrmod 1.0)
-          (diffout 0.0) (zreg:float 0.0) (c 0.0))
-      (lambda (amp:float frq:float nothing:float)
-        (set! inc (/ frq SRs))
-        ;; positive frequencies
-        (if (and (> inc 0.0) (>= mod 1.0))
-            (begin (set! mod (- mod 1.0))
-                   (set! sqrmod (* sqrmod -1.0))))
-        ;; negative frequencies
-        (if (and (< inc 0.0) (<= mod 0.0))
-            (begin (set! mod (+ mod 1.0))
-                   (set! sqrmod (* sqrmod -1.0))))
-        ;; start with saw
-        (set! sawout (- (* mod 2.0) 1.0)) ;; bipolar sawtooth
-        (set! sawout (* sawout sawout)) ;; sqr'd sawtooth
-        (set! sawout (- 1.0 sawout)) ;; inverted sqr'd sawtooth
-        ;; modulate with sqr (50 % pulse width)
-        (set! out (* sawout sqrmod))
-        ;; differentiate
-        (set! diffout (- out zreg))
-        (set! zreg out)
-        (set! c (/ SRs (* 4.0 2.0 frq (- 1.0 inc))))
-        (set! mod (+ mod inc)) ;; update mod
-        (set! mod (+ mod inc)) ;; update mod
-        (* diffout c amp)))))
+; (bind-func bltriXAnalogue_c
+;   (lambda (mod:float)
+;     (let ((sawout:float 0.0) (sqrout 0.0) (inc 0.0)
+;           (out:float 0.0)
+;           (sqrmod 1.0)
+;           (diffout 0.0) (zreg:float 0.0) (c 0.0))
+;       (lambda (amp:float frq:float nothing:float)
+;         (set! inc (/ frq SRs))
+;         ;; positive frequencies
+;         (if (and (> inc 0.0) (>= mod 1.0))
+;             (begin (set! mod (- mod 1.0))
+;                    (set! sqrmod (* sqrmod -1.0))))
+;         ;; negative frequencies
+;         (if (and (< inc 0.0) (<= mod 0.0))
+;             (begin (set! mod (+ mod 1.0))
+;                    (set! sqrmod (* sqrmod -1.0))))
+;         ;; start with saw
+;         (set! sawout (- (* mod 2.0) 1.0)) ;; bipolar sawtooth
+;         (set! sawout (* sawout sawout)) ;; sqr'd sawtooth
+;         (set! sawout (- 1.0 sawout)) ;; inverted sqr'd sawtooth
+;         ;; modulate with sqr (50 % pulse width)
+;         (set! out (* sawout sqrmod))
+;         ;; differentiate
+;         (set! diffout (- out zreg))
+;         (set! zreg out)
+;         (set! c (/ SRs (* 4.0 2.0 frq (- 1.0 inc))))
+;         (set! mod (+ mod inc)) ;; update mod
+;         (set! mod (+ mod inc)) ;; update mod
+;         (* diffout c amp)))))
 
-(bind-func blsawXAnalogue_c
-  (lambda (mod inverted:i1 highcpu:i1)
-    (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
-          (rising (if inverted 1 0))
-          (inv (if inverted -1.0 1.0)))
-      (lambda (amp:float frq:float nothing:float)
-        (set! inc (/ frq SRs))
-        ;; positive frequencies
-        (if (and (> inc 0.0) (>= mod 1.0))
-            (set! mod (- mod 1.0)))
-        ;; negative frequencies
-        (if (and (< inc 0.0) (<= mod 0.0))
-            (set! mod (+ mod 1.0)))
-        (set! blep
-              (if highcpu
-                  (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 rising 4.0 #f)
-                  (poly_blep mod (fabs inc) 1.0 rising)))
-        (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
-        (set! mod (+ mod inc)) ;; update mod
-        (* amp (+ out blep))))))
+; (bind-func blsawXAnalogue_c
+;   (lambda (mod inverted:i1 highcpu:i1)
+;     (let ((inc 0.0) (absinc 0.0:f) (out 0.0) (blep 0.0) (t 0.0)
+;           (rising (if inverted 1 0))
+;           (inv (if inverted -1.0 1.0)))
+;       (lambda (amp:float frq:float nothing:float)
+;         (set! inc (/ frq SRs))
+;         ;; positive frequencies
+;         (if (and (> inc 0.0) (>= mod 1.0))
+;             (set! mod (- mod 1.0)))
+;         ;; negative frequencies
+;         (if (and (< inc 0.0) (<= mod 0.0))
+;             (set! mod (+ mod 1.0)))
+;         (set! blep
+;               (if highcpu
+;                   (blep_n (cast fBLEPTable_8_BLKHAR SAMPLE*) 4096.0 mod (fabs inc) 1.0 rising 4.0 #f)
+;                   (poly_blep mod (fabs inc) 1.0 rising)))
+;         (set! out (* inv (- (* mod 2.0) 1.0))) ;; bipolar
+;         (set! mod (+ mod inc)) ;; update mod
+;         (* amp (+ out blep))))))
 
 
-;; inlined moog ladder for analogue
-;; type is LPF4, LPF2 only (this for use of analogue synth)
+;; inlined moog ladder for cerberus
+;; type is LPF4, LPF2 only (this for use of cerberus synth)
 ;; rate is the minimum number of samples to allow between frq/res updates
-(bind-func moog_ladder_inlined
+(bind-func cerberus_moog_ladder_inlined
   (lambda (type)
     (let ((i:i64 0)
           (m_dK 0.0)
@@ -149,15 +149,98 @@
 ;; finished helpfer functions onto notes and fx
 ;;
 
+;; LFO OPTIONS
+(bind-val LFO_OPT_NULL enum 0)
+(bind-val LFO_OPT_FRQ_TO_FRQ enum 1)
+(bind-val LFO_OPT_FRQ_TO_AMP enum 2)
+(bind-val LFO_OPT_NOTEDUR enum 3)
+
+(bind-func cerberus_reset_lfos
+  (lambda (lfos:|4,|8,[SAMPLE,i64,i64]*||* idx:i64 frequency:SAMPLE onecycleinhz:SAMPLE phases:|4,SAMPLE|* mod_options:|4,i32|*)
+    (let ((obj (aref-ptr lfos idx))
+          (sine (cref (cast (aref obj 0) [void]*) osc [void]*))
+          (saw (cref (cast (aref obj 1) [void]*) osc [void]*))
+          (pulse (cref (cast (aref obj 2) [void]*) osc [void]*))
+          (tri (cref (cast (aref obj 3) [void]*) osc [void]*))
+          (opts (aref mod_options idx))
+          (notedur_value (if (> (& opts LFO_OPT_NOTEDUR) 0) onecycleinhz 1.0))
+          (amod_value (if (> (& opts LFO_OPT_FRQ_TO_AMP) 0) frequency 1.0))
+          (fmod_value (if (> (& opts LFO_OPT_FRQ_TO_FRQ) 0) frequency 1.0)))
+      ;; only the above need a phases
+      (sine.phase (aref phases idx))
+      (saw.mod (aref phases idx))
+      (saw.pulse (aref phases idx))
+      (saw.tri (aref phases idx))
+      ;; also set amod + fmod
+      (cset! (cast (aref obj 0) [void]*) amod amod_value float)
+      (cset! (cast (aref obj 0) [void]*) fmod fmod_value float)
+      (cset! (cast (aref obj 1) [void]*) amod amod_value float)
+      (cset! (cast (aref obj 1) [void]*) fmod fmod_value float)
+      (cset! (cast (aref obj 2) [void]*) amod amod_value float)
+      (cset! (cast (aref obj 2) [void]*) fmod fmod_value float)
+      (cset! (cast (aref obj 3) [void]*) amod amod_value float)
+      (cset! (cast (aref obj 3) [void]*) fmod fmod_value float)
+      
+      (cset! (cast (aref obj 0) [void]*) notedur notedur_value float)
+      (cset! (cast (aref obj 1) [void]*) notedur notedur_value float)
+      (cset! (cast (aref obj 2) [void]*) notedur notedur_value float)
+      (cset! (cast (aref obj 3) [void]*) notedur notedur_value float)
+      void)))
+
+
+(bind-func cerberus_create_lfos
+  (lambda (lfos:|4,|8,[SAMPLE,i64,i64]*||* i:i64 frequency:SAMPLE onecycleinhz:SAMPLE mod_amp:|4,SAMPLE|* mod_frq:|4,SAMPLE|* mod_phase:|4,SAMPLE|* mod_options:|4,i32|* mod_attack:|4,SAMPLE|* mod_decay:|4,SAMPLE|* mod_attack_slope:|4,SAMPLE|* mod_decay_slope:|4,SAMPLE|*)
+    (let ((opts (aref mod_options i))
+          (notedur:SAMPLE (if (> (& opts LFO_OPT_NOTEDUR) 0) onecycleinhz 1.0))
+          (amod:SAMPLE (if (> (& opts LFO_OPT_FRQ_TO_AMP) 0) frequency 1.0))
+          (fmod:SAMPLE (* notedur (if (> (& opts LFO_OPT_FRQ_TO_FRQ) 0) frequency 1.0))))
+      (aset! lfos i
+        (array (let ((osc (osc_c (aref mod_phase i))))
+                (lambda (chan:i64 idx:i64)
+                  (osc (* amod (aref mod_amp idx))
+                       (* fmod (aref mod_frq idx)))))
+              (let ((osc (saw_c (aref mod_phase i))))
+                (lambda (chan:i64 idx:i64)
+                  (osc (* amod (aref mod_amp idx))
+                       (* fmod (aref mod_frq idx)))))
+              (let ((osc (pulse_c (aref mod_phase i))))
+                (lambda (chan:i64 idx:i64)
+                  (osc (* amod (aref mod_amp idx))
+                       (* fmod (aref mod_frq idx))
+                       0.5)))
+              (let ((osc (tri_c (aref mod_phase i))))
+                (lambda (chan:i64 idx:i64)
+                  (osc (* amod (aref mod_amp idx))
+                       (* fmod (aref mod_frq idx)))))
+              (let ((osc (ad_c)))
+                (cset! osc cycle #t i1)
+                (lambda (chan:i64 idx:i64)
+                  (osc chan 1.0
+                        (aref mod_attack idx)
+                        (aref mod_decay idx)
+                        (aref mod_attack_slope idx)
+                        (aref mod_decay_slope idx))))
+              (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant instead of WT
+              (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant
+              (let ((cnt 0)
+                    (rem:SAMPLE (* (aref mod_amp i) (random)))) ;; random S & H
+                (lambda (chan:i64 idx:i64)
+                  (if (and (= chan 0 )
+                            (= (% cnt (ftoi64 (/ SRf (aref mod_frq idx)))) 0))
+                      (begin
+                        (set! cnt (+ cnt 1))
+                        (set! rem (* (aref mod_amp idx) (random)))))
+                  rem)) ;; random S & H
+              )))
+    void))
+
 ;; performance profile  (0 high, 1 low)
-(bind-func analogue_note
+(bind-func cerberus_note
   (lambda ()
     (let ((MILLISEC (* .001 SRs))
           (amp_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
           (filter_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
           (pitch_env:|2,SAMPLE| (array 0.0:f 0.0))
-          (mod_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
-          (mod_env_delay:SAMPLE 0.0)
           (oldfreq 440.0:f)
           (tune1:SAMPLE 1.0)
           (tune2:SAMPLE 1.0)
@@ -188,7 +271,17 @@
           (osc4_wt:AudioBuffer* DefaultWaveTable)
           (osc_slop:SAMPLE 0.0)
           (sub_amp:SAMPLE 0.0)
+          (mod_amp:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+          (mod_frq:|4,SAMPLE|* (array_ref -1.0 -1.0 -1.0 -1.0))
+          (mod_phase:|4,SAMPLE|* (array_ref 0.25 0.25 0.25 0.25))
+          (mod_options:|4,i32|* (array_ref 0 0 0 0))
+          (mod_attack:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
+          (mod_decay:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0))
+          (mod_attack_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
+          (mod_decay_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0))
+          (lfo_types:|4,i32|* (array_ref PARAM_TRI PARAM_TRI PARAM_TRI PARAM_TRI))
           (mods:|32,SAMPLE|* (alloc))
+          (mod_matrix:|8,|32,SAMPLE||* (alloc))
           (noise_amp_mod:SAMPLE 0.0)
           (filter_type:i64 2) ;; LPF2 LPF4, HPF2 HPF4, BPF2 BPF4
           (follow_frq 0.0)
@@ -212,18 +305,24 @@
               (target_amp:SAMPLE amplitude)
               (newampinc:SAMPLE 0.0)
               (duration:i64 (note_duration data))
+              (onecycleinhz:SAMPLE (/ SRf (convert duration)))
+              (mod_frq_actual:|4,SAMPLE|* (alloc))
+              (mod_amp_actual:|4,SAMPLE|* (alloc))
               (glideinc:SAMPLE 0.0) ;; for portamento
               (midifrq:SAMPLE 0.0)
               (new_note_timer:i64 0)
+              (lfos:|4,|8,[SAMPLE,i64,i64]*||* (alloc))
+              (modslocal:|32,SAMPLE|* (alloc))
               (frq 0.0)
+              (fm4_out:SAMPLE 0.0)
+              (am4_out:SAMPLE 0.0)
+              (pm4_out:SAMPLE 0.0)
               (adsr1 (adsr_c))
               (adsr2 (adsr_c))
               (adsr3 (adsr_c))
-              (adsr4 (dadsr_c))
               (adsr1_val 0.0)
               (adsr2_val 0.0)
               (adsr3_val 0.0)
-              (adsr4_val:SAMPLE 0.0)
               ;; (gate:SAMPLE 1.0)
               (amp:SAMPLE 0.0)
               (cof:SAMPLE 0.0)
@@ -239,13 +338,8 @@
               (filter_release (aref filter_env 3))
               (pitch_attack (aref pitch_env 0))
               (pitch_decay (aref pitch_env 1))
-              (mod_delay mod_env_delay)
-              (mod_attack (aref mod_env 0))
-              (mod_decay (aref mod_env 1))
-              (mod_sustain (aref mod_env 2))
-              (mod_release (aref mod_env 3))
               (filter:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]* (if (= 0 performance_profile)
-                                                         (moog_ladder_inlined (i64toi32 filter_type))
+                                                         (cerberus_moog_ladder_inlined (i64toi32 filter_type))
                                                          (lpf_c)))
               (_osc1_phase (+ osc1_phase (* osc_phase_slop .1 (random))))
               (_osc2_phase (+ osc2_phase (* osc_phase_slop .1 (random))))
@@ -275,14 +369,34 @@
               (osc2_out:SAMPLE 0.0)
               (osc3_out:SAMPLE 0.0)
               (osc4_out:SAMPLE 0.0)
+              (tmpmod:|32,SAMPLE|* null)
+              (tmpval:SAMPLE 0.0)
+              (tmp:SAMPLE 0.0)
+              (useosc1 #t)
+              (useosc2 #f)
+              (useosc3 #f)
+              (useosc4 #f)
+              (usesub #f)
+              (usenoise #f)
               (zero:SAMPLE 0.0)
               (white (white_c))
               (pink (pink_c))
+              (noisef (if (= noise PARAM_WHITE) white pink))
               (sub_out 0.0)
               (noise_out 0.0)
               (subosc (osc_c 0.0))
-              (main_out 0.0:f))
+              (main_out 0.0:f)
+              (i:i64 0)
+              (j:i64 0))
+          (dotimes (i 4)
+            (cerberus_create_lfos lfos i frequency onecycleinhz mod_amp mod_frq mod_phase mod_options mod_attack mod_decay mod_attack_slope mod_decay_slope))
           (if (= 0 performance_profile) (filter.saturation (clamp filter_saturation 1.0:f 3.0:f)))
+          ;; (if (> osc1_amp 0.001) (set! useosc1 #t))  ;; always
+          (if (> osc2_amp 0.001) (set! useosc2 #t))
+          (if (> osc3_amp 0.001) (set! useosc3 #t))
+          (if (> osc4_amp 0.001) (set! useosc4 #t))
+          (if (> sub_amp 0.001) (set! usesub #t))
+          (if (> noise_amp 0.001) (set! usenoise #t))
           (lambda (time:i64 chan:i64)
             (if (= chan 0)
                 (begin
@@ -294,7 +408,7 @@
                         (if (not legato)
                             (begin
                                 (set! amplitude (note_amplitude data)) ;; reset envelopes
-                                (retrigger_adsr adsr1) (retrigger_adsr adsr2) (retrigger_adsr adsr3) (retrigger_dadsr adsr4)))
+                                (retrigger_adsr adsr1) (retrigger_adsr adsr2) (retrigger_adsr adsr3)))
                         ;; (note_starttime data (tref data 7))
                         (set! starttime (tref data 7)) ;(note_starttime data))
                         (set! target_frq (note_frequency data))
@@ -306,7 +420,10 @@
                         (AudioBuffer_set_phase wt4 0.0)
                         (set! reltime 0)
                         (set! gate 1.0) ;(note_gate data))
-                        (set! duration (note_duration data))))
+                        (set! duration (note_duration data))
+                        (set! onecycleinhz (/ SRf (convert duration)))
+                        (dotimes (i 4)
+                          (cerberus_reset_lfos lfos i target_frq onecycleinhz mod_phase mod_options))))
                   ;; voice steeling done
                   (if (> (fabs (- target_frq frequency)) 0.125) ;; 1/8 hz
                       (set! frequency (+ frequency glideinc)))
@@ -315,15 +432,30 @@
                   (set! adsr1_val (adsr1 chan gate amp_attack amp_decay amp_sustain amp_release))
                   (set! adsr2_val (adsr2 chan gate filter_attack filter_decay filter_sustain filter_release))
                   (set! adsr3_val (adsr3 chan gate pitch_attack pitch_decay 0.0 0.0))
-                  (set! adsr4_val (adsr4 chan gate mod_delay mod_attack mod_decay mod_sustain mod_release))
+                  ;; calc local mod matrix changes
+                  (begin
+                    (memcpy (cast modslocal i8*) (cast mods i8*) 128)
+                    (dotimes (i 3)
+                      (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
+                      (set! tmpmod (aref-ptr mod_matrix (+ i 4))) ;; only get 'note' lfos
+                      (dotimes (j 19) (aset! modslocal j (+ (aref modslocal j) (* tmp (aref tmpmod j)))))
+                      void)
+                    ;; the 4th lfo is a modulator
+                    (set! tmp ((aref (aref-ptr lfos 3) (aref lfo_types 3)) chan 3))
+                    (set! tmpmod (aref-ptr mod_matrix (+ 3 4))) ;; only get 'note' lfos
+                    (dotimes (j 19)
+                      (set! tmpval (aref tmpmod j))
+                      (if (> tmpval 0.0)
+                          (aset! modslocal j (* (aref modslocal j) (* tmp (aref tmpmod j))))))
+                    )
                   (set! amp (* amplitude adsr1_val))
                   (set! cof (clamp (+ filter_frq (* follow_frq 8.0 frequency) (* follow_amp amplitude 12000.0)
-                                      (* adsr4_val (aref mods PARAM_FILTER_FRQ))
+                                      (aref modslocal PARAM_FILTER_FRQ)
                                       (* filter_env_amt adsr2_val))
                                    0.0 22000.0))
-                  (set! res (+ reso (* adsr4_val (aref mods PARAM_FILTER_RES))))
+                  (set! res (+ reso (aref modslocal PARAM_FILTER_RES)))
                   (set! frq (+ frequency (* pitch_env_amt frequency adsr3_val) 0.0))
-                  (if (< frq 10.0) (set! frq 10.0))
+                  ;; (if (< frq 10.0) (set! frq 10.0))
                   ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
                   (if (< gate 0.1) (set! reltime (+ reltime 1)))
                   (if (> reltime amp_release_samples)
@@ -331,67 +463,60 @@
                           (note_active data #f) ;; stop note if amp less than 0.01
                           (begin (set! amplitude (- amplitude 0.01)) #t))) ;; otherwise decrease amplitude over max 100 samples
                   ;; setup mod sources
-                  (if (> osc1_amp 0.001)
-                      (set! osc1_out (* (+ osc1_amp (* adsr4_val (aref mods PARAM_OSC1_AMP)))
-                                        (cond ((= osc1_wave 0) (sin1 1.0 (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))))
-                                              ((= osc1_wave 1) (saw1 1.0 (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))))
-                                              ((= osc1_wave 2) (pulse1 1.0 (+ (* tune1 frq)
-                                                                              (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
-                                                                       (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
-                                              ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))))
-                                              ((= osc1_wave 4) (AudioBuffer_read_interp_pw wt1
-                                                                  (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
-                                                                  0
-                                                                  (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
-                                              (else zero))))
-                      (set! osc1_out 0.0))
-                  (if (> osc2_amp 0.001)
-                      (set! osc2_out (* (+ osc2_amp (* adsr4_val (aref mods PARAM_OSC2_AMP)))
-                                        (cond ((= osc2_wave 0) (sin2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))))
-                                              ((= osc2_wave 1) (saw2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))))
-                                              ((= osc2_wave 2) (pulse2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
-                                                                       (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
-                                              ((= osc2_wave 3) (tri2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))))
-                                              ((= osc2_wave 4) (AudioBuffer_read_interp_pw wt2
-                                                                  (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
-                                                                  0
-                                                                  (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
-                                              (else zero))))
-                      (set! osc2_out 0.0))
-                  (if (> osc3_amp 0.001)
-                      (set! osc3_out (* (+ osc3_amp (* adsr4_val (aref mods PARAM_OSC3_AMP)))
-                                        (cond ((= osc3_wave 0) (sin3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))))
-                                              ((= osc3_wave 1) (saw3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))))
-                                              ((= osc3_wave 2) (pulse3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
-                                                                       (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
-                                              ((= osc3_wave 3) (tri3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))))
-                                              ((= osc3_wave 4) (AudioBuffer_read_interp_pw wt3
-                                                                  (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
-                                                                  0
-                                                                  (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
-                                              (else zero))))
-                      (set! osc3_out 0.0))
-                  (if (> osc4_amp 0.001)
-                      (set! osc4_out (* (+ osc4_amp (* adsr4_val (aref mods PARAM_OSC4_AMP)))
-                                        (cond ((= osc4_wave 0) (sin4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))))
-                                              ((= osc4_wave 1) (saw4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))))
-                                              ((= osc4_wave 2) (pulse4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
-                                                                       (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
-                                              ((= osc4_wave 3) (tri4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))))
-                                              ((= osc4_wave 4) (AudioBuffer_read_interp_pw wt4
-                                                                  (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
-                                                                  0
-                                                                  (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
-                                              (else zero))))
-                      (set! osc4_out 0.0))
-                  (if (> sub_amp 0.001)
-                      (set! sub_out (* sub_amp (subosc 1.0 (* frq 0.25))))
-                      (set! sub_out 0.0))
-                  (if (> noise_amp 0.001)
-                      (if (= noise PARAM_WHITE)
-                          (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (white)))
-                          (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (pink))))
-                      (set! noise_out 0.0))
+                  (if useosc1
+                      (begin
+                        (set! osc1_out (* (+ osc1_amp (aref modslocal PARAM_OSC1_AMP))
+                                          (cond ((= osc1_wave 0) (sin1 1.0 (+ (* tune1 frq) (aref modslocal PARAM_OSC1_FRQ))))
+                                                ((= osc1_wave 1) (saw1 1.0 (+ (* tune1 frq) (aref modslocal PARAM_OSC1_FRQ))))
+                                                ((= osc1_wave 2) (pulse1 1.0 (+ (* tune1 frq) (aref modslocal PARAM_OSC1_FRQ))
+                                                                        (+ pw1 (aref modslocal PARAM_OSC1_PW))))
+                                                ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (aref modslocal PARAM_OSC1_FRQ))))
+                                                ((= osc1_wave 4) (AudioBuffer_read_interp_pw wt1
+                                                                    (+ (* tune1 frq) (aref modslocal PARAM_OSC1_FRQ))
+                                                                    0
+                                                                    (+ pw1 (aref modslocal PARAM_OSC1_PW))))
+                                                (else zero))))))
+                  (if useosc2
+                      (begin
+                        (set! osc2_out (* (+ osc2_amp (aref modslocal PARAM_OSC2_AMP))
+                                          (cond ((= osc2_wave 0) (sin2 1.0 (+ (* tune2 frq) (aref modslocal PARAM_OSC2_FRQ))))
+                                                ((= osc2_wave 1) (saw2 1.0 (+ (* tune2 frq) (aref modslocal PARAM_OSC2_FRQ))))
+                                                ((= osc2_wave 2) (pulse2 1.0 (+ (* tune2 frq) (aref modslocal PARAM_OSC2_FRQ))
+                                                                        (+ pw2 (aref modslocal PARAM_OSC2_PW))))
+                                                ((= osc2_wave 3) (tri2 1.0 (+ (* tune2 frq) (aref modslocal PARAM_OSC2_FRQ))))
+                                                ((= osc2_wave 4) (AudioBuffer_read_interp_pw wt2
+                                                                    (+ (* tune2 frq) (aref modslocal PARAM_OSC2_FRQ))
+                                                                    0
+                                                                    (+ pw2 (aref modslocal PARAM_OSC2_PW))))
+                                                (else zero))))))
+                  (if useosc3
+                      (begin
+                        (set! osc3_out (* (+ osc3_amp (aref modslocal PARAM_OSC3_AMP))
+                                          (cond ((= osc3_wave 0) (sin3 1.0 (+ (* tune3 frq) (aref modslocal PARAM_OSC3_FRQ))))
+                                                ((= osc3_wave 1) (saw3 1.0 (+ (* tune3 frq) (aref modslocal PARAM_OSC3_FRQ))))
+                                                ((= osc3_wave 2) (pulse3 1.0 (+ (* tune3 frq) (aref modslocal PARAM_OSC3_FRQ))
+                                                                        (+ pw3 (aref modslocal PARAM_OSC3_PW))))
+                                                ((= osc3_wave 3) (tri3 1.0 (+ (* tune3 frq) (aref modslocal PARAM_OSC3_FRQ))))
+                                                ((= osc3_wave 4) (AudioBuffer_read_interp_pw wt3
+                                                                    (+ (* tune3 frq) (aref modslocal PARAM_OSC3_FRQ))
+                                                                    0
+                                                                    (+ pw3 (aref modslocal PARAM_OSC3_PW))))
+                                                (else zero))))))
+                  (if useosc4
+                      (begin
+                        (set! osc4_out (* (+ osc4_amp (aref modslocal PARAM_OSC4_AMP))
+                                          (cond ((= osc4_wave 0) (sin4 1.0 (+ (* tune4 frq) (aref modslocal PARAM_OSC4_FRQ))))
+                                                ((= osc4_wave 1) (saw4 1.0 (+ (* tune4 frq) (aref modslocal PARAM_OSC4_FRQ))))
+                                                ((= osc4_wave 2) (pulse4 1.0 (+ (* tune4 frq) (aref modslocal PARAM_OSC4_FRQ))
+                                                                        (+ pw4 (aref modslocal PARAM_OSC4_PW))))
+                                                ((= osc4_wave 3) (tri4 1.0 (+ (* tune4 frq) (aref modslocal PARAM_OSC4_FRQ))))
+                                                ((= osc4_wave 4) (AudioBuffer_read_interp_pw wt4
+                                                                    (+ (* tune4 frq) (aref modslocal PARAM_OSC4_FRQ))
+                                                                    0
+                                                                    (+ pw4 (aref modslocal PARAM_OSC4_PW))))
+                                                (else zero))))))
+                  (if usesub (set! sub_out (subosc sub_amp (* frq 0.25))))
+                  (if usenoise (set! noise_out (* 0.5 (+ noise_amp (aref modslocal PARAM_NOISE_AMP)) (noisef))))
                   (set! main_out (* amp (filter
                                (+ osc1_out
                                   osc2_out
@@ -402,25 +527,25 @@
                         cof reso)))))
             main_out))))))
 
-
 ;; FX
-(bind-func analogue_fx
+(bind-func cerberus_fx
   (let ((MILLISEC (* .001 SRf))
         (CHANSF (i32tof CHANNELS)))
     (lambda ()
       (let ((notekernel:NOTE_KERNEL null)
-            (name 'Analogue')
+            (name 'Cerberus')
             (mod_amp:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
+            (mod_frq:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
             (mod_phase:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0))
             (mod_options:|4,i32|* (array_ref 0 0 0 0))
-            (mod_frq:|4,SAMPLE|* (array_ref 1.0 1.0 1.0 1.0))
             (mod_attack:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0)) ;; in millis
             (mod_decay:|4,SAMPLE|* (array_ref 10.0 10.0 10.0 10.0))
             (mod_attack_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0)) ;; between -1.0 log and 1.0 exp  (0.0 is linear)
             (mod_decay_slope:|4,SAMPLE|* (array_ref 0.0 0.0 0.0 0.0))
             (mods:|32,SAMPLE|* null) ;(alloc))
-            (mod_matrix:|4,|32,SAMPLE||* (alloc))
+            (mod_matrix:|8,|32,SAMPLE||* null); (alloc))
             (tmpmod:|32,SAMPLE|* null)
+            (tmpval:SAMPLE 0.0)
             (lfos:|4,|8,[SAMPLE,i64,i64]*||* (alloc))
             (lfo_types:|4,i32|* (alloc))
             (hpf (hpf_c))
@@ -457,54 +582,26 @@
             (gain 2.0))
         (dotimes (i 4)
           (aset! lfo_types i PARAM_SINE)
-          (aset! lfos i
-                 (array (let ((osc (osc_c 0.0)))
-                          (lambda (chan:i64 idx:i64)
-                            (osc (aref mod_amp idx)
-                                 (aref mod_frq idx))))
-                        (let ((osc (saw_c 0.0)))
-                          (lambda (chan:i64 idx:i64)
-                            (osc (aref mod_amp idx)
-                                 (aref mod_frq idx))))
-                        (let ((osc (pulse_c 0.0)))
-                          (lambda (chan:i64 idx:i64)
-                            (osc (aref mod_amp idx)
-                                 (aref mod_frq idx)
-                                 0.5)))
-                        (let ((osc (tri_c 0.0)))
-                          (lambda (chan:i64 idx:i64)
-                            (osc (aref mod_amp idx)
-                                 (aref mod_frq idx))))
-                        (let ((osc (ad_c)))
-                          (cset! osc cycle #t i1)
-                          (lambda (chan:i64 idx:i64)
-                            (osc chan 1.0
-                                 (aref mod_attack idx)
-                                 (aref mod_decay idx)
-                                 (aref mod_attack_slope idx)
-                                 (aref mod_decay_slope idx))))
-                        (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant instead of WT
-                        (lambda (chan:i64 idx:i64) (aref mod_amp idx)) ;; constant
-                        (let ((cnt 0)
-                              (rem:float (* (aref mod_amp i) (random)))) ;; random S & H
-                          (lambda (chan:i64 idx:i64)
-                            (if (and (= chan 0 )
-                                     (= (% cnt (ftoi64 (/ SRf (aref mod_frq idx)))) 0))
-                                (begin
-                                  (set! cnt (+ cnt 1))
-                                  (set! rem (* (aref mod_amp idx) (random)))))
-                            rem)) ;; random S & H
-                        ))) ;; constant
+          (cerberus_create_lfos lfos i 0.0 0.0 mod_amp mod_frq mod_phase mod_options mod_attack mod_decay mod_attack_slope mod_decay_slope))
         (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
           ;; calc mod matrix changes
           (begin
             (if (= mods null) (set! mods (notekernel.mods:|32,SAMPLE|*)))
+            (if (= mod_matrix null) (set! mod_matrix (notekernel.mod_matrix:|8,|32,SAMPLE||*)))
             (memset (cast mods i8*) 0 128) ;(size_of mods))
-            (dotimes (i 4)
+            (dotimes (i 3)
               (set! tmp ((aref (aref-ptr lfos i) (aref lfo_types i)) chan i))
               (set! tmpmod (aref-ptr mod_matrix i))
               (dotimes (j 32) (aset! mods j (+ (aref mods j) (* tmp (aref tmpmod j)))))
-              void))
+              void)
+            ;; the 4th lfo is a modulator!
+            (set! tmp ((aref (aref-ptr lfos 3) (aref lfo_types 3)) chan 3))
+            (set! tmpmod (aref-ptr mod_matrix 3))
+            (dotimes (j 32) 
+              (set! tmpval (aref tmpmod j))
+              (if (> tmpval 0.0)
+                  (aset! mods j (* (aref mods j) (* tmp (aref tmpmod j))))))
+          )
           (set! out in)
           (set! out (overdrive out overdrive_amt))
           (if (< hpf_frq 20000.0)
@@ -539,205 +636,16 @@
                                (+ reverb_mix (aref mods PARAM_REVERB_MIX)))))
           (* gain fxout))))))
 
-
-
 ;;;
 ;;; tests
 ;;;
 
-
-(bind-func analogueVec_note
-  (lambda ()
-    (let ((MILLISEC (* .001 SRs))
-          (amp_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
-          (filter_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
-          (pitch_env:|2,SAMPLE| (array 0.0:f 0.0))
-          (mod_env:|4,SAMPLE| (array 0.0:f 0.0 1.0 0.0))
-          (oldfreq 440.0:f)
-          (tune1:SAMPLE 1.0)
-          (tune2:SAMPLE 1.0)
-          (tune3:SAMPLE 1.0)
-          (tune4:SAMPLE 1.0)
-          (osc1_wave:enum PARAM_SAW)
-          (osc2_wave:enum PARAM_SAW)
-          (osc3_wave:enum PARAM_SAW)
-          (osc4_wave:enum PARAM_SAW)
-          (pw1:SAMPLE 0.5)
-          (pw2:SAMPLE 0.5)
-          (pw3:SAMPLE 0.5)
-          (pw4:SAMPLE 0.5)
-          (noise:enum PARAM_WHITE) ;; white
-          (noise_amp:SAMPLE 0.0)
-          (osc1_amp:SAMPLE 0.4)
-          (osc2_amp:SAMPLE 0.0)
-          (osc3_amp:SAMPLE 0.0)
-          (osc4_amp:SAMPLE 0.0)
-          (osc_slop:SAMPLE 0.0)
-          (sub_amp:SAMPLE 0.0)
-          (mods:|32,SAMPLE|* (alloc))
-          (noise_amp_mod:SAMPLE 0.0)
-          (filter_type:i64 2) ;; LPF2 LPF4, HPF2 HPF4, BPF2 BPF4
-          (follow_frq 0.0)
-          (follow_amp 0.0)
-          (legato #f) ;; if legato is true then don't retrigger adsr's!
-          (filter_frq:SAMPLE 15000.0) ;;
-          (filter_env_amt:SAMPLE 0.0) ;; this for lpf
-          (filter_saturation:SAMPLE 1.0)
-          (pitch_env_amt:SAMPLE 0.0)
-          (portamento:SAMPLE 2.0) ;; in millis
-          (res:SAMPLE 0.0)
-          (reso:SAMPLE 0.0))
-      (lambda (data:NoteData* nargs:i64 dargs:SAMPLE*)
-        (let ((starttime:i64 (note_starttime data))
-              (frequency:SAMPLE (+ (note_frequency data) (* (- (random) 0.5) (note_frequency data) osc_slop 0.05)))
-              (target_frq:SAMPLE frequency)
-              (amplitude:SAMPLE (note_amplitude data))
-              (target_amp:SAMPLE amplitude)
-              (newampinc:SAMPLE 0.0)
-              (duration:i64 (note_duration data))
-              (glideinc:SAMPLE 0.0) ;; for portamento
-              (midifrq:SAMPLE 0.0)
-              (new_note_timer:i64 0)
-              (frq 0.0)
-              (osc_pws_v (vector pw1 pw2 pw3 pw4))
-              (osc_tunes_v (vector tune1 tune2 tune3 tune4))
-              (osc_modamps_v (vector (aref mods PARAM_OSC1_AMP) (aref mods PARAM_OSC2_AMP) (aref mods PARAM_OSC3_AMP) (aref mods PARAM_OSC4_AMP)))
-              (osc_modfrqs_v (vector (aref mods PARAM_OSC1_FRQ) (aref mods PARAM_OSC2_FRQ) (aref mods PARAM_OSC3_FRQ) (aref mods PARAM_OSC4_FRQ)))
-              (osc_modpws_v (vector (aref mods PARAM_OSC1_PW) (aref mods PARAM_OSC2_PW) (aref mods PARAM_OSC3_PW) (aref mods PARAM_OSC4_PW)))
-              (osc_amps_v (vector osc1_amp osc2_amp osc3_amp osc4_amp))
-              (osc_amp_v (vector 1.0:f 1.0 1.0 1.0))
-              (osc_frq_v (vector 1.0:f 1.0 1.0 1.0))
-              (osc_tune_v (vector 1.0:f 1.0 1.0 1.0))
-              (osc_pw_v (vector 1.0:f 1.0 1.0 1.0))
-              (osc_tmp_v (vector 1.0:f 1.0 1.0 1.0))
-              (osc_out_v (vector 1.0:f 1.0 1.0 1.0))
-              (adsr4_v (vector 1.0:f 1.0 1.0 1.0))
-              (adsr1 (adsr_c))
-              (adsr2 (adsr_c))
-              (adsr3 (adsr_c))
-              (adsr4 (adsr_c))
-              (adsr1_val 0.0)
-              (adsr2_val 0.0)
-              (adsr3_val 0.0)
-              (adsr4_val 0.0)
-              ;; (gate:SAMPLE 1.0)
-              (amp:SAMPLE 0.0)
-              (cof:SAMPLE 0.0)
-              (amp_attack (aref amp_env 0))
-              (amp_decay (aref amp_env 1))
-              (amp_sustain (aref amp_env 2))
-              (amp_release (+ 3.0 (aref amp_env 3))) ;; a 3ms release minimum
-              (amp_release_samples (convert (* SRs (/ amp_release 1000.0)) i64))
-              (reltime:i64 0)
-              (filter_attack (aref filter_env 0))
-              (filter_decay (aref filter_env 1))
-              (filter_sustain (aref filter_env 2))
-              (filter_release (aref filter_env 3))
-              (pitch_attack (aref pitch_env 0))
-              (pitch_decay (aref pitch_env 1))
-              (mod_attack (aref mod_env 0))
-              (mod_decay (aref mod_env 1))
-              (mod_sustain (aref mod_env 2))
-              (mod_release (aref mod_env 3))
-              (filter:[SAMPLE,SAMPLE,SAMPLE,SAMPLE]* (moog_ladder_inlined (i64toi32 filter_type)))
-              (osc1 (cond ((= osc1_wave 1) (blsawXAnalogue_c (* .025 (random)) #f #f))
-                          ((= osc1_wave 2) (blpulse_c 1.0 #f))
-                          ((= osc1_wave 3) (bltriXAnalogue_c 1.0))
-                          ((= osc1_wave 0) (oscXAnalogue_c (* .025 (random))))
-                          (else (oscXAnalogue_c (* .025 (random)))))) ;; else sin
-              (osc2 (cond ((= osc1_wave 1) (blsawXAnalogue_c (* .025 (random)) #f #f))
-                          ((= osc1_wave 2) (blpulse_c 1.0 #f))
-                          ((= osc1_wave 3) (bltriXAnalogue_c 1.0))
-                          ((= osc1_wave 0) (oscXAnalogue_c (* .025 (random))))
-                          (else (oscXAnalogue_c (* .025 (random)))))) ;; else sin
-              (osc3 (cond ((= osc1_wave 1) (blsawXAnalogue_c (* .025 (random)) #f #f))
-                          ((= osc1_wave 2) (blpulse_c 1.0 #f))
-                          ((= osc1_wave 3) (bltriXAnalogue_c 1.0))
-                          ((= osc1_wave 0) (oscXAnalogue_c (* .025 (random))))
-                          (else (oscXAnalogue_c (* .025 (random)))))) ;; else sin
-              (osc4 (cond ((= osc1_wave 1) (blsawXAnalogue_c (* .025 (random)) #f #f))
-                          ((= osc1_wave 2) (blpulse_c 1.0 #f))
-                          ((= osc1_wave 3) (bltriXAnalogue_c 1.0))
-                          ((= osc1_wave 0) (oscXAnalogue_c (* .025 (random))))
-                          (else (oscXAnalogue_c (* .025 (random)))))) ;; else sin which is cheapest
-              (osc1_out:SAMPLE 0.0)
-              (osc2_out:SAMPLE 0.0)
-              (osc3_out:SAMPLE 0.0)
-              (osc4_out:SAMPLE 0.0)
-              (zero:SAMPLE 0.0)
-              (white (white_c))
-              (pink (pink_c))
-              (sub_out 0.0)
-              (noise_out 0.0)
-              (subosc (osc_c 0.0))
-              (main_out 0.0:f))
-          (filter.saturation (clamp filter_saturation 1.0:f 3.0:f))
-          (lambda (time:i64 chan:i64)
-            (if (= chan 0)
-                (begin
-                  ;; this for voice steeling
-                  (if (<> starttime (tref data 1))
-                      (begin
-                        (println "steeling voice:" (convert (frq2midi frequency) i64))
-                        (set! starttime (note_starttime data))
-                        (set! frequency (note_frequency data))
-                        (set! duration (note_duration data))))
-                  (if (and (> (note_gate data) 0.5) (> (- time starttime) duration)) (note_gate data 0.0)) ;; (set! gate 0.0))
-                  (set! adsr1_val (adsr1 chan (note_gate data) amp_attack amp_decay amp_sustain amp_release))
-                  (set! adsr2_val (adsr2 chan (note_gate data) filter_attack filter_decay filter_sustain filter_release))
-                  (set! adsr3_val (adsr3 chan (note_gate data) pitch_attack pitch_decay 0.0 0.0))
-                  (set! adsr4_val (adsr4 chan (note_gate data) mod_attack mod_decay mod_sustain mod_release))
-                  (set! amp (* amplitude adsr1_val))
-                  (set! cof (clamp (+ filter_frq (* follow_frq 8.0 frequency) (* follow_amp amplitude 12000.0)
-                                      (* adsr4_val (aref mods PARAM_FILTER_FRQ))
-                                      (* filter_env_amt adsr2_val))
-                                   0.0 22000.0))
-                  (set! res (+ reso (* adsr4_val (aref mods PARAM_FILTER_RES))))
-                  (set! frq (+ frequency (* pitch_env_amt frequency adsr3_val) 0.0))
-                  (if (< frq 10.0) (set! frq 10.0))
-                  ;; if gate is OFF and amp is sufficiently close to 0.0 then stop note!
-                  (if (< (note_gate data) 0.1) (set! reltime (+ reltime 1)))
-                  (if (> reltime amp_release_samples)
-                      (begin
-                        ;; (println "NOTE OFF!" data)
-                        (note_active data #f)))
-                  ;; 4 * oscillators
-                  (set! adsr4_v (vector adsr4_val adsr4_val adsr4_val adsr4_val))
-                  (set! osc_amp_v (+ osc_amps_v (* adsr4_v osc_modamps_v)))
-                  (set! osc_frq_v (+ (* (vector frq frq frq frq) osc_tunes_v) (* adsr4_v osc_modfrqs_v)))
-                  (set! osc_pw_v (+ osc_pws_v (* adsr4_v osc_modpws_v)))
-                  (set! osc_out_v (* osc_amp_v (vector (if (> osc1_amp 0.001) (osc1 1.0 (vref osc_frq_v 0) (vref osc_pw_v 0)) 0.0)
-                                                       (if (> osc2_amp 0.001) (osc2 1.0 (vref osc_frq_v 1) (vref osc_pw_v 1)) 0.0)
-                                                       (if (> osc3_amp 0.001) (osc3 1.0 (vref osc_frq_v 2) (vref osc_pw_v 2)) 0.0)
-                                                       (if (> osc1_amp 0.001) (osc4 1.0 (vref osc_frq_v 3) (vref osc_pw_v 3)) 0.0))))
-                  (if (> sub_amp 0.001)
-                      (set! sub_out (* sub_amp (subosc 1.0 (* frq 0.25))))
-                      (set! sub_out 0.0))
-                  (if (> noise_amp 0.001)
-                      (if (= noise PARAM_WHITE)
-                          (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (white)))
-                          (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (pink))))
-                      (set! noise_out 0.0))
-                  (set! main_out (* amp (filter
-                               (+ (vref osc_out_v 0)
-                                  (vref osc_out_v 1)
-                                  (vref osc_out_v 2)
-                                  (vref osc_out_v 3)
-                                  sub_out
-                                  noise_out)
-                        cof reso)))))
-            main_out))))))
-
-(bind-func analogueVec_fx
-  (lambda ()
-    (analogue_fx)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; RESET for analogues
+;; RESET for cerberuss
 ;;
 
-(bind-func analogue_reset
+(bind-func cerberus_reset
   (let ((i 0) (j 0))
     (lambda (inst:i8*)
       ;;
@@ -887,26 +795,36 @@
       (set_lfo_ad inst PARAM_LFO2 10.0 10.0 0.0 0.0)
       (set_lfo_ad inst PARAM_LFO3 10.0 10.0 0.0 0.0)
       (set_lfo_ad inst PARAM_LFO4 10.0 10.0 0.0 0.0)
+      (set_lfo_ad inst PARAM_LFO5 10.0 10.0 0.0 0.0)
+      (set_lfo_ad inst PARAM_LFO6 10.0 10.0 0.0 0.0)
+      (set_lfo_ad inst PARAM_LFO7 10.0 10.0 0.0 0.0)
+      (set_lfo_ad inst PARAM_LFO8 10.0 10.0 0.0 0.0)
       ;; set amp frq
       (set_lfo inst PARAM_LFO1 1.0 1.0 0.0 0)
       (set_lfo inst PARAM_LFO2 1.0 1.0 0.0 0)
       (set_lfo inst PARAM_LFO3 1.0 1.0 0.0 0)
       (set_lfo inst PARAM_LFO4 1.0 1.0 0.0 0)
+      (set_lfo inst PARAM_LFO5 1.0 1.0 0.0 0)
+      (set_lfo inst PARAM_LFO6 1.0 1.0 0.0 0)
+      (set_lfo inst PARAM_LFO7 1.0 1.0 0.0 0)
+      (set_lfo inst PARAM_LFO8 1.0 1.0 0.0 0)
       ;; set LFO type
       (set_lfo_type inst PARAM_LFO1 PARAM_SINE)
       (set_lfo_type inst PARAM_LFO2 PARAM_SINE)
       (set_lfo_type inst PARAM_LFO3 PARAM_SINE)
       (set_lfo_type inst PARAM_LFO4 PARAM_SINE)
+      (set_lfo_type inst PARAM_LFO5 PARAM_TRI)
+      (set_lfo_type inst PARAM_LFO6 PARAM_TRI)
+      (set_lfo_type inst PARAM_LFO7 PARAM_TRI)
+      (set_lfo_type inst PARAM_LFO8 PARAM_TRI)
+
       ;;
       ;; mod matrix
       ;;
       ;; reset mod matrix - turn everything off
-      (dotimes (i 4)   ;; 4 modulation sources
+      (dotimes (i 8)   ;; 8 modulation sources
         (doloop (j 32) ;; 32 modulation targets
           (set_mod_matrix inst i j 0.0)))
-
-      ;; mod env
-      (set_mod_env inst 0.0 0.0 1.0 0.0)
 
       ;; filter saturation (0.0 - 2.0)
       (set_filter_drive inst 0.0)
@@ -916,15 +834,15 @@
       (set_osc_phase_slop inst 0.1) ;; default 0.1
 
       ;; done
-      (println "Analogue Synthesizer Reset!")
+      (println "cerberus Synthesizer Reset!")
       void)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;; scheme 's-expression' fileio for analogue presets
+;; scheme 's-expression' fileio for cerberus presets
 ;;
-(sys:load "libs/core/instruments/analogue_fileio-scm.xtm")
+(sys:load "libs/core/instruments/cerberus_fileio-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
 (impc:aot:insert-forms
- (sys:load "libs/core/instruments/analogue_fileio-scm.xtm"))
+ (sys:load "libs/core/instruments/cerberus_fileio-scm.xtm"))
