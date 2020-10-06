@@ -82,6 +82,11 @@
 #include <dirent.h>
 #endif
 
+#ifdef DYLIB
+#include <cmrc/cmrc.hpp>
+CMRC_DECLARE(xtm);
+#endif
+
 // setting this define should make call_compiled thread safe BUT ...
 // also extremely SLOW !
 
@@ -213,20 +218,35 @@ static llvm::Module* jitCompile(const std::string& String)
     static std::string sInlineString; // This is a hack for now, but it *WORKS*
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
+
+#ifdef DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+#endif
+
     if (sInlineString.empty()) {
         {
+#ifdef DYLIB
+            auto data = fs.open("runtime/bitcode.ll");
+            sInlineString = std::string(data.begin(), data.end());
+#else
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             sInlineString = inString.str();
+#endif
         }
         std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
                 std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         {
+#ifdef DYLIB
+            auto data = fs.open("runtime/inline.ll");
+            std::string tString = std::string(data.begin(), data.end());
+#else
             std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
             std::stringstream inString;
             inString << inStream.rdbuf();
             std::string tString = inString.str();
+#endif
             std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), sGlobalSymRegex, 1),
                     std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
         }
@@ -240,10 +260,15 @@ static llvm::Module* jitCompile(const std::string& String)
                 std::string bitcode;
                 llvm::raw_string_ostream bitstream(sInlineBitcode);
                 llvm::WriteBitcodeToFile(newModule.get(), bitstream);
+#ifdef DYLIB
+                auto data = fs.open("runtime/inline.ll");
+                sInlineString = std::string(data.begin(), data.end());
+#else
                 std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
                 std::stringstream inString;
                 inString << inStream.rdbuf();
                 sInlineString = inString.str();
+#endif
             } else {
 std::cout << pa.getMessage().str() << std::endl;
                 abort();

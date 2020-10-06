@@ -49,6 +49,11 @@
 #ifdef _WIN32
 #include <ws2tcpip.h>
 
+#ifdef DYLIB
+#include <cmrc/cmrc.hpp>
+CMRC_DECLARE(xtm);
+#endif
+
 static void usleep(LONGLONG Us)
 {
     auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
@@ -131,6 +136,12 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     memset(m_schemeOutportString, 0, SCHEME_OUTPORT_STRING_LENGTH);
     scheme_set_output_port_string(m_scheme, m_schemeOutportString, m_schemeOutportString +
             SCHEME_OUTPORT_STRING_LENGTH - 1);
+#ifdef DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open("runtime/init.xtm");
+    std::string fstr = std::string(data.begin(), data.end());
+    loadString(fstr);
+#else
     FILE* initscm = fopen((m_loadPath + "runtime/init.xtm").c_str(), "r");
     if (!initscm) {
  	    ascii_error();
@@ -140,6 +151,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
         exit(1);
     }
     scheme_load_file(m_scheme, initscm);
+#endif
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (m_serverSocket < 0) {
 	    ascii_error();
@@ -228,6 +240,37 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path)
     return true;
 }
 
+bool SchemeProcess::loadString(const std::string& str) {
+    uint64_t now(UNIV::TIME);
+    scheme_load_string(m_scheme, str.c_str(), now, now + (m_maxDuration * 2.0));
+    return true;
+}
+
+#ifdef DYLIB
+bool SchemeProcess::loadFileAsString(char* fname)
+{
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open(fname);
+    std::string fstr = std::string(data.begin(), data.end());
+    loadString(fstr);
+    return true;
+}
+
+void SchemeProcess::findAndReplaceAll(std::string & data, std::string toSearch, std::string replaceStr)
+{
+    // Get the first occurrence
+    size_t pos = data.find(toSearch);
+    // Repeat till end is reached
+    while( pos != std::string::npos)
+    {
+        // Replace this occurrence of Sub String
+        data.replace(pos, toSearch.size(), replaceStr);
+        // Get the next occurrence from the current position
+        pos =data.find(toSearch, pos + replaceStr.size());
+    }
+}
+#endif
+
 void* SchemeProcess::taskImpl()
 {
     sm_current = this;
@@ -239,9 +282,15 @@ void* SchemeProcess::taskImpl()
 #endif
     while(!m_running) {
     }
+#ifdef DYLIB
+    loadFileAsString("runtime/scheme.xtm");
+    loadFileAsString("runtime/llvmti.xtm");
+    loadFileAsString("runtime/llvmir.xtm");
+#else
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
+#endif
     m_libsLoaded = true;
 #ifdef _WIN32
     Sleep(2000);
@@ -251,9 +300,28 @@ void* SchemeProcess::taskImpl()
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         EXTMonitor::ScopedLock lock(m_guard);
+#ifdef DYLIB
+        auto fs = cmrc::xtm::get_filesystem();
+        auto data = fs.open("runtime/init.ll");
+        std::string fstr = std::string(data.begin(), data.end());
+        findAndReplaceAll(fstr, std::string("\""), std::string("\\\""));
+        fstr.insert(0, "(sys:compile-init-ll-from-str \"");
+        fstr.append("\")");
+        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, new std::string(fstr), "file_init",
+                                    SchemeTask::Type::LOCAL_PROCESS_STRING));
+        if (extemp::UNIV::EXT_LOADBASE) {
+            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+                    new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"), "file_init",
+                        SchemeTask::Type::LOCAL_PROCESS_STRING));
+        } /* else {
+            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+                    new std::string("(sys:compile-init-ll)"), "file_init",
+                        SchemeTask::Type::LOCAL_PROCESS_STRING));
+        } */
+#else
         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
-            new std::string("(sys:compile-init-ll)"), "file_init",
-                SchemeTask::Type::LOCAL_PROCESS_STRING));
+                                    new std::string("(sys:compile-init-ll)"), "file_init",
+                                    SchemeTask::Type::LOCAL_PROCESS_STRING));
 
         if (extemp::UNIV::EXT_LOADBASE) {
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
@@ -264,6 +332,7 @@ void* SchemeProcess::taskImpl()
                     new std::string("(sys:compile-init-ll)"), "file_init",
                         SchemeTask::Type::LOCAL_PROCESS_STRING));
         } */
+#endif
         if (!m_initExpr.empty()) {
             ascii_text_color(0, 5, 10);
             printf("\nEvaluating expression: ");

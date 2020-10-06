@@ -25,8 +25,10 @@ if(DYLIB)
   set(EXTERNAL_SHLIBS_AUDIO OFF)
   set(EXTERNAL_SHLIBS_GRAPHICS OFF)
   set(EXTERNAL_SHLIBS OFF)
-  message(STATUS "Building Extempore as a dynamic library")
+  message(STATUS "Building Extempore as a library")
   message(STATUS "Building without external dependencies")
+
+  add_definitions( -DDYLIB=1 )
 endif()
 
 # share directory
@@ -372,6 +374,19 @@ endforeach()
 # source files
 
 if (DYLIB)
+  include(${CMAKE_SOURCE_DIR}/CMakeRC.cmake)
+
+  # bundle these files into extempore dylib
+  cmrc_add_resource_library(rc_xtm NAMESPACE "xtm"
+    runtime/bitcode.ll
+    runtime/init.ll
+    runtime/init.xtm
+    runtime/inline.ll
+    runtime/llvmir.xtm
+    runtime/llvmti.xtm
+    runtime/scheme.xtm
+  )
+
   add_library(extempore SHARED src/Extempore.cpp
     src/AudioDevice.cpp
     src/EXTLLVM.cpp
@@ -385,6 +400,7 @@ if (DYLIB)
     src/TaskScheduler.cpp
     src/UNIV.cpp
   )
+  target_link_libraries(extempore PRIVATE rc_xtm)
 else()
   add_executable(extempore src/Extempore.cpp
     src/AudioDevice.cpp
@@ -450,6 +466,9 @@ if(PACKAGE)
 elseif(EXT_SHARE_DIR)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+elseif(DYLIB)
+  target_compile_definitions(extempore
+    PRIVATE -DEXT_SHARE_DIR=".")
 else()
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${CMAKE_SOURCE_DIR}")

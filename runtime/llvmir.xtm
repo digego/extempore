@@ -99,6 +99,31 @@
   (lambda ()
     (sys:compile-ll "init.ll")))
 
+;; to compile the special init.ll file (which needs to be done on most
+;; startups)
+(define sys:compile-ll-from-str
+  (lambda (str)
+    (let ((print? #f))
+      (if (string=? (ipc:get-process-name) *impc:compiler:process*)
+          (let ((init-ll-string str))
+            (if (and init-ll-string (llvm:compile-ir init-ll-string))
+                (if print?
+                    (begin
+                      (print "\nCompiling ")
+                      (print-with-colors 'blue 'default #t (print name))
+                      (print "... ")
+                      (print-with-colors 'green 'default #t (print "done"))
+                      (print "\n\n"))
+                    #t)
+                (begin
+                  (print-with-colors 'red 'default #t (print "\n\nError compiling " name " IR\n\n"))
+                  (print "This is pretty bad.  Exiting...\n")
+                  (quit 1))))))))
+
+(define sys:compile-init-ll-from-str
+  (lambda (str)
+    (sys:compile-ll-from-str str)))
+
 ;; GCHANGE
 ;; removes %b when returning base types (i.e. !head%b returns !head)
 (define impc:ir:get-base-type-g
