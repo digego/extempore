@@ -1,74 +1,122 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; modulation sources
-
-;; (bind-val PARAM_LFO1 enum 0)
-;; (bind-val PARAM_LFO2 enum 1)
-;; (bind-val PARAM_LFO3 enum 2)
-;; (bind-val PARAM_LFO4 enum 3)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; modulation destinations (note)
-
-;; (bind-val PARAM_OSC1_AMP enum 0)
-;; (bind-val PARAM_OSC1_FRQ enum 1)
-;; (bind-val PARAM_OSC1_PW enum 2)
-;; (bind-val PARAM_OSC1_PAN enum 3)
-;; (bind-val PARAM_OSC2_AMP enum 4)
-;; (bind-val PARAM_OSC2_FRQ enum 5)
-;; (bind-val PARAM_OSC2_PW enum 6)
-;; (bind-val PARAM_OSC2_PAN enum 7)
-;; (bind-val PARAM_OSC3_AMP enum 8)
-;; (bind-val PARAM_OSC3_FRQ enum 9)
-;; (bind-val PARAM_OSC3_PW enum 10)
-;; (bind-val PARAM_OSC3_PAN enum 11)
-;; (bind-val PARAM_OSC4_AMP enum 12)
-;; (bind-val PARAM_OSC4_FRQ enum 13)
-;; (bind-val PARAM_OSC4_PW enum 14)
-;; (bind-val PARAM_OSC4_PAN enum 15)
-;; (bind-val PARAM_NOISE_AMP enum 16)
-;; (bind-val PARAM_FILTER_FRQ enum 17)
-;; (bind-val PARAM_FILTER_RES enum 18)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; modulation destinations (fx)
-
-;; (bind-val PARAM_PAN_WIDTH enum 19)
-;; (bind-val PARAM_PAN_POS enum 20)
-;; (bind-val PARAM_DELAY_TIME_LEFT enum 21)
-;; (bind-val PARAM_DELAY_TIME_RIGHT enum 22)
-;; (bind-val PARAM_DELAY_FB enum 23) ;; feedback
-;; (bind-val PARAM_REVERB_SIZE enum 24)
-;; (bind-val PARAM_REVERB_PREDELAY enum 25)
-;; (bind-val PARAM_REVERB_ABSORB enum 26)
-;; (bind-val PARAM_REVERB_MIX enum 27)
-;; (bind-val PARAM_FLANGER_LOW enum 28)
-;; (bind-val PARAM_FLANGER_HIGH enum 29)
-;; (bind-val PARAM_FLANGER_RATE enum 30)
-;; (bind-val PARAM_FLANGER_FB enum 31)
-
-
 ;; cc_offsets------------------
+;; (evaluate (print_cc_offsets) to check if this comment is up-to-date)
 ;; osc1: 0
 ;; osc2: 8
 ;; osc3: 16
-;; osc4: 24
-;; subnoise: 32
-;; filter: 36
-;; amp_pitch_env 40
 ;; filter_env: 48
 ;; delay: 56
 ;; reverb: 60
-;; matrix: 64
-;; main: 68
-;; lfo1: 72
-;; lfo2: 80
-;; lfo3: 88
-;; lfo4: 96
+;; flanger: 64
+;; main: 72
+;; matrix: 76
+;; lfo1: 80
+;; you can easly activate lfo 2 3 and 4, extras should go to 104
+;; extras: 88
 
+;;; CCs
+;;; the value you see in the lists must be added to the offset
+;;; that you see in the parentheses to get the desidered CC
+;; 4 *oscillators* (0, 8, 16, 24) each have:
+;; - `0` amplitude
+;; - `1` wave shape
+;; - `2` pulse width
+;; - `3` tune
+;; - `4` octave
+;; - `5` phase
+;; - `6` nothing
+;; - `7` nothing
+;; *subnoise* (32) have:
+;; - `0` amplitude of sub osc
+;; - `1` amplitude of noise
+;; - `2` noise type
+;; - `3` filter type
+;; *filter* (36):
+;; - `0` lfp frequency
+;; - `1` lfp resolution
+;; - `2` hfp frequency
+;; - `3` filter drive/saturation
+;; *ampitude pitch envelope* (40) have:
+;; - `0` amplitude attack
+;; - `1` amplitude decay
+;; - `2` amplitude sustain
+;; - `3` amplitude release
+;; - `4` amplitude lenght
+;; - `5` pitch attack
+;; - `6` pitch decay
+;; - `7` pitch envelope amount
+;; *filter envelope* (48) have:
+;; - `0` attack
+;; - `1` decay
+;; - `2` sustain
+;; - `3` release
+;; - `4` lenght
+;; - `5` amount
+;; - `6` follow note frequency (+ cutoff (* frequency value))
+;; - `7` follow amplitude (+ cutoff (* amplitude value))
+;; *delay* (56) have:
+;; - `0` time left ms
+;; - `1` time right ms
+;; - `2` mix
+;; - `3` feedback
+;; *reverb* (60) have:
+;; - `0` mix
+;; - `1` room size
+;; - `2` pre-delay ms
+;; - `3` absorption
+;; *flanger* (64) have:
+;; - `0` mix
+;; - `1` low mark ms
+;; - `2` delay range
+;; - `3` high mark ms
+;; - `4` range course
+;; - `5` range rate
+;; - `6` range feedback
+;; - `7` nothing
+;; *main* (72) have:
+;; - `0` pan position
+;; - `1` gain
+;; - `2` portamento ms
+;; - `3` RESET when value `127`
+;; *matrix* (76) have:
+;; - `0` moulation source
+;; - `1` modulation target
+;; - `2` amplitude of modulation
+;; - `3` nothing
+;; 4 *lfo* (80) each have:
+;; - `0` evelope attack
+;; - `1` envelope decay
+;; - `2` envelope attack slope
+;; - `3` evelope decay slope
+;; - `4` envelope lenght
+;; - `5` lfo amp
+;; - `6` lfo frequency
+;; - `7` lfo type
+;; *extras* (88) have: nothing
 
-;; extras: 104 - things that came later :(
+;;; enumerated values:
+;; - `waveform` CCs 1, 9, 17, 25:
+;;   + `0` sine
+;;   + `1` sawtooth
+;;   + `2` pulse
+;;   + `3` triangle
+;;   + `4` wavetable
+;; - `LFO waveform` CCs 91, 99, 107, 115:
+;;   + `0` sine
+;;   + `1` sawtooth
+;;   + `2` pulse
+;;   + `3` triangle
+;;   + `4` wavetable
+;;   + `5` attack-decay
+;;   + `6` constant
+;;   + `7` random
 
-;; filter saturation 104.
+;; - `noise type` CC 34:
+;;   + `0` white
+;;   + `1` pink
+
+;; - `noise filter type` CC 35:
+;;   + `1` 12db
+;;   + `2` 24db
 
 (bind-func get_waveform
   (lambda (value:i32)
