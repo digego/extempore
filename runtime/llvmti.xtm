@@ -11369,18 +11369,19 @@ xtlang's `let' syntax is the same as Scheme"
                                   (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
       (if (null? rel-paths)
           #f
-          (if (file-exists? (car rel-paths))
-              (let ((dylib (sys:open-dylib (car rel-paths) #t)))
-                (if dylib
-                    (cons dylib (car rel-paths))
+          (let ((dylib (sys:open-dylib (car rel-paths) #t)))
+            (if dylib
+                (cons dylib (car rel-paths))
+                (if (file-exists? (car rel-paths))
+                    ;; if sys:open-dylib failed bu the file is there, something's gone wrong
                     (begin
                       (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
                                          (print "Error"))
                       (print ": could not open ")
                       (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (car rel-paths))
                       (print " dynamic library\n")
-                      (error ""))))
-              (loop (cdr rel-paths)))))))
+                      (error ""))
+                    (loop (cdr rel-paths)))))))))
 
 (define impc:ti:bind-dylib
   (lambda (library lib-paths)
