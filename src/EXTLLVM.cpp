@@ -432,8 +432,6 @@ EXPORT float imp_rand2_f(float Start, float Limit)
 
 ///////////////////////////////////
 
-
-
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
   char c[1024];
   auto pos(strchr(symbol, '.'));
