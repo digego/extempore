@@ -76,8 +76,8 @@ On Linux, you'll need to specify an [ALSA](http://www.alsa-project.org/) backend
 for portaudio. To use the `asound` portaudio backend (the default) you'll need
 the `libasound` package. Extempore also includes a legacy
 [Jack](http://www.jackaudio.org/) portaudio backend, but it has bitrotted in
-recent years. If you want to use Jack and you're happy to do some spelunking,
-set the `JACK` CMake option with `-DJACK=ON`.
+recent years. PortAudio should pick it up if it's there, but you might have to
+do some spelunking.
 
 #### Ubuntu
 
@@ -124,4 +124,4 @@ account](http://www.steinberg.net/nc/en/company/developer/sdk_download_portal/cr
 then you can log in and download the ASIO SDK (make sure you get the right SDK).
 You also need to download and install [ASIO4ALL](http://www.asio4all.com/) with
 the 'offline setup panel' option enabled. After that, copy the ASIO files into
-the `src/portaudio/src/hostapi/asio`, and use the `-DASIO=ON` CMake option.
+the `src/portaudio/src/hostapi/asio`.
