@@ -170,7 +170,7 @@ endif()
 # portaudio #
 #############
 
-ExternalProject_Add(portaudio
+ExternalProject_Add(portaudio_static
   PREFIX portaudio
   URL https://github.com/PortAudio/portaudio/archive/93df249256ddd8dc9a398367323426ae9d84a517.zip
   URL_MD5 e265398f7d3db406060f3ddacf6a8116
@@ -180,7 +180,8 @@ ExternalProject_Add(portaudio
   -DPA_LIBNAME_ADD_SUFFIX=OFF
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
   -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
-  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS})
+  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio)
 
 ##############
 # LLVM 3.8.0 #
@@ -312,7 +313,7 @@ endif()
 # dependencies
 
 add_dependencies(extempore pcre)
-add_dependencies(extempore portaudio)
+add_dependencies(extempore portaudio_static)
 
 if(BUILD_LLVM)
   if(WIN32)
@@ -328,16 +329,16 @@ endif()
 
 
 target_include_directories(extempore
-  PRIVATE src/pcre)
-
-target_link_libraries(extempore
   PRIVATE
-  pcre
-  ${PA_LIBRARY} # found through find_library above
-  )
+  src/pcre
+  ${CMAKE_BINARY_DIR}/portaudio/include)
+
+target_link_libraries(extempore PRIVATE pcre)
+
+target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
 
 target_include_directories(extempore PRIVATE ${EXT_LLVM_DIR}/include)
-target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE portaudio ${LLVM_LIBRARIES})
 
 # compiler options
 
