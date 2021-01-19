@@ -179,12 +179,6 @@ ExternalProject_Add(portaudio
   -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
   -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS})
 
-find_library(PA_LIBRARY portaudio)
-
-if(NOT PA_LIBRARY)
-  message(FATAL_ERROR "couldn't find portaudio---aborting.")
-endif()
-
 ##############
 # LLVM 3.8.0 #
 ##############
