@@ -312,7 +312,7 @@ if(UNIX)
   set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
 endif()
 
-# dependencies
+# static extempore build dependencies
 
 add_dependencies(extempore pcre)
 add_dependencies(extempore portaudio_static)
@@ -329,18 +329,17 @@ if(WIN32)
   target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
 endif()
 
-
 target_include_directories(extempore
   PRIVATE
   src/pcre
-  ${CMAKE_BINARY_DIR}/portaudio/include)
-
-target_link_libraries(extempore PRIVATE pcre)
+  ${CMAKE_BINARY_DIR}/portaudio/include # installed by ExternalProject
+  ${EXT_LLVM_DIR}/include)
 
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
-
-target_include_directories(extempore PRIVATE ${EXT_LLVM_DIR}/include)
-target_link_libraries(extempore PRIVATE portaudio ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE pcre portaudio ${LLVM_LIBRARIES})
+if(UNIX)
+  target_link_libraries(extempore PRIVATE asound)
+endif()
 
 # compiler options
 
