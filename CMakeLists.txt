@@ -177,7 +177,7 @@ ExternalProject_Add(portaudio_static
   URL https://github.com/PortAudio/portaudio/archive/93df249256ddd8dc9a398367323426ae9d84a517.zip
   URL_MD5 e265398f7d3db406060f3ddacf6a8116
   CMAKE_ARGS
-  -DPA_BUILD_static=ON
+  -DPA_BUILD_STATIC=ON
   -DPA_BUILD_SHARED=OFF
   -DPA_LIBNAME_ADD_SUFFIX=OFF
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
