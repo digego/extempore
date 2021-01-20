@@ -337,7 +337,7 @@ target_include_directories(extempore
 
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
 target_link_libraries(extempore PRIVATE pcre portaudio ${LLVM_LIBRARIES})
-if(UNIX)
+if(UNIX AND NOT APPLE)
   target_link_libraries(extempore PRIVATE asound)
 endif()
 
