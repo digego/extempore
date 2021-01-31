@@ -238,5 +238,13 @@ EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
     return 0;
 }
 
+EXPORT bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
+{
+    while (unlikely(zone && (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
+      zone = zone->memories;
+    }
+    return zone;
+}
+
 } // namespace EXTLLVM
 } // namespace extemp
