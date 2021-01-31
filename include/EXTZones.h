@@ -30,3 +30,12 @@ struct llvm_zone_stack
 
 extern thread_local llvm_zone_stack* tls_llvm_zone_stack;
 extern thread_local uint64_t tls_llvm_zone_stacksize;
+
+const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
+const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
+
+namespace extemp {
+namespace EXTLLVM {
+  llvm_zone_t* llvm_zone_create(uint64_t size);
+}
+}
