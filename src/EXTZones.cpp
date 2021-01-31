@@ -200,5 +200,43 @@ uint64_t llvm_threads_get_zone_stacksize() {
     return tls_llvm_zone_stacksize;
 }
 
+// merge note - the following were not exposed from EXTLLVM.h before, and still aren't in any header.
+EXPORT void llvm_zone_print(llvm_zone_t* zone)
+{
+  auto tmp(zone);
+  auto total_size(zone->size);
+  int64_t segments(1);
+  while (tmp->memories) {
+    tmp = tmp->memories;
+    total_size += tmp->size;
+    segments++;
+  }
+  printf("<MemZone(%p) size(%" PRId64 ") free(%" PRId64 ") segs(%" PRId64 ")>",zone,total_size,(zone->size - zone->offset),segments);
+  return;
+}
+
+EXPORT uint64_t llvm_zone_ptr_size(void* ptr) // could be inline version in llvm (as well)
+{
+    return *(reinterpret_cast<uint64_t*>(ptr) - 1);
+}
+
+EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2)
+{
+    uint64_t size1 = llvm_zone_ptr_size(ptr1);
+    uint64_t size2 = llvm_zone_ptr_size(ptr2);
+
+    if (unlikely(size1 != size2)) {
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2);
+      return 1;
+    }
+    if (unlikely(!size1)) {
+  //printf("Bad LLVM ptr copy - size mismatch setting %p:%lld -> %p:%lld\n",ptr1,size1,ptr2,size2);
+      return 1;
+    }
+    //printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
+    std::memcpy(ptr2, ptr1, size1);
+    return 0;
+}
+
 } // namespace EXTLLVM
 } // namespace extemp
