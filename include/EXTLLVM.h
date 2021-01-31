@@ -113,38 +113,6 @@ namespace extemp
 namespace EXTLLVM
 {
 
-const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
-const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
-
-inline llvm_zone_t* llvm_zone_create(uint64_t size)
-{
-    auto zone(reinterpret_cast<llvm_zone_t*>(malloc(sizeof(llvm_zone_t))));
-    if (unlikely(!zone)) {
-        abort(); // in case a leak can be analyzed post-mortem
-    }
-#ifdef _WIN32
-	if (size == 0) {
-		zone->memory = NULL;
-	}
-	else {
-		// this crashes extempore but I have no idea why????
-		// zone->memory = _aligned_malloc((size_t)size, (size_t)LLVM_ZONE_ALIGN);
-		zone->memory = malloc(size_t(size));
-	}
-#else
-    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
-#endif
-    zone->mark = 0;
-    zone->offset = 0;
-    if (unlikely(!zone->memory)) {
-        size = 0;
-    }
-    zone->size = size;
-    zone->cleanup_hooks = nullptr;
-    zone->memories = nullptr;
-    return zone;
-}
-
 EXPORT void llvm_zone_destroy(llvm_zone_t* Zone);
 
 inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
