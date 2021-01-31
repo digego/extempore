@@ -113,18 +113,6 @@ namespace extemp
 namespace EXTLLVM
 {
 
-EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
-
-inline llvm_zone_stack* llvm_threads_get_zone_stack()
-{
-    return tls_llvm_zone_stack;
-}
-
-inline void llvm_threads_set_zone_stack(llvm_zone_stack* Stack)
-{
-    tls_llvm_zone_stack = Stack;
-}
-
 inline void llvm_push_zone_stack(llvm_zone_t* Zone)
 {
     auto stack(reinterpret_cast<llvm_zone_stack*>(malloc(sizeof(llvm_zone_stack))));
