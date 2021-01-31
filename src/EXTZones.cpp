@@ -5,8 +5,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#define DEBUG_ZONE_ALLOC 0 // TODO / NOMERGE: delete this from EXTLLVM.cpp
-#define DEBUG_ZONE_STACK 0 // TODO / NOMERGE: delete this from EXTLLVM.cpp
+#define DEBUG_ZONE_ALLOC 0
+#define DEBUG_ZONE_STACK 0
 #define EXTENSIBLE_ZONES 1
 #define LEAKY_ZONES 1
 
