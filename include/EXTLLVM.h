@@ -113,13 +113,6 @@ namespace extemp
 namespace EXTLLVM
 {
 
-
-inline llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
-{
-    Zone->offset = 0;
-    return Zone;
-}
-
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
 
 inline llvm_zone_stack* llvm_threads_get_zone_stack()
