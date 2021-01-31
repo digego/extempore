@@ -119,9 +119,6 @@
 
 #include "SchemeProcess.h"
 
-#define DEBUG_ZONE_STACK 0
-#define DEBUG_ZONE_ALLOC 0
-
 // llvm_scheme foreign function -> string name
 // also is not thread safe!
 std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
