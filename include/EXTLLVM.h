@@ -33,17 +33,16 @@
  *
  */
 
-#ifndef _EXTLLVM_H
-#define _EXTLLVM_H
+#pragma once
 
-#include "Scheme.h"
+#include <Scheme.h>
+#include <EXTMutex.h>
+#include <BranchPrediction.h>
+#include <UNIV.h>
+
 #include <vector>
 #include <string>
 #include <memory>
-
-#include "EXTMutex.h"
-#include "BranchPrediction.h"
-#include "UNIV.h"
 
 struct zone_hooks_t {
   uint64_t space; // here just so we don't get <i8*,i8*>
@@ -260,5 +259,3 @@ EXPORT const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
 }
 
 }
-
-#endif
