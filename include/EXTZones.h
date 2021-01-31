@@ -46,5 +46,8 @@ namespace EXTLLVM {
   void llvm_push_zone_stack(llvm_zone_t* Zone);
   llvm_zone_t* llvm_peek_zone_stack();
   EXPORT llvm_zone_t* llvm_pop_zone_stack();
+  void llvm_threads_inc_zone_stacksize();
+  void llvm_threads_dec_zone_stacksize();
+  uint64_t llvm_threads_get_zone_stacksize();
 }
 }

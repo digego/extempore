@@ -113,19 +113,6 @@ namespace extemp
 namespace EXTLLVM
 {
 
-
-inline void llvm_threads_inc_zone_stacksize() {
-    ++tls_llvm_zone_stacksize;
-}
-
-inline void llvm_threads_dec_zone_stacksize() {
-    --tls_llvm_zone_stacksize;
-}
-
-inline uint64_t llvm_threads_get_zone_stacksize() {
-    return tls_llvm_zone_stacksize;
-}
-
 uint64_t getSymbolAddress(const std::string&);
 void addModule(llvm::Module* m);
 
