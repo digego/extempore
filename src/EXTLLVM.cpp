@@ -177,9 +177,6 @@ EXPORT void llvm_runtime_error(int error, void* arg)
   return;
 }
 
-thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
-thread_local uint64_t tls_llvm_zone_stacksize = 0;
-
 EXPORT void llvm_zone_print(llvm_zone_t* zone)
 {
   auto tmp(zone);
