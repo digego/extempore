@@ -188,7 +188,17 @@ EXPORT llvm_zone_t* llvm_pop_zone_stack()
     return head;
 }
 
+void llvm_threads_inc_zone_stacksize() {
+    ++tls_llvm_zone_stacksize;
+}
 
+void llvm_threads_dec_zone_stacksize() {
+    --tls_llvm_zone_stacksize;
+}
+
+uint64_t llvm_threads_get_zone_stacksize() {
+    return tls_llvm_zone_stacksize;
+}
 
 } // namespace EXTLLVM
 } // namespace extemp
