@@ -177,8 +177,8 @@ EXPORT void llvm_runtime_error(int error, void* arg)
   return;
 }
 
-THREAD_LOCAL llvm_zone_stack* tls_llvm_zone_stack = 0;
-THREAD_LOCAL uint64_t tls_llvm_zone_stacksize = 0;
+thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
+thread_local uint64_t tls_llvm_zone_stacksize = 0;
 
 EXPORT void llvm_zone_print(llvm_zone_t* zone)
 {
@@ -243,7 +243,7 @@ EXPORT void* llvm_get_function_ptr(char* fname)
 
 EXPORT char* extitoa(int64_t val)
 {
-    static THREAD_LOCAL char buf[32];
+    static thread_local char buf[32];
     sprintf(buf, "%" PRId64, val);
     return buf;
 }
@@ -374,7 +374,7 @@ EXPORT void llvm_print_f64(double num)
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-static THREAD_LOCAL std::minstd_rand* sRandGen;
+static thread_local std::minstd_rand* sRandGen;
 
 EXPORT double imp_randd()
 {
@@ -810,7 +810,7 @@ EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
     return extemp::EXTLLVM::llvm_zone_create(Size);
 }
 
-static THREAD_LOCAL llvm_zone_t* tls_llvm_callback_zone = 0;
+static thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
 
 static inline llvm_zone_t* llvm_threads_get_callback_zone()
 {

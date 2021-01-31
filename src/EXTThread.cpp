@@ -52,7 +52,7 @@
 namespace extemp
 {
 
-THREAD_LOCAL EXTThread* EXTThread::sm_current = 0;
+thread_local EXTThread* EXTThread::sm_current = 0;
 
 EXTThread::~EXTThread()
 {

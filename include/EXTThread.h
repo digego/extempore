@@ -68,7 +68,7 @@ private:
     std::thread   m_thread;
 #endif
 
-    static THREAD_LOCAL EXTThread* sm_current;
+    static thread_local EXTThread* sm_current;
 public:
     EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
       m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false), m_subsume(false) {

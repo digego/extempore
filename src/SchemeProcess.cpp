@@ -103,7 +103,7 @@ llvm_zone_t* llvm_zone_create(uint64_t);
 
 namespace extemp {
 
-THREAD_LOCAL SchemeProcess* SchemeProcess::sm_current = 0;
+thread_local SchemeProcess* SchemeProcess::sm_current = 0;
 const char* SchemeProcess::sm_banner = "\n"
         "##########################################\n"
         "##                                      ##\n"
