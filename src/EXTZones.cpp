@@ -53,5 +53,12 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone)
     free(Zone);
 }
 
+llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
+{
+    Zone->offset = 0;
+    return Zone;
+}
+
+
 } // namespace EXTLLVM
 } // namespace extemp
