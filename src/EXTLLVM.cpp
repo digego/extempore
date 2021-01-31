@@ -170,14 +170,6 @@ EXPORT void llvm_runtime_error(int error, void* arg)
   return;
 }
 
-EXPORT bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr)
-{
-    while (unlikely(zone && (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
-      zone = zone->memories;
-    }
-    return zone;
-}
-
 EXPORT void llvm_schedule_callback(long long time, void* dat)
 {
   //printf("scheduled callback %lld\n",time);
