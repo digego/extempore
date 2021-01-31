@@ -641,48 +641,6 @@ static long long llvm_get_next_prime(long long start)
 }
 #endif
 
-EXPORT void* llvm_zone_malloc_from_current_zone(uint64_t size)
-{
-  return llvm_zone_malloc(llvm_peek_zone_stack(), size);
-}
-
-EXPORT bool llvm_ptr_in_current_zone(void* ptr)
-{
-    return llvm_ptr_in_zone(llvm_peek_zone_stack(), ptr);
-}
-
-EXPORT llvm_zone_t* llvm_peek_zone_stack_extern()
-{
-    return extemp::EXTLLVM::llvm_peek_zone_stack();
-}
-
-EXPORT void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
-{
-    extemp::EXTLLVM::llvm_push_zone_stack(Zone);
-}
-
-EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
-{
-    return extemp::EXTLLVM::llvm_zone_create(Size);
-}
-
-static thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
-
-static inline llvm_zone_t* llvm_threads_get_callback_zone()
-{
-    if (unlikely(!tls_llvm_callback_zone)) {
-        tls_llvm_callback_zone = llvm_zone_create(1024 * 1024); // default callback zone 1M
-    }
-    return tls_llvm_callback_zone;
-}
-
-EXPORT llvm_zone_t* llvm_zone_callback_setup()
-{
-    auto zone(llvm_threads_get_callback_zone());
-    llvm_push_zone_stack(zone);
-    return llvm_zone_reset(zone);
-}
-
 EXPORT void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background)
 {
     ascii_text_color(Bold, Foreground, Background);
