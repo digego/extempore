@@ -1,5 +1,6 @@
 #pragma once
 
+#include <UNIV.h>
 
 #include <cinttypes>
 
@@ -37,5 +38,6 @@ const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
 namespace extemp {
 namespace EXTLLVM {
   llvm_zone_t* llvm_zone_create(uint64_t size);
+  EXPORT void llvm_zone_destroy(llvm_zone_t* Zone);
 }
 }

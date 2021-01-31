@@ -694,18 +694,6 @@ static long long llvm_get_next_prime(long long start)
 }
 #endif
 
-EXPORT void llvm_zone_destroy(llvm_zone_t* Zone)
-{
-#if DEBUG_ZONE_ALLOC
-    printf("DestroyZone: %p:%p:%lld:%lld\n", Zone, Zone->memory, Zone->offset, Zone->size);
-#endif
-    if (Zone->memories) {
-        llvm_zone_destroy(Zone->memories);
-    }
-    free(Zone->memory);
-    free(Zone);
-}
-
 EXPORT llvm_zone_t* llvm_pop_zone_stack()
 {
     auto stack(llvm_threads_get_zone_stack());

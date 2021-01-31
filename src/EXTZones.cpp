@@ -3,6 +3,9 @@
 
 #include <cstdlib>
 
+// TODO / NOMERGE: delete this from EXTLLVM.cpp
+#define DEBUG_ZONE_ALLOC 0
+
 thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 
@@ -36,6 +39,18 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     zone->cleanup_hooks = nullptr;
     zone->memories = nullptr;
     return zone;
+}
+
+EXPORT void llvm_zone_destroy(llvm_zone_t* Zone)
+{
+#if DEBUG_ZONE_ALLOC
+    printf("DestroyZone: %p:%p:%lld:%lld\n", Zone, Zone->memory, Zone->offset, Zone->size);
+#endif
+    if (Zone->memories) {
+        llvm_zone_destroy(Zone->memories);
+    }
+    free(Zone->memory);
+    free(Zone);
 }
 
 } // namespace EXTLLVM
