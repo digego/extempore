@@ -43,5 +43,8 @@ namespace EXTLLVM {
   EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size);
   llvm_zone_stack* llvm_threads_get_zone_stack();
   void llvm_threads_set_zone_stack(llvm_zone_stack* Stack);
+  void llvm_push_zone_stack(llvm_zone_t* Zone);
+  llvm_zone_t* llvm_peek_zone_stack();
+  EXPORT llvm_zone_t* llvm_pop_zone_stack();
 }
 }
