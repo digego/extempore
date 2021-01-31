@@ -77,8 +77,8 @@ struct llvm_zone_stack
 
 struct closure_address_table;
 
-extern THREAD_LOCAL llvm_zone_stack* tls_llvm_zone_stack;
-extern THREAD_LOCAL uint64_t tls_llvm_zone_stacksize;
+extern thread_local llvm_zone_stack* tls_llvm_zone_stack;
+extern thread_local uint64_t tls_llvm_zone_stacksize;
 
 extern "C"
 {

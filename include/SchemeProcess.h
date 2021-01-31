@@ -121,7 +121,7 @@ private:
     char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
     static const char*                           sm_banner;
-    static THREAD_LOCAL SchemeProcess*           sm_current;
+    static thread_local SchemeProcess*           sm_current;
 private:
     void schemeCallback(TaskI* Task) {
         addCallback(Task, SchemeTask::Type::SCHEME_CALLBACK);
