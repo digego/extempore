@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 #define DEBUG_ZONE_ALLOC 0
 #define DEBUG_ZONE_STACK 0
@@ -67,12 +68,12 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     // NOMERGE: changed this
-    static extemp::EXTMutex alloc_mutex = []() {
-        extemp::EXTMutex m("alloc mutex");
-        m.init();
+    static std::unique_ptr<extemp::EXTMutex> alloc_mutex = []() {
+        std::unique_ptr<extemp::EXTMutex> m(new extemp::EXTMutex("alloc mutex"));
+        m->init();
         return m;
     }();
-    extemp::EXTMutex::ScopedLock lock(alloc_mutex);
+    extemp::EXTMutex::ScopedLock lock(*alloc_mutex);
 #if DEBUG_ZONE_ALLOC
     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
 #endif

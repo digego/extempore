@@ -57,7 +57,7 @@ has more details, but if you just want a one-liner to fix it, it's
 
     sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /
 
-#### macOS 10.15 Catalinz
+#### macOS 10.15 Catalina
 
 Since macOS 10.15 Apple requires all binaries to be signed & notarized, and the
 Extempore core team (Andy & Ben) haven't yet got an Apple Developer account set
