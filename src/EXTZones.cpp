@@ -58,7 +58,6 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone)
     free(Zone);
 }
 
-// NOMERGE: dropped 'inline' on lots of these functions
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 {
     Zone->offset = 0;
@@ -67,7 +66,6 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
-    // NOMERGE: changed this
     static std::unique_ptr<extemp::EXTMutex> alloc_mutex = []() {
         std::unique_ptr<extemp::EXTMutex> m(new extemp::EXTMutex("alloc mutex"));
         m->init();
