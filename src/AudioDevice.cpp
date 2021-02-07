@@ -207,7 +207,7 @@ void* audioCallbackMT(void* Args)
     //printf("Starting RT Audio Process\n");
     unsigned idx = uintptr_t(Args);
     auto cache_wrapper(AudioDevice::I()->getDSPWrapper());
-    auto zone(extemp::EXTLLVM::llvm_peek_zone_stack());
+    auto zone(extemp::EXTZones::llvm_peek_zone_stack());
     SAMPLE* outbuf = AudioDevice::I()->getDSPMTOutBuffer();
     SAMPLE* outbufs[2];
     outbufs[0] = outbuf + UNIV::CHANNELS * UNIV::NUM_FRAMES * idx * 2;
@@ -244,17 +244,17 @@ void* audioCallbackMT(void* Args)
             if (UNIV::IN_CHANNELS==UNIV::CHANNELS) {
                 for(uint64_t k=0; k<UNIV::CHANNELS; k++) {
                     outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin+k], (i+LTIME),k,&(indata[0])));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else if (UNIV::IN_CHANNELS==1) {
                 for(uint64_t k=0; k<UNIV::CHANNELS; k++) {
                     outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin], (i+LTIME),k,&(indata[0])));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else {
                 for(uint64_t k=0; k<UNIV::CHANNELS; k++) {
                     outbuf[iout+k] = audio_sanity(cache_wrapper(zone, (void*)closure, 0.0, (i+LTIME),k,&(indata[0])));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             }
         }
@@ -279,7 +279,7 @@ void* audioCallbackMTBuf(void* dat) {
 
     dsp_f_ptr_array dsp_wrapper_array = AudioDevice::I()->getDSPWrapperArray();
     dsp_f_ptr_array cache_wrapper = dsp_wrapper_array;
-    llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
+    llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
     float* outbuf = AudioDevice::I()->getDSPMTOutBufferArray();
     outbuf = outbuf+(UNIV::CHANNELS*UNIV::NUM_FRAMES*idx);
     float* inbuf = AudioDevice::I()->getDSPMTInBufferArray();
@@ -300,7 +300,7 @@ void* audioCallbackMTBuf(void* dat) {
       } // spin
       lcount++;
       cache_wrapper(zone, reinterpret_cast<void*>(closure), inbuf, outbuf, UNIV::DEVICE_TIME, NULL);
-      extemp::EXTLLVM::llvm_zone_reset(zone);
+      extemp::EXTZones::llvm_zone_reset(zone);
       ++sThreadDoneCount;
     }
     return 0;
@@ -340,7 +340,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         auto dsp_wrapper(AudioDevice::I()->getDSPWrapper());
         auto cache_wrapper(dsp_wrapper);
         auto closure = *((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
-        llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
+        llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         auto dat(reinterpret_cast<float*>(OutputBuffer));
         auto in(reinterpret_cast<const float*>(InputBuffer));
         auto time(UNIV::DEVICE_TIME);
@@ -350,7 +350,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0, time, k,
                             &dummy)));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             }
         } else if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
@@ -359,7 +359,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *(in++),
                             time, k, indata)));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             }
         } else if (UNIV::IN_CHANNELS == 1) {
@@ -367,7 +367,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), *in,
                             time, k, in)));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
                 ++in;
             } 
@@ -379,7 +379,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity_f(float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0,
                                                                   time, k, &indata[i*UNIV::IN_CHANNELS])));
-                    extemp::EXTLLVM::llvm_zone_reset(zone);
+                    extemp::EXTZones::llvm_zone_reset(zone);
                 }
             }
         }
@@ -388,11 +388,11 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     if (AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
         dsp_f_ptr_array cache_wrapper = AudioDevice::I()->getDSPWrapperArray();
         auto closure = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
-        llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
+        llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         float* indat = (float*) InputBuffer;
         float* outdat = (float*) OutputBuffer;
         cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, UserData);
-        extemp::EXTLLVM::llvm_zone_reset(zone);
+        extemp::EXTZones::llvm_zone_reset(zone);
     } else if (AudioDevice::I()->getDSPSUMWrapper()) { // if true then multi threaded sample-by-sample
         int numthreads = AudioDevice::I()->getNumThreads();
         bool zerolatency = AudioDevice::I()->getZeroLatency();
@@ -420,7 +420,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
         dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
         auto closure = * ((SAMPLE(**)(SAMPLE*,uint64_t,uint64_t,SAMPLE*)) cache_closure);
-        llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
+        llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         bool toggle = AudioDevice::I()->getToggle();
         SAMPLE* indats[AudioDevice::MAX_RT_AUDIO_THREADS]; // can't be variable on wi
         indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
@@ -442,7 +442,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
               in[jj] = indats[jj][iout+k];
             }
             dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (i+UNIV::DEVICE_TIME),k,nullptr));
-            extemp::EXTLLVM::llvm_zone_reset(zone);
+            extemp::EXTZones::llvm_zone_reset(zone);
           }
         }
         if (!zerolatency) {
@@ -485,7 +485,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       dsp_f_ptr_sum_array dsp_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
       dsp_f_ptr_sum_array cache_wrapper = dsp_wrapper;
       auto closure  = *((void(**)(float**,float*,uint64_t,void*)) cache_closure);
-      llvm_zone_t* zone = extemp::EXTLLVM::llvm_peek_zone_stack();
+      llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
       //float** indat = (float**)
       float* indats[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* outdat = (float*) OutputBuffer;
@@ -494,7 +494,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         indats[jj] = indats[0]+(UNIV::NUM_FRAMES*UNIV::CHANNELS*jj);
       }
       cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, UserData);
-      extemp::EXTLLVM::llvm_zone_reset(zone);
+      extemp::EXTZones::llvm_zone_reset(zone);
       //printf("main out\n");
     } else {
         //zero out audiobuffer

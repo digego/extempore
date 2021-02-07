@@ -36,7 +36,7 @@ const unsigned LLVM_ZONE_ALIGN = 32; // MUST BE POWER OF 2!
 const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
 
 namespace extemp {
-namespace EXTLLVM {
+namespace EXTZones {
   llvm_zone_t* llvm_zone_create(uint64_t size);
   EXPORT void llvm_zone_destroy(llvm_zone_t* Zone);
   llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone);
