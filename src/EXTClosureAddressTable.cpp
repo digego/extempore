@@ -77,7 +77,7 @@ EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
     if (alloctype == 1) {
         t = reinterpret_cast<closure_address_table*>(malloc(sizeof(struct closure_address_table)));
     } else {
-        t = (struct closure_address_table*) extemp::EXTLLVM::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
+        t = (struct closure_address_table*) extemp::EXTZones::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
     }
     t->id = string_hash(name);
     t->name = name;

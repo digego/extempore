@@ -587,7 +587,7 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
 
 static extemp::CMG DestroyMallocZoneWithDelayCM(
         [](extemp::TaskI* Task)->void {
-            llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(Task)->getArg());
+            extemp::EXTZones::llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(Task)->getArg());
         });
 
 EXPORT void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay)
@@ -889,7 +889,7 @@ void initLLVM()
         const char* name;
         uintptr_t   address;
     } mappingTable[] = {
-        { "llvm_zone_destroy", uintptr_t(&llvm_zone_destroy) },
+        { "llvm_zone_destroy", uintptr_t(&extemp::EXTZones::llvm_zone_destroy) },
     };
     for (auto& elem : mappingTable) {
         EE->updateGlobalMapping(elem.name, elem.address);

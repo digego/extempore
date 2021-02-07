@@ -15,7 +15,7 @@ thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 
 namespace extemp {
-namespace EXTLLVM {
+namespace EXTZones {
 
 llvm_zone_t* llvm_zone_create(uint64_t size)
 {
@@ -259,17 +259,17 @@ EXPORT bool llvm_ptr_in_current_zone(void* ptr)
 
 EXPORT llvm_zone_t* llvm_peek_zone_stack_extern()
 {
-    return extemp::EXTLLVM::llvm_peek_zone_stack();
+    return llvm_peek_zone_stack();
 }
 
 EXPORT void llvm_push_zone_stack_extern(llvm_zone_t* Zone)
 {
-    extemp::EXTLLVM::llvm_push_zone_stack(Zone);
+    llvm_push_zone_stack(Zone);
 }
 
 EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size)
 {
-    return extemp::EXTLLVM::llvm_zone_create(Size);
+    return llvm_zone_create(Size);
 }
 
 static thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
@@ -289,5 +289,5 @@ EXPORT llvm_zone_t* llvm_zone_callback_setup()
     return llvm_zone_reset(zone);
 }
 
-} // namespace EXTLLVM
+} // namespace EXTZones
 } // namespace extemp
