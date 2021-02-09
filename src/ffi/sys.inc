@@ -50,9 +50,9 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
         if (pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F)
         {
 #ifdef _WIN32
-            std::cout << "LoadLibrary error:" << GetLastError() << std::endl;
+            std::cout << "LoadLibraryA() error:" << GetLastError() << std::endl;
 #else
-            printf("Bad: %s\n", dlerror());
+            printf("dlopen() error: %s\n", dlerror());
 #endif
         }
         return Scheme->F;

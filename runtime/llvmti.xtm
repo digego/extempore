@@ -11351,7 +11351,7 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:search-for-dylib
   (lambda (path)
-    (let loop ((rel-paths
+    (let loop ((candidate-paths
                 (append
                  (list
                   path
@@ -11367,20 +11367,21 @@ xtlang's `let' syntax is the same as Scheme"
                                             ":")
                                            '("/usr/local/lib/" "/usr/lib/" "/opt/local/lib/" "/usr/lib/x86_64-linux-gnu")))
                                   (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
-      (if (null? rel-paths)
+      (if (null? candidate-paths)
           #f
-          (if (file-exists? (car rel-paths))
-              (let ((dylib (sys:open-dylib (car rel-paths) #t)))
-                (if dylib
-                    (cons dylib (car rel-paths))
+          (let ((dylib (sys:open-dylib (car candidate-paths) #f)))
+            (if dylib
+                (cons dylib (car candidate-paths))
+                (if (file-exists? (car candidate-paths))
+                    ;; if sys:open-dylib failed bu the file is there, something's gone wrong
                     (begin
                       (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
                                          (print "Error"))
                       (print ": could not open ")
-                      (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (car rel-paths))
+                      (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (car candidate-paths))
                       (print " dynamic library\n")
-                      (error ""))))
-              (loop (cdr rel-paths)))))))
+                      (error ""))
+                    (loop (cdr candidate-paths)))))))))
 
 (define impc:ti:bind-dylib
   (lambda (library lib-paths)

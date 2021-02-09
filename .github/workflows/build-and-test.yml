@@ -15,7 +15,7 @@ jobs:
           - ubuntu-18.04
           - ubuntu-20.04
           - macos-10.15 # catalina
-          # - macos-11.0  # big sur (removed for now due to "missing libGL" issue)
+          - macos-11.0  # big sur
           - windows-2016
           - windows-2019
         config:
@@ -39,6 +39,9 @@ jobs:
         run: mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
       - name: build
+        run: cmake --build build --target extempore --config ${{ matrix.config }}
+
+      - name: aot-compile-stdlib
         run: cmake --build build --config ${{ matrix.config }}
 
       - name: test

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 project(Extempore VERSION 0.8.7)
 
+cmake_policy(SET CMP0114 NEW)
+
 option(ASSETS "download multimedia assets (approx 500MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
 option(PACKAGE "set up install targets for packaging" OFF)
@@ -9,9 +11,6 @@ option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library de
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
-# optional audio backends (see INSTALL.md)
-option(ASIO "use the ASIO Portaudio backend" OFF)
-option(JACK "use the Jack Portaudio backend" OFF)
 option(DYLIB "build extempore as a dynamic library" OFF)
 
 ## this is useful because we can group targets together (e.g. all the AOT libs)
@@ -173,133 +172,18 @@ endif()
 # portaudio #
 #############
 
-add_library(portaudio STATIC
-  src/portaudio/src/common/pa_allocation.c
-  src/portaudio/src/common/pa_allocation.h
-  src/portaudio/src/common/pa_converters.c
-  src/portaudio/src/common/pa_converters.h
-  src/portaudio/src/common/pa_cpuload.c
-  src/portaudio/src/common/pa_cpuload.h
-  src/portaudio/src/common/pa_debugprint.c
-  src/portaudio/src/common/pa_debugprint.h
-  src/portaudio/src/common/pa_dither.c
-  src/portaudio/src/common/pa_dither.h
-  src/portaudio/src/common/pa_endianness.h
-  src/portaudio/src/common/pa_front.c
-  src/portaudio/src/common/pa_hostapi.h
-  src/portaudio/src/common/pa_memorybarrier.h
-  src/portaudio/src/common/pa_process.c
-  src/portaudio/src/common/pa_process.h
-  src/portaudio/src/common/pa_ringbuffer.c
-  src/portaudio/src/common/pa_ringbuffer.h
-  src/portaudio/src/common/pa_stream.c
-  src/portaudio/src/common/pa_stream.h
-  src/portaudio/src/common/pa_trace.c
-  src/portaudio/src/common/pa_trace.h
-  src/portaudio/src/common/pa_types.h
-  src/portaudio/src/common/pa_util.h
-  )
-
-target_include_directories(portaudio
-  PRIVATE src/portaudio/include
-  PRIVATE src/portaudio/src/common)
-
-# platform-specific
-
-if(APPLE)
-  # use CoreAudio on macOS
-  target_sources(portaudio
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core.c
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_blocking.c
-    # PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_old.c
-    PRIVATE src/portaudio/src/hostapi/coreaudio/pa_mac_core_utilities.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
-    )
-  target_include_directories(portaudio
-    PRIVATE src/portaudio/src/os/unix)
-  target_compile_definitions(portaudio
-    PRIVATE -DPA_USE_COREAUDIO)
-  target_compile_options(portaudio
-    PRIVATE -Wno-deprecated-declarations)
-  target_link_libraries(portaudio
-    PRIVATE "-framework CoreAudio"
-    PRIVATE "-framework AudioUnit"
-    PRIVATE "-framework AudioToolbox")
-
-elseif(UNIX AND NOT APPLE)
-  # use ALSA on Linux
-  target_sources(portaudio
-    PRIVATE src/portaudio/src/hostapi/alsa/pa_linux_alsa.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_hostapis.c
-    PRIVATE src/portaudio/src/os/unix/pa_unix_util.c
-    )
-  target_include_directories(portaudio
-    PRIVATE src/portaudio/src/os/unix)
-  target_compile_definitions(portaudio
-    PRIVATE -DPA_USE_ALSA)
-  target_link_libraries(portaudio
-    PRIVATE asound)
-
-  if(JACK)
-    target_sources(portaudio
-      PRIVATE src/portaudio/src/hostapi/jack/pa_jack.c)
-    target_compile_definitions(portaudio
-      PRIVATE -DPA_USE_JACK)
-    target_link_libraries(portaudio
-      PRIVATE jack)
-  endif()
-
-elseif(WIN32)
-  # use everything except for ASIO on Windows by default, but you can
-  # use asio with the cmake ASIO option (see below)
-  target_sources(portaudio
-    PRIVATE src/portaudio/src/hostapi/wdmks/pa_win_wdmks.c
-    # PRIVATE src/portaudio/src/hostapi/wmme/pa_win_wmme.c
-    PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds.c
-    PRIVATE src/portaudio/src/hostapi/dsound/pa_win_ds_dynlink.c
-    # PRIVATE src/portaudio/src/hostapi/wasapi/pa_win_wasapi.c
-    PRIVATE src/portaudio/src/os/win/pa_win_coinitialize.c
-    PRIVATE src/portaudio/src/os/win/pa_win_hostapis.c
-    PRIVATE src/portaudio/src/os/win/pa_win_util.c
-    PRIVATE src/portaudio/src/os/win/pa_win_waveformat.c
-    PRIVATE src/portaudio/src/os/win/pa_win_wdmks_utils.c
-    PRIVATE src/portaudio/src/os/win/pa_x86_plain_converters.c
-    )
-  target_include_directories(portaudio
-    PRIVATE src/portaudio/src/os/win)
-  target_compile_definitions(portaudio
-    PRIVATE -DPA_USE_WDMKS
-    # PRIVATE -DPA_USE_WMME
-    # PRIVATE -DPA_USE_WASAPI
-    PRIVATE -DPA_USE_DS)
-endif()
-
-if(ASIO)
-  # if you want to build with ASIO on Windows, you need the ASIO SDK.
-  # See src/portaudio/src/hostapi/asio/ASIO-README.txt for
-  # instructions on how to get it
-
-  # then, copy it into the src/portaudio/src/hostapi/asio directory in
-  # the Extempore source folder
-  target_sources(portaudio
-    PRIVATE src/portaudio/src/hostapi/asio/pa_asio.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/common/asio.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/asiodrivers.cpp
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/pc/asiolist.cpp
-    )
-  target_include_directories(portaudio
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/common
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host
-    PRIVATE src/portaudio/src/hostapi/asio/ASIOSDK/host/pc)
-  target_compile_definitions(portaudio
-    PRIVATE -DPA_USE_ASIO)
-endif()
-
-if(PACKAGE)
-  target_compile_options(portaudio
-    PRIVATE -mtune=generic)
-endif()
+ExternalProject_Add(portaudio_static
+  PREFIX portaudio
+  URL https://github.com/PortAudio/portaudio/archive/4932b488c5174b6ed9b924878dbd44e992a89f2f.zip
+  URL_MD5 50ff694a98ced1bfb01569c2112da47d
+  CMAKE_ARGS
+  -DPA_BUILD_STATIC=ON
+  -DPA_BUILD_SHARED=OFF
+  -DPA_LIBNAME_ADD_SUFFIX=OFF
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
+  -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
+  -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio)
 
 ##############
 # LLVM 3.8.0 #
@@ -430,9 +314,10 @@ if(UNIX)
   set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
 endif()
 
-# dependencies
+# static extempore build dependencies
 
-add_dependencies(extempore pcre portaudio)
+add_dependencies(extempore pcre)
+add_dependencies(extempore portaudio_static)
 
 if(BUILD_LLVM)
   if(WIN32)
@@ -446,17 +331,17 @@ if(WIN32)
   target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
 endif()
 
-
 target_include_directories(extempore
-  PRIVATE src/pcre
-  PRIVATE src/portaudio/include)
+  PRIVATE
+  src/pcre
+  ${CMAKE_BINARY_DIR}/portaudio/include # installed by ExternalProject
+  ${EXT_LLVM_DIR}/include)
 
-target_link_libraries(extempore
-  PRIVATE pcre
-  PRIVATE portaudio)
-
-target_include_directories(extempore PRIVATE ${EXT_LLVM_DIR}/include)
-target_link_libraries(extempore PRIVATE ${LLVM_LIBRARIES})
+target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
+target_link_libraries(extempore PRIVATE pcre portaudio ${LLVM_LIBRARIES})
+if(UNIX AND NOT APPLE)
+  target_link_libraries(extempore PRIVATE asound)
+endif()
 
 # compiler options
 
@@ -529,7 +414,6 @@ elseif(APPLE) # macOS
     PRIVATE "-framework AudioToolbox")
 
 elseif(UNIX AND NOT APPLE) # Linux
-  set_property(TARGET portaudio PROPERTY POSITION_INDEPENDENT_CODE ON)
   set_property(TARGET pcre PROPERTY POSITION_INDEPENDENT_CODE ON)
   set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
   # target_link_libraries(extempore PRIVATE --export-dynamic)
