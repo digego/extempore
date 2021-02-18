@@ -3,6 +3,12 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.8.8
+
+- upgrade PortAudio (to fix a build error on macOS Big Sur)
+- refactoring of LLVM stuff (in preparation for the LLVM 11 upgrade from nicdonaldson)
+- improvements to the GitHub actinos CI test matrix
+
 ## v0.8.7
 
 ### Added
