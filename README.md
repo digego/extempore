@@ -2,6 +2,8 @@
 
 A programming environment for cyberphysical programming (Linux/macOS/Windows).
 
+**Note**: Extempore is not yet compatible with Apple Silicon.
+
 ## Getting started
 
 ### The easy way
