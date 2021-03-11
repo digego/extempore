@@ -174,8 +174,8 @@ endif()
 
 ExternalProject_Add(portaudio_static
   PREFIX portaudio
-  URL https://github.com/PortAudio/portaudio/archive/4932b488c5174b6ed9b924878dbd44e992a89f2f.zip
-  URL_MD5 50ff694a98ced1bfb01569c2112da47d
+  URL https://github.com/PortAudio/portaudio/archive/3f7bee79a65327d2e0965e8a74299723ed6f072d.zip
+  URL_MD5 182b76e05f6ef21d9f5716da7489905d
   CMAKE_ARGS
   -DPA_BUILD_STATIC=ON
   -DPA_BUILD_SHARED=OFF
