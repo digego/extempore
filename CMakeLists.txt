@@ -573,7 +573,8 @@ if(UNIX)
 
     ExternalProject_Add(rtmidi
       PREFIX rtmidi
-      URL https://github.com/thestk/rtmidi/archive/0b5d67c0f738aa2b0f3e658d26c638434ee518f8.zip
+      URL https://github.com/thestk/rtmidi/archive/84d130bf22d878ff1b0e224346e2e0f9e3ba8099.zip
+      URL_MD5 d932b9fef01b859a1b8b86a3c8dc6621
       CMAKE_ARGS
       -DRTMIDI_BUILD_TESTING=OFF
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -742,7 +743,8 @@ if(WIN32)
 
     ExternalProject_Add(rtmidi
       PREFIX rtmidi
-      URL https://github.com/thestk/rtmidi/archive/0b5d67c0f738aa2b0f3e658d26c638434ee518f8.zip
+      URL https://github.com/thestk/rtmidi/archive/84d130bf22d878ff1b0e224346e2e0f9e3ba8099.zip
+      URL_MD5 d932b9fef01b859a1b8b86a3c8dc6621
       CMAKE_ARGS
       -DRTMIDI_BUILD_TESTING=OFF
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
