@@ -931,8 +931,13 @@ if(WIN32)
 endif(WIN32)
 
 if(APPLE)
-  # this should work on macOS Mojave and earlier, but not on Catalina - that's a
-  # whole different signing system (which needs to be tackled ASAP)
+  # this is designed to prevent the "accept incoming connections" firewall
+  # dialog every time you try and connect to a running Extempore process, but it
+  # doesn't work (because moving the extempore binary as part of the INSTALL
+  # step borks the signature or something)
+  #
+  # so this will be fixed/removed in future, but for now it's at least an
+  # example of how to run a post-build command on the created executable
   add_custom_command(TARGET extempore POST_BUILD
 	COMMENT "signing the $<TARGET_FILE:extempore> binary (to avoid annoying firewall pop-ups)"
 	COMMAND codesign --force --deep --sign - $<TARGET_FILE:extempore>)
