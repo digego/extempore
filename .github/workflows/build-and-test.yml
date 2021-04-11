@@ -93,31 +93,31 @@ jobs:
           cmake --install . --prefix ../llvm-3.8.0.install
           cp .\Release\bin\llvm-as.exe ../llvm-3.8.0.install/bin/
 
-      - name: configure, nix
-        if: ${{ !contains(matrix.os, 'windows') }}
-        run: cd extempore && mkdir build && cd build && env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
+      #- name: configure, nix
+      #  if: ${{ !contains(matrix.os, 'windows') }}
+      #  run: cd extempore && mkdir build && cd build && env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
-      - name: configure, windows
-        if: contains(matrix.os, 'windows')
-        run: |
-          $Env:EXT_LLVM_DIR = "$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
-          cd extempore && mkdir build && cd build && cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
+      #- name: configure, windows
+      #  if: contains(matrix.os, 'windows')
+      #  run: |
+      #    $Env:EXT_LLVM_DIR = "$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
+      #    cd extempore && mkdir build && cd build && cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
 
-      - name: build, nix
-        if: ${{ !contains(matrix.os, 'windows') }}
-        run: |
-          cd extempore/build
-          env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake --build . -j2 --config Release
+      #- name: build, nix
+      #  if: ${{ !contains(matrix.os, 'windows') }}
+      #  run: |
+      #    cd extempore/build
+      #    env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake --build . -j2 --config Release
 
-      - name: build, windows
-        if: contains(matrix.os, 'windows')
-        run: |
-          cd extempore/build
-          $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install/Release"
-          cmake --build . -j2 --config Release
+      #- name: build, windows
+      #  if: contains(matrix.os, 'windows')
+      #  run: |
+      #    cd extempore/build
+      #    $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install/Release"
+      #    cmake --build . -j2 --config Release
 
-      #- name: aot-compile-stdlib
-      #  run: cd extempore && cmake --build build --config ${{ matrix.config }}
+      ##- name: aot-compile-stdlib
+      ##  run: cd extempore && cmake --build build --config ${{ matrix.config }}
 
-      - name: test
-        run: cd extempore && cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core
+      #- name: test
+      #  run: cd extempore && cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core
