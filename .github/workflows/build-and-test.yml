@@ -71,6 +71,28 @@ jobs:
           cd llvm-3.8.0.build
           cmake -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_RUNTIME=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_GO_TESTS=OFF -DLLVM_INCLUDE_DOCS=OFF -DCMAKE_INSTALL_PREFIX=../llvm-3.8.0.install ../llvm-3.8.0.src/
 
+      - name: build llvm
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          cd llvm-3.8.0.build
+          # if you're doing this by hand you might need `-- -j2` instead of `-j2`
+          cmake --build . --config Release -j2
+          cmake --build . --config Release -j2 --target llvm-as
+
+      - name: install llvm nix
+        if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
+        run: |
+          cd llvm-3.8.0.build
+          cmake --install .
+          cp bin/llvm-as $GITHUB_WORKSPACE/llvm-3.8.0.install/bin/
+
+      - name: install llvm windows
+        if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          cd llvm-3.8.0.build
+          cmake --install . --prefix ../llvm-3.8.0.install
+          cp .\Release\bin\llvm-as.exe ../llvm-3.8.0.install/bin/
+
       - name: configure
         run: cd extempore && mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
