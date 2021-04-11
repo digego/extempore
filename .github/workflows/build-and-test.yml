@@ -35,6 +35,26 @@ jobs:
           sudo apt update
           sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
 
+      - name: cache llvm
+        id: llvm-cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ./llvm-3.8.0.install
+          key: ${{ matrix.os }}-llvm.3.8.0-0 # bump this number if you want to trigger an LLVM build
+
+      - name: download and unpack llvm, nixes
+        if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
+        run: |
+          wget "https://releases.llvm.org/3.8.0/llvm-3.8.0.src.tar.xz"
+          cmake -E tar xJf llvm-3.8.0.src.tar.xz
+
+      - name: download and unpack llvm, windows
+        if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          Invoke-webrequest "https://releases.llvm.org/3.8.0/llvm-3.8.0.src.tar.xz" -outfile llvm-3.8.0.src.tar.xz
+          cmake -E tar xJf llvm-3.8.0.src.tar.xz
+
       - name: configure
         run: mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
