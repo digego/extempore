@@ -63,6 +63,14 @@ jobs:
           cd llvm-3.8.0.src/
           patch -p0 -i ../extempore/extras/extempore-llvm-3.8.0.patch
 
+      - name: configure llvm
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir llvm-3.8.0.build
+          mkdir llvm-3.8.0.install
+          cd llvm-3.8.0.build
+          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_RUNTIME=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_GO_TESTS=OFF -DLLVM_INCLUDE_DOCS=OFF -DCMAKE_INSTALL_PREFIX=../llvm-3.8.0.install ../llvm-3.8.0.src/
+
       - name: configure
         run: cd extempore && mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
