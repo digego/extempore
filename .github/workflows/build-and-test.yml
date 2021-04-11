@@ -27,8 +27,6 @@ jobs:
             cmake-generator: -G "Visual Studio 16 2019" -A x64
 
     steps:
-      - uses: actions/checkout@v2
-
       - if: contains(matrix.os, 'ubuntu')
         name: deps
         run: |
@@ -55,14 +53,23 @@ jobs:
           Invoke-webrequest "https://releases.llvm.org/3.8.0/llvm-3.8.0.src.tar.xz" -outfile llvm-3.8.0.src.tar.xz
           cmake -E tar xJf llvm-3.8.0.src.tar.xz
 
+      - uses: actions/checkout@v2
+        path: extempore
+
+      - name: patch llvm
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          cd llvm-3.8.0.src/
+          patch -p0 -i $GITHUB_WORKSPACE/extempore/extras/extempore-llvm-3.8.0.patch
+
       - name: configure
-        run: mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
+        run: cd extempore && mkdir build && cd build && cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
 
       - name: build
-        run: cmake --build build --target extempore --config ${{ matrix.config }}
+        run: cd extempore && cmake --build build --target extempore --config ${{ matrix.config }}
 
       - name: aot-compile-stdlib
-        run: cmake --build build --config ${{ matrix.config }}
+        run: cd extempore && cmake --build build --config ${{ matrix.config }}
 
       - name: test
-        run: cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core
+        run: cd extempore && cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core
