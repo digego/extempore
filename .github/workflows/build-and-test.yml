@@ -39,9 +39,9 @@ jobs:
         with:
           path: |
             ./llvm-3.8.0.install
-          key: ${{ matrix.os }}-llvm.3.8.0-2 # bump this number if you want to trigger an LLVM build
+          key: ${{ matrix.os }}-llvm.3.8.0-3 # bump this number if you want to trigger an LLVM build
 
-      - name: download and unpack llvm, nixes
+      - name: download and unpack llvm, nix
         if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
         run: |
           wget "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz"
@@ -59,7 +59,7 @@ jobs:
           mkdir llvm-3.8.0.build
           mkdir llvm-3.8.0.install
           cd llvm-3.8.0.build
-          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_RUNTIME=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_GO_TESTS=OFF -DLLVM_INCLUDE_DOCS=OFF -DCMAKE_C_FLAGS="" -DCMAKE_CXX_FLAGS="" -DCMAKE_INSTALL_PREFIX=../llvm-3.8.0.install ../llvm-3.8.0.src/
+          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_RUNTIME=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_GO_TESTS=OFF -DLLVM_INCLUDE_DOCS=OFF -DCMAKE_C_FLAGS="" -DCMAKE_CXX_FLAGS="" -DCMAKE_INSTALL_PREFIX=../llvm-3.8.0.install ${{ matrix.cmake-generator }} ../llvm-3.8.0.src/
 
       - name: build llvm
         if: steps.llvm-cache.outputs.cache-hit != 'true'
@@ -89,7 +89,7 @@ jobs:
 
       - name: configure, nix
         if: ${{ !contains(matrix.os, 'windows') }}
-        run: cd extempore && mkdir build && cd build && env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON cmake ${{ matrix.cmake-generator }} ..
+        run: cd extempore && mkdir build && cd build && env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
 
       - name: configure, windows
         if: contains(matrix.os, 'windows')
