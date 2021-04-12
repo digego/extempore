@@ -39,29 +39,19 @@ jobs:
         with:
           path: |
             ./llvm-3.8.0.install
-          key: ${{ matrix.os }}-llvm.3.8.0-1 # bump this number if you want to trigger an LLVM build
+          key: ${{ matrix.os }}-llvm.3.8.0-2 # bump this number if you want to trigger an LLVM build
 
       - name: download and unpack llvm, nixes
         if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
         run: |
-          wget "https://releases.llvm.org/3.8.0/llvm-3.8.0.src.tar.xz"
+          wget "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz"
           cmake -E tar xJf llvm-3.8.0.src.tar.xz
 
       - name: download and unpack llvm, windows
         if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
         run: |
-          Invoke-webrequest "https://releases.llvm.org/3.8.0/llvm-3.8.0.src.tar.xz" -outfile llvm-3.8.0.src.tar.xz
+          Invoke-webrequest "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz"
           cmake -E tar xJf llvm-3.8.0.src.tar.xz
-
-      - uses: actions/checkout@v2
-        with:
-          path: extempore
-
-      - name: patch llvm
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        run: |
-          cd llvm-3.8.0.src/
-          patch -p0 -i ../extempore/extras/extempore-llvm-3.8.0.patch
 
       - name: configure llvm
         if: steps.llvm-cache.outputs.cache-hit != 'true'
@@ -92,6 +82,10 @@ jobs:
           cd llvm-3.8.0.build
           cmake --install . --prefix ../llvm-3.8.0.install
           cp .\Release\bin\llvm-as.exe ../llvm-3.8.0.install/bin/
+
+      - uses: actions/checkout@v2
+        with:
+          path: extempore
 
       #- name: configure, nix
       #  if: ${{ !contains(matrix.os, 'windows') }}
