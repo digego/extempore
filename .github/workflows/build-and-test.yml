@@ -19,7 +19,7 @@ jobs:
           - windows-2016
           - windows-2019
         config:
-          - Release
+          - Release # If you add Debug, be careful about the LLVM build, you might still want that to be Release.
         include:
           - os: windows-2016
             cmake-generator: -G "Visual Studio 15 2017" -A x64
@@ -97,15 +97,14 @@ jobs:
         with:
           path: extempore
 
-      - name: configure, nix
-        if: ${{ !contains(matrix.os, 'windows') }}
-        run: cd extempore && mkdir build && cd build && env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
-
-      - name: configure, windows
-        if: contains(matrix.os, 'windows')
+      - name: configure
+        env:
+          EXT_LLVM_DIR: "${{ env.EXT_LLVM_DIR }}"
         run: |
-          $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
-          cd extempore && mkdir build && cd build && cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
+          cd extempore
+          mkdir build
+          cd build
+          cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
 
       - name: build, nix
         if: ${{ !contains(matrix.os, 'windows') }}
