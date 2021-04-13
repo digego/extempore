@@ -19,7 +19,9 @@ jobs:
           - windows-2016
           - windows-2019
         config:
-          - Release # If you add Debug, be careful about the LLVM build, you might still want that to be Release.
+          - Release
+          # If you add Debug, be careful about the LLVM build.
+          # LLVM Debug builds take a really long time, and consume a lot of disk space.
         include:
           - os: windows-2016
             cmake-generator: -G "Visual Studio 15 2017" -A x64
@@ -39,7 +41,7 @@ jobs:
         with:
           path: |
             ./llvm-3.8.0.install
-          key: ${{ matrix.os }}-llvm.3.8.0-3 # bump this number if you want to trigger an LLVM build
+          key: ${{ matrix.os }}-${{ matrix.config }}-llvm.3.8.0-0 # bump this number if you want to trigger an LLVM build
 
       - name: download and unpack llvm, nix
         if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
