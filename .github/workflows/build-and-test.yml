@@ -99,15 +99,18 @@ jobs:
 
       - name: build, nix
         if: ${{ !contains(matrix.os, 'windows') }}
+        env:
+          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
         run: |
           cd extempore/build
-          env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake --build . -j2 --config Release
+          cmake --build . -j2 --config Release
 
       - name: build, windows
         if: contains(matrix.os, 'windows')
+        env:
+          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/Release"
         run: |
           cd extempore/build
-          $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install/Release"
           cmake --build . -j2 --config Release
 
       #- name: aot-compile-stdlib
