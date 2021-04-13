@@ -87,10 +87,19 @@ jobs:
         with:
           path: extempore
 
-      - name: configure
-        env:
-          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
+      # I have no idea why env: seems to work fine above ^, but not here :(
+      - name: configure, nix
+        if: ${{ !contains(matrix.os, 'windows') }}
         run: |
+          cd extempore
+          mkdir build
+          cd build
+          env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
+
+      - name: configure, windows
+        if: contains(matrix.os, 'windows')
+        run: |
+          $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
           cd extempore
           mkdir build
           cd build
