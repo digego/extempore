@@ -83,23 +83,13 @@ jobs:
           cmake --install . --prefix ../llvm-3.8.0.install
           cp .\${{ matrix.config }}\bin\llvm-as.exe ../llvm-3.8.0.install/bin/
 
-      - name: llvm install path, nix
-        if: ${{ !contains(matrix.os, 'windows') }}
-        run: |
-          echo "EXT_LLVM_DIR=${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install" >> $GITHUB_ENV
-
-      - name: llvm install path, windows
-        if: contains(matrix.os, 'windows')
-        run: |
-          echo "EXT_LLVM_DIR=${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/Release" >> $GITHUB_ENV
-
       - uses: actions/checkout@v2
         with:
           path: extempore
 
       - name: configure
         env:
-          EXT_LLVM_DIR: "${{ env.EXT_LLVM_DIR }}"
+          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
         run: |
           cd extempore
           mkdir build
