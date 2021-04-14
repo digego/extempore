@@ -43,13 +43,13 @@ jobs:
             ./llvm-3.8.0.install
           key: ${{ matrix.os }}-${{ matrix.config }}-llvm.3.8.0-0 # bump this number if you want to trigger an LLVM build
 
-      - name: download and unpack llvm, nix
+      - name: download and unpack llvm (macos/linux)
         if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
         run: |
           wget "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz"
           cmake -E tar xJf llvm-3.8.0.src-patched-for-extempore.tar.xz
 
-      - name: download and unpack llvm, windows
+      - name: download and unpack llvm (windows)
         if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
         run: |
           Invoke-webrequest -Uri "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz" -OutFile "llvm-3.8.0.src-patched-for-extempore.tar.xz"
@@ -71,14 +71,14 @@ jobs:
           cmake --build . --config ${{ matrix.config }} -j2
           cmake --build . --config ${{ matrix.config }} -j2 --target llvm-as
 
-      - name: install llvm nix
+      - name: install llvm (macos/linux)
         if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
         run: |
           cd llvm-3.8.0.build
           cmake --install .
           cp bin/llvm-as $GITHUB_WORKSPACE/llvm-3.8.0.install/bin/
 
-      - name: install llvm windows
+      - name: install llvm (windows)
         if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
         run: |
           cd llvm-3.8.0.build
@@ -90,7 +90,7 @@ jobs:
           path: extempore
 
       # I have no idea why `env:` seems to work for building, but not configuring :(
-      - name: configure, nix
+      - name: configure extempore (macos/linux)
         if: ${{ !contains(matrix.os, 'windows') }}
         run: |
           cd extempore
@@ -98,7 +98,7 @@ jobs:
           cd build
           env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
 
-      - name: configure, windows
+      - name: configure extempore (windows)
         if: contains(matrix.os, 'windows')
         run: |
           $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
@@ -107,7 +107,7 @@ jobs:
           cd build
           cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
 
-      - name: build, nix
+      - name: build extempore (macos/linux)
         if: ${{ !contains(matrix.os, 'windows') }}
         env:
           EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
@@ -115,7 +115,7 @@ jobs:
           cd extempore/build
           cmake --build . -j2 --config ${{ matrix.config }} --target extempore
 
-      - name: build, windows
+      - name: build extempore (windows)
         if: contains(matrix.os, 'windows')
         env:
           EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/${{ matrix.config }}"
@@ -123,7 +123,7 @@ jobs:
           cd extempore/build
           cmake --build . -j2 --config ${{ matrix.config }} --target extempore
 
-      - name: aot-compile-stdlib, nix
+      - name: aot-compile-stdlib (macos/linux)
         if: ${{ !contains(matrix.os, 'windows') }}
         env:
           EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
@@ -131,7 +131,7 @@ jobs:
           cd extempore/build
           cmake --build . -j2 --config ${{ matrix.config }}
 
-      - name: aot-compile-stdlib, windows
+      - name: aot-compile-stdlib (windows)
         if: ${{ contains(matrix.os, 'windows') }}
         env:
           EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/${{ matrix.config }}"
