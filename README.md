@@ -77,7 +77,7 @@ list](https://github.com/digego/extempore/graphs/contributors)).
 
 ## Docs & Community
 
-Extempore documentation can be found at https://extemporelang.github.io/docs/
+Extempore documentation can be found at <https://extemporelang.github.io/docs/>
 
 You can also join the Extempore community:
 
