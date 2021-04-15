@@ -81,8 +81,7 @@ Extempore documentation can be found at <https://extemporelang.github.io/docs/>
 
 You can also join the Extempore community:
 
-- [Extempore google group](http://groups.google.com/group/extemporelang)
-- [Extempore mailing list](mailto:extemporelang@googlegroups.com)
+- [Extempore Google group/mailing list](http://groups.google.com/group/extemporelang)
 - [#extempore on chat.toplap.org](https://chat.toplap.org/home) (although not as
   well-monitored as the mailing list)
 
