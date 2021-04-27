@@ -297,15 +297,20 @@ static llvm::Module* jitCompile(const std::string& String)
     }
     std::unique_ptr<llvm::Module> newModule;
     std::vector<std::string> symbols;
-    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
-            std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
+
+    // Copy all @symbols @like @this into symbols
+    insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
+
     std::sort(symbols.begin(), symbols.end());
     auto end(std::unique(symbols.begin(), symbols.end()));
+
     std::unordered_set<std::string> ignoreSyms;
-    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
-            std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
+    insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
+
     std::string declarations;
     llvm::raw_string_ostream dstream(declarations);
+
+    // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
     for (auto iter = symbols.begin(); iter != end; ++iter) {
         const char* sym(iter->c_str());
         if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
@@ -315,7 +320,7 @@ static llvm::Module* jitCompile(const std::string& String)
         if (!gv) {
             continue;
         }
-        auto func(llvm::dyn_cast<llvm::Function>(gv));
+        const llvm::Function* func(llvm::dyn_cast<llvm::Function>(gv));
         if (func) {
             dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
             bool first(true);
