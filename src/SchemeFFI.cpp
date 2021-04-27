@@ -217,6 +217,19 @@ static const std::string bitcodeDotLLString() {
     return sBitcodeDotLLString;
 }
 
+static std::string IRToBitcode(const std::string &ir) {
+    std::string bitcode;
+    llvm::SMDiagnostic pa;
+    auto mod(llvm::parseAssemblyString(ir, pa, llvm::getGlobalContext()));
+    if (!mod) {
+        pa.print("IRToBitcode", llvm::outs());
+        std::abort();
+    }
+    llvm::raw_string_ostream bitstream(bitcode);
+    llvm::WriteBitcodeToFile(mod.get(), bitstream);
+    return bitcode;
+}
+
 // match @symbols @like @this_123
 static const std::regex sGlobalSymRegex(
   "[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
@@ -276,16 +289,8 @@ static llvm::Module* jitCompile(const std::string& String)
         // need to avoid parsing the types twice
         static bool first(true);
         if (!first) {
-            auto newModule(parseAssemblyString(sInlineString, pa, getGlobalContext()));
-            if (newModule) {
-                std::string bitcode;
-                llvm::raw_string_ostream bitstream(sInlineBitcode);
-                llvm::WriteBitcodeToFile(newModule.get(), bitstream);
-                sInlineString = inlineDotLLString();
-            } else {
-                std::cout << pa.getMessage().str() << std::endl;
-                abort();
-            }
+            sInlineBitcode = IRToBitcode(sInlineString);
+            sInlineString = inlineDotLLString();
         } else {
             first = false;
         }
