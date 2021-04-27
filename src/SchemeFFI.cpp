@@ -341,14 +341,15 @@ static llvm::Module* jitCompile(const std::string& String)
             dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
         }
     }
-// std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+
+    // std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
     if (!sInlineBitcode.empty()) {
         auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
             asmcode = sInlineString + dstream.str() + asmcode;
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
-std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+                std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
                 newModule.reset();
             }
         }
@@ -365,11 +366,11 @@ std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std
             PM_NO->run(*newModule);
         }
     }
-    //std::stringstream ss;
+
     if (unlikely(!newModule))
     {
-// std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
-// std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
+        // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
+        // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
         std::string errstr;
         llvm::raw_string_ostream ss(errstr);
         pa.print("LLVM IR",ss);
