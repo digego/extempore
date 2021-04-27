@@ -184,7 +184,60 @@ void initSchemeFFI(scheme* sc)
     }
 }
 
-static long long llvm_emitcounter = 0;
+static std::string fileToString(const std::string &fileName) {
+    std::ifstream inStream(fileName);
+    std::stringstream inString;
+    inString << inStream.rdbuf();
+    return inString.str();
+}
+
+static const std::string inlineDotLLString() {
+#ifdef DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open("runtime/inline.ll");
+    static const std::string sInlineDotLLString(data.begin(), data.end());
+#else
+    static const std::string sInlineDotLLString(
+      fileToString(UNIV::SHARE_DIR + "/runtime/inline.ll"));
+#endif
+
+    return sInlineDotLLString;
+}
+
+static const std::string bitcodeDotLLString() {
+#ifdef DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open("runtime/bitcode.ll");
+    static const std::string sBitcodeDotLLString(data.begin(), data.end());
+#else
+    static const std::string sBitcodeDotLLString(
+      fileToString(UNIV::SHARE_DIR + "/runtime/bitcode.ll"));
+#endif
+
+    return sBitcodeDotLLString;
+}
+
+// match @symbols @like @this_123
+static const std::regex sGlobalSymRegex(
+  "[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
+  std::regex::optimize);
+
+// match "define @sym"
+static const std::regex sDefineSymRegex(
+  "define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
+  std::regex::optimize | std::regex::ECMAScript);
+
+// template is temporary, we'll remove this once the refactoring is done
+template <class T>
+static void insertMatchingSymbols(
+  const std::string &code, const std::regex &regex,
+  // std::unordered_set<std::string> &containingSet
+  T &containingSet)
+{
+    std::copy(std::sregex_token_iterator(code.begin(), code.end(), regex, 1),
+              std::sregex_token_iterator(),
+              std::inserter(containingSet, containingSet.begin()));
+}
 
 static std::string SanitizeType(llvm::Type* Type)
 {
@@ -199,18 +252,12 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
-static std::regex sGlobalSymRegex("[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
-static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
-
 static llvm::Module* jitCompile(const std::string& String)
 {
     // Create some module to put our function into it.
     using namespace llvm;
     legacy::PassManager* PM = extemp::EXTLLVM::PM;
     legacy::PassManager* PM_NO = extemp::EXTLLVM::PM_NO;
-
-    char modname[256];
-    sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
 
     std::string asmcode(String);
     SMDiagnostic pa;
@@ -219,38 +266,12 @@ static llvm::Module* jitCompile(const std::string& String)
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
 
-#ifdef DYLIB
-    auto fs = cmrc::xtm::get_filesystem();
-#endif
-
     if (sInlineString.empty()) {
-        {
-#ifdef DYLIB
-            auto data = fs.open("runtime/bitcode.ll");
-            sInlineString = std::string(data.begin(), data.end());
-#else
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
-            std::stringstream inString;
-            inString << inStream.rdbuf();
-            sInlineString = inString.str();
-#endif
-        }
-        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
-                std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
-        {
-#ifdef DYLIB
-            auto data = fs.open("runtime/inline.ll");
-            std::string tString = std::string(data.begin(), data.end());
-#else
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
-            std::stringstream inString;
-            inString << inStream.rdbuf();
-            std::string tString = inString.str();
-#endif
-            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), sGlobalSymRegex, 1),
-                    std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
-        }
+        sInlineString = bitcodeDotLLString();
+        insertMatchingSymbols(sInlineString, sGlobalSymRegex, sInlineSyms);
+        insertMatchingSymbols(inlineDotLLString(), sGlobalSymRegex, sInlineSyms);
     }
+
     if (sInlineBitcode.empty()) {
         // need to avoid parsing the types twice
         static bool first(true);
@@ -260,17 +281,9 @@ static llvm::Module* jitCompile(const std::string& String)
                 std::string bitcode;
                 llvm::raw_string_ostream bitstream(sInlineBitcode);
                 llvm::WriteBitcodeToFile(newModule.get(), bitstream);
-#ifdef DYLIB
-                auto data = fs.open("runtime/inline.ll");
-                sInlineString = std::string(data.begin(), data.end());
-#else
-                std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
-                std::stringstream inString;
-                inString << inStream.rdbuf();
-                sInlineString = inString.str();
-#endif
+                sInlineString = inlineDotLLString();
             } else {
-std::cout << pa.getMessage().str() << std::endl;
+                std::cout << pa.getMessage().str() << std::endl;
                 abort();
             }
         } else {
