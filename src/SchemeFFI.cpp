@@ -327,24 +327,18 @@ static llvm::Module* jitCompile(const std::string& String)
     std::string asmcode(String);
     llvm::SMDiagnostic pa;
 
-    static std::string sInlineBitcode;
-
-    if (sInlineBitcode.empty()) {
-        // need to avoid parsing the types twice
-        static bool first(true);
-        if (!first) {
-            sInlineBitcode = IRToBitcode(bitcodeDotLLString());
-        } else {
-            first = false;
-        }
-    }
+    static std::string sInlineBitcode(IRToBitcode(bitcodeDotLLString()));
 
     // Create some module to put our function into it.
     std::unique_ptr<llvm::Module> newModule;
     std::string declarations = globalDeclarations(asmcode);
 
     // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
-    if (!sInlineBitcode.empty()) {
+
+    // The first file we compile is init.ll, and we don't want to prepend inline.ll, or any global
+    // declarations to it.
+    static bool shouldPrepend(false);
+    if (shouldPrepend) {
         auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), llvm::getGlobalContext()));
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
@@ -356,6 +350,7 @@ static llvm::Module* jitCompile(const std::string& String)
         }
     } else {
         newModule = parseAssemblyString(asmcode, pa, llvm::getGlobalContext());
+        shouldPrepend = true;
     }
     if (newModule) {
         if (unlikely(!extemp::UNIV::ARCH.empty())) {
