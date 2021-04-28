@@ -284,9 +284,11 @@ static std::unordered_set<std::string> loadInlineSyms() {
 
 static std::string
 globalDeclarations(const std::string &asmcode) {
+    // Contains @all @symbols from bitcode.ll and inline.ll
     static std::unordered_set<std::string> sInlineSyms(loadInlineSyms());
+
     std::vector<std::string> symbols;
-    // Copy all @symbols @like @this into symbols
+    // Copy all @symbols @like @this into symbols from asmcode
     insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
     std::sort(symbols.begin(), symbols.end());
     auto end(std::unique(symbols.begin(), symbols.end()));
@@ -294,9 +296,7 @@ globalDeclarations(const std::string &asmcode) {
     std::unordered_set<std::string> ignoreSyms;
     insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
 
-
     std::stringstream ss;
-
     // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
     for (auto iter = symbols.begin(); iter != end; ++iter) {
         const char* sym(iter->c_str());
@@ -345,10 +345,10 @@ static llvm::Module* jitCompile(const std::string& String)
 
     // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
 
-    // The first file we compile is init.ll, and we don't want to prepend inline.ll, or any global
-    // declarations to it.
-    static bool shouldPrepend(false);
-    if (shouldPrepend) {
+    // The first file we compile is init.ll, and we don't want to prepend inline.ll,
+    // or any global declarations to it.
+    static bool isThisInitDotLL(true);
+    if (!isThisInitDotLL) {
         std::unique_ptr<llvm::Module> mod(parseBitcodeFile(sInlineBitcode));
         if (likely(mod)) {
             newModule = std::move(mod);
@@ -361,10 +361,13 @@ static llvm::Module* jitCompile(const std::string& String)
                 newModule.reset();
             }
         }
-    } else {
-        newModule = parseAssemblyString(asmcode, pa, llvm::getGlobalContext());
-        shouldPrepend = true;
     }
+
+    if (isThisInitDotLL) {
+        newModule = parseAssemblyString(asmcode, pa, llvm::getGlobalContext());
+        isThisInitDotLL = false;
+    }
+
     if (newModule) {
         if (unlikely(!extemp::UNIV::ARCH.empty())) {
             newModule->setTargetTriple(extemp::UNIV::ARCH);
