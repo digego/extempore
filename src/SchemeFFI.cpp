@@ -325,22 +325,21 @@ static llvm::Module* jitCompile(const std::string& String)
     std::string asmcode(String);
     SMDiagnostic pa;
 
-    static std::string sInlineString; // This is a hack for now, but it *WORKS*
     static std::string sInlineBitcode;
     static std::unordered_set<std::string> sInlineSyms;
 
-    if (sInlineString.empty()) {
-        sInlineString = bitcodeDotLLString();
-        insertMatchingSymbols(sInlineString, sGlobalSymRegex, sInlineSyms);
+    static bool loadedInlineSyms(false);
+    if (!loadedInlineSyms) {
+        insertMatchingSymbols(bitcodeDotLLString(), sGlobalSymRegex, sInlineSyms);
         insertMatchingSymbols(inlineDotLLString(), sGlobalSymRegex, sInlineSyms);
+        loadedInlineSyms = true;
     }
 
     if (sInlineBitcode.empty()) {
         // need to avoid parsing the types twice
         static bool first(true);
         if (!first) {
-            sInlineBitcode = IRToBitcode(sInlineString);
-            sInlineString = inlineDotLLString();
+            sInlineBitcode = IRToBitcode(bitcodeDotLLString());
         } else {
             first = false;
         }
@@ -353,7 +352,7 @@ static llvm::Module* jitCompile(const std::string& String)
         auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
-            asmcode = sInlineString + declarations + asmcode;
+            asmcode = inlineDotLLString() + declarations + asmcode;
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
                 std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
                 newModule.reset();
