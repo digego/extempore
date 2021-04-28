@@ -342,8 +342,8 @@ static llvm::Module* jitCompile(const std::string& asmcode)
 
     // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
 
-    // The first file we compile is init.ll, and we don't want to prepend inline.ll,
-    // or any global declarations to it.
+    // The first file we compile is init.ll, and we don't want to prepend bitcode.ll,
+    // inline.ll, or any global declarations to it.
     static bool isThisInitDotLL(true);
 
     llvm::SMDiagnostic pa;
