@@ -265,9 +265,16 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
+static std::unordered_set<std::string> loadInlineSyms() {
+    std::unordered_set<std::string> inlineSyms;
+    insertMatchingSymbols(bitcodeDotLLString(), sGlobalSymRegex, inlineSyms);
+    insertMatchingSymbols(inlineDotLLString(), sGlobalSymRegex, inlineSyms);
+    return inlineSyms;
+}
+
 static std::string
-globalDeclarations(const std::string &asmcode,
-                   const std::unordered_set<std::string> &sInlineSyms) {
+globalDeclarations(const std::string &asmcode) {
+    static std::unordered_set<std::string> sInlineSyms(loadInlineSyms());
     std::vector<std::string> symbols;
     // Copy all @symbols @like @this into symbols
     insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
@@ -326,14 +333,6 @@ static llvm::Module* jitCompile(const std::string& String)
     SMDiagnostic pa;
 
     static std::string sInlineBitcode;
-    static std::unordered_set<std::string> sInlineSyms;
-
-    static bool loadedInlineSyms(false);
-    if (!loadedInlineSyms) {
-        insertMatchingSymbols(bitcodeDotLLString(), sGlobalSymRegex, sInlineSyms);
-        insertMatchingSymbols(inlineDotLLString(), sGlobalSymRegex, sInlineSyms);
-        loadedInlineSyms = true;
-    }
 
     if (sInlineBitcode.empty()) {
         // need to avoid parsing the types twice
@@ -345,7 +344,7 @@ static llvm::Module* jitCompile(const std::string& String)
         }
     }
     std::unique_ptr<llvm::Module> newModule;
-    std::string declarations = globalDeclarations(asmcode, sInlineSyms);
+    std::string declarations = globalDeclarations(asmcode);
 
     // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
     if (!sInlineBitcode.empty()) {
