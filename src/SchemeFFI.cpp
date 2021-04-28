@@ -265,6 +265,56 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
+static std::string
+globalDeclarations(const std::string &asmcode,
+                   const std::unordered_set<std::string> &sInlineSyms) {
+    std::vector<std::string> symbols;
+    // Copy all @symbols @like @this into symbols
+    insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
+    std::sort(symbols.begin(), symbols.end());
+    auto end(std::unique(symbols.begin(), symbols.end()));
+
+    std::unordered_set<std::string> ignoreSyms;
+    insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
+
+
+    std::stringstream ss;
+
+    // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
+    for (auto iter = symbols.begin(); iter != end; ++iter) {
+        const char* sym(iter->c_str());
+        if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
+            continue;
+        }
+        auto gv = extemp::EXTLLVM::getGlobalValue(sym);
+        if (!gv) {
+            continue;
+        }
+        const llvm::Function* func(llvm::dyn_cast<llvm::Function>(gv));
+        if (func) {
+            ss << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
+            bool first(true);
+            for (const auto& arg : func->getArgumentList()) {
+                if (!first) {
+                    ss << ", ";
+                } else {
+                    first = false;
+                }
+                ss << SanitizeType(arg.getType());
+            }
+            if (func->isVarArg()) {
+                ss << ", ...";
+            }
+            ss << ")\n";
+        } else {
+            auto str(SanitizeType(gv->getType()));
+            ss << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
+        }
+    }
+
+    return ss.str();
+}
+
 static llvm::Module* jitCompile(const std::string& String)
 {
     // Create some module to put our function into it.
@@ -296,60 +346,16 @@ static llvm::Module* jitCompile(const std::string& String)
         }
     }
     std::unique_ptr<llvm::Module> newModule;
-    std::vector<std::string> symbols;
+    std::string declarations = globalDeclarations(asmcode, sInlineSyms);
 
-    // Copy all @symbols @like @this into symbols
-    insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
-
-    std::sort(symbols.begin(), symbols.end());
-    auto end(std::unique(symbols.begin(), symbols.end()));
-
-    std::unordered_set<std::string> ignoreSyms;
-    insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
-
-    std::string declarations;
-    llvm::raw_string_ostream dstream(declarations);
-
-    // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
-    for (auto iter = symbols.begin(); iter != end; ++iter) {
-        const char* sym(iter->c_str());
-        if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
-            continue;
-        }
-        auto gv = extemp::EXTLLVM::getGlobalValue(sym);
-        if (!gv) {
-            continue;
-        }
-        const llvm::Function* func(llvm::dyn_cast<llvm::Function>(gv));
-        if (func) {
-            dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
-            bool first(true);
-            for (const auto& arg : func->getArgumentList()) {
-                if (!first) {
-                    dstream << ", ";
-                } else {
-                    first = false;
-                }
-                dstream << SanitizeType(arg.getType());
-            }
-            if (func->isVarArg()) {
-                dstream << ", ...";
-            }
-            dstream << ")\n";
-        } else {
-            auto str(SanitizeType(gv->getType()));
-            dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
-        }
-    }
-
-    // std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+    // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
     if (!sInlineBitcode.empty()) {
         auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
-            asmcode = sInlineString + dstream.str() + asmcode;
+            asmcode = sInlineString + declarations + asmcode;
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
-                std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+                std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
                 newModule.reset();
             }
         }
