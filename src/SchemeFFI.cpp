@@ -332,11 +332,8 @@ globalDeclarations(const std::string &asmcode) {
     return ss.str();
 }
 
-static llvm::Module* jitCompile(const std::string& String)
+static llvm::Module* jitCompile(const std::string& asmcode)
 {
-    std::string asmcode(String);
-    llvm::SMDiagnostic pa;
-
     static std::string sInlineBitcode(IRToBitcode(bitcodeDotLLString()));
 
     // Create some module to put our function into it.
@@ -348,12 +345,14 @@ static llvm::Module* jitCompile(const std::string& String)
     // The first file we compile is init.ll, and we don't want to prepend inline.ll,
     // or any global declarations to it.
     static bool isThisInitDotLL(true);
+
+    llvm::SMDiagnostic pa;
     if (!isThisInitDotLL) {
         std::unique_ptr<llvm::Module> mod(parseBitcodeFile(sInlineBitcode));
         if (likely(mod)) {
             newModule = std::move(mod);
-            asmcode = inlineDotLLString() + declarations + asmcode;
-            if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
+            const std::string code = inlineDotLLString() + declarations + asmcode;
+            if (parseAssemblyInto(llvm::MemoryBufferRef(code, "<string>"), *newModule, pa)) {
                 std::cout << "**** DECL ****\n"
                           << declarations
                           << "**** ENDDECL ****\n"
@@ -383,12 +382,11 @@ static llvm::Module* jitCompile(const std::string& String)
     {
         // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
         // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
-        std::string errstr;
-        llvm::raw_string_ostream ss(errstr);
-        pa.print("LLVM IR",ss);
-        printf("%s\n",ss.str().c_str());
+        pa.print("LLVM IR", llvm::outs());
         return nullptr;
-    } else if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
+    }
+
+    if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
         std::cout << "\nInvalid LLVM IR\n";
         return nullptr;
     }
