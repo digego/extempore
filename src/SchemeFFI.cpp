@@ -230,6 +230,16 @@ static std::string IRToBitcode(const std::string &ir) {
     return bitcode;
 }
 
+static std::unique_ptr<llvm::Module> parseBitcodeFile(const std::string &sInlineBitcode) {
+    llvm::ErrorOr<std::unique_ptr<llvm::Module>> maybe(llvm::parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), llvm::getGlobalContext()));
+
+    if (maybe) {
+        return std::move(maybe.get());
+    } else {
+        return nullptr;
+    }
+}
+
 // match @symbols @like @this_123
 static const std::regex sGlobalSymRegex(
   "[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
@@ -339,12 +349,15 @@ static llvm::Module* jitCompile(const std::string& String)
     // declarations to it.
     static bool shouldPrepend(false);
     if (shouldPrepend) {
-        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), llvm::getGlobalContext()));
-        if (likely(modOrErr)) {
-            newModule = std::move(modOrErr.get());
+        std::unique_ptr<llvm::Module> mod(parseBitcodeFile(sInlineBitcode));
+        if (likely(mod)) {
+            newModule = std::move(mod);
             asmcode = inlineDotLLString() + declarations + asmcode;
             if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
-                std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
+                std::cout << "**** DECL ****\n"
+                          << declarations
+                          << "**** ENDDECL ****\n"
+                          << std::endl;
                 newModule.reset();
             }
         }
