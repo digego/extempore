@@ -324,13 +324,8 @@ globalDeclarations(const std::string &asmcode) {
 
 static llvm::Module* jitCompile(const std::string& String)
 {
-    // Create some module to put our function into it.
-    using namespace llvm;
-    legacy::PassManager* PM = extemp::EXTLLVM::PM;
-    legacy::PassManager* PM_NO = extemp::EXTLLVM::PM_NO;
-
     std::string asmcode(String);
-    SMDiagnostic pa;
+    llvm::SMDiagnostic pa;
 
     static std::string sInlineBitcode;
 
@@ -343,12 +338,14 @@ static llvm::Module* jitCompile(const std::string& String)
             first = false;
         }
     }
+
+    // Create some module to put our function into it.
     std::unique_ptr<llvm::Module> newModule;
     std::string declarations = globalDeclarations(asmcode);
 
     // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
     if (!sInlineBitcode.empty()) {
-        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
+        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), llvm::getGlobalContext()));
         if (likely(modOrErr)) {
             newModule = std::move(modOrErr.get());
             asmcode = inlineDotLLString() + declarations + asmcode;
@@ -358,16 +355,16 @@ static llvm::Module* jitCompile(const std::string& String)
             }
         }
     } else {
-       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
+        newModule = parseAssemblyString(asmcode, pa, llvm::getGlobalContext());
     }
     if (newModule) {
         if (unlikely(!extemp::UNIV::ARCH.empty())) {
             newModule->setTargetTriple(extemp::UNIV::ARCH);
         }
         if (EXTLLVM::OPTIMIZE_COMPILES) {
-            PM->run(*newModule);
+            extemp::EXTLLVM::PM->run(*newModule);
         } else {
-            PM_NO->run(*newModule);
+            extemp::EXTLLVM::PM_NO->run(*newModule);
         }
     }
 
