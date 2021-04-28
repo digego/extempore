@@ -250,12 +250,9 @@ static const std::regex sDefineSymRegex(
   "define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
   std::regex::optimize | std::regex::ECMAScript);
 
-// template is temporary, we'll remove this once the refactoring is done
-template <class T>
 static void insertMatchingSymbols(
   const std::string &code, const std::regex &regex,
-  // std::unordered_set<std::string> &containingSet
-  T &containingSet)
+  std::unordered_set<std::string> &containingSet)
 {
     std::copy(std::sregex_token_iterator(code.begin(), code.end(), regex, 1),
               std::sregex_token_iterator(),
@@ -287,19 +284,17 @@ globalDeclarations(const std::string &asmcode) {
     // Contains @all @symbols from bitcode.ll and inline.ll
     static std::unordered_set<std::string> sInlineSyms(loadInlineSyms());
 
-    std::vector<std::string> symbols;
+    std::unordered_set<std::string> symbols;
     // Copy all @symbols @like @this into symbols from asmcode
     insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
-    std::sort(symbols.begin(), symbols.end());
-    auto end(std::unique(symbols.begin(), symbols.end()));
 
     std::unordered_set<std::string> ignoreSyms;
     insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
 
     std::stringstream ss;
     // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
-    for (auto iter = symbols.begin(); iter != end; ++iter) {
-        const char* sym(iter->c_str());
+    for (auto sym_s : symbols) {
+        const char* sym(sym_s.c_str());
         if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
             continue;
         }
