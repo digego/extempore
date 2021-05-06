@@ -49,7 +49,7 @@
 #ifdef _WIN32
 #include <ws2tcpip.h>
 
-#ifdef DYLIB
+#ifdef EXT_DYLIB
 #include <cmrc/cmrc.hpp>
 CMRC_DECLARE(xtm);
 #endif

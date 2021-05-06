@@ -11,7 +11,7 @@ option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library de
 option(EXTERNAL_SHLIBS_GRAPHICS "download & build graphics-related external library dependencies" ON)
 set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
-option(DYLIB "build extempore as a dynamic library" OFF)
+option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 
 ## this is useful because we can group targets together (e.g. all the AOT libs)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -20,14 +20,12 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # option wrangling #
 ####################
 
-if(DYLIB)
+if(EXT_DYLIB)
   set(EXTERNAL_SHLIBS_AUDIO OFF)
   set(EXTERNAL_SHLIBS_GRAPHICS OFF)
   set(EXTERNAL_SHLIBS OFF)
   message(STATUS "Building Extempore as a library")
   message(STATUS "Building without external dependencies")
-
-  add_definitions( -DDYLIB=1 )
 endif()
 
 # share directory
@@ -172,6 +170,8 @@ endif()
 # portaudio #
 #############
 
+include(ExternalProject)
+
 ExternalProject_Add(portaudio_static
   PREFIX portaudio
   URL https://github.com/PortAudio/portaudio/archive/3f7bee79a65327d2e0965e8a74299723ed6f072d.zip
@@ -257,7 +257,7 @@ endforeach()
 
 # source files
 
-if (DYLIB)
+if (EXT_DYLIB)
   include(${CMAKE_SOURCE_DIR}/CMakeRC.cmake)
 
   # bundle these files into extempore dylib
@@ -355,9 +355,11 @@ if(PACKAGE)
 elseif(EXT_SHARE_DIR)
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
-elseif(DYLIB)
+elseif(EXT_DYLIB)
   target_compile_definitions(extempore
-    PRIVATE -DEXT_SHARE_DIR=".")
+    PRIVATE -DEXT_DYLIB=1 
+    PRIVATE -DEXT_SHARE_DIR="."
+  )
 else()
   target_compile_definitions(extempore
     PRIVATE -DEXT_SHARE_DIR="${CMAKE_SOURCE_DIR}")
