@@ -68,6 +68,11 @@ if(EXTERNAL_SHLIBS)
   endif()
 endif()
 
+if (EXT_DYLIB)
+  set(EXT_DEPS_C_FLAGS "${EXT_DEPS_C_FLAGS} -fPIC")
+  set(EXT_DEPS_CXX_FLAGS "${EXT_DEPS_CXX_FLAGS} -fPIC")
+endif()
+
 if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
   message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
@@ -271,7 +276,8 @@ if (EXT_DYLIB)
     runtime/scheme.xtm
   )
 
-  add_library(extempore SHARED src/Extempore.cpp
+  add_library(extempore SHARED 
+    src/Extempore.cpp
     src/AudioDevice.cpp
     src/EXTZones.cpp
     src/EXTClosureAddressTable.cpp
