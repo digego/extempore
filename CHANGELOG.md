@@ -3,6 +3,10 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.8.9
+
+- bugfix for `@rpath/libportaudio.dylib` bug (introduced in 0.8.8)
+
 ## v0.8.8
 
 - upgrade PortAudio (to fix a build error on macOS Big Sur)
