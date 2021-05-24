@@ -14,6 +14,9 @@ set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 
 option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 
+## see note about the status of the Jack backend in BUILDING.md
+option(JACK "use the Jack Portaudio backend" OFF)
+
 ## this is useful because we can group targets together (e.g. all the AOT libs)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -186,6 +189,7 @@ ExternalProject_Add(portaudio_static
   -DPA_BUILD_STATIC=ON
   -DPA_BUILD_SHARED=OFF
   -DPA_LIBNAME_ADD_SUFFIX=OFF
+  -DPA_USE_JACK=${JACK}
   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
   -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
   -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
