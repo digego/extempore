@@ -82,7 +82,7 @@
 #include <dirent.h>
 #endif
 
-#ifdef DYLIB
+#ifdef EXT_DYLIB
 #include <cmrc/cmrc.hpp>
 CMRC_DECLARE(xtm);
 #endif
@@ -192,7 +192,7 @@ static std::string fileToString(const std::string &fileName) {
 }
 
 static const std::string inlineDotLLString() {
-#ifdef DYLIB
+#ifdef EXT_DYLIB
     auto fs = cmrc::xtm::get_filesystem();
     auto data = fs.open("runtime/inline.ll");
     static const std::string sInlineDotLLString(data.begin(), data.end());
@@ -205,7 +205,7 @@ static const std::string inlineDotLLString() {
 }
 
 static const std::string bitcodeDotLLString() {
-#ifdef DYLIB
+#ifdef EXT_DYLIB
     auto fs = cmrc::xtm::get_filesystem();
     auto data = fs.open("runtime/bitcode.ll");
     static const std::string sBitcodeDotLLString(data.begin(), data.end());
