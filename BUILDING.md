@@ -8,7 +8,7 @@ in more depth, here's some more information.
 
 - a C++ compiler (`clang`, `gcc` >= 4.9, `msvc` >= VS2015)
 - Git
-- CMake
+- CMake >= 3.19
 - Python >= 2.7 (for LLVM)
 
 For platform-specific deps, see "Platform-specific notes" below.
