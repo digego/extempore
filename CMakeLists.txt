@@ -1011,7 +1011,6 @@ if(BUILD_TESTS)
   extempore_add_example_as_test(examples/external/gl-compatibility.xtm 10 examples-graphics)
   # extempore_add_example_as_test(examples/external/going-native.xtm 60 examples-graphics) # broken for now
   extempore_add_example_as_test(examples/external/granulator.xtm 10 examples-audio)
-  extempore_add_example_as_test(examples/external/gui.xtm 10 examples-graphics)
   extempore_add_example_as_test(examples/external/openvg.xtm 10 examples-graphics)
   extempore_add_example_as_test(examples/external/portmidi-output.xtm 10 examples-audio) # no audio output, but sends MIDI messages
   extempore_add_example_as_test(examples/external/portmidi.xtm 10 examples-audio)        # no audio output, but sends MIDI messages
