@@ -56,31 +56,55 @@
 ;; and a real number for my-test-1f
 (println (my-test-1f 6.0)) ;; 30.0
 
+;; xtlang performs type inferencing. This means that when you compile a function
+;; with bind-func you don't necessarily have to spell out explicitly the type of
+;; every argument/variable. Keep in mind that functions are first-class citizens
+;; in xtlang. They are actually closures that have a specific type, something
+;; like [returntype,inputtype1,inputtype2]*.
 
-;; you are free to recompile an existing closure
-;; so we can change my-test-1 to
-(bind-func my-test-1
+;; In the case of the next example "int_or_double_literal", the compiler has
+;; enough clues to figure out that it takes an integer input and returns an
+;; integer. So the compiler presents the closure as type [i64,i64]*.
+
+(bind-func int_or_double_literal
   (lambda (a)
-    (/ a 5)))
+    (/ a 5)))  ;; Compiled:  int_or_double_literal >>> [i64,i64]*
 
-(println (my-test-1 30)) ; 30 / 5 = 6
+(println ($ (int_or_double_literal 30)))  ;; 6
 
-;; note that the closures signature is still the same
-;; as it was before.  This is important because we are
-;; NOT allowed to change an existing compiled closures
-;; type signature.
-;;
-;; So we CANNOT do this
+;; If another version that takes a double input is needed, you are free to
+;; recompile an existing closure with different type signature. This time the
+;; compiler presents the closure as type [double,double]*. It will take a double
+;; and return a double.
 
-                                        ;(bind-func my-test-1
-                                        ;   (lambda (a)
-                                        ;      (/ a 5.0)))
+(bind-func int_or_double_literal
+  (lambda (a)
+    (/ a 5.000)))  ;; Compiled:  int_or_double_literal >>> [double,double]*
 
-;; Just remember that you are not currently allowed to redefine an
-;; existing function to a new definition that requres a different type signature.
-;; This is to protect against the situation where you have allready compiled
-;; code which requires the current signature.
+(println ($ (int_or_double_literal 30)))  ;; 6. The first version still works
+(println ($ (int_or_double_literal 30.000)))  ;; 6.000000 The new version works too!
 
+;; xtlang functions are polymorphic in the sense that a symbol myfunc may be
+;; bound to multiple compiled functions with different arguments - as in
+;; different argument types or different number of arguments. Also xtlang
+;; polymorphism allows single symbol to be bound to multiple functions with the
+;; same input argument types, but different return types.
+
+;; There are now TWO versions of our "int_or_double_literal" closure. The
+;; appropriate version is called depending on what input type is supplied. This
+;; is an example of xtlang polymorphism. Many functions provided in xtlang have
+;; several versions with the same name. Different versions might take different
+;; inputs and return different outputs.
+
+;; We can check the two versions of our "int_or_double_literal" as follows:
+(impc:ti:polyfunc-pretty-print "int_or_double_literal")
+
+;; This gets printed out to log:
+;; Polymorphic options for int_or_double_literal
+;;   int_or_double_literal_adhoc_W2RvdWJsZSxkb3VibGVd:[double,double]*
+;;   int_or_double_literal_adhoc_W2k2NCxpNjRd:[i64,i64]*
+
+;; Notice there are different addresses attached to the closure names.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Because we are working with closures
