@@ -160,6 +160,7 @@ extern "C" inline double getRealTime()
 }
 
 #elif __linux__
+#include <time.h>
 
 extern "C" inline double getRealTime()
 {
