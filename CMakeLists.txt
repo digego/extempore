@@ -1,8 +1,23 @@
 cmake_minimum_required(VERSION 3.1) # we use target_sources()
 project(Extempore VERSION 0.8.9)
 
-# for backwards compatibility with CMake older than 3.19
-cmake_policy(SET CMP0114 OLD)
+if(POLICY CMP0114)
+  # for backwards compatibility with CMake older than 3.19
+  cmake_policy(SET CMP0114 OLD)
+endif()
+
+if(POLICY CMP0051)
+  cmake_policy(SET CMP0051 NEW)
+endif()
+
+if(POLICY CMP0075)
+  cmake_policy(SET CMP0075 NEW)
+endif()
+
+if(POLICY CMP0135)
+  # to suppress warning about DOWNLOAD_EXTRACT_TIMESTAMP using cmake 3.24+
+  cmake_policy(SET CMP0135 NEW)
+endif()
 
 option(ASSETS "download multimedia assets (approx 500MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
@@ -15,7 +30,7 @@ set(EXTERNAL_SHLIBS (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
 option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 
 ## see note about the status of the Jack backend in BUILDING.md
-option(JACK "use the Jack Portaudio backend" OFF)
+option(JACK "use the Jack Portaudio backend" ON)
 
 ## this is useful because we can group targets together (e.g. all the AOT libs)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -350,6 +365,10 @@ target_include_directories(extempore
   ${CMAKE_BINARY_DIR}/portaudio/include # installed by ExternalProject
   ${EXT_LLVM_DIR}/include)
 
+if(JACK)
+  # jack is actually cross-platform
+  target_link_libraries(extempore PRIVATE jack)
+endif()
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
 target_link_libraries(extempore PRIVATE pcre portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
 if(UNIX AND NOT APPLE)
