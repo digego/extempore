@@ -190,12 +190,49 @@ if(PACKAGE)
     PRIVATE -mtune=generic)
 endif()
 
+########
+# JACK #
+########
+
+if(JACK)
+  #[[
+  jack is actually cross-platform.
+  according to this comment
+  https://github.com/PortAudio/portaudio/blob/2dc8b6eb17ac5fda1f89722cfa0889bfc6e73434/cmake/modules/FindJACK.cmake#L17
+  pipewire's jack implementation is only found by pkg-config
+  I don't feel like this is required anymore, since I am testing with:
+  $ pkg-config --modversion jack
+  1.9.17
+  $ pkg-config --list-all | grep jack
+  jack                           jack - PipeWire JACK API
+  and by commenting out the pkgconfig here it is found by find_library
+  so keeping mostly for backward compatibilty
+  ]]
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(JackCheck jack)
+    if(NOT JackCheck_FOUND)
+      message(NOTICE "JACK disabled because not found")
+      set(JACK OFF)
+    endif()
+  else()
+    find_library(JackCheck
+      NAMES jack
+      DOC "JACK library"
+    )
+    if(NOT JackCheck)
+      message(NOTICE "JACK disabled because not found")
+      set(JACK OFF)
+    endif()
+  endif()
+endif()
+
+
 #############
 # portaudio #
 #############
 
 include(ExternalProject)
-
 ExternalProject_Add(portaudio_static
   PREFIX portaudio
   URL https://github.com/PortAudio/portaudio/archive/3f7bee79a65327d2e0965e8a74299723ed6f072d.zip
@@ -365,37 +402,10 @@ target_include_directories(extempore
   ${CMAKE_BINARY_DIR}/portaudio/include # installed by ExternalProject
   ${EXT_LLVM_DIR}/include)
 
-
 if(JACK)
-  #[[
-  jack is actually cross-platform.
-  according to this comment
-  https://github.com/PortAudio/portaudio/blob/2dc8b6eb17ac5fda1f89722cfa0889bfc6e73434/cmake/modules/FindJACK.cmake#L17
-  pipewire's jack implementation is only found by pkg-config
-  I don't feel like this is required anymore, since I am testing with:
-  $ pkg-config --modversion jack
-  1.9.17
-  $ pkg-config --list-all | grep jack
-  jack                           jack - PipeWire JACK API
-  and by commenting out the pkgconfig here it is found by find_library
-  so keeping mostly for backward compatibilty
-  ]]
-  find_package(PkgConfig QUIET)
-  if(PkgConfig_FOUND)
-    pkg_check_modules(JackCheck jack)
-    if(JackCheck_FOUND)
-      target_link_libraries(extempore PRIVATE jack)
-    endif()
-  else()
-    find_library(JackCheck_FOUND
-      NAMES jack
-      DOC "JACK library"
-    )
-    if(JackCheck_FOUND)
-      target_link_libraries(extempore PRIVATE jack)
-    endif()
-  endif()
+  target_link_libraries(extempore PRIVATE jack)
 endif()
+
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
 target_link_libraries(extempore PRIVATE pcre portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
 if(UNIX AND NOT APPLE)
