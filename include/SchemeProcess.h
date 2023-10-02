@@ -138,7 +138,7 @@ private:
     }
     bool loadFile(const std::string& File, const std::string& Path = std::string());
     bool loadString(const std::string& str);
-#ifdef DYLIB
+#ifdef EXT_DYLIB
     bool loadFileAsString(char* fname);
     void findAndReplaceAll(std::string &data, std::string toSearch, std::string replaceStr);
 #endif

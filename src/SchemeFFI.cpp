@@ -82,7 +82,7 @@
 #include <dirent.h>
 #endif
 
-#ifdef DYLIB
+#ifdef EXT_DYLIB
 #include <cmrc/cmrc.hpp>
 CMRC_DECLARE(xtm);
 #endif
@@ -184,7 +184,80 @@ void initSchemeFFI(scheme* sc)
     }
 }
 
-static long long llvm_emitcounter = 0;
+static std::string fileToString(const std::string &fileName) {
+    std::ifstream inStream(fileName);
+    std::stringstream inString;
+    inString << inStream.rdbuf();
+    return inString.str();
+}
+
+static const std::string inlineDotLLString() {
+#ifdef EXT_DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open("runtime/inline.ll");
+    static const std::string sInlineDotLLString(data.begin(), data.end());
+#else
+    static const std::string sInlineDotLLString(
+      fileToString(UNIV::SHARE_DIR + "/runtime/inline.ll"));
+#endif
+
+    return sInlineDotLLString;
+}
+
+static const std::string bitcodeDotLLString() {
+#ifdef EXT_DYLIB
+    auto fs = cmrc::xtm::get_filesystem();
+    auto data = fs.open("runtime/bitcode.ll");
+    static const std::string sBitcodeDotLLString(data.begin(), data.end());
+#else
+    static const std::string sBitcodeDotLLString(
+      fileToString(UNIV::SHARE_DIR + "/runtime/bitcode.ll"));
+#endif
+
+    return sBitcodeDotLLString;
+}
+
+static std::string IRToBitcode(const std::string &ir) {
+    std::string bitcode;
+    llvm::SMDiagnostic pa;
+    auto mod(llvm::parseAssemblyString(ir, pa, llvm::getGlobalContext()));
+    if (!mod) {
+        pa.print("IRToBitcode", llvm::outs());
+        std::abort();
+    }
+    llvm::raw_string_ostream bitstream(bitcode);
+    llvm::WriteBitcodeToFile(mod.get(), bitstream);
+    return bitcode;
+}
+
+static std::unique_ptr<llvm::Module> parseBitcodeFile(const std::string &sInlineBitcode) {
+    llvm::ErrorOr<std::unique_ptr<llvm::Module>> maybe(llvm::parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), llvm::getGlobalContext()));
+
+    if (maybe) {
+        return std::move(maybe.get());
+    } else {
+        return nullptr;
+    }
+}
+
+// match @symbols @like @this_123
+static const std::regex sGlobalSymRegex(
+  "[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
+  std::regex::optimize);
+
+// match "define @sym"
+static const std::regex sDefineSymRegex(
+  "define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)",
+  std::regex::optimize | std::regex::ECMAScript);
+
+static void insertMatchingSymbols(
+  const std::string &code, const std::regex &regex,
+  std::unordered_set<std::string> &containingSet)
+{
+    std::copy(std::sregex_token_iterator(code.begin(), code.end(), regex, 1),
+              std::sregex_token_iterator(),
+              std::inserter(containingSet, containingSet.begin()));
+}
 
 static std::string SanitizeType(llvm::Type* Type)
 {
@@ -199,97 +272,29 @@ static std::string SanitizeType(llvm::Type* Type)
     return str;
 }
 
-static std::regex sGlobalSymRegex("[ \t]@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize);
-static std::regex sDefineSymRegex("define[^\\n]+@([-a-zA-Z$._][-a-zA-Z$._0-9]*)", std::regex::optimize | std::regex::ECMAScript);
+static std::unordered_set<std::string> loadInlineSyms() {
+    std::unordered_set<std::string> inlineSyms;
+    insertMatchingSymbols(bitcodeDotLLString(), sGlobalSymRegex, inlineSyms);
+    insertMatchingSymbols(inlineDotLLString(), sGlobalSymRegex, inlineSyms);
+    return inlineSyms;
+}
 
-static llvm::Module* jitCompile(const std::string& String)
-{
-    // Create some module to put our function into it.
-    using namespace llvm;
-    legacy::PassManager* PM = extemp::EXTLLVM::PM;
-    legacy::PassManager* PM_NO = extemp::EXTLLVM::PM_NO;
+static std::string
+globalDeclarations(const std::string &asmcode) {
+    // Contains @all @symbols from bitcode.ll and inline.ll
+    static std::unordered_set<std::string> sInlineSyms(loadInlineSyms());
 
-    char modname[256];
-    sprintf(modname, "xtmmodule_%lld", ++llvm_emitcounter);
+    std::unordered_set<std::string> symbols;
+    // Copy all @symbols @like @this into symbols from asmcode
+    insertMatchingSymbols(asmcode, sGlobalSymRegex, symbols);
 
-    std::string asmcode(String);
-    SMDiagnostic pa;
-
-    static std::string sInlineString; // This is a hack for now, but it *WORKS*
-    static std::string sInlineBitcode;
-    static std::unordered_set<std::string> sInlineSyms;
-
-#ifdef DYLIB
-    auto fs = cmrc::xtm::get_filesystem();
-#endif
-
-    if (sInlineString.empty()) {
-        {
-#ifdef DYLIB
-            auto data = fs.open("runtime/bitcode.ll");
-            sInlineString = std::string(data.begin(), data.end());
-#else
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
-            std::stringstream inString;
-            inString << inStream.rdbuf();
-            sInlineString = inString.str();
-#endif
-        }
-        std::copy(std::sregex_token_iterator(sInlineString.begin(), sInlineString.end(), sGlobalSymRegex, 1),
-                std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
-        {
-#ifdef DYLIB
-            auto data = fs.open("runtime/inline.ll");
-            std::string tString = std::string(data.begin(), data.end());
-#else
-            std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
-            std::stringstream inString;
-            inString << inStream.rdbuf();
-            std::string tString = inString.str();
-#endif
-            std::copy(std::sregex_token_iterator(tString.begin(), tString.end(), sGlobalSymRegex, 1),
-                    std::sregex_token_iterator(), std::inserter(sInlineSyms, sInlineSyms.begin()));
-        }
-    }
-    if (sInlineBitcode.empty()) {
-        // need to avoid parsing the types twice
-        static bool first(true);
-        if (!first) {
-            auto newModule(parseAssemblyString(sInlineString, pa, getGlobalContext()));
-            if (newModule) {
-                std::string bitcode;
-                llvm::raw_string_ostream bitstream(sInlineBitcode);
-                llvm::WriteBitcodeToFile(newModule.get(), bitstream);
-#ifdef DYLIB
-                auto data = fs.open("runtime/inline.ll");
-                sInlineString = std::string(data.begin(), data.end());
-#else
-                std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/inline.ll");
-                std::stringstream inString;
-                inString << inStream.rdbuf();
-                sInlineString = inString.str();
-#endif
-            } else {
-std::cout << pa.getMessage().str() << std::endl;
-                abort();
-            }
-        } else {
-            first = false;
-        }
-    }
-    std::unique_ptr<llvm::Module> newModule;
-    std::vector<std::string> symbols;
-    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sGlobalSymRegex, 1),
-            std::sregex_token_iterator(), std::inserter(symbols, symbols.begin()));
-    std::sort(symbols.begin(), symbols.end());
-    auto end(std::unique(symbols.begin(), symbols.end()));
     std::unordered_set<std::string> ignoreSyms;
-    std::copy(std::sregex_token_iterator(asmcode.begin(), asmcode.end(), sDefineSymRegex, 1),
-            std::sregex_token_iterator(), std::inserter(ignoreSyms, ignoreSyms.begin()));
-    std::string declarations;
-    llvm::raw_string_ostream dstream(declarations);
-    for (auto iter = symbols.begin(); iter != end; ++iter) {
-        const char* sym(iter->c_str());
+    insertMatchingSymbols(asmcode, sDefineSymRegex, ignoreSyms);
+
+    std::stringstream ss;
+    // Iterating over all @symbols @in @asmcode matching sGlobalSymRegex
+    for (auto sym_s : symbols) {
+        const char* sym(sym_s.c_str());
         if (sInlineSyms.find(sym) != sInlineSyms.end() || ignoreSyms.find(sym) != ignoreSyms.end()) {
             continue;
         }
@@ -297,62 +302,86 @@ std::cout << pa.getMessage().str() << std::endl;
         if (!gv) {
             continue;
         }
-        auto func(llvm::dyn_cast<llvm::Function>(gv));
+        const llvm::Function* func(llvm::dyn_cast<llvm::Function>(gv));
         if (func) {
-            dstream << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
+            ss << "declare " << SanitizeType(func->getReturnType()) << " @" << sym << " (";
             bool first(true);
             for (const auto& arg : func->getArgumentList()) {
                 if (!first) {
-                    dstream << ", ";
+                    ss << ", ";
                 } else {
                     first = false;
                 }
-                dstream << SanitizeType(arg.getType());
+                ss << SanitizeType(arg.getType());
             }
             if (func->isVarArg()) {
-                dstream << ", ...";
+                ss << ", ...";
             }
-            dstream << ")\n";
+            ss << ")\n";
         } else {
             auto str(SanitizeType(gv->getType()));
-            dstream << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
+            ss << '@' << sym << " = external global " << str.substr(0, str.length() - 1) << '\n';
         }
     }
-// std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
-    if (!sInlineBitcode.empty()) {
-        auto modOrErr(parseBitcodeFile(llvm::MemoryBufferRef(sInlineBitcode, "<string>"), getGlobalContext()));
-        if (likely(modOrErr)) {
-            newModule = std::move(modOrErr.get());
-            asmcode = sInlineString + dstream.str() + asmcode;
-            if (parseAssemblyInto(llvm::MemoryBufferRef(asmcode, "<string>"), *newModule, pa)) {
-std::cout << "**** DECL ****\n" << dstream.str() << "**** ENDDECL ****\n" << std::endl;
+
+    return ss.str();
+}
+
+static llvm::Module* jitCompile(const std::string& asmcode)
+{
+    static std::string sInlineBitcode(IRToBitcode(bitcodeDotLLString()));
+
+    // Create some module to put our function into it.
+    std::unique_ptr<llvm::Module> newModule;
+    std::string declarations = globalDeclarations(asmcode);
+
+    // std::cout << "**** DECL ****\n" << declarations << "**** ENDDECL ****\n" << std::endl;
+
+    // The first file we compile is init.ll, and we don't want to prepend bitcode.ll,
+    // inline.ll, or any global declarations to it.
+    static bool isThisInitDotLL(true);
+
+    llvm::SMDiagnostic pa;
+    if (!isThisInitDotLL) {
+        std::unique_ptr<llvm::Module> mod(parseBitcodeFile(sInlineBitcode));
+        if (likely(mod)) {
+            newModule = std::move(mod);
+            const std::string code = inlineDotLLString() + declarations + asmcode;
+            if (parseAssemblyInto(llvm::MemoryBufferRef(code, "<string>"), *newModule, pa)) {
+                std::cout << "**** DECL ****\n"
+                          << declarations
+                          << "**** ENDDECL ****\n"
+                          << std::endl;
                 newModule.reset();
             }
         }
-    } else {
-       newModule = parseAssemblyString(asmcode, pa, getGlobalContext());
     }
+
+    if (isThisInitDotLL) {
+        newModule = parseAssemblyString(asmcode, pa, llvm::getGlobalContext());
+        isThisInitDotLL = false;
+    }
+
     if (newModule) {
         if (unlikely(!extemp::UNIV::ARCH.empty())) {
             newModule->setTargetTriple(extemp::UNIV::ARCH);
         }
         if (EXTLLVM::OPTIMIZE_COMPILES) {
-            PM->run(*newModule);
+            extemp::EXTLLVM::PM->run(*newModule);
         } else {
-            PM_NO->run(*newModule);
+            extemp::EXTLLVM::PM_NO->run(*newModule);
         }
     }
-    //std::stringstream ss;
+
     if (unlikely(!newModule))
     {
-// std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
-// std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
-        std::string errstr;
-        llvm::raw_string_ostream ss(errstr);
-        pa.print("LLVM IR",ss);
-        printf("%s\n",ss.str().c_str());
+        // std::cout << "**** CODE ****\n" << asmcode << " **** ENDCODE ****" << std::endl;
+        // std::cout << pa.getMessage().str() << std::endl << pa.getLineNo() << std::endl;
+        pa.print("LLVM IR", llvm::outs());
         return nullptr;
-    } else if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
+    }
+
+    if (extemp::EXTLLVM::VERIFY_COMPILES && verifyModule(*newModule)) {
         std::cout << "\nInvalid LLVM IR\n";
         return nullptr;
     }
