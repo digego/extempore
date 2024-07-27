@@ -39,6 +39,7 @@
 #include <iostream>
 
 #include "CM.h"
+#include <cstdint>
 
 namespace extemp {
 
