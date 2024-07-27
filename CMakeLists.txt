@@ -210,7 +210,7 @@ else()
   if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
-	  URL http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz
+	  URL https://github.com/digego/extempore/releases/download/v0.8.9/llvm-3.8.0.src-patched-for-extempore.tar.xz
       URL_MD5 600ee9a94d2e104f53be739568f3508e
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
@@ -232,7 +232,7 @@ else()
   else()
     ExternalProject_Add(LLVM
       PREFIX llvm
-	  URL http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz
+	  URL https://github.com/digego/extempore/releases/download/v0.8.9/llvm-3.8.0.src-patched-for-extempore.tar.xz
       URL_MD5 600ee9a94d2e104f53be739568f3508e
       CMAKE_ARGS
       -DLLVM_TARGETS_TO_BUILD=X86
