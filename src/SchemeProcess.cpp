@@ -46,13 +46,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifdef _WIN32
-#include <ws2tcpip.h>
-
 #ifdef EXT_DYLIB
 #include <cmrc/cmrc.hpp>
 CMRC_DECLARE(xtm);
 #endif
+
+#ifdef _WIN32
+#include <ws2tcpip.h>
 
 static void usleep(LONGLONG Us)
 {
@@ -134,7 +134,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     memset(m_schemeOutportString, 0, SCHEME_OUTPORT_STRING_LENGTH);
     scheme_set_output_port_string(m_scheme, m_schemeOutportString, m_schemeOutportString +
             SCHEME_OUTPORT_STRING_LENGTH - 1);
-#ifdef DYLIB
+#ifdef EXT_DYLIB
     auto fs = cmrc::xtm::get_filesystem();
     auto data = fs.open("runtime/init.xtm");
     std::string fstr = std::string(data.begin(), data.end());
@@ -244,7 +244,7 @@ bool SchemeProcess::loadString(const std::string& str) {
     return true;
 }
 
-#ifdef DYLIB
+#ifdef EXT_DYLIB
 bool SchemeProcess::loadFileAsString(char* fname)
 {
     auto fs = cmrc::xtm::get_filesystem();
@@ -280,7 +280,7 @@ void* SchemeProcess::taskImpl()
 #endif
     while(!m_running) {
     }
-#ifdef DYLIB
+#ifdef EXT_DYLIB
     loadFileAsString("runtime/scheme.xtm");
     loadFileAsString("runtime/llvmti.xtm");
     loadFileAsString("runtime/llvmir.xtm");
@@ -298,7 +298,7 @@ void* SchemeProcess::taskImpl()
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         EXTMonitor::ScopedLock lock(m_guard);
-#ifdef DYLIB
+#ifdef EXT_DYLIB
         auto fs = cmrc::xtm::get_filesystem();
         auto data = fs.open("runtime/init.ll");
         std::string fstr = std::string(data.begin(), data.end());
