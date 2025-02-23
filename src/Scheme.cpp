@@ -5634,9 +5634,9 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
             std::cout << "TIME:" << extemp::UNIV::TIME << " END:" << sc->call_end_time << std::endl;
             char msg[512];
             if(is_symbol(sc->last_symbol_apply)) {
-                sprintf(msg,"\"%s\" Exceeded maximum rumtime. If you need a higher default process execution time use sys:set-default-timeout\n",symname_sc(sc,sc->last_symbol_apply));
+                sprintf(msg,"\"%s\" Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n",symname_sc(sc,sc->last_symbol_apply));
             }else{
-                sprintf(msg,"Exceeded maximum rumtime. If you need a higher default process execution time use sys:set-default-timeout\n");
+                sprintf(msg,"Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n");
             }
             sc->call_end_time = ULLONG_MAX;
             _Error_1(sc, msg, sc->NIL, sc->code->_debugger->_size);
