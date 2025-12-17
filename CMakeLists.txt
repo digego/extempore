@@ -216,67 +216,90 @@ ExternalProject_Add(portaudio_static
   -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
   -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio)
 
-##############
-# LLVM 3.8.0 #
-##############
+###############
+# LLVM 21.1.7 #
+###############
 
 # if you need to build LLVM by hand, the command will be something like
-# cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-3.8.0-release
+# cmake .. -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=c:/Users/ben/Code/extempore/llvm-21.1.7-release
+
+# Detect target architecture for LLVM.
+if(APPLE)
+  if(UNAME_MACHINE_NAME STREQUAL "arm64")
+    set(LLVM_TARGET_ARCH "AArch64")
+    set(LLVM_ARCH_PREFIX "AArch64")
+  else()
+    set(LLVM_TARGET_ARCH "X86")
+    set(LLVM_ARCH_PREFIX "X86")
+  endif()
+elseif(UNIX)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    set(LLVM_TARGET_ARCH "AArch64")
+    set(LLVM_ARCH_PREFIX "AArch64")
+  else()
+    set(LLVM_TARGET_ARCH "X86")
+    set(LLVM_ARCH_PREFIX "X86")
+  endif()
+else()
+  # Only x86_64 currently supported for Windows.
+  set(LLVM_TARGET_ARCH "X86")
+  set(LLVM_ARCH_PREFIX "X86")
+endif()
+
+message(STATUS "LLVM target architecture: ${LLVM_TARGET_ARCH}")
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT BUILD_LLVM)
   add_custom_target(LLVM)
 else()
   include(ExternalProject)
 
-  if(PACKAGE)
     ExternalProject_Add(LLVM
       PREFIX llvm
-	  URL https://github.com/digego/extempore/releases/download/v0.8.9/llvm-3.8.0.src-patched-for-extempore.tar.xz
-      URL_MD5 600ee9a94d2e104f53be739568f3508e
+    URL https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.7/llvm-project-21.1.7.src.tar.xz
+    SOURCE_SUBDIR llvm
       CMAKE_ARGS
-      -DLLVM_TARGETS_TO_BUILD=X86
+      -DLLVM_TARGETS_TO_BUILD=${LLVM_TARGET_ARCH}
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
       -DLLVM_ENABLE_TERMINFO=OFF
       -DLLVM_ENABLE_ZLIB=OFF
+      -DLLVM_ENABLE_ZSTD=OFF
+      -DLLVM_ENABLE_LIBXML2=OFF
       -DLLVM_INCLUDE_TOOLS=ON
       -DLLVM_BUILD_TOOLS=ON
       -DLLVM_INCLUDE_UTILS=OFF
       -DLLVM_BUILD_RUNTIME=OFF
       -DLLVM_INCLUDE_EXAMPLES=OFF
       -DLLVM_INCLUDE_TESTS=OFF
-      -DLLVM_INCLUDE_GO_TESTS=OFF
-      -DLLVM_INCLUDE_GO_TESTS=OFF
+      -DLLVM_INCLUDE_BENCHMARKS=OFF
       -DLLVM_INCLUDE_DOCS=OFF
+      -DLLVM_ENABLE_BINDINGS=OFF
+      -DLLVM_ENABLE_OCAMLDOC=OFF
       -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
       -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
       -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
-  else()
-    ExternalProject_Add(LLVM
-      PREFIX llvm
-	  URL https://github.com/digego/extempore/releases/download/v0.8.9/llvm-3.8.0.src-patched-for-extempore.tar.xz
-      URL_MD5 600ee9a94d2e104f53be739568f3508e
-      CMAKE_ARGS
-      -DLLVM_TARGETS_TO_BUILD=X86
-      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-      -DLLVM_ENABLE_TERMINFO=OFF
-      -DLLVM_ENABLE_ZLIB=OFF
-      -DLLVM_INCLUDE_TOOLS=ON
-      -DLLVM_BUILD_TOOLS=ON
-      -DLLVM_INCLUDE_UTILS=OFF
-      -DLLVM_BUILD_RUNTIME=OFF
-      -DLLVM_INCLUDE_EXAMPLES=OFF
-      -DLLVM_INCLUDE_TESTS=OFF
-      -DLLVM_INCLUDE_GO_TESTS=OFF
-      -DLLVM_INCLUDE_GO_TESTS=OFF
-      -DLLVM_INCLUDE_DOCS=OFF
-      -DCMAKE_INSTALL_PREFIX=${EXT_LLVM_DIR})
-  endif()
   ExternalProject_Add_StepTargets(LLVM install)
 endif()
 
-# the ordering of these libs matters, especially with the gcc linker.
-# Check the output of "llvm-config --libnames" to be sure
-set(EXT_LLVM_LIBRARIES "LLVMLTO;LLVMObjCARCOpts;LLVMSymbolize;LLVMDebugInfoPDB;LLVMDebugInfoDWARF;LLVMMIRParser;LLVMLibDriver;LLVMOption;LLVMTableGen;LLVMOrcJIT;LLVMPasses;LLVMipo;LLVMVectorize;LLVMLinker;LLVMIRReader;LLVMAsmParser;LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMSelectionDAG;LLVMAsmPrinter;LLVMX86Desc;LLVMMCDisassembler;LLVMX86Info;LLVMX86AsmPrinter;LLVMX86Utils;LLVMMCJIT;LLVMLineEditor;LLVMDebugInfoCodeView;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMCodeGen;LLVMTarget;LLVMScalarOpts;LLVMInstCombine;LLVMInstrumentation;LLVMProfileData;LLVMObject;LLVMMCParser;LLVMTransformUtils;LLVMMC;LLVMBitWriter;LLVMBitReader;LLVMAnalysis;LLVMCore;LLVMSupport")
+# Architecture-independent libraries (order matters for linker!)
+set(EXT_LLVM_LIBRARIES_COMMON
+  "LLVMWindowsManifest;LLVMXRay;LLVMLibDriver;LLVMDlltoolDriver;LLVMTextAPIBinaryReader;LLVMCoverage;LLVMLineEditor;LLVMSandboxIR;LLVMOrcDebugging;LLVMOrcJIT;LLVMWindowsDriver;LLVMMCJIT;LLVMJITLink;LLVMInterpreter;LLVMExecutionEngine;LLVMRuntimeDyld;LLVMOrcTargetProcess;LLVMOrcShared;LLVMDWP;LLVMDebugInfoLogicalView;LLVMDebugInfoGSYM;LLVMOption;LLVMObjectYAML;LLVMObjCopy;LLVMMCA;LLVMMCDisassembler;LLVMLTO;LLVMCFGuard;LLVMCFIVerify;LLVMFrontendOpenACC;LLVMFrontendHLSL;LLVMFrontendDriver;LLVMFrontendDirective;LLVMExtensions;LLVMPasses;LLVMHipStdPar;LLVMCoroutines;LLVMipo;LLVMInstrumentation;LLVMVectorize;LLVMLinker;LLVMFrontendOpenMP;LLVMFrontendOffloading;LLVMDWARFLinkerParallel;LLVMDWARFLinkerClassic;LLVMDWARFLinker;LLVMDWARFCFIChecker;LLVMGlobalISel;LLVMMIRParser;LLVMAsmPrinter;LLVMSelectionDAG;LLVMCodeGen;LLVMCGData;LLVMTarget;LLVMObjCARCOpts;LLVMCodeGenTypes;LLVMIRPrinter;LLVMInterfaceStub;LLVMFileCheck;LLVMFuzzMutate;LLVMFuzzerCLI;LLVMScalarOpts;LLVMInstCombine;LLVMAggressiveInstCombine;LLVMTransformUtils;LLVMBitWriter;LLVMAnalysis;LLVMProfileData;LLVMDebuginfod;LLVMSymbolize;LLVMDebugInfoBTF;LLVMDebugInfoPDB;LLVMDebugInfoMSF;LLVMDebugInfoDWARF;LLVMDebugInfoDWARFLowLevel;LLVMObject;LLVMTextAPI;LLVMMCParser;LLVMIRReader;LLVMAsmParser;LLVMMC;LLVMDebugInfoCodeView;LLVMBitReader;LLVMFrontendAtomic;LLVMCore;LLVMRemarks;LLVMBitstreamReader;LLVMBinaryFormat;LLVMTargetParser;LLVMTableGen;LLVMTableGenBasic;LLVMTableGenCommon;LLVMTelemetry;LLVMSupport;LLVMDemangle")
+
+# Architecture-specific libraries
+set(EXT_LLVM_LIBRARIES_X86 "LLVMX86Disassembler;LLVMX86AsmParser;LLVMX86CodeGen;LLVMX86Desc;LLVMX86Info")
+set(EXT_LLVM_LIBRARIES_AARCH64 "LLVMAArch64Disassembler;LLVMAArch64AsmParser;LLVMAArch64CodeGen;LLVMAArch64Desc;LLVMAArch64Info;LLVMAArch64Utils")
+
+# Select the appropriate libraries.
+if(LLVM_TARGET_ARCH STREQUAL "AArch64")
+  set(EXT_LLVM_LIBRARIES_ARCH ${EXT_LLVM_LIBRARIES_AARCH64})
+else()
+  set(EXT_LLVM_LIBRARIES_ARCH ${EXT_LLVM_LIBRARIES_X86})
+endif()
+
+# Combine into final list (arch-specific libs need to come before common libs for linker)
+set(EXT_LLVM_LIBRARIES "${EXT_LLVM_LIBRARIES_ARCH};${EXT_LLVM_LIBRARIES_COMMON}")
 foreach(llvm_lib ${EXT_LLVM_LIBRARIES})
   get_filename_component(LLVM_LIB_FULLPATH "${EXT_LLVM_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${llvm_lib}${CMAKE_STATIC_LIBRARY_SUFFIX}" ABSOLUTE)
   list(APPEND LLVM_LIBRARIES ${LLVM_LIB_FULLPATH})
