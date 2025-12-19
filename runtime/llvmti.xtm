@@ -3198,12 +3198,13 @@
            (asdll? (if (sys:cmdarg "dll") #t #f))
            (file-no-extension (filename-strip-extension (filename-from-path file-path)))
            (aot-compilation-file (string-append file-no-extension ".exe"))
-           (in-file-port (open-input-file (sanitize-platform-path file-path))))
+           (in-file-port (open-input-file (sanitize-platform-path file-path)))
+           (original-optimize-flag (llvm:optimize)))
       (set! *impc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
       (set! *impc:aot:func-defs-in-mod* '())
       (if (impc:aot:currently-compiling?)
           (begin
-            (llvm:optimize #t); // should this be restored later?
+            (llvm:optimize #t)
             ;; this is the 'success' branch
             (set! *impc:aot:current-lib-name* file-no-extension)
             ;; (impc:aot:insert-header libname-no-extension)
@@ -3254,10 +3255,13 @@
                   (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
                 (impc:aot:compile-exe file-no-extension module libs asdll?))
             (set! *impc:aot:current-output-port* #f)
+            ;; Restore original optimization flag
+            (llvm:optimize original-optimize-flag)
             ;; (close-port *impc:aot:current-output-port*)
             (quit 0))
           (begin
             (begin (print-with-colors 'black 'red #t (print " Error "))
+              (llvm:optimize original-optimize-flag)
               (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
               (quit 2)))))))
 
@@ -3282,7 +3286,8 @@
           (llas-path (sanitize-platform-path (string-append (get-llvm-path) "/bin/llvm-as")))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
-                         (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path))))))
+                         (open-input-file (sanitize-platform-path (string-append (sys:share-dir) "/" lib-path)))))
+          (original-optimize-flag (llvm:optimize)))
       (if (not in-file-port)
           (begin (print-with-colors 'black 'red #t
                                     (print "Error:"))
@@ -3313,7 +3318,7 @@
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
                       (begin
-                        (llvm:optimize #t); // should this be restored later?
+                        (llvm:optimize #t)
                         ;; this is the 'success' branch
                         (set! *impc:aot:current-lib-name* libname-no-extension)
                         ;; module name for globals
@@ -3334,13 +3339,16 @@
                                     (print "Successfully wrote file to ")
                                     (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
                                     (impc:aot:print-compilation-details start-time)
+                                    (llvm:optimize original-optimize-flag)
                                     (quit 0))
                              (begin (print-with-colors 'black 'red #t (print " Error "))
                                     (print "\n\nsomething went wrong in writing the output file ")
                                     (print-with-colors 'red 'faultde #t (print aot-compilation-file-path "\n"))
+                                    (llvm:optimize original-optimize-flag)
                                     (quit 1))))
                       (begin (print-with-colors 'black 'red #t (print " Error "))
                              (print "\n\ncannot write file at " aot-compilation-file-path "\n")
+                             (llvm:optimize original-optimize-flag)
                              (quit 2))))))))))
 
 
@@ -3359,7 +3367,9 @@
                  (libname (sanitize-platform-path (filename-from-path lib-path)))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
                  (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
-                 (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname))))
+                 (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
+                 (original-opt-level (llvm:optimization-level))
+                 (original-optimize-flag (llvm:optimize)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
                        (close-port *impc:aot:current-output-port*)
@@ -3376,7 +3386,9 @@
                   (set! *impc:aot:func-defs-in-mod* '())
                   (if (impc:aot:currently-compiling?)
                       (begin
-                        (llvm:optimize #t); // should this be restored later?
+                        (llvm:optimize #t)
+                        ;; Use O3 optimization for AOT compilation.
+                        (llvm:optimization-level 3)
                         ;; this is the 'success' branch
                         (set! *impc:aot:current-lib-name* libname-no-extension)
                         ;; (impc:aot:insert-header libname-no-extension)
@@ -3394,8 +3406,11 @@
                           (print "\n"))
                         (let ((module (impc:compiler:flush-jit-compilation-queue)))
                           (if (not module)
-                              (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                          (impc:aot:compile-module libname-no-extension module))
+                              (impc:compiler:print-compiler-error "Failed compiling LLVM IR")
+                              (impc:aot:compile-module libname-no-extension module)))
+                        ;; Restore configured optimization level and flag after AOT completes
+                        (llvm:optimization-level original-opt-level)
+                        (llvm:optimize original-optimize-flag)
                         ;; (impc:aot:insert-footer libname-no-extension)
                         (close-port *impc:aot:current-output-port*)
                         (set! *impc:aot:current-lib-name* "xtmdylib")
