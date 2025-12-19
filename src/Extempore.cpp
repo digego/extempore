@@ -254,9 +254,9 @@ EXPORT int extempore_init(int argc, char** argv)
                 } else {
 #ifdef _WIN32
                   extemp::UNIV::EXT_TERM = 1;
-#else                  
+#else
                   extemp::UNIV::EXT_TERM = 0;
-#endif                  
+#endif
                 }
                 break;
             case OPT_NO_AUDIO:
@@ -406,7 +406,7 @@ EXPORT int extempore_init(int argc, char** argv)
     startup_ok &= primary->start();
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
-    //std::cout << "primary started:" << std::endl << std::flush;    
+    //std::cout << "primary started:" << std::endl << std::flush;
     if (!startup_ok) {
         ascii_error();
         printf("ERROR:");
@@ -423,7 +423,7 @@ EXPORT int extempore_init(int argc, char** argv)
 #else
       sleep(2000);
 #endif
-    }      
+    }
 #else
     primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
 

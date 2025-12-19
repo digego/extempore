@@ -212,7 +212,7 @@ void* audioCallbackMT(void* Args)
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 
+#elif _WIN32
     SetThreadPriority(GetCurrentThread(), 15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     //printf("Starting RT Audio Process\n");
@@ -282,7 +282,7 @@ void* audioCallbackMTBuf(void* dat) {
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 
+#elif _WIN32
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     unsigned idx = uintptr_t(dat);
@@ -381,7 +381,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
                 ++in;
-            } 
+            }
         } else { // for when in channels & out channels don't match
           //SAMPLE* indata = alloc(UNIV::IN_CHANNELS); // auto
           //indata(in);

@@ -325,7 +325,7 @@ if (EXT_DYLIB)
     runtime/scheme.xtm
   )
 
-  add_library(extempore SHARED 
+  add_library(extempore SHARED
     src/Extempore.cpp
     src/AudioDevice.cpp
     src/EXTZones.cpp
@@ -416,7 +416,7 @@ elseif(EXT_SHARE_DIR)
     PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
 elseif(EXT_DYLIB)
   target_compile_definitions(extempore
-    PRIVATE -DEXT_DYLIB=1 
+    PRIVATE -DEXT_DYLIB=1
     PRIVATE -DEXT_SHARE_DIR="."
   )
 else()

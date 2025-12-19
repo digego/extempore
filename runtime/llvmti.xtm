@@ -6807,7 +6807,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                   (arity (- (length ast) 1))
                   ;; (lll (println 'gname gname arity (if request? (cons request? args) args)))
                   (gpt (impc:ti:genericfunc-types gname arity (if request? (cons request? args) args)))
-                  (gpt-valid (if (equal? #f gpt) 
+                  (gpt-valid (if (equal? #f gpt)
                                  (impc:compiler:print-compiler-error "no valid generic options available for: " ast)
                                  #t))
                   ;; request? request? args)))
@@ -6916,12 +6916,12 @@ Continue executing `body' forms until `test-expression' returns #f"
                              (let ((req (regex:matched request? "^%([^_]*).*"))
                                    (gen (regex:matched (symbol->string (cadr gpoly-type)) "^([A-Za-z][^{:]*).*")))
                                 ;; (println 'req req 'gen gen)
-                                (if (and (= (length req) 2) 
+                                (if (and (= (length req) 2)
                                          (= (length gen) 2))
                                     (if (and (not (equal? (cadr req) (cadr gen)))
                                              #t) ;; (not (equal? (cadr gen) "_")))
                                          ;; (impc:compiler:print-compiler-error "no valid generic options available for: " ast)))))
-                                        (impc:compiler:print-compiler-error (string-append "Return type mismatch for generic function which expected return type '" (cadr gen) "' and got named type '" (cadr req) "'") ast)))))  
+                                        (impc:compiler:print-compiler-error (string-append "Return type mismatch for generic function which expected return type '" (cadr gen) "' and got named type '" (cadr req) "'") ast)))))
                         ;; (println 'update 'return 'var 'with  (impc:ti:update-var (cadr gpoly-type) vars kts (list request?)))
                          (if (not (assoc-strcmp (cadr gpoly-type) vars))
                              (set-cdr! vars (cons (list (cadr gpoly-type)) (cdr vars))))
@@ -7863,7 +7863,7 @@ xtlang's `let' syntax is the same as Scheme"
                (regex:match? request? "^%.*")
                (regex:match? a "^%.*")
                (not (equal? request? a)))
-          (impc:compiler:print-compiler-error (string-append "type error calculating return type - expected named type '" a "' got '" request? "'") ast))        
+          (impc:compiler:print-compiler-error (string-append "type error calculating return type - expected named type '" a "' got '" request? "'") ast))
       (if *impc:ti:print-sub-checks* (println 'ret:> 'ast: ast 'a: a 'sym: sym))
       (if (and (impc:ir:type? t)
                (impc:ir:closure? t))
@@ -11084,7 +11084,7 @@ xtlang's `let' syntax is the same as Scheme"
                           (tfill! obj ,@argslist)
                           (pref obj 0))))
                    (interaction-environment))
-             (if copy? 
+             (if copy?
                  (begin
                    (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
                       (lambda (,(string->symbol (string-append "x:" namestr "*")))
@@ -11587,13 +11587,13 @@ e.g.
            (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
 
 (define-macro (register-lib-type library name type docstring)
-  (if (impc:aot:currently-compiling?) 
+  (if (impc:aot:currently-compiling?)
       (set! *impc:ti:suppress-ir-generation* #t)
       (set! *impc:ti:suppress-ir-generation* #f))
   (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
-    `(begin 
+    `(begin
        (impc:ti:register-new-namedtype ,namestr
                                       ',(impc:ir:get-type-from-pretty-str typestr namestr)
                                       ,docstring)
