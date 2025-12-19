@@ -128,6 +128,7 @@ llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, const std::vector<
 extern int64_t LLVM_COUNT;
 extern bool OPTIMIZE_COMPILES;
 extern bool VERIFY_COMPILES;
+extern int OPTIMIZATION_LEVEL;  // 0=O0, 1=O1, 2=O2, 3=O3
 extern std::vector<llvm::Module*> Ms;
 
 void initLLVM();

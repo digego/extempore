@@ -1,7 +1,23 @@
 static pointer optimizeCompiles(scheme* Scheme, pointer Args)
 {
+    if (Args == Scheme->NIL) {
+        return EXTLLVM::OPTIMIZE_COMPILES ? Scheme->T : Scheme->F;
+    }
     EXTLLVM::OPTIMIZE_COMPILES = (pair_car(Args) == Scheme->T);
-    return Scheme->T;
+    return EXTLLVM::OPTIMIZE_COMPILES ? Scheme->T : Scheme->F;
+}
+
+static pointer optimizationLevel(scheme* Scheme, pointer Args)
+{
+    if (Args == Scheme->NIL) {
+        return mk_integer(Scheme, EXTLLVM::OPTIMIZATION_LEVEL);
+    }
+    // Set optimization level (0-3)
+    int level = ivalue(pair_car(Args));
+    if (level < 0) level = 0;
+    if (level > 3) level = 3;
+    EXTLLVM::OPTIMIZATION_LEVEL = level;
+    return mk_integer(Scheme, level);
 }
 
 static pointer jitCompileIRString(scheme* Scheme, pointer Args)
@@ -751,6 +767,7 @@ static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
 
 #define LLVM_DEFS \
         { "llvm:optimize", &optimizeCompiles }, \
+        { "llvm:optimization-level", &optimizationLevel }, \
         { "llvm:jit-compile-ir-string", &jitCompileIRString}, \
         { "llvm:ffi-set-name", &ff_set_name }, \
         { "llvm:ffi-get-name", &ff_get_name }, \

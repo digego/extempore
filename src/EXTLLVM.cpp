@@ -53,6 +53,8 @@
 #include "llvm/IR/Verifier.h"
 
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/OptimizationLevel.h"
+
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -606,6 +608,7 @@ std::vector<llvm::Module*> Ms;
 int64_t LLVM_COUNT = 0l;
 bool OPTIMIZE_COMPILES = true;
 bool VERIFY_COMPILES = true;
+int OPTIMIZATION_LEVEL = 2;
 
 uint64_t getFunctionAddress(const std::string& name) {
     if (!JIT) return 0;

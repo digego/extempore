@@ -51,6 +51,7 @@
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/OptimizationLevel.h"
 
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
@@ -637,6 +638,18 @@ static llvm::Module* jitCompile(const std::string& String)
             PB.registerFunctionAnalyses(FAM);
             PB.registerLoopAnalyses(LAM);
             PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+            // Use configurable optimization level.
+            llvm::OptimizationLevel optLevel;
+            switch (EXTLLVM::OPTIMIZATION_LEVEL) {
+                case 0: optLevel = llvm::OptimizationLevel::O0; break;
+                case 1: optLevel = llvm::OptimizationLevel::O1; break;
+                case 3: optLevel = llvm::OptimizationLevel::O3; break;
+                case 2:
+                default: optLevel = llvm::OptimizationLevel::O2; break;
+            }
+            llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(optLevel);
+            MPM.run(*newModule, MAM);
         }
 
         // Verify the module.
