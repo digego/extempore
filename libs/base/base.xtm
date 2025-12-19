@@ -346,20 +346,30 @@
        (if (null? type)
            (if (and (impc:ti:polyfunc-exists? closure-name)
                     (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
-               (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
-                      (bt (impc:ir:get-base-type t))
-                      (fullname (string-append closure-name
-                                               "_adhoc_"
-                                               (cname-encode bt)
-                                               "_native")))
-                 fullname)
-               (impc:compiler:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name)))
-           (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
-                  (fullname (string-append closure-name
-                                           "_adhoc_"
-                                           (cname-encode bt)
-                                           "_native")))
-             fullname)))))
+               ;; It's a polyfunc, so look up actual name from adhoc-name-cache.
+               (let* ((target-type (car (impc:ti:get-polyfunc-candidate-types closure-name)))
+                      (cache-key (cons closure-name target-type))
+                      (cached (assoc cache-key *impc:ti:adhoc-name-cache*)))
+                 (if cached
+                     (string-append (cdr cached) "_native")
+                     ;; Cache miss, so construct the traditional name for AOT-loaded functions.
+                     (let* ((t (impc:ir:pretty-print-type target-type))
+                            (bt (impc:ir:get-base-type t)))
+                       (string-append closure-name "_adhoc_" (cname-encode bt) "_native"))))
+               ;; Not a polyfunc, so must be a regular closure, just append _native.
+               (if (impc:ti:closure-exists? closure-name)
+                   (string-append closure-name "_native")
+                   (impc:compiler:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name))))
+           ;; When type is provided, look up the cached name.
+           (let* ((target-type (impc:ir:get-type-from-pretty-str (symbol->string (car type))))
+                  (cache-key (cons closure-name target-type))
+                  (cached (assoc cache-key *impc:ti:adhoc-name-cache*)))
+             (if cached
+                 (string-append (cdr cached) "_native")
+                 ;; Cache miss, so construct the traditional name for AOT-loaded functions.
+                 (let* ((t (impc:ir:pretty-print-type target-type))
+                        (bt (impc:ir:get-base-type t)))
+                   (string-append closure-name "_adhoc_" (cname-encode bt) "_native"))))))))
 
 ;; the same functionality, but for use in xtlang code
 (bind-macro

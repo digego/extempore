@@ -4,6 +4,8 @@
 
 #include <cinttypes>
 
+struct llvm_zone_t;
+
 namespace extemp {
 namespace ClosureAddressTable {
     ///////////////////////////////////////////////////////////////////////
@@ -19,6 +21,7 @@ namespace ClosureAddressTable {
     };
 
     EXPORT closure_address_table* get_address_table(const char *name, extemp::ClosureAddressTable::closure_address_table *table);
+    EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, closure_address_table* table);
 
     EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table);
     EXPORT bool check_address_exists(uint64_t id, closure_address_table* table);

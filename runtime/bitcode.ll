@@ -1,4 +1,154 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TYPE DEFINITIONS
+
+; Zone and closure variable table types
+%mzone = type {i8*, i64, i64, i64, i8*, %mzone*}
+%clsvar = type {i8*, i32, i8*, %clsvar*}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; EXTERNAL RUNTIME FUNCTION DECLARATIONS
+
+; Closure address table functions (implemented in C++)
+declare %clsvar* @add_address_table(%mzone*, i8*, i32, i8*, i32, %clsvar*) nounwind
+declare %clsvar* @get_address_table(i8*, %clsvar*) nounwind
+declare i32 @get_address_offset(i64, %clsvar*) nounwind
+declare i1 @check_address_type(i64, %clsvar*, i8*) nounwind
+declare i1 @check_address_exists(i64, %clsvar*) nounwind
+
+; Zone memory management functions (implemented in C++)
+declare %mzone* @llvm_zone_callback_setup() nounwind
+declare %mzone* @llvm_pop_zone_stack() nounwind
+declare void @llvm_zone_destroy(%mzone*) nounwind
+declare void @llvm_zone_print(%mzone*) nounwind
+declare i8* @llvm_zone_malloc(%mzone*, i64) nounwind
+declare i8* @llvm_zone_malloc_from_current_zone(i64) nounwind
+declare i1 @llvm_ptr_in_zone(%mzone*, i8*) nounwind
+declare i1 @llvm_zone_copy_ptr(i8*, i8*) nounwind
+declare i64 @llvm_zone_ptr_size(i8*) nounwind
+declare i1 @llvm_ptr_in_current_zone(i8*) nounwind
+declare void @llvm_destroy_zone_after_delay(%mzone*, i64)
+
+; Scheme value constructor functions (implemented in C++)
+declare i8* @mk_i64(i8*, i64)
+declare i8* @mk_i32(i8*, i32)
+declare i8* @mk_i16(i8*, i16)
+declare i8* @mk_i8(i8*, i8)
+declare i8* @mk_i1(i8*, i1)
+declare i8* @mk_double(i8*, double)
+declare i8* @mk_float(i8*, float)
+declare i8* @mk_string(i8*, i8*)
+declare i8* @mk_cptr(i8*, i8*)
+
+; Scheme value accessor functions (implemented in C++)
+declare i64 @i64value(i8*)
+declare i32 @i32value(i8*)
+declare i16 @i16value(i8*)
+declare i8 @i8value(i8*)
+declare i1 @i1value(i8*)
+declare double @r64value(i8*)
+declare float @r32value(i8*)
+declare i8* @string_value(i8*)
+declare i8* @cptr_value(i8*)
+
+; Encoding/decoding utility functions (implemented in C++)
+declare i8* @base64_encode(i8*, i64, i64*) nounwind
+declare i8* @base64_decode(i8*, i64, i64*) nounwind
+declare i8* @cname_encode(i8*, i64, i64*) nounwind
+declare i8* @cname_decode(i8*, i64, i64*) nounwind
+
+; Standard C library math functions
+declare i64 @llabs(i64) nounwind
+declare float @sinhf(float) nounwind
+declare float @tanf(float) nounwind
+declare float @tanhf(float) nounwind
+
+; Standard C library file I/O functions
+declare i32 @remove(i8*) nounwind
+
+declare i8* @list_ref(i8*, i32, i8*)
+
+; System functions
+declare i8* @sys_sharedir() nounwind
+declare i8* @sys_slurp_file(i8*) nounwind
+
+; Standard C library functions
+declare i8* @malloc(i64) nounwind
+declare i8* @realloc(i8*, i64) nounwind
+declare void @free(i8*) nounwind
+declare i8* @memset(i8*, i32, i64) nounwind
+declare i8* @memcpy(i8*, i8*, i64) nounwind
+declare i32 @memcmp(i8*, i8*, i64) nounwind
+declare i32 @putchar(i32) nounwind
+declare i64 @strlen(i8*) nounwind
+declare i8* @strcpy(i8*, i8*) nounwind
+declare i8* @strncpy(i8*, i8*, i64) nounwind
+declare i8* @strcat(i8*, i8*) nounwind
+declare i8* @strncat(i8*, i8*, i64) nounwind
+declare i32 @strcmp(i8*, i8*) nounwind
+declare i32 @strncmp(i8*, i8*, i64) nounwind
+declare i8* @strchr(i8*, i32) nounwind
+declare i8* @strstr(i8*, i8*) nounwind
+
+; Extempore runtime functions (implemented in C++)
+declare i1 @rmatch(i8*, i8*) nounwind
+declare i64 @rmatches(i8*, i8*, i8**, i64) nounwind
+declare i8** @rsplit(i8*, i8*, i8**, i64) nounwind
+declare i8* @rreplace(i8*, i8*, i8*) nounwind
+
+; Random number generators (implemented in C++)
+declare double @imp_randd() nounwind
+declare float @imp_randf() nounwind
+declare i64 @imp_rand1_i64(i64) nounwind
+declare i64 @imp_rand2_i64(i64, i64) nounwind
+declare i32 @imp_rand1_i32(i32) nounwind
+declare i32 @imp_rand2_i32(i32, i32) nounwind
+declare double @imp_rand1_d(double) nounwind
+declare double @imp_rand2_d(double, double) nounwind
+declare float @imp_rand1_f(float) nounwind
+declare float @imp_rand2_f(float, float) nounwind
+
+; Standard math library functions
+declare double @atan2(double, double) nounwind
+declare float @atan2f(float, float) nounwind
+
+; Additional Extempore runtime functions (implemented in C++)
+; Note: Many zone/inline functions are defined in inline.ll or later in this file
+declare i8* @llvm_get_function_ptr(i8*) nounwind
+declare void @llvm_runtime_error(i64, i8*) nounwind
+declare void @llvm_print_pointer(i8*) nounwind
+declare void @llvm_print_i32(i32) nounwind
+declare void @llvm_print_i64(i64) nounwind
+declare void @llvm_print_f32(float) nounwind
+declare void @llvm_print_f64(double) nounwind
+declare i8* @extitoa(i64) nounwind
+declare i64 @string_hash(i8*) nounwind
+declare void @llvm_schedule_callback(i64, i8*) nounwind
+declare void @llvm_send_udp(i8*, i32, i8*, i32) nounwind
+declare i64 @next_prime(i64) nounwind
+declare void @free_after_delay(i8*, double) nounwind
+declare i8* @llvm_disassemble(i8*, i32) nounwind
+
+; Thread functions
+declare i8* @thread_fork(i8*, i8*) nounwind
+declare void @thread_destroy(i8*) nounwind
+declare i32 @thread_join(i8*) nounwind
+declare i32 @thread_kill(i8*) nounwind
+declare i8* @thread_self() nounwind
+declare i32 @thread_equal_self(i8*) nounwind
+declare i32 @thread_equal(i8*, i8*) nounwind
+declare i64 @thread_sleep(i64, i64) nounwind
+declare i8* @mutex_create() nounwind
+declare i32 @mutex_destroy(i8*) nounwind
+declare i32 @mutex_lock(i8*) nounwind
+declare i32 @mutex_unlock(i8*) nounwind
+declare i32 @mutex_trylock(i8*) nounwind
+
+; Clock functions
+declare double @clock_clock() nounwind
+declare double @audio_clock_base() nounwind
+declare double @audio_clock_now() nounwind
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SCHEME STUFF
 
 define private i8* @impc_null() nounwind alwaysinline
@@ -484,15 +634,17 @@ define private i8* @i16toptr(i16 %a) alwaysinline
   ret i8* %return
 }
 
+; Portable 80-bit extended precision to double conversion
+; Works on both x86_64 and ARM64 by manually parsing IEEE 754 extended format
+; The 80-bit format is: 1 sign bit, 15 exponent bits, 64 mantissa bits (explicit integer bit)
+; Input is big-endian (as used in AIFF files)
+declare double @fp80_to_double_portable(i8*) nounwind
+
 define private double @fp80ptrtod(i8* %fp80ptr)
 {
-  %1 = alloca i8*, align 8
-  store i8* %fp80ptr, i8** %1, align 8
-  %2 = load i8*, i8** %1, align 8
-  %3 = bitcast i8* %2 to x86_fp80*
-  %4 = load x86_fp80, x86_fp80* %3, align 16
-  %5 = fptrunc x86_fp80 %4 to double
-  ret double %5
+entry:
+  %result = call double @fp80_to_double_portable(i8* %fp80ptr)
+  ret double %result
 }
 
 declare i32 @printf(i8* noalias nocapture, ...)

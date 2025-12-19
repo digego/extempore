@@ -55,10 +55,15 @@
     (if *impc:compiler:print-raw-llvm*
         (print-full-nq *impc:compiler:queued-llvm-ir-string*))
     (if (not (string=? *impc:compiler:queued-llvm-ir-string* ""))
-        (let ((res (llvm:jit-compile-ir-string *impc:compiler:queued-llvm-ir-string*)))
+        (let* ((ir-to-compile *impc:compiler:queued-llvm-ir-string*)
+               (res (llvm:jit-compile-ir-string ir-to-compile)))
           (impc:compiler:reset-jit-compilation-queue)
-          ;; (print "Flushed IR compilation queue with result: " res "\n")
-          res))))
+          ;; (if (not res)
+          ;;     (begin
+          ;;       (print "FLUSH FAILED. IR was:\n")
+          ;;       (print-full-nq ir-to-compile)))
+          res)
+        #t)))
 
 ;; JIT-compile the IR string, or queue it for AOT-compilation
 (define llvm:compile-ir
@@ -1681,16 +1686,16 @@
                      ;; (println 'symstr: symstr 'symtype: symtype)
                      ;; (println 'typestr: typestr)
                      (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
-                              (impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
+                              (impc:ir:number? symtype)
                               (impc:ir:number? (impc:ir:get-type-from-str typestr)))
-                         (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
+                         (set! typestr (impc:ir:get-type-str symtype)))
                      ;; type check
-                     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
+                     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: symtype)
                      (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
-                                      (cdr (assoc-strcmp (caar p) types))))
+                                      symtype))
                          (impc:compiler:print-type-mismatch-error
                           (impc:ir:pretty-print-type typestr)
-                          (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
+                          (impc:ir:pretty-print-type symtype)
                           (caar p)))
                                         ;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
                                         ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
@@ -4122,13 +4127,13 @@
 (define impc:ir:intrinsic-substitution
   (lambda (name)
     (cond
-      ((string=? name "memcpy") "llvm.memcpy.p0i8.p0i8.i64")
+      ((string=? name "memcpy") "llvm.memcpy.p0.p0.i64")
       (else name))))
 
 (define impc:ir:function-fixup-args
   (lambda (name)
     (cond
-      ((string=? name "memcpy") ", i32 1, i1 0")
+      ((string=? name "memcpy") ", i1 0")
       (else ""))))
 
 (define impc:ir:compiler:native-call

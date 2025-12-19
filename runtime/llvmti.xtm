@@ -1122,6 +1122,9 @@
 ;; --------
 ;;
 (define *impc:ti:closure-cache* '())
+
+;; Map from (polyfunc-name . type) to adhoc name with counter.
+(define *impc:ti:adhoc-name-cache* '())
 ;;
 ;; each element of the list is of the form
 ;;
@@ -2666,6 +2669,7 @@
 
 (define *impc:aot:current-output-port* #f)
 (define *impc:aot:current-lib-name* "xtmdylib")
+(define *impc:aot:owning-lib-name* "xtmdylib")
 (define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *impc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *impc:aot:unix-link-libraries* '("-lextempore -lm"))
@@ -2765,7 +2769,9 @@
 
 (define impc:aot:insert-static-binding-details
   (lambda (name type)
-    (if (output-port? *impc:aot:current-output-port*)
+    ;; Only emit binding details if we're compiling the owning library.
+    (if (and (output-port? *impc:aot:current-output-port*)
+             (equal? *impc:aot:owning-lib-name* *impc:aot:current-lib-name*))
         (begin
           (write (list 'bind-lib (string->symbol *impc:aot:current-lib-name*) name type)
                  *impc:aot:current-output-port*)
@@ -3090,7 +3096,9 @@
 
 (define impc:aot:insert-header
   (lambda (libname)
-    (if (output-port? *impc:aot:current-output-port*)
+    (set! *impc:aot:owning-lib-name* libname)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             (equal? libname *impc:aot:current-lib-name*))
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
                    *impc:aot:current-output-port*)
@@ -3125,7 +3133,8 @@
 (define impc:aot:import-ll
   (lambda (libname)
     (if (and (output-port? *impc:aot:current-output-port*)
-             (not *impc:compiler:aot:dll*))
+             (not *impc:compiler:aot:dll*)
+             (equal? libname *impc:aot:current-lib-name*))
         (begin
           (write `(llvm:compile-ir (sys:slurp-file ,(string-append "libs/aot-cache/" libname ".ll")))
                   *impc:aot:current-output-port*)
@@ -3135,7 +3144,8 @@
 
 (define impc:aot:insert-footer
   (lambda (libname)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (and (output-port? *impc:aot:current-output-port*)
+             (equal? libname *impc:aot:current-lib-name*))
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
                    *impc:aot:current-output-port*)
@@ -5901,6 +5911,12 @@ Continue executing `body' forms until `test-expression' returns #f"
            (list (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string ast)))))
           ((impc:ti:nativefunc-exists? (symbol->string ast))
            (list (impc:ti:get-nativefunc-type (symbol->string ast))))
+          ;; Check for closures before falling through to polyfunc handling.
+          ;; This prevents closures that are also registered as polyfuncs
+          ;; from being incorrectly treated as polymorphic references.
+          ((impc:ti:closure-exists? (symbol->string ast))
+           (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*)
+                       (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types (symbol->string ast))))))
           (else
            (if (and (symbol? ast)
                     (impc:ti:genericfunc-exists? (string->symbol (impc:ir:get-base-type (symbol->string ast)))))
@@ -8377,10 +8393,12 @@ xtlang's `let' syntax is the same as Scheme"
     ;; (println 'cls 'ref 'check: ast 'request? request?)
     (if (<> (length ast) 4)
         (impc:compiler:print-bad-arity-error ast))
-    (let* (;; a should be a closure of some kind
+    (let* (;; a should be a closure or a single-candidate polyfunc.
            (a (if (and (symbol? (cadr ast))
-                       (impc:ti:closure-exists? (symbol->string (cadr ast))))
-                  #t ; // yes (cadr ast) is a globally defined closure
+                       (or (impc:ti:closure-exists? (symbol->string (cadr ast)))
+                           (and (impc:ti:polyfunc-exists? (symbol->string (cadr ast)))
+                                (= 1 (length (impc:ti:get-polyfunc-candidate-names (symbol->string (cadr ast))))))))
+                  ; #t ; // yes (cadr ast) is a globally defined closure or single-candidate polyfunc.
                   (impc:ti:type-check (cadr ast) vars kts #f))) ;; do NOT check against request!
            ;; b should be a string (the var's name)
            (b (impc:ti:type-check (caddr ast) vars kts (impc:ir:pointer++ (list *impc:ir:si8*)))))
@@ -8396,10 +8414,12 @@ xtlang's `let' syntax is the same as Scheme"
     ;; (println 'cls2 'ref 'check: ast 'request? request?)
     (if (<> (length ast) 3)
         (impc:compiler:print-bad-arity-error ast))
-    (let* (;; a should be a closure of some kind
+    (let* (;; a should be a closure or a single-candidate polyfunc.
            (a (if (and (symbol? (cadr ast))
-                       (impc:ti:closure-exists? (symbol->string (cadr ast))))
-                  #t ; // yes (cadr ast) is a globally defined closure
+                       (or (impc:ti:closure-exists? (symbol->string (cadr ast)))
+                           (and (impc:ti:polyfunc-exists? (symbol->string (cadr ast)))
+                                (= 1 (length (impc:ti:get-polyfunc-candidate-names (symbol->string (cadr ast))))))))
+                  #t ; // yes (cadr ast) is a globally defined closure or single-candidate polyfunc.
                   (impc:ti:type-check (cadr ast) vars kts #f))) ;; request?)))
            ;; b should be a string (the var's name)
            (b (impc:ti:type-check (caddr ast) vars kts (list *impc:ir:si8*))))
@@ -9136,19 +9156,27 @@ xtlang's `let' syntax is the same as Scheme"
                 (not (string-contains? (symbol->string ast) ":"))
                 (impc:ti:polyfunc-exists? (symbol->string ast)))
            (let* ((pname (symbol->string ast))
-                  (ts (impc:ti:get-polyfunc-candidate-types pname)))
-             (if (= (length ts) 1)
-                 (string->symbol (string-append pname "_adhoc_" (cname-encode (impc:ir:get-base-type (impc:ir:pretty-print-type (car ts))))))
+                  (names (impc:ti:get-polyfunc-candidate-names pname)))
+             (if (and names (= (length names) 1))
+                 ;; Use actual implementation name from cache.
+                 (string->symbol (car names))
                  (impc:compiler:print-compiler-error "Try forcing a type. Ambiguous polymorphic function" ast))))
           ((and (symbol? ast)
                 (string-contains? (symbol->string ast) ":")
                 (impc:ti:polyfunc-exists? (car (regex:type-split (symbol->string ast) ":"))))
            (let* ((res (regex:type-split (symbol->string ast) ":"))
                   (pname (car res))
-                  (ptype (if (impc:ti:typealias-exists? (cadr res))
-                             (impc:ir:get-base-type (impc:ir:pretty-print-type (impc:ti:get-typealias-type (cadr res))))
-                             (impc:ir:get-base-type (cadr res)))))
-             (string->symbol (string-append pname "_adhoc_" (cname-encode ptype)))))
+                  (ptype-str (cadr res))
+                  (ptype (impc:ir:get-type-from-pretty-str
+                          (if (impc:ti:typealias-exists? ptype-str)
+                              (impc:ir:pretty-print-type (impc:ti:get-typealias-type ptype-str))
+                              ptype-str)))
+                  ;; Look up actual implementation name.
+                  (candidate (impc:ti:get-polyfunc-candidate pname ptype)))
+             (if candidate
+                 candidate
+                 ;; Fallback to manual construction if not found.
+                 (string->symbol (string-append pname "_adhoc_" (cname-encode (impc:ir:get-base-type ptype-str)))))))
           ((and (symbol? ast)
                 (string-contains? (symbol->string ast) ":"))
            (let* ((p (regex:type-split (symbol->string ast) ":"))
@@ -9194,12 +9222,11 @@ xtlang's `let' syntax is the same as Scheme"
            (let* ((nm (regex:split (symbol->string ast) "##"))
                   (n1 (car nm))
                   (type (cdr (assoc-strcmp ast types)))
-                  (ptype (impc:ir:pretty-print-type type))
-                  (cn (cname-encode (impc:ir:get-base-type ptype)))
-                  (newn (string-append n1 "_adhoc_" cn)))
-             (if (not (impc:ti:closure-exists? newn))
-                 (impc:compiler:print-compiler-error (string-append "Bad type: " ptype " for polymorphic function " (car nm)) ast))
-             (string->symbol newn)))
+                  ;; Use polyfunc cache to find the implementation.
+                  (candidate (impc:ti:get-polyfunc-candidate n1 type)))
+             (if (not candidate)
+                 (impc:compiler:print-compiler-error (string-append "Bad type: " (impc:ir:pretty-print-type type) " for polymorphic function " (car nm)) ast))
+             candidate))
           ((and (symbol? ast)
                 (string-contains? (symbol->string ast) "##")
                 (assoc-strcmp ast types))
@@ -9976,11 +10003,6 @@ xtlang's `let' syntax is the same as Scheme"
           (if (not (null? args))
               (set! args (replace-all args (list (cons adhoc-poly-name symname)))))
           (set! code (replace-all code (list (cons adhoc-poly-name symname))))))
-    ;; don't want type checking to find existing native versions!
-    (if (and *impc:compile* (not static))
-        (begin
-          (llvm:erase-function (string-append (symbol->string symname) "_setter"))
-          (llvm:erase-function (string-append (symbol->string symname) "_maker"))))
     (let* ((symname-string (symbol->string symname))
            (oldsymname-string symname-string)
            ;(c code)
@@ -10060,21 +10082,24 @@ xtlang's `let' syntax is the same as Scheme"
                           (f (cdr lst)))))))
         (f t5))
 
-      (if (and poly ;;*impc:ti:implicit-adhoc-compiles*
-               (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
-          (let* ((p (assoc-strcmp symname types))
-                 (n (car p))
-                 (t (impc:ir:pretty-print-type (cdr p)))
+      ;; Append type encoding to adhoc name for global uniqueness.
+      (if (and poly (regex:match? symname-string "_adhoc_[0-9]+$"))
+          (let* ((p (assoc-strcmp symname types)))
+            (if p
+                (let* ((t (impc:ir:pretty-print-type (cdr p)))
                  (base (impc:ir:get-base-type t))
-                 (depth (impc:ir:get-ptr-depth t))
-                 (new (string-append adhoc-poly-name-string "_adhoc_" (cname-encode base)))
-                 (tt (assoc-strcmp symname types))
-                 (t6 (replace-all t5 (list (cons symname (string->symbol new))))))
-            (set-car! tt (string->symbol new))
-            (set! symname (string->symbol new))
-            (set! symname-string new)
-            (set! newast (impc:ti:add-types-to-source symname t6 (cl:tree-copy types) (list))))
-          (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list))))
+                       (final-name (string-append symname-string "_" (cname-encode base)))
+                       (final-sym (string->symbol final-name))
+                       (old-sym symname))
+                  ;; Update symname in types list.
+                  (set-car! p final-sym)
+                  ;; Replace old name with new name in AST.
+                  (set! t5 (replace-all t5 (list (cons old-sym final-sym))))
+                  ;; Update symname variable.
+                  (set! symname final-sym)
+                  (set! symname-string final-name)))))
+
+      (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list)))
 
       ;;
       ;; modify code for static functions
@@ -10160,7 +10185,22 @@ xtlang's `let' syntax is the same as Scheme"
                       0 "[static]"))
           (let* ((closure-type (cadr (impc:ir:gname))) ;; normal closure
              (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
-             (compile-stub? (not (impc:ti:closure-exists? symname-string)))
+             (existing-type (impc:ti:get-closure-type symname-string))
+             ;; Compile stubs if first compilation or type has changed.
+             (compile-stub? (or (not (impc:ti:closure-exists? symname-string))
+                                (null? existing-type)
+                                (not (equal? (impc:ir:get-type-from-str closure-type) existing-type))))
+             ;; Erase old definitions only when recompiling stubs.
+             (_ (if (and *impc:compile* (not static) compile-stub?)
+                    (begin
+                      (llvm:erase-function symname-string)
+                      (llvm:erase-function (string-append symname-string "_native"))
+                      (llvm:erase-function (string-append symname-string "_setter"))
+                      (llvm:erase-function (string-append symname-string "_maker"))
+                      (llvm:erase-function (string-append symname-string "_getter"))
+                      (llvm:remove-globalvar (string-append symname-string "_var"))
+                      (llvm:remove-globalvar (string-append symname-string "_var_zone")))
+                    #f))
              (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
                                       "(i8* %_impz) nounwind {\nentry:\n"
                                       ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
@@ -10456,12 +10496,12 @@ xtlang's `let' syntax is the same as Scheme"
         (if *impc:compiler:print*
             (println '------------------------------compiling 'maker----------------------------------->))
         (if *impc:compiler:print* (print-full-nq maker-ir))
-        (if *impc:compile*
+        (if (and *impc:compile* compile-stub?)
             (impc:compiler:queue-ir-for-compilation maker-ir))
         (if *impc:compiler:print*
             (println '--------------------------------compiling 'setter----------------------------------->))
         (if *impc:compiler:print* (print-full-nq setter-ir))
-        (if *impc:compile*
+        (if (and *impc:compile* compile-stub?)
             (impc:compiler:queue-ir-for-compilation setter-ir))
         (if *impc:compiler:print*
             (println '--------------------------------compiling 'getter----------------------------------->))
@@ -10503,12 +10543,23 @@ xtlang's `let' syntax is the same as Scheme"
                           (impc:ti:update-closure-name adhoc-poly-name-string symname-string)
                           (impc:ti:set-closure-type symname-string closure-type-list)
                           (impc:ti:set-closure-body symname-string code)
+                          ;; Store mapping for get_native_fptr lookup.
+                          (set! *impc:ti:adhoc-name-cache*
+                                (cons (cons (cons adhoc-poly-name-string closure-type-list) symname-string)
+                                      *impc:ti:adhoc-name-cache*))
                           ;; add to the AOT-header if we're precompiling
                           (impc:aot:insert-closure-binding-details symname-string
                                                                    closure-type-list
                                                                    (impc:ti:get-closure-zone-size symname-string)
                                                                    (impc:ti:get-closure-docstring symname-string)
                                                                    (impc:ti:get-closure-body symname-string))
+                          ;; Clear old polyfunc candidates of same type before adding new one
+                          ;; This prevents accumulation of candidates that causes "ambiguous wrapper" errors.
+                          (let ((pfdata (assoc-strcmp adhoc-poly-name-string *impc:ti:polyfunc-cache*)))
+                            (if pfdata
+                                (vector-set! (cdr pfdata) 0
+                                             (cl:remove-if (lambda (x) (equal? (vector-ref x 1) closure-type-list))
+                                                           (vector-ref (cdr pfdata) 0)))))
                           (eval `(bind-poly ,adhoc-poly-name ,symname) (interaction-environment)))
                         (begin
                           (impc:ti:set-closure-type symname-string closure-type-list)
@@ -11643,9 +11694,7 @@ e.g.
                 (llvm:run setter)
                 ;; don't destroy - this happens in _setter func
                 (sys:pop-memzone))
-              (begin
-                (error)
-                (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter)))))))
+              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter))))))
 
 (define impc:ti:create-scm-wrapper?
   (lambda (func-name)

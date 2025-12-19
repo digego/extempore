@@ -37,8 +37,13 @@
 #include <iostream>
 #include <string.h>
 #include <inttypes.h>
-#include <xmmintrin.h>
 #include <regex>
+
+// x86 SSE intrinsics for audio_sanity_f optimization
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <xmmintrin.h>
+#define USE_SSE_AUDIO_SANITY 1
+#endif
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -136,7 +141,13 @@ static inline SAMPLE audio_sanity(SAMPLE x)
 static inline float audio_sanity_f(float x)
 {
     if (likely(isfinite(x))) {
+#if USE_SSE_AUDIO_SANITY
         _mm_store_ss(&x, _mm_min_ss(_mm_max_ss(_mm_set_ss(x), _mm_set_ss(-0.99f)), _mm_set_ss(0.99f)));
+#else
+        // Portable branchless clamp for ARM64 and other architectures
+        if (x < -0.99f) x = -0.99f;
+        else if (x > 0.99f) x = 0.99f;
+#endif
         return x;
     }
     return 0.0;
