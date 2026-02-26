@@ -202,7 +202,12 @@ if(EXT_DYLIB)
         runtime/init.ll
         runtime/init.xtm
         runtime/llvmir.xtm
-        runtime/llvmti.xtm
+        runtime/llvmti-globals.xtm
+        runtime/llvmti-caches.xtm
+        runtime/llvmti-aot.xtm
+        runtime/llvmti-transforms.xtm
+        runtime/llvmti-typecheck.xtm
+        runtime/llvmti-bind.xtm
         runtime/scheme.xtm)
     add_library(extempore SHARED ${EXTEMPORE_SOURCES})
     target_link_libraries(extempore PRIVATE rc_xtm)

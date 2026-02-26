@@ -269,11 +269,21 @@ void* SchemeProcess::taskImpl()
     }
 #ifdef DYLIB
     loadFileAsString("runtime/scheme.xtm");
-    loadFileAsString("runtime/llvmti.xtm");
+    loadFileAsString("runtime/llvmti-globals.xtm");
+    loadFileAsString("runtime/llvmti-caches.xtm");
+    loadFileAsString("runtime/llvmti-aot.xtm");
+    loadFileAsString("runtime/llvmti-transforms.xtm");
+    loadFileAsString("runtime/llvmti-typecheck.xtm");
+    loadFileAsString("runtime/llvmti-bind.xtm");
     loadFileAsString("runtime/llvmir.xtm");
 #else
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-globals.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-caches.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-aot.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-transforms.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-typecheck.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
 #endif
     m_libsLoaded = true;

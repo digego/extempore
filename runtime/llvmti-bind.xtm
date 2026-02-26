@@ -1,0 +1,2754 @@
+
+(define impc:ti:get-expression-type
+  (lambda (ast)
+    (let* ((symname 'nosuchname)
+           (c `(let ((xtm_exp_result ,ast)) xtm_exp_result))
+           (shadows (impc:ti:rename-all-shadow-vars symname c '()))
+           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
+           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+           (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
+           (c2 (impc:ti:get-var-types shadow-code))
+           (ccc (append (cdr c2) (cdr c1)))
+           (cc (impc:ti:expand-generic-types ccc))
+           (t1 (car c2))
+           (t2 (impc:ti:closure:convert t1 (list))) ;(list symname)))
+           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t2 '())))
+           (forced-types '()) ;(apply impc:ti:handle-forced-types t1 (append cc args)))
+           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (typespre (impc:ti:run-type-check vars forced-types t1))
+           (t5 (impc:ti:closure:convert t4 (list symname)))
+           (types (impc:ti:type-normalize typespre)))
+      (cdr (assoc 'xtm_exp_result types)))))
+
+(define impc:ti:get-global-var-types
+  (lambda (ast)
+    (if (atom? ast)
+        (if (and (symbol? ast)
+                 (impc:ti:globalvar-exists? (symbol->string ast)))
+            (cons ast (string->symbol (impc:ir:pretty-print-type (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string ast))))))
+            #f)
+        (if (pair? ast)
+            (list (impc:ti:get-global-var-types (car ast))
+                  (impc:ti:get-global-var-types (cdr ast)))
+            #f))))
+
+
+(define make_static_scheme_wrapper_ir
+  (lambda (symname-string closure-type)
+    (let* ((stub-type (impc:ir:get-closure-type-from-str closure-type))
+           (scheme-stub-valid? #t)
+          (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
+          (ir (string-append "define dllexport ccc i8* "
+          " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+          "{\nentry:\n"
+          (apply string-append
+                  (map (lambda (t n idx)
+                        (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                        (cond ((and (not (number? t))
+                                                    (not (impc:ir:pointer? t)))
+                                              (set! scheme-stub-valid? #f)
+                                              "")
+                                              ((or (not (number? t))
+                                                  (not (or (impc:ir:number? t)
+                                                            (impc:ir:void? t))))
+                                              (if (and (number? t)
+                                                        (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
+                                                  (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                  (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                  "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                  n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
+                                              ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                (impc:ti:scm_rt_check_string n symname-string)
+                                                                                n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                              ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                  (impc:ti:scm_rt_check_string n symname-string)
+                                                                                  n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                              (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))
+                      (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
+          (if (impc:ir:void? (car stub-type)) "" "%result = ")
+              "call ccc " (impc:ir:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
+
+          (string-join
+                  (map (lambda (t n)
+                        (string-append (impc:ir:get-type-str t) " " n))
+                      (cdr stub-type)
+                      (make-list-with-proc (length (cdr stub-type))
+                                            (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
+          ")\n"
+
+          (let* ((t (car stub-type)))
+            (cond ((and (not (number? t))
+                        (not (impc:ir:pointer? t)))
+                    (set! scheme-stub-valid? #f)
+                    "")
+                  ((or (not (number? t))
+                        (not (or (impc:ir:number? t)
+                                (impc:ir:void? t))))
+                    (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+                                  "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                  ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                  ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                  ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                  ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                  ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                  ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                  ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                  ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                  ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                  (else (impc:compiler:print-compiler-error "return type error in scheme stub"))))
+
+          "ret i8* %res\n"
+          "}\n\n"))))
+      (if scheme-stub-valid? ir #f))))
+
+
+(define *impc:ti:adhoc-cnt* 0)
+
+(define impc:ti:run
+  (lambda (symname code zone-size poly static . args)
+    ;; (println '-----------> 'impc:ti:run: symname 'poly: poly 'static: static)
+    ;; (println 'code: code)
+    ;; (println 'args: args)
+    (set! *impc:ir:sym-name-stack* '())
+    (set! *impc:ir:ls_var* '())
+    (set! *impc:ti:bound-lambdas* '())
+    (set! *impc:ti:generic-type-mappings* '())
+    (set! *impc:ti:nativef-generics-recurse-test* 0)
+    ;; adhoc
+    (set! *impc:ti:adhoc-cnt* (+ *impc:ti:adhoc-cnt* 1))
+    (define adhoc-poly-name symname)
+    (define adhoc-poly-name-string (symbol->string symname))
+    (if (and poly ;*impc:ti:implicit-adhoc-compiles*
+             (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
+        (begin
+          (set! symname (string->symbol (string-append adhoc-poly-name-string
+                                                       "_adhoc_"
+                                                       (number->string *impc:ti:adhoc-cnt*))))
+          (if (not (null? args))
+              (set! args (replace-all args (list (cons adhoc-poly-name symname)))))
+          (set! code (replace-all code (list (cons adhoc-poly-name symname))))))
+    (let* ((symname-string (symbol->string symname))
+           (oldsymname-string symname-string)
+           ;(c code)
+           (shadows (impc:ti:rename-all-shadow-vars symname code '()))
+           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
+           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+           ;; might be over kill doing shadow vars twice!
+           (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
+           (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
+           (ccc (append (cdr c2) (cdr c1)))
+           (cc (impc:ti:expand-generic-types ccc))
+           (t1 (car c2))
+           (t2 (impc:ti:mark-returns t1 symname #f #f #f))
+           (t3 (impc:ti:closure:convert t2 (list symname)))
+           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
+           ;; (llllllllll (begin (println 'vars: vars) (error)))
+           (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
+           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (typespre (impc:ti:run-type-check vars forced-types t4))
+           (t5 (impc:ti:closure:convert t4 (list symname)))
+           (types (impc:ti:type-normalize typespre))
+           (newast '()))
+      ;; (println 'forced: forced-types)
+      ;; (println 'types-post: types)
+      ;; (println 'run: (impc:ti:unity? types))
+      ;; (println 'newast: newast)
+      ;; (println 'forced: forced-types)
+      ;; (println 'times: (- ct2 ct1) (- ct3 ct2) (- ct4 ct3) (- ct5 ct4) (- ct6 ct5) (- ct7 ct6) (- ct8 ct7) (- ct9 ct8) (- ct10 ct9) (- ct11 ct10))
+
+      ;; (println 'typesa types)
+      ;; A FINAL TYPE CLEANUP
+      ;;
+      ;; finally we remove !bang types which ultimately don't need to be resolved fully
+      ;; don't need to be resolved because they are helpers to resolution not reified types in their own right
+      ;;
+      ;; also we make sure that any types of the form (sym "%list...") are converted to (sym . "%list...")
+      ;; in other words change list ("%list...") into atom "%list..."
+
+      (set! types (cl:remove #f (map (lambda (x)
+                                       (if (or (regex:match? (symbol->string (car x)) "^!")
+                                               (regex:match? (symbol->string (car x))
+                                                             "^[A-Za-z0-9_-]*(:<|{).*##[0-9]*$"))
+                                           #f
+                                           (if (list? (cdr x))
+                                               (if (= (length (cdr x)) 1)
+                                                   (cons (car x) (cadr x))
+                                                   x)
+                                               x)))
+                                     types)))
+      ;; just added by andrew (can be safely removed)
+
+      (if (null? types)
+          (impc:compiler:print-could-not-resolve-type-error symname))
+
+      ;; (println 'final-types: types)
+
+      ;; if we didn't unify print error and bomb out!
+      (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
+          (let ((name (car (regex:type-split (symbol->string symname) "(_adhoc_|_poly_)"))))
+            (impc:compiler:print-could-not-resolve-types
+             types
+             (car (cdaadr t1))
+             name)))
+
+      ;; remove all t: expressions from source
+      ;; i.e. (t: (* 2 3) i64) -> (* 2 3)
+      ;; as (t: ...) is purely for type check stage (which is now complete)
+      (letrec ((f (lambda (lst)
+                    (if (or (atom? lst) (null? lst)) 'done
+                        (begin
+                          (if (and (list? lst)
+                                   (equal? (car lst) 't:))
+                              (let ((v (cadr lst)))
+                                (set-car! lst (car v))
+                                (set-cdr! lst (cdr v))))
+                          (f (car lst))
+                          (f (cdr lst)))))))
+        (f t5))
+
+      (if (and poly ;;*impc:ti:implicit-adhoc-compiles*
+               (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
+          (let* ((p (assoc-strcmp symname types))
+                 (n (car p))
+                 (t (impc:ir:pretty-print-type (cdr p)))
+                 (base (impc:ir:get-base-type t))
+                 (depth (impc:ir:get-ptr-depth t))
+                 (new (string-append adhoc-poly-name-string "_adhoc_" (number->string *impc:ti:adhoc-cnt*) "_" (cname-encode base)))
+                 (tt (assoc-strcmp symname types))
+                 (t6 (replace-all t5 (list (cons symname (string->symbol new))))))
+            (set-car! tt (string->symbol new))
+            (set! symname (string->symbol new))
+            (set! symname-string new)
+            (set! newast (impc:ti:add-types-to-source symname t6 (cl:tree-copy types) (list))))
+          (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list))))
+
+      ;;
+      ;; modify code for static functions
+      ;;
+      (if static
+          (let* ((code (cdr (cadar (caddr newast))))
+                 (env (caar (caddr newast)))
+                 (num (car code))
+                 (name (cadr code))
+                 (n2 (regex:split name "__"))
+                 (body (cddr code)))
+            ;; first strip the environment! (i.e. static not closure!)
+            (set! body (remove-all '_x_x_ (replace-all body `((,env . _x_x_)))))
+            ;; then replace make-closure with make-static (at the top level)
+            (set! newast (apply list '__make-static num (car n2) body))))
+
+      ;; (println 'newtypes:)
+      ;; (for-each (lambda (t) (println t)) types)
+
+      ;; If this function has been defined before make sure we aren't changing its signature!!
+      (if (and (impc:ti:closure-exists? symname-string)
+               (or (<> (length (impc:ti:get-closure-arg-types symname-string))
+                       (length (cddr (assoc-strcmp symname types))))
+                   (cl:position #f (map (lambda (a b)
+                                          (equal? a b))
+                                        (cons (+ *impc:ir:closure*
+                                                 *impc:ir:pointer*
+                                                 *impc:ir:pointer*)
+                                              (map (lambda (x) (impc:ir:get-type-from-str x))
+                                                   (impc:ti:get-closure-arg-types symname-string)))
+                                        (cdr (assoc-strcmp symname types))))))
+          (impc:compiler:print-no-redefinitions-error
+           symname
+           (impc:ir:pptype (cons (+ *impc:ir:closure*
+                                    *impc:ir:pointer*
+                                    *impc:ir:pointer*)
+                                 (map (lambda (x) (impc:ir:get-type-from-str x))
+                                      (impc:ti:get-closure-arg-types symname-string))))
+           (impc:ir:pptype (cdr (assoc-strcmp symname types)))))
+                                        ;(log-error "stop")
+      (if *impc:compiler:print-ast* (println '---------------------------------))
+      (if *impc:compiler:print-ast* (println 'types: types))
+                                        ;(println 'ctypes: converted-types)
+      (if *impc:compiler:print-ast* (println 'newast: newast))
+      ;; check for unfound types
+      (for-each (lambda (t)
+                  (if (not (impc:ir:type? (cdr t)))
+                      (impc:compiler:print-could-not-resolve-type-error (car t))))
+                types)
+      ;; compile to ir
+      (define fstr (impc:ir:compiler newast types))
+      ;;
+      ;; now compile ir to x86 and make stub code
+      (if static ;; static function or normal closure?
+          (let* ((closure-type (cadr (impc:ir:gname)))
+                 ;; compile scheme_ir specifically for static functions
+                 (scheme_ir (make_static_scheme_wrapper_ir (symbol->string symname) closure-type)))
+            (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-str closure-type) "" '())
+            (if (string? scheme_ir) (llvm:compile-ir scheme_ir))
+            (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
+                (begin ;; (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                       (impc:aot:insert-static-binding-details symname (string->symbol (impc:ir:pretty-print-type closure-type)))
+                       (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*) symname (impc:ir:pretty-print-type closure-type))
+                       ;; scheme stub always has type i8* i8* i8*
+                       (if (string? scheme_ir)
+                           (begin
+                             (impc:aot:insert-static-binding-details (string->symbol (string-append (symbol->string symname) "_scheme")) (string->symbol "[i8*,i8*,i8*]*"))
+                              ;; (newline *impc:aot:current-output-port*)
+                              ;  (impc:compiler:print-lib-binding-details-to-log (string->symbol *impc:aot:current-lib-name*)
+                              ;                                                   (string->symbol (string-append (symbol->string symname) "_scheme"))
+                              ;                                                   (string->symbol "[i8*,i8*,i8*]*"))
+                              (write `(mk-ff ,(symbol->string symname) (llvm:get-function-pointer ,(string-append (symbol->string symname) "_scheme"))) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*))))
+                (begin
+                  (if (and (string? scheme_ir)
+                           (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme")))
+                      (mk-ff (symbol->string symname) (llvm:get-function-pointer (string-append (symbol->string symname) "_scheme"))))))
+            ;; (impc:aot:insert-nativefunc-binding-details library symname type docstring)))
+            (impc:compiler:print-bind-func-details-to-log
+                      "Compiled:"
+                      symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
+                      (impc:ir:pretty-print-type closure-type)
+                      0 "[static]"))
+          (let* ((closure-type (cadr (impc:ir:gname))) ;; normal closure
+             (closure-type-- (impc:ir:get-type-str (impc:ir:pointer-- (impc:ir:get-type-from-str closure-type))))
+             ;; Check if closure has a type. If not, this is first compilation and we need stubs.
+             (compile-stub? (or (not (impc:ti:closure-exists? symname-string))
+                                (null? (impc:ti:get-closure-type symname-string))))
+             ;; Erase old definitions only when recompiling stubs.
+             (_ (if (and *impc:compile* (not static) compile-stub?)
+                    (begin
+                      (llvm:erase-function symname-string)
+                      (llvm:erase-function (string-append symname-string "_native"))
+                      (llvm:erase-function (string-append symname-string "_setter"))
+                      (llvm:erase-function (string-append symname-string "_maker"))
+                      (llvm:erase-function (string-append symname-string "_getter"))
+                      (llvm:remove-globalvar (string-append symname-string "_var"))
+                      (llvm:remove-globalvar (string-append symname-string "_var_zone")))
+                    #f))
+             (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
+                                      "(i8* %_impz) nounwind {\nentry:\n"
+                                      ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
+                                      ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                      ;; ;; new lines for impz
+                                      "%_impzPtr = alloca i8*\n"
+                                      "store i8* %_impz, i8** %_impzPtr\n"
+                                      ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                      fstr "}\n\n"))
+             (setter-ir (string-append (if compile-stub?
+                                           (string-append "@" symname-string "_var = dllexport global [1 x i8*] [ i8* null ]\n\n"
+                                                          "@" symname-string "_var_zone = dllexport global [1 x i8*] [ i8* null ]\n\n")
+                                           "")
+                                       "define dllexport ccc void @" (string-append symname-string "_setter")
+                                       "() alwaysinline nounwind {\nentry:\n"
+                                       "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                       "%oldzone1 = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
+                                       "%oldzone2 = load i8*, i8** %oldzone1\n"
+                                       "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
+                                       "store i8* %_impz, i8** %oldzone1\n"
+                                        ; existing code
+                                       "%closure = call ccc " (cadr (impc:ir:gname))
+                                       " @" symname-string "_maker" "(i8* %_impz)\n"
+                                       "%ptr = bitcast " (cadr (impc:ir:gname)) " %closure to i8*\n"
+                                       "%varptr = bitcast [1 x i8*]* @" symname-string "_var to i8**\n"
+                                       "store i8* %ptr, i8** %varptr\n"
+                                       ;; new code
+                                       "; destroy oldzone if not null\n"
+                                       "%test = icmp ne %mzone* %oldzone3, null\n"
+                                       "br i1 %test, label %then, label %cont\n"
+                                        ;"then:\ncall ccc void @llvm_zone_destroy(%mzone* %oldzone3)\nbr label %cont\n"
+                                       "then:\ncall ccc void @llvm_destroy_zone_after_delay(%mzone* %oldzone3, i64 441000)\nbr label %cont\n"
+                                       "cont:\n"
+                                       "ret void\n}\n\n"))
+             (stub-type (impc:ir:get-closure-type-from-str closure-type))
+             (getter-ir (string-append "define dllexport ccc i8* @" symname-string "_getter() alwaysinline nounwind {\n"
+                                       "entry:\n"
+                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                       "%func = load i8*, i8** %ptr\n"
+                                       "ret i8* %func\n}\n\n"))
+             (cb-struct-type (if (null? (cdr stub-type))
+                                 '()
+                                 (string-append ;"{void(i8*)*"
+                                  "{"
+                                  (impc:ir:get-type-str (cadr stub-type))
+                                  (apply string-append
+                                         (map (lambda (a)
+                                                (string-append ", " (impc:ir:get-type-str a)))
+                                              (cddr stub-type)))
+                                  "}*")))
+             (callback-ir (string-append "define dllexport ccc void @" (string-append symname-string "_callback(i8* %dat, %mzone* %inzone) alwaysinline nounwind {\n"
+                                                                                      "entry:\n"
+                                                                                      (if (null? cb-struct-type)
+                                                                                          "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
+                                                                                          (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
+                                                                                      (apply string-append (map (lambda (n t ap a)
+                                                                                                                  (string-append ap " = getelementptr " (impc:ir:pointer-- cb-struct-type) ", " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
+                                                                                                                                 a " = load " (impc:ir:get-type-str t) ", " (impc:ir:get-type-str t) "* " ap "\n"))
+                                                                                                                (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
+                                                                                                                (cdr stub-type)
+                                                                                                                (make-list-with-proc (- (length stub-type) 1)
+                                                                                                                                     (lambda (i) (string-append "%arg_p_" (atom->string i))))
+                                                                                                                (make-list-with-proc (- (length stub-type) 1)
+                                                                                                                                     (lambda (i) (string-append "%arg_" (atom->string i))))))
+                                        ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                                                      ;"%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
+                                                                                      ;"%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      "call ccc void @llvm_push_zone_stack(%mzone* %inzone)\n"
+                                                                                      "%_impz = bitcast %mzone* %inzone to i8*\n"
+                                                                                      "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                                                      "%ptrvar = load i8*, i8** %ptr\n"
+                                                                                      "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                                                      "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                                                      "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                                      "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                                      "%ff = load "
+                                                                                      (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
+                                                                                      (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
+                                                                                      "* %fPtr\n"
+                                                                                      "%ee = load i8*, i8** %ePtr\n"
+                                                                                      (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                                                      "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                                                      ;;"call ccc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                                                      (apply string-append (map (lambda (t n)
+                                                                                                                  (string-append ", "
+                                                                                                                                 (impc:ir:get-type-str t)
+                                                                                                                                 " " n))
+                                                                                                                (cdr stub-type)
+                                                                                                                (make-list-with-proc (length (cdr stub-type))
+                                                                                                                                     (lambda (i) (string-append "%arg_" (atom->string i))))))
+                                                                                      ")\n"
+                                                                                      "%_nowoldzone = call ccc %mzone* @llvm_pop_zone_stack()\n"
+                                                                                      "call ccc void @llvm_zone_destroy(%mzone* %_nowoldzone)\n"
+                                                                                      "ret void\n"
+                                                                                      "}\n\n")))
+             (scheme-stub-valid? #t)
+             (scheme-stub-ir (string-append "define dllexport ccc i8* " ;(impc:ir:get-type-str (car stub-type))
+                                            " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+                                                                "{\nentry:\n"
+                                                                "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                                "%_impz = bitcast %mzone* %_zone to i8*\n"
+
+                                        ;(begin (println 'aaaaa) "")
+
+                                                                (apply string-append
+                                                                       (map (lambda (t n idx)
+                                        ;(println 't: t 'n: n 'idx: idx)
+                                                                              (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                                             (cond ((and (not (number? t))
+                                                                                                         (not (impc:ir:pointer? t)))
+                                                                                                    (set! scheme-stub-valid? #f)
+                                                                                                    "")
+                                                                                                   ((or (not (number? t))
+                                                                                                        (not (or (impc:ir:number? t)
+                                                                                                                 (impc:ir:void? t))))
+                                                                                                    (if (and (number? t)
+                                                                                                             (= t (+ *impc:ir:pointer* *impc:ir:si8*)))
+                                                                                                        (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                       n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                                                                        (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                       "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                                                                       n " = bitcast i8* %ttv_" (number->string idx) " to " (impc:ir:get-type-str t) "\n")))
+                                                                                                   ((= t *impc:ir:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                       n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                       (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                       n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                                      (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                      n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                                                                                   ((= t *impc:ir:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                                                        (impc:ti:scm_rt_check_string n symname-string)
+                                                                                                                                        n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                                                                                   (else (impc:compiler:print-compiler-error "bad type in scheme stub")))))
+                                                                            (cdr stub-type)
+                                                                            (make-list-with-proc (length (cdr stub-type))
+                                                                                                 (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                            (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
+
+                                        ;(begin (println 'bbbbb) "")
+
+                                                                "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                                "%ptrvar = load i8*, i8** %ptr\n"
+                                                                "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                                "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                                "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                "%ff = load "
+                                                                (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
+                                                                (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
+                                                                "* %fPtr\n"
+                                                                "%ee = load i8*, i8** %ePtr\n"
+                                                                (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                                "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+
+                                                                (apply string-append
+                                                                       (map (lambda (t n)
+                                                                              (string-append ", " (impc:ir:get-type-str t) " " n))
+                                                                            (cdr stub-type)
+                                                                            (make-list-with-proc (length (cdr stub-type))
+                                                                                                 (lambda (i) (string-append "%arg_" (atom->string i))))))
+                                                                ")\n"
+
+                                        ;(begin (println 'ccccc) "")
+
+                                                                (let* ((t (car stub-type)))
+                                                                  (cond ((and (not (number? t))
+                                                                              (not (impc:ir:pointer? t)))
+                                                                         (set! scheme-stub-valid? #f)
+                                                                         "")
+                                                                        ((or (not (number? t))
+                                                                             (not (or (impc:ir:number? t)
+                                                                                      (impc:ir:void? t))))
+                                                                         (string-append "%tmpres = bitcast " (impc:ir:get-type-str t) " %result to i8*\n"
+                                                                                        "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                                                                        ((= t *impc:ir:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                                                                        ((= t *impc:ir:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                                                                        ((= t *impc:ir:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                                                                        ((= t *impc:ir:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                                                                        ((= t *impc:ir:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                                                                        ((= t *impc:ir:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                                                                        ((= t *impc:ir:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                                                                        ((= t *impc:ir:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                                                                        ((= t *impc:ir:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                                                                        ((= t *impc:ir:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                                                                        ((= t *impc:ir:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                                                                        ((= t *impc:ir:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                                                                        ((= t *impc:ir:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                                                                        (else (impc:compiler:print-compiler-error "return type error in scheme stub"))))
+
+                                                                "ret i8* %res\n"
+                                                                "}\n\n")))
+             (stub-ir (string-append "define dllexport fastcc " (impc:ir:get-type-str (car stub-type))
+                                     " @" (string-append symname-string "("
+                                                         (apply string-append (map (lambda (t n c)
+                                                                                     (string-append c (impc:ir:get-type-str t) " "
+                                                                                                    n))
+                                                                                   (cdr stub-type)
+                                                                                   (make-list-with-proc (length (cdr stub-type))
+                                                                                                        (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                                   (cons "" (make-list (length (cdr stub-type)) ","))))
+                                                         ") alwaysinline nounwind \n"
+                                                         "{\nentry:\n"
+                                                         "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                         "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                         "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                         "%ptrvar = load i8*, i8** %ptr\n"
+                                                         "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                         "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                         "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                         "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                         "%ff = load "
+                                                         (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
+                                                         (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
+                                                         "* %fPtr\n"
+                                                         "%ee = load i8*, i8** %ePtr\n"
+                                                         (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                         "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                         (apply string-append (map (lambda (t n)
+                                                                                     (string-append ", "
+                                                                                                    (impc:ir:get-type-str t)
+                                                                                                    " " n))
+                                                                                   (cdr stub-type)
+                                                                                   (make-list-with-proc (length (cdr stub-type))
+                                                                                                        (lambda (i) (string-append "%arg_" (atom->string i))))))
+                                                         ")\nret " (impc:ir:get-type-str (car stub-type))
+                                                         (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
+                                                         "}\n\n")))
+             (native-ir (string-append "define dllexport ccc " (impc:ir:get-type-str (car stub-type))
+                                       " @" (string-append symname-string "_native("
+                                                           (apply string-append (map (lambda (t n c)
+                                                                                       (string-append c (impc:ir:get-type-str t) " "
+                                                                                                      n))
+                                                                                     (cdr stub-type)
+                                                                                     (make-list-with-proc (length (cdr stub-type))
+                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                                                     (cons "" (make-list (length (cdr stub-type)) ","))))
+                                                           ") alwaysinline nounwind \n"
+                                                           "{\nentry:\n"
+                                                           "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                                                           "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                           "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                                                           "%ptrvar = load i8*, i8** %ptr\n"
+                                                           "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                                                           "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                                                           "%fPtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                           "%ePtr = getelementptr " (impc:ir:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                           "%ff = load "
+                                                           (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
+                                                           (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
+                                                           "* %fPtr\n"
+                                                           "%ee = load i8*, i8** %ePtr\n"
+                                                           (if (impc:ir:void? (car stub-type)) "" "%result = ")
+                                                           "call fastcc " (impc:ir:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                           (apply string-append (map (lambda (t n)
+                                                                                       (string-append ", "
+                                                                                                      (impc:ir:get-type-str t)
+                                                                                                      " " n))
+                                                                                     (cdr stub-type)
+                                                                                     (make-list-with-proc (length (cdr stub-type))
+                                                                                                          (lambda (i) (string-append "%arg_" (atom->string i))))))
+                                                           ")\nret " (impc:ir:get-type-str (car stub-type))
+                                                           (if (impc:ir:void? (car stub-type)) "\n" " %result\n")
+                                                           "}\n\n"))))
+        (if *impc:compiler:print*
+            (println '------------------------------compiling 'maker----------------------------------->))
+        (if *impc:compiler:print* (print-full-nq maker-ir))
+        (if (and *impc:compile* compile-stub?)
+            (impc:compiler:queue-ir-for-compilation maker-ir))
+        (if *impc:compiler:print*
+            (println '--------------------------------compiling 'setter----------------------------------->))
+        (if *impc:compiler:print* (print-full-nq setter-ir))
+        (if (and *impc:compile* compile-stub?)
+            (impc:compiler:queue-ir-for-compilation setter-ir))
+        (if *impc:compiler:print*
+            (println '--------------------------------compiling 'getter----------------------------------->))
+        (if *impc:compiler:print* (print-full-nq getter-ir))
+        (if (and *impc:compile* compile-stub?)
+            (impc:compiler:queue-ir-for-compilation getter-ir))
+        (if *impc:compiler:print*
+            (println '--------------------------------compiling 'stubs----------------------------------->))
+        (if *impc:compiler:print* (print-full-nq stub-ir))
+        (if *impc:compiler:print* (print-full-nq native-ir))
+        (if *impc:compiler:print* (print-full-nq scheme-stub-ir))
+        (if (and *impc:compile* compile-stub?)
+            (begin (impc:compiler:queue-ir-for-compilation stub-ir)
+                   (impc:compiler:queue-ir-for-compilation native-ir)
+                   (if (and scheme-stub-valid? *impc:compile:scheme-stubs*)
+                       (impc:compiler:queue-ir-for-compilation scheme-stub-ir) #t)))
+        (if *impc:compiler:print*
+            (println '----------------------------compiling 'callback----------------------------------->))
+        (if *impc:compiler:print* (print-full-nq callback-ir))
+        (if (and *impc:compile* compile-stub?)
+            (impc:compiler:queue-ir-for-compilation callback-ir))
+        (if (not (impc:aot:currently-compiling?))
+            (if (not (impc:compiler:flush-jit-compilation-queue))
+                (impc:compiler:print-compiler-error "could not compile helper functions" symname)))
+        (if *impc:compile*
+            ;; make sure the (now resolved) function types hit the
+            ;; closure/nativefunc cache
+            (let ((closure-type-list (impc:ir:get-type-from-str closure-type)))
+              (if (and (impc:ti:closure-exists? symname-string)
+                       (impc:aot:currently-compiling?))
+                  (if (not (equal? closure-type-list (impc:ti:get-closure-type symname-string)))
+                      (impc:compiler:print-no-redefinitions-error symname
+                                                                  (impc:ti:get-closure-type symname-string)
+                                                                  closure-type-list))
+                  (begin
+                    (if (and *impc:ti:implicit-adhoc-compiles*
+                             (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
+                        (begin
+                          (impc:ti:update-closure-name adhoc-poly-name-string symname-string)
+                          (impc:ti:set-closure-type symname-string closure-type-list)
+                          (impc:ti:set-closure-body symname-string code)
+                          ;; add to the AOT-header if we're precompiling
+                          (impc:aot:insert-closure-binding-details symname-string
+                                                                   closure-type-list
+                                                                   (impc:ti:get-closure-zone-size symname-string)
+                                                                   (impc:ti:get-closure-docstring symname-string)
+                                                                   (impc:ti:get-closure-body symname-string))
+                          ;; Clear old polyfunc candidates of same type before adding new one
+                          ;; This prevents accumulation of candidates that causes "ambiguous wrapper" errors
+                          (let ((pfdata (hashtable-ref *impc:ti:polyfunc-cache* adhoc-poly-name-string)))
+                            (if pfdata
+                                (vector-set! pfdata 0
+                                             (cl:remove-if (lambda (x) (equal? (vector-ref x 1) closure-type-list))
+                                                           (vector-ref pfdata 0)))))
+                          (eval `(bind-poly ,adhoc-poly-name ,symname) (interaction-environment)))
+                        (begin
+                          (impc:ti:set-closure-type symname-string closure-type-list)
+                          ;; add to the AOT-header if we're precompiling
+                          (impc:aot:insert-closure-binding-details symname-string
+                                                                   closure-type-list
+                                                                   (impc:ti:get-closure-zone-size symname-string)
+                                                                   (impc:ti:get-closure-docstring symname-string)
+                                                                   (impc:ti:get-closure-body symname-string))))))
+              (cond ((regex:match? symname-string "_poly_")
+                     ;; (println 'spec: symname-string)
+                     (impc:compiler:print-bind-func-details-to-log
+                      "Spec'zed:"
+                      (string->symbol (car (regex:split symname-string "_poly_")))
+                      (impc:ir:pretty-print-type closure-type)
+                      zone-size))
+                    ((regex:match? symname-string "_adhoc_")
+                     (impc:compiler:print-bind-func-details-to-log
+                      "Compiled:"
+                      (string->symbol (car (regex:split symname-string "_adhoc_")))
+                      (impc:ir:pretty-print-type closure-type)
+                      zone-size))
+                    (else
+                     (impc:compiler:print-bind-func-details-to-log
+                      "Compiled:"
+                      symname
+                      (impc:ir:pretty-print-type closure-type)
+                      zone-size)))))
+        symname-string)))))
+
+(define-macro (xtm-closure-doc name)
+  `(let ((docstring (impc:ti:get-closure-docstring ,name))
+         (types (impc:ti:get-closure-type ,name))
+         (form (impc:ti:get-closure-body ,name)))
+     (if docstring
+         (list (cdr docstring) (cdr types) (cdr form))
+         (if types
+             (list '() (cdr types) (cdr form))
+             (if form
+                 (list '() '() (cdr form))
+                 #f)))))
+
+(define-macro (define-static symname . args)
+  (let ((types (cdr (reverse args)))
+        (expr (car (reverse args)))
+        (aot_sexpr '()))
+    (if (regex:match? (symbol->string symname) ":")
+        (let ((sres (regex:type-split (symbol->string symname) ":")))
+          (set! symname (string->symbol (car sres)))
+          (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
+    ;; (print-full symname 'types: types 'e: expr 'args: args)
+    `(let* ((newname (impc:ti:run ',symname
+                                  '(let ((,symname ,expr)) ,symname)
+                                  0
+                                  #f
+                                  #t
+                                  ,@(if (null? types)
+                                        '()
+                                        (map (lambda (k) (list 'quote k)) types)))))
+        newname)))
+
+(define-macro (bind-static . args)
+  (if (string? (cadr args))
+      (if (not (equal? (caaddr args) 'lambda))
+        (impc:compiler:print-compiler-error "static functions cannot be closures!"))
+      (if (not (equal? (caadr args) 'lambda))
+        (impc:compiler:print-compiler-error "static functions cannot be closures!")))
+  ;; if aot and func already exists then bomb out
+  (if (and (output-port? *impc:aot:current-output-port*)
+           (impc:ti:closure-exists? (symbol->string (car args))))
+      (begin ;; (impc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
+             #t)
+      ;; if doc-string exists!
+      (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
+            (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
+            (poly (if (boolean? (cadr args)) (cadr args) #t))
+            (docstring (if (string? (cadr args))
+                           (cadr args)
+                           (if (and (not (null? (cddr args))) (string? (caddr args)))
+                               (caddr args)
+                               "")))
+            ;; closure body is always in last position, preceeded by zone
+            ;; size and/or docstring
+            (closure-body (car (reverse args))))
+        (if (member func-name *impc:reserved-keywords*)
+            (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
+        ;; strip docstring
+        (set! args (cl:remove-if string? args))
+        ;; strip poly
+        (set! args (cl:remove-if boolean? args))
+        (if (impc:ti:polyfunc-exists? (car args))
+            (impc:compiler:print-already-bound-error (car args) " static function"))
+        ;; (if (impc:ti:genericfunc-exists? (car args))
+        ;;     (impc:compiler:print-already-bound-error (car args) "generic closure"))
+        (if (regex:match? (symbol->string (car args)) ":")
+            (let* ((res (regex:type-split (symbol->string (car args)) ":"))
+                   (name (car res))
+                   (type1 (cadr res))
+                   (type (if (char=? (string-ref type1 0) #\[)
+                             (if (= (impc:ir:get-ptr-depth type1) 1)
+                                 type1
+                                 (impc:compiler:print-bad-type-error type1 "must be a closure pointer"))
+                             (if (impc:ti:typealias-exists? type1)
+                                 (impc:ti:get-typealias-type-pretty type1)
+                                 (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-static"))))
+                   (ags (impc:ir:get-pretty-closure-arg-strings type))
+                   ;; expand all non-explict generic types
+                   ;; i.e. expand list* into list:<!a,list*>*
+                   (expand-polys (map (lambda (k)
+                                        (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                            (impc:ir:pointer++
+                                             (string-append (impc:ir:get-base-type k) ":"
+                                                            (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
+                                             (impc:ir:get-ptr-depth k))
+                                            k))
+                                      ags))
+                   (newtype (string-append "[" (string-join expand-polys ",") "]*"))
+                   (newnametype (string->symbol (string-append name ":" newtype))))
+              ;; (println 'oldargs: args)
+              ;; (println 'newargs: (cons newnametype (cdr args)))
+              (if (impc:ti:bang-type? newtype)
+                  (begin
+                    (impc:compiler:print-compiler-error "static functions cannot be generic!"))
+                  (begin
+                    (if (impc:ti:closure-or-nativefunc-exists? func-name)
+                        (impc:compiler:print-compiler-error "static functions cannot be redefined!")
+                        (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+                    `(eval '(define-static ,(car args) ,@(cdr args)) (interaction-environment)))))
+            (begin
+              (if ;; (impc:ti:closure-exists? func-name)
+                  (impc:ti:closure-or-nativefunc-exists? func-name)
+                  (impc:compiler:print-compiler-error "static functions cannot be redefined!")
+                  (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+              `(eval '(define-static ,(car args) ,@(cdr args)) (interaction-environment)))))))
+
+(define-macro (definec symname poly . args)
+  (let ((zone-size *impc:default-zone-size*))
+    (if (number? (car args))
+        (begin (set! zone-size (car args))
+               (set! args (cdr args))))
+    (let ((types (cdr (reverse args)))
+          (expr (car (reverse args)))
+          (aot_sexpr '()))
+      (if (regex:match? (symbol->string symname) ":")
+          (let ((sres (regex:type-split (symbol->string symname) ":")))
+            (set! symname (string->symbol (car sres)))
+            (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
+      (let ((base-symname-str (symbol->string symname)))
+        ;; (print-full symname 'types: types 'e: expr 'args: args)
+        `(let* ((newname (impc:ti:run ',symname
+                                      '(let ((,symname ,expr)) ,symname)
+                                      ,zone-size
+                                      ,poly
+                                      #f
+                                      ,@(if (null? types)
+                                            '()
+                                            (map (lambda (k) (list 'quote k)) types)))))
+           (impc:ti:initialize-closure-with-new-zone newname *impc:default-zone-size*)
+           (impc:ti:create-scheme-wrapper newname)
+           (impc:ti:update-dsp-closure-if-registered ,base-symname-str newname))))))
+
+(define-macro (bind-closure . args)
+  ;; if aot and func already exists then bomb out
+  (if (and (output-port? *impc:aot:current-output-port*)
+           (impc:ti:closure-exists? (symbol->string (car args))))
+      (begin ;; (impc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
+             #t)
+      ;; if doc-string exists!
+      (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
+            (zone-size (if (number? (cadr args)) (cadr args) *impc:default-zone-size*))
+            (poly (if (boolean? (cadr args)) (cadr args) #t))
+            (docstring (if (string? (cadr args))
+                           (cadr args)
+                           (if (and (not (null? (cddr args))) (string? (caddr args)))
+                               (caddr args)
+                               "")))
+            ;; closure body is always in last position, preceeded by zone
+            ;; size and/or docstring
+            (closure-body (car (reverse args))))
+        (if (member func-name *impc:reserved-keywords*)
+          (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
+        ;; strip docstring
+        (set! args (cl:remove-if string? args))
+        ;; strip poly
+        (set! args (cl:remove-if boolean? args))
+        ;; (if (impc:ti:polyfunc-exists? (car args))
+        ;;     (impc:compiler:print-already-bound-error (car args) "polymorphic closure"))
+        ;; (if (impc:ti:genericfunc-exists? (car args))
+        ;;     (impc:compiler:print-already-bound-error (car args) "generic closure"))
+        (if (regex:match? (symbol->string (car args)) ":")
+            (let* ((res (regex:type-split (symbol->string (car args)) ":"))
+                   (name (car res))
+                   (type1 (cadr res))
+                   (type (if (char=? (string-ref type1 0) #\[)
+                             (if (= (impc:ir:get-ptr-depth type1) 1)
+                                 type1
+                                 (impc:compiler:print-bad-type-error type1 "must be a closure pointer"))
+                             (if (impc:ti:typealias-exists? type1)
+                                 (impc:ti:get-typealias-type-pretty type1)
+                                 (impc:compiler:print-bad-type-error type1 "Bad closure type for bind-func"))))
+                   (ags (impc:ir:get-pretty-closure-arg-strings type))
+                   ;; expand all non-explict generic types
+                   ;; i.e. expand list* into list:<!a,list*>*
+                   (expand-polys (map (lambda (k)
+                                        (if (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                            (impc:ir:pointer++
+                                             (string-append (impc:ir:get-base-type k) ":"
+                                                            (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
+                                             (impc:ir:get-ptr-depth k))
+                                            k))
+                                      ags))
+                   (newtype (string-append "[" (string-join expand-polys ",") "]*"))
+                   (newnametype (string->symbol (string-append name ":" newtype))))
+              ;; (println 'oldargs: args)
+              ;; (println 'newargs: (cons newnametype (cdr args)))
+              (if (impc:ti:bang-type? newtype)
+                  (begin
+                    (impc:aot:insert-generic-func (cons 'bind-func (cons newnametype (cdr args))))
+                    (impc:ti:register-new-genericfunc (cons 'bind-func (cons newnametype (cdr args))))
+                    ;;(impc:ti:register-new-genericfunc (cons 'bind-func args))
+                    `(impc:compiler:print-binding-details-to-log "GenrFunc:" ,(car res) ,(cadr res)))
+                  (begin
+                    (if (impc:ti:closure-exists? func-name)
+                        (begin
+                          (impc:ti:set-closure-docstring func-name docstring)
+                          (impc:ti:set-closure-body func-name closure-body))
+                        (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+                    `(eval '(definec ,(car args) ,poly ,@(cdr args)) (interaction-environment)))))
+            (begin
+              (if (impc:ti:closure-exists? func-name)
+                  (begin
+                    (impc:ti:set-closure-docstring func-name docstring)
+                    (impc:ti:set-closure-body func-name closure-body))
+                  (impc:ti:register-new-closure func-name '() zone-size docstring closure-body))
+              `(eval '(definec ,(car args) ,poly ,@(cdr args)) (interaction-environment)))))))
+
+(define-macro (bind-func . args)
+  (if (< (length args) 2)
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (and (= (length args) 2) (not (symbol? (car args))) (not (or (string? (cadr args)) (list? (cadr args)))))
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (and (= (length args) 3)
+           (not (symbol? (car args)))
+           (not (symbol? (cadr args)))
+           (not (or (string? (caddr args))
+                    (list (caddr args)))))
+      (impc:compiler:print-compiler-error "Poorly formed bind-func expression"))
+  (if (equal? (car args) 'static)
+      `(bind-static ,@(cdr args))
+      `(bind-closure ,@args)))
+
+
+(impc:ti:register-new-builtin
+ "bind-func"
+ ""
+ "compile an xtlang closure"
+ '(closure-name optional-zone-size optional-docstring closure-body))
+
+;; bind-func-ipc is for passing an already compiled (and setter'd)
+;; native function across to a non-primary process
+(define bind-func-ipc
+  (lambda (symname)
+    (let ((zone-size *impc:default-zone-size*))
+      (eval
+       `(define ,symname
+          (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
+       (interaction-environment)))))
+
+(define ipc:bind-func
+  (lambda (procname symname)
+    (if (regex:match? (symbol->string symname) "_adhoc_")
+        (ipc:call procname 'bind-func-ipc symname)
+        (let* ((polyname (symbol->string symname))
+               (polytypes (impc:ti:get-polyfunc-candidate-list polyname)))
+          (if (and (list? polytypes)
+                   (= (length polytypes) 1))
+              (begin (ipc:call procname 'bind-func-ipc
+                               (string->symbol (vector-ref (car polytypes) 0)))
+                     (ipc:define procname symname (eval symname)))
+              (log-error "Not a monomorphic xtlang function:" symname))))))
+
+(define ipc:load
+  (lambda (process-name file)
+    (ipc:call process-name 'sys:load file)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-macro (bind-alias symbol type . docstring)
+  `(begin (impc:ti:register-new-typealias
+           ,(symbol->string symbol)
+           ',(impc:ir:get-type-from-pretty-str (symbol->string type))
+           ,(if (null? docstring) "" (car docstring)))
+          (impc:compiler:print-binding-details-to-log
+           "SetAlias:"
+           ',symbol
+           ;;(print ',type)
+           (begin
+             (set! *impc:ir:get-type-callback-off* #t) ;; don't wait, do it immediately
+             (let ((r (impc:ir:pretty-print-type ,(symbol->string symbol))))
+               (set! *impc:ir:get-type-callback-off* #f)
+               r))
+           )))
+
+(impc:ti:register-new-builtin
+ "bind-alias"
+ ""
+ "bind an xtlang type alias"
+ '(alias-name alias-target optional-docstring))
+
+(define impc:ti:word-upcase
+  (lambda (w)
+    (let* ((n (string->list w))
+           (u (char-upcase (car n)))
+           (n1 (list->string (cons u (cdr n)))))
+      n1)))
+
+(define impc:ti:word-downcase
+  (lambda (w)
+    (let* ((n (string->list w))
+           (u (char-downcase (car n)))
+           (n1 (list->string (cons u (cdr n)))))
+      n1)))
+
+(define impc:ti:gather-all-gvars-helper
+  (lambda (gtype)
+    (foldl (lambda (lst val)
+             (if (list? val)
+                 (append (impc:ti:gather-all-gvars-helper val) lst)
+                 (if (and (symbol? val)
+                          (regex:match? (symbol->string val) "^!"))
+                     (cons val lst)
+                     lst)))
+           '() gtype)))
+
+(define impc:ti:gather-all-gvars
+  (lambda (gtype)
+    (reverse
+     (cl:remove-duplicates
+      (impc:ti:gather-all-gvars-helper gtype)))))
+
+(define impc:ti:compile-type-dataconstructors
+  (lambda (name type generic printer? copy? constructor?)
+    (if (or (not (string? type)) ;; if not already a pretty type
+            (regex:match? type "^\\s*{"))
+        (set! type (impc:ir:pretty-print-type type)))
+    ;; (println 'DataConstructor: 'name: name 'type type 'gen generic 'print: printer? 'const: constructor?)
+    ;; (println 'impc:ti:compile-type-dataconstructors name type generic)
+    (let* ((tsplit (car (regex:type-split (symbol->string name) "_poly_")))
+           (a (map (lambda (x)
+                     (if (and (string=? tsplit (impc:ir:get-base-type x))
+                              (= 1 (impc:ir:get-ptr-depth x)))
+                         (string-append (symbol->string name) "*")
+                         x))
+                   (impc:ir:get-pretty-tuple-arg-strings type)))
+           (arglst1 (make-list-with-proc (length a) (lambda (i) (string->symbol (string-append "arg_" (atom->string i))))))
+           (arglst2 (range (length a)))
+           (namestr (symbol->string name))
+           ;;(namestrup (impc:ti:word-upcase (symbol->string name)))
+           ;;(namestrdown (impc:ti:word-downcase (symbol->string name)))
+           (ctype (string-append "["
+                                 (if generic
+                                     ;(apply string-append namestr ":" type "*"
+                                     (apply string-append namestr
+                                            "{"
+                                            (string-join
+                                             (map (lambda (x) (symbol->string x))
+                                                  (impc:ti:gather-all-gvars (impc:ir:get-type-from-pretty-str type)))
+                                             ",")
+                                            "}*"
+
+                                            (map (lambda (x)
+                                                   (string-append
+                                                    ","
+                                                    (if (regex:match? x (string-append namestr "([{<:*)|$"))
+                                                        (regex:replace x
+                                                                       (string-append namestr "([*]*)")
+                                                                       (string-append namestr ":" type "$1"))
+                                                        x)))
+                                                 a))
+                                     (apply string-append (symbol->string name) "*"
+                                            (map (lambda (x) (string-append "," x)) a)))
+                                 "]*"))
+           (argslist (map (lambda (a b) b) a arglst1))
+           (hcopy_body (if generic #f
+                           (map (lambda (a b c)
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                  (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
+                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'hcopy
+                                                        (string->symbol (string-append "hcopy:[" t "*," t "*]*")))))
+                                        ;; (println 't: t 'name: name 'type: type)
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,fname (tref x ,c)))))
+                                      `(tset! obj ,b (tref x ,c))))
+                                a arglst2 (range (length a)))))
+           (hfree_body (if generic #f
+                           (map (lambda (a c)
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                  (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
+                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'hfree
+                                                        (string->symbol (string-append "hfree:[void," t "*]*")))))
+                                        `(if (not (null? (tref x ,c)))
+                                             (,fname (tref x ,c))))))
+                                a (range (length a)))))
+           (zcopy_body (if generic #f
+                           (map (lambda (a b c)
+                                  (define aa a)
+                                  (set! a (impc:ir:get-type-from-pretty-str a))
+                                  (if (and (impc:ir:tuple? a)
+                                           (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
+                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                      (let* ((t (substring a 1 (- (string-length a) 1)))
+                                             (fname (if (string=? namestr t)
+                                                        'zcopy
+                                                        (string->symbol (string-append "zcopy:[" t "*," t "*,mzone*,mzone*]*")))))
+                                        `(if (not (null? (tref x ,c)))
+                                             (tset! obj ,b (,fname (tref x ,c) fromz toz))))
+                                      (if (and (impc:ir:pointer? a)
+                                               (= 1 (impc:ir:get-ptr-depth a)))
+                                          `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
+                                               (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
+                                                 (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
+                                                         ,(impc:ir:get-type-size (impc:ir:pointer-- a)))
+                                                 (tset! obj ,b newptr))
+                                               (tset! obj ,b (tref x ,c)))
+                                          `(begin
+                                             (tset! obj ,b (tref x ,c))))))
+                                a arglst2 (range (length a)))))
+           (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
+      ;;(println 'hcopy: hcopy_body)
+      (sys:with-quiet-compiler
+       (if constructor?
+           (begin
+             (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
+                      (lambda ,argslist
+                        (let ((obj (zalloc)))
+                          ,@body
+                          obj)))
+                   (interaction-environment))))
+       ;; (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+       (eval `(bind-func ,(string->symbol (string-append namestr "_z:" ctype)) #t
+                (lambda ,argslist
+                  (let ((obj (zalloc)))
+                    ,@body
+                    obj)))
+             (interaction-environment))
+       (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
+                (lambda ,argslist
+                  (let ((obj (halloc)))
+                    ,@body
+                    obj)))
+             (interaction-environment))
+       (if (and generic printer?)
+           (begin
+             (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+                      (lambda (x)
+                        (if (null? x)
+                            (sprintout ,(string-append "<" namestr ":null"))
+                            (sprintout ,(string-append "<" namestr ":")
+                                       ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                       ">"))))
+                   (interaction-environment))
+             (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                      (lambda (x)
+                        (if (null? x)
+                            (printout ,(string-append "<" namestr ":null"))
+                            (printout ,(string-append "<" namestr ":")
+                                      ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
+                                      ">"))
+                        void))
+                   (interaction-environment))))
+       (if (not generic)
+           (begin
+             (if (and (not (regex:match? namestr "_poly_")) printer?)
+                 (begin
+                   (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              (if (null? x)
+                                  (sprintout ,(string-append "<" namestr ":null>"))
+                                  (sprintout ,(string-append "<" namestr ":")
+                                             ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
+                                                                           (range (length a)))))
+                                             ">"))))
+                         (interaction-environment))
+                   (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              (if (null? x)
+                                  (printout ,(string-append "<" namestr ":null>"))
+                                  (printout ,(string-append "<" namestr ":")
+                                            ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
+                                                                          (range (length a)))))
+                                            ">"))
+                              void))
+                         (interaction-environment))))
+             (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
+                      (lambda ,argslist
+                        (let ((,(string->symbol (string-append "obj:" namestr "*")) (salloc)))
+                          (tfill! obj ,@argslist)
+                          (pref obj 0))))
+                   (interaction-environment))
+             (if copy?
+                 (begin
+                   (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                        (let ((obj (halloc)))
+                          ,@hcopy_body
+                          obj)))
+                   (interaction-environment))
+                  (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                        ,@hfree_body
+                        (free x)
+                        void))
+                   (interaction-environment))
+                 (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
+                      (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
+                        (if (llvm_ptr_in_zone fromz (cast x i8*))
+                            (begin (push_zone toz)
+                              (let ((obj (zalloc)))
+                                 ,@zcopy_body
+                                 (pop_zone)
+                                 obj))
+                            x)))
+                   (interaction-environment))))
+             )))
+      ;; (println 'dc-out: name)
+      #t)))
+
+;; bind-type expects: (symbol type [docstring])
+(define-macro (bind-type . args)
+  ;; (println 'bind-type args)
+  (if (null? args)
+      (impc:compiler:print-compiler-error "Bind type missing arguments! (symbol type [docstring])"))
+  (let* ((symbol (car args))
+         (type_1 (cadr args))
+         (type (string->symbol
+                (string-append "<"
+                 (string-join
+                  (map (lambda (x)
+                         (if (impc:ti:typealias-exists? x)
+                             (impc:ir:pretty-print-type (impc:ti:get-typealias-type x))
+                             x))
+                       (impc:ir:get-pretty-tuple-arg-strings (symbol->string type_1)))
+                  ",")
+                 ">")))
+         (docstring (if (string? (car (reverse args))) (car (reverse args)) ""))
+         (extras (cl:remove #f (map (lambda (x) (if (pair? x) x #f)) args)))
+         (printer? (if (assoc-strcmp 'printer? extras)
+                       (cdr (assoc-strcmp 'printer? extras))
+                       #t))
+         (copy? (if (assoc-strcmp 'copy? extras)
+                       (cdr (assoc-strcmp 'copy? extras))
+                       #t))
+         (constructor? (if (assoc-strcmp 'constructor? extras)
+                           (cdr (assoc-strcmp 'constructor? extras))
+                           #t)))
+    (if (not (char=? (string-ref (symbol->string type_1) (- (string-length (symbol->string type_1)) 1)) #\>))
+        (impc:compiler:print-bad-type-error type_1 "is a malformed tuple type"))
+    (if (impc:ti:bang-type? type) ;; send generic named types to aot
+        (impc:aot:insert-generic-type `(bind-type ,@args)))
+    (if (<> (impc:ir:get-ptr-depth type) 0)
+        (impc:compiler:print-bad-type-error type "cannot be a pointer"))
+    (if (not (char=? (string-ref (symbol->string type) 0) #\<))
+        (impc:compiler:print-bad-type-error type "must be a tuple type"))
+    `(begin
+       (set! *impc:ir:get-type-callback-off* #t)
+       (let* ((ags (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
+              ;; expand all non-explict generic types
+              ;; i.e. expand list* into list:<!a,list*>*
+              (expand-polys (map (lambda (k)
+                                   (if (and (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))
+                                            (not (equal? (impc:ir:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
+                                       (impc:ir:pointer++
+                                        (string-append (impc:ir:get-base-type k) ":"
+                                                       (symbol->string (impc:ti:get-generictype-candidate-types (impc:ir:get-base-type k))))
+                                        (impc:ir:get-ptr-depth k))
+                                       k))
+                                 ags))
+              (newtype (string-append "<" (string-join expand-polys ",") ">")))
+         ;; (println 'authors_type: ,(symbol->string type))
+         ;; (println 'transformed_type: newtype)
+         ;; and on with the show!
+         (if (impc:ti:bang-type? newtype) ;; then must be poly type
+             (begin
+               (impc:ti:register-new-generictype ',symbol (string->symbol newtype))
+               (impc:compiler:print-binding-details-to-log "GenrType:" ',symbol ',type))
+             (let ((typelist (cons *impc:ir:tuple* (impc:ir:get-type-from-pretty-tuple ,(symbol->string type)
+                                                                                       ,(symbol->string symbol)))))
+               (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
+                                                   (impc:ir:get-type-str typelist)))
+                   (begin (impc:ti:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
+                          (impc:compiler:print-binding-details-to-log "DataType:" ',symbol ',type))
+                   (impc:compiler:print-compiler-error "could not compile IR for type" ',type)))))
+       ;; the next line is to help specialize any element types that may not already be specialized!
+       (map (lambda (a) (impc:ir:get-type-from-pretty-str a (symbol->string ',(car args)))) (impc:ir:get-pretty-tuple-arg-strings ,(symbol->string type)))
+       (set! *impc:ir:get-type-callback-off* #f)
+       ;; (sys:wait (now))
+       ;; now compile data constructor
+       (impc:ti:compile-type-dataconstructors
+        ',symbol
+        (if (impc:ti:get-generictype-candidate-types ',symbol)
+            (symbol->string (impc:ti:get-generictype-candidate-types ',symbol))
+            (impc:ir:pretty-print-type (impc:ti:get-namedtype-type ,(symbol->string symbol))))
+        (if (impc:ti:get-generictype-candidate-types ',symbol) #t #f)
+        ,printer?
+        ,copy?
+        ,constructor?))))
+
+(impc:ti:register-new-builtin
+ "bind-type"
+ ""
+ "bind an xtlang named type"
+ '(name type optional-docstring))
+
+(define-macro (impc:pretty-print-vars . varlist)
+  (map (lambda (var)
+         `(begin (println '--- (quote ,var) '---)
+                 (println ,var)))
+       varlist))
+
+(define impc:ti:construct-generic-type-if-valid
+  (lambda (t)
+    ;; named type might need to be constructed!
+    (if (and (string? t)
+             (char=? (string-ref t 0) #\%)
+             (regex:match? t "_poly_"))
+        (if (impc:ti:namedtype-exists? t)
+            #t ;; if 't' exists don't do anything else
+            (let* ((p (regex:split t "_poly_"))
+                   (n (substring (car p) 1 (string-length (car p)))))
+              (if (not (impc:ti:get-generictype-candidate-types n))
+                  #f  ;; if not a generic type then bad :(
+                  (begin
+                    #t))))
+        #t)))
+
+
+;; bind-val takes an optional argument, the meaning of which depends
+;; on the type of the val, and also an optional docstring
+(define-macro (bind-val symbol type . args)
+  (let* ((string-literal? (and (equal? 'i8* type)
+                               (not (null? args))
+                               (string? (car args))))
+         (value (if string-literal?
+                    (car args)
+                    (if (not (or (null? args) (string? (car args))))
+                        (car args)
+                        #f)))
+         (docstring (if (or (null? args)
+                            (not (string? (car (reverse args))))
+                            (and string-literal? (= (length args) 1)))
+                        ""
+                        (car (reverse args))))
+         (t (impc:ir:get-type-from-pretty-str (atom->string type)))
+         (oldt (impc:ti:get-globalvar-type (symbol->string symbol))))
+    ;; this next line looks superflous but isn't!
+    ;; 't' maybe a %blah_poly_Hldkfjs* etc. that is not
+    ;; yet "constructed". calling get-type-from-pretty-str
+    ;; will construct it if it doesn't yet exist
+    (if (string? t) (impc:ir:get-type-from-pretty-str t))
+    (cond (oldt
+           `(impc:compiler:print-already-bound-error ',symbol ,(impc:ir:pretty-print-type (impc:ir:pointer-- oldt))))
+          ;; string literal
+          (string-literal?
+           `(begin
+              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                              " = dllexport global i8* zeroinitializer"))
+              ;; we should really take the globalvar out of the cache
+              ;; if the previous steps failed
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
+              (impc:aot:do-or-emit
+               (call-as-xtlang (set! ,symbol ,value) void))
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
+          ;; non-pointer values
+          ((and (or (impc:ir:number? t)
+                    (impc:ir:boolean? t)
+                    (not (impc:ir:pointer? t))))
+           `(begin
+              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                              " = dllexport global "
+                                              ,(impc:ir:get-type-str t) " "
+                                              ,(if (number? value)
+                                                   ;; can we serialise the value straight into the
+                                                   ;;  IR? (e.g. i32/i64/float/double)
+                                                   (if (equal? t *impc:ir:fp32*)
+                                                       (llvm:convert-float (atom->string value))
+                                                       (atom->string value))
+                                                   ;; otherwise use zeroinitializer and we'll just use a
+                                                   ;; set! inside a call-as-xtlang a bit further down
+                                                   "zeroinitializer")))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
+              ;; set value for non int/float literals
+              ,(if (and value (not (number? value)))
+                   `(impc:aot:do-or-emit
+                     (call-as-xtlang (set! ,symbol (convert ,value ,type)) void)))
+              ;; we should really take the globalvar out of the
+              ;; cache if any of the previous steps failed
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
+          ;; pointer
+          ((impc:ir:pointer? t)
+           (if (or (not value) (integer? value))
+               `(begin
+                  (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                  " = dllexport global "
+                                                  ,(impc:ir:get-type-str t)
+                                                  " zeroinitializer"))
+                  (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                  (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                             ,(symbol->string symbol)
+                                                             ,(symbol->string type)
+                                                             ,docstring)
+                  (impc:aot:do-or-emit
+                   (call-as-xtlang (set! ,symbol (cast (malloc ,(* (or value 1)
+                                                                   (if (impc:ir:number? t)
+                                                                       (impc:ir:get-type-size t)
+                                                                       (/ (sys:pointer-size) 8))))
+                                                       ,type))
+                                   void))
+                  ;; we should really take the globalvar out of the cache
+                  ;; if the previous steps failed
+                  (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                              ,(symbol->string symbol)
+                                                              ,(impc:ir:pretty-print-type t)))
+               (if (list? value)
+                   `(begin
+                      (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                      " = dllexport global "
+                                                      ,(impc:ir:get-type-str t)
+                                                      "zeroinitializer"))
+                      (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                      (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                                 ,(symbol->string symbol)
+                                                                 ,(symbol->string type)
+                                                                 ,docstring)
+                      (impc:aot:do-or-emit
+                       (call-as-xtlang (set! ,symbol ,value) void))
+                      ;; we should really take the globalvar out of the cache
+                      ;; if the previous steps failed
+                      (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                                  ,(symbol->string symbol)
+                                                                  ,(impc:ir:pretty-print-type t)))
+                   `(impc:compiler:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
+          ;; tuple/array/vector
+          ((or (impc:ir:tuple? t) (impc:ir:array? t) (impc:ir:vector? t))
+           `(begin
+              (llvm:compile-ir
+               (string-append
+                "@" ,(symbol->string symbol)
+                " = dllexport global "
+                ,(impc:ir:get-type-str t) " zeroinitializer"))
+              (impc:ti:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+              (impc:aot:insert-globalvar-binding-details *impc:aot:current-lib-name*
+                                                         ,(symbol->string symbol)
+                                                         ,(symbol->string type)
+                                                         ,docstring)
+              ;; we should really take the globalvar out of the cache
+              ;; if the previous steps failed
+              (impc:compiler:print-binding-details-to-log "SetValue:"
+                                                          ,(symbol->string symbol)
+                                                          ,(impc:ir:pretty-print-type t))))
+          (else (impc:compiler:print-missing-identifier-error type 'type)))))
+
+(impc:ti:register-new-builtin
+ "bind-val"
+ ""
+ "bind a global variable"
+ '(variable-name type optional-value optional-docstring))
+
+(define-macro (bind-ext-val symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      (llvm:compile-ir
+        (string-append "@" ,(symbol->string symname) " = external global " (impc:ir:get-type-str type-list)))
+      (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
+      (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+      (impc:compiler:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+
+(impc:ti:register-new-builtin
+ "bind-ext-val"
+ ""
+ "bind an external global variable"
+ '(variable-name type optional-value optional-docstring))
+
+(define-macro (register-ext-val symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      ; (llvm:compile-ir
+      ;   (string-append "@" ,(symbol->string symname) " = external global " (impc:ir:get-type-str type-list)))
+      (impc:ti:register-new-globalvar ,(symbol->string symname) type-list ds)
+      (impc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+      (impc:compiler:print-binding-details-to-log "register-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+
+(define-macro (bind-poly poly_sym implementation_sym . docstring)
+  (if (impc:ti:genericfunc-exists? implementation_sym)
+      (impc:compiler:print-compiler-error (string-append "bind-poly only accepts monomorphic functions, not " (symbol->string implementation_sym))))
+  (if (not (impc:ti:closure-or-nativefunc-exists? (symbol->string implementation_sym)))
+      (impc:compiler:print-missing-identifier-error implementation_sym 'closure))
+  (let ((type (impc:ti:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
+    (if type
+        `(begin
+           (impc:ti:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
+           (impc:ti:create-scheme-wrapper (symbol->string ',implementation_sym))
+           (if (not (regex:match? ,(symbol->string implementation_sym) "(_adhoc_|_poly_)"))
+               (impc:compiler:print-polying-details-to-log "PolyFunc:"
+                                                           ,(symbol->string poly_sym)
+                                                           ,(symbol->string implementation_sym)
+                                                           ,(impc:ir:pretty-print-type type))))
+        `(impc:compiler:print-missing-identifier-error ',implementation_sym 'closure))))
+
+(impc:ti:register-new-builtin
+ "bind-poly"
+ ""
+ "bind a polymorphic symbol"
+ '(poly-name closure-name optional-docstring))
+
+(define impc:ti:search-for-dylib
+  (lambda (path)
+    (let loop ((candidate-paths
+                (append
+                 (list
+                  path
+                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
+                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))
+                 (unix-or-Windows (map
+                                   (lambda (x)
+                                     (sanitize-platform-path
+                                      (string-append x "/" path)))
+                                   (append (regex:split
+                                            (sys:command-output
+                                             "echo $LD_LIBRARY_PATH")
+                                            ":")
+                                           '("/usr/local/lib/"
+                                             "/usr/lib/"
+                                             "/opt/local/lib/"
+                                             ;; Linux
+                                             "/usr/lib/x86_64-linux-gnu"
+                                             "/usr/lib/aarch64-linux-gnu"
+                                             ;; macOS
+                                             "/opt/homebrew/lib/"
+                                             "/usr/local/Cellar/"
+                                             "/opt/homebrew/Cellar/")))
+                                  (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
+      (if (null? candidate-paths)
+          #f
+          (let ((dylib (sys:open-dylib (car candidate-paths) #f)))
+            (if dylib
+                (cons dylib (car candidate-paths))
+                (if (file-exists? (car candidate-paths))
+                    ;; if sys:open-dylib failed bu the file is there, something's gone wrong
+                    (begin
+                      (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                                         (print "Error"))
+                      (print ": could not open ")
+                      (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (car candidate-paths))
+                      (print " dynamic library\n")
+                      (error ""))
+                    (loop (cdr candidate-paths)))))))))
+
+(define impc:ti:bind-dylib
+  (lambda (library lib-paths)
+    (let ((dylib-pair
+           (let loop ((paths lib-paths))
+             (if (null? paths)
+                 #f
+                 (or (impc:ti:search-for-dylib (car paths))
+                     (loop (cdr paths)))))))
+      (if dylib-pair
+          (begin
+            (eval (list 'define library (car dylib-pair))
+                  (interaction-environment))
+            (set! *impc:aot:current-load-dylib-info*
+                  (cons library (cdr dylib-pair)))
+            (impc:aot:add-win-link-library (cdr dylib-pair))
+            (impc:compiler:print-dylib-loading-details-to-log (cdr dylib-pair))
+            #t)
+          (begin
+            (print-with-colors *impc:compiler:pretty-print-error-color* 'default #t
+                               (print "Error"))
+            (print ": could not find ")
+            (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print library))
+            (print " dynamic library\n")
+            (error ""))))))
+
+(define-macro (bind-dylib library lib-path . args)
+  (let ((path (eval lib-path)))
+    (if (string? path)
+        (set! path (list path)))
+    (apply impc:aot:insert-load-dylib-details library path args)
+    `(impc:ti:bind-dylib ',library ',path)))
+
+(impc:ti:register-new-builtin
+ "bind-dylib"
+ ""
+ "load a dynamic library
+
+e.g.
+
+(bind-dylib lib \"libGL.so\")
+
+@param lib-symbol - symbol to refer to the library
+@param lib-paths - a string (or list of strings) of paths to search for the dylib"
+ '(lib-symbol lib-paths))
+
+;; this here for wrapping llvm dynamic binds
+(define-macro (bind-lib library symname type . args)
+  `(impc:ti:bind-lib ',library ',symname ',type
+                     ;; calling convention
+                     ,(if (and (not (null? args)) (number? (car args)))
+                          (car args)
+                          0) ;; 0=ccc
+                     ;; docstring
+                     ,(if (and (not (null? args)) (string? (car (reverse args))))
+                          (car (reverse args))
+                          "")))
+
+(impc:ti:register-new-builtin
+ "bind-lib"
+ ""
+ "bind a C function from a shared library"
+ '(libname function-name type optional-docstring))
+
+;; this was previously called __dynamic-bind
+(define impc:ti:bind-lib
+  (lambda (library symname type calling-convention docstring)
+    (if (llvm:get-function (symbol->string symname)) ;; if already bound!
+        (begin
+          (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+          (impc:compiler:print-lib-binding-details-to-log library symname type)
+          (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+        (if (not (eval library))
+            (impc:compiler:print-compiler-error
+              (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
+            (let* ((ctype (cdr (impc:ir:get-type-from-pretty-str (symbol->string type))))
+                  (ir-string (string-append "declare "
+                                            "cc " (atom->string calling-convention)
+                                            " "
+                                            (impc:ir:get-type-str (car ctype))
+                                            " @"
+                                            (symbol->string symname)
+                                            "("
+                                            (if (null? (cdr ctype))
+                                                ""
+                                                (apply string-append
+                                                        (impc:ir:get-type-str (cadr ctype))
+                                                        (map (lambda (v)
+                                                              (string-append "," (impc:ir:get-type-str v)))
+                                                            (cddr ctype))))
+                                            ") nounwind")))
+              (if (and (llvm:compile-ir ir-string)
+                      (llvm:bind-symbol (eval library) (symbol->string symname)))
+                  (begin
+                    (if (output-port? *impc:aot:current-output-port*) ;; *impc:compiler:aot:dll*)
+                        (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *impc:aot:current-output-port*)
+                              (newline *impc:aot:current-output-port*)))
+                    (impc:ti:register-new-nativefunc (symbol->string symname) (impc:ir:get-type-from-pretty-str (symbol->string type)) "" '())
+                    (impc:compiler:print-lib-binding-details-to-log library symname type)
+                    (impc:aot:insert-nativefunc-binding-details library symname type docstring))
+                  (impc:compiler:print-compiler-error (string-append "could not bind " (symbol->string symname)))))))))
+
+(define-macro (unbind-func symname)
+  `(begin
+     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var"))
+     (llvm:erase-function ,(symbol->string symname))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_setter"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_getter"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_callback"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_native"))
+     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var_zone"))
+     (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))
+         (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
+
+(define-macro (bind-lib-type library name type docstring)
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type)))
+    `(begin
+       (if (llvm:compile-ir ,(string-append "%" namestr " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str typestr namestr))))
+           (impc:ti:register-new-namedtype ,namestr
+                                           ',(impc:ir:get-type-from-pretty-str typestr namestr)
+                                           ,docstring)
+           (impc:compiler:print-compiler-error "bind-lib-type failed" ,name)))))
+
+(define-macro (register-lib-type library name type docstring)
+  (if (impc:aot:currently-compiling?)
+      (set! *impc:ti:suppress-ir-generation* #t)
+      (set! *impc:ti:suppress-ir-generation* #f))
+  (let* ((a (impc:ir:get-pretty-tuple-arg-strings (symbol->string type)))
+         (namestr (symbol->string name))
+         (typestr (symbol->string type)))
+    `(begin
+       (impc:ti:register-new-namedtype ,namestr
+                                      ',(impc:ir:get-type-from-pretty-str typestr namestr)
+                                      ,docstring)
+       (set! *impc:ti:suppress-ir-generation* #f))))
+
+
+;;; this here for binding to CLOSURE in dylib
+;;
+;; arg is for *optional* zone size arg
+(define-macro (bind-lib-func library symname type zone-size docstring body)
+  `(begin
+     (bind-lib ,library ,symname ,type fastcc)
+     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void]*)
+     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
+     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
+     (if (impc:ti:create-scm-wrapper? ,(symbol->string symname))
+         (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
+     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
+     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
+               ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
+     (if (not (llvm:compile-ir
+               (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
+                              "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
+         (impc:compiler:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
+     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
+     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
+     ;; bind scheme function
+     (if (impc:ti:create-scm-wrapper? ,(symbol->string symname))
+         (eval (define ,symname
+                 (impc:ti:create-scheme-wrapper (symbol->string ',symname)))
+               (interaction-environment))
+         (impc:compiler:print-no-scheme-stub-notification (symbol->string ',symname)))
+     (impc:ti:register-new-closure ,(symbol->string symname)
+                                   (impc:ir:get-type-from-pretty-str ,(symbol->string type))
+                                   ,zone-size
+                                   ,docstring
+                                   ,body)
+     (impc:compiler:print-binding-details-to-log "LibBound:"
+                                                 ,(symbol->string symname)
+                                                 ,(symbol->string type))
+     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname)
+                                               ,zone-size)))
+
+(define-macro (register-lib-func library symname type zone-size docstring body)
+  `(begin
+     ;; bind scheme function
+     (impc:ti:register-new-closure ,(symbol->string symname)
+                                   (impc:ir:get-type-from-pretty-str ,(symbol->string type))
+                                   ,zone-size
+                                   ,docstring
+                                   ,body)
+     (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                 ,(symbol->string symname)
+                                                 ,(symbol->string type))
+     (impc:ti:initialize-closure-with-new-zone ,(symbol->string symname) ,zone-size)))
+
+
+(define-macro (bind-lib-val library symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+     (if (and (llvm:compile-ir
+               (string-append "@" ,(symbol->string symname) " = external global "
+                              (impc:ir:get-type-str type-list)))
+              (llvm:bind-symbol ,library ,(symbol->string symname)))
+         (begin
+           (impc:ti:register-new-globalvar ,(symbol->string symname)
+                                           type-list
+                                           ds)
+           (impc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                      ,(symbol->string symname)
+                                                      ,(symbol->string type)
+                                                      ds)
+           (impc:compiler:print-binding-details-to-log "LibBound:"
+                                                       ,(symbol->string symname)
+                                                       ,(symbol->string type)))
+         (impc:compiler:print-compiler-error (string-append "could not bind-lib-val "
+                                                            ,(symbol->string symname)
+                                                            " from library "
+                                                            ,(symbol->string library))))))
+
+(define-macro (register-lib-val library symname type . docstring)
+  `(let* ((type-str ,(if (impc:ti:typealias-exists? (symbol->string type))
+                         (impc:ti:get-typealias-ground-type-pretty (symbol->string type))
+                         (symbol->string type)))
+          (type-list (impc:ir:get-type-from-pretty-str type-str))
+          (ds ,(if (null? docstring) "" (car docstring))))
+      (begin
+           (impc:ti:register-new-globalvar ,(symbol->string symname)
+                                           type-list
+                                           ds)
+           (impc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                      ,(symbol->string symname)
+                                                      ,(symbol->string type)
+                                                      ds)
+           (impc:compiler:print-binding-details-to-log "Lib Registered:"
+                                                       ,(symbol->string symname)
+                                                       ,(symbol->string type)))))
+
+;; THIS IS A HELPER FUNCTION
+;;
+;; returns a (bind-lib-xtm) form for the named function
+;; by using the xtm-closure-doc to get the type
+;; function must already have been compiled into module
+(define-macro (bind-lib-xtm-get-string name)
+  (let ((res (eval `(xtm-closure-doc ,name))))
+    (if (string? res)
+        `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol res)))
+        `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol (cdr res)))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define impc:ti:initialize-closure-with-new-zone
+  (lambda (func-name zone-size)
+    (if (not (impc:aot:currently-compiling?))
+        (let ((setter (llvm:get-function (string-append func-name "_setter"))))
+          (if setter
+              (begin
+                (sys:push-memzone (sys:create-mzone zone-size))
+                (llvm:run setter)
+                ;; don't destroy - this happens in _setter func
+                (sys:pop-memzone))
+              (impc:compiler:print-missing-identifier-error (string->symbol (string-append func-name "_setter")) 'closure-setter))))))
+
+(define impc:ti:create-scm-wrapper?
+  (lambda (func-name)
+    (cl:every
+     (lambda (type)
+       (or (impc:ir:void? type)
+           (impc:ir:floating-point? type)
+           (impc:ir:fixed-point? type)
+           (impc:ir:pointer? type)))
+     (map impc:ir:get-type-from-str
+          (impc:ti:get-closure-or-nativefunc-arg-types func-name)))))
+
+(define impc:ti:adhoc-scheme-wrapper
+  (lambda (polyname funcname)
+    `(define ,(string->symbol polyname)
+       (lambda args
+         (if (and (not (null? args))
+                  (symbol? (car args)))
+             (if (equal? (car args) 'xtlang)
+                 ',(string->symbol funcname)
+                 (if (null? (cdr args))
+                     (eval (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")")))
+                     (eval (append (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")"))
+                                   (list (cadr args))))))
+             (apply ,(string->symbol funcname) args))))))
+
+
+(define impc:ti:create-scheme-wrapper
+  (lambda (func-name)
+    (if (impc:aot:currently-compiling?)
+        (lambda ()
+          (if (not (impc:aot:currently-compiling?))
+              (begin
+                (print-with-colors 'yellow 'default #t (print "Compiler Warning:"))
+                (print " the scheme wrapper for ")
+                (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print (string->symbol func-name)))
+                (print " was called, but it doesn't exist (yet)\n"))))
+        (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme")))
+              (p (regex:split func-name "_adhoc_")))
+          (if (and
+               (or (not (defined? (string->symbol (car p))))
+                   (defined? (string->symbol (string-append (car p) "_xtlang_name"))))
+               (not (null? (cdr p)))) ;; if _adhoc_ is true
+              (let ((polytypes (impc:ti:get-polyfunc-candidate-list (car p))))
+                (if (and (list? polytypes)
+                         (= (length polytypes) 1))
+                    (begin
+                      (eval `(define
+                               ,(string->symbol (string-append (car p) "_xtlang_name"))
+                               ,(vector-ref (car polytypes) 0))
+                            (interaction-environment))
+                      (eval (impc:ti:adhoc-scheme-wrapper
+                             (car p)
+                             (vector-ref (car polytypes) 0))
+                            (interaction-environment)))
+                    (begin
+                      (eval `(define ,(string->symbol (string-append (car p) "_xtlang_name")) #f)
+                            (interaction-environment))
+                      (eval `(define ,(string->symbol (car p))
+                               (lambda args
+                                 (println 'Ambiguous 'or 'unavailable 'xtlang 'wrapper: ,(car p))))
+                            (interaction-environment))))))
+          (if scheme-func
+              (begin
+                (llvm:ffi-set-name scheme-func func-name)
+                ;; (println 'mk-ff func-name)
+                (mk-ff func-name scheme-func))
+              (impc:compiler:print-no-scheme-stub-notification (string->symbol func-name)))))))
+
+;; a helper for returning a native closure (if one exists!)
+(define llvm:get-native-closure
+  (lambda (name)
+    (if (impc:aot:currently-compiling?)
+        (impc:compiler:print-not-during-aot-error)
+        (let ((f (llvm:get-function (string-append name "_getter"))))
+          (if f (llvm:run f)
+              '())))))
+
+(define llvm:get-closure-setter
+  (lambda (name)
+    (if (impc:aot:currently-compiling?)
+        (impc:compiler:print-not-during-aot-error)
+        (llvm:get-function-pointer (string-append name "_setter")))))
+
+;; a helper for returning a scheme closure native closure (if one exists!)
+(define llvm:get-native-function
+  (lambda (name)
+    (if (impc:aot:currently-compiling?)
+        (impc:compiler:print-not-during-aot-error)
+        (llvm:get-function-pointer (string-append name "_native")))))
+
+;; Wrap a native, bound C function, allowing it to be called from scheme
+(define-macro (bind-wrapper local-sym native-sym)
+  (let* ((types (cdr (impc:ti:get-closure-arg-types (symbol->string native-sym))))
+         (args (map (lambda (t v) v)
+                    types (make-list-with-proc
+                           (length types)
+                           (lambda (i)
+                             (string->symbol (string-append "arg_" (atom->string i))))))))
+    `(bind-func ,local-sym
+       (lambda ,args
+         ,(cons native-sym args)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; very dodgy
+;; generic constraints
+;;
+;; simply forces supplied specialisations
+;; add to polys and remove gpoly
+;;
+;; for example
+;;
+;; (bind-func test:[!a,!a]*
+;;   (lambda (x) (* x x)))
+;;
+;; (constrain-genericfunc test [i32,i32]* [float,float]*)
+;;
+(define impc:ti:constrain-genericfunc
+  (lambda (sym . types)
+    ;; (println 'impc:ti:constrain-genericfunc 'sym: sym types)
+    (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
+        (impc:compiler:print-missing-identifier-error sym "generic function")
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))
+          (set! *impc:ti:print-code-specialization-compiles* #t)
+          (for-each
+           (lambda (t)
+             (if (regex:match? t "_poly_")
+                 (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
+             (let ((etype (cname-encode t)))
+               (if (not (impc:ti:closure-exists? (string-append sym "_poly_" etype)))
+                   (let* ((arity (impc:ir:get-arity-from-pretty-closure t))
+                          (code (caddr (cadr (impc:ti:genericfunc-types (string->symbol sym) arity t))))
+                          (pfunc (string->symbol (string-append sym "_poly_" etype))))
+                     ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                     ;; pre-populate the closure cache for the new specialised func
+                     (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
+                         (impc:ti:register-new-closure (symbol->string pfunc)
+                                                       '()
+                                                       *impc:default-zone-size*
+                                                       ""
+                                                       code))
+                     (set! code `(let ((,pfunc ,code)) ,pfunc))
+                     (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol t)))
+                     (impc:ti:register-new-polyfunc sym
+                                                    (symbol->string pfunc)
+                                                    (impc:ir:get-type-from-pretty-str t)
+                                                    "")
+                     (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
+                                                               *impc:default-zone-size*)
+                     pfunc))))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          (set! *impc:ti:genericfunc-cache*
+                (cl:remove-if (lambda (x)
+                                (if (string=? (symbol->string (car x)) sym)
+                                    #t #f))
+                              *impc:ti:genericfunc-cache*))
+          #t))))
+
+(define-macro (constrain-genericfunc sym . args)
+  (apply impc:ti:constrain-genericfunc
+         (symbol->string sym)
+         (map (lambda (x)
+                (if (regex:match? (symbol->string x) "^\\$")
+                    (set! x (string->symbol (string-append (symbol->string sym) ":" (symbol->string x)))))
+                (symbol->string (impc:ti:expand-generic-type x))) args)))
+
+;; old name (for compatibility)
+(define constrain-generic constrain-genericfunc)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; specialize generic type!
+;;
+(define impc:ti:specialize-generictype
+  (lambda (sym . types)
+    ;; (println 'impc:ti:specialize-generictype 'sym: sym types)
+    (if (not (impc:ti:get-generictype-candidate-types (string->symbol sym)))
+        (impc:compiler:print-missing-generic-type-error sym)
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))
+          (set! *impc:ti:print-code-specialization-compiles* #t)
+          (for-each
+           (lambda (t)
+             (if (regex:match? t ":")
+                 (set! t (cadr (regex:type-split t ":"))))
+             (let ((newname (string-append sym "_poly_" (cname-encode t))))
+               (if (llvm:compile-ir (string-append "%" newname " = type " (impc:ir:get-type-str (impc:ir:get-type-from-pretty-str t))))
+                   (impc:ti:compile-type-dataconstructors (string->symbol newname) t #f #t #t #t)
+                   (impc:compiler:print-compiler-error "failed to compile IR in impc:ti:specialize-generictype" sym))))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          #t))))
+
+(define-macro (specialize-generictype sym . args)
+  (apply impc:ti:specialize-generictype
+         (symbol->string sym)
+         (map (lambda (x)
+                (if (regex:match? (symbol->string x) "^\\$")
+                    (set! x (string->symbol (string-append (symbol->string sym) ":" (symbol->string x)))))
+                (symbol->string (impc:ti:expand-generic-type x))) args)))
+
+
+;; force specializations on a generic funtion
+(define impc:ti:specialize-genericfunc
+  (lambda (sym . types)
+    ;; (println 'impc:ti:specialize-genericfunc 'sym: sym types)
+    (if (not (impc:ti:genericfunc-exists? (string->symbol sym)))
+        (impc:compiler:print-missing-identifier-error sym "generic function")
+        (let ((printspec *impc:ti:print-code-specialization-compiles*))
+          (set! *impc:ti:print-code-specialization-compiles* #t)
+          (for-each
+           (lambda (t)
+             (if (regex:match? t "_poly_")
+                 (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
+             (let ((etype (cname-encode t)))
+               (if (not (impc:ti:closure-exists? (string-append sym "_poly_" etype)))
+                   (let* ((arity (impc:ir:get-arity-from-pretty-closure t))
+                          (gftypes (impc:ti:genericfunc-types (string->symbol sym) arity t))
+                          (res (if (not gftypes)
+                                   (impc:compiler:print-compiler-error "Bad generic closure type:" (list sym t))))
+                          (code (caddr (cadr gftypes)))
+                          (pfunc (string->symbol (string-append sym "_poly_" etype))))
+                     ;; (println 'makesym etype 't: t)
+                     ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                     ;; pre-populate the closure cache for the new specialised func
+                     (if (not (impc:ti:closure-exists? (symbol->string pfunc)))
+                         (impc:ti:register-new-closure (symbol->string pfunc)
+                                                       '()
+                                                       *impc:default-zone-size*
+                                                       ""
+                                                       code))
+                     (set! code `(let ((,pfunc ,code)) ,pfunc))
+                     (impc:ti:run pfunc code *impc:default-zone-size* #f #f (cons pfunc (string->symbol t)))
+                     (impc:ti:register-new-polyfunc sym
+                                                    (symbol->string pfunc)
+                                                    (impc:ir:get-type-from-pretty-str t)
+                                                    "")
+                     (impc:ti:initialize-closure-with-new-zone (symbol->string pfunc)
+                                                               *impc:default-zone-size*)
+                     pfunc))))
+           types)
+          (set! *impc:ti:print-code-specialization-compiles* printspec)
+          #t))))
+
+(define-macro (call-as-xtlang . expr)
+  (if (not (impc:aot:currently-compiling?))
+      (sys:with-quiet-compiler
+       (begin
+         (set! *impc:ir:sym-name-stack* '())
+         (set! *impc:ir:ls_var* '())
+         (set! *impc:ti:bound-lambdas* '())
+         (set! *impc:ti:generic-type-mappings* '())
+         (set! *impc:ti:nativef-generics-recurse-test* 0)
+         (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+           (eval `(bind-func xtlang_expression
+                    (lambda ()
+                      ,(if (equal? type -1)
+                           `(let ((s:i8* (halloc 2)))
+                              ,@expr
+                              s)
+                           `(letz ((res (begin ,@expr))
+                                   (s:String* (toString res))
+                                   (lgth (+ 1 (tref s 0)))
+                                   (oldcs (tref s 1))
+                                   (newcs:i8* (halloc lgth)))
+                              (strcpy newcs oldcs)
+                              newcs))))
+                 (interaction-environment))
+           (quote (string->atom (cptr->string (xtlang_expression)))))))))
+
+(define xtmX call-as-xtlang)
+(define $ call-as-xtlang)
+
+;; this version uses a let instead of a letz
+(define-macro (call-as-xtlang-leaky . expr)
+  (if (not (impc:aot:currently-compiling?))
+      (sys:with-quiet-compiler
+       (begin
+         (set! *impc:ir:sym-name-stack* '())
+         (set! *impc:ir:ls_var* '())
+         (set! *impc:ti:bound-lambdas* '())
+         (set! *impc:ti:generic-type-mappings* '())
+         (set! *impc:ti:nativef-generics-recurse-test* 0)
+         (let ((type (impc:ti:get-expression-type (car (reverse expr)))))
+           (eval `(bind-func xtlang_expression
+                    (lambda ()
+                      ,(if (not (impc:ir:pointer? type))
+                           `(let ((s:i8* null))
+                              ;; (println "returning null for non-pointer type")
+                              ,@expr
+                              s)
+                           `(let ((res:i8* (cast (begin ,@expr) i8*)))
+                              res))))
+                 (interaction-environment))
+           (quote (xtlang_expression)))))))
+
+(define $$ call-as-xtlang-leaky)
+
+;; helper macro for specializing generics
+;;
+;; i.e. (specialize-genericfunc blah [i32,i32]* [i64,i64]*)
+(define-macro (specialize-genericfunc sym . args)
+  (apply impc:ti:specialize-genericfunc
+         (symbol->string sym)
+         (map (lambda (x)
+                (if (regex:match? (symbol->string x) "^\\$")
+                    (set! x (string->symbol (string-append (symbol->string sym) ":" (symbol->string x)))))
+                (symbol->string (impc:ti:expand-generic-type x))) args)))
+
+;;;;;;;;;;;;
+;; xtmdoc ;;
+;;;;;;;;;;;;
+
+;; the documentation function should return an associative list with
+;; the following keys:
+
+;; ((name . awesome_closure)
+;;  (category . "closure")
+;;  (type . "[i64]")
+;;  (args . (arg1 arg2))
+;;  (docstring . "the docstring))
+
+;; the keys must be present, but the cdr of each element may be
+;; missing where appropriate (e.g. scheme functions have no type field)
+
+(define xtmdoc-strip-arg-type-annotations
+  (lambda (form)
+    (if (or (symbol? form)
+            (not (list? form)))
+        form
+        (map (lambda (arg)
+               (string->symbol (car (regex:split (symbol->string arg) ":"))))
+             form))))
+
+(define xtmdoc-get-args-from-form
+  (lambda (form)
+    (if (null? form)
+        #f
+        (if (equal? (car form) 'lambda)
+            (xtmdoc-strip-arg-type-annotations (cadr form))
+            (if (and (list? (car form)) (equal? (caar form) 'lambda))
+                (xtmdoc-strip-arg-type-annotations (cadar form))
+                ;; recurse!
+                (xtmdoc-get-args-from-form (if (member (car form) '(let let* letz))
+                                               (cddr form)
+                                               (cdr form))))))))
+
+;; currently only returns the result for the first arity
+(define xtmdoc-get-xtlang-genericfunc-args
+  (lambda (fn-sym)
+    (xtmdoc-get-args-from-form
+     (caddar (cdddar (assoc-strcmp-all fn-sym *impc:ti:genericfunc-cache*))))))
+
+(define xtmdoc-builtin-handler
+  (lambda (name-sym)
+    (list
+     '(category . "builtin")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (impc:ti:get-builtin-args (symbol->string name-sym)))
+     (cons 'type
+           (let ((type (impc:ti:get-builtin-type-str (symbol->string name-sym))))
+             (if (string=? type "") '() type)))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-builtin-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-genericfunc-handler
+  (lambda (name-sym)
+    ;; once we have a way to handle multipe aritys, we should update
+    ;; this function
+    (list
+     '(category . "generic closure")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
+     (cons 'type (impc:ti:simplify-genericfunc-pretty-type
+                  (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*)))))
+     (list 'docstring))))
+
+(define xtmdoc-generictype-handler
+  (lambda (name-sym)
+    (list
+     '(category . "generic type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ti:simplify-generictype-pretty-type
+                  (symbol->string (impc:ti:get-generictype-candidate-types name-sym))))
+     (list 'docstring))))
+
+(define xtmdoc-polyfunc-handler
+  (lambda (name-sym)
+    (list
+     '(category . "polymorphic closure")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args "")
+     (list 'type)
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-polyfunc-docstring (symbol->string name-sym)))
+                 (poly-options-docstring
+                  (string-join (map (lambda (pf)
+                                      (let* ((option-name (vector-ref pf 0)))
+                                        (string-append "@poly " option-name ":"
+                                                       (impc:ir:pretty-print-type (vector-ref pf 1)))))
+                                    (cl:remove-if
+                                     (lambda (pf) (regex:match? (vector-ref pf 0) "_poly_"))
+                                     (impc:ti:get-polyfunc-candidate-list (symbol->string name-sym))))
+                               "\n")))
+             (string-append docstring "\n\n" poly-options-docstring))))))
+
+(define xtmdoc-polytype-handler
+  (lambda (name-sym)
+    (list
+     '(category . "polymorphic type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (string-join (map (lambda (pf) (impc:ir:pretty-print-type pf))
+                                   (impc:ti:get-polytype-candidate-types (symbol->string name-sym)))
+                              " "))
+     (list 'docstring))))
+
+(define xtmdoc-closure-handler
+  (lambda (name-sym)
+    (list
+     '(category . "closure")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (xtmdoc-get-args-from-form (impc:ti:get-closure-body (symbol->string name-sym))))
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-closure-type (symbol->string name-sym))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-closure-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-nativefunc-handler
+  (lambda (name-sym)
+    (list
+     '(category . "C function")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (impc:ti:get-nativefunc-arg-names (symbol->string name-sym)))
+     (cons 'type
+           (let ((type (impc:ti:get-nativefunc-type (symbol->string name-sym))))
+             (if (equal? type 'varargs)
+                 "varargs"
+                 (impc:ir:pretty-print-type type))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-nativefunc-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-typealias-handler
+  (lambda (name-sym)
+    (list
+     '(category . "type alias")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-typealias-ground-type (symbol->string name-sym))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-typealias-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-namedtype-handler
+  (lambda (name-sym)
+    (list
+     '(category . "named type")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     (cons 'type (impc:ir:pretty-print-type (impc:ti:get-namedtype-type (symbol->string name-sym))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-namedtype-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-globalvar-handler
+  (lambda (name-sym)
+    (list
+     '(category . "global var")
+     (cons 'name (symbol->string name-sym))
+     (list 'args)
+     ;; rememeber that global vars need to be "depointerised" by one level
+     (cons 'type (impc:ir:pretty-print-type (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string name-sym)))))
+     (cons 'docstring
+           (let ((docstring (impc:ti:get-globalvar-docstring (symbol->string name-sym))))
+             (if (string=? docstring "") '() docstring))))))
+
+(define xtmdoc-scheme-function-handler
+  (lambda (name-sym)
+    (list
+     '(category . "scheme closure")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (xtmdoc-get-args-from-form (get-closure-code (eval name-sym))))
+     (list 'type)
+     (list 'docstring))))
+
+(define xtmdoc-scheme-macro-handler
+  (lambda (name-sym)
+    (list
+     '(category . "scheme macro")
+     (cons 'name (symbol->string name-sym))
+     (cons 'args (cadadr (caddr (get-closure-code (eval name-sym)))))
+     (list 'type)
+     (list 'docstring))))
+
+(define xtmdoc-documentation-function
+  (lambda (name)
+    (let ((sym (string->symbol name)))
+      (cond ((impc:ti:builtin-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-builtin-handler sym)))
+            ((impc:ti:typealias-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-typealias-handler sym)))
+            ((impc:ti:genericfunc-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-genericfunc-handler sym)))
+            ((impc:ti:polyfunc-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-polyfunc-handler sym)))
+            ((impc:ti:closure-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-closure-handler sym)))
+            ((impc:ti:nativefunc-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-nativefunc-handler sym)))
+            ((impc:ti:globalvar-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-globalvar-handler sym)))
+            ((impc:ti:generictype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-generictype-handler sym)))
+            ((impc:ti:polytype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-polytype-handler sym)))
+            ((impc:ti:namedtype-exists? name)
+             (cons 'xtmdoc-docstring (xtmdoc-namedtype-handler sym)))
+            ((and (defined? sym) (closure? (eval sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-scheme-function-handler sym)))
+            ((and (defined? sym) (macro? (eval sym)))
+             (cons 'xtmdoc-docstring (xtmdoc-scheme-macro-handler sym)))
+            (else
+             '(xtmdoc-docstring-nodocstring))))))
+
+;; sort the alists (as returned by the various handler functions) into
+;; a reasonably meaningful order (least to most important)
+(define xtmdoc-alist-lessthan
+  (lambda (left right)
+    (let ((categories '("C function"
+                        "global var"
+                        "polymorphic closure"
+                        "polymorphic type"
+                        "closure"
+                        "named type"
+                        "generic closure"
+                        "generic type"
+                        "type alias"
+                        "builtin")))
+      (let ((lpos (cl:position (cdr (assoc-strcmp 'category left)) categories))
+            (rpos (cl:position (cdr (assoc-strcmp 'category right)) categories)))
+        (if (<> lpos rpos)
+            (< lpos rpos)
+            (string<? (cdr (assoc-strcmp 'name left))
+                      (cdr (assoc-strcmp 'name right))))))))
+
+(define xtmdoc-clean-nativefunc-alist
+  (lambda (closure-alists nativefunc-alists)
+    (cl:remove-if
+     (lambda (nativefunc-data)
+       (let ((nativefunc-name (cdr (assoc-strcmp 'name nativefunc-data))))
+         (cl:find-if (lambda (closure-data)
+                       ;; is it a closure?
+                       (string=? (cdr (assoc-strcmp 'name closure-data)) nativefunc-name))
+                     closure-alists)))
+     nativefunc-alists)))
+
+(define xtmdoc-all-doc-alists
+  (lambda (include-nativefuncs?)
+    (let* ((closure-alists
+            (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
+                 (hashtable->alist *impc:ti:closure-cache*)))
+           (all-doc-alists
+            (append
+             (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:builtin-cache*))
+             (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:typealias-cache*))
+             (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
+             (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
+
+             (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:namedtype-cache*))
+             closure-alists
+             (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:polytype-cache*))
+             (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:polyfunc-cache*))
+             (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:globalvar-cache*))
+             ;; make sure the "_native" versions of each closure don't get in
+             ;; there (since the closure is already there)
+             (if include-nativefuncs?
+                 (xtmdoc-clean-nativefunc-alist
+                  closure-alists
+                  (map (lambda (x)
+                         (xtmdoc-nativefunc-handler (string->symbol (car x))))
+                       (hashtable->alist *impc:ti:nativefunc-cache*)))
+                 '()))))
+      ;; filter out the things which shouldn't make it to the exported docs
+      (cl:remove-if
+       (lambda (doc-alist)
+         (regex:match? (cdr (assoc-strcmp 'name doc-alist))
+                       "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
+       all-doc-alists))))
+
+;; we handle the args field separately, since there are a few special
+;; cases to handle
+(define xtmdoc-write-alist-args-as-json
+  (lambda (xtmdoc-alist file-port)
+    ;; (println (cdr (assoc-strcmp 'name xtmdoc-alist)))
+    (display ",\n  \"args\": " file-port)
+    (let ((category (cdr (assoc-strcmp 'category xtmdoc-alist)))
+          (args (cdr (assoc-strcmp 'args xtmdoc-alist)))
+          (type (cdr (assoc-strcmp 'type xtmdoc-alist))))
+      ;; arg names and types
+      (cond
+       ((member category '("closure" "generic closure"))
+        (display
+         (string-append
+          "["
+          (string-join (map (lambda (name type)
+                              (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                            (cons 'RETURN args)
+                            (impc:ir:get-pretty-closure-arg-strings type))
+                       ", ")
+          "]")
+         file-port))
+       ((string=? category "builtin")
+        (if (or (not (string? type))
+                (string=? type "")
+                (<> (length (cdr (impc:ir:get-pretty-closure-arg-strings type)))
+                    (length args)))
+            ;; allow builtins have malformed arg/type relationships
+            (display
+             (string-append
+              "["
+              (string-join (map (lambda (name)
+                                  (string-append "[\"" (symbol->string name) "\", null]"))
+                                args)
+                           ", ")
+              "]")
+             file-port)
+            (display
+             (string-append
+              "["
+              (string-join (map (lambda (name type)
+                                  (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                                (cons 'RETURN args)
+                                (impc:ir:get-pretty-closure-arg-strings type))
+                           ", ")
+              "]")
+             file-port)))
+       ((string=? category "C function")
+        (display
+         (string-append
+          "["
+          ;; at the moment, there's no way of telling the xtlang
+          ;; compiler about the names of the arguments to a C function
+          (string-join (map (lambda (type)
+                              (string-append "[null, \"" type "\"]"))
+                            (impc:ir:get-pretty-closure-arg-strings type))
+                       ", ")
+          "]")
+         file-port))
+       ;; these are the ones for which "args" doesn't make sense
+       ;; "named type"
+       ;; "generic type"
+       ;; "polymorphic closure"
+       ;; "global var"
+       ;; "polymorphic type"
+       ;; "type alias"
+       (else (write 'null file-port))))))
+
+(define xtmdoc-write-alist-as-json
+  (lambda (xtmdoc-alist file-port)
+    (display "{\n  \"category\": " file-port)
+    (write (cdr (assoc-strcmp 'category xtmdoc-alist)) file-port)
+    (display ",\n  \"name\": " file-port)
+    (write (cdr (assoc-strcmp 'name xtmdoc-alist)) file-port)
+    (xtmdoc-write-alist-args-as-json xtmdoc-alist file-port)
+    (display ",\n  \"type\": " file-port)
+    (let ((type (cdr (assoc-strcmp 'type xtmdoc-alist))))
+      (write (if (null? type) 'null type) file-port))
+    (display ",\n  \"docstring\": " file-port)
+    (let ((docstring (cdr (assoc-strcmp 'docstring xtmdoc-alist))))
+      (write (if (null? docstring) 'null docstring) file-port))
+    (display "\n}" file-port)))
+
+(define xtmdoc-export-caches-to-json
+  (lambda (file-path include-nativefuncs?)
+    (let ((outfile-port (open-output-file file-path)))
+      (display "[\n" outfile-port)
+      (let loop ((doc-alists (cl:sort (xtmdoc-all-doc-alists include-nativefuncs?)
+                                      (lambda (a b) (not (xtmdoc-alist-lessthan a b))))))
+        (if (null? doc-alists)
+            (begin
+              (display "\n]" outfile-port)
+              (close-port outfile-port)
+              (print "Succesfully exported docs as json to " file-path "\n")
+              #t)
+            (begin
+              (xtmdoc-write-alist-as-json (car doc-alists) outfile-port)
+              (if (not (null? (cdr doc-alists)))
+                  (display ",\n" outfile-port))
+              (loop (cdr doc-alists))))))))
+
+(define-macro (impc:ti:get-native-name closure-name . type)
+  (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
+         (base (if (null? (cdr pair)) "" (impc:ir:get-base-type (cadr pair)))))
+    (set! closure-name (symbol->string closure-name))
+    (if (not (null? (cdr pair)))
+        (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
+        (if (null? type)
+            (if (and (impc:ti:polyfunc-exists? closure-name)
+                     (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
+                (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
+                       (bt (impc:ir:get-base-type t))
+                       (fullname (string-append closure-name
+                                                "_adhoc_"
+                                                (cname-encode bt)
+                                                "_native")))
+                  fullname)
+                (impc:compiler:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name)))
+            (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
+                   (fullname (string-append closure-name
+                                            "_adhoc_"
+                                            (cname-encode bt)
+                                            "_native")))
+              fullname)))))
+
+(define-macro (impc:ti:get-mono-name closure-name . type)
+  (let* ((pair (regex:type-split (symbol->string closure-name) ":"))
+         (base (if (null? (cdr pair)) "" (impc:ir:get-base-type (cadr pair)))))
+    (set! closure-name (symbol->string closure-name))
+    (if (not (null? (cdr pair)))
+        (string-append (car pair) "_adhoc_" (cname-encode base) "_native")
+        (if (null? type)
+            (if (and (impc:ti:polyfunc-exists? closure-name)
+                     (= (length (impc:ti:get-polyfunc-candidate-types closure-name)) 1))
+                (let* ((t (impc:ir:pretty-print-type (car (impc:ti:get-polyfunc-candidate-types closure-name))))
+                       (bt (impc:ir:get-base-type t))
+                       (fullname (string-append closure-name
+                                                "_adhoc_"
+                                                (cname-encode bt)
+                                                "")))
+                  fullname)
+                (impc:compiler:print-compiler-error "Try forcing a type? Ambiguous call to get_native_fptr" (string->symbol closure-name)))
+            (let* ((bt (impc:ir:get-base-type (symbol->string (car type))))
+                   (fullname (string-append closure-name
+                                            "_adhoc_"
+                                            (cname-encode bt)
+                                            "")))
+              fullname)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; print ir & x86 assm
+;;
+
+(define-macro (llvm:ir name . type)
+  (let ((t (if (null? type) #f (car type))))
+    `(let* ((n1 ,(if t
+                     `(impc:ti:get-mono-name ,name ,t)
+                     `(impc:ti:get-mono-name ,name)))
+            (n2 (llvm:get-closure-work-name n1)))
+       ;; (println 'n1 n1 'n2 n2)
+       (llvm:print-closure n2))))
+
+(define-macro (llvm:asm name . args)
+  (let* ((a1 (if (null? args) #f (car args)))
+         (a2 (if (null? args) #f (if (null? (cdr args)) #f (cadr args))))
+         (type (if (symbol? a1) a1 (if (symbol? a2) a2 #f)))
+         (assm_print_type (if (number? a1) a1 (if (number? a2) a2 #f))))
+    `(let ((n1 ,(if type
+                    `(impc:ti:get-mono-name ,name ,type)
+                    `(impc:ti:get-mono-name ,name))))
+       ,(if (not assm_print_type)
+            `(print (llvm:disassemble n1 0) "\n")
+            `(print (llvm:disassemble n1 ,assm_print_type) "\n")))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; helper functions for constraint checking
+;;
+;; note that these need to take *impc:ir:notype* into acct
+;;
+;; in other words they should only fail for actual types
+;; they should succeed against *impc:ir:notype*
+;;
+
+;; (define t:integer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:fixed-point? x))))
+;; (define t:float? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:floating-point? x))))
+;; (define t:number? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:number? x))))
+;; (define t:void? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:void? x))))
+;; (define t:signed? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:signed? x))))
+;; (define t:closure? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:closure? x))))
+;; (define t:vector? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:vector? x))))
+;; (define t:array? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:array? x))))
+;; (define t:tuple? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:tuple? x))))
+;; (define t:scalar? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:scalar? x))))
+;; (define t:pointer? (lambda (x) (or (equal? x *impc:ir:notype*) (impc:ir:pointer? x))))
+;; (define t:notype? (lambda (x) (equal? x *impc:ir:notype*)))
+
+(define t:integer? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:fixed-point? x)))
+(define t:float? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:floating-point? x)))
+(define t:number? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:number? x)))
+(define t:void? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:void? x)))
+(define t:signed? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:signed? x)))
+(define t:closure? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:closure? x)))
+(define t:vector? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:vector? x)))
+(define t:array? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:array? x)))
+(define t:tuple? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:tuple? x)))
+(define t:scalar? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:scalar? x)))
+(define t:pointer? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (impc:ir:pointer? x)))
+(define t:notype? (lambda (x) (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x))) (equal? x *impc:ir:notype*)))
+
+;; how many elements (or args for closure) does type have
+;;
+(define t:elts? (lambda (x num)
+                  (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x)))
+                  (cond ((string? x) (= num -1))
+                        ((or (t:array? x) (t:vector? x))
+                         (= (cadr x) num))
+                        ((t:tuple? x)
+                         (= (- (length x) 1) num))
+                        ((t:closure? x)
+                         (= (- (length x) 2) num))
+                        (else (= num 1)))))
+
+;; closure with number of args
+(define t:closure-size? (lambda (f num)
+                          (if (string? f) (set! f (impc:ir:get-type-from-pretty-str f)))
+                          (and (impc:ir:closure? f)
+                               (t:elts? f num))))
+
+
+;; named type check strips pointers!
+;; (you can use t:pointer? fo
+;; (define t:cleanup-string-type
+;;   (lambda (a)
+;;     (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+;;            (bt (impc:ir:get-base-type (impc:ir:clean-named-type a)))
+;;            (ptrdepth (impc:ir:get-ptr-depth a))
+;;            (strtype (impc:ir:pointer++ nt ptrdepth)))
+;;       ;; (println 'bt bt 'ptrdepth ptrdepth 'nt nt 'strtype strtype)
+;;       (apply string-append bt (make-list ptrdepth "*")))))
+
+(define t:cleanup-string-type
+  (lambda (a)
+    (let* ((nt (impc:ti:get-named-type (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+           (bt (impc:ir:get-base-type (impc:ir:clean-named-type a))))
+      bt)))
+
+(define reduce-ptrdepth-to-zero
+  (lambda (t)
+    (if (> (impc:ir:get-ptr-depth t) 0)
+        (reduce-ptrdepth-to-zero (impc:ir:pointer-- t))
+        t)))
+
+(define t:named? (lambda (x y)
+                   (if (or (t:notype? x) (t:notype? y))
+                       #t
+                       (begin
+                         (if (symbol? x) (set! x (symbol->string x)))
+                         (if (symbol? y) (set! y (symbol->string y)))
+                         (if (string? x) (set! x (impc:ir:get-type-from-pretty-str x)))
+                         (if (string? y) (set! y (impc:ir:get-type-from-pretty-str y)))
+                         (set! x (reduce-ptrdepth-to-zero x))
+                         (set! y (reduce-ptrdepth-to-zero y))
+                         ;; (println 'x x 'y y)
+                         (if (and (string? x) (string? y))
+                             (if (string=? (t:cleanup-string-type x) (t:cleanup-string-type y))
+                                 #t
+                                 #f)
+                             (impc:ir:types-equal? x y))))))
+
+;; (define t:named? (lambda (x y)
+;;                    (if (or (t:notype? x) (t:notype? y))
+;;                        #t
+;;                        (begin
+;;                          (if (symbol? x) (set! x (symbol->string x)))
+;;                          (if (symbol? y) (set! y (symbol->string y)))
+;;                          (if (not (and (string? x) (string? y)))
+;;                              (impc:compiler:print-compiler-error "poorly formed t:named? constraint args" (list x y)))
+;;                          (if (string=? (t:cleanup-string-type-b x) (t:cleanup-string-type-b y))
+;;                                  #t
+;;                                  #f)))))
+
+
+(define t:poly-exists?
+  (lambda (name type)
+    (if (member *impc:ir:notype* type)
+        #t
+        (begin
+          (if (symbol? name) (set! name (symbol->string name)))
+          (if (impc:ti:get-polyfunc-candidate name (cons 213 type)) #t #f)))))
+
+
+;; to catch the dreaded heisenbug...
+
+(define s-p-a-c-e-s___
+  (lambda ()
+    (string-append "  ")))

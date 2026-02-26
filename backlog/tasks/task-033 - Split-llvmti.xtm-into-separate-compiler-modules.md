@@ -1,10 +1,11 @@
 ---
 id: TASK-033
 title: Split llvmti.xtm into separate compiler modules
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@ben'
 created_date: '2026-02-26 09:44'
-updated_date: '2026-02-26 09:44'
+updated_date: '2026-02-26 10:10'
 labels:
   - compiler
   - architecture
@@ -21,8 +22,8 @@ runtime/llvmti.xtm is 12,517 lines containing caches, transforms, type inference
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 llvmti.xtm split into at least 4 separate files along phase boundaries
-- [ ] #2 Load order defined and documented in a top-level loader or scheme.xtm
-- [ ] #3 No change in compiler behaviour (core tests pass)
-- [ ] #4 AOT compilation works (build aot_external_audio target)
+- [x] #1 llvmti.xtm split into at least 4 separate files along phase boundaries
+- [x] #2 Load order defined and documented in a top-level loader or scheme.xtm
+- [x] #3 No change in compiler behaviour (core tests pass)
+- [x] #4 AOT compilation works (build aot_external_audio target)
 <!-- AC:END -->
