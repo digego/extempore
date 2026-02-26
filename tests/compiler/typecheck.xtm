@@ -1,0 +1,35 @@
+;;; tests/compiler/typecheck.xtm -- unit tests for type inference
+
+(sys:load "libs/core/test.xtm")
+
+(xtmtest-result (impc:ti:get-expression-type 42)
+                2
+                "integer-literal")
+
+(xtmtest-result (impc:ti:get-expression-type 4.0)
+                0
+                "float-literal")
+
+(xtmtest-result (impc:ti:get-expression-type #t)
+                10
+                "boolean-literal")
+
+(xtmtest-result (impc:ti:get-expression-type '(+ 1 2))
+                2
+                "arithmetic")
+
+(xtmtest-result (impc:ti:get-expression-type '(if #t 1 2))
+                2
+                "if-expression")
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) x))
+                2
+                "let-expression")
+
+(xtmtest-result (impc:ti:get-expression-type '(lambda (x:i64) (+ x 1)))
+                '(213 2 2)
+                "lambda")
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+                2
+                "nested-let")

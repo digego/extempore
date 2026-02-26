@@ -1,0 +1,74 @@
+;;; tests/compiler/transforms.xtm -- unit tests for first-transform helpers
+
+(sys:load "libs/core/test.xtm")
+
+;; and
+
+(xtmtest-result (impc:ti:and '(a))
+                '(if a a #f)
+                "and-single")
+
+(xtmtest-result (impc:ti:and '(a b c))
+                '(if a (if b (if c c #f) #f) #f)
+                "and-chain")
+
+;; or
+
+(xtmtest-result (impc:ti:or '(a))
+                '(if a a #f)
+                "or-single")
+
+(xtmtest-result (impc:ti:or '(a b))
+                '(if a a (if b b #f))
+                "or-chain")
+
+;; cond
+
+(xtmtest-result (impc:ti:cond '((test1 body1)))
+                '(if test1 (begin body1))
+                "cond-single")
+
+(xtmtest-result (impc:ti:cond '((test1 body1) (else body2)))
+                '(if test1 (begin body1) (begin body2))
+                "cond-else")
+
+;; not
+
+(xtmtest-result (impc:ti:not 'x)
+                '(if x #f #t)
+                "not")
+
+;; binary-arity
+
+(xtmtest-result (impc:ti:binary-arity '(+ 1 2 3) #f)
+                '(+ (+ 1 2) 3)
+                "binary-arity")
+
+;; AST constructors and accessors
+
+(xtmtest-with-fixture ast-if-round-trip
+  (define node (ast:make-if 'test 'then 'els))
+  (is? (ast:if-test node) 'test "if-test")
+  (is? (ast:if-then node) 'then "if-then")
+  (is? (ast:if-else node) 'els "if-else"))
+
+(xtmtest-with-fixture ast-let-round-trip
+  (define node (ast:make-let 'let '((x 1)) '(+ x 1)))
+  (is? (ast:let-tag node) 'let "let-tag")
+  (is? (ast:let-bindings node) '((x 1)) "let-bindings")
+  (is? (ast:let-body node) '(+ x 1) "let-body"))
+
+(xtmtest-with-fixture ast-lambda-round-trip
+  (define node (ast:make-lambda 'lambda '(x y) '(+ x y)))
+  (is? (ast:lambda-tag node) 'lambda "lambda-tag")
+  (is? (ast:lambda-params node) '(x y) "lambda-params")
+  (is? (ast:lambda-body node) '(+ x y) "lambda-body"))
+
+(xtmtest-with-fixture ast-predicates
+  (define (bool x) (if x #t #f))
+  (is? (bool (ast:if? '(if a b c))) #t "if-positive")
+  (is? (bool (ast:let? '(let ((x 1)) x))) #t "let-positive")
+  (is? (bool (ast:lambda? '(lambda (x) x))) #t "lambda-positive")
+  (is? (bool (ast:begin? '(begin 1 2))) #t "begin-positive")
+  (is? (bool (ast:if? '(+ 1 2))) #f "if-negative")
+  (is? (bool (ast:let? 42)) #f "let-negative"))

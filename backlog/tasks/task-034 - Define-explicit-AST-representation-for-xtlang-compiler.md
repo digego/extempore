@@ -1,10 +1,11 @@
 ---
 id: TASK-034
 title: Define explicit AST representation for xtlang compiler
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@ben'
 created_date: '2026-02-26 09:44'
-updated_date: '2026-02-26 09:44'
+updated_date: '2026-02-27 07:00'
 labels:
   - compiler
   - architecture
@@ -21,9 +22,9 @@ The xtlang compiler operates on raw s-expressions with car/cdr pattern matching 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 AST node types defined with constructors and accessors (at minimum: let, lambda, if, call, var, lit, set!)
-- [ ] #2 first-transform produces the new AST representation
-- [ ] #3 type-check consumes the new AST representation
-- [ ] #4 AST validator function exists and runs between passes in debug mode
-- [ ] #5 Core library tests pass
+- [x] #1 AST node types defined with constructors and accessors (at minimum: let, lambda, if, call, var, lit, set!)
+- [x] #2 first-transform produces the new AST representation
+- [x] #3 type-check consumes the new AST representation
+- [x] #4 AST validator function exists and runs between passes in debug mode
+- [x] #5 Core library tests pass
 <!-- AC:END -->

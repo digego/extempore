@@ -1,7 +1,7 @@
 ---
 id: TASK-035
 title: Add compiler-internal unit tests for xtlang compiler passes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-26 09:44'
 updated_date: '2026-02-26 09:44'
@@ -21,9 +21,9 @@ Currently all compiler tests are end-to-end (.xtm files that compile and run). A
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Test file exists for first-transform with at least 10 desugaring cases (and/or/cond, println, n-ary operators, dot notation)
-- [ ] #2 Test file exists for type unification with at least 8 cases (simple types, closures, tuples, pointers, failure cases)
-- [ ] #3 Test file exists for type-check on small expressions (literals, let, lambda, if, arithmetic)
-- [ ] #4 Tests runnable via ctest with a new label (e.g. compiler-unit)
-- [ ] #5 All new tests pass
+- [x] #1 Test file exists for first-transform with at least 10 desugaring cases (and/or/cond, println, n-ary operators, dot notation)
+- [x] #2 Test file exists for type unification with at least 8 cases (simple types, closures, tuples, pointers, failure cases)
+- [x] #3 Test file exists for type-check on small expressions (literals, let, lambda, if, arithmetic)
+- [x] #4 Tests runnable via ctest with a new label (e.g. compiler-unit)
+- [x] #5 All new tests pass
 <!-- AC:END -->
