@@ -748,12 +748,30 @@
           (print " available for ")
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; STRING-KEYED HASH TABLE
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Built on C FFI primitives (src/ffi/hashtable.inc):
+;;   make-hashtable, hashtable-ref, hashtable-set!,
+;;   hashtable-remove!, hashtable-count, hashtable-keys,
+;;   hashtable->alist
+;;
+;; A hash table is a Scheme vector where each slot holds an alist.
+;; The vector is GC-traced so stored values are protected.
+;; Hashing and lookup happen in C for performance.
+
+;; hashtable-for-each: call f on each (key . value) pair
+(define hashtable-for-each
+  (lambda (f ht)
+    (for-each f (hashtable->alist ht))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GLOBAL XTLANG CACHE ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; global lists which cache the state (especially types) of all the
-;; things.
+;; global hash tables which cache the state (especially types) of all
+;; the things.
 
 ;; types should be stored in the list format, although they can be
 ;; printed prettily, obviously
@@ -767,41 +785,43 @@
 (define *impc:reserved-keywords*
   '("cat" "if" "list" "define" "letz" "memzone" "beginz" "let" "zone_cleanup" ">=" "<=" "and" "quote" "list" "strln" "strj" "sprintln" "println" "printout" "afill!" "pfill!" "tfill!" "or" "free" "not" "cond" "cset!" "cref" "refcheck" "doloop" "dotimes" "while" "now" "aref" "&" "bor" "&" "<<" ">>" "~" "else" "null" "pset!" "pref" "pref-ptr" "vset!" "vref" "tref" "tref-ptr" "alloc" "salloc" "halloc" "zalloc" "randomf" "void" "#t" "#f")) ;; etc..
 
-(define *impc:ti:builtin-cache* '(;; math operators
-                                  ("+" . #("[!v,!v,!v...]*" "addition operator: overload xtm_addition to add support for new types" (arg1 arg2...)))
-                                  ("-" . #("[!v,!v,!v...]*" "subtraction operator: overload xtm_subtraction to add support for new types" (arg1 arg2...)))
-                                  ("*" . #("[!v,!v,!v...]*" "multiplication operator: overload xtm_multiplication to add support for new types" (arg1 arg2...)))
-                                  ("/" . #("[!v,!v,!v...]*" "division operator: overload xtm_division to add support for new types" (arg1 arg2...)))
-                                  ("%" . #("[!v,!v,!v]*" "modulo operator: overload xtm_modulo to add support for new types" (arg1 arg2)))
-                                  ("set!" . #("[!v,!v,!v]*" "set var to value" (var value)))
-                                  ;; pointer/tuple/array/vector set/ref
-                                  ("pref" . #("[!v,!v*,i64]*" "pointer-(de)reference" (ptr idx)))
-                                  ("pref-ptr" . #("[!v*,!v*,i64]*" "pointer-(de)reference" (ptr idx)))
-                                  ("pset!" . #("[!v,!v*,i64,!v]*" "pointer-set" (ptr idx val)))
-                                  ("pfill!" . #("[!v,!v*,!v...]*" "pointer-fill fill ptr with values" (ptr v1...)))
-                                  ("tref" . #("[!v,!v*,i64]*" "tuple-(de)reference" (tuple idx)))
-                                  ("tref-ptr" . #("[!v*,!v*,i64]*" "tuple-(de)reference" (tuple idx)))
-                                  ("tset!" . #("[!v,!v*,i64,!v]*" "tuple-set" (tuple idx val)))
-                                  ("tfill!" . #("[!v,!v*,!v...]*" "tuple-fill fill tuple with values" (tuple v1...)))
-                                  ("aref" . #("[!v,!v*,i64]*" "array-(de)reference" (array idx)))
-                                  ("aref-ptr" . #("[!v*,!v*,i64]*" "array-(de)reference" (array idx)))
-                                  ("aset!" . #("[!v,!v*,i64,!v]*" "array-set" (array idx val)))
-                                  ("afill!" . #("[!v,!v*,!v...]*" "array-fill fill array with values" (array v1...)))
-                                  ("vref" . #("[!v,!v*,i64]*" "vector-(de)reference" (vector idx)))
-                                  ("vref-ptr" . #("[!v*,!v*,i64]*" "vector-(de)reference" (vector idx)))
-                                  ("vset!" . #("[!v,!v*,i64,!v]*" "vector-set" (vector idx val)))
-                                  ("vfill!" . #("[!v,!v*,!v...]*" "vector-fill fill vector with values" (vector v1...)))
-                                  ;; printing
-                                  ("println" . #("[void,!v...]*" "generic print function - to add support for NewType, overload print:[void,NewType]*" (val1...)))
-                                  ;; memory allocation
-                                  ("alloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
-                                  ("zalloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
-                                  ("halloc" . #("[!v*,i64]*" "allocate memory from the heap with size (optional, default = 1)" (optional-size)))
-                                  ("salloc" . #("[!v*,i64]*" "allocate memory from the stack zone with size (optional, default = 1)" (optional-size)))
-                                  ;; Extempore runtime stuff
-                                  ("callback" . #("[i1,i64,sym,args...]*" "set callback for closure at time with args" (time closure args...)))
-                                  ;; special scheme macros
-                                  ("call-as-xtlang" . #("[String*,!v]*" "the body of this (scheme) macro will be executed as xtlang" (body)))))
+(define *impc:ti:builtin-cache* (make-hashtable 64))
+(for-each (lambda (entry) (hashtable-set! *impc:ti:builtin-cache* (car entry) (cdr entry)))
+          '(;; math operators
+            ("+" . #("[!v,!v,!v...]*" "addition operator: overload xtm_addition to add support for new types" (arg1 arg2...)))
+            ("-" . #("[!v,!v,!v...]*" "subtraction operator: overload xtm_subtraction to add support for new types" (arg1 arg2...)))
+            ("*" . #("[!v,!v,!v...]*" "multiplication operator: overload xtm_multiplication to add support for new types" (arg1 arg2...)))
+            ("/" . #("[!v,!v,!v...]*" "division operator: overload xtm_division to add support for new types" (arg1 arg2...)))
+            ("%" . #("[!v,!v,!v]*" "modulo operator: overload xtm_modulo to add support for new types" (arg1 arg2)))
+            ("set!" . #("[!v,!v,!v]*" "set var to value" (var value)))
+            ;; pointer/tuple/array/vector set/ref
+            ("pref" . #("[!v,!v*,i64]*" "pointer-(de)reference" (ptr idx)))
+            ("pref-ptr" . #("[!v*,!v*,i64]*" "pointer-(de)reference" (ptr idx)))
+            ("pset!" . #("[!v,!v*,i64,!v]*" "pointer-set" (ptr idx val)))
+            ("pfill!" . #("[!v,!v*,!v...]*" "pointer-fill fill ptr with values" (ptr v1...)))
+            ("tref" . #("[!v,!v*,i64]*" "tuple-(de)reference" (tuple idx)))
+            ("tref-ptr" . #("[!v*,!v*,i64]*" "tuple-(de)reference" (tuple idx)))
+            ("tset!" . #("[!v,!v*,i64,!v]*" "tuple-set" (tuple idx val)))
+            ("tfill!" . #("[!v,!v*,!v...]*" "tuple-fill fill tuple with values" (tuple v1...)))
+            ("aref" . #("[!v,!v*,i64]*" "array-(de)reference" (array idx)))
+            ("aref-ptr" . #("[!v*,!v*,i64]*" "array-(de)reference" (array idx)))
+            ("aset!" . #("[!v,!v*,i64,!v]*" "array-set" (array idx val)))
+            ("afill!" . #("[!v,!v*,!v...]*" "array-fill fill array with values" (array v1...)))
+            ("vref" . #("[!v,!v*,i64]*" "vector-(de)reference" (vector idx)))
+            ("vref-ptr" . #("[!v*,!v*,i64]*" "vector-(de)reference" (vector idx)))
+            ("vset!" . #("[!v,!v*,i64,!v]*" "vector-set" (vector idx val)))
+            ("vfill!" . #("[!v,!v*,!v...]*" "vector-fill fill vector with values" (vector v1...)))
+            ;; printing
+            ("println" . #("[void,!v...]*" "generic print function - to add support for NewType, overload print:[void,NewType]*" (val1...)))
+            ;; memory allocation
+            ("alloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
+            ("zalloc" . #("[!v*,i64]*" "allocate memory from current zone with size (optional, default = 1)" (optional-size)))
+            ("halloc" . #("[!v*,i64]*" "allocate memory from the heap with size (optional, default = 1)" (optional-size)))
+            ("salloc" . #("[!v*,i64]*" "allocate memory from the stack zone with size (optional, default = 1)" (optional-size)))
+            ;; Extempore runtime stuff
+            ("callback" . #("[i1,i64,sym,args...]*" "set callback for closure at time with args" (time closure args...)))
+            ;; special scheme macros
+            ("call-as-xtlang" . #("[String*,!v]*" "the body of this (scheme) macro will be executed as xtlang" (body)))))
 ;;
 ;; language builtins - the cache is just used for documentation at
 ;; this stage, the actual builtins are handled in the compiler (mostly
@@ -817,11 +837,13 @@
 ;;
 (define impc:ti:print-builtin-cache
   (lambda ()
-    (println '*impc:ti:builtin-cache*: *impc:ti:builtin-cache*)))
+    (print '*impc:ti:builtin-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:builtin-cache*)))
 
 (define impc:ti:reset-builtin-cache
   (lambda ()
-    (set! *impc:ti:builtin-cache* '())))
+    (hashtable-clear! *impc:ti:builtin-cache*)))
 
 ;; this is never called in regular compilation! the builtin cache is
 ;; populated by hand (see above) and is mostly here for documentation
@@ -836,18 +858,12 @@
         (impc:compiler:print-compiler-error "couldn't register new builtin")
         (if (impc:ti:builtin-exists? builtin-name)
             (impc:compiler:print-already-bound-error builtin-name (impc:ti:get-builtin-type builtin-name))
-            ;; create a new entry
-            (begin
-              (set! *impc:ti:builtin-cache*
-                    (cons (cons builtin-name (vector type-str docstring args))
-                          *impc:ti:builtin-cache*))
-              (car *impc:ti:builtin-cache*))))))
+            (hashtable-set! *impc:ti:builtin-cache* builtin-name (vector type-str docstring args))))))
 
 (define impc:ti:get-builtin-type-str
   (lambda (builtin-name)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
-      ;; (println 'cls-list: builtin-data)
-      (if builtin-data (vector-ref (cdr builtin-data) 0) #f))))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
+      (if builtin-data (vector-ref builtin-data 0) #f))))
 
 (define impc:ti:builtin-exists?
   (lambda (builtin-name)
@@ -856,42 +872,43 @@
 
 (define impc:ti:set-builtin-type-str
   (lambda (builtin-name type-str)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
       (if builtin-data
-          (if (not (null? (vector-ref (cdr builtin-data) 0)))
+          (if (not (null? (vector-ref builtin-data 0)))
               (begin (print "Warning: attempting to re-type already typed builtin")
                      (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print builtin-name))
                      (print " to ")
                      (print-with-colors *impc:compiler:pretty-print-type-color* 'default #t (print (impc:ir:pretty-print-type-str type-str) "\n")))
-              (vector-set! (cdr builtin-data) 0 type-str))
+              (vector-set! builtin-data 0 type-str))
           (impc:compiler:print-compiler-error "tried to set type of unknown builtin" builtin-name)))))
 
 (define impc:ti:get-builtin-docstring
   (lambda (builtin-name)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
-      (if builtin-data (vector-ref (cdr builtin-data) 1) #f))))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
+      (if builtin-data (vector-ref builtin-data 1) #f))))
 
 (define impc:ti:set-builtin-docstring
   (lambda (builtin-name docstring)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
-      (if builtin-data (vector-set! (cdr builtin-data) 1 docstring) #f))))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
+      (if builtin-data (vector-set! builtin-data 1 docstring) #f))))
 
 (define impc:ti:get-builtin-args
   (lambda (builtin-name)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
-      (if builtin-data (vector-ref (cdr builtin-data) 2) #f))))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
+      (if builtin-data (vector-ref builtin-data 2) #f))))
 
 (define impc:ti:set-builtin-args
   (lambda (builtin-name args)
-    (let ((builtin-data (assoc-strcmp builtin-name *impc:ti:builtin-cache*)))
-      (if builtin-data (vector-set! (cdr builtin-data) 2 args) #f))))
+    (let ((builtin-data (hashtable-ref *impc:ti:builtin-cache* builtin-name)))
+      (if builtin-data (vector-set! builtin-data 2 args) #f))))
 
 ;;;;;;;;;;;;;;
 ;; named types
 ;; -----------
 ;;
-(define *impc:ti:namedtype-cache* '(("mzone" . #((14 108 2 2 2 108 "%mzone*") "Extempore memory zone"))
-                                   ("clsvar" . #((14 108 4 108 2 "%clsvar*") "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))))
+(define *impc:ti:namedtype-cache* (make-hashtable 256))
+(hashtable-set! *impc:ti:namedtype-cache* "mzone" (vector '(14 108 2 2 2 108 "%mzone*") "Extempore memory zone"))
+(hashtable-set! *impc:ti:namedtype-cache* "clsvar" (vector '(14 108 4 108 2 "%clsvar*") "Extempore closure address table: <name,offset,type,TODO_whatisthis,next_table>"))
 ;;
 ;; each element of the list is of the form
 ;;
@@ -899,19 +916,21 @@
 
 (define impc:ti:print-namedtype-cache
   (lambda ()
-    (println '*impc:ti:namedtype-cache*: *impc:ti:namedtype-cache*)))
+    (print '*impc:ti:namedtype-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:namedtype-cache*)))
 
 (define impc:ti:reset-namedtype-cache
   (lambda ()
-    (set! *impc:ti:namedtype-cache* '())))
+    (hashtable-clear! *impc:ti:namedtype-cache*)))
 
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-namedtype-type
   (lambda (namedtype-name)
     (if (string? namedtype-name)
         (let ((ptr-depth (impc:ir:get-ptr-depth namedtype-name))
-              (namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-          (if namedtype-data (impc:ir:pointer++ (vector-ref (cdr namedtype-data) 0) ptr-depth) #f))
+              (namedtype-data (hashtable-ref *impc:ti:namedtype-cache* (impc:ir:clean-named-type namedtype-name))))
+          (if namedtype-data (impc:ir:pointer++ (vector-ref namedtype-data 0) ptr-depth) #f))
         #f)))
 
 (define impc:ti:namedtype-exists?
@@ -930,47 +949,43 @@
                       (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new named type")
             (begin
-              ;; add to the AOT-header if we're precompiling
-              (set! *impc:ti:namedtype-cache*
-                    (cons (cons namedtype-name (vector type docstring))
-                          *impc:ti:namedtype-cache*))
-              (car *impc:ti:namedtype-cache*)
+              (hashtable-set! *impc:ti:namedtype-cache* namedtype-name (vector type docstring))
               (impc:aot:insert-namedtype-binding-details namedtype-name type docstring))))))
 
 (define impc:ti:get-namedtype-docstring
   (lambda (namedtype-name)
-    (let ((namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if namedtype-data (vector-ref (cdr namedtype-data) 1) #f))))
+    (let ((namedtype-data (hashtable-ref *impc:ti:namedtype-cache* (impc:ir:clean-named-type namedtype-name))))
+      (if namedtype-data (vector-ref namedtype-data 1) #f))))
 
 (define impc:ti:set-namedtype-docstring
   (lambda (namedtype-name docstring)
-    (let ((namedtype-data (assoc-strcmp (impc:ir:clean-named-type namedtype-name) *impc:ti:namedtype-cache*)))
-      (if namedtype-data (vector-set! (cdr namedtype-data) 1 docstring) #f))))
+    (let ((namedtype-data (hashtable-ref *impc:ti:namedtype-cache* (impc:ir:clean-named-type namedtype-name))))
+      (if namedtype-data (vector-set! namedtype-data 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;
 ;; type aliases
 ;; ------------
 ;;
-(define *impc:ti:typealias-cache* '())
+(define *impc:ti:typealias-cache* (make-hashtable 256))
 ;;
-;; each element of the list is of the form
-;;
-;; (name . #(type-alias docstring))
+;; each entry maps name -> #(type-alias docstring)
 
 (define impc:ti:print-typealias-cache
   (lambda ()
-    (println '*impc:ti:typealias-cache*: *impc:ti:typealias-cache*)))
+    (print '*impc:ti:typealias-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:typealias-cache*)))
 
 (define impc:ti:reset-typealias-cache
   (lambda ()
-    (set! *impc:ti:typealias-cache* '())))
+    (hashtable-clear! *impc:ti:typealias-cache*)))
 
 (define impc:ti:get-typealias-type
   (lambda (typealias-name)
     (if (string? typealias-name)
         (let ((ptr-depth (impc:ir:get-ptr-depth typealias-name))
-              (typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
-          (if typealias-data (impc:ir:pointer++ (vector-ref (cdr typealias-data) 0) ptr-depth) #f))
+              (typealias-data (hashtable-ref *impc:ti:typealias-cache* (impc:ir:clean-named-type typealias-name))))
+          (if typealias-data (impc:ir:pointer++ (vector-ref typealias-data 0) ptr-depth) #f))
         #f)))
 
 ;; as above but returns pretty type
@@ -978,8 +993,8 @@
   (lambda (typealias-name)
     (if (string? typealias-name)
         (let ((ptr-depth (impc:ir:get-ptr-depth typealias-name))
-              (typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
-          (if typealias-data (impc:ir:pretty-print-type (impc:ir:pointer++ (vector-ref (cdr typealias-data) 0) ptr-depth))
+              (typealias-data (hashtable-ref *impc:ti:typealias-cache* (impc:ir:clean-named-type typealias-name))))
+          (if typealias-data (impc:ir:pretty-print-type (impc:ir:pointer++ (vector-ref typealias-data 0) ptr-depth))
               #f))
         #f)))
 
@@ -1022,32 +1037,26 @@
                       (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new type alias")
             (begin
-              ;; add to the AOT-header if we're precompiling
-              (set! *impc:ti:typealias-cache*
-                    (cons (cons typealias-name (vector type docstring))
-                          *impc:ti:typealias-cache*))
-              (car *impc:ti:typealias-cache*)
+              (hashtable-set! *impc:ti:typealias-cache* typealias-name (vector type docstring))
               (impc:aot:insert-typealias-binding-details typealias-name type docstring))))))
 
 (define impc:ti:get-typealias-docstring
   (lambda (typealias-name)
-    (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
-      (if typealias-data (vector-ref (cdr typealias-data) 1) #f))))
+    (let ((typealias-data (hashtable-ref *impc:ti:typealias-cache* (impc:ir:clean-named-type typealias-name))))
+      (if typealias-data (vector-ref typealias-data 1) #f))))
 
 (define impc:ti:set-typealias-docstring
   (lambda (typealias-name docstring)
-    (let ((typealias-data (assoc-strcmp (impc:ir:clean-named-type typealias-name) *impc:ti:typealias-cache*)))
-      (if typealias-data (vector-set! (cdr typealias-data) 1 docstring) #f))))
+    (let ((typealias-data (hashtable-ref *impc:ti:typealias-cache* (impc:ir:clean-named-type typealias-name))))
+      (if typealias-data (vector-set! typealias-data 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;
 ;; xtlang macros
 ;; -------------
 ;;
-(define *impc:ti:xtmacro-cache* '())
+(define *impc:ti:xtmacro-cache* (make-hashtable 64))
 ;;
-;; each element of the list is of the form
-;;
-;; (name . #(docstring))
+;; each entry maps name -> #(docstring)
 ;;
 ;; create an xtlang macro through bind-macro. behind the scenes, these
 ;; are currently implemented as scheme macros (although with an
@@ -1055,16 +1064,18 @@
 
 (define impc:ti:print-xtmacro-cache
   (lambda ()
-    (println '*impc:ti:xtmacro-cache*: *impc:ti:xtmacro-cache*)))
+    (print '*impc:ti:xtmacro-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:xtmacro-cache*)))
 
 (define impc:ti:reset-xtmacro-cache
   (lambda ()
-    (set! *impc:ti:xtmacro-cache* '())))
+    (hashtable-clear! *impc:ti:xtmacro-cache*)))
 
 (define impc:ti:xtmacro-exists?
   (lambda (xtmacro-name)
     (if (and (string? xtmacro-name)
-             (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*))
+             (hashtable-ref *impc:ti:xtmacro-cache* xtmacro-name))
         #t
         #f)))
 
@@ -1073,21 +1084,17 @@
     ;; check arg types
     (if (and (or (string? macro-name) (begin (println 'bad 'macro-name: macro-name) #f))
              (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f)))
-        (begin
-          (set! *impc:ti:xtmacro-cache*
-                (cons (cons macro-name (vector docstring))
-                      *impc:ti:xtmacro-cache*))
-          (car *impc:ti:xtmacro-cache*)))))
+        (hashtable-set! *impc:ti:xtmacro-cache* macro-name (vector docstring)))))
 
 (define impc:ti:get-xtmacro-docstring
   (lambda (xtmacro-name)
-    (let ((xtmacro-data (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*)))
-      (if xtmacro-data (vector-ref (cdr xtmacro-data) 0) #f))))
+    (let ((xtmacro-data (hashtable-ref *impc:ti:xtmacro-cache* xtmacro-name)))
+      (if xtmacro-data (vector-ref xtmacro-data 0) #f))))
 
 (define impc:ti:set-xtmacro-docstring
   (lambda (xtmacro-name docstring)
-    (let ((xtmacro-data (assoc-strcmp xtmacro-name *impc:ti:xtmacro-cache*)))
-      (if xtmacro-data (vector-set! (cdr xtmacro-data) 0 docstring) #f))))
+    (let ((xtmacro-data (hashtable-ref *impc:ti:xtmacro-cache* xtmacro-name)))
+      (if xtmacro-data (vector-set! xtmacro-data 0 docstring) #f))))
 
 ;; docstrings are compulsory for xtlang macros
 (define-macro (bind-macro . forms)
@@ -1121,26 +1128,22 @@
 ;; closures
 ;; --------
 ;;
-(define *impc:ti:closure-cache* '())
+(define *impc:ti:closure-cache* (make-hashtable 512))
+;; insertion-order list of closure names for AOT init ordering
+(define *impc:ti:closure-cache-order* '())
 ;;
-;; each element of the list is of the form
-;;
-;; (name . #(type docstring zone-size body))
-;;
-;; this list replaces *impc:closuretypes*, *impc:closurebodies* and *impc:docstrings*
-;;
-;; TODO:
-;;
-;; - if we keep these lists sorted, then lookups become O(log2(N))
-;;   rather than O(N) (or we could even use a hash-map one day...)
+;; each entry maps name -> #(type docstring zone-size body)
 
 (define impc:ti:print-closure-cache
   (lambda ()
-    (println '*impc:ti:closure-cache*: *impc:ti:closure-cache*)))
+    (print '*impc:ti:closure-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:closure-cache*)))
 
 (define impc:ti:reset-closure-cache
   (lambda ()
-    (set! *impc:ti:closure-cache* '())))
+    (hashtable-clear! *impc:ti:closure-cache*)
+    (set! *impc:ti:closure-cache-order* '())))
 
 (define impc:ti:register-new-closure
   (lambda (closure-name type zone-size docstring body)
@@ -1156,20 +1159,16 @@
             (let ((t (impc:ti:get-closure-type closure-name)))
               ;; (println 'double-registration: (equal? t type) 'new: type 'extant: t)
               (if (equal? t type)
-                  (assoc-strcmp closure-name *impc:ti:closure-cache*)
+                  #t
                   (impc:compiler:print-already-bound-error closure-name (impc:ti:get-closure-type closure-name))))
-            ;; create a new entry
             (begin
-              (set! *impc:ti:closure-cache*
-                    (cons (cons closure-name (vector type docstring zone-size body))
-                          *impc:ti:closure-cache*))
-              (car *impc:ti:closure-cache*))))))
+              (hashtable-set! *impc:ti:closure-cache* closure-name (vector type docstring zone-size body))
+              (set! *impc:ti:closure-cache-order* (cons closure-name *impc:ti:closure-cache-order*)))))))
 
 (define impc:ti:get-closure-type
   (lambda (closure-name)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      ;; (println 'cls-list: closure-data)
-      (if closure-data (vector-ref (cdr closure-data) 0) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-ref closure-data 0) #f))))
 
 (define impc:ti:get-closure-arg-types
   (lambda (name)
@@ -1192,9 +1191,9 @@
 
 (define impc:ti:set-closure-type
   (lambda (closure-name type)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
       (if closure-data
-          (if (not (null? (vector-ref (cdr closure-data) 0)))
+          (if (not (null? (vector-ref closure-data 0)))
               (begin (print-with-colors 'yellow 'default #t (print "Warning"))
                      (print ": attempting to re-type already typed closure ")
                      (if (impc:ir:poly-or-adhoc? closure-name)
@@ -1206,46 +1205,47 @@
                      (print " to ")
                      (print-with-colors *impc:compiler:pretty-print-type-color*
                                         'default #f (print (impc:ir:pretty-print-type type) "\n")))
-              (vector-set! (cdr closure-data) 0 type))
+              (vector-set! closure-data 0 type))
           (impc:compiler:print-compiler-error "tried to set type of unknown closure" closure-name)))))
 
 (define impc:ti:update-closure-name
   (lambda (closure-name new-closure-name)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
       (if closure-data
           (begin
-            (set-car! closure-data new-closure-name))
+            (hashtable-remove! *impc:ti:closure-cache* closure-name)
+            (hashtable-set! *impc:ti:closure-cache* new-closure-name closure-data))
           (impc:compiler:print-compiler-error "tried to set type of unknown closure" closure-name)))))
 
 (define impc:ti:get-closure-docstring
   (lambda (closure-name)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-ref (cdr closure-data) 1) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-ref closure-data 1) #f))))
 
 (define impc:ti:set-closure-docstring
   (lambda (closure-name docstring)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-set! (cdr closure-data) 1 docstring) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-set! closure-data 1 docstring) #f))))
 
 (define impc:ti:get-closure-zone-size
   (lambda (closure-name)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-ref (cdr closure-data) 2) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-ref closure-data 2) #f))))
 
 (define impc:ti:set-closure-zone-size
   (lambda (closure-name body)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-set! (cdr closure-data) 2 body) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-set! closure-data 2 body) #f))))
 
 (define impc:ti:get-closure-body
   (lambda (closure-name)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-ref (cdr closure-data) 3) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-ref closure-data 3) #f))))
 
 (define impc:ti:set-closure-body
   (lambda (closure-name body)
-    (let ((closure-data (assoc-strcmp closure-name *impc:ti:closure-cache*)))
-      (if closure-data (vector-set! (cdr closure-data) 3 body) #f))))
+    (let ((closure-data (hashtable-ref *impc:ti:closure-cache* closure-name)))
+      (if closure-data (vector-set! closure-data 3 body) #f))))
 
 ;; (define impc:ti:update-closure-body
 ;;   (lambda (closure-name new-closure-name body)
@@ -1261,11 +1261,10 @@
 ;; native (C) functions
 ;; --------------------
 ;;
-;; each element of the list is of the form
+;; each entry maps name -> #(type docstring args)
 ;;
-;; (name . #(type docstring args))
-;;
-(define *impc:ti:nativefunc-cache*
+(define *impc:ti:nativefunc-cache* (make-hashtable 1024))
+(for-each (lambda (entry) (hashtable-set! *impc:ti:nativefunc-cache* (car entry) (cdr entry)))
   '(;; functions in Extempore binary (defined in {EXTLLVM,SchemeFFI}.cpp)
     ("abort" . #((213 -1) "" ())) ;; libc
     ("abs" . #((213 4 4) "" ())) ;; libc
@@ -1732,11 +1731,13 @@
 
 (define impc:ti:print-nativefunc-cache
   (lambda ()
-    (println '*impc:ti:nativefunc-cache*: *impc:ti:nativefunc-cache*)))
+    (print '*impc:ti:nativefunc-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:nativefunc-cache*)))
 
 (define impc:ti:reset-nativefunc-cache
   (lambda ()
-    (set! *impc:ti:nativefunc-cache* '())))
+    (hashtable-clear! *impc:ti:nativefunc-cache*)))
 
 (define impc:ti:register-new-nativefunc
   (lambda (nativefunc-name type docstring arg-list)
@@ -1746,21 +1747,12 @@
                   (or (string? docstring) (begin (println 'bad 'docstring: docstring)))
                   (or (list? arg-list) (begin (println 'bad 'arg-list: arg-list)))))
         (impc:compiler:print-compiler-error "couldn't register new nativefunc")
-        (let ((existing (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-          (if existing
-              ;; update details if it already exists
-              (set-cdr! existing (vector type docstring arg-list))
-              ;; or create a new entry
-              (begin
-                (set! *impc:ti:nativefunc-cache*
-                      (cons (cons nativefunc-name (vector type docstring arg-list))
-                            *impc:ti:nativefunc-cache*))
-                (car *impc:ti:nativefunc-cache*)))))))
+        (hashtable-set! *impc:ti:nativefunc-cache* nativefunc-name (vector type docstring arg-list)))))
 
 (define impc:ti:get-nativefunc-type
   (lambda (nativefunc-name)
-    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nfunc-data (vector-ref (cdr nfunc-data) 0) #f))))
+    (let ((nfunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nfunc-data (vector-ref nfunc-data 0) #f))))
 
 (define impc:ti:get-nativefunc-arg-types
   (lambda (name)
@@ -1775,28 +1767,28 @@
 
 (define impc:ti:set-nativefunc-type
   (lambda (nativefunc-name type)
-    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nfunc-data (vector-set! (cdr nfunc-data) 0 type) #f))))
+    (let ((nfunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nfunc-data (vector-set! nfunc-data 0 type) #f))))
 
 (define impc:ti:get-nativefunc-docstring
   (lambda (nativefunc-name)
-    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nfunc-data (vector-ref (cdr nfunc-data) 1) #f))))
+    (let ((nfunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nfunc-data (vector-ref nfunc-data 1) #f))))
 
 (define impc:ti:set-nativefunc-docstring
   (lambda (nativefunc-name docstring)
-    (let ((nfunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nfunc-data (vector-set! (cdr nfunc-data) 1 docstring) #f))))
+    (let ((nfunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nfunc-data (vector-set! nfunc-data 1 docstring) #f))))
 
 (define impc:ti:get-nativefunc-arg-names
   (lambda (nativefunc-name)
-    (let ((nativefunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nativefunc-data (vector-ref (cdr nativefunc-data) 2) #f))))
+    (let ((nativefunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nativefunc-data (vector-ref nativefunc-data 2) #f))))
 
 (define impc:ti:set-nativefunc-arg-names
   (lambda (nativefunc-name arg-list)
-    (let ((nativefunc-data (assoc-strcmp nativefunc-name *impc:ti:nativefunc-cache*)))
-      (if nativefunc-data (vector-set! (cdr nativefunc-data) 2 arg-list) #f))))
+    (let ((nativefunc-data (hashtable-ref *impc:ti:nativefunc-cache* nativefunc-name)))
+      (if nativefunc-data (vector-set! nativefunc-data 2 arg-list) #f))))
 
 ;; helpers for dealing with either closures or nativefuncs
 
@@ -1832,26 +1824,27 @@
 ;;
 ;; (polyfunc-name . #((list #(func1 func1type) #(func2 func2type)) docstring))
 ;;
-(define *impc:ti:polyfunc-cache*
-  '())
+(define *impc:ti:polyfunc-cache* (make-hashtable 256))
 
 (define impc:ti:print-polyfunc-cache
   (lambda ()
-    (println '*impc:ti:polyfunc-cache*: *impc:ti:polyfunc-cache*)))
+    (print '*impc:ti:polyfunc-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                      *impc:ti:polyfunc-cache*)))
 
 (define impc:ti:reset-polyfunc-cache
   (lambda ()
-    (set! *impc:ti:polyfunc-cache* '())))
+    (hashtable-clear! *impc:ti:polyfunc-cache*)))
 
 (define impc:ti:polyfunc-exists?
   (lambda (polyfunc-name)
-    (if (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*) #t #f)))
+    (if (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name) #t #f)))
 
 (define impc:ti:get-polyfunc-candidate-list
   (lambda (polyfunc-name)
-    (let ((pfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+    (let ((pfunc-data (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name)))
       (if pfunc-data
-          (vector-ref (cdr pfunc-data) 0)
+          (vector-ref pfunc-data 0)
           #f))))
 
 ;; only add the docstring first time around
@@ -1864,15 +1857,15 @@
                   (or (list? func-type) (begin (println 'bad 'type: func-type) #f))
                   (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic function")
-        (let ((candidates (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
+        (let ((candidates (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name)))
           ;; add the bind-poly form to the AOT-header if we're precompiling
           (if candidates
               (let ((res (cl:find-if (lambda (x) (string=? (vector-ref x 0) func-name))
-                                     (vector-ref (cdr candidates) 0))))
+                                     (vector-ref candidates 0))))
                 ;; update the docstring
                 (if (not (string=? docstring ""))
                     (begin
-                      (vector-set! (cdr candidates) 1 docstring)
+                      (vector-set! candidates 1 docstring)
                       (print-with-colors 'yellow 'default #t (print "Warning:"))
                       (print " the docstring for the polymorphic function ")
                       (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print func-name))
@@ -1881,19 +1874,17 @@
                     ;; if we're overriding an already poly'd function
                     (vector-set! res 1 func-type)
                     ;; if we're adding a new poly'd function
-                    (vector-set! (cdr candidates) 0
+                    (vector-set! candidates 0
                                  (cons (vector func-name func-type)
-                                       (vector-ref (cdr candidates) 0)))))
+                                       (vector-ref candidates 0)))))
               ;; or create a new entry
-              (set! *impc:ti:polyfunc-cache*
-                    (cons (cons polyfunc-name (vector (list (vector func-name func-type)) docstring))
-                          *impc:ti:polyfunc-cache*)))
+              (hashtable-set! *impc:ti:polyfunc-cache* polyfunc-name (vector (list (vector func-name func-type)) docstring)))
           (impc:aot:insert-polyfunc-binding-details polyfunc-name func-name docstring)))))
 
 (define impc:ti:get-polyfunc-docstring
   (lambda (polyfunc-name)
-    (let ((polyfunc-data (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*)))
-      (if polyfunc-data (vector-ref (cdr polyfunc-data) 1) #f))))
+    (let ((polyfunc-data (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name)))
+      (if polyfunc-data (vector-ref polyfunc-data 1) #f))))
 
 (define impc:ti:get-polyfunc-candidate-names
   (lambda (polyfunc-name)
@@ -1947,8 +1938,7 @@
 (define impc:ti:remove-polyfunc-candidate
   (lambda (polyfunc-name func-type)
     (let* ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
-          (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
-          (v (cdr n)))
+           (v (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name)))
       (vector-set! v 0 (cl:delete-if (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
       (set! candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
       (println 'Removed (string->symbol polyfunc-name))
@@ -1958,8 +1948,7 @@
 (define impc:ti:unique-polyfunc-candidate
   (lambda (polyfunc-name func-type)
     (let* ((candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
-          (n (assoc-strcmp polyfunc-name *impc:ti:polyfunc-cache*))
-          (v (cdr n)))
+           (v (hashtable-ref *impc:ti:polyfunc-cache* polyfunc-name)))
       (vector-set! v 0 (cl:delete-if-not (lambda (x) (equal? (vector-ref x 1) func-type)) candidates))
       (set! candidates (impc:ti:get-polyfunc-candidate-list polyfunc-name))
       (if (= (length candidates) 1)
@@ -1979,7 +1968,7 @@
 
 (define-macro clear-session
   (lambda ()
-    (set! *impc:ti:polyfunc-cache* '())))
+    (hashtable-clear! *impc:ti:polyfunc-cache*)))
 
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -2400,26 +2389,27 @@
 ;;
 ;; (polytype-name . #((list #(func1 func1type) #(func2 func2type)) docstring))
 ;;
-(define *impc:ti:polytype-cache*
-  '())
+(define *impc:ti:polytype-cache* (make-hashtable 256))
 
 (define impc:ti:print-polytype-cache
   (lambda ()
-    (println '*impc:ti:polytype-cache*: *impc:ti:polytype-cache*)))
+    (print '*impc:ti:polytype-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                        *impc:ti:polytype-cache*)))
 
 (define impc:ti:reset-polytype-cache
   (lambda ()
-    (set! *impc:ti:polytype-cache* '())))
+    (hashtable-clear! *impc:ti:polytype-cache*)))
 
 (define impc:ti:polytype-exists?
   (lambda (polytype-name)
-    (if (assoc-strcmp polytype-name *impc:ti:polytype-cache*) #t #f)))
+    (if (hashtable-ref *impc:ti:polytype-cache* polytype-name) #t #f)))
 
 (define impc:ti:get-polytype-candidate-list
   (lambda (polytype-name)
-    (let ((pfunc-data (assoc-strcmp polytype-name *impc:ti:polytype-cache*)))
+    (let ((pfunc-data (hashtable-ref *impc:ti:polytype-cache* polytype-name)))
       (if pfunc-data
-          (vector-ref (cdr pfunc-data) 0)
+          (vector-ref pfunc-data 0)
           #f))))
 
 ;; only add the docstring first time around
@@ -2433,21 +2423,19 @@
                   (or (list? type) (begin (println 'bad 'type: type) #f))
                   (or (string? docstring) (begin (println 'bad 'docstring: docstring)))))
         (impc:compiler:print-compiler-error "couldn't register new polymorphic type")
-        (let ((candidates (assoc-strcmp polytype-name *impc:ti:polytype-cache*)))
+        (let ((candidates (hashtable-ref *impc:ti:polytype-cache* polytype-name)))
           (if candidates
               (let ((res (cl:find-if (lambda (x) (string=? (vector-ref x 0) type-name))
-                                     (vector-ref (cdr candidates) 0))))
+                                     (vector-ref candidates 0))))
                 (if res
                     ;; if we're overriding an already poly'd type
                     (vector-set! res 1 type)
                     ;; if we're adding a new poly'd type
-                    (vector-set! (cdr candidates) 0
+                    (vector-set! candidates 0
                                  (cons (vector type-name type)
-                                       (vector-ref (cdr candidates) 0)))))
+                                       (vector-ref candidates 0)))))
               ;; or create a new entry
-              (set! *impc:ti:polytype-cache*
-                    (cons (cons polytype-name (vector (list (vector type-name type)) docstring))
-                          *impc:ti:polytype-cache*)))
+              (hashtable-set! *impc:ti:polytype-cache* polytype-name (vector (list (vector type-name type)) docstring)))
           (if (not (impc:ti:namedtype-exists? type-name))
               (impc:ti:register-new-namedtype type-name type docstring))))))
 
@@ -2602,23 +2590,24 @@
 ;;
 ;; (name . #(type docstring))
 ;;
-(define *impc:ti:globalvar-cache*
-  '())
+(define *impc:ti:globalvar-cache* (make-hashtable 256))
 
 (define impc:ti:print-globalvar-cache
   (lambda ()
-    (println '*impc:ti:globalvar-cache*: *impc:ti:globalvar-cache*)))
+    (print '*impc:ti:globalvar-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                        *impc:ti:globalvar-cache*)))
 
 (define impc:ti:reset-globalvar-cache
   (lambda ()
-    (set! *impc:ti:globalvar-cache* '())))
+    (hashtable-clear! *impc:ti:globalvar-cache*)))
 
 ;; type is immutable, doesn't need a setter
 (define impc:ti:get-globalvar-type
   (lambda (globalvar-name)
-    (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
+    (let ((globalvar-data (hashtable-ref *impc:ti:globalvar-cache* globalvar-name)))
       (if globalvar-data
-          (vector-ref (cdr globalvar-data) 0)
+          (vector-ref globalvar-data 0)
           #f))))
 
 (define impc:ti:globalvar-exists?
@@ -2637,28 +2626,23 @@
                           (begin (println 'bad 'type: type) #f))
                       (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f))))
             (impc:compiler:print-compiler-error "couldn't register new globalvar")
-            (begin
-              ;; add the bind-poly form to the AOT-header if we're precompiling
-              (set! *impc:ti:globalvar-cache*
-                    ;; the old llvm:get-global-variable-type returned
-                    ;; an extra level of pointerness from the bind-val
-                    ;; declaration (e.g. (bind-val mytype i64) would
-                    ;; return type "i64*"), so we increment the
-                    ;; "pointerlyness" by one level here to mimic this
-                    ;; behaviour
-                    (cons (cons globalvar-name (vector (impc:ir:pointer++ type) docstring))
-                          *impc:ti:globalvar-cache*))
-              (car *impc:ti:globalvar-cache*))))))
+            ;; the old llvm:get-global-variable-type returned
+            ;; an extra level of pointerness from the bind-val
+            ;; declaration (e.g. (bind-val mytype i64) would
+            ;; return type "i64*"), so we increment the
+            ;; "pointerlyness" by one level here to mimic this
+            ;; behaviour
+            (hashtable-set! *impc:ti:globalvar-cache* globalvar-name (vector (impc:ir:pointer++ type) docstring))))))
 
 (define impc:ti:get-globalvar-docstring
   (lambda (globalvar-name)
-    (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
-      (if globalvar-data (vector-ref (cdr globalvar-data) 1) #f))))
+    (let ((globalvar-data (hashtable-ref *impc:ti:globalvar-cache* globalvar-name)))
+      (if globalvar-data (vector-ref globalvar-data 1) #f))))
 
 (define impc:ti:set-globalvar-docstring
   (lambda (globalvar-name docstring)
-    (let ((globalvar-data (assoc-strcmp globalvar-name *impc:ti:globalvar-cache*)))
-      (if globalvar-data (vector-set! (cdr globalvar-data) 1 docstring) #f))))
+    (let ((globalvar-data (hashtable-ref *impc:ti:globalvar-cache* globalvar-name)))
+      (if globalvar-data (vector-set! globalvar-data 1 docstring) #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; AOT-compilation ;;
@@ -3082,13 +3066,13 @@
 (define impc:aot:print-compilation-details
   (lambda (start-time)
     (log-info "Total compile time:" (real->integer (- (clock:clock) start-time)) "seconds")
-    (log-info "type aliases:" (length *impc:ti:typealias-cache*))
-    (log-info "named types:" (length *impc:ti:namedtype-cache*))
+    (log-info "type aliases:" (hashtable-count *impc:ti:typealias-cache*))
+    (log-info "named types:" (hashtable-count *impc:ti:namedtype-cache*))
     (log-info "generic types:" (length *impc:ti:generictype-cache*))
-    (log-info "type specialisations:" (length *impc:ti:polytype-cache*))
-    (log-info "top-level closures:" (length *impc:ti:closure-cache*))
+    (log-info "type specialisations:" (hashtable-count *impc:ti:polytype-cache*))
+    (log-info "top-level closures:" (hashtable-count *impc:ti:closure-cache*))
     (log-info "generic functions:" (length *impc:ti:genericfunc-cache*))
-    (log-info "function specialisations:" (length *impc:ti:polyfunc-cache*))))
+    (log-info "function specialisations:" (hashtable-count *impc:ti:polyfunc-cache*))))
 
 (define-macro (unix-or-Windows unix-expr win-expr)
   (if (string=? (sys:platform) "Windows")
@@ -3143,14 +3127,15 @@
             (sys:load file-path)
             (println)
             ;; static functions don't get a _setter()
-            (define remove-all-static-functions
-              (lambda (lst)
-                (filter (lambda (x) (impc:ir:type? (vector-ref (cdr x) 0))) lst)))
+            ;; use insertion-order list to ensure correct init order
             (define all-closure-setters
               (apply string-append
-                     (map (lambda (x)
-                            (string-append "call void @" (car x) "_setter();\n"))
-                          (reverse (remove-all-static-functions *impc:ti:closure-cache*))))) ;; reverse - make sure we initialize function in correct order!
+                     (map (lambda (name)
+                            (string-append "call void @" name "_setter();\n"))
+                          (filter (lambda (name)
+                                    (let ((data (hashtable-ref *impc:ti:closure-cache* name)))
+                                      (and data (impc:ir:type? (vector-ref data 0)))))
+                                  (reverse *impc:ti:closure-cache-order*)))))
             (if asdll?
               (llvm:compile-ir
                 (string-append "define dllexport void @" file-no-extension "_init() {\n"
@@ -10473,11 +10458,11 @@ xtlang's `let' syntax is the same as Scheme"
                                                                    (impc:ti:get-closure-body symname-string))
                           ;; Clear old polyfunc candidates of same type before adding new one
                           ;; This prevents accumulation of candidates that causes "ambiguous wrapper" errors
-                          (let ((pfdata (assoc-strcmp adhoc-poly-name-string *impc:ti:polyfunc-cache*)))
+                          (let ((pfdata (hashtable-ref *impc:ti:polyfunc-cache* adhoc-poly-name-string)))
                             (if pfdata
-                                (vector-set! (cdr pfdata) 0
+                                (vector-set! pfdata 0
                                              (cl:remove-if (lambda (x) (equal? (vector-ref x 1) closure-type-list))
-                                                           (vector-ref (cdr pfdata) 0)))))
+                                                           (vector-ref pfdata 0)))))
                           (eval `(bind-poly ,adhoc-poly-name ,symname) (interaction-environment)))
                         (begin
                           (impc:ti:set-closure-type symname-string closure-type-list)
@@ -12186,19 +12171,19 @@ e.g.
   (lambda (include-nativefuncs?)
     (let* ((closure-alists
             (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
-                 *impc:ti:closure-cache*))
+                 (hashtable->alist *impc:ti:closure-cache*)))
            (all-doc-alists
             (append
-             (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) *impc:ti:builtin-cache*)
-             (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) *impc:ti:typealias-cache*)
+             (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:builtin-cache*))
+             (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:typealias-cache*))
              (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
              (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
 
-             (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) *impc:ti:namedtype-cache*)
+             (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:namedtype-cache*))
              closure-alists
-             (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) *impc:ti:polytype-cache*)
-             (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) *impc:ti:polyfunc-cache*)
-             (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) *impc:ti:globalvar-cache*)
+             (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:polytype-cache*))
+             (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:polyfunc-cache*))
+             (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:globalvar-cache*))
              ;; make sure the "_native" versions of each closure don't get in
              ;; there (since the closure is already there)
              (if include-nativefuncs?
@@ -12206,7 +12191,7 @@ e.g.
                   closure-alists
                   (map (lambda (x)
                          (xtmdoc-nativefunc-handler (string->symbol (car x))))
-                       *impc:ti:nativefunc-cache*))
+                       (hashtable->alist *impc:ti:nativefunc-cache*)))
                  '()))))
       ;; filter out the things which shouldn't make it to the exported docs
       (cl:remove-if
