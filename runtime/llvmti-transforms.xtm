@@ -1571,7 +1571,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                       ;;                          (apply string-append (make-list ptrdepth "*"))
                       ;;                          "##" gnum)))
                       ;; (println 'updatevar: vs 'with rettype)
-                      (impc:ti:update-var vs vars '() rettype)
+                      (set! vars (impc:ti:vars-update vs vars '() rettype))
                       rettype))
                   vs))
             vs))))
@@ -1791,8 +1791,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                          (map (lambda (a b)
                                 (if (and (symbol? a)
                                          (assoc-strcmp a vars))
-                                    (begin
-                                      (impc:ti:update-var a vars '() b))))
+                                    (set! vars (impc:ti:vars-update a vars '() b))))
                               (cdr e)
                               (cdr atom-type)))))
                lists))
@@ -2009,8 +2008,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                        (if (and gtd2 (= (cadr gtd) (cadr gtd2)))
                            (let ((val (impc:ti:check-bang-against-reified sym (car k) vars)))
                              (if val
-                                 (begin
-                                   (impc:ti:update-var sym vars '() val))))))))
+                                 (set! vars (impc:ti:vars-update sym vars '() val))))))))
                vars)))
 
     ;; (if (not (cl:find-if list? types))
