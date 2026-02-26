@@ -273,6 +273,7 @@ void* SchemeProcess::taskImpl()
     loadFileAsString("runtime/llvmti-caches.xtm");
     loadFileAsString("runtime/llvmti-aot.xtm");
     loadFileAsString("runtime/llvmti-transforms.xtm");
+    loadFileAsString("runtime/llvmti-ast.xtm");
     loadFileAsString("runtime/llvmti-typecheck.xtm");
     loadFileAsString("runtime/llvmti-bind.xtm");
     loadFileAsString("runtime/llvmir.xtm");
@@ -282,6 +283,7 @@ void* SchemeProcess::taskImpl()
     loadFile("runtime/llvmti-caches.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti-aot.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti-transforms.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/llvmti-ast.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti-typecheck.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmti-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);

@@ -2163,8 +2163,8 @@
     ;; (println 'letchk: ast 'req request?) ; 'vars vars)
     ;; (println 'vars: vars '(cadr ast) (cadr ast))
     ;; for the symbols we want to set each return type
-    (let ((internalreq? (cond ((equal? `(begin ,(caar (cadr ast)))
-                                       (caddr ast))
+    (let ((internalreq? (cond ((equal? `(begin ,(caar (ast:let-bindings ast)))
+                                       (ast:let-body ast))
                                request?)
                               (else #f))))
       (for-each (lambda (e)
@@ -2191,10 +2191,10 @@
                         (impc:ti:update-var (car e) vars kts a)
                         ;; (println '---vars: vars)
                         )))
-                (cadr ast))
+                (ast:let-bindings ast))
       ;; then return the return type for the whole let
       ;; which should have a begin body! so caddr should work
-      (let ((ret (impc:ti:type-check (caddr ast) vars kts request?)))
+      (let ((ret (impc:ti:type-check (ast:let-body ast) vars kts request?)))
         ret))))
 
 (impc:ti:register-new-builtin
@@ -2304,7 +2304,7 @@ xtlang's `let' syntax is the same as Scheme"
     ;;(println 'request: request?)
     ;; we should ONLY use request? on the LAST sexpr in the begin
     ;; i.e. we should only use the LAST begin sexpr for a return type
-    (let ((sexplst (reverse (cdr ast))))
+    (let ((sexplst (reverse (ast:begin-exprs ast))))
       (if (and (list? (car sexplst))
                (member (caar sexplst) '(ifret)))
           (if (<> (length (car sexplst)) 4)
@@ -2351,11 +2351,11 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:if-check
   (lambda (ast vars kts request?)
                                         ;(println 'if: ast 'request? request?)
-    (let* ((a (impc:ti:type-check (cadr ast) vars kts #f)) ;request?))
-           (b (impc:ti:type-check (caddr ast) vars kts request?))
+    (let* ((a (impc:ti:type-check (ast:if-test ast) vars kts #f)) ;request?))
+           (b (impc:ti:type-check (ast:if-then ast) vars kts request?))
            (c (if (null? (cdddr ast))
                   '()
-                  (impc:ti:type-check (cadddr ast) vars kts request?)))
+                  (impc:ti:type-check (ast:if-else ast) vars kts request?)))
            (t (impc:ti:type-unify (list b c) vars)))
                                         ;(t (cl:intersection (if (atom? b) (list b) b) (if (atom? c) (list c) c))))
       (if *impc:ti:print-sub-checks* (println 'if:> 'a: a 'b: b 'c: c 't: t))
@@ -2866,8 +2866,8 @@ xtlang's `let' syntax is the same as Scheme"
 (define impc:ti:set-check
   (lambda (ast vars kts request?)
     ;; (println 'ast: ast 'vars: vars 'kts: kts 'request?: request?)
-    (let* ((sym (impc:ti:get-var (cadr ast) vars))
-           (a (impc:ti:type-check (caddr ast) vars kts (cdr sym))))
+    (let* ((sym (impc:ti:get-var (ast:set!-var ast) vars))
+           (a (impc:ti:type-check (ast:set!-expr ast) vars kts (cdr sym))))
       (if *impc:ti:print-sub-checks* (println 'set!:> 'ast: ast 'a: a))
       ;; (println 'a: a 'sym: sym)
       (if (and (list? a)
@@ -2916,7 +2916,7 @@ xtlang's `let' syntax is the same as Scheme"
         ;; if there is a request then cycle through
         ;; and set lambda arg symbols
         (begin
-          (if (<> (length (cadr ast))
+          (if (<> (length (ast:lambda-params ast))
                   (length (cddr request?)))
               (begin
                 (impc:compiler:print-compiler-error "Bad request to lambda chk:" ast)))
@@ -2925,19 +2925,19 @@ xtlang's `let' syntax is the same as Scheme"
                      (if (atom? req)
                          (impc:ti:update-var sym vars kts (list req))
                          (impc:ti:update-var sym vars kts req))))
-               (cadr ast)
+               (ast:lambda-params ast)
                (cddr request?))
           ;; finally set request? to the return type
           (set! request? (cadr request?))))
     ;; run body for type coverage
     ;; grab the last result as return type
-    (let ((res (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)))
+    (let ((res (impc:ti:type-unify (impc:ti:type-check (ast:lambda-body ast) vars kts request?) vars)))
       ;; if no valid return type rerun type-check for a second time
       (if (not (or (impc:ir:type? res)
                    (and (list? res)
                         (= (length res) 1)
                         (impc:ir:type? (car res)))))
-          (set! res (impc:ti:type-unify (impc:ti:type-check (caddr ast) vars kts request?) vars)))
+          (set! res (impc:ti:type-unify (impc:ti:type-check (ast:lambda-body ast) vars kts request?) vars)))
       ;; (println 'bbbb: res '-> request? request?) ;  '-> (caddr ast))
       ;; if we have a choice between numeric options we force one!
       (if (and (not (impc:ti:complex-type? res))
@@ -2954,18 +2954,18 @@ xtlang's `let' syntax is the same as Scheme"
       (if (and (list? res)
                (= (length res) 1)
                (impc:ir:type? (car res)))
-          (begin (impc:ti:type-check (caddr ast) vars kts (car res))
+          (begin (impc:ti:type-check (ast:lambda-body ast) vars kts (car res))
                  (set! res (car res))))
       ;; return lambda type which is made up of
       ;; argument symbols plus return type from last body expression
-      (let* ((ret (list (impc:ir:pointer++ (list* *impc:ir:closure* res (cadr ast)) 2)))
+      (let* ((ret (list (impc:ir:pointer++ (list* *impc:ir:closure* res (ast:lambda-params ast)) 2)))
              (uret (impc:ti:type-unify ret vars)))
         (if (not (null? uret))
             (map (lambda (sym req)
                    ;; (println 'larg: sym 'req: req)
                    (if (symbol? sym)
                        (impc:ti:update-var sym vars kts (impc:ti:type-unify req vars))))
-                 (cadr ast)
+                 (ast:lambda-params ast)
                  (cddr uret)))
         ;; (println 'vars3 vars)
         (if (null? uret) ret uret)))))
@@ -3277,8 +3277,8 @@ xtlang's `let' syntax is the same as Scheme"
           ((and (atom? ast) (symbol? ast)) (impc:ti:symbol-check ast vars kts request?))
           ((and (atom? ast) (string? ast)) (impc:ti:string-check ast vars kts request?))
           ((atom? ast) (impc:compiler:print-compiler-error "internal error unhandled atom" ast))
-          ((and (list? ast) (member (car ast) *impc:letslist*)) (impc:ti:let-check ast vars kts request?))
-          ((and (list? ast) (member (car ast) *impc:lambdaslist*)) (impc:ti:lambda-check ast vars kts request?))
+          ((ast:let? ast) (impc:ti:let-check ast vars kts request?))
+          ((ast:lambda? ast) (impc:ti:lambda-check ast vars kts request?))
           ((and (list? ast) (equal? (car ast) 't:))
            (impc:ti:type-check (cadr ast) vars kts
                                (impc:ir:get-type-from-pretty-str
@@ -3389,9 +3389,9 @@ xtlang's `let' syntax is the same as Scheme"
                     (impc:ti:closure-exists? (symbol->string (car ast)))))
            ;; (println 'native: ast 'r: request?)
            (impc:ti:nativef-check ast vars kts request?))
-          ((and (list? ast) (member (car ast) '(begin))) (impc:ti:begin-check ast vars kts request?))
-          ((and (list? ast) (member (car ast) '(if ifret))) (impc:ti:if-check ast vars kts request?))
-          ((and (list? ast) (member (car ast) '(set!))) (impc:ti:set-check ast vars kts request?))
+          ((ast:begin? ast) (impc:ti:begin-check ast vars kts request?))
+          ((ast:if? ast) (impc:ti:if-check ast vars kts request?))
+          ((ast:set!? ast) (impc:ti:set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(ret->))) (impc:ti:ret-check ast vars kts request?))
           ((and (list? ast) (assoc-strcmp (car ast) vars)) (impc:ti:closure-call-check ast vars kts request?))
           ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))

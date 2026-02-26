@@ -206,6 +206,7 @@ if(EXT_DYLIB)
         runtime/llvmti-caches.xtm
         runtime/llvmti-aot.xtm
         runtime/llvmti-transforms.xtm
+        runtime/llvmti-ast.xtm
         runtime/llvmti-typecheck.xtm
         runtime/llvmti-bind.xtm
         runtime/scheme.xtm)

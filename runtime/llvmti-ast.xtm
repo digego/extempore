@@ -1,0 +1,167 @@
+;;
+;; Thin AST accessor layer for the xtlang compiler.
+;;
+;; Provides predicates, accessors, and constructors for the 7 core
+;; node types (let, lambda, if, begin, set!, call, var, lit).
+;; The underlying representation is unchanged (tagged lists), so
+;; intermediate passes and IR generation work unmodified.
+;;
+;; Loaded between llvmti-transforms.xtm and llvmti-typecheck.xtm.
+;;
+
+;; --- predicates ---
+
+(define ast:let?
+  (lambda (ast)
+    (and (list? ast) (member (car ast) *impc:letslist*))))
+
+(define ast:lambda?
+  (lambda (ast)
+    (and (list? ast) (member (car ast) *impc:lambdaslist*))))
+
+(define ast:if?
+  (lambda (ast)
+    (and (list? ast) (member (car ast) '(if ifret)))))
+
+(define ast:begin?
+  (lambda (ast)
+    (and (list? ast) (eq? (car ast) 'begin))))
+
+(define ast:set!?
+  (lambda (ast)
+    (and (list? ast) (eq? (car ast) 'set!))))
+
+(define ast:var?
+  (lambda (ast)
+    (symbol? ast)))
+
+(define ast:lit?
+  (lambda (ast)
+    (or (number? ast) (string? ast) (boolean? ast))))
+
+(define ast:call?
+  (lambda (ast)
+    (and (list? ast)
+         (not (null? ast))
+         (not (ast:let? ast))
+         (not (ast:lambda? ast))
+         (not (ast:if? ast))
+         (not (ast:begin? ast))
+         (not (ast:set!? ast)))))
+
+;; --- let accessors ---
+;; (let ((x 1) (y 2)) body) => (let bindings body)
+
+(define ast:let-tag
+  (lambda (ast) (car ast)))
+
+(define ast:let-bindings
+  (lambda (ast) (cadr ast)))
+
+(define ast:let-body
+  (lambda (ast) (caddr ast)))
+
+;; --- lambda accessors ---
+;; (lambda (x y) body) => (lambda params body)
+
+(define ast:lambda-tag
+  (lambda (ast) (car ast)))
+
+(define ast:lambda-params
+  (lambda (ast) (cadr ast)))
+
+(define ast:lambda-body
+  (lambda (ast) (caddr ast)))
+
+;; --- if accessors ---
+;; (if test then else) => (if test then else)
+
+(define ast:if-test
+  (lambda (ast) (cadr ast)))
+
+(define ast:if-then
+  (lambda (ast) (caddr ast)))
+
+(define ast:if-else
+  (lambda (ast)
+    (if (null? (cdddr ast)) '() (cadddr ast))))
+
+;; --- begin accessors ---
+;; (begin e1 e2 ...) => (begin . exprs)
+
+(define ast:begin-exprs
+  (lambda (ast) (cdr ast)))
+
+;; --- set! accessors ---
+;; (set! var expr)
+
+(define ast:set!-var
+  (lambda (ast) (cadr ast)))
+
+(define ast:set!-expr
+  (lambda (ast) (caddr ast)))
+
+;; --- constructors ---
+
+(define ast:make-if
+  (lambda (test then else-branch)
+    (list 'if test then else-branch)))
+
+(define ast:make-begin
+  (lambda (exprs)
+    (cons 'begin exprs)))
+
+(define ast:make-set!
+  (lambda (var expr)
+    (list 'set! var expr)))
+
+(define ast:make-let
+  (lambda (tag bindings body)
+    (cons tag (cons bindings (list body)))))
+
+(define ast:make-lambda
+  (lambda (tag params body)
+    (cons tag (cons params (list body)))))
+
+;; --- validation ---
+
+(define *impc:ast:validate* #f)
+
+(define ast:validate
+  (lambda (ast)
+    (cond
+     ((null? ast) #t)
+     ((ast:lit? ast) #t)
+     ((ast:var? ast) #t)
+     ((ast:let? ast)
+      (if (< (length ast) 3)
+          (begin (log-error 'ast:validate "let node too short:" ast) #f)
+          (begin
+            (for-each (lambda (b)
+                        (if (or (not (list? b)) (< (length b) 2))
+                            (log-error 'ast:validate "bad let binding:" b)))
+                      (ast:let-bindings ast))
+            (ast:validate (ast:let-body ast)))))
+     ((ast:lambda? ast)
+      (if (< (length ast) 3)
+          (begin (log-error 'ast:validate "lambda node too short:" ast) #f)
+          (ast:validate (ast:lambda-body ast))))
+     ((ast:if? ast)
+      (if (< (length ast) 3)
+          (begin (log-error 'ast:validate "if node too short:" ast) #f)
+          (begin
+            (ast:validate (ast:if-test ast))
+            (ast:validate (ast:if-then ast))
+            (if (> (length ast) 3) (ast:validate (ast:if-else ast)))
+            #t)))
+     ((ast:begin? ast)
+      (for-each ast:validate (ast:begin-exprs ast))
+      #t)
+     ((ast:set!? ast)
+      (if (< (length ast) 3)
+          (begin (log-error 'ast:validate "set! node too short:" ast) #f)
+          (ast:validate (ast:set!-expr ast))))
+     ((list? ast)
+      (for-each ast:validate ast)
+      #t)
+     (else #t))))

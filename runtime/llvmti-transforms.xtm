@@ -311,7 +311,7 @@
 (define impc:ti:and
   (lambda (ast)
     (if (pair? ast)
-        (list 'if (car ast)
+        (ast:make-if (car ast)
               (if (null? (cdr ast))
                   (car ast)
                   (impc:ti:and (cdr ast)))
@@ -320,7 +320,7 @@
 (define impc:ti:or
   (lambda (ast)
     (if (pair? ast)
-        (list 'if (car ast)
+        (ast:make-if (car ast)
               (car ast)
               (if (null? (cdr ast))
                   #f
@@ -329,24 +329,24 @@
 (define impc:ti:cond
   (lambda (ast)
     (if (null? ast) '()
-        (list 'if (caar ast)
+        (ast:make-if (caar ast)
               (if (null? (cdar ast))
                   '()
-                  (apply list 'begin (cdar ast)))
+                  (ast:make-begin (cdar ast)))
               (impc:ti:cond (cdr ast))))))
 
 (define impc:ti:cond
   (lambda (ast)
     (cl:remove '()
                (if (null? ast) '()
-                   (list 'if (caar ast)
+                   (ast:make-if (caar ast)
                          (if (null? (cdar ast))
                              (impc:compiler:print-badly-formed-expression-error 'cond ast)
-                             (apply list 'begin (cdar ast)))
+                             (ast:make-begin (cdar ast)))
                          (if (and
                               (not (null? (cdr ast)))
                               (eq? (caadr ast) 'else))
-                             (apply list 'begin (cdadr ast))
+                             (ast:make-begin (cdadr ast))
                              (if (not (null? (cdr ast)))
                                  (impc:ti:cond (cdr ast)))))))))
 
@@ -446,7 +446,7 @@
 
 (define impc:ti:not
   (lambda (ast)
-    (list 'if ast #f #t)))
+    (ast:make-if ast #f #t)))
 
 (define impc:ti:quote
   (lambda (ast)
@@ -473,10 +473,9 @@
   (lambda (ast)
     (set! *anonlambdanum* (+ 1 *anonlambdanum*))
     (let* ((fname (string->symbol (string-append "_anon_lambda_" (number->string *anonlambdanum*))))
-           (rest (cons (impc:ti:first-transform (cadr ast) #t)
-                       (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))
-           ;;(expr (cons 'lambda rest)))
-           (expr (cons (car ast) rest)))
+           (expr (ast:make-lambda (car ast)
+                                  (impc:ti:first-transform (cadr ast) #t)
+                                  (ast:make-begin (impc:ti:first-transform (cddr ast) #t)))))
       `(let ((,fname ,expr))
          (begin ,fname)))))
 
@@ -930,9 +929,9 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ((member (car ast) *impc:lambdaslist*)
                       (if inbody?
                           (impc:ti:lambda ast)
-                          (cons (impc:ti:first-transform (car ast) inbody?)
-                                (cons (impc:ti:first-transform (cadr ast) #t)
-                                      (list (cons 'begin (impc:ti:first-transform (cddr ast) #t)))))))
+                          (ast:make-lambda (impc:ti:first-transform (car ast) inbody?)
+                                           (impc:ti:first-transform (cadr ast) #t)
+                                           (ast:make-begin (impc:ti:first-transform (cddr ast) #t)))))
                      ((eq? (car ast) 'cond)
                       (impc:ti:first-transform (impc:ti:cond (cdr ast)) inbody?))
                      ((eq? (car ast) 'cset!)
@@ -977,13 +976,12 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ((eq? (car ast) 'dotimes) (impc:ti:dotimes ast inbody?))
                      ((eq? (car ast) 'while) (impc:ti:while ast inbody?))
                      ((member (car ast) *impc:letslist*)
-                      (cons (impc:ti:first-transform (car ast) inbody?)
-                            (cons (map (lambda (p)
-                                         (list (impc:ti:first-transform (car p) #f)
-                                               (impc:ti:first-transform (cadr p) #f))
-                                         )
-                                       (cadr ast))
-                                  (list (cons 'begin (impc:ti:first-transform (cddr ast) #t))))))
+                      (ast:make-let (impc:ti:first-transform (car ast) inbody?)
+                                    (map (lambda (p)
+                                           (list (impc:ti:first-transform (car p) #f)
+                                                 (impc:ti:first-transform (cadr p) #f)))
+                                         (cadr ast))
+                                    (ast:make-begin (impc:ti:first-transform (cddr ast) #t))))
                      ((and (symbol? (car ast))
                            (regex:match? (symbol->string (car ast)) ".*\\..*")
                            (not (regex:match? (symbol->string (car ast)) "\\.[0-9]*i$"))
