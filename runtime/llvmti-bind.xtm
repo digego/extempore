@@ -3,19 +3,15 @@
   (lambda (ast)
     (let* ((symname 'nosuchname)
            (c `(let ((xtm_exp_result ,ast)) xtm_exp_result))
-           (shadows (impc:ti:rename-all-shadow-vars symname c '()))
-           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
-           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
-           (____validate (if *impc:ast:validate* (ast:validate ta)))
-           (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
-           (c2 (impc:ti:get-var-types shadow-code))
-           (ccc (append (cdr c2) (cdr c1)))
-           (cc (impc:ti:expand-generic-types ccc))
-           (t1 (car c2))
-           (t2 (impc:ti:closure:convert t1 (list))) ;(list symname)))
-           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t2 '())))
-           (forced-types '()) ;(apply impc:ti:handle-forced-types t1 (append cc args)))
-           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (syn (impc:ti:syntactic-phase symname c))
+           (t1 (car syn))
+           (t2 (impc:ti:closure:convert t1 (list)))
+           (vars (let ((syms (impc:ti:find-all-vars t2 '()))
+                       (ht (make-hashtable 64)))
+                   (for-each (lambda (s) (hashtable-set! ht s '())) syms)
+                   ht))
+           (forced-types '())
+           (t4 (impc:ti:coercion-run t2 forced-types))
            (typespre (impc:ti:run-type-check vars forced-types t1))
            (t5 (impc:ti:closure:convert t4 (list symname)))
            (types (impc:ti:type-normalize typespre)))
@@ -145,111 +141,100 @@
 
 (define *impc:ti:adhoc-cnt* 0)
 
-(define impc:ti:run
-  (lambda (symname code zone-size poly static . args)
-    ;; (println '-----------> 'impc:ti:run: symname 'poly: poly 'static: static)
-    ;; (println 'code: code)
-    ;; (println 'args: args)
+(define impc:ti:clear-pipeline-state
+  (lambda ()
     (set! *impc:ir:sym-name-stack* '())
     (set! *impc:ir:ls_var* '())
     (set! *impc:ti:bound-lambdas* '())
     (set! *impc:ti:generic-type-mappings* '())
-    (set! *impc:ti:nativef-generics-recurse-test* 0)
-    ;; adhoc
+    (set! *impc:ti:nativef-generics-recurse-test* 0)))
+
+(define impc:ti:adhoc-poly-setup
+  (lambda (symname code poly args)
     (set! *impc:ti:adhoc-cnt* (+ *impc:ti:adhoc-cnt* 1))
-    (define adhoc-poly-name symname)
-    (define adhoc-poly-name-string (symbol->string symname))
-    (if (and poly ;*impc:ti:implicit-adhoc-compiles*
-             (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
-        (begin
-          (set! symname (string->symbol (string-append adhoc-poly-name-string
-                                                       "_adhoc_"
-                                                       (number->string *impc:ti:adhoc-cnt*))))
-          (if (not (null? args))
-              (set! args (replace-all args (list (cons adhoc-poly-name symname)))))
-          (set! code (replace-all code (list (cons adhoc-poly-name symname))))))
-    (let* ((symname-string (symbol->string symname))
-           (oldsymname-string symname-string)
-           ;(c code)
-           (shadows (impc:ti:rename-all-shadow-vars symname code '()))
-           (c1 (impc:ti:get-var-types shadows)) ;; this is a cons pairof (ast . types)
-           (ta (impc:ti:first-transform (car c1) #t)) ;; car is ast
+    (let ((adhoc-name symname)
+          (adhoc-name-string (symbol->string symname)))
+      (if (and poly
+               (not (regex:match? adhoc-name-string "(_poly_|_adhoc_)")))
+          (begin
+            (set! symname (string->symbol (string-append adhoc-name-string
+                                                         "_adhoc_"
+                                                         (number->string *impc:ti:adhoc-cnt*))))
+            (if (not (null? args))
+                (set! args (replace-all args (list (cons adhoc-name symname)))))
+            (set! code (replace-all code (list (cons adhoc-name symname))))))
+      (list symname code args adhoc-name adhoc-name-string))))
+
+(define impc:ti:syntactic-phase
+  (lambda (symname code)
+    (let* ((shadows (impc:ti:rename-all-shadow-vars symname code '()))
+           (c1 (impc:ti:get-var-types shadows))
+           (ta (impc:ti:first-transform (car c1) #t))
            (____validate (if *impc:ast:validate* (ast:validate ta)))
-           ;; might be over kill doing shadow vars twice!
            (shadow-code (impc:ti:rename-all-shadow-vars symname ta '()))
-           (c2 (impc:ti:get-var-types shadow-code)) ;; it is possible for macros in the first-transform to introduce new var-types
+           (c2 (impc:ti:get-var-types shadow-code))
            (ccc (append (cdr c2) (cdr c1)))
            (cc (impc:ti:expand-generic-types ccc))
-           (t1 (car c2))
-           (t2 (impc:ti:mark-returns t1 symname #f #f #f))
+           (t1 (car c2)))
+      (list t1 cc))))
+
+(define impc:ti:annotation-phase
+  (lambda (t1 symname)
+    (let* ((t2 (impc:ti:mark-returns t1 symname #f #f #f))
            (t3 (impc:ti:closure:convert t2 (list symname)))
-           (vars (map (lambda (x) (list x)) (impc:ti:find-all-vars t3 '())))
-           ;; (llllllllll (begin (println 'vars: vars) (error)))
-           (forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
-           (t4 (impc:ti:coercion-run t2 forced-types)) ;; t4 and t5 are optional
+           (vars (let* ((syms (impc:ti:find-all-vars t3 '()))
+                        (ht (make-hashtable (max 64 (* 2 (length syms))))))
+                   (for-each (lambda (s) (hashtable-set! ht s '())) syms)
+                   ht)))
+      (list t2 vars))))
+
+(define impc:ti:type-phase
+  (lambda (t1 t2 vars cc args symname)
+    (let* ((forced-types (apply impc:ti:handle-forced-types t1 (append cc args)))
+           (t4 (impc:ti:coercion-run t2 forced-types))
            (typespre (impc:ti:run-type-check vars forced-types t4))
            (t5 (impc:ti:closure:convert t4 (list symname)))
-           (types (impc:ti:type-normalize typespre))
-           (newast '()))
-      ;; (println 'forced: forced-types)
-      ;; (println 'types-post: types)
-      ;; (println 'run: (impc:ti:unity? types))
-      ;; (println 'newast: newast)
-      ;; (println 'forced: forced-types)
-      ;; (println 'times: (- ct2 ct1) (- ct3 ct2) (- ct4 ct3) (- ct5 ct4) (- ct6 ct5) (- ct7 ct6) (- ct8 ct7) (- ct9 ct8) (- ct10 ct9) (- ct11 ct10))
+           (types (impc:ti:type-normalize typespre)))
+      (list types t5))))
 
-      ;; (println 'typesa types)
-      ;; A FINAL TYPE CLEANUP
-      ;;
-      ;; finally we remove !bang types which ultimately don't need to be resolved fully
-      ;; don't need to be resolved because they are helpers to resolution not reified types in their own right
-      ;;
-      ;; also we make sure that any types of the form (sym "%list...") are converted to (sym . "%list...")
-      ;; in other words change list ("%list...") into atom "%list..."
-
-      (set! types (cl:remove #f (map (lambda (x)
-                                       (if (or (regex:match? (symbol->string (car x)) "^!")
-                                               (regex:match? (symbol->string (car x))
-                                                             "^[A-Za-z0-9_-]*(:<|{).*##[0-9]*$"))
-                                           #f
-                                           (if (list? (cdr x))
-                                               (if (= (length (cdr x)) 1)
-                                                   (cons (car x) (cadr x))
-                                                   x)
-                                               x)))
-                                     types)))
-      ;; just added by andrew (can be safely removed)
-
-      (if (null? types)
-          (impc:compiler:print-could-not-resolve-type-error symname))
-
-      ;; (println 'final-types: types)
-
-      ;; if we didn't unify print error and bomb out!
-      (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
-          (let ((name (car (regex:type-split (symbol->string symname) "(_adhoc_|_poly_)"))))
-            (impc:compiler:print-could-not-resolve-types
-             types
-             (car (cdaadr t1))
-             name)))
-
-      ;; remove all t: expressions from source
-      ;; i.e. (t: (* 2 3) i64) -> (* 2 3)
-      ;; as (t: ...) is purely for type check stage (which is now complete)
-      (letrec ((f (lambda (lst)
-                    (if (or (atom? lst) (null? lst)) 'done
-                        (begin
-                          (if (and (list? lst)
-                                   (equal? (car lst) 't:))
-                              (let ((v (cadr lst)))
-                                (set-car! lst (car v))
-                                (set-cdr! lst (cdr v))))
-                          (f (car lst))
-                          (f (cdr lst)))))))
-        (f t5))
-
-      (if (and poly ;;*impc:ti:implicit-adhoc-compiles*
-               (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
+(define impc:ti:semantic-phase
+  (lambda (types t1 t5 symname symname-string poly adhoc-poly-name-string)
+    ;; remove !bang types and fix list-type format
+    (set! types (cl:remove #f (map (lambda (x)
+                                     (if (or (regex:match? (symbol->string (car x)) "^!")
+                                             (regex:match? (symbol->string (car x))
+                                                           "^[A-Za-z0-9_-]*(:<|{).*##[0-9]*$"))
+                                         #f
+                                         (if (list? (cdr x))
+                                             (if (= (length (cdr x)) 1)
+                                                 (cons (car x) (cadr x))
+                                                 x)
+                                             x)))
+                                   types)))
+    (if (null? types)
+        (impc:compiler:print-could-not-resolve-type-error symname))
+    (if (not (cl:every (lambda (x) x) (impc:ti:unity? types)))
+        (let* ((sname (symbol->string symname))
+               (name (car (string-split-on sname (if (string-contains? sname "_poly_") "_poly_" "_adhoc_")))))
+          (impc:compiler:print-could-not-resolve-types
+           types
+           (car (cdaadr t1))
+           name)))
+    ;; remove t: annotations from AST (purely for type check stage)
+    (letrec ((f (lambda (lst)
+                  (if (or (atom? lst) (null? lst)) 'done
+                      (begin
+                        (if (and (list? lst)
+                                 (equal? (car lst) 't:))
+                            (let ((v (cadr lst)))
+                              (set-car! lst (car v))
+                              (set-cdr! lst (cdr v))))
+                        (f (car lst))
+                        (f (cdr lst)))))))
+      (f t5))
+    ;; poly specialisation + add types to source
+    (let ((newast '()))
+      (if (and poly (not (regex:match? adhoc-poly-name-string "(_poly_|_adhoc_)")))
           (let* ((p (assoc-strcmp symname types))
                  (n (car p))
                  (t (impc:ir:pretty-print-type (cdr p)))
@@ -263,6 +248,32 @@
             (set! symname-string new)
             (set! newast (impc:ti:add-types-to-source symname t6 (cl:tree-copy types) (list))))
           (set! newast (impc:ti:add-types-to-source symname t5 (cl:tree-copy types) (list))))
+      (list types newast symname symname-string))))
+
+(define impc:ti:run
+  (lambda (symname code zone-size poly static . args)
+    (impc:ti:clear-pipeline-state)
+    (let* ((setup (impc:ti:adhoc-poly-setup symname code poly args))
+           (symname (car setup))
+           (code (cadr setup))
+           (args (caddr setup))
+           (adhoc-poly-name (cadddr setup))
+           (adhoc-poly-name-string (car (cddddr setup)))
+           (symname-string (symbol->string symname))
+           (syn (impc:ti:syntactic-phase symname code))
+           (t1 (car syn))
+           (cc (cadr syn))
+           (ann (impc:ti:annotation-phase t1 symname))
+           (t2 (car ann))
+           (vars (cadr ann))
+           (tp (impc:ti:type-phase t1 t2 vars cc args symname))
+           (types (car tp))
+           (t5 (cadr tp))
+           (sem (impc:ti:semantic-phase types t1 t5 symname symname-string poly adhoc-poly-name-string))
+           (types (car sem))
+           (newast (cadr sem))
+           (symname (caddr sem))
+           (symname-string (cadddr sem)))
 
       ;;
       ;; modify code for static functions
@@ -2014,11 +2025,7 @@ e.g.
                      pfunc))))
            types)
           (set! *impc:ti:print-code-specialization-compiles* printspec)
-          (set! *impc:ti:genericfunc-cache*
-                (cl:remove-if (lambda (x)
-                                (if (string=? (symbol->string (car x)) sym)
-                                    #t #f))
-                              *impc:ti:genericfunc-cache*))
+          (hashtable-delete! *impc:ti:genericfunc-cache* sym)
           #t))))
 
 (define-macro (constrain-genericfunc sym . args)
@@ -2213,7 +2220,7 @@ e.g.
 (define xtmdoc-get-xtlang-genericfunc-args
   (lambda (fn-sym)
     (xtmdoc-get-args-from-form
-     (caddar (cdddar (assoc-strcmp-all fn-sym *impc:ti:genericfunc-cache*))))))
+     (caddar (cdddar (reverse (or (hashtable-ref *impc:ti:genericfunc-cache* (symbol->string fn-sym)) '())))))))
 
 (define xtmdoc-builtin-handler
   (lambda (name-sym)
@@ -2237,7 +2244,7 @@ e.g.
      (cons 'name (symbol->string name-sym))
      (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
      (cons 'type (impc:ti:simplify-genericfunc-pretty-type
-                  (symbol->string (caddar (assoc-strcmp-all name-sym *impc:ti:genericfunc-cache*)))))
+                  (symbol->string (caddar (reverse (or (hashtable-ref *impc:ti:genericfunc-cache* (symbol->string name-sym)) '()))))))
      (list 'docstring))))
 
 (define xtmdoc-generictype-handler
@@ -2430,8 +2437,8 @@ e.g.
             (append
              (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:builtin-cache*))
              (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:typealias-cache*))
-             (map (lambda (data) (xtmdoc-generictype-handler (car data))) *impc:ti:generictype-cache*)
-             (map (lambda (data) (xtmdoc-genericfunc-handler (car data))) *impc:ti:genericfunc-cache*)
+             (map (lambda (data) (xtmdoc-generictype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:generictype-cache*))
+             (map (lambda (data) (xtmdoc-genericfunc-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:genericfunc-cache*))
 
              (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) (hashtable->alist *impc:ti:namedtype-cache*))
              closure-alists

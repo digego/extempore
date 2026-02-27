@@ -509,8 +509,9 @@
                       (if (null? tsr)
                           (begin
                             (if (and (symbol? (car t))
-                                     (or (regex:match? (symbol->string (car t)) "^_anon_lambda" )
-                                         (regex:match? (symbol->string (car t)) "^!")))
+                                     (let ((s (symbol->string (car t))))
+                                       (or (string-contains? s "_anon_lambda")
+                                           (char=? (string-ref s 0) #\!))))
                                 'done
                                 (begin
                                   (print-with-colors 'red 'black #t (print "unresolved: "))
@@ -685,4 +686,13 @@
           (print-with-colors 'cyan 'default #t (print  "scheme stub"))
           (print " available for ")
           (print-with-colors *impc:compiler:pretty-print-name-color* 'default #t (print symname "\n"))))))
+
+(define string-split-on
+  (lambda (s delim)
+    (let ((pos (string-index-of s delim))
+          (dlen (string-length delim)))
+      (if pos
+          (list (substring s 0 pos)
+                (substring s (+ pos dlen) (string-length s)))
+          (list s)))))
 

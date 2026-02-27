@@ -20,34 +20,25 @@
   (lambda ()
     (set! *impc:zone* (sys:default-mzone))))
 
-;; regex:type-split pair is like regex split
-;; but only splits on 'first' occurence
-(define regex:type-split
-  (lambda (str char)
-    (let ((p (regex:split str char)))
-      (if (and (> (length p) 1)
-               (> (length (cdr p)) 1))
-          (list (car p) (apply string-append (cadr p)
-                               (map (lambda (k) (string-append char k)) (cddr p))))
-          p))))
+(define regex:type-split string-split-on)
 
 (define impc:ti:split-namedfunc
   (lambda (str)
     (if (symbol? str) (set! str (symbol->string str)))
-    (regex:type-split str ":")))
+    (string-split-on str ":")))
 
 (define impc:ti:split-namedtype
   (lambda (str)
     (if (symbol? str) (set! str (symbol->string str)))
-    (if (regex:match? str "^[A-Za-z0-9_]*{")
-        (let* ((p (regex:type-split str "{"))
+    (if (string-contains? str "{")
+        (let* ((p (string-split-on str "{"))
                (ptrd (impc:ir:get-ptr-depth (cadr p)))
                (base (impc:ir:get-base-type (cadr p))))
           (list (car p) (apply string-append "<" (substring base 0 (- (string-length base) 1)) ">"
                                (make-list ptrd "*"))))
-        (if (regex:match? str "^[A-Za-z0-9_]*:")
-            (regex:type-split str ":")
-            (regex:type-split str "\\*")))))
+        (if (string-contains? str ":")
+            (string-split-on str ":")
+            (string-split-on str "*")))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -67,14 +58,17 @@
                                      (if (and (list? a)
                                               (eq? (car a) '*colon-hook*))
                                          (impc:compiler:print-double-colon-error (caddr a)))
-                                     (if (string-contains? (symbol->string a) ":")
-                                         (let ((t (regex:type-split (symbol->string a) ":")))
-                                           (if (regex:match? (cadr t) "^\\<|\\[")
-                                               (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                   (impc:compiler:print-bad-type-error (cadr t))))
-                                           (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
-                                           (string->symbol (car t)))
-                                         a))
+                                     (let ((a-str (symbol->string a)))
+                                       (if (string-contains? a-str ":")
+                                           (let ((t (string-split-on a-str ":")))
+                                             (if (let ((c (string-ref (cadr t) 0)))
+                                                   (or (char=? c #\<) (char=? c #\[)))
+                                                 (if (not (or (string-contains? (cadr t) ">")
+                                                              (string-contains? (cadr t) "]")))
+                                                     (impc:compiler:print-bad-type-error (cadr t))))
+                                             (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
+                                             (string->symbol (car t)))
+                                           a)))
                                    (cadr ast))
                               (f (cddr ast))))
                       ((member (car ast) *impc:letslist*)
@@ -88,14 +82,17 @@
                                      (if (and (list? (car a))
                                               (eq? (car (car a)) '*colon-hook*))
                                          (impc:compiler:print-double-colon-error (caddr (car a))))
-                                     (if (string-contains? (symbol->string (car a)) ":")
-                                         (let ((t (regex:type-split (symbol->string (car a)) ":")))
-                                           (if (regex:match? (cadr t) "^\\<|\\[")
-                                               (if (not (regex:match? (cadr t) "\\>|\\]"))
-                                                   (impc:compiler:print-bad-type-error (cadr t))))
-                                           (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
-                                           (list (string->symbol (car t)) (car (f (cdr a)))))
-                                         (list (car a) (car (f (cdr a))))))
+                                     (let ((ca-str (symbol->string (car a))))
+                                       (if (string-contains? ca-str ":")
+                                           (let ((t (string-split-on ca-str ":")))
+                                             (if (let ((c (string-ref (cadr t) 0)))
+                                                   (or (char=? c #\<) (char=? c #\[)))
+                                                 (if (not (or (string-contains? (cadr t) ">")
+                                                              (string-contains? (cadr t) "]")))
+                                                     (impc:compiler:print-bad-type-error (cadr t))))
+                                             (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
+                                             (list (string->symbol (car t)) (car (f (cdr a)))))
+                                           (list (car a) (car (f (cdr a)))))))
                                    (cadr ast))
                               (f (cddr ast))))
                       ((pair? ast)
@@ -115,7 +112,7 @@
 
 (define impc:ti:expand-generic-type-func-gpoly-arity
   (lambda (name xvararity)
-    (let* ((all-gpolys (cl:remove-if-not (lambda (x) (equal? (car x) name)) *impc:ti:genericfunc-cache*))
+    (let* ((all-gpolys (or (hashtable-ref *impc:ti:genericfunc-cache* (symbol->string name)) '()))
            (all-gtypes (map (lambda (x) (caddr x)) all-gpolys))
            (all-type-arity (map (lambda (x) (length
                                              (cl:remove-duplicates
@@ -145,9 +142,9 @@
                             (impc:ir:get-pretty-tuple-arg-strings base)))
                  (gtt (if func?
                           (impc:ti:expand-generic-type-func-gpoly-arity (string->symbol name) (length xvars))
-                          (assoc-strcmp (string->symbol name) *impc:ti:generictype-cache*)))
+                          (hashtable-ref *impc:ti:generictype-cache* name)))
                  (gtype (if gtt
-                            (symbol->string (if func? (car gtt) (cdr gtt)))
+                            (symbol->string (if func? (car gtt) gtt))
                             (impc:compiler:print-cannot-expand-non-generic-error name)))
                  (_gvars (regex:match-all gtype "(![A-Za-z0-9_]*)"))
                  (gvars (cl:remove-duplicates _gvars)))
@@ -948,10 +945,10 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define impc:ti:transform-dot-syntax
   (lambda (ast inbody?)
     (let ((head-str (symbol->string (car ast))))
-      (if (and (regex:match? head-str ".*\\..*")
+      (if (and (string-contains? head-str ".")
                (not (regex:match? head-str "\\.[0-9]*i$"))
-               (not (number? (string->atom (car (regex:type-split head-str ":"))))))
-          (if (regex:match? head-str ".*\\..*:.*")
+               (not (number? (string->atom (car (string-split-on head-str ":"))))))
+          (if (and (string-contains? head-str ".") (string-contains? head-str ":"))
               (let* ((subs (regex:split head-str "\\."))
                      (a (string->symbol (car subs)))
                      (subs2 (regex:type-split (car (reverse subs)) ":"))
@@ -1061,7 +1058,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                         (number->string *unique-polynum*)))
                          (impc:ti:first-transform (cdr ast) inbody?)))
                   ((and (symbol? head)
-                        (regex:match? (symbol->string head) ":\\[")
+                        (string-contains? (symbol->string head) ":[")
+
                         (impc:ti:transform-typed-poly ast inbody?)))
                   ((impc:ti:transform-special-form ast inbody?))
                   ((impc:ti:transform-definition ast inbody?))
@@ -1141,26 +1139,24 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define impc:ti:reify-generic-type-expand
   (lambda (type gnum spec vars)
     ;; (println 'reifyin: type 'gnum: gnum 'spec: spec) ; 'vars: vars)
-    (for-each (lambda (v)
-                ;; (println 'v: v)
-                (if (and (impc:ti:bang-type? (car v))
-                         (if (not gnum) #t
-                             (regex:match? (symbol->string (car v)) (string-append "##" gnum)))
-                         (regex:match? type (car (regex:split (symbol->string (car v)) "(##)|(%)")))
-                         (not (null? (cdr v))))
-                    (let* ((t (impc:ti:type-normalize (impc:ti:type-unify (cdr v) vars)))
-                           ;; (llllll (println 't: t))
-                           (tl (if (impc:ir:type? t)
-                                   (impc:ir:pretty-print-type t)
-                                   '())))
-                      ;; (println 'v: v 't: t 'tl: tl)
-                      (if (not (null? tl))
-                          (let* ((xx (car (regex:type-split (symbol->string (car v)) "##")))
-                                 (base (impc:ir:get-base-type xx))
-                                 (xxx (string-append base "[*]*")))
-                            (set! type (regex:replace-all type xxx tl)))))
-                    #f))
-              vars)
+    (hashtable-for-each
+     (lambda (v)
+       (if (and (impc:ti:bang-type? (car v))
+                (if (not gnum) #t
+                    (regex:match? (symbol->string (car v)) (string-append "##" gnum)))
+                (regex:match? type (car (regex:split (symbol->string (car v)) "(##)|(%)")))
+                (not (null? (cdr v))))
+           (let* ((t (impc:ti:type-normalize (impc:ti:type-unify (cdr v) vars)))
+                  (tl (if (impc:ir:type? t)
+                          (impc:ir:pretty-print-type t)
+                          '())))
+             (if (not (null? tl))
+                 (let* ((xx (car (regex:type-split (symbol->string (car v)) "##")))
+                        (base (impc:ir:get-base-type xx))
+                        (xxx (string-append base "[*]*")))
+                   (set! type (regex:replace-all type xxx tl)))))
+           #f))
+     vars)
     ;; (println 'reifyout: type 'gnum: gnum)
     type))
 
@@ -1177,7 +1173,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                  (make-list (impc:ir:get-ptr-depth string-type) "*"))
           ;; next check if type is already maximized!
           (if (or (not (impc:ti:get-generictype-candidate-types (car p)))  ;; not generic!
-                  (and (not (regex:match? (cadr p) "({|!)"))
+                  (and (not (or (string-contains? (cadr p) "{")
+                                (string-contains? (cadr p) "!")))
                        (not (string-contains? string-type "{"))))
               string-type
               ;; otherwise we really do need to max type!
@@ -1186,7 +1183,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (ags
                       (cl:remove #f
                                  (map (lambda (x)
-                                        (if (regex:match? x "^[A-Za-z0-9_]*{")
+                                        (if (string-contains? x "{")
                                             (impc:ti:maximize-generic-type x)
                                             (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
                                                 #f
@@ -1195,7 +1192,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (named_ags (cl:remove
                                  #f
                                  (map (lambda (x)
-                                        (if (regex:match? x "^[A-Za-z0-9_]*{")
+                                        (if (string-contains? x "{")
                                             (impc:ti:maximize-generic-type x)
                                             #f))
                                       (impc:ir:get-pretty-tuple-arg-strings argstr))))
@@ -1210,7 +1207,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (named_gags (cl:remove
                                   #f
                                   (map (lambda (x)
-                                         (if (regex:match? x "^[A-Za-z0-9_]*({|:<)")
+                                         (if (or (string-contains? x "{")
+                                                 (string-contains? x ":<"))
                                              (string-append "\\Q" x "\\E")
                                              #f))
                                        (impc:ir:get-pretty-tuple-arg-strings gtype))))
@@ -1227,7 +1225,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                        ;; (lllll (println 'newt newt))
                        (newt2 (map (lambda (x)
                                      ;; (println 'string-type string-type 'x x)
-                                     (if (regex:match? x "^[A-Za-z0-9_]*{")
+                                     (if (string-contains? x "{")
                                          (if (regex:match? x (string-append string-type "\\**"))
                                              (regex:replace x "^([^{]*).+(\\*+)$" "$1$2")
                                              (impc:ti:maximize-generic-type x))
@@ -1272,12 +1270,13 @@ Continue executing `body' forms until `test-expression' returns #f"
            ;; (lllllllll (println 'lst1: plst))
            (typevars (cl:remove-duplicates
                       (cl:remove-if (lambda (x)
-                                      (and (not (regex:match? (car x) "^!"))            ;; typevar
-                                           (not (and (regex:match? (car x) "^[A-Za-z]") ;; or generic type
-                                                     (impc:ti:generictype-exists?
-                                                      (car (impc:ti:split-namedtype (car x)))))) ;;(regex:type-split (car x) ":")))))
-                                           (not (and (regex:match? (car x) "^\\[")
-                                                     (regex:match? (car x) "!")))))
+                                      (let ((cx (string-ref (car x) 0)))
+                                        (and (not (char=? cx #\!))            ;; typevar
+                                             (not (and (char-alphabetic? cx) ;; or generic type
+                                                       (impc:ti:generictype-exists?
+                                                        (car (impc:ti:split-namedtype (car x))))))
+                                             (not (and (char=? cx #\[)
+                                                       (string-contains? (car x) "!"))))))
                                     plst)))
            ;; (lllllllllll (println 'lst2: typevars))
            (tv2 (map (lambda (x)
@@ -1300,26 +1299,26 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                     tvars))))
                                  ;; (println 'res: res)
                                  res) ;; (car minargs))
-                               (begin
+                               (let* ((xd-split (string-split-on (cdr x) ":"))
+                                      (xd-name (car xd-split))
+                                      (xd-type (cadr xd-split)))
                                  (if (not (impc:ti:get-generictype-candidate-types
-                                           (string->symbol
-                                            (car (regex:type-split (cdr x) ":")))))
-                                     (impc:compiler:print-bad-type-error (string->symbol (car (regex:type-split (cdr x) ":"))) "type is undefined"))
+                                           (string->symbol xd-name)))
+                                     (impc:compiler:print-bad-type-error (string->symbol xd-name) "type is undefined"))
                                  (apply string-append
-                                        (car (regex:type-split (cdr x) ":"))
+                                        xd-name
                                         "{"
                                         (string-join (impc:ti:minimize-generic-type
-                                                      (cadr (regex:type-split (cdr x) ":"))
+                                                      xd-type
                                                       (if (string-contains? (car x) ":")
-                                                          (cadr (regex:type-split (car x) ":"))
+                                                          (cadr (string-split-on (car x) ":"))
                                                           (symbol->string (impc:ti:get-generictype-candidate-types
-                                                                           (string->symbol
-                                                                            (car (regex:type-split (cdr x) ":")))))))
+                                                                           (string->symbol xd-name)))))
                                                      ",")
                                         "}"
                                         (make-list (impc:ir:get-ptr-depth (cdr x)) "*"))))
-                           (if (and (regex:match? (cdr x) "^(\\[|<)") ;; closures and tuples!
-                                    (regex:match? (car x) "^(\\[|<)"))
+                           (if (and (let ((c (string-ref (cdr x) 0))) (or (char=? c #\[) (char=? c #\<)))
+                                    (let ((c (string-ref (car x) 0))) (or (char=? c #\[) (char=? c #\<))))
                                (let ((ptrd (impc:ir:get-ptr-depth (cdr x)))
                                      (b1 (impc:ir:get-base-type (cdr x)))
                                      (b2 (impc:ir:get-base-type (car x))))
@@ -1393,7 +1392,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                (cdr l1) (append (car res) newl1)
                (cdr l2) (append (cdr res) newl2)))
             (if (and (symbol? (car l1))
-                     (regex:match? (symbol->string (car l1)) "^!"))
+                     (char=? (string-ref (symbol->string (car l1)) 0) #\!))
                 (impc:ti:minimize-gen-type-x (cdr l1) (cons (car l1) newl1)
                         (cdr l2) (cons (car l2) newl2))
                 (impc:ti:minimize-gen-type-x (cdr l1) newl1
@@ -1450,15 +1449,15 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; (println 'vars: vars)
     ;; (println 'all-vs: all-vs)
     ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
-    ;; (println '-> (assoc-strcmp vs vars))
-    (if (and (assoc-strcmp vs vars)
-             (not (null? (cdr (assoc-strcmp vs vars))))
-             (impc:ir:type? (cadr (assoc-strcmp vs vars))))
-        (cadr (assoc-strcmp vs vars))
+    ;; (println '-> (hashtable-ref vars vs))
+    (if (and (hashtable-ref vars vs)
+             (not (null? (hashtable-ref vars vs)))
+             (impc:ir:type? (car (hashtable-ref vars vs))))
+        (car (hashtable-ref vars vs))
         (if (and (symbol? vs)
                  (string-contains? (symbol->string vs) "##")
-                 (not (regex:match? (symbol->string vs) "^!")))
-            (let* ((rsplit1a (regex:split (symbol->string vs) "##")) ;\\$\\$\\$"))
+                 (not (char=? (string-ref (symbol->string vs) 0) #\!)))
+            (let* ((rsplit1a (string-split-on (symbol->string vs) "##"))
                    (rsplit1 (if (string-contains? (car rsplit1a) "{")
                                 (cons (impc:ti:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
                                 rsplit1a))
@@ -1495,15 +1494,16 @@ Continue executing `body' forms until `test-expression' returns #f"
                               es2))
                      (tr (cl:remove-if (lambda (x)
                                          ;; (println 'x: x 'gpolyname: gpolyname)
-                                         (if (and (not (regex:match? x "^(<|\\[)"))
-                                                  (string-contains? x ":"))
-                                             (let ((p (regex:type-split x ":")))
-                                               (or (string=? (car p) gpolyname)
-                                                   (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
-                                             (if (regex:match? x "^!")
-                                                 #f
-                                                 (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                     (impc:ir:type? (impc:ir:get-type-from-pretty-str x))))))
+                                         (let ((c (string-ref x 0)))
+                                           (if (and (not (or (char=? c #\<) (char=? c #\[)))
+                                                    (string-contains? x ":"))
+                                               (let ((p (string-split-on x ":")))
+                                                 (or (string=? (car p) gpolyname)
+                                                     (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
+                                               (if (char=? c #\!)
+                                                   #f
+                                                   (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
+                                                       (impc:ir:type? (impc:ir:get-type-from-pretty-str x)))))))
                                        ;; (impc:ir:type? x)))))
                                        es)))
                 (if (null? tr) (set! validelements? #t))
@@ -1566,8 +1566,8 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;     ;; (println 'vs vs 'all-vs all-vs 'vars vars)
 ;;     (impc:ti:type-unify all-vs vars)
 ;;     ;; (println 'vs: vs 'vars: vars)
-;;     (if (not (null? (cdr (assoc-strcmp vs vars))))
-;;         (cdr (assoc-strcmp vs vars))
+;;     (if (not (null? (hashtable-ref vars vs)))
+;;         (hashtable-ref vars vs)
 ;;         vs)))
 
 
@@ -1590,14 +1590,14 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;                               (string->symbol (car (regex:type-split (symbol->string vs) ":")))))
 ;;                         #t #f))
 ;;                 (impc:ti:reify-generic-type vs vars all-vs)
-;;                 (if (not (assoc-strcmp vs vars)) ;; if not in vars
+;;                 (if (not (hashtable-ref vars vs)) ;; if not in vars
 ;;                     (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
 ;;                         vs
 ;;                         ;; (impc:compiler:print-variable-not-marked-as-free-error vs))
 ;;                         vs)
 ;;                     ;; check to see a type has been defined
 ;;                     ;; otherwise return null
-;;                     (let ((t (cdr (assoc-strcmp vs vars))))
+;;                     (let ((t (hashtable-ref vars vs)))
 ;;                       ;; first check to see if the symbol vs has a value
 ;;                       (if (null? t) ;; if it doesn't we might need to reverse match!
 ;;                           (impc:ti:symbol-expand-reverse-check vs vars all-vs)
@@ -1771,7 +1771,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                               (= (car e) (car atom-type)))
                          (map (lambda (a b)
                                 (if (and (symbol? a)
-                                         (assoc-strcmp a vars))
+                                         (hashtable-ref vars a))
                                     (set! vars (impc:ti:vars-update a vars '() b))))
                               (cdr e)
                               (cdr atom-type)))))
@@ -1815,15 +1815,16 @@ Continue executing `body' forms until `test-expression' returns #f"
                     (or (impc:ti:get-generictype-candidate-types
                          (string->symbol
                           (impc:ir:get-base-type
-                           (car (regex:split (car (regex:split (symbol->string t) "##")) "%")))))
-                        (if (and (regex:match? (symbol->string t) "(:|{)")
+                           (car (string-split-on (car (string-split-on (symbol->string t) "##")) "%")))))
+                        (if (and (or (string-contains? (symbol->string t) ":")
+                                     (string-contains? (symbol->string t) "{"))
                                  (impc:ti:get-generictype-candidate-types
                                   (string->symbol (car (impc:ti:split-namedtype t)))))
                             #t
                             #f)))
                (impc:ti:reify-generic-type t vars '())
-               (if (and (symbol? t) (assoc-strcmp t vars))
-                   (let ((r (impc:ti:type-unify (cdr (assoc-strcmp t vars)) vars)))
+               (if (and (symbol? t) (hashtable-ref vars t))
+                   (let ((r (impc:ti:type-unify (hashtable-ref vars t) vars)))
                      (if (null? r) t r)) ;; if r is NULL or false return t
                    t)))
           ((list? t)
@@ -1931,14 +1932,16 @@ Continue executing `body' forms until `test-expression' returns #f"
   (lambda (a)
     (if (and (symbol? a)
              (string-contains? (symbol->string a) "##"))
-        (let* ((gname (car (regex:split (symbol->string a) "##")))
-               (gnum (string->number (cadr (regex:split (symbol->string a) "##"))))
+        (let* ((a-parts (string-split-on (symbol->string a) "##"))
+               (gname (car a-parts))
+               (gnum (string->number (cadr a-parts)))
                (_basename (impc:ir:get-base-type gname))
                (name_and_type (impc:ti:split-namedtype _basename))
                (basename (car name_and_type))
                (gtype (if (null? (cdr name_and_type)) #f (cadr name_and_type)))
-               (gchar (cdr (regex:split basename "%")))
-               (gname2 (car (regex:split basename "%")))
+               (b-parts (string-split-on basename "%"))
+               (gchar (cdr b-parts))
+               (gname2 (car b-parts))
                (gpt (impc:ti:get-generictype-candidate-types gname2)))
           (if gpt
               (list (string->symbol gname2) gnum (if (null? gchar) "" (car gchar)) (impc:ir:get-type-from-pretty-str (symbol->string gpt)) gtype)
@@ -1950,18 +1953,17 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; example use is in impc:ti:sym-unify
 (define impc:ti:check-bang-against-reified
   (lambda (bang-sym reified-sym vars)
-    (let ((r (assoc-strcmp reified-sym vars)))
-      (if (null? r)
+    (let ((type (hashtable-ref vars reified-sym)))
+      (if (or (not type) (null? type))
           #f
           (let* ((gtd (impc:ti:generic-type-details reified-sym))
                  (gtd2 (impc:ti:generic-type-details bang-sym))
-                 (type (cdr r))
                  (gtype (cadddr gtd))
                  (pos (cl:position (car gtd2) gtype)))
             (if (and type pos (list? (car type)) (> (length (car type)) pos))
                 (let ((val (list-ref (car type) pos)))
                   val)
-                (if (regex:match? (symbol->string (car r)) "^!g(.*)_.*##([0-9]*)$")
+                (if (regex:match? (symbol->string reified-sym) "^!g(.*)_.*##([0-9]*)$")
                     (let ((l1 (regex:matched (symbol->string bang-sym) "^!g(.*)_.*##([0-9]*)$"))
                           (l2 (regex:matched (symbol->string reified-sym) "^!g(.*)_.*##([0-9]*)$")))
                       (if (and (= (length l1) (length l2))
@@ -1980,17 +1982,20 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; then we trawl through vars looking for reified
     ;; types which we might be able to match it against.
     (if (and (null? types)
-             (regex:match? (symbol->string sym) "^!"))
+             (char=? (string-ref (symbol->string sym) 0) #\!))
         (let ((gtd (impc:ti:generic-type-details sym)))
-          (map (lambda (k)
-                 (if (and (not (null? (cdr k)))
-                          (impc:ir:type? (cadr k)))
-                     (let ((gtd2 (impc:ti:generic-type-details (car k))))
-                       (if (and gtd2 (= (cadr gtd) (cadr gtd2)))
-                           (let ((val (impc:ti:check-bang-against-reified sym (car k) vars)))
-                             (if val
-                                 (set! vars (impc:ti:vars-update sym vars '() val))))))))
-               vars)))
+          (if gtd
+              (hashtable-for-each
+               (lambda (k)
+                 (let ((k-types (cdr k)))
+                   (if (and (not (null? k-types))
+                            (impc:ir:type? (car k-types)))
+                       (let ((gtd2 (impc:ti:generic-type-details (car k))))
+                         (if (and gtd2 (= (cadr gtd) (cadr gtd2)))
+                             (let ((val (impc:ti:check-bang-against-reified sym (car k) vars)))
+                               (if val
+                                   (set! vars (impc:ti:vars-update sym vars '() val)))))))))
+               vars))))
 
     ;; (if (not (cl:find-if list? types))
     ;;    (begin (set! types (cl:remove-duplicates types)) ;; first normalize and check for duplicates
@@ -2016,59 +2021,23 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; types can be given types.
 (define impc:ti:unify
   (lambda (vars)
-    ;; (println 'unifyvars: vars)
-    (let ((result (map (lambda (v)
-                         ;;(println 'unify-v: v)
-                         (let* ((sym (car v))
-                                ;;(kkkkkk (println 'sym sym))
-                                ;; expand any symbols and do reverse symbol checks
-                                ;; (types-expanded (map (lambda (t)
-                                ;;                        ;; first CLEAN the type (remove extraneous lists)
-                                ;;                        (set! t (impc:ti:type-clean t))
-                                ;;                        (if (or (symbol? t)
-                                ;;                                (list? t))
-                                ;;                            (let ((res (impc:ti:symbol-expand t vars (cdr v))))
-                                ;;                              (set! res (impc:ti:type-clean res))
-                                ;;                              res)
-                                ;;                            t))
-                                ;;                      (cdr v)))
-                                ;; (kkkkkkkk (println 'unify-v-expanded: v 'expanded: types-expanded))
-                                ;; (types-unified types-expanded)) ;(impc:ti:sym-unify sym types-expanded vars)))
-                                (types-unified (impc:ti:sym-unify sym (cdr v) vars)))
-;                                (types-unified (impc:ti:sym-unify sym types-expanded vars)))
-
-                           ;; (println 'sym_____: v)
-                           ;; (println 'expanded: types-expanded)
-                           ;; (println 'unified_: types-unified)
-                           ;; (println 'vars____: vars)
-
-                           ;; (println 'types-unified: types-unified)
-                           ;; (println 'un-expanded (cdr v))
-                           ;; (println 'un-unified types-expanded)
-                           ;; (println 'unified types-unified)
-                           ;; (println 'vdone: v)
-                           (cons sym types-unified)))
-                       vars)))
-      ;; a final comparison between vars and result
-      ;; this is because things in VAR may well have changed
-      ;;
-      ;; anything in result that is NULL will hopefully
-      ;; have a value in vars that we can use
-      (let ((result2 (map (lambda (a b)
-                            (if (null? (cdr a))
-                                (if (not (null? (cdr b)))
-                                    (if (= (length (cdr b)) 1)
-                                        (cons (car a) (cadr b))
-                                        (cons (car a) (cdr b)))
-                                    a)
-                                a))
-                          result
-                          vars)))
-        ;; (println 'result: result)
-        ;; (println 'vars: vars)
-        ;; (println 'result2: result2)
-
-        ;; and return result
+    (let* ((pairs (hashtable->alist vars))
+           (result (map (lambda (v)
+                          (let* ((sym (car v))
+                                 (pre (cdr v))
+                                 (types-unified (impc:ti:sym-unify sym pre vars)))
+                            (cons sym types-unified)))
+                        pairs)))
+      (let ((result2 (map (lambda (a)
+                            (let ((b-types (hashtable-ref vars (car a))))
+                              (if (null? (cdr a))
+                                  (if (and b-types (not (null? b-types)))
+                                      (if (= (length b-types) 1)
+                                          (cons (car a) (car b-types))
+                                          (cons (car a) b-types))
+                                      a)
+                                  a)))
+                          result)))
         result2))))
 
 

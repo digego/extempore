@@ -1229,20 +1229,21 @@
 ;; copied from the old ad-hoc cache (with a few "API" functions
 ;; renamed)
 ;;
-(define *impc:ti:genericfunc-cache* '())
+(define *impc:ti:genericfunc-cache* (make-hashtable 64))
 
 (define *impc:ti:genericfunc-needs-update* '())
 
 (define impc:ti:print-genericfunc-cache
   (lambda ()
     (println '----------------------)
-    (map (lambda (x)
-           (println ':> x))
-         *impc:ti:genericfunc-cache*)))
+    (hashtable-for-each (lambda (entry)
+                          (for-each (lambda (x) (println ':> x))
+                                    (cdr entry)))
+                        *impc:ti:genericfunc-cache*)))
 
 (define impc:ti:reset-genericfunc-cache
   (lambda ()
-    (set! *impc:ti:genericfunc-cache* '())))
+    (hashtable-clear! *impc:ti:genericfunc-cache*)))
 
 (define impc:ti:genericfunc-src-changed
   (lambda (name arity)
@@ -1290,7 +1291,8 @@
                              (impc:ti:genericfunc-apply-macros (if type-constraint
                                                                    (car (cddddr code))
                                                                    (caddr code))))))
-      (if (not (regex:match? (symbol->string (cadr code)) "(:|{)"))
+      (if (not (or (string-contains? (symbol->string (cadr code)) ":")
+                   (string-contains? (symbol->string (cadr code)) "{")))
           (impc:compiler:print-compiler-error "generic functions must supply type"))
       (let* ((res (impc:ti:split-namedfunc (cadr code))) ;;(regex:type-split (symbol->string (cadr code)) ":"))
              (name (string->symbol (car res)))
@@ -1302,8 +1304,8 @@
              (syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
              (newsyms (map (lambda (s)
                              ;; (println 's: s)
-                             (if (regex:match? s "^!g")
-                                 (let ((r (regex:split s "_")))
+                             (if (and (> (string-length s) 2) (char=? (string-ref s 1) #\g))
+                                 (let ((r (string-split-on s "_")))
                                    (string-append (car r) "___" (number->string num)))
                                  (let ((r (string-append "!gx"
                                                          (substring s 1 (string-length s))
@@ -1317,11 +1319,12 @@
                            syms))
              (newtype1 (regex:replace-everything type syms newsyms))
              (newtype (string->symbol (regex:replace-all newtype1 "___" "_")))
-             (newtypematch (map (lambda (k) (if (regex:match? k "(:|{)")
+             (newtypematch (map (lambda (k) (if (or (string-contains? k ":")
+                                                    (string-contains? k "{"))
                                            ;; (car (regex:type-split k ":"))
                                            (apply string-append (car (impc:ti:split-namedtype k))
                                                   (make-list (impc:ir:get-ptr-depth k) "*"))
-                                           (if (regex:match? k "^\\!g")
+                                           (if (and (> (string-length k) 2) (char=? (string-ref k 1) #\g))
                                                "_"
                                                (regex:replace-all k "\\!g[^,\\]\\>]*" "_"))))
                                 (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))))
@@ -1332,50 +1335,45 @@
                                                            (symbol->string newtype)))
                             (caddr code))))
         ;; (println 'newtype newtype 'newsyms newsyms 'newcode newcode 'newtypem newtypematch 'constraint type-constraint)
-        (let ((v (cl:remove-if (lambda (x)
-                                 (or
-                                  (<> arity (cadr x))
-                                  (not (string=? (symbol->string name) (symbol->string (car x))))
-                                  (not (equal? type-constraint (car (cdr (cddddr x)))))
-                                  (member #f
-                                          (map (lambda (xx yy)
-                                                 ;; (println 'for x 'xx: xx 'yy: yy (car (cddddr x)))
-                                                 (let ((res (if (regex:match? xx "^\\!g")
-                                                                (string=?
-                                                                 (car (regex:type-split yy "_"))
-                                                                 (car (regex:type-split xx "_")))
-                                                                (string=?
-                                                                 ;; (car (regex:type-split yy ":"))
-                                                                 ;; (car (regex:type-split xx ":"))))))
-                                                                 (car (impc:ti:split-namedtype yy))
-                                                                 (car (impc:ti:split-namedtype xx))))))
-                                                   ;; (println 'res: res)
-                                                   res))
-                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
-                                               (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
-                 *impc:ti:genericfunc-cache*)))
+        (let* ((name-str (symbol->string name))
+               (entries (or (hashtable-ref *impc:ti:genericfunc-cache* name-str) '()))
+               (v (cl:remove-if (lambda (x)
+                                  (or
+                                   (<> arity (cadr x))
+                                   (not (equal? type-constraint (car (cdr (cddddr x)))))
+                                   (member #f
+                                           (map (lambda (xx yy)
+                                                  ;; (println 'for x 'xx: xx 'yy: yy (car (cddddr x)))
+                                                  (let ((res (if (and (> (string-length xx) 2) (char=? (string-ref xx 1) #\g))
+                                                                 (string=?
+                                                                  (car (string-split-on yy "_"))
+                                                                  (car (string-split-on xx "_")))
+                                                                 (string=?
+                                                                  (car (impc:ti:split-namedtype yy))
+                                                                  (car (impc:ti:split-namedtype xx))))))
+                                                    ;; (println 'res: res)
+                                                    res))
+                                                (impc:ir:get-pretty-closure-arg-strings (symbol->string newtype))
+                                                (impc:ir:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
+                             entries)))
         (if (= num *impc:ti:generic-count*)
-              (set! *impc:ti:genericfunc-num-list* (cons (cons (symbol->string name) *impc:ti:generic-count*) *impc:ti:genericfunc-num-list*)))
-        ;; (set! *impc:ti:generic-count* (- *impc:ti:generic-count* 1)))
-          ;; (if (not (null? v))
-          ;;     (println 'updating: name 'with newtype 'and type-constraint 'for v)
-          ;;     (println 'adding: name 'with newtype 'and type-constraint))
+              (set! *impc:ti:genericfunc-num-list* (cons (cons name-str *impc:ti:generic-count*) *impc:ti:genericfunc-num-list*)))
           (if (not (null? v))
               (set-cdr! (car v) (list arity newtype newcode newtypematch type-constraint))
-              (set! *impc:ti:genericfunc-cache* (cons (list name arity newtype newcode newtypematch type-constraint) *impc:ti:genericfunc-cache*)))
+              (hashtable-set! *impc:ti:genericfunc-cache* name-str
+                              (cons (list name arity newtype newcode newtypematch type-constraint) entries)))
           (set! *impc:ti:genericfunc-needs-update* (cons (cons name arity) *impc:ti:genericfunc-needs-update*))
           #t)))))
 
 ;; with an optional arity check
 (define impc:ti:genericfunc-exists?
   (lambda (name . arity)
-    (if (string? name) (set! name (string->symbol name)))
-    (if (null? arity)
-        (let ((res (assoc-strcmp name *impc:ti:genericfunc-cache*)))
-          (if res #t #f))
-        (let* ((res (assoc-strcmp-all name *impc:ti:genericfunc-cache*))
-               (results (map (lambda (r) (cadr r)) res)))
-          (if (and (not (null? results)) (member (car arity) results)) #t #f)))))
+    (if (symbol? name) (set! name (symbol->string name)))
+    (let ((entries (or (hashtable-ref *impc:ti:genericfunc-cache* name) '())))
+      (if (null? arity)
+          (not (null? entries))
+          (let ((results (map (lambda (r) (cadr r)) entries)))
+            (if (member (car arity) results) #t #f))))))
 
 ;; (define impc:ti:genericfunc-type-constraint
 ;;   (lambda (name . arity)
@@ -1414,7 +1412,8 @@
                             (apply string-append (cadr (regex:matched x "%(.*)_poly_.*")) (make-list depth "*"))
                             (apply string-append (cadr (regex:matched x "%([^-*]*)")) (make-list depth "*")))))
                      ((and (symbol? x)
-                           (regex:match? (symbol->string x) "(:|{)")) ;; this is my last change here!!
+                           (or (string-contains? (symbol->string x) ":")
+                               (string-contains? (symbol->string x) "{"))) ;; this is my last change here!!
                       (let ((depth (impc:ir:get-ptr-depth x)))
                         ;; (println 'depth_b: x depth)
                         (apply string-append (car (impc:ti:split-namedtype x)) (make-list depth "*"))))
@@ -1522,16 +1521,17 @@
                                  (if (or (char=? (string-ref x 0) (integer->char 91))
                                          (char=? (string-ref x 0) (integer->char 60)))
                                      x
-                                     (if (regex:match? x "(:|{)")
+                                     (if (or (string-contains? x ":")
+                                             (string-contains? x "{"))
                                          (apply string-append (car (impc:ti:split-namedtype x))
                                                 (make-list (impc:ir:get-ptr-depth x) "*"))
-                                         (if (regex:match? x "^\\!")
+                                         (if (char=? (string-ref x 0) #\!)
                                              "_"
                                              x))))
                                ags))))
             (else (set! type (make-list (+ 1 arity) "_"))))
       ;; (println 'type_b: type)
-      (let* ((tmp (assoc-strcmp-all (string->symbol name) *impc:ti:genericfunc-cache*))
+      (let* ((tmp (reverse (or (hashtable-ref *impc:ti:genericfunc-cache* name) '())))
              (res (cl:remove-if (lambda (x)
                                   (or
                                    (not (if (list-ref x 5)
@@ -1609,8 +1609,8 @@
 
 (define impc:ti:genericfunc-pretty-print
   (lambda (name)
-    (if (string? name) (set! name (string->symbol name)))
-    (let ((candidates (assoc-strcmp-all name *impc:ti:genericfunc-cache*)))
+    (if (symbol? name) (set! name (symbol->string name)))
+    (let ((candidates (reverse (or (hashtable-ref *impc:ti:genericfunc-cache* name) '()))))
       (if (null? candidates)
           (begin
             (print "No generic specialisations found for ")
@@ -1764,23 +1764,24 @@
 ;; copied from the old ad-hoc cache (with a few "API" functions
 ;; renamed)
 ;;
-(define *impc:ti:generictype-cache* '())
+(define *impc:ti:generictype-cache* (make-hashtable 64))
 
 (define *impc:ti:generictype-needs-update* '())
 
 (define impc:ti:print-generictype-cache
   (lambda ()
-    (println '*impc:ti:generictype-cache*: *impc:ti:generictype-cache*)))
+    (print '*impc:ti:generictype-cache*:)
+    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
+                        *impc:ti:generictype-cache*)))
 
 (define impc:ti:reset-generictype-cache
   (lambda ()
-    (set! *impc:ti:generictype-cache* '())))
+    (hashtable-clear! *impc:ti:generictype-cache*)))
 
 (define impc:ti:generictype-exists?
   (lambda (name)
-    (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc-strcmp name *impc:ti:generictype-cache*)))
-      (if res #t #f))))
+    (if (symbol? name) (set! name (symbol->string name)))
+    (if (hashtable-ref *impc:ti:generictype-cache* name) #t #f)))
 
 (define *impc:ti:generic-count* 0)
 
@@ -1793,8 +1794,8 @@
       (if (symbol? type) (set! type (symbol->string type)))
       (let* ((syms (cl:remove-duplicates (regex:match-all type "![a-zA-Z0-9_]*")))
              (newsyms (map (lambda (s)
-                             (if (regex:match? s "^!g")
-                                 (let ((r (regex:split s "_")))
+                             (if (and (> (string-length s) 2) (char=? (string-ref s 1) #\g))
+                                 (let ((r (string-split-on s "_")))
                                    (set! cnt (+ cnt 1))
                                    (string-append (car r) "x" (number->string cnt) "_" (number->string *impc:ti:generic-count*)))
                                  (let ((r (string-append "!g"
@@ -1804,20 +1805,15 @@
                                    r)))
                            syms))
              (newtype (string->symbol (regex:replace-everything type syms newsyms)))
-             (v (assoc-strcmp name *impc:ti:generictype-cache*)))
-        ;; (println 'gtype-name: name 'type: type 'newtype: newtype 'v: v)
-        (if v
-            (set-cdr! v newtype)
-            (set! *impc:ti:generictype-cache* (cons (cons name newtype) *impc:ti:generictype-cache*)))
+             (key (if (symbol? name) (symbol->string name) name)))
+        ;; (println 'gtype-name: name 'type: type 'newtype: newtype)
+        (hashtable-set! *impc:ti:generictype-cache* key newtype)
         #t))))
 
 (define impc:ti:get-generictype-candidate-types
   (lambda (name)
-    (if (string? name) (set! name (string->symbol name)))
-    (let ((res (assoc-strcmp name *impc:ti:generictype-cache*)))
-      (if res
-          (cdr res)
-          #f))))
+    (if (symbol? name) (set! name (symbol->string name)))
+    (hashtable-ref *impc:ti:generictype-cache* name)))
 
 ;; checks both named types and poly types
 (define impc:ti:get-named-type
