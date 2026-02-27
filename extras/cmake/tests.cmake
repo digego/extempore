@@ -65,6 +65,8 @@ extempore_add_test(tests/external/fft.xtm libs-external)
 
 # Core examples
 extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
+extempore_add_example_as_test(examples/core/expr_problem.xtm 10 examples-core)
+extempore_add_example_as_test(examples/core/extempore_lang.xtm 60 examples-core)
 extempore_add_example_as_test(examples/core/fmsynth.xtm 10 examples-audio)
 extempore_add_example_as_test(examples/core/mtaudio.xtm 10 examples-audio)
 extempore_add_example_as_test(examples/core/nbody_lang_shootout.xtm 10 examples-core)
