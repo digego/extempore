@@ -1139,7 +1139,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define impc:ti:reify-generic-type-expand
   (lambda (type gnum spec vars)
     ;; (println 'reifyin: type 'gnum: gnum 'spec: spec) ; 'vars: vars)
-    (hashtable-for-each
+    (impc:ti:vars-for-each
      (lambda (v)
        (if (and (impc:ti:bang-type? (car v))
                 (if (not gnum) #t
@@ -1450,10 +1450,10 @@ Continue executing `body' forms until `test-expression' returns #f"
     ;; (println 'all-vs: all-vs)
     ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
     ;; (println '-> (hashtable-ref vars vs))
-    (if (and (hashtable-ref vars vs)
-             (not (null? (hashtable-ref vars vs)))
-             (impc:ir:type? (car (hashtable-ref vars vs))))
-        (car (hashtable-ref vars vs))
+    (if (and (impc:ti:vars-ref vars vs)
+             (not (null? (impc:ti:vars-ref vars vs)))
+             (impc:ir:type? (car (impc:ti:vars-ref vars vs))))
+        (car (impc:ti:vars-ref vars vs))
         (if (and (symbol? vs)
                  (string-contains? (symbol->string vs) "##")
                  (not (char=? (string-ref (symbol->string vs) 0) #\!)))
@@ -1771,7 +1771,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                               (= (car e) (car atom-type)))
                          (map (lambda (a b)
                                 (if (and (symbol? a)
-                                         (hashtable-ref vars a))
+                                         (impc:ti:vars-ref vars a))
                                     (set! vars (impc:ti:vars-update a vars '() b))))
                               (cdr e)
                               (cdr atom-type)))))
@@ -1834,8 +1834,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                             #t
                             #f)))
                (impc:ti:reify-generic-type t vars '())
-               (if (and (symbol? t) (hashtable-ref vars t))
-                   (let ((val (hashtable-ref vars t)))
+               (if (and (symbol? t) (impc:ti:vars-ref vars t))
+                   (let ((val (impc:ti:vars-ref vars t)))
                      (if (impc:ti:occurs-in-type? t val)
                          t
                          (let ((r (impc:ti:type-unify val vars)))
@@ -1967,7 +1967,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; example use is in impc:ti:sym-unify
 (define impc:ti:check-bang-against-reified
   (lambda (bang-sym reified-sym vars)
-    (let ((type (hashtable-ref vars reified-sym)))
+    (let ((type (impc:ti:vars-ref vars reified-sym)))
       (if (or (not type) (null? type))
           #f
           (let* ((gtd (impc:ti:generic-type-details reified-sym))
@@ -1999,7 +1999,7 @@ Continue executing `body' forms until `test-expression' returns #f"
              (char=? (string-ref (symbol->string sym) 0) #\!))
         (let ((gtd (impc:ti:generic-type-details sym)))
           (if gtd
-              (hashtable-for-each
+              (impc:ti:vars-for-each
                (lambda (k)
                  (let ((k-types (cdr k)))
                    (if (and (not (null? k-types))
@@ -2035,7 +2035,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; types can be given types.
 (define impc:ti:unify
   (lambda (vars)
-    (let* ((pairs (hashtable->alist vars))
+    (let* ((pairs (impc:ti:vars->alist vars))
            (result (map (lambda (v)
                           (let* ((sym (car v))
                                  (pre (cdr v))
@@ -2043,7 +2043,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                             (cons sym types-unified)))
                         pairs)))
       (let ((result2 (map (lambda (a)
-                            (let ((b-types (hashtable-ref vars (car a))))
+                            (let ((b-types (impc:ti:vars-ref vars (car a))))
                               (if (null? (cdr a))
                                   (if (and b-types (not (null? b-types)))
                                       (if (= (length b-types) 1)

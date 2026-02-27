@@ -1,3 +1,74 @@
+(define impc:ti:make-uf-cell
+  (lambda (val)
+    (let ((cell (vector #f 0 val)))
+      (vector-set! cell 0 cell)
+      cell)))
+
+(define impc:ti:uf-find!
+  (lambda (cell)
+    (if (eq? (vector-ref cell 0) cell)
+        cell
+        (let ((root (impc:ti:uf-find! (vector-ref cell 0))))
+          (vector-set! cell 0 root)
+          root))))
+
+(define impc:ti:uf-union!
+  (lambda (a b)
+    (let ((ra (impc:ti:uf-find! a))
+          (rb (impc:ti:uf-find! b)))
+      (if (eq? ra rb)
+          ra
+          (let ((rank-a (vector-ref ra 1))
+                (rank-b (vector-ref rb 1))
+                (merged (cl:remove-duplicates
+                          (append (vector-ref ra 2) (vector-ref rb 2)))))
+            (cond ((< rank-a rank-b)
+                   (vector-set! ra 0 rb)
+                   (vector-set! rb 2 merged)
+                   rb)
+                  ((> rank-a rank-b)
+                   (vector-set! rb 0 ra)
+                   (vector-set! ra 2 merged)
+                   ra)
+                  (else
+                   (vector-set! rb 0 ra)
+                   (vector-set! ra 1 (+ rank-a 1))
+                   (vector-set! ra 2 merged)
+                   ra)))))))
+
+(define impc:ti:uf-value
+  (lambda (cell)
+    (vector-ref (impc:ti:uf-find! cell) 2)))
+
+(define impc:ti:uf-set-value!
+  (lambda (cell val)
+    (vector-set! (impc:ti:uf-find! cell) 2 val)))
+
+(define impc:ti:vars-ref
+  (lambda (vars sym)
+    (let ((cell (hashtable-ref vars sym)))
+      (if cell
+          (impc:ti:uf-value cell)
+          #f))))
+
+(define impc:ti:vars-for-each
+  (lambda (f vars)
+    (hashtable-for-each
+      (lambda (entry)
+        (f (cons (car entry) (impc:ti:uf-value (cdr entry)))))
+      vars)))
+
+(define impc:ti:vars->alist
+  (lambda (vars)
+    (let ((result '()))
+      (hashtable-for-each
+        (lambda (entry)
+          (set! result (cons (cons (car entry)
+                                   (impc:ti:uf-value (cdr entry)))
+                             result)))
+        vars)
+      result)))
+
 ;; this is here for whenever we get
 ;; new 'argument' information about
 ;; a locally bound lambda which might help
@@ -22,7 +93,7 @@
                                                   vars kts #f))
                 (if (null? t)
                     (let ((argtypes (map (lambda (x)
-                                           (car (hashtable-ref vars x)))
+                                           (car (impc:ti:vars-ref vars x)))
                                          args)))
                       (set! vars (impc:ti:vars-update sym vars kts (cons 213 (cons (car rettype) argtypes))))))
                 (if (impc:ir:type? rettype)
@@ -56,23 +127,29 @@
                     (if (not (string-contains? (symbol->string sym) "!"))
                         (impc:compiler:print-missing-identifier-error sym 'type))
                     'exit)
-                  (let ((existing-types (hashtable-ref vars sym)))
+                  (let ((existing-types (impc:ti:vars-ref vars sym)))
                     (if existing-types
-                        (begin
-                          (if (or (impc:ir:type? t)
-                                  (impc:ti:complex-type? t))
-                              (begin
-                                (if (and (impc:ir:closure? t)
-                                         (not (impc:ir:type? t)))
-                                    (let ((res (impc:ti:type-check-bound-lambda sym vars kts t)))
-                                      (if res
-                                          (set-car! (cdr t) res))))
-                                (if (and (string? t)
-                                         (string-contains? (symbol->string sym) "##"))
-                                    (let ((gtd (impc:ti:generic-type-details sym)))
-                                      (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
-                                (hashtable-set! vars sym (cl:remove-duplicates (append (list t) existing-types))))
-                              (hashtable-set! vars sym (cl:remove-duplicates (append t existing-types)))))
+                        (if (and (symbol? t) (hashtable-ref vars t))
+                            (impc:ti:uf-union! (hashtable-ref vars sym) (hashtable-ref vars t))
+                            (begin
+                              (if (or (impc:ir:type? t)
+                                      (impc:ti:complex-type? t))
+                                  (begin
+                                    (if (and (impc:ir:closure? t)
+                                             (not (impc:ir:type? t)))
+                                        (let ((res (impc:ti:type-check-bound-lambda sym vars kts t)))
+                                          (if res
+                                              (set-car! (cdr t) res))))
+                                    (if (and (string? t)
+                                             (string-contains? (symbol->string sym) "##"))
+                                        (let ((gtd (impc:ti:generic-type-details sym)))
+                                          (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
+                                    (impc:ti:uf-set-value!
+                                      (hashtable-ref vars sym)
+                                      (cl:remove-duplicates (append (list t) existing-types))))
+                                  (impc:ti:uf-set-value!
+                                    (hashtable-ref vars sym)
+                                    (cl:remove-duplicates (append t existing-types))))))
                         '()))))))))
 
 
@@ -88,16 +165,16 @@
              (not (impc:ti:closure-exists? (symbol->string sym)))
              (not (impc:ti:globalvar-exists? (symbol->string sym))))
         (impc:compiler:print-missing-identifier-error sym 'variable)
-        (let ((existing-types (hashtable-ref vars sym)))
-          (if existing-types
+        (let ((cell (hashtable-ref vars sym)))
+          (if cell
               (if (impc:ir:type? t)
                   (begin
                     (if (and (string? t)
                              (string-contains? (symbol->string sym) "##"))
                         (let ((gtd (impc:ti:generic-type-details sym)))
                           (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
-                    (hashtable-set! vars sym (list t)))
-                  (hashtable-set! vars sym t))
+                    (impc:ti:uf-set-value! cell (list t)))
+                  (impc:ti:uf-set-value! cell t))
               '())))))
 
 
@@ -105,7 +182,7 @@
   (lambda (sym vars)
     (if (not (symbol? sym))
         (impc:compiler:print-missing-identifier-error sym 'variable)
-        (let ((types (hashtable-ref vars sym)))
+        (let ((types (impc:ti:vars-ref vars sym)))
           (if (not types)
               (if (impc:ti:globalvar-exists? (symbol->string sym))
                   (cons sym (impc:ir:pointer-- (impc:ti:get-globalvar-type (symbol->string sym))))
@@ -115,8 +192,9 @@
 
 (define impc:ti:clear-all-vars
   (lambda (vars)
-    (for-each (lambda (key) (hashtable-set! vars key '()))
-              (hashtable-keys vars))))
+    (hashtable-for-each
+      (lambda (entry) (impc:ti:uf-set-value! (cdr entry) '()))
+      vars)))
 
 (define tc-result (lambda (type vars) (vector type vars)))
 (define tc-type (lambda (r) (vector-ref r 0)))
@@ -125,7 +203,10 @@
 
 (define impc:ti:vars-set
   (lambda (sym new-types vars)
-    (hashtable-set! vars sym new-types)
+    (let ((cell (hashtable-ref vars sym)))
+      (if cell
+          (impc:ti:uf-set-value! cell new-types)
+          (hashtable-set! vars sym (impc:ti:make-uf-cell new-types))))
     vars))
 
 (define impc:ti:vars-update
@@ -140,19 +221,23 @@
 
 (define impc:ti:vars-add
   (lambda (sym vars)
-    (hashtable-set! vars sym '())
+    (hashtable-set! vars sym (impc:ti:make-uf-cell '()))
     vars))
 
 (define impc:ti:vars-snapshot
   (lambda (vars)
     (let ((ht (make-hashtable (max 64 (* 2 (hashtable-count vars))))))
-      (hashtable-for-each (lambda (entry) (hashtable-set! ht (car entry) (cdr entry))) vars)
+      (hashtable-for-each
+        (lambda (entry)
+          (hashtable-set! ht (car entry)
+            (impc:ti:make-uf-cell (impc:ti:uf-value (cdr entry)))))
+        vars)
       ht)))
 
 (define impc:ti:vars-clear
   (lambda (vars)
     (let ((ht (make-hashtable (max 64 (* 2 (hashtable-count vars))))))
-      (for-each (lambda (key) (hashtable-set! ht key '()))
+      (for-each (lambda (key) (hashtable-set! ht key (impc:ti:make-uf-cell '())))
                 (hashtable-keys vars))
       ht)))
 
@@ -168,7 +253,7 @@
           (dotimes (i ptr-level) (set! t (impc:ir:pointer++ t)))
           (list t))
         (if (symbol? t)
-            (let ((types (hashtable-ref vars t)))
+            (let ((types (impc:ti:vars-ref vars t)))
               (if (not types) '() types))
             t))))
 
@@ -312,14 +397,14 @@
         (impc:compiler:print-compiler-error "Trying to symbol check a non-symbol" ast)
         (let ((ast-str (symbol->string ast)))
           (cond ((assoc-strcmp ast kts)
-                 (tc-result (list (hashtable-ref vars ast)) vars))
+                 (tc-result (list (impc:ti:vars-ref vars ast)) vars))
                 ((and
-                  (hashtable-ref vars ast)
-                  (impc:ir:type? (impc:ti:type-unify (hashtable-ref vars ast) vars))
+                  (impc:ti:vars-ref vars ast)
+                  (impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars ast) vars))
                   (if request?
-                      (equal? request? (impc:ti:type-unify (hashtable-ref vars ast) vars))
+                      (equal? request? (impc:ti:type-unify (impc:ti:vars-ref vars ast) vars))
                       #t))
-                 (tc-result (list (impc:ti:type-unify (hashtable-ref vars ast) vars)) vars))
+                 (tc-result (list (impc:ti:type-unify (impc:ti:vars-ref vars ast) vars)) vars))
                 ((impc:ti:globalvar-exists? ast-str)
                  (tc-result (list (impc:ir:pointer-- (impc:ti:get-globalvar-type ast-str))) vars))
                 ((impc:ti:nativefunc-exists? ast-str)
@@ -338,10 +423,10 @@
                        (let ((pt (impc:ti:get-polyfunc-candidate-types ast-base)))
                          (cond ((and (> (length pt) 1)
                                      (assoc request? pt))
-                                (if (hashtable-ref vars ast) (set! vars (impc:ti:vars-update ast vars kts (list request?))))
+                                (if (impc:ti:vars-ref vars ast) (set! vars (impc:ti:vars-update ast vars kts (list request?))))
                                 (set! ast (string->symbol (string-append ast-base ":" (impc:ir:pretty-print-type request?)))))
                                ((= (length pt) 1)
-                                (if (hashtable-ref vars ast) (set! vars (impc:ti:vars-update ast vars kts pt)))
+                                (if (impc:ti:vars-ref vars ast) (set! vars (impc:ti:vars-update ast vars kts pt)))
                                 (set! ast (string->symbol (string-append ast-base ":" (impc:ir:pretty-print-type (car pt))))))
                                (else
                                 (impc:compiler:print-compiler-error
@@ -349,7 +434,7 @@
                    (set! ast-str (symbol->string ast))
                    (if *impc:ti:print-sub-checks* (println 'sym:> 'ast: ast 'request? request?))
                    (let ((polytype #f))
-                     (if (and (not (hashtable-ref vars ast))
+                     (if (and (not (impc:ti:vars-ref vars ast))
                               (not (impc:ti:closure-exists? ast-str))
                               (not (impc:ti:globalvar-exists? ast-str)))
                          (if (string-contains? ast-str ":")
@@ -369,8 +454,8 @@
                              (impc:compiler:print-missing-identifier-error ast 'symbol)))
                      (set! ast-str (symbol->string ast))
                      (let ((type (if polytype polytype
-                                     (if (hashtable-ref vars ast)
-                                         (hashtable-ref vars ast)
+                                     (if (impc:ti:vars-ref vars ast)
+                                         (impc:ti:vars-ref vars ast)
                                          (if (impc:ti:closure-exists? ast-str)
                                              (list (cons (+ *impc:ir:closure* *impc:ir:pointer* *impc:ir:pointer*) (map impc:ir:get-type-from-str (impc:ti:get-closure-arg-types ast-str))))
                                              (list (impc:ir:pointer-- (impc:ti:get-globalvar-type ast-str))))))))
@@ -400,8 +485,8 @@
     (if (equal? request? *impc:ir:notype*) (set! request? #f))
     ;; if request is false
     (if (not request?)
-        (begin (if (member (cadr ast) kts) (set! request? (hashtable-ref vars (cadr ast))))
-               (if (member (caddr ast) kts) (set! request? (hashtable-ref vars (caddr ast))))))
+        (begin (if (member (cadr ast) kts) (set! request? (impc:ti:vars-ref vars (cadr ast))))
+               (if (member (caddr ast) kts) (set! request? (impc:ti:vars-ref vars (caddr ast))))))
     ;; now start type checking
     (let* ((n1 (cadr ast))
            (n2 (caddr ast))
@@ -419,12 +504,12 @@
           (begin
             (if (and (list? a)
                      (list? n1)
-                     (hashtable-ref vars (car n1)))
+                     (impc:ti:vars-ref vars (car n1)))
                 (begin (set! vars (impc:ti:vars-force (car n1) vars kts '()))
                        (impc:ti:type-check n1 vars kts t)))
             (if (and (list? b)
                      (list? n2)
-                     (hashtable-ref vars (car n2)))
+                     (impc:ti:vars-ref vars (car n2)))
                 (begin (set! vars (impc:ti:vars-force (car n2) vars kts '()))
                        (impc:ti:type-check n2 vars kts t)))))
       ;; one more try for equality!
@@ -565,12 +650,12 @@
           (begin
             (if (and (list? a)
                      (list? n1)
-                     (hashtable-ref vars (car n1)))
+                     (impc:ti:vars-ref vars (car n1)))
                 (begin (set! vars (impc:ti:vars-force (car n1) vars kts '()))
                        (impc:ti:type-check n1 vars kts t)))
             (if (and (list? b)
                      (list? n2)
-                     (hashtable-ref vars (car n2)))
+                     (impc:ti:vars-ref vars (car n2)))
                 (begin (set! vars (impc:ti:vars-force (car n2) vars kts '()))
                        (impc:ti:type-check n2 vars kts t)))))
       (if *impc:ti:print-sub-checks* (println 'compare:> 'ast: ast 'a: a 'b: b 't: t 'request? request?))
@@ -720,12 +805,12 @@
                         (impc:ir:get-type-from-pretty-str (cadr p2a)) '()))
                (t1b (if (not (null? (cdr p2b)))
                         (impc:ir:get-type-from-pretty-str (cadr p2b)) '()))
-               (au (if (and (hashtable-ref vars aa)
-                            (= (length (hashtable-ref vars aa)) 1))
-                       (car (hashtable-ref vars aa))))
-               (bu (if (and (hashtable-ref vars bb)
-                            (= (length (hashtable-ref vars bb)) 1))
-                       (car (hashtable-ref vars bb)))))
+               (au (if (and (impc:ti:vars-ref vars aa)
+                            (= (length (impc:ti:vars-ref vars aa)) 1))
+                       (car (impc:ti:vars-ref vars aa))))
+               (bu (if (and (impc:ti:vars-ref vars bb)
+                            (= (length (impc:ti:vars-ref vars bb)) 1))
+                       (car (impc:ti:vars-ref vars bb)))))
           (if (and (null? bu) (char=? (string-ref (car p2b) 0) #\%))
               (set! bu (car p2b)))
           (if (string? au)
@@ -774,19 +859,19 @@
 
              (if (and (atom? gt)
                       (symbol? gt)
-                      (hashtable-ref vars gt)
+                      (impc:ti:vars-ref vars gt)
                       (if (string-contains? (symbol->string gt) ":")
                           (impc:ti:generic-types-matchup? gt tt vars)
                           #t))
          (begin ;; (println '----matched-polytype-1: gt '-> tt)
            (if (symbol? tt)
                (begin
-                 (if (not (hashtable-ref vars tt))
+                 (if (not (impc:ti:vars-ref vars tt))
                      (set! vars (impc:ti:vars-add tt vars)))
-                 (if (null? (hashtable-ref vars tt))
+                 (if (null? (impc:ti:vars-ref vars tt))
                      (set! vars (impc:ti:vars-update gt vars kts (list tt)))
                      (begin
-                       (set! vars (impc:ti:vars-update gt vars kts (impc:ti:type-unify (hashtable-ref vars tt) vars))))))
+                       (set! vars (impc:ti:vars-update gt vars kts (impc:ti:type-unify (impc:ti:vars-ref vars tt) vars))))))
                  (set! vars (impc:ti:vars-update gt vars kts (impc:ti:type-unify tt vars))))))
 
        (if (atom? tt)
@@ -818,15 +903,15 @@
                     ;; (println 'vars: vars)
                     (if (and (atom? aa)
                              (symbol? aa)
-                             (hashtable-ref vars aa)
+                             (impc:ti:vars-ref vars aa)
                              (if (string-contains? (symbol->string aa) ":")
                                  (impc:ti:generic-types-matchup? aa bb vars)
                                  #t))
-                        (if (and (symbol? bb) (hashtable-ref vars bb))
+                        (if (and (symbol? bb) (impc:ti:vars-ref vars bb))
                             (begin
-                                        ;(set! tt (impc:ti:type-unify (hashtable-ref vars bb) vars))
+                                        ;(set! tt (impc:ti:type-unify (impc:ti:vars-ref vars bb) vars))
                                         ;(impc:ti:update-var aa vars kts tt))
-                              (set! vars (impc:ti:vars-update aa vars kts (hashtable-ref vars bb))))
+                              (set! vars (impc:ti:vars-update aa vars kts (impc:ti:vars-ref vars bb))))
                             (if (string? bb)
                                 (set! vars (impc:ti:vars-update aa vars kts bb))
                                 (set! vars (impc:ti:vars-update aa vars kts (list bb)))))))
@@ -923,8 +1008,8 @@
     ;; if we can improve them with any reified types we may have
     (for-each (lambda (k)
                 (if (symbol? k)
-                    (if (hashtable-ref vars k) ;;(not (not (hashtable-ref vars k)))
-                        (let ((v (hashtable-ref vars k)))
+                    (if (impc:ti:vars-ref vars k) ;;(not (not (impc:ti:vars-ref vars k)))
+                        (let ((v (impc:ti:vars-ref vars k)))
                           (if (string? v)
                               (impc:ti:reverse-set-bangs-from-reified k v gnum vars)
                               (if (and (list? v)
@@ -936,7 +1021,7 @@
     (for-each (lambda (a)
                 (if (and (symbol? a)
                          (string-contains? (symbol->string a) "##")
-                         (not (hashtable-ref vars a)))
+                         (not (impc:ti:vars-ref vars a)))
                     ;; (null? (hashtable-ref vars a)))
                     ;; should call this impc:ti:symbol-tryto-reify-generic-type
                     (let ((res (impc:ti:reify-generic-type a vars '())))
@@ -982,7 +1067,7 @@
                    (trequest (if req? req? tr1))
                    (kts (cl:remove #f (map (lambda (x y) (if (impc:ir:type? y) x #f)) (cadr s1) args)))
                    (newvars (let ((ht (impc:ti:vars-snapshot vars)))
-                              (for-each (lambda (sym) (hashtable-set! ht sym '())) lvarnames)
+                              (for-each (lambda (sym) (hashtable-set! ht sym (impc:ti:make-uf-cell '()))) lvarnames)
                               ht))
                    (ttype '()))
               ;; this here as a check (could be removed)
@@ -1034,10 +1119,11 @@
               ;; we must propagate explicitly)
               (hashtable-for-each
                (lambda (entry)
-                 (if (and (not (member (car entry) lvarnames))
-                          (hashtable-ref vars (car entry))
-                          (not (null? (cdr entry))))
-                     (hashtable-set! vars (car entry) (cdr entry))))
+                 (let ((val (impc:ti:uf-value (cdr entry))))
+                   (if (and (not (member (car entry) lvarnames))
+                            (impc:ti:vars-ref vars (car entry))
+                            (not (null? val)))
+                       (impc:ti:uf-set-value! (hashtable-ref vars (car entry)) val))))
                newvars)
               ;; don't let any local vars (lvars) escape back up to a
               ;; level where they will not mean anything!!!!
@@ -1169,17 +1255,17 @@
              (for-each (lambda (x r)
                          (impc:ti:type-check x vars kts r))
                        (cdr ast)
-                       (cddr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))
-             (list (cadr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))))
-          ((impc:ir:type? (impc:ti:type-unify (hashtable-ref vars (car ast)) vars))
+                       (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
+             (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))))
+          ((impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))
            ;; (println 'leave-early2: ast ': (hashtable-ref vars (car ast))) ;;(hashtable-ref vars (car ast)))
            (begin
              (for-each (lambda (x r)
                          (impc:ti:type-check x vars kts r))
                        (cdr ast)
-                       (cddr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))
+                       (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
              ;; (println 'hit: (impc:ti:type-unify (hashtable-ref vars (car ast)) vars))
-             (list (cadr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))))
+             (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))))
           (else
            (let* ((args (map (lambda (x)
                                ;; (println ast 'check x)
@@ -1253,7 +1339,7 @@
                          ;; (println 'a a)
                          (if (or (char-alphabetic? (string-ref a 0))
                                 (char=? (string-ref a 0) #\!))
-                             (if (and (not (hashtable-ref vars (string->symbol (string-append a "##" (number->string gnum)))))
+                             (if (and (not (impc:ti:vars-ref vars (string->symbol (string-append a "##" (number->string gnum)))))
                                       (or (string-contains? a ":")
                                           (string-contains? a "!")
                                           (string-contains? a "{")))
@@ -1271,7 +1357,7 @@
                          (let ((vs (cl:remove-duplicates (regex:match-all a "(![a-zA-Z0-9]*_[0-9]*)"))))
                            (for-each (lambda (x)
                                        (set! x (string->symbol (string-append x "##" (atom->string gnum))))
-                                       (if (not (hashtable-ref vars x))
+                                       (if (not (impc:ti:vars-ref vars x))
                                            (begin
                                              ;; (println 'no 'match 'for x 'in 'vars 'so 'adding 'it)
                                              (set! vars (impc:ti:vars-add x vars)))))
@@ -1309,7 +1395,7 @@
                                          ;; (impc:compiler:print-compiler-error "no valid generic options available for: " ast)))))
                                         (impc:compiler:print-compiler-error (string-append "Return type mismatch for generic function which expected return type '" (cadr gen) "' and got named type '" (cadr req) "'") ast)))))
                         ;; (println 'update 'return 'var 'with  (impc:ti:update-var (cadr gpoly-type) vars kts (list request?)))
-                         (if (not (hashtable-ref vars (cadr gpoly-type)))
+                         (if (not (impc:ti:vars-ref vars (cadr gpoly-type)))
                              (set! vars (impc:ti:vars-add (cadr gpoly-type) vars)))
                          (set! vars (impc:ti:vars-update (cadr gpoly-type) vars kts (list request?)))))
                  (set! gpoly-type (cons (car gpoly-type) (cons request? (cddr gpoly-type))))))
@@ -1366,8 +1452,8 @@
                                         ((equal? gpoly-type gpoly-type-orig) ;; no new information!
                                          newgtype)
                                         ((and (equal? gname *impc:ti:type-check-function-symbol-short*) ;; this for recursive generic
-                                              (impc:ir:type? (car (hashtable-ref vars *impc:ti:type-check-function-symbol*))))
-                                         (car (hashtable-ref vars *impc:ti:type-check-function-symbol*)))
+                                              (impc:ir:type? (car (impc:ti:vars-ref vars *impc:ti:type-check-function-symbol*))))
+                                         (car (impc:ti:vars-ref vars *impc:ti:type-check-function-symbol*)))
                                         (else
                                          (set! nvars (impc:ti:vars-snapshot vars))
                                          (let ((r (impc:ti:nativef-generics-check-return-type
@@ -1383,12 +1469,14 @@
                      (if (vector? nvars)
                          (hashtable-for-each
                           (lambda (n)
-                            (let ((v-types (hashtable-ref vars (car n))))
+                            (let* ((sym (car n))
+                                   (val (impc:ti:uf-value (cdr n)))
+                                   (v-types (impc:ti:vars-ref vars sym)))
                               (if (and v-types
                                        (null? v-types)
-                                       (= (length n) 2)
-                                       (impc:ir:type? (cadr n)))
-                                  (set! vars (impc:ti:vars-update (car n) vars kts (cdr n))))))
+                                       (= (length val) 1)
+                                       (impc:ir:type? (car val)))
+                                  (set! vars (impc:ti:vars-update sym vars kts val)))))
                           nvars))
                      ;; check to see if for-each is possible (i.e. request and (cadr gpoly-type)) are same length
                      ;; (if (list? request?)
@@ -1501,7 +1589,7 @@
                        ;; with the reified return type of grtype
                        (if (and (impc:ir:type? grtype)
                                 (symbol? (cadr gftype))
-                                (hashtable-ref vars (cadr gftype)))
+                                (impc:ti:vars-ref vars (cadr gftype)))
                            (begin
                              ;; (println 'update-e: (cadr gftype) 'with: (cadr grtype))
                              (set! vars (impc:ti:vars-update (cadr gftype) vars kts (cadr grtype)))))
@@ -1903,17 +1991,17 @@
              (for-each (lambda (a r)
                          (impc:ti:type-unify (impc:ti:type-check a vars kts r) vars))
                        (cdr ast)
-                       (cddr (hashtable-ref vars (car ast)) vars))
+                       (cddr (impc:ti:vars-ref vars (car ast)) vars))
              (list (cadr (cdr (assoc-strcmp (car ast) kts))))))
-          ((and (impc:ir:type? (impc:ti:type-unify (hashtable-ref vars (car ast)) vars))
+          ((and (impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))
                 (or (equal? request? #f)
-                    (equal? request? (impc:ti:type-unify (hashtable-ref vars (car ast)) vars))))
+                    (equal? request? (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))))
            (begin
              (for-each (lambda (a r)
                          (impc:ti:type-unify (impc:ti:type-check a vars kts r) vars))
                        (cdr ast)
-                       (cddr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))
-             (list (cadr (impc:ti:type-unify (hashtable-ref vars (car ast)) vars)))))
+                       (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
+             (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))))
           (else
            (let* ((polyf (string->symbol (car (string-split-on (symbol->string (car ast)) "##"))))
                   (ftypes (impc:ti:get-polyfunc-candidate-types (symbol->string polyf)))
@@ -2083,15 +2171,15 @@
                                                  (impc:ti:type-check a vars kts '()))
                                                (cdddr ast))))))
                    (if (and (impc:ir:type? fargs)
-                            (hashtable-ref vars (caddr ast))
-                            (null? (hashtable-ref vars (caddr ast))))
+                            (impc:ti:vars-ref vars (caddr ast))
+                            (null? (impc:ti:vars-ref vars (caddr ast))))
                        (set! vars (impc:ti:vars-update (caddr ast) vars kts fargs))))
                  (tc-result (list *impc:ir:void*) vars))
           (begin (if (<> (+ 2 (length ftype))
                          (length ast))
                      (impc:compiler:print-compiler-error "bad arity in call" ast))
-                 (if (and (hashtable-ref vars (caddr ast))
-                          (null? (hashtable-ref vars (caddr ast))))
+                 (if (and (impc:ti:vars-ref vars (caddr ast))
+                          (null? (impc:ti:vars-ref vars (caddr ast))))
                      (set! vars (impc:ti:vars-update (caddr ast) vars kts ftype)))
                  ;; we don't care what we get back
                  (for-each (lambda (a t)
@@ -2147,17 +2235,17 @@
                            (equal? (caadr e) 'lambda))
                       (set! *impc:ti:bound-lambdas* (cons e *impc:ti:bound-lambdas*)))
                   (if (and #f
-                           (hashtable-ref vars (car e))
-                           (impc:ir:type? (impc:ti:type-unify (hashtable-ref vars (car e)) vars)))
-                      (list (impc:ti:type-unify (hashtable-ref vars (car e)) vars))
+                           (impc:ti:vars-ref vars (car e))
+                           (impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars (car e)) vars)))
+                      (list (impc:ti:type-unify (impc:ti:vars-ref vars (car e)) vars))
                       (let ((a (impc:ti:type-check (cadr e) vars kts
                                                    (cond ((assoc-strcmp (car e) kts)
                                                           ;; (println 'retfor (car e) (cadr (assoc-strcmp (car e) kts)))
                                                           (cadr (assoc-strcmp (car e) kts)))
-                                                         ((and (not (null? (hashtable-ref vars (car e))))
-                                                               (impc:ir:type? (car (hashtable-ref vars (car e)))))
+                                                         ((and (not (null? (impc:ti:vars-ref vars (car e))))
+                                                               (impc:ir:type? (car (impc:ti:vars-ref vars (car e)))))
                                                           ;; (println 'retfor (car e) (car (hashtable-ref vars (car e))))
-                                                          (car (hashtable-ref vars (car e))))
+                                                          (car (impc:ti:vars-ref vars (car e))))
                                                          (else
                                                           ;; (println 'retfor (car e) internalreq?)
                                                           internalreq?)))))
@@ -2209,10 +2297,10 @@ xtlang's `let' syntax is the same as Scheme"
     ;; (println 'null-check 'ast: ast 'request? request?)
     (let ((res (if (and (symbol? request?)
                         (string-contains? (symbol->string request?) "##"))
-                   (if (hashtable-ref vars request?)
-                       (if (null? (hashtable-ref vars request?))
+                   (if (impc:ti:vars-ref vars request?)
+                       (if (null? (impc:ti:vars-ref vars request?))
                            request?
-                           (hashtable-ref vars request?)))
+                           (impc:ti:vars-ref vars request?)))
                    (if (and request?
                             (impc:ir:pointer? request?))
                        (list request?)
@@ -2636,9 +2724,9 @@ xtlang's `let' syntax is the same as Scheme"
 
 (define impc:ti:ref-check
   (lambda (ast vars kts request?)
-    (if (not (hashtable-ref vars (cadr ast)))
+    (if (not (impc:ti:vars-ref vars (cadr ast)))
         (impc:compiler:print-compiler-error "no valid local variable found in call to ref" ast))
-    (tc-result (list (impc:ir:pointer++ (car (hashtable-ref vars (cadr ast))))) vars)))
+    (tc-result (list (impc:ir:pointer++ (car (impc:ti:vars-ref vars (cadr ast))))) vars)))
 
 (define impc:ti:make-tuple-check
   (lambda (ast vars kts request?)
@@ -2697,8 +2785,8 @@ xtlang's `let' syntax is the same as Scheme"
       ;; it's type with c but for polymorphic cases
       ;; we should ensure that we also do a type-unification
       (if (symbol? (cadddr ast))
-          (let* ((types (if (hashtable-ref vars (cadddr ast))
-                            (hashtable-ref vars (cadddr ast))
+          (let* ((types (if (impc:ti:vars-ref vars (cadddr ast))
+                            (impc:ti:vars-ref vars (cadddr ast))
                             (impc:ti:type-check (cadddr ast) vars kts req?)))
                  (utype (impc:ti:type-unify (list c types) vars)))
                                         ;(println 'types: types 'utype: utype 'c: (list c types))
@@ -2793,8 +2881,8 @@ xtlang's `let' syntax is the same as Scheme"
                      (impc:compiler:print-index-oob-error 'tuple ast))
                  (let ((res (list-ref (car a) (+ 1 idx))))
                    (if (not (impc:ir:type? res))
-                       (if (and (hashtable-ref vars res) request?)
-                           (if (null? (hashtable-ref vars res))
+                       (if (and (impc:ti:vars-ref vars res) request?)
+                           (if (null? (impc:ti:vars-ref vars res))
                                (begin
                                  ;; (println 'updateres: res '-> request?)
                                  (set! vars (impc:ti:vars-update res vars kts request?))
@@ -2879,10 +2967,10 @@ xtlang's `let' syntax is the same as Scheme"
                (impc:ir:type? (car a)))
           (set! a (car a)))
       ;; if sym is not a global var then add return type to sym
-      (if (and (hashtable-ref vars (car sym))
-               (member a (hashtable-ref vars (car sym))))
+      (if (and (impc:ti:vars-ref vars (car sym))
+               (member a (impc:ti:vars-ref vars (car sym))))
           (set! vars (impc:ti:vars-force (car sym) vars '() a))
-          (if (hashtable-ref vars (car sym))
+          (if (impc:ti:vars-ref vars (car sym))
               (set! vars (impc:ti:vars-update (car sym) vars kts a))))
       (tc-result a vars))))
 
@@ -2985,8 +3073,8 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts request?)
     ;; (println 'cchint 'ast: ast 'vars: vars 'request: request?)
     ;; otherwise we need to try to find a type definition for the closure
-    (let* ((ctype (if (hashtable-ref vars (car ast))
-                      (hashtable-ref vars (car ast))
+    (let* ((ctype (if (impc:ti:vars-ref vars (car ast))
+                      (impc:ti:vars-ref vars (car ast))
                       (if (impc:ti:closure-exists? (symbol->string (car ast)))
                           (list (impc:ti:get-closure-type (symbol->string (car ast))))
                           ;; check for globalvar closures
@@ -3041,7 +3129,7 @@ xtlang's `let' syntax is the same as Scheme"
                         '()))))
 
       (if *impc:ti:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
-      (if (hashtable-ref vars (car ast))
+      (if (impc:ti:vars-ref vars (car ast))
           (set! vars (impc:ti:vars-update (car ast) vars kts
                               (list (impc:ir:pointer++ (list* *impc:ir:closure* ret res) 2)))))
       (tc-result (if (list? ret) ret
@@ -3410,7 +3498,7 @@ xtlang's `let' syntax is the same as Scheme"
           ((ast:if? ast) (impc:ti:if-check ast vars kts request?))
           ((ast:set!? ast) (impc:ti:set-check ast vars kts request?))
           ((and (list? ast) (member (car ast) '(ret->))) (impc:ti:ret-check ast vars kts request?))
-          ((and (list? ast) (hashtable-ref vars (car ast))) (impc:ti:closure-call-check ast vars kts request?))
+          ((and (list? ast) (impc:ti:vars-ref vars (car ast))) (impc:ti:closure-call-check ast vars kts request?))
           ((and (list? ast) (list? (car ast))) (impc:ti:closure-in-first-position ast vars kts request?))
           ((and (list? ast) ;; this is here to check against closures as global vars (i.e. not in local environment)
                 (symbol? (car ast))
@@ -3495,8 +3583,9 @@ xtlang's `let' syntax is the same as Scheme"
     ;; (if (null? cnt) (sys:clear-log-view))
     (let* ((fvars (let ((ht (impc:ti:vars-snapshot vars)))
                     (for-each (lambda (ft)
-                                (if (hashtable-ref ht (car ft))
-                                    (hashtable-set! ht (car ft) (list (cdr ft)))))
+                                (let ((cell (hashtable-ref ht (car ft))))
+                                  (if cell
+                                      (impc:ti:uf-set-value! cell (list (cdr ft))))))
                               forced-types)
                     ht))
            ;; (lll (println 'vars1: vars))
