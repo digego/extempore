@@ -32,17 +32,147 @@
                 '(if test1 (begin body1) (begin body2))
                 "cond-else")
 
+(xtmtest-result (impc:ti:cond '((t1 b1) (t2 b2) (else b3)))
+                '(if t1 (begin b1) (if t2 (begin b2) (begin b3)))
+                "cond-multi")
+
 ;; not
 
 (xtmtest-result (impc:ti:not 'x)
                 '(if x #f #t)
                 "not")
 
+;; gteq / lteq
+
+(xtmtest-result (impc:ti:gteq '(>= a b))
+                '(or (> a b) (= a b))
+                "gteq")
+
+(xtmtest-result (impc:ti:lteq '(<= a b))
+                '(or (< a b) (= a b))
+                "lteq")
+
+;; list -> cons chain
+
+(xtmtest-result (impc:ti:list '())
+                'null
+                "list-empty")
+
+(xtmtest-result (impc:ti:list '(a))
+                '(cons a null)
+                "list-single")
+
+(xtmtest-result (impc:ti:list '(a b))
+                '(cons a (cons b null))
+                "list-chain")
+
+;; quote
+
+(xtmtest-result (impc:ti:quote '())
+                '(impc_null)
+                "quote-null")
+
+(xtmtest-result (impc:ti:quote 'hello)
+                '(Symbol "hello")
+                "quote-symbol")
+
 ;; binary-arity
 
 (xtmtest-result (impc:ti:binary-arity '(+ 1 2 3) #f)
                 '(+ (+ 1 2) 3)
-                "binary-arity")
+                "binary-arity-3")
+
+(xtmtest-result (impc:ti:binary-arity '(* 1 2 3 4) #f)
+                '(* (* (* 1 2) 3) 4)
+                "binary-arity-4")
+
+;; fill operations
+
+(xtmtest-result (impc:ti:afill! '(arr 10 20 30))
+                '(begin (aset! arr 0 10) (aset! arr 1 20) (aset! arr 2 30))
+                "afill-basic")
+
+(xtmtest-result (impc:ti:tfill! '(tup 10 20))
+                '(begin (tset! tup 0 10) (tset! tup 1 20))
+                "tfill-basic")
+
+(xtmtest-result (impc:ti:vfill! '(vec 1 2 3 4))
+                '(begin (vset! vec 0 1) (vset! vec 1 2) (vset! vec 2 3) (vset! vec 3 4))
+                "vfill-basic")
+
+(xtmtest-result (impc:ti:pfill! '(ptr 10))
+                '(begin (pset! ptr 0 10))
+                "pfill-basic")
+
+;; bitwise-not
+
+(xtmtest-result (impc:ti:bitwise-not-to-eor '(~ x) #f)
+                '(bitwise-eor x -1)
+                "bitwise-not")
+
+;; collection constructors via first-transform
+
+(xtmtest-result (impc:ti:first-transform '(vector 1 2 3) #t)
+                '(make-vector 1 2 3)
+                "vector-to-make-vector")
+
+(xtmtest-result (impc:ti:first-transform '(array 4 5) #t)
+                '(make-array 4 5)
+                "array-to-make-array")
+
+(xtmtest-result (impc:ti:first-transform '(tuple 1 2) #t)
+                '(make-tuple 1 2)
+                "tuple-to-make-tuple")
+
+;; boolean / null / void atoms
+
+(xtmtest-result (impc:ti:first-transform #f #t)
+                '(impc_false)
+                "false-atom")
+
+(xtmtest-result (impc:ti:first-transform #t #t)
+                '(impc_true)
+                "true-atom")
+
+(xtmtest-result (impc:ti:first-transform 'null #t)
+                '(impc_null)
+                "null-atom")
+
+(xtmtest-result (impc:ti:first-transform 'void #t)
+                '(void)
+                "void-atom")
+
+;; symbol aliasing
+
+(xtmtest-result (impc:ti:first-transform 'pset! #t)
+                'pointer-set!
+                "pset-alias")
+
+(xtmtest-result (impc:ti:first-transform 'pref #t)
+                'pointer-ref
+                "pref-alias")
+
+(xtmtest-result (impc:ti:first-transform 'aref #t)
+                'array-ref
+                "aref-alias")
+
+(xtmtest-result (impc:ti:first-transform 'tref #t)
+                'tuple-ref
+                "tref-alias")
+
+(xtmtest-result (impc:ti:first-transform 'alloc #t)
+                'zone-alloc
+                "alloc-alias")
+
+(xtmtest-result (impc:ti:first-transform 'now #t)
+                'llvm_now
+                "now-alias")
+
+;; free wrapping
+
+(xtmtest-result (impc:ti:first-transform '(free x) #t)
+                '(free (bitcast x i8*))
+                "free-wrapping")
 
 ;; AST constructors and accessors
 
@@ -70,5 +200,53 @@
   (is? (bool (ast:let? '(let ((x 1)) x))) #t "let-positive")
   (is? (bool (ast:lambda? '(lambda (x) x))) #t "lambda-positive")
   (is? (bool (ast:begin? '(begin 1 2))) #t "begin-positive")
+  (is? (bool (ast:set!? '(set! x 1))) #t "set!-positive")
+  (is? (bool (ast:var? 'x)) #t "var-positive")
+  (is? (bool (ast:lit? 42)) #t "lit-number")
+  (is? (bool (ast:lit? "hello")) #t "lit-string")
+  (is? (bool (ast:call? '(foo 1 2))) #t "call-positive")
   (is? (bool (ast:if? '(+ 1 2))) #f "if-negative")
-  (is? (bool (ast:let? 42)) #f "let-negative"))
+  (is? (bool (ast:let? 42)) #f "let-negative")
+  (is? (bool (ast:call? '(if a b c))) #f "call-negative-if")
+  (is? (bool (ast:call? '(let ((x 1)) x))) #f "call-negative-let"))
+
+(xtmtest-with-fixture ast-begin-set
+  (define bnode (ast:make-begin '(1 2 3)))
+  (is? (ast:begin-exprs bnode) '(1 2 3) "begin-exprs")
+  (define snode (ast:make-set! 'x '(+ 1 2)))
+  (is? (ast:set!-var snode) 'x "set!-var")
+  (is? (ast:set!-expr snode) '(+ 1 2) "set!-expr"))
+
+;; lambda wrapping in first-transform (produces let-bound anon lambda)
+
+(xtmtest-with-fixture lambda-in-body
+  (define (bool x) (if x #t #f))
+  (define result (impc:ti:first-transform '(lambda (x) (+ x 1)) #t))
+  (is? (bool (ast:let? result)) #t "lambda-wraps-in-let")
+  (define binding-val (cadr (car (ast:let-bindings result))))
+  (is? (bool (ast:lambda? binding-val)) #t "binding-is-lambda"))
+
+;; let in first-transform preserves structure
+
+(xtmtest-with-fixture let-transform
+  (define (bool x) (if x #t #f))
+  (define result (impc:ti:first-transform '(let ((x 1)) (+ x 2)) #t))
+  (is? (bool (ast:let? result)) #t "let-preserved")
+  (is? (length (ast:let-bindings result)) 1 "let-one-binding"))
+
+;; cond -> if via first-transform
+
+(xtmtest-result (impc:ti:first-transform '(cond (#t 1) (else 2)) #t)
+                '(if (impc_true) (begin 1) (begin 2))
+                "cond-through-first-transform")
+
+;; AST validation
+
+(xtmtest-with-fixture ast-validate
+  (is? (ast:validate '(if a b c)) #t "validate-if")
+  (is? (ast:validate '(let ((x 1)) x)) #t "validate-let")
+  (is? (ast:validate '(lambda (x) x)) #t "validate-lambda")
+  (is? (ast:validate '(begin 1 2 3)) #t "validate-begin")
+  (is? (ast:validate '(set! x 1)) #t "validate-set!")
+  (is? (ast:validate 42) #t "validate-literal")
+  (is? (ast:validate 'x) #t "validate-var"))

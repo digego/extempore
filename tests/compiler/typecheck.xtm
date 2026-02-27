@@ -2,6 +2,8 @@
 
 (sys:load "libs/core/test.xtm")
 
+;; literal types
+
 (xtmtest-result (impc:ti:get-expression-type 42)
                 2
                 "integer-literal")
@@ -14,22 +16,83 @@
                 10
                 "boolean-literal")
 
+;; arithmetic
+
 (xtmtest-result (impc:ti:get-expression-type '(+ 1 2))
                 2
                 "arithmetic")
+
+(xtmtest-result (impc:ti:get-expression-type '(* 3 4))
+                2
+                "multiply")
+
+(xtmtest-result (impc:ti:get-expression-type '(- 10 5))
+                2
+                "subtract")
+
+;; if expression
 
 (xtmtest-result (impc:ti:get-expression-type '(if #t 1 2))
                 2
                 "if-expression")
 
+;; let expression
+
 (xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) x))
                 2
                 "let-expression")
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+                2
+                "nested-let")
+
+;; lambda
 
 (xtmtest-result (impc:ti:get-expression-type '(lambda (x:i64) (+ x 1)))
                 '(213 2 2)
                 "lambda")
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+(xtmtest-with-fixture lambda-two-args
+  (define typ (impc:ti:get-expression-type '(lambda (x:i64 y:i64) (+ x y))))
+  (is? (car typ) 213 "closure-tag")
+  (is? (length typ) 4 "three-type-slots"))
+
+;; nested let
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) (let ((y:i64 2)) (+ x y))))
                 2
-                "nested-let")
+                "nested-let-scopes")
+
+;; boolean operations via if
+
+(xtmtest-result (impc:ti:get-expression-type '(if #t #t #f))
+                10
+                "if-boolean-result")
+
+;; multi-arg arithmetic (binary arity normalisation)
+
+(xtmtest-result (impc:ti:get-expression-type '(+ 1 2 3))
+                2
+                "multi-arg-add")
+
+(xtmtest-result (impc:ti:get-expression-type '(* 1 2 3 4))
+                2
+                "multi-arg-mul")
+
+;; float arithmetic
+
+(xtmtest-result (impc:ti:get-expression-type '(+ 1.0 2.0))
+                0
+                "float-add")
+
+;; let with float
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:double 1.0)) (+ x 2.0)))
+                0
+                "let-float")
+
+;; begin expression (type of last expression)
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) (begin x)))
+                2
+                "begin-expr")
