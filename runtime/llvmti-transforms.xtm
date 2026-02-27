@@ -1802,6 +1802,17 @@ Continue executing `body' forms until `test-expression' returns #f"
           (set! p4 '())
           (if (null? p4) t2 p4)))))
 
+(define impc:ti:occurs-in-type?
+  (lambda (sym type)
+    (cond ((null? type) #f)
+          ((symbol? type) (equal? sym type))
+          ((string? type) #f)
+          ((number? type) #f)
+          ((list? type) (cl:some (lambda (t) (impc:ti:occurs-in-type? sym t)) type))
+          ((pair? type) (or (impc:ti:occurs-in-type? sym (car type))
+                            (impc:ti:occurs-in-type? sym (cdr type))))
+          (else #f))))
+
 ;;
 ;; IF TYPE CANNOT BE UNIFIED SUCCESSFULLY THEN WE SHOULD RETURN NULL '()
 ;; i.e. if we have ((114 0 0) (14 0 0)) don't return this -> return '()
@@ -1824,8 +1835,11 @@ Continue executing `body' forms until `test-expression' returns #f"
                             #f)))
                (impc:ti:reify-generic-type t vars '())
                (if (and (symbol? t) (hashtable-ref vars t))
-                   (let ((r (impc:ti:type-unify (hashtable-ref vars t) vars)))
-                     (if (null? r) t r)) ;; if r is NULL or false return t
+                   (let ((val (hashtable-ref vars t)))
+                     (if (impc:ti:occurs-in-type? t val)
+                         t
+                         (let ((r (impc:ti:type-unify val vars)))
+                           (if (null? r) t r))))
                    t)))
           ((list? t)
            (cond ((impc:ti:complex-type? t)
