@@ -1,184 +1,102 @@
-// String-keyed hash table built on top of Scheme vectors.
+// Hash table FFI using s7's built-in hash tables.
 //
-// A hash table is a Scheme vector where each slot holds an alist of
-// (key . value) pairs.  Keys are strings or symbols; lookup uses the
-// same comparison semantics as assoc-strcmp.  The underlying vector is
-// GC-traced, so values are protected from collection.
-//
-// Scheme API:
-//   (make-hashtable size)           -> vector
-//   (hashtable-ref ht key)          -> value or #f
-//   (hashtable-set! ht key value)   -> value
-//   (hashtable-remove! ht key)      -> #t or #f
-//   (hashtable-count ht)            -> integer
+// Provides compatibility with the original vector-of-alists implementation.
+// s7 hash tables use equal? for key comparison, which matches the previous
+// semantics for symbol and string keys (symbols are interned in s7).
 
-static inline uint64_t ht_str_hash(const char* str)
-{
-    uint64_t result = 5381;
-    unsigned char c;
-    while ((c = *(str++)))
-        result = result * 33 + c;
-    return result;
-}
-
-static inline const char* ht_key_string(scheme* sc, pointer key)
-{
-    if (is_symbol(key))
-        return strvalue(car(key));
-    if (is_string(key))
-        return strvalue(key);
-    return nullptr;
-}
-
-// (make-hashtable size) -> vector
-// Creates a vector of `size` empty lists.
 static pointer hashtable_make(scheme* sc, pointer args)
 {
     int size = static_cast<int>(ivalue(pair_car(args)));
     if (size < 1) size = 256;
-    return mk_vector(sc, size);
+    return s7_make_hash_table(sc->sc, size);
 }
 
-// (hashtable-ref ht key) -> value or #f
-// Hashes key, looks up in the corresponding bucket via assoc-strcmp.
 static pointer hashtable_ref(scheme* sc, pointer args)
 {
     pointer ht  = pair_car(args);
     pointer key = pair_cadr(args);
-
-    const char* skey = ht_key_string(sc, key);
-    if (!skey) return sc->F;
-
-    int idx = ht_str_hash(skey) % ht->_size;
-    pointer bucket = vector_elem(ht, idx);
-    pointer entry = assoc_strcmp(sc, key, bucket);
-    if (entry == sc->F) return sc->F;
-    return cdr(entry);
+    pointer result = s7_hash_table_ref(sc->sc, ht, key);
+    return result;
 }
 
-// (hashtable-set! ht key value) -> value
-// If key exists in the bucket, updates its cdr.  Otherwise conses a
-// new (key . value) pair onto the bucket.
 static pointer hashtable_set(scheme* sc, pointer args)
 {
     pointer ht    = pair_car(args);
     pointer key   = pair_cadr(args);
     pointer value = pair_caddr(args);
-
-    const char* skey = ht_key_string(sc, key);
-    if (!skey) return sc->F;
-
-    int idx = ht_str_hash(skey) % ht->_size;
-    pointer bucket = vector_elem(ht, idx);
-    pointer entry = assoc_strcmp(sc, key, bucket);
-
-    if (entry != sc->F) {
-        cdr(entry) = value;
-    } else {
-        pointer new_pair = cons(sc, key, value);
-        set_vector_elem(sc, ht, idx, cons(sc, new_pair, bucket));
-    }
+    s7_hash_table_set(sc->sc, ht, key, value);
     return value;
 }
 
-// (hashtable-remove! ht key) -> #t if removed, #f if not found
 static pointer hashtable_remove(scheme* sc, pointer args)
 {
     pointer ht  = pair_car(args);
     pointer key = pair_cadr(args);
-
-    const char* skey = ht_key_string(sc, key);
-    if (!skey) return sc->F;
-
-    int idx = ht_str_hash(skey) % ht->_size;
-    pointer bucket = vector_elem(ht, idx);
-
-    // Build a new bucket list without the matching entry
-    pointer prev = sc->NIL;
-    pointer result = sc->NIL;
-    bool found = false;
-
-    for (pointer x = bucket; is_pair(x); x = cdr(x)) {
-        pointer pair = car(x);
-        if (!found && is_pair(pair)) {
-            const char* ekey = nullptr;
-            pointer ekey_ptr = car(pair);
-            if (is_symbol(ekey_ptr))
-                ekey = strvalue(car(ekey_ptr));
-            else if (is_string(ekey_ptr))
-                ekey = strvalue(ekey_ptr);
-            if (ekey && strcmp(ekey, skey) == 0) {
-                found = true;
-                continue;  // skip this entry
-            }
-        }
-        result = cons(sc, pair, result);
-    }
-
-    if (found) {
-        // Reverse result to maintain order (not strictly necessary but tidy)
-        pointer reversed = sc->NIL;
-        for (pointer x = result; is_pair(x); x = cdr(x))
-            reversed = cons(sc, car(x), reversed);
-        set_vector_elem(sc, ht, idx, reversed);
-        return sc->T;
-    }
-    return sc->F;
+    pointer existing = s7_hash_table_ref(sc->sc, ht, key);
+    if (existing == sc->F) return sc->F;
+    // s7_hash_table_set with value #f (the missing-key value) triggers removal
+    s7_hash_table_set(sc->sc, ht, key, sc->F);
+    return sc->T;
 }
 
-// (hashtable-count ht) -> integer
-// Counts total entries across all buckets.
 static pointer hashtable_count(scheme* sc, pointer args)
 {
     pointer ht = pair_car(args);
-    int count = 0;
-    int size = ht->_size;
-    for (int i = 0; i < size; i++) {
-        for (pointer x = vector_elem(ht, i); is_pair(x); x = cdr(x))
-            count++;
-    }
-    return mk_integer(sc, count);
+    s7_pointer entries_sym = s7_make_symbol(sc->sc, "hash-table-entries");
+    s7_pointer result = s7_call(sc->sc, s7_symbol_value(sc->sc, entries_sym),
+                                s7_list(sc->sc, 1, ht));
+    return result;
 }
 
-// (hashtable-clear! ht) -> ht
-// Sets all buckets to NIL.
 static pointer hashtable_clear(scheme* sc, pointer args)
 {
     pointer ht = pair_car(args);
-    int size = ht->_size;
-    for (int i = 0; i < size; i++)
-        set_vector_elem(sc, ht, i, sc->NIL);
+    // Collect keys first (can't mutate while iterating)
+    s7_pointer keys_fn = s7_eval_c_string(sc->sc, "(lambda (ht) (map car ht))");
+    s7_int gc_loc = s7_gc_protect(sc->sc, keys_fn);
+    s7_pointer keys = s7_call(sc->sc, keys_fn, s7_list(sc->sc, 1, ht));
+    s7_gc_unprotect_at(sc->sc, gc_loc);
+    // Remove each key by setting to #f (triggers s7 removal)
+    for (s7_pointer k = keys; s7_is_pair(k); k = s7_cdr(k))
+        s7_hash_table_set(sc->sc, ht, s7_car(k), sc->F);
     return ht;
 }
 
-// (hashtable-keys ht) -> list of keys
 static pointer hashtable_keys(scheme* sc, pointer args)
 {
     pointer ht = pair_car(args);
     pointer result = sc->NIL;
-    int size = ht->_size;
-    for (int i = 0; i < size; i++) {
-        for (pointer x = vector_elem(ht, i); is_pair(x); x = cdr(x)) {
-            if (is_pair(car(x)))
-                result = cons(sc, car(car(x)), result);
-        }
-    }
+    // Use for-each via Scheme to collect keys
+    s7_pointer keys_fn = s7_eval_c_string(sc->sc,
+        "(lambda (ht) (map car ht))");
+    s7_int gc_loc = s7_gc_protect(sc->sc, keys_fn);
+    result = s7_call(sc->sc, keys_fn, s7_list(sc->sc, 1, ht));
+    s7_gc_unprotect_at(sc->sc, gc_loc);
     return result;
 }
 
-// (hashtable->alist ht) -> list of (key . value) pairs
 static pointer hashtable_to_alist(scheme* sc, pointer args)
 {
     pointer ht = pair_car(args);
-    pointer result = sc->NIL;
-    int size = ht->_size;
-    for (int i = 0; i < size; i++) {
-        for (pointer x = vector_elem(ht, i); is_pair(x); x = cdr(x)) {
-            if (is_pair(car(x)))
-                result = cons(sc, car(x), result);
-        }
-    }
+    // s7 hash tables can be iterated as lists of (key . value) pairs
+    s7_pointer alist_fn = s7_eval_c_string(sc->sc,
+        "(lambda (ht) (map values ht))");
+    s7_int gc_loc = s7_gc_protect(sc->sc, alist_fn);
+    pointer result = s7_call(sc->sc, alist_fn, s7_list(sc->sc, 1, ht));
+    s7_gc_unprotect_at(sc->sc, gc_loc);
     return result;
+}
+
+static pointer hashtable_for_each(scheme* sc, pointer args)
+{
+    pointer proc = pair_car(args);
+    pointer ht   = pair_cadr(args);
+    s7_pointer fe_fn = s7_eval_c_string(sc->sc,
+        "(lambda (proc ht) (for-each (lambda (entry) (proc (car entry) (cdr entry))) ht))");
+    s7_int gc_loc = s7_gc_protect(sc->sc, fe_fn);
+    s7_call(sc->sc, fe_fn, s7_list(sc->sc, 2, proc, ht));
+    s7_gc_unprotect_at(sc->sc, gc_loc);
+    return sc->T;
 }
 
 #define HASHTABLE_DEFS \
@@ -189,4 +107,5 @@ static pointer hashtable_to_alist(scheme* sc, pointer args)
         { "hashtable-clear!", &hashtable_clear }, \
         { "hashtable-count", &hashtable_count }, \
         { "hashtable-keys", &hashtable_keys }, \
-        { "hashtable->alist", &hashtable_to_alist }
+        { "hashtable->alist", &hashtable_to_alist }, \
+        { "hashtable-for-each", &hashtable_for_each }

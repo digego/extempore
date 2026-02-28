@@ -39,6 +39,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/ADT/StringExtras.h"
@@ -75,6 +76,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Linker/Linker.h"
 
+#include "pcre.h"
 #include "SchemeFFI.h"
 #include "AudioDevice.h"
 #include "UNIV.h"
@@ -107,8 +109,6 @@ CMRC_DECLARE(xtm);
 #define LLVM_EE_LOCK
 
 ////////////////////////////////
-
-#include "pcre.h"
 
 #ifdef __APPLE__
 #include <malloc/malloc.h>
@@ -662,7 +662,6 @@ static llvm::Module* jitCompile(const std::string& irString)
                 symbolNames.push_back(glob.getName().str());
             }
         }
-
         // Step 10: Clone for metadata tracking.
         auto metadataModule = CloneModule(*baseModule);
 

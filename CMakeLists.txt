@@ -63,6 +63,26 @@ set(DEP_GLFW_VERSION "3.4")
 set(DEP_WGPU_VERSION "27.0.4.0")
 set(DEP_ASSIMP_VERSION "5.4.3")
 
+######
+# s7 #
+######
+
+add_library(s7_lib STATIC src/s7.c)
+target_include_directories(s7_lib PUBLIC include)
+target_compile_definitions(s7_lib PRIVATE
+    -DHAVE_COMPLEX_NUMBERS=0
+    -DWITH_SYSTEM_EXTRAS=0
+    -DWITH_C_LOADER=0
+    -DWITH_GMP=0)
+if(UNIX)
+    target_compile_options(s7_lib PRIVATE -Wno-unused-result)
+    target_link_libraries(s7_lib PRIVATE dl m)
+endif()
+set_property(TARGET s7_lib PROPERTY C_STANDARD 17)
+if(NOT WIN32)
+    set_property(TARGET s7_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
+
 ########
 # PCRE #
 ########
@@ -187,7 +207,7 @@ set(EXTEMPORE_SOURCES
     src/EXTThread.cpp
     src/shims/__hash_memory.cpp
     src/OSC.cpp
-    src/Scheme.cpp
+    src/SchemeS7.cpp
     src/SchemeFFI.cpp
     src/SchemeProcess.cpp
     src/SchemeREPL.cpp
@@ -216,7 +236,7 @@ else()
     add_executable(extempore ${EXTEMPORE_SOURCES})
 endif()
 
-add_dependencies(extempore pcre portaudio_static)
+add_dependencies(extempore s7_lib portaudio_static)
 
 target_include_directories(extempore PRIVATE
     include
@@ -225,7 +245,7 @@ target_include_directories(extempore PRIVATE
     ${LLVM_INCLUDE_DIRS})
 
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
-target_link_libraries(extempore PRIVATE pcre portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE s7_lib pcre portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
 
 # Compile definitions
 if(EXT_SHARE_DIR)

@@ -1304,7 +1304,7 @@
   tree)))
 
 ;@
-(define (cl:copy-list lst) (append lst '()))
+(define (cl:copy-list lst) (if (list? lst) (append lst '()) lst))
 ;@
 (define (cl:adjoin obj lst) (if (member obj lst) lst (cons obj lst)))
 ;@
@@ -1785,7 +1785,9 @@
                         (begin
                           (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
                           (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
-                          (eval (car *global-sysload-evals*) (interaction-environment))
+                          (*s7-catch* #t
+                            (lambda () (eval (car *global-sysload-evals*) (interaction-environment)))
+                            (lambda (type info) #f))
                           (loop (read input)))))
                   (close-input-port input)
                   (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*))

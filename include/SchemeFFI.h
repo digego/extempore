@@ -36,7 +36,8 @@
 #ifndef _SCHEME_FFI_H
 #define _SCHEME_FFI_H
 
-#include "Scheme.h"
+#include "SchemeS7.h"
+#include "SchemeS7Private.h"
 
 namespace extemp {
 

@@ -47,8 +47,8 @@
 ;;
 (define impc:ti:get-var-types
   (lambda (ast)
-    (let* ((types '())
-           (f (lambda (ast)
+    (let ((types '()))
+     (letrec ((f (lambda (ast)
                 ;;(print 'ast: ast 'types: types)
                 (cond ((null? ast) '())
                       ((atom? ast) ast)
@@ -98,7 +98,7 @@
                       ((pair? ast)
                        (cons (f (car ast))
                              (f (cdr ast))))))))
-      (cons (f ast) types))))
+      (cons (f ast) types)))))
 
 
 
@@ -983,7 +983,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define impc:ti:transform-atom
   (lambda (ast inbody?)
-    (cond ((rational? ast)
+    (cond ((and (rational? ast) (not (integer? ast)))
            (impc:ti:first-transform `(Rat ,(rational->n ast) ,(rational->d ast)) inbody?))
           ((eq? ast #f) '(impc_false))
           ((eq? ast #t) '(impc_true))
@@ -1014,6 +1014,8 @@ Continue executing `body' forms until `test-expression' returns #f"
           ((eq? ast 'alloc) 'zone-alloc)
           ((eq? ast 'randomf) 'imp_randf)
           ((eq? ast 'void) '(void))
+          ((and (complex? ast) (not (real? ast)))
+           (impc:ti:first-transform `(Cpxd ,(real-part ast) ,(imag-part ast)) inbody?))
           ((and (symbol? ast)
                 (regex:match? (symbol->string ast) "^[+-]?[0-9]*\\.?[0-9]*[+-][0-9]*\\.?[0-9]*i$"))
            (let ((p (regex:matched (symbol->string ast) "^([+-]?[0-9]*\\.?[0-9]*)([+-][0-9]*\\.?[0-9]*)i$")))
@@ -1047,7 +1049,11 @@ Continue executing `body' forms until `test-expression' returns #f"
   (lambda (ast inbody?)
     (if (null? ast) '()
         (cond ((list? ast)
-               (let ((head (car ast)))
+               (let* ((h (car ast))
+                      (head (if (syntax? h)
+                                (string->symbol (substring (object->string h) 2))
+                                h))
+                      (ast (if (syntax? h) (cons head (cdr ast)) ast)))
                  (cond
                   ((and (symbol? head)
                         (or (impc:ti:get-polyfunc-candidate-types (symbol->string head))

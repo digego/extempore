@@ -88,8 +88,8 @@
 #include <UNIV.h>
 #include <SchemeFFI.h>
 #include <TaskScheduler.h>
-#include <Scheme.h>
-#include <pcre.h>
+#include <SchemeS7.h>
+#include <SchemeS7Private.h>
 #include <OSC.h>
 #include <cmath>
 #include <BranchPrediction.h>
@@ -501,7 +501,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   strcat(c,fname);
   strcat(c,d);
   pointer xtlang_f_name = find_slot_in_env(_sc,_sc->envir,mk_symbol(_sc,c),1);
-  char* xtlang_name = strvalue(pair_cdr(xtlang_f_name));
+  char* xtlang_name = string_value(pair_cdr(xtlang_f_name));
   //printf("in llvm scheme env set %s.%s:%s  xtlang:%s\n",fname,vname,tname,xtlang_name);
   uint64_t id = string_hash(vname);
   // Module* M = extemp::EXTLLVM::M;
