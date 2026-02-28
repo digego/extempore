@@ -1,9 +1,10 @@
 ---
 id: TASK-037.01
 title: Add occurs check to type-unify
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-27 21:43'
+updated_date: '2026-02-28 05:42'
 labels:
   - compiler
   - type-inference
@@ -31,3 +32,9 @@ Key file: runtime/llvmti-transforms.xtm (impc:ti:type-unify, ~line 1809)
 - [ ] #3 all existing tests pass unchanged (ctest -L libs-core, libs-external)
 - [ ] #4 no change to inference results for well-typed programs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented occurs check in type-unify. See commit 889c414d.
+<!-- SECTION:NOTES:END -->

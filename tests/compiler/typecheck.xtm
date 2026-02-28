@@ -96,3 +96,33 @@
 (xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) (begin x)))
                 2
                 "begin-expr")
+
+;; bidirectional mode helpers
+
+(xtmtest-result (impc:ti:synth-mode? #f) #t "synth-mode-false")
+(xtmtest-result (impc:ti:synth-mode? '()) #t "synth-mode-null")
+(xtmtest-result (impc:ti:synth-mode? *impc:ir:notype*) #t "synth-mode-notype")
+(xtmtest-result (impc:ti:synth-mode? (list *impc:ir:notype*)) #t "synth-mode-notype-list")
+(xtmtest-result (impc:ti:synth-mode? *impc:ir:si64*) #f "synth-mode-concrete-type")
+(xtmtest-result (impc:ti:synth-mode? "i64") #f "synth-mode-string-type")
+
+(xtmtest-result (impc:ti:normalise-expected #f) #f "normalise-false")
+(xtmtest-result (impc:ti:normalise-expected '()) #f "normalise-null")
+(xtmtest-result (impc:ti:normalise-expected *impc:ir:notype*) #f "normalise-notype")
+(xtmtest-result (impc:ti:normalise-expected (list *impc:ir:notype*)) #f "normalise-notype-list")
+(xtmtest-result (impc:ti:normalise-expected (list *impc:ir:si64*)) *impc:ir:si64* "normalise-unwrap-singleton")
+(xtmtest-result (impc:ti:normalise-expected *impc:ir:si64*) *impc:ir:si64* "normalise-pass-through")
+
+(xtmtest-result (impc:ti:check-type #f) #f "check-type-synth")
+(xtmtest-result (impc:ti:check-type *impc:ir:si64*) *impc:ir:si64* "check-type-concrete")
+(xtmtest-result (impc:ti:check-type *impc:ir:notype*) #f "check-type-notype")
+
+;; subsumption helper
+
+(xtmtest-result (impc:ti:subsume *impc:ir:si64* #f (make-hashtable 8))
+                *impc:ir:si64*
+                "subsume-synth-mode")
+
+(xtmtest-result (impc:ti:subsume *impc:ir:si64* *impc:ir:si64* (make-hashtable 8))
+                *impc:ir:si64*
+                "subsume-same-type")

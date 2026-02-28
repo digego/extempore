@@ -1,9 +1,10 @@
 ---
 id: TASK-037.02
 title: Replace vars hash table with union-find unification
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-27 21:43'
+updated_date: '2026-02-28 05:42'
 labels:
   - compiler
   - type-inference
@@ -39,3 +40,9 @@ Key files: runtime/llvmti-typecheck.xtm (run-type-check*, vars-update, vars-snap
 - [ ] #5 all existing tests pass (ctest -L libs-core, libs-external, examples)
 - [ ] #6 compiler performance equal or better on representative programs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Replaced vars hash table with union-find unification. See commit af42d746.
+<!-- SECTION:NOTES:END -->

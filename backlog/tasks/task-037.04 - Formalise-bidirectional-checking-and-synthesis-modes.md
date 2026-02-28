@@ -1,9 +1,10 @@
 ---
 id: TASK-037.04
 title: Formalise bidirectional checking and synthesis modes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-27 21:43'
+updated_date: '2026-02-28 05:41'
 labels:
   - compiler
   - type-inference
@@ -39,3 +40,9 @@ References: Dunfield & Krishnaswami, Bidirectional Typing (2021 survey)
 - [ ] #4 all existing tests pass (ctest -L libs-core, libs-external, examples)
 - [ ] #5 no change to inference results for existing programs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Renamed request? to expected across all ~50 check functions (452 occurrences). Added centralised normalise-expected call in type-check dispatch. Removed per-function cleanup from math-check, math-intrinsic-check, nativef-generics. Added mode helpers (synth-mode?, normalise-expected, check-type) and subsumption helper. Changed begin-check to pass #f for non-final expressions. Added 17 unit tests. All test suites pass.
+<!-- SECTION:NOTES:END -->
