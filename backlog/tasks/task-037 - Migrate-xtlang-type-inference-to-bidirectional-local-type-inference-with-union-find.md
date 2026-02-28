@@ -3,9 +3,10 @@ id: TASK-037
 title: >-
   Migrate xtlang type inference to bidirectional local type inference with
   union-find
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-27 21:43'
+updated_date: '2026-02-28 06:37'
 labels:
   - compiler
   - type-inference
@@ -35,8 +36,14 @@ References: Pierce & Turner (Local Type Inference, 2000), Dunfield & Krishnaswam
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 4 stages completed as subtasks
-- [ ] #2 All existing tests pass (ctest -L libs-core, libs-external, examples)
-- [ ] #3 No change to language semantics
-- [ ] #4 Compiler performance equal or better than current
+- [x] #1 All 4 stages completed as subtasks
+- [x] #2 All existing tests pass (ctest -L libs-core, libs-external, examples)
+- [x] #3 No change to language semantics
+- [x] #4 Compiler performance equal or better than current
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+All 4 subtasks completed: occurs check (037.01), union-find (037.02), constraint store (037.03), bidirectional modes (037.04). All tests pass. Remaining potential improvements (retry loop elimination, subsume wiring, scope chain) tracked implicitly.
+<!-- SECTION:NOTES:END -->
