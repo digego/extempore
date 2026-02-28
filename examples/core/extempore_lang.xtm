@@ -1275,3 +1275,29 @@
 (let ((t (clock:clock)))
   (vtest_c)
   (println 'Vec 'Test 'C '-> 'Seconds (list (- (clock:clock) t))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; closure redefinition propagation
+;;
+;; when a closure is redefined, callers that
+;; reference it should see the new definition
+
+(bind-func redef_inner
+  (lambda (x:i64)
+    (* x 2)))
+
+(bind-func redef_caller
+  (lambda (x:i64)
+    (redef_inner x)))
+
+(println (redef_caller 5)) ;; 10
+
+;; now redefine the inner closure
+(bind-func redef_inner
+  (lambda (x:i64)
+    (* x 3)))
+
+;; caller should pick up the new definition
+(println (redef_caller 5)) ;; 15
