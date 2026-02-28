@@ -44,6 +44,31 @@
   (lambda (cell val)
     (vector-set! (impc:ti:uf-find! cell) 2 val)))
 
+(define *impc:ti:constraints* '())
+
+(define impc:ti:emit-constraint!
+  (lambda (kind lhs rhs)
+    (set! *impc:ti:constraints*
+          (cons (vector kind lhs rhs) *impc:ti:constraints*))))
+
+(define impc:ti:clear-constraints!
+  (lambda () (set! *impc:ti:constraints* '())))
+
+(define impc:ti:solve-constraints
+  (lambda (constraints vars kts)
+    (for-each
+      (lambda (c)
+        (let ((kind (vector-ref c 0))
+              (lhs (vector-ref c 1))
+              (rhs (vector-ref c 2)))
+          (cond ((eq? kind 'eq) (impc:ti:update-var lhs vars kts rhs))
+                ((eq? kind 'force) (impc:ti:force-var lhs vars kts rhs))
+                ((eq? kind 'union)
+                 (let ((ca (hashtable-ref vars lhs))
+                       (cb (hashtable-ref vars rhs)))
+                   (if (and ca cb) (impc:ti:uf-union! ca cb)))))))
+      constraints)))
+
 (define impc:ti:vars-ref
   (lambda (vars sym)
     (let ((cell (hashtable-ref vars sym)))
@@ -130,7 +155,9 @@
                   (let ((existing-types (impc:ti:vars-ref vars sym)))
                     (if existing-types
                         (if (and (symbol? t) (hashtable-ref vars t))
-                            (impc:ti:uf-union! (hashtable-ref vars sym) (hashtable-ref vars t))
+                            (begin
+                              (impc:ti:emit-constraint! 'union sym t)
+                              (impc:ti:uf-union! (hashtable-ref vars sym) (hashtable-ref vars t)))
                             (begin
                               (if (or (impc:ir:type? t)
                                       (impc:ti:complex-type? t))
@@ -144,12 +171,15 @@
                                              (string-contains? (symbol->string sym) "##"))
                                         (let ((gtd (impc:ti:generic-type-details sym)))
                                           (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
+                                    (impc:ti:emit-constraint! 'eq sym t)
                                     (impc:ti:uf-set-value!
                                       (hashtable-ref vars sym)
                                       (cl:remove-duplicates (append (list t) existing-types))))
-                                  (impc:ti:uf-set-value!
-                                    (hashtable-ref vars sym)
-                                    (cl:remove-duplicates (append t existing-types))))))
+                                  (begin
+                                    (impc:ti:emit-constraint! 'eq sym t)
+                                    (impc:ti:uf-set-value!
+                                      (hashtable-ref vars sym)
+                                      (cl:remove-duplicates (append t existing-types)))))))
                         '()))))))))
 
 
@@ -167,14 +197,16 @@
         (impc:compiler:print-missing-identifier-error sym 'variable)
         (let ((cell (hashtable-ref vars sym)))
           (if cell
-              (if (impc:ir:type? t)
-                  (begin
-                    (if (and (string? t)
-                             (string-contains? (symbol->string sym) "##"))
-                        (let ((gtd (impc:ti:generic-type-details sym)))
-                          (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
-                    (impc:ti:uf-set-value! cell (list t)))
-                  (impc:ti:uf-set-value! cell t))
+              (begin
+                (impc:ti:emit-constraint! 'force sym t)
+                (if (impc:ir:type? t)
+                    (begin
+                      (if (and (string? t)
+                               (string-contains? (symbol->string sym) "##"))
+                          (let ((gtd (impc:ti:generic-type-details sym)))
+                            (impc:ti:reverse-set-bangs-from-reified sym t (cadr gtd) vars)))
+                      (impc:ti:uf-set-value! cell (list t)))
+                    (impc:ti:uf-set-value! cell t)))
               '())))))
 
 
@@ -1228,6 +1260,105 @@
 
 (define *impc:ti:nativef-generics:calls* 0)
 
+(define impc:ti:nativef-generics-early-exit
+  (lambda (ast vars kts)
+    (cond ((assoc-strcmp (car ast) kts)
+           (for-each (lambda (x r)
+                       (impc:ti:type-check x vars kts r))
+                     (cdr ast)
+                     (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
+           (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))))
+          ((impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))
+           (for-each (lambda (x r)
+                       (impc:ti:type-check x vars kts r))
+                     (cdr ast)
+                     (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
+           (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))))
+          (else #f))))
+
+(define impc:ti:nativef-generics-inject-missing-vars
+  (lambda (vars gpoly-code gnum)
+    (let ((type-strs (impc:ir:get-pretty-closure-arg-strings
+                      (cadr (string-split-on (symbol->string (cadr gpoly-code)) ":")))))
+      (for-each (lambda (a)
+                  (if (or (char-alphabetic? (string-ref a 0))
+                         (char=? (string-ref a 0) #\!))
+                      (if (and (not (impc:ti:vars-ref vars (string->symbol (string-append a "##" (number->string gnum)))))
+                               (or (string-contains? a ":")
+                                   (string-contains? a "!")
+                                   (string-contains? a "{")))
+                          (let ((newsymm (string->symbol (string-append a "##" (number->string gnum))))
+                                (all-syms (cl:remove-duplicates (map (lambda (aa)
+                                                                       (string->symbol (string-append aa "##" (number->string gnum))))
+                                                                     (regex:match-all a "![^,}>\\]]*")))))
+                            (set! all-syms (remove (symbol->string newsymm) all-syms))
+                            (impc:ti:vars-add newsymm vars)))))
+                type-strs)
+      (for-each (lambda (a)
+                  (let ((vs (cl:remove-duplicates (regex:match-all a "(![a-zA-Z0-9]*_[0-9]*)"))))
+                    (for-each (lambda (x)
+                                (let ((sym (string->symbol (string-append x "##" (atom->string gnum)))))
+                                  (if (not (impc:ti:vars-ref vars sym))
+                                      (impc:ti:vars-add sym vars))))
+                              vs)))
+                type-strs))))
+
+(define impc:ti:nativef-generics-check-constraint
+  (lambda (ast grtype arity constraint constraint-code)
+    (if (and (not (null? grtype)) constraint)
+        (let* ((lgrtype (if (= (length grtype) (+ 2 arity))
+                            grtype
+                            (car (cl:remove-if-not (lambda (x)
+                                                     (impc:ir:closure? x))
+                                                   grtype))))
+               (chk (if (and (list? (cadr constraint-code))
+                             (<> (length (cdr lgrtype))
+                                 (length (cadr constraint-code))))
+                        'false
+                        (apply (eval constraint)
+                               (map (lambda (x)
+                                      (if (string? x)
+                                          (apply string-append
+                                                 (car (string-split-on (impc:ir:pretty-print-type x) "{"))
+                                                 (make-list (impc:ir:get-ptr-depth x) "*"))
+                                          x))
+                                    (cdr lgrtype))))))
+          (if (boolean? chk)
+              (if chk
+                  grtype
+                  (impc:compiler:print-constraint-error
+                   (car (string-split-on (atom->string (car ast)) "##"))
+                   (impc:ir:pretty-print-type grtype)
+                   constraint
+                   ast))
+              (if (impc:ir:type? chk)
+                  chk
+                  (impc:compiler:print-compiler-error
+                   (string-append "Poorly defined constraint check: "
+                                  (sexpr->string constraint)
+                                  " for generic call "
+                                  (sexpr->string ast)
+                                  " for type "
+                                  (if (impc:ir:type? grtype)
+                                      (impc:ir:pretty-print-type grtype)
+                                      "<uknown>"))))))
+        grtype)))
+
+(define impc:ti:nativef-generics-emit-final
+  (lambda (ast vars kts grtype gftype)
+    (if (and (impc:ir:type? grtype)
+             (symbol? (cadr gftype))
+             (impc:ti:vars-ref vars (cadr gftype)))
+        (impc:ti:vars-update (cadr gftype) vars kts (cadr grtype)))
+    (map (lambda (x y)
+           (if (symbol? x)
+               (impc:ti:vars-update x vars kts (list y))))
+         (cdr ast)
+         (cddr gftype))
+    (if (impc:ir:type? grtype)
+        (impc:ti:vars-update (car ast) vars kts (list grtype))
+        (impc:ti:vars-update (car ast) vars kts (list gftype)))))
+
 ;; generics check
 (define impc:ti:nativef-generics
   (lambda (ast vars kts request?)
@@ -1247,27 +1378,10 @@
     (if (not (impc:ir:type? request?))
         (set! request? #f))
     ;;
-    ;; (println 'generics-check (car ast) 'request: request?)
-    ;; only check if not already fully formed!
-    (cond ((assoc-strcmp (car ast) kts)
-           ;; (println 'leave-early1: ast ': (assoc-strcmp (car ast) kts))
-           (begin
-             (for-each (lambda (x r)
-                         (impc:ti:type-check x vars kts r))
-                       (cdr ast)
-                       (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
-             (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))))
-          ((impc:ir:type? (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars))
-           ;; (println 'leave-early2: ast ': (hashtable-ref vars (car ast))) ;;(hashtable-ref vars (car ast)))
-           (begin
-             (for-each (lambda (x r)
-                         (impc:ti:type-check x vars kts r))
-                       (cdr ast)
-                       (cddr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))
-             ;; (println 'hit: (impc:ti:type-unify (hashtable-ref vars (car ast)) vars))
-             (list (cadr (impc:ti:type-unify (impc:ti:vars-ref vars (car ast)) vars)))))
-          (else
-           (let* ((args (map (lambda (x)
+    (let ((early (impc:ti:nativef-generics-early-exit ast vars kts)))
+      (if early
+          early
+          (let* ((args (map (lambda (x)
                                ;; (println ast 'check x)
                                (impc:ti:type-unify (impc:ti:type-check x vars kts #f) vars))
                              (cdr ast)))
@@ -1296,75 +1410,7 @@
              ;; (println "constraint:" constraint)
              ;; (println "constraint-code:" constraint-code)
 
-          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-             ;; it is possible for some generic types to be missed from 'vars'
-             ;; due to the fact that a different gpoly (overridden generic) choice
-             ;; was made when initially seeding 'vars'
-             ;; so ... at this point we check and inject missing arg types into vars
-             ;;
-             ;; (for-each (lambda (a)
-             ;;             (if (regex:match? a "^([a-zA-Z]|!)")
-             ;;                 (if (and (not (hashtable-ref vars (string->symbol (string-append a "##" (number->string gnum)))))
-             ;;                          (regex:match? a "(:|!|{)"))
-             ;;                     (let ((newsymm (string->symbol (string-append a "##" (number->string gnum))))
-             ;;                           (all-syms (cl:remove-duplicates (map (lambda (aa)
-             ;;                                                                  (string->symbol (string-append aa "##" (number->string gnum))))
-             ;;                                                                (regex:match-all a "![^,}>\\]]*")))))
-             ;;                       ;; (println 'all all-syms 'new newsymm)
-             ;;                       (set! all-syms (remove (symbol->string newsymm) all-syms))
-             ;;                       ;; (println 'adding_p newsymm 'gnum gnum) ;newsym newsymm)
-             ;;                       ;; add newsym
-             ;;                       (set-cdr! vars (cons (list newsymm) (cdr vars)))
-             ;;                       ;; add all-syms
-             ;;                       (for-each (lambda (x)
-             ;;                                   (if (and (not (hashtable-ref vars x))
-             ;;                                            (regex:match? (symbol->string x) "^([a-zA-Z]|!)"))
-             ;;                                       (begin
-             ;;                                         ;; (println 'adding_sub x 'gnum gnum)
-             ;;                                         (set-cdr! vars (cons (list x) (cdr vars)))
-             ;;                                         ;;(set! vars (cons (list (string->symbol x)) vars))
-             ;;                                         )))
-             ;;                                 all-syms)))))
-             ;;           (impc:ir:get-pretty-closure-arg-strings (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
-
-          ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-             ;; it is possible for some generic types to be missed from 'vars'
-             ;; due to the fact that a different gpoly (overridden generic) choice
-             ;; was made when initially seeding 'vars'
-             ;; so ... at this point we check and inject missing
-             ;; generic bang types into vars
-             ;;
-             ;; this for things like Point:<!ga_130,!ga_130>
-             (for-each (lambda (a)
-                         ;; (println 'a a)
-                         (if (or (char-alphabetic? (string-ref a 0))
-                                (char=? (string-ref a 0) #\!))
-                             (if (and (not (impc:ti:vars-ref vars (string->symbol (string-append a "##" (number->string gnum)))))
-                                      (or (string-contains? a ":")
-                                          (string-contains? a "!")
-                                          (string-contains? a "{")))
-                                 (let ((newsymm (string->symbol (string-append a "##" (number->string gnum))))
-                                       (all-syms (cl:remove-duplicates (map (lambda (aa)
-                                                                              (string->symbol (string-append aa "##" (number->string gnum))))
-                                                                            (regex:match-all a "![^,}>\\]]*")))))
-                                   (set! all-syms (remove (symbol->string newsymm) all-syms))
-                                   ;; (println 'adding_p newsymm 'gnum gnum)
-                                   (set! vars (impc:ti:vars-add newsymm vars))))))
-                       (impc:ir:get-pretty-closure-arg-strings
-                        (cadr (string-split-on (symbol->string (cadr gpoly-code)) ":"))))
-             ;; this for the subs of above (i.e. !ga_130)
-             (for-each (lambda (a)
-                         (let ((vs (cl:remove-duplicates (regex:match-all a "(![a-zA-Z0-9]*_[0-9]*)"))))
-                           (for-each (lambda (x)
-                                       (set! x (string->symbol (string-append x "##" (atom->string gnum))))
-                                       (if (not (impc:ti:vars-ref vars x))
-                                           (begin
-                                             ;; (println 'no 'match 'for x 'in 'vars 'so 'adding 'it)
-                                             (set! vars (impc:ti:vars-add x vars)))))
-                                     vs)))
-                       (impc:ir:get-pretty-closure-arg-strings
-                        (cadr (string-split-on (symbol->string (cadr gpoly-code)) ":"))))
-             ;;;;;;;;;;;;;;;;
+             (impc:ti:nativef-generics-inject-missing-vars vars gpoly-code gnum)
 
 
              (if (<> (length (cdr gpoly-type))
@@ -1538,77 +1584,9 @@
                        ;; don't seem to need this anymore :(  ???
                        ;; (impc:ti:nativef-generics-final-tests ast gpoly-type gftype gnum vars kts)
 
-                       ;; (println 'pre ast 'grtype grtype 'gftype gftype 'constraint constraint)
                        (if (null? grtype) (set! grtype gftype))
-
-                       ;; apply any type constraints check!
-                       (if (and (not (null? grtype))
-                                constraint)
-                           (let* ((lgrtype (if (= (length grtype) (+ 2 arity)) ;; in case grtype is a list of multiple closure options rather than 1 specific closure type
-                                               grtype
-                                               (car (cl:remove-if-not (lambda (x)
-                                                                        (impc:ir:closure? x))
-                                                                      grtype))))
-                                  (chk (if (and (list? (cadr constraint-code))
-                                                (<> (length (cdr lgrtype))
-                                                    (length (cadr constraint-code))))
-                                          'false
-                                          (apply (eval constraint)
-                                                 (map (lambda (x)
-                                                        (if (string? x)
-                                                            (apply string-append
-                                                                   (car (string-split-on (impc:ir:pretty-print-type x) "{"))
-                                                                   (make-list (impc:ir:get-ptr-depth x) "*"))
-                                                            x))
-                                                      (cdr lgrtype)))
-                                          #t)))
-                             (if (boolean? chk)
-                                 (if chk
-                                     'great
-                                     (impc:compiler:print-constraint-error
-                                      (car (string-split-on (atom->string (car ast)) "##"))
-                                      (impc:ir:pretty-print-type grtype)
-                                      constraint
-                                      ast))
-                                 (if (impc:ir:type? chk)
-                                     (set! grtype chk)
-                                     (impc:compiler:print-compiler-error
-                                      (string-append "Poorly defined constraint check: "
-                                                     (sexpr->string constraint)
-                                                     " for generic call "
-                                                     (sexpr->string ast)
-                                                     " for type "
-                                                     (if (impc:ir:type? grtype)
-                                                         (impc:ir:pretty-print-type grtype)
-                                                         "<uknown>")))))))
-
-                       ;; (println 'post ast 'constraint 'grtype grtype 'gftype gftype)
-                       ;; if grtype is VALID
-                       ;; and if the return type of gftype is a symbol
-                       ;; THEN update the return type of gftype (symbol)
-                       ;; with the reified return type of grtype
-                       (if (and (impc:ir:type? grtype)
-                                (symbol? (cadr gftype))
-                                (impc:ti:vars-ref vars (cadr gftype)))
-                           (begin
-                             ;; (println 'update-e: (cadr gftype) 'with: (cadr grtype))
-                             (set! vars (impc:ti:vars-update (cadr gftype) vars kts (cadr grtype)))))
-
-                       ;; update arguments?!
-                       (map (lambda (x y)
-                              (if (symbol? x)
-                                  (begin ;; (println 'update-f: x 'with: (list y))
-                                         (set! vars (impc:ti:vars-update x vars kts (list y))))))
-                            (cdr ast)
-                            (cddr gftype))
-
-                       (if (impc:ir:type? grtype)
-                           (begin
-                             ;(println 'udpate-g: (car ast) 'with: (list grtype))
-                             (set! vars (impc:ti:vars-update (car ast) vars kts (list grtype))))
-                           (begin
-                             ;(println 'update-h: (car ast) 'with: (list gftype) 'r: request? 'gp: gpoly-type)
-                             (set! vars (impc:ti:vars-update (car ast) vars kts (list gftype)))))))))
+                       (set! grtype (impc:ti:nativef-generics-check-constraint ast grtype arity constraint constraint-code))
+                       (impc:ti:nativef-generics-emit-final ast vars kts grtype gftype)))))
              ;; (println 'done-continue ast)
              ;; (println 'gret: request? gpoly-type)
              (tc-result (if request?
@@ -3592,7 +3570,7 @@ xtlang's `let' syntax is the same as Scheme"
            (kts (map (lambda (x) (car x)) forced-types)) ;; just need symbols from forced-types
            ;; fvars gets modified 'in place' during this next
            ;; operation
-           (t1 (clock:clock))
+           (t1 (begin (if (null? cnt) (impc:ti:clear-constraints!)) (clock:clock)))
            (ret (impc:ti:type-check ast fvars kts #f))
            (t2 (clock:clock))
            (u1 (impc:ti:unify fvars))

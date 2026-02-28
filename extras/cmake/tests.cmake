@@ -59,6 +59,7 @@ extempore_add_test(tests/compiler/transforms.xtm compiler-unit)
 extempore_add_test(tests/compiler/typeunify.xtm compiler-unit)
 extempore_add_test(tests/compiler/typecheck.xtm compiler-unit)
 extempore_add_test(tests/compiler/pipeline.xtm compiler-unit)
+extempore_add_test(tests/compiler/constraints.xtm compiler-unit)
 
 # External library tests
 extempore_add_test(tests/external/fft.xtm libs-external)

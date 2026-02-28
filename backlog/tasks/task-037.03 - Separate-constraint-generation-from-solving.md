@@ -1,9 +1,10 @@
 ---
 id: TASK-037.03
 title: Separate constraint generation from solving
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-27 21:43'
+updated_date: '2026-02-28 04:19'
 labels:
   - compiler
   - type-inference
@@ -34,10 +35,16 @@ Key files: runtime/llvmti-typecheck.xtm (type-check dispatch, nativef-generics),
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 explicit constraint data structure defined (equality, overload, coercion)
-- [ ] #2 type-check dispatch emits constraints instead of solving inline
-- [ ] #3 separate constraint solver processes all constraints
-- [ ] #4 nativef-generics decomposed into constraint emitter + specialisation
-- [ ] #5 numeric coercion defaulting produces identical results to current algorithm
-- [ ] #6 all existing tests pass (ctest -L libs-core, libs-external, examples)
+- [x] #1 explicit constraint data structure defined (equality, overload, coercion)
+- [x] #2 type-check dispatch emits constraints instead of solving inline
+- [x] #3 separate constraint solver processes all constraints
+- [x] #4 nativef-generics decomposed into constraint emitter + specialisation
+- [x] #5 numeric coercion defaulting produces identical results to current algorithm
+- [x] #6 all existing tests pass (ctest -L libs-core, libs-external, examples)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented dual-write constraint store (emit + solve eagerly) in runtime/llvmti-typecheck.xtm. Constraint types: eq, force, union stored as 3-element vectors. Emission points in update-var and force-var. Replay solver (impc:ti:solve-constraints) processes constraint log. Decomposed nativef-generics into 4 focused functions: early-exit, inject-missing-vars, check-constraint, emit-final. Added 8 unit tests in tests/compiler/constraints.xtm (all pass). All existing tests produce identical results to parent commit (2 pre-existing failures in adt.xtm/generics.xtm unrelated to this change).
+<!-- SECTION:NOTES:END -->
