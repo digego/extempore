@@ -1159,15 +1159,11 @@
     (set! *error-hook* '())
     (set! *error-hook* throw))))
 
-(define *dsp:registered-base-name* #f)
-(define *dsp:registered-mt-base-names* '())
-
 ;; this for buffered version
 (define _dsp:set!
   (lambda (zerolatency? name . args)
     (println 'zerolatency: zerolatency?)
     (let* ((nn (if (symbol? name) (symbol->string name) name))
-           (base-name (car (regex:split nn "_adhoc_")))
            (ft (impc:ti:get-closure-arg-types nn))
            (ct (if ft
                    (map (lambda (x) (impc:ir:get-type-from-str x)) ft)
@@ -1178,16 +1174,14 @@
                               *impc:ir:si64*
                               (+ *impc:ir:si8* *impc:ir:pointer*)))
              (sys:set-dsp-wrapper-array (llvm:get-function-pointer "imp_dsp_wrapper_array"))
-             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
-             (set! *dsp:registered-base-name* base-name)) ;; whole buffer
+             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
             ((equal? ct (list *impc:ir:double*
                               *impc:ir:double*
                               *impc:ir:si64*
                               *impc:ir:si64*
                               (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
              (sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dsp_wrapper"))
-             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
-             (set! *dsp:registered-base-name* base-name)) ;; whole buffer
+             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
             ((equal? ct (list *impc:ir:double*
                               (+ *impc:ir:double* *impc:ir:pointer*)
                               *impc:ir:si64*
@@ -1198,19 +1192,14 @@
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
              (dotimes (i (length args))
                (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
-             (sys:init-mt-audio (length args) zerolatency?)
-             (set! *dsp:registered-base-name* base-name)
-             (set! *dsp:registered-mt-base-names*
-                   (map (lambda (a) (car (regex:split a "_adhoc_"))) args))
-             )
+             (sys:init-mt-audio (length args) zerolatency?))
             ((equal? ct (list *impc:ir:float*
                               *impc:ir:float*
                               *impc:ir:si64*
                               *impc:ir:si64*
                               (+ *impc:ir:float* *impc:ir:pointer*))) ;; sample by sample form FX
              (sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dspf_wrapper"))
-             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
-             (set! *dsp:registered-base-name* base-name)) ;; whole buffer
+             (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
             ((equal? ct (list *impc:ir:float*
                               (+ *impc:ir:float* *impc:ir:pointer*)
                               *impc:ir:si64*
@@ -1221,11 +1210,7 @@
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
              (dotimes (i (length args))
                (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
-             (sys:init-mt-audio (length args) zerolatency?)
-             (set! *dsp:registered-base-name* base-name)
-             (set! *dsp:registered-mt-base-names*
-                   (map (lambda (a) (car (regex:split a "_adhoc_"))) args))
-             )
+             (sys:init-mt-audio (length args) zerolatency?))
             ((equal? ct (list *impc:ir:void*
                               (+ *impc:ir:float* *impc:ir:pointer* *impc:ir:pointer*)
                               (+ *impc:ir:float* *impc:ir:pointer*)
@@ -1236,11 +1221,7 @@
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
              (dotimes (i (length args))
                (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
-             (sys:init-mt-audio-buf (length args) zerolatency?)
-             (set! *dsp:registered-base-name* base-name)
-             (set! *dsp:registered-mt-base-names*
-                   (map (lambda (a) (car (regex:split a "_adhoc_"))) args))
-             )
+             (sys:init-mt-audio-buf (length args) zerolatency?))
             (else (log-error 'Bad 'closure 'signature 'for 'dsp:set! ct))))))
 
 (define-macro (dsp:set! . names)
@@ -1252,24 +1233,6 @@
                       (cdr names)
                       names))))
     `(_dsp:set! ,zerolatency ,@lst)))
-
-(define impc:ti:update-dsp-closure-if-registered
-  (lambda (base-name adhoc-name)
-    (if (and (string? *dsp:registered-base-name*)
-             (string=? base-name *dsp:registered-base-name*))
-        (let ((ptr (llvm:get-function-pointer
-                    (string-append adhoc-name "_getter"))))
-          (if ptr (sys:set-dsp-closure ptr))))
-    (if (and (list? *dsp:registered-mt-base-names*)
-             (not (null? *dsp:registered-mt-base-names*)))
-        (let loop ((names *dsp:registered-mt-base-names*) (idx 0))
-          (if (not (null? names))
-              (begin
-                (if (string=? base-name (car names))
-                    (let ((ptr (llvm:get-function-pointer
-                                (string-append adhoc-name "_getter"))))
-                      (if ptr (sys:set-dspmt-closure ptr idx))))
-                (loop (cdr names) (+ idx 1))))))))
 
 ;; filename wrangling
 

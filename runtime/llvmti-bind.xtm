@@ -140,6 +140,7 @@
 
 
 (define *impc:ti:adhoc-cnt* 0)
+(define *impc:ti:adhoc-name-map* (make-hashtable 256))
 
 (define impc:ti:clear-pipeline-state
   (lambda ()
@@ -240,7 +241,13 @@
                  (t (impc:ir:pretty-print-type (cdr p)))
                  (base (impc:ir:get-base-type t))
                  (depth (impc:ir:get-ptr-depth t))
-                 (new (string-append adhoc-poly-name-string "_adhoc_" (number->string *impc:ti:adhoc-cnt*) "_" (cname-encode base)))
+                 (cname (cname-encode base))
+                 (map-key (string-append adhoc-poly-name-string "_" cname))
+                 (existing (hashtable-ref *impc:ti:adhoc-name-map* map-key))
+                 (new (or existing
+                          (let ((nm (string-append adhoc-poly-name-string "_adhoc_" (number->string *impc:ti:adhoc-cnt*) "_" cname)))
+                            (hashtable-set! *impc:ti:adhoc-name-map* map-key nm)
+                            nm)))
                  (tt (assoc-strcmp symname types))
                  (t6 (replace-all t5 (list (cons symname (string->symbol new))))))
             (set-car! tt (string->symbol new))
@@ -363,15 +370,19 @@
              (compile-stub? (or (not (impc:ti:closure-exists? symname-string))
                                 (null? (impc:ti:get-closure-type symname-string))))
              ;; Erase old definitions only when recompiling stubs.
-             (_ (if (and *impc:compile* (not static) compile-stub?)
-                    (begin
-                      (llvm:erase-function symname-string)
-                      (llvm:erase-function (string-append symname-string "_native"))
-                      (llvm:erase-function (string-append symname-string "_setter"))
-                      (llvm:erase-function (string-append symname-string "_maker"))
-                      (llvm:erase-function (string-append symname-string "_getter"))
-                      (llvm:remove-globalvar (string-append symname-string "_var"))
-                      (llvm:remove-globalvar (string-append symname-string "_var_zone")))
+             (_ (if (and *impc:compile* (not static))
+                    (if compile-stub?
+                        (begin
+                          (llvm:erase-function symname-string)
+                          (llvm:erase-function (string-append symname-string "_native"))
+                          (llvm:erase-function (string-append symname-string "_setter"))
+                          (llvm:erase-function (string-append symname-string "_maker"))
+                          (llvm:erase-function (string-append symname-string "_getter"))
+                          (llvm:remove-globalvar (string-append symname-string "_var"))
+                          (llvm:remove-globalvar (string-append symname-string "_var_zone")))
+                        (begin
+                          (llvm:erase-function (string-append symname-string "_setter"))
+                          (llvm:erase-function (string-append symname-string "_maker"))))
                     #f))
              (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
                                       "(i8* %_impz) nounwind {\nentry:\n"
@@ -668,12 +679,12 @@
         (if *impc:compiler:print*
             (println '------------------------------compiling 'maker----------------------------------->))
         (if *impc:compiler:print* (print-full-nq maker-ir))
-        (if (and *impc:compile* compile-stub?)
+        (if *impc:compile*
             (impc:compiler:queue-ir-for-compilation maker-ir))
         (if *impc:compiler:print*
             (println '--------------------------------compiling 'setter----------------------------------->))
         (if *impc:compiler:print* (print-full-nq setter-ir))
-        (if (and *impc:compile* compile-stub?)
+        (if *impc:compile*
             (impc:compiler:queue-ir-for-compilation setter-ir))
         (if *impc:compiler:print*
             (println '--------------------------------compiling 'getter----------------------------------->))
@@ -886,8 +897,7 @@
                                             '()
                                             (map (lambda (k) (list 'quote k)) types)))))
            (impc:ti:initialize-closure-with-new-zone newname *impc:default-zone-size*)
-           (impc:ti:create-scheme-wrapper newname)
-           (impc:ti:update-dsp-closure-if-registered ,base-symname-str newname))))))
+           (impc:ti:create-scheme-wrapper newname))))))
 
 (define-macro (bind-closure . args)
   ;; if aot and func already exists then bomb out
