@@ -132,6 +132,11 @@ message(STATUS "LLVM target architecture: ${LLVM_TARGET_ARCH}")
 
 include(FetchContent)
 
+# Use direct FetchContent population (CMake 3.30+) to avoid sub-build issues on macOS
+if(POLICY CMP0168)
+    cmake_policy(SET CMP0168 NEW)
+endif()
+
 set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
 set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
