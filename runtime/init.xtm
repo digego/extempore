@@ -1,4 +1,4 @@
-;; Extempore init.xtm — s7-compatible version
+;; Extempore init.xtm --- s7-compatible version
 ;;
 ;; s7 provides many R5RS builtins that TinyScheme required init.xtm to define:
 ;;   caar..cddddr, call/cc, even?, odd?, zero?, positive?, negative?, abs, gcd,
@@ -8,23 +8,35 @@
 ;;   string-fill!, quasiquote, string=?, string<?, char=?, char<?, etc.
 ;; Those definitions are omitted here.
 
-;; unless/when macros
-(define-macro (unless test . body)
-  `(if (not ,test) (begin ,@body)))
+;; Hash table compatibility aliases wrapping s7's native hash tables.
+;; Replaces the C FFI from hashtable.inc with zero-overhead Scheme wrappers.
+(define (make-hashtable . args)
+  (make-hash-table (if (null? args) 256 (car args))))
+(define hashtable-ref hash-table-ref)
+(define hashtable-set! hash-table-set!)
+(define (hashtable-remove! ht key)
+  (if (eq? (hash-table-ref ht key) #f) #f
+      (begin (hash-table-set! ht key #f) #t)))
+(define (hashtable-count ht)
+  (hash-table-entries ht))
+(define (hashtable-keys ht)
+  (map car ht))
+(define (hashtable->alist ht)
+  (map values ht))
+(define (hashtable-clear! ht)
+  (let ((keys (map car ht)))
+    (for-each (lambda (k) (hash-table-set! ht k #f)) keys))
+  ht)
+(define (hashtable-for-each f ht)
+  (for-each f ht))
 
-(define-macro (when test . body)
-  `(if ,test (begin ,@body)))
+;; String search wrappers around s7's built-in string-position.
+;; string-position returns the index or #f; argument order is (needle haystack).
+(define (string-contains? s find) (string-position find s))
+(define (string-index-of s find) (string-position find s))
 
 ;; Math utilities not in s7
-(define exact? integer?)
-(define (inexact? x) (and (real? x) (not (integer? x))))
-(define complex? number?)
-(define (exact->inexact n) (* n 1.0))
 (define (<> n1 n2) (not (= n1 n2)))
-(define (max . lst)
-  (foldr (lambda (a b) (if (> a b) a b)) (car lst) (cdr lst)))
-(define (min . lst)
-  (foldr (lambda (a b) (if (< a b) a b)) (car lst) (cdr lst)))
 (define (succ x) (+ x 1))
 (define (pred x) (- x 1))
 

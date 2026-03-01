@@ -212,6 +212,32 @@ scheme* scheme_init_new()
         "    (for-each display args)"
         "    (newline)))");
 
+    // gensym: s7's gensym returns {gensym}-N with curly braces, which are
+    // invalid in LLVM IR identifiers. Override with clean alphanumeric names.
+    s7_eval_c_string(sc->sc,
+        "(let ((counter 0))"
+        "  (set! gensym"
+        "    (lambda args"
+        "      (let ((prefix (if (pair? args) (car args) \"gensym\")))"
+        "        (set! counter (+ counter 1))"
+        "        (string->symbol (string-append prefix \"_\" (number->string counter)))))))");
+
+    // open-input-file: s7 throws an error when the file doesn't exist,
+    // but TinyScheme returned #f. Extempore code relies on the #f behavior.
+    s7_eval_c_string(sc->sc,
+        "(let ((s7-open-input-file open-input-file))"
+        "  (set! open-input-file"
+        "    (lambda (path . mode)"
+        "      (catch #t"
+        "        (lambda () (apply s7-open-input-file path mode))"
+        "        (lambda (type info) #f)))))");
+
+    // file-exists?: not built into s7, was defined in TinyScheme
+    s7_eval_c_string(sc->sc,
+        "(define (file-exists? path)"
+        "  (let ((port (open-input-file path)))"
+        "    (if port (begin (close-input-port port) #t) #f)))");
+
     return sc;
 }
 
@@ -497,7 +523,10 @@ pointer mk_symbol(scheme* sc, const char* name)
 
 pointer gensym(scheme* sc)
 {
-    return s7_gensym(sc->sc, "gensym");
+    static int counter = 0;
+    char buf[64];
+    snprintf(buf, sizeof(buf), "gensym_%d", counter++);
+    return s7_make_symbol(sc->sc, buf);
 }
 
 pointer mk_string(scheme* sc, const char* str)
@@ -708,6 +737,8 @@ char* syntaxname(pointer p)
 
 void* cptr_value(pointer p)
 {
+    if (s7_is_string(p))
+        return const_cast<char*>(s7_string(p));
     return s7_c_pointer(p);
 }
 
