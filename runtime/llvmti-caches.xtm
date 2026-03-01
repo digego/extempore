@@ -1,21 +1,3 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; STRING-KEYED HASH TABLE
-;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Built on C FFI primitives (src/ffi/hashtable.inc):
-;;   make-hashtable, hashtable-ref, hashtable-set!,
-;;   hashtable-remove!, hashtable-count, hashtable-keys,
-;;   hashtable->alist
-;;
-;; A hash table is a Scheme vector where each slot holds an alist.
-;; The vector is GC-traced so stored values are protected.
-;; Hashing and lookup happen in C for performance.
-
-;; hashtable-for-each: call f on each (key . value) pair
-(define hashtable-for-each
-  (lambda (f ht)
-    (for-each f (hashtable->alist ht))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GLOBAL XTLANG CACHE ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -349,24 +331,26 @@
 ;; docstrings are compulsory for xtlang macros
 (define-macro (bind-macro . forms)
   (let* ((string-in-first-pos? (string? (car forms)))
-         (docstring (if string-in-first-pos? (car forms) ""))
+         (string-in-second-pos? (and (not string-in-first-pos?)
+                                     (pair? (cdr forms))
+                                     (string? (cadr forms))))
+         (docstring (cond (string-in-first-pos? (car forms))
+                          (string-in-second-pos? (cadr forms))
+                          (else "")))
          (name-and-args (if string-in-first-pos? (cadr forms) (car forms)))
-         (body (if string-in-first-pos? (cddr forms) (cdr forms))))
-    ;; (if (> (length body) 1)
-    ;;     (set! body (cons 'begin body)))
-    ;; (println 'body: body)
+         (body (if (or string-in-first-pos? string-in-second-pos?) (cddr forms) (cdr forms)))
+         (body-expr (if (null? (cdr body)) (car body) (cons 'begin body))))
     `(begin
-       (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',@body)
+       (impc:aot:insert-xtmacro-binding-details ',name-and-args ,docstring ',body-expr)
        (impc:ti:register-new-xtmacro ,(symbol->string (car name-and-args)) ,docstring)
        (impc:compiler:print-binding-details-to-log
         "XtmMacro:"
         ',(car name-and-args)
-        ""
-        ;; now actually create the macro
-        (define-macro
-          ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
-                 (cdr name-and-args))
-          ,@body)))))
+        "")
+       (define-macro
+         ,(cons (string->symbol (string-append "xtmacro_" (symbol->string (car name-and-args))))
+                (cdr name-and-args))
+         ,@body))))
 
 (impc:ti:register-new-builtin
  "bind-macro"
@@ -1216,9 +1200,8 @@
     ,(symbol->string name)
     ',(impc:ir:pointer++ (impc:ir:get-type-from-pretty-str (impc:ir:get-base-type (symbol->string type))))))
 
-(define-macro clear-session
-  (lambda ()
-    (hashtable-clear! *impc:ti:polyfunc-cache*)))
+(define-macro (clear-session)
+  (hashtable-clear! *impc:ti:polyfunc-cache*))
 
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1541,8 +1524,7 @@
                                                               (if (string=? x "_")
                                                                   *impc:ir:notype*
                                                                   (impc:ir:get-type-from-pretty-str x))
-                                                              *impc:ir:notype*
-                                                              x))
+                                                              *impc:ir:notype*))
                                                         type))
                                             #t))
                                    (<> arity (cadr x))))
@@ -1603,7 +1585,7 @@
               ;;                      (println k))
               ;;                    weights))
               ;; (println 'best: w ': (length weights) '-> (assoc w weights))
-              (if (> (length (assoc-strcmp-all w weights)) 1)
+              (if (> (length (or (assoc-strcmp-all w weights) '())) 1)
                   (impc:compiler:print-compiler-error (string-append "ambiguous generic overload " (symbol->string name) " -> " (symbol->string type))))
               (cdddr (assoc w weights))))))))
 

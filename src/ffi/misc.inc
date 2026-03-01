@@ -47,22 +47,21 @@ static pointer stringToCptr(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, strdup(cstr));;
 }
 
-static char* cstrstrip(char* String)
-{
-    while (*String == ' ') {
-        ++String;
-    }
-    char* end = String + strlen(String) - 1;
-    while (end >= String && *end == ' ') {
-        --end;
-    }
-    *(end + 1) = '\0';
-    return String;
-}
-
 static pointer stringStrip(scheme* Scheme, pointer Args)
 {
-    return mk_string(Scheme, cstrstrip(string_value(pair_car(Args))));
+    pointer arg = pair_car(Args);
+    const char* str;
+    if (s7_is_output_port(Scheme->sc, arg)) {
+        str = s7_get_output_string(Scheme->sc, arg);
+    } else {
+        str = string_value(arg);
+    }
+    if (!str || !*str) return mk_string(Scheme, "");
+    while (*str == ' ') ++str;
+    const char* end = str + strlen(str) - 1;
+    while (end >= str && *end == ' ') --end;
+    size_t len = (end >= str) ? static_cast<size_t>(end - str + 1) : 0;
+    return mk_counted_string(Scheme, str, static_cast<int>(len));
 }
 
 static pointer stringHash(scheme* Scheme, pointer Args)
@@ -289,21 +288,6 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer string_contains(scheme* Scheme, pointer Args)
-{
-    char* data = string_value(pair_car(Args));
-    char* find = string_value(pair_cadr(Args));
-    return strstr(data, find) ? Scheme->T : Scheme->F;
-}
-
-static pointer string_index_of(scheme* Scheme, pointer Args)
-{
-    char* data = string_value(pair_car(Args));
-    char* find = string_value(pair_cadr(Args));
-    char* pos = strstr(data, find);
-    return pos ? mk_integer(Scheme, pos - data) : Scheme->F;
-}
-
 #define MISC_DEFS \
         { "cptr:get-i64", &dataGETi64 }, \
         { "cptr:get-double", &dataGETdouble }, \
@@ -335,6 +319,4 @@ static pointer string_index_of(scheme* Scheme, pointer Args)
         { "mk-ff", &scmAddForeignFunc }, \
         { "impc:ir:getname", &impcirGetName }, \
         { "impc:ir:gettype", &impcirGetType }, \
-        { "impc:ir:addtodict", &impcirAdd }, \
-        { "string-contains?", &string_contains }, \
-        { "string-index-of", &string_index_of }
+        { "impc:ir:addtodict", &impcirAdd }

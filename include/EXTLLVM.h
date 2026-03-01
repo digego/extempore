@@ -35,7 +35,7 @@
 
 #pragma once
 
-#include <Scheme.h>
+#include <SchemeS7.h>
 #include <EXTZones.h>
 #include <EXTMutex.h>
 #include <BranchPrediction.h>

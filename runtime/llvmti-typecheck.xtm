@@ -92,7 +92,8 @@
                                    (impc:ti:uf-value (cdr entry)))
                              result)))
         vars)
-      result)))
+      (sort! result (lambda (a b) (string<? (symbol->string (car a))
+                                             (symbol->string (car b))))))))
 
 ;; this is here for whenever we get
 ;; new 'argument' information about
@@ -134,7 +135,7 @@
                  (impc:ir:type? (car t))))
         (set! t (car t)))
     (set! t (impc:ti:type-clean t))
-    (set! t (impc:ti:type-normalize t vars))
+    (set! t (impc:ti:type-normalize t))
     (if (or (null? t)
             (equal? t #f)
             (impc:ti:occurs-in-type? sym t)
@@ -190,7 +191,7 @@
              (string? (car t)))
         (set! t (car t)))
     (set! t (impc:ti:type-clean t))
-    (set! t (impc:ti:type-normalize t vars))
+    (set! t (impc:ti:type-normalize t))
     (if (and (not (hashtable-ref vars sym))
              (not (impc:ti:closure-exists? (symbol->string sym)))
              (not (impc:ti:globalvar-exists? (symbol->string sym))))
@@ -1215,8 +1216,8 @@
           (if (string-contains? t ":")
               (apply string-append (car (string-split-on t ":")) (make-list ptrdepth "*"))
               (if (string-contains? t "{")
-                  (apply string-append (car (string-split-on t "{")) (make-list ptrdepth "*")))
-              t)))))
+                  (apply string-append (car (string-split-on t "{")) (make-list ptrdepth "*"))
+                  t))))))
 
 
 (define impc:ti:variable-substitution-pairs
@@ -1233,7 +1234,8 @@
                                       (if (and (impc:ir:type? a)
                                                (symbol? b)
                                                (char=? (string-ref (symbol->string b) 0) #\!))
-                                          (cons (symbol->string b) (impc:ir:pretty-print-type a))))
+                                          (cons (symbol->string b) (impc:ir:pretty-print-type a))
+                                          '()))
                                      (else '())))
                              t1 t2))))
           pairs))))
@@ -1523,7 +1525,7 @@
                      ;; have to be careful that it is a fully valid type though!
                      ;; otherwise we might introduce dependencies from inside
                      ;; a generic call that we should not have access to
-                     (if (vector? nvars)
+                     (if (hash-table? nvars)
                          (hashtable-for-each
                           (lambda (n)
                             (let* ((sym (car n))

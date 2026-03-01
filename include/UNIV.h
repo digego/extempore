@@ -79,8 +79,8 @@
 #define D_MILLION 1000000.0
 
 struct scheme;
-struct cell;
-typedef struct cell* pointer;
+struct s7_cell;
+typedef struct s7_cell* pointer;
 
 extern "C" {
 

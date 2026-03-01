@@ -47,11 +47,9 @@
     (if (output-port? *impc:aot:current-output-port*)
         (begin
           (write
-           (list
-            'bind-macro
-            name-and-args
-            docstring
-            body)
+           (if (string=? docstring "")
+               (list 'bind-macro name-and-args body)
+               (list 'bind-macro docstring name-and-args body))
            *impc:aot:current-output-port*)
           (newline *impc:aot:current-output-port*)))))
 
@@ -583,7 +581,7 @@
                         (sys:load lib-path)
                         (log-info "finished compiling" lib-path)
                         (log-info "JIT-compiling IR...")
-                        (sys:dump-string-to-file ll-path *impc:compiler:queued-llvm-ir-string*)
+                        (sys:dump-string-to-file ll-path (emit-buffer->string *impc:compiler:queued-llvm-ir-string*))
                         (close-port *impc:aot:current-output-port*)
                         (set! *impc:compiler:global-module-name* #f)
                         (set! *impc:aot:current-lib-name* "xtmdylib")

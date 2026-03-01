@@ -44,10 +44,10 @@
 (define xtmtest-reset-results
   (lambda ()
     (set! *xtmtest-results*
-          '((correct)
-            (incorrect)
-            (compile)
-            (no-compile)))))
+          (list (list 'correct)
+                (list 'incorrect)
+                (list 'compile)
+                (list 'no-compile)))))
 
 (define *xtmtest-results* '())
 
@@ -86,7 +86,10 @@
             (eval ',form (interaction-environment))
             (catch (xtmtest-update-test-result func-sym 'compile ',call #f #f)
                    (let ((result (eval ',call (interaction-environment))))
-                     (if (or (not exp-res) (equal? exp-res result))
+                     (if (or (not exp-res)
+                             (if (and (number? exp-res) (number? result))
+                                 (= exp-res result)
+                                 (equal? exp-res result)))
                          (xtmtest-update-test-result func-sym 'correct ',call exp-res result)
                          (xtmtest-update-test-result func-sym 'incorrect ',call exp-res result)))))))
 

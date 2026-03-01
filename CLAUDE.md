@@ -68,14 +68,14 @@ NOTE: this project uses GitHub Actions (in particular the
 
 ## Languages
 
-- **C++17**: runtime in `src/` (Scheme.cpp, EXTLLVM.cpp, AudioDevice.cpp)
+- **C++17**: runtime in `src/` (SchemeS7.cpp, EXTLLVM.cpp, AudioDevice.cpp)
 - **Scheme**: user-facing interpreted language
 - **xtlang**: compiled DSL, files use `.xtm` extension, compiles to LLVM IR
 
 ## Key files
 
 - `src/Extempore.cpp` --- main entry point
-- `src/Scheme.cpp` --- Scheme interpreter
+- `src/SchemeS7.cpp` --- s7 Scheme interpreter adapter
 - `src/EXTLLVM.cpp` --- LLVM JIT compilation
 - `runtime/scheme.xtm` --- Scheme runtime bootstrap
 - `libs/core/test.xtm` --- test harness (`xtmtest-run-tests`, `is?` macro)

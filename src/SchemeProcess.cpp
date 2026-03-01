@@ -608,12 +608,14 @@ SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env): m_scheme(Sche
         fflush(stdout);
         abort();
     }
+    m_gcLoc = s7_gc_protect(m_scheme->sc, Env);
     m_scheme->imp_env.insert(Env);
 }
 
 SchemeObj::~SchemeObj()
 {
-    if (likely(m_env)) { // impossible to be null?
+    if (likely(m_env)) {
+        s7_gc_unprotect_at(m_scheme->sc, m_gcLoc);
         m_scheme->m_process->createSchemeTask(m_env, "destroy SchemeObj", SchemeTask::Type::DESTROY_ENV);
     }
 }

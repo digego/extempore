@@ -37,13 +37,13 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <regex>
 #include <string>
 #include <sstream>
 #include <iosfwd>
 #include <iomanip>
-#include "pcre.h"
 #include "SchemeFFI.h"
-#include "SchemePrivate.h"
+#include "SchemeS7Private.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -274,242 +274,72 @@ EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_
 
 EXPORT bool rmatch(char* regex, const char* str)
 {
-  //  char* data = char* strstring_value(pair_car(args));
-  // char* pattern = string_value(pair_cadr(args));
-  const char* data = str;
-  char* pattern = regex;
-
-  pcre *re;
-  const char *error;
-  int erroffset;
-
-  re = pcre_compile(    pattern, /* the pattern */
-                        0, /* default options */
-                        &error, /* for error message */
-                        &erroffset, /* for error offset */
-                        nullptr); /* use default character tables */
-
-  int rc;
-  int ovector[30];
-  rc = pcre_exec(       re, /* result of pcre_compile() */
-                        nullptr, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        30); /* number of elements (NOT size in bytes) */
-
-  return (rc>=0) ? true : false;
+    try {
+        std::regex re(regex);
+        return std::regex_search(str, re);
+    } catch (const std::regex_error&) {
+        return false;
+    }
 }
 
-
-// bool rmatches(char* regex, char* str, struct regex_matched_buffer* result)
-//     {
-//   char* data = str;
-//   char* pattern = regex;
-//      pcre *re;
-//      const char *error;
-//      int erroffset;
-//      re = pcre_compile(      pattern, /* the pattern */
-//                              0, /* default options */
-//                              &error, /* for error message */
-//                              &erroffset, /* for error offset */
-//                              nullptr); /* use default character tables */
-
-//      int rc;
-//      int ovector[60];
-//      rc = pcre_exec( re, /* result of pcre_compile() */
-//                      nullptr, /* we didn’t study the pattern */
-//                      data, /* the subject string */
-//                      strlen(data), /* the length of the subject string */
-//                      0, /* start at offset 0 in the subject */
-//                      0, /* default options */
-//                      ovector, /* vector of integers for substring information */
-//                      60); /* number of elements (NOT size in bytes) */
-
-//      // if failed to match return empty list
-//      if(rc<0 || rc>100) return false;
-
-//   result->matches = rc;
-//      for(int i=0, p=0, k=(rc-1);i<rc;i++,k--)
-//      {
-//          //std::cout << "RC: " << rc << " " << ovector[p] << "::" << ovector[p+1] << std::endl;
-//     p=i*2;
-
-//        if(ovector[p]==-1) {
-//       strcpy(result->data[k],"");
-//        }else{
-//       int range = ovector[p+1] - ovector[p];
-//       char* b = (char*) alloca(range+1);
-//       memset(b,0,range+1);
-//       char* a = data+ovector[p];
-//       char* substring = strncpy(b, a, range);
-//       strcpy(result->data[k],substring);
-//        }
-//      }
-//   return true;
-// }
-
-
 EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
-    {
-  char* data = str;
-  char* pattern = regex;
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                nullptr); /* use default character tables */
-
-        // pointer to hold return results
-        int rc;
-        int ovector[60];
-  int64_t num=0;
-
-        while(true) {
-            rc = pcre_exec(     re, /* result of pcre_compile() */
-                                nullptr, /* we didn’t study the pattern */
-                                data, /* the subject string */
-                                strlen(data), /* the length of the subject string */
-                                0, /* start at offset 0 in the subject */
-                                0, /* default options */
-                                ovector, /* vector of integers for substring information */
-                                60); /* number of elements (NOT size in bytes) */
-
-            //std::cout << data << " RC: " << rc << " " << ovector[0] << "::" << ovector[1] << "  num " << num << " max " << maxnum << std::endl;
-            if(rc<1 || num>=maxnum) {
-        return num;
-            }
-            int range = ovector[1] - ovector[0];
-            char* b = (char*) alloca(range+1);
-            b[range] = '\0';
-            char* a = data+ovector[0];
-            char* substring = strncpy(b, a, range);
-      // std::cout << "substr:" << substring << std::endl;
-      char* tmp = (char*) malloc(range+1);
-      tmp[range] = '\0';
-      strncpy(tmp,substring,range);
-      // std::cout << "adding:" << tmp << " at:" << num << std::endl;
-      results[num]=tmp;
-      // std::cout << "done!" << std::endl;
-      num++;
-            //_sc->imp_env->insert(list);
-            data = data+range+ovector[0];
+{
+    try {
+        std::string s(str);
+        std::regex re(regex);
+        int64_t num = 0;
+        auto begin = std::sregex_iterator(s.begin(), s.end(), re);
+        auto end = std::sregex_iterator();
+        for (auto it = begin; it != end && num < maxnum; ++it) {
+            std::string match = (*it)[0].str();
+            char* tmp = (char*)malloc(match.length() + 1);
+            strcpy(tmp, match.c_str());
+            results[num] = tmp;
+            num++;
         }
-  return 0;
+        return num;
+    } catch (const std::regex_error&) {
+        return 0;
+    }
 }
 
 EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
-{ // TODO: harmonize with FFI
-  int length = strlen(str);
-  pcre *re;
-  const char *error;
-  int erroffset;
-  //printf("dat: str\n");
-  // should probably move this regex compile to global
-  re = pcre_compile(    regex, /* the regex */
-                        0, /* default options */
-                        &error, /* for error message */
-                        &erroffset, /* for error offset */
-                        nullptr); /* use default character tables */
-  int rc;
-  int ovector[60];
-  rc = pcre_exec(       re, /* result of pcre_compile() */
-                        nullptr, /* we didn’t study the regex */
-                        str, /* the subject string */
-                        strlen(str), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        60); /* number of elements (NOT size in bytes) */
-
-  if(rc<1 || rc>1) return false; // then we failed
-  int range = ovector[0];
-  int range2 = ovector[1];
-  //printf("reg ranges %d:%d\n",range,range2);
-  a[range] = '\0';;
-  memcpy(a, str, range);
-  b[length - range2] = '\0';
-  memcpy(b, str + range2, length - range2);
-  return true;
+{
+    try {
+        std::string s(str);
+        std::regex re(regex);
+        std::cmatch m;
+        if (!std::regex_search(str, m, re) || m.size() != 1) return false;
+        int range = static_cast<int>(m.position(0));
+        int range2 = range + static_cast<int>(m.length(0));
+        int length = static_cast<int>(strlen(str));
+        memcpy(a, str, range);
+        a[range] = '\0';
+        memcpy(b, str + range2, length - range2);
+        b[length - range2] = '\0';
+        return true;
+    } catch (const std::regex_error&) {
+        return false;
+    }
 }
 
-
-// returns char* result
-EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
-
-  char* data = str; //string_value(pair_car(args));
-        char* pattern = regex; //string_value(pair_cadr(args));
-  char* replace = replacement;
-        //strcpy(result,replacement);
-
-        pcre *re;
-        const char *error;
-        int erroffset;
-        re = pcre_compile(      pattern, /* the pattern */
-                                0, /* default options */
-                                &error, /* for error message */
-                                &erroffset, /* for error offset */
-                                nullptr); /* use default character tables */
-
-        int rc;
-        int ovector[60];
-
-        rc = pcre_exec( re, /* result of pcre_compile() */
-                        nullptr, /* we didn’t study the pattern */
-                        data, /* the subject string */
-                        strlen(data), /* the length of the subject string */
-                        0, /* start at offset 0 in the subject */
-                        0, /* default options */
-                        ovector, /* vector of integers for substring information */
-                        60); /* number of elements (NOT size in bytes) */
-
-        // no match found return original string
-        if(rc<1) {strcpy(result,str); return result;} // Return mk_string(_sc,data);
-        // ok we have a match
-        // first replace any groups in replace string (i.e. $1 $2 ...)
-        char* res = (char*) "";
-        char* sep = (char*) "$";
-        char* tmp = 0;
-  int datalength = strlen(data);
-        int pos,range,size,cnt = 0;
-  strcpy(result,replace);
-        char* p = strtok(result,sep);
-  if(p==nullptr) { strcpy(result, str); return result; };
-        do{
-            char* cc;
-            pos = strtol(p,&cc,10);
-      // std::cout << "p: " << p << " pos: " << pos << " cc:" << cc << std::endl;
-            range = (pos>0 && pos<20) ? ovector[(pos*2)+1] - ovector[pos*2] : 0;
-      // std::cout << "cnt: " << cnt << " rc:" << rc << " range: " << range << std::endl;
-      if(pos>=rc || range < 0 || range > datalength) {
-        range = 0;
-        cc = p;
-      }
-            size = strlen(res);
-            tmp = (char*) alloca(size+range+strlen(cc)+1);
-            tmp[size+range+strlen(cc)] = '\0';
-            memcpy(tmp,res,size);
-            memcpy(tmp+size,data+ovector[pos*2],range);
-            memcpy(tmp+size+range,cc,strlen(cc));
-            res = tmp;
-            p = strtok(nullptr, sep);
-      cnt++;
-        }while(p);
-        // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
-        int lgth = ovector[0] + strlen(res) + strlen(data) - ovector[1] + 1;
-        range = ovector[1] - ovector[0];
-        //char* result = (char*) alloca(lgth);
-        if(lgth>4096) return str;
-        result[lgth - 1] = '\0'; // TODO: lots of this can be simplified
-        memcpy(result,data,ovector[0]);
-        memcpy(result+ovector[0],res,strlen(res));
-        memcpy(result+ovector[0]+strlen(res),data+ovector[1],strlen(data)-ovector[1]);
+EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result)
+{
+    try {
+        std::string s(str);
+        std::regex re(regex);
+        std::string res = std::regex_replace(s, re, std::string(replacement),
+                                              std::regex_constants::format_first_only);
+        if (res.length() >= 4096) {
+            strcpy(result, str);
+            return result;
+        }
+        strcpy(result, res.c_str());
         return result;
+    } catch (const std::regex_error&) {
+        strcpy(result, str);
+        return result;
+    }
 }
 
 EXPORT const char* sys_sharedir(){
@@ -610,156 +440,100 @@ struct dump_stack_frame {
 
 void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full, bool stringquotes)
 {
-    if(val == 0) {
+    if (val == 0) {
         ss << "-ERROR BAD POINTER-";
         return;
     }
-    if (pointer_type(val) > T_LAST_SYSTEM_TYPE) {
-        printf("Bad cell type - not printing\n");
-        return;
-    }
 
-    if(is_string(val)) {
-        if(stringquotes) {
+    // Use s7's object->string for a general fallback, but handle common types
+    // explicitly for formatting compatibility with the previous TinyScheme output.
+
+    if (val == _sc->NIL) {
+        ss << (full ? "()" : "NIL");
+    } else if (val == _sc->T) {
+        ss << "#t";
+    } else if (val == _sc->F) {
+        ss << "#f";
+    } else if (val == _sc->EOF_OBJ) {
+        ss << "#<EOF>";
+    } else if (is_string(val)) {
+        if (stringquotes) {
             ss << "\"" << string_value(val) << "\"";
-        }else{
+        } else {
             ss << string_value(val);
         }
-    }else if(is_symbol(val)){
+    } else if (is_symbol(val)) {
         ss << symname(val);
-    }else if(is_character(val)){
+    } else if (is_character(val)) {
         ss << charvalue(val);
-    }else if(is_environment(val)){
-        ss << "#<ENVIRONMENT " << val << " ";
-        if(full) {
-            if(is_vector(val->_object._cons._car)) {
-                ss << "<VECTOR-FRAME>";
-            }else{
-                printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-            }
-            ss << " ";
-            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
+    } else if (is_integer(val)) {
+        ss << ivalue(val);
+    } else if (is_rational(val)) {
+        ss << s7_numerator(val) << "/" << s7_denominator(val);
+    } else if (is_number(val)) {
+        if (full) {
+            ss << std::fixed << std::showpoint << std::setprecision(23) << rvalue(val);
+        } else {
+            ss << std::fixed << std::showpoint << rvalue(val);
         }
-        ss << ">";
-    }else if(is_proc(val)){
-        ss << "#<PROC " << procname(val) << ">";
-    }else if(is_foreign(val)){
-        ss << "#<FOREIGN>";
-    }else if(is_macro(val)){
-        ss << "#<MACRO>";
-    }else if(is_closure(val)){
-        ss << "#<<CLOSURE " << val << ">";
-        if(full) {
-            ss << "<CODE ";
-            printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-            ss << "> ";
-            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
-            ss << ">>";
-        }
-    }else if(is_continuation(val)){
-        ss << "#<<CONTINUATION " << val << ">";
-        if(full) {
-            unsigned int* stack = (unsigned int*) cptr_value(pair_cdr(val));
-            int nframes = stack[0];
-            dump_stack_frame* frames = (dump_stack_frame*)&stack[1];
-            for(int j=0;j<nframes;j++)
-            {
-                ss << std::endl << std::endl << "FRAME(" << j << ")--------------------------";
-                ss << std::endl << "OPCODE: " << frames[j].op; // << std::endl << "----------" << std::endl;
-
-                // print args
-                ss << std::endl << "ARGS: ";
-                pointer args = frames[j].args;
-                extemp::UNIV::printSchemeCell(_sc, ss, args, true, stringquotes);
-
-                // copy code
-                ss << std::endl << "CODE: ";
-                pointer code = frames[j].code;
-                //          ss.str("");
-                extemp::UNIV::printSchemeCell(_sc, ss, code, true, stringquotes);
-                //          std::cout << "CODE" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-
-                ss << std::endl << "ENVIR: ";
-                pointer envir = frames[j].envir;
-                //          ss.str("");
-                extemp::UNIV::printSchemeCell(_sc, ss, envir, true, stringquotes);
-                //          std::cout << "ENVIR" << std::endl << ss.str() << std::endl << "-----------" << std::endl;
-            }
-        }
-        ss << std::endl << ">>";
-    }else if(is_cptr(val)){
+    } else if (is_cptr(val)) {
         void* p = cptr_value(val);
         ss << "#<CPTR: " << p << ">";
-    }else if(is_vector(val)){
-        //ss << "#<VECTOR>";
-        if(true) {
-            ss << "#(";
-            int i;
-            long long num=val->_size;//  /2+ivalue_unchecked(val)%2;
-            if(num > 1000 && !full) { // exit if larger than 1000 elements
-                ss << " -- " << num << " elements -- )";
-                return;
-            }
-            //std::cout << "  NUM: " << num << std::endl;
-            for(i=0; i<num; i++) {
-                /* Vector cells will be treated like ordinary cells */
-                printSchemeCell(_sc, ss, vector_elem(val,i), full, stringquotes);
-                if(i+1 < num) ss << " ";
-            }
-            ss << ")";
-        }
-    }else if(is_port(val)){
-        ss << "#<PORT" << val << ">";
-    }else if(is_pair(val)){
-        int lgth = list_length(_sc, val);
-        if(lgth<0) // is pair
-        {
-            ss << "(";
-            printSchemeCell(_sc, ss, val->_object._cons._car, full, stringquotes);
-            ss << " . ";
-            printSchemeCell(_sc, ss, val->_object._cons._cdr, full, stringquotes);
-            ss << ")";
-        }else if(lgth>1000 && !full) {
-            ss << "( -- " << lgth << " elements -- )";
+    } else if (is_vector(val)) {
+        ss << "#(";
+        long long num = vector_length(val);
+        if (num > 1000 && !full) {
+            ss << " -- " << num << " elements -- )";
             return;
-        }else{ // is list
+        }
+        for (long long i = 0; i < num; i++) {
+            printSchemeCell(_sc, ss, vector_elem(val, i), full, stringquotes);
+            if (i + 1 < num) ss << " ";
+        }
+        ss << ")";
+    } else if (is_pair(val)) {
+        int lgth = list_length(_sc, val);
+        if (lgth < 0) {
             ss << "(";
-            for(int i=0;i<lgth;i++)
-            {
+            printSchemeCell(_sc, ss, pair_car(val), full, stringquotes);
+            ss << " . ";
+            printSchemeCell(_sc, ss, pair_cdr(val), full, stringquotes);
+            ss << ")";
+        } else if (lgth > 1000 && !full) {
+            ss << "( -- " << lgth << " elements -- )";
+        } else {
+            ss << "(";
+            for (int i = 0; i < lgth; i++) {
                 printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
-                if(i<(lgth-1)) ss << " ";
+                if (i < lgth - 1) ss << " ";
             }
             ss << ")";
         }
-    }else if(is_foreign(val)){
-        ss << "#<FOREIGN FUNC>";
-    }else if(val == _sc->NIL){
-        if(full) {
-            ss << "()";
-        }else{
-            ss << "NIL";
+    } else if (is_environment(val)) {
+        ss << "#<ENVIRONMENT " << val << ">";
+    } else if (is_closure(val)) {
+        ss << "#<CLOSURE " << val << ">";
+        if (full) {
+            char* repr = s7_object_to_c_string(_sc->sc, val);
+            if (repr) {
+                ss << " " << repr;
+                free(repr);
+            }
         }
-    }else if(_sc->T == val){
-        ss << "#t";
-    }else if(_sc->F == val){
-        ss << "#f";
-    }else if(is_integer(val)){
-        ss << ivalue(val);
-    }else if(is_rational(val)){
-        ss << val->_object._number.value.ratvalue.n << "/" << val->_object._number.value.ratvalue.d;
-    }else if(is_real(val)){
-        if(full){
-            ss << std::fixed << std::showpoint << std::setprecision(23) << rvalue(val);
-        }else{
-            ss << std::fixed << std::showpoint << /* << std::setprecision(15) <<*/ rvalue(val);
+    } else if (is_proc(val) || is_foreign(val)) {
+        char* repr = s7_object_to_c_string(_sc->sc, val);
+        ss << (repr ? repr : "#<PROCEDURE>");
+        free(repr);
+    } else {
+        // Fallback: use s7's object->string
+        char* repr = s7_object_to_c_string(_sc->sc, val);
+        if (repr) {
+            ss << repr;
+            free(repr);
+        } else {
+            ss << "#<UNKNOWN " << val << ">";
         }
-    }else if(_sc->EOF_OBJ == val){
-      ss << "#<EOF>";
-    }else{
-        ss << "UNKOWN VALUE: " << val << " (GC'd?) ";
     }
-
-    return;
 }
 
 }

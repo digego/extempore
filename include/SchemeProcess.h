@@ -36,8 +36,8 @@
 #ifndef SCHEME_PROCESS_H
 #define SCHEME_PROCESS_H
 
-#include "Scheme.h"
-#include "SchemePrivate.h"
+#include "SchemeS7.h"
+#include "SchemeS7Private.h"
 #include <string>
 #include "Task.h"
 #include <queue>
@@ -52,24 +52,6 @@ typedef int SOCKET;
 #endif
 
 struct llvm_zone_t;
-
-#define pair_caar(p) pair_car(pair_car(p))
-#define pair_cadr(p) pair_car(pair_cdr(p))
-#define pair_cdar(p) pair_cdr(pair_car(p))
-#define pair_cddr(p) pair_cdr(pair_cdr(p))
-#define pair_cadar(p) pair_car(pair_cdr(pair_car(p)))
-#define pair_caadr(p) pair_car(pair_car(pair_cdr(p)))
-#define pair_cdaar(p) pair_cdr(pair_car(pair_car(p)))
-#define pair_caddr(p) pair_car(pair_cdr(pair_cdr(p)))
-#define pair_cddar(p) pair_cdr(pair_cdr(pair_car(p)))
-#define pair_cdddr(p) pair_cdr(pair_cdr(pair_cdr(p)))
-#define pair_cadddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(p))))
-#define pair_cddddr(p) pair_cdr(pair_cdr(pair_cdr(pair_cdr(p))))
-#define pair_caddddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p)))))
-#define pair_cdddddr(p) pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p)))))
-#define pair_cadddddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p))))))
-#define pair_cddddddr(p) pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p))))))
-#define pair_caddddddr(p) pair_car(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(pair_cdr(p)))))))
 
 namespace extemp {
 
@@ -133,7 +115,13 @@ private:
     void* serverImpl();
     void* taskImpl();
     void resetOutportString() {
-        m_scheme->outport->_object._port->rep.string.curr = m_schemeOutportString;
+        // With s7, error output goes to the error port string.
+        // Get the output, copy to m_schemeOutportString, then reset.
+        const char* output = s7_get_output_string(m_scheme->sc, m_scheme->output_port);
+        if (output) {
+            strncpy(m_schemeOutportString, output, SCHEME_OUTPORT_STRING_LENGTH - 1);
+            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH - 1] = '\0';
+        }
         memset(m_schemeOutportString, 0, sizeof(m_schemeOutportString));
     }
     bool loadFile(const std::string& File, const std::string& Path = std::string());
@@ -194,6 +182,7 @@ private:
     scheme* m_scheme;
     pointer m_values;
     pointer m_env;
+    s7_int m_gcLoc;
 public:
     SchemeObj(scheme* Sheme, pointer Values, pointer Env);
     ~SchemeObj();
@@ -201,6 +190,7 @@ public:
     pointer getEnvironment() const { return m_env; }
     pointer getValue() const { return m_values; }
     scheme* getScheme() const { return m_scheme; }
+    s7_int getGcLoc() const { return m_gcLoc; }
 };
 
 

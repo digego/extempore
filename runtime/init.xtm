@@ -1,170 +1,58 @@
-;; Per R5RS, up to four deep compositions should be defined
-(define (caar x) (car (car x)))
-(define (cadr x) (car (cdr x)))
-(define (cdar x) (cdr (car x)))
-(define (cddr x) (cdr (cdr x)))
-(define (caaar x) (car (car (car x))))
-(define (caadr x) (car (car (cdr x))))
-(define (cadar x) (car (cdr (car x))))
-(define (caddr x) (car (cdr (cdr x))))
-(define (cdaar x) (cdr (car (car x))))
-(define (cdadr x) (cdr (car (cdr x))))
-(define (cddar x) (cdr (cdr (car x))))
-(define (cdddr x) (cdr (cdr (cdr x))))
-(define (caaaar x) (car (car (car (car x)))))
-(define (caaadr x) (car (car (car (cdr x)))))
-(define (caadar x) (car (car (cdr (car x)))))
-(define (caaddr x) (car (car (cdr (cdr x)))))
-(define (cadaar x) (car (cdr (car (car x)))))
-(define (cadadr x) (car (cdr (car (cdr x)))))
-(define (caddar x) (car (cdr (cdr (car x)))))
-(define (cadddr x) (car (cdr (cdr (cdr x)))))
-(define (cdaaar x) (cdr (car (car (car x)))))
-(define (cdaadr x) (cdr (car (car (cdr x)))))
-(define (cdadar x) (cdr (car (cdr (car x)))))
-(define (cdaddr x) (cdr (car (cdr (cdr x)))))
-(define (cddaar x) (cdr (cdr (car (car x)))))
-(define (cddadr x) (cdr (cdr (car (cdr x)))))
-(define (cdddar x) (cdr (cdr (cdr (car x)))))
-(define (cddddr x) (cdr (cdr (cdr (cdr x)))))
+;; Extempore init.xtm --- s7-compatible version
+;;
+;; s7 provides many R5RS builtins that TinyScheme required init.xtm to define:
+;;   caar..cddddr, call/cc, even?, odd?, zero?, positive?, negative?, abs, gcd,
+;;   lcm, string->list, list->string, string->number, number->string, list,
+;;   map, for-each, member, memq, memv, assoc, assq, assv, list-tail, list-ref,
+;;   vector->list, list->vector, vector-fill!, equal?, do, string-copy,
+;;   string-fill!, quasiquote, string=?, string<?, char=?, char<?, etc.
+;; Those definitions are omitted here.
 
-(macro (unless form)
-       `(if (not ,(cadr form)) (begin ,@(cddr form))))
+;; Hash table compatibility aliases wrapping s7's native hash tables.
+;; Replaces the C FFI from hashtable.inc with zero-overhead Scheme wrappers.
+(define (make-hashtable . args)
+  (make-hash-table (if (null? args) 256 (car args))))
+(define hashtable-ref hash-table-ref)
+(define hashtable-set! hash-table-set!)
+(define (hashtable-remove! ht key)
+  (if (eq? (hash-table-ref ht key) #f) #f
+      (begin (hash-table-set! ht key #f) #t)))
+(define (hashtable-count ht)
+  (hash-table-entries ht))
+(define (hashtable-keys ht)
+  (map car ht))
+(define (hashtable->alist ht)
+  (map values ht))
+(define (hashtable-clear! ht)
+  (let ((keys (map car ht)))
+    (for-each (lambda (k) (hash-table-set! ht k #f)) keys))
+  ht)
+(define (hashtable-for-each f ht)
+  (for-each f ht))
 
-(macro (when form)
-       `(if ,(cadr form) (begin ,@(cddr form))))
+;; String search wrappers around s7's built-in string-position.
+;; string-position returns the index or #f; argument order is (needle haystack).
+(define (string-contains? s find) (string-position find s))
+(define (string-index-of s find) (string-position find s))
 
-                                        ; DEFINE-MACRO Contributed by Andy Gaynor
-(macro (define-macro dform)
-       (if (symbol? (cadr dform))
-           `(macro ,@(cdr dform))
-           (let ((form (gensym)))
-             `(macro (,(caadr dform) ,form)
-                     (apply (lambda ,(cdadr dform) ,@(cddr dform)) (cdr ,form))))))
-
-                                        ; Utilities for math. Notice that inexact->exact is primitive,
-                                        ; but exact->inexact is not.
-(define exact? integer?)
-(define (inexact? x) (and (real? x) (not (integer? x))))
-(define (even? n) (= (remainder n 2) 0))
-(define (odd? n) (not (= (remainder n 2) 0)))
-(define (zero? n) (= n 0))
-(define (positive? n) (> n 0))
-(define (negative? n) (< n 0))
-(define complex? number?)
-(define (abs n) (if (>= n 0) n (- n)))
-(define (exact->inexact n) (* n 1.0))
+;; Math utilities not in s7
 (define (<> n1 n2) (not (= n1 n2)))
-(define (max . lst)
-  (foldr (lambda (a b) (if (> a b) a b)) (car lst) (cdr lst)))
-(define (min . lst)
-  (foldr (lambda (a b) (if (< a b) a b)) (car lst) (cdr lst)))
 (define (succ x) (+ x 1))
 (define (pred x) (- x 1))
-(define (gcd a b)
-  (let ((aa (abs a))
-        (bb (abs b)))
-    (if (= bb 0)
-        aa
-        (gcd bb (remainder aa bb)))))
-(define (lcm a b)
-  (if (or (= a 0) (= b 0))
-      0
-      (abs (* (quotient a (gcd a b)) b))))
 
-(define call/cc call-with-current-continuation)
-
-(define (string . charlist)
-  (list->string charlist))
-
-(define (list->string charlist)
-  (let* ((len (length charlist))
-         (newstr (make-string len))
-         (fill-string!
-          (lambda (str i len charlist)
-            (if (= i len)
-                str
-                (begin (string-set! str i (car charlist))
-                       (fill-string! str (+ i 1) len (cdr charlist)))))))
-    (fill-string! newstr 0 len charlist)))
-
-(define (string-fill! s e)
-  (let ((n (string-length s)))
-    (let loop ((i 0))
-      (if (= i n)
-          s
-          (begin (string-set! s i e) (loop (succ i)))))))
-
-(define (string->list s)
-  (let loop ((n (pred (string-length s))) (l '()))
-    (if (= n -1)
-        l
-        (loop (pred n) (cons (string-ref s n) l)))))
-
-(define (string-copy str)
-  (string-append str))
-
+;; String/atom conversion (TinyScheme-specific, shimmed in SchemeS7.cpp)
 (define (string->anyatom str pred)
   (let* ((a (string->atom str)))
     (if (pred a) a
         (error "string->xxx: not a xxx" a))))
-
-(define (string->number str) (string->anyatom str number?))
 
 (define (anyatom->string n pred)
   (if (pred n)
       (atom->string n)
       (error "xxx->string: not a xxx" n)))
 
-
-(define (number->string n) (anyatom->string n number?))
-
-(define (char-cmp? cmp a b)
-  (cmp (char->integer a) (char->integer b)))
-(define (char-ci-cmp? cmp a b)
-  (cmp (char->integer (char-downcase a)) (char->integer (char-downcase b))))
-
-(define (char=? a b) (char-cmp? = a b))
-(define (char<? a b) (char-cmp? < a b))
-(define (char>? a b) (char-cmp? > a b))
-(define (char<=? a b) (char-cmp? <= a b))
-(define (char>=? a b) (char-cmp? >= a b))
-
-(define (char-ci=? a b) (char-ci-cmp? = a b))
-(define (char-ci<? a b) (char-ci-cmp? < a b))
-(define (char-ci>? a b) (char-ci-cmp? > a b))
-(define (char-ci<=? a b) (char-ci-cmp? <= a b))
-(define (char-ci>=? a b) (char-ci-cmp? >= a b))
-
-                                        ; Note the trick of returning (cmp x y)
-(define (string-cmp? chcmp cmp a b)
-  (let ((na (string-length a)) (nb (string-length b)))
-    (let loop ((i 0))
-      (cond
-       ((= i na)
-        (if (= i nb) (cmp 0 0) (cmp 0 1)))
-       ((= i nb)
-        (cmp 1 0))
-       ((chcmp = (string-ref a i) (string-ref b i))
-        (loop (succ i)))
-       (else
-        (chcmp cmp (string-ref a i) (string-ref b i)))))))
-
-
-(define (string=? a b) (string-cmp? char-cmp? = a b))
-(define (string<? a b) (string-cmp? char-cmp? < a b))
-(define (string>? a b) (string-cmp? char-cmp? > a b))
-(define (string<=? a b) (string-cmp? char-cmp? <= a b))
-(define (string>=? a b) (string-cmp? char-cmp? >= a b))
-
-(define (string-ci=? a b) (string-cmp? char-ci-cmp? = a b))
-(define (string-ci<? a b) (string-cmp? char-ci-cmp? < a b))
-(define (string-ci>? a b) (string-cmp? char-ci-cmp? > a b))
-(define (string-ci<=? a b) (string-cmp? char-ci-cmp? <= a b))
-(define (string-ci>=? a b) (string-cmp? char-ci-cmp? >= a b))
-
-(define (list . x) x)
-
+;; foldr (left fold — TinyScheme's naming)
+;; Already defined in SchemeS7.cpp shims, but kept here for clarity
 (define (foldr f x lst)
   (if (null? lst)
       x
@@ -182,34 +70,6 @@
          (cdr lists)
          (append cars (list car1))
          (append cdrs (list cdr1))))))
-
-(define (map proc . lists)
-  (if (null? lists)
-      (apply proc)
-      (if (null? (car lists))
-          '()
-          (let* ((unz (apply unzip1-with-cdr lists))
-                 (cars (car unz))
-                 (cdrs (cdr unz)))
-            (cons (apply proc cars) (apply map (cons proc cdrs)))))))
-
-(define (for-each proc . lists)
-  (if (null? lists)
-      (apply proc)
-      (if (null? (car lists))
-          #t
-          (let* ((unz (apply unzip1-with-cdr lists))
-                 (cars (car unz))
-                 (cdrs (cdr unz)))
-            (apply proc cars) (apply map (cons proc cdrs))))))
-
-(define (list-tail x k)
-  (if (zero? k)
-      x
-      (list-tail (cdr x) (- k 1))))
-
-(define (list-ref x k)
-  (car (list-tail x k)))
 
 (define (last-pair x)
   (if (pair? (cdr x))
@@ -229,168 +89,22 @@
                (and (equal? (vector-ref x i) (vector-ref y i))
                     (loop (succ i))))))))
 
-(define (list->vector x)
-  (apply vector x))
-
-(define (vector-fill! v e)
-  (let ((n (vector-length v)))
-    (let loop ((i 0))
-      (if (= i n)
-          v
-          (begin (vector-set! v i e) (loop (succ i)))))))
-
-(define (vector->list v)
-  (let loop ((n (pred (vector-length v))) (l '()))
-    (if (= n -1)
-        l
-        (loop (pred n) (cons (vector-ref v n) l)))))
-
-;; The following quasiquote macro is due to Eric S. Tiedemann.
-;;   Copyright 1988 by Eric S. Tiedemann; all rights reserved.
-;;
-;; Subsequently modified to handle vectors: D. Souflis
-
-(macro
- quasiquote
- (lambda (l)
-   (define (mcons f l r)
-     (if (and (pair? r)
-              (eq? (car r) 'quote)
-              (eq? (car (cdr r)) (cdr f))
-              (pair? l)
-              (eq? (car l) 'quote)
-              (eq? (car (cdr l)) (car f)))
-         (if (or (procedure? f) (number? f) (string? f))
-             f
-             (list 'quote f))
-         (if (eqv? l vector)
-             (apply l (eval r))
-             (list 'cons l r)
-             )))
-   (define (mappend f l r)
-     (if (or (null? (cdr f))
-             (and (pair? r)
-                  (eq? (car r) 'quote)
-                  (eq? (car (cdr r)) '())))
-         l
-         (list 'append l r)))
-   (define (foo level form)
-     (cond ((not (pair? form))
-            (if (or (procedure? form) (number? form) (string? form))
-                form
-                (list 'quote form))
-            )
-           ((eq? 'quasiquote (car form))
-            (mcons form ''quasiquote (foo (+ level 1) (cdr form))))
-           (#t (if (zero? level)
-                   (cond ((eq? (car form) 'unquote) (car (cdr form)))
-                         ((eq? (car form) 'unquote-splicing)
-                          (error "Unquote-splicing wasn't in a list:"
-                                 form))
-                         ((and (pair? (car form))
-                               (eq? (car (car form)) 'unquote-splicing))
-                          (mappend form (car (cdr (car form)))
-                                   (foo level (cdr form))))
-                         (#t (mcons form (foo level (car form))
-                                    (foo level (cdr form)))))
-                   (cond ((eq? (car form) 'unquote)
-                          (mcons form ''unquote (foo (- level 1)
-                                                     (cdr form))))
-                         ((eq? (car form) 'unquote-splicing)
-                          (mcons form ''unquote-splicing
-                                 (foo (- level 1) (cdr form))))
-                         (#t (mcons form (foo level (car form))
-                                    (foo level (cdr form)))))))))
-   (foo 0 (car (cdr l)))))
-
-
-;;;;; atom? and equal? written by a.k
-
 ;;;; atom?
 (define (atom? x)
   (not (pair? x)))
 
-;;;;    equal?
-(define (equal? x y)
-  (cond
-   ((pair? x)
-    (and (pair? y)
-         (equal? (car x) (car y))
-         (equal? (cdr x) (cdr y))))
-   ((vector? x)
-    (and (vector? y) (vector-equal? x y)))
-   ((string? x)
-    (and (string? y) (string=? x y)))
-   (else (eqv? x y))))
-
-;;;; (do ((var init inc) ...) (endtest result ...) body ...)
-;;
-(macro do
-       (lambda (do-macro)
-         (apply (lambda (do vars endtest . body)
-                  (let ((do-loop (gensym)))
-                    `(letrec ((,do-loop
-                               (lambda ,(map (lambda (x)
-                                               (if (pair? x) (car x) x))
-                                             `,vars)
-                                       (if ,(car endtest)
-                                           (begin ,@(cdr endtest))
-                                           (begin
-                                             ,@body
-                                             (,do-loop
-                                              ,@(map (lambda (x)
-                                                       (cond
-                                                        ((not (pair? x)) x)
-                                                        ((< (length x) 3) (car x))
-                                                        (else (car (cdr (cdr x))))))
-                                                     `,vars)))))))
-                       (,do-loop
-                        ,@(map (lambda (x)
-                                 (if (and (pair? x) (cdr x))
-                                     (car (cdr x))
-                                     '()))
-                               `,vars)))))
-                do-macro)))
-
-;;;; generic-member
-(define (generic-member cmp obj lst)
-  (cond
-   ((null? lst) #f)
-   ((cmp obj (car lst)) lst)
-   (else (generic-member cmp obj (cdr lst)))))
-
-(define (memq obj lst)
-  (generic-member eq? obj lst))
-(define (memv obj lst)
-  (generic-member eqv? obj lst))
-(define (member obj lst)
-  (generic-member equal? obj lst))
-
-;;;; generic-assoc
-(define (generic-assoc cmp obj alst)
-  (cond
-   ((null? alst) #f)
-   ((cmp obj (caar alst)) (car alst))
-   (else (generic-assoc cmp obj (cdr alst)))))
-
-(define (assq obj alst)
-  (generic-assoc eq? obj alst))
-(define (assv obj alst)
-  (generic-assoc eqv? obj alst))
-(define (assoc obj alst)
-  (generic-assoc equal? obj alst))
-
 (define (acons x y z) (cons (cons x y) z))
 
 ;;;; Utility to ease macro creation
+;; s7's macroexpand is a special form (doesn't evaluate its argument).
+;; Wrap it so macro-expand is a function that accepts a computed form.
 (define (macro-expand form)
-  ((eval (get-closure-code (eval (car form)))) form))
+  (eval (list 'macroexpand form)))
 
 ;;;; Handy for imperative programs
-;;;; Used as: (define-with-return (foo x y) .... (return z) ...)
-(macro (define-with-return form)
-       `(define ,(cadr form)
-          (call/cc (lambda (return) ,@(cddr form)))))
+(define-macro (define-with-return head . body)
+  `(define ,head
+     (call/cc (lambda (return) ,@body))))
 
 ;;;; Simple exception handling
 ;;
@@ -427,30 +141,31 @@
       (apply (pop-handler))
       (apply error x)))
 
-(macro (catch form)
-       (let ((label (gensym)))
-         `(call/cc (lambda (exit)
-                     (push-handler (lambda () (exit ,(cadr form))))
-                     (let ((,label (begin ,@(cddr form))))
-                       (pop-handler)
-                       ,label)))))
+;; Override s7's catch with TinyScheme-compatible version
+;; s7's catch is (catch tag thunk handler)
+;; TinyScheme's catch is (catch error-value body...)
+;; We save s7's catch and use it to intercept errors.
+(define *s7-catch* catch)
+(define-macro (catch error-value . body)
+  `(*s7-catch* #t
+     (lambda () ,@body)
+     (lambda (type info) ,error-value)))
 
-(define *error-hook* throw)
+;; *error-hook* is immutable in s7; use s7's error handling instead
 (define *livecoding-error-hook* (lambda (msg a) 1))
 
-;;;;; Definition of MAKE-ENVIRONMENT, to be used with two-argument EVAL
-
-(macro (make-environment form)
-       `(apply (lambda ()
-                 ,@(cdr form)
-                 (current-environment))))
+;;;;; Definition of MAKE-ENVIRONMENT
+(define-macro (make-environment . body)
+  `(let ()
+     ,@body
+     (curlet)))
 
 (define-macro (eval-polymorphic x . envl)
   (display envl)
-  (let* ((env (if (null? envl) (current-environment) (eval (car envl))))
+  (let* ((env (if (null? envl) (curlet) (eval (car envl))))
          (xval (eval x env)))
-    (if (closure? xval)
-        (make-closure (get-closure-code xval) env)
+    (if (procedure? xval)
+        xval
         xval)))
 
 ;; Redefine this if you install another package infrastructure
@@ -490,10 +205,10 @@
     (if (eq? inport #f)
         #f
         (let ((prev-inport (current-input-port)))
-          (set-input-port inport)
+          (set-current-input-port inport)
           (let ((res (p)))
             (close-input-port inport)
-            (set-input-port prev-inport)
+            (set-current-input-port prev-inport)
             res)))))
 
 (define (with-output-to-file s p)
@@ -501,10 +216,10 @@
     (if (eq? outport #f)
         #f
         (let ((prev-outport (current-output-port)))
-          (set-output-port outport)
+          (set-current-output-port outport)
           (let ((res (p)))
             (close-output-port outport)
-            (set-output-port prev-outport)
+            (set-current-output-port prev-outport)
             res)))))
 
 (define (with-input-output-from-to-files si so p)
@@ -517,13 +232,13 @@
           #f)
         (let ((prev-inport (current-input-port))
               (prev-outport (current-output-port)))
-          (set-input-port inport)
-          (set-output-port outport)
+          (set-current-input-port inport)
+          (set-current-output-port outport)
           (let ((res (p)))
             (close-input-port inport)
             (close-output-port outport)
-            (set-input-port prev-inport)
-            (set-output-port prev-outport)
+            (set-current-input-port prev-inport)
+            (set-current-output-port prev-outport)
             res)))))
 
 ;; Random number generator (maximum cycle)

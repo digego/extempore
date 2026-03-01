@@ -29,18 +29,23 @@ static pointer jitCompileIRString(scheme* Scheme, pointer Args)
 static pointer ff_set_name(scheme* Scheme, pointer Args)
 {
    pointer x = pair_car(Args);
-   foreign_func ff = x->_object._ff;
-   char* name = string_value(pair_cadr(Args));
-   llvm_scheme_ff_set_name(ff, name);
+   // In the s7 adapter, foreign functions don't expose their raw function pointer.
+   // This is a no-op for now — ff_set_name/ff_get_name are used for debugging only.
+   (void)x;
    return Scheme->T;
 }
 
 static pointer ff_get_name(scheme* Scheme, pointer Args)
 {
    pointer x = pair_car(Args);
-   foreign_func ff = x->_object._ff;
-   const char* name = llvm_scheme_ff_get_name(ff);
-   return mk_string(Scheme,name);
+   // Return the s7 function name if available
+   if (s7_is_function(x)) {
+       char* name = s7_object_to_c_string(Scheme->sc, x);
+       pointer result = mk_string(Scheme, name ? name : "#<unknown>");
+       free(name);
+       return result;
+   }
+   return mk_string(Scheme, "#<unknown>");
 }
 
 static pointer get_function(scheme* Scheme, pointer Args)
@@ -278,8 +283,8 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
     pointer argList = Args;
     for (unsigned i = 0; i < lgth; ++i) {
         auto argTy = funcType->getParamType(i);
-        pointer p = car(argList);
-        argList = cdr(argList);
+        pointer p = pair_car(argList);
+        argList = pair_cdr(argList);
 
         switch (argTy->getTypeID()) {
         case llvm::Type::IntegerTyID: {

@@ -54,7 +54,10 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value)
         // ignore end of file
     } else if (is_closure(Value)) {
         std::stringstream tmp;
-        UNIV::printSchemeCell(Scheme, tmp, closure_code(Value), true);
+        pointer cargs = s7_closure_args(Scheme->sc, Value);
+        pointer cbody = s7_closure_body(Scheme->sc, Value);
+        pointer code = cons(Scheme, cargs, cbody);
+        UNIV::printSchemeCell(Scheme, tmp, code, true);
         Stream << "(lambda " << tmp.str().substr(1);
     } else if (is_string(Value) || is_number(Value) || is_symbol(Value)) {
         UNIV::printSchemeCell(Scheme, Stream, Value, true);

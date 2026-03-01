@@ -778,41 +778,10 @@ declare i32 @fscanf(i8*, i8* noalias nocapture, ...)
 
 ;; scheme helpers
 
-define private i32 @is_type(i8* %ptr, i32 %val) alwaysinline
-{
-  %1 = bitcast i8* %ptr to i32*
-  %2 = load i32, i32* %1
-  %3 = and i32 %2, 15
-  %set = icmp eq i32 %3, %val
-  %res = zext i1 %set to i32
-  ret i32 %res
-}
-
-define private i32 @is_string(i8* %ptr) alwaysinline
-{
-  %res = call i32 @is_type(i8* %ptr, i32 1)
-  ret i32 %res
-}
-
-define private i32 @is_real(i8* %ptr) alwaysinline
-{
-  %res = call i32 @is_type(i8* %ptr, i32 2)
-  ret i32 %res
-}
-
-define private i32 @is_cptr(i8* %ptr) alwaysinline
-{
-  %res = call i32 @is_type(i8* %ptr, i32 15)
-  ret i32 %res
-}
-
-define private i32 @is_cptr_or_str(i8* %ptr) alwaysinline
-{
-  %v1 = call i32 @is_cptr(i8* %ptr)
-  %v2 = call i32 @is_string(i8* %ptr)
-  %res = or i32 %v1, %v2
-  ret i32 %res
-}
+declare i32 @is_string(i8*) nounwind
+declare i32 @is_real(i8*) nounwind
+declare i32 @is_cptr(i8*) nounwind
+declare i32 @is_cptr_or_str(i8*) nounwind
 
 define private void @llvm_zone_ptr_set_size(i8* %zone, i64 %size) nounwind alwaysinline
 {
@@ -893,8 +862,4 @@ define private %mzone* @llvm_zone_reset(%mzone* %zone) nounwind alwaysinline
 }
 
 declare i32 @is_integer_extern(i8*)
-define private i32 @is_integer(i8* %ptr) nounwind alwaysinline
-{
-  %res = call i32 @is_integer_extern(i8* %ptr)
-  ret i32 %res
-}
+declare i32 @is_integer(i8*) nounwind
