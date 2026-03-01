@@ -39,7 +39,7 @@ struct scheme {
     uint64_t call_end_time;
     uint64_t call_default_time;
 
-    // Legacy fields (used by dead code in EXTLLVM.cpp, called only from deleted Scheme.cpp)
+    // Used by find_slot_in_env in EXTLLVM.cpp
     pointer envir;
     pointer args;
 

@@ -269,7 +269,7 @@ if(UNIX)
         -fno-common
         -Woverloaded-virtual
         -Wno-unused-result)
-    set_source_files_properties(src/Scheme.cpp PROPERTIES COMPILE_FLAGS -Wno-switch)
+
     target_link_libraries(extempore PRIVATE pthread linenoise)
 endif()
 
