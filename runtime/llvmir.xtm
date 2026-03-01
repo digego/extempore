@@ -339,14 +339,18 @@
 
 (define impc:ir:poly-or-adhoc?
   (lambda (name)
-    (regex:match? name "(_adhoc_|_poly_)")))
+    (or (string-contains? name "_poly_")
+        (string-contains? name "_adhoc_"))))
 
 (define impc:ir:split-and-decode-poly-adhoc-name
   (lambda (name)
-    (if (impc:ir:poly-or-adhoc? name)
-        (let ((split-name (regex:type-split name "(_adhoc_|_poly_)")))
-          (list (car split-name) (cname-decode (cadr split-name))))
-        #f)))
+    (let ((p (string-split-on name "_poly_")))
+      (if (= (length p) 2)
+          (list (car p) (cname-decode (cadr p)))
+          (let ((p2 (string-split-on name "_adhoc_")))
+            (if (= (length p2) 2)
+                (list (car p2) (cname-decode (cadr p2)))
+                #f))))))
 
 (define impc:ir:get-type-from-pretty-str
   (lambda (string-type . args)

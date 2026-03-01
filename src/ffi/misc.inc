@@ -296,6 +296,14 @@ static pointer string_contains(scheme* Scheme, pointer Args)
     return strstr(data, find) ? Scheme->T : Scheme->F;
 }
 
+static pointer string_index_of(scheme* Scheme, pointer Args)
+{
+    char* data = string_value(pair_car(Args));
+    char* find = string_value(pair_cadr(Args));
+    char* pos = strstr(data, find);
+    return pos ? mk_integer(Scheme, pos - data) : Scheme->F;
+}
+
 #define MISC_DEFS \
         { "cptr:get-i64", &dataGETi64 }, \
         { "cptr:get-double", &dataGETdouble }, \
@@ -328,4 +336,5 @@ static pointer string_contains(scheme* Scheme, pointer Args)
         { "impc:ir:getname", &impcirGetName }, \
         { "impc:ir:gettype", &impcirGetType }, \
         { "impc:ir:addtodict", &impcirAdd }, \
-        { "string-contains?", &string_contains }
+        { "string-contains?", &string_contains }, \
+        { "string-index-of", &string_index_of }

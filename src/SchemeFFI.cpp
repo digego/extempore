@@ -168,6 +168,7 @@ static std::string formatLLVMType(llvm::Type* Type)
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
 #include "ffi/assoc.inc"
+#include "ffi/hashtable.inc"
 #include "ffi/number.inc"
 #include "ffi/sys.inc"
 #include "ffi/sys_dsp.inc"
@@ -214,6 +215,7 @@ void initSchemeFFI(scheme* sc)
         UTILITY_DEFS,
         IPC_DEFS,
         ASSOC_DEFS,
+        HASHTABLE_DEFS,
         NUMBER_DEFS,
         SYS_DEFS,
         SYS_DSP_DEFS,

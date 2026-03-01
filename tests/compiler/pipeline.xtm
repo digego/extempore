@@ -1,0 +1,84 @@
+;;; tests/compiler/pipeline.xtm -- integration tests for compilation pipeline
+
+(sys:load "libs/core/test.xtm")
+
+;; Test that the pipeline stages compose correctly.
+;; These tests exercise the full path from source through first-transform,
+;; shadow renaming, type checking, and closure conversion.
+
+;; impc:ti:get-expression-type runs the full pipeline
+;; (shadow rename -> var types -> first-transform -> shadow rename ->
+;;  var types -> closure convert -> type check -> normalise)
+
+;; simple identity through pipeline
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 42)) x))
+                2
+                "pipeline-identity")
+
+;; arithmetic pipeline
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+                2
+                "pipeline-arith")
+
+;; lambda pipeline returns closure type
+;; NOTE: use 'typ' not 'result' to avoid shadowing xtmtest internals
+
+(xtmtest-with-fixture pipeline-lambda
+  (define typ (impc:ti:get-expression-type '(lambda (x:i64) (+ x 1))))
+  (is? (list? typ) #t "lambda-returns-list")
+  (is? (car typ) 213 "lambda-closure-tag")
+  (is? (cadr typ) 2 "lambda-return-type")
+  (is? (caddr typ) 2 "lambda-param-type"))
+
+;; desugaring composes with type checking
+
+(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y 3)))
+                2
+                "pipeline-binary-arity")
+
+;; boolean desugaring
+
+(xtmtest-result (impc:ti:get-expression-type '(if (and #t #f) 1 2))
+                2
+                "pipeline-and-desugar")
+
+(xtmtest-result (impc:ti:get-expression-type '(if (or #t #f) 1 2))
+                2
+                "pipeline-or-desugar")
+
+(xtmtest-result (impc:ti:get-expression-type '(if (not #t) 1 2))
+                2
+                "pipeline-not-desugar")
+
+;; cond desugaring through pipeline
+
+(xtmtest-result (impc:ti:get-expression-type '(cond (#t 42) (else 0)))
+                2
+                "pipeline-cond")
+
+;; comparison operators (>= and <= desugar to or)
+
+(xtmtest-result (impc:ti:get-expression-type '(if (>= 1 2) 10 20))
+                2
+                "pipeline-gteq")
+
+(xtmtest-result (impc:ti:get-expression-type '(if (<= 1 2) 10 20))
+                2
+                "pipeline-lteq")
+
+;; nested lambda
+
+(xtmtest-with-fixture pipeline-nested-lambda
+  (define typ (impc:ti:get-expression-type '(lambda (x:i64) (lambda (y:i64) (+ x y)))))
+  (is? (list? typ) #t "nested-lambda-returns-list")
+  (is? (car typ) 213 "nested-lambda-outer-tag"))
+
+;; let with lambda application
+
+(xtmtest-with-fixture pipeline-let-lambda
+  (define typ (impc:ti:get-expression-type
+               '(let ((f (lambda (x:i64) (+ x 1))))
+                  (f 10))))
+  (is? typ 2 "let-lambda-app"))

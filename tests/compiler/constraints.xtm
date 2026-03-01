@@ -1,0 +1,74 @@
+;;; tests/compiler/constraints.xtm -- unit tests for constraint store
+
+(sys:load "libs/core/test.xtm")
+
+;; constraint emission from let expression
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(let ((x:i64 1)) x))
+                       (min (length *impc:ti:constraints*) 1))
+                1
+                "let-emits-constraints")
+
+;; constraint is a 3-element vector
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(let ((x:i64 1)) x))
+                       (vector-length (car *impc:ti:constraints*)))
+                3
+                "constraint-has-3-fields")
+
+;; constraint kind is a symbol
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(let ((x:i64 1)) x))
+                       (let ((kind (vector-ref (car *impc:ti:constraints*) 0)))
+                         (if (member kind '(eq force union)) 1 0)))
+                1
+                "constraint-kind-valid")
+
+;; arithmetic emits constraints
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(+ 1 2))
+                       (min (length *impc:ti:constraints*) 1))
+                1
+                "arithmetic-emits-constraints")
+
+;; clear resets the store
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(+ 1 2))
+                       (impc:ti:clear-constraints!)
+                       (length *impc:ti:constraints*))
+                0
+                "clear-resets-store")
+
+;; lambda emits constraints
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(lambda (x:i64) (+ x 1)))
+                       (min (length *impc:ti:constraints*) 1))
+                1
+                "lambda-emits-constraints")
+
+;; force constraints are emitted for typed arithmetic
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+                       (let loop ((cs *impc:ti:constraints*) (n 0))
+                         (if (null? cs) (min n 1)
+                             (loop (cdr cs)
+                                   (if (eq? (vector-ref (car cs) 0) 'force)
+                                       (+ n 1) n)))))
+                1
+                "force-constraints-emitted")
+
+;; replay: type-check result is consistent with constraint log
+
+(xtmtest-result (begin (impc:ti:clear-constraints!)
+                       (let ((r (impc:ti:get-expression-type
+                                 '(let ((x:i64 1) (y:i64 2)) (+ x y)))))
+                         (list r (min (length *impc:ti:constraints*) 1))))
+                '(2 1)
+                "replay-result-and-constraints")
