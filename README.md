@@ -4,12 +4,13 @@ A programming environment for cyberphysical programming (Linux/macOS/Windows).
 
 > [!NOTE]
 >
-> **Dec '25**: Extempore's `master` branch is not yet compatible with Apple
-> Silicon. However, there's some work going on
-> [to fix this](https://github.com/digego/extempore/tree/aarch64). Current
-> status is that everything builds & tests pass on macOS/Linux but not yet on
-> Windows. And it hasn't been tested in anger (i.e. in a gig). When there's an
-> update we'll post on the
+> **Mar '26**: Extempore's `master` branch doesn't yet support aarch64
+> (including Apple Silicon), but there's experimental support on the
+> [`aarch64` branch](https://github.com/digego/extempore/tree/aarch64). CI is
+> green on all platforms (macOS, Windows, Linux x64 and aarch64) and things are
+> looking good, but it hasn't been merged to master yet. See
+> [this blog post](https://benswift.me/blog/2026/02/26/extempore-is-alive-on-aarch64-part-deux/)
+> for details, and give it a try if you're keen---bug reports welcome on the
 > [mailing list](http://groups.google.com/group/extemporelang).
 
 ## Getting started
