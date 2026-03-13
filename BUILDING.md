@@ -25,7 +25,7 @@ repo](https://github.com/extemporelang/extempore-assets).
 
 This option is off by default because it's a pretty big (~300MB) download. If
 you don't set `-DASSETS=ON` at build time that's ok---CMake will still create an
-`assets` target which you can "build" afterwards to downoad the assets and move
+`assets` target which you can "build" afterwards to download the assets and move
 them into place.
 
 ## Targets
