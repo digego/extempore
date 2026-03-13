@@ -37,8 +37,13 @@
 #include <iostream>
 #include <string.h>
 #include <inttypes.h>
-#include <xmmintrin.h>
 #include <regex>
+
+// x86 SSE intrinsics for audio_sanity_f optimization
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <xmmintrin.h>
+#define USE_SSE_AUDIO_SANITY 1
+#endif
 
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
@@ -136,7 +141,13 @@ static inline SAMPLE audio_sanity(SAMPLE x)
 static inline float audio_sanity_f(float x)
 {
     if (likely(isfinite(x))) {
+#if USE_SSE_AUDIO_SANITY
         _mm_store_ss(&x, _mm_min_ss(_mm_max_ss(_mm_set_ss(x), _mm_set_ss(-0.99f)), _mm_set_ss(0.99f)));
+#else
+        // Portable branchless clamp for ARM64 and other architectures
+        if (x < -0.99f) x = -0.99f;
+        else if (x > 0.99f) x = 0.99f;
+#endif
         return x;
     }
     return 0.0;
@@ -201,7 +212,7 @@ void* audioCallbackMT(void* Args)
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 
+#elif _WIN32
     SetThreadPriority(GetCurrentThread(), 15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     //printf("Starting RT Audio Process\n");
@@ -271,7 +282,7 @@ void* audioCallbackMTBuf(void* dat) {
     set_thread_realtime(pthread_mach_thread_np(pthread_self()), clockFrequency*.01,clockFrequency*.007,clockFrequency*.007);
 #elif __linux__
     set_thread_realtime(pthread_self(), SCHED_RR, 20);
-#elif _WIN32 
+#elif _WIN32
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     unsigned idx = uintptr_t(dat);
@@ -370,7 +381,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
                 ++in;
-            } 
+            }
         } else { // for when in channels & out channels don't match
           //SAMPLE* indata = alloc(UNIV::IN_CHANNELS); // auto
           //indata(in);

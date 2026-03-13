@@ -125,7 +125,7 @@ enum { OPT_COMPILE_STR, OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
-       OPT_LATENCY,
+       OPT_LATENCY, OPT_LEVEL,
        OPT_HELP
      };
 
@@ -155,6 +155,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_ARCH,           "--arch",          SO_REQ_SEP    },
     { OPT_CPU,            "--cpu",           SO_REQ_SEP    },
     { OPT_ATTR,           "--attr",          SO_MULTI      },
+    { OPT_LEVEL,          "--opt-level",     SO_REQ_SEP    },
     { OPT_HELP,           "--help",          SO_NONE       },
     SO_END_OF_OPTIONS
 };
@@ -253,9 +254,9 @@ EXPORT int extempore_init(int argc, char** argv)
                 } else {
 #ifdef _WIN32
                   extemp::UNIV::EXT_TERM = 1;
-#else                  
+#else
                   extemp::UNIV::EXT_TERM = 0;
-#endif                  
+#endif
                 }
                 break;
             case OPT_NO_AUDIO:
@@ -300,6 +301,9 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_ATTR:
                 extemp::UNIV::ATTRS.push_back(args.OptionArg());
                 break;
+            case OPT_LEVEL:
+                extemp::EXTLLVM::OPTIMIZATION_LEVEL = atoi(args.OptionArg());
+                break;
             case OPT_HELP:
             default:
                 std::cout << "Extempore's command line options: " << std::endl;
@@ -310,6 +314,7 @@ EXPORT int extempore_init(int argc, char** argv)
                 std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "          --nobase: don't load base lib on startup" << std::endl;
+                std::cout << "       --opt-level: LLVM optimization level 0-3" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
                 std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
@@ -401,7 +406,7 @@ EXPORT int extempore_init(int argc, char** argv)
     startup_ok &= primary->start();
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
-    //std::cout << "primary started:" << std::endl << std::flush;    
+    //std::cout << "primary started:" << std::endl << std::flush;
     if (!startup_ok) {
         ascii_error();
         printf("ERROR:");
@@ -418,7 +423,7 @@ EXPORT int extempore_init(int argc, char** argv)
 #else
       sleep(2000);
 #endif
-    }      
+    }
 #else
     primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
 

@@ -55,10 +55,15 @@
     (if *impc:compiler:print-raw-llvm*
         (print-full-nq *impc:compiler:queued-llvm-ir-string*))
     (if (not (string=? *impc:compiler:queued-llvm-ir-string* ""))
-        (let ((res (llvm:jit-compile-ir-string *impc:compiler:queued-llvm-ir-string*)))
+        (let* ((ir-to-compile *impc:compiler:queued-llvm-ir-string*)
+               (res (llvm:jit-compile-ir-string ir-to-compile)))
           (impc:compiler:reset-jit-compilation-queue)
-          ;; (print "Flushed IR compilation queue with result: " res "\n")
-          res))))
+          ;; (if (not res)
+          ;;     (begin
+          ;;       (print "FLUSH FAILED. IR was:\n")
+          ;;       (print-full-nq ir-to-compile)))
+          res)
+        #t)))
 
 ;; JIT-compile the IR string, or queue it for AOT-compilation
 (define llvm:compile-ir
@@ -1197,11 +1202,14 @@
                                    ", "))
                 os)
           (emit  (impc:ir:get-type-str (car t)) " (" os))
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (if (symbol? (list-ref args i))
-            (impc:compiler:print-could-not-resolve-type-error (list-ref args i)))
-        (emit (impc:ir:get-type-str (list-ref args i)) os))
+      (let loop ((args-remaining args) (first? #t))
+        (if (not (null? args-remaining))
+            (let ((arg (car args-remaining)))
+              (if (not first?) (emit ", " os))
+              (if (symbol? arg)
+                  (impc:compiler:print-could-not-resolve-type-error arg))
+              (emit (impc:ir:get-type-str arg) os)
+              (loop (cdr args-remaining) #f))))
       (emit ")" os)
       (impc:ir:strip-space os))))
 
@@ -1211,9 +1219,12 @@
     (let* ((os (make-string 0))
            (args t))
       (emit "{"os)
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (emit (impc:ir:get-type-str (cdr (list-ref args i))) os))
+      (let loop ((args-remaining args) (first? #t))
+        (if (not (null? args-remaining))
+            (let ((arg (car args-remaining)))
+              (if (not first?) (emit ", " os))
+              (emit (impc:ir:get-type-str (cdr arg)) os)
+              (loop (cdr args-remaining) #f))))
       (emit "}" os)
       (impc:ir:strip-space os))))
 
@@ -1223,9 +1234,12 @@
     (let* ((os (make-string 0))
            (args t))
       (emit "{"os)
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (emit  (impc:ir:get-type-str (cdr (list-ref args i))) "*" os))
+      (let loop ((args-remaining args) (first? #t))
+        (if (not (null? args-remaining))
+            (let ((arg (car args-remaining)))
+              (if (not first?) (emit ", " os))
+              (emit  (impc:ir:get-type-str (cdr arg)) "*" os)
+              (loop (cdr args-remaining) #f))))
       (emit "}" os)
       (impc:ir:strip-space os))))
 
@@ -1233,13 +1247,14 @@
 (define impc:ir:make-arglist-str
   (lambda (args . with-symbol?)
     (let* ((os (make-string 0)))
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (let ((arg (list-ref args i)))
-                                        ;(print 'arg: arg)
+      (let loop ((args-remaining args) (first? #t))
+        (if (not (null? args-remaining))
+            (let ((arg (car args-remaining)))
+              (if (not first?) (emit ", " os))
           (emit (impc:ir:get-type-str (cdr arg)) os)
           (if (car with-symbol?)
-              (emit  " %" (symbol->string (car arg)) os))))
+                  (emit  " %" (symbol->string (car arg)) os))
+              (loop (cdr args-remaining) #f))))
       (impc:ir:strip-space os))))
 
 
@@ -1357,9 +1372,9 @@
       (emit "\n; malloc closure address table\n" os2)
       (emit (impc:ir:gname "addytable" "%clsvar*") " = call %clsvar* @new_address_table()\n" os2)
       (define table (impc:ir:gname))
-      (define ptridx 0)
-      (dotimes (i (length env))
-        (let* ((e (list-ref env i))
+      (let loop ((env-remaining env) (ptridx 0))
+        (if (not (null? env-remaining))
+            (let* ((e (car env-remaining))
                (varname (if (regex:match? (symbol->string (car e)) "__sub$")
                             (cadr (regex:matched (symbol->string (car e)) "(.*)__sub$"))
                             (symbol->string (car e))))
@@ -1383,12 +1398,13 @@
                 "%clsvar* " (car table) ")\n"
                 os2)
           (set! table (impc:ir:gname))
-          (set! ptridx (+ ptridx (/ (sys:pointer-size) 8))))) ; need it as bytes
+              (loop (cdr env-remaining) (+ ptridx (/ (sys:pointer-size) 8)))))) ; need it as bytes
       (emit (impc:ir:gname "address-table" "i8*") " = bitcast %clsvar* " (car table) " to i8*\n" os2)
       ;; add data to environment structure
       (emit "; add data to environment\n" os1)
-      (dotimes (i (length env))
-        (let* ((e (list-ref env i))
+      (let loop ((env-remaining env) (i 0))
+        (if (not (null? env-remaining))
+            (let* ((e (car env-remaining))
                (alloc? (not (regex:match? (symbol->string (car e)) "__sub$"))))
           ;; first fixup mangled name if not allocing
           (if (not alloc?) (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
@@ -1406,7 +1422,8 @@
           ;;(emit "call ccc void @llvm_print_pointer(i8* " (car (impc:ir:gname)) ")\n" os1)
           (emit "store " (cadr t) " %" (symbol->string (car e)) "Ptr"
                 ", "
-                (cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1)))
+                    (cadr t) "* " (car (impc:ir:gname "tmp_envptr")) "\n\n" os1)
+              (loop (cdr env-remaining) (+ i 1)))))
 
       (emit "\n" os1)
 
@@ -1496,8 +1513,9 @@
           (begin (emit "; setup environment\n" os)
                  (emit (string-append "%impenv = bitcast i8* %_impenv to "
                                       (impc:ir:make-struct-str-env env) "*\n") os)
-                 (dotimes (i (length env))
-                   (let ((e (list-ref env i)))
+                 (let loop ((env-remaining env) (i 0))
+                   (if (not (null? env-remaining))
+                       (let ((e (car env-remaining)))
                      ;; need to strip __sub's
                      (if (regex:match? (symbol->string (car e)) "__sub$")
                          (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
@@ -1509,11 +1527,13 @@
                      (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
                                           (impc:ir:get-type-str (cdr e)) "*, "
                                           (impc:ir:get-type-str (cdr e)) "** %"
-                                          (symbol->string (car e)) "Ptr_\n") os)))))
+                                              (symbol->string (car e)) "Ptr_\n") os)
+                         (loop (cdr env-remaining) (+ i 1)))))))
       ;; next we pull the function arguments
       (emit "\n; setup arguments\n" os)
-      (dotimes (i (length args))
-        (let* ((a (list-ref args i)))
+      (let loop ((args-remaining args))
+        (if (not (null? args-remaining))
+            (let* ((a (car args-remaining)))
           (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
           (if (> allocate-mem? 0)
               (begin ;; (println 'yes: allocate-mem? 'mem: ast)
@@ -1531,7 +1551,8 @@
                 (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (impc:ir:get-type-str (cdr a)) "*\n" os))
               (emit  "%" (symbol->string (car a)) "Ptr = alloca " (impc:ir:get-type-str (cdr a)) "\n" os))
           (emit (string-append "store " (impc:ir:get-type-str (cdr a)) " %" (symbol->string (car a))
-                               ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+                                   ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)
+              (loop (cdr args-remaining)))))
       (emit "\n" os)
       ;; compile body
       ;; (println '_compin: *impc:ir:sym-name-stack*)
@@ -1606,8 +1627,9 @@
 
       ;; next we pull the function arguments
       (emit "\n; setup arguments\n" os)
-      (dotimes (i (length args))
-        (let* ((a (list-ref args i)))
+      (let loop ((args-remaining args))
+        (if (not (null? args-remaining))
+            (let* ((a (car args-remaining)))
           (set! *impc:ir:sym-name-stack* (cons (car a) *impc:ir:sym-name-stack*))
           (if (> allocate-mem? 0)
               (begin ;; (println 'yes: allocate-mem? 'mem: ast)
@@ -1625,7 +1647,8 @@
                 (emit "%" (symbol->string (car a)) "Ptr = bitcast i8* %dat_" (symbol->string (car a)) " to " (impc:ir:get-type-str (cdr a)) "*\n" os))
               (emit  "%" (symbol->string (car a)) "Ptr = alloca " (impc:ir:get-type-str (cdr a)) "\n" os))
           (emit (string-append "store " (impc:ir:get-type-str (cdr a)) " %" (symbol->string (car a))
-                               ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)))
+                                   ", " (impc:ir:get-type-str (cdr a)) "* %" (symbol->string (car a)) "Ptr\n") os)
+              (loop (cdr args-remaining)))))
       (emit "\n" os)
       ;; compile body
       ;; (println '_compin: *impc:ir:sym-name-stack*)
@@ -1681,16 +1704,16 @@
                      ;; (println 'symstr: symstr 'symtype: symtype)
                      ;; (println 'typestr: typestr)
                      (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
-                              (impc:ir:number? (cdr (assoc-strcmp (caar p) types)))
+                              (impc:ir:number? symtype)
                               (impc:ir:number? (impc:ir:get-type-from-str typestr)))
-                         (set! typestr (impc:ir:get-type-str (cdr (assoc-strcmp (caar p) types)))))
+                         (set! typestr (impc:ir:get-type-str symtype)))
                      ;; type check
-                     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: (cdr (assoc-strcmp (caar p) types)))
+                     ;; (println 'tt1: (impc:ir:get-type-from-str typestr) 'tt2: symtype)
                      (if (not (equal? (impc:ir:get-type-from-str typestr) ;; check to see if the two types are equal?
-                                      (cdr (assoc-strcmp (caar p) types))))
+                                      symtype))
                          (impc:compiler:print-type-mismatch-error
                           (impc:ir:pretty-print-type typestr)
-                          (impc:ir:pretty-print-type (cdr (assoc-strcmp (caar p) types)))
+                          (impc:ir:pretty-print-type symtype)
                           (caar p)))
                                         ;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
                                         ;(emit (impc:ir:gname "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
@@ -2309,7 +2332,7 @@
                                      (impc:compiler:print-bad-type-error (car ast) "remember that closures must be pointers")
                                      (impc:compiler:print-bad-type-error (car ast) "bad type for closure")))))
            ;;(recursive-call (if (eq? (car ast) (car *impc:ir:sym-name-stack*)) #t #f))
-           (recursive-call (if (member (car ast) *impc:ir:sym-name-stack*) #t #f))
+           (recursive-call (if (memq (car ast) *impc:ir:sym-name-stack*) #t #f))
            (os (make-string 0))
            (ftype (impc:ir:make-function-str functiontype #t))
            (clstype (string-append "{i8*, i8*, " ftype "*}*"))
@@ -2586,7 +2609,7 @@
       (if global? ;; (impc:ti:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
                                (symbol->string (cadr ast)) "\n") os)
-          (if (member (cadr ast) *impc:ir:sym-name-stack*)
+          (if (memq (cadr ast) *impc:ir:sym-name-stack*)  ;; memq for symbols
               (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
                                    (symbol->string (cadr ast)) "Ptr\n") os)
               (impc:compiler:print-missing-identifier-error (cadr ast) 'variable)))
@@ -4122,13 +4145,13 @@
 (define impc:ir:intrinsic-substitution
   (lambda (name)
     (cond
-      ((string=? name "memcpy") "llvm.memcpy.p0i8.p0i8.i64")
+      ((string=? name "memcpy") "llvm.memcpy.p0.p0.i64")
       (else name))))
 
 (define impc:ir:function-fixup-args
   (lambda (name)
     (cond
-      ((string=? name "memcpy") ", i32 1, i1 0")
+      ((string=? name "memcpy") ", i1 0")
       (else ""))))
 
 (define impc:ir:compiler:native-call

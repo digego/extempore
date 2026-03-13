@@ -45,6 +45,9 @@
 #include <string>
 #include <memory>
 
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm/Support/Error.h"
+
 
 struct _llvm_callback_struct_ {
     void(*fptr)(void*,llvm_zone_t*);
@@ -94,15 +97,11 @@ class GlobalVariable;
 class GlobalValue;
 class Function;
 class StructType;
-class ModuleProvider;
-class SectionMemoryManager;
-class ExecutionEngine;
+class LLVMContext;
 
-namespace legacy
-{
-
-class PassManager;
-
+namespace orc {
+class LLJIT;
+class ThreadSafeContext;
 }
 
 } // end llvm namespace
@@ -113,16 +112,23 @@ namespace extemp
 namespace EXTLLVM
 {
 
-uint64_t getSymbolAddress(const std::string&);
+uint64_t getFunctionAddress(const std::string&);
 void addModule(llvm::Module* m);
 
-extern llvm::ExecutionEngine* EE; // TODO: nobody should need this (?)
-extern llvm::Module* M;
+extern std::unique_ptr<llvm::orc::LLJIT> JIT;
+
+extern std::unique_ptr<llvm::orc::ThreadSafeContext> TSC;
+
+llvm::orc::ThreadSafeContext& getThreadSafeContext();
+bool removeSymbol(const std::string& name);
+void removeFromGlobalMap(const std::string& name);
+
+llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, const std::vector<std::string>& symbolNames);
+
 extern int64_t LLVM_COUNT;
 extern bool OPTIMIZE_COMPILES;
 extern bool VERIFY_COMPILES;
-extern llvm::legacy::PassManager* PM;
-extern llvm::legacy::PassManager* PM_NO;
+extern int OPTIMIZATION_LEVEL;  // 0=O0, 1=O1, 2=O2, 3=O3
 extern std::vector<llvm::Module*> Ms;
 
 void initLLVM();

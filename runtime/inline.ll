@@ -1,3 +1,7 @@
+; Type definitions required for LLVM 21+ (types must be sized before GEP)
+%mzone = type {i8*, i64, i64, i64, i8*, %mzone*}
+%clsvar = type {i8*, i32, i8*, %clsvar*}
+
 define private %clsvar* @new_address_table() nounwind alwaysinline
 {
   ret %clsvar* null
@@ -56,3 +60,9 @@ define private i32 @is_integer(i8* %ptr) nounwind alwaysinline
   %res = call i32 @is_integer_extern(i8* %ptr)
   ret i32 %res
 }
+
+; Main callback for XTLang code (defined in Extempore.cpp)
+declare void @xtm_set_main_callback(i8*)
+
+; Window event registration (defined in UNIV.cpp)
+declare i32 @register_for_window_events()
