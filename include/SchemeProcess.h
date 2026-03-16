@@ -163,7 +163,7 @@ public:
         m_threadTask.setPriority(Priority, false);
         m_threadServer.setPriority(Priority, false);
     }
-    int getPriority() const {
+    int getPriority() {
         assert(m_threadTask.getPriority() == m_threadServer.getPriority());
         return m_threadTask.getPriority();
     }

@@ -101,7 +101,7 @@ You can also join the Extempore community:
 
 ## Licence
 
-Copyright (c) 2011-2020, Andrew Sorensen
+Copyright (c) 2011-2025, Andrew Sorensen
 
 All rights reserved.
 

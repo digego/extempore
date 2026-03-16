@@ -1,144 +1,74 @@
-name: Build & run tests
+name: Build & test
 
 on:
-  - push
-  - pull_request
+  push:
+    branches: [master, aarch64]
+  pull_request:
+
+env:
+  LLVM_VERSION: "21.1.7"
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-18.04
-          - ubuntu-20.04
-          - macos-10.15 # catalina
-          - macos-11.0  # big sur
-          - windows-2016
-          - windows-2019
-        config:
-          - Release
-          # If you add Debug, be careful about the LLVM build.
-          # LLVM Debug builds take a really long time, and consume a lot of disk space.
         include:
-          - os: windows-2016
-            cmake-generator: -G "Visual Studio 15 2017" -A x64
-          - os: windows-2019
-            cmake-generator: -G "Visual Studio 16 2019" -A x64
+          - os: ubuntu-24.04
+            name: Linux x86_64
+          - os: macos-15
+            name: macOS aarch64
+          - os: windows-2022
+            name: Windows x86_64
+
+    name: ${{ matrix.name }}
 
     steps:
-      - if: contains(matrix.os, 'ubuntu')
-        name: deps
-        run: |
-          sudo apt update
-          sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+      - uses: actions/checkout@v4
 
-      - name: cache llvm
-        id: llvm-cache
-        uses: actions/cache@v2
+      - name: Restore LLVM cache
+        id: cache-llvm
+        uses: actions/cache/restore@v4
         with:
           path: |
-            ./llvm-3.8.0.install
-          key: ${{ matrix.os }}-${{ matrix.config }}-llvm.3.8.0-0 # bump this number if you want to trigger an LLVM build
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v6
 
-      - name: download and unpack llvm (macos/linux)
-        if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
-          wget "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz"
-          cmake -E tar xJf llvm-3.8.0.src-patched-for-extempore.tar.xz
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
 
-      - name: download and unpack llvm (windows)
-        if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
-        run: |
-          Invoke-webrequest -Uri "http://extempore.moso.com.au/extras/llvm-3.8.0.src-patched-for-extempore.tar.xz" -OutFile "llvm-3.8.0.src-patched-for-extempore.tar.xz"
-          cmake -E tar xJf llvm-3.8.0.src-patched-for-extempore.tar.xz
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
-      - name: configure llvm
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir llvm-3.8.0.build
-          mkdir llvm-3.8.0.install
-          cd llvm-3.8.0.build
-          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DLLVM_ENABLE_TERMINFO=OFF -DLLVM_ENABLE_ZLIB=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_RUNTIME=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_GO_TESTS=OFF -DLLVM_INCLUDE_DOCS=OFF -DCMAKE_C_FLAGS="" -DCMAKE_CXX_FLAGS="" -DCMAKE_INSTALL_PREFIX=../llvm-3.8.0.install ${{ matrix.cmake-generator }} ../llvm-3.8.0.src/
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 
-      - name: build llvm
-        if: steps.llvm-cache.outputs.cache-hit != 'true'
-        run: |
-          cd llvm-3.8.0.build
-          # if you're doing this by hand you might need `-- -j2` instead of `-j2`
-          cmake --build . --config ${{ matrix.config }} -j2
-          cmake --build . --config ${{ matrix.config }} -j2 --target llvm-as
+      - name: Build LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: cmake --build build --target llvm-libs
 
-      - name: install llvm (macos/linux)
-        if: steps.llvm-cache.outputs.cache-hit != 'true' && !contains(matrix.os, 'windows')
-        run: |
-          cd llvm-3.8.0.build
-          cmake --install .
-          cp bin/llvm-as $GITHUB_WORKSPACE/llvm-3.8.0.install/bin/
-
-      - name: install llvm (windows)
-        if: contains(matrix.os, 'windows') && steps.llvm-cache.outputs.cache-hit != 'true'
-        run: |
-          cd llvm-3.8.0.build
-          cmake --install . --prefix ../llvm-3.8.0.install
-          cp .\${{ matrix.config }}\bin\llvm-as.exe ../llvm-3.8.0.install/bin/
-
-      - uses: actions/checkout@v2
+      - name: Save LLVM cache
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
-          path: extempore
+          path: |
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v6
 
-      # I have no idea why `env:` seems to work for building, but not configuring :(
-      - name: configure extempore (macos/linux)
-        if: ${{ !contains(matrix.os, 'windows') }}
-        run: |
-          cd extempore
-          mkdir build
-          cd build
-          env EXT_LLVM_DIR=$GITHUB_WORKSPACE/llvm-3.8.0.install cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
+      - name: Build
+        timeout-minutes: 30
+        run: cmake --build build --parallel 2
 
-      - name: configure extempore (windows)
-        if: contains(matrix.os, 'windows')
-        run: |
-          $Env:EXT_LLVM_DIR="$Env:GITHUB_WORKSPACE/llvm-3.8.0.install"
-          cd extempore
-          mkdir build
-          cd build
-          cmake -DASSETS=ON ${{ matrix.cmake-generator }} ..
-
-      - name: build extempore (macos/linux)
-        if: ${{ !contains(matrix.os, 'windows') }}
-        env:
-          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
-        run: |
-          cd extempore/build
-          cmake --build . -j2 --config ${{ matrix.config }} --target extempore
-
-      - name: build extempore (windows)
-        if: contains(matrix.os, 'windows')
-        env:
-          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/${{ matrix.config }}"
-        run: |
-          cd extempore/build
-          cmake --build . -j2 --config ${{ matrix.config }} --target extempore
-
-      - name: aot-compile-stdlib (macos/linux)
-        if: ${{ !contains(matrix.os, 'windows') }}
-        env:
-          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install"
-        run: |
-          cd extempore/build
-          cmake --build . -j2 --config ${{ matrix.config }}
-
-      - name: aot-compile-stdlib (windows)
-        if: ${{ contains(matrix.os, 'windows') }}
-        env:
-          EXT_LLVM_DIR: "${{ env.GITHUB_WORKSPACE }}/llvm-3.8.0.install/${{ matrix.config }}"
-        run: |
-          cd extempore/build
-          # -j1 due to intermittent flakiness when building AOT in parallel on Windows
-          cmake --build . -j1 --config ${{ matrix.config }}
-
-      - name: test
-        run: cd extempore && cd build && ctest --build-config ${{ matrix.config }} --label-regex libs-core
+      - name: Test
+        timeout-minutes: 15
+        run: ctest --test-dir build --build-config Release --label-regex libs-core --output-on-failure

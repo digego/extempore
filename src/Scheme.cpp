@@ -55,8 +55,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-#include <inttypes.h>
+#include <cinttypes>
 
+#include <chrono>
+#include <thread>
 #include <iostream>
 #include <sstream>
 #ifndef _WIN32
@@ -81,12 +83,12 @@
 # include "dynload.h"
 #endif
 #if USE_MATH
-# include <math.h>
+# include <cmath>
 #endif
-#include <limits.h>
-#include <float.h>
-#include <ctype.h>
-#include <stddef.h>
+#include <climits>
+#include <cfloat>
+#include <cctype>
+#include <cstddef>
 
 #include "UNIV.h"
 #include "SchemeProcess.h"
@@ -117,12 +119,9 @@
 
 #define banner "Extempore"
 
-#include <string.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 
-#ifdef _WIN32
-#define atoll _atoi64
-#endif
 /*
 #if USE_STRLWR
 static const char *strlwr(char *s) {
@@ -169,7 +168,9 @@ inline void unlink(pointer p)
 //int hit_thread_insert = 0;
 
 static long long treadmill_inserts_per_cycle = 0;
+#ifdef TREADMILL_CHECKS
 static int last_call_to_insert_treadmill = 0;
+#endif
 
 inline void insert_treadmill(scheme* sc, pointer p)
 {
@@ -953,7 +954,7 @@ static int alloc_cellseg(scheme *sc, int n) {
     char *cp;
     long i;
     int k;
-    int adj=ADJ;
+    size_t adj=ADJ;
 
     if(adj<sizeof(struct cell)) {
         adj=sizeof(struct cell);
@@ -1080,11 +1081,6 @@ static int alloc_cellseg(scheme *sc, int n) {
     //printf("------------- FINISHED SANITY CHECK TREADMILL AFTER ALLOCATION ---------------\n");
 #endif
 
-    char str[256];
-    //    sprintf(str,"Allocated: %d cell segements for a total of %d.  Free cells = %lld",n,sc->last_cell_seg,sc->fcells);
-    //sprintf(str,"Allocated: %d cell segments for a total of %d.",n,sc->last_cell_seg);
-    //CPPBridge::notification(str);
-    //std::cout << "Allocated: " << n << " Cell Segments For A Total Of " << sc->last_cell_seg << ",  Free Cells = " << sc->fcells << std::endl;
     return n;
 }
 
@@ -1202,7 +1198,7 @@ static inline pointer oblist_find_by_name(scheme *sc, const char *name)
 
 static pointer oblist_all_symbols(scheme *sc)
 {
-    int i;
+    unsigned int i;
     pointer x;
     pointer ob_list = sc->NIL;
 
@@ -1448,7 +1444,7 @@ pointer gensym(scheme *sc) {
     char name[40];
     sc->gensym_cnt++;
     if(sc->gensym_cnt>10000000) sc->gensym_cnt = 0;
-    sprintf(name,"gensym-%ld",sc->gensym_cnt);
+    snprintf(name, sizeof(name), "gensym-%ld",sc->gensym_cnt);
     //printf("gensym %s\n",name);
     x = immutable_cons(sc, mk_string(sc, name), sc->NIL);
     typeflag(x) = T_SYMBOL;
@@ -1551,14 +1547,14 @@ static pointer mk_sharp_const(scheme *sc, char *name) {
     else if (!strcmp(name, "f"))
         return (sc->F);
     else if (*name == 'o') {/* #o (octal) */
-        sprintf(tmp, "0%s", name+1);
+        snprintf(tmp, sizeof(tmp), "0%s", name+1);
         sscanf(tmp, "%lo", &x);
         return (mk_integer(sc, x));
     } else if (*name == 'd') {    /* #d (decimal) */
         sscanf(name+1, "%ld", &x);
         return (mk_integer(sc, x));
     } else if (*name == 'x') {    /* #x (hex) */
-        sprintf(tmp, "0x%s", name+1);
+        snprintf(tmp, sizeof(tmp), "0x%s", name+1);
         sscanf(tmp, "%lx", &x);
         return (mk_integer(sc, x));
     } else if (*name == 'b') {    /* #b (binary) */
@@ -1675,11 +1671,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
         std::cout << "TREADMILL: FLIP SPINNING" << std::endl << std::flush;
 #endif
 
-#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(50));
-#else
-        usleep(50);
-#endif
     }
 #ifdef TREADMILL_DEBUG
     std::cout << "TREADMILL: FINISHSED SPINNING - ON WITH THE WORK" << std::endl << std::flush;
@@ -1797,19 +1789,18 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
     sc->treadmill_scan = sc->treadmill_top; //sc->treadmill_free->_ccw;
     //sc->treadmill_scan->_colour = sc->dark;
 
-//#ifdef TREADMILL_CHECKS
+#if defined(TREADMILL_CHECKS) || defined(TREADMILL_DEBUG)
     /////////////////////////////////////////////////////////////
     //Sanity checks marking free cell colours
     long long free_cells = 0;
     pointer t = sc->treadmill_free;
-#ifdef TREADMILL_CHECKS
     for( ; t != sc->treadmill_bottom ; ++free_cells)
     {
+#ifdef TREADMILL_CHECKS
              t->_list_colour = 0; //set ecrus to frees
+#endif
              t = t->_cw;
     }
-#endif
-
 #ifdef TREADMILL_CHECKS
     if(free_cells != ecrus)
     {
@@ -1817,15 +1808,15 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
         _Error_1(sc, "Old Ecrus should match exactly to new free_cells!", sc->NIL,0);
     }
 #endif
-
 #ifdef TREADMILL_DEBUG
     std::cout << "TREADMILL: # FREE CELLS : " << free_cells << std::endl << std::flush;
+#endif
 #endif
 
     //std::cout << "CELLS IN FREE LIST: " << free_cells << std::endl;
     //    sc->fcells = free_cells;
     //if(sc->fcells < 20000 || (sc->fcells < (sc->allocation_request+20000)))
-    if(treadmill_inserts_per_cycle > ((sc->total_memory_allocated/2)-20000))
+    if(treadmill_inserts_per_cycle > (long long)((sc->total_memory_allocated/2)-20000))
     {
 //              sc->mutex->Lock(); // lock and don't unlock because we're totally broken :(
 //              std::cout << "TREADMILL: RUNNING OUT OF MEMORY!" << std::endl << std::flush;
@@ -1834,7 +1825,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 
         //////////////////////////////////////////
         // ADD NEW MEMORY
-        int adj=ADJ;
+        size_t adj=ADJ;
 
         if(adj<sizeof(struct cell)) {
             adj=sizeof(struct cell);
@@ -1969,11 +1960,7 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
         }catch( ... ) {
             std::cout << "ERROR: SENDING NOTIFICATION TO SCANNER THREAD" << std::endl << std::flush;
         }
-#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(50));
-#else
-        usleep(50);
-#endif
 #ifdef TREADMILL_DEBUG
         std::cout << "SPINNING FLIP WAITING FOR NOTIFICATION" << std::endl << std::flush;
 #endif
@@ -1989,7 +1976,6 @@ static void treadmill_flip(scheme* sc,pointer a,pointer b)
 static void* treadmill_scanner(void* obj)
 {
    scheme* sc = (scheme*) obj;
-   int total_previous_scan = 0;
 
    sc->mutex->lock();
    while(true)
@@ -2001,7 +1987,6 @@ static void* treadmill_scanner(void* obj)
 
        //treadmill_mark_roots(sc);
 
-       total_previous_scan = 0;
        //mutex.Lock();
 
        while(!sc->treadmill_flip_active || sc->treadmill_scan != sc->treadmill_top) { // untill the flip is activated we need to keep checking for new objects that may be added to the grey list
@@ -2099,7 +2084,6 @@ static void* treadmill_scanner(void* obj)
              sc->treadmill_scan->_list_colour = 3;
 #endif
              sc->treadmill_scan = sc->treadmill_scan->_ccw;
-             total_previous_scan++;
 
              if(!(count & 16383)) {         // force a yield every now and then?
                sc->mutex->unlock();
@@ -2109,11 +2093,7 @@ static void* treadmill_scanner(void* obj)
 
            }
          sc->mutex->unlock(); // yeild here to let interpreter add greys to the treadmill!!
-#ifdef _WIN32
          std::this_thread::sleep_for(std::chrono::microseconds(500));
-#else
-         usleep(500);
-#endif
          sc->mutex->lock(); // But lock again after sleep!
        }
 #ifdef _WIN32
@@ -2225,18 +2205,10 @@ static pointer port_from_filename(scheme *sc, const char *fn, int prop) {
 }
 
 static port *port_rep_from_file(scheme *sc, FILE *f, int prop) {
-    char *rw;
     port *pt;
     pt=(port*)sc->malloc(sizeof(port));
     if(pt==0) {
         return 0;
-    }
-    if(prop==(port_input|port_output)) {
-        rw=(char*)"a+";
-    } else if(prop==port_output) {
-        rw=(char*)"w";
-    } else {
-        rw=(char*)"r";
     }
     pt->kind=port_file|prop;
     pt->rep.stdio.file=f;
@@ -2446,7 +2418,7 @@ static pointer readstrexp(scheme *sc) {
 
     for (;;) {
         c=inchar(sc);
-        if(c==EOF || p-sc->strbuff>sizeof(sc->strbuff)-1) {
+        if(c==EOF || (size_t)(p-sc->strbuff)>sizeof(sc->strbuff)-1) {
             printf("String exceeded string buffer size or reached EOF\n");
             return sc->F;
         }
@@ -2670,15 +2642,15 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
     } else if (is_number(l)) {
         p = sc->strbuff;
         if (is_integer(l)) {
-            sprintf(p, "%" PRId64, ivalue_unchecked(l));
+            snprintf(p, sizeof(sc->strbuff), "%" PRId64, ivalue_unchecked(l));
         } else if(is_rational(l)) {
-            sprintf(p, "%" PRId64 "/%" PRId64, ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
+            snprintf(p, sizeof(sc->strbuff), "%" PRId64 "/%" PRId64, ratvalue_unchecked(l).n,ratvalue_unchecked(l).d);
             //sprintf(p, "%ld/%ld", l->_object._number.value.ratvalue.n, l->_object._number.value.ratvalue.d);
         } else {
             //std::stringstream ss;
             //ss << std::fixed << std::showpoint << rvalue_unchecked(l);
             //p = (char*) ss.str().c_str();
-            sprintf(p, "%#.20g", rvalue_unchecked(l));
+            snprintf(p, sizeof(sc->strbuff), "%#.20g", rvalue_unchecked(l));
             //sprintf(p, "%#.4e", rvalue_unchecked(l));
         }
     } else if (is_string(l)) {
@@ -2699,13 +2671,13 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         } else {
             switch(c) {
             case ' ':
-                sprintf(p,"#\\space"); break;
+                snprintf(p, sizeof(sc->strbuff), "#\\space"); break;
             case '\n':
-                sprintf(p,"#\\newline"); break;
+                snprintf(p, sizeof(sc->strbuff), "#\\newline"); break;
             case '\r':
-                sprintf(p,"#\\return"); break;
+                snprintf(p, sizeof(sc->strbuff), "#\\return"); break;
             case '\t':
-                sprintf(p,"#\\tab"); break;
+                snprintf(p, sizeof(sc->strbuff), "#\\tab"); break;
             default:
 #if USE_ASCII_NAMES
                 if(c==127) {
@@ -2715,17 +2687,17 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
                 }
 #else
                 if(c<32) {
-                    sprintf(p,"#\\x%x",c); break;
+                    snprintf(p, sizeof(sc->strbuff), "#\\x%x",c); break;
                 }
 #endif
-                sprintf(p,"#\\%c",c); break;
+                snprintf(p, sizeof(sc->strbuff), "#\\%c",c); break;
             }
         }
     } else if (is_symbol(l)) {
         p = symname_sc(sc,l);
     } else if (is_proc(l)) {
         p = sc->strbuff;
-        sprintf(p, "#<%s PROCEDURE %" PRId64 ">", procname(l),procnum(l));
+        snprintf(p, sizeof(sc->strbuff), "#<%s PROCEDURE %" PRId64 ">", procname(l),procnum(l));
     } else if (is_macro(l)) {
         p = (char*)"#<MACRO>";
     } else if (is_closure(l)) {
@@ -2734,7 +2706,7 @@ static void atom2str(scheme *sc, pointer l, int f, char **pp, int *plen) {
         p = (char*)"#<PROMISE>";
     } else if (is_foreign(l)) {
         p = sc->strbuff;
-        sprintf(p, "#<FOREIGN PROCEDURE %" PRId64 ">", procnum(l));
+        snprintf(p, sizeof(sc->strbuff), "#<FOREIGN PROCEDURE %" PRId64 ">", procnum(l));
     } else if (is_continuation(l)) {
         p = (char*)"#<CONTINUATION>";
     } else if (is_cptr(l)) {
@@ -3098,12 +3070,12 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
         std::stringstream ss;
         extemp::UNIV::printSchemeCell(sc, ss, a, true);
         //sprintf(msg, "position:(%d) in function \"%s\"\n%s\nwith: %s\nTrace: %s",position,fname,s,ss.str().c_str(),sss.str().c_str());
-        sprintf(msg, "%s %s\nTrace: %s",s,ss.str().c_str(),sss.str().c_str());
+        snprintf(msg, sizeof(msg), "%s %s\nTrace: %s",s,ss.str().c_str(),sss.str().c_str());
         sc->error_position = position;
     }else{
         position = location; //sc->code->_size;
         //sprintf(msg, "position:(%d) in function \"%s\"\n%s\nTrace: %s",position,fname,s,sss.str().c_str());
-        sprintf(msg, "%s\nTrace: %s",s,sss.str().c_str());
+        snprintf(msg, sizeof(msg), "%s\nTrace: %s",s,sss.str().c_str());
         sc->error_position = position;
     }
     std::cout << msg << std::endl;
@@ -3117,7 +3089,7 @@ static pointer _Error_1(scheme *sc, const char *s, pointer a, int location, int 
     }
     //memset(fname, 0, 256);
     // this as error return string - we parse this in the editor so it's format is important!
-    sprintf(msg,"%s::%d::%s",fname,position,s);
+    snprintf(msg, sizeof(msg), "%s::%d::%s",fname,position,s);
     putstr(sc, msg); // this line sends fname to scheme stderr (which is read as a return result by schemeinterface)
 
 
@@ -3892,7 +3864,7 @@ static pointer opexe_0(scheme *sc, enum scheme_opcodes op) {
         }
 
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,0);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -4114,7 +4086,7 @@ static pointer opexe_1(scheme *sc, enum scheme_opcodes op) {
         s_goto(sc,OP_APPLY);
 
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,0);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -4586,7 +4558,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
         //s_return(sc,mk_integer(sc,ivalue(car(sc->args))));
 
     case OP_VECREF: { /* vector-ref */
-        int index;
+        unsigned int index;
 
         index=ivalue(cadr(sc->args));
 
@@ -4598,7 +4570,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     }
 
     case OP_VECSET: {   /* vector-set! */
-        int index;
+        unsigned int index;
 
         if(is_immutable(car(sc->args))) {
             Error_1(sc,"vector-set!: unable to alter immutable vector:",car(sc->args),sc->code->_debugger->_size);
@@ -4614,7 +4586,7 @@ static pointer opexe_2(scheme *sc, enum scheme_opcodes op) {
     }
 
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,sc->code->_debugger->_size);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -4792,7 +4764,7 @@ static pointer opexe_3(scheme *sc, enum scheme_opcodes op) {
     case OP_EQV:        /* eqv? */
         s_retbool(eqv_sc(sc, car(sc->args), cadr(sc->args)));
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,sc->code->_debugger->_size);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -5347,7 +5319,7 @@ static pointer opexe_5(scheme *sc, enum scheme_opcodes op) {
     }
 
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,0);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -5404,7 +5376,7 @@ static pointer opexe_6(scheme *sc, enum scheme_opcodes op) {
     case OP_MACROP:          /* macro? */
         s_retbool(is_macro(car(sc->args)));
     default:
-        sprintf(sc->strbuff, "%d: illegal operator", sc->op);
+        snprintf(sc->strbuff, sizeof(sc->strbuff), "%d: illegal operator", sc->op);
         Error_0(sc,sc->strbuff,0);
         // ASIMP
         std::cout << "ILLEGAL OPERATION " << sc->op << std::endl;
@@ -5624,9 +5596,6 @@ const char *procname(pointer x) {
 
 /* kernel of this interpreter */
 static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
-    int count=0;
-    int old_op;
-
     sc->op = op;
     for (;;) {
         if(extemp::UNIV::TIME > sc->call_end_time)
@@ -5634,9 +5603,9 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
             std::cout << "TIME:" << extemp::UNIV::TIME << " END:" << sc->call_end_time << std::endl;
             char msg[512];
             if(is_symbol(sc->last_symbol_apply)) {
-                sprintf(msg,"\"%s\" Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n",symname_sc(sc,sc->last_symbol_apply));
+                snprintf(msg, sizeof(msg), "\"%s\" Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n",symname_sc(sc,sc->last_symbol_apply));
             }else{
-                sprintf(msg,"Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n");
+                snprintf(msg, sizeof(msg), "Exceeded maximum runtime. If you need a higher default process execution time use sys:set-default-timeout\n");
             }
             sc->call_end_time = ULLONG_MAX;
             _Error_1(sc, msg, sc->NIL, sc->code->_debugger->_size);
@@ -5652,7 +5621,7 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
             /* Check number of arguments */
             if(n<pcd->min_arity) {
                 ok=0;
-                sprintf(msg,"function(%s): needs%s %d argument(s)",
+                snprintf(msg, sizeof(msg), "function(%s): needs%s %d argument(s)",
                         pcd->name,
                         pcd->min_arity==pcd->max_arity?"":" at least",
                         pcd->min_arity);
@@ -5662,14 +5631,14 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
             }
             if(ok && n>pcd->max_arity) {
                 ok=0;
-                sprintf(msg,"function(%s): needs%s %d argument(s)",
+                snprintf(msg, sizeof(msg), "function(%s): needs%s %d argument(s)",
                         pcd->name,
                         pcd->min_arity==pcd->max_arity?"":" at most",
                         pcd->max_arity);
                 std::cout << "PROBLEM HERE B? " << std::endl;
             }
             if(ok) {
-                if(pcd->arg_tests_encoding!=0) {
+                if(pcd->arg_tests_encoding!=0 && n>0) {
                     int i=0;
                     int j;
                     const char *t=pcd->arg_tests_encoding;
@@ -5716,7 +5685,6 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
                 pcd=dispatch_table+sc->op;
             }
         }
-        old_op=sc->op;
         if (pcd->func(sc, (enum scheme_opcodes)sc->op) == sc->NIL) {
             return;
         }
@@ -5725,7 +5693,6 @@ static void Eval_Cycle(scheme *sc, enum scheme_opcodes op) {
             fprintf(stderr,"No memory!\n");
             return;
         }
-        count++;
     }
 }
 
@@ -5928,16 +5895,11 @@ int scheme_init_custom_alloc(scheme *sc, func_alloc malloc, func_dealloc free) {
 
     // setup treadmill stuff
     sc->mutex = new extemp::EXTMutex("treadmill_mutex");
-    sc->mutex->init();
     sc->Treadmill_Guard = new extemp::EXTMonitor("treadmill_guard");
-    sc->Treadmill_Guard->init();
 
     sc->treadmill_flip_active = false;
     sc->treadmill_scanner_finished = false;
 
-
-    //define keywords
-    int dispatch_table_length = sizeof(dispatch_table) / sizeof(dispatch_table[0]);
 
     treadmill_mark_roots(sc, sc->NIL, sc->NIL);
 

@@ -66,31 +66,8 @@ private:
     std::string  m_name;
     EXTMutex     m_mutex;
     EXTCondition m_condition;
-    bool         m_initialised;
 public:
-    EXTMonitor(const std::string& Name): m_name(Name), m_mutex(Name), m_initialised(false) {
-        init();
-    }
-    ~EXTMonitor() {
-        destroy();
-    }
-
-    void init()
-    {
-        if (!m_initialised)
-        {
-            m_mutex.init();
-            m_condition.init();
-            m_initialised = true;
-        }
-    }
-    void destroy() {
-        if (m_initialised)
-        {
-            m_initialised = false;
-            m_mutex.destroy();
-            m_condition.destroy();
-        }
+    EXTMonitor(const std::string& Name): m_name(Name), m_mutex(Name) {
     }
     void lock() {
         m_mutex.lock();

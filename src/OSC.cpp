@@ -38,16 +38,17 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
-#include <math.h>
+#include <cmath>
+
+#include <chrono>
+#include <thread>
 
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <stdlib.h>
+#include <cstdlib>
 
 #ifdef _WIN32
-#include <thread>
-#include <chrono>
 #else
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -236,8 +237,8 @@ uint32_t unswap32i(uint32_t a)
 namespace extemp {
 
   std::map<scheme*, OSC*> OSC::SCHEME_MAP;
-  //OSC* OSC::singleton = NULL;
-  //scheme* OSC::sc = NULL;
+  //OSC* OSC::singleton = nullptr;
+  //scheme* OSC::sc = nullptr;
 
   int get_message_length(std::string& typetags, char* args)
   {
@@ -327,7 +328,7 @@ namespace extemp {
       }
     }
     ss << ")";
-    if(_sc != NULL) {
+    if(_sc != nullptr) {
 #ifdef _OSC_DEBUG_
       std::cout << "SEND SCHEME: " << ss.str() << std::endl;
 #endif
@@ -395,7 +396,7 @@ namespace extemp {
       }
     }
     ss << ")";
-    if(scm != NULL) {
+    if(scm != nullptr) {
 #ifdef _OSC_DEBUG_
       std::cout << "SEND SCHEME: " << ss.str() << std::endl;
 #endif
@@ -427,12 +428,12 @@ namespace extemp {
       std::string netaddy(inet_ntoa(osc->getClientAddress()->sin_addr));
       int netport = (int) ntohs(osc->getClientAddress()->sin_port);
 #endif
-      if(osc->getNativeUDP() != NULL) {       
+      if(osc->getNativeUDP() != nullptr) {       
         char* args = osc->getMessageData();
         int (*nativeUDP) (char*,int) = osc->getNativeUDP();
         nativeUDP(args,bytes_read);
       }
-      if(bytes_read > -1 && osc->getNativeUDP() == NULL) {
+      if(bytes_read > -1 && osc->getNativeUDP() == nullptr) {
         //printf("udp packet size(%lld)\n",bytes_read);
         //std::cout << "OSC from client port: " << osc->getClientAddress() << " " << osc->getAddress() <<  std::endl;
         char* args = osc->getMessageData();
@@ -472,7 +473,7 @@ namespace extemp {
             res = OSC::getOSCString(args+pos,&typetags);
             used += res;
             pos += res;
-            if(osc->getNativeOSC() == NULL) {
+            if(osc->getNativeOSC() == nullptr) {
               int ret_from_call = send_scheme_call(osc->sc,osc->fname,timestamp,address,typetags,netaddy,netport,args+pos);
               if(ret_from_call < 0) break;
               else pos += size-used; //ret_from_call;
@@ -483,7 +484,7 @@ namespace extemp {
             }
           }
         }else{
-          if(osc->getNativeOSC() == NULL) {
+          if(osc->getNativeOSC() == nullptr) {
             pos += OSC::getOSCString(args+pos,&typetags);
             pos += send_scheme_call(osc->sc,osc->fname,0.0,address,typetags,netaddy,netport,args+pos);
           }else{
@@ -504,14 +505,10 @@ namespace extemp {
         //osc->getCallback()(address,typetags,args,(bytes_read - (typetags_length + address_length)),reply,&reply_length,&caller);
         //if(reply_length > 0) sendto(osc->getSocketFD(), reply, reply_length, 0, (struct sockaddr*)osc->getClientAddress(), osc->sizeOfClientAddress());
       }else{
-#ifdef _WIN32
         std::this_thread::sleep_for(std::chrono::microseconds(1000));
-#else
-        usleep(1000);
-#endif
       }
     }
-    return NULL;
+    return nullptr;
   }
 
 #ifdef _WIN32
@@ -519,7 +516,7 @@ namespace extemp {
   {
     // seed rng for process
     // UNIV::initRand();
-    return NULL;
+    return nullptr;
   }
 #else
 
@@ -529,7 +526,6 @@ namespace extemp {
   // 0 = still filling packet + active escape is OFF
   // -1 = bad packet
   int parse_osc_slip_data(std::vector<char>* data, char* buf, int res, bool active_escape) {
-    std::vector<char>::iterator it = data->end();
     // copy buf into data
     for(int i=0;i<res;i++,buf++) {
       switch(*buf){
@@ -558,7 +554,7 @@ namespace extemp {
 
   int process_osc_data(SchemeProcess* scm, OSC* osc, struct sockaddr_in client_address, char* args, long length) {
     //printf("Processing osc data %lld:%p\n",length,args);
-    if(length > 0 && args != NULL) {
+    if(length > 0 && args != nullptr) {
       // process the OSC data (should be its own method)
       double timestamp;
       long oscpos = 0;
@@ -595,7 +591,7 @@ namespace extemp {
           res = OSC::getOSCString(args+oscpos,&typetags);
           used += res;
           oscpos += res;
-          if(osc->getNativeOSC() == NULL) {
+          if(osc->getNativeOSC() == nullptr) {
             int ret_from_call = send_scheme_process_call(scm,osc->fname,timestamp,address,typetags,args+oscpos);
             if(ret_from_call < 0) break;
             else oscpos += size-used; //ret_from_call;
@@ -606,7 +602,7 @@ namespace extemp {
           }
         }
       }else{
-        if(osc->getNativeOSC() == NULL) {
+        if(osc->getNativeOSC() == nullptr) {
           oscpos += OSC::getOSCString(args+oscpos,&typetags);
           oscpos += send_scheme_process_call(scm,osc->fname,0.0,address,typetags,args+oscpos);
         }else{
@@ -651,7 +647,7 @@ namespace extemp {
 
     fd_set rfd; //open read sockets (man select for more info)
     std::vector<int> client_sockets;
-    std::map<int,std::vector<char>*> data_map;
+    std::map<int,std::vector<char>> data_map;
     std::map<int,bool> data_packet;
     std::map<int,bool> data_active_escape;
     FD_ZERO(&rfd); //zero out open sockets
@@ -659,7 +655,7 @@ namespace extemp {
     FD_SET(socket_fd, &rfd); //add server socket to open sockets list
     int highest_fd = socket_fd+1;
     //printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
-    int BUFLEN = 1024;
+    static constexpr int BUFLEN = 1024;
     char buf[BUFLEN];
     while(scm->getRunning()) {
       fd_set c_rfd;
@@ -668,7 +664,7 @@ namespace extemp {
       timeval pause;
       pause.tv_sec = 1;
       pause.tv_usec = 0;
-      int res = select(highest_fd, &c_rfd, NULL, NULL, &pause);
+      int res = select(highest_fd, &c_rfd, nullptr, nullptr, &pause);
       if(res >= 0) {
       }else{
         struct stat buf;
@@ -696,7 +692,7 @@ namespace extemp {
         if(res >= highest_fd) highest_fd = res+1;
         FD_SET(res, &rfd); //add new socket to the FD_SET
         client_sockets.push_back(res);
-        data_map[res] = new std::vector<char>;
+        data_map[res] = std::vector<char>();
         std::string outstr ("OSC connected over TCP.");
         write(res, outstr.c_str(), outstr.length()+1);
         continue;
@@ -707,12 +703,11 @@ namespace extemp {
       while(pos != client_sockets.end()) { // check through all fd's for matches against FD_ISSET
         if(FD_ISSET(*pos, &c_rfd)) { //see if any client sockets have data for us
           int sock = *pos;
-          for(int j=0; true; j++) { //read from stream in BUFLEN blocks
+          for(;;) { //read from stream in BUFLEN blocks
             res = read(sock, buf, BUFLEN);
             if(res == 0) { //close the socket
               FD_CLR(sock, &rfd);
-              delete(data_map[sock]);
-              data_map[sock] = 0;
+              data_map.erase(sock);
               ascii_warning();
               std::cout << "Closed TCP-OSC Socket" << std::endl;
               ascii_normal();
@@ -748,19 +743,19 @@ namespace extemp {
             // OK from here we can assume that we are
             // in a valid OSC SLIP packet and can start
             // loading up data_map[sock]
-            int result = parse_osc_slip_data(data_map[sock],bufptr,res,data_active_escape[sock]);
+            int result = parse_osc_slip_data(&data_map[sock],bufptr,res,data_active_escape[sock]);
 
             if(result == 2) { // complete osc packet
               //printf("full osc packet\n");
-              process_osc_data(scm, osc, client_address, data_map[sock]->data(), data_map[sock]->size());
-              data_map[sock]->clear();
+              process_osc_data(scm, osc, client_address, data_map[sock].data(), data_map[sock].size());
+              data_map[sock].clear();
               data_active_escape[sock] = false;
               data_packet[sock] = false;
             }else if(result == -1){ // bad osc packet
               ascii_error();
               printf("Bad SLIP OSC Packet!!!!!\n");
               ascii_normal();
-              data_map[sock]->clear();
+              data_map[sock].clear();
               data_active_escape[sock] = false;
               data_packet[sock] = false;
             }else if(result == 0 || result == 1) { // more reading to do
@@ -770,7 +765,7 @@ namespace extemp {
               ascii_error();
               printf("Unknown return type from parse_osc_slip_data!!!!!\n");
               ascii_normal();
-              data_map[sock]->clear();
+              data_map[sock].clear();
               data_active_escape[sock] = false;
               data_packet[sock] = false;
             }
@@ -798,8 +793,7 @@ namespace extemp {
         continue;
       }
       FD_CLR(sock, &rfd);
-      delete(data_map[sock]);
-      data_map[sock] = 0;
+      data_map.erase(sock);
       std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
       close(sock);
       std::cout << "DONE-CLOSING_CLIENT" << std::endl;
@@ -807,11 +801,11 @@ namespace extemp {
     }
     if(close(socket_fd)) {
       std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
-      perror(NULL);
+      perror(nullptr);
     }
     delete sop;
     std::cout << "Exiting server thread" << std::endl;
-    return NULL;
+    return nullptr;
   }
 #endif
 
@@ -942,11 +936,7 @@ namespace extemp {
 
   int OSC::setOSCTimestamp(char* data, double d)
   {
-#ifdef _WIN32
-    uint32_t seconds = (uint32_t) d;
-#else
-    uint32_t seconds = trunc(d);
-#endif
+    uint32_t seconds = static_cast<uint32_t>(d);
 
     double fractional = d - (double) seconds;
     seconds += 3187296000ul; //1543503872;
@@ -1151,36 +1141,36 @@ namespace extemp {
 
     pointer arg = pair_cadddr(args);
     int tmpsize = 1024;
-    char* tmp = (char*) malloc(tmpsize);
-    //char tmp[1024];
-    ptr = tmp;
+    std::vector<char> tmp(tmpsize);
+    char* tmpPtr = tmp.data();
+    ptr = tmpPtr;
     int lgth = 0;
-    processArgs(arg,&tmp,&ptr,&lgth,typetags,_sc);
+    processArgs(arg,&tmpPtr,&ptr,&lgth,typetags,_sc);
 
-    char* message = (char*) malloc(1024+tmpsize);
-    ptr = message;
+    std::vector<char> message(1024 + tmpsize);
+    ptr = message.data();
     ret = OSC::setOSCString(ptr, &address);
     length += ret; ptr += ret;
     ret = OSC::setOSCString(ptr, &typetags);
     length += ret; ptr += ret;
-    memcpy(ptr, tmp, lgth);
+    memcpy(ptr, tmp.data(), lgth);
     length += lgth;
 #ifdef _OSC_DEBUG_
-    std::cout << "SENDING MSG: " << message << "  of size: " << length << std::endl;
+    std::cout << "SENDING MSG: " << message.data() << "  of size: " << length << std::endl;
 #endif
 
 #ifdef _WIN32
     int err = 0;
     if(OSC::I(_sc)->send_from_serverfd) {
-      err = fd->send_to(std::experimental::net::buffer(message, length), sa);
+      err = fd->send_to(std::experimental::net::buffer(message.data(), length), sa);
     }else{
       std::experimental::net::io_context service;
       std::experimental::net::ip::udp::socket socket(service);
       socket.open(std::experimental::net::ip::udp::v4());
-      socket.send_to(std::experimental::net::buffer(message, length), sa);
+      socket.send_to(std::experimental::net::buffer(message.data(), length), sa);
     }
 #else
-    int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
+    int err = sendto(fd, message.data(), length, 0, (struct sockaddr*)&sa, sizeof(sa));
     if(!OSC::I(_sc)->send_from_serverfd) close(fd);
 #endif
     if(err < 0)
@@ -1195,9 +1185,6 @@ namespace extemp {
         }
 
       }
-
-    free(tmp);
-    free(message);
 
     delete t->getArg();
     return;
@@ -1264,14 +1251,14 @@ namespace extemp {
     if(pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
       if (pair_cdddr(args) != _sc->NIL && pair_cadddr(args) == _sc->T) {
         osc->setNativeUDP( (int(*)(char*,int)) cptr_value(pair_caddr(args)));
-        osc->setNativeOSC(NULL);
+        osc->setNativeOSC(nullptr);
       }else{        
         osc->setNativeOSC( (int(*)(char*,char*,char*,int)) cptr_value(pair_caddr(args)));
-        osc->setNativeUDP(NULL);
+        osc->setNativeUDP(nullptr);
       }
     }else{
-      osc->setNativeOSC(NULL);
-      osc->setNativeUDP(NULL);      
+      osc->setNativeOSC(nullptr);
+      osc->setNativeUDP(nullptr);      
     }
 
     // setup server port

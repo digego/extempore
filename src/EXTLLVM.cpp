@@ -40,34 +40,47 @@
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Config/llvm-config.h" // for LLVM_VERSION_STRING
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/Interpreter.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/LinkAllPasses.h"
+#include "llvm/IR/Verifier.h"
+
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/OptimizationLevel.h"
+
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetOptions.h"
-#include "llvm/Support/MemoryObject.h"
+#include "llvm/Support/Error.h"
+#include "llvm/TargetParser/Host.h"
+
 #include "llvm/MC/MCAsmInfo.h"
-#include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCDisassembler/MCDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/MC/MCInstrInfo.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 
 #include <random>
 #include <fstream>
-#include "stdarg.h"
+#include <mutex>
+#include <unordered_map>
+#include <set>
+#include <cmath>
+#include <cstdlib>
+#include <cstdarg>
 
 #include <EXTLLVM.h>
 #include <EXTClosureAddressTable.h>
@@ -78,7 +91,7 @@
 #include <Scheme.h>
 #include <pcre.h>
 #include <OSC.h>
-#include <math.h>
+#include <cmath>
 #include <BranchPrediction.h>
 
 #ifdef _WIN32
@@ -110,10 +123,10 @@
 #include <arpa/inet.h>
 #endif
 
-#ifdef _WIN32
 #include <chrono>
 #include <thread>
-#else
+
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 
@@ -125,14 +138,14 @@ std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
 
 EXPORT void* malloc16(size_t Size)
 {
+    if (!Size) {
+        return nullptr;
+    }
 #ifdef _WIN32
     return _aligned_malloc(Size, 16);
 #else
-    void* result;
-    if (posix_memalign(&result, 16, Size)) {
-        return nullptr;
-    }
-    return result;
+    Size = (Size + 15) & ~size_t(15);
+    return std::aligned_alloc(16, Size);
 #endif
 }
 
@@ -140,8 +153,65 @@ EXPORT void free16(void* Ptr) {
 #ifdef _WIN32
     _aligned_free(Ptr);
 #else
-    free(Ptr);
+    std::free(Ptr);
 #endif
+}
+
+// Portable conversion from 80-bit extended precision (big-endian) to double.
+// Used for reading AIFF audio files, which store sample rate in this format.
+// Format: 1 sign bit, 15 exponent bits, 64 mantissa bits (with explicit integer bit)
+EXPORT double fp80_to_double_portable(const unsigned char* bytes)
+{
+    // Read big-endian 80-bit value
+    unsigned int exponent = (unsigned(bytes[0]) << 8) | bytes[1];
+    uint64_t mantissa = (uint64_t(bytes[2]) << 56) | (uint64_t(bytes[3]) << 48) |
+                        (uint64_t(bytes[4]) << 40) | (uint64_t(bytes[5]) << 32) |
+                        (uint64_t(bytes[6]) << 24) | (uint64_t(bytes[7]) << 16) |
+                        (uint64_t(bytes[8]) << 8)  | uint64_t(bytes[9]);
+
+    // Extract sign bit
+    int sign = (exponent >> 15) & 1;
+    exponent &= 0x7FFF;
+
+    // Handle special cases.
+    if (exponent == 0 && mantissa == 0) {
+        return sign ? -0.0 : 0.0;
+    }
+    if (exponent == 0x7FFF) {
+        // Infinity or NaN - for audio sample rates, this shouldn't happen.
+        return sign ? -INFINITY : INFINITY;
+    }
+
+    // Convert to double.
+    // x86_fp80 exponent bias is 16383, double bias is 1023
+    int64_t exp_unbiased = int64_t(exponent) - 16383;
+
+    // The mantissa has an explicit integer bit (bit 63).
+    // Double has implicit integer bit, so we need to handle this.
+    union { uint64_t i; double d; } result;
+
+    if (mantissa & (1ULL << 63)) {
+        // Normal number - integer bit is set.
+        // Remove the integer bit and shift mantissa to fit in double's 52-bit mantissa.
+        uint64_t double_mantissa = (mantissa & 0x7FFFFFFFFFFFFFFFULL) >> 11;
+        int64_t double_exp = exp_unbiased + 1023;
+
+        if (double_exp >= 2047) {
+            // Overflow to infinity.
+            return sign ? -INFINITY : INFINITY;
+        } else if (double_exp <= 0) {
+            // Underflow - denormalized or zero.
+            return sign ? -0.0 : 0.0;
+        } else {
+            // Pack into IEEE 754 double format.
+            result.i = (uint64_t(sign) << 63) | (uint64_t(double_exp) << 52) | double_mantissa;
+        }
+    } else {
+        // Denormalized or pseudo-denormalized - rare for audio sample rates.
+        return sign ? -0.0 : 0.0;
+    }
+
+    return result.d;
 }
 
 const char* llvm_scheme_ff_get_name(foreign_func ff)
@@ -183,13 +253,13 @@ EXPORT void llvm_schedule_callback(long long time, void* dat)
 
 EXPORT void* llvm_get_function_ptr(char* fname)
 {
-  return reinterpret_cast<void*>(extemp::EXTLLVM::EE->getFunctionAddress(fname));
+  return reinterpret_cast<void*>(extemp::EXTLLVM::getFunctionAddress(fname));
 }
 
 EXPORT char* extitoa(int64_t val)
 {
     static thread_local char buf[32];
-    sprintf(buf, "%" PRId64, val);
+    snprintf(buf, sizeof(buf), "%" PRId64, val);
     return buf;
 }
 
@@ -247,7 +317,7 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
   int ret = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
   if (ret) { printf("Error: Could not open set socket to broadcast mode\n"); }
   //////////////////////////////////////
-    
+
   int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
   close(fd);
 #endif
@@ -437,7 +507,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
   // Module* M = extemp::EXTLLVM::M;
   std::string funcname(xtlang_name);
   std::string getter("_getter");
-  void*(*p)() = (void*(*)()) extemp::EXTLLVM::EE->getFunctionAddress(funcname + getter);
+  void*(*p)() = (void*(*)()) extemp::EXTLLVM::getFunctionAddress(funcname + getter);
   if (!p) {
     printf("Error attempting to set environment variable in closure %s.%s\n",fname,vname);
     return _sc->F;
@@ -524,40 +594,143 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym)
 namespace extemp {
 namespace EXTLLVM {
 
-llvm::ExecutionEngine* EE = nullptr;
-llvm::legacy::PassManager* PM;
-llvm::legacy::PassManager* PM_NO;
-llvm::Module* M = nullptr; // TODO: obsolete?
+// ORC JIT
+std::unique_ptr<llvm::orc::LLJIT> JIT = nullptr;
+std::unique_ptr<llvm::orc::ThreadSafeContext> TSC = nullptr;
+
+llvm::orc::ThreadSafeContext& getThreadSafeContext() {
+    // Ensure the thread-safe context exists before returning a reference
+    if (!TSC) {
+        TSC = std::make_unique<llvm::orc::ThreadSafeContext>(
+            std::make_unique<llvm::LLVMContext>());
+    }
+    return *TSC;
+}
+
 std::vector<llvm::Module*> Ms;
 int64_t LLVM_COUNT = 0l;
 bool OPTIMIZE_COMPILES = true;
 bool VERIFY_COMPILES = true;
+int OPTIMIZATION_LEVEL = 2;  // Default to O2
 
-static llvm::SectionMemoryManager* MM = nullptr;
+// Map from counter-less adhoc names to their full counter-ful names.
+// e.g. "foo_adhoc_W2k4K_native" -> "foo_adhoc_9_W2k4K_native"
+// The xtlang get_native_fptr macro generates names without the counter,
+// but the compiled functions include an adhoc counter in their names.
+static std::unordered_map<std::string, std::string> sAdhocAliases;
 
-uint64_t getSymbolAddress(const std::string& name) {
-    return MM->getSymbolAddress(name);
+static std::string stripAdhocCounter(std::string_view name) {
+    auto pos = name.find("_adhoc_");
+    if (pos == std::string_view::npos) return "";
+    size_t afterAdhoc = pos + 7;
+    size_t counterEnd = afterAdhoc;
+    while (counterEnd < name.size() && name[counterEnd] >= '0' && name[counterEnd] <= '9') {
+        counterEnd++;
+    }
+    if (counterEnd > afterAdhoc && counterEnd < name.size() && name[counterEnd] == '_') {
+        return std::string(name.substr(0, afterAdhoc)) + std::string(name.substr(counterEnd + 1));
+    }
+    return "";
+}
+
+void registerAdhocAlias(std::string_view fullName) {
+    auto alias = stripAdhocCounter(fullName);
+    if (!alias.empty()) {
+        sAdhocAliases[alias] = std::string(fullName);
+    }
+}
+
+// Get function address - main lookup function
+uint64_t getFunctionAddress(std::string_view name) {
+    if (!JIT) {
+        return 0;
+    }
+
+    auto sym = JIT->lookup(llvm::StringRef(name.data(), name.size()));
+    if (!sym) {
+        llvm::consumeError(sym.takeError());
+        // Fall back to counter-less adhoc alias lookup
+        auto it = sAdhocAliases.find(std::string(name));
+        if (it != sAdhocAliases.end()) {
+            auto sym2 = JIT->lookup(it->second);
+            if (sym2) return sym2->getValue();
+            llvm::consumeError(sym2.takeError());
+        }
+        return 0;
+    }
+    return sym->getValue();
+}
+
+// Remove a single symbol from the JIT - called from Scheme via llvm:erase-function
+bool removeSymbol(const std::string& name) {
+    if (!JIT) return false;
+
+    auto& ES = JIT->getExecutionSession();
+    auto& JD = JIT->getMainJITDylib();
+
+    // Try to remove both mangled and unmangled versions
+    for (const auto& tryName : {name, "_" + name}) {
+        llvm::orc::SymbolNameSet toRemove;
+        toRemove.insert(ES.intern(tryName));
+        if (auto err = JD.remove(toRemove)) {
+            llvm::consumeError(std::move(err));
+        }
+    }
+    return true;
+}
+
+// Add a module to the JIT
+// Symbol removal for redefinition is handled by Scheme calling llvm:erase-function
+// BEFORE sending the IR to be compiled. This ensures symbols are only removed
+// when we actually intend to redefine them.
+llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, const std::vector<std::string>& symbolNames) {
+    if (!JIT) return llvm::make_error<llvm::StringError>("JIT not initialized", llvm::inconvertibleErrorCode());
+
+    if (auto err = JIT->addIRModule(std::move(TSM))) {
+        return err;
+    }
+
+    return llvm::Error::success();
 }
 
 EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
 {
     size_t code_size = 1024 * 100;
     std::string Error;
-    llvm::TargetMachine *TM = extemp::EXTLLVM::EE->getTargetMachine();
-    llvm::Triple Triple = TM->getTargetTriple();
-    const llvm::Target TheTarget = TM->getTarget();
-    std::string TripleName = Triple.getTriple();
-    //const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(ArchName,Triple,Error);
-    const llvm::MCRegisterInfo* MRI(TheTarget.createMCRegInfo(TripleName));
-    const llvm::MCAsmInfo* AsmInfo(TheTarget.createMCAsmInfo(*MRI,TripleName));
-    const llvm::MCSubtargetInfo* STI(TheTarget.createMCSubtargetInfo(TripleName,"",""));
-    const llvm::MCInstrInfo* MII(TheTarget.createMCInstrInfo());
-    //const llvm::MCInstrAnalysis* MIA(TheTarget->createMCInstrAnalysis(MII->get()));
-    llvm::MCContext Ctx(AsmInfo, MRI, nullptr);
-    llvm::MCDisassembler* DisAsm(TheTarget.createMCDisassembler(*STI, Ctx));
-    llvm::MCInstPrinter* IP(TheTarget.createMCInstPrinter(Triple,syntax,*AsmInfo,*MII,*MRI)); //,*STI));
+
+    // Get target triple from host
+    std::string TripleName = llvm::sys::getProcessTriple();
+    llvm::Triple Triple(TripleName);
+
+    // Look up target
+    const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(TripleName, Error);
+    if (!TheTarget) {
+        std::string errMsg = "Disassembler error: " + Error;
+        return strdup(errMsg.c_str());
+    }
+
+    std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TripleName));
+    if (!MRI) return strdup("Failed to create MCRegisterInfo");
+
+    llvm::MCTargetOptions MCOptions;
+    std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
+    if (!AsmInfo) return strdup("Failed to create MCAsmInfo");
+
+    std::unique_ptr<const llvm::MCSubtargetInfo> STI(TheTarget->createMCSubtargetInfo(TripleName, "", ""));
+    if (!STI) return strdup("Failed to create MCSubtargetInfo");
+
+    std::unique_ptr<const llvm::MCInstrInfo> MII(TheTarget->createMCInstrInfo());
+    if (!MII) return strdup("Failed to create MCInstrInfo");
+
+    llvm::MCContext Ctx(Triple, AsmInfo.get(), MRI.get(), STI.get());
+    std::unique_ptr<llvm::MCDisassembler> DisAsm(TheTarget->createMCDisassembler(*STI, Ctx));
+    if (!DisAsm) return strdup("Failed to create MCDisassembler");
+
+    std::unique_ptr<llvm::MCInstPrinter> IP(TheTarget->createMCInstPrinter(Triple, syntax, *AsmInfo, *MII, *MRI));
+    if (!IP) return strdup("Failed to create MCInstPrinter");
+
     IP->setPrintImmHex(true);
-    IP->setUseMarkup(true);
+
     std::string out_str;
     llvm::raw_string_ostream OS(out_str);
     llvm::ArrayRef<uint8_t> mem(Code, code_size);
@@ -566,7 +739,7 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
     OS << "\n";
     for (index = 0; index < code_size; index += size) {
         llvm::MCInst Inst;
-        if (DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls(), llvm::nulls())) {
+        if (DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls())) {
             auto instSize(*reinterpret_cast<const size_t*>(Code + index));
             if (instSize <= 0) {
                 break;
@@ -576,7 +749,7 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
             OS.write_hex(size_t(Code) + index);
             OS.write(": ", 2);
             OS.write_hex(instSize);
-            IP->printInst(&Inst, OS, "", *STI);
+            IP->printInst(&Inst, 0, "", *STI, OS);
             OS << "\n";
         } else if (!size) {
             size = 1;
@@ -668,7 +841,6 @@ EXPORT double audio_clock_now()
 EXPORT void* mutex_create()
 {
     auto mutex(new EXTMutex);
-    mutex->init();
     return mutex;
 }
 
@@ -735,205 +907,192 @@ EXPORT void* thread_self()
 
 EXPORT int64_t thread_sleep(int64_t Secs, int64_t Nanosecs)
 {
-#ifdef _WIN32
     std::this_thread::sleep_for(std::chrono::seconds(Secs) + std::chrono::nanoseconds(Nanosecs));
     return 0;
-#else
-    timespec a = { Secs, Nanosecs };
-    timespec b;
-    while (true) {
-        auto res(nanosleep(&a ,&b));
-        if (likely(!res)) {
-            return 0;
-        }
-        if (unlikely(errno != EINTR)) {
-            return -1;
-        }
-        a = b;
-    }
-#endif
 }
 
 
+// Register a symbol with the JIT
+static void registerSymbol(const char* name, void* addr) {
+    if (!JIT) return;
+    auto& ES = JIT->getExecutionSession();
+    auto& JD = JIT->getMainJITDylib();
+
+    llvm::orc::SymbolMap Symbols;
+    Symbols[ES.intern(name)] = {
+        llvm::orc::ExecutorAddr::fromPtr(addr),
+        llvm::JITSymbolFlags::Exported
+    };
+
+    auto err = JD.define(llvm::orc::absoluteSymbols(std::move(Symbols)));
+    if (err) {
+        llvm::consumeError(std::move(err));
+    }
+}
+
 void initLLVM()
 {
-    if (unlikely(EE)) {
+    if (unlikely(JIT)) {
         return;
     }
-    llvm::TargetOptions Opts;
-    Opts.GuaranteedTailCallOpt = true;
-    Opts.UnsafeFPMath = false;
+
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
-    LLVMInitializeX86Disassembler();
-    auto& context(llvm::getGlobalContext());
-    auto module(llvm::make_unique<llvm::Module>("xtmmodule_0", context));
-    M = module.get();
-    addModule(M);
-    if (!extemp::UNIV::ARCH.empty()) {
-        M->setTargetTriple(extemp::UNIV::ARCH);
-    }
-    // Build engine with JIT
-    llvm::EngineBuilder factory(std::move(module));
-    factory.setEngineKind(llvm::EngineKind::JIT);
-    factory.setTargetOptions(Opts);
-    auto mm(llvm::make_unique<llvm::SectionMemoryManager>());
-    MM = mm.get();
-    factory.setMCJITMemoryManager(std::move(mm));
-#ifdef _WIN32
-    if (!extemp::UNIV::ATTRS.empty()) {
-        factory.setMAttrs(extemp::UNIV::ATTRS);
-    }
-    if (!extemp::UNIV::CPU.empty()) {
-        factory.setMCPU(extemp::UNIV::CPU);
-    }
-    llvm::TargetMachine* tm = factory.selectTarget();
-#else
-    factory.setOptLevel(llvm::CodeGenOpt::Aggressive);
-    llvm::Triple triple(llvm::sys::getProcessTriple());
-    std::string cpu;
-    if (!extemp::UNIV::CPU.empty()) {
-        cpu = extemp::UNIV::CPU.front();
-    } else {
-        cpu = llvm::sys::getHostCPUName();
-    }
-    llvm::SmallVector<std::string, 10> lattrs;
-    if (!extemp::UNIV::ATTRS.empty()) {
-        for (const auto& attr : extemp::UNIV::ATTRS) {
-            lattrs.append(1, attr);
-        }
-    } else {
-        llvm::StringMap<bool> HostFeatures;
-        llvm::sys::getHostCPUFeatures(HostFeatures);
+    llvm::InitializeNativeTargetAsmParser();
+    llvm::InitializeNativeTargetDisassembler();
+
+    // Create thread-safe context
+    TSC = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
+
+    // Build LLJIT
+    auto JITBuilder = llvm::orc::LLJITBuilder();
+
+    // Configure target machine
+    std::string triple = llvm::sys::getProcessTriple();
+    std::string cpu = extemp::UNIV::CPU.empty() ?
+        std::string(llvm::sys::getHostCPUName()) : extemp::UNIV::CPU;
+
+    // Get host features
+    auto HostFeatures = llvm::sys::getHostCPUFeatures();
+    std::vector<std::string> featureVec;
+    std::string featureString;
         for (auto& feature : HostFeatures) {
-		  std::string featureName = feature.getKey().str();
-		  // temporarily disable all AVX512-related codegen because it
-		  // causes crashes on this old version of LLVM - see GH #378 for
-		  // more details.
-		  if (feature.getValue() && featureName.compare(0, 6, "avx512")){
-			lattrs.append(1, featureName);
-		  }else{
-			lattrs.append(1, std::string("-") + featureName);
-		  }
-        }
+        std::string featureStr;
+        featureStr += (feature.getValue() ? "+" : "-");
+        featureStr += feature.getKey().str();
+        featureVec.push_back(featureStr);
+        if (!featureString.empty()) featureString += ",";
+        featureString += featureStr;
     }
-    llvm::TargetMachine* tm = factory.selectTarget(triple, "", cpu, lattrs);
-#endif // _WIN32
-    EE = factory.create(tm);
-    EE->DisableLazyCompilation(true);
+
+    // Store triple for later use.
+    if (extemp::UNIV::ARCH.empty()) {
+        extemp::UNIV::ARCH = triple;
+		  }
+
+    // Set up target machine builder with actual CPU features.
+    JITBuilder.setJITTargetMachineBuilder(
+        llvm::orc::JITTargetMachineBuilder(llvm::Triple(triple))
+            .setCPU(cpu)
+            .addFeatures(featureVec)
+            .setCodeGenOptLevel(llvm::CodeGenOptLevel::Aggressive));
+
+    // Create the JIT.
+    auto JITResult = JITBuilder.create();
+    if (!JITResult) {
+        std::cerr << "ERROR: Failed to create LLJIT: "
+                  << llvm::toString(JITResult.takeError()) << std::endl;
+        exit(1);
+    }
+    JIT = std::move(*JITResult);
+
+    // Add DynamicLibrarySearchGenerator to make all process symbols available.
+    auto& MainJD = JIT->getMainJITDylib();
+    auto DLSGOrErr = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+        JIT->getDataLayout().getGlobalPrefix());
+    if (!DLSGOrErr) {
+        std::cerr << "ERROR: Failed to create DynamicLibrarySearchGenerator: "
+                  << llvm::toString(DLSGOrErr.takeError()) << std::endl;
+        exit(1);
+    }
+    MainJD.addGenerator(std::move(*DLSGOrErr));
+
+    // Print configuration.
     ascii_normal();
     std::cout << "ARCH           : " << std::flush;
     ascii_info();
-    std::cout << std::string(tm->getTargetTriple().normalize()) << std::endl;
-#ifdef _WIN32
-    if (!std::string(tm->getTargetFeatureString()).empty()) {
-#else
-    if (!std::string(tm->getTargetCPU()).empty()) {
-#endif
+    std::cout << triple << std::endl;
+
+    if (!cpu.empty()) {
         ascii_normal();
         std::cout << "CPU            : " << std::flush;
         ascii_info();
-        std::cout << std::string(tm->getTargetCPU()) << std::endl;
+        std::cout << cpu << std::endl;
     }
-    if (!std::string(tm->getTargetFeatureString()).empty()) {
-        ascii_normal();
-        std::cout << "ATTRS          : " << std::flush;
-        auto data(tm->getTargetFeatureString().data());
-        for (; *data; ++data) {
-            switch (*data) {
-            case '+':
-                ascii_info();
-                break;
-            case '-':
-                ascii_error();
-                break;
-            case ',':
-                ascii_normal();
-                break;
-            }
-            putchar(*data);
-        }
-        putchar('\n');
-    }
+
     ascii_normal();
     std::cout << "LLVM           : " << std::flush;
     ascii_info();
     std::cout << LLVM_VERSION_STRING;
-    std::cout << " MCJIT" << std::endl;
+    std::cout << " ORC JIT" << std::endl;
     ascii_normal();
-    PM_NO = new llvm::legacy::PassManager();
-    PM_NO->add(llvm::createAlwaysInlinerPass());
-    PM = new llvm::legacy::PassManager();
-    PM->add(llvm::createAggressiveDCEPass());
-    PM->add(llvm::createAlwaysInlinerPass());
-    PM->add(llvm::createArgumentPromotionPass());
-    PM->add(llvm::createCFGSimplificationPass());
-    PM->add(llvm::createDeadStoreEliminationPass());
-    PM->add(llvm::createFunctionInliningPass());
-    PM->add(llvm::createGVNPass(true));
-    PM->add(llvm::createIndVarSimplifyPass());
-    PM->add(llvm::createInstructionCombiningPass());
-    PM->add(llvm::createJumpThreadingPass());
-    PM->add(llvm::createLICMPass());
-    PM->add(llvm::createLoopDeletionPass());
-    PM->add(llvm::createLoopRotatePass());
-    PM->add(llvm::createLoopUnrollPass());
-    PM->add(llvm::createMemCpyOptPass());
-    PM->add(llvm::createPromoteMemoryToRegisterPass());
-    PM->add(llvm::createReassociatePass());
-    PM->add(llvm::createScalarReplAggregatesPass());
-    PM->add(llvm::createSCCPPass());
-    PM->add(llvm::createTailCallEliminationPass());
 
-    static struct {
-        const char* name;
-        uintptr_t   address;
-    } mappingTable[] = {
-        { "llvm_zone_destroy", uintptr_t(&extemp::EXTZones::llvm_zone_destroy) },
-    };
-    for (auto& elem : mappingTable) {
-        EE->updateGlobalMapping(elem.name, elem.address);
-    }
+    // Register built-in symbols with the JIT.
 
-    // tell LLVM about some built-in functions
-    EE->updateGlobalMapping("get_address_offset", (uint64_t)&extemp::ClosureAddressTable::get_address_offset);
-    EE->updateGlobalMapping("string_hash", (uint64_t)&string_hash);
-    EE->updateGlobalMapping("swap64i", (uint64_t)&swap64i);
-    EE->updateGlobalMapping("swap64f", (uint64_t)&swap64f);
-    EE->updateGlobalMapping("swap32i", (uint64_t)&swap32i);
-    EE->updateGlobalMapping("swap32f", (uint64_t)&swap32f);
-    EE->updateGlobalMapping("unswap64i", (uint64_t)&unswap64i);
-    EE->updateGlobalMapping("unswap64f", (uint64_t)&unswap64f);
-    EE->updateGlobalMapping("unswap32i", (uint64_t)&unswap32i);
-    EE->updateGlobalMapping("unswap32f", (uint64_t)&unswap32f);
-    EE->updateGlobalMapping("rsplit", (uint64_t)&rsplit);
-    EE->updateGlobalMapping("rmatch", (uint64_t)&rmatch);
-    EE->updateGlobalMapping("rreplace", (uint64_t)&rreplace);
-    EE->updateGlobalMapping("r64value", (uint64_t)&r64value);
-    EE->updateGlobalMapping("mk_double", (uint64_t)&mk_double);
-    EE->updateGlobalMapping("r32value", (uint64_t)&r32value);
-    EE->updateGlobalMapping("mk_float", (uint64_t)&mk_float);
-    EE->updateGlobalMapping("mk_i64", (uint64_t)&mk_i64);
-    EE->updateGlobalMapping("mk_i32", (uint64_t)&mk_i32);
-    EE->updateGlobalMapping("mk_i16", (uint64_t)&mk_i16);
-    EE->updateGlobalMapping("mk_i8", (uint64_t)&mk_i8);
-    EE->updateGlobalMapping("mk_i1", (uint64_t)&mk_i1);
-    EE->updateGlobalMapping("string_value", (uint64_t)&string_value);
-    EE->updateGlobalMapping("mk_string", (uint64_t)&mk_string);
-    EE->updateGlobalMapping("cptr_value", (uint64_t)&cptr_value);
-    EE->updateGlobalMapping("mk_cptr", (uint64_t)&mk_cptr);
-    EE->updateGlobalMapping("sys_sharedir", (uint64_t)&sys_sharedir);
-    EE->updateGlobalMapping("sys_slurp_file", (uint64_t)&sys_slurp_file);
-    extemp::EXTLLVM::EE->finalizeObject();
+    // Zone memory management functions
+    registerSymbol("llvm_zone_destroy", (void*)&extemp::EXTZones::llvm_zone_destroy);
+    registerSymbol("llvm_zone_malloc", (void*)&extemp::EXTZones::llvm_zone_malloc);
+    registerSymbol("llvm_zone_malloc_from_current_zone", (void*)&extemp::EXTZones::llvm_zone_malloc_from_current_zone);
+    registerSymbol("llvm_zone_print", (void*)&extemp::EXTZones::llvm_zone_print);
+    registerSymbol("llvm_zone_ptr_size", (void*)&extemp::EXTZones::llvm_zone_ptr_size);
+    registerSymbol("llvm_zone_copy_ptr", (void*)&extemp::EXTZones::llvm_zone_copy_ptr);
+    registerSymbol("llvm_ptr_in_zone", (void*)&extemp::EXTZones::llvm_ptr_in_zone);
+    registerSymbol("llvm_ptr_in_current_zone", (void*)&extemp::EXTZones::llvm_ptr_in_current_zone);
+    registerSymbol("llvm_pop_zone_stack", (void*)&extemp::EXTZones::llvm_pop_zone_stack);
+    registerSymbol("llvm_zone_callback_setup", (void*)&extemp::EXTZones::llvm_zone_callback_setup);
+    registerSymbol("llvm_peek_zone_stack_extern", (void*)&extemp::EXTZones::llvm_peek_zone_stack_extern);
+    registerSymbol("llvm_push_zone_stack_extern", (void*)&extemp::EXTZones::llvm_push_zone_stack_extern);
+    registerSymbol("llvm_zone_create_extern", (void*)&extemp::EXTZones::llvm_zone_create_extern);
+    registerSymbol("llvm_destroy_zone_after_delay", (void*)&llvm_destroy_zone_after_delay);
+
+    // Closure address table functions
+    registerSymbol("get_address_offset", (void*)&extemp::ClosureAddressTable::get_address_offset);
+    registerSymbol("add_address_table", (void*)&extemp::ClosureAddressTable::add_address_table);
+    registerSymbol("get_address_table", (void*)&extemp::ClosureAddressTable::get_address_table);
+    registerSymbol("check_address_exists", (void*)&extemp::ClosureAddressTable::check_address_exists);
+    registerSymbol("check_address_type", (void*)&extemp::ClosureAddressTable::check_address_type);
+    registerSymbol("string_hash", (void*)&string_hash);
+    registerSymbol("swap64i", (void*)&swap64i);
+    registerSymbol("swap64f", (void*)&swap64f);
+    registerSymbol("swap32i", (void*)&swap32i);
+    registerSymbol("swap32f", (void*)&swap32f);
+    registerSymbol("unswap64i", (void*)&unswap64i);
+    registerSymbol("unswap64f", (void*)&unswap64f);
+    registerSymbol("unswap32i", (void*)&unswap32i);
+    registerSymbol("unswap32f", (void*)&unswap32f);
+    registerSymbol("rsplit", (void*)&rsplit);
+    registerSymbol("rmatch", (void*)&rmatch);
+    registerSymbol("rreplace", (void*)&rreplace);
+    registerSymbol("r64value", (void*)&r64value);
+    registerSymbol("mk_double", (void*)&mk_double);
+    registerSymbol("r32value", (void*)&r32value);
+    registerSymbol("mk_float", (void*)&mk_float);
+    registerSymbol("mk_i64", (void*)&mk_i64);
+    registerSymbol("mk_i32", (void*)&mk_i32);
+    registerSymbol("mk_i16", (void*)&mk_i16);
+    registerSymbol("mk_i8", (void*)&mk_i8);
+    registerSymbol("mk_i1", (void*)&mk_i1);
+    registerSymbol("string_value", (void*)&string_value);
+    registerSymbol("mk_string", (void*)&mk_string);
+    registerSymbol("cptr_value", (void*)&cptr_value);
+    registerSymbol("mk_cptr", (void*)&mk_cptr);
+    registerSymbol("sys_sharedir", (void*)&sys_sharedir);
+    registerSymbol("sys_slurp_file", (void*)&sys_slurp_file);
+    registerSymbol("fp80_to_double_portable", (void*)&fp80_to_double_portable);
+
     return;
 }
 
 } // namespace EXTLLVM
 } // namespace extemp
 
-#include <unordered_map>
-
 static std::unordered_map<std::string, const llvm::GlobalValue*> sGlobalMap;
+
+// Cleanup handler to avoid segfaults during static destruction
+static void cleanupLLVM() {
+    sGlobalMap.clear();
+    extemp::EXTLLVM::Ms.clear();
+    // Reset the JIT to release resources.
+    if (extemp::EXTLLVM::JIT) {
+        extemp::EXTLLVM::JIT.reset();
+    }
+}
+
+static struct EXTLLVMCleanupRegistrar {
+    EXTLLVMCleanupRegistrar() {
+        std::atexit(cleanupLLVM);
+    }
+} sCleanupRegistrar;
 
 namespace extemp {
 
@@ -943,12 +1102,13 @@ void EXTLLVM::addModule(llvm::Module* Module)
         std::string str;
         llvm::raw_string_ostream stream(str);
         function.printAsOperand(stream, false);
-        auto result(sGlobalMap.insert(std::make_pair(stream.str().substr(1), &function)));
+        std::string funcName = stream.str().substr(1);
+        auto result(sGlobalMap.insert(std::make_pair(funcName, &function)));
         if (!result.second) {
             result.first->second = &function;
         }
     }
-    for (const auto& global : Module->getGlobalList()) {
+    for (const auto& global : Module->globals()) {
         std::string str;
         llvm::raw_string_ostream stream(str);
         global.printAsOperand(stream, false);
@@ -958,6 +1118,10 @@ void EXTLLVM::addModule(llvm::Module* Module)
         }
     }
     Ms.push_back(Module);
+}
+
+void EXTLLVM::removeFromGlobalMap(const std::string& name) {
+    sGlobalMap.erase(name);
 }
 
 const llvm::GlobalValue* EXTLLVM::getGlobalValue(const char* Name)

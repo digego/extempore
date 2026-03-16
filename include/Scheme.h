@@ -58,9 +58,9 @@
 #ifndef _SCHEME_H
 #define _SCHEME_H
 
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdint>
 
 #include "BranchPrediction.h"
 #include "UNIV.h"
@@ -407,12 +407,16 @@ EXPORT inline int is_rational(pointer Ptr) { return Ptr->_object._number.num_typ
 EXPORT inline char*& strvalue(pointer Ptr) { return Ptr->_object._string._svalue; }
 EXPORT inline auto strlength(pointer Ptr) -> decltype(cell::_object._string._length)& { return Ptr->_object._string._length; }
 
+} // extern "C"
+
 class ScmRuntimeError {
 public:
   ScmRuntimeError(const char* _msg, pointer _p) {msg = _msg;p = _p;};
   const char* msg;
   pointer p;
 };
+
+extern "C" {
 
 inline char* string_value(pointer Ptr)
 {
@@ -422,7 +426,7 @@ inline char* string_value(pointer Ptr)
     return strvalue(Ptr);
 }
 
-}
+} // extern "C"
 
 #endif
 

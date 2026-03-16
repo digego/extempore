@@ -55,10 +55,15 @@
     (if *impc:compiler:print-raw-llvm*
         (print-full-nq *impc:compiler:queued-llvm-ir-string*))
     (if (not (string=? *impc:compiler:queued-llvm-ir-string* ""))
-        (let ((res (llvm:jit-compile-ir-string *impc:compiler:queued-llvm-ir-string*)))
+        (let* ((ir-to-compile *impc:compiler:queued-llvm-ir-string*)
+               (res (llvm:jit-compile-ir-string ir-to-compile)))
           (impc:compiler:reset-jit-compilation-queue)
-          ;; (print "Flushed IR compilation queue with result: " res "\n")
-          res))))
+          (if (not res)
+              (begin
+                (print "FLUSH FAILED. IR was:\n")
+                (print-full-nq ir-to-compile)))
+          res)
+        #t)))
 
 ;; JIT-compile the IR string, or queue it for AOT-compilation
 (define llvm:compile-ir
@@ -130,7 +135,8 @@
   (lambda (str)
     (let* ((r1 (car (regex:split str "##")))
            (r2 (impc:ir:get-ptr-depth r1))
-           (r3 (string-append "^([^%]*)%*[a-z]*" (apply string-append (make-list r2 "\\*")) "$")))
+           (stars (if (= r2 0) "" (apply string-append (make-list r2 "\\*"))))
+           (r3 (string-append "^([^%]*)%*[a-z]*" stars "$")))
       ;; (println str r2 "$1")
       (regex:replace r1 r3 "$1"))))
 
@@ -141,17 +147,19 @@
   (lambda (str)
     (let* ((r1 (car (regex:split str "##")))
            (r2 (impc:ir:get-ptr-depth r1))
-           (r3 (string-append "^(.*)" (apply string-append (make-list r2 "\\*")) "$")))
-      ;; (println str r2 "$1")
+           (stars (if (= r2 0) "" (apply string-append (make-list r2 "\\*"))))
+           (r3 (string-append "^(.*)" stars "$")))
       (regex:replace r1 r3 "$1"))))
 
 
 (define impc:ir:get-ptr-depth
   (lambda (t)
     (if (string? t)
-        (string-length (cadr (regex:matched t "([*]*)($|#)")))
+        (let ((m (regex:matched t "([*]*)($|#)")))
+          (if (null? m)
+              0
+              (string-length (cadr m))))
         (let ((slc (impc:ir:str-list-check t)))
-                                        ;(println 't: t 'slc: slc)
           (if (string? slc)
               (impc:ir:get-ptr-depth slc)
               (real->integer (floor (/ (impc:ir:str-list-check slc) *impc:ir:pointer*))))))))
@@ -342,7 +350,6 @@
 
 (define impc:ir:get-type-from-pretty-str
   (lambda (string-type . args)
-    ;; (println 'pretty-string-type-in string-type)
     (let ((res (apply impc:ir:get-type-from-pretty-str-rec string-type args)))
       ;; (println 'pretty-string-type string-type 'to res)
       res)))
@@ -4122,13 +4129,13 @@
 (define impc:ir:intrinsic-substitution
   (lambda (name)
     (cond
-      ((string=? name "memcpy") "llvm.memcpy.p0i8.p0i8.i64")
+      ((string=? name "memcpy") "llvm.memcpy.p0.p0.i64")
       (else name))))
 
 (define impc:ir:function-fixup-args
   (lambda (name)
     (cond
-      ((string=? name "memcpy") ", i32 1, i1 0")
+      ((string=? name "memcpy") ", i1 0")
       (else ""))))
 
 (define impc:ir:compiler:native-call

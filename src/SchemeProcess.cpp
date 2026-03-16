@@ -41,10 +41,13 @@
 #include <iosfwd>
 #include <iomanip>
 #include <stdexcept>
-#include <errno.h>
+#include <cerrno>
 
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
@@ -54,21 +57,6 @@
 CMRC_DECLARE(xtm);
 #endif
 
-static void usleep(LONGLONG Us)
-{
-    auto timer(CreateWaitableTimer(NULL, TRUE, NULL));
-    if (!timer) {
-        return;
-    }
-    LARGE_INTEGER li;
-    li.QuadPart = -Us * 10;
-    if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
-        CloseHandle(timer);
-        return;
-    }
-    WaitForSingleObject(timer, INFINITE);
-    CloseHandle(timer);
-}
 #else
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -80,7 +68,7 @@ static int closesocket(int Socket) {
     return close(Socket);
 }
 #endif
-#include <stdlib.h>
+#include <cstdlib>
 #include "UNIV.h"
 
 #define EXT_INITEXPR_BUFLEN 1024
@@ -101,7 +89,7 @@ namespace EXTZones {
 
 namespace extemp {
 
-thread_local SchemeProcess* SchemeProcess::sm_current = 0;
+thread_local SchemeProcess* SchemeProcess::sm_current = nullptr;
 const char* SchemeProcess::sm_banner = "\n"
         "##########################################\n"
         "##                                      ##\n"
@@ -170,36 +158,39 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
 
 bool SchemeProcess::start(bool subsume)
 {
-    //set socket options
-    int t_reuse = 1;
-    setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse), sizeof(t_reuse));
-    struct sockaddr_in address;
-    memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_port = htons(m_serverPort);
-    address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
-    if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
-		ascii_error();
-		printf("ERROR:");
-		ascii_normal();
-        std::cout << " server: could not bind server socket on port " << m_serverPort << std::endl;
-        m_running = false;
-        return false;
-    }
-    if (listen(m_serverSocket, 5) < 0) {
-	    ascii_error();
-		printf("ERROR:");
-		ascii_normal();
-        std::cout << " problem listening to extempore socket" << std::endl;
-        m_running = false;
-        return false;
+    if (!UNIV::BATCH_MODE) {
+        //set socket options
+        int t_reuse = 1;
+        setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse), sizeof(t_reuse));
+        struct sockaddr_in address;
+        memset(&address, 0, sizeof(address));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(m_serverPort);
+        address.sin_addr.s_addr = htonl(INADDR_ANY); //set server's IP
+        if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
+            ascii_error();
+            printf("ERROR:");
+            ascii_normal();
+            std::cout << " server: could not bind server socket on port " << m_serverPort << std::endl;
+            m_running = false;
+            return false;
+        }
+        if (listen(m_serverSocket, 5) < 0) {
+            ascii_error();
+            printf("ERROR:");
+            ascii_normal();
+            std::cout << " problem listening to extempore socket" << std::endl;
+            m_running = false;
+            return false;
+        }
     }
     if (subsume) {
       m_threadTask.setSubsume();
     }
-    m_guard.init();    
-    m_threadServer.start();
-    m_threadTask.start();    
+    if (!UNIV::BATCH_MODE) {
+        m_threadServer.start();
+    }
+    m_threadTask.start();
     return true;
 }
 
@@ -273,11 +264,7 @@ void* SchemeProcess::taskImpl()
 {
     sm_current = this;
     OSC::schemeInit(this);
-#ifdef _WIN32
-    Sleep(1000);
-#else
-    sleep(1); // give time for NSApp etc. to init
-#endif
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // give time for NSApp etc. to init
     while(!m_running) {
     }
 #ifdef DYLIB
@@ -290,11 +277,7 @@ void* SchemeProcess::taskImpl()
     loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
 #endif
     m_libsLoaded = true;
-#ifdef _WIN32
-    Sleep(2000);
-#else
-    sleep(2); // give time for NSApp etc. to init
-#endif
+    std::this_thread::sleep_for(std::chrono::seconds(2)); // give time for NSApp etc. to init
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         EXTMonitor::ScopedLock lock(m_guard);
@@ -342,7 +325,7 @@ void* SchemeProcess::taskImpl()
     }
     while (likely(m_running)) {
         if (unlikely(m_taskQueue.empty())) {
-            usleep(1000); // 1 ms
+            std::this_thread::sleep_for(std::chrono::microseconds(1000)); // 1 ms
             continue;
         }
         while (likely(!m_taskQueue.empty() && m_running)) {
@@ -390,8 +373,8 @@ void* SchemeProcess::taskImpl()
                                 auto minutes(time / UNIV::MINUTE());
                                 time -= minutes * UNIV::MINUTE();
                                 auto seconds(time / UNIV::SECOND());
-                                char prompt[24];
-                                sprintf(prompt, "\n[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
+                                char prompt[32];
+                                snprintf(prompt, sizeof(prompt), "\n[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
                                 ss << prompt;
                             }
                             UNIV::printSchemeCell(m_scheme, ss, m_scheme->value);
@@ -465,7 +448,7 @@ void* SchemeProcess::taskImpl()
 void* SchemeProcess::serverImpl()
 {
     while (!m_libsLoaded) {
-        usleep(1000);
+        std::this_thread::sleep_for(std::chrono::microseconds(1000));
     }
     fd_set readFds;
     std::vector<SOCKET> clientSockets;
@@ -476,7 +459,7 @@ void* SchemeProcess::serverImpl()
     while (m_running) {
         fd_set curReadFds;
         FD_COPY(&readFds, &curReadFds);
-        int res(select(numFds, &curReadFds, NULL, NULL, nullptr));
+        int res(select(numFds, &curReadFds, nullptr, nullptr, nullptr));
         if (unlikely(res < 0)) { // assumes only one failure
             auto iter(clientSockets.begin());
             for (; iter != clientSockets.end(); ++iter) {
@@ -517,8 +500,8 @@ void* SchemeProcess::serverImpl()
                 auto minutes(time / UNIV::MINUTE());
                 time -= minutes * UNIV::MINUTE();
                 auto seconds(time / UNIV::SECOND());
-                char prompt[23];
-                sprintf(prompt, "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
+                char prompt[32];
+                snprintf(prompt, sizeof(prompt), "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours), unsigned(minutes), unsigned(seconds));
                 outString += prompt;
             } else {
                 outString += "Welcome to extempore!";
@@ -574,8 +557,8 @@ void* SchemeProcess::serverImpl()
                     std::string::size_type end = evalStr.find_first_of('\x0d', pos);
                     for (; end != std::string::npos; pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
                         EXTMonitor::ScopedLock lock(m_guard, true);
-                        char c[8];
-                        sprintf(c, "%i", int(sock));
+                        char c[16];
+                        snprintf(c, sizeof(c), "%i", int(sock));
                         std::string* s = new std::string(evalStr.substr(pos, end - pos + 1));
                         // std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << *s << std::endl;
                         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c, SchemeTask::Type::REPL));
@@ -591,7 +574,7 @@ void* SchemeProcess::serverImpl()
     }
     if (closesocket(m_serverSocket)) {
         std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
-        perror(NULL);
+        perror(nullptr);
     }
     std::cout << "Exiting server thread" << std::endl;
     return this;

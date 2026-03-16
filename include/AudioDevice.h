@@ -48,7 +48,7 @@
 #include <portaudio.h>
 #endif
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <vector>
 #include "UNIV.h"

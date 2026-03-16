@@ -1,7 +1,7 @@
 #if !defined(nanotime_H_)
 #define nanotime_H_
 
-#include <stdint.h>
+#include <cstdint>
 
 static inline uint64_t rdtsc()
 {

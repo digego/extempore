@@ -34,9 +34,9 @@
  */
 
 #include "UNIV.h"
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cmath>
+#include <cstdlib>
+#include <cstdio>
 #include <string>
 #include <sstream>
 #include <iosfwd>
@@ -103,8 +103,8 @@ static char base64_std_encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H
                                            'w', 'x', 'y', 'z', '0', '1', '2', '3',
                                            '4', '5', '6', '7', '8', '9', '+', '/'};
 
-static char *base64_std_decoding_table = NULL;
-static char *base64_codesafe_decoding_table = NULL;
+static char *base64_std_decoding_table = nullptr;
+static char *base64_codesafe_decoding_table = nullptr;
 static int _base64_mod_table[] = {0, 2, 1};
 
 void base64_std_build_decoding_table() {
@@ -138,7 +138,7 @@ EXPORT char* cname_encode(char *data, size_t input_length, size_t *output_length
     //char *encoded_data = (char*) malloc(*output_length);
     char *encoded_data = (char*) malloc(*output_length+1);
     encoded_data[*output_length] = 0;
-    if (encoded_data == NULL) return NULL;
+    if (encoded_data == nullptr) return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -164,9 +164,9 @@ EXPORT char* cname_encode(char *data, size_t input_length, size_t *output_length
 
 EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length)
 {
-    if (base64_codesafe_decoding_table == NULL) base64_codesafe_build_decoding_table();
+    if (base64_codesafe_decoding_table == nullptr) base64_codesafe_build_decoding_table();
 
-    char* d2 = NULL;
+    char* d2 = nullptr;
     // pad with $'s
     if (input_length % 4 != 0) {
       int lgthdiff = (4-(input_length % 4));
@@ -179,14 +179,14 @@ EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length
       data = d2;
     }
 
-    if (input_length % 4 != 0) return NULL;
+    if (input_length % 4 != 0) return nullptr;
     *output_length = input_length / 4 * 3;
     if (data[input_length - 1] == '$') (*output_length)--;
     if (data[input_length - 2] == '$') (*output_length)--;
 
     char *decoded_data = (char*) malloc(*output_length+1);
     decoded_data[*output_length] = 0;
-    if (decoded_data == NULL) return NULL;
+    if (decoded_data == nullptr) return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -216,7 +216,7 @@ EXPORT char* base64_encode(const unsigned char *data, size_t input_length, size_
     char *encoded_data = (char*) malloc(*output_length+1);
     encoded_data[*output_length]=0;
 
-    if (encoded_data == NULL) return NULL;
+    if (encoded_data == nullptr) return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -241,16 +241,16 @@ EXPORT char* base64_encode(const unsigned char *data, size_t input_length, size_
 
 EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_t *output_length)
 {
-    if (base64_std_decoding_table == NULL) base64_std_build_decoding_table();
+    if (base64_std_decoding_table == nullptr) base64_std_build_decoding_table();
 
-    if (input_length % 4 != 0) return NULL;
+    if (input_length % 4 != 0) return nullptr;
 
     *output_length = input_length / 4 * 3;
     if (data[input_length - 1] == '=') (*output_length)--;
     if (data[input_length - 2] == '=') (*output_length)--;
 
     unsigned char *decoded_data = (unsigned char*) malloc(*output_length);
-    if (decoded_data == NULL) return NULL;
+    if (decoded_data == nullptr) return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -287,12 +287,12 @@ EXPORT bool rmatch(char* regex, const char* str)
                         0, /* default options */
                         &error, /* for error message */
                         &erroffset, /* for error offset */
-                        NULL); /* use default character tables */
+                        nullptr); /* use default character tables */
 
   int rc;
   int ovector[30];
   rc = pcre_exec(       re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
+                        nullptr, /* we didn’t study the pattern */
                         data, /* the subject string */
                         strlen(data), /* the length of the subject string */
                         0, /* start at offset 0 in the subject */
@@ -315,12 +315,12 @@ EXPORT bool rmatch(char* regex, const char* str)
 //                              0, /* default options */
 //                              &error, /* for error message */
 //                              &erroffset, /* for error offset */
-//                              NULL); /* use default character tables */
+//                              nullptr); /* use default character tables */
 
 //      int rc;
 //      int ovector[60];
 //      rc = pcre_exec( re, /* result of pcre_compile() */
-//                      NULL, /* we didn’t study the pattern */
+//                      nullptr, /* we didn’t study the pattern */
 //                      data, /* the subject string */
 //                      strlen(data), /* the length of the subject string */
 //                      0, /* start at offset 0 in the subject */
@@ -363,7 +363,7 @@ EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
                                 0, /* default options */
                                 &error, /* for error message */
                                 &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
+                                nullptr); /* use default character tables */
 
         // pointer to hold return results
         int rc;
@@ -372,7 +372,7 @@ EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
 
         while(true) {
             rc = pcre_exec(     re, /* result of pcre_compile() */
-                                NULL, /* we didn’t study the pattern */
+                                nullptr, /* we didn’t study the pattern */
                                 data, /* the subject string */
                                 strlen(data), /* the length of the subject string */
                                 0, /* start at offset 0 in the subject */
@@ -415,11 +415,11 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
                         0, /* default options */
                         &error, /* for error message */
                         &erroffset, /* for error offset */
-                        NULL); /* use default character tables */
+                        nullptr); /* use default character tables */
   int rc;
   int ovector[60];
   rc = pcre_exec(       re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the regex */
+                        nullptr, /* we didn’t study the regex */
                         str, /* the subject string */
                         strlen(str), /* the length of the subject string */
                         0, /* start at offset 0 in the subject */
@@ -454,13 +454,13 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
                                 0, /* default options */
                                 &error, /* for error message */
                                 &erroffset, /* for error offset */
-                                NULL); /* use default character tables */
+                                nullptr); /* use default character tables */
 
         int rc;
         int ovector[60];
 
         rc = pcre_exec( re, /* result of pcre_compile() */
-                        NULL, /* we didn’t study the pattern */
+                        nullptr, /* we didn’t study the pattern */
                         data, /* the subject string */
                         strlen(data), /* the length of the subject string */
                         0, /* start at offset 0 in the subject */
@@ -479,7 +479,7 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
         int pos,range,size,cnt = 0;
   strcpy(result,replace);
         char* p = strtok(result,sep);
-  if(p==NULL) { strcpy(result, str); return result; };
+  if(p==nullptr) { strcpy(result, str); return result; };
         do{
             char* cc;
             pos = strtol(p,&cc,10);
@@ -497,7 +497,7 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
             memcpy(tmp+size,data+ovector[pos*2],range);
             memcpy(tmp+size+range,cc,strlen(cc));
             res = tmp;
-            p = strtok(NULL, sep);
+            p = strtok(nullptr, sep);
       cnt++;
         }while(p);
         // now we can use "rep" to replace the original regex match (i.e. ovector[0]-ovector[1])
@@ -538,7 +538,7 @@ EXPORT char* sys_slurp_file(const char* fname)
     buf[file_size-1] = '\0';
     return buf;
   }
-  return NULL;
+  return nullptr;
 }
 
 EXPORT int register_for_window_events()
@@ -570,6 +570,7 @@ double AUDIO_CLOCK_NOW = 0.0;
 double AUDIO_CLOCK_BASE = 0.0;
 uint64_t TIME_DIVISION = 1;
 bool AUDIO_NONE = false;
+bool BATCH_MODE = false;
 uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
 std::string AUDIO_DEVICE_NAME;
@@ -597,17 +598,6 @@ double midi2frq(double pitch)
 double frqRatio(double semitones)
 {
     return pow(2.0, (semitones/12.0));
-}
-
-bool file_check(const std::string& filename)
-{
-    FILE* fd = fopen(filename.c_str(),"r");
-    if(fd == NULL){
-        return false;
-    }else{
-        fclose(fd);
-        return true;
-    }
 }
 
 struct dump_stack_frame {
