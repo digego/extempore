@@ -769,7 +769,8 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
 
     // Look up the target
     std::string error;
-    auto target = llvm::TargetRegistry::lookupTarget(triple, error);
+    llvm::Triple tripleObj(triple);
+    auto target = llvm::TargetRegistry::lookupTarget(tripleObj, error);
     if (!target) {
         std::cerr << "llvm:emit-object-file: " << error << std::endl;
         return Scheme->F;

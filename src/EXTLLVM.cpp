@@ -703,20 +703,20 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax)
     llvm::Triple Triple(TripleName);
 
     // Look up target
-    const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(TripleName, Error);
+    const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(Triple, Error);
     if (!TheTarget) {
         std::string errMsg = "Disassembler error: " + Error;
         return strdup(errMsg.c_str());
     }
 
-    std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(TripleName));
+    std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Triple));
     if (!MRI) return strdup("Failed to create MCRegisterInfo");
 
     llvm::MCTargetOptions MCOptions;
-    std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(TheTarget->createMCAsmInfo(*MRI, TripleName, MCOptions));
+    std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(TheTarget->createMCAsmInfo(*MRI, Triple, MCOptions));
     if (!AsmInfo) return strdup("Failed to create MCAsmInfo");
 
-    std::unique_ptr<const llvm::MCSubtargetInfo> STI(TheTarget->createMCSubtargetInfo(TripleName, "", ""));
+    std::unique_ptr<const llvm::MCSubtargetInfo> STI(TheTarget->createMCSubtargetInfo(Triple, "", ""));
     if (!STI) return strdup("Failed to create MCSubtargetInfo");
 
     std::unique_ptr<const llvm::MCInstrInfo> MII(TheTarget->createMCInstrInfo());
