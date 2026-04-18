@@ -35,6 +35,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Restore LLVM cache
+        id: cache-llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
+
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -47,6 +57,20 @@ jobs:
 
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DASSETS=ON
+
+      - name: Build LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: cmake --build build --target llvm-libs
+
+      - name: Save LLVM cache
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
 
       - name: Build
         run: cmake --build build --parallel 2
