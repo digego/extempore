@@ -3,6 +3,72 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.9.0-beta
+
+A major release, shipped as a beta so the new platforms, toolchain, and asset
+packaging can bake before cutting a stable v0.9.0. See `MERGE_CHANGELOG.md`
+for the full breakdown.
+
+### Platforms
+
+- Linux aarch64 and macOS arm64 (Apple Silicon) are now first-class targets in
+  the CI matrix alongside Linux x86_64 and Windows x86_64.
+
+### Toolchain
+
+- LLVM upgraded from 17 to **22.1.1**. JIT migrated from the legacy JIT to
+  **ORC JIT**.
+- LLVM is now fetched and built in-tree via CMake's `FetchContent` (replacing
+  `ExternalProject`); only the components Extempore uses are built.
+- Minimum CMake 3.28. Builds use the Ninja generator.
+
+### Scheme interpreter
+
+- **TinyScheme replaced with s7**. All Scheme/xtlang code now runs through
+  `src/SchemeS7.cpp` with compatibility shims for TinyScheme APIs.
+
+### Graphics
+
+- OpenGL graphics stack replaced with **WebGPU via wgpu-native**. New
+  `libs/external/webgpu.xtm`, Shadertoy-style live-coding lib
+  (`libs/external/shadertoy.xtm`), and two WebGPU examples
+  (`webgpu-triangle.xtm`, `shadertoy.xtm`).
+- Legacy OpenGL examples, shader tutorials, and graphics libraries removed.
+
+### Compiler
+
+- Major refactor of `runtime/llvmti.xtm` into separate modules.
+- Converted caches to hashtables, replaced regex with string ops, added
+  structured error handling. `sTypeDefinitions` string accumulator replaced
+  with structured maps.
+- New compiler unit test suite (`tests/compiler/`).
+
+### Runtime
+
+- New `--repl` flag: interactive linenoise-based REPL (Linux/macOS).
+- DSP hot-swap fixed after the ORC JIT migration.
+- Many C++ modernisations (`nullptr`, `std::vector`, `std::string_view`,
+  C++17 stdlib replacing platform ifdefs).
+
+### Docs
+
+- New VitePress documentation site under `docs/`.
+- `extras/tree-sitter-extempore/` added as a submodule for editor tooling.
+
+### Assets
+
+- The assets tarball (`ASSETS=ON`) now comes from a GitHub release asset on
+  `extemporelang/extempore-assets` (tag `v0.9.0`), ~250 MB of audio samples
+  and impulse responses. Unused fonts, images, 3D models and the duplicate
+  Christmas Carol sample have been trimmed out.
+
+### Examples
+
+- `examples/contrib/` removed (legacy graphics, unmaintained externals).
+- Core/external example set slimmed to only those that load cleanly in CI.
+- Full working set registered in `extras/cmake/tests.cmake` and tested on
+  every push.
+
 ## v0.8.9
 
 - bugfix for `@rpath/libportaudio.dylib` bug (introduced in 0.8.8)

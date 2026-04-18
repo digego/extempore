@@ -1,34 +1,39 @@
-# assumes that these variables have been set by the main CMakeLists.txt, e.g.
-
-# don't set this in this file - CMAKE_SOURCE_DIR isn't what you think it is when
-# running a command with -P
-
-# set(ASSETS_PATH ${CMAKE_SOURCE_DIR}/assets)
-
-# also set a (short) git ref for the asset tarball
-
-# set(ASSETS_GIT_REF 0c9f32c)
+# Download the extempore-assets tarball from a GitHub release.
+#
+# Expected variables (set by the caller, e.g. via -D):
+#   ASSETS_PATH     - absolute path where the assets/ directory should end up
+#   ASSETS_VERSION  - release tag, e.g. "v0.9.0"
+#
+# The release asset must be named "extempore-assets.tar.xz" and, when
+# extracted, must produce a top-level directory called "extempore-assets".
 
 if(EXISTS ${ASSETS_PATH})
-  message(WARNING "Directory ${ASSETS_PATH} already exists - skipping asset dowload step")
-else()
-  message(STATUS "Downloading assets from https://github.com/extemporelang/extempore-assets")
-
-  file(DOWNLOAD
-	https://api.github.com/repos/extemporelang/extempore-assets/tarball/${ASSETS_GIT_REF}
-	${CMAKE_BINARY_DIR}/assets.tar.gz
-	# options
-	INACTIVITY_TIMEOUT 60
-	SHOW_PROGRESS)
-
-  # untar it with CMake's built-in untar command
-  execute_process(COMMAND ${CMAKE_COMMAND} -E tar xz ${CMAKE_BINARY_DIR}/assets.tar.gz)
-
-  # rename folder to just "assets", move into source directory
-  file(RENAME
-	extemporelang-extempore-assets-${ASSETS_GIT_REF}
-	${ASSETS_PATH})
-
-  message(STATUS "moved assets to ${ASSETS_PATH}")
-
+  message(WARNING "Directory ${ASSETS_PATH} already exists - skipping asset download step")
+  return()
 endif()
+
+set(_url "https://github.com/extemporelang/extempore-assets/releases/download/${ASSETS_VERSION}/extempore-assets.tar.xz")
+set(_archive "${CMAKE_BINARY_DIR}/extempore-assets.tar.xz")
+
+message(STATUS "Downloading extempore-assets ${ASSETS_VERSION} from ${_url}")
+
+file(DOWNLOAD
+  ${_url}
+  ${_archive}
+  INACTIVITY_TIMEOUT 60
+  SHOW_PROGRESS
+  STATUS _status)
+
+list(GET _status 0 _status_code)
+if(NOT _status_code EQUAL 0)
+  list(GET _status 1 _status_msg)
+  message(FATAL_ERROR "Failed to download assets (${_status_code}): ${_status_msg}")
+endif()
+
+file(ARCHIVE_EXTRACT
+  INPUT ${_archive}
+  DESTINATION ${CMAKE_BINARY_DIR})
+
+file(RENAME ${CMAKE_BINARY_DIR}/extempore-assets ${ASSETS_PATH})
+
+message(STATUS "Assets extracted to ${ASSETS_PATH}")

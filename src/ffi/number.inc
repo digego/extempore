@@ -38,7 +38,7 @@ static pointer rationalToNumerator(scheme* Scheme, pointer Args)
     if (!is_rational(rat)) {
        return mk_integer(Scheme, ivalue(rat));
     }
-    return mk_integer(Scheme, rat->_object._number.value.ratvalue.n);
+    return mk_integer(Scheme, s7_numerator(rat));
 }
 
 static pointer rationalToDenominator(scheme* Scheme, pointer Args)
@@ -47,7 +47,7 @@ static pointer rationalToDenominator(scheme* Scheme, pointer Args)
     if (!is_rational(rat)) {
         return mk_integer(Scheme, 1);
     }
-    return mk_integer(Scheme, rat->_object._number.value.ratvalue.d);
+    return mk_integer(Scheme, s7_denominator(rat));
 }
 
 #define NUMBER_DEFS \

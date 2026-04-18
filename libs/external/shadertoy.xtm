@@ -1,0 +1,318 @@
+;;; shadertoy.xtm -- Shadertoy-style fullscreen fragment shaders via WebGPU
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libwgpu_native, libxtmwebgpu
+
+;;; Commentary:
+
+;; A live-coding environment for fragment shaders in the style of Shadertoy
+;; (https://www.shadertoy.com). Renders a fullscreen triangle and passes
+;; uniforms (time, resolution, mouse) to the fragment shader.
+;;
+;; Quick start:
+;;
+;;   (sys:load "libs/external/shadertoy.xtm")
+;;
+;;   ;; A default shader is already running. To write your own, call
+;;   ;; shadertoy-compile with your fragment shader code:
+;;
+;;   (shadertoy-compile "
+;;   @fragment
+;;   fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
+;;       let uv = frag_coord.xy / uniforms.iResolution.xy;
+;;       let col = 0.5 + 0.5 * cos(uniforms.iTime + uv.xyx + vec3f(0.0, 2.0, 4.0));
+;;       return vec4f(col, 1.0);
+;;   }
+;;   ")
+;;
+;; Your fragment shader has access to the `uniforms` struct:
+;;
+;;   uniforms.iResolution  vec4f  framebuffer size in pixels (xy), pixel ratio (z)
+;;   uniforms.iMouse       vec4f  mouse position (xy = current, zw = last click)
+;;   uniforms.iTime        f32    time in seconds since start
+;;   uniforms.iTimeDelta   f32    time since last frame in seconds
+;;   uniforms.iFrame       f32    frame counter
+;;
+;; The vertex shader and uniform declarations are prepended automatically.
+;; You only write the @fragment function (and any helpers you need).
+;; Close the window to stop the render loop.
+
+;;; Code:
+
+(sys:load "libs/external/webgpu.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; additional C helper bindings ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libxtmwebgpu xtm_wgpu_create_buffer [WGPUBuffer*,WGPUDevice*,i64,i32]*)
+(bind-lib libxtmwebgpu xtm_wgpu_create_uniform_layout [WGPUBindGroupLayout*,WGPUDevice*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_create_uniform_bind_group [WGPUBindGroup*,WGPUDevice*,WGPUBindGroupLayout*,WGPUBuffer*,i64]*)
+(bind-lib libxtmwebgpu xtm_wgpu_create_pipeline_with_layout [WGPURenderPipeline*,WGPUDevice*,WGPUShaderModule*,i32,i8*,i8*,WGPUBindGroupLayout*]*)
+
+;;;;;;;;;;;;;;;;;;;;;
+;; uniform layout  ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; Matches the WGSL Uniforms struct: 3 x vec4f worth of data (48 bytes).
+;; Fields are packed as 12 consecutive f32 values for easy memcpy to the GPU.
+;; Layout: iResolution(xyzw), iMouse(xyzw), iTime, iTimeDelta, iFrame, _pad
+(bind-type ShadertoyUniforms <float,float,float,float,float,float,float,float,float,float,float,float>)
+
+(bind-val ST_UNIFORM_SIZE i64 48) ;; sizeof(ShadertoyUniforms)
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; WGSL boilerplate ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; The preamble defines the uniform struct and a fullscreen triangle vertex
+;; shader. It is prepended to every fragment shader source passed to
+;; shadertoy-compile, so you only need to write the @fragment function.
+
+(define shadertoy-preamble
+"struct Uniforms {
+    iResolution: vec4f,
+    iMouse: vec4f,
+    iTime: f32,
+    iTimeDelta: f32,
+    iFrame: f32,
+    _pad: f32,
+};
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+// Fullscreen triangle covering the entire viewport.
+// Three vertices at (-1,-1), (3,-1), (-1,3) produce a single triangle
+// that extends well beyond clip space, so after clipping it fills the
+// screen. This avoids needing a vertex buffer.
+@vertex
+fn vs_main(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4f {
+    var pos = array<vec2f, 3>(
+        vec2f(-1.0, -1.0),
+        vec2f( 3.0, -1.0),
+        vec2f(-1.0,  3.0)
+    );
+    return vec4f(pos[idx], 0.0, 1.0);
+}
+
+")
+
+;; Default shader: animated colour gradient (the classic Shadertoy hello world)
+(define shadertoy-default-fragment
+"@fragment
+fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
+    let uv = frag_coord.xy / uniforms.iResolution.xy;
+    let col = 0.5 + 0.5 * cos(uniforms.iTime + uv.xyx + vec3f(0.0, 2.0, 4.0));
+    return vec4f(col, 1.0);
+}
+")
+
+;;;;;;;;;;;;;;;;;;;;
+;; initialisation ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; Bail out early if there's no display (e.g. CI / headless)
+(if (<> (glfw_init) 1)
+    (begin (println "no display available, exiting") (quit 0)))
+
+(bind-val st_window GLFWwindow*
+  (glfw_create_webgpu_window 800 600))
+
+(bind-val st_instance WGPUInstance*
+  (wgpuCreateInstance null))
+
+(bind-val st_surface WGPUSurface*
+  (xtm_wgpu_create_surface st_instance st_window))
+
+(bind-val st_adapter WGPUAdapter*
+  (xtm_wgpu_request_adapter st_instance st_surface))
+
+(bind-val st_device WGPUDevice*
+  (xtm_wgpu_request_device st_instance st_adapter))
+
+(bind-val st_queue WGPUQueue*
+  (wgpuDeviceGetQueue st_device))
+
+(bind-val st_format i32
+  (xtm_wgpu_surface_format st_surface st_adapter))
+
+(bind-val st_surface_configured i1
+  (begin (xtm_wgpu_configure_surface st_surface st_device st_format st_window) 1:i1))
+
+;; Uniform buffer and bind group (created once, reused across shader recompiles)
+(bind-val st_uniform_buf WGPUBuffer*
+  (xtm_wgpu_create_buffer st_device ST_UNIFORM_SIZE
+                           (bor WGPUBufferUsage_Uniform WGPUBufferUsage_CopyDst)))
+
+(bind-val st_bind_group_layout WGPUBindGroupLayout*
+  (xtm_wgpu_create_uniform_layout st_device))
+
+(bind-val st_bind_group WGPUBindGroup*
+  (xtm_wgpu_create_uniform_bind_group st_device st_bind_group_layout
+                                       st_uniform_buf ST_UNIFORM_SIZE))
+
+;; Uniform data and timing state
+(bind-val st_uniforms ShadertoyUniforms* (zalloc))
+(bind-val st_start_time i64 (now))
+(bind-val st_frame_count float 0.0)
+(bind-val st_mouse_click_x float 0.0)
+(bind-val st_mouse_click_y float 0.0)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; shader (re)compile  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Default WGSL as a bind-val string (preamble + default fragment baked together
+;; so the shader module and pipeline can be initialised directly).
+(bind-val st_default_wgsl i8*
+"struct Uniforms {
+    iResolution: vec4f,
+    iMouse: vec4f,
+    iTime: f32,
+    iTimeDelta: f32,
+    iFrame: f32,
+    _pad: f32,
+};
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+@vertex
+fn vs_main(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4f {
+    var pos = array<vec2f, 3>(
+        vec2f(-1.0, -1.0),
+        vec2f( 3.0, -1.0),
+        vec2f(-1.0,  3.0)
+    );
+    return vec4f(pos[idx], 0.0, 1.0);
+}
+
+@fragment
+fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
+    let uv = frag_coord.xy / uniforms.iResolution.xy;
+    let col = 0.5 + 0.5 * cos(uniforms.iTime + uv.xyx + vec3f(0.0, 2.0, 4.0));
+    return vec4f(col, 1.0);
+}
+")
+
+;; Shader module and pipeline (initialised with default, replaced on recompile)
+(bind-val st_shader WGPUShaderModule*
+  (xtm_wgpu_create_shader st_device st_default_wgsl))
+
+(bind-val st_pipeline WGPURenderPipeline*
+  (xtm_wgpu_create_pipeline_with_layout st_device st_shader st_format
+                                         "vs_main" "fs_main" st_bind_group_layout))
+
+;; Low-level recompile: takes a complete WGSL source string (preamble + fragment).
+;; Releases the old shader and pipeline, creates new ones.
+(bind-func shadertoy_set_shader
+  (lambda (wgsl:i8*)
+    (let ((new_shader (xtm_wgpu_create_shader st_device wgsl)))
+      (if (null? new_shader)
+          (begin (println "shader compilation failed") void)
+          (let ((new_pipeline (xtm_wgpu_create_pipeline_with_layout
+                                st_device new_shader st_format
+                                "vs_main" "fs_main" st_bind_group_layout)))
+            (wgpuRenderPipelineRelease st_pipeline)
+            (wgpuShaderModuleRelease st_shader)
+            (set! st_pipeline new_pipeline)
+            (set! st_shader new_shader)
+            (println "shader compiled OK")
+            void)))))
+
+;; Scheme-level convenience: prepends the preamble (uniforms + vertex shader)
+;; to a fragment shader source string, then compiles the whole thing.
+;;
+;; Usage:
+;;   (shadertoy-compile "
+;;   @fragment
+;;   fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
+;;       let uv = frag_coord.xy / uniforms.iResolution.xy;
+;;       return vec4f(uv, 0.5 + 0.5 * sin(uniforms.iTime), 1.0);
+;;   }
+;;   ")
+(define (shadertoy-compile frag-source)
+  (shadertoy_set_shader (string-append shadertoy-preamble frag-source)))
+
+;;;;;;;;;;;;;;;;;;;;
+;; render loop    ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; Update the uniform buffer with current time, resolution, and mouse state.
+(bind-func shadertoy_update_uniforms
+  (lambda (time:i64 last_time:i64)
+    (let ((fbw:i32* (salloc))
+          (fbh:i32* (salloc))
+          (ww:i32* (salloc))
+          (wh:i32* (salloc))
+          (mx:double* (salloc))
+          (my:double* (salloc))
+          (t (/ (i64tod (- time st_start_time)) 44100.0))
+          (dt (/ (i64tod (- time last_time)) 44100.0)))
+      (glfwGetFramebufferSize st_window fbw fbh)
+      (glfwGetWindowSize st_window ww wh)
+      (glfwGetCursorPos st_window mx my)
+      ;; Track mouse click position
+      (if (= (glfwGetMouseButton st_window GLFW_MOUSE_BUTTON_LEFT) GLFW_PRESS)
+          (begin
+            (set! st_mouse_click_x (dtof (pref mx 0)))
+            (set! st_mouse_click_y (dtof (pref my 0)))))
+      ;; iResolution: framebuffer size + pixel ratio
+      (tset! st_uniforms 0 (i32tof (pref fbw 0)))
+      (tset! st_uniforms 1 (i32tof (pref fbh 0)))
+      (tset! st_uniforms 2 (if (> (pref ww 0) 0)
+                               (/ (i32tof (pref fbw 0)) (i32tof (pref ww 0)))
+                               1.0))
+      (tset! st_uniforms 3 0.0)
+      ;; iMouse: current position (xy) and last click (zw)
+      (tset! st_uniforms 4 (dtof (pref mx 0)))
+      (tset! st_uniforms 5 (dtof (pref my 0)))
+      (tset! st_uniforms 6 st_mouse_click_x)
+      (tset! st_uniforms 7 st_mouse_click_y)
+      ;; iTime, iTimeDelta, iFrame
+      (tset! st_uniforms 8 (dtof t))
+      (tset! st_uniforms 9 (dtof dt))
+      (tset! st_uniforms 10 st_frame_count)
+      (tset! st_uniforms 11 0.0)
+      (set! st_frame_count (+ st_frame_count 1.0))
+      (wgpuQueueWriteBuffer st_queue st_uniform_buf 0
+                             (cast st_uniforms i8*)
+                             ST_UNIFORM_SIZE)
+      void)))
+
+;; Draw one frame: begin pass, set pipeline + bind group, draw fullscreen
+;; triangle, end pass.
+(bind-func shadertoy_draw_frame
+  (lambda ()
+    (let ((encoder:WGPUCommandEncoder* null)
+          (pass:WGPURenderPassEncoder* null)
+          (view:WGPUTextureView* null))
+      (xtm_wgpu_begin_frame st_surface st_device 0.0 0.0 0.0 1.0
+                             (ref encoder) (ref pass) (ref view))
+      (if (not (null? pass))
+          (begin
+            (wgpuRenderPassEncoderSetPipeline pass st_pipeline)
+            (wgpuRenderPassEncoderSetBindGroup pass 0 st_bind_group 0 null)
+            (wgpuRenderPassEncoderDraw pass 3 1 0 0)
+            (xtm_wgpu_end_frame st_surface st_queue encoder pass view)))
+      void)))
+
+;; The main render loop. Runs at ~60fps using extempore's callback scheduler.
+;; Redefine this function to change render behaviour (e.g. adjust framerate,
+;; add pre/post processing).
+(bind-func shadertoy_render_loop
+  (lambda (time:i64 delta_t:double last_time:i64)
+    (glfwPollEvents)
+    (if (= (glfwWindowShouldClose st_window) 0)
+        (begin
+          (if (not (null? st_pipeline))
+              (begin
+                (shadertoy_update_uniforms time last_time)
+                (shadertoy_draw_frame)))
+          (let ((next_time (+ time (convert (* 44100. delta_t)))))
+            (callback next_time shadertoy_render_loop next_time delta_t time)))
+        (println "shadertoy window closed"))))
+
+;; Start (or restart) the render loop.
+(define (shadertoy-start)
+  (shadertoy_render_loop (now) (/ 1.0 60.0) (now)))
+
+(println "shadertoy ready")

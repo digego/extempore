@@ -11,7 +11,7 @@
 #define EXTENSIBLE_ZONES 1
 #define LEAKY_ZONES 1
 
-thread_local llvm_zone_stack* tls_llvm_zone_stack = 0;
+thread_local llvm_zone_stack* tls_llvm_zone_stack = nullptr;
 thread_local uint64_t tls_llvm_zone_stacksize = 0;
 
 namespace extemp {
@@ -25,7 +25,7 @@ llvm_zone_t* llvm_zone_create(uint64_t size)
     }
 #ifdef _WIN32
 	if (size == 0) {
-		zone->memory = NULL;
+		zone->memory = nullptr;
 	}
 	else {
 		// this crashes extempore but I have no idea why????
@@ -68,7 +68,6 @@ EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
     static std::unique_ptr<extemp::EXTMutex> alloc_mutex = []() {
         std::unique_ptr<extemp::EXTMutex> m(new extemp::EXTMutex("alloc mutex"));
-        m->init();
         return m;
     }();
     extemp::EXTMutex::ScopedLock lock(*alloc_mutex);
@@ -104,11 +103,11 @@ EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 #elif LEAKY_ZONES       // if LEAKY ZONE is TRUE then just print a warning and just leak the memory
         printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n",zone,zone->size,size);
         printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
-        fflush(NULL);
+        fflush(nullptr);
         return malloc((size_t)size);  // TODO: what about the stored size????
 #else
         printf("\nZone:%p size:%lld is full ... exiting!\n",zone,zone->size,size);
-        fflush(NULL);
+        fflush(nullptr);
         exit(1);
 #endif
     }
@@ -144,9 +143,9 @@ llvm_zone_t* llvm_peek_zone_stack()
 {
     llvm_zone_t* z = 0;
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is NULL
+    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is nullptr
 #if DEBUG_ZONE_STACK
-        printf("TRYING TO PEEK AT A NULL ZONE STACK\n");
+        printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
 #endif
         llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1); // default root zone is 1M
         llvm_push_zone_stack(z);

@@ -37,7 +37,7 @@
 #define OSC_H
 
 #include "UNIV.h"
-#include <stdio.h>
+#include <cstdio>
 #include <iostream>
 #include <stdexcept>
 #include <map>
@@ -84,7 +84,7 @@ namespace extemp {
 		throw std::runtime_error("Error: NO such OSC Server");
 	    }				
 	    return SCHEME_MAP[_sc];
-	    //if(OSC::singleton == NULL) OSC::singleton = new OSC(); return OSC::singleton; 
+	    //if(OSC::singleton == nullptr) OSC::singleton = new OSC(); return OSC::singleton; 
 	}
 	static void schemeInit(SchemeProcess* scm);
 	//void getMessage();

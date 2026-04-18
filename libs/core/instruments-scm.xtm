@@ -198,13 +198,14 @@
     (callback time 'xtm_gate_off note)))
 
 ;; the play macro
-(macro (play args)
-       (if (symbol? (cadr args))
-           `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-                       ,@(cdr (cddddr args)))
-           `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-                       (*metro* 'dur ,(car (cdr (cddddr args))))
-                       ,@(cddr (cddddr args)))))
+(define-macro (play . __play-rest)
+  (let ((args (cons 'play __play-rest)))
+    (if (symbol? (cadr args))
+        `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
+                    ,@(cdr (cddddr args)))
+        `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
+                    (*metro* 'dur ,(car (cdr (cddddr args))))
+                    ,@(cddr (cddddr args))))))
 
 
 (define-macro (playob o b . args)

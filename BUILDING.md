@@ -47,16 +47,6 @@ following targets might come in handy:
 
 ### macOS
 
-#### macOS 10.14 Mojave
-
-On macOS 10.14 Apple removed some of the system OpenGL headers,
-which means that some of Extempore's dependencies (e.g. nanovg) won't build.
-[This blog
-post](https://silvae86.github.io/sysadmin/mac/osx/mojave/beta/libxml2/2018/07/05/fixing-missing-headers-for-homebrew-in-mac-osx-mojave/)
-has more details, but if you just want a one-liner to fix it, it's
-
-    sudo installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /
-
 #### macOS 10.15 Catalina
 
 Since macOS 10.15 Apple requires all binaries to be signed & notarized, and the

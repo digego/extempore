@@ -36,7 +36,7 @@
 #ifndef UNIV_H
 #define UNIV_H
 
-#include <stdint.h>
+#include <cstdint>
 #include <BranchPrediction.h>
 
 #include <string>
@@ -67,7 +67,7 @@
 #endif
 
 #if __GNUC__
-#if __x86_64__ || __ppc64__
+#if __x86_64__ || __ppc64__ || __aarch64__
 #define TARGET_64BIT
 #else
 #define TARGET_32BIT
@@ -78,15 +78,9 @@
 #define D_BILLION 1000000000.0
 #define D_MILLION 1000000.0
 
-#ifdef _WIN32
-#define OS_PATH_DELIM '\\'
-#else
-#define OS_PATH_DELIM '/'
-#endif
-
 struct scheme;
-struct cell;
-typedef struct cell* pointer;
+struct s7_cell;
+typedef struct s7_cell* pointer;
 
 extern "C" {
 
@@ -126,6 +120,7 @@ EXPORT uint32_t NUM_FRAMES;
 extern uint32_t EXT_TERM;
 extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;
+extern bool BATCH_MODE;
 extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern std::string AUDIO_DEVICE_NAME;
@@ -139,7 +134,6 @@ extern std::vector<std::string> ATTRS;
 extern double midi2frq(double pitch);
 extern double frqRatio(double semitones);
 extern void initRand();
-extern bool file_check(const std::string& filename);
 extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
 
 }
@@ -187,7 +181,7 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     }
 #ifdef _WIN32
     extern int WINDOWS_COLORS[];
-    extern int WINDOWS_BGCOLORS[];    
+    extern int WINDOWS_BGCOLORS[];
     if (unlikely(extemp::UNIV::EXT_TERM == 1)) {
       Foreground = (Foreground > 7) ? 7 : Foreground;
       Background = (Background > 7) ? 0 : Background;

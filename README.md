@@ -1,17 +1,6 @@
 # Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
-A programming environment for cyberphysical programming (Linux/macOS/Windows).
-
-> [!NOTE]
->
-> **Mar '26**: Extempore's `master` branch doesn't yet support aarch64
-> (including Apple Silicon), but there's experimental support on the
-> [`aarch64` branch](https://github.com/digego/extempore/tree/aarch64). CI is
-> green on all platforms (macOS, Windows, Linux x64 and aarch64) and things are
-> looking good, but it hasn't been merged to master yet. See
-> [this blog post](https://benswift.me/blog/2026/02/26/extempore-is-alive-on-aarch64-part-deux/)
-> for details, and give it a try if you're keen---bug reports welcome on the
-> [mailing list](http://groups.google.com/group/extemporelang).
+A programming environment for cyberphysical programming (Linux/macOS/Windows, including Apple Silicon and Linux aarch64).
 
 ## Getting started
 
@@ -101,7 +90,7 @@ You can also join the Extempore community:
 
 ## Licence
 
-Copyright (c) 2011-2020, Andrew Sorensen
+Copyright (c) 2011-2025, Andrew Sorensen
 
 All rights reserved.
 

@@ -1,0 +1,31 @@
+;;; shadertoy.xtm -- Shadertoy-style fragment shader live-coding
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Starts the Shadertoy render loop with a default shader. Evaluate the
+;; commented shadertoy-compile form below (or write your own) to replace
+;; the shader at runtime. Run interactively, or with:
+;;   ./extempore --batch '(sys:load-then-quit "examples/external/shadertoy.xtm" 10)'
+
+;;; Code:
+
+(sys:load "libs/external/shadertoy.xtm")
+
+;; bail out if no display available (e.g. in CI)
+(if (<> (glfw_init) 1)
+    (begin (println "no display available, exiting") (quit 0)))
+
+(shadertoy-start)
+
+;; Try evaluating this to replace the default shader with a custom one:
+;;
+;; (shadertoy-compile "
+;; @fragment
+;; fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
+;;     let uv = frag_coord.xy / uniforms.iResolution.xy;
+;;     return vec4f(uv, 0.5 + 0.5 * sin(uniforms.iTime), 1.0);
+;; }
+;; ")

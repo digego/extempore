@@ -34,8 +34,8 @@
  */
 
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #include "UNIV.h"
 #include "EXTThread.h"
@@ -45,6 +45,9 @@
 #elif __APPLE__
 #include <mach/thread_policy.h>
 #include <mach/thread_act.h>
+#include <pthread.h>
+#else
+#include <pthread.h>
 #endif
 
 // #define _EXTTHREAD_DEBUG_
@@ -52,7 +55,7 @@
 namespace extemp
 {
 
-thread_local EXTThread* EXTThread::sm_current = 0;
+thread_local EXTThread* EXTThread::sm_current = nullptr;
 
 EXTThread::~EXTThread()
 {
@@ -71,29 +74,24 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
     if (Arg) {
         m_arg = Arg;
     }
-    int result = 22; //EINVAL;
+    int result = 0;
     if (!m_initialised && !m_subsume) {
-#ifdef _WIN32
         std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
         m_thread = std::thread(fn);
-        result = 0;
-#elif __APPLE__
-        result = pthread_create(&m_thread, NULL, Trampoline, this);
-#else
-        result = pthread_create(&m_thread, NULL, Trampoline, this);
-        if (!result && !m_name.empty()) {
-            pthread_setname_np(m_thread, m_name.c_str());
+#ifdef __linux__
+        if (!m_name.empty()) {
+            pthread_setname_np(m_thread.native_handle(), m_name.c_str());
         }
 #endif
-        m_initialised = !result;
+        m_initialised = true;
     }
     if(m_subsume && !m_initialised) {
       m_initialised = true;
-#ifdef __linux__      
-      if (!result && !m_name.empty()) {
-         pthread_setname_np(m_thread, m_name.c_str());
+#ifdef __linux__
+      if (!m_name.empty()) {
+         pthread_setname_np(pthread_self(), m_name.c_str());
       }
-#endif            
+#endif
       // Trampoline here never returns!
       Trampoline(this);
     }
@@ -107,10 +105,10 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 
 int EXTThread::kill()
 {
-#ifdef _WIN32
-    return 0;
+#ifndef _WIN32
+    return pthread_cancel(m_thread.native_handle());
 #else
-    return pthread_cancel(m_thread);
+    return 0;
 #endif
 }
 
@@ -118,12 +116,8 @@ int EXTThread::detach()
 {
     int result = 22; //EINVAL;
     if (m_initialised) {
-#ifdef _WIN32
         m_thread.detach();
         result = 0;
-#else
-        result = pthread_detach(m_thread);
-#endif
         m_detached = !result;
     }
 #ifdef _EXTTHREAD_DEBUG_
@@ -138,12 +132,8 @@ int EXTThread::join()
 {
     int result = 22; //EINVAL;
     if (m_initialised) {
-#ifdef _WIN32
         m_thread.join();
         result = 0;
-#else
-        result = pthread_join(m_thread, NULL);
-#endif
         m_joined = ! result;
     }
 #ifdef _EXTTHREAD_DEBUG_
@@ -156,15 +146,11 @@ int EXTThread::join()
 
 int EXTThread::setPriority(int Priority, bool Realtime)
 {
-#ifdef _WIN32
     auto thread = m_thread.native_handle();
-#else
-    auto thread = m_thread;
-#endif
 #ifdef __linux__
     sched_param param;
     int policy;
-    pthread_getschedparam(m_thread, &policy, &param);
+    pthread_getschedparam(thread, &policy, &param);
     param.sched_priority = Priority;
     if (Realtime) { // for realtime threads, use SCHED_RR policy
       policy = SCHED_RR;
@@ -198,12 +184,12 @@ int EXTThread::setPriority(int Priority, bool Realtime)
 #endif
 }
 
-int EXTThread::getPriority() const
+int EXTThread::getPriority()
 {
 #ifdef __linux__
     int policy;
     sched_param param;
-    pthread_getschedparam(m_thread, &policy, &param);
+    pthread_getschedparam(m_thread.native_handle(), &policy, &param);
     return param.sched_priority;
 #endif
     // fprintf(stderr, "Error: thread priority only available Linux\n");

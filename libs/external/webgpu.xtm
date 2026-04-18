@@ -1,0 +1,143 @@
+;;; webgpu.xtm -- WebGPU bindings via wgpu-native
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs: libwgpu_native, libxtmwebgpu
+
+;;; Commentary:
+
+;; WebGPU bindings using wgpu-native (https://github.com/gfx-rs/wgpu-native).
+;; The C helper library (libxtmwebgpu) wraps struct-by-value and async
+;; callback APIs that xtlang's FFI can't call directly. Direct wgpu-native
+;; bindings are provided for the render-loop functions where live-coding
+;; control matters.
+
+;;; Code:
+
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/webgpu.xtm" 'quiet))
+(sys:load-preload-check 'webgpu)
+(define *xtmlib-webgpu-loaded* #t)
+
+(impc:aot:suppress-aot-do
+ (sys:load "libs/base/base.xtm")
+ (sys:load "libs/external/glfw3.xtm"))
+(impc:aot:insert-forms
+ (sys:load "libs/base/base.xtm" 'quiet)
+ (sys:load "libs/external/glfw3.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmwebgpu")
+
+;;;;;;;;;;;;;
+;; dylibs  ;;
+;;;;;;;;;;;;;
+
+(bind-dylib libwgpu
+  (cond ((string=? (sys:platform) "OSX") "libwgpu_native.dylib")
+        ((string=? (sys:platform) "Linux") "libwgpu_native.so")
+        ((string=? (sys:platform) "Windows") "wgpu_native.dll"))
+  "xtmwebgpu")
+
+(bind-dylib libxtmwebgpu
+  (cond ((string=? (sys:platform) "OSX") "libxtmwebgpu.dylib")
+        ((string=? (sys:platform) "Linux") "libxtmwebgpu.so")
+        ((string=? (sys:platform) "Windows") "xtmwebgpu.dll"))
+  "xtmwebgpu")
+
+(impc:aot:import-ll "xtmwebgpu")
+
+;;;;;;;;;;;;;;;;;
+;; opaque types ;;
+;;;;;;;;;;;;;;;;;
+
+(bind-alias WGPUInstance i8)
+(bind-alias WGPUAdapter i8)
+(bind-alias WGPUDevice i8)
+(bind-alias WGPUSurface i8)
+(bind-alias WGPUQueue i8)
+(bind-alias WGPUCommandEncoder i8)
+(bind-alias WGPURenderPassEncoder i8)
+(bind-alias WGPURenderPipeline i8)
+(bind-alias WGPUShaderModule i8)
+(bind-alias WGPUBuffer i8)
+(bind-alias WGPUTexture i8)
+(bind-alias WGPUTextureView i8)
+(bind-alias WGPUCommandBuffer i8)
+(bind-alias WGPUBindGroup i8)
+(bind-alias WGPUBindGroupLayout i8)
+(bind-alias WGPUPipelineLayout i8)
+
+;;;;;;;;;;;;;;;;;;;;
+;; enum constants ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(bind-val WGPUTextureFormat_BGRA8Unorm i32 #x1B)
+(bind-val WGPUTextureFormat_RGBA8Unorm i32 #x16)
+(bind-val WGPUPrimitiveTopology_TriangleList i32 3)
+(bind-val WGPULoadOp_Clear i32 1)
+(bind-val WGPUStoreOp_Store i32 1)
+(bind-val WGPUBufferUsage_Vertex i32 #x0020)
+(bind-val WGPUBufferUsage_Index i32 #x0010)
+(bind-val WGPUBufferUsage_Uniform i32 #x0040)
+(bind-val WGPUBufferUsage_CopyDst i32 #x0008)
+(bind-val WGPUIndexFormat_Uint16 i32 1)
+(bind-val WGPUIndexFormat_Uint32 i32 2)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; C helper library bindings ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libxtmwebgpu xtm_wgpu_create_surface [WGPUSurface*,WGPUInstance*,GLFWwindow*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_request_adapter [WGPUAdapter*,WGPUInstance*,WGPUSurface*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_request_device [WGPUDevice*,WGPUInstance*,WGPUAdapter*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_configure_surface [void,WGPUSurface*,WGPUDevice*,i32,GLFWwindow*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_surface_format [i32,WGPUSurface*,WGPUAdapter*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_create_shader [WGPUShaderModule*,WGPUDevice*,i8*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_create_pipeline [WGPURenderPipeline*,WGPUDevice*,WGPUShaderModule*,i32,i8*,i8*]*)
+(bind-lib libxtmwebgpu xtm_wgpu_begin_frame [void,WGPUSurface*,WGPUDevice*,double,double,double,double,WGPUCommandEncoder**,WGPURenderPassEncoder**,WGPUTextureView**]*)
+(bind-lib libxtmwebgpu xtm_wgpu_end_frame [void,WGPUSurface*,WGPUQueue*,WGPUCommandEncoder*,WGPURenderPassEncoder*,WGPUTextureView*]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; direct wgpu-native bindings ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-lib libwgpu wgpuCreateInstance [WGPUInstance*,i8*]*)
+(bind-lib libwgpu wgpuDeviceGetQueue [WGPUQueue*,WGPUDevice*]*)
+(bind-lib libwgpu wgpuRenderPassEncoderSetPipeline [void,WGPURenderPassEncoder*,WGPURenderPipeline*]*)
+(bind-lib libwgpu wgpuRenderPassEncoderDraw [void,WGPURenderPassEncoder*,i32,i32,i32,i32]*)
+(bind-lib libwgpu wgpuRenderPassEncoderSetVertexBuffer [void,WGPURenderPassEncoder*,i32,WGPUBuffer*,i64,i64]*)
+(bind-lib libwgpu wgpuRenderPassEncoderSetIndexBuffer [void,WGPURenderPassEncoder*,WGPUBuffer*,i32,i64,i64]*)
+(bind-lib libwgpu wgpuRenderPassEncoderDrawIndexed [void,WGPURenderPassEncoder*,i32,i32,i32,i32,i32]*)
+(bind-lib libwgpu wgpuRenderPassEncoderSetBindGroup [void,WGPURenderPassEncoder*,i32,WGPUBindGroup*,i64,i32*]*)
+(bind-lib libwgpu wgpuRenderPassEncoderEnd [void,WGPURenderPassEncoder*]*)
+(bind-lib libwgpu wgpuInstanceProcessEvents [void,WGPUInstance*]*)
+(bind-lib libwgpu wgpuInstanceRelease [void,WGPUInstance*]*)
+(bind-lib libwgpu wgpuAdapterRelease [void,WGPUAdapter*]*)
+(bind-lib libwgpu wgpuDeviceRelease [void,WGPUDevice*]*)
+(bind-lib libwgpu wgpuSurfaceRelease [void,WGPUSurface*]*)
+(bind-lib libwgpu wgpuQueueRelease [void,WGPUQueue*]*)
+(bind-lib libwgpu wgpuShaderModuleRelease [void,WGPUShaderModule*]*)
+(bind-lib libwgpu wgpuRenderPipelineRelease [void,WGPURenderPipeline*]*)
+(bind-lib libwgpu wgpuQueueWriteBuffer [void,WGPUQueue*,WGPUBuffer*,i64,i8*,i64]*)
+(bind-lib libwgpu wgpuSurfaceUnconfigure [void,WGPUSurface*]*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; xtlang helpers      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func wgpu_draw_frame
+  (lambda (surface:WGPUSurface* device:WGPUDevice* queue:WGPUQueue*
+           pipeline:WGPURenderPipeline* r:double g:double b:double)
+    (let ((encoder:WGPUCommandEncoder* null)
+          (pass:WGPURenderPassEncoder* null)
+          (view:WGPUTextureView* null))
+      (xtm_wgpu_begin_frame surface device r g b 1.0
+                             (ref encoder) (ref pass) (ref view))
+      (if (not (null? pass))
+          (begin
+            (wgpuRenderPassEncoderSetPipeline pass pipeline)
+            (wgpuRenderPassEncoderDraw pass 3 1 0 0)
+            (xtm_wgpu_end_frame surface queue encoder pass view)))
+      void)))
+
+(impc:aot:insert-footer "xtmwebgpu")
+(define *xtmlib-webgpu-loaded* #t)

@@ -43,13 +43,16 @@
 #include <string>
 #include "EXTLLVM.h"
 
+#include <chrono>
+#include <thread>
+
 #ifndef _WIN32
-#include <unistd.h>
+#include "LinenoiseREPL.h"
 #include <signal.h>
 #else
 #undef min
 #undef max
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #endif
 
 #ifdef __APPLE__
@@ -78,14 +81,10 @@ void* extempore_primary_repl_delayed_connect(void* dat)
     std::string host("localhost");
     std::string primary_name("primary");
     int primary_port = pass_primary_port;
-#ifdef _WIN32
-	Sleep(1000);
-#else
-    sleep(1);
-#endif
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
     primary_repl->connectToProcessAtHostname(host, primary_port);
-    return NULL;
+    return nullptr;
 }
 
 // WARNING EVIL WINDOWS TERMINATION CODE!
@@ -121,11 +120,12 @@ void sig_handler(int Signo)
 #endif
 
 enum { OPT_COMPILE_STR, OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
-       OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE,
+       OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE, OPT_BATCH,
        OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
        OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
-       OPT_LATENCY,
+       OPT_LATENCY, OPT_LEVEL,
+       OPT_REPL,
        OPT_HELP
      };
 
@@ -141,6 +141,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_IN_CHANNELS,    "--inchannels",    SO_REQ_SEP    },
     { OPT_INITEXPR,       "--eval",          SO_REQ_SEP    },
     { OPT_INITFILE,       "--run",           SO_REQ_SEP    },
+    { OPT_BATCH,          "--batch",         SO_REQ_SEP    },
     { OPT_PORT,           "--port",          SO_REQ_SEP    },
     { OPT_TERM,           "--term",          SO_REQ_SEP    },
     { OPT_NO_AUDIO,       "--noaudio",       SO_NONE       },
@@ -155,6 +156,8 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_ARCH,           "--arch",          SO_REQ_SEP    },
     { OPT_CPU,            "--cpu",           SO_REQ_SEP    },
     { OPT_ATTR,           "--attr",          SO_MULTI      },
+    { OPT_LEVEL,          "--opt-level",     SO_REQ_SEP    },
+    { OPT_REPL,           "--repl",          SO_NONE       },
     { OPT_HELP,           "--help",          SO_NONE       },
     SO_END_OF_OPTIONS
 };
@@ -167,8 +170,9 @@ EXPORT int extempore_init(int argc, char** argv)
     std::string utility_name("utility");
     int primary_port = 7099;
     int utility_port = 7098;
+    bool repl_mode = false;
 #ifndef _WIN32
-    // redirect stderr to NULL
+    // redirect stderr to nullptr
     freopen("/dev/null", "w", stderr);
 
         // signal handlers for OSX/Linux
@@ -220,6 +224,11 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_INITEXPR:
                 initexpr = std::string(args.OptionArg());
                 break;
+            case OPT_BATCH:
+                initexpr = std::string(args.OptionArg());
+                extemp::UNIV::BATCH_MODE = true;
+                extemp::UNIV::AUDIO_NONE = true;
+                break;
             case OPT_INITFILE:
                 {
                     size_t start_pos = 0;
@@ -230,8 +239,7 @@ EXPORT int extempore_init(int argc, char** argv)
                         str.replace(start_pos, from.length(), to);
                         start_pos += to.length();
                     }
-					extemp::UNIV::EXT_LOADBASE = false; // never load base when compiling
-                    initexpr = std::string("(sys:load \"") + str + std::string("\")");
+	                    initexpr = std::string("(sys:load \"") + str + std::string("\")");
                 }
                 break;
             case OPT_NOBASE:
@@ -253,9 +261,9 @@ EXPORT int extempore_init(int argc, char** argv)
                 } else {
 #ifdef _WIN32
                   extemp::UNIV::EXT_TERM = 1;
-#else                  
+#else
                   extemp::UNIV::EXT_TERM = 0;
-#endif                  
+#endif
                 }
                 break;
             case OPT_NO_AUDIO:
@@ -300,16 +308,29 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_ATTR:
                 extemp::UNIV::ATTRS.push_back(args.OptionArg());
                 break;
+            case OPT_LEVEL:
+                extemp::EXTLLVM::OPTIMIZATION_LEVEL = atoi(args.OptionArg());
+                break;
+            case OPT_REPL:
+#ifndef _WIN32
+                repl_mode = true;
+#else
+                std::cout << "--repl is not supported on Windows" << std::endl;
+                return 1;
+#endif
+                break;
             case OPT_HELP:
             default:
                 std::cout << "Extempore's command line options: " << std::endl;
                 std::cout << "            --help: prints this menu" << std::endl;
                 std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
+                std::cout << "           --batch: run in batch mode (no server, single process, no audio) with given expression" << std::endl;
                 std::cout << "            --port: port for primary process [7099]" << std::endl;
                 std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
                 std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "          --nobase: don't load base lib on startup" << std::endl;
+                std::cout << "       --opt-level: LLVM optimization level 0-3" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
                 std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
@@ -325,6 +346,7 @@ EXPORT int extempore_init(int argc, char** argv)
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
                 std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
 				std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
+                std::cout << "            --repl: start an interactive REPL (Linux/macOS only)" << std::endl;
                 std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
                 std::_Exit(0);
             }
@@ -349,7 +371,7 @@ EXPORT int extempore_init(int argc, char** argv)
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_default();
-    std::cout << "Andrew Sorensen (c) 2010-2020" << std::endl;
+    std::cout << "Andrew Sorensen (c) 2010-2025" << std::endl;
     std::cout << "andrew@moso.com.au, @digego" << std::endl;
     std::cout << std::endl;
     ascii_default();
@@ -361,6 +383,12 @@ EXPORT int extempore_init(int argc, char** argv)
     }
 #endif
 
+    if (extemp::UNIV::AUDIO_NONE) {
+        if (extemp::UNIV::TIME_DIVISION == 1) {
+            extemp::UNIV::TIME_DIVISION = 4;
+        }
+        extemp::TaskScheduler::I()->setFrames(extemp::UNIV::NUM_FRAMES);
+    }
     extemp::TaskScheduler::I()->start();
     extemp::EXTLLVM::initLLVM();
     extemp::SchemeProcess* primary = 0;
@@ -375,11 +403,6 @@ EXPORT int extempore_init(int argc, char** argv)
     if (!extemp::UNIV::AUDIO_NONE) {
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
-    } else {
-	  // don't need this anymore, but we do need timediv to be > 1
-	  if (extemp::UNIV::TIME_DIVISION == 1) {
-		extemp::UNIV::TIME_DIVISION = 4;
-	  }
     }
     ascii_normal();
 #ifdef SUBSUME_PRIMARY
@@ -391,44 +414,56 @@ EXPORT int extempore_init(int argc, char** argv)
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
     bool startup_ok = true;
-    extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
-    startup_ok &= utility->start();
-    extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
-    utility_repl->connectToProcessAtHostname(host, utility_port);
+
+    if (extemp::UNIV::BATCH_MODE) {
+        // Batch mode: single process, no server, no utility process
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+        primary->start(true); // this will not return
+    } else {
+        // Normal mode: utility + primary processes with server threads
+        extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
+        startup_ok &= utility->start();
+        extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
+        utility_repl->connectToProcessAtHostname(host, utility_port);
 
 #ifndef SUBSUME_PRIMARY // if not subsume primary (i.e. primary NOT on thread 0)
-    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
-    startup_ok &= primary->start();
-    extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
-    primary_repl->connectToProcessAtHostname(host, primary_port);
-    //std::cout << "primary started:" << std::endl << std::flush;    
-    if (!startup_ok) {
-        ascii_error();
-        printf("ERROR:");
-        ascii_default();
-		std::cout << " one or more processes failed to start, exiting." << std::endl;
-        exit(1);
-    }
-    while (true) {
-      if (XTMMainCallback) { XTMMainCallback(); }
-#ifdef _WIN32
-      Sleep(2000);
-#elif __APPLE__
-      sleep(2);
-#else
-      sleep(2000);
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+        startup_ok &= primary->start();
+        extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
+        primary_repl->connectToProcessAtHostname(host, primary_port);
 #endif
-    }      
+        if (!startup_ok) {
+            ascii_error();
+            printf("ERROR:");
+            ascii_default();
+            std::cout << " one or more processes failed to start, exiting." << std::endl;
+            exit(1);
+        }
+#ifndef SUBSUME_PRIMARY
+        while (true) {
+          if (XTMMainCallback) { XTMMainCallback(); }
+          std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
 #else
-    primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
 
-    // need to connect to primary from alternate thread (can be short lived simply puts repl on heap)
-    extemp::EXTThread* replthread = new extemp::EXTThread(extempore_primary_repl_delayed_connect,primary);
-    pass_primary_port = primary_port;
-    replthread->start();
-    // start the primary process running on this thread (i.e. process thread 0)
-    primary->start(true); // this will not return
+        // need to connect to primary from alternate thread (can be short lived simply puts repl on heap)
+        extemp::EXTThread* replthread = new extemp::EXTThread(extempore_primary_repl_delayed_connect,primary);
+        pass_primary_port = primary_port;
+        replthread->start();
+
+#ifndef _WIN32
+        if (repl_mode) {
+            auto* repl_args = new linenoise_repl_args{host, primary_port};
+            auto* repl_thread = new extemp::EXTThread(linenoise_repl, repl_args, "linenoise_repl");
+            repl_thread->start();
+        }
+#endif
+
+        // start the primary process running on this thread (i.e. process thread 0)
+        primary->start(true); // this will not return
 #endif // end SUBSUME_PRIMARY
+    }
     return 0;
 }
 

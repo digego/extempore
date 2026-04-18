@@ -48,7 +48,7 @@
 #include <portaudio.h>
 #endif
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <vector>
 #include "UNIV.h"
@@ -113,18 +113,10 @@ public:
     }
 
     void setDSPClosure(void* Function) {
-        if (m_dsp_closure) {
-            printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
-            return;
-        }
         m_dsp_closure = reinterpret_cast<closure_getter_fn_type>(Function);
     }
     closure_getter_fn_type getDSPClosure() { return m_dsp_closure; }
     void setDSPMTClosure(void* Function, int Index) {
-        if (m_dsp_mt_closure[Index]) {
-            printf("You can only set the DSP callback once, but you\ncan re-define that function as often as you like\n");
-            return;
-        }
         m_dsp_mt_closure[Index] = reinterpret_cast<closure_getter_fn_type>(Function);
     }
     closure_getter_fn_type getDSPMTClosure(int Index) { return m_dsp_mt_closure[Index]; }

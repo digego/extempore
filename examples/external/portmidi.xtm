@@ -18,6 +18,10 @@
 (pm_initialize)
 (pm_print_devices)
 
+;; bail out if no MIDI devices are available (e.g. in CI)
+(if (or (= (pm_default_in) -1) (= (pm_default_out) -1))
+    (begin (println "no MIDI devices found, exiting") (quit 0)))
+
 ;; we'll just create one input and one output device (midi_in and
 ;; midi_out), but by passing the appropriate device index arguments to
 ;; pm_create_input_stream and pm_create_output_stream you can create

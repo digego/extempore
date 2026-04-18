@@ -37,7 +37,7 @@
 #include "EXTMutex.h"
 #include "UNIV.h"
 
-#include <stdio.h>         /* Basic I/O routines          */
+#include <cstdio>
 
 #ifdef _WIN32
 // nothing
@@ -49,13 +49,16 @@
 #include <netdb.h>         /* host to IP resolution       */
 #endif
 
+#include <chrono>
+#include <thread>
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <iostream>
 #include <sstream>
-#include <string.h>
-#include <errno.h>
+#include <cstring>
+#include <cerrno>
 
 namespace extemp {
 
@@ -68,7 +71,6 @@ SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_titl
 	printf("INFO:");
 	ascii_default();
 	std::cout << " starting " << m_title << " process..." << std::endl;
-    m_writeLock.init();
     sm_repls[m_title] = this;
 }
 
@@ -139,11 +141,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         return false;
     }
     // wait for main server to start up first time out of the gates.
-#ifdef _WIN32
-    Sleep(1000);
-#else
-    sleep(1);
-#endif
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
 #ifdef _WIN32
     m_serverIoService = new std::experimental::net::io_context;

@@ -5,51 +5,92 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*" # Push events to matching vX.X.X*, e.g. v0.9.8-beta
 
+env:
+  LLVM_VERSION: "22.1.1"
+
 jobs:
   build:
-    name: build & upload the zipfile to the GitHub releases page
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-18.04
-          - ubuntu-20.04
-          - macos-10.15 # catalina
-          - macos-11.0  # big sur
-          - windows-2016
-          - windows-2019
         include:
-          - os: windows-2016
-            cmake-generator: -G "Visual Studio 15 2017" -A x64
-          - os: windows-2019
-            cmake-generator: -G "Visual Studio 16 2019" -A x64
+          - os: ubuntu-24.04
+            name: Linux x86_64
+            artifact: extempore-linux-x86_64
+          - os: ubuntu-24.04-arm
+            name: Linux aarch64
+            artifact: extempore-linux-aarch64
+          - os: macos-15
+            name: macOS aarch64
+            artifact: extempore-macos-aarch64
+          - os: windows-2022
+            name: Windows x86_64
+            artifact: extempore-windows-x86_64
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
 
-      - if: contains(matrix.os, 'ubuntu')
-        name: deps
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
-          sudo apt update
-          sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
 
-      - name: configure
-        run: mkdir build && cd build && cmake ${{ matrix.cmake-generator }} -DPACKAGE=ON ..
+      - name: Set up MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
-      - name: build
-        run: cmake --build build --config Release --target package
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DASSETS=ON
 
-      - id: tag-name
-        name: get git tag name
-        uses: olegtarasov/get-tag@v2.1
+      - name: Build
+        run: cmake --build build --parallel 2
 
-      - name: upload zipfile to release
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -eu
+          STAGE="${ARTIFACT}-${REF_NAME}"
+          mkdir -p "dist/${STAGE}"
+          cp build/extempore "dist/${STAGE}/"
+          for d in libs runtime examples assets; do
+            [ -d "$d" ] && cp -r "$d" "dist/${STAGE}/"
+          done
+          for f in README.md BUILDING.md CHANGELOG.md; do
+            [ -f "$f" ] && cp "$f" "dist/${STAGE}/"
+          done
+          (cd dist && zip -r "../build/extempore.zip" "${STAGE}")
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $stage = "$env:ARTIFACT-$env:REF_NAME"
+          New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
+          Copy-Item build/extempore.exe "dist/$stage/"
+          foreach ($d in 'libs','runtime','examples','assets') {
+            if (Test-Path $d) { Copy-Item -Recurse $d "dist/$stage/" }
+          }
+          foreach ($f in 'README.md','BUILDING.md','CHANGELOG.md') {
+            if (Test-Path $f) { Copy-Item $f "dist/$stage/" }
+          }
+          Compress-Archive -Path "dist/$stage" -DestinationPath build/extempore.zip
+
+      - name: Upload to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.EXTEMPORE_RELEASE_TOKEN }}
           file: build/extempore.zip
-          asset_name: extempore-${{ steps.tag-name.outputs.tag }}-${{ matrix.os }}.zip
+          asset_name: ${{ matrix.artifact }}-${{ github.ref_name }}.zip
           tag: ${{ github.ref }}
           overwrite: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

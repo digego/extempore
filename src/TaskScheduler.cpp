@@ -36,7 +36,9 @@
 #include "TaskScheduler.h"
 #include "EXTMonitor.h"
 #include "AudioDevice.h"
-#include <math.h>
+#include <cmath>
+#include <thread>
+#include <chrono>
 
 namespace extemp {
 
@@ -45,8 +47,6 @@ TaskScheduler TaskScheduler::sm_instance;
 TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler"),
     m_guard("task_scheduler_guard"), m_queueMutex("taskQueue")
 {
-    m_guard.init();
-    m_queueMutex.init();
 }
 
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
@@ -55,8 +55,7 @@ static double LAST_REALTIME_STAMP = 0.0;
 void TaskScheduler::timeSlice()
 {
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
-    uint64_t nanosecs = double(frames) / UNIV::SAMPLE_RATE * D_BILLION;
-    timespec remain { 0, 0 };
+    long nanosecs = long(double(frames) / UNIV::SAMPLE_RATE * D_BILLION);
     if (unlikely(UNIV::AUDIO_NONE)) { // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
         UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
@@ -90,23 +89,17 @@ void TaskScheduler::timeSlice()
             AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
         }
         UNIV::TIME += frames;
-#ifdef _WIN32
-    // not on windows yet!
-#else
-    // if last error (b.tv_nsec) is small then keep sleeping
         double realtimeStamp = getRealTime();
         double timediff = realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLE_RATE);
         LAST_REALTIME_STAMP = realtimeStamp;
-        timespec delay { 0, long(nanosecs - remain.tv_nsec) }; // this better be all sub-second
-        // subtract any timediff error!
-        // then multiply by 0.5 to split the difference (i.e only move halfway towards the error).
-        delay.tv_nsec -= timediff / 2 * BILLION;
+        long delay_ns = nanosecs - long(timediff / 2 * BILLION);
         if (likely(!UNIV::AUDIO_NONE)) {
-            delay.tv_nsec += (double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
-                    UNIV::SAMPLE_RATE / 2 * BILLION;
+            delay_ns += long((double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
+                    UNIV::SAMPLE_RATE / 2 * BILLION);
         }
-        nanosleep(&delay, &remain);
-#endif
+        if (delay_ns > 0) {
+            std::this_thread::sleep_for(std::chrono::nanoseconds(delay_ns));
+        }
     } while (true);
 }
 

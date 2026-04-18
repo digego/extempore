@@ -36,12 +36,7 @@
 #ifndef EXT_MUTEX
 #define EXT_MUTEX
 
-#ifdef _WIN32
 #include <mutex>
-#else
-#include "pthread.h"
-#endif
-
 #include <string>
 
 namespace extemp
@@ -64,129 +59,17 @@ public:
     };
 private:
     std::string          m_name;
-    bool                 m_initialised;
-#ifdef _WIN32
     std::recursive_mutex m_mutex;
-#else
-    pthread_mutex_t      m_mutex;
-#endif
 public:
-    EXTMutex(const std::string& Name = std::string()): m_name(Name), m_initialised(false) {
-    }
-    ~EXTMutex() {
-        destroy();
+    EXTMutex(const std::string& Name = std::string()): m_name(Name) {
     }
 
-    void init(bool Recursive = true);
-    void destroy();
-
-    void lock();
-    void unlock();
-    bool try_lock();
+    void lock() { m_mutex.lock(); }
+    void unlock() { m_mutex.unlock(); }
+    bool try_lock() { return m_mutex.try_lock(); }
 
     friend class EXTCondition;
 };
-
-#ifdef _WIN32
-#include <exception>
-
-inline void EXTMutex::init(bool Recursive)
-{
-    m_initialised = true;
-}
-
-inline void EXTMutex::destroy()
-{
-    m_initialised = false;
-}
-
-inline void EXTMutex::lock()
-{
-    try {
-        m_mutex.lock();
-    } catch(std::exception& e) {
-        fprintf(stderr, "Problem locking mutex: %s\n", e.what());
-    }
-}
-
-inline void EXTMutex::unlock()
-{
-    try {
-        m_mutex.unlock();
-    } catch(std::exception& e){
-        fprintf(stderr, "Problem unlocking mutex: %s\n", e.what());
-    }
-}
-
-inline bool EXTMutex::try_lock()
-{
-    return m_mutex.try_lock();
-}
-
-#else // begin POSIX
-
-inline void EXTMutex::init(bool Recursive)
-{
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-#ifdef _EXTMUTEX_DEBUG_
-    pthread_mutexattr_settype(&attr, (!Recursive) ? PTHREAD_MUTEX_ERRORCHECK : PTHREAD_MUTEX_NORMAL);
-#else
-    pthread_mutexattr_settype(&attr, (Recursive) ? PTHREAD_MUTEX_RECURSIVE : PTHREAD_MUTEX_NORMAL);
-#endif
-    auto result(pthread_mutex_init(&m_mutex, &attr));
-    m_initialised = !result;
-#ifdef _EXTMUTEX_DEBUG_
-    if (result)
-    {
-        dprintf(2, "Error initialising mutex: %s err: %d", m_name, result);
-    }
-#endif
-}
-
-inline void EXTMutex::destroy()
-{
-    if (m_initialised)
-    {
-        m_initialised = false;
-        auto __attribute__((unused)) result(pthread_mutex_destroy(&m_mutex));
-#ifdef _EXTMUTEX_DEBUG_
-        if (result)
-        {
-            dprintf(2, "Error destroying mutex: %s err: %d\n", m_name, result);
-        }
-#endif
-    }
-}
-
-inline void EXTMutex::lock()
-{
-    auto __attribute__((unused)) result(pthread_mutex_lock(&m_mutex));
-#ifdef _EXTMUTEX_DEBUG_
-    if (result)
-    {
-        dprintf(2, "Error locking mutex: %s err: %d\n", name, result;
-    }
-#endif
-}
-
-inline void EXTMutex::unlock()
-{
-    auto __attribute__((unused)) result(pthread_mutex_unlock(&m_mutex));
-#ifdef _EXTMUTEX_DEBUG_
-    if (result)
-    {
-        dprintf(2, "Error unlocking mutex: %s err: %d\n", name, result);
-    }
-#endif
-}
-
-inline bool EXTMutex::try_lock()
-{
-    return !pthread_mutex_trylock(&m_mutex);
-}
-
-#endif // end POSIX
 
 } //End Namespace
 

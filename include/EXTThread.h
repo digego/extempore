@@ -36,13 +36,8 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
-#ifdef _WIN32
 #include <thread>
 #include <functional>
-#else
-#include "pthread.h"
-#endif
-
 #include <string>
 
 #include "UNIV.h"
@@ -62,11 +57,7 @@ private:
     bool          m_detached;
     bool          m_joined;
     bool          m_subsume; // subsume the current thread
-#ifndef _WIN32
-    pthread_t     m_thread;
-#else
     std::thread   m_thread;
-#endif
 
     static thread_local EXTThread* sm_current;
 public:
@@ -83,16 +74,12 @@ public:
     bool isRunning() const { return m_initialised; }
     bool isCurrentThread() { return sm_current == this; }
     int setPriority(int Priority, bool Realtime);
-    int getPriority() const; //doesn't say if it's realtime or not
-#ifdef _WIN32
+    int getPriority(); //doesn't say if it's realtime or not
     std::thread& getThread() { return m_thread; }
-#else
-    pthread_t getThread() { return m_thread; }
-#endif
 
     static void* Trampoline(void* Arg) {
         auto thread(reinterpret_cast<EXTThread*>(Arg));
-#ifdef __APPLE__ // unforunately apple requires pthread_setname_np in current thread
+#ifdef __APPLE__ // apple requires pthread_setname_np in current thread
         if (!thread->m_name.empty()) {
             pthread_setname_np(thread->m_name.c_str());
         }
