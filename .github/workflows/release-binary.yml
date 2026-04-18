@@ -78,13 +78,15 @@ jobs:
         run: |
           $stage = "$env:ARTIFACT-$env:REF_NAME"
           New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
-          Copy-Item build/extempore.exe "dist/$stage/"
+          # On Windows extempore.exe is placed at the source-dir root, not build/
+          Copy-Item extempore.exe "dist/$stage/"
           foreach ($d in 'libs','runtime','examples','assets') {
             if (Test-Path $d) { Copy-Item -Recurse $d "dist/$stage/" }
           }
           foreach ($f in 'README.md','BUILDING.md','CHANGELOG.md') {
             if (Test-Path $f) { Copy-Item $f "dist/$stage/" }
           }
+          New-Item -ItemType Directory -Force -Path build | Out-Null
           Compress-Archive -Path "dist/$stage" -DestinationPath build/extempore.zip
 
       - name: Upload to release
