@@ -1,24 +1,27 @@
-# Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20run%20tests/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
+# Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20test/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
-A programming environment for cyberphysical programming (Linux/macOS/Windows, including Apple Silicon and Linux aarch64).
+A programming environment for cyberphysical programming. Runs on Linux
+(x86_64 and aarch64), macOS (Apple Silicon) and Windows (x86_64).
+
+## What's new in v0.9.0
+
+v0.9.0-beta is a large release. The highlights:
+
+- **LLVM 22** --- bumped from LLVM 17, fetched and built in-tree via CMake's
+  `FetchContent` (no separate LLVM install required).
+- **ORC JIT** --- replaces the legacy MCJIT, including DSP hot-swap and module
+  tracking.
+- **s7 Scheme** --- replaces TinyScheme as the Scheme interpreter.
+- **WebGPU graphics** --- the OpenGL stack has been replaced with WebGPU via
+  `wgpu-native`. Enable with `-DEXTERNAL_SHLIBS_GRAPHICS=ON`.
+- **Linux aarch64** --- first-class support, alongside macOS arm64, Linux x64
+  and Windows x64. All four platforms are tested in CI.
+- **Interactive REPL** --- pass `--repl` for a linenoise-based REPL (Linux and
+  macOS only).
 
 ## Getting started
 
 ### The easy way
-
-Download [VSCode](https://code.visualstudio.com/), install the Extempore
-extension and then use the _Extempore: Download binary_ command to do the rest.
-
-**Note**: Extempore's binary releases are
-[built automatically](https://github.com/digego/extempore/actions?query=workflow%3ARelease)
-for Windows, macOS and Linux (Linux release are built on Ubuntu, on other
-distros YMMV).
-
-For more details, head to the
-[Quickstart page](https://extemporelang.github.io/docs/overview/quickstart/) in
-Extempore's online docs.
-
-### The _slightly_ harder way (for those who don't want to use VSCode)
 
 Download the latest
 [binary release](https://github.com/digego/extempore/releases) for your
@@ -29,28 +32,40 @@ Then,
 [set up your text editor of choice](https://extemporelang.github.io/docs/guides/editor-support/)
 and away you go.
 
+_Note_: the VSCode extension used to offer an _Extempore: Download binary_
+command for one-click setup. It hasn't been updated for v0.9.0 and may not work
+--- downloading the release manually is the safest option for now.
+
 ### Build from source
 
 **For more information**, check out [BUILDING.md](./BUILDING.md).
 
-Extempore's CMake build process downloads and build all the dependencies you
-need (including LLVM). So, if you've got a C++ compiler, git and CMake, here are
-some one-liner build commands:
+Extempore's CMake build process downloads and builds all the dependencies you
+need (including LLVM). So, if you've got a C++ compiler, git, CMake >= 3.28 and
+Ninja, here are some one-liner build commands.
 
 On **Linux/macOS**:
 
-    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -DASSETS=ON .. && make && sudo make install
+    git clone https://github.com/digego/extempore && cmake -S extempore -B extempore/build -G Ninja -DASSETS=ON && cmake --build extempore/build -j$(nproc)
 
-On **Windows** (if you're using VS2019---adjust as necessary for your VS
-version):
+On **Windows** (adjust the generator for your VS version):
 
-    git clone https://github.com/digego/extempore && mkdir extempore/build && cd extempore/build && cmake -G "Visual Studio 16 2019" -A x64 -DASSETS=ON .. && cmake --build . --target INSTALL --config Release
+    git clone https://github.com/digego/extempore && cmake -S extempore -B extempore/build -G "Visual Studio 17 2022" -A x64 -DASSETS=ON && cmake --build extempore/build --config Release
 
-_Note:_ in the above one-liners the `ASSETS` build-time option (boolean, default
-`OFF`) is set to `ON`. This will download the Extempore binary assets---required
-for many of the examples, but adds a ~300MB download to build process. If you'd
+_Note on build time_: the first build takes ~10-30 minutes because LLVM is
+compiled from source. Subsequent builds reuse the cached LLVM artifacts under
+`build/_deps/`.
+
+_Note on ASSETS_: the `ASSETS` build-time option (boolean, default `OFF`) is set
+to `ON` above. This will download the Extempore binary assets --- required for
+many of the examples, but adds a ~250MB download to the build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
+
+_Note on running_: the `extempore` binary locates its runtime files
+(`runtime/`, `libs/`, `examples/`) relative to the source tree at build time.
+Run it from the build directory (`./extempore`) rather than installing it to a
+system location.
 
 ## See Extempore in action
 
@@ -90,7 +105,7 @@ You can also join the Extempore community:
 
 ## Licence
 
-Copyright (c) 2011-2025, Andrew Sorensen
+Copyright (c) 2011-2026, Andrew Sorensen
 
 All rights reserved.
 
