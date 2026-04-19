@@ -81,6 +81,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdarg>
+#include <ctime>
 #include <mutex>
 #include <shared_mutex>
 
@@ -397,15 +398,13 @@ EXPORT void llvm_print_f64(double num)
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-static thread_local std::minstd_rand* sRandGen;
+static thread_local std::minstd_rand sRandGen{
+    static_cast<std::minstd_rand::result_type>(std::time(nullptr))};
 
 EXPORT double imp_randd()
 {
-    if (unlikely(!sRandGen)) {
-        sRandGen = new std::minstd_rand(time(nullptr));
-    }
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was intended
-    return std::uniform_real_distribution<double>()(*sRandGen);
+    return std::uniform_real_distribution<double>()(sRandGen);
 }
 
 EXPORT float imp_randf()

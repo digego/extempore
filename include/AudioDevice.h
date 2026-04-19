@@ -50,6 +50,8 @@
 
 #include <cstdint>
 
+#include <array>
+#include <memory>
 #include <vector>
 #include "UNIV.h"
 #include "EXTThread.h"
@@ -86,7 +88,7 @@ private:
     SAMPLE* inbuf;
     float* outbuf_f;
     float* inbuf_f;
-    EXTThread* m_threads[MAX_RT_AUDIO_THREADS];
+    std::array<std::unique_ptr<EXTThread>, MAX_RT_AUDIO_THREADS> m_threads;
     unsigned   m_numThreads;
     bool       m_zeroLatency;
     bool       m_toggle;
@@ -151,7 +153,6 @@ public:
     void initMTAudio(int NumThreads, bool ZeroLatency);
     void initMTAudioBuf(int,bool);
 
-    EXTThread** getMTThreads() { return m_threads; }
     int getNumThreads() { return m_numThreads; }
     dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
     dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
