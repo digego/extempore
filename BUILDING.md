@@ -6,112 +6,100 @@ in more depth, here's some more information.
 
 ## Build-time deps
 
-- a C++ compiler (`clang`, `gcc` >= 4.9, `msvc` >= VS2015)
+- a C++17 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
 - Git
-- CMake >= 3.19
-- Python >= 2.7 (for LLVM)
+- CMake >= 3.28
+- Ninja (recommended on Linux/macOS)
+- Python >= 3.8 (for LLVM)
 
-For platform-specific deps, see "Platform-specific notes" below.
+## Build options
 
-## Options
+See the top of `CMakeLists.txt` for all the available options. The ones most
+users will care about:
 
-See the top of `CMakeLists.txt` for all the available build options.
+- `ASSETS` (default `OFF`) --- download the multimedia assets (audio samples,
+  impulse responses) needed to run many of the examples. ~250MB download. If
+  you don't set `-DASSETS=ON` at configure time, CMake still creates an
+  `assets` target you can build afterwards.
+- `BUILD_TESTS` (default `ON`) --- build the test targets (including examples
+  registered as ctest tests).
+- `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
+  (portaudio, portmidi, sndfile, kissfft).
+- `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics
+  stack (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
+- `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead
+  of ALSA.
 
-The most relevant option for new Extempore users is the `ASSETS` option. It's
-off by default, but if set to `ON` the Extempore build process will download a
-bunch of assets (e.g. sound files, 3D model files) which are necessary to run
-many of the Extempore examples. These asset files live in a [separate
-repo](https://github.com/extemporelang/extempore-assets).
+## LLVM
 
-This option is off by default because it's a pretty big (~300MB) download. If
-you don't set `-DASSETS=ON` at build time that's ok---CMake will still create an
-`assets` target which you can "build" afterwards to downoad the assets and move
-them into place.
+Extempore links against a specific version of LLVM (currently 22.1.1, pinned in
+`CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's `FetchContent`
+--- no system LLVM required.
+
+The first build takes ~10-30 min because LLVM is compiled from source.
+Subsequent builds reuse the cached artifacts under `build/_deps/llvm-*`. Only
+the components Extempore needs are built (OrcJIT, target codegen, AsmParser,
+Passes, MCDisassembler, IRPrinter).
+
+CI caches `build/_deps/` across runs --- see `.github/workflows/build-and-test.yml`.
 
 ## Targets
 
-The default target will build Extempore, all the dependencies, and AOT-compile
-the standard library (for faster startup). However, in other situations the
-following targets might come in handy:
+The default target builds Extempore, all the dependencies, and AOT-compiles the
+standard library (for faster startup). Other targets worth knowing about:
 
-- on macOS and Linux, the `install` target will move the extempore executable to
-  `/usr/local/bin` (or similar) and the rest of the Extempore share directory to
-  `/usr/local/share/extempore` (does nothing on Windows)
+- `aot_core` --- AOT-compile just the core standard library (pure-xtlang
+  libraries with no external C library dependencies).
+- `aot_external_audio` --- AOT-compile the external audio libraries (portmidi,
+  sndfile, fft, etc). This is the default AOT target.
+- `clean_aot` --- remove all AOT-compiled files.
+- `assets` --- download and unpack the assets tarball.
 
-- the `aot` target will ahead-of-time compile just the core standard library,
-  i.e. the pure-xtlang libraries with no external C library dependencies
+## Running Extempore
 
-- the `clean_aot` target will remove all AOT-compiled files
+The `extempore` binary locates its share directory (`runtime/`, `libs/`,
+`examples/`) relative to the source tree at build time. Run it from the build
+directory:
+
+    ./extempore                 # audio + Scheme interpreter, listens on port 7099
+    ./extempore --noaudio       # same, without audio
+    ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
+    ./extempore --batch "(begin (println 'hello) (quit 0))"
 
 ## Platform-specific notes
 
 ### macOS
 
-#### macOS 10.15 Catalina
+Extempore's macOS builds target arm64 (Apple Silicon) with a minimum deployment
+target of macOS 11.0 Big Sur.
 
-Since macOS 10.15 Apple requires all binaries to be signed & notarized, and the
-Extempore core team (Andy & Ben) haven't yet got an Apple Developer account set
-up to do that (it's on the to-do list). So if you have problems with the macOS
-Gatekeeper saying that it doesn't trust the `extempore` binary then reach out on
-the [mailing list](mailto:extemporelang@googlegroups.com)---there's a workaround
-which isn't ideal (disabling the "is this binary legit?" check) but we can keep
-you up-to-date on the best way to deal with the issue.
+Apple requires distributed binaries to be signed & notarised, and the Extempore
+core team haven't got an Apple Developer account set up for that. If Gatekeeper
+refuses to run the `extempore` binary, reach out on the
+[mailing list](mailto:extemporelang@googlegroups.com).
 
 ### Linux
 
-Extempore is built & tested on Ubuntu, but is also known to work with Debian,
-Fedora, Arch, NixOS, and inside a docker container.
+Extempore is built & tested on Ubuntu 24.04 (x86_64 and aarch64) in CI.
 
-On Linux, you'll need to specify an [ALSA](http://www.alsa-project.org/) backend
-for portaudio. To use the `asound` portaudio backend (the default) you'll need
-the `libasound` package. Extempore also includes a legacy
-[Jack](http://www.jackaudio.org/) portaudio backend, but it has bitrotted in
-recent years. PortAudio should pick it up if it's there, but you might have to
-do some spelunking.
+You'll need the ALSA dev headers for PortAudio. On Ubuntu:
 
-#### Ubuntu
+    sudo apt-get install libasound2-dev
 
-On Ubuntu 18.04-20.04 you can get the required deps with:
+For the WebGPU graphics build (`-DEXTERNAL_SHLIBS_GRAPHICS=ON`) you'll also need:
 
-    sudo apt-get install libasound2-dev xorg-dev libglu1-mesa-dev
-
-#### Arch
-
-There's an [AUR package](https://aur.archlinux.org/packages/extempore-git/)
+    sudo apt-get install xorg-dev libglu1-mesa-dev
 
 ### Windows
 
-Extempore is built & tested on Windows 10 with Visual Studio 2017 and Visual
-Studio 2019. If you don't already have VS installed, you can download the free
-[Visual Studio
-Community](https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx)---that's
-perfectly fine for building Extempore (although the paid versions of VS will
-work as well).
+Extempore is built & tested on Windows Server 2022 with Visual Studio 2022. If
+you don't already have VS installed, download the free
+[Visual Studio Community](https://visualstudio.microsoft.com/vs/community/).
 
-In the CMake build process, you'll need to specify which version you're
-using---confusingly the Visual Studio version numbers and years don't _quite_ line up, so
-the respective generators are:
-
-- VS2017: "-G "Visual Studio 15 2017" -A x64"
-- VS2019: "-G "Visual Studio 16 2019" -A x64"
+The CMake generator for VS2022 is `-G "Visual Studio 17 2022" -A x64`.
 
 #### Missing `VCRUNTIME140_1.dll`
 
-If you ever see the error message _VCRUNTIME140_1.dll was not found_, then
-you'll need to download the x64 `vc_redist.x64.exe`. Make sure you get it from
-the official [Windows
-website](https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads),
-because there are lots of sketchy places on the web which will try and get you
-to download theirs instead.
-
-#### ASIO
-
-If you want to use the **ASIO** audio backend on Windows (which _might_ give you
-lower-latency audio, or it might not) you need to download the [ASIO
-SDK](http://www.steinberg.net/nc/en/company/developer/sdk_download_portal.html)
-from Steinberg. You have to create a [third party developer
-account](http://www.steinberg.net/nc/en/company/developer/sdk_download_portal/create_3rd_party_developer_account.html),
-then you can log in and download the ASIO SDK (make sure you get the right SDK).
-You also need to download and install [ASIO4ALL](http://www.asio4all.com/) with
-the 'offline setup panel' option enabled. After that, copy the ASIO files into
-the `src/portaudio/src/hostapi/asio`.
+If you see _VCRUNTIME140_1.dll was not found_, install the x64
+`vc_redist.x64.exe` from the
+[official Microsoft page](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
