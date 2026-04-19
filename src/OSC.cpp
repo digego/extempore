@@ -35,6 +35,7 @@
 
 #include "OSC.h"
 #include "SchemeProcess.h"
+#include "ext/NetUtil.h"
 #include <string>
 #include <iomanip>
 #include <sstream>
@@ -1103,21 +1104,18 @@ namespace extemp {
     std::experimental::net::ip::udp::endpoint sa = *iter;
 #else
     struct sockaddr_in sa;
-    struct hostent* hen; /* host-to-IP translation */
 
-    /* Address resolution stage */
-    hen = gethostbyname(host);
-    if (!hen) {
-      printf("OSC Error: Could no resolve host name\n");
+    uint32_t resolved = extemp::net_util::resolve_ipv4(host);
+    if (!resolved) {
+      printf("OSC Error: Could not resolve host name\n");
       delete t->getArg();
       return;
     }
 
     memset(&sa, 0, sizeof(sa));
-
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
-    memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
+    sa.sin_addr.s_addr = resolved;
 #endif
 
 

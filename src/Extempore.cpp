@@ -49,6 +49,8 @@
 #ifndef _WIN32
 #include "LinenoiseREPL.h"
 #include <signal.h>
+#include <unistd.h>
+#include <cstdlib>
 #else
 #undef min
 #undef max
@@ -107,13 +109,20 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 
 void sig_handler(int Signo)
 {
+  // Async-signal-safe: write(2) and _Exit are on the POSIX safe list,
+  // printf / exit are not. We drop the helpful "(SIGINT), exiting..."
+  // prefix in favour of correctness.
   if (Signo == SIGINT) {
-      printf("\nReceived interrupt signal (SIGINT), exiting Extempore...\n");
-      _exit(0);
+      static const char msg[] = "\nextempore: SIGINT, exiting\n";
+      ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+      (void)r;
+      _Exit(128 + SIGINT);
   }
   else if (Signo == SIGTERM) {
-      printf("\nReceived termination signal (SIGTERM), exiting Extempore...\n");
-      exit(0);
+      static const char msg[] = "\nextempore: SIGTERM, exiting\n";
+      ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+      (void)r;
+      _Exit(128 + SIGTERM);
   }
 }
 
@@ -172,10 +181,7 @@ EXPORT int extempore_init(int argc, char** argv)
     int utility_port = 7098;
     bool repl_mode = false;
 #ifndef _WIN32
-    // redirect stderr to nullptr
-    freopen("/dev/null", "w", stderr);
-
-        // signal handlers for OSX/Linux
+    // signal handlers for OSX/Linux
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
                 printf("\nWarning: can't catch SIGINT.\n");
     }
