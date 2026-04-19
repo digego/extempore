@@ -257,18 +257,18 @@ EXPORT int extempore_init(int argc, char** argv)
                 break;
             case OPT_TERM:
                 if (!strcmp(args.OptionArg(), "cmd")) {
-                    extemp::UNIV::EXT_TERM = 1;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::Cmd;
                 } else if (!strcmp(args.OptionArg(), "basic")) {
-                    extemp::UNIV::EXT_TERM = 2;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::Basic;
                 } else if (!strcmp(args.OptionArg(), "nocolor")) {
-                  extemp::UNIV::EXT_TERM = 3;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::NoColor;
                 } else if (!strcmp(args.OptionArg(), "ansi")) {
-                  extemp::UNIV::EXT_TERM = 0;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::Ansi;
                 } else {
 #ifdef _WIN32
-                  extemp::UNIV::EXT_TERM = 1;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::Cmd;
 #else
-                  extemp::UNIV::EXT_TERM = 0;
+                    extemp::UNIV::EXT_TERM = extemp::UNIV::TerminalMode::Ansi;
 #endif
                 }
                 break;

@@ -125,7 +125,13 @@ inline uint32_t SECOND() { return SAMPLE_RATE; }
 inline uint32_t MINUTE() { return SAMPLE_RATE * 60; }
 inline uint32_t HOUR() { return MINUTE() * 60; }
 EXPORT uint32_t NUM_FRAMES;
-extern uint32_t EXT_TERM;
+enum class TerminalMode : uint32_t {
+    Ansi    = 0,
+    Cmd     = 1,
+    Basic   = 2,
+    NoColor = 3,
+};
+extern TerminalMode EXT_TERM;
 extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;
 extern bool BATCH_MODE;
@@ -184,13 +190,13 @@ extern "C" inline double getRealTime()
 
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background)
 {
-    if (unlikely(extemp::UNIV::EXT_TERM == 3)) {
+    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor)) {
         return;
     }
 #ifdef _WIN32
     extern int WINDOWS_COLORS[];
     extern int WINDOWS_BGCOLORS[];
-    if (unlikely(extemp::UNIV::EXT_TERM == 1)) {
+    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Cmd)) {
       Foreground = (Foreground > 7) ? 7 : Foreground;
       Background = (Background > 7) ? 0 : Background;
       HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -206,7 +212,7 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     // then default to black background and white text
     Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
     Background = (Background > 9 || Background == 8) ? 9 : Background;
-    if (unlikely(extemp::UNIV::EXT_TERM == 2)) {
+    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Basic)) {
         if (unlikely(Background == 9)) {
             Background = 0;
         }

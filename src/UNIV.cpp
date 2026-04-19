@@ -414,11 +414,10 @@ std::string ARCH;
 std::string CPU;
 std::vector<std::string> ATTRS;
 
-// 0 is for ansi, 1 is for MSDos CMD shell
 #ifdef _WIN32
-uint32_t EXT_TERM = 1;
+TerminalMode EXT_TERM = TerminalMode::Cmd;
 #else
-uint32_t EXT_TERM = 0;
+TerminalMode EXT_TERM = TerminalMode::Ansi;
 #endif
 bool EXT_LOADBASE = true;
 
