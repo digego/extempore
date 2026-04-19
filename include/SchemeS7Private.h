@@ -3,7 +3,6 @@
 
 #include "SchemeS7.h"
 #include "EXTThread.h"
-#include "EXTMonitor.h"
 #include "s7.h"
 
 #include <set>

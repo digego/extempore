@@ -107,7 +107,7 @@ const char* SchemeProcess::sm_banner = "\n"
 
 SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort, bool Banner,
         const std::string& InitExpr): m_loadPath(LoadPath), m_name(Name), m_serverPort(ServerPort),
-        m_banner(Banner), m_initExpr(InitExpr), m_libsLoaded(false), m_guard("scheme_server_guard"),
+        m_banner(Banner), m_initExpr(InitExpr), m_libsLoaded(false),
         m_running(true), m_threadTask(&taskTrampoline, this, "SP_task"),
         m_threadServer(&serverTrampoline, this, "SP_server")
 {
@@ -204,17 +204,19 @@ void SchemeProcess::stop()
 
 void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type)
 {
-    EXTMonitor::ScopedLock lock(m_guard, true);
+    std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
     auto currentTime(TaskAdd->getStartTime());
     auto duration(TaskAdd->getDuration());
     auto task(static_cast<Task<SchemeObj*>*>(TaskAdd));
     m_taskQueue.push(SchemeTask(currentTime, duration, task->getArg(), "tmp_label", Type));
+    m_guardCond.notify_one();
 }
 
 void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, SchemeTask::Type Type)
 {
-    EXTMonitor::ScopedLock lock(m_guard, true);
+    std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
     m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, Arg, Label, Type));
+    m_guardCond.notify_one();
 }
 
 bool SchemeProcess::loadFile(const std::string& File, const std::string& Path)
@@ -292,7 +294,7 @@ void* SchemeProcess::taskImpl()
     std::this_thread::sleep_for(std::chrono::seconds(2)); // give time for NSApp etc. to init
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
-        EXTMonitor::ScopedLock lock(m_guard);
+        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
 #ifdef DYLIB
         auto fs = cmrc::xtm::get_filesystem();
         auto data = fs.open("runtime/init.ll");
@@ -341,10 +343,12 @@ void* SchemeProcess::taskImpl()
             continue;
         }
         while (likely(!m_taskQueue.empty() && m_running)) {
-            m_guard.lock();
-            SchemeTask task = m_taskQueue.front();
-            m_taskQueue.pop();
-            m_guard.unlock();
+            SchemeTask task = [&]() {
+                std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+                SchemeTask t = m_taskQueue.front();
+                m_taskQueue.pop();
+                return t;
+            }();
             switch (task.getType()) {
             case SchemeTask::Type::DESTROY_ENV:
                 m_scheme->imp_env.erase(reinterpret_cast<pointer>(task.getPtr()));
@@ -577,12 +581,13 @@ void* SchemeProcess::serverImpl()
                     std::string::size_type pos = 0;
                     std::string::size_type end = evalStr.find_first_of('\x0d', pos);
                     for (; end != std::string::npos; pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
-                        EXTMonitor::ScopedLock lock(m_guard, true);
+                        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                         char c[16];
                         snprintf(c, sizeof(c), "%i", int(sock));
                         std::string* s = new std::string(evalStr.substr(pos, end - pos + 1));
                         // std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << *s << std::endl;
                         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c, SchemeTask::Type::REPL));
+                        m_guardCond.notify_one();
                     }
                 }
             }

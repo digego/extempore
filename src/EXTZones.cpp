@@ -1,10 +1,10 @@
 #include <EXTZones.h>
-#include <EXTMutex.h>
 #include <BranchPrediction.h>
 
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 
 #define DEBUG_ZONE_ALLOC 0
 #define DEBUG_ZONE_STACK 0
@@ -66,11 +66,8 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone)
 
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size)
 {
-    static std::unique_ptr<extemp::EXTMutex> alloc_mutex = []() {
-        std::unique_ptr<extemp::EXTMutex> m(new extemp::EXTMutex("alloc mutex"));
-        return m;
-    }();
-    extemp::EXTMutex::ScopedLock lock(*alloc_mutex);
+    static std::recursive_mutex alloc_mutex;
+    std::lock_guard<std::recursive_mutex> lock(alloc_mutex);
 #if DEBUG_ZONE_ALLOC
     printf("MallocZone: %p:%p:%lld:%lld:%lld\n",zone,zone->memory,zone->offset,zone->size,size);
 #endif

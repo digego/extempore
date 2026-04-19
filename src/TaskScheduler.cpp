@@ -34,7 +34,6 @@
  */
 
 #include "TaskScheduler.h"
-#include "EXTMonitor.h"
 #include "AudioDevice.h"
 #include <cmath>
 #include <thread>
@@ -44,8 +43,7 @@ namespace extemp {
 
 TaskScheduler TaskScheduler::sm_instance;
 
-TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler"),
-    m_guard("task_scheduler_guard"), m_queueMutex("taskQueue")
+TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler")
 {
 }
 
