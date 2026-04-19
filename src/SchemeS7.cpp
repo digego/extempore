@@ -1,5 +1,6 @@
 #include "SchemeS7Private.h"
 #include <array>
+#include <atomic>
 #include <iostream>
 #include <mutex>
 #include <unordered_map>
@@ -23,15 +24,18 @@ void scheme_register_wrapper(s7_scheme* raw_sc, scheme* wrapper)
 }
 
 static constexpr int MAX_FFI_FUNCS = 4096;
-static foreign_func s_ffiTable[MAX_FFI_FUNCS];
-static int s_ffiCount = 0;
+// Registration can race across scheme instances; reads happen from every
+// scheme call.  Atomics give us a happens-before between the store in
+// mk_foreign_func and the load here with no mutex on the hot path.
+static std::atomic<foreign_func> s_ffiTable[MAX_FFI_FUNCS];
+static std::atomic<int> s_ffiCount{0};
 
 template<int N>
 static s7_pointer ffi_trampoline(s7_scheme* raw_sc, s7_pointer args)
 {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
     try {
-        return s_ffiTable[N](wrapper, args);
+        return s_ffiTable[N].load(std::memory_order_acquire)(wrapper, args);
     } catch (const ScmRuntimeError& e) {
         return s7_error(raw_sc, s7_make_symbol(raw_sc, "wrong-type-arg"),
                         s7_list(raw_sc, 1, s7_make_string(raw_sc, e.msg)));
@@ -532,13 +536,13 @@ pointer mk_character(scheme* sc, int c)
 
 pointer mk_foreign_func(scheme* sc, foreign_func f)
 {
-    int slot = s_ffiCount++;
+    int slot = s_ffiCount.fetch_add(1, std::memory_order_relaxed);
     if (slot >= MAX_FFI_FUNCS) {
         printf("Too many FFI functions registered (slot %d, max %d)\n", slot, MAX_FFI_FUNCS);
         fflush(stdout);
         return sc->F;
     }
-    s_ffiTable[slot] = f;
+    s_ffiTable[slot].store(f, std::memory_order_release);
     return s7_make_function(sc->sc, "#<foreign>", s_trampolineTable[slot], 0, 0, true, nullptr);
 }
 
