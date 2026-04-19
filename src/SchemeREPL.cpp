@@ -35,6 +35,7 @@
 
 #include "SchemeREPL.h"
 #include "UNIV.h"
+#include "ext/NetUtil.h"
 
 #include <cstdio>
 
@@ -64,7 +65,12 @@ namespace extemp {
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 
 SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_title(Title), m_process(Process),
-        m_serverSocket(0), m_connected(false), m_active(true)
+#ifdef _WIN32
+        m_serverSocket(nullptr),
+#else
+        m_serverSocket(-1),
+#endif
+        m_connected(false), m_active(true)
 {
     ascii_info();
 	printf("INFO:");
@@ -75,9 +81,15 @@ SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_titl
 
 void SchemeREPL::writeString(std::string&& String)
 {
+#ifdef _WIN32
     if (!m_serverSocket) {
         return;
     }
+#else
+    if (m_serverSocket == -1) {
+        return;
+    }
+#endif
     std::lock_guard<std::recursive_mutex> lock(m_writeLock);
     String.push_back('\r');
     String.push_back('\n');
@@ -129,10 +141,9 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     //std::cout << "resolved: " << ep << std::endl << std::flush;
     if(iter == end) {
 #else
-	struct sockaddr_in sa;
-	struct hostent* hen; /* host-to-IP translation */
-    hen = gethostbyname(hostname.c_str());
-    if (!hen) {
+    struct sockaddr_in sa;
+    uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
+    if (!resolved) {
 #endif
         ascii_error();
         printf("Could not resolve host name\n");
@@ -159,7 +170,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
-    memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
+    sa.sin_addr.s_addr = resolved;
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
     if (m_serverSocket < 0) {
@@ -208,15 +219,20 @@ void SchemeREPL::closeREPL()
 {
     m_active = false;
 #ifdef _WIN32
-    m_serverSocket->close();
-    delete m_serverSocket;
+    if (m_serverSocket) {
+        m_serverSocket->close();
+        delete m_serverSocket;
+        m_serverSocket = nullptr;
+    }
     delete m_serverIoService;
-    m_serverIoService = 0;
+    m_serverIoService = nullptr;
 #else
-    shutdown(m_serverSocket, SHUT_RDWR);
-    close(m_serverSocket);
+    if (m_serverSocket != -1) {
+        shutdown(m_serverSocket, SHUT_RDWR);
+        close(m_serverSocket);
+        m_serverSocket = -1;
+    }
 #endif
-    m_serverSocket = 0;
     m_connected = false;
 }
 

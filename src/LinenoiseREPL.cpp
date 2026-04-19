@@ -2,12 +2,12 @@
 
 #include "LinenoiseREPL.h"
 #include "linenoise/linenoise.h"
+#include "ext/NetUtil.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netdb.h>
 #include <unistd.h>
 #include <cstring>
 #include <cstdio>
@@ -18,8 +18,8 @@
 
 static int connect_to_server(const std::string& host, int port)
 {
-    struct hostent* hen = gethostbyname(host.c_str());
-    if (!hen) {
+    uint32_t resolved = extemp::net_util::resolve_ipv4(host.c_str());
+    if (!resolved) {
         fprintf(stderr, "repl: could not resolve host '%s'\n", host.c_str());
         return -1;
     }
@@ -28,7 +28,7 @@ static int connect_to_server(const std::string& host, int port)
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
-    memcpy(&sa.sin_addr.s_addr, hen->h_addr_list[0], hen->h_length);
+    sa.sin_addr.s_addr = resolved;
 
     int retries = 30;
     for (int i = 0; i < retries; i++) {
