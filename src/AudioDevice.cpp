@@ -289,7 +289,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     auto sched(reinterpret_cast<TaskScheduler*>(UserData));
     UNIV::DEVICE_TIME += FramesPerBuffer;
     if (likely(UNIV::TIME_DIVISION == 1)) {
-        UNIV::TIME = UNIV::DEVICE_TIME;
+        UNIV::TIME.store(UNIV::DEVICE_TIME.load());
     }
     if (unlikely(AudioDevice::CLOCKBASE < 1.0)) {
         AudioDevice::CLOCKBASE = getRealTime();
@@ -320,7 +320,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         auto dat(reinterpret_cast<float*>(OutputBuffer));
         auto in(reinterpret_cast<const float*>(InputBuffer));
-        auto time(UNIV::DEVICE_TIME);
+        uint64_t time(UNIV::DEVICE_TIME);
         if (likely(!UNIV::IN_CHANNELS)) {
             float dummy(0.0);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {

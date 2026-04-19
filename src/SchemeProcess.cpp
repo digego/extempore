@@ -392,7 +392,7 @@ void* SchemeProcess::taskImpl()
                             resetOutportString();
                         } else {
                             if (m_banner) {
-                                auto time(UNIV::TIME);
+                                uint64_t time(UNIV::TIME);
                                 auto hours(time / UNIV::HOUR());
                                 time -= hours * UNIV::HOUR();
                                 auto minutes(time / UNIV::MINUTE());
@@ -520,7 +520,7 @@ void* SchemeProcess::serverImpl()
             std::string outString;
             if (m_banner) {
                 outString += sm_banner;
-                auto time(UNIV::TIME);
+                uint64_t time(UNIV::TIME);
                 auto hours(time / UNIV::HOUR());
                 time -= hours * UNIV::HOUR();
                 auto minutes(time / UNIV::MINUTE());

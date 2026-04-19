@@ -393,8 +393,11 @@ uint32_t NUM_FRAMES = 1024;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;
 uint32_t SAMPLE_RATE = 44100;
-volatile uint64_t TIME = 0l;
-uint64_t DEVICE_TIME = 0l;
+std::atomic<uint64_t> TIME{0};
+std::atomic<uint64_t> DEVICE_TIME{0};
+static_assert(std::atomic<uint64_t>::is_always_lock_free,
+              "std::atomic<uint64_t> must be lock-free so the xtlang JIT's "
+              "plain i64 loads of @TIME remain compatible");
 double AUDIO_CLOCK_NOW = 0.0;
 double AUDIO_CLOCK_BASE = 0.0;
 uint64_t TIME_DIVISION = 1;
