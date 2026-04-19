@@ -44,6 +44,7 @@
 #include <iomanip>
 #include "SchemeFFI.h"
 #include "SchemeS7Private.h"
+#include "ext/FileUtil.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
@@ -348,27 +349,12 @@ EXPORT const char* sys_sharedir(){
 
 EXPORT char* sys_slurp_file(const char* fname)
 {
-    std::string filename(fname);
-    std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + filename);
-
-    // check raw path first, then prepend SHARE_DIR
-    std::FILE *fp = std::fopen(filename.c_str(), "rb");
-    if (!fp) {
-      fp = std::fopen(sharedir_filename.c_str(), "rb");
+    // Try the raw path first, then prepend SHARE_DIR.
+    if (char* buf = extemp::file_util::slurp_file(fname)) {
+        return buf;
     }
-
-  if(fp){
-    std::fseek(fp, 0, SEEK_END);
-    size_t file_size = std::ftell(fp);
-    char* buf = (char*)malloc(file_size*sizeof(char));
-    std::rewind(fp);
-    std::fread(buf, 1, file_size, fp);
-    std::fclose(fp);
-
-    buf[file_size-1] = '\0';
-    return buf;
-  }
-  return nullptr;
+    std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + fname);
+    return extemp::file_util::slurp_file(sharedir_filename.c_str());
 }
 
 EXPORT int register_for_window_events()
