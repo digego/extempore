@@ -167,46 +167,50 @@ EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length
 {
     if (base64_codesafe_decoding_table == nullptr) base64_codesafe_build_decoding_table();
 
-    char* d2 = nullptr;
-    // pad with $'s
+    // Pad with $'s to align to 4 bytes. pad_buf is separate from the outer
+    // scope so we always know which buffer to free at the end.
+    char* pad_buf = nullptr;
     if (input_length % 4 != 0) {
-      int lgthdiff = (4-(input_length % 4));
-      char* d2 = (char*) malloc(input_length+lgthdiff);
-      memcpy(d2,data,input_length);
-      input_length = input_length+lgthdiff;
-      for(int i=0;i<lgthdiff;i++) {
-        d2[input_length-1-i] = '$';
-      }
-      data = d2;
+        int lgthdiff = (4 - (input_length % 4));
+        pad_buf = (char*) malloc(input_length + lgthdiff);
+        memcpy(pad_buf, data, input_length);
+        input_length = input_length + lgthdiff;
+        for (int i = 0; i < lgthdiff; i++) {
+            pad_buf[input_length - 1 - i] = '$';
+        }
+        data = pad_buf;
     }
 
-    if (input_length % 4 != 0) return nullptr;
+    if (input_length % 4 != 0) { if (pad_buf) free(pad_buf); return nullptr; }
     *output_length = input_length / 4 * 3;
     if (data[input_length - 1] == '$') (*output_length)--;
     if (data[input_length - 2] == '$') (*output_length)--;
 
-    char *decoded_data = (char*) malloc(*output_length+1);
+    char *decoded_data = (char*) malloc(*output_length + 1);
+    if (decoded_data == nullptr) { if (pad_buf) free(pad_buf); return nullptr; }
     decoded_data[*output_length] = 0;
-    if (decoded_data == nullptr) return nullptr;
+
+    auto fetch = [&](unsigned& i) -> uint32_t {
+        unsigned char c = static_cast<unsigned char>(data[i++]);
+        return c == '$' ? 0u : base64_codesafe_decoding_table[c];
+    };
 
     for (unsigned i = 0, j = 0; i < input_length;) {
-
-        uint32_t sextet_a = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_b = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_c = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_d = data[i] == '$' ? 0 & i++ : base64_codesafe_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_a = fetch(i);
+        uint32_t sextet_b = fetch(i);
+        uint32_t sextet_c = fetch(i);
+        uint32_t sextet_d = fetch(i);
 
         uint32_t triple = (sextet_a << 3 * 6)
-        + (sextet_b << 2 * 6)
-        + (sextet_c << 1 * 6)
-        + (sextet_d << 0 * 6);
+                        + (sextet_b << 2 * 6)
+                        + (sextet_c << 1 * 6)
+                        + (sextet_d << 0 * 6);
 
         if (j < *output_length) decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
         if (j < *output_length) decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
         if (j < *output_length) decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
     }
-    if (d2) free(d2);
-    //printf("DECODE: %d:%s\n",*output_length,decoded_data);
+    if (pad_buf) free(pad_buf);
     return decoded_data;
 }
 
@@ -253,12 +257,17 @@ EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_
     unsigned char *decoded_data = (unsigned char*) malloc(*output_length);
     if (decoded_data == nullptr) return nullptr;
 
+    auto fetch = [&](unsigned& i) -> uint32_t {
+        unsigned char c = static_cast<unsigned char>(data[i++]);
+        return c == '=' ? 0u : base64_std_decoding_table[c];
+    };
+
     for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t sextet_a = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_b = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_c = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
-        uint32_t sextet_d = data[i] == '=' ? 0 & i++ : base64_std_decoding_table[unsigned(data[i++])];
+        uint32_t sextet_a = fetch(i);
+        uint32_t sextet_b = fetch(i);
+        uint32_t sextet_c = fetch(i);
+        uint32_t sextet_d = fetch(i);
 
         uint32_t triple = (sextet_a << 3 * 6)
         + (sextet_b << 2 * 6)
