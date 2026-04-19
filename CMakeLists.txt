@@ -323,7 +323,7 @@ if(WIN32)
     target_include_directories(extempore SYSTEM PRIVATE src/networking-ts-impl/include)
     target_compile_definitions(extempore PRIVATE -DPCRE_STATIC -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
     target_compile_options(extempore PRIVATE /bigobj /W3 /wd4244 /wd4267 /wd4018 /wd4996 /we4715)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
+    target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
     set_target_properties(extempore PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
         RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
