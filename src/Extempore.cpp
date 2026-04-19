@@ -330,6 +330,7 @@ EXPORT int extempore_init(int argc, char** argv)
                 std::cout << "Extempore's command line options: " << std::endl;
                 std::cout << "            --help: prints this menu" << std::endl;
                 std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
+                std::cout << "            --eval: scheme expression to evaluate at startup" << std::endl;
                 std::cout << "           --batch: run in batch mode (no server, single process, no audio) with given expression" << std::endl;
                 std::cout << "            --port: port for primary process [7099]" << std::endl;
                 std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
@@ -342,16 +343,17 @@ EXPORT int extempore_init(int argc, char** argv)
                 std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
                 std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
                 std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
-                std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the defaul)" << std::endl;
+                std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the default)" << std::endl;
                 std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
                 std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
                 std::cout << "     --device-name: a regex to match the name of the audio device to use (output or duplex) (overrides index)" << std::endl;
-                std::cout << "   --indevice-name: a regex to match the namd of the audio input device to use (overrides index)" << std::endl;
+                std::cout << "   --indevice-name: a regex to match the name of the audio input device to use (overrides index)" << std::endl;
                 std::cout << "         --latency: attempts to force audio output latency" << std::endl;
+                std::cout << "        --realtime: use realtime process priority (Windows only)" << std::endl;
                 std::cout << "            --arch: the target architecture [current host]" << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
                 std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
-				std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
+                std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
                 std::cout << "            --repl: start an interactive REPL (Linux/macOS only)" << std::endl;
                 std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
                 std::_Exit(0);
