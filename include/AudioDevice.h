@@ -51,6 +51,7 @@
 #include <cstdint>
 
 #include <array>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include "UNIV.h"
@@ -89,7 +90,7 @@ private:
     float* outbuf_f;
     float* inbuf_f;
     std::array<std::unique_ptr<EXTThread>, MAX_RT_AUDIO_THREADS> m_threads;
-    unsigned   m_numThreads;
+    std::atomic<unsigned> m_numThreads;
     bool       m_zeroLatency;
     bool       m_toggle;
 
@@ -153,7 +154,7 @@ public:
     void initMTAudio(int NumThreads, bool ZeroLatency);
     void initMTAudioBuf(int,bool);
 
-    int getNumThreads() { return m_numThreads; }
+    int getNumThreads() const { return int(m_numThreads.load(std::memory_order_acquire)); }
     dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
     dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
     dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }

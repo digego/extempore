@@ -52,6 +52,8 @@
 #include "BranchPrediction.h"
 
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 #ifdef _WIN32
@@ -163,12 +165,45 @@ uint64_t start_time = 0;
   //-----------------------------------
   //  PORT AUDIO
   //-----------------------------------
-#define NANO_SLEEP_DURATION 100000
 
-static std::atomic_int sThreadDoneCount;
-static std::atomic_int_fast64_t sSignalCount;
+namespace {
 
-static const auto MT_SLEEP_DURATION = std::chrono::nanoseconds(NANO_SLEEP_DURATION);
+// C++17 stand-in for std::counting_semaphore (which is C++20). Used to
+// synchronise the multi-threaded audio dispatcher with its worker threads
+// without spinning on atomics. Replaces the old sSignalCount /
+// sThreadDoneCount pair that had a TOCTOU race on m_numThreads and could
+// leave sThreadDoneCount > numThreads during a thread-count change.
+class MtSemaphore {
+public:
+    void release(unsigned n) {
+        if (n == 0) return;
+        {
+            std::lock_guard<std::mutex> lk(m_mutex);
+            m_count += n;
+        }
+        if (n == 1) {
+            m_cv.notify_one();
+        } else {
+            m_cv.notify_all();
+        }
+    }
+    void acquire() {
+        std::unique_lock<std::mutex> lk(m_mutex);
+        m_cv.wait(lk, [this] { return m_count > 0; });
+        --m_count;
+    }
+private:
+    std::mutex              m_mutex;
+    std::condition_variable m_cv;
+    unsigned                m_count = 0;
+};
+
+// dispatcher -> workers
+MtSemaphore sMtWorkAvailable;
+// workers -> dispatcher
+MtSemaphore sMtWorkComplete;
+
+} // anonymous namespace
 
 void* audioCallbackMT(void* Args)
 {
@@ -193,24 +228,15 @@ void* audioCallbackMT(void* Args)
     SAMPLE* indata = (SAMPLE*) malloc(UNIV::IN_CHANNELS * 8);
     bool zerolatency = AudioDevice::I()->getZeroLatency();
     bool toggle = false;
-    int64_t lcount = 0; // local count
-    printf("Starting RT Audio process with SIG CNT: %" PRId64 "\n",int64_t(sSignalCount));
+    printf("Starting RT Audio MT worker %u\n", idx);
     while (true) {
+        sMtWorkAvailable.acquire();
         outbuf = outbufs[toggle];
         if (unlikely(!zerolatency)) {
             toggle = !toggle;
         }
         auto cache_closure(AudioDevice::I()->getDSPMTClosure(idx)());
         auto closure = *reinterpret_cast<closure_fn_type*>(cache_closure);
-        int cnt = 0;
-        while(sSignalCount <= lcount) { // wait);
-            std::this_thread::sleep_for(MT_SLEEP_DURATION);
-            cnt++;
-            if (!(cnt%100000)) {
-                printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount,int64_t(sSignalCount));
-            }
-        } // spin
-        ++lcount;
         uint64_t LTIME = UNIV::DEVICE_TIME;
         for (uint32_t i=0;i<UNIV::NUM_FRAMES;i++) {
             uint32_t iout = i*UNIV::CHANNELS;
@@ -235,7 +261,7 @@ void* audioCallbackMT(void* Args)
                 }
             }
         }
-        ++sThreadDoneCount;
+        sMtWorkComplete.release(1);
     }
     return 0;
 }
@@ -252,7 +278,6 @@ void* audioCallbackMTBuf(void* dat) {
     SetThreadPriority(GetCurrentThread(),15); // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
     unsigned idx = uintptr_t(dat);
-    int64_t lcount = 0; // local count
 
     dsp_f_ptr_array dsp_wrapper_array = AudioDevice::I()->getDSPWrapperArray();
     dsp_f_ptr_array cache_wrapper = dsp_wrapper_array;
@@ -261,24 +286,15 @@ void* audioCallbackMTBuf(void* dat) {
     outbuf = outbuf+(UNIV::CHANNELS*UNIV::NUM_FRAMES*idx);
     float* inbuf = AudioDevice::I()->getDSPMTInBufferArray();
 
-    printf("Starting RT Audio process with SIG CNT: %" PRId64 "\n",int64_t(sSignalCount));
+    printf("Starting RT Audio MTBuf worker %u\n", idx);
 
-// TODO: USED FOR????    float* indata = (float*) malloc(UNIV::IN_CHANNELS*4);
     while (true) {
+      sMtWorkAvailable.acquire();
       auto cache_closure(AudioDevice::I()->getDSPMTClosure(idx)());
       auto closure = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
-      int cnt = 0;
-      while (sSignalCount <= lcount) { // wait
-        std::this_thread::sleep_for(MT_SLEEP_DURATION);
-        cnt++;
-        if (!(cnt%100000)) {
-            printf("Still locked in %d cnt(%" PRId64 ":%" PRId64 ")\n!",idx,lcount, int64_t(sSignalCount));
-        }
-      } // spin
-      lcount++;
       cache_wrapper(zone, reinterpret_cast<void*>(closure), inbuf, outbuf, UNIV::DEVICE_TIME, nullptr);
       extemp::EXTZones::llvm_zone_reset(zone);
-      ++sThreadDoneCount;
+      sMtWorkComplete.release(1);
     }
     return 0;
 }
@@ -371,27 +387,17 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, UserData);
         extemp::EXTZones::llvm_zone_reset(zone);
     } else if (AudioDevice::I()->getDSPSUMWrapper()) { // if true then multi threaded sample-by-sample
-        int numthreads = AudioDevice::I()->getNumThreads();
-        bool zerolatency = AudioDevice::I()->getZeroLatency();
+        const unsigned numthreads = unsigned(AudioDevice::I()->getNumThreads());
+        const bool zerolatency = AudioDevice::I()->getZeroLatency();
         SAMPLE in[32];
         SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
         float* input = (float*) InputBuffer;
         for(unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = (SAMPLE) input[i];
-        sThreadDoneCount = 0;
         if (zerolatency) {
-            ++sSignalCount;
-            int cnt = 0;
-            while (sThreadDoneCount != numthreads) {
-                std::this_thread::sleep_for(MT_SLEEP_DURATION);
-                ++cnt;
-                if (!(cnt % 100000)) {
-                    printf("Locked with threads:%d of %d cnt(%" PRId64 ")!\n", sThreadDoneCount.load(), numthreads,
-                            sSignalCount.load());
-                    if(sThreadDoneCount > numthreads) printf("in MT Audio sThreadDoneCount should never be greater than numthreads! - this is a race :(");
-                }
-                numthreads = AudioDevice::I()->getNumThreads();
+            sMtWorkAvailable.release(numthreads);
+            for (unsigned i = 0; i < numthreads; ++i) {
+                sMtWorkComplete.acquire();
             }
-            sThreadDoneCount = 0;
         }
         //printf("process audio sum ...\n");
         dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
@@ -406,7 +412,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         if (!zerolatency && !toggle) {
             indats[0] = indats[0] + UNIV::NUM_FRAMES*UNIV::CHANNELS;
         }
-        for (int jj=1;jj<numthreads;jj++) {
+        for (unsigned jj=1;jj<numthreads;jj++) {
             indats[jj] = indats[0] + (UNIV::NUM_FRAMES*UNIV::CHANNELS*jj*2);
         }
         for(uint64_t i=0;i<UNIV::NUM_FRAMES;i++) {
@@ -415,7 +421,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
 
         for(uint64_t k=0; k<UNIV::CHANNELS; k++)
           {
-            for(int jj=0;jj<numthreads;jj++) {
+            for(unsigned jj=0;jj<numthreads;jj++) {
               in[jj] = indats[jj][iout+k];
             }
             dat[iout+k] = audio_sanity_f((float)cache_wrapper(zone, (void*)closure, in, (i+UNIV::DEVICE_TIME),k,nullptr));
@@ -423,42 +429,22 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
           }
         }
         if (!zerolatency) {
-            ++sSignalCount;
-            int cnt = 0;
-            while (sThreadDoneCount != numthreads) {
-                std::this_thread::sleep_for(MT_SLEEP_DURATION);
-                ++cnt;
-                if (!(cnt % 100000)) {
-                    printf("Locked with threads:%d of %d cnt(%" PRId64 ")!\n", sThreadDoneCount.load(), numthreads,
-                            sSignalCount.load());
-                    if(sThreadDoneCount > numthreads) printf("in MT Audio sThreadDoneCount should never be greater than numthreads! - this is a race :(");
-                }
-                numthreads = AudioDevice::I()->getNumThreads();
+            sMtWorkAvailable.release(numthreads);
+            for (unsigned i = 0; i < numthreads; ++i) {
+                sMtWorkComplete.acquire();
             }
-            sThreadDoneCount = 0;
         }
     }else if(AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then both MT and buffer based
-      int numthreads = AudioDevice::I()->getNumThreads();
+      const unsigned numthreads = unsigned(AudioDevice::I()->getNumThreads());
 
-      // TODO: UNUSED???      double in[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
       float* input = (float*) InputBuffer;
       for (unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = input[i];
       // start computing in all audio threads
-        sThreadDoneCount = 0;
-        ++sSignalCount;
-        int cnt = 0;
-        while (sThreadDoneCount != numthreads) {
-            std::this_thread::sleep_for(MT_SLEEP_DURATION);
-            ++cnt;
-            if (!(cnt % 100000)) {
-                printf("Locked with threads:%d of %d cnt(%" PRId64 ")!\n", sThreadDoneCount.load(), numthreads,
-                        sSignalCount.load());
-                if(sThreadDoneCount > numthreads) printf("in MT Audio sThreadDoneCount should never be greater than numthreads! - this is a race :(");
-            }
-            numthreads = AudioDevice::I()->getNumThreads();
+        sMtWorkAvailable.release(numthreads);
+        for (unsigned i = 0; i < numthreads; ++i) {
+            sMtWorkComplete.acquire();
         }
-        sThreadDoneCount = 0;
       dsp_f_ptr_sum_array dsp_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
       dsp_f_ptr_sum_array cache_wrapper = dsp_wrapper;
       auto closure  = *((void(**)(float**,float*,uint64_t,void*)) cache_closure);
@@ -467,7 +453,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       float* indats[AudioDevice::MAX_RT_AUDIO_THREADS];
       float* outdat = (float*) OutputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
-      for(int jj=1;jj<numthreads;jj++) {
+      for(unsigned jj=1;jj<numthreads;jj++) {
         indats[jj] = indats[0]+(UNIV::NUM_FRAMES*UNIV::CHANNELS*jj);
       }
       cache_wrapper(zone, (void*)closure, indats, outdat, UNIV::DEVICE_TIME, UserData);
@@ -679,15 +665,15 @@ void AudioDevice::initMTAudio(int Num, bool ZeroLatency)
         printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
         exit(1);
     }
-    //printf("ssignal %" PRId64 "\n!",int64_t(sSignalCount));
-    m_numThreads = Num;
+    const unsigned n = unsigned(Num);
+    m_numThreads.store(n, std::memory_order_release);
     m_zeroLatency = ZeroLatency;
     m_toggle = true;
     inbuf = (SAMPLE*) malloc(UNIV::IN_CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE));
     // outbuf * 2 for double buffering
-    outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
-    memset(outbuf, 0, UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
-    for (unsigned i = 0; i < m_numThreads; ++i) {
+    outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*n*2);
+    memset(outbuf, 0, UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*n*2);
+    for (unsigned i = 0; i < n; ++i) {
         m_threads[i] = std::make_unique<EXTThread>(audioCallbackMT,
                 reinterpret_cast<void*>(uintptr_t(i)),
                 std::string("MT_AUD_") + char('A' + i));
@@ -701,12 +687,12 @@ void AudioDevice::initMTAudioBuf(int Num, bool ZeroLatency)
         printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
         exit(1);
     }
-    //printf("ssignal %" PRId64 "\n!",int64_t(sSignalCount));
-    m_numThreads = Num;
+    const unsigned n = unsigned(Num);
+    m_numThreads.store(n, std::memory_order_release);
     m_zeroLatency = ZeroLatency;
     inbuf_f = (float*) malloc(UNIV::IN_CHANNELS*UNIV::NUM_FRAMES*4);
-    outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*4*m_numThreads);
-    for (unsigned i = 0; i < m_numThreads; ++i) {
+    outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*4*n);
+    for (unsigned i = 0; i < n; ++i) {
         m_threads[i] = std::make_unique<EXTThread>(audioCallbackMTBuf,
                 reinterpret_cast<void*>(uintptr_t(i)),
                 std::string("MT_AUDB_") + char('A' + i));
