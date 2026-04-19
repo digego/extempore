@@ -315,14 +315,18 @@ EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
 
 EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
 {
+    // Callers in libs/core/adt.xtm allocate 2048-byte buffers for a and b.
+    // Bail rather than write past the buffer. A proper API with explicit
+    // capacity is tracked as a follow-up backlog task.
+    constexpr size_t kAssumedBufSize = 2048;
     try {
-        std::string s(str);
         std::regex re(regex);
         std::cmatch m;
         if (!std::regex_search(str, m, re) || m.size() != 1) return false;
-        int range = static_cast<int>(m.position(0));
-        int range2 = range + static_cast<int>(m.length(0));
-        int length = static_cast<int>(strlen(str));
+        size_t range = static_cast<size_t>(m.position(0));
+        size_t range2 = range + static_cast<size_t>(m.length(0));
+        size_t length = strlen(str);
+        if (range >= kAssumedBufSize || (length - range2) >= kAssumedBufSize) return false;
         memcpy(a, str, range);
         a[range] = '\0';
         memcpy(b, str + range2, length - range2);
