@@ -668,10 +668,10 @@ namespace extemp {
       int res = select(highest_fd, &c_rfd, nullptr, nullptr, &pause);
       if(res >= 0) {
       }else{
-        struct stat buf;
+        struct stat st;
         std::vector<int>::iterator pos = client_sockets.begin();
         while(pos != client_sockets.end()) {
-          int result = fstat(*pos,&buf);
+          int result = fstat(*pos,&st);
           if(result < 0) {
             FD_CLR(*pos,&rfd);
             client_sockets.erase(pos);
@@ -961,8 +961,8 @@ namespace extemp {
 #endif
     *i = swap32i(*i);
     char* byte_array = (char*) i;
-    for(int i=0;i<4;++i) {
-      data[i] = byte_array[i];
+    for(int j=0;j<4;++j) {
+      data[j] = byte_array[j];
     }
     return 4;
   }
