@@ -40,7 +40,6 @@
 
 #include <queue>
 
-#include "EXTMutex.h"
 #include "Task.h"
 #include "BranchPrediction.h"
 

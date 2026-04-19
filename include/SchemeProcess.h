@@ -40,6 +40,9 @@
 #include "SchemeS7Private.h"
 #include <string>
 #include "Task.h"
+#include "EXTThread.h"
+#include <condition_variable>
+#include <mutex>
 #include <queue>
 #include <map>
 #include <sstream>
@@ -90,7 +93,8 @@ private:
     bool            m_banner;
     std::string     m_initExpr;
     bool            m_libsLoaded;
-    EXTMonitor      m_guard;
+    std::recursive_mutex        m_guardMutex;
+    std::condition_variable_any m_guardCond;
     bool            m_running;
     EXTThread       m_threadTask;
     EXTThread       m_threadServer;

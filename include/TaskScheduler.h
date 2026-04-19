@@ -37,13 +37,23 @@
 #define TASK_SCHEDULER_H
 
 #include "PriorityQueue.h"
-#include "EXTMonitor.h"
 #include "EXTThread.h"
 #include "UNIV.h"
 
+#include <condition_variable>
+#include <mutex>
+
 namespace extemp {
 
-class EXTMonitor;
+// Paired mutex + condvar used by the scheduler and its clients.
+struct Monitor {
+    std::recursive_mutex        mutex;
+    std::condition_variable_any cond;
+    void lock()   { mutex.lock(); }
+    void unlock() { mutex.unlock(); }
+    void wait()   { std::unique_lock<std::recursive_mutex> lk(mutex); cond.wait(lk); }
+    void signal() { cond.notify_one(); }
+};
 
 class TaskScheduler
 {
@@ -51,8 +61,8 @@ private:
     unsigned               m_numFrames;
     PriorityQueue<TaskI>   m_queue;
     EXTThread              m_queueThread;
-    EXTMonitor             m_guard;
-    EXTMutex               m_queueMutex;
+    Monitor                m_guard;
+    std::recursive_mutex   m_queueMutex;
 
     static TaskScheduler sm_instance;
 private:
@@ -67,10 +77,10 @@ public:
 
     void start() { m_queueThread.start(); }
     void setFrames(unsigned Frames) { m_numFrames = Frames; }
-    EXTMonitor& getGuard() { return m_guard; }
+    Monitor& getGuard() { return m_guard; }
 
     void add(TaskI* Task) {
-        EXTMutex::ScopedLock lock(m_queueMutex);
+        std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
         m_queue.add(Task);
     }
     template <typename T>

@@ -34,7 +34,6 @@
  */
 
 #include "SchemeREPL.h"
-#include "EXTMutex.h"
 #include "UNIV.h"
 
 #include <cstdio>
@@ -65,7 +64,7 @@ namespace extemp {
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 
 SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_title(Title), m_process(Process),
-        m_serverSocket(0), m_connected(false), m_active(true), m_writeLock("repl_lock")
+        m_serverSocket(0), m_connected(false), m_active(true)
 {
     ascii_info();
 	printf("INFO:");
@@ -79,7 +78,7 @@ void SchemeREPL::writeString(std::string&& String)
     if (!m_serverSocket) {
         return;
     }
-    EXTMutex::ScopedLock lock(m_writeLock);
+    std::lock_guard<std::recursive_mutex> lock(m_writeLock);
     String.push_back('\r');
     String.push_back('\n');
     int length = String.length();

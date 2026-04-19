@@ -34,7 +34,7 @@
  */
 
 #include "UNIV.h"
-#include "EXTMutex.h"
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -70,7 +70,7 @@ private:
     char                          m_buf[BUFLENGTH];
     bool                          m_connected;
     bool                          m_active;
-    EXTMutex                      m_writeLock;
+    std::recursive_mutex          m_writeLock;
 
     static repls_type sm_repls;
 public:

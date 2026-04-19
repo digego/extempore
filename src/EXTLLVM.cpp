@@ -81,6 +81,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdarg>
+#include <mutex>
 
 #include <EXTLLVM.h>
 #include <EXTClosureAddressTable.h>
@@ -837,34 +838,37 @@ EXPORT double audio_clock_now()
 }
 
 // CATEGORY: native mutex
+//
+// xtlang code stores the returned void* and may call lock more than once
+// from the same thread without a matching unlock, so recursive semantics
+// are preserved.
 
 EXPORT void* mutex_create()
 {
-    auto mutex(new EXTMutex);
-    return mutex;
+    return new std::recursive_mutex;
 }
 
 EXPORT int mutex_destroy(void* Mutex)
 {
-    delete reinterpret_cast<EXTMutex*>(Mutex);
+    delete reinterpret_cast<std::recursive_mutex*>(Mutex);
     return 0;
 }
 
 EXPORT int mutex_lock(void* Mutex)
 {
-    reinterpret_cast<EXTMutex*>(Mutex)->lock();
+    reinterpret_cast<std::recursive_mutex*>(Mutex)->lock();
     return 0;
 }
 
 EXPORT int mutex_unlock(void* Mutex)
 {
-    reinterpret_cast<EXTMutex*>(Mutex)->unlock();
+    reinterpret_cast<std::recursive_mutex*>(Mutex)->unlock();
     return 0;
 }
 
 EXPORT int mutex_trylock(void* Mutex)
 {
-    return reinterpret_cast<EXTMutex*>(Mutex)->try_lock();
+    return reinterpret_cast<std::recursive_mutex*>(Mutex)->try_lock();
 }
 
 // CATEGORY: native thread
