@@ -245,7 +245,9 @@ add_dependencies(extempore s7_lib portaudio_static)
 
 target_include_directories(extempore PRIVATE
     include
-    src/pcre
+    src/pcre)
+
+target_include_directories(extempore SYSTEM PRIVATE
     ${CMAKE_BINARY_DIR}/portaudio/include
     ${LLVM_INCLUDE_DIRS})
 
@@ -272,16 +274,27 @@ if(UNIX)
         -fvisibility-inlines-hidden
         -fno-rtti
         -fno-common
+        -Wall
+        -Wextra
         -Woverloaded-virtual
-        -Wno-unused-result)
+        -Wshadow
+        -Wno-unused-result
+        -Wno-unused-parameter
+        -Wno-unused-variable
+        -Wno-unused-function
+        -Wno-missing-field-initializers
+        -Wno-sign-compare
+        -Wno-deprecated-declarations
+        -Werror=return-type
+        -Werror=uninitialized)
 
     target_link_libraries(extempore PRIVATE pthread linenoise)
 endif()
 
 if(WIN32)
-    target_include_directories(extempore PRIVATE src/networking-ts-impl/include)
+    target_include_directories(extempore SYSTEM PRIVATE src/networking-ts-impl/include)
     target_compile_definitions(extempore PRIVATE -DPCRE_STATIC -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
-    target_compile_options(extempore PRIVATE /bigobj)
+    target_compile_options(extempore PRIVATE /bigobj /W3 /wd4244 /wd4267 /wd4018 /wd4996 /we4715)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
     set_target_properties(extempore PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
