@@ -82,6 +82,7 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <mutex>
+#include <shared_mutex>
 
 #include <EXTLLVM.h>
 #include <ext/NetUtil.h>
@@ -134,9 +135,12 @@
 
 #include "SchemeProcess.h"
 
-// llvm_scheme foreign function -> string name
-// also is not thread safe!
+// llvm_scheme foreign function -> string name.  std::map keeps iterators /
+// stored strings stable across inserts, so a reader that copied out .c_str()
+// under a shared lock can safely use it after releasing the lock (we never
+// erase entries).
 std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
+static std::shared_mutex LLVM_SCHEME_FF_MAP_MUTEX;
 
 EXPORT void* malloc16(size_t Size)
 {
@@ -218,13 +222,18 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes)
 
 const char* llvm_scheme_ff_get_name(foreign_func ff)
 {
-    return LLVM_SCHEME_FF_MAP[ff].c_str();
+    std::shared_lock<std::shared_mutex> lock(LLVM_SCHEME_FF_MAP_MUTEX);
+    auto it = LLVM_SCHEME_FF_MAP.find(ff);
+    if (it == LLVM_SCHEME_FF_MAP.end()) {
+        return "";
+    }
+    return it->second.c_str();
 }
 
-void llvm_scheme_ff_set_name(foreign_func ff,const char* name)
+void llvm_scheme_ff_set_name(foreign_func ff, const char* name)
 {
+    std::unique_lock<std::shared_mutex> lock(LLVM_SCHEME_FF_MAP_MUTEX);
     LLVM_SCHEME_FF_MAP[ff] = std::string(name);
-    return;
 }
 
 // LLVM RUNTIME ERROR
