@@ -487,6 +487,15 @@ AudioDevice::AudioDevice(): m_started(false), buffer(0), m_dsp_closure(nullptr),
 
 AudioDevice::~AudioDevice()
 {
+    // The RT audio threads run `while(true)` loops and are intentionally
+    // leaked at process exit.  std::thread would call std::terminate if
+    // destroyed while joinable, so detach each EXTThread before the
+    // unique_ptr in m_threads destroys the underlying std::thread.
+    for (auto& t : m_threads) {
+        if (t && t->isRunning()) {
+            t->detach();
+        }
+    }
     if (stream && !UNIV::AUDIO_NONE) {
         PaError err;
         err = Pa_StopStream(stream);
@@ -679,7 +688,8 @@ void AudioDevice::initMTAudio(int Num, bool ZeroLatency)
     outbuf = (SAMPLE*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
     memset(outbuf, 0, UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(SAMPLE)*m_numThreads*2);
     for (unsigned i = 0; i < m_numThreads; ++i) {
-        m_threads[i] = new EXTThread(audioCallbackMT, reinterpret_cast<void*>(uintptr_t(i)),
+        m_threads[i] = std::make_unique<EXTThread>(audioCallbackMT,
+                reinterpret_cast<void*>(uintptr_t(i)),
                 std::string("MT_AUD_") + char('A' + i));
         m_threads[i]->start();
     }
@@ -697,8 +707,9 @@ void AudioDevice::initMTAudioBuf(int Num, bool ZeroLatency)
     inbuf_f = (float*) malloc(UNIV::IN_CHANNELS*UNIV::NUM_FRAMES*4);
     outbuf_f = (float*) malloc(UNIV::CHANNELS*UNIV::NUM_FRAMES*4*m_numThreads);
     for (unsigned i = 0; i < m_numThreads; ++i) {
-        m_threads[i] = new EXTThread(audioCallbackMTBuf, reinterpret_cast<void*>(uintptr_t(i)),
-            std::string("MT_AUDB_") + char('A' + i));
+        m_threads[i] = std::make_unique<EXTThread>(audioCallbackMTBuf,
+                reinterpret_cast<void*>(uintptr_t(i)),
+                std::string("MT_AUDB_") + char('A' + i));
         m_threads[i]->start();
     }
 }
