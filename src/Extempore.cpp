@@ -453,16 +453,17 @@ EXPORT int extempore_init(int argc, char** argv)
 #else
         primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
 
-        // need to connect to primary from alternate thread (can be short lived simply puts repl on heap)
-        extemp::EXTThread* replthread = new extemp::EXTThread(extempore_primary_repl_delayed_connect,primary);
+        // Fire-and-forget: both helpers run for the life of the process and
+        // don't need the RT-scheduling / subsume features of EXTThread, so
+        // std::thread + detach is sufficient.  Detaching mirrors the
+        // previous behaviour of leaking the EXTThread*.
         pass_primary_port = primary_port;
-        replthread->start();
+        std::thread([primary] { extempore_primary_repl_delayed_connect(primary); }).detach();
 
 #ifndef _WIN32
         if (repl_mode) {
             auto* repl_args = new linenoise_repl_args{host, primary_port};
-            auto* repl_thread = new extemp::EXTThread(linenoise_repl, repl_args, "linenoise_repl");
-            repl_thread->start();
+            std::thread([repl_args] { linenoise_repl(repl_args); }).detach();
         }
 #endif
 
