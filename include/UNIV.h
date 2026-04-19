@@ -36,6 +36,7 @@
 #ifndef UNIV_H
 #define UNIV_H
 
+#include <atomic>
 #include <cstdint>
 #include <BranchPrediction.h>
 
@@ -108,8 +109,15 @@ extern std::string SHARE_DIR;
 EXPORT uint32_t CHANNELS;
 EXPORT uint32_t IN_CHANNELS;
 EXPORT uint32_t SAMPLE_RATE;
-EXPORT volatile uint64_t TIME;
-extern uint64_t DEVICE_TIME;
+// TIME is written by the scheduler thread (TaskScheduler::timeSlice) and
+// read from every other thread; atomic<uint64_t> gives a lock-free load/
+// store on all tier-1 platforms.  DEVICE_TIME is written by the audio
+// callback and read from other threads, same story.  The xtlang JIT
+// accesses TIME via @TIME in runtime/bitcode.ll as a plain i64 load — OK
+// because the layout of std::atomic<uint64_t> is a single uint64_t on
+// all supported compilers.
+EXPORT std::atomic<uint64_t> TIME;
+extern std::atomic<uint64_t> DEVICE_TIME;
 extern double AUDIO_CLOCK_BASE;
 extern double AUDIO_CLOCK_NOW;
 extern uint64_t TIME_DIVISION;

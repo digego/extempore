@@ -41,6 +41,7 @@
 #include <string>
 #include "Task.h"
 #include "EXTThread.h"
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -92,7 +93,10 @@ private:
     int16_t         m_serverPort;
     bool            m_banner;
     std::string     m_initExpr;
-    bool            m_libsLoaded;
+    // Set once by the task thread after the runtime libs finish loading.
+    // Read by the server thread spin-waiting in serverImpl(); must be
+    // synchronised.
+    std::atomic<bool> m_libsLoaded;
     std::recursive_mutex        m_guardMutex;
     std::condition_variable_any m_guardCond;
     bool            m_running;
