@@ -7,6 +7,8 @@ endif()
 
 include(CTest)
 
+add_subdirectory(tests/cpp-unit)
+
 set(EXTEMPORE_TEST_PORT_COUNTER 17099 CACHE INTERNAL "")
 
 function(extempore_get_next_port OUT_VAR)
