@@ -70,8 +70,8 @@ private:
     Type        m_type; // 0 = repl task,  1 = callback task,  2 = destroy env task
     void*       m_ptr2;
 public:
-    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, Type Type, void* Ptr2 = 0):
-            m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(Type), m_ptr2(Ptr2) {
+    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, Type TaskType, void* Ptr2 = 0):
+            m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(TaskType), m_ptr2(Ptr2) {
     }
 
     uint64_t getTime() const { return m_time; }
