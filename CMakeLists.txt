@@ -14,6 +14,7 @@ option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 #########
 # setup #
@@ -338,6 +339,26 @@ else()
     target_link_libraries(extempore PRIVATE dl asound)
     target_link_options(extempore PRIVATE -rdynamic)
 endif()
+
+##############
+# clang-tidy #
+##############
+
+# Requires CMAKE_EXPORT_COMPILE_COMMANDS=ON (Ninja sets this automatically).
+# Filters to extempore source files only, not vendored third-party code.
+set(TIDY_SOURCES "")
+foreach(_src ${EXTEMPORE_SOURCES})
+    if(NOT _src MATCHES "(s7\\.c|pcre|networking-ts-impl|ffi/|shims/|linenoise)")
+        list(APPEND TIDY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
+    endif()
+endforeach()
+
+add_custom_target(tidy
+    COMMAND clang-tidy -p ${CMAKE_BINARY_DIR} ${TIDY_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Running clang-tidy on Extempore sources"
+    USES_TERMINAL
+    VERBATIM)
 
 ##########
 # assets #
