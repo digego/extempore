@@ -182,6 +182,16 @@ FetchContent_Declare(LLVM
 
 FetchContent_MakeAvailable(LLVM)
 
+# GoogleTest for C++ unit tests.
+if(BUILD_TESTS)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+endif()
+
 set(EXTEMPORE_LLVM_COMPONENTS
     OrcJIT
     ${LLVM_TARGET_ARCH}
