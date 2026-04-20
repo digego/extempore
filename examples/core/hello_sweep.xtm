@@ -1,0 +1,45 @@
+;;; hello_sweep.xtm -- scheduler-driven DSP parameter change
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The most common xtlang pattern: a DSP whose parameters are controlled
+;; from Scheme via temporal-recursion callbacks. Here a single sine
+;; oscillator reads its frequency from a bind-val, and a Scheme callback
+;; scheduled one second after dsp:set! flips it from 330 Hz to 770 Hz.
+;;
+;; Useful as a test that (callback time 'fn args) fires at the expected
+;; sample when driven by the offline --audio-outfile renderer. In realtime
+;; mode the same code produces a one-second 330 Hz tone that jumps up to
+;; 770 Hz for the second second.
+;;
+;; NB: all bind-func compilation and Scheme defines must finish BEFORE
+;; dsp:set! --- once dsp:set! is called the offline driver starts counting
+;; toward --duration and can self-exit while the main thread is still
+;; JIT-compiling later forms.
+
+;;; Code:
+
+(bind-val dsp_freq SAMPLE 330.0)
+
+(bind-func dsp:DSP
+  (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
+    (* 0.5 (sin (* STWOPI dsp_freq (/ (i64tof time) SRf))))))
+
+(bind-func set_dsp_freq
+  (lambda (f:SAMPLE)
+    (set! dsp_freq f)
+    void))
+
+;; callback target must be a Scheme-level define; it can in turn invoke
+;; the xtlang set_dsp_freq to mutate the bound value.
+(define sweep-change-freq
+  (lambda (f)
+    (set_dsp_freq f)))
+
+;; Everything above is compiled up front so that dsp:set! + callback can
+;; happen as an atomic pair before the offline driver finalizes.
+(dsp:set! dsp)
+(callback (+ (now) 44100) 'sweep-change-freq 770.0)

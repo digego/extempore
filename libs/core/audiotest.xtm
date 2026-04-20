@@ -200,6 +200,70 @@
                                min_target max_noise) (set! ok #f)))
             (if ok (begin (println "PASS") 0) 1))))))
 
+;; Goertzel on a half-open frame range [start, end) of a specific channel.
+;; Factors the inner loop out of audiotest_goertzel for range-based analysis
+;; (used by audiotest_assert_sweep to probe each half of a WAV separately).
+(bind-func audiotest_goertzel_range
+  (lambda (ab:AudioBuffer* ch:i64 freq:double start:i64 end:i64)
+    (let ((nchan (AudioBuffer_channels ab))
+          (data (AudioBuffer_data ab))
+          (sr (AudioBuffer_samplerate ab))
+          (N (convert (- end start) double))
+          (k (convert (dtoi64 (+ 0.5 (/ (* N freq) sr))) double))
+          (w (* 2.0 (* 3.14159265358979323846 (/ k N))))
+          (coeff (* 2.0 (cos w)))
+          (s0:double 0.0)
+          (s1:double 0.0)
+          (s2:double 0.0)
+          (i start))
+      (while (< i end)
+        (let ((x:double 0.0)
+              (sum:double 0.0)
+              (j:i64 0))
+          (if (< ch 0)
+              (begin
+                (dotimes (j nchan)
+                  (set! sum (+ sum (convert (pref data (+ (* i nchan) j)) double))))
+                (set! x (/ sum (convert nchan double))))
+              (set! x (convert (pref data (+ (* i nchan) ch)) double)))
+          (set! s0 (+ x (- (* coeff s1) s2)))
+          (set! s2 s1)
+          (set! s1 s0))
+        (set! i (+ i 1)))
+      (+ (* s2 s2) (- (* s1 s1) (* coeff (* s1 s2)))))))
+
+;; Verify a two-segment sweep: freq_a should dominate samples
+;; [0, split_frame - guard) and freq_b should dominate
+;; [split_frame + guard, end). The ±guard window around split_frame is
+;; skipped to tolerate scheduler-callback timing jitter in offline free-run
+;; rendering (callbacks may fire several thousand samples late on busy CI).
+;; guard is expressed in samples; a typical value is 8000 (~180ms at 44.1k).
+(bind-func audiotest_assert_sweep
+  (lambda (path:i8* freq_a:double freq_b:double split_frame:i64 guard:i64)
+    (let ((ab (AudioBuffer_from_wave path)))
+      (if (null? ab)
+          (begin (printf "FAIL: could not read %s\n" path) 1)
+          (let ((nfr (AudioBuffer_frames ab))
+                (a_end (- split_frame guard))
+                (b_start (+ split_frame guard))
+                (ok #t))
+            (if (or (< a_end 100) (> b_start (- nfr 100)))
+                (begin (printf "FAIL: split_frame %lld +/- guard %lld out of range for %lld-frame file\n"
+                               split_frame guard nfr) (set! ok #f))
+                (let ((ga_first (audiotest_goertzel_range ab -1 freq_a 0 a_end))
+                      (gb_first (audiotest_goertzel_range ab -1 freq_b 0 a_end))
+                      (ga_second (audiotest_goertzel_range ab -1 freq_a b_start nfr))
+                      (gb_second (audiotest_goertzel_range ab -1 freq_b b_start nfr)))
+                  (printf "audiotest-sweep: %s  split=%lld(+-%lld)  pre[%.0f=%.2e %.0f=%.2e]  post[%.0f=%.2e %.0f=%.2e]\n"
+                          path split_frame guard
+                          freq_a ga_first freq_b gb_first
+                          freq_a ga_second freq_b gb_second)
+                  (if (< ga_first (* 10.0 gb_first))
+                      (begin (printf "FAIL: pre-split region should be %.1f Hz, not %.1f Hz\n" freq_a freq_b) (set! ok #f)))
+                  (if (< gb_second (* 10.0 ga_second))
+                      (begin (printf "FAIL: post-split region should be %.1f Hz, not %.1f Hz\n" freq_b freq_a) (set! ok #f)))))
+            (if ok (begin (println "PASS") 0) 1))))))
+
 ;; CTest invocation idiom: this file is loaded via sys:load, then the xtlang
 ;; assertion is called directly and its return value is handed to (quit). A
 ;; pass returns 0, a fail returns 1, producing the corresponding process

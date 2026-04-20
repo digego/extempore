@@ -111,6 +111,10 @@ extempore_add_audio_offline_test(hello_mt
     examples/core/hello_mt.xtm 1.0
     "(audiotest_assert_three_sines \"@WAV@\" 330.0 550.0 770.0)"
     audio-offline)
+extempore_add_audio_offline_test(hello_sweep
+    examples/core/hello_sweep.xtm 2.0
+    "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44100 8000)"
+    audio-offline)
 
 # Core examples
 extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
