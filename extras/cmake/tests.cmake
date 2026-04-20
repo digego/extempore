@@ -99,20 +99,20 @@ extempore_add_test(tests/external/fft.xtm libs-external)
 # then verify it contains a sine at the expected frequency. Free-run driver
 # means ~1s of audio renders in well under a second; 1.0s of content is
 # plenty for a reliable Goertzel check.
-extempore_add_audio_offline_test(hello_sine
-    examples/core/hello_sine.xtm 1.0
+extempore_add_audio_offline_test(hello-sine
+    examples/core/hello-sine.xtm 1.0
     "(audiotest_assert_sine \"@WAV@\" 440.0)"
     audio-offline)
-extempore_add_audio_offline_test(hello_stereo
-    examples/core/hello_stereo.xtm 1.0
+extempore_add_audio_offline_test(hello-stereo
+    examples/core/hello-stereo.xtm 1.0
     "(audiotest_assert_stereo_sine \"@WAV@\" 330.0 550.0)"
     audio-offline)
-extempore_add_audio_offline_test(hello_mt
-    examples/core/hello_mt.xtm 1.0
+extempore_add_audio_offline_test(hello-mt
+    examples/core/hello-mt.xtm 1.0
     "(audiotest_assert_three_sines \"@WAV@\" 330.0 550.0 770.0)"
     audio-offline)
-extempore_add_audio_offline_test(hello_sweep
-    examples/core/hello_sweep.xtm 2.0
+extempore_add_audio_offline_test(hello-sweep
+    examples/core/hello-sweep.xtm 2.0
     "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44100 8000)"
     audio-offline)
 

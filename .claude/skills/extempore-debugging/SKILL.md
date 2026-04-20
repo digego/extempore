@@ -367,7 +367,7 @@ The offline file driver renders DSP output directly to a float32 WAV without
 any OS audio subsystem. Works in `--batch` mode, so it's suitable for CI:
 
 ```bash
-./build/extempore --batch '(sys:load "examples/core/hello_sine.xtm")' \
+./build/extempore --batch '(sys:load "examples/core/hello-sine.xtm")' \
   --audio-outfile /tmp/out.wav --duration 1.0
 ```
 

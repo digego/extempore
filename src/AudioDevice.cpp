@@ -540,6 +540,14 @@ void FileAudioDriver::run() {
         const size_t samples = m_outBuf.size();
         std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file);
         m_framesWritten += frames;
+        // Sleep briefly so the task scheduler thread actually gets CPU between
+        // our per-buffer signal() calls. The scheduler uses a plain condvar
+        // wait with no predicate loop, so signals that arrive before it
+        // re-enters wait() are lost; without this throttle the driver runs
+        // so tight that scheduled Scheme callbacks can miss the entire render
+        // window. 100us * ~86 buffers/sec = <10ms overhead per render second,
+        // still >>100x realtime.
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
 
     // If we stopped because --duration was reached (rather than an external
