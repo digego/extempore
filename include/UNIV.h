@@ -140,6 +140,12 @@ extern uint32_t AUDIO_IN_DEVICE;
 extern std::string AUDIO_DEVICE_NAME;
 extern std::string AUDIO_IN_DEVICE_NAME;
 extern double AUDIO_OUTPUT_LATENCY;
+// --audio-outfile <path>: if non-empty, DSP output is written to a WAV file
+// via the offline FileAudioDriver instead of opening a PortAudio stream.
+extern std::string AUDIO_OUTFILE_PATH;
+// --duration <seconds>: optional hard cap on offline render length. 0 means
+// render until (quit) is called.
+extern double AUDIO_OUTFILE_DURATION;
 extern double CLOCK_OFFSET;
 extern std::unordered_map<std::string, std::string> CMDPARAMS;
 extern std::string ARCH;

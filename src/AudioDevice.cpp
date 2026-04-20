@@ -73,7 +73,9 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <cstdio>
 #include <atomic>
+#include <vector>
 
 // this is an aribrary maximum
 
@@ -299,8 +301,7 @@ void* audioCallbackMTBuf(void* dat) {
     return 0;
 }
 
-int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long FramesPerBuffer,
-        const PaStreamCallbackTimeInfo* TimeInfo, PaStreamCallbackFlags StatusFlags, void* UserData)
+void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer, void* UserData)
 {
     auto sched(reinterpret_cast<TaskScheduler*>(UserData));
     UNIV::DEVICE_TIME += FramesPerBuffer;
@@ -318,24 +319,15 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
     auto dsp_closure(AudioDevice::I()->getDSPClosure());
     if (unlikely(!dsp_closure)) {
         memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
-        return paContinue;
+        return;
     }
     auto cache_closure(dsp_closure());
-    if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
-        if (StatusFlags & paOutputUnderflow) {
-            printf("Audio underflow: are you pushing extempore too hard?\n");
-        }
-        if (StatusFlags & paOutputOverflow) {
-            printf("Audio output overflow\n");
-        }
-    }
     if (likely(AudioDevice::I()->getDSPWrapper() && !AudioDevice::I()->getDSPSUMWrapper())) { // sample by sample
-        auto dsp_wrapper(AudioDevice::I()->getDSPWrapper());
-        auto cache_wrapper(dsp_wrapper);
+        auto cache_wrapper(AudioDevice::I()->getDSPWrapper());
         auto closure = *((SAMPLE(**)(SAMPLE, uint64_t, uint64_t,SAMPLE*)) cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
-        auto dat(reinterpret_cast<float*>(OutputBuffer));
-        auto in(reinterpret_cast<const float*>(InputBuffer));
+        auto dat(OutputBuffer);
+        auto in(InputBuffer);
         uint64_t time(UNIV::DEVICE_TIME);
         if (likely(!UNIV::IN_CHANNELS)) {
             float dummy(0.0);
@@ -376,14 +368,14 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
                 }
             }
         }
-        return 0;
+        return;
     }
     if (AudioDevice::I()->getDSPWrapperArray() && !AudioDevice::I()->getDSPSUMWrapperArray()) { // if true then we must be buffer by buffer
         dsp_f_ptr_array cache_wrapper = AudioDevice::I()->getDSPWrapperArray();
         auto closure = *((void(**)(float*,float*,uint64_t,void*)) cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
-        float* indat = (float*) InputBuffer;
-        float* outdat = (float*) OutputBuffer;
+        float* indat = const_cast<float*>(InputBuffer);
+        float* outdat = OutputBuffer;
         cache_wrapper(zone, (void*)closure, indat, outdat, UNIV::DEVICE_TIME, UserData);
         extemp::EXTZones::llvm_zone_reset(zone);
     } else if (AudioDevice::I()->getDSPSUMWrapper()) { // if true then multi threaded sample-by-sample
@@ -391,7 +383,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         const bool zerolatency = AudioDevice::I()->getZeroLatency();
         SAMPLE in[32];
         SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
-        float* input = (float*) InputBuffer;
+        const float* input = InputBuffer;
         for(unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = (SAMPLE) input[i];
         if (zerolatency) {
             sMtWorkAvailable.release(numthreads);
@@ -400,8 +392,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
             }
         }
         //printf("process audio sum ...\n");
-        dsp_f_ptr_sum dsp_wrapper = AudioDevice::I()->getDSPSUMWrapper();
-        dsp_f_ptr_sum cache_wrapper = dsp_wrapper;
+        dsp_f_ptr_sum cache_wrapper = AudioDevice::I()->getDSPSUMWrapper();
         auto closure = * ((SAMPLE(**)(SAMPLE*,uint64_t,uint64_t,SAMPLE*)) cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         bool toggle = AudioDevice::I()->getToggle();
@@ -417,7 +408,7 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         }
         for(uint64_t i=0;i<UNIV::NUM_FRAMES;i++) {
             uint32_t iout = i*UNIV::CHANNELS;
-            float* dat = (float*) OutputBuffer;
+            float* dat = OutputBuffer;
 
         for(uint64_t k=0; k<UNIV::CHANNELS; k++)
           {
@@ -438,20 +429,19 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
       const unsigned numthreads = unsigned(AudioDevice::I()->getNumThreads());
 
       float* inb = AudioDevice::I()->getDSPMTInBufferArray();
-      float* input = (float*) InputBuffer;
+      const float* input = InputBuffer;
       for (unsigned i=0;i<UNIV::IN_CHANNELS*UNIV::NUM_FRAMES;i++) inb[i] = input[i];
       // start computing in all audio threads
         sMtWorkAvailable.release(numthreads);
         for (unsigned i = 0; i < numthreads; ++i) {
             sMtWorkComplete.acquire();
         }
-      dsp_f_ptr_sum_array dsp_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
-      dsp_f_ptr_sum_array cache_wrapper = dsp_wrapper;
+      dsp_f_ptr_sum_array cache_wrapper = AudioDevice::I()->getDSPSUMWrapperArray();
       auto closure  = *((void(**)(float**,float*,uint64_t,void*)) cache_closure);
       llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
       //float** indat = (float**)
       float* indats[AudioDevice::MAX_RT_AUDIO_THREADS];
-      float* outdat = (float*) OutputBuffer;
+      float* outdat = OutputBuffer;
       indats[0] = AudioDevice::I()->getDSPMTOutBufferArray();
       for(unsigned jj=1;jj<numthreads;jj++) {
         indats[jj] = indats[0]+(UNIV::NUM_FRAMES*UNIV::CHANNELS*jj);
@@ -464,8 +454,210 @@ int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long Fra
         memset(OutputBuffer,0,(UNIV::CHANNELS*UNIV::NUM_FRAMES*sizeof(float)));
         //nothin to do
     }
-    return 0;
-  }
+}
+
+//-----------------------------------
+//  FILE AUDIO DRIVER
+//-----------------------------------
+//
+// Alternative backend to PortAudio: renders DSP output to a float32 WAV file,
+// driven by a dedicated thread that free-runs as fast as processFrames() can
+// execute. Used when --audio-outfile is specified. Intended for offline tests
+// and best-effort headless rendering, NOT realtime playback.
+//
+// The WAV header is rewritten on stop() with the final sample count, so quit()
+// (which calls std::_Exit and skips destructors) must invoke stop() first.
+namespace {
+
+class FileAudioDriver {
+public:
+    bool start(const std::string& path, double maxSeconds);
+    void stop();
+    bool isRunning() const { return m_running.load(std::memory_order_acquire); }
+
+private:
+    void run();
+    bool openWav(const std::string& path);
+    void finalizeWav();
+
+    FILE* m_file = nullptr;
+    std::string m_path;
+    std::thread m_thread;
+    std::atomic<bool> m_stop{false};
+    std::atomic<bool> m_running{false};
+    uint64_t m_framesWritten = 0;
+    uint64_t m_maxFrames = 0; // 0 = unlimited
+    std::vector<float> m_inBuf;
+    std::vector<float> m_outBuf;
+};
+
+FileAudioDriver sFileDriver;
+
+bool FileAudioDriver::openWav(const std::string& path) {
+    m_file = std::fopen(path.c_str(), "wb");
+    if (!m_file) {
+        return false;
+    }
+    // Reserve 44 bytes for the header; filled in by finalizeWav() once we know
+    // the data size.
+    char placeholder[44] = {0};
+    if (std::fwrite(placeholder, 1, sizeof(placeholder), m_file) != sizeof(placeholder)) {
+        std::fclose(m_file);
+        m_file = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void FileAudioDriver::finalizeWav() {
+    if (!m_file) return;
+    const uint32_t channels = UNIV::CHANNELS;
+    const uint32_t sampleRate = UNIV::SAMPLE_RATE;
+    const uint32_t bitsPerSample = 32;
+    const uint32_t blockAlign = channels * (bitsPerSample / 8);
+    const uint32_t byteRate = sampleRate * blockAlign;
+    const uint32_t dataBytes = static_cast<uint32_t>(m_framesWritten * blockAlign);
+    const uint32_t riffSize = 36 + dataBytes;
+
+    unsigned char hdr[44];
+    std::memcpy(hdr + 0, "RIFF", 4);
+    std::memcpy(hdr + 4, &riffSize, 4);
+    std::memcpy(hdr + 8, "WAVE", 4);
+    std::memcpy(hdr + 12, "fmt ", 4);
+    const uint32_t fmtSize = 16;
+    std::memcpy(hdr + 16, &fmtSize, 4);
+    const uint16_t audioFormat = 3; // WAVE_FORMAT_IEEE_FLOAT
+    std::memcpy(hdr + 20, &audioFormat, 2);
+    const uint16_t numChannels = static_cast<uint16_t>(channels);
+    std::memcpy(hdr + 22, &numChannels, 2);
+    std::memcpy(hdr + 24, &sampleRate, 4);
+    std::memcpy(hdr + 28, &byteRate, 4);
+    const uint16_t blockAlign16 = static_cast<uint16_t>(blockAlign);
+    std::memcpy(hdr + 32, &blockAlign16, 2);
+    const uint16_t bitsPerSample16 = static_cast<uint16_t>(bitsPerSample);
+    std::memcpy(hdr + 34, &bitsPerSample16, 2);
+    std::memcpy(hdr + 36, "data", 4);
+    std::memcpy(hdr + 40, &dataBytes, 4);
+
+    std::fflush(m_file);
+    std::fseek(m_file, 0, SEEK_SET);
+    std::fwrite(hdr, 1, sizeof(hdr), m_file);
+    std::fflush(m_file);
+    std::fclose(m_file);
+    m_file = nullptr;
+}
+
+bool FileAudioDriver::start(const std::string& path, double maxSeconds) {
+    if (m_running.load()) return false;
+    if (!openWav(path)) {
+        ascii_error();
+        printf("Error: could not open --audio-outfile path for writing: %s\n", path.c_str());
+        ascii_normal();
+        return false;
+    }
+    m_path = path;
+    m_framesWritten = 0;
+    m_maxFrames = (maxSeconds > 0.0)
+                      ? static_cast<uint64_t>(maxSeconds * UNIV::SAMPLE_RATE)
+                      : 0;
+    m_inBuf.assign(UNIV::IN_CHANNELS * UNIV::NUM_FRAMES, 0.0f);
+    m_outBuf.assign(UNIV::CHANNELS * UNIV::NUM_FRAMES, 0.0f);
+    m_stop.store(false);
+    m_running.store(true, std::memory_order_release);
+    m_thread = std::thread([this] { this->run(); });
+    return true;
+}
+
+void FileAudioDriver::run() {
+    // Offline free-run: pump processFrames as fast as we can, writing each
+    // buffer to disk. UNIV::DEVICE_TIME / UNIV::TIME advance inside
+    // processFrames, so scheduled xtlang callbacks still fire at the correct
+    // sample times (just faster than wall-clock).
+    //
+    // Free-run will typically outrun the Scheme compile/setup path, so we
+    // don't start counting toward --duration until a DSP closure is registered.
+    // Before that, we still tick processFrames (to advance the scheduler and
+    // let the main thread progress) but we do NOT write output and we do NOT
+    // advance m_framesWritten. This keeps the recorded output aligned with the
+    // first sample after dsp:set! takes effect.
+    const uint32_t frames = UNIV::NUM_FRAMES;
+    bool dspSeen = false;
+    bool reachedDuration = false;
+    while (!m_stop.load(std::memory_order_acquire)) {
+        if (dspSeen && m_maxFrames && m_framesWritten >= m_maxFrames) {
+            reachedDuration = true;
+            break;
+        }
+
+        const bool haveDSP = (AudioDevice::I()->getDSPClosure() != nullptr);
+        std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
+        AudioDevice::I()->processFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(),
+                                        m_outBuf.data(), frames,
+                                        TaskScheduler::I());
+        if (!dspSeen) {
+            if (haveDSP) {
+                dspSeen = true;
+            } else {
+                // Yield so the main thread can make progress compiling DSP.
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+        }
+        const size_t samples = m_outBuf.size();
+        std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file);
+        m_framesWritten += frames;
+    }
+
+    // If we stopped because --duration was reached (rather than an external
+    // stop() call), finalize and terminate the process here. The main thread
+    // may still be in a loop waiting for us; _Exit bypasses destructors
+    // (matching how Scheme's (quit) behaves).
+    if (reachedDuration) {
+        bool expected = true;
+        if (m_running.compare_exchange_strong(expected, false)) {
+            finalizeWav();
+            printf("[--audio-outfile: %llu frames written to %s]\n",
+                   static_cast<unsigned long long>(m_framesWritten),
+                   m_path.c_str());
+            fflush(stdout);
+            std::_Exit(0);
+        }
+    }
+}
+
+void FileAudioDriver::stop() {
+    if (!m_running.exchange(false)) return;
+    m_stop.store(true, std::memory_order_release);
+    if (m_thread.joinable()) m_thread.join();
+    finalizeWav();
+}
+
+} // anonymous namespace
+
+bool AudioDevice::fileDriverRunning() {
+    return sFileDriver.isRunning();
+}
+
+void AudioDevice::stopFileDriver() {
+    sFileDriver.stop();
+}
+
+static int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long FramesPerBuffer,
+        const PaStreamCallbackTimeInfo* /*TimeInfo*/, PaStreamCallbackFlags StatusFlags, void* UserData)
+{
+    if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
+        if (StatusFlags & paOutputUnderflow) {
+            printf("Audio underflow: are you pushing extempore too hard?\n");
+        }
+        if (StatusFlags & paOutputOverflow) {
+            printf("Audio output overflow\n");
+        }
+    }
+    AudioDevice::I()->processFrames(reinterpret_cast<const float*>(InputBuffer),
+                                    reinterpret_cast<float*>(OutputBuffer),
+                                    FramesPerBuffer, UserData);
+    return paContinue;
+}
 
 AudioDevice::AudioDevice(): m_started(false), buffer(0), m_dsp_closure(nullptr), dsp_wrapper(0), dsp_wrapper_array(0), m_numThreads(50) /* NOT 0! */, m_zeroLatency(true)
 {
@@ -526,6 +718,20 @@ void AudioDevice::start()
     if (UNIV::AUDIO_NONE) {
         ascii_error();
         fprintf(stderr, "Error: cannot set the audio device in --noaudio mode\n");
+        ascii_normal();
+        return;
+    }
+    if (!UNIV::AUDIO_OUTFILE_PATH.empty()) {
+        if (!sFileDriver.start(UNIV::AUDIO_OUTFILE_PATH, UNIV::AUDIO_OUTFILE_DURATION)) {
+            std::_Exit(1);
+        }
+        m_started = true;
+        ascii_normal();
+        std::cout << "Output Device  : " << std::flush;
+        ascii_info();
+        std::cout << "file://" << UNIV::AUDIO_OUTFILE_PATH
+                  << " (offline, " << UNIV::CHANNELS << "ch float32 @ "
+                  << UNIV::SAMPLE_RATE << " Hz)" << std::endl;
         ascii_normal();
         return;
     }
@@ -650,6 +856,11 @@ void AudioDevice::start()
 void AudioDevice::stop()
 {
     if (!m_started) {
+        return;
+    }
+    if (sFileDriver.isRunning()) {
+        sFileDriver.stop();
+        m_started = false;
         return;
     }
     PaError err = Pa_StopStream(stream);

@@ -42,6 +42,11 @@ static pointer emit(scheme* Scheme, pointer Args)
 static pointer exit_extempore(scheme* Scheme, pointer Args)
 {
     int rc(ivalue(pair_car(Args)));
+    // std::_Exit bypasses destructors AND discards stdio buffers. Flush any
+    // pending output (e.g. printf from xtlang tests) and finalize the offline
+    // WAV before terminating.
+    std::fflush(stdout);
+    extemp::AudioDevice::stopFileDriver();
     std::_Exit(rc);
 }
 

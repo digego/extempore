@@ -108,6 +108,12 @@ public:
     void start();
     void stop();
 
+    // Core DSP dispatch: called by the PortAudio callback in realtime mode,
+    // and by the offline file driver when --audio-outfile is active. Advances
+    // UNIV::DEVICE_TIME/TIME, signals the task scheduler, and invokes whichever
+    // DSP wrapper variant has been registered (sample/array/MT-sum/MT-array).
+    void processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer, void* UserData);
+
     bool getZeroLatency() { return m_zeroLatency; }
     void setZeroLatency(bool Val) { m_zeroLatency = Val; }
     bool getToggle() {
@@ -177,6 +183,13 @@ public:
 
     static double getCPULoad();
     static void printDevices();
+
+    // FileAudioDriver hooks (offline --audio-outfile mode). These are no-ops
+    // unless the driver has been started via start() with UNIV::AUDIO_OUTFILE_PATH
+    // set. stopFileDriver() finalizes the WAV header; must be called before
+    // any std::_Exit() that would otherwise skip destructors.
+    static bool fileDriverRunning();
+    static void stopFileDriver();
 
     static double CLOCKBASE;
     static double REALTIME;

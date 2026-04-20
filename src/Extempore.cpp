@@ -134,6 +134,7 @@ enum { OPT_COMPILE_STR, OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
        OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
        OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
        OPT_LATENCY, OPT_LEVEL,
+       OPT_AUDIO_OUTFILE, OPT_DURATION,
        OPT_REPL,
        OPT_HELP
      };
@@ -166,6 +167,8 @@ CSimpleOptA::SOption g_rgOptions[] = {
     { OPT_CPU,            "--cpu",           SO_REQ_SEP    },
     { OPT_ATTR,           "--attr",          SO_MULTI      },
     { OPT_LEVEL,          "--opt-level",     SO_REQ_SEP    },
+    { OPT_AUDIO_OUTFILE,  "--audio-outfile", SO_REQ_SEP    },
+    { OPT_DURATION,       "--duration",      SO_REQ_SEP    },
     { OPT_REPL,           "--repl",          SO_NONE       },
     { OPT_HELP,           "--help",          SO_NONE       },
     SO_END_OF_OPTIONS
@@ -233,7 +236,7 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_BATCH:
                 initexpr = std::string(args.OptionArg());
                 extemp::UNIV::BATCH_MODE = true;
-                extemp::UNIV::AUDIO_NONE = true;
+                // AUDIO_NONE is set after parsing, only if --audio-outfile wasn't passed
                 break;
             case OPT_INITFILE:
                 {
@@ -317,6 +320,12 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_LEVEL:
                 extemp::EXTLLVM::OPTIMIZATION_LEVEL = atoi(args.OptionArg());
                 break;
+            case OPT_AUDIO_OUTFILE:
+                extemp::UNIV::AUDIO_OUTFILE_PATH = args.OptionArg();
+                break;
+            case OPT_DURATION:
+                extemp::UNIV::AUDIO_OUTFILE_DURATION = atof(args.OptionArg());
+                break;
             case OPT_REPL:
 #ifndef _WIN32
                 repl_mode = true;
@@ -356,6 +365,8 @@ EXPORT int extempore_init(int argc, char** argv)
                 std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
                 std::cout << "            --repl: start an interactive REPL (Linux/macOS only)" << std::endl;
                 std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
+                std::cout << "   --audio-outfile: render DSP output to the given WAV file (float32) instead of an audio device" << std::endl;
+                std::cout << "        --duration: hard cap on --audio-outfile render length (seconds); 0 = render until (quit)" << std::endl;
                 std::_Exit(0);
             }
         } else {
@@ -374,6 +385,17 @@ EXPORT int extempore_init(int argc, char** argv)
             std::cout << std::endl << std::flush;
             ascii_default();
         }
+    }
+    // --batch implies --noaudio only when --audio-outfile was not specified.
+    // --audio-outfile lets batch runs render DSP to a file via the offline driver.
+    if (extemp::UNIV::BATCH_MODE && extemp::UNIV::AUDIO_OUTFILE_PATH.empty()) {
+        extemp::UNIV::AUDIO_NONE = true;
+    }
+    if (!extemp::UNIV::AUDIO_OUTFILE_PATH.empty() && extemp::UNIV::AUDIO_NONE) {
+        ascii_error();
+        std::cout << "Error: --audio-outfile cannot be combined with --noaudio" << std::endl;
+        ascii_normal();
+        return 1;
     }
     ascii_normal();
     std::cout << std::endl;

@@ -57,10 +57,17 @@ impc:compiler:flush-jit-compilation-queue
 
 - `--nobase`: Skip loading base library (useful for debugging JIT in isolation)
 - `--noaudio`: Disable audio (required for headless/CI testing)
-- `--batch "expr"`: Batch mode (no server, single process, no audio); exits only
-  if the expression calls `(quit ...)`. Implies `--noaudio`.
+- `--batch "expr"`: Batch mode (no server, single process); exits only
+  if the expression calls `(quit ...)`. Implies `--noaudio` **unless
+  `--audio-outfile` is also given** — in that case the offline file driver
+  handles audio output.
 - `--eval "expr"`: Evaluate expression at startup but keep full server running
   (utility + primary processes, TCP server on port 7099).
+- `--audio-outfile <path>`: render DSP output to a float32 WAV file via an
+  offline driver (see below). Combines with `--batch` for headless CI runs.
+- `--duration <seconds>`: cap on `--audio-outfile` render length. When reached,
+  the driver finalizes the WAV and self-exits with status 0. 0/unset = render
+  until `(quit)`.
 
 ### --batch vs --eval differences
 
@@ -157,6 +164,56 @@ When a user reports a bug from interactive use:
    `printf '(expr)\r\n' | nc -w 10 localhost 7099`
 4. If the bug is specifically about redefinition or accumulated state, send
    multiple expressions sequentially via TCP to simulate an interactive session
+
+## Scheme ↔ xtlang interop gotchas
+
+### Calling xtlang functions from Scheme
+
+A top-level `bind-func` makes the function name callable from the Scheme
+interaction environment. `(bind-func foo ...)` → `(foo arg1 arg2)` works.
+Return values flow back (i64 → Scheme integer, double → real, etc.).
+
+### `--batch` evaluates a single expression
+
+`--batch "<expr>"` reads one Scheme form. Multiple top-level expressions won't
+all run — wrap them in `(begin ...)`:
+
+```bash
+# WRONG: only the first form runs
+--batch '(sys:load "foo.xtm") (foo_test)'
+
+# RIGHT
+--batch '(begin (sys:load "foo.xtm") (foo_test))'
+```
+
+### `(quit rc)` and stdio flushing
+
+`exit_extempore` in `src/ffi/utility.inc` calls `std::_Exit(rc)`, which bypasses
+destructors **and discards stdio buffers**. It explicitly `fflush(stdout)`
+before `_Exit` so xtlang `printf` output isn't lost. If you add another
+pre-exit cleanup step there, keep it short — `_Exit` runs right after.
+
+### xtlang `set!` returns the assigned value
+
+Unlike Scheme where `set!` is effectively void, xtlang `set!` returns the new
+value. This breaks the common pattern `(if cond (set! x v))` with no else
+branch — the type inferencer sees `then: (type of v)` vs. implicit `else:
+void` and errors. Fixes: add explicit `void` branches, or wrap in `begin`:
+
+```scheme
+;; WRONG: type error "float vs void"
+(if (> v peak) (set! peak v))
+
+;; RIGHT
+(if (> v peak) (begin (set! peak v) void) void)
+```
+
+### Mis-reading shell exit codes behind `|`
+
+`cmd | tail` puts `tail` as the last pipeline member, so `$?` is tail's exit
+code, not `cmd`'s. To check the actual program's exit status, either avoid
+the pipe (`cmd > file 2>&1; echo $?`) or use `PIPESTATUS[0]` in bash/zsh.
+This bit me while verifying `(quit 1)` propagation.
 
 ## Debugging commands
 
@@ -274,7 +331,11 @@ timeout 120 ./build/extempore --noaudio --batch \
 ```
 
 Test labels: `libs-core`, `libs-external`, `examples-audio`, `examples-core`,
-`examples-graphics`. Defined in `extras/cmake/tests.cmake`.
+`examples-graphics`, `audio-offline`. Defined in `extras/cmake/tests.cmake`.
+
+The `audio-offline` label covers two-phase tests that render a DSP file to a
+WAV via `--audio-outfile` and then assert on it with `libs/core/audiotest.xtm`.
+Register via `extempore_add_audio_offline_test(name render_xtm duration freq label)`.
 
 ### Examples as tests
 
@@ -298,11 +359,55 @@ a test but fail interactively if the issue is audio-specific (e.g. `dsp:set!`
 registration, hot-swap). To test with audio enabled, use `--eval` instead of
 `--batch`.
 
-## Capturing audio output to a file (headless/SSH)
+## Capturing audio output to a file (headless/SSH/CI)
 
-`--batch` implies `--noaudio`, so you can't capture real audio output that way.
-Instead, use `--eval` (which keeps audio enabled) with PipeWire's `pw-record` to
-capture from the sink monitor.
+### Offline rendering with `--audio-outfile` (preferred)
+
+The offline file driver renders DSP output directly to a float32 WAV without
+any OS audio subsystem. Works in `--batch` mode, so it's suitable for CI:
+
+```bash
+./build/extempore --batch '(sys:load "examples/core/hello_sine.xtm")' \
+  --audio-outfile /tmp/out.wav --duration 1.0
+```
+
+The driver free-runs faster than realtime (~100× on typical hardware for a
+simple sine). Key semantics:
+
+- Counts toward `--duration` only after `dsp:set!` registers a closure, so
+  compile-path latency doesn't eat the render window.
+- On `--duration` reached, the driver finalizes the WAV header and calls
+  `std::_Exit(0)`. User script doesn't need to quit itself.
+- On user `(quit rc)`, `exit_extempore` calls `stopFileDriver()` before
+  `_Exit`, so the WAV is finalized in either path.
+- Not realtime — anything that uses wall-clock (`clock:clock`, MIDI I/O,
+  network) will drift because `getRealTime()` is still real time while
+  `UNIV::TIME` free-runs. DSP that depends only on the `time` sample counter
+  renders identically to realtime.
+
+### Asserting on offline output
+
+`libs/core/audiotest.xtm` provides `audiotest_assert_sine`,
+`audiotest_rms`, `audiotest_peak`, `audiotest_goertzel`. Call from Scheme with
+the xtlang function name directly; pipe the return through `(quit ...)` so the
+process exit code matches the assertion outcome:
+
+```bash
+./build/extempore --batch '(begin (sys:load "libs/core/audiotest.xtm")
+                                  (quit (audiotest_assert_sine "/tmp/out.wav" 440.0)))'
+```
+
+Returns 0 on PASS, 1 on FAIL, with a diagnostic line printed to stdout.
+
+`CMake` registration: see `extempore_add_audio_offline_test` in
+`extras/cmake/tests.cmake`. The macro chains render + verify via `cmake -P`
+running `extras/cmake/run_audio_offline_test.cmake`, so it works on all
+platforms CTest supports.
+
+### Live capture from a real audio output (pw-record fallback)
+
+When you need to verify the *realtime* path (not offline), use PipeWire's
+`pw-record` with `--eval` (which keeps audio enabled).
 
 ### Prerequisites
 

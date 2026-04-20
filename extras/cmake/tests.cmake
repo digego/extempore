@@ -48,6 +48,28 @@ macro(extempore_add_example_as_test examplefile timeout label)
         LABELS ${label})
 endmacro()
 
+# Render a DSP file offline via --audio-outfile, then assert on the output WAV
+# using libs/core/audiotest.xtm. freq is the expected sine frequency in Hz.
+# duration is the length of audio to render (seconds). Two-phase: implemented
+# as a cmake -P script so it works cross-platform.
+macro(extempore_add_audio_offline_test testname renderfile duration freq label)
+    set(_wav "${CMAKE_CURRENT_BINARY_DIR}/audio_offline_${testname}.wav")
+    add_test(NAME audio-offline/${testname}
+        COMMAND ${CMAKE_COMMAND}
+            -DEXTEMPORE=$<TARGET_FILE:extempore>
+            -DWORK_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DRENDER_XTM=${renderfile}
+            -DWAV_PATH=${_wav}
+            -DDURATION=${duration}
+            -DFREQ=${freq}
+            -DRENDER_TIMEOUT=60
+            -DVERIFY_TIMEOUT=60
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_audio_offline_test.cmake)
+    set_tests_properties(audio-offline/${testname} PROPERTIES
+        TIMEOUT 180
+        LABELS ${label})
+endmacro()
+
 # Core library tests
 extempore_add_ipc_test(tests/core/system.xtm libs-core)
 extempore_add_test(tests/core/adt.xtm libs-core)
@@ -65,6 +87,12 @@ extempore_add_test(tests/compiler/constraints.xtm compiler-unit)
 
 # External library tests
 extempore_add_test(tests/external/fft.xtm libs-external)
+
+# Offline audio-rendering tests: render a DSP to a WAV with --audio-outfile,
+# then verify it contains a sine at the expected frequency. Free-run driver
+# means ~1s of audio renders in well under a second; 1.0s of content is
+# plenty for a reliable Goertzel check.
+extempore_add_audio_offline_test(hello_sine examples/core/hello_sine.xtm 1.0 440.0 audio-offline)
 
 # Core examples
 extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)

@@ -408,6 +408,8 @@ uint32_t AUDIO_IN_DEVICE = -1;
 std::string AUDIO_DEVICE_NAME;
 std::string AUDIO_IN_DEVICE_NAME;
 double AUDIO_OUTPUT_LATENCY = 0.0;
+std::string AUDIO_OUTFILE_PATH;
+double AUDIO_OUTFILE_DURATION = 0.0;
 double CLOCK_OFFSET = 0.0;
 std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;
