@@ -1,0 +1,36 @@
+;;; hello_mt.xtm -- minimal multi-threaded DSP example
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Exercises the multi-threaded audio dispatcher: three per-thread sine
+;; oscillators at 330/550/770 Hz are summed by a top-level DSPMT. Useful
+;; as a smoke test for the MT path in processFrames() (both realtime and
+;; offline --audio-outfile).
+;;
+;; See examples/core/mtaudio.xtm for a more elaborate version using the
+;; instruments library.
+
+;;; Code:
+
+(bind-func dsp_tone1:DSP
+  (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
+    (* 0.3 (sin (* STWOPI 330.0 (/ (i64tof time) SRf))))))
+
+(bind-func dsp_tone2:DSP
+  (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
+    (* 0.3 (sin (* STWOPI 550.0 (/ (i64tof time) SRf))))))
+
+(bind-func dsp_tone3:DSP
+  (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
+    (* 0.3 (sin (* STWOPI 770.0 (/ (i64tof time) SRf))))))
+
+;; DSPMT receives the three per-thread outputs in `in` (SAMPLE*) and mixes
+;; them down to a single-channel signal replicated across output channels.
+(bind-func dspmt:DSPMT
+  (lambda (in:SAMPLE* time:i64 channel:i64 data:SAMPLE*)
+    (+ (pref in 0) (pref in 1) (pref in 2))))
+
+(dsp:set! dspmt dsp_tone1 dsp_tone2 dsp_tone3)

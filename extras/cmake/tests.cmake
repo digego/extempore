@@ -49,10 +49,17 @@ macro(extempore_add_example_as_test examplefile timeout label)
 endmacro()
 
 # Render a DSP file offline via --audio-outfile, then assert on the output WAV
-# using libs/core/audiotest.xtm. freq is the expected sine frequency in Hz.
+# using libs/core/audiotest.xtm. assert_expr is any xtlang expression returning
+# i64 (0 pass, non-zero fail); use @WAV@ in the expression to reference the
+# rendered file path, e.g.:
+#
+#   (audiotest_assert_sine "@WAV@" 440.0)
+#   (audiotest_assert_stereo_sine "@WAV@" 330.0 550.0)
+#   (audiotest_assert_three_sines "@WAV@" 330.0 550.0 770.0)
+#
 # duration is the length of audio to render (seconds). Two-phase: implemented
 # as a cmake -P script so it works cross-platform.
-macro(extempore_add_audio_offline_test testname renderfile duration freq label)
+macro(extempore_add_audio_offline_test testname renderfile duration assert_expr label)
     set(_wav "${CMAKE_CURRENT_BINARY_DIR}/audio_offline_${testname}.wav")
     add_test(NAME audio-offline/${testname}
         COMMAND ${CMAKE_COMMAND}
@@ -61,7 +68,7 @@ macro(extempore_add_audio_offline_test testname renderfile duration freq label)
             -DRENDER_XTM=${renderfile}
             -DWAV_PATH=${_wav}
             -DDURATION=${duration}
-            -DFREQ=${freq}
+            -DASSERT_EXPR=${assert_expr}
             -DRENDER_TIMEOUT=60
             -DVERIFY_TIMEOUT=60
             -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_audio_offline_test.cmake)
@@ -92,7 +99,18 @@ extempore_add_test(tests/external/fft.xtm libs-external)
 # then verify it contains a sine at the expected frequency. Free-run driver
 # means ~1s of audio renders in well under a second; 1.0s of content is
 # plenty for a reliable Goertzel check.
-extempore_add_audio_offline_test(hello_sine examples/core/hello_sine.xtm 1.0 440.0 audio-offline)
+extempore_add_audio_offline_test(hello_sine
+    examples/core/hello_sine.xtm 1.0
+    "(audiotest_assert_sine \"@WAV@\" 440.0)"
+    audio-offline)
+extempore_add_audio_offline_test(hello_stereo
+    examples/core/hello_stereo.xtm 1.0
+    "(audiotest_assert_stereo_sine \"@WAV@\" 330.0 550.0)"
+    audio-offline)
+extempore_add_audio_offline_test(hello_mt
+    examples/core/hello_mt.xtm 1.0
+    "(audiotest_assert_three_sines \"@WAV@\" 330.0 550.0 770.0)"
+    audio-offline)
 
 # Core examples
 extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)

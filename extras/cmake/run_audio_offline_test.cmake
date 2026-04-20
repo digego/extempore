@@ -1,22 +1,25 @@
 # Two-phase offline audio test: render a DSP to a float32 WAV, then load the
 # audiotest.xtm assertion helpers and verify the output. Invoked via cmake -P
-# so it works on all platforms supported by CTest. Requires these variables
-# to be passed via -D on the cmake command line:
+# so it works on all platforms supported by CTest. Required variables:
 #
-#   EXTEMPORE      full path to the extempore binary under test
-#   WORK_DIR       working directory (extempore source tree; used for sys:load paths)
-#   RENDER_XTM     relative path to the DSP file to render (loaded via sys:load)
-#   WAV_PATH       absolute path to the WAV file to produce
-#   DURATION       seconds of audio to render (float)
-#   FREQ           expected sine frequency in Hz (float, for audiotest_assert_sine)
-#   RENDER_TIMEOUT seconds of wall-clock time allowed for the render phase
-#   VERIFY_TIMEOUT seconds of wall-clock time allowed for the verify phase
+#   EXTEMPORE       full path to the extempore binary under test
+#   WORK_DIR        working directory (extempore source tree; used for sys:load paths)
+#   RENDER_XTM      relative path to the DSP file to render (loaded via sys:load)
+#   WAV_PATH        absolute path to the WAV file to produce
+#   DURATION        seconds of audio to render (float)
+#   ASSERT_EXPR     xtlang assertion expression, with @WAV@ as a placeholder
+#                   for the rendered WAV path. Example:
+#                     "(audiotest_assert_sine \"@WAV@\" 440.0)"
+#   RENDER_TIMEOUT  seconds of wall-clock time allowed for the render phase
+#   VERIFY_TIMEOUT  seconds of wall-clock time allowed for the verify phase
 
-foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION FREQ RENDER_TIMEOUT VERIFY_TIMEOUT)
+foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION ASSERT_EXPR RENDER_TIMEOUT VERIFY_TIMEOUT)
     if(NOT DEFINED ${var})
         message(FATAL_ERROR "run_audio_offline_test.cmake: required variable ${var} not set")
     endif()
 endforeach()
+
+string(REPLACE "@WAV@" "${WAV_PATH}" ASSERT_EXPR_EXPANDED "${ASSERT_EXPR}")
 
 # Phase 1: render
 file(REMOVE "${WAV_PATH}")
@@ -40,7 +43,7 @@ endif()
 # Phase 2: verify
 execute_process(
     COMMAND "${EXTEMPORE}" --term nocolor
-        --batch "(begin (sys:load \"libs/core/audiotest.xtm\") (quit (audiotest_assert_sine \"${WAV_PATH}\" ${FREQ})))"
+        --batch "(begin (sys:load \"libs/core/audiotest.xtm\") (quit ${ASSERT_EXPR_EXPANDED}))"
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE verify_rc
     TIMEOUT ${VERIFY_TIMEOUT})

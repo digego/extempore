@@ -1,0 +1,20 @@
+;;; hello_stereo.xtm -- minimal stereo sine (different freq per channel)
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Left channel: 330 Hz; right channel: 550 Hz. Useful for verifying the
+;; DSP callback receives the correct channel index, catching L/R swaps,
+;; and exercising the offline --audio-outfile driver with multi-channel
+;; output.
+
+;;; Code:
+
+(bind-func dsp:DSP
+  (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
+    (let ((freq (if (= channel 0) 330.0 550.0)))
+      (* 0.5 (sin (* STWOPI freq (/ (i64tof time) SRf)))))))
+
+(dsp:set! dsp)

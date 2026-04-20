@@ -132,6 +132,71 @@
                 (begin (printf "FAIL: target freq %.1f Hz not dominant\n" freq) (set! ok #f)))
             (if ok (begin (println "PASS") 0) 1))))))
 
+;; Per-channel sine check. Verifies the WAV has exactly two channels and each
+;; channel contains a dominant sine at the expected frequency. Useful for
+;; catching L/R swaps or single-channel-only DSPs.
+(bind-func audiotest_assert_stereo_sine
+  (lambda (path:i8* freq_l:double freq_r:double)
+    (let ((ab (AudioBuffer_from_wave path)))
+      (if (null? ab)
+          (begin (printf "FAIL: could not read %s\n" path) 1)
+          (let ((nch (AudioBuffer_channels ab))
+                (ok #t))
+            (if (<> nch 2)
+                (begin (printf "FAIL: expected 2 channels, got %lld\n" nch) (set! ok #f))
+                (let ((pk_l (convert (audiotest_peak ab 0) double))
+                      (pk_r (convert (audiotest_peak ab 1) double))
+                      (gl_at_l (audiotest_goertzel ab 0 freq_l))
+                      (gl_at_r (audiotest_goertzel ab 0 freq_r))
+                      (gr_at_l (audiotest_goertzel ab 1 freq_l))
+                      (gr_at_r (audiotest_goertzel ab 1 freq_r)))
+                  (printf "audiotest-stereo: %s  pk_l=%.4f pk_r=%.4f  L[g@%.0f=%.2e g@%.0f=%.2e]  R[g@%.0f=%.2e g@%.0f=%.2e]\n"
+                          path pk_l pk_r freq_l gl_at_l freq_r gl_at_r freq_l gr_at_l freq_r gr_at_r)
+                  (if (< pk_l 0.05) (begin (println "FAIL: left channel silent") (set! ok #f)))
+                  (if (< pk_r 0.05) (begin (println "FAIL: right channel silent") (set! ok #f)))
+                  ;; left should have freq_l dominant over freq_r
+                  (if (< gl_at_l (* 10.0 gl_at_r))
+                      (begin (printf "FAIL: left channel should contain %.1f Hz, not %.1f Hz\n" freq_l freq_r) (set! ok #f)))
+                  ;; right should have freq_r dominant over freq_l
+                  (if (< gr_at_r (* 10.0 gr_at_l))
+                      (begin (printf "FAIL: right channel should contain %.1f Hz, not %.1f Hz\n" freq_r freq_l) (set! ok #f)))))
+            (if ok (begin (println "PASS") 0) 1))))))
+
+;; Verify three specific frequencies are simultaneously present in the signal.
+;; Useful for multi-oscillator or multi-threaded DSPs where each voice plays a
+;; different pitch. For each fN, asserts Goertzel(fN) is >= min_energy and is
+;; dominant over neighbor bins that aren't one of the three target pitches.
+(bind-func audiotest_assert_three_sines
+  (lambda (path:i8* f1:double f2:double f3:double)
+    (let ((ab (AudioBuffer_from_wave path)))
+      (if (null? ab)
+          (begin (printf "FAIL: could not read %s\n" path) 1)
+          (let ((pk (convert (audiotest_peak ab -1) double))
+                (g1 (audiotest_goertzel ab -1 f1))
+                (g2 (audiotest_goertzel ab -1 f2))
+                (g3 (audiotest_goertzel ab -1 f3))
+                ;; probes at frequencies we expect to NOT contain energy
+                (gmid12 (audiotest_goertzel ab -1 (* 0.5 (+ f1 f2))))
+                (gmid23 (audiotest_goertzel ab -1 (* 0.5 (+ f2 f3))))
+                (min_target 0.0)
+                (max_noise 0.0)
+                (ok #t))
+            (printf "audiotest-three: %s  peak=%.4f  g@%.0f=%.2e g@%.0f=%.2e g@%.0f=%.2e  noise[%.0f=%.2e %.0f=%.2e]\n"
+                    path pk f1 g1 f2 g2 f3 g3
+                    (* 0.5 (+ f1 f2)) gmid12
+                    (* 0.5 (+ f2 f3)) gmid23)
+            (set! min_target (if (< g1 g2) g1 g2))
+            (if (< g3 min_target) (set! min_target g3))
+            (set! max_noise (if (> gmid12 gmid23) gmid12 gmid23))
+            (if (< pk 0.05) (begin (println "FAIL: silent") (set! ok #f)))
+            (if (> pk 0.99) (begin (println "FAIL: clipping") (set! ok #f)))
+            (if (< min_target 1.0e5)
+                (begin (printf "FAIL: min target-freq energy %.2e < 1e5\n" min_target) (set! ok #f)))
+            (if (< min_target (* 1000.0 max_noise))
+                (begin (printf "FAIL: target/noise ratio < 1000 (min_target=%.2e max_noise=%.2e)\n"
+                               min_target max_noise) (set! ok #f)))
+            (if ok (begin (println "PASS") 0) 1))))))
+
 ;; CTest invocation idiom: this file is loaded via sys:load, then the xtlang
 ;; assertion is called directly and its return value is handed to (quit). A
 ;; pass returns 0, a fail returns 1, producing the corresponding process
