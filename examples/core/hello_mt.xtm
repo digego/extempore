@@ -15,17 +15,22 @@
 
 ;;; Code:
 
+;; Per-oscillator amplitude kept at 0.2 so the 3-voice sum peaks at ~0.6,
+;; well clear of audio_sanity_f's ±0.99 clip threshold. Brushing the clip
+;; ceiling produces intermodulation products at exactly the frequencies we
+;; probe as "noise" (770-330=440, 2*330=660), which spuriously fails the
+;; target/noise ratio check.
 (bind-func dsp_tone1:DSP
   (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
-    (* 0.3 (sin (* STWOPI 330.0 (/ (i64tof time) SRf))))))
+    (* 0.2 (sin (* STWOPI 330.0 (/ (i64tof time) SRf))))))
 
 (bind-func dsp_tone2:DSP
   (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
-    (* 0.3 (sin (* STWOPI 550.0 (/ (i64tof time) SRf))))))
+    (* 0.2 (sin (* STWOPI 550.0 (/ (i64tof time) SRf))))))
 
 (bind-func dsp_tone3:DSP
   (lambda (in:SAMPLE time:i64 channel:i64 data:SAMPLE*)
-    (* 0.3 (sin (* STWOPI 770.0 (/ (i64tof time) SRf))))))
+    (* 0.2 (sin (* STWOPI 770.0 (/ (i64tof time) SRf))))))
 
 ;; DSPMT receives the three per-thread outputs in `in` (SAMPLE*) and mixes
 ;; them down to a single-channel signal replicated across output channels.
