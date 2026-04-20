@@ -41,8 +41,6 @@
 %wts = type double (i8*, i8*, double*, i64, i64, double*)
 %wt_f = type float (i8*, i8*, float, i64, i64, float*)
 %wts_f = type float (i8*, i8*, float*, i64, i64, float*)
-%wta = type void (i8*, i8*, float*, float*, i64, i8*)
-%wta_s = type void (i8*, i8*, float**, float*, i64, i8*)
 
 ;; Double-precision sample DSP wrapper
 define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
@@ -94,32 +92,6 @@ entry:
   %e = load i8*, i8** %ePtr
   %result = tail call fastcc float %f(i8* %_impz, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
   ret float %result
-}
-
-;; Array-based DSP wrapper (for block processing)
-define dllexport void @imp_dsp_wrapper_array(i8* %_impz, i8* %closure, float* %datain, float* %dataout, i64 %time, i8* %data)
-{
-entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wta* }*
-  %fPtr = getelementptr { i8*, i8*, %wta* }, { i8*, i8*, %wta* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wta* }, { i8*, i8*, %wta* }* %closureVal, i32 0, i32 1
-  %f = load %wta*, %wta** %fPtr
-  %e = load i8*, i8** %ePtr
-  tail call fastcc void %f(i8* %_impz, i8* %e, float* %datain, float* %dataout, i64 %time, i8* %data)
-  ret void
-}
-
-;; Array-based multi-channel sum DSP wrapper
-define dllexport void @imp_dsp_sum_wrapper_array(i8* %_impz, i8* %closure, float** %datain, float* %dataout, i64 %time, i8* %data)
-{
-entry:
-  %closureVal = bitcast i8* %closure to { i8*, i8*, %wta_s* }*
-  %fPtr = getelementptr { i8*, i8*, %wta_s* }, { i8*, i8*, %wta_s* }* %closureVal, i32 0, i32 2
-  %ePtr = getelementptr { i8*, i8*, %wta_s* }, { i8*, i8*, %wta_s* }* %closureVal, i32 0, i32 1
-  %f = load %wta_s*, %wta_s** %fPtr
-  %e = load i8*, i8** %ePtr
-  tail call fastcc void %f(i8* %_impz, i8* %e, float** %datain, float* %dataout, i64 %time, i8* %data)
-  ret void
 }
 
 ;; Get the environment pointer from a closure

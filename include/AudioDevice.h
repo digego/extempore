@@ -59,8 +59,6 @@
 
 typedef float SAMPLE;
 
-typedef void (*dsp_f_ptr_array)(void*, void*, float*, float*, uint64_t, void*);
-typedef void (*dsp_f_ptr_sum_array)(void* ,void* ,float** ,float*, uint64_t, void*);
 typedef SAMPLE (*dsp_f_ptr)(void*, void*, SAMPLE, uint64_t, uint64_t, const SAMPLE*);
 typedef SAMPLE (*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, const SAMPLE*);
 
@@ -83,12 +81,8 @@ private:
     closure_getter_fn_type m_dsp_mt_closure[128];
     dsp_f_ptr dsp_wrapper;
     dsp_f_ptr_sum dsp_wrapper_sum;
-    dsp_f_ptr_array dsp_wrapper_array;
-    dsp_f_ptr_sum_array dsp_wrapper_sum_array;
     SAMPLE* outbuf;
     SAMPLE* inbuf;
-    float* outbuf_f;
-    float* inbuf_f;
     std::array<std::unique_ptr<EXTThread>, MAX_RT_AUDIO_THREADS> m_threads;
     std::atomic<unsigned> m_numThreads;
     bool       m_zeroLatency;
@@ -98,7 +92,7 @@ private:
     static AudioDevice SINGLETON;
 private:
     bool WrapperSet() const {
-        return dsp_wrapper || dsp_wrapper_array || dsp_wrapper_sum || dsp_wrapper_sum_array;
+        return dsp_wrapper || dsp_wrapper_sum;
     }
 public:
     AudioDevice();
@@ -110,8 +104,8 @@ public:
 
     // Core DSP dispatch: called by the PortAudio callback in realtime mode,
     // and by the offline file driver when --audio-outfile is active. Advances
-    // UNIV::DEVICE_TIME/TIME, signals the task scheduler, and invokes whichever
-    // DSP wrapper variant has been registered (sample/array/MT-sum/MT-array).
+    // UNIV::DEVICE_TIME/TIME, signals the task scheduler, and invokes the
+    // registered DSP wrapper (sample-by-sample or MT-sum).
     void processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer, void* UserData);
 
     bool getZeroLatency() { return m_zeroLatency; }
@@ -136,12 +130,6 @@ public:
         }
         dsp_wrapper = Wrapper;
     }
-    void setDSPWrapperArray(dsp_f_ptr_array Wrapper) {
-        if (WrapperSet()) {
-            return;
-        }
-        dsp_wrapper_array = Wrapper;
-    }
     void setDSPMTWrapper(dsp_f_ptr_sum WrapperSum, dsp_f_ptr Wrapper) {
         if (WrapperSet()) {
             return;
@@ -149,27 +137,15 @@ public:
         dsp_wrapper_sum = WrapperSum;
         dsp_wrapper = Wrapper;
     }
-    void setDSPMTWrapperArray(dsp_f_ptr_sum_array WrapperSumArray, dsp_f_ptr_array WrapperArray) {
-        if (WrapperSet()) {
-            return;
-        }
-        dsp_wrapper_sum_array = WrapperSumArray;
-        dsp_wrapper_array = WrapperArray;
-    }
 
     void initMTAudio(int NumThreads, bool ZeroLatency);
-    void initMTAudioBuf(int,bool);
 
     int getNumThreads() const { return int(m_numThreads.load(std::memory_order_acquire)); }
     dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
-    dsp_f_ptr_array getDSPWrapperArray() { return dsp_wrapper_array; }
     dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
-    dsp_f_ptr_sum_array getDSPSUMWrapperArray() { return dsp_wrapper_sum_array; }
 
     SAMPLE* getDSPMTInBuffer() { return inbuf; }
     SAMPLE* getDSPMTOutBuffer() { return outbuf; }
-    float* getDSPMTInBufferArray() { return inbuf_f; }
-    float* getDSPMTOutBufferArray() { return outbuf_f; }
 
     PaStream* getPaStream() { return stream; }
 

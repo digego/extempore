@@ -467,38 +467,6 @@ Audio call back function that is single sample and multi threaded.
 ### Example
 TODO
 
-## DSPMC
-__Type Alias__ : [void,SAMPLE*,SAMPLE*,i64,i8* ]
-
-### Parameters
-1. __in:SAMPLE__ : input sample block from sound card for all channels. This holds all input channels in an interleaved buffer.
-2. __out:SAMPLE__ : pointer to output sample block to write audio. This holds all output channels in an interleaved buffer.
-3. __chan:i64__ : the channel that the current sample comes from, and the corresponding channel that the current sample will go to.
-4. __TODO:i64__ : TODO what is this? time?
-5. __data:i8*__ : TODO currently unused.
-
-### Description
-Audio call back function that process audio blocks of size ``FRAME``.
-
-### Example
-TODO
-
-## DSPMCMT
-__Type Alias__ : [void, SAMPLE** ,SAMPLE*,i64,i8* ]
-
-### Parameters
-1. __in:SAMPLE**_ : TODO input sample block from sound card for all channels. This holds all input channels in an interleaved buffer.
-2. __out:SAMPLE*__ : pointer to output sample block to write audio. This holds all output channels in an interleaved buffer.
-3. __chan:i64__ : the channel that the current sample comes from, and the corresponding channel that the current sample will go to.
-4. __TODO:i64__ : TODO what is this? time?
-5. __data:i8*__ : TODO currently unused.
-
-### Description
-Multi-threaded audio call back function that process audio blocks of size ``NUM_FRAMES``.
-
-### Example
-TODO
-
 ## SPI
 Constant
 Type: SAMPLE
