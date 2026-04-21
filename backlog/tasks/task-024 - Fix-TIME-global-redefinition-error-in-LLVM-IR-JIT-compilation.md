@@ -1,9 +1,10 @@
 ---
 id: TASK-024
 title: Fix @TIME global redefinition error in LLVM IR JIT compilation
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-17 04:05'
+updated_date: '2026-04-21 09:49'
 labels:
   - bug
   - llvm
@@ -58,8 +59,14 @@ Specifically, after cloning the template module (step 2, ~line 389), collect all
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 sTypeDefinitions does not contain external declarations for globals already defined in the template module
-- [ ] #2 fmsynth.xtm loads successfully with --noaudio --batch mode
-- [ ] #3 All 6 core tests (libs-core) continue to pass
-- [ ] #4 Audio examples (scheduler.xtm, topclock_metro.xtm) load without FLUSH FAILED error
+- [x] #1 sTypeDefinitions does not contain external declarations for globals already defined in the template module
+- [x] #2 fmsynth.xtm loads successfully with --noaudio --batch mode
+- [x] #3 All 6 core tests (libs-core) continue to pass
+- [x] #4 Audio examples (scheduler.xtm, topclock_metro.xtm) load without FLUSH FAILED error
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fixed by commit 11c53292 (refactor jitCompile to use LLVM module cloning with LinkOnceODR). The sTypeDefinitions-concatenation approach was replaced with buildPreamble + LinkOnceODR linkage + sTemplateGlobalNames filtering in src/SchemeFFI.cpp. Verified: fmsynth.xtm and scheduler.xtm load successfully via './build/extempore --noaudio --batch ...' with no FLUSH FAILED error and clean exit 0.
+<!-- SECTION:NOTES:END -->

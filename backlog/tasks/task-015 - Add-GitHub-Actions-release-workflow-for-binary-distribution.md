@@ -1,9 +1,10 @@
 ---
-id: task-015
+id: TASK-015
 title: Add GitHub Actions release workflow for binary distribution
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-18 09:48'
+updated_date: '2026-04-21 09:49'
 labels:
   - ci
   - packaging
@@ -48,3 +49,9 @@ The workflow should:
 - AOT compilation of stdlib should be included in the release build
 - May want to code-sign macOS binaries to avoid "damaged app" warnings
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Completed: .github/workflows/release-binary.yml exists and covers Linux x86_64, Linux aarch64, macOS aarch64, and Windows x86_64. Triggers on v* tags and uploads artifacts per platform.
+<!-- SECTION:NOTES:END -->

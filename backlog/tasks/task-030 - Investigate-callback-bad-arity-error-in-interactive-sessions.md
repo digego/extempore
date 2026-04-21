@@ -1,10 +1,10 @@
 ---
 id: TASK-030
 title: Investigate callback "bad arity" error in interactive sessions
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-23 09:57'
-updated_date: '2026-02-23 10:23'
+updated_date: '2026-04-21 09:49'
 labels:
   - bug
   - compiler
@@ -54,20 +54,8 @@ A failing test exists in `tests/failing.xtm` (`callback_single_arg_recursion`).
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-## Debug logging output
-
-With annotation (FAILS):
-```
-DEBUG-CB func: onearg_loop_adhoc_9 ast-len: 5 ftype-len: 1 ftype: ((213 2 2)) ftypeA: NIL cbType: ((213 2 2))
-```
-
-Without annotation (WORKS):
-```
-DEBUG-CB func: twoarg_loop_adhoc_8 ast-len: 6 ftype-len: 0 ftype: NIL ftypeA: NIL cbType: NIL
-```
-
-Two-arg with annotation also fails:
-```
-DEBUG-CB func: twoarg_annotated_adhoc_10 ast-len: 6 ftype-len: 1 ftype: ((213 -1 2 2)) ftypeA: NIL cbType: ((213 -1 2 2))
-```
+Fixed: direct reproduction from the task description now compiles cleanly. Verified both cases:
+- (bind-func test_loop:[i64,i64]* (lambda (t:i64) ... (callback (+ t 44100) test_loop (+ t 44100)) t)) → 'Compiled: test_loop >>> [i64,i64]*'
+- (bind-func twoarg_annotated:[i64,i64,i64]* (lambda (a:i64 b:i64) ... (callback (+ a 44100) twoarg_annotated (+ a 44100) b) a)) → 'Compiled: twoarg_annotated >>> [i64,i64,i64]*'
+Likely addressed by the type-inference rewrites in TASK-037 / TASK-032-036. tests/failing.xtm does not contain callback_single_arg_recursion.
 <!-- SECTION:NOTES:END -->
