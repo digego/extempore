@@ -66,6 +66,12 @@ directory:
     ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
     ./extempore --batch "(begin (println 'hello) (quit 0))"
 
+If you've moved the `extempore` binary away from the source tree (for example,
+out of a downloaded release archive), point it at the share directory
+explicitly:
+
+    ./extempore --sharedir /path/to/extempore
+
 ## Platform-specific notes
 
 ### macOS
@@ -75,7 +81,12 @@ target of macOS 11.0 Big Sur.
 
 Apple requires distributed binaries to be signed & notarised, and the Extempore
 core team haven't got an Apple Developer account set up for that. If Gatekeeper
-refuses to run the `extempore` binary, reach out on the
+refuses to run the `extempore` binary from a downloaded release, strip the
+quarantine attribute and try again:
+
+    xattr -dr com.apple.quarantine /path/to/extempore
+
+If that doesn't help, reach out on the
 [mailing list](mailto:extemporelang@googlegroups.com).
 
 ### Linux

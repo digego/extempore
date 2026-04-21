@@ -1,7 +1,10 @@
 # Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20test/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
 
-A programming environment for cyberphysical programming. Runs on Linux
-(x86_64 and aarch64), macOS (Apple Silicon) and Windows (x86_64).
+Extempore is a live-coding environment for music, audio and graphics. It pairs
+a Scheme interpreter with _xtlang_---a statically-typed lisp that compiles to
+LLVM IR at runtime---so you can reshape a running program while it keeps
+making sound. Runs on Linux (x86_64 and aarch64), macOS (Apple Silicon) and
+Windows (x86_64).
 
 ## What's new in v0.9.0
 
@@ -66,6 +69,21 @@ _Note on running_: the `extempore` binary locates its runtime files
 (`runtime/`, `libs/`, `examples/`) relative to the source tree at build time.
 Run it from the build directory (`./extempore`) rather than installing it to a
 system location.
+
+### Hear your first sine wave
+
+With Extempore running and an editor connected to port 7099, evaluate this
+and you should hear a 440 Hz tone:
+
+```scheme
+(bind-func dsp:DSP
+  (lambda (in time chan data)
+    (* 0.5 (sin (* STWOPI 440.0 (/ (i64tof time) SRf))))))
+(dsp:set! dsp)
+```
+
+The full example lives at
+[`examples/core/hello-sine.xtm`](./examples/core/hello-sine.xtm).
 
 ## See Extempore in action
 

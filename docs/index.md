@@ -11,7 +11,7 @@ hero:
       link: /overview/quickstart
     - theme: alt
       text: View on GitHub
-      link: https://github.com/extemporelang/extempore
+      link: https://github.com/digego/extempore
 
 features:
   - title: Overview

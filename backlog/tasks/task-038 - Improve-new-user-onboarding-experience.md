@@ -1,9 +1,10 @@
 ---
 id: TASK-038
 title: Improve new-user onboarding experience
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-19 01:07'
+updated_date: '2026-04-20 21:23'
 labels:
   - docs
   - onboarding
@@ -44,14 +45,14 @@ Small inconsistencies worth fixing in passing:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 README tagline replaced and 'paste this to hear sine' block added under Getting Started
-- [ ] #2 docs/reference/index.md is a real landing page with links, no org-mode draft content visible
-- [ ] #3 VSCode binary download instructions are consistent between README and quickstart
-- [ ] #4 docs/overview/contributing.md documents the current VitePress workflow and omits shipped wishlist items
-- [ ] #5 examples/hello_world.xtm exists and is linked from README and quickstart
-- [ ] #6 xtlang tutorial covering bind-func, types, closures, and memory zones is drafted or scoped as its own follow-up task
-- [ ] #7 JIT/type error-message glossary is drafted or scoped as its own follow-up task
-- [ ] #8 Extempore prints a 'listening on :7099' pointer on startup
-- [ ] #9 Canonical GitHub org is chosen and all README/docs links normalised
-- [ ] #10 ASSETS size, macOS quarantine fix, --sharedir, and banner year inconsistencies are reconciled
+- [x] #1 README tagline replaced and 'paste this to hear sine' block added under Getting Started
+- [x] #2 docs/reference/index.md is a real landing page with links, no org-mode draft content visible
+- [x] #3 VSCode binary download instructions are consistent between README and quickstart
+- [x] #4 docs/overview/contributing.md documents the current VitePress workflow and omits shipped wishlist items
+- [x] #5 examples/hello_world.xtm exists and is linked from README and quickstart
+- [x] #6 xtlang tutorial covering bind-func, types, closures, and memory zones is drafted or scoped as its own follow-up task
+- [x] #7 JIT/type error-message glossary is drafted or scoped as its own follow-up task
+- [x] #8 Extempore prints a 'listening on :7099' pointer on startup
+- [x] #9 Canonical GitHub org is chosen and all README/docs links normalised
+- [x] #10 ASSETS size, macOS quarantine fix, --sharedir, and banner year inconsistencies are reconciled
 <!-- AC:END -->

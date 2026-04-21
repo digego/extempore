@@ -27,7 +27,7 @@ three questions that Impromptu users might have:
 There are some obvious 'big picture' differences:
 
 -   Extempore is cross-platform (OS X, Linux & Windows)
--   Extempore is [open source](https://github.com/extemporelang/extempore)
+-   Extempore is [open source](https://github.com/digego/extempore)
 -   Extempore is now just an executable, it no longer has a built in editor &
     log view (so [you can use your favourite editor](editor-support.md))
 

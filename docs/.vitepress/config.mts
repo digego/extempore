@@ -15,7 +15,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Docs', link: '/overview/quickstart' },
-      { text: 'GitHub', link: 'https://github.com/extemporelang/extempore' }
+      { text: 'GitHub', link: 'https://github.com/digego/extempore' }
     ],
     sidebar: [
       {
@@ -65,10 +65,10 @@ export default defineConfig({
       }
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/extemporelang/extempore' }
+      { icon: 'github', link: 'https://github.com/digego/extempore' }
     ],
     editLink: {
-      pattern: 'https://github.com/extemporelang/extempore/edit/master/docs/:path'
+      pattern: 'https://github.com/digego/extempore/edit/master/docs/:path'
     }
   }
 })

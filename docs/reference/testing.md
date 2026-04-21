@@ -90,7 +90,7 @@ To **exclude** only the labels matching `<regex>`, use:
 
 ## Get involved {#get-involved}
 
-We really appreciate [bug reports](https://github.com/extemporelang/extempore/issues),
+We really appreciate [bug reports](https://github.com/digego/extempore/issues),
 and the best way to submit them these days is in the form of a failing test.
 
 You can just paste the failing test into an email to the [mailing

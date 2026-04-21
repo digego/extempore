@@ -401,7 +401,7 @@ EXPORT int extempore_init(int argc, char** argv)
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_default();
-    std::cout << "Andrew Sorensen (c) 2010-2025" << std::endl;
+    std::cout << "Andrew Sorensen (c) 2011-2026" << std::endl;
     std::cout << "andrew@moso.com.au, @digego" << std::endl;
     std::cout << std::endl;
     ascii_default();
@@ -470,6 +470,10 @@ EXPORT int extempore_init(int argc, char** argv)
             exit(1);
         }
 #ifndef SUBSUME_PRIMARY
+        ascii_info();
+        std::cout << "Listening on TCP port " << primary_port
+                  << " --- connect your editor to send code." << std::endl;
+        ascii_default();
         while (true) {
           if (XTMMainCallback) { XTMMainCallback(); }
           std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -490,6 +494,11 @@ EXPORT int extempore_init(int argc, char** argv)
             std::thread([repl_args] { linenoise_repl(repl_args); }).detach();
         }
 #endif
+
+        ascii_info();
+        std::cout << "Listening on TCP port " << primary_port
+                  << " --- connect your editor to send code." << std::endl;
+        ascii_default();
 
         // start the primary process running on this thread (i.e. process thread 0)
         primary->start(true); // this will not return

@@ -609,7 +609,7 @@ If you're wondering why it plays that specific scale---and how you could play a
 _different_ scale---then the reason is that there are two more "special"
 variables, `*root*` and `*scale*`, which are [initialised to the following
 values at
-start-up](https://github.com/extemporelang/extempore/blob/master/libs/core/pattern-language.xtm):
+start-up](https://github.com/digego/extempore/blob/master/libs/core/pattern-language.xtm):
 
 ```extempore
 (define *root* 0)

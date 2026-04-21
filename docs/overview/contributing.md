@@ -2,108 +2,87 @@
 title: Contributing
 ---
 
-There are heaps of ways you can contribute to Extempore---whether you've been
-hacking Extempore code for a long time or whether you're just starting out. If
-you're in the latter category then you can especially help out with the
-docs---take notes as you learn, write down (& suggest) fixes for anything that's
-missing or unclear. It's hard for [Andrew](https://twitter.com/digego) &
-[Ben](https://twitter.com/benswift) to remember what it's like to start out, but
-that doesn't mean that others should have to fight through like we did :)
+# Contributing to Extempore
 
-If you've got questions, or want to bounce around some ideas for improvements
-before you go ahead and make big changes then get in touch on the [mailing
-list](mailto:extemporelang@googlegroups.com).
+There are heaps of ways you can contribute to Extempore---whether you've been
+hacking Extempore code for a long time or you're just starting out. If you're
+in the latter camp, the docs are an especially good place to help: take notes
+as you learn, and open a PR for anything that's missing or unclear. It's hard
+for [Andrew](https://github.com/digego) and
+[Ben](https://github.com/benswift) to remember what it's like to start from
+scratch, so fresh eyes are genuinely valuable.
+
+If you've got questions, or want to bounce ideas around before making a big
+change, get in touch on the
+[mailing list](mailto:extemporelang@googlegroups.com) or open an issue on
+[GitHub](https://github.com/digego/extempore/issues).
 
 ## Documentation
 
-This documentation is built using [Jekyll](https://jekyllrb.com/), using the
-[Jekyll Doc](https://aksakalli.github.io/jekyll-doc-theme/) theme. Since it's
-all just markdown files in the `_docs/` subdirectory, it's easy for others to
-contribute.
+These docs are built with [VitePress](https://vitepress.dev). The sources
+live in [`docs/`](https://github.com/digego/extempore/tree/master/docs) in
+the main repo---just markdown files, easy to edit.
 
-If you find problems, or can think of improvements, [fork away on
-GH](https://github.com/extemporelang/extempore), edit the documentation source files
-and submit a pull request---there's a nice little "IMPROVE THIS PAGE" link at the
-bottom of every page. We'd love these docs to become a real community effort.
-There will probably be a few broken links and other little things like that, so
-no pull request is too small to be appreciated :)
+### Editing
 
-### Building
+1. Fork [`digego/extempore`](https://github.com/digego/extempore).
+2. Edit the relevant `.md` file under `docs/`.
+3. Open a PR.
 
-To generate these docs, you'll need a working ruby install & a few packages. The
-best way to get started is to use [bundler](http://bundler.io/), then it's:
+There's an "Edit this page on GitHub" link at the bottom of every docs page
+that will drop you straight into the right file.
 
-```
-    bundle install # to get all the packages
-    bundle exec jekyll build # to build the docs website
-```
+### Building locally
 
-If you want to see your changes locally (which of course you do!) then you can
-run a local 'live' test server with
+From the repo root:
 
-```
-    bundle exec jekyll serve              # or
-    bundle exec jekyll serve --livereload # to have the site reload on save
+```sh
+cd docs
+npm install
+npm run dev       # live-reloading dev server
+npm run build     # production build into docs/.vitepress/dist
+npm run preview   # preview the production build
 ```
 
-### Hosting
+### Style
 
-The docs are built and hosted automatically by GitHub through [GitHub
-pages](https://pages.github.com/). So the docs are re-built for every commit to
-the master branch of [the extemporelang.github.io
-repo](https://github.com/extemporelang/extemporelang.github.io).
+There's no formal style guide, but a few principles:
 
-### Style {#documentation-style}
+- content goes in `overview/`, `reference/` or `guides/` (wherever fits best)
+- filenames use kebab-case (e.g. `page-title.md`)
+- use level-2 headings (`##`) and below in page bodies---the page title comes
+  from the frontmatter
+- prefer second-person ("now you've built an instrument") over first-person
+  plural ("now we've built an instrument"); some older pages still use "we"
+  from their blog-post origins, and we're converting them over time
 
-There's no official styleguide, and as mentioned elsewhere some of this started
-off as blog posts on Ben's blog, so it's a bit all-over-the-place when it comes
-to style. Still, here are some general style/formatting principles:
+## Contributing code
 
-- on each page, use level 2 headings (`##`) as the highest level (i.e. no level
-  1 headings---that's reserved for the page title)
+The main source tree is C++ (runtime) and xtlang (standard library and
+examples). See [`BUILDING.md`](https://github.com/digego/extempore/blob/master/BUILDING.md)
+for how to build from source, and [`CLAUDE.md`](https://github.com/digego/extempore/blob/master/CLAUDE.md)
+for a one-page map of the codebase.
 
-- content should go in either the `overview`, `reference` or `guides` folders
-  (wherever it fits best)
-
-- use kebab-case for docs filenames (e.g. `page-title.md`)
-
-- a conversational writing style is ok, preferrably in a second-person narrative
-  voice (e.g. "now you're built an instrument") rather than first-person ("now
-  we've built an instrument") (**note:** there's a bunch of "we" stuff in there
-  from when Ben first wrote the material as blog posts, but the plan is to
-  change it to "you" over time)
+Issues and PRs live at
+[digego/extempore](https://github.com/digego/extempore).
 
 ## Extempore wishlist
 
-Building a new programming language, runtime and ecosystem is a multifaceted
-job. Here are a few projects (some small, some not so small) which would be
-really nice---if you think you'd like to contribute, give us a shout out on the
-[mailing list](mailto:extemporelang@googlegroups.com).
+A few projects (some small, some not so small) that would be really nice. If
+any catch your eye, give us a shout on the
+[mailing list](mailto:extemporelang@googlegroups.com) before you start.
 
-### Core {#core}
-
-These projects involve hacking on the Extempore executable itself:
-
-1. upgrade to latest LLVM with ORCJIT
-2. port Extempore to 64-bit ARM (`aarch64`)
-
-### xtlang {#xtlang}
-
-These projects (mostly) involve adding/improving libraries for doing cool things
-in xtlang:
+### xtlang libraries
 
 1. a 2D/3D hardware-accelerated data visualisation library (e.g. a vega-lite
    for Extempore)
-2. add TensorFlow C bindings for (at least) inference, & an example of how to
-   run a cool deep-learning-powered image processing model
-3. add DirectX (or perhaps Vulkan) support
-4. implement [Godot](https://godotengine.org)/Extempore integration
+2. TensorFlow (or equivalent) C bindings for inference, with an example of a
+   deep-learning image-processing model
+3. additional graphics backends (DirectX, Vulkan)
+4. [Godot](https://godotengine.org)/Extempore integration
 
-### Ecosystem {#ecosystem}
+### Ecosystem
 
-These projects are "ecosystem/tooling" projects.
-
-1. create an xtlang package manager (e.g. CPAN or cargo for Extempore)
-2. make the CMake build process aware of the xtlang ahead-of-time compilation
-   process, so that `make aot` only re-aot-compiles an xtlang library if it has
-   changed
+1. an xtlang package manager (CPAN/cargo-style)
+2. make the CMake build aware of the xtlang ahead-of-time compilation
+   process, so `make aot` only re-AOT-compiles a library if it has changed

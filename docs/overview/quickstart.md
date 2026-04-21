@@ -4,7 +4,7 @@ title: Quickstart
 
 Welcome, Extempore traveller. If you don't have a favourite text editor or don't
 usually [build things from
-source](https://github.com/extemporelang/extempore/blob/master/BUILDING.md) (or
+source](https://github.com/digego/extempore/blob/master/BUILDING.md) (or
 don't know what those things even _mean_) then these instructions will get you
 up & running asap.
 
@@ -46,18 +46,17 @@ Command Palette...`).
 
 ### Download Extempore
 
-If you're on Windows or macOS then VSCode has an _Extempore: Download binary_
-command which will download & set up Extempore for you (again, access it through
-the [_Command Palette_](#vscode-command-palette )). It's about a 300MB download,
-so it might take a while, but when it's done you're good to go.
+Grab the latest release from the [GitHub releases
+page](https://github.com/digego/extempore/releases), unzip it and put it
+wherever you like (e.g. in your _Documents_ folder). Then set the _Extempore:
+Sharedir_ VSCode config setting to point at that folder---this lets VSCode
+start Extempore for you (we'll do that in the next step).
 
-If you want to download the binary yourself it's also not tricky, just get the
-latest version from the [GitHub releases
-page](https://github.com/extemporelang/extempore/releases), unzip it and put it
-wherever you like (e.g. in your _Documents_ folder). It's also a good idea to
-set the _Extempore: Sharedir_ VSCode config setting to point to the place where
-you put your Extempore folder---this will allow VSCode to easily start Extempore
-for you (as we'll see in the next step).
+::: warning
+The VSCode extension used to offer an _Extempore: Download binary_ command
+for one-click setup. It hasn't been updated for v0.9.0, so download the
+release archive manually for now.
+:::
 
 ## Using Extempore {#using-extempore}
 
@@ -185,7 +184,8 @@ as well).
 ### "Hello, Sine!" {#hello-sine}
 
 Since Extempore has multimedia programming as a core part of its DNA,
-here's "Hello, Sine!"
+here's "Hello, Sine!"---the full version lives at
+[`examples/core/hello-sine.xtm`](https://github.com/digego/extempore/blob/master/examples/core/hello-sine.xtm).
 
 ```xtlang
 (bind-func sine:DSP
@@ -321,7 +321,7 @@ If you go with option #4, remember that you can create a new copy of
 `audiosetup.xtm` and modify it to your heart's content. Even if you've just been
 messing with the original `audiosetup.xtm` file directly, remember that you can
 get a "pristine" version at any time from
-[GitHub](https://github.com/extemporelang/extempore/blob/master/examples/sharedsystem/audiosetup.xtm).
+[GitHub](https://github.com/digego/extempore/blob/master/examples/sharedsystem/audiosetup.xtm).
 
 ### Windows
 

@@ -4,7 +4,7 @@ project(Extempore VERSION 0.9.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(ASSETS "download multimedia assets (approx 500MB)" OFF)
+option(ASSETS "download multimedia assets (approx 250MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
 set(EXTEMPORE_SANITIZE "" CACHE STRING "Build with sanitizer: asan, ubsan, tsan, asan+ubsan")
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)

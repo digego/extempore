@@ -1,7 +1,7 @@
 <template>
   <div class="beta-banner">
     These docs are in beta --- some content may be outdated or incomplete.
-    <a href="https://github.com/extemporelang/extempore/issues">Feedback welcome.</a>
+    <a href="https://github.com/digego/extempore/issues">Feedback welcome.</a>
   </div>
 </template>
 
