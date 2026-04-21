@@ -31,9 +31,11 @@ export default defineConfig({
       {
         text: 'Reference',
         items: [
+          { text: 'xtlang tutorial', link: '/reference/tutorial' },
           { text: 'xtlang types', link: '/reference/types' },
           { text: 'Type inferencing', link: '/reference/type-inference' },
           { text: 'Memory management', link: '/reference/memory-management' },
+          { text: 'Error messages', link: '/reference/error-messages' },
           { text: 'Scheme-xtlang interop', link: '/reference/scheme-xtlang-interop' },
           { text: 'Concurrency', link: '/reference/concurrency' },
           { text: 'C-xtlang interop', link: '/reference/c-xtlang-interop' },
