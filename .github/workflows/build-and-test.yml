@@ -67,8 +67,24 @@ jobs:
             build/.ninja_deps
           key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
 
+      - name: Restore AOT cache
+        id: cache-aot
+        uses: actions/cache/restore@v5
+        with:
+          path: libs/aot-cache
+          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**') }}
+          restore-keys: |
+            ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-
+
       - name: Build
         run: cmake --build build --parallel 2
+
+      - name: Save AOT cache
+        if: steps.cache-aot.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: libs/aot-cache
+          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**') }}
 
       - name: Test
         timeout-minutes: 30
