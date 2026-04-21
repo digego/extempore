@@ -48,20 +48,18 @@
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/Support/Error.h"
 
-
 struct _llvm_callback_struct_ {
-    void(*fptr)(void*,llvm_zone_t*);
+    void (*fptr)(void*, llvm_zone_t*);
     void* dat;
     llvm_zone_t* zone;
 };
 
 struct closure_address_table;
 
-extern "C"
-{
+extern "C" {
 
 const char* llvm_scheme_ff_get_name(foreign_func ff);
-void llvm_scheme_ff_set_name(foreign_func ff,const char* name);
+void llvm_scheme_ff_set_name(foreign_func ff, const char* name);
 
 void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 
@@ -69,11 +67,10 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
 bool regex_split(char* str, char** a, char** b);
 
-static inline uint64_t string_hash(const char* str)
-{
+static inline uint64_t string_hash(const char* str) {
     uint64_t result(0);
     unsigned char c;
-    while((c = *(str++))) {
+    while ((c = *(str++))) {
         result = result * 33 + uint8_t(c);
     }
     return result;
@@ -81,7 +78,6 @@ static inline uint64_t string_hash(const char* str)
 
 EXPORT double imp_randd();
 EXPORT int64_t imp_rand1_i64(int64_t a);
-
 }
 
 ///////////////////////////////////////////////////
@@ -102,15 +98,13 @@ class LLVMContext;
 namespace orc {
 class LLJIT;
 class ThreadSafeContext;
-}
+}  // namespace orc
 
-} // end llvm namespace
+}  // namespace llvm
 
-namespace extemp
-{
+namespace extemp {
 
-namespace EXTLLVM
-{
+namespace EXTLLVM {
 
 uint64_t getFunctionAddress(std::string_view name);
 void registerAdhocAlias(std::string_view fullName);
@@ -125,7 +119,8 @@ llvm::orc::ThreadSafeContext& getThreadSafeContext();
 bool removeSymbol(const std::string& name);
 void removeFromGlobalMap(const std::string& name);
 
-llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, const std::vector<std::string>& symbolNames);
+llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM,
+                             const std::vector<std::string>& symbolNames);
 
 extern int64_t LLVM_COUNT;
 extern bool OPTIMIZE_COMPILES;
@@ -137,9 +132,11 @@ void initLLVM();
 const llvm::Function* getFunction(const char* name);
 const llvm::GlobalVariable* getGlobalVariable(const char* name);
 const llvm::GlobalValue* getGlobalValue(const char* name);
-inline std::vector<llvm::Module*>& getModules() { return Ms; } // not going to protect these!!!
-EXPORT const char* llvm_disassemble(const unsigned char*  Code, int Syntax);
+inline std::vector<llvm::Module*>& getModules() {
+    return Ms;
+}  // not going to protect these!!!
+EXPORT const char* llvm_disassemble(const unsigned char* Code, int Syntax);
 
-}
+}  // namespace EXTLLVM
 
-}
+}  // namespace extemp

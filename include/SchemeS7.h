@@ -10,17 +10,16 @@
 #include "s7.h"
 
 #ifndef _MSC_VER
-# define SCHEME_EXPORT
+#define SCHEME_EXPORT
 #else
-# ifdef _SCHEME_SOURCE
-#  define SCHEME_EXPORT __declspec(dllexport)
-# else
-#  define SCHEME_EXPORT __declspec(dllimport)
-# endif
+#ifdef _SCHEME_SOURCE
+#define SCHEME_EXPORT __declspec(dllexport)
+#else
+#define SCHEME_EXPORT __declspec(dllimport)
+#endif
 #endif
 
-extern "C"
-{
+extern "C" {
 
 // pointer is already typedef'd in UNIV.h as s7_cell* which matches s7_pointer
 typedef pointer (*foreign_func)(struct scheme*, pointer);
@@ -37,7 +36,8 @@ void scheme_load_file(scheme* sc, FILE* fin);
 void scheme_load_string(scheme* sc, const char* cmd, uint64_t start_time, uint64_t end_time);
 void scheme_apply0(scheme* sc, const char* procname);
 pointer scheme_apply1(scheme* sc, const char* procname, pointer);
-void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time, uint64_t call_duration);
+void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
+                 uint64_t call_duration);
 void scheme_call_without_stack_reset(scheme* sc, pointer func, pointer args);
 void scheme_set_external_data(scheme* sc, void* p);
 void scheme_define(scheme* sc, pointer env, pointer symbol, pointer value);
@@ -168,11 +168,14 @@ enum scheme_types {
     T_LAST_SYSTEM_TYPE = 15
 };
 
-} // extern "C"
+}  // extern "C"
 
 class ScmRuntimeError {
-public:
-    ScmRuntimeError(const char* _msg, pointer _p) { msg = _msg; p = _p; }
+  public:
+    ScmRuntimeError(const char* _msg, pointer _p) {
+        msg = _msg;
+        p = _p;
+    }
     const char* msg;
     pointer p;
 };

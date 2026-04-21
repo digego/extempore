@@ -36,7 +36,7 @@
 #ifndef PRIORITY_QUEUE_H
 #define PRIORITY_QUEUE_H
 
-//#define _DEBUG_QUEUE_
+// #define _DEBUG_QUEUE_
 
 #include <queue>
 
@@ -45,33 +45,29 @@
 
 namespace extemp {
 
-template<typename T>
-class PriorityQueue
-{
-private:
-    typedef std::pair<uint64_t, T*>                                                      key_type;
+template <typename T> class PriorityQueue {
+  private:
+    typedef std::pair<uint64_t, T*> key_type;
     typedef std::priority_queue<key_type, std::vector<key_type>, std::greater<key_type>> queue_type;
-private:
-    queue_type  m_queue;
-public:
-    ~PriorityQueue()
-    {
+
+  private:
+    queue_type m_queue;
+
+  public:
+    ~PriorityQueue() {
         clear();
     }
 
-    void add(T* Val)
-    {
+    void add(T* Val) {
         m_queue.push(key_type(Val->getStartTime(), Val));
     }
-    void clear()
-    {
+    void clear() {
         while (!m_queue.empty()) {
             delete m_queue.top().second;
             m_queue.pop();
         }
     }
-    T* pop()
-    {
+    T* pop() {
         if (unlikely(m_queue.empty())) {
             return nullptr;
         }
@@ -79,15 +75,16 @@ public:
         m_queue.pop();
         return element;
     }
-    T* peek()
-    {
+    T* peek() {
         if (unlikely(m_queue.empty())) {
             return nullptr;
         }
         return m_queue.top().second;
     }
-    size_t size() { return m_queue.size(); }
+    size_t size() {
+        return m_queue.size();
+    }
 };
 
-} //End Namespace
+}  // namespace extemp
 #endif

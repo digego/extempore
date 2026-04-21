@@ -75,7 +75,7 @@
 #endif
 #endif
 
-#define BILLION  1000000000L
+#define BILLION 1000000000L
 #define D_BILLION 1000000000.0
 #define D_MILLION 1000000.0
 
@@ -86,24 +86,22 @@ typedef struct s7_cell* pointer;
 extern "C" {
 
 EXPORT bool rmatch(char* regex, const char* str);
-EXPORT int64_t rmatches(char* regex, char* str, char** results,int64_t maxnum); //struct regex_matched_buffer* result);
+EXPORT int64_t rmatches(char* regex, char* str, char** results,
+                        int64_t maxnum);  // struct regex_matched_buffer* result);
 EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b);
 EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result);
-EXPORT char* base64_encode(const unsigned char *data,size_t input_length,size_t *output_length);
-EXPORT unsigned char* base64_decode(const char *data,size_t input_length,size_t *output_length);
-EXPORT char* cname_encode(char *data,size_t input_length,size_t *output_length);
-EXPORT char* cname_decode(char *data,size_t input_length,size_t *output_length);
+EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_t* output_length);
+EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_t* output_length);
+EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length);
+EXPORT char* cname_decode(char* data, size_t input_length, size_t* output_length);
 EXPORT const char* sys_sharedir();
 EXPORT char* sys_slurp_file(const char* fname);
 EXPORT int register_for_window_events();
-
 }
 
-namespace extemp
-{
+namespace extemp {
 
-namespace UNIV
-{
+namespace UNIV {
 
 extern std::string SHARE_DIR;
 EXPORT uint32_t CHANNELS;
@@ -121,14 +119,20 @@ extern std::atomic<uint64_t> DEVICE_TIME;
 extern double AUDIO_CLOCK_BASE;
 extern double AUDIO_CLOCK_NOW;
 extern uint64_t TIME_DIVISION;
-inline uint32_t SECOND() { return SAMPLE_RATE; }
-inline uint32_t MINUTE() { return SAMPLE_RATE * 60; }
-inline uint32_t HOUR() { return MINUTE() * 60; }
+inline uint32_t SECOND() {
+    return SAMPLE_RATE;
+}
+inline uint32_t MINUTE() {
+    return SAMPLE_RATE * 60;
+}
+inline uint32_t HOUR() {
+    return MINUTE() * 60;
+}
 EXPORT uint32_t NUM_FRAMES;
 enum class TerminalMode : uint32_t {
-    Ansi    = 0,
-    Cmd     = 1,
-    Basic   = 2,
+    Ansi = 0,
+    Cmd = 1,
+    Basic = 2,
     NoColor = 3,
 };
 extern TerminalMode EXT_TERM;
@@ -154,11 +158,12 @@ extern std::vector<std::string> ATTRS;
 extern double midi2frq(double pitch);
 extern double frqRatio(double semitones);
 extern void initRand();
-extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false, bool = true);
+extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, bool = false,
+                            bool = true);
 
-}
+}  // namespace UNIV
 
-}
+}  // namespace extemp
 
 #ifdef _WIN32
 #include <chrono>
@@ -168,16 +173,17 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 // clock/time
 #ifdef _WIN32
 
-extern "C" inline double getRealTime()
-{
-    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) / D_BILLION;
+extern "C" inline double getRealTime() {
+    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      std::chrono::high_resolution_clock::now().time_since_epoch())
+                      .count()) /
+           D_BILLION;
 }
 
 #elif __linux__
 #include <time.h>
 
-extern "C" inline double getRealTime()
-{
+extern "C" inline double getRealTime() {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
     return t.tv_sec + t.tv_nsec / D_BILLION;
@@ -187,15 +193,13 @@ extern "C" inline double getRealTime()
 
 #include <CoreAudio/HostTime.h>
 
-extern "C" inline double getRealTime()
-{
+extern "C" inline double getRealTime() {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
 }
 
 #endif
 
-inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background)
-{
+inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
     if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor)) {
         return;
     }
@@ -203,17 +207,18 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     extern int WINDOWS_COLORS[];
     extern int WINDOWS_BGCOLORS[];
     if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Cmd)) {
-      Foreground = (Foreground > 7) ? 7 : Foreground;
-      Background = (Background > 7) ? 0 : Background;
-      HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-      if (Background > 0) {
-        SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground] | WINDOWS_BGCOLORS[Background]);
-      } else {
-        SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
-      }
-      return;
+        Foreground = (Foreground > 7) ? 7 : Foreground;
+        Background = (Background > 7) ? 0 : Background;
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (Background > 0) {
+            SetConsoleTextAttribute(console,
+                                    WINDOWS_COLORS[Foreground] | WINDOWS_BGCOLORS[Background]);
+        } else {
+            SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
+        }
+        return;
     }
-#endif //#else
+#endif  // #else
     // if simple term (that doesn't support defaults)
     // then default to black background and white text
     Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
@@ -230,10 +235,20 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     // #endif
 }
 
-inline void ascii_default() { ascii_text_color(false, 9, 9); }
-inline void ascii_normal() { ascii_text_color(false, 7, 9); }
-inline void ascii_error() { ascii_text_color(true, 1, 9); }
-inline void ascii_warning() { ascii_text_color(true, 3, 9); }
-inline void ascii_info() { ascii_text_color(true, 6, 9); }
+inline void ascii_default() {
+    ascii_text_color(false, 9, 9);
+}
+inline void ascii_normal() {
+    ascii_text_color(false, 7, 9);
+}
+inline void ascii_error() {
+    ascii_text_color(true, 1, 9);
+}
+inline void ascii_warning() {
+    ascii_text_color(true, 3, 9);
+}
+inline void ascii_info() {
+    ascii_text_color(true, 6, 9);
+}
 
 #endif

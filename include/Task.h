@@ -43,45 +43,60 @@
 
 namespace extemp {
 
-class TaskI
-{
-private:
+class TaskI {
+  private:
     uint64_t m_startTime;
     uint64_t m_duration;
-    CM*      m_classMember;
-    int      m_tag;
-    bool     m_isCallback;
-    bool     m_active;
-    bool     m_isAumidi;
-protected:
-    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool Callback = false):
-            m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag), m_isCallback(Callback),
-            m_active(true), m_isAumidi(false) {
-    }
-public:
+    CM* m_classMember;
+    int m_tag;
+    bool m_isCallback;
+    bool m_active;
+    bool m_isAumidi;
+
+  protected:
+    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool Callback = false)
+        : m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag),
+          m_isCallback(Callback), m_active(true), m_isAumidi(false) {}
+
+  public:
     virtual ~TaskI() = default;
 
-    void setStartTime(uint64_t StartTime) { m_startTime = StartTime; }
-    uint64_t getStartTime() const { return m_startTime; }
-    uint64_t getDuration() const { return m_duration; }
-    int getTag() const { return m_tag; }
-    bool isActive() const { return m_active; }
-    bool isCallback() const { return m_isCallback; }
-    void execute() { m_classMember->execute(this); }
-};
-
-template<typename T = int>
-class Task: public TaskI
-{
-private:
-    T m_arg;
-public:
-    Task(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag = 0, bool Callback = false):
-            TaskI(StartTime, Duration, ClassMember, Tag, Callback), m_arg(Arg) {
+    void setStartTime(uint64_t StartTime) {
+        m_startTime = StartTime;
     }
-
-    const T& getArg() const { return m_arg; }
+    uint64_t getStartTime() const {
+        return m_startTime;
+    }
+    uint64_t getDuration() const {
+        return m_duration;
+    }
+    int getTag() const {
+        return m_tag;
+    }
+    bool isActive() const {
+        return m_active;
+    }
+    bool isCallback() const {
+        return m_isCallback;
+    }
+    void execute() {
+        m_classMember->execute(this);
+    }
 };
 
-} //End Namespace
+template <typename T = int> class Task : public TaskI {
+  private:
+    T m_arg;
+
+  public:
+    Task(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg, int Tag = 0,
+         bool Callback = false)
+        : TaskI(StartTime, Duration, ClassMember, Tag, Callback), m_arg(Arg) {}
+
+    const T& getArg() const {
+        return m_arg;
+    }
+};
+
+}  // namespace extemp
 #endif

@@ -36,13 +36,13 @@
 #ifndef _AUDIO_DEVICE_H
 #define _AUDIO_DEVICE_H
 
-#if defined (__APPLE__)
+#if defined(__APPLE__)
 #include <CoreAudio/AudioHardware.h>
 #endif
 
-#if defined (COREAUDIO) //__APPLE__)
+#if defined(COREAUDIO)  //__APPLE__)
 #include <CoreAudio/AudioHardware.h>
-#elif defined (ALSA_AUDIO)
+#elif defined(ALSA_AUDIO)
 #include <alsa/asoundlib.h>
 #else
 #include <portaudio.h>
@@ -64,16 +64,16 @@ typedef SAMPLE (*dsp_f_ptr_sum)(void*, void*, SAMPLE*, uint64_t, uint64_t, const
 
 typedef SAMPLE (*closure_fn_type)(SAMPLE, uint64_t, uint64_t, const SAMPLE*);
 
-namespace extemp
-{
+namespace extemp {
 
-class AudioDevice
-{
-private:
+class AudioDevice {
+  private:
     typedef void* (*closure_getter_fn_type)();
-public:
+
+  public:
     static const unsigned MAX_RT_AUDIO_THREADS = 16;
-private:
+
+  private:
     bool m_started;
     PaStream* stream;
     float* buffer;
@@ -85,16 +85,18 @@ private:
     SAMPLE* inbuf;
     std::array<std::unique_ptr<EXTThread>, MAX_RT_AUDIO_THREADS> m_threads;
     std::atomic<unsigned> m_numThreads;
-    bool       m_zeroLatency;
-    bool       m_toggle;
+    bool m_zeroLatency;
+    bool m_toggle;
 
-    //static AudioDevice* SINGLETON;
+    // static AudioDevice* SINGLETON;
     static AudioDevice SINGLETON;
-private:
+
+  private:
     bool WrapperSet() const {
         return dsp_wrapper || dsp_wrapper_sum;
     }
-public:
+
+  public:
     AudioDevice();
     ~AudioDevice();
 
@@ -106,10 +108,15 @@ public:
     // and by the offline file driver when --audio-outfile is active. Advances
     // UNIV::DEVICE_TIME/TIME, signals the task scheduler, and invokes the
     // registered DSP wrapper (sample-by-sample or MT-sum).
-    void processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer, void* UserData);
+    void processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer,
+                       void* UserData);
 
-    bool getZeroLatency() { return m_zeroLatency; }
-    void setZeroLatency(bool Val) { m_zeroLatency = Val; }
+    bool getZeroLatency() {
+        return m_zeroLatency;
+    }
+    void setZeroLatency(bool Val) {
+        m_zeroLatency = Val;
+    }
     bool getToggle() {
         m_toggle = !m_toggle;
         return m_toggle;
@@ -118,11 +125,15 @@ public:
     void setDSPClosure(void* Function) {
         m_dsp_closure = reinterpret_cast<closure_getter_fn_type>(Function);
     }
-    closure_getter_fn_type getDSPClosure() { return m_dsp_closure; }
+    closure_getter_fn_type getDSPClosure() {
+        return m_dsp_closure;
+    }
     void setDSPMTClosure(void* Function, int Index) {
         m_dsp_mt_closure[Index] = reinterpret_cast<closure_getter_fn_type>(Function);
     }
-    closure_getter_fn_type getDSPMTClosure(int Index) { return m_dsp_mt_closure[Index]; }
+    closure_getter_fn_type getDSPMTClosure(int Index) {
+        return m_dsp_mt_closure[Index];
+    }
 
     void setDSPWrapper(dsp_f_ptr Wrapper) {
         if (WrapperSet()) {
@@ -140,16 +151,28 @@ public:
 
     void initMTAudio(int NumThreads, bool ZeroLatency);
 
-    int getNumThreads() const { return int(m_numThreads.load(std::memory_order_acquire)); }
-    dsp_f_ptr getDSPWrapper() { return dsp_wrapper; }
-    dsp_f_ptr_sum getDSPSUMWrapper() { return dsp_wrapper_sum; }
+    int getNumThreads() const {
+        return int(m_numThreads.load(std::memory_order_acquire));
+    }
+    dsp_f_ptr getDSPWrapper() {
+        return dsp_wrapper;
+    }
+    dsp_f_ptr_sum getDSPSUMWrapper() {
+        return dsp_wrapper_sum;
+    }
 
-    SAMPLE* getDSPMTInBuffer() { return inbuf; }
-    SAMPLE* getDSPMTOutBuffer() { return outbuf; }
+    SAMPLE* getDSPMTInBuffer() {
+        return inbuf;
+    }
+    SAMPLE* getDSPMTOutBuffer() {
+        return outbuf;
+    }
 
-    PaStream* getPaStream() { return stream; }
+    PaStream* getPaStream() {
+        return stream;
+    }
 
-    static AudioDevice* I() { 
+    static AudioDevice* I() {
         // if (!SINGLETON) {
         //     SINGLETON = new AudioDevice();
         // }
@@ -172,5 +195,5 @@ public:
     static double CLOCKOFFSET;
 };
 
-} //End Namespace
+}  // namespace extemp
 #endif

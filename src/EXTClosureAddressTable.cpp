@@ -5,8 +5,7 @@
 
 namespace extemp {
 namespace ClosureAddressTable {
-EXPORT closure_address_table * get_address_table(const char *name, closure_address_table *table)
-{
+EXPORT closure_address_table* get_address_table(const char* name, closure_address_table* table) {
     while (table) {
         if (strcmp(table->name, name))
             return table;
@@ -16,12 +15,10 @@ EXPORT closure_address_table * get_address_table(const char *name, closure_addre
     return 0;
 }
 
-EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table)
-{
-    while(table)
-    {
+EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table) {
+    while (table) {
         // printf("%p name: %s\ntablename: %s\n\n", name, name, table->name);
-        if(table->id == id) {
+        if (table->id == id) {
             // printf("in %s returning offset %d from %s\n", table->name, table->offset, name);
             return table->offset;
         }
@@ -31,8 +28,7 @@ EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table)
     return 0;
 }
 
-EXPORT bool check_address_exists(uint64_t id, closure_address_table* table)
-{
+EXPORT bool check_address_exists(uint64_t id, closure_address_table* table) {
     do {
         if (table->id == id) {
             return true;
@@ -42,16 +38,15 @@ EXPORT bool check_address_exists(uint64_t id, closure_address_table* table)
     return false;
 }
 
-EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const char* type)
-{
-    while(table)
-    {
-        if(table->id == id) {
-            if((strcmp(table->type, type)!=0) && (strcmp("{i8*, i8*, void (i8*, i8*)*}**", type) != 0)) {
-                printf("Runtime Type Error: bad type %s for %s. Should be %s\n", type, table->name, table->type);
+EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const char* type) {
+    while (table) {
+        if (table->id == id) {
+            if ((strcmp(table->type, type) != 0) &&
+                (strcmp("{i8*, i8*, void (i8*, i8*)*}**", type) != 0)) {
+                printf("Runtime Type Error: bad type %s for %s. Should be %s\n", type, table->name,
+                       table->type);
                 return 0;
-            }
-            else {
+            } else {
                 return 1;
             }
         }
@@ -61,23 +56,24 @@ EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const 
     return 0;
 }
 
-static uint64_t string_hash(const char* str)
-{
+static uint64_t string_hash(const char* str) {
     uint64_t result(0);
     unsigned char c;
-    while((c = *(str++))) {
+    while ((c = *(str++))) {
         result = result * 33 + uint8_t(c);
     }
     return result;
 }
 
-EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset, char* type, int alloctype, struct closure_address_table* table)
-{
+EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset,
+                                                char* type, int alloctype,
+                                                struct closure_address_table* table) {
     struct closure_address_table* t = NULL;
     if (alloctype == 1) {
         t = reinterpret_cast<closure_address_table*>(malloc(sizeof(struct closure_address_table)));
     } else {
-        t = (struct closure_address_table*) extemp::EXTZones::llvm_zone_malloc(zone,sizeof(struct closure_address_table));
+        t = (struct closure_address_table*)extemp::EXTZones::llvm_zone_malloc(
+            zone, sizeof(struct closure_address_table));
     }
     t->id = string_hash(name);
     t->name = name;
@@ -86,5 +82,5 @@ EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, u
     t->next = table;
     return t;
 }
-} // namespace ClosureAddressTable
-} // namespace extemp
+}  // namespace ClosureAddressTable
+}  // namespace extemp

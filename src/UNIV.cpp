@@ -57,71 +57,63 @@
 #include <malloc.h>
 #include <Windows.h>
 
-enum Windows_Color_Convert
-{
-    Black   = 0,
-    Red     = FOREGROUND_RED,
-    Green   = FOREGROUND_GREEN,
-    Yellow  = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-    Blue    = FOREGROUND_BLUE  | FOREGROUND_INTENSITY,
-    Magenta = FOREGROUND_RED   | FOREGROUND_BLUE,
-    Cyan    = FOREGROUND_GREEN | FOREGROUND_BLUE,
-    White   = FOREGROUND_RED   | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY
+enum Windows_Color_Convert {
+    Black = 0,
+    Red = FOREGROUND_RED,
+    Green = FOREGROUND_GREEN,
+    Yellow = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    Blue = FOREGROUND_BLUE | FOREGROUND_INTENSITY,
+    Magenta = FOREGROUND_RED | FOREGROUND_BLUE,
+    Cyan = FOREGROUND_GREEN | FOREGROUND_BLUE,
+    White = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY
 };
 
-enum Windows_BGColor_convert
-{
-    BGBlack   = 0,
-    BGRed     = BACKGROUND_RED,
-    BGGreen   = BACKGROUND_GREEN,
-    BGYellow  = BACKGROUND_RED   | BACKGROUND_GREEN | BACKGROUND_INTENSITY,
-    BGBlue    = BACKGROUND_BLUE,
-    BGMagenta = BACKGROUND_RED   | BACKGROUND_BLUE,
-    BGCyan    = BACKGROUND_GREEN | BACKGROUND_BLUE,
-    BGWhite   = BACKGROUND_RED   | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY,
+enum Windows_BGColor_convert {
+    BGBlack = 0,
+    BGRed = BACKGROUND_RED,
+    BGGreen = BACKGROUND_GREEN,
+    BGYellow = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY,
+    BGBlue = BACKGROUND_BLUE,
+    BGMagenta = BACKGROUND_RED | BACKGROUND_BLUE,
+    BGCyan = BACKGROUND_GREEN | BACKGROUND_BLUE,
+    BGWhite = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY,
 };
 
-int WINDOWS_COLORS[] = { Black, Red, Green, Yellow, Blue, Magenta, Cyan, White };
-int WINDOWS_BGCOLORS[] = { BGBlack, BGRed, BGGreen, BGYellow, BGBlue, BGMagenta, BGCyan, BGWhite };
+int WINDOWS_COLORS[] = {Black, Red, Green, Yellow, Blue, Magenta, Cyan, White};
+int WINDOWS_BGCOLORS[] = {BGBlack, BGRed, BGGreen, BGYellow, BGBlue, BGMagenta, BGCyan, BGWhite};
 
 #endif
 
-static char base64_codesafe_encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-                                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-                                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-                                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-                                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
-                                                '4', '5', '6', '7', '8', '9', '_', '-'};
+static char base64_codesafe_encoding_table[] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+    'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '_', '-'};
 
-static char base64_std_encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-                                           'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-                                           'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-                                           'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-                                           'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                                           'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                                           'w', 'x', 'y', 'z', '0', '1', '2', '3',
-                                           '4', '5', '6', '7', '8', '9', '+', '/'};
+static char base64_std_encoding_table[] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+    'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'};
 
-static char *base64_std_decoding_table = nullptr;
-static char *base64_codesafe_decoding_table = nullptr;
+static char* base64_std_decoding_table = nullptr;
+static char* base64_codesafe_decoding_table = nullptr;
 static int _base64_mod_table[] = {0, 2, 1};
 
 void base64_std_build_decoding_table() {
 
-  base64_std_decoding_table = (char*) malloc(256);
+    base64_std_decoding_table = (char*)malloc(256);
 
     for (int i = 0; i < 64; i++)
-        base64_std_decoding_table[(unsigned char) base64_std_encoding_table[i]] = i;
+        base64_std_decoding_table[(unsigned char)base64_std_encoding_table[i]] = i;
 }
 
 void base64_codesafe_build_decoding_table() {
 
-  base64_codesafe_decoding_table = (char*) malloc(256);
+    base64_codesafe_decoding_table = (char*)malloc(256);
 
     for (int i = 0; i < 64; i++)
-        base64_codesafe_decoding_table[(unsigned char) base64_codesafe_encoding_table[i]] = i;
+        base64_codesafe_decoding_table[(unsigned char)base64_codesafe_encoding_table[i]] = i;
 }
 
 void base64_std_cleanup() {
@@ -132,14 +124,14 @@ void base64_codesafe_cleanup() {
     free(base64_codesafe_decoding_table);
 }
 
-EXPORT char* cname_encode(char *data, size_t input_length, size_t *output_length)
-{
+EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length) {
     *output_length = 4 * ((input_length + 2) / 3);
 
-    //char *encoded_data = (char*) malloc(*output_length);
-    char *encoded_data = (char*) malloc(*output_length+1);
+    // char *encoded_data = (char*) malloc(*output_length);
+    char* encoded_data = (char*)malloc(*output_length + 1);
     encoded_data[*output_length] = 0;
-    if (encoded_data == nullptr) return nullptr;
+    if (encoded_data == nullptr)
+        return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -156,23 +148,23 @@ EXPORT char* cname_encode(char *data, size_t input_length, size_t *output_length
     }
 
     for (int i = 0; i < _base64_mod_table[input_length % 3]; i++) {
-      encoded_data[*output_length - 1 - i] = 0; //'$';
+        encoded_data[*output_length - 1 - i] = 0;  //'$';
     }
 
-    //printf("ENCODE: %d:%s\n",*output_length,encoded_data);
+    // printf("ENCODE: %d:%s\n",*output_length,encoded_data);
     return encoded_data;
 }
 
-EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length)
-{
-    if (base64_codesafe_decoding_table == nullptr) base64_codesafe_build_decoding_table();
+EXPORT char* cname_decode(char* data, size_t input_length, size_t* output_length) {
+    if (base64_codesafe_decoding_table == nullptr)
+        base64_codesafe_build_decoding_table();
 
     // Pad with $'s to align to 4 bytes. pad_buf is separate from the outer
     // scope so we always know which buffer to free at the end.
     char* pad_buf = nullptr;
     if (input_length % 4 != 0) {
         int lgthdiff = (4 - (input_length % 4));
-        pad_buf = (char*) malloc(input_length + lgthdiff);
+        pad_buf = (char*)malloc(input_length + lgthdiff);
         memcpy(pad_buf, data, input_length);
         input_length = input_length + lgthdiff;
         for (int i = 0; i < lgthdiff; i++) {
@@ -181,13 +173,23 @@ EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length
         data = pad_buf;
     }
 
-    if (input_length % 4 != 0) { if (pad_buf) free(pad_buf); return nullptr; }
+    if (input_length % 4 != 0) {
+        if (pad_buf)
+            free(pad_buf);
+        return nullptr;
+    }
     *output_length = input_length / 4 * 3;
-    if (data[input_length - 1] == '$') (*output_length)--;
-    if (data[input_length - 2] == '$') (*output_length)--;
+    if (data[input_length - 1] == '$')
+        (*output_length)--;
+    if (data[input_length - 2] == '$')
+        (*output_length)--;
 
-    char *decoded_data = (char*) malloc(*output_length + 1);
-    if (decoded_data == nullptr) { if (pad_buf) free(pad_buf); return nullptr; }
+    char* decoded_data = (char*)malloc(*output_length + 1);
+    if (decoded_data == nullptr) {
+        if (pad_buf)
+            free(pad_buf);
+        return nullptr;
+    }
     decoded_data[*output_length] = 0;
 
     auto fetch = [&](unsigned& i) -> uint32_t {
@@ -201,27 +203,29 @@ EXPORT char* cname_decode(char *data, size_t input_length, size_t *output_length
         uint32_t sextet_c = fetch(i);
         uint32_t sextet_d = fetch(i);
 
-        uint32_t triple = (sextet_a << 3 * 6)
-                        + (sextet_b << 2 * 6)
-                        + (sextet_c << 1 * 6)
-                        + (sextet_d << 0 * 6);
+        uint32_t triple =
+            (sextet_a << 3 * 6) + (sextet_b << 2 * 6) + (sextet_c << 1 * 6) + (sextet_d << 0 * 6);
 
-        if (j < *output_length) decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
-        if (j < *output_length) decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
-        if (j < *output_length) decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
     }
-    if (pad_buf) free(pad_buf);
+    if (pad_buf)
+        free(pad_buf);
     return decoded_data;
 }
 
-EXPORT char* base64_encode(const unsigned char *data, size_t input_length, size_t *output_length)
-{
+EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_t* output_length) {
     *output_length = 4 * ((input_length + 2) / 3);
 
-    char *encoded_data = (char*) malloc(*output_length+1);
-    encoded_data[*output_length]=0;
+    char* encoded_data = (char*)malloc(*output_length + 1);
+    encoded_data[*output_length] = 0;
 
-    if (encoded_data == nullptr) return nullptr;
+    if (encoded_data == nullptr)
+        return nullptr;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -243,19 +247,22 @@ EXPORT char* base64_encode(const unsigned char *data, size_t input_length, size_
     return encoded_data;
 }
 
+EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_t* output_length) {
+    if (base64_std_decoding_table == nullptr)
+        base64_std_build_decoding_table();
 
-EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_t *output_length)
-{
-    if (base64_std_decoding_table == nullptr) base64_std_build_decoding_table();
-
-    if (input_length % 4 != 0) return nullptr;
+    if (input_length % 4 != 0)
+        return nullptr;
 
     *output_length = input_length / 4 * 3;
-    if (data[input_length - 1] == '=') (*output_length)--;
-    if (data[input_length - 2] == '=') (*output_length)--;
+    if (data[input_length - 1] == '=')
+        (*output_length)--;
+    if (data[input_length - 2] == '=')
+        (*output_length)--;
 
-    unsigned char *decoded_data = (unsigned char*) malloc(*output_length);
-    if (decoded_data == nullptr) return nullptr;
+    unsigned char* decoded_data = (unsigned char*)malloc(*output_length);
+    if (decoded_data == nullptr)
+        return nullptr;
 
     auto fetch = [&](unsigned& i) -> uint32_t {
         unsigned char c = static_cast<unsigned char>(data[i++]);
@@ -269,21 +276,21 @@ EXPORT unsigned char* base64_decode(const char *data, size_t input_length, size_
         uint32_t sextet_c = fetch(i);
         uint32_t sextet_d = fetch(i);
 
-        uint32_t triple = (sextet_a << 3 * 6)
-        + (sextet_b << 2 * 6)
-        + (sextet_c << 1 * 6)
-        + (sextet_d << 0 * 6);
+        uint32_t triple =
+            (sextet_a << 3 * 6) + (sextet_b << 2 * 6) + (sextet_c << 1 * 6) + (sextet_d << 0 * 6);
 
-        if (j < *output_length) decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
-        if (j < *output_length) decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
-        if (j < *output_length) decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
+        if (j < *output_length)
+            decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
     }
 
     return decoded_data;
 }
 
-EXPORT bool rmatch(char* regex, const char* str)
-{
+EXPORT bool rmatch(char* regex, const char* str) {
     try {
         std::regex re(regex);
         return std::regex_search(str, re);
@@ -292,8 +299,7 @@ EXPORT bool rmatch(char* regex, const char* str)
     }
 }
 
-EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
-{
+EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum) {
     try {
         std::string s(str);
         std::regex re(regex);
@@ -313,8 +319,7 @@ EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum)
     }
 }
 
-EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
-{
+EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
     // Callers in libs/core/adt.xtm allocate 2048-byte buffers for a and b.
     // Bail rather than write past the buffer. A proper API with explicit
     // capacity is tracked as a follow-up backlog task.
@@ -322,11 +327,13 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
     try {
         std::regex re(regex);
         std::cmatch m;
-        if (!std::regex_search(str, m, re) || m.size() != 1) return false;
+        if (!std::regex_search(str, m, re) || m.size() != 1)
+            return false;
         size_t range = static_cast<size_t>(m.position(0));
         size_t range2 = range + static_cast<size_t>(m.length(0));
         size_t length = strlen(str);
-        if (range >= kAssumedBufSize || (length - range2) >= kAssumedBufSize) return false;
+        if (range >= kAssumedBufSize || (length - range2) >= kAssumedBufSize)
+            return false;
         memcpy(a, str, range);
         a[range] = '\0';
         memcpy(b, str + range2, length - range2);
@@ -337,13 +344,12 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b)
     }
 }
 
-EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result)
-{
+EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
     try {
         std::string s(str);
         std::regex re(regex);
         std::string res = std::regex_replace(s, re, std::string(replacement),
-                                              std::regex_constants::format_first_only);
+                                             std::regex_constants::format_first_only);
         if (res.length() >= 4096) {
             strcpy(result, str);
             return result;
@@ -356,12 +362,11 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result)
     }
 }
 
-EXPORT const char* sys_sharedir(){
-  return extemp::UNIV::SHARE_DIR.c_str();
+EXPORT const char* sys_sharedir() {
+    return extemp::UNIV::SHARE_DIR.c_str();
 }
 
-EXPORT char* sys_slurp_file(const char* fname)
-{
+EXPORT char* sys_slurp_file(const char* fname) {
     // Try the raw path first, then prepend SHARE_DIR.
     if (char* buf = extemp::file_util::slurp_file(fname)) {
         return buf;
@@ -370,23 +375,20 @@ EXPORT char* sys_slurp_file(const char* fname)
     return extemp::file_util::slurp_file(sharedir_filename.c_str());
 }
 
-EXPORT int register_for_window_events()
-{
+EXPORT int register_for_window_events() {
 #ifdef __APPLE__
-  // to give Extempore it's own dock icon, etc
-  return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    // to give Extempore it's own dock icon, etc
+    return (int)[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 #else
-  // implement the required "receive events" functionality for Linux
-  // or Windows if necessary
-  return 1;
+    // implement the required "receive events" functionality for Linux
+    // or Windows if necessary
+    return 1;
 #endif
 }
 
-namespace extemp
-{
+namespace extemp {
 
-namespace UNIV
-{
+namespace UNIV {
 
 std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
 uint32_t NUM_FRAMES = 1024;
@@ -423,14 +425,12 @@ TerminalMode EXT_TERM = TerminalMode::Ansi;
 #endif
 bool EXT_LOADBASE = true;
 
-double midi2frq(double pitch)
-{
-    return 220.0 * pow(2.0,(pitch - 57.0)/12);
+double midi2frq(double pitch) {
+    return 220.0 * pow(2.0, (pitch - 57.0) / 12);
 }
 
-double frqRatio(double semitones)
-{
-    return pow(2.0, (semitones/12.0));
+double frqRatio(double semitones) {
+    return pow(2.0, (semitones / 12.0));
 }
 
 struct dump_stack_frame {
@@ -440,9 +440,8 @@ struct dump_stack_frame {
     pointer code;
 };
 
-
-void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full, bool stringquotes)
-{
+void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
+                     bool stringquotes) {
     if (val == 0) {
         ss << "-ERROR BAD POINTER-";
         return;
@@ -491,7 +490,8 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
         }
         for (long long i = 0; i < num; i++) {
             printSchemeCell(_sc, ss, vector_elem(val, i), full, stringquotes);
-            if (i + 1 < num) ss << " ";
+            if (i + 1 < num)
+                ss << " ";
         }
         ss << ")";
     } else if (is_pair(val)) {
@@ -508,7 +508,8 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
             ss << "(";
             for (int i = 0; i < lgth; i++) {
                 printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
-                if (i < lgth - 1) ss << " ";
+                if (i < lgth - 1)
+                    ss << " ";
             }
             ss << ")";
         }
@@ -539,6 +540,6 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
     }
 }
 
-}
+}  // namespace UNIV
 
-} //End Namespace
+}  // namespace extemp

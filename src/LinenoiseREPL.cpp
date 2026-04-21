@@ -16,8 +16,7 @@
 #include <chrono>
 #include <thread>
 
-static int connect_to_server(const std::string& host, int port)
-{
+static int connect_to_server(const std::string& host, int port) {
     uint32_t resolved = extemp::net_util::resolve_ipv4(host.c_str());
     if (!resolved) {
         fprintf(stderr, "repl: could not resolve host '%s'\n", host.c_str());
@@ -50,8 +49,7 @@ static int connect_to_server(const std::string& host, int port)
     return -1;
 }
 
-static bool read_response(int sock, std::string& out)
-{
+static bool read_response(int sock, std::string& out) {
     out.clear();
     char buf[4096];
     while (true) {
@@ -68,8 +66,7 @@ static bool read_response(int sock, std::string& out)
     }
 }
 
-static bool send_expression(int sock, const std::string& expr)
-{
+static bool send_expression(int sock, const std::string& expr) {
     std::string msg = expr + "\r\n";
     const char* p = msg.c_str();
     size_t remaining = msg.size();
@@ -84,8 +81,7 @@ static bool send_expression(int sock, const std::string& expr)
     return true;
 }
 
-static int paren_depth(const std::string& input)
-{
+static int paren_depth(const std::string& input) {
     int depth = 0;
     bool in_string = false;
     bool in_line_comment = false;
@@ -137,8 +133,7 @@ static int paren_depth(const std::string& input)
     return depth;
 }
 
-static const char* history_path()
-{
+static const char* history_path() {
     static std::string path;
     if (path.empty()) {
         const char* home = getenv("HOME");
@@ -151,8 +146,7 @@ static const char* history_path()
     return path.c_str();
 }
 
-void* linenoise_repl(void* dat)
-{
+void* linenoise_repl(void* dat) {
     auto* args = static_cast<linenoise_repl_args*>(dat);
     std::string host = args->host;
     int port = args->port;

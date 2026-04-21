@@ -42,11 +42,11 @@
 #ifdef _WIN32
 // nothing
 #else
-#include <sys/types.h>     /* standard system types       */
-#include <netinet/in.h>    /* Internet address structures */
-#include <netinet/tcp.h>   /* for define of TCP_NODELAY  Nagles Algorithm*/
-#include <sys/socket.h>    /* socket interface functions  */
-#include <netdb.h>         /* host to IP resolution       */
+#include <sys/types.h>   /* standard system types       */
+#include <netinet/in.h>  /* Internet address structures */
+#include <netinet/tcp.h> /* for define of TCP_NODELAY  Nagles Algorithm*/
+#include <sys/socket.h>  /* socket interface functions  */
+#include <netdb.h>       /* host to IP resolution       */
 #endif
 
 #include <chrono>
@@ -64,23 +64,22 @@ namespace extemp {
 
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 
-SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process): m_title(Title), m_process(Process),
+SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
+    : m_title(Title), m_process(Process),
 #ifdef _WIN32
-        m_serverSocket(nullptr),
+      m_serverSocket(nullptr),
 #else
-        m_serverSocket(-1),
+      m_serverSocket(-1),
 #endif
-        m_connected(false), m_active(true)
-{
+      m_connected(false), m_active(true) {
     ascii_info();
-	printf("INFO:");
-	ascii_default();
-	std::cout << " starting " << m_title << " process..." << std::endl;
+    printf("INFO:");
+    ascii_default();
+    std::cout << " starting " << m_title << " process..." << std::endl;
     sm_repls[m_title] = this;
 }
 
-void SchemeREPL::writeString(std::string&& String)
-{
+void SchemeREPL::writeString(std::string&& String) {
 #ifdef _WIN32
     if (!m_serverSocket) {
         return;
@@ -103,7 +102,8 @@ void SchemeREPL::writeString(std::string&& String)
         int chars_written = write(m_serverSocket, b, lth);
 #endif
         if (chars_written != lth) {
-            printf("There was an error sending this expression to the interpreter. Check for non-ascii characters in your code.\n");
+            printf("There was an error sending this expression to the interpreter. Check for "
+                   "non-ascii characters in your code.\n");
         }
         length -= lth;
         if (length < 1) {
@@ -113,14 +113,13 @@ void SchemeREPL::writeString(std::string&& String)
     }
 }
 
-bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int port)
-{
+bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int port) {
     if (m_connected) {
         return false;
     }
     int rc;
-	// this whole "trying to connect" print-out is just confusing to newcomers
-	// I'd delete it, but SB likes to leave these comments in :)
+    // this whole "trying to connect" print-out is just confusing to newcomers
+    // I'd delete it, but SB likes to leave these comments in :)
 
     // printf("Trying to connect to ");
     // printf("'%s'",hostname.c_str());
@@ -134,12 +133,13 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     std::experimental::net::ip::tcp::resolver resolver(context);
     std::stringstream ss;
     ss << port;
-	std::experimental::net::ip::tcp::resolver::results_type res = resolver.resolve(std::experimental::net::ip::tcp::v4(), hostname, ss.str());
-	auto iter = res.begin();
-	auto end = res.end();
+    std::experimental::net::ip::tcp::resolver::results_type res =
+        resolver.resolve(std::experimental::net::ip::tcp::v4(), hostname, ss.str());
+    auto iter = res.begin();
+    auto end = res.end();
     std::experimental::net::ip::tcp::endpoint ep = *iter;
-    //std::cout << "resolved: " << ep << std::endl << std::flush;
-    if(iter == end) {
+    // std::cout << "resolved: " << ep << std::endl << std::flush;
+    if (iter == end) {
 #else
     struct sockaddr_in sa;
     uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
@@ -159,7 +159,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         m_serverSocket = new std::experimental::net::ip::tcp::socket(*m_serverIoService);
         m_serverSocket->open(std::experimental::net::ip::tcp::v4());
         m_serverSocket->connect(ep);
-    } catch(std::exception& e){
+    } catch (std::exception& e) {
         ascii_error();
         std::cout << "Connection Error:" << e.what() << std::endl;
         ascii_default();
@@ -180,43 +180,44 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         return false;
     }
     int flag = 1;
-    int result = setsockopt(m_serverSocket,            /* socket affected */
-                            IPPROTO_TCP,     /* set option at TCP level */
-                            TCP_NODELAY,     /* name of option */
-                            (char *) &flag,  /* the cast is historical cruft */
-                            sizeof(int));    /* length of option value */
+    int result = setsockopt(m_serverSocket, /* socket affected */
+                            IPPROTO_TCP,    /* set option at TCP level */
+                            TCP_NODELAY,    /* name of option */
+                            (char*)&flag,   /* the cast is historical cruft */
+                            sizeof(int));   /* length of option value */
     if (result < 0) {
         printf("error turning off TCP Nagle ALGO\n");
     }
-    rc = connect(m_serverSocket, (struct sockaddr *)&sa, sizeof(sa));
+    rc = connect(m_serverSocket, (struct sockaddr*)&sa, sizeof(sa));
     if (rc) {
         ascii_error();
-        printf("Connection error:%d\n",errno);
+        printf("Connection error:%d\n", errno);
         ascii_default();
         return false;
     }
 
-    //should now be connected
+    // should now be connected
     rc = read(m_serverSocket, m_buf, sizeof(m_buf));
 #endif
     if (!rc) {
         this->closeREPL();
-		ascii_warning();
-		printf("WARN:");
-		ascii_default();
-		std::cout << " could not connect " << m_title << " process to port " << port << " (port is in use by another process)" << std::endl;
+        ascii_warning();
+        printf("WARN:");
+        ascii_default();
+        std::cout << " could not connect " << m_title << " process to port " << port
+                  << " (port is in use by another process)" << std::endl;
         return false;
     }
-	ascii_info();
+    ascii_info();
     printf("INFO:");
-	ascii_default();
-	std::cout << " client: connected to server " << m_title << " process at " << hostname << ":" << port << std::endl;
+    ascii_default();
+    std::cout << " client: connected to server " << m_title << " process at " << hostname << ":"
+              << port << std::endl;
     m_connected = true;
     return true;
 }
 
-void SchemeREPL::closeREPL()
-{
+void SchemeREPL::closeREPL() {
     m_active = false;
 #ifdef _WIN32
     if (m_serverSocket) {
@@ -236,4 +237,4 @@ void SchemeREPL::closeREPL()
     m_connected = false;
 }
 
-}
+}  // namespace extemp

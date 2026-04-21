@@ -42,44 +42,53 @@
 
 #include "UNIV.h"
 
-namespace extemp
-{
+namespace extemp {
 
-class EXTThread
-{
-public:
+class EXTThread {
+  public:
     typedef void* (*function_type)(void*);
-private:
+
+  private:
     function_type m_function;
-    void*         m_arg;
-    std::string   m_name;
-    bool          m_initialised;
-    bool          m_detached;
-    bool          m_joined;
-    bool          m_subsume; // subsume the current thread
-    std::thread   m_thread;
+    void* m_arg;
+    std::string m_name;
+    bool m_initialised;
+    bool m_detached;
+    bool m_joined;
+    bool m_subsume;  // subsume the current thread
+    std::thread m_thread;
 
     static thread_local EXTThread* sm_current;
-public:
-    EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string()): m_function(EntryPoint),
-      m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false), m_joined(false), m_subsume(false) {
-    }
+
+  public:
+    EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string())
+        : m_function(EntryPoint), m_arg(Arg), m_name(Name), m_initialised(false), m_detached(false),
+          m_joined(false), m_subsume(false) {}
     ~EXTThread();
 
-    int start(function_type EntryPoint = nullptr, void* Arg = nullptr); // overrides - ugly, from OSC
+    int start(function_type EntryPoint = nullptr,
+              void* Arg = nullptr);  // overrides - ugly, from OSC
     int kill();
     int detach();
     int join();
-    void setSubsume() { m_subsume = true; }
-    bool isRunning() const { return m_initialised; }
-    bool isCurrentThread() { return sm_current == this; }
+    void setSubsume() {
+        m_subsume = true;
+    }
+    bool isRunning() const {
+        return m_initialised;
+    }
+    bool isCurrentThread() {
+        return sm_current == this;
+    }
     int setPriority(int Priority, bool Realtime);
-    int getPriority(); //doesn't say if it's realtime or not
-    std::thread& getThread() { return m_thread; }
+    int getPriority();  // doesn't say if it's realtime or not
+    std::thread& getThread() {
+        return m_thread;
+    }
 
     static void* Trampoline(void* Arg) {
         auto thread(reinterpret_cast<EXTThread*>(Arg));
-#ifdef __APPLE__ // apple requires pthread_setname_np in current thread
+#ifdef __APPLE__  // apple requires pthread_setname_np in current thread
         if (!thread->m_name.empty()) {
             pthread_setname_np(thread->m_name.c_str());
         }
@@ -92,6 +101,6 @@ public:
     }
 };
 
-} //End Namespace
+}  // namespace extemp
 
 #endif

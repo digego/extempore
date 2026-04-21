@@ -54,36 +54,41 @@ namespace extemp {
 class SchemeProcess;
 
 class SchemeREPL {
-private:
+  private:
     typedef std::unordered_map<std::string, SchemeREPL*> repls_type;
 
     static const int BUFLENGTH = 1024;
-private:
-    std::string                   m_title;
-    SchemeProcess*                m_process;
+
+  private:
+    std::string m_title;
+    SchemeProcess* m_process;
 #ifdef _WIN32
     std::experimental::net::ip::tcp::socket* m_serverSocket;
-    std::experimental::net::io_context*      m_serverIoService;
+    std::experimental::net::io_context* m_serverIoService;
 #else
-    int                           m_serverSocket;
+    int m_serverSocket;
 #endif
-    char                          m_buf[BUFLENGTH];
-    bool                          m_connected;
-    bool                          m_active;
-    std::recursive_mutex          m_writeLock;
+    char m_buf[BUFLENGTH];
+    bool m_connected;
+    bool m_active;
+    std::recursive_mutex m_writeLock;
 
     static repls_type sm_repls;
-public:
+
+  public:
     SchemeREPL(const std::string& Title, SchemeProcess* Process);
 
-    const std::string& getTitle() { return m_title; }
-    void writeString(std::string&&); // ick (modifying)
+    const std::string& getTitle() {
+        return m_title;
+    }
+    void writeString(std::string&&);  // ick (modifying)
     bool connectToProcessAtHostname(const std::string&, int);
     void closeREPL();
-    SchemeProcess* getProcess() { return m_process; }
+    SchemeProcess* getProcess() {
+        return m_process;
+    }
 
-    static SchemeREPL* I(const std::string& name)
-    {
+    static SchemeREPL* I(const std::string& name) {
         auto iter(sm_repls.find(name));
         if (unlikely(iter == sm_repls.end())) {
             return nullptr;
@@ -92,4 +97,4 @@ public:
     }
 };
 
-}
+}  // namespace extemp

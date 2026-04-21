@@ -52,13 +52,11 @@
 
 // #define _EXTTHREAD_DEBUG_
 
-namespace extemp
-{
+namespace extemp {
 
 thread_local EXTThread* EXTThread::sm_current = nullptr;
 
-EXTThread::~EXTThread()
-{
+EXTThread::~EXTThread() {
 #ifdef _EXTTHREAD_DEBUG_
     if (m_initialised && !m_detached && !m_joined) {
         printf("Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
@@ -66,8 +64,7 @@ EXTThread::~EXTThread()
 #endif
 }
 
-int EXTThread::start(function_type EntryPoint, void* Arg)
-{
+int EXTThread::start(function_type EntryPoint, void* Arg) {
     if (EntryPoint) {
         m_function = EntryPoint;
     }
@@ -76,7 +73,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
     }
     int result = 0;
     if (!m_initialised && !m_subsume) {
-        std::function<void*()> fn = [=]()->void* { return Trampoline(this); };
+        std::function<void*()> fn = [=]() -> void* { return Trampoline(this); };
         m_thread = std::thread(fn);
 #ifdef __linux__
         if (!m_name.empty()) {
@@ -85,15 +82,15 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
 #endif
         m_initialised = true;
     }
-    if(m_subsume && !m_initialised) {
-      m_initialised = true;
+    if (m_subsume && !m_initialised) {
+        m_initialised = true;
 #ifdef __linux__
-      if (!m_name.empty()) {
-         pthread_setname_np(pthread_self(), m_name.c_str());
-      }
+        if (!m_name.empty()) {
+            pthread_setname_np(pthread_self(), m_name.c_str());
+        }
 #endif
-      // Trampoline here never returns!
-      Trampoline(this);
+        // Trampoline here never returns!
+        Trampoline(this);
     }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
@@ -103,8 +100,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg)
     return result;
 }
 
-int EXTThread::kill()
-{
+int EXTThread::kill() {
 #ifndef _WIN32
     return pthread_cancel(m_thread.native_handle());
 #else
@@ -112,9 +108,8 @@ int EXTThread::kill()
 #endif
 }
 
-int EXTThread::detach()
-{
-    int result = 22; //EINVAL;
+int EXTThread::detach() {
+    int result = 22;  // EINVAL;
     if (m_initialised) {
         m_thread.detach();
         result = 0;
@@ -128,13 +123,12 @@ int EXTThread::detach()
     return result;
 }
 
-int EXTThread::join()
-{
-    int result = 22; //EINVAL;
+int EXTThread::join() {
+    int result = 22;  // EINVAL;
     if (m_initialised) {
         m_thread.join();
         result = 0;
-        m_joined = ! result;
+        m_joined = !result;
     }
 #ifdef _EXTTHREAD_DEBUG_
     if (result) {
@@ -144,39 +138,36 @@ int EXTThread::join()
     return result;
 }
 
-int EXTThread::setPriority(int Priority, bool Realtime)
-{
+int EXTThread::setPriority(int Priority, bool Realtime) {
     auto thread = m_thread.native_handle();
 #ifdef __linux__
     sched_param param;
     int policy;
     pthread_getschedparam(thread, &policy, &param);
     param.sched_priority = Priority;
-    if (Realtime) { // for realtime threads, use SCHED_RR policy
-      policy = SCHED_RR;
+    if (Realtime) {  // for realtime threads, use SCHED_RR policy
+        policy = SCHED_RR;
     }
     int result = pthread_setschedparam(thread, policy, &param);
     if (result) {
-      printf("Error: failed to set thread priority: %s\n", strerror(result));
-      return 0;
+        printf("Error: failed to set thread priority: %s\n", strerror(result));
+        return 0;
     }
     return 1;
 #elif __APPLE__
     struct thread_time_constraint_policy ttcpolicy;
     int result;
     // OSX magic numbers
-    ttcpolicy.period = uint32_t(UNIV::SAMPLE_RATE / 100); // HZ/160
-    ttcpolicy.computation = uint32_t(UNIV::SAMPLE_RATE / 143); // HZ/3300;
-    ttcpolicy.constraint = uint32_t(UNIV::SAMPLE_RATE / 143); // HZ/2200;
-    ttcpolicy.preemptible = 1; // 1
-    result = thread_policy_set(pthread_mach_thread_np(thread),
-                               THREAD_TIME_CONSTRAINT_POLICY,
-                               (thread_policy_t)&ttcpolicy,
-                               THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+    ttcpolicy.period = uint32_t(UNIV::SAMPLE_RATE / 100);       // HZ/160
+    ttcpolicy.computation = uint32_t(UNIV::SAMPLE_RATE / 143);  // HZ/3300;
+    ttcpolicy.constraint = uint32_t(UNIV::SAMPLE_RATE / 143);   // HZ/2200;
+    ttcpolicy.preemptible = 1;                                  // 1
+    result = thread_policy_set(pthread_mach_thread_np(thread), THREAD_TIME_CONSTRAINT_POLICY,
+                               (thread_policy_t)&ttcpolicy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
     if (result != KERN_SUCCESS) {
         printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
-      }
+    }
     return 1;
 #else
     printf("Error: cannot set thread priority on Windows\n");
@@ -184,8 +175,7 @@ int EXTThread::setPriority(int Priority, bool Realtime)
 #endif
 }
 
-int EXTThread::getPriority()
-{
+int EXTThread::getPriority() {
 #ifdef __linux__
     int policy;
     sched_param param;
@@ -196,4 +186,4 @@ int EXTThread::getPriority()
     return 0;
 }
 
-}
+}  // namespace extemp

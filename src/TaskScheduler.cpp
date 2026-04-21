@@ -43,18 +43,16 @@ namespace extemp {
 
 TaskScheduler TaskScheduler::sm_instance;
 
-TaskScheduler::TaskScheduler(): m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler")
-{
-}
+TaskScheduler::TaskScheduler()
+    : m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler") {}
 
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
 static double LAST_REALTIME_STAMP = 0.0;
 
-void TaskScheduler::timeSlice()
-{
+void TaskScheduler::timeSlice() {
     uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
     long nanosecs = long(double(frames) / UNIV::SAMPLE_RATE * D_BILLION);
-    if (unlikely(UNIV::AUDIO_NONE)) { // i.e. if no audio device
+    if (unlikely(UNIV::AUDIO_NONE)) {  // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
         UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
     }
@@ -69,7 +67,7 @@ void TaskScheduler::timeSlice()
                 if (likely(!task->getTag())) {
                     task->execute();
                 }
-            } catch(std::exception& e) {
+            } catch (std::exception& e) {
                 std::cout << "Error executing scheduled task! " << e.what() << std::endl;
             }
             delete task;
@@ -88,12 +86,14 @@ void TaskScheduler::timeSlice()
         }
         UNIV::TIME += frames;
         double realtimeStamp = getRealTime();
-        double timediff = realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLE_RATE);
+        double timediff =
+            realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLE_RATE);
         LAST_REALTIME_STAMP = realtimeStamp;
         long delay_ns = nanosecs - long(timediff / 2 * BILLION);
         if (likely(!UNIV::AUDIO_NONE)) {
-            delay_ns += long((double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
-                    UNIV::SAMPLE_RATE / 2 * BILLION);
+            delay_ns +=
+                long((double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
+                     UNIV::SAMPLE_RATE / 2 * BILLION);
         }
         if (delay_ns > 0) {
             std::this_thread::sleep_for(std::chrono::nanoseconds(delay_ns));
@@ -101,8 +101,7 @@ void TaskScheduler::timeSlice()
     } while (true);
 }
 
-void* TaskScheduler::queueThreadImpl()
-{
+void* TaskScheduler::queueThreadImpl() {
     if (likely(UNIV::TIME_DIVISION == 1)) {
         while (true) {
             timeSlice();
@@ -112,8 +111,8 @@ void* TaskScheduler::queueThreadImpl()
         }
         return this;
     }
-    timeSlice(); // will never return
+    timeSlice();  // will never return
     return nullptr;
 }
 
-} // End Namespace
+}  // namespace extemp

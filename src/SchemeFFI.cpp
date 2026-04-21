@@ -117,7 +117,7 @@ CMRC_DECLARE(xtm);
 #endif
 
 #ifdef _WIN32
-//#include <unistd.h>
+// #include <unistd.h>
 #include <malloc.h>
 #elif __APPLE__
 #include <Cocoa/Cocoa.h>
@@ -125,32 +125,33 @@ CMRC_DECLARE(xtm);
 #include <AppKit/AppKit.h>
 #endif
 
-#define PRINT_ERROR(format, ...)            \
-    ascii_error();                   \
-    printf(format, ##__VA_ARGS__);           \
+#define PRINT_ERROR(format, ...)                                                                   \
+    ascii_error();                                                                                 \
+    printf(format, ##__VA_ARGS__);                                                                 \
     ascii_normal()
 
 #include <queue>
-//#include <unistd.h>
+// #include <unistd.h>
 #include <EXTLLVM.h>
-namespace extemp { namespace SchemeFFI {
+namespace extemp {
+namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
-}}
+}
+}  // namespace extemp
 
 namespace extemp {
 
 namespace SchemeFFI {
 
-static std::string formatLLVMType(llvm::Type* Type)
-{
+static std::string formatLLVMType(llvm::Type* Type) {
     if (auto* ST = llvm::dyn_cast<llvm::StructType>(Type)) {
         if (ST->hasName()) {
             llvm::StringRef name = ST->getName();
             auto dotPos = name.rfind('.');
             if (dotPos != llvm::StringRef::npos) {
                 llvm::StringRef suffix = name.substr(dotPos + 1);
-                bool isNumericSuffix = !suffix.empty() &&
-                    std::all_of(suffix.begin(), suffix.end(), ::isdigit);
+                bool isNumericSuffix =
+                    !suffix.empty() && std::all_of(suffix.begin(), suffix.end(), ::isdigit);
                 if (isNumericSuffix) {
                     return "%" + name.substr(0, dotPos).str();
                 }
@@ -192,36 +193,24 @@ static std::unordered_map<std::string, std::string> sGlobalDecls;
 // already exist in every cloned template module and would cause redefinitions.
 static std::unordered_set<std::string> sTemplateGlobalNames;
 static std::mutex sTemplateMutex;
-void initSchemeFFI(scheme* sc)
-{
+void initSchemeFFI(scheme* sc) {
     static struct {
         const char* name;
-        uint32_t    value;
+        uint32_t value;
     } integerTable[] = {
-        { "*au:block-size*", UNIV::NUM_FRAMES },
-        { "*au:samplerate*", UNIV::SAMPLE_RATE },
-        { "*au:channels*", UNIV::CHANNELS },
-        { "*au:in-channels*", UNIV::IN_CHANNELS },
+        {"*au:block-size*", UNIV::NUM_FRAMES},
+        {"*au:samplerate*", UNIV::SAMPLE_RATE},
+        {"*au:channels*", UNIV::CHANNELS},
+        {"*au:in-channels*", UNIV::IN_CHANNELS},
     };
-    for (auto& elem: integerTable) {
+    for (auto& elem : integerTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_integer(sc, elem.value));
     }
     static struct {
-        const char*  name;
+        const char* name;
         foreign_func func;
-    } funcTable[] = {
-        UTILITY_DEFS,
-        IPC_DEFS,
-        ASSOC_DEFS,
-        NUMBER_DEFS,
-        SYS_DEFS,
-        SYS_DSP_DEFS,
-        SYS_ZONE_DEFS,
-        MISC_DEFS,
-        REGEX_DEFS,
-        LLVM_DEFS,
-        CLOCK_DEFS
-    };
+    } funcTable[] = {UTILITY_DEFS,  IPC_DEFS,  ASSOC_DEFS, NUMBER_DEFS, SYS_DEFS,  SYS_DSP_DEFS,
+                     SYS_ZONE_DEFS, MISC_DEFS, REGEX_DEFS, LLVM_DEFS,   CLOCK_DEFS};
     for (auto& elem : funcTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_foreign_func(sc, elem.func));
     }
@@ -257,7 +246,8 @@ static IRNames extractIRNames(const std::string& irString) {
     size_t pos = 0;
     while (pos < irString.size()) {
         size_t lineEnd = irString.find('\n', pos);
-        if (lineEnd == std::string::npos) lineEnd = irString.size();
+        if (lineEnd == std::string::npos)
+            lineEnd = irString.size();
         size_t lineLen = lineEnd - pos;
 
         // Use a string_view bounded to this line to avoid O(n^2) scans.
@@ -309,17 +299,20 @@ static std::string buildPreamble(const std::string& irString = "") {
     }
 
     for (const auto& [name, val] : sTypeDefs) {
-        if (existing.types.count(name)) continue;
+        if (existing.types.count(name))
+            continue;
         preamble += val;
     }
 
     for (const auto& [name, val] : sFuncDecls) {
-        if (existing.funcs.count(name)) continue;
+        if (existing.funcs.count(name))
+            continue;
         preamble += val;
     }
 
     for (const auto& [name, val] : sGlobalDecls) {
-        if (existing.globals.count(name)) continue;
+        if (existing.globals.count(name))
+            continue;
         preamble += val;
     }
 
@@ -327,9 +320,9 @@ static std::string buildPreamble(const std::string& irString = "") {
 }
 
 // Extract external global declarations from IR string and add to sGlobalDecls.
-// This handles globals that are declared but not defined (e.g., @SAMPLE_RATE = external global i32).
-// These get dropped by LLVM if they're not used in the same module.
-// NOTE: lockless version - caller must hold sTemplateMutex.
+// This handles globals that are declared but not defined (e.g., @SAMPLE_RATE = external global
+// i32). These get dropped by LLVM if they're not used in the same module. NOTE: lockless version -
+// caller must hold sTemplateMutex.
 static void extractExternalGlobalsLockless(const std::string& irString) {
     std::istringstream stream(irString);
     std::string line;
@@ -362,11 +355,12 @@ static std::string extractTypeDef(const std::string& line) {
         start++;
     }
     // Skip trailing whitespace and CR
-    while (end > start && (line[end-1] == ' ' || line[end-1] == '\t' ||
-                           line[end-1] == '\r' || line[end-1] == '\n')) {
+    while (end > start && (line[end - 1] == ' ' || line[end - 1] == '\t' || line[end - 1] == '\r' ||
+                           line[end - 1] == '\n')) {
         end--;
     }
-    if (start >= end) return "";
+    if (start >= end)
+        return "";
 
     std::string trimmed = line.substr(start, end - start);
     // Check for type definition pattern: %name = type ...
@@ -407,7 +401,7 @@ static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        
+
         std::string typeDef = extractTypeDef(line);
         if (!typeDef.empty()) {
             size_t eqPos = typeDef.find(" = type ");
@@ -417,7 +411,6 @@ static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
             }
             continue;
         }
-
     }
 
     // Parse template module to create the binary bitcode for fast cloning.
@@ -448,8 +441,8 @@ static std::unique_ptr<llvm::Module> cloneTemplateModule(llvm::LLVMContext& ctx)
         return nullptr;
     }
 
-    auto modOrErr = llvm::parseBitcodeFile(
-        llvm::MemoryBufferRef(sTemplateBitcode, "<template>"), ctx);
+    auto modOrErr =
+        llvm::parseBitcodeFile(llvm::MemoryBufferRef(sTemplateBitcode, "<template>"), ctx);
     if (modOrErr) {
         return std::move(modOrErr.get());
     }
@@ -457,8 +450,7 @@ static std::unique_ptr<llvm::Module> cloneTemplateModule(llvm::LLVMContext& ctx)
     return nullptr;
 }
 
-static llvm::Module* jitCompile(const std::string& irString)
-{
+static llvm::Module* jitCompile(const std::string& irString) {
     using namespace llvm;
 
     char modname[256];
@@ -485,7 +477,7 @@ static llvm::Module* jitCompile(const std::string& irString)
             std::cerr << "Failed to clone template module" << std::endl;
             return;
         }
-        
+
         // Set linkage to LinkOnceODR so the linker can deduplicate across modules.
         for (auto& func : baseModule->functions()) {
             if (!func.isDeclaration() && !func.isIntrinsic()) {
@@ -498,7 +490,7 @@ static llvm::Module* jitCompile(const std::string& irString)
             }
         }
         baseModule->setModuleIdentifier(modname);
-        
+
         // Set target triple and data layout.
         if (!extemp::UNIV::ARCH.empty()) {
             baseModule->setTargetTriple(Triple(extemp::UNIV::ARCH));
@@ -526,11 +518,14 @@ static llvm::Module* jitCompile(const std::string& irString)
         {
             std::lock_guard<std::mutex> lock(sTemplateMutex);
             for (const auto& func : baseModule->functions()) {
-                if (!func.isDeclaration() || func.isIntrinsic()) continue;
+                if (!func.isDeclaration() || func.isIntrinsic())
+                    continue;
 
                 std::string name = func.getName().str();
-                if (sTemplateGlobalNames.count(name)) continue;
-                if (sFuncDecls.count(name)) continue;
+                if (sTemplateGlobalNames.count(name))
+                    continue;
+                if (sFuncDecls.count(name))
+                    continue;
 
                 // For bind-lib declarations, register as external library function
                 // so the JIT uses C calling convention.
@@ -551,12 +546,14 @@ static llvm::Module* jitCompile(const std::string& irString)
                 ss << " @" << name << "(";
                 bool first = true;
                 for (unsigned i = 0; i < funcType->getNumParams(); ++i) {
-                    if (!first) ss << ", ";
+                    if (!first)
+                        ss << ", ";
                     first = false;
                     funcType->getParamType(i)->print(ss, false, true);
                 }
                 if (funcType->isVarArg()) {
-                    if (!first) ss << ", ";
+                    if (!first)
+                        ss << ", ";
                     ss << "...";
                 }
                 ss << ")";
@@ -571,14 +568,17 @@ static llvm::Module* jitCompile(const std::string& irString)
         // Step 5: Add function/global declarations for previously compiled symbols.
         // This allows the current module to reference symbols from earlier compiles.
         for (auto& func : baseModule->functions()) {
-            if (!func.isDeclaration()) continue;
-            if (func.isIntrinsic()) continue;
+            if (!func.isDeclaration())
+                continue;
+            if (func.isIntrinsic())
+                continue;
 
             std::string name = func.getName().str();
 
             // Look up in global map of compiled functions.
             auto gv = EXTLLVM::getGlobalValue(name.c_str());
-            if (!gv) continue;
+            if (!gv)
+                continue;
 
             if (auto srcFunc = dyn_cast<Function>(gv)) {
                 auto funcType = srcFunc->getFunctionType();
@@ -596,12 +596,14 @@ static llvm::Module* jitCompile(const std::string& irString)
         }
 
         for (const auto& global : baseModule->globals()) {
-            if (!global.isDeclaration()) continue;
+            if (!global.isDeclaration())
+                continue;
 
             std::string name = global.getName().str();
 
             auto gv = EXTLLVM::getGlobalValue(name.c_str());
-            if (!gv) continue;
+            if (!gv)
+                continue;
 
             if (auto srcGlobal = dyn_cast<GlobalVariable>(gv)) {
                 baseModule->getOrInsertGlobal(name, srcGlobal->getValueType());
@@ -624,11 +626,19 @@ static llvm::Module* jitCompile(const std::string& irString)
 
             OptimizationLevel optLevel;
             switch (EXTLLVM::OPTIMIZATION_LEVEL) {
-                case 0: optLevel = OptimizationLevel::O0; break;
-                case 1: optLevel = OptimizationLevel::O1; break;
-                case 3: optLevel = OptimizationLevel::O3; break;
-                case 2:
-                default: optLevel = OptimizationLevel::O2; break;
+            case 0:
+                optLevel = OptimizationLevel::O0;
+                break;
+            case 1:
+                optLevel = OptimizationLevel::O1;
+                break;
+            case 3:
+                optLevel = OptimizationLevel::O3;
+                break;
+            case 2:
+            default:
+                optLevel = OptimizationLevel::O2;
+                break;
             }
             ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(optLevel);
             MPM.run(*baseModule, MAM);
@@ -640,7 +650,8 @@ static llvm::Module* jitCompile(const std::string& irString)
             raw_string_ostream verifyStream(verifyErrors);
             bool invalid = verifyModule(*baseModule, &verifyStream);
             if (invalid) {
-                std::cerr << "Invalid LLVM IR for " << modname << ":\n" << verifyErrors << std::endl;
+                std::cerr << "Invalid LLVM IR for " << modname << ":\n"
+                          << verifyErrors << std::endl;
                 return;
             }
         }
@@ -663,13 +674,12 @@ static llvm::Module* jitCompile(const std::string& irString)
         auto metadataModule = CloneModule(*baseModule);
 
         // Step 11: Add to ORC JIT.
-        auto TSM = orc::ThreadSafeModule(std::move(baseModule),
-                                          EXTLLVM::getThreadSafeContext());
+        auto TSM = orc::ThreadSafeModule(std::move(baseModule), EXTLLVM::getThreadSafeContext());
         auto err = EXTLLVM::addTrackedModule(std::move(TSM), symbolNames);
 
         if (err) {
-            std::cerr << "Failed to add module " << modname << " to JIT: "
-                      << toString(std::move(err)) << std::endl;
+            std::cerr << "Failed to add module " << modname
+                      << " to JIT: " << toString(std::move(err)) << std::endl;
             modulePtr = nullptr;
         } else {
             modulePtr = metadataModule.get();
@@ -684,7 +694,7 @@ static llvm::Module* jitCompile(const std::string& irString)
             // We also need to add any new type definitions from the module.
             {
                 std::lock_guard<std::mutex> lock(sTemplateMutex);
-                
+
                 // First, add any identified struct types from the module.
                 for (auto* structType : metadataModule->getIdentifiedStructTypes()) {
                     if (structType->hasName() && !structType->isOpaque()) {
@@ -703,7 +713,8 @@ static llvm::Module* jitCompile(const std::string& irString)
                             ts << "{ ";
                         }
                         for (unsigned i = 0; i < structType->getNumElements(); ++i) {
-                            if (i > 0) ts << ", ";
+                            if (i > 0)
+                                ts << ", ";
                             structType->getElementType(i)->print(ts, false, true);
                         }
                         if (structType->isPacked()) {
@@ -715,10 +726,11 @@ static llvm::Module* jitCompile(const std::string& irString)
                         sTypeDefs.emplace(name, ts.str());
                     }
                 }
-                
+
                 // Now add function declarations for newly defined functions.
                 for (const auto& func : metadataModule->functions()) {
-                    if (func.isDeclaration()) continue;
+                    if (func.isDeclaration())
+                        continue;
 
                     std::string name = func.getName().str();
                     if (sFuncDecls.count(name)) {
@@ -741,12 +753,14 @@ static llvm::Module* jitCompile(const std::string& irString)
 
                     bool first = true;
                     for (unsigned i = 0; i < funcType->getNumParams(); ++i) {
-                        if (!first) ss << ", ";
+                        if (!first)
+                            ss << ", ";
                         first = false;
                         funcType->getParamType(i)->print(ss, false, true);
                     }
                     if (funcType->isVarArg()) {
-                        if (!first) ss << ", ";
+                        if (!first)
+                            ss << ", ";
                         ss << "...";
                     }
                     ss << ")";
@@ -758,7 +772,7 @@ static llvm::Module* jitCompile(const std::string& irString)
 
                     sFuncDecls.emplace(name, ss.str());
                 }
-                
+
                 for (const auto& glob : metadataModule->globals()) {
                     std::string name = glob.getName().str();
                     if (sTemplateGlobalNames.count(name)) {
@@ -782,12 +796,12 @@ static llvm::Module* jitCompile(const std::string& irString)
 
                     sGlobalDecls.emplace(name, ss.str());
                 }
-                
+
                 // Also extract external global declarations from the original IR string.
                 // LLVM drops unused external declarations during parsing, so we need to
                 // capture them from the source IR to make them available to subsequent modules.
                 extractExternalGlobalsLockless(irString);
-                
+
                 // Extract type definitions from the user IR string.
                 // LLVM's module may not preserve forward declarations or opaque types,
                 // so we need to capture them from the source IR as well.
@@ -807,7 +821,7 @@ static llvm::Module* jitCompile(const std::string& irString)
                     }
                 }
             }
-            
+
             metadataModule.release();
         }
     });
@@ -815,6 +829,6 @@ static llvm::Module* jitCompile(const std::string& irString)
     return modulePtr;
 }
 
-}
+}  // namespace SchemeFFI
 
-} // end namespace
+}  // namespace extemp

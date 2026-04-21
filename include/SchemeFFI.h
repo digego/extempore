@@ -47,6 +47,6 @@ void initSchemeFFI(scheme* Scheme);
 
 }
 
-} // end namespace
+}  // namespace extemp
 
 #endif

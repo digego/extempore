@@ -68,18 +68,16 @@
 void (*XTMMainCallback)();
 
 extern "C" {
-  void xtm_set_main_callback( void(*f)() )
-  {
+void xtm_set_main_callback(void (*f)()) {
     XTMMainCallback = f;
     return;
-  }
+}
 }
 
-int pass_primary_port = 7099; // lazy :(
+int pass_primary_port = 7099;  // lazy :(
 
-void* extempore_primary_repl_delayed_connect(void* dat)
-{
-    extemp::SchemeProcess* primary = (extemp::SchemeProcess*) dat;
+void* extempore_primary_repl_delayed_connect(void* dat) {
+    extemp::SchemeProcess* primary = (extemp::SchemeProcess*)dat;
     std::string host("localhost");
     std::string primary_name("primary");
     int primary_port = pass_primary_port;
@@ -92,90 +90,105 @@ void* extempore_primary_repl_delayed_connect(void* dat)
 // WARNING EVIL WINDOWS TERMINATION CODE!
 #ifdef _WIN32
 
-BOOL CtrlHandler(DWORD fdwCtrlType)
-{
-    switch(fdwCtrlType)
-  {
+BOOL CtrlHandler(DWORD fdwCtrlType) {
+    switch (fdwCtrlType) {
     case CTRL_C_EVENT:
-      //printf( "Ctrl-C event\n\n" );
-      TerminateProcess(GetCurrentProcess(),1);
-      return( TRUE );
+        // printf( "Ctrl-C event\n\n" );
+        TerminateProcess(GetCurrentProcess(), 1);
+        return (TRUE);
     default:
-      return FALSE;
-  }
+        return FALSE;
+    }
 }
 
-#else // !_WIN32
+#else  // !_WIN32
 
-void sig_handler(int Signo)
-{
-  // Async-signal-safe: write(2) and _Exit are on the POSIX safe list,
-  // printf / exit are not. We drop the helpful "(SIGINT), exiting..."
-  // prefix in favour of correctness.
-  if (Signo == SIGINT) {
-      static const char msg[] = "\nextempore: SIGINT, exiting\n";
-      ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
-      (void)r;
-      _Exit(128 + SIGINT);
-  }
-  else if (Signo == SIGTERM) {
-      static const char msg[] = "\nextempore: SIGTERM, exiting\n";
-      ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
-      (void)r;
-      _Exit(128 + SIGTERM);
-  }
+void sig_handler(int Signo) {
+    // Async-signal-safe: write(2) and _Exit are on the POSIX safe list,
+    // printf / exit are not. We drop the helpful "(SIGINT), exiting..."
+    // prefix in favour of correctness.
+    if (Signo == SIGINT) {
+        static const char msg[] = "\nextempore: SIGINT, exiting\n";
+        ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        (void)r;
+        _Exit(128 + SIGINT);
+    } else if (Signo == SIGTERM) {
+        static const char msg[] = "\nextempore: SIGTERM, exiting\n";
+        ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        (void)r;
+        _Exit(128 + SIGTERM);
+    }
 }
 
 #endif
 
-enum { OPT_COMPILE_STR, OPT_SHAREDIR, OPT_NOBASE, OPT_SAMPLERATE, OPT_FRAMES,
-       OPT_CHANNELS, OPT_IN_CHANNELS, OPT_INITEXPR, OPT_INITFILE, OPT_BATCH,
-       OPT_PORT, OPT_TERM, OPT_NO_AUDIO, OPT_TIME_DIV, OPT_DEVICE, OPT_IN_DEVICE,
-       OPT_DEVICE_NAME, OPT_IN_DEVICE_NAME,
-       OPT_PRT_DEVICES, OPT_REALTIME, OPT_ARCH, OPT_CPU, OPT_ATTR,
-       OPT_LATENCY, OPT_LEVEL,
-       OPT_AUDIO_OUTFILE, OPT_DURATION,
-       OPT_REPL,
-       OPT_HELP
-     };
+enum {
+    OPT_COMPILE_STR,
+    OPT_SHAREDIR,
+    OPT_NOBASE,
+    OPT_SAMPLERATE,
+    OPT_FRAMES,
+    OPT_CHANNELS,
+    OPT_IN_CHANNELS,
+    OPT_INITEXPR,
+    OPT_INITFILE,
+    OPT_BATCH,
+    OPT_PORT,
+    OPT_TERM,
+    OPT_NO_AUDIO,
+    OPT_TIME_DIV,
+    OPT_DEVICE,
+    OPT_IN_DEVICE,
+    OPT_DEVICE_NAME,
+    OPT_IN_DEVICE_NAME,
+    OPT_PRT_DEVICES,
+    OPT_REALTIME,
+    OPT_ARCH,
+    OPT_CPU,
+    OPT_ATTR,
+    OPT_LATENCY,
+    OPT_LEVEL,
+    OPT_AUDIO_OUTFILE,
+    OPT_DURATION,
+    OPT_REPL,
+    OPT_HELP
+};
 
 CSimpleOptA::SOption g_rgOptions[] = {
     // ID              TEXT                   TYPE
-    { OPT_COMPILE_STR,    "--compile",       SO_REQ_SEP    },
-    { OPT_SHAREDIR,       "--runtime",       SO_REQ_SEP    },
-    { OPT_SHAREDIR,       "--sharedir",      SO_REQ_SEP    },
-    { OPT_NOBASE,         "--nobase",        SO_NONE       },
-    { OPT_SAMPLERATE,     "--samplerate",    SO_REQ_SEP    },
-    { OPT_FRAMES,         "--frames",        SO_REQ_SEP    },
-    { OPT_CHANNELS,       "--channels",      SO_REQ_SEP    },
-    { OPT_IN_CHANNELS,    "--inchannels",    SO_REQ_SEP    },
-    { OPT_INITEXPR,       "--eval",          SO_REQ_SEP    },
-    { OPT_INITFILE,       "--run",           SO_REQ_SEP    },
-    { OPT_BATCH,          "--batch",         SO_REQ_SEP    },
-    { OPT_PORT,           "--port",          SO_REQ_SEP    },
-    { OPT_TERM,           "--term",          SO_REQ_SEP    },
-    { OPT_NO_AUDIO,       "--noaudio",       SO_NONE       },
-    { OPT_TIME_DIV,       "--timediv",       SO_REQ_SEP    },
-    { OPT_DEVICE,         "--device",        SO_REQ_SEP    },
-    { OPT_IN_DEVICE,      "--indevice",      SO_REQ_SEP    },
-    { OPT_DEVICE_NAME,    "--device-name",   SO_REQ_SEP    },
-    { OPT_IN_DEVICE_NAME, "--indevice-name", SO_REQ_SEP    },
-    { OPT_LATENCY,        "--latency",       SO_REQ_SEP    },
-    { OPT_PRT_DEVICES,    "--print-devices", SO_NONE       },
-    { OPT_REALTIME,       "--realtime",      SO_NONE       },
-    { OPT_ARCH,           "--arch",          SO_REQ_SEP    },
-    { OPT_CPU,            "--cpu",           SO_REQ_SEP    },
-    { OPT_ATTR,           "--attr",          SO_MULTI      },
-    { OPT_LEVEL,          "--opt-level",     SO_REQ_SEP    },
-    { OPT_AUDIO_OUTFILE,  "--audio-outfile", SO_REQ_SEP    },
-    { OPT_DURATION,       "--duration",      SO_REQ_SEP    },
-    { OPT_REPL,           "--repl",          SO_NONE       },
-    { OPT_HELP,           "--help",          SO_NONE       },
-    SO_END_OF_OPTIONS
-};
+    {OPT_COMPILE_STR, "--compile", SO_REQ_SEP},
+    {OPT_SHAREDIR, "--runtime", SO_REQ_SEP},
+    {OPT_SHAREDIR, "--sharedir", SO_REQ_SEP},
+    {OPT_NOBASE, "--nobase", SO_NONE},
+    {OPT_SAMPLERATE, "--samplerate", SO_REQ_SEP},
+    {OPT_FRAMES, "--frames", SO_REQ_SEP},
+    {OPT_CHANNELS, "--channels", SO_REQ_SEP},
+    {OPT_IN_CHANNELS, "--inchannels", SO_REQ_SEP},
+    {OPT_INITEXPR, "--eval", SO_REQ_SEP},
+    {OPT_INITFILE, "--run", SO_REQ_SEP},
+    {OPT_BATCH, "--batch", SO_REQ_SEP},
+    {OPT_PORT, "--port", SO_REQ_SEP},
+    {OPT_TERM, "--term", SO_REQ_SEP},
+    {OPT_NO_AUDIO, "--noaudio", SO_NONE},
+    {OPT_TIME_DIV, "--timediv", SO_REQ_SEP},
+    {OPT_DEVICE, "--device", SO_REQ_SEP},
+    {OPT_IN_DEVICE, "--indevice", SO_REQ_SEP},
+    {OPT_DEVICE_NAME, "--device-name", SO_REQ_SEP},
+    {OPT_IN_DEVICE_NAME, "--indevice-name", SO_REQ_SEP},
+    {OPT_LATENCY, "--latency", SO_REQ_SEP},
+    {OPT_PRT_DEVICES, "--print-devices", SO_NONE},
+    {OPT_REALTIME, "--realtime", SO_NONE},
+    {OPT_ARCH, "--arch", SO_REQ_SEP},
+    {OPT_CPU, "--cpu", SO_REQ_SEP},
+    {OPT_ATTR, "--attr", SO_MULTI},
+    {OPT_LEVEL, "--opt-level", SO_REQ_SEP},
+    {OPT_AUDIO_OUTFILE, "--audio-outfile", SO_REQ_SEP},
+    {OPT_DURATION, "--duration", SO_REQ_SEP},
+    {OPT_REPL, "--repl", SO_NONE},
+    {OPT_HELP, "--help", SO_NONE},
+    SO_END_OF_OPTIONS};
 
-EXPORT int extempore_init(int argc, char** argv)
-{
+EXPORT int extempore_init(int argc, char** argv) {
     std::string initexpr;
     std::string host("localhost");
     std::string primary_name("primary");
@@ -186,35 +199,33 @@ EXPORT int extempore_init(int argc, char** argv)
 #ifndef _WIN32
     // signal handlers for OSX/Linux
     if (signal(SIGINT, sig_handler) == SIG_ERR) {
-                printf("\nWarning: can't catch SIGINT.\n");
+        printf("\nWarning: can't catch SIGINT.\n");
     }
     if (signal(SIGTERM, sig_handler) == SIG_ERR) {
-                printf("\nWarning: can't catch SIGTERM.\n");
+        printf("\nWarning: can't catch SIGTERM.\n");
     }
 #else
     WSADATA wsadata;
-    WSAStartup(0x0202, &wsadata); // I didn't seem to need to call this... but (?)
+    WSAStartup(0x0202, &wsadata);  // I didn't seem to need to call this... but (?)
     SetConsoleCtrlHandler(PHANDLER_ROUTINE(CtrlHandler), TRUE);
 #endif
 
     CSimpleOptA args(argc, argv, g_rgOptions);
     while (args.Next()) {
         if (args.LastError() == SO_SUCCESS) {
-            switch(args.OptionId()) {
-            case OPT_COMPILE_STR:
-				{
-					size_t start_pos = 0;
-					std::string str(args.OptionArg());
-					std::string from("\\");
-					std::string to("\\\\");
-					while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-						str.replace(start_pos, from.length(), to);
-						start_pos += to.length();
-					}
-					extemp::UNIV::EXT_LOADBASE = false; // never load base when compiling
-					initexpr = std::string("(impc:aot:compile-xtm-exe \"") + str + std::string("\")");
-				}
-                break;
+            switch (args.OptionId()) {
+            case OPT_COMPILE_STR: {
+                size_t start_pos = 0;
+                std::string str(args.OptionArg());
+                std::string from("\\");
+                std::string to("\\\\");
+                while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+                    str.replace(start_pos, from.length(), to);
+                    start_pos += to.length();
+                }
+                extemp::UNIV::EXT_LOADBASE = false;  // never load base when compiling
+                initexpr = std::string("(impc:aot:compile-xtm-exe \"") + str + std::string("\")");
+            } break;
             case OPT_SHAREDIR:
                 extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());
                 break;
@@ -238,19 +249,17 @@ EXPORT int extempore_init(int argc, char** argv)
                 extemp::UNIV::BATCH_MODE = true;
                 // AUDIO_NONE is set after parsing, only if --audio-outfile wasn't passed
                 break;
-            case OPT_INITFILE:
-                {
-                    size_t start_pos = 0;
-                    std::string str(args.OptionArg());
-                    std::string from("\\");
-                    std::string to("\\\\");
-                    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-                        str.replace(start_pos, from.length(), to);
-                        start_pos += to.length();
-                    }
-	                    initexpr = std::string("(sys:load \"") + str + std::string("\")");
+            case OPT_INITFILE: {
+                size_t start_pos = 0;
+                std::string str(args.OptionArg());
+                std::string from("\\");
+                std::string to("\\\\");
+                while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+                    str.replace(start_pos, from.length(), to);
+                    start_pos += to.length();
                 }
-                break;
+                initexpr = std::string("(sys:load \"") + str + std::string("\")");
+            } break;
             case OPT_NOBASE:
                 extemp::UNIV::EXT_LOADBASE = false;
                 break;
@@ -296,7 +305,7 @@ EXPORT int extempore_init(int argc, char** argv)
             case OPT_LATENCY:
                 extemp::UNIV::AUDIO_OUTPUT_LATENCY = atoi(args.OptionArg()) / 1000.0;
                 break;
-#if !( defined (___ALSA_AUDIO___) || defined (COREAUDIO))
+#if !(defined(___ALSA_AUDIO___) || defined(COREAUDIO))
             case OPT_PRT_DEVICES:
                 extemp::AudioDevice::printDevices();
                 return 0;
@@ -305,7 +314,8 @@ EXPORT int extempore_init(int argc, char** argv)
 #ifdef _WIN32
                 SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 #else
-                std::cout << "Realtime priority setting not available on your platform" << std::endl;
+                std::cout << "Realtime priority setting not available on your platform"
+                          << std::endl;
 #endif
                 break;
             case OPT_ARCH:
@@ -338,35 +348,67 @@ EXPORT int extempore_init(int argc, char** argv)
             default:
                 std::cout << "Extempore's command line options: " << std::endl;
                 std::cout << "            --help: prints this menu" << std::endl;
-                std::cout << "             --run: path to a scheme file to load at startup" << std::endl;
-                std::cout << "            --eval: scheme expression to evaluate at startup" << std::endl;
-                std::cout << "           --batch: run in batch mode (no server, single process, no audio) with given expression" << std::endl;
+                std::cout << "             --run: path to a scheme file to load at startup"
+                          << std::endl;
+                std::cout << "            --eval: scheme expression to evaluate at startup"
+                          << std::endl;
+                std::cout << "           --batch: run in batch mode (no server, single process, no "
+                             "audio) with given expression"
+                          << std::endl;
                 std::cout << "            --port: port for primary process [7099]" << std::endl;
-                std::cout << "            --term: either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor" << std::endl;
-                std::cout << "        --sharedir: location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)" << std::endl;
+                std::cout << "            --term: either ansi, cmd (windows), basic (for simpler "
+                             "ansi terms), or nocolor"
+                          << std::endl;
+                std::cout << "        --sharedir: location of the Extempore share dir (which "
+                             "contains runtime/, libs/, examples/, etc.)"
+                          << std::endl;
                 std::cout << "         --runtime: [deprecated] use --sharedir instead" << std::endl;
                 std::cout << "          --nobase: don't load base lib on startup" << std::endl;
                 std::cout << "       --opt-level: LLVM optimization level 0-3" << std::endl;
                 std::cout << "      --samplerate: audio samplerate" << std::endl;
                 std::cout << "          --frames: attempts to force frames [1024]" << std::endl;
-                std::cout << "        --channels: attempts to force num of output audio channels" << std::endl;
-                std::cout << "      --inchannels: attempts to force num of input audio channels" << std::endl;
-                std::cout << "         --noaudio: no audio output: use a \"dummy\" device (overrides --device option)" << std::endl;
-                std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling engine (1 = no division which is the default)" << std::endl;
-                std::cout << "          --device: the index of the audio device to use (output or duplex)" << std::endl;
-                std::cout << "        --indevice: the index of the audio input device to use" << std::endl;
-                std::cout << "     --device-name: a regex to match the name of the audio device to use (output or duplex) (overrides index)" << std::endl;
-                std::cout << "   --indevice-name: a regex to match the name of the audio input device to use (overrides index)" << std::endl;
-                std::cout << "         --latency: attempts to force audio output latency" << std::endl;
-                std::cout << "        --realtime: use realtime process priority (Windows only)" << std::endl;
-                std::cout << "            --arch: the target architecture [current host]" << std::endl;
+                std::cout << "        --channels: attempts to force num of output audio channels"
+                          << std::endl;
+                std::cout << "      --inchannels: attempts to force num of input audio channels"
+                          << std::endl;
+                std::cout << "         --noaudio: no audio output: use a \"dummy\" device "
+                             "(overrides --device option)"
+                          << std::endl;
+                std::cout << "         --timediv: timed sub divisions of FRAMES for scheduling "
+                             "engine (1 = no division which is the default)"
+                          << std::endl;
+                std::cout
+                    << "          --device: the index of the audio device to use (output or duplex)"
+                    << std::endl;
+                std::cout << "        --indevice: the index of the audio input device to use"
+                          << std::endl;
+                std::cout << "     --device-name: a regex to match the name of the audio device to "
+                             "use (output or duplex) (overrides index)"
+                          << std::endl;
+                std::cout << "   --indevice-name: a regex to match the name of the audio input "
+                             "device to use (overrides index)"
+                          << std::endl;
+                std::cout << "         --latency: attempts to force audio output latency"
+                          << std::endl;
+                std::cout << "        --realtime: use realtime process priority (Windows only)"
+                          << std::endl;
+                std::cout << "            --arch: the target architecture [current host]"
+                          << std::endl;
                 std::cout << "             --cpu: the target cpu [current host]" << std::endl;
-                std::cout << "            --attr: additional target attributes (allows multiple)" << std::endl;
-                std::cout << "         --compile: compiles xtm file to native executable" << std::endl;
-                std::cout << "            --repl: start an interactive REPL (Linux/macOS only)" << std::endl;
-                std::cout << "   --print-devices: print the available audio devices to console" << std::endl;
-                std::cout << "   --audio-outfile: render DSP output to the given WAV file (float32) instead of an audio device" << std::endl;
-                std::cout << "        --duration: hard cap on --audio-outfile render length (seconds); 0 = render until (quit)" << std::endl;
+                std::cout << "            --attr: additional target attributes (allows multiple)"
+                          << std::endl;
+                std::cout << "         --compile: compiles xtm file to native executable"
+                          << std::endl;
+                std::cout << "            --repl: start an interactive REPL (Linux/macOS only)"
+                          << std::endl;
+                std::cout << "   --print-devices: print the available audio devices to console"
+                          << std::endl;
+                std::cout << "   --audio-outfile: render DSP output to the given WAV file "
+                             "(float32) instead of an audio device"
+                          << std::endl;
+                std::cout << "        --duration: hard cap on --audio-outfile render length "
+                             "(seconds); 0 = render until (quit)"
+                          << std::endl;
                 std::_Exit(0);
             }
         } else {
@@ -437,8 +479,8 @@ EXPORT int extempore_init(int argc, char** argv)
     ascii_normal();
 #ifdef SUBSUME_PRIMARY
     std::cout << "Primary        : ";
-	ascii_info();
-	std::cout << "thread 0" << std::endl;
+    ascii_info();
+    std::cout << "thread 0" << std::endl;
     ascii_default();
 #endif
     std::cout << "---------------------------------------" << std::endl;
@@ -447,17 +489,20 @@ EXPORT int extempore_init(int argc, char** argv)
 
     if (extemp::UNIV::BATCH_MODE) {
         // Batch mode: single process, no server, no utility process
-        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
-        primary->start(true); // this will not return
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0,
+                                            initexpr);
+        primary->start(true);  // this will not return
     } else {
         // Normal mode: utility + primary processes with server threads
-        extemp::SchemeProcess* utility = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
+        extemp::SchemeProcess* utility =
+            new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
         startup_ok &= utility->start();
         extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
         utility_repl->connectToProcessAtHostname(host, utility_port);
 
-#ifndef SUBSUME_PRIMARY // if not subsume primary (i.e. primary NOT on thread 0)
-        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+#ifndef SUBSUME_PRIMARY  // if not subsume primary (i.e. primary NOT on thread 0)
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0,
+                                            initexpr);
         startup_ok &= primary->start();
         extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
         primary_repl->connectToProcessAtHostname(host, primary_port);
@@ -475,11 +520,14 @@ EXPORT int extempore_init(int argc, char** argv)
                   << " --- connect your editor to send code." << std::endl;
         ascii_default();
         while (true) {
-          if (XTMMainCallback) { XTMMainCallback(); }
-          std::this_thread::sleep_for(std::chrono::seconds(2));
+            if (XTMMainCallback) {
+                XTMMainCallback();
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
         }
 #else
-        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0, initexpr);
+        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0,
+                                            initexpr);
 
         // Fire-and-forget: both helpers run for the life of the process and
         // don't need the RT-scheduling / subsume features of EXTThread, so
@@ -501,8 +549,8 @@ EXPORT int extempore_init(int argc, char** argv)
         ascii_default();
 
         // start the primary process running on this thread (i.e. process thread 0)
-        primary->start(true); // this will not return
-#endif // end SUBSUME_PRIMARY
+        primary->start(true);  // this will not return
+#endif  // end SUBSUME_PRIMARY
     }
     return 0;
 }

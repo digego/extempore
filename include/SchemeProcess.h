@@ -60,59 +60,82 @@ struct llvm_zone_t;
 namespace extemp {
 
 class SchemeTask {
-public:
-    enum class Type { REPL, SCHEME_CALLBACK, DESTROY_ENV, CALLBACK_SYMBOL,
-            LOCAL_PROCESS_STRING = 5, EXTEMPORE_CALLBACK };
-private:
-    uint64_t    m_time;
-    uint64_t    m_maxDuration;
-    void*       m_ptr;
-    std::string m_label;
-    Type        m_type; // 0 = repl task,  1 = callback task,  2 = destroy env task
-    void*       m_ptr2;
-public:
-    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label, Type TaskType, void* Ptr2 = 0):
-            m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(TaskType), m_ptr2(Ptr2) {
-    }
+  public:
+    enum class Type {
+        REPL,
+        SCHEME_CALLBACK,
+        DESTROY_ENV,
+        CALLBACK_SYMBOL,
+        LOCAL_PROCESS_STRING = 5,
+        EXTEMPORE_CALLBACK
+    };
 
-    uint64_t getTime() const { return m_time; }
-    uint64_t getMaxDuration() const { return m_maxDuration; }
-    void* getPtr() const { return m_ptr; }
-    void* getPtr2() const { return m_ptr2; }
-    const std::string& getLabel() const { return m_label; }
-    Type getType() const { return m_type; }
+  private:
+    uint64_t m_time;
+    uint64_t m_maxDuration;
+    void* m_ptr;
+    std::string m_label;
+    Type m_type;  // 0 = repl task,  1 = callback task,  2 = destroy env task
+    void* m_ptr2;
+
+  public:
+    SchemeTask(uint64_t Time, uint64_t MaxDuration, void* Ptr, const std::string& Label,
+               Type TaskType, void* Ptr2 = 0)
+        : m_time(Time), m_maxDuration(MaxDuration), m_ptr(Ptr), m_label(Label), m_type(TaskType),
+          m_ptr2(Ptr2) {}
+
+    uint64_t getTime() const {
+        return m_time;
+    }
+    uint64_t getMaxDuration() const {
+        return m_maxDuration;
+    }
+    void* getPtr() const {
+        return m_ptr;
+    }
+    void* getPtr2() const {
+        return m_ptr2;
+    }
+    const std::string& getLabel() const {
+        return m_label;
+    }
+    Type getType() const {
+        return m_type;
+    }
 };
 
 class SchemeProcess {
-private:
+  private:
     typedef std::queue<SchemeTask> task_queue_type;
     static const unsigned SCHEME_OUTPORT_STRING_LENGTH = 256;
-private:
-    std::string     m_loadPath;
-    std::string     m_name;
-    int16_t         m_serverPort;
-    bool            m_banner;
-    std::string     m_initExpr;
+
+  private:
+    std::string m_loadPath;
+    std::string m_name;
+    int16_t m_serverPort;
+    bool m_banner;
+    std::string m_initExpr;
     // Set once by the task thread after the runtime libs finish loading.
     // Read by the server thread spin-waiting in serverImpl(); must be
     // synchronised.
     std::atomic<bool> m_libsLoaded;
-    std::recursive_mutex        m_guardMutex;
+    std::recursive_mutex m_guardMutex;
     std::condition_variable_any m_guardCond;
-    bool            m_running;
-    EXTThread       m_threadTask;
-    EXTThread       m_threadServer;
-    scheme*         m_scheme;
-    uint64_t        m_maxDuration;
-    SOCKET          m_serverSocket;
+    bool m_running;
+    EXTThread m_threadTask;
+    EXTThread m_threadServer;
+    scheme* m_scheme;
+    uint64_t m_maxDuration;
+    SOCKET m_serverSocket;
     task_queue_type m_taskQueue;
-    llvm_zone_t*    m_defaultZone;
-    extemp::CM*     m_extemporeCallback;
-    char            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
+    llvm_zone_t* m_defaultZone;
+    extemp::CM* m_extemporeCallback;
+    char m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
-    static const char*                           sm_banner;
-    static thread_local SchemeProcess*           sm_current;
-private:
+    static const char* sm_banner;
+    static thread_local SchemeProcess* sm_current;
+
+  private:
     void schemeCallback(TaskI* Task) {
         addCallback(Task, SchemeTask::Type::SCHEME_CALLBACK);
     }
@@ -136,7 +159,7 @@ private:
     bool loadString(const std::string& str);
 #ifdef DYLIB
     bool loadFileAsString(char* fname);
-    void findAndReplaceAll(std::string &data, std::string toSearch, std::string replaceStr);
+    void findAndReplaceAll(std::string& data, std::string toSearch, std::string replaceStr);
 #endif
 
     static void* serverTrampoline(void* Arg) {
@@ -145,16 +168,29 @@ private:
     static void* taskTrampoline(void* Arg) {
         return reinterpret_cast<SchemeProcess*>(Arg)->taskImpl();
     }
-public:
-    SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort = 7010, bool Banner = false,
-            const std::string& InitExpr = std::string());
 
-    uint64_t getMaxDuration() const { return m_maxDuration; }
-    void setMaxDuration(uint64_t MaxDuration) { m_maxDuration = MaxDuration; }
-    bool getRunning() const { return m_running; }
-    llvm_zone_t* getDefaultZone() { return m_defaultZone; }
-    const std::string& getName() { return m_name; }
-    extemp::CM* getExtemporeCallback() const { return m_extemporeCallback; }
+  public:
+    SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort = 7010,
+                  bool Banner = false, const std::string& InitExpr = std::string());
+
+    uint64_t getMaxDuration() const {
+        return m_maxDuration;
+    }
+    void setMaxDuration(uint64_t MaxDuration) {
+        m_maxDuration = MaxDuration;
+    }
+    bool getRunning() const {
+        return m_running;
+    }
+    llvm_zone_t* getDefaultZone() {
+        return m_defaultZone;
+    }
+    const std::string& getName() {
+        return m_name;
+    }
+    extemp::CM* getExtemporeCallback() const {
+        return m_extemporeCallback;
+    }
     void setPriority(int Priority) {
         m_threadTask.setPriority(Priority, false);
         m_threadServer.setPriority(Priority, false);
@@ -168,40 +204,51 @@ public:
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), Arg);
     }
     void addForeignFunc(char* Symbol, foreign_func Func) {
-        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_foreign_func(m_scheme, Func));
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
+                      mk_foreign_func(m_scheme, Func));
     }
     void addGlobalCptr(char* Symbol, void* Ptr) {
-        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_cptr(m_scheme, Ptr));
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
+                      mk_cptr(m_scheme, Ptr));
     }
-    void addSchemeGlobal(char* Symbol, void* Cptr)
-    {
-        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), mk_cptr(m_scheme, Cptr));
+    void addSchemeGlobal(char* Symbol, void* Cptr) {
+        scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
+                      mk_cptr(m_scheme, Cptr));
     }
     void createSchemeTask(void* Arg, const std::string& label, SchemeTask::Type TaskType);
     void stop();
-    bool start(bool subsume=false);
+    bool start(bool subsume = false);
 
-    static SchemeProcess* I() { return sm_current; }
+    static SchemeProcess* I() {
+        return sm_current;
+    }
 };
 
-class SchemeObj
-{
-private:
+class SchemeObj {
+  private:
     scheme* m_scheme;
     pointer m_values;
     pointer m_env;
     s7_int m_gcLoc;
-public:
+
+  public:
     SchemeObj(scheme* Sheme, pointer Values, pointer Env);
     ~SchemeObj();
 
-    pointer getEnvironment() const { return m_env; }
-    pointer getValue() const { return m_values; }
-    scheme* getScheme() const { return m_scheme; }
-    s7_int getGcLoc() const { return m_gcLoc; }
+    pointer getEnvironment() const {
+        return m_env;
+    }
+    pointer getValue() const {
+        return m_values;
+    }
+    scheme* getScheme() const {
+        return m_scheme;
+    }
+    s7_int getGcLoc() const {
+        return m_gcLoc;
+    }
 };
 
-
-} //End Namespace
+}  // namespace extemp
 
 #endif
