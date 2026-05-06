@@ -106,6 +106,9 @@ commit logs, but for which we are extremely grateful. Many others have
 contributed to Extempore's development
 ([see the full list](https://github.com/digego/extempore/graphs/contributors)).
 
+[Ben Swift](https://github.com/benswift) is the current maintainer --- please
+direct issues, questions and emails his way.
+
 ## Docs & Community
 
 Extempore documentation can be found at <https://extemporelang.github.io/docs/>
