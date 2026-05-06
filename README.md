@@ -22,6 +22,13 @@ v0.9.0-beta is a large release. The highlights:
 - **Interactive REPL** --- pass `--repl` for a linenoise-based REPL (Linux and
   macOS only).
 
+v0.9.0 reworks a lot under the hood, so expect some rough edges. The old
+OpenGL-based graphics stack will not work, and isn't likely to anytime soon ---
+although a couple of new minimal WebGPU examples may suggest a way forward. If
+you hit core audio breakage, please
+[file an issue](https://github.com/digego/extempore/issues) with a minimal
+reproducible example where possible.
+
 ## Getting started
 
 ### The easy way
