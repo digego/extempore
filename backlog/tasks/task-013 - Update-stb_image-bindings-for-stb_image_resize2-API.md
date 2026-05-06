@@ -1,9 +1,10 @@
 ---
-id: task-013
+id: TASK-013
 title: Update stb_image bindings for stb_image_resize2 API
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-12-18 02:46'
+updated_date: '2026-04-21 11:26'
 labels:
   - graphics
   - external-libs
@@ -37,3 +38,9 @@ Current bindings in stb_image.xtm that need updating:
 
 First step should be to determine if these resize functions are actually used anywhere in the codebase or examples.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed without porting: the stbir_resize_* bindings were dead code (no usage in libs/, examples/, or runtime/). Removed the whole stb_image_resize.h block from libs/external/stb_image.xtm; aot_stb_image still builds.
+<!-- SECTION:NOTES:END -->
