@@ -3,11 +3,9 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## v0.9.0-beta
+## v0.9.0
 
-A major release, shipped as a beta so the new platforms, toolchain, and asset
-packaging can bake before cutting a stable v0.9.0. See `MERGE_CHANGELOG.md`
-for the full breakdown.
+A major release. See `MERGE_CHANGELOG.md` for the full breakdown.
 
 ### Platforms
 
@@ -68,6 +66,25 @@ for the full breakdown.
 - Core/external example set slimmed to only those that load cleanly in CI.
 - Full working set registered in `extras/cmake/tests.cmake` and tested on
   every push.
+
+### Stability
+
+Post-beta hardening before cutting the stable release:
+
+- **Concurrency**: atomic `UNIV::TIME`/`DEVICE_TIME` and `m_libsLoaded`; race
+  fixes in the s7 FFI table; `gethostbyname` replaced with thread-safe
+  `getaddrinfo`; MT dispatcher spin-sleep swapped for a counting semaphore;
+  audio threads converted to RAII with per-thread PRNG; legacy
+  `EXTMutex`/`EXTMonitor`/`EXTCondition` wrappers removed.
+- **Buffer/UB fixes**: `sys_slurp_file` off-by-one and unchecked `fread`,
+  `rsplit` buffer overrun, `cname_decode` leak.
+- **Tooling**: `-Wall -Wextra` with bug-finding warnings promoted to errors;
+  new `EXTEMPORE_SANITIZE` build option for ASan/UBSan/TSan; `.clang-format`
+  and `.clang-tidy` configs (LLVM-based, no mass reformat).
+- **Headless audio**: new `--audio-outfile` offline file driver renders DSP to
+  WAV without an OS audio device, enabling audio-assertion tests in CI.
+- **Docs**: xtlang tutorial and error-message glossary; new-user onboarding
+  overhaul.
 
 ## v0.8.9
 

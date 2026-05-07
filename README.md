@@ -8,7 +8,7 @@ Windows (x86_64).
 
 ## What's new in v0.9.0
 
-v0.9.0-beta is a large release. The highlights:
+v0.9.0 is a large release. The highlights:
 
 - **LLVM 22** --- bumped from LLVM 17, fetched and built in-tree via CMake's
   `FetchContent` (no separate LLVM install required).
