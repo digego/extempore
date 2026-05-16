@@ -46,6 +46,16 @@ _Note_: the VSCode extension used to offer an _Extempore: Download binary_
 command for one-click setup. It hasn't been updated for v0.9.0 and may not work
 --- downloading the release manually is the safest option for now.
 
+_Note on macOS first launch_: the binaries aren't signed with an Apple
+Developer ID, so on first launch macOS will refuse to run them ("apple could
+not verify ... is free of malware"). To clear the quarantine flag on the whole
+unzipped folder in one go, run:
+
+    xattr -dr com.apple.quarantine /path/to/extempore
+
+(replace the path with wherever you unzipped it, e.g. `~/Downloads/extempore`).
+After that, `extempore` will launch normally.
+
 ### Build from source
 
 **For more information**, check out [BUILDING.md](./BUILDING.md).
