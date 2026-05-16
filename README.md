@@ -48,8 +48,15 @@ command for one-click setup. It hasn't been updated for v0.9.0 and may not work
 
 _Note on macOS first launch_: the binaries aren't signed with an Apple
 Developer ID, so on first launch macOS will refuse to run them ("apple could
-not verify ... is free of malware"). To clear the quarantine flag on the whole
-unzipped folder in one go, run:
+not verify ... is free of malware"). Despite the wording, this means Apple
+hasn't _checked_ the binary, not that anything malicious has been _detected_
+--- the release is built in public from the source in this repository by the
+[Release workflow](https://github.com/digego/extempore/actions/workflows/release-binary.yml),
+and you can rebuild it yourself from source if you'd prefer (see below).
+Signing with a Developer ID requires a paid Apple Developer account, which
+Extempore (as a research project) doesn't currently maintain.
+
+To clear the quarantine flag on the whole unzipped folder in one go, run:
 
     xattr -dr com.apple.quarantine /path/to/extempore
 
