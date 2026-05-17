@@ -3,6 +3,21 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.9.1
+
+Patch release fixing a critical packaging bug in the v0.9.0 binary release.
+
+- **Release packaging**: the v0.9.0 binary release had `EXT_SHARE_DIR`
+  hardcoded to the GitHub Actions runner's ephemeral source path, so
+  downloaded binaries aborted with `could not locate file init.xtm` on every
+  user's machine. The release workflow now passes `-DEXT_SHARE_DIR=.` so the
+  binary locates `runtime/`, `libs/` etc. relative to the current working
+  directory --- matching what the README already tells users to do (run
+  `./extempore` from inside the unzipped folder).
+
+  Workaround for anyone stuck on a v0.9.0 download: run
+  `./extempore --sharedir .` from inside the extempore folder.
+
 ## v0.9.0
 
 A major release. See `MERGE_CHANGELOG.md` for the full breakdown.
