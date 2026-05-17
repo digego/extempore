@@ -58,7 +58,9 @@ jobs:
           arch: x64
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DASSETS=ON
+        # EXT_SHARE_DIR=. so the released binary locates runtime/, libs/, etc.
+        # relative to CWD instead of the (long-gone) CI worker's source path.
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DASSETS=ON -DEXT_SHARE_DIR=.
 
       - name: Build LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
