@@ -50,7 +50,7 @@ endif()
 # dependency version pinning #
 #############################
 
-set(DEP_LLVM_VERSION "22.1.1")
+set(DEP_LLVM_VERSION "22.1.6")
 set(DEP_PORTAUDIO_VERSION "v19.7.0")
 set(DEP_PORTAUDIO_MD5 "54297c72a852669f9987ee7bb9fba0a6")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
