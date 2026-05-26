@@ -3,6 +3,18 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.9.2
+
+Patch release fixing a multi-form REPL eval regression introduced with the s7
+swap in v0.9.0.
+
+- **Multi-form eval**: selecting and evaluating multiple top-level
+  s-expressions in one go (over the eval socket or via `--batch`/`--eval`)
+  previously ran only the first form and silently discarded the rest. The
+  s7-backed `eval_with_error_trap` was using `s7_eval_c_string` (single-form
+  read-and-eval) instead of `s7_load_c_string` (the `load` equivalent that
+  iterates every top-level form). Reported on the mailing list by George.
+
 ## v0.9.1
 
 Patch release fixing a critical packaging bug in the v0.9.0 binary release.

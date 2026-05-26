@@ -249,7 +249,9 @@ static void eval_with_error_trap(scheme* sc, const char* str) {
     s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
-    s7_pointer result = s7_eval_c_string(sc->sc, str);
+    // s7_load_c_string iterates all top-level forms; s7_eval_c_string reads
+    // only the first and silently discards the rest.
+    s7_pointer result = s7_load_c_string(sc->sc, str, strlen(str));
 
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
