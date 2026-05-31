@@ -9002,8 +9002,15 @@ static /* inline */ s7_pointer new_symbol(s7_scheme *sc, const char *name, s7_in
   symbol_clear_ctr(new_sym); /* alloc_symbol uses malloc */
   symbol_clear_type(new_sym);
 
+  /* A symbol whose name begins or ends with ':' is a keyword -- but only when
+     the character adjacent to the colon is a letter.  This keeps real keywords
+     (:rest, :readable, foo:, ... -- all alphabetic) working while leaving
+     operator-like names such as the pattern-language ':>' and ':|' macros as
+     ordinary, definable symbols.  [extempore-local change vs upstream s7;
+     re-apply on s7 upgrade -- see libs/core/pattern-language.xtm] */
   if ((len > 1) &&                                    /* not 0, otherwise : is a keyword */
-      ((name[0] == ':') || (name[len - 1] == ':')))   /* see s7test under keyword? for troubles if both colons are present */
+      (((name[0] == ':') && (isalpha((unsigned char)name[1]))) ||
+       ((name[len - 1] == ':') && (isalpha((unsigned char)name[len - 2])))))
     {
       s7_pointer slot, ksym;
       set_type_bit(new_sym, T_Immutable | T_Keyword);

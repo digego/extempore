@@ -1,0 +1,59 @@
+;;; tests/core/pattern-language.xtm -- regression tests for the pattern language
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; The pattern-language operators :> (start/modify a pattern) and :| (stop a
+;; pattern) begin with a colon. s7 treats any symbol that begins or ends with a
+;; colon as a self-evaluating keyword constant, and a keyword cannot be bound
+;; with define-macro. So under stock s7 the macro definitions in
+;; libs/core/pattern-language.xtm silently failed, (:> A ...) was read as a
+;; plain application, and evaluating it raised "Unbound variable A".
+;;
+;; This broke in v0.9.0 when the interpreter moved from the old TinyScheme-
+;; derived reader to s7 (reported on the mailing list by George Wright, May
+;; 2026). The fix narrows s7's keyword rule in src/s7.c (new_symbol) so a colon
+;; only marks a keyword when the character adjacent to it is a letter.
+;;
+;; These tests pin both halves of that behaviour: operator-style colon names
+;; stay ordinary, macro-bindable symbols, while genuine keywords (and hence
+;; define*/keyword arguments) are untouched. If someone reverts the s7 patch or
+;; bumps to a stock s7, these fail.
+
+;;; Code:
+
+(sys:load "libs/core/pattern-language.xtm" 'quiet)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reader invariants -- the root cause
+
+;; operator-style colon names must NOT be keywords (so they can be macros)
+(xtmtest-result (keyword? ':>) #f "colon-gt-not-keyword")
+(xtmtest-result (keyword? ':|) #f "colon-bar-not-keyword")
+(xtmtest-result (symbol? ':>) #t "colon-gt-is-symbol")
+
+;; ... but genuine keywords (a letter adjacent to the colon) must stay keywords,
+;; otherwise define* and keyword arguments break
+(xtmtest-result (keyword? ':readable) #t "leading-colon-keyword-intact")
+(xtmtest-result (keyword? 'foo:) #t "trailing-colon-keyword-intact")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; capabilities the pattern language depends on
+
+;; the operators are actually bound as macros
+(xtmtest-result (macro? (symbol->value ':>)) #t "colon-gt-is-macro")
+(xtmtest-result (macro? (symbol->value ':|)) #t "colon-bar-is-macro")
+
+;; the canonical pattern_basics form expands to a looper instead of raising
+;; "Unbound variable A"
+(xtmtest-result (car (macroexpand (:> A 4 0 (play syn1 @1 80 dur) (list 60 63 67 72))))
+                'rmap-loop-runner
+                "colon-gt-expands")
+
+;; keyword arguments still resolve -- guards against over-narrowing the rule
+(xtmtest-result (let () (define* (kwarg-fn (b 2)) b) (kwarg-fn :b 10))
+                10
+                "keyword-arg-still-binds")
