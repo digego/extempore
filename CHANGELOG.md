@@ -3,6 +3,27 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.9.3
+
+Patch release fixing the pattern language, broken since the s7 swap in v0.9.0.
+
+- **Pattern language**: the `:>` (start/modify) and `:|` (stop) pattern
+  operators stopped working in v0.9.0 --- evaluating e.g. `(:> A 4 0 (play syn1
+  @1 80 dur) (list 60 63 67 72))` raised `Unbound variable A`, as did every
+  `examples/sharedsystem/pattern_basics.xtm` line. s7 (unlike the old
+  TinyScheme reader) treats any symbol that begins or ends with a colon as a
+  self-evaluating keyword constant, and a keyword can't be bound with
+  `define-macro`, so the operator definitions silently failed and `(:> ...)`
+  was read as an ordinary application. Fixed by narrowing s7's keyword rule (in
+  our vendored `src/s7.c`) so a colon only marks a keyword when the character
+  adjacent to it is a letter: genuine keywords (`:readable`, `foo:`, `define*`
+  keyword args --- all alphabetic) are unaffected, while operator-style names
+  like `:>` and `:|` stay ordinary, macro-bindable symbols. This is a
+  deliberate extempore-local divergence from stock s7 --- we can't rename the
+  operators without breaking pattern-language code already out in the wild, so
+  we adapt the reader instead. New `tests/core/pattern-language.xtm` guards it.
+  Reported on the mailing list by George.
+
 ## v0.9.2
 
 Patch release fixing a multi-form REPL eval regression introduced with the s7
