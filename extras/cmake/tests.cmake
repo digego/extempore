@@ -93,6 +93,23 @@ extempore_add_test(tests/compiler/typecheck.xtm compiler-unit)
 extempore_add_test(tests/compiler/pipeline.xtm compiler-unit)
 extempore_add_test(tests/compiler/constraints.xtm compiler-unit)
 
+# AOT compilation round-trip test (two-phase): AOT-compile a fixture library,
+# then in a fresh process load it from its precompiled cache and assert the
+# AOT-compiled code executes and preserves type/global-var docstrings.
+add_test(NAME tests/core/aot-compilation.xtm
+    COMMAND ${CMAKE_COMMAND}
+        -DEXTEMPORE=$<TARGET_FILE:extempore>
+        -DWORK_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DLIB_XTM=tests/core/aot-compilation-lib.xtm
+        -DTEST_XTM=tests/core/aot-compilation.xtm
+        -DCACHE_LL=libs/aot-cache/xtmaot-compilation-lib.ll
+        -DCOMPILE_TIMEOUT=120
+        -DTEST_TIMEOUT=60
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_aot_test.cmake)
+set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
+    TIMEOUT 200
+    LABELS compiler-unit)
+
 # External library tests
 extempore_add_test(tests/external/fft.xtm libs-external)
 

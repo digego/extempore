@@ -1,0 +1,30 @@
+;;; aot-compilation.xtm -- AOT compilation round-trip test (phase 2)
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Phase 2 of the AOT round-trip test. Phase 1 (driven by
+;; extras/cmake/run_aot_test.cmake) AOT-compiles the fixture library
+;; tests/core/aot-compilation-lib.xtm; this file then loads the fixture
+;; from its precompiled cache in a fresh process and verifies that the
+;; AOT-compiled code (a) executes correctly and (b) preserves metadata
+;; (type and global-var docstrings) through the cache round-trip.
+
+;;; Code:
+
+;; the fixture must have been AOT-compiled first (phase 1)
+(if (not (file-exists? "libs/aot-cache/xtmaot-compilation-lib.ll"))
+    (sys:load-escape "aot-compilation: fixture not AOT-compiled --- run phase 1 first"))
+
+;; load the precompiled fixture (pulls in its AOT cache)
+(sys:load "tests/core/aot-compilation-lib.xtm")
+
+;; --- execution survives the AOT round-trip ---
+(xtmtest-result (aot_answer) 42)
+(xtmtest-result (aot_add 3 4) 7)
+
+;; --- metadata (docstrings) survives the AOT round-trip ---
+(xtmtest-result (string=? (impc:ti:get-namedtype-docstring "AOTPoint") "aot-type-doc") #t)
+(xtmtest-result (string=? (impc:ti:get-globalvar-docstring "aot_global") "aot-gv-doc") #t)

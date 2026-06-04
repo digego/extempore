@@ -1,0 +1,43 @@
+;;; aot-compilation-lib.xtm -- fixture library for the AOT round-trip test
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A small, self-contained library that gets AOT-compiled (phase 1) and
+;; then loaded from its precompiled cache in a fresh process (phase 2) by
+;; tests/core/aot-compilation.xtm. The forms below let that test check
+;; that AOT-compiled code (a) loads and executes correctly and (b)
+;; preserves metadata (docstrings) through the cache round-trip.
+
+;; This is a library, so it follows the usual AOT scaffolding (cf. any
+;; libs/core/*.xtm); it is NOT meant to be run as a test directly.
+
+;;; Code:
+
+(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/aot-compilation-lib.xtm" 'quiet))
+(sys:load-preload-check 'aot-compilation-lib)
+(define *xtmlib-aot-compilation-lib-loaded* #t)
+
+(impc:aot:suppress-aot-do (sys:load "libs/base/base.xtm"))
+(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+
+(impc:aot:insert-header "xtmaot-compilation-lib")
+(impc:aot:import-ll "xtmaot-compilation-lib")
+
+;; --- execution: must return the right values after the AOT round-trip ---
+
+(bind-func aot_answer:[i64]*
+  (lambda () 42))
+
+(bind-func aot_add:[i64,i64,i64]*
+  (lambda (a b) (+ a b)))
+
+;; --- metadata: docstrings must survive AOT compilation ---
+
+(bind-type AOTPoint <i64,i64> "aot-type-doc")
+
+(bind-val aot_global i64 99 "aot-gv-doc")
+
+(impc:aot:insert-footer "xtmaot-compilation-lib")
