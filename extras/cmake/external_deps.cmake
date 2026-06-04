@@ -1,8 +1,8 @@
 # External shared library dependencies for Extempore
-# Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS, EXTERNAL_SHLIBS_GRAPHICS_OPENGL options
+# Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS options
 # Sets up: ExternalProject targets and platform-shlibs copy targets
 
-if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS OR EXTERNAL_SHLIBS_GRAPHICS_OPENGL))
+if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
     return()
 endif()
 
@@ -201,88 +201,5 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
             COMMAND ${CMAKE_COMMAND} -E copy ${_wgpu_dir}/lib/wgpu_native.lib ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
         set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
-    endif()
-endif()
-
-################################
-# Legacy OpenGL graphics stack #
-################################
-
-if(EXTERNAL_SHLIBS_GRAPHICS_OPENGL)
-    if(NOT TARGET stb_image)
-        extempore_add_external(stb_image
-            URL https://github.com/extemporelang/stb/archive/${DEP_STB_COMMIT}.zip
-            FOLDER EXTERNAL_SHLIBS)
-    endif()
-
-    if(NOT TARGET glfw3)
-        extempore_add_external(glfw3
-            URL https://github.com/glfw/glfw/releases/download/${DEP_GLFW_VERSION}/glfw-${DEP_GLFW_VERSION}.zip
-            FOLDER EXTERNAL_SHLIBS
-            CMAKE_ARGS
-                -DBUILD_SHARED_LIBS=ON
-                -DGLFW_BUILD_EXAMPLES=OFF
-                -DGLFW_BUILD_TESTS=OFF)
-    endif()
-
-    extempore_add_external(nanovg
-        URL https://github.com/extemporelang/nanovg/archive/${DEP_NANOVG_COMMIT}.tar.gz
-        FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS -DEXTEMPORE_LIB_PATH=${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs/extempore.lib)
-    add_dependencies(nanovg extempore)
-
-    extempore_add_external(assimp
-        URL https://github.com/assimp/assimp/archive/v${DEP_ASSIMP_VERSION}.zip
-        FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS
-            -DCMAKE_DEBUG_POSTFIX=
-            -DASSIMP_BUILD_ASSIMP_TOOLS=OFF
-            -DASSIMP_BUILD_SAMPLES=OFF
-            -DASSIMP_BUILD_TESTS=OFF)
-
-    if(UNIX)
-        set(_opengl_deps assimp nanovg)
-        set(_opengl_copy_commands
-            COMMAND ${CMAKE_COMMAND} -E copy libassimp${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy libnanovg${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR})
-
-        if(NOT EXTERNAL_SHLIBS_GRAPHICS)
-            list(APPEND _opengl_deps glfw3 stb_image)
-            list(APPEND _opengl_copy_commands
-                COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-                COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR})
-        endif()
-
-        add_custom_target(external_shlibs_graphics_opengl
-            COMMENT "Copying OpenGL graphics shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS ${_opengl_deps}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            ${_opengl_copy_commands}
-            WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
-        set_target_properties(external_shlibs_graphics_opengl PROPERTIES FOLDER EXTERNAL_SHLIBS)
-    elseif(WIN32)
-        set(_opengl_deps assimp nanovg)
-        set(_opengl_copy_commands
-            COMMAND ${CMAKE_COMMAND} -E copy bin/assimp-vc130-mt.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/assimp-vc130-mt.lib ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/nanovg.lib ${EXT_PLATFORM_SHLIBS_DIR})
-
-        if(NOT EXTERNAL_SHLIBS_GRAPHICS)
-            list(APPEND _opengl_deps glfw3 stb_image)
-            list(APPEND _opengl_copy_commands
-                COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
-                COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
-                COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
-                COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR})
-        endif()
-
-        add_custom_target(external_shlibs_graphics_opengl
-            COMMENT "Copying OpenGL graphics .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS ${_opengl_deps}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            ${_opengl_copy_commands}
-            WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
-        set_target_properties(external_shlibs_graphics_opengl PROPERTIES FOLDER EXTERNAL_SHLIBS)
     endif()
 endif()

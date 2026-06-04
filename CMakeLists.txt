@@ -9,7 +9,6 @@ option(BUILD_TESTS "build test targets (including examples)" ON)
 set(EXTEMPORE_SANITIZE "" CACHE STRING "Build with sanitizer: asan, ubsan, tsan, asan+ubsan")
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native, stb_image)" OFF)
-option(EXTERNAL_SHLIBS_GRAPHICS_OPENGL "legacy OpenGL graphics (nanovg, assimp)" OFF)
 option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 
@@ -36,7 +35,6 @@ endif()
 if(EXT_DYLIB)
     set(EXTERNAL_SHLIBS_AUDIO OFF)
     set(EXTERNAL_SHLIBS_GRAPHICS OFF)
-    set(EXTERNAL_SHLIBS_GRAPHICS_OPENGL OFF)
     message(STATUS "Building Extempore as a library without external dependencies")
 endif()
 
@@ -59,11 +57,9 @@ set(DEP_RTMIDI_VERSION "6.0.0")
 set(DEP_RTMIDI_MD5 "4fd20d9f3227023d4b369f21d29667ef")
 set(DEP_KISS_FFT_VERSION "1.3.0")
 set(DEP_SNDFILE_COMMIT "ae64caf9b5946d365971c550875000342e763de6")
-set(DEP_NANOVG_COMMIT "3c60175fcc2e5fe305b04355cdce35d499c80310")
 set(DEP_STB_COMMIT "152a250a702bf28951bb0220d63bc0c99830c498")
 set(DEP_GLFW_VERSION "3.4")
 set(DEP_WGPU_VERSION "27.0.4.0")
-set(DEP_ASSIMP_VERSION "5.4.3")
 
 ######
 # s7 #
@@ -422,21 +418,6 @@ set(AOT_EXTERNAL_GRAPHICS_LIBS
     "libs/external/glfw3.xtm"
     "libs/external/webgpu.xtm")
 
-if(DEFINED ENV{EXTEMPORE_FORCE_GL_GETPROCADDRESS})
-    set(GL_BIND_METHOD getprocaddress)
-else()
-    set(GL_BIND_METHOD directbind)
-endif()
-
-set(AOT_EXTERNAL_GRAPHICS_OPENGL_LIBS
-    "libs/contrib/gl/glcore-${GL_BIND_METHOD}.xtm"
-    "libs/contrib/gl/gl-objects.xtm"
-    "libs/contrib/gl/gl-objects2.xtm"
-    "libs/contrib/nanovg.xtm"
-    "libs/contrib/gl/glcompat-${GL_BIND_METHOD}.xtm"
-    "libs/contrib/graphics-pipeline.xtm"
-    "libs/contrib/assimp.xtm")
-
 # AOT compilation with proper per-library dependencies
 if(APPLE)
     find_program(TIMEOUT_CMD gtimeout)
@@ -519,24 +500,6 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     aotcompile_lib(libs/external/stb_image.xtm graphics base)
     aotcompile_lib(libs/external/glfw3.xtm graphics base)
     aotcompile_lib(libs/external/webgpu.xtm graphics base glfw3)
-endif()
-
-# External graphics libs (legacy OpenGL)
-if(EXTERNAL_SHLIBS_GRAPHICS_OPENGL)
-    add_custom_target(aot_external_graphics_opengl)
-    set_target_properties(aot_external_graphics_opengl PROPERTIES FOLDER AOT)
-    add_dependencies(aot_external_graphics_opengl extempore external_shlibs_graphics_opengl)
-    if(NOT EXTERNAL_SHLIBS_GRAPHICS)
-        aotcompile_lib(libs/external/stb_image.xtm graphics_opengl base)
-        aotcompile_lib(libs/external/glfw3.xtm graphics_opengl base)
-    endif()
-    aotcompile_lib(libs/contrib/gl/glcore-${GL_BIND_METHOD}.xtm graphics_opengl base)
-    aotcompile_lib(libs/contrib/gl/gl-objects.xtm graphics_opengl base math glcore-${GL_BIND_METHOD} stb_image)
-    aotcompile_lib(libs/contrib/gl/gl-objects2.xtm graphics_opengl base glcore-${GL_BIND_METHOD} stb_image)
-    aotcompile_lib(libs/contrib/graphics-pipeline.xtm graphics_opengl base math glcore-${GL_BIND_METHOD} stb_image gl-objects2)
-    aotcompile_lib(libs/contrib/nanovg.xtm graphics_opengl base glcore-${GL_BIND_METHOD})
-    aotcompile_lib(libs/contrib/assimp.xtm graphics_opengl base stb_image graphics-pipeline)
-    aotcompile_lib(libs/contrib/gl/glcompat-${GL_BIND_METHOD}.xtm graphics_opengl base)
 endif()
 
 add_custom_target(clean_aot
