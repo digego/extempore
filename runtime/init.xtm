@@ -30,6 +30,20 @@
 (define (hashtable-for-each f ht)
   (for-each f ht))
 
+;; Symbol property lists --- TinyScheme's put/get (its USE_PLIST builtins, a
+;; MacLisp/Common-Lisp-heritage extension, not part of any RnRS). TinyScheme
+;; kept a per-symbol association list keyed by a second symbol; s7 has no
+;; equivalent, so back it with a hash table keyed by (sym . key). A re-put on
+;; the same pair overwrites, matching TinyScheme's in-place update. get returns
+;; #f when the property is absent --- that follows s7's hash-table-ref
+;; convention, and TinyScheme's '() was likewise false in that dialect.
+(define *symbol-properties* (make-hash-table))
+(define (put sym key val)
+  (hash-table-set! *symbol-properties* (cons sym key) val)
+  #t)
+(define (get sym key)
+  (hash-table-ref *symbol-properties* (cons sym key)))
+
 ;; String search wrappers around s7's built-in string-position.
 ;; string-position returns the index or #f; argument order is (needle haystack).
 (define (string-contains? s find) (string-position find s))

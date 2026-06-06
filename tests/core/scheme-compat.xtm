@@ -1,0 +1,41 @@
+;;; tests/core/scheme-compat.xtm -- TinyScheme->s7 compatibility shims
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; runtime/init.xtm re-provides builtins that the old TinyScheme-derived
+;; interpreter offered but s7 does not. These tests pin the shims that aren't
+;; exercised elsewhere, so a regression (or an s7 upgrade that shadows them)
+;; fails loudly here.
+;;
+;; put/get are TinyScheme's symbol property lists (its USE_PLIST builtins, a
+;; MacLisp/Common-Lisp-heritage extension -- not part of any RnRS). They went
+;; missing in v0.9.0 when the interpreter moved to s7, so (put 'a 'b 10) raised
+;; "Unbound variable put" (reported on the mailing list by Minoru, June 2026).
+;; The shim backs them with a hash table keyed by (sym . key).
+
+;;; Code:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; put/get -- symbol property lists
+
+;; the canonical round-trip from Minoru's report
+(xtmtest-result (begin (put 'a 'b 10) (get 'a 'b)) 10 "put-get-round-trip")
+
+;; put reports success with #t, like TinyScheme
+(xtmtest-result (put 'put-ok 'k 1) #t "put-returns-true")
+
+;; a re-put on the same (sym . key) overwrites in place rather than shadowing
+(xtmtest-result (begin (put 'upd 'k 1) (put 'upd 'k 2) (get 'upd 'k)) 2 "put-updates-in-place")
+
+;; an absent property is #f (false), not '() -- '() is true under s7, so #f is
+;; what keeps (if (get ...) ...) behaving as TinyScheme code expects
+(xtmtest-result (get 'never 'set) #f "get-missing-is-false")
+
+;; distinct keys coexist on the one symbol, and values need not be numbers
+(xtmtest-result (begin (put 'sym 'k1 'v1) (put 'sym 'k2 'v2) (list (get 'sym 'k1) (get 'sym 'k2)))
+                '(v1 v2)
+                "distinct-keys-per-symbol")

@@ -85,6 +85,7 @@ extempore_add_test(tests/core/std.xtm libs-core)
 extempore_add_test(tests/core/xtlang.xtm libs-core)
 extempore_add_test(tests/core/generics.xtm libs-core)
 extempore_add_test(tests/core/pattern-language.xtm libs-core)
+extempore_add_test(tests/core/scheme-compat.xtm libs-core)
 
 # Compiler unit tests
 extempore_add_test(tests/compiler/transforms.xtm compiler-unit)
