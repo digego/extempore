@@ -1,8 +1,33 @@
 cmake_minimum_required(VERSION 3.28)
-project(Extempore VERSION 0.9.0)
+project(Extempore)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Version --- the git tag is the single source of truth. CI passes the tag
+# explicitly (-DEXTEMPORE_VERSION=${github.ref_name}) since its checkout is
+# shallow; local dev builds derive it from `git describe`; a git-less source
+# build falls back to "unknown". Captured at configure time into a generated
+# header (reconfigure to refresh).
+if(NOT EXTEMPORE_VERSION)
+    find_package(Git QUIET)
+    if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            OUTPUT_VARIABLE EXTEMPORE_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+    endif()
+endif()
+if(NOT EXTEMPORE_VERSION)
+    set(EXTEMPORE_VERSION "unknown")
+endif()
+message(STATUS "Extempore version: ${EXTEMPORE_VERSION}")
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/ExtemporeVersion.h.in
+    ${CMAKE_BINARY_DIR}/generated/ExtemporeVersion.h
+    @ONLY)
 
 option(ASSETS "download multimedia assets (approx 250MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
@@ -227,7 +252,8 @@ add_dependencies(extempore s7_lib portaudio_static)
 
 target_include_directories(extempore PRIVATE
     include
-    src/pcre)
+    src/pcre
+    ${CMAKE_BINARY_DIR}/generated)
 
 target_include_directories(extempore SYSTEM PRIVATE
     ${CMAKE_BINARY_DIR}/portaudio/include

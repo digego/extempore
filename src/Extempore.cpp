@@ -43,6 +43,8 @@
 #include <string>
 #include "EXTLLVM.h"
 
+#include "ExtemporeVersion.h"
+
 #include <chrono>
 #include <thread>
 
@@ -151,6 +153,7 @@ enum {
     OPT_AUDIO_OUTFILE,
     OPT_DURATION,
     OPT_REPL,
+    OPT_VERSION,
     OPT_HELP
 };
 
@@ -185,6 +188,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     {OPT_AUDIO_OUTFILE, "--audio-outfile", SO_REQ_SEP},
     {OPT_DURATION, "--duration", SO_REQ_SEP},
     {OPT_REPL, "--repl", SO_NONE},
+    {OPT_VERSION, "--version", SO_NONE},
     {OPT_HELP, "--help", SO_NONE},
     SO_END_OF_OPTIONS};
 
@@ -344,10 +348,15 @@ EXPORT int extempore_init(int argc, char** argv) {
                 return 1;
 #endif
                 break;
+            case OPT_VERSION:
+                std::cout << "Extempore " << EXTEMPORE_VERSION << std::endl;
+                std::_Exit(0);
             case OPT_HELP:
             default:
                 std::cout << "Extempore's command line options: " << std::endl;
                 std::cout << "            --help: prints this menu" << std::endl;
+                std::cout << "         --version: prints the Extempore version and exits"
+                          << std::endl;
                 std::cout << "             --run: path to a scheme file to load at startup"
                           << std::endl;
                 std::cout << "            --eval: scheme expression to evaluate at startup"
@@ -443,8 +452,9 @@ EXPORT int extempore_init(int argc, char** argv) {
     std::cout << std::endl;
     std::cout << "------------- Extempore -------------- " << std::endl;
     ascii_default();
-    std::cout << "Andrew Sorensen (c) 2011-2026" << std::endl;
-    std::cout << "andrew@moso.com.au, @digego" << std::endl;
+    std::cout << EXTEMPORE_VERSION << std::endl;
+    std::cout << "(c) Andrew Sorensen, Ben Swift" << std::endl;
+    std::cout << "ben@benswift.me" << std::endl;
     std::cout << std::endl;
     ascii_default();
 #ifdef _WIN32

@@ -37,6 +37,7 @@
 #include "SchemeProcess.h"
 #include "SchemeFFI.h"
 #include "OSC.h"
+#include "ExtemporeVersion.h"
 
 #include <iosfwd>
 #include <iomanip>
@@ -89,15 +90,16 @@ const char* SchemeProcess::sm_banner = "\n"
                                        "##                                      ##\n"
                                        "##               EXTEMPORE              ##\n"
                                        "##                                      ##\n"
-                                       "##           andrew@moso.com.au         ##\n"
+                                       "##    (c) Andrew Sorensen, Ben Swift    ##\n"
                                        "##                                      ##\n"
-                                       "##            (c) 2005-2015             ##\n"
+                                       "##           ben@benswift.me            ##\n"
                                        "##                                      ##\n"
                                        "##########################################\n"
                                        "     ################################\n"
                                        "          ######################\n"
                                        "               ############\n"
-                                       "                    ##\n\n";
+                                       "                    ##\n\n"
+                                       "              " EXTEMPORE_VERSION "\n\n";
 
 SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort,
                              bool Banner, const std::string& InitExpr)
