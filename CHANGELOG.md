@@ -3,6 +3,28 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.9.4
+
+Patch release restoring the `put`/`get` symbol property-list functions, broken
+since the s7 swap in v0.9.0.
+
+- **Scheme `put`/`get`**: `(put 'a 'b 10)` and `(get 'a 'b)` --- TinyScheme's
+  symbol property lists --- raised `Unbound variable put`/`get` since v0.9.0.
+  They were TinyScheme builtins (its optional `USE_PLIST` feature, a
+  MacLisp/Common-Lisp-heritage extension that no RnRS defines, enabled in our
+  vendored copy) with no s7 equivalent, so the interpreter swap dropped them.
+  Restored in `runtime/init.xtm` --- the file that already re-provides dropped
+  TinyScheme builtins --- backed by a hash table keyed by `(sym . key)`: a
+  re-`put` overwrites in place, and `get` returns `#f` when a property is
+  absent. New `tests/core/scheme-compat.xtm` guards them. Reported on the
+  mailing list by Minoru.
+
+- **Build**: removed the long-broken `EXT_DYLIB` ("build as a dynamic library")
+  CMake option. A rename from `DYLIB` to `EXT_DYLIB` left seven of its eight
+  source guards as dead `#ifdef DYLIB` blocks, so the embedded-resource loading
+  it promised never compiled. The option and its dead code are gone, with no
+  change to the normal executable build.
+
 ## v0.9.3
 
 Patch release fixing the pattern language, broken since the s7 swap in v0.9.0.
