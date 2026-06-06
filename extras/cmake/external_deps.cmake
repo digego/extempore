@@ -13,11 +13,6 @@ set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs)
 set(EXT_DEPS_C_FLAGS "")
 set(EXT_DEPS_CXX_FLAGS "")
 
-if(EXT_DYLIB)
-    string(APPEND EXT_DEPS_C_FLAGS " -fPIC")
-    string(APPEND EXT_DEPS_CXX_FLAGS " -fPIC")
-endif()
-
 if(WIN32)
     string(APPEND EXT_DEPS_C_FLAGS " /DWIN32")
 endif()

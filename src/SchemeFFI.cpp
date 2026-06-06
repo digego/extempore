@@ -98,11 +98,6 @@
 #include <dirent.h>
 #endif
 
-#ifdef DYLIB
-#include <cmrc/cmrc.hpp>
-CMRC_DECLARE(xtm);
-#endif
-
 // setting this define should make call_compiled thread safe BUT ...
 // also extremely SLOW !
 
@@ -381,16 +376,10 @@ static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
     }
 
     std::string inlineString;
-#ifdef DYLIB
-    auto fs = cmrc::xtm::get_filesystem();
-    auto data = fs.open("runtime/bitcode.ll");
-    inlineString = std::string(data.begin(), data.end());
-#else
     std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
     std::stringstream ss;
     ss << inStream.rdbuf();
     inlineString = ss.str();
-#endif
 
     // Extract type definitions and declarations (line by line to handle CRLF safely).
     // Declarations are needed so user IR can reference runtime symbols during parsing.

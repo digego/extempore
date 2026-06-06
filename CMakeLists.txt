@@ -9,7 +9,6 @@ option(BUILD_TESTS "build test targets (including examples)" ON)
 set(EXTEMPORE_SANITIZE "" CACHE STRING "Build with sanitizer: asan, ubsan, tsan, asan+ubsan")
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native, stb_image)" OFF)
-option(EXT_DYLIB "build extempore as a dynamic library" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -30,12 +29,6 @@ if(NOT CMAKE_BUILD_TYPE)
     message(STATUS "Building 'Release' configuration")
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
-
-if(EXT_DYLIB)
-    set(EXTERNAL_SHLIBS_AUDIO OFF)
-    set(EXTERNAL_SHLIBS_GRAPHICS OFF)
-    message(STATUS "Building Extempore as a library without external dependencies")
 endif()
 
 if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -228,26 +221,7 @@ set(EXTEMPORE_SOURCES
     src/UNIV.cpp
     src/LinenoiseREPL.cpp)
 
-if(EXT_DYLIB)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/CMakeRC.cmake)
-    cmrc_add_resource_library(rc_xtm NAMESPACE "xtm"
-        runtime/bitcode.ll
-        runtime/init.ll
-        runtime/init.xtm
-        runtime/llvmir.xtm
-        runtime/llvmti-globals.xtm
-        runtime/llvmti-caches.xtm
-        runtime/llvmti-aot.xtm
-        runtime/llvmti-transforms.xtm
-        runtime/llvmti-ast.xtm
-        runtime/llvmti-typecheck.xtm
-        runtime/llvmti-bind.xtm
-        runtime/scheme.xtm)
-    add_library(extempore SHARED ${EXTEMPORE_SOURCES})
-    target_link_libraries(extempore PRIVATE rc_xtm)
-else()
-    add_executable(extempore ${EXTEMPORE_SOURCES})
-endif()
+add_executable(extempore ${EXTEMPORE_SOURCES})
 
 add_dependencies(extempore s7_lib portaudio_static)
 
@@ -265,8 +239,6 @@ target_link_libraries(extempore PRIVATE s7_lib pcre portaudio${CMAKE_STATIC_LIBR
 # Compile definitions
 if(EXT_SHARE_DIR)
     target_compile_definitions(extempore PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
-elseif(EXT_DYLIB)
-    target_compile_definitions(extempore PRIVATE -DEXT_DYLIB=1 -DEXT_SHARE_DIR=".")
 else()
     target_compile_definitions(extempore PRIVATE -DEXT_SHARE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
