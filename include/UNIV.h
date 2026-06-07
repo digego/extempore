@@ -54,11 +54,6 @@
 #define EXPORT extern "C"
 #endif
 
-#if __APPLE__
-#include <CoreAudio/HostTime.h>
-#include <CoreFoundation/CFDate.h>
-#endif
-
 #define BILLION 1000000000L
 #define D_BILLION 1000000000.0
 #define D_MILLION 1000000.0
@@ -157,31 +152,18 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 
 // clock/time
 //
-// Wall-clock seconds since the Unix epoch. std::chrono::system_clock measures
-// Unix-epoch wall time on every platform, so it folds the old Windows and Linux
-// branches into one. On Windows this also fixes a latent bug: the previous
-// high_resolution_clock has a boot-relative (unspecified) epoch, which is wrong
-// for the cross-machine clock sync that consumes this value. The macOS branch
-// keeps CoreFoundation's clock for now, pending a check that AudioDevice's
-// sample-clock base maths doesn't depend on its exact representation.
-#ifdef __APPLE__
-
-#include <CoreAudio/HostTime.h>
-
-extern "C" inline double getRealTime() {
-    return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
-}
-
-#else
-
+// Wall-clock seconds since the Unix epoch, uniform across platforms via
+// std::chrono::system_clock (Unix-epoch wall time everywhere). This replaced
+// three per-platform clocks: the Windows high_resolution_clock had a
+// boot-relative epoch (wrong for the cross-machine clock sync that consumes
+// it), while Linux's clock_gettime(CLOCK_REALTIME) and the macOS CoreFoundation
+// clock both returned exactly the Unix wall time system_clock already provides.
 extern "C" inline double getRealTime() {
     return double(std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count()) /
            D_BILLION;
 }
-
-#endif
 
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
     if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor)) {
