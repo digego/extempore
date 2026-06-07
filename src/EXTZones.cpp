@@ -6,6 +6,10 @@
 #include <memory>
 #include <mutex>
 
+#ifdef _WIN32
+#include <malloc.h>  // _aligned_malloc / _aligned_free
+#endif
+
 #define DEBUG_ZONE_ALLOC 0
 #define DEBUG_ZONE_STACK 0
 #define EXTENSIBLE_ZONES 1
@@ -17,22 +21,38 @@ thread_local uint64_t tls_llvm_zone_stacksize = 0;
 namespace extemp {
 namespace EXTZones {
 
+// Zone memory is allocated aligned to LLVM_ZONE_ALIGN and must be released with
+// the matching free. The old Windows path used plain malloc (only 16-byte
+// aligned, not the 32 the zones promise) because _aligned_malloc "crashed" --
+// the real cause was llvm_zone_destroy below freeing with plain free(), which
+// is undefined for _aligned_malloc. Pairing _aligned_malloc with _aligned_free
+// fixes both the under-alignment and the crash.
+static void* zone_aligned_alloc(size_t size) {
+#ifdef _WIN32
+    return _aligned_malloc(size, LLVM_ZONE_ALIGN);
+#else
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr, LLVM_ZONE_ALIGN, size) != 0) {
+        ptr = nullptr;
+    }
+    return ptr;
+#endif
+}
+
+static void zone_aligned_free(void* ptr) {
+#ifdef _WIN32
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+}
+
 llvm_zone_t* llvm_zone_create(uint64_t size) {
     auto zone(reinterpret_cast<llvm_zone_t*>(malloc(sizeof(llvm_zone_t))));
     if (unlikely(!zone)) {
         abort();  // in case a leak can be analyzed post-mortem
     }
-#ifdef _WIN32
-    if (size == 0) {
-        zone->memory = nullptr;
-    } else {
-        // this crashes extempore but I have no idea why????
-        // zone->memory = _aligned_malloc((size_t)size, (size_t)LLVM_ZONE_ALIGN);
-        zone->memory = malloc(size_t(size));
-    }
-#else
-    posix_memalign(&zone->memory, LLVM_ZONE_ALIGN, size_t(size));
-#endif
+    zone->memory = size ? zone_aligned_alloc(size_t(size)) : nullptr;
     zone->mark = 0;
     zone->offset = 0;
     if (unlikely(!zone->memory)) {
@@ -51,7 +71,7 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
     if (Zone->memories) {
         llvm_zone_destroy(Zone->memories);
     }
-    free(Zone->memory);
+    zone_aligned_free(Zone->memory);
     free(Zone);
 }
 
