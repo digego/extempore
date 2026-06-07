@@ -205,7 +205,9 @@ void* audioCallbackMT(void* Args) {
     outbufs[0] = outbuf + UNIV::CHANNELS * UNIV::NUM_FRAMES * idx * 2;
     outbufs[1] = outbufs[0] + UNIV::CHANNELS * UNIV::NUM_FRAMES;
     SAMPLE* inbuf = AudioDevice::I()->getDSPMTInBuffer();
-    SAMPLE* indata = (SAMPLE*)malloc(UNIV::IN_CHANNELS * 8);
+    // per-worker scratch buffer for one frame of input, sized once before the
+    // realtime loop so the loop stays allocation-free
+    std::vector<SAMPLE> indata(UNIV::IN_CHANNELS);
     bool zerolatency = AudioDevice::I()->getZeroLatency();
     bool toggle = false;
     printf("Starting RT Audio MT worker %u\n", idx);
