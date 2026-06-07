@@ -25,7 +25,6 @@ void scheme_set_output_port_string(scheme* sc, char* start, char* past_the_end);
 void scheme_load_file(scheme* sc, FILE* fin);
 void scheme_load_string(scheme* sc, const char* cmd, uint64_t start_time, uint64_t end_time);
 void scheme_apply0(scheme* sc, const char* procname);
-pointer scheme_apply1(scheme* sc, const char* procname, pointer);
 void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
                  uint64_t call_duration);
 void scheme_call_without_stack_reset(scheme* sc, pointer func, pointer args);
@@ -70,10 +69,6 @@ EXPORT pointer mk_cptr(scheme* sc, void* p);
 void putstr(scheme* sc, const char* s);
 EXPORT int pointer_type(pointer p);
 
-pointer mk_continuation(scheme* sc);
-pointer mk_closure(scheme* sc, pointer c, pointer e);
-const char* procname(pointer x);
-
 pointer cons(scheme* sc, pointer a, pointer b);
 pointer immutable_cons(scheme* sc, pointer a, pointer b);
 void putcharacter(scheme* sc, int c);
@@ -106,14 +101,11 @@ EXPORT void* cptr_value(pointer p);
 EXPORT char* syntaxname(pointer p);
 EXPORT int is_closure(pointer p);
 EXPORT int is_macro(pointer p);
-pointer closure_code(pointer p);
 pointer closure_env(pointer p);
 
 EXPORT int is_continuation(pointer p);
-EXPORT int is_promise(pointer p);
 EXPORT int is_environment(pointer p);
 int is_immutable(pointer p);
-void setimmutable(pointer p);
 
 EXPORT int is_pair(pointer p);
 EXPORT int is_integer(pointer p);

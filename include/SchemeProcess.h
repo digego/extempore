@@ -156,7 +156,6 @@ class SchemeProcess {
         memset(m_schemeOutportString, 0, sizeof(m_schemeOutportString));
     }
     bool loadFile(const std::string& File, const std::string& Path = std::string());
-    bool loadString(const std::string& str);
 
     static void* serverTrampoline(void* Arg) {
         return reinterpret_cast<SchemeProcess*>(Arg)->serverImpl();

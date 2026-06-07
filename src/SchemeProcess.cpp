@@ -220,12 +220,6 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path) {
     return true;
 }
 
-bool SchemeProcess::loadString(const std::string& str) {
-    uint64_t now(UNIV::TIME);
-    scheme_load_string(m_scheme, str.c_str(), now, now + (m_maxDuration * 2.0));
-    return true;
-}
-
 void* SchemeProcess::taskImpl() {
     sm_current = this;
     OSC::schemeInit(this);

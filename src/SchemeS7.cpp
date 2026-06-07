@@ -314,15 +314,6 @@ void scheme_apply0(scheme* sc, const char* name) {
     eval_with_error_trap(sc, expr.c_str());
 }
 
-pointer scheme_apply1(scheme* sc, const char* name, pointer arg) {
-    s7_pointer sym = s7_make_symbol(sc->sc, name);
-    s7_pointer func = s7_symbol_value(sc->sc, sym);
-    s7_pointer args = s7_cons(sc->sc, arg, s7_nil(sc->sc));
-    s7_pointer result = s7_call(sc->sc, func, args);
-    sc->value = result;
-    return result;
-}
-
 void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
                  uint64_t call_duration) {
     sc->call_start_time = start_time;
@@ -543,16 +534,6 @@ long long vector_length(pointer vec) {
     return s7_vector_length(vec);
 }
 
-pointer mk_continuation(scheme* sc) {
-    return s7_make_continuation(sc->sc);
-}
-
-pointer mk_closure(scheme* sc, pointer c, pointer e) {
-    // Create a lambda from code c in environment e
-    // This is a best-effort shim — closures are typically created by eval
-    return s7_eval(sc->sc, s7_cons(sc->sc, s7_make_symbol(sc->sc, "lambda"), c), e);
-}
-
 void putstr(scheme* sc, const char* s) {
     s7_display(sc->sc, s7_make_string(sc->sc, s), s7_current_output_port(sc->sc));
 }
@@ -582,11 +563,6 @@ int pointer_type(pointer p) {
     if (s7_is_let(p))
         return T_ENVIRONMENT;
     return T_PAIR;  // fallback
-}
-
-const char* procname(pointer x) {
-    // s7 doesn't expose proc names the same way
-    return "#<procedure>";
 }
 
 int is_string(pointer p) {
@@ -651,18 +627,8 @@ int is_continuation(pointer p) {
     return 0;
 }
 
-int is_promise(pointer) {
-    return 0;
-}
-
 int is_immutable(pointer p) {
     return s7_is_immutable(p);
-}
-void setimmutable(pointer p) { /* need sc for s7_set_immutable */ }
-
-pointer closure_code(pointer p) {
-    // Can't call s7_lambda_body without sc — will be handled at call sites
-    return nullptr;
 }
 
 pointer closure_env(pointer p) {
