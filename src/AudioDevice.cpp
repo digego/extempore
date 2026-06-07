@@ -39,12 +39,6 @@
 #include <cinttypes>
 #include <regex>
 
-// x86 SSE intrinsics for audio_sanity_f optimization
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
-#include <xmmintrin.h>
-#define USE_SSE_AUDIO_SANITY 1
-#endif
-
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
 #include "EXTLLVM.h"
@@ -73,6 +67,7 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <atomic>
 #include <vector>
@@ -117,34 +112,11 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 }
 #endif
 
-#include <cmath>
-
-static inline SAMPLE audio_sanity(SAMPLE x) {
-    if (likely(std::isfinite(x))) {
-        if (unlikely(x < -0.99f))
-            return -0.99f;
-        if (unlikely(x > 0.99f))
-            return 0.99f;
-        return x;
-    }
-    return 0.0;
-}
-
-static inline float audio_sanity_f(float x) {
-    if (likely(std::isfinite(x))) {
-#if USE_SSE_AUDIO_SANITY
-        _mm_store_ss(&x,
-                     _mm_min_ss(_mm_max_ss(_mm_set_ss(x), _mm_set_ss(-0.99f)), _mm_set_ss(0.99f)));
-#else
-        // Portable branchless clamp for ARM64 and other architectures
-        if (x < -0.99f)
-            x = -0.99f;
-        else if (x > 0.99f)
-            x = 0.99f;
-#endif
-        return x;
-    }
-    return 0.0;
+// Reject non-finite samples and clamp the rest to a safe range. The finite
+// check runs first so NaN/inf never reach std::clamp; on x86 and ARM, compilers
+// lower the clamp to min/max instructions, so no hand-written intrinsics needed.
+static inline float audio_sanity(float x) {
+    return likely(std::isfinite(x)) ? std::clamp(x, -0.99f, 0.99f) : 0.0f;
 }
 
 // double audio_sanity_d(double x)
@@ -311,7 +283,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             float dummy(0.0);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
-                    *(dat++) = audio_sanity_f(float(cache_wrapper(
+                    *(dat++) = audio_sanity(float(cache_wrapper(
                         zone, reinterpret_cast<void*>(closure), 0.0, time, k, &dummy)));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
@@ -320,7 +292,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 auto indata(in);
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
-                    *(dat++) = audio_sanity_f(float(cache_wrapper(
+                    *(dat++) = audio_sanity(float(cache_wrapper(
                         zone, reinterpret_cast<void*>(closure), *(in++), time, k, indata)));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
@@ -328,7 +300,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         } else if (UNIV::IN_CHANNELS == 1) {
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
-                    *(dat++) = audio_sanity_f(float(
+                    *(dat++) = audio_sanity(float(
                         cache_wrapper(zone, reinterpret_cast<void*>(closure), *in, time, k, in)));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
@@ -340,7 +312,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             auto indata(in);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
-                    *(dat++) = audio_sanity_f(
+                    *(dat++) = audio_sanity(
                         float(cache_wrapper(zone, reinterpret_cast<void*>(closure), 0.0, time, k,
                                             &indata[i * UNIV::IN_CHANNELS])));
                     extemp::EXTZones::llvm_zone_reset(zone);
@@ -385,7 +357,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
                 for (unsigned jj = 0; jj < numthreads; jj++) {
                     in[jj] = indats[jj][iout + k];
                 }
-                dat[iout + k] = audio_sanity_f((float)cache_wrapper(
+                dat[iout + k] = audio_sanity((float)cache_wrapper(
                     zone, (void*)closure, in, (i + UNIV::DEVICE_TIME), k, nullptr));
                 extemp::EXTZones::llvm_zone_reset(zone);
             }
