@@ -61,7 +61,7 @@ extern "C" {
 const char* llvm_scheme_ff_get_name(foreign_func ff);
 void llvm_scheme_ff_set_name(foreign_func ff, const char* name);
 
-void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
+EXPORT void llvm_destroy_zone_after_delay(llvm_zone_t* zone, uint64_t delay);
 
 pointer llvm_scheme_env_set(scheme* _sc, char* sym);
 bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol);
