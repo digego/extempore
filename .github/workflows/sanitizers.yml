@@ -1,0 +1,124 @@
+name: Sanitizers
+
+# Sanitizer and clang-tidy runs are slow and memory-hungry, so they run on a
+# weekly schedule and on demand rather than on every push. They are
+# intentionally NOT required checks: treat a red run as a list of things to
+# triage, not a merge blocker. Once a configuration has proven reliably green it
+# can be promoted into the main build-and-test matrix (.github/workflows/
+# build-and-test.yml).
+#
+# Everything runs on Linux x86_64 and reuses the LLVM cache built by the main
+# build job (the EXTEMPORE_SANITIZE flag only instruments Extempore's own
+# objects, not the cached LLVM libraries).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+
+env:
+  LLVM_VERSION: "22.1.6"
+
+jobs:
+  sanitize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sanitizer: tsan
+            name: ThreadSanitizer
+          - sanitizer: asan+ubsan
+            name: Address+UB Sanitizer
+    name: ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore LLVM cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ubuntu-24.04-llvm-${{ env.LLVM_VERSION }}-v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DEXTEMPORE_SANITIZE=${{ matrix.sanitizer }}
+
+      - name: Build LLVM (on cache miss)
+        run: cmake --build build --target llvm-libs
+
+      - name: Build
+        # setarch -R disables ASLR for the AOT-compile step: ThreadSanitizer
+        # aborts with "unexpected memory mapping" when a PIE binary lands outside
+        # its expected address ranges, which it reliably does on the runners.
+        # The personality flag is inherited by the extempore processes ninja
+        # spawns. A sanitizer report raised while AOT-compiling the standard
+        # library shouldn't fail the build; the test step below is where findings
+        # should surface. detect_leaks=0 because Extempore deliberately leaks a
+        # handful of process-lifetime objects (the primary SchemeProcess/REPL,
+        # and OSC servers whose receive thread never stops), which LeakSanitizer
+        # would otherwise flag.
+        env:
+          TSAN_OPTIONS: "exitcode=0"
+          ASAN_OPTIONS: "exitcode=0:detect_leaks=0"
+          UBSAN_OPTIONS: "exitcode=0"
+        run: setarch -R cmake --build build --parallel 2
+
+      - name: Test
+        timeout-minutes: 90
+        # Restricted to the fast, deterministic suites: the example/audio tests
+        # carry tight per-test timeouts that instrumentation's 5-15x slowdown
+        # would trip, drowning real findings in spurious timeouts.
+        env:
+          TSAN_OPTIONS: "halt_on_error=0 second_deadlock_stack=1"
+          ASAN_OPTIONS: "halt_on_error=0:detect_leaks=0:abort_on_error=1"
+          UBSAN_OPTIONS: "halt_on_error=0:print_stacktrace=1"
+        run: setarch -R ctest --test-dir build --build-config Release --label-regex "libs-core|cpp-unit" --output-on-failure
+
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # Informational until the tree is confirmed clean against .clang-tidy; the
+    # check set there is curated but has never been enforced in CI. Promote to a
+    # required check (and set WarningsAsErrors) once it reports clean.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore LLVM cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/_deps
+            build/.ninja_log
+            build/.ninja_deps
+          key: ubuntu-24.04-llvm-${{ env.LLVM_VERSION }}-v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev clang-tidy
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+      - name: Build LLVM (on cache miss)
+        run: cmake --build build --target llvm-libs
+
+      - name: Generate sources and headers
+        # clang-tidy needs the generated headers (e.g. ExtemporeVersion.h) and a
+        # populated compile_commands.json to parse the translation units.
+        run: cmake --build build --target extempore --parallel 2
+
+      - name: Run clang-tidy
+        run: cmake --build build --target tidy
