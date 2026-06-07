@@ -73,7 +73,7 @@ int EXTThread::start(function_type EntryPoint, void* Arg) {
     }
     int result = 0;
     if (!m_initialised && !m_subsume) {
-        std::function<void*()> fn = [=]() -> void* { return Trampoline(this); };
+        std::function<void*()> fn = [this]() -> void* { return Trampoline(this); };
         m_thread = std::thread(fn);
 #ifdef __linux__
         if (!m_name.empty()) {

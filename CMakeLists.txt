@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 project(Extempore)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Version --- the git tag is the single source of truth. CI passes the tag
