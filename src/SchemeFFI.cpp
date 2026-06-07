@@ -84,7 +84,7 @@
 #include "SchemeProcess.h"
 #include "SchemeREPL.h"
 #include <unordered_set>
-#include <unordered_map>
+#include <map>
 #include <atomic>
 #include <string_view>
 
@@ -180,9 +180,11 @@ static std::mutex sExternalLibFunctionNamesMutex;
 // Cached template module (parsed bitcode.ll) and its binary form for fast cloning.
 static std::string sTemplateBitcode;
 // IR declarations keyed by bare name (without % or @ prefix), prepended to every user IR.
-static std::unordered_map<std::string, std::string> sTypeDefs;
-static std::unordered_map<std::string, std::string> sFuncDecls;
-static std::unordered_map<std::string, std::string> sGlobalDecls;
+// std::map (ordered) rather than unordered_map so the generated preamble is
+// byte-deterministic across runs, keeping the AOT cache reproducible.
+static std::map<std::string, std::string> sTypeDefs;
+static std::map<std::string, std::string> sFuncDecls;
+static std::map<std::string, std::string> sGlobalDecls;
 // Global/function names defined in the template module (bitcode.ll).
 // Declarations for these must not be added to the maps above, since they
 // already exist in every cloned template module and would cause redefinitions.
