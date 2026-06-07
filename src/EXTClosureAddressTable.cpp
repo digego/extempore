@@ -7,7 +7,7 @@ namespace extemp {
 namespace ClosureAddressTable {
 EXPORT closure_address_table* get_address_table(const char* name, closure_address_table* table) {
     while (table) {
-        if (strcmp(table->name, name))
+        if (strcmp(table->name, name) == 0)
             return table;
         table = table->next;
     }
@@ -29,12 +29,12 @@ EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table) {
 }
 
 EXPORT bool check_address_exists(uint64_t id, closure_address_table* table) {
-    do {
+    while (table) {
         if (table->id == id) {
             return true;
         }
         table = table->next;
-    } while (table);
+    }
     return false;
 }
 

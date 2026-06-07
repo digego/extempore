@@ -70,7 +70,7 @@ EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
     size += LLVM_ZONE_ALIGN;  // for storing size information
     if (unlikely(zone->offset + size >= zone->size)) {
 #if EXTENSIBLE_ZONES  // if extensible_zones is true then extend zone size by zone->size
-        int old_zone_size = zone->size;
+        uint64_t old_zone_size = zone->size;
         bool iszero(!zone->size);
         if (size > zone->size) {
             zone->size = size;
@@ -137,7 +137,7 @@ llvm_zone_t* llvm_peek_zone_stack() {
 #if DEBUG_ZONE_STACK
         printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
 #endif
-        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1);  // default root zone is 1M
+        z = llvm_zone_create(1024 * 1024 * 1);  // default root zone is 1M
         llvm_push_zone_stack(z);
         stack = llvm_threads_get_zone_stack();
 #if DEBUG_ZONE_STACK

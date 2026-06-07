@@ -16,6 +16,8 @@ static pointer platform(scheme* Scheme, pointer Args)
     return mk_string(Scheme, "Linux");
 #elif _WIN32
     return mk_string(Scheme, "Windows");
+#else
+    return mk_string(Scheme, "unknown");
 #endif
 }
 

@@ -732,7 +732,7 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax) {
         llvm::MCInst Inst;
         if (DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls())) {
             auto instSize(*reinterpret_cast<const size_t*>(Code + index));
-            if (instSize <= 0) {
+            if (instSize == 0) {
                 break;
             }
             OS.indent(4);

@@ -146,13 +146,9 @@ class SchemeProcess {
     void* serverImpl();
     void* taskImpl();
     void resetOutportString() {
-        // With s7, error output goes to the error port string.
-        // Get the output, copy to m_schemeOutportString, then reset.
-        const char* output = s7_get_output_string(m_scheme->sc, m_scheme->output_port);
-        if (output) {
-            strncpy(m_schemeOutportString, output, SCHEME_OUTPORT_STRING_LENGTH - 1);
-            m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH - 1] = '\0';
-        }
+        // m_schemeOutportString is the s7 output port's backing buffer (wired up
+        // with scheme_set_output_port_string in the constructor); callers read it
+        // after an eval, then call this to clear it ready for the next one.
         memset(m_schemeOutportString, 0, sizeof(m_schemeOutportString));
     }
     bool loadFile(const std::string& File, const std::string& Path = std::string());
