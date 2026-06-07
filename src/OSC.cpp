@@ -753,11 +753,11 @@ OSC::OSC() : threadOSC(&osc_mesg_callback, this, "OSC"), message_length(0), star
 void OSC::schemeInit(SchemeProcess* scm) {
     // scm->addForeignFunc("osc-send-msg", &OSC::sendOSC);
     // scm->addGlobalCptr((char*)"*io:osc-send-msg*",mk_cb(this,OSC,sendOSC));
-    scm->addForeignFunc((char*)"io:osc:start-server", &OSC::registerScheme);
-    scm->addForeignFunc((char*)"io:osc:set-real-64bit?", &OSC::set_real_type);
-    scm->addForeignFunc((char*)"io:osc:set-integer-64bit?", &OSC::set_integer_type);
-    scm->addForeignFunc((char*)"io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
-    scm->addForeignFunc((char*)"io:osc:netaddress?", &OSC::set_msg_include_netaddr);
+    scm->addForeignFunc("io:osc:start-server", &OSC::registerScheme);
+    scm->addForeignFunc("io:osc:set-real-64bit?", &OSC::set_real_type);
+    scm->addForeignFunc("io:osc:set-integer-64bit?", &OSC::set_integer_type);
+    scm->addForeignFunc("io:osc:send-from-server-socket?", &OSC::send_from_server_socket);
+    scm->addForeignFunc("io:osc:netaddress?", &OSC::set_msg_include_netaddr);
 
     // scm->addGlobal("*samplerate*",mk_integer(scm->getSchemeEnv(),AUHost::SAMPLERATE));
 }
@@ -1159,7 +1159,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
     if (osc->getConnectionType() == OSC_UDP_TYPE) {
 
         SchemeProcess* scm = _sc->m_process;
-        scm->addGlobalCptr((char*)"*io:osc:send-msg*", mk_cb(osc, OSC, sendOSC));
+        scm->addGlobalCptr("*io:osc:send-msg*", mk_cb(osc, OSC, sendOSC));
 
 #ifdef _WIN32
         std::experimental::net::ip::udp::endpoint* osc_address = osc->getAddress();
@@ -1225,7 +1225,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
     if (osc->getConnectionType() == OSC_TCP_TYPE) {
 
         SchemeProcess* scm = _sc->m_process;
-        scm->addGlobalCptr((char*)"*io:osc:send-msg*", mk_cb(osc, OSC, sendOSC));
+        scm->addGlobalCptr("*io:osc:send-msg*", mk_cb(osc, OSC, sendOSC));
 
         // SchemeProcess* scm = new extemp::SchemeProcess(UNIV::SHARE_DIR,
         // std::string("tcp-osc-server"), port, 0); scm->start();

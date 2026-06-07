@@ -191,18 +191,18 @@ class SchemeProcess {
         return m_threadTask.getPriority();
     }
 
-    void addGlobal(char* Symbol, pointer Arg) {
+    void addGlobal(const char* Symbol, pointer Arg) {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol), Arg);
     }
-    void addForeignFunc(char* Symbol, foreign_func Func) {
+    void addForeignFunc(const char* Symbol, foreign_func Func) {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
                       mk_foreign_func(m_scheme, Func));
     }
-    void addGlobalCptr(char* Symbol, void* Ptr) {
+    void addGlobalCptr(const char* Symbol, void* Ptr) {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
                       mk_cptr(m_scheme, Ptr));
     }
-    void addSchemeGlobal(char* Symbol, void* Cptr) {
+    void addSchemeGlobal(const char* Symbol, void* Cptr) {
         scheme_define(m_scheme, m_scheme->global_env, mk_symbol(m_scheme, Symbol),
                       mk_cptr(m_scheme, Cptr));
     }
