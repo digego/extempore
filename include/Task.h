@@ -36,8 +36,6 @@
 #ifndef IMP_TASK_H
 #define IMP_TASK_H
 
-#include <iostream>
-
 #include "CM.h"
 #include <cstdint>
 

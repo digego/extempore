@@ -82,7 +82,6 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <ctime>
-#include <mutex>
 #include <shared_mutex>
 
 #include <EXTLLVM.h>
@@ -95,7 +94,6 @@
 #include <SchemeS7.h>
 #include <SchemeS7Private.h>
 #include <OSC.h>
-#include <cmath>
 #include <BranchPrediction.h>
 
 #ifdef _WIN32

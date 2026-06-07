@@ -33,6 +33,8 @@
  *
  */
 
+#pragma once
+
 #include "UNIV.h"
 #include <mutex>
 #include <string>

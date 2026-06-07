@@ -1,10 +1,9 @@
 #include "SchemeS7Private.h"
 #include <array>
 #include <atomic>
-#include <iostream>
 #include <mutex>
+#include <string>
 #include <unordered_map>
-#include <vector>
 
 static std::mutex s_wrapperMapMutex;
 static std::unordered_map<s7_scheme*, scheme*> s_wrapperMap;

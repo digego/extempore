@@ -47,6 +47,9 @@
 
 #include <chrono>
 #include <thread>
+#include <iostream>
+#include <cstring>
+#include <cstdio>
 
 #ifndef _WIN32
 #include "LinenoiseREPL.h"

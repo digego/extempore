@@ -129,9 +129,6 @@ EXPORT int32_t i32value(pointer p);
 EXPORT int16_t i16value(pointer p);
 EXPORT int8_t i8value(pointer p);
 EXPORT bool i1value(scheme* sc, pointer p);
-EXPORT double r64value(pointer p);
-EXPORT float r32value(pointer p);
-EXPORT long long charvalue(pointer p);
 EXPORT int is_integer_extern(pointer p);
 
 void load_file(scheme* sc, FILE* fin);
