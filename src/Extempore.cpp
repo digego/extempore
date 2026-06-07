@@ -67,18 +67,6 @@
 #include <AppKit/AppKit.h>
 #endif
 
-#define SUBSUME_PRIMARY
-
-// main callback for use by XTLang code
-void (*XTMMainCallback)();
-
-extern "C" {
-void xtm_set_main_callback(void (*f)()) {
-    XTMMainCallback = f;
-    return;
-}
-}
-
 int pass_primary_port = 7099;  // lazy :(
 
 void* extempore_primary_repl_delayed_connect(void* dat) {
@@ -489,12 +477,10 @@ EXPORT int extempore_init(int argc, char** argv) {
         dev->start();
     }
     ascii_normal();
-#ifdef SUBSUME_PRIMARY
     std::cout << "Primary        : ";
     ascii_info();
     std::cout << "thread 0" << std::endl;
     ascii_default();
-#endif
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
     bool startup_ok = true;
@@ -512,13 +498,6 @@ EXPORT int extempore_init(int argc, char** argv) {
         extemp::SchemeREPL* utility_repl = new extemp::SchemeREPL(utility_name, utility);
         utility_repl->connectToProcessAtHostname(host, utility_port);
 
-#ifndef SUBSUME_PRIMARY  // if not subsume primary (i.e. primary NOT on thread 0)
-        primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0,
-                                            initexpr);
-        startup_ok &= primary->start();
-        extemp::SchemeREPL* primary_repl = new extemp::SchemeREPL(primary_name, primary);
-        primary_repl->connectToProcessAtHostname(host, primary_port);
-#endif
         if (!startup_ok) {
             ascii_error();
             printf("ERROR:");
@@ -526,25 +505,13 @@ EXPORT int extempore_init(int argc, char** argv) {
             std::cout << " one or more processes failed to start, exiting." << std::endl;
             exit(1);
         }
-#ifndef SUBSUME_PRIMARY
-        ascii_info();
-        std::cout << "Listening on TCP port " << primary_port
-                  << " --- connect your editor to send code." << std::endl;
-        ascii_default();
-        while (true) {
-            if (XTMMainCallback) {
-                XTMMainCallback();
-            }
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-        }
-#else
         primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port, 0,
                                             initexpr);
 
         // Fire-and-forget: both helpers run for the life of the process and
-        // don't need the RT-scheduling / subsume features of EXTThread, so
-        // std::thread + detach is sufficient.  Detaching mirrors the
-        // previous behaviour of leaking the EXTThread*.
+        // don't need the RT-scheduling features of EXTThread, so std::thread +
+        // detach is sufficient.  Detaching mirrors the previous behaviour of
+        // leaking the EXTThread*.
         pass_primary_port = primary_port;
         std::thread([primary] { extempore_primary_repl_delayed_connect(primary); }).detach();
 
@@ -560,9 +527,8 @@ EXPORT int extempore_init(int argc, char** argv) {
                   << " --- connect your editor to send code." << std::endl;
         ascii_default();
 
-        // start the primary process running on this thread (i.e. process thread 0)
+        // the primary process runs on this thread (process thread 0)
         primary->start(true);  // this will not return
-#endif  // end SUBSUME_PRIMARY
     }
     return 0;
 }

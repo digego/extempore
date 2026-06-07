@@ -159,7 +159,6 @@ declare i32 @swap32i(i32) nounwind
 declare i32 @unswap32i(i32) nounwind
 
 ; Callback registration
-declare void @xtm_set_main_callback(i8*) nounwind
 declare i32 @register_for_window_events() nounwind
 
 ; 16-byte aligned memory
