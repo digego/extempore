@@ -101,11 +101,12 @@ int EXTThread::start(function_type EntryPoint, void* Arg) {
 }
 
 int EXTThread::kill() {
-#ifndef _WIN32
-    return pthread_cancel(m_thread.native_handle());
-#else
+    // Cooperative cancellation: request the thread stop and let it unwind
+    // cleanly at its next stopRequested() check. (Previously pthread_cancel,
+    // which is undefined behaviour with C++ RAII/locks and was a silent no-op
+    // on Windows anyway.)
+    m_stopRequested.store(true, std::memory_order_relaxed);
     return 0;
-#endif
 }
 
 int EXTThread::detach() {

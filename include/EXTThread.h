@@ -36,6 +36,7 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
+#include <atomic>
 #include <thread>
 #include <functional>
 #include <string>
@@ -56,6 +57,7 @@ class EXTThread {
     bool m_detached;
     bool m_joined;
     bool m_subsume;  // subsume the current thread
+    std::atomic<bool> m_stopRequested{false};
     std::thread m_thread;
 
     static thread_local EXTThread* sm_current;
@@ -68,7 +70,10 @@ class EXTThread {
 
     int start(function_type EntryPoint = nullptr,
               void* Arg = nullptr);  // overrides - ugly, from OSC
-    int kill();
+    int kill();  // cooperative: requests stop; the thread must poll stopRequested()
+    bool stopRequested() const {
+        return m_stopRequested.load(std::memory_order_relaxed);
+    }
     int detach();
     int join();
     void setSubsume() {
