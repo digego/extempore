@@ -104,10 +104,6 @@
 #include <sys/types.h>
 #endif
 
-#ifdef __linux__
-#include <sys/syscall.h>
-#endif
-
 #ifdef _WIN32
 #include <experimental/buffer>
 #include <experimental/executor>

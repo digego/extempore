@@ -775,11 +775,3 @@ void load_string(scheme* sc, const char* input) {
     uint64_t now = extemp::UNIV::TIME;
     scheme_load_string(sc, input, now, now + sc->call_default_time);
 }
-
-unsigned long string_hash(const char* s) {
-    unsigned long hash = 5381;
-    int c;
-    while ((c = *s++))
-        hash = ((hash << 5) + hash) + c;
-    return hash;
-}

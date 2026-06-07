@@ -59,22 +59,6 @@
 #include <CoreFoundation/CFDate.h>
 #endif
 
-#if _WIN32 || _WIN64
-#if _WIN64
-#define TARGET_64BIT
-#else
-#define TARGET_32BIT
-#endif
-#endif
-
-#if __GNUC__
-#if __x86_64__ || __ppc64__ || __aarch64__
-#define TARGET_64BIT
-#else
-#define TARGET_32BIT
-#endif
-#endif
-
 #define BILLION 1000000000L
 #define D_BILLION 1000000000.0
 #define D_MILLION 1000000.0

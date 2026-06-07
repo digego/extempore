@@ -40,13 +40,7 @@
 #include <CoreAudio/AudioHardware.h>
 #endif
 
-#if defined(COREAUDIO)  //__APPLE__)
-#include <CoreAudio/AudioHardware.h>
-#elif defined(ALSA_AUDIO)
-#include <alsa/asoundlib.h>
-#else
 #include <portaudio.h>
-#endif
 
 #include <cstdint>
 

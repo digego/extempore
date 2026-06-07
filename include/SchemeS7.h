@@ -9,16 +9,6 @@
 #include "UNIV.h"
 #include "s7.h"
 
-#ifndef _MSC_VER
-#define SCHEME_EXPORT
-#else
-#ifdef _SCHEME_SOURCE
-#define SCHEME_EXPORT __declspec(dllexport)
-#else
-#define SCHEME_EXPORT __declspec(dllimport)
-#endif
-#endif
-
 extern "C" {
 
 // pointer is already typedef'd in UNIV.h as s7_cell* which matches s7_pointer
