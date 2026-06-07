@@ -68,7 +68,7 @@ NOTE: this project uses GitHub Actions (in particular the
 
 ## Languages
 
-- **C++17**: runtime in `src/` (SchemeS7.cpp, EXTLLVM.cpp, AudioDevice.cpp)
+- **C++20**: runtime in `src/` (SchemeS7.cpp, EXTLLVM.cpp, AudioDevice.cpp)
 - **Scheme**: user-facing interpreted language
 - **xtlang**: compiled DSL, files use `.xtm` extension, compiles to LLVM IR
 

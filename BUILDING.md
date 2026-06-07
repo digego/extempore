@@ -6,7 +6,7 @@ in more depth, here's some more information.
 
 ## Build-time deps
 
-- a C++17 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
+- a C++20 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
 - Git
 - CMake >= 3.28
 - Ninja (recommended on Linux/macOS)
