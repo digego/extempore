@@ -183,7 +183,9 @@ static pointer get_function_pointer(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, reinterpret_cast<void*>(addr));
 }
 
-static pointer remove_function(scheme* Scheme, pointer Args)
+// llvm:remove-function, llvm:remove-globalvar and llvm:erase-function are all
+// the same operation: remove a JIT symbol and drop its global-map entry.
+static pointer remove_symbol_and_global(scheme* Scheme, pointer Args)
 {
     const char* name = string_value(pair_car(Args));
     if (EXTLLVM::removeSymbol(name)) {
@@ -193,24 +195,16 @@ static pointer remove_function(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static pointer remove_global_var(scheme* Scheme, pointer Args)
-{
-    const char* name = string_value(pair_car(Args));
-    if (EXTLLVM::removeSymbol(name)) {
-        EXTLLVM::removeFromGlobalMap(name);
-    return Scheme->T;
-    }
-    return Scheme->F;
+static pointer remove_function(scheme* Scheme, pointer Args) {
+    return remove_symbol_and_global(Scheme, Args);
 }
 
-static pointer erase_function(scheme* Scheme, pointer Args)
-{
-    const char* name = string_value(pair_car(Args));
-    if (EXTLLVM::removeSymbol(name)) {
-        EXTLLVM::removeFromGlobalMap(name);
-    return Scheme->T;
-    }
-    return Scheme->F;
+static pointer remove_global_var(scheme* Scheme, pointer Args) {
+    return remove_symbol_and_global(Scheme, Args);
+}
+
+static pointer erase_function(scheme* Scheme, pointer Args) {
+    return remove_symbol_and_global(Scheme, Args);
 }
 
 static pointer llvm_call_void_native(scheme* Scheme, pointer Args)

@@ -195,6 +195,19 @@ CSimpleOptA::SOption g_rgOptions[] = {
     {OPT_HELP, "--help", SO_NONE},
     SO_END_OF_OPTIONS};
 
+// Double every backslash in a string, so Windows paths survive embedding in a
+// Scheme string literal.
+static std::string escape_backslashes(std::string str) {
+    size_t start_pos = 0;
+    const std::string from("\\");
+    const std::string to("\\\\");
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+    return str;
+}
+
 EXPORT int extempore_init(int argc, char** argv) {
     std::string initexpr;
     std::string host("localhost");
@@ -222,14 +235,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         if (args.LastError() == SO_SUCCESS) {
             switch (args.OptionId()) {
             case OPT_COMPILE_STR: {
-                size_t start_pos = 0;
-                std::string str(args.OptionArg());
-                std::string from("\\");
-                std::string to("\\\\");
-                while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-                    str.replace(start_pos, from.length(), to);
-                    start_pos += to.length();
-                }
+                std::string str = escape_backslashes(args.OptionArg());
                 extemp::UNIV::EXT_LOADBASE = false;  // never load base when compiling
                 initexpr = std::string("(impc:aot:compile-xtm-exe \"") + str + std::string("\")");
             } break;
@@ -257,14 +263,7 @@ EXPORT int extempore_init(int argc, char** argv) {
                 // AUDIO_NONE is set after parsing, only if --audio-outfile wasn't passed
                 break;
             case OPT_INITFILE: {
-                size_t start_pos = 0;
-                std::string str(args.OptionArg());
-                std::string from("\\");
-                std::string to("\\\\");
-                while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-                    str.replace(start_pos, from.length(), to);
-                    start_pos += to.length();
-                }
+                std::string str = escape_backslashes(args.OptionArg());
                 initexpr = std::string("(sys:load \"") + str + std::string("\")");
             } break;
             case OPT_NOBASE:
