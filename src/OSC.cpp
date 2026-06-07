@@ -44,6 +44,7 @@
 #include <array>
 #include <bit>
 #include <cstddef>
+#include <cstring>
 
 #include <chrono>
 #include <thread>
@@ -809,7 +810,9 @@ int OSC::setOSCfloat(char* data, float* f) {
 }
 
 int OSC::getOSCfloat(const char* data, float* f) {
-    *f = unswap32f(*((uint32_t*)data));
+    uint32_t raw;
+    std::memcpy(&raw, data, sizeof(raw));
+    *f = unswap32f(raw);
 #ifdef _OSC_DEBUG_
     std::cout << "OSC FLOAT 32 = " << *f << std::endl;
 #endif
@@ -829,7 +832,9 @@ int OSC::setOSCdouble(char* data, double* f) {
 }
 
 int OSC::getOSCdouble(const char* data, double* f) {
-    *f = unswap64f(*((uint64_t*)data));
+    uint64_t raw;
+    std::memcpy(&raw, data, sizeof(raw));
+    *f = unswap64f(raw);
 #ifdef _OSC_DEBUG_
     std::cout << "OSC FLOAT 64 = " << *f << std::endl;
 #endif
@@ -837,7 +842,8 @@ int OSC::getOSCdouble(const char* data, double* f) {
 }
 
 int OSC::getOSCTimestamp(const char* data, double* d) {
-    uint32_t* dat = (uint32_t*)data;
+    uint32_t dat[2];
+    std::memcpy(dat, data, sizeof(dat));
     int64_t seconds = unswap32i(dat[0]);
     uint32_t fractional = unswap32i(dat[1]);
 
@@ -860,11 +866,8 @@ int OSC::setOSCTimestamp(char* data, double d) {
 
     uint32_t fractionali = (uint32_t)(fractional * 4294967296.0);
 
-    uint32_t* si = (uint32_t*)data;
-    uint32_t* sf = (uint32_t*)(data + 4);
-
-    *si = swap32i(seconds);
-    *sf = swap32i(fractionali);
+    uint32_t out[2] = {swap32i(seconds), swap32i(fractionali)};
+    std::memcpy(data, out, sizeof(out));
 
     // great! now we have both bits of the NTP puzzle, we just need to jam them into a datastream
     return 8;
@@ -883,7 +886,9 @@ int OSC::setOSCInt(char* data, int* i) {
 }
 
 int OSC::getOSCInt(const char* data, int* i) {
-    *i = unswap32i(*((int*)data));
+    uint32_t raw;
+    std::memcpy(&raw, data, sizeof(raw));
+    *i = unswap32i(raw);
 #ifdef _OSC_DEBUG_
     std::cout << "OSC INT = " << *i << std::endl;
 #endif
@@ -900,7 +905,9 @@ int OSC::setOSCLong(char* data, int64_t* l) {
 }
 
 int OSC::getOSCLong(const char* data, int64_t* l) {
-    *l = unswap64i(*((int64_t*)data));
+    uint64_t raw;
+    std::memcpy(&raw, data, sizeof(raw));
+    *l = unswap64i(raw);
 #ifdef _OSC_DEBUG_
     std::cout << "OSC LONG = " << *l << std::endl;
 #endif
