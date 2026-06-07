@@ -150,35 +150,35 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 }  // namespace extemp
 
 #ifdef _WIN32
-#include <chrono>
 #include <Windows.h>
 #endif
 
+#include <chrono>
+
 // clock/time
-#ifdef _WIN32
-
-extern "C" inline double getRealTime() {
-    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::high_resolution_clock::now().time_since_epoch())
-                      .count()) /
-           D_BILLION;
-}
-
-#elif __linux__
-#include <time.h>
-
-extern "C" inline double getRealTime() {
-    struct timespec t;
-    clock_gettime(CLOCK_REALTIME, &t);
-    return t.tv_sec + t.tv_nsec / D_BILLION;
-}
-
-#elif __APPLE__
+//
+// Wall-clock seconds since the Unix epoch. std::chrono::system_clock measures
+// Unix-epoch wall time on every platform, so it folds the old Windows and Linux
+// branches into one. On Windows this also fixes a latent bug: the previous
+// high_resolution_clock has a boot-relative (unspecified) epoch, which is wrong
+// for the cross-machine clock sync that consumes this value. The macOS branch
+// keeps CoreFoundation's clock for now, pending a check that AudioDevice's
+// sample-clock base maths doesn't depend on its exact representation.
+#ifdef __APPLE__
 
 #include <CoreAudio/HostTime.h>
 
 extern "C" inline double getRealTime() {
     return CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970;
+}
+
+#else
+
+extern "C" inline double getRealTime() {
+    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      std::chrono::system_clock::now().time_since_epoch())
+                      .count()) /
+           D_BILLION;
 }
 
 #endif
