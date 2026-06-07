@@ -48,6 +48,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <semaphore>
 #include <thread>
 
 #ifdef _WIN32
@@ -145,42 +146,17 @@ uint64_t start_time = 0;
 
 namespace {
 
-// C++17 stand-in for std::counting_semaphore (which is C++20). Used to
-// synchronise the multi-threaded audio dispatcher with its worker threads
-// without spinning on atomics. Replaces the old sSignalCount /
-// sThreadDoneCount pair that had a TOCTOU race on m_numThreads and could
-// leave sThreadDoneCount > numThreads during a thread-count change.
-class MtSemaphore {
-  public:
-    void release(unsigned n) {
-        if (n == 0)
-            return;
-        {
-            std::lock_guard<std::mutex> lk(m_mutex);
-            m_count += n;
-        }
-        if (n == 1) {
-            m_cv.notify_one();
-        } else {
-            m_cv.notify_all();
-        }
-    }
-    void acquire() {
-        std::unique_lock<std::mutex> lk(m_mutex);
-        m_cv.wait(lk, [this] { return m_count > 0; });
-        --m_count;
-    }
-
-  private:
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
-    unsigned m_count = 0;
-};
+// Counting semaphores synchronise the multi-threaded audio dispatcher with its
+// worker threads without spinning on atomics. (This replaced a hand-rolled
+// mutex+condvar stand-in, and before that a sSignalCount/sThreadDoneCount pair
+// that had a TOCTOU race on the thread count.) Both start empty: the dispatcher
+// release()s work for the workers to acquire(), and the workers release()
+// completion for the dispatcher to acquire().
 
 // dispatcher -> workers
-MtSemaphore sMtWorkAvailable;
+std::counting_semaphore<> sMtWorkAvailable{0};
 // workers -> dispatcher
-MtSemaphore sMtWorkComplete;
+std::counting_semaphore<> sMtWorkComplete{0};
 
 }  // anonymous namespace
 
