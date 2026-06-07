@@ -3,6 +3,45 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## Unreleased
+
+A broad modernisation of the C++ runtime. None of it changes what Extempore
+does --- every test suite stays green on Linux (x64 and arm64), macOS (arm64)
+and Windows --- but the codebase now needs a C++20 compiler (GCC 13+, a recent
+Clang, or MSVC from Visual Studio 2022), and a good deal of dead code, platform
+`#ifdef`s and latent bugs went out with the tide.
+
+- **C++20**: the required standard moves from C++17 to C++20, which lets a few
+  hand-rolled stand-ins retire to the standard library. `MtSemaphore` --- whose
+  own comment admitted it was a placeholder for `std::counting_semaphore` ---
+  becomes the real thing; the eight OSC byte-swap helpers shed ~130 lines of
+  `unsigned char*` aliasing for `std::endian` and `std::bit_cast`, and are now
+  correct on a big-endian host rather than merely lucky on a little-endian one;
+  and an 80-bit-float-to-`double` union pun becomes a `std::bit_cast`. The bump
+  also smoked out a genuine latent bug --- `llvm_destroy_zone_after_delay` was
+  declared and defined with inconsistent dll-linkage, which MSVC waved through
+  under C++17 and rejects under C++20.
+
+- **Correctness**: `getRealTime` on Windows had been reading a boot-relative
+  clock (`high_resolution_clock`) and handing it to the cross-machine clock-sync
+  code as though it were wall-clock time; it now comes from
+  `std::chrono::system_clock` on every platform. Memory zones on Windows were
+  quietly under-aligned --- plain `malloc` rather than the promised 32 bytes,
+  because an earlier `_aligned_malloc` had been paired with a plain `free` ---
+  and are now aligned and released correctly. Several fields shared across
+  threads with no synchronisation at all (the scheduler's clock, the run-state
+  flags) became `std::atomic`, and a clutch of quieter bugs --- an inverted
+  `strcmp`, a `do/while` that dereferenced before its null check, a zone size
+  truncated to `int`, a GC-unprotected temporary --- are fixed.
+
+- **Cleanup**: out went a pile of dead weight --- unreachable
+  conditional-compilation branches, orphaned helpers, leftover TinyScheme-era
+  shims, and the whole vestigial "run a scheduler on thread 0" mechanism
+  (`SUBSUME_PRIMARY`, `XTMMainCallback`, the `sched_main` macro), none of it
+  reachable since the primary process moved onto thread 0. `thread_kill`'s
+  `pthread_cancel` --- undefined behaviour against C++ RAII, and a silent no-op
+  on Windows --- gives way to a cooperative stop flag.
+
 ## v0.9.4
 
 Patch release restoring the `put`/`get` symbol property-list functions, broken
