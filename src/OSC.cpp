@@ -306,8 +306,13 @@ void* osc_mesg_callback(void* obj_p) {
                 std::experimental::net::buffer(osc->getMessageData(), 20000),
                 sender);  //*osc->getClientAddress());
         } catch (std::exception& e) {
+            // A receive error (e.g. Windows' spurious WSAECONNRESET after a prior
+            // send to a closed port) must not tear down the whole process -- and
+            // hence any live performance. Log, pause briefly, and retry, mirroring
+            // the POSIX path's behaviour when recvfrom fails below.
             std::cout << "OSC Message Receive Exception: " << e.what() << std::endl;
-            exit(1);
+            std::this_thread::sleep_for(std::chrono::microseconds(1000));
+            continue;
         }
         std::string netaddy = osc->getClientAddress()->address().to_string();
         int netport = (int)osc->getClientAddress()->port();
@@ -1125,9 +1130,8 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
     OSC* osc = new OSC();  // OSC::I();
     SCHEME_MAP[_sc] = osc;
     int port = ivalue(pair_car(args));
-    memset(osc->fname, 0, 256);
     char* name = string_value(pair_cadr(args));
-    strcpy(osc->fname, name);
+    std::snprintf(osc->fname, sizeof(osc->fname), "%s", name);
 
     // should we use native callback?
     if (pair_cddr(args) != _sc->NIL && is_cptr(pair_caddr(args))) {
