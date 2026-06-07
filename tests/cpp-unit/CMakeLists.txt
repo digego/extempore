@@ -13,7 +13,7 @@ target_include_directories(extempore_cpp_unit PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src)
 
-target_compile_features(extempore_cpp_unit PRIVATE cxx_std_17)
+target_compile_features(extempore_cpp_unit PRIVATE cxx_std_20)
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(extempore_cpp_unit PRIVATE pthread)
