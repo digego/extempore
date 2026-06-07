@@ -82,7 +82,6 @@ class OSC {
             throw std::runtime_error("Error: NO such OSC Server");
         }
         return SCHEME_MAP[_sc];
-        // if(OSC::singleton == nullptr) OSC::singleton = new OSC(); return OSC::singleton;
     }
     static void schemeInit(SchemeProcess* scm);
     // void getMessage();
@@ -103,8 +102,6 @@ class OSC {
     static void processArgs(pointer arg, char** tmp, char** ptr, int* lgth, std::string& typetags,
                             scheme* _sc);
 
-    int clearMessageBuffer();
-    static void getOSCStringSection(std::string* input, std::string* output, int section);
     // static pointer sendOSC(scheme* _sc, pointer args);
 
     static pointer registerScheme(scheme* _sc, pointer args);
@@ -222,7 +219,6 @@ class OSC {
     bool msg_include_netaddr;
 
   private:
-    static OSC* singleton;
     EXTThread threadOSC;
 #ifdef _WIN32
     std::experimental::net::ip::udp::socket* socket;

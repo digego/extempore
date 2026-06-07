@@ -228,35 +228,6 @@ uint32_t unswap32i(uint32_t a) {
 namespace extemp {
 
 std::map<scheme*, OSC*> OSC::SCHEME_MAP;
-// OSC* OSC::singleton = nullptr;
-// scheme* OSC::sc = nullptr;
-
-int get_message_length(std::string& typetags, char* args) {
-    int pos = 0;
-    for (unsigned i = 1; i < typetags.size(); ++i) {
-        if (typetags[i] == 'i') {
-            pos += 4;
-        } else if (typetags[i] == 'f') {
-            pos += 4;
-        } else if (typetags[i] == 'd') {
-            pos += 8;
-        } else if (typetags[i] == 's') {
-            std::string osc_str;
-            pos += OSC::getOSCString(args + pos, &osc_str);
-        } else if (typetags[i] == 'h') {
-            pos += 8;
-        } else if (typetags[i] == 't') {
-            pos += 8;
-        } else if (typetags[i] == '[') {
-            pos += 0;
-        } else if (typetags[i] == ']') {
-            pos += 0;
-        } else {
-            return -1;
-        }
-    }
-    return pos;
-}
 
 int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address,
                      std::string& typetags, std::string& netaddy, int netport, char* args) {
@@ -1015,38 +986,6 @@ int OSC::getOSCLong(const char* data, int64_t* l) {
     std::cout << "OSC LONG = " << *l << std::endl;
 #endif
     return 8;
-}
-
-void OSC::getOSCStringSection(std::string* input, std::string* output, int num) {
-    int start = 0;
-    int end = 0;
-    for (int i = 0; i <= num; ++i) {
-        end = input->find('/', start + 1);
-        if (i < num)
-            start = end;
-    }
-    start++;  // skip over the "/"
-    output->append(input->substr(start, end - start));
-}
-
-int OSC::clearMessageBuffer() {
-#ifdef _OSC_DEBUG_
-    printf("CLEAR MESSAGE BUFFER\n");
-#endif
-    message_length = 0;
-    int cnt = -1;
-    do {
-        cnt++;
-#ifdef _WIN32
-        message_length = socket->receive_from(std::experimental::net::buffer(message_data, 256),
-                                              *osc_client_address);
-#else
-        message_length =
-            recvfrom(socket_fd, message_data, 256, 0, (struct sockaddr*)&osc_client_address,
-                     (socklen_t*)&osc_client_address_size);
-#endif
-    } while (message_length > -1);
-    return cnt;
 }
 
 void OSC::processArgs(pointer arg, char** tmp, char** ptr, int* lgth, std::string& typetags,
