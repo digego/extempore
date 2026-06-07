@@ -40,6 +40,10 @@
 #include <iomanip>
 #include <sstream>
 #include <cmath>
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cstddef>
 
 #include <chrono>
 #include <thread>
@@ -86,139 +90,54 @@ typedef struct scm_osc_pair {
 
 ///////////////////////////////////////////////
 //
-// THIS IS UGLY AND INEFFICIENT CHANGE ME!
+// OSC encodes numbers big-endian. On a little-endian host -- every platform we
+// target -- converting a value to/from the wire is a byte reversal; std::endian
+// makes that assumption explicit and std::bit_cast does the type-puns without
+// the old unsigned char* aliasing. The eight functions keep their extern "C"
+// signatures: they are registered into the JIT by name.
 //
-// swap using char pointers
-//
+namespace {
+template <class T>
+T osc_byteswap(T value) {
+    if constexpr (std::endian::native == std::endian::little) {
+        auto bytes = std::bit_cast<std::array<std::byte, sizeof(T)>>(value);
+        std::reverse(bytes.begin(), bytes.end());
+        return std::bit_cast<T>(bytes);
+    }
+    return value;  // big-endian host: already in OSC wire order
+}
+}  // namespace
+
 uint64_t swap64f(double d) {
-    uint64_t a;
-    unsigned char* dst = (unsigned char*)&a;
-    unsigned char* src = (unsigned char*)&d;
-
-    dst[0] = src[7];
-    dst[1] = src[6];
-    dst[2] = src[5];
-    dst[3] = src[4];
-    dst[4] = src[3];
-    dst[5] = src[2];
-    dst[6] = src[1];
-    dst[7] = src[0];
-
-    return a;
+    return osc_byteswap(std::bit_cast<uint64_t>(d));
 }
 
-// unswap using char pointers
 double unswap64f(uint64_t a) {
-
-    double d;
-    unsigned char* src = (unsigned char*)&a;
-    unsigned char* dst = (unsigned char*)&d;
-
-    dst[0] = src[7];
-    dst[1] = src[6];
-    dst[2] = src[5];
-    dst[3] = src[4];
-    dst[4] = src[3];
-    dst[5] = src[2];
-    dst[6] = src[1];
-    dst[7] = src[0];
-
-    return d;
+    return std::bit_cast<double>(osc_byteswap(a));
 }
 
-// swap using char pointers
 uint32_t swap32f(float f) {
-    uint32_t a;
-    unsigned char* dst = (unsigned char*)&a;
-    unsigned char* src = (unsigned char*)&f;
-
-    dst[0] = src[3];
-    dst[1] = src[2];
-    dst[2] = src[1];
-    dst[3] = src[0];
-
-    return a;
+    return osc_byteswap(std::bit_cast<uint32_t>(f));
 }
 
-// unswap using char pointers
 float unswap32f(uint32_t a) {
-
-    float f;
-    unsigned char* src = (unsigned char*)&a;
-    unsigned char* dst = (unsigned char*)&f;
-
-    dst[0] = src[3];
-    dst[1] = src[2];
-    dst[2] = src[1];
-    dst[3] = src[0];
-
-    return f;
+    return std::bit_cast<float>(osc_byteswap(a));
 }
 
-// swap using char pointers
 uint64_t swap64i(uint64_t d) {
-    uint64_t a;
-    unsigned char* dst = (unsigned char*)&a;
-    unsigned char* src = (unsigned char*)&d;
-
-    dst[0] = src[7];
-    dst[1] = src[6];
-    dst[2] = src[5];
-    dst[3] = src[4];
-    dst[4] = src[3];
-    dst[5] = src[2];
-    dst[6] = src[1];
-    dst[7] = src[0];
-
-    return a;
+    return osc_byteswap(d);
 }
 
-// unswap using char pointers
 uint64_t unswap64i(uint64_t a) {
-
-    uint64_t d;
-    unsigned char* src = (unsigned char*)&a;
-    unsigned char* dst = (unsigned char*)&d;
-
-    dst[0] = src[7];
-    dst[1] = src[6];
-    dst[2] = src[5];
-    dst[3] = src[4];
-    dst[4] = src[3];
-    dst[5] = src[2];
-    dst[6] = src[1];
-    dst[7] = src[0];
-
-    return d;
+    return osc_byteswap(a);
 }
 
-// swap using char pointers
 uint32_t swap32i(uint32_t f) {
-    uint32_t a;
-    unsigned char* dst = (unsigned char*)&a;
-    unsigned char* src = (unsigned char*)&f;
-
-    dst[0] = src[3];
-    dst[1] = src[2];
-    dst[2] = src[1];
-    dst[3] = src[0];
-
-    return a;
+    return osc_byteswap(f);
 }
 
-// unswap using char pointers
 uint32_t unswap32i(uint32_t a) {
-
-    uint32_t f;
-    unsigned char* src = (unsigned char*)&a;
-    unsigned char* dst = (unsigned char*)&f;
-
-    dst[0] = src[3];
-    dst[1] = src[2];
-    dst[2] = src[1];
-    dst[3] = src[0];
-
-    return f;
+    return osc_byteswap(a);
 }
 
 ///////////////////////////////////////////////////////////////
