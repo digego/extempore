@@ -73,6 +73,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 
+#include <bit>
 #include <random>
 #include <fstream>
 #include <mutex>
@@ -185,13 +186,8 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
     // x86_fp80 exponent bias is 16383, double bias is 1023
     int64_t exp_unbiased = int64_t(exponent) - 16383;
 
-    // The mantissa has an explicit integer bit (bit 63).
-    // Double has implicit integer bit, so we need to handle this.
-    union {
-        uint64_t i;
-        double d;
-    } result;
-
+    // The mantissa has an explicit integer bit (bit 63); double has an implicit
+    // one, so handle it explicitly.
     if (mantissa & (1ULL << 63)) {
         // Normal number - integer bit is set.
         // Remove the integer bit and shift mantissa to fit in double's 52-bit mantissa.
@@ -206,14 +202,14 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
             return sign ? -0.0 : 0.0;
         } else {
             // Pack into IEEE 754 double format.
-            result.i = (uint64_t(sign) << 63) | (uint64_t(double_exp) << 52) | double_mantissa;
+            uint64_t result_bits =
+                (uint64_t(sign) << 63) | (uint64_t(double_exp) << 52) | double_mantissa;
+            return std::bit_cast<double>(result_bits);
         }
     } else {
         // Denormalized or pseudo-denormalized - rare for audio sample rates.
         return sign ? -0.0 : 0.0;
     }
-
-    return result.d;
 }
 
 const char* llvm_scheme_ff_get_name(foreign_func ff) {
