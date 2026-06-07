@@ -400,8 +400,11 @@ std::atomic<uint64_t> DEVICE_TIME{0};
 static_assert(std::atomic<uint64_t>::is_always_lock_free,
               "std::atomic<uint64_t> must be lock-free so the xtlang JIT's "
               "plain i64 loads of @TIME remain compatible");
-double AUDIO_CLOCK_NOW = 0.0;
-double AUDIO_CLOCK_BASE = 0.0;
+static_assert(std::atomic<double>::is_always_lock_free,
+              "std::atomic<double> must be lock-free so the realtime audio "
+              "callback can publish the clock without blocking");
+std::atomic<double> AUDIO_CLOCK_NOW = 0.0;
+std::atomic<double> AUDIO_CLOCK_BASE = 0.0;
 uint64_t TIME_DIVISION = 1;
 bool AUDIO_NONE = false;
 bool BATCH_MODE = false;

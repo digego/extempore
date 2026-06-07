@@ -133,8 +133,8 @@ namespace extemp {
 AudioDevice AudioDevice::SINGLETON;
 // AudioDevice* AudioDevice::SINGLETON = nullptr;
 
-double AudioDevice::REALTIME = 0.0;
-double AudioDevice::CLOCKBASE = 0.0;
+std::atomic<double> AudioDevice::REALTIME = 0.0;
+std::atomic<double> AudioDevice::CLOCKBASE = 0.0;
 double AudioDevice::CLOCKOFFSET = 0.0;
 bool first_callback = true;
 uint64_t start_time = 0;
@@ -261,10 +261,10 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
     }
     if (unlikely(AudioDevice::CLOCKBASE < 1.0)) {
         AudioDevice::CLOCKBASE = getRealTime();
-        UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
+        UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     }
     AudioDevice::REALTIME = getRealTime();
-    UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
+    UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
     sched->setFrames(FramesPerBuffer);
     sched->getGuard().signal();
     auto dsp_closure(AudioDevice::I()->getDSPClosure());

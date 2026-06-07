@@ -54,7 +54,7 @@ void TaskScheduler::timeSlice() {
     long nanosecs = long(double(frames) / UNIV::SAMPLE_RATE * D_BILLION);
     if (unlikely(UNIV::AUDIO_NONE)) {  // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
-        UNIV::AUDIO_CLOCK_BASE = AudioDevice::CLOCKBASE;
+        UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     }
     LAST_REALTIME_STAMP = getRealTime();
     do {
@@ -80,7 +80,7 @@ void TaskScheduler::timeSlice() {
         }
         if (unlikely(UNIV::AUDIO_NONE)) {
             AudioDevice::REALTIME = getRealTime();
-            UNIV::AUDIO_CLOCK_NOW = AudioDevice::REALTIME;
+            UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
         } else if (!UNIV::DEVICE_TIME) {
             AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
         }

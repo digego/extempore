@@ -184,8 +184,8 @@ class AudioDevice {
     static bool fileDriverRunning();
     static void stopFileDriver();
 
-    static double CLOCKBASE;
-    static double REALTIME;
+    static std::atomic<double> CLOCKBASE;
+    static std::atomic<double> REALTIME;
     static double CLOCKOFFSET;
 };
 

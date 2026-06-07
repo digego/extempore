@@ -121,7 +121,7 @@ class SchemeProcess {
     std::atomic<bool> m_libsLoaded;
     std::recursive_mutex m_guardMutex;
     std::condition_variable_any m_guardCond;
-    bool m_running;
+    std::atomic<bool> m_running;
     EXTThread m_threadTask;
     EXTThread m_threadServer;
     scheme* m_scheme;

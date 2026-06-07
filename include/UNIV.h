@@ -100,8 +100,8 @@ EXPORT uint32_t SAMPLE_RATE;
 // all supported compilers.
 EXPORT std::atomic<uint64_t> TIME;
 extern std::atomic<uint64_t> DEVICE_TIME;
-extern double AUDIO_CLOCK_BASE;
-extern double AUDIO_CLOCK_NOW;
+extern std::atomic<double> AUDIO_CLOCK_BASE;
+extern std::atomic<double> AUDIO_CLOCK_NOW;
 extern uint64_t TIME_DIVISION;
 inline uint32_t SECOND() {
     return SAMPLE_RATE;

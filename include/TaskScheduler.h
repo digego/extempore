@@ -40,6 +40,7 @@
 #include "EXTThread.h"
 #include "UNIV.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 
@@ -66,7 +67,7 @@ struct Monitor {
 
 class TaskScheduler {
   private:
-    unsigned m_numFrames;
+    std::atomic<unsigned> m_numFrames;
     PriorityQueue<TaskI> m_queue;
     EXTThread m_queueThread;
     Monitor m_guard;
