@@ -145,6 +145,14 @@ class SchemeProcess {
     void addCallback(TaskI* Task, SchemeTask::Type Type);
     void* serverImpl();
     void* taskImpl();
+    // The task thread is the sole consumer of m_taskQueue, but producers (the
+    // server thread and the scheduler/REPL callbacks) push under m_guardMutex --
+    // so the consumer's emptiness checks must take the same lock too, or they
+    // race the push() on the deque's internals.
+    bool taskQueueEmpty() {
+        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+        return m_taskQueue.empty();
+    }
     void resetOutportString() {
         // m_schemeOutportString is the s7 output port's backing buffer (wired up
         // with scheme_set_output_port_string in the constructor); callers read it

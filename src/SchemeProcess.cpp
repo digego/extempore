@@ -264,11 +264,11 @@ void* SchemeProcess::taskImpl() {
         }
     }
     while (likely(m_running)) {
-        if (unlikely(m_taskQueue.empty())) {
+        if (unlikely(taskQueueEmpty())) {
             std::this_thread::sleep_for(std::chrono::microseconds(1000));  // 1 ms
             continue;
         }
-        while (likely(!m_taskQueue.empty() && m_running)) {
+        while (likely(!taskQueueEmpty() && m_running)) {
             SchemeTask task = [&]() {
                 std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                 SchemeTask t = m_taskQueue.front();
