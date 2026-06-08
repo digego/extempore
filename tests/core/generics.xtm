@@ -284,14 +284,17 @@
 ;; root-cause analysis and task-055 for the fix (a canonical type representation
 ;; with a real unifier; runtime/llvmti-types.xtm).
 ;;
-;; STATUS: the generic-FUNCTION path is FIXED (positive lock immediately below).
-;; The generic-TYPE path -- a depth-bearing type variable in a *tuple field* --
-;; is still being migrated (the reification site is separate), so the cases
-;; further down stay locked 'compile-should-fail.  Those bodies also exercise an
-;; unrelated codegen bug (a void-returning function with a value-yielding tail
-;; expression; see task-057), so they cannot become clean passing repros until
-;; that is fixed too; when both land, replace 'compile-should-fail with the
-;; expected value in the trailing comment.
+;; STATUS: both paths are now FIXED.  The generic-FUNCTION path (positive lock
+;; immediately below) landed in task-055; the generic-TYPE path -- a
+;; depth-bearing type variable in a *tuple field*, reified through the
+;; auto-generated data constructor -- in task-058, by treating a type variable
+;; as one identity at a structural pointer depth (so !a and !a* are the same
+;; variable, X vs X*, not two symbols reconciled by stripping/adding stars).
+;;
+;; The repros below are written value-returning rather than void.  The original
+;; characterisation used void-returning put functions, whose value-yielding tail
+;; tripped an unrelated codegen bug (task-057); returning the stored value
+;; isolates the #315 behaviour cleanly.
 
 ;; Positive lock (FIXED): a type variable at depth-1 (!a*) and depth-0 (!a) in
 ;; one generic-function signature now binds consistently -- !a* against i64*
@@ -308,7 +311,7 @@
 ;; #315 itself: depth-1 type-variable tuple field + bare !a parameter, via pset!
 (bind-type Csn315 <!a*,i64> (printer? . #f))
 (bind-func Csn315:[Csn315{!a}*,i64]* (lambda (x) (let ((arr:!a* (halloc x))) (Csn315_z arr x))))
-(bind-func csn315_put:[void,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val)))
+(bind-func csn315_put:[!a,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val) val))
 (xtmtest
  (bind-func csn315_use
    (lambda ()
@@ -316,10 +319,10 @@
        (csn315_put t 6 4)
        (pref (tref t 0) 6))))
  (csn315_use)
- 'compile-should-fail) ;; phase-1: expect 4
+ 4)
 
 ;; the same defect with NO tuple: a type variable at depth 1 and depth 0
-(bind-func csn_notuple:[void,!a*,!a]* (lambda (p v) (pset! p 0 v)))
+(bind-func csn_notuple:[!a,!a*,!a]* (lambda (p v) (pset! p 0 v) v))
 (xtmtest
  (bind-func csn_notuple_use
    (lambda ()
@@ -327,12 +330,12 @@
        (csn_notuple p 5)
        (pref p 0))))
  (csn_notuple_use)
- 'compile-should-fail) ;; phase-1: expect 5
+ 5)
 
 ;; depth-2 type-variable tuple field
 (bind-type CsnDeep <!a**,i64> (printer? . #f))
 (bind-func CsnDeep:[CsnDeep{!a}*,i64]* (lambda (n) (let ((arr:!a** (halloc n))) (CsnDeep_z arr n))))
-(bind-func csndeep_put:[void,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(bind-func csndeep_put:[!a*,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v) v))
 (xtmtest
  (bind-func csndeep_use
    (lambda ()
@@ -342,12 +345,12 @@
        (csndeep_put t 1 p)
        (pref (pref (tref t 0) 1) 0))))
  (csndeep_use)
- 'compile-should-fail) ;; phase-1: expect 42
+ 42)
 
-;; two type variables, mixed depth (!a* depth-1 is the bug; !b depth-0 is fine)
+;; two type variables, mixed depth (!a* depth-1 was the bug; !b depth-0 is fine)
 (bind-type CsnTwo <!a*,!b> (printer? . #f))
 (bind-func CsnTwo:[CsnTwo{!a,!b}*,i64,!b]* (lambda (n b) (let ((arr:!a* (halloc n))) (CsnTwo_z arr b))))
-(bind-func csntwo_put:[void,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(bind-func csntwo_put:[!a,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v) v))
 (xtmtest
  (bind-func csntwo_use
    (lambda ()
@@ -355,7 +358,7 @@
        (csntwo_put t 3 7)
        (pref (tref t 0) 3))))
  (csntwo_use)
- 'compile-should-fail) ;; phase-1: expect 7
+ 7)
 
 ;; boundary lock (must keep PASSING): a depth-0 type-variable tuple field is fine
 (bind-type CsnD0 <!a,i64> (printer? . #f))

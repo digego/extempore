@@ -154,3 +154,32 @@
                   (impc:type:to-pretty (impc:type:apply-subst term subst) tbl))
                 "<i64*,i64>"
                 "reify-keeps-depth")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pointer-depth core  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; reduce and deepen are structural inverses on concrete int-codes.  This is the
+;; #315 parameter/field relationship made structural: a type variable's depth-0
+;; binding (its base, !a = i64) re-deepens to the starred occurrence (!a* =
+;; i64*), and a depth-1 value strips back to the base, both via the unifier
+;; rather than star arithmetic.
+(xtmtest-result (impc:type:deepen-ptr-depth 2 1) 102 "deepen-base")
+(xtmtest-result (impc:type:deepen-ptr-depth 2 2) 202 "deepen-twice")
+(xtmtest-result (impc:type:deepen-ptr-depth '(14 2 0) 1) '(114 2 0) "deepen-tuple")
+(xtmtest-result (impc:type:deepen-ptr-depth "%Foo" 1) "%Foo*" "deepen-named")
+(xtmtest-result (impc:type:reduce-ptr-depth (impc:type:deepen-ptr-depth 2 2) 2)
+                2 "deepen-reduce-roundtrip")
+
+;; a concrete value shallower than the requested reduction has no inverse: the
+;; unifier reports 'fail rather than underflowing to a bogus code.  (update-var
+;; reads this to drop the #315 conflation of !a* with a depth-0 value.)
+(xtmtest-result (impc:type:reduce-ptr-depth 2 1) 'fail "reduce-underflow-fails")
+
+;; the type parameters of a template are its free variables by identity ---
+;; depth-independent, deduplicated, in first-seen order --- the bare !a, never
+;; the field usage !a*.
+(xtmtest-result (impc:type:pretty-type-params "<!a*,i64>")  '("!a")      "params-depth1")
+(xtmtest-result (impc:type:pretty-type-params "<!a**,i64>") '("!a")      "params-depth2")
+(xtmtest-result (impc:type:pretty-type-params "<!a*,!b>")   '("!a" "!b") "params-two")
+(xtmtest-result (impc:type:pretty-type-params "<!a,!a*>")   '("!a")      "params-shared")

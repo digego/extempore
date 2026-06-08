@@ -1139,12 +1139,8 @@ Continue executing `body' forms until `test-expression' returns #f"
              (if (not (null? tl))
                  (let* ((xx (car (regex:type-split (symbol->string (car v)) "##")))
                         (base (impc:ir:get-base-type xx))
-                        ;; #315: capture the template's pointer stars and carry
-                        ;; them onto the substituted type, so a tuple field !a*
-                        ;; reifies to i64* rather than i64.  The base variable
-                        ;; holds the depth-0 value (see impc:ti:update-var).
-                        (xxx (string-append "(" base ")([*]*)")))
-                   (set! type (regex:replace-all type xxx (string-append tl "$2"))))))
+                        (xxx (string-append base "[*]*")))
+                   (set! type (regex:replace-all type xxx tl)))))
            #f))
      vars)
     ;; (println 'reifyout: type 'gnum: gnum)
@@ -1177,14 +1173,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                             (impc:ti:maximize-generic-type x)
                                             (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
                                                 #f
-                                                ;; #315: a bang-variable argument is the
-                                                ;; type parameter's identity; its pointer
-                                                ;; depth (if any) is spurious, since the
-                                                ;; template field supplies the depth.  A
-                                                ;; concrete argument keeps its depth.
-                                                (if (char=? (string-ref x 0) #\!)
-                                                    (impc:type:strip-trailing-stars x)
-                                                    x))))
+                                                x)))
                                       (impc:ir:get-pretty-tuple-arg-strings argstr)))) ;)
                      (named_ags (cl:remove
                                  #f
@@ -1831,13 +1820,28 @@ Continue executing `body' forms until `test-expression' returns #f"
                             #t
                             #f)))
                (impc:ti:reify-generic-type t vars '())
-               (if (and (symbol? t) (impc:ti:vars-ref vars t))
-                   (let ((val (impc:ti:vars-ref vars t)))
+               (let ((val (and (symbol? t) (impc:ti:vars-ref vars t))))
+                 (if (and val (not (null? val)))
+                     ;; directly bound (bare variable, or a symbolic chain):
+                     ;; resolve through its value as usual
                      (if (impc:ti:occurs-in-type? t val)
                          t
                          (let ((r (impc:ti:type-unify val vars)))
-                           (if (null? r) t r))))
-                   t)))
+                           (if (null? r) t r)))
+                     ;; #315: a starred occurrence (!a*) carries no binding of its
+                     ;; own --- it is the base variable (!a) at a pointer depth.
+                     ;; Resolve the base and re-apply the depth structurally, so
+                     ;; !a* reifies to i64* when !a = i64 (the field/parameter
+                     ;; relationship is X vs X*, never derived by string surgery).
+                     (let ((depth (and (symbol? t)
+                                       (impc:type:bare-bang-var? t)
+                                       (impc:ir:get-ptr-depth (symbol->string t)))))
+                       (if (and depth (> depth 0))
+                           (let ((base (impc:ti:type-unify (impc:type:bang-base-key t) vars)))
+                             (if (impc:ir:type? base)
+                                 (impc:type:deepen-ptr-depth base depth)
+                                 t))
+                           t))))))
           ((list? t)
            (cond ((impc:ti:complex-type? t)
                   (map (lambda (v) (impc:ti:type-unify v vars)) t))

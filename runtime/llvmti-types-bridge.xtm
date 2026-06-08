@@ -144,6 +144,21 @@
                     (impc:type:to-intcode (impc:type:apply-subst v subst))
                     'fail)))))))
 
+;; Add `d' pointer levels to an int-code type --- the structural inverse of
+;; reduce-ptr-depth.  This is how a type variable's depth-0 binding (stored
+;; under its bare/base key) is re-deepened for a starred occurrence (!a* given
+;; !a = i64 yields i64*), so the parameter/field relationship stays structural
+;; (X vs X*) rather than symbolic (!a vs !a*).  Routed through the canonical
+;; core so tuple/named/closure encodings deepen correctly in one place; a
+;; residual variable is interned so it can render back to its bang name.
+(define impc:type:deepen-ptr-depth
+  (lambda (t d)
+    (if (<= d 0)
+        t
+        (let* ((intern (make-hashtable))
+               (term (impc:type:from-intcode t intern)))
+          (impc:type:to-intcode-open (impc:type:wrap-ptr d term) intern)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; int-code -> term    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -343,3 +358,16 @@
               acc
               (loop (string-append acc "," (impc:type:to-pretty (car rest) intern))
                     (cdr rest)))))))
+
+;; The type parameters of a generic template (a pretty tuple type): the
+;; bang-names of its free type *variables*, in first-seen order, deduplicated
+;; and depth-independent --- so <!a*,i64>, <!a**,i64> and <!a,!a*> all have the
+;; single parameter !a.  This is the canonical replacement for gathering bang
+;; symbols and stripping their pointer stars by hand: a variable's identity is
+;; structural (its node) rather than its surface spelling, so the type parameter
+;; (the identity !a) is cleanly distinct from a field usage (!a* at depth).
+(define impc:type:pretty-type-params
+  (lambda (s)
+    (let* ((intern (make-hashtable))
+           (term (impc:type:from-pretty s intern)))
+      (map (lambda (id) (hashtable-ref intern id)) (impc:type:free-vars term)))))

@@ -1061,23 +1061,6 @@
            (n1 (list->string (cons u (cdr n)))))
       n1)))
 
-(define impc:ti:gather-all-gvars-helper
-  (lambda (gtype)
-    (foldl (lambda (lst val)
-             (if (list? val)
-                 (append (impc:ti:gather-all-gvars-helper val) lst)
-                 (if (and (symbol? val)
-                          (regex:match? (symbol->string val) "^!"))
-                     (cons val lst)
-                     lst)))
-           '() gtype)))
-
-(define impc:ti:gather-all-gvars
-  (lambda (gtype)
-    (reverse
-     (cl:remove-duplicates
-      (impc:ti:gather-all-gvars-helper gtype)))))
-
 ;; #316: a tuple field that is a pointer to a named type is normally deep
 ;; copied/freed/zcopied via that type's hcopy/hfree/zcopy poly. Opaque runtime
 ;; pointers such as mzone* have no such poly candidate, so emitting the deep call
@@ -1128,18 +1111,16 @@
                                      ;(apply string-append namestr ":" type "*"
                                      (apply string-append namestr
                                             "{"
+                                            ;; #315: the type parameters are the
+                                            ;; template's free type variables by
+                                            ;; identity (depth-independent), so the
+                                            ;; constructor returns Box{!a}*, not
+                                            ;; Box{!a*}*.  Routed through the
+                                            ;; canonical core (free-vars) rather
+                                            ;; than gathering bang symbols and
+                                            ;; stripping their stars by hand.
                                             (string-join
-                                             ;; #315: the type parameter list is
-                                             ;; bare variable identities; strip
-                                             ;; any field pointer depth so the
-                                             ;; constructor returns Box{!a}*, not
-                                             ;; Box{!a*}* (which double-counts).
-                                             (cl:remove-duplicates
-                                              (map (lambda (x)
-                                                     (impc:type:strip-trailing-stars
-                                                      (symbol->string x)))
-                                                   (impc:ti:gather-all-gvars
-                                                    (impc:ir:get-type-from-pretty-str type))))
+                                             (impc:type:pretty-type-params type)
                                              ",")
                                             "}*"
 
