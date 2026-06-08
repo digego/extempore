@@ -588,10 +588,15 @@
                          (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t #t))
                      string-type))
                    ;; (error ""))))
-            ;; #315: keep the pointer depth on a type variable (!a* stays !a*,
-            ;; not !a) so it can be carried through unification as structure.
+            ;; #315: keep the pointer depth on a *bare* type variable (!a* stays
+            ;; !a*, not !a) so it carries through unification as structure.  A
+            ;; generic instance with a bang parameter (e.g. Box315{!a}) merely
+            ;; contains a bang --- the trailing depth belongs to the instance,
+            ;; not the variable --- so leave it exactly as the old code did.
             ((impc:ti:bang-type? base)
-             (string->symbol (string-append base (make-string ptr-depth #\*))))
+             (if (char=? (string-ref base 0) #\!)
+                 (string->symbol (string-append base (make-string ptr-depth #\*)))
+                 (string->symbol base)))
             ((or (impc:ti:get-generictype-candidate-types base)
                  (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
              ;; (println 'gen_chk_with_args: args)
