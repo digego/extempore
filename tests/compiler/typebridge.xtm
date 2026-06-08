@@ -113,3 +113,44 @@
                           (impc:type:from-intcode (string->symbol "!a##7") tbl)))
                 #f
                 "bang-distinct-callsites")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pretty <-> term     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Parsing a surface type string then rendering it back is the identity, for
+;; concrete types and for types carrying bang variables alike --- the property
+;; the canonical reification relies on.
+(xtmtest-result
+ (let ((corpus (list "i64" "i64*" "double" "<i64,double>" "<i64,double>*"
+                     "[i64,i64]*" "|4,double|" "/4,float/"
+                     "!a*" "<!a*,i64>" "<!a*,!b>" "<!a,<!b,i64>>")))
+   (cl:remove-if
+    (lambda (s)
+      (let* ((tbl (make-hashtable)) (term (impc:type:from-pretty s tbl)))
+        (string=? s (impc:type:to-pretty term tbl))))
+    corpus))
+ '()
+ "pretty-roundtrip")
+
+;; a tuple field !a* parses to a pointer-to-variable
+(xtmtest-result (let ((tbl (make-hashtable)))
+                  (impc:type:ptr? (cadr (impc:type:from-pretty "<!a*,i64>" tbl))))
+                #t
+                "pretty-field-is-pointer")
+
+;; !a and !a* in one type share a single variable
+(xtmtest-result (let* ((tbl (make-hashtable))
+                       (term (impc:type:from-pretty "<!a,!a*>" tbl)))
+                  (equal? (cadr term) (impc:type:ptr-to (caddr term))))
+                #t
+                "pretty-shares-variable")
+
+;; substituting the variable's binding reifies the field with its depth intact
+(xtmtest-result (let* ((tbl (make-hashtable))
+                       (term (impc:type:from-pretty "<!a*,i64>" tbl))
+                       (v (impc:type:from-pretty "!a" tbl))
+                       (subst (impc:type:unify v 'i64 impc:type:empty-subst)))
+                  (impc:type:to-pretty (impc:type:apply-subst term subst) tbl))
+                "<i64*,i64>"
+                "reify-keeps-depth")

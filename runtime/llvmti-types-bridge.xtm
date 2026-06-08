@@ -152,11 +152,14 @@
 ;; hashtable mapping the (star-stripped, ##-suffix-bearing) name to a variable,
 ;; so that the two occurrences of !a in a signature --- and !a and !a* --- map
 ;; to the same variable, while !a##3 and !a##7 (two call sites) stay distinct.
+;; The reverse map (variable id -> name) is recorded too, keyed by the integer
+;; id, so a residual variable can be rendered back to its bang-symbol.
 (define impc:type:intern-var
   (lambda (name intern)
     (or (hashtable-ref intern name)
         (let ((v (impc:type:fresh-var)))
           (hashtable-set! intern name v)
+          (hashtable-set! intern (impc:type:var-id v) name)
           v))))
 
 (define impc:type:from-intcode-bang
@@ -235,21 +238,28 @@
 ;; term -> int-code    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Encode a *concrete* canonical term (no free variables) back into the live
-;; int-code representation.  A residual type variable is a compiler bug --- a
-;; type that should have been resolved by unification was not --- so we error
-;; loudly rather than invent an encoding for it.
-(define impc:type:to-intcode
-  (lambda (t)
+;; Encode a canonical term back into the live int-code representation.  With a
+;; non-#f `intern' a residual type variable is rendered as its bang-symbol (via
+;; the reverse name map recorded by impc:type:intern-var); with #f a residual
+;; variable is a compiler bug --- a type that should have been resolved by
+;; unification was not --- so we error loudly rather than invent an encoding.
+(define impc:type:to-intcode-open
+  (lambda (t intern)
     (let* ((sp (impc:type:strip-ptr t))
            (depth (car sp))
            (base (cdr sp))
-           (off (* depth *impc:ir:pointer*)))
+           (off (* depth *impc:ir:pointer*))
+           (rec (lambda (x) (impc:type:to-intcode-open x intern))))
       (cond
         ((impc:type:var? base)
-         (impc:compiler:print-compiler-error
-          (string-append "unresolved type variable "
-                         (impc:type:term->string base))))
+         (if intern
+             (let ((name (hashtable-ref intern (impc:type:var-id base))))
+               (string->symbol
+                (string-append (if name name "!gx_unresolved")
+                               (make-string depth #\*))))
+             (impc:compiler:print-compiler-error
+              (string-append "unresolved type variable "
+                             (impc:type:term->string base)))))
         ((symbol? base)
          (let ((code (impc:type:base->code base)))
            (if code
@@ -259,20 +269,77 @@
         ((impc:type:named? base)
          (string-append "%" (impc:type:named-name base) (make-string depth #\*)))
         ((impc:type:tuple? base)
-         (cons (+ *impc:ir:tuple* off)
-               (map impc:type:to-intcode (cdr base))))
+         (cons (+ *impc:ir:tuple* off) (map rec (cdr base))))
         ((impc:type:array? base)
          (list (+ *impc:ir:array* off)
                (impc:type:array-size base)
-               (impc:type:to-intcode (impc:type:array-elt base))))
+               (rec (impc:type:array-elt base))))
         ((impc:type:vector? base)
          (list (+ *impc:ir:vector* off)
                (impc:type:vector-size base)
-               (impc:type:to-intcode (impc:type:vector-elt base))))
+               (rec (impc:type:vector-elt base))))
         ((impc:type:closure? base)
          ;; a closure carries an intrinsic box, hence (+ depth 1)
          (cons (+ *impc:ir:closure* (* (+ depth 1) *impc:ir:pointer*))
-               (map impc:type:to-intcode (cdr base))))
+               (map rec (cdr base))))
         (else
          (impc:compiler:print-compiler-error
           (string-append "cannot encode term " (impc:type:term->string base))))))))
+
+(define impc:type:to-intcode
+  (lambda (t) (impc:type:to-intcode-open t #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pretty <-> term     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Parse a pretty type string into a canonical term, interning its bang
+;; variables through `intern' (so repeated names share a variable and the
+;; reverse map is available for rendering).  Composes the existing surface
+;; parser with the int-code bridge.
+(define impc:type:from-pretty
+  (lambda (s intern)
+    (impc:type:from-intcode (impc:ir:get-type-from-pretty-str s) intern)))
+
+;; Render a canonical term back to an xtlang *surface* type string (tuples
+;; <...>, arrays |n,t|, closures [r,a], pointers trailing *), so the result can
+;; be re-parsed by get-type-from-pretty-str.  Residual variables render as their
+;; bang names (pointer depth comes from the enclosing ptr wrappers); base types
+;; go through pretty-print-type for their canonical surface spelling.
+(define impc:type:to-pretty
+  (lambda (t intern)
+    (cond
+      ((impc:type:var? t)
+       (let ((name (hashtable-ref intern (impc:type:var-id t))))
+         (if name name "!gx_unresolved")))
+      ((symbol? t)
+       (let ((code (impc:type:base->code t)))
+         (if code (impc:ir:pretty-print-type code) (symbol->string t))))
+      ((number? t) (number->string t))
+      ((impc:type:ptr? t)
+       (string-append (impc:type:to-pretty (impc:type:ptr-to t) intern) "*"))
+      ((impc:type:named? t)
+       (string-append "%" (impc:type:named-name t)))
+      ((impc:type:tuple? t)
+       (string-append "<" (impc:type:to-pretty-list (cdr t) intern) ">"))
+      ((impc:type:array? t)
+       (string-append "|" (number->string (impc:type:array-size t)) ","
+                      (impc:type:to-pretty (impc:type:array-elt t) intern) "|"))
+      ((impc:type:vector? t)
+       (string-append "/" (number->string (impc:type:vector-size t)) ","
+                      (impc:type:to-pretty (impc:type:vector-elt t) intern) "/"))
+      ((impc:type:closure? t)
+       (string-append "[" (impc:type:to-pretty-list (cdr t) intern) "]"))
+      (else (impc:compiler:print-compiler-error
+             (string-append "cannot render term " (impc:type:term->string t)))))))
+
+(define impc:type:to-pretty-list
+  (lambda (ts intern)
+    (if (null? ts)
+        ""
+        (let loop ((acc (impc:type:to-pretty (car ts) intern))
+                   (rest (cdr ts)))
+          (if (null? rest)
+              acc
+              (loop (string-append acc "," (impc:type:to-pretty (car rest) intern))
+                    (cdr rest)))))))
