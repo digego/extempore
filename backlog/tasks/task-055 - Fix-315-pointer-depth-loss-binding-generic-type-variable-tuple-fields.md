@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 08:58'
+updated_date: '2026-06-08 09:03'
 labels:
   - xtlang
   - compiler
@@ -30,7 +30,10 @@ Phase 1 of the task-054 redesign (see backlog/docs/doc-001). Localised fix for #
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-PROGRESS (canonical-core refactor). Built the isolated type core (runtime/llvmti-types.xtm: term algebra + Robinson unifier + occurs check + instantiation; 28 unit tests in tests/compiler/typecore.xtm) and the int-code<->term bridge (runtime/llvmti-types-bridge.xtm; 14 round-trip tests in tests/compiler/typebridge.xtm). Then fixed the generic-FUNCTION path of #315 (commit: typecheck: fix #315 ...): parser keeps the star (llvmir:591), and update-var normalises depth-bearing bare type variables at the single binding chokepoint via impc:type:reduce-ptr-depth (unifier-backed, so depth underflow fails cleanly instead of the -98). Validated: gsig315_use => 42 (was the #315 type error). All suites green (compiler-unit, libs-core, libs-external).
-
-REMAINING: (1) the generic-TYPE path -- a depth-bearing type variable in a tuple field, e.g. bind-type <!a*,i64> -- still fails; my fix moves it past the pset! type error to 'could not resolve types' at the reification site (reverse-set-bangs-from-reified). Needs the same canonical treatment there. (2) task-057 (unrelated void-return codegen bug) blocks the void-pattern characterisation repros from becoming clean passing tests.
+TYPE-PATH FINDINGS (generic-TYPE path of #315, still open). The function path is fixed+committed (see prior note). For the type path (a depth-bearing type variable in a tuple field, e.g. bind-type Box <!a*,i64>):
+- parse fix + update-var normalisation move it PAST the pset! type error (baseline) to 'could not resolve types' at reification.
+- Site 1: impc:ti:reify-generic-type-expand (transforms ~1140-1143) drops pointer stars during template substitution: (regex:replace-all type (string-append base "[*]*") tl) replaces !a* with the base value tl and discards the matched stars. Fix: capture them -- (string-append "(" base ")([*]*)") with replacement (string-append tl "$2"). Correct but insufficient alone.
+- Site 2 (the real blocker): at reification time the template's type variable is UNBOUND. Probe of reify-generic-type-expand output: '<!gxa_33*,i64>' -- !gxa_33 is never substituted because !a=i64 is not in vars (or under a mismatched key) when expand runs. This is the reverse-set-bangs-from-reified (typecheck ~1030) + nativef-generics matchup flow.
+- Also observed: template field !a* (depth 1) appearing as !ga_31** (depth 2) for the !ga_ type-var family -- an extra pointer++ somewhere.
+NEXT PHASE: route the generic-TYPE reification binding (reverse-set-bangs + matchup + reify-generic-type-expand) through the canonical core (impc:type: apply-subst / reduce-ptr-depth), so the type variable is bound depth-correctly and substituted with stars preserved -- the same approach that fixed the function path, applied to the reification machinery. This is the attempt-2 '-98' territory; the canonical reduce-ptr-depth already handles the underflow that produced -98.
 <!-- SECTION:NOTES:END -->
