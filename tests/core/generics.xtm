@@ -272,3 +272,82 @@
 ;;                     (s2 (Rectangle 1.0 2.0 3.0 4.0)))
 ;;                 (list s1 s2))))
 ;;          (make_shapes))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Characterisation locks: type-variable pointer depth (issue #315 class)
+;;
+;; A type variable used at more than one pointer depth in a signature is
+;; currently miscompiled -- a tuple field "!a*" (or a bare-vs-pointer parameter)
+;; absorbs a spurious pointer level. See backlog/docs/doc-001 (task-054) for the
+;; root-cause analysis and task-055 for the fix.
+;;
+;; The KNOWN-BROKEN cases below are locked with 'compile-should-fail so the suite
+;; is green today. When the fix lands they will start compiling and these tests
+;; will go RED -- at that point replace 'compile-should-fail with the expected
+;; return value noted in the trailing comment.
+
+;; #315 itself: depth-1 type-variable tuple field + bare !a parameter, via pset!
+(bind-type Csn315 <!a*,i64> (printer? . #f))
+(bind-func Csn315:[Csn315{!a}*,i64]* (lambda (x) (let ((arr:!a* (halloc x))) (Csn315_z arr x))))
+(bind-func csn315_put:[void,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val)))
+(xtmtest
+ (bind-func csn315_use
+   (lambda ()
+     (let ((t:Csn315{i64}* (Csn315 16)))
+       (csn315_put t 6 4)
+       (pref (tref t 0) 6))))
+ (csn315_use)
+ 'compile-should-fail) ;; phase-1: expect 4
+
+;; the same defect with NO tuple: a type variable at depth 1 and depth 0
+(bind-func csn_notuple:[void,!a*,!a]* (lambda (p v) (pset! p 0 v)))
+(xtmtest
+ (bind-func csn_notuple_use
+   (lambda ()
+     (let ((p:i64* (halloc)))
+       (csn_notuple p 5)
+       (pref p 0))))
+ (csn_notuple_use)
+ 'compile-should-fail) ;; phase-1: expect 5
+
+;; depth-2 type-variable tuple field
+(bind-type CsnDeep <!a**,i64> (printer? . #f))
+(bind-func CsnDeep:[CsnDeep{!a}*,i64]* (lambda (n) (let ((arr:!a** (halloc n))) (CsnDeep_z arr n))))
+(bind-func csndeep_put:[void,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(xtmtest
+ (bind-func csndeep_use
+   (lambda ()
+     (let ((t:CsnDeep{i64}* (CsnDeep 4))
+           (p:i64* (halloc)))
+       (pset! p 0 42)
+       (csndeep_put t 1 p)
+       (pref (pref (tref t 0) 1) 0))))
+ (csndeep_use)
+ 'compile-should-fail) ;; phase-1: expect 42
+
+;; two type variables, mixed depth (!a* depth-1 is the bug; !b depth-0 is fine)
+(bind-type CsnTwo <!a*,!b> (printer? . #f))
+(bind-func CsnTwo:[CsnTwo{!a,!b}*,i64,!b]* (lambda (n b) (let ((arr:!a* (halloc n))) (CsnTwo_z arr b))))
+(bind-func csntwo_put:[void,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(xtmtest
+ (bind-func csntwo_use
+   (lambda ()
+     (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
+       (csntwo_put t 3 7)
+       (pref (tref t 0) 3))))
+ (csntwo_use)
+ 'compile-should-fail) ;; phase-1: expect 7
+
+;; boundary lock (must keep PASSING): a depth-0 type-variable tuple field is fine
+(bind-type CsnD0 <!a,i64> (printer? . #f))
+(bind-func CsnD0:[CsnD0{!a}*,!a]* (lambda (v) (CsnD0_z v 1)))
+(bind-func csnd0_get:[!a,CsnD0{!a}*]* (lambda (t) (tref t 0)))
+(xtmtest
+ (bind-func csnd0_use
+   (lambda ()
+     (let ((t:CsnD0{i64}* (CsnD0 7)))
+       (csnd0_get t))))
+ (csnd0_use)
+ 7)
