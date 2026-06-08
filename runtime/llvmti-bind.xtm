@@ -1078,6 +1078,32 @@
      (cl:remove-duplicates
       (impc:ti:gather-all-gvars-helper gtype)))))
 
+;; #316: a tuple field that is a pointer to a named type is normally deep
+;; copied/freed/zcopied via that type's hcopy/hfree/zcopy poly. Opaque runtime
+;; pointers such as mzone* have no such poly candidate, so emitting the deep call
+;; would reference a symbol that doesn't exist (a link-time "cannot find symbol"
+;; error). Detect that case so the generator can fall back to the shallow
+;; handling it already uses for primitive-pointer fields (i.e. share the
+;; pointer). `field-type' is the field's "%Name*" pretty type; `subject-index'
+;; is the position of the operated-on type in a candidate's closure-type list
+;; (1 = return type for hcopy/zcopy, 2 = first arg for hfree, whose return is
+;; void). A recursive self-reference always has the function --- it is the very
+;; one being defined.
+(define impc:ti:tuple-field-deep-op?
+  (lambda (field-type namestr polyname subject-index)
+    (let ((t (substring field-type 1 (- (string-length field-type) 1))))
+      (or (string=? namestr t)
+          (let ((cands (impc:ti:get-polyfunc-candidate-types polyname)))
+            (if (and cands
+                     (cl:find-if
+                      (lambda (ct)
+                        (and (list? ct)
+                             (> (length ct) subject-index)
+                             (string? (list-ref ct subject-index))
+                             (string=? (list-ref ct subject-index) field-type)))
+                      cands))
+                #t #f))))))
+
 (define impc:ti:compile-type-dataconstructors
   (lambda (name type generic printer? copy? constructor?)
     (if (or (not (string? type)) ;; if not already a pretty type
@@ -1126,7 +1152,8 @@
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
-                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                           (= 1 (impc:ir:get-ptr-depth a))
+                                           (impc:ti:tuple-field-deep-op? a namestr "hcopy" 1))
                                       (let* ((t (substring a 1 (- (string-length a) 1)))
                                              (fname (if (string=? namestr t)
                                                         'hcopy
@@ -1134,6 +1161,7 @@
                                         ;; (println 't: t 'name: name 'type: type)
                                         `(if (not (null? (tref x ,c)))
                                              (tset! obj ,b (,fname (tref x ,c)))))
+                                      ;; scalar, primitive pointer, or opaque pointer (e.g. mzone*): shallow copy
                                       `(tset! obj ,b (tref x ,c))))
                                 a arglst2 (range (length a)))))
            (hfree_body (if generic #f
@@ -1141,13 +1169,16 @@
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
-                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                           (= 1 (impc:ir:get-ptr-depth a))
+                                           (impc:ti:tuple-field-deep-op? a namestr "hfree" 2))
                                       (let* ((t (substring a 1 (- (string-length a) 1)))
                                              (fname (if (string=? namestr t)
                                                         'hfree
                                                         (string->symbol (string-append "hfree:[void," t "*]*")))))
                                         `(if (not (null? (tref x ,c)))
-                                             (,fname (tref x ,c))))))
+                                             (,fname (tref x ,c))))
+                                      ;; opaque pointer (e.g. mzone*): not owned, don't free
+                                      ))
                                 a (range (length a)))))
            (zcopy_body (if generic #f
                            (map (lambda (a b c)
@@ -1155,13 +1186,16 @@
                                   (set! a (impc:ir:get-type-from-pretty-str a))
                                   (if (and (impc:ir:tuple? a)
                                            (string? a) ;; i.e. must be a named type "%Pair*" NOT <i32,i32>* (for example)
-                                           (= 1 (impc:ir:get-ptr-depth a)))
+                                           (= 1 (impc:ir:get-ptr-depth a))
+                                           (impc:ti:tuple-field-deep-op? a namestr "zcopy" 1))
                                       (let* ((t (substring a 1 (- (string-length a) 1)))
                                              (fname (if (string=? namestr t)
                                                         'zcopy
                                                         (string->symbol (string-append "zcopy:[" t "*," t "*,mzone*,mzone*]*")))))
                                         `(if (not (null? (tref x ,c)))
                                              (tset! obj ,b (,fname (tref x ,c) fromz toz))))
+                                      ;; opaque pointer (e.g. mzone*) falls through here: shared unless it
+                                      ;; points into the from-zone (zone structs never do)
                                       (if (and (impc:ir:pointer? a)
                                                (= 1 (impc:ir:get-ptr-depth a)))
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
