@@ -1129,8 +1129,17 @@
                                      (apply string-append namestr
                                             "{"
                                             (string-join
-                                             (map (lambda (x) (symbol->string x))
-                                                  (impc:ti:gather-all-gvars (impc:ir:get-type-from-pretty-str type)))
+                                             ;; #315: the type parameter list is
+                                             ;; bare variable identities; strip
+                                             ;; any field pointer depth so the
+                                             ;; constructor returns Box{!a}*, not
+                                             ;; Box{!a*}* (which double-counts).
+                                             (cl:remove-duplicates
+                                              (map (lambda (x)
+                                                     (impc:type:strip-trailing-stars
+                                                      (symbol->string x)))
+                                                   (impc:ti:gather-all-gvars
+                                                    (impc:ir:get-type-from-pretty-str type))))
                                              ",")
                                             "}*"
 
