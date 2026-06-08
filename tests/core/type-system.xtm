@@ -1,0 +1,81 @@
+;;; type-system.xtm -- type-checker behaviours and soundness
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; run these tests with (xtmtest-run-tests "tests/core/type-system.xtm" #t #f)
+;;
+;; Coverage for type-system behaviours that previously had no test: the return
+;; type soundness check (#371), auto-generated tuple copy/free for opaque
+;; pointer fields (#316), and type aliases. See backlog/docs/doc-001 (task-054)
+;; for the wider generic-type-compiler audit.
+
+;;; Code:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Return-type soundness (#371)
+;;
+;; A bind-func whose body yields a concrete pointer/tuple type different from
+;; its declared return type must be REJECTED -- before the fix it compiled and
+;; silently bit-cast the result (an unsound reinterpret).
+
+(bind-type T371a <i64,i64,double>)
+(bind-type T371b <i64,i64>)
+
+(xtmtest
+ (bind-func test_return_type_mismatch:[T371a*]*
+   (lambda ()
+     (let ((x:T371b* (T371b 1 2)))
+       x)))
+ (test_return_type_mismatch)
+ 'compile-should-fail)
+
+;; the matching-return-type version must still compile, and reading it back
+;; through a wrapper confirms the check is not a false positive
+(xtmtest-compile
+ (bind-func make_t371b:[T371b*]*
+   (lambda () (T371b 3 4))))
+
+(xtmtest
+ (bind-func read_t371b
+   (lambda () (tref (make_t371b) 1)))
+ (read_t371b)
+ 4)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Opaque pointer as a tuple field (#316)
+;;
+;; The auto-generated hcopy/hfree/zcopy for a tuple must fall back to a shallow
+;; copy for an opaque runtime pointer (mzone*) that has no copy function of its
+;; own -- before the fix this failed with 'cannot find symbol hcopy:[mzone*,mzone*]'.
+
+(xtmtest-compile
+ (bind-type TupleWithZone <i64,mzone*>))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Type aliases (bind-alias)
+
+(bind-alias MyI64 i64)
+
+(xtmtest
+ (bind-func test_alias_scalar:[MyI64,MyI64]*
+   (lambda (x) (+ x 1)))
+ (test_alias_scalar 41)
+ 42)
+
+;; alias of a named tuple type, used in a typed let binding
+(bind-type AliasedPair <i64,i64>)
+(bind-alias PairAlias AliasedPair)
+
+(xtmtest
+ (bind-func test_alias_named
+   (lambda ()
+     (let ((p:PairAlias* (AliasedPair 5 9)))
+       (tref p 1))))
+ (test_alias_named)
+ 9)

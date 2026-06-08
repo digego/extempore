@@ -351,3 +351,18 @@
        (csnd0_get t))))
  (csnd0_use)
  7)
+
+;; boundary lock (must keep PASSING): a type variable nested inside a closure
+;; field of a generic tuple sits at depth 0 inside the closure, so it is matched
+;; structurally and is NOT affected by the #315 pointer-depth defect.
+(bind-type Csn315F <[!a,!a]*,i64> (printer? . #f))
+(bind-func Csn315F:[Csn315F{!a}*,[!a,!a]*]* (lambda (f) (Csn315F_z f 1)))
+(bind-func csn315F_call:[!a,Csn315F{!a}*,!a]* (lambda (t v) ((tref t 0) v)))
+(xtmtest
+ (bind-func csn315F_use
+   (lambda ()
+     (let ((dbl:[i64,i64]* (lambda (x) (* x 2)))
+           (t:Csn315F{i64}* (Csn315F dbl)))
+       (csn315F_call t 5))))
+ (csn315F_use)
+ 10)

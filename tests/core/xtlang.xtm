@@ -1366,3 +1366,40 @@
 ;; (bind-val hl_test4 double* 10)
 ;; (bind-type hl_test_type <i64> "docstring")
 ;; (bind-lib testlib testfn [i32,i32]*)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; let-bound closures invoked by a sibling binding (#137, #140)
+;;
+;; A closure's environment must be linked before a later sibling binding's
+;; initializer runs; otherwise a recursive or composed lambda called from a
+;; sibling dereferences an unlinked environment and SIGSEGVs.
+
+(xtmtest
+ (bind-func test_let_recursive_sibling
+   (lambda ()
+     (let ((fact:[i64,i64]* (lambda (n) (if (< n 1) 1 (* n (fact (- n 1))))))
+           (r (fact 5)))
+       r)))
+ (test_let_recursive_sibling)
+ 120)
+
+(xtmtest
+ (bind-func test_let_composed_sibling
+   (lambda ()
+     (let ((add1:[i64,i64]* (lambda (x) (+ x 1)))
+           (dbl:[i64,i64]* (lambda (x) (* x 2)))
+           (comp:[i64,i64]* (lambda (x) (add1 (dbl x))))
+           (r (comp 5)))
+       r)))
+ (test_let_composed_sibling)
+ 11)
+
+;; letz whose body tail returns void, e.g. a trailing println (#150) -- the
+;; zone copy-out must recognise the void tail and skip it.
+(xtmtest-compile
+ (bind-func test_letz_void_tail
+   (lambda ()
+     (letz ((x:i64 5))
+       (println "letz void tail" x)))))
