@@ -67,8 +67,11 @@ endif()
 #############################
 
 set(DEP_LLVM_VERSION "22.1.6")
-set(DEP_PORTAUDIO_VERSION "v19.7.0")
-set(DEP_PORTAUDIO_MD5 "54297c72a852669f9987ee7bb9fba0a6")
+# PortAudio tags releases rarely (v19.7.0 is from 2021), so pin master by commit
+# SHA for its modern CMake (3.10 -- which lets us drop the policy-version floor
+# the old 2.8 CMake needed) and five years of platform fixes. Still built static.
+set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
+set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
 set(DEP_PORTMIDI_MD5 "212d4fa92fbb40c8bbaee054af138bf8")
 set(DEP_RTMIDI_VERSION "6.0.0")
@@ -134,15 +137,12 @@ include(ExternalProject)
 ExternalProject_Add(portaudio_static
     PREFIX portaudio
     URL https://github.com/PortAudio/portaudio/archive/${DEP_PORTAUDIO_VERSION}.zip
-    URL_MD5 ${DEP_PORTAUDIO_MD5}
+    URL_HASH SHA256=${DEP_PORTAUDIO_SHA256}
     CMAKE_ARGS
-        -DPA_BUILD_STATIC=ON
-        -DPA_BUILD_SHARED=OFF
-        -DPA_LIBNAME_ADD_SUFFIX=OFF
+        -DPA_BUILD_SHARED_LIBS=OFF
         -DPA_USE_JACK=${JACK}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio)
 
 ########
 # LLVM #
