@@ -544,6 +544,29 @@
 
 (define *xtm_mz_num* 0)
 
+;; #150: a builtin type string like "[void,!v...]*" has a void return type
+;; exactly when it opens with "[void" immediately followed by "," or "]".
+(define impc:ti:type-str-void-return?
+  (lambda (ts)
+    (and (string? ts)
+         (> (string-length ts) 5)
+         (string=? (substring ts 0 5) "[void")
+         (memv (string-ref ts 5) (list #\, #\])))))
+
+;; #150: is this tail FORM one whose value is void? memzone/letz needs to know
+;; so it can skip the copy-out (you cannot copy a void result out of the dying
+;; zone). The check is syntactic --- it runs before type inference --- so it
+;; recognises the void-yielding loop forms and any call to a builtin whose
+;; registered return type is void (e.g. println). Anything else is left to the
+;; caller's descent, so this only ever *adds* void classifications.
+(define impc:ti:memzone-tail-returns-void?
+  (lambda (form)
+    (and (pair? form)
+         (symbol? (car form))
+         (or (memq (car form) '(dotimes doloop while))
+             (impc:ti:type-str-void-return?
+              (impc:ti:get-builtin-type-str (symbol->string (car form))))))))
+
 (define impc:ti:check-memzone-void?
   (lambda (ast)
     (if (atom? ast)
@@ -551,7 +574,13 @@
         (if (list? ast)
             (if (null? ast)
                 #f
-                (impc:ti:check-memzone-void? (car (reverse ast))))
+                (let ((tail (car (reverse ast))))
+                  ;; a void-yielding tail call (e.g. println) settles it; for
+                  ;; sequencing forms (begin/let/...) the tail is their result,
+                  ;; so keep descending as before.
+                  (if (impc:ti:memzone-tail-returns-void? tail)
+                      #t
+                      (impc:ti:check-memzone-void? tail))))
             #f))))
 
 (define impc:ti:memzone
