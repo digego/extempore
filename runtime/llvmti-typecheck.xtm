@@ -3033,6 +3033,24 @@ xtlang's `let' syntax is the same as Scheme"
                (impc:ir:type? (car res)))
           (begin (impc:ti:type-check (ast:lambda-body ast) vars kts (car res))
                  (set! res (car res))))
+      ;; #371: if a concrete *pointer* return type was requested (e.g. via a
+      ;; bind-func signature) the body must actually produce that pointer type.
+      ;; Without this check a mismatch between two concrete pointer/tuple types
+      ;; slips through --- the declared type silently wins and the body's value
+      ;; is bit-cast to it, an unsoundness. Restricting to pointers leaves the
+      ;; legitimate scalar coercions (numeric widening, scalar->vector
+      ;; broadcast) to the existing forcing/codegen path, and skips anything
+      ;; still generic (a !-type).
+      (if (and expected (impc:ir:type? expected) (impc:ir:type? res)
+               (impc:ir:pointer? expected) (impc:ir:pointer? res)
+               (not (impc:ti:bang-type? expected)) (not (impc:ti:bang-type? res))
+               (not (equal? res expected)))
+          (impc:compiler:print-compiler-error
+           (string-append "function body returns type '"
+                          (impc:ir:pretty-print-type res)
+                          "' but its signature declares a return type of '"
+                          (impc:ir:pretty-print-type expected) "'")
+           (ast:lambda-body ast)))
       ;; return lambda type which is made up of
       ;; argument symbols plus return type from last body expression
       (let* ((ret (list (impc:ir:pointer++ (list* *impc:ir:closure* res (ast:lambda-params ast)) 2)))
