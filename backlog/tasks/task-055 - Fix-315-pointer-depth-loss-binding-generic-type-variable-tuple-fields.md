@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 06:23'
+updated_date: '2026-06-08 07:11'
 labels:
   - xtlang
   - compiler
@@ -43,4 +43,24 @@ This goes through nativef-generics (function path), not reverse-set-bangs (tuple
 RE-SCOPE: #315 cannot be fixed by a binding-site patch. The fix is the type-variable-carries-pointer-depth slice of the audit's Phase 2 (doc-001 section 4.4 / Phase 1): make a typevar retain declared pointer depth at parse time (llvmir.xtm:591) and have type-unify (~1872) strip+reapply it. Higher risk (touches the ##gnum/freshening string machinery); must land behind the Phase-0 characterisation net. libs-core stayed green (8/8) under the reverted patch.
 
 PAUSED pending direction on whether to take on the representation change now.
+
+PHASE-1 ATTEMPT 2 (representation fix) -- design validated, reverted (tree clean, libs-core 9/9 green). WIP saved at backlog/docs/task-055-phase1-wip.patch.
+
+INVARIANT chosen: a type variable's value is stored depth-0 under its BASE name (!a##gnum); every USE re-applies its own declared pointer depth. So !a* and !a are distinguishable and a single binding serves both.
+
+THREE coordinated changes made (all in the patch), CONFIRMED individually:
+1. Parse (llvmir.xtm ~591): bang branch keeps the stars -- (string-append base (make-string ptr-depth #\*)). Verified: get-type-from-pretty-str '<!a*,i64>' -> (14 !a* 2); depth-0 !a unchanged.
+2. Resolve (type-unify, transforms.xtm ~1823): new branch -- if t is a bang at ptr-depth>0, look up the base key (strip stars, keep ##gnum) and pointer++ the result by the depth.
+3. Bind (reverse-set-bangs-from-reified, typecheck.xtm ~1033): bind under get-base-type(b)##gnum with pointer--(a, depth).
+
+RESULT: runtime loads fine (parens OK); both failures MOVED but not fixed.
+- #315 (tuple) now errors in the auto-generated constructor: 'conflicting i64* with i64 in (tuple-set! obj 0 arg_0)' -- the constructor's !a* arg type resolves to i64 (base) without depth re-applied.
+- no-tuple [void,!a*,!a]* now mis-codegens: 'LLVM IR: void type only allowed for function results / bitcast i64 to void'.
+
+REMAINING PATHS needing the SAME base-key/depth normalization (the fix is multi-path, as the audit predicted):
+- nativef-generics-check-args (typecheck.xtm ~915-930): function-arg binding (binds gt:=tt under the starred key; needs base-key + pointer-- like change 3).
+- the constructor / tuple-set! field-type resolution that raises print-type-conflict-error (globals.xtm:407) -- find where the auto-generated constructor's !a* param/field types are resolved and ensure depth is re-applied.
+- likely several get-base-type-then-resolve sites (any code that strips stars before resolving loses the depth).
+
+NEXT: apply the patch, then extend the depth-normalization to check-args + the constructor path, validating against the characterisation net (csn315/csndeep/csntwo/csn_notuple flip from compile-should-fail to their expected values; csnd0 + the libs stay green) after each change.
 <!-- SECTION:NOTES:END -->

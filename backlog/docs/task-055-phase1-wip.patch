@@ -1,0 +1,87 @@
+diff --git a/runtime/llvmir.xtm b/runtime/llvmir.xtm
+index 33c095ec..7034bd08 100644
+--- a/runtime/llvmir.xtm
++++ b/runtime/llvmir.xtm
+@@ -588,7 +588,9 @@
+                          (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t #t))
+                      string-type))
+                    ;; (error ""))))
+-            ((impc:ti:bang-type? base) (string->symbol base))
++            ;; #315: keep a type variable's pointer depth (e.g. "!a*" stays a
++            ;; depth-1 typevar instead of collapsing to "!a"); depth-0 is unchanged
++            ((impc:ti:bang-type? base) (string->symbol (string-append base (make-string ptr-depth #\*))))
+             ((or (impc:ti:get-generictype-candidate-types base)
+                  (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
+              ;; (println 'gen_chk_with_args: args)
+diff --git a/runtime/llvmti-transforms.xtm b/runtime/llvmti-transforms.xtm
+index c6a1b1ac..dc272cb3 100644
+--- a/runtime/llvmti-transforms.xtm
++++ b/runtime/llvmti-transforms.xtm
+@@ -1820,13 +1820,35 @@ Continue executing `body' forms until `test-expression' returns #f"
+                             #t
+                             #f)))
+                (impc:ti:reify-generic-type t vars '())
+-               (if (and (symbol? t) (impc:ti:vars-ref vars t))
+-                   (let ((val (impc:ti:vars-ref vars t)))
+-                     (if (impc:ti:occurs-in-type? t val)
+-                         t
+-                         (let ((r (impc:ti:type-unify val vars)))
+-                           (if (null? r) t r))))
+-                   t)))
++               (if (and (symbol? t)
++                        (impc:ti:bang-type? t)
++                        (> (impc:ir:get-ptr-depth (symbol->string t)) 0))
++                   ;; #315: a type variable used at pointer depth >= 1 (an "!a*"
++                   ;; tuple field or pointer parameter). Its value is stored
++                   ;; depth-0 under the base name, so resolve the base variable
++                   ;; and re-apply the depth instead of collapsing "!a*" to "!a".
++                   (let* ((tstr (symbol->string t))
++                          (depth (impc:ir:get-ptr-depth tstr))
++                          (gp (string-split-on tstr "##"))
++                          (base-key (string->symbol
++                                     (if (null? (cdr gp))
++                                         (impc:ir:get-base-type (car gp))
++                                         (string-append (impc:ir:get-base-type (car gp))
++                                                        "##" (cadr gp)))))
++                          (bval (impc:ti:vars-ref vars base-key)))
++                     (if (and bval (not (impc:ti:occurs-in-type? base-key bval)))
++                         (let ((r (impc:ti:type-unify bval vars)))
++                           (if (and (not (null? r)) (impc:ir:type? r))
++                               (impc:ir:pointer++ r depth)
++                               t))
++                         t))
++                   (if (and (symbol? t) (impc:ti:vars-ref vars t))
++                       (let ((val (impc:ti:vars-ref vars t)))
++                         (if (impc:ti:occurs-in-type? t val)
++                             t
++                             (let ((r (impc:ti:type-unify val vars)))
++                               (if (null? r) t r))))
++                       t))))
+           ((list? t)
+            (cond ((impc:ti:complex-type? t)
+                   (map (lambda (v) (impc:ti:type-unify v vars)) t))
+diff --git a/runtime/llvmti-typecheck.xtm b/runtime/llvmti-typecheck.xtm
+index 3d01c0a1..c39ba97b 100644
+--- a/runtime/llvmti-typecheck.xtm
++++ b/runtime/llvmti-typecheck.xtm
+@@ -1033,9 +1033,17 @@
+               (for-each (lambda (a b)
+                           (if (symbol? b)
+                               (if (char=? (string-ref (symbol->string b) 0) #\!)
+-                                  (set! vars (impc:ti:vars-update
+-                                   (string->symbol (string-append (symbol->string b) "##" (number->string gnum)))
+-                                   vars '() a))))
++                                  ;; #315: bind the type variable under its BASE
++                                  ;; name with the field's declared pointer depth
++                                  ;; stripped, so a "!a*" field binds !a to T (not T*)
++                                  (let* ((bstr (symbol->string b))
++                                         (depth (impc:ir:get-ptr-depth bstr))
++                                         (aval (if (and (> depth 0) (not (string? a)))
++                                                   (impc:ir:pointer-- a depth)
++                                                   a)))
++                                    (set! vars (impc:ti:vars-update
++                                     (string->symbol (string-append (impc:ir:get-base-type bstr) "##" (number->string gnum)))
++                                     vars '() aval)))))
+                           (if (and (string? a)
+                                    (not (string=? a reified)) ;; watch out for recursive!
+                                    (string-contains? a "_poly_"))
