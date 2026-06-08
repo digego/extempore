@@ -1679,7 +1679,6 @@
   (lambda (ast types)
     ;; (println 'ast: ast 'types types)
     (let* ((os (make-string 0))
-           (lambda-envs '())
            (result '())
            (env-zone-tmp '())
            (res
@@ -1768,14 +1767,17 @@
                                     "\n") os)
                (emit (string-append "store " typestr " %" symstr ", "
                                     typestr "* %" symstr "Ptr\n\n") os)
+               ;; #137/#140: fill this closure's environment immediately, rather
+               ;; than deferring all env-fills until after the whole binding
+               ;; list. A later sibling initializer in the same let may call an
+               ;; earlier binding (e.g. a recursive lambda invoked from another
+               ;; binding's value), and that call needs the callee's environment
+               ;; already linked. All slots are pre-allocated above, so the
+               ;; env-fill only ever stores slot pointers --- forward and mutual
+               ;; references keep working.
                (if (pair? value)
-                   (set! lambda-envs (cons (cdr value) lambda-envs)))))
+                   (emit (cdr value) os))))
            (caddr ast) res)
-
-      ;; fill in and lambda environments now
-      (map (lambda (a)
-             (emit a os))
-           lambda-envs)
                                         ; (emit "call ccc void @llvm_print_i32(i32 999)\n" os)
       ;; (println '____________B> ast)
       ;; compile body
