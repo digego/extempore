@@ -1,9 +1,10 @@
 ---
 id: TASK-054
 title: Audit and redesign the xtlang generic type compiler
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-08 04:51'
+updated_date: '2026-06-08 05:20'
 labels:
   - xtlang
   - compiler
@@ -39,10 +40,26 @@ The concrete-typed analog (bind-type CTest <i64*,i64>, same put) compiles fine, 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Findings doc maps the type representation(s) and every conversion boundary between int-code / pretty-string / tagged-list forms
-- [ ] #2 Freshening + unification call graph documented across type-unify, type-unify-closure, polytype-match?, generic-types-matchup?, reify-generic-type(-expand), nativef-generics-check-args, make-gtypes-unique
-- [ ] #3 Inventory of special-case hacks, duplicate definitions, and dead/commented code in the generic path
-- [ ] #4 #315 root cause documented precisely, plus the class of related latent bugs the same flaw implies, with repro sketches
-- [ ] #5 Phased redesign proposed (canonical type representation + a real unifier with a substitution map and consistent fresh-variable identity), with per-phase risk/effort and a characterisation-test strategy
-- [ ] #6 No production code changed (read-only audit; redesign is a written proposal)
+- [x] #1 Findings doc maps the type representation(s) and every conversion boundary between int-code / pretty-string / tagged-list forms
+- [x] #2 Freshening + unification call graph documented across type-unify, type-unify-closure, polytype-match?, generic-types-matchup?, reify-generic-type(-expand), nativef-generics-check-args, make-gtypes-unique
+- [x] #3 Inventory of special-case hacks, duplicate definitions, and dead/commented code in the generic path
+- [x] #4 #315 root cause documented precisely, plus the class of related latent bugs the same flaw implies, with repro sketches
+- [x] #5 Phased redesign proposed (canonical type representation + a real unifier with a substitution map and consistent fresh-variable identity), with per-phase risk/effort and a characterisation-test strategy
+- [x] #6 No production code changed (read-only audit; redesign is a written proposal)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Read-only audit delivered as backlog/docs/doc-001. Evidence gathered by source reading, ast-grep/rg search, and read-only experiments against build/extempore (incl. the live #315 repro and REPL-only instrumentation; no files touched outside backlog/docs and /tmp).
+
+KEY CORRECTION: the recorded #315 diagnosis (task-053 / issue: 'the two !a occurrences get separate freshened identities and are never unified') is mechanically WRONG. Verified statically and by experiment that register-new-genericfunc dedups then replaces all occurrences (caches.xtm:1286,1302), so both function-signature !a share one name (!gxa_34). Real cause: type variables carry no pointer level, so a tuple field !a* collapses to bare !a at llvmir.xtm:591, and reverse-set-bangs-from-reified (typecheck.xtm:1033-1043) binds the var to the whole concrete field i64* instead of stripping the field's declared pointer depth. Bug class mapped (depth>=1 typevar tuple fields; nested generic tuples fail silently). Implication: a 'unify the two vars / single substitution map' fix would NOT fix #315 on its own.
+
+Phased redesign proposed (doc section 5): Phase 0 net+cleanup, Phase 1 localised #315 fix, Phase 2 canonical type representation, Phase 3 real unifier + substitution map + consistent freshening, Phase 4 remove string algebra. Recommended follow-up tasks listed but NOT created (awaiting direction).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Findings doc + phased redesign delivered at backlog/docs/doc-001. All 6 ACs met. Headline: the originally-recorded #315 root cause is wrong; real cause is pointer-depth loss for type-variable tuple fields (llvmir.xtm:591 + reverse-set-bangs typecheck.xtm:1033-1043), not a freshening-identity divergence. No production code changed.
+<!-- SECTION:FINAL_SUMMARY:END -->
