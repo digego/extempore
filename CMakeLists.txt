@@ -307,6 +307,15 @@ if(UNIX)
         endif()
         target_compile_options(extempore PRIVATE ${SAN_FLAGS})
         target_link_options(extempore PRIVATE ${SAN_FLAGS})
+        # GCC's -Wmaybe-uninitialized (promoted to an error by -Werror=uninitialized
+        # above) fires false positives inside libstdc++'s own <regex> headers once
+        # the sanitizers perturb inlining at -O3 --- see the std::regex use in
+        # AudioDevice.cpp. Demote it to a plain warning for sanitizer builds so a
+        # spurious diagnostic can't fail the build and mask the actual sanitizer run.
+        # The un-instrumented Release build doesn't trip it, so it stays strict.
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(extempore PRIVATE -Wno-error=maybe-uninitialized)
+        endif()
         message(STATUS "Extempore sanitizers enabled: ${EXTEMPORE_SANITIZE}")
     endif()
 
