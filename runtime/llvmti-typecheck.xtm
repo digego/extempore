@@ -136,6 +136,25 @@
         (set! t (car t)))
     (set! t (impc:ti:type-clean t))
     (set! t (impc:ti:type-normalize t))
+    ;; #315: a bang-variable written with pointer stars (!a*) binds its base
+    ;; variable (!a) to a correspondingly shallower type.  Normalise the key
+    ;; back to its star-free form --- the historical storage convention --- and
+    ;; strip the same number of pointer levels from the value, at this single
+    ;; binding chokepoint so every caller agrees on the convention.  An
+    ;; irreducible value (shallower than the variable's depth) is left as-is:
+    ;; no worse than the previous behaviour.  The key must be a *bare* type
+    ;; variable (starting with !), not a generic-type instance such as
+    ;; CsnD0{!a}* whose trailing star is the tuple pointer, not a variable depth.
+    (if (and (symbol? sym)
+             (impc:type:bare-bang-var? sym)
+             (> (impc:ir:get-ptr-depth (symbol->string sym)) 0))
+        (begin
+          (if (impc:ir:type? t)
+              (let ((reduced (impc:type:reduce-ptr-depth
+                              t (impc:ir:get-ptr-depth (symbol->string sym)))))
+                (if (not (eq? reduced 'fail))
+                    (set! t reduced))))
+          (set! sym (impc:type:bang-base-key sym))))
     (if (or (null? t)
             (equal? t #f)
             (impc:ti:occurs-in-type? sym t)

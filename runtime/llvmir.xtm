@@ -588,7 +588,10 @@
                          (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol name1) type #f #t #t #t))
                      string-type))
                    ;; (error ""))))
-            ((impc:ti:bang-type? base) (string->symbol base))
+            ;; #315: keep the pointer depth on a type variable (!a* stays !a*,
+            ;; not !a) so it can be carried through unification as structure.
+            ((impc:ti:bang-type? base)
+             (string->symbol (string-append base (make-string ptr-depth #\*))))
             ((or (impc:ti:get-generictype-candidate-types base)
                  (impc:ti:get-generictype-candidate-types (car (regex:split base "%"))))
              ;; (println 'gen_chk_with_args: args)

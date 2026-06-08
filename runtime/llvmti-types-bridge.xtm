@@ -98,6 +98,52 @@
   (lambda (s)
     (substring s 0 (- (string-length s) (impc:type:trailing-stars s)))))
 
+;; A *bare* type variable: a symbol whose name starts with `!'.  This is
+;; stricter than impc:ti:bang-type? (which only asks whether `!' occurs
+;; somewhere) so that a generic-type instance like CsnD0{!a}* --- whose name
+;; merely contains a bang --- is not mistaken for a variable.
+(define impc:type:bare-bang-var?
+  (lambda (sym)
+    (and (symbol? sym)
+         (let ((s (symbol->string sym)))
+           (and (> (string-length s) 0)
+                (char=? (string-ref s 0) #\!))))))
+
+;; The base (star-stripped) key for a bang-variable symbol, preserving any
+;; ##gnum call-site suffix: !gxa_29*##3 -> !gxa_29##3.  This is the key under
+;; which a bang-variable's binding is stored, regardless of the pointer depth
+;; at which it was written.
+(define impc:type:bang-base-key
+  (lambda (sym)
+    (let* ((str (symbol->string sym))
+           (parts (string-split-on str "##"))
+           (head (car parts))
+           (suffix (if (> (length parts) 1)
+                       (string-append "##" (cadr parts))
+                       "")))
+      (string->symbol (string-append (impc:type:strip-trailing-stars head) suffix)))))
+
+;; Remove `d' pointer levels from a concrete int-code type, via the unifier so
+;; that an impossible reduction (the value is shallower than d) fails cleanly
+;; rather than underflowing into a bogus negative code --- the -98 of the old
+;; string arithmetic.  Returns the reduced int-code, or the symbol 'fail.  A
+;; type that still contains variables is returned unchanged, leaving its depth
+;; to be reconciled through the substitution store.
+(define impc:type:reduce-ptr-depth
+  (lambda (t d)
+    (if (<= d 0)
+        t
+        (let* ((intern (make-hashtable))
+               (term (impc:type:from-intcode t intern)))
+          (if (pair? (impc:type:free-vars term))
+              t
+              (let* ((v (impc:type:fresh-var))
+                     (subst (impc:type:unify (impc:type:wrap-ptr d v) term
+                                             impc:type:empty-subst)))
+                (if subst
+                    (impc:type:to-intcode (impc:type:apply-subst v subst))
+                    'fail)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; int-code -> term    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
