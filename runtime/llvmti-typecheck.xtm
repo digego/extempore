@@ -3140,42 +3140,6 @@ xtlang's `let' syntax is the same as Scheme"
 ;; (fptrcall fptr ... args)
 (define impc:ti:fptrcall-check
   (lambda (ast vars kts expected)
-    ;; (println 'ast: ast)
-    (let* ((fptr (impc:ti:type-check (cadr ast) vars kts #f))
-           ;; (lllll (println 'fptr fptr))
-           (ctype (if (impc:ir:closure? (car fptr))
-                      (car fptr)
-                      (impc:compiler:print-bad-type-error (car fptr) "bad fptr type in fptrcall")))
-           ;; (lllllll (println 'ctype ctype))
-           ;; get argument expression types
-           (res (map (lambda (e t)
-                       ;;(println 'e: e 't: t)
-                       (let ((res (impc:ti:type-check e vars kts
-                                                      (if (symbol? t)
-                                                          (tc-unwrap (impc:ti:symbol-check t vars kts #f))
-                                                          t))))
-                         ;; if t is a symbol then add res to t
-                         (if (symbol? t)
-                             (if (or (and (list? res)
-                                          (impc:ir:type? (car res)))
-                                     (impc:ir:type? res))
-                                 (set! vars (impc:ti:vars-force t vars kts res))
-                                 (set! vars (impc:ti:vars-update t vars kts res))))
-                         res))
-                     (cddr ast)
-                     (if (<> (length (cddr ctype))
-                             (length (cddr ast)))
-                         (impc:compiler:print-bad-arity-error ast)
-                         (cddr ctype)))))
-      (tc-result (cadr ctype) vars))))
-
-
-
-;; for fptrcall
-;; which has the form
-;; (fptrcall fptr ... args)
-(define impc:ti:fptrcall-check
-  (lambda (ast vars kts expected)
     (let* ((fptr (impc:ti:type-check (cadr ast) vars kts #f)))
       (tc-result
       (if (null? fptr)
@@ -4104,15 +4068,6 @@ xtlang's `let' syntax is the same as Scheme"
 ;;
 ;; adds make-closure and make-env tags
 ;;
-
-(define impc:ti:allocate-var?
-  (lambda (ast)
-    (cond ((null? ast) #f)
-          ((member ast *impc:lambdaslist*) #t)
-          ((pair? ast)
-           (or (impc:ti:allocate-var? (car ast))
-               (impc:ti:allocate-var? (cdr ast))))
-          (else #f))))
 
 (define impc:ti:allocate-var?
   (lambda (ast)
