@@ -1403,3 +1403,17 @@
    (lambda ()
      (letz ((x:i64 5))
        (println "letz void tail" x)))))
+
+;; void-returning function whose body tail yields a value (pset! returns the
+;; stored value): the tail value is discarded and the function emits `ret void',
+;; not an invalid `bitcast <val> to void' (task-057).  The side effect still
+;; happens, so the stored value is readable afterwards.
+(bind-func void_value_tail_set:[void,i64*,i64]* (lambda (p v) (pset! p 0 v)))
+(xtmtest
+ (bind-func test_void_value_tail
+   (lambda ()
+     (let ((p:i64* (salloc)))
+       (void_value_tail_set p 9)
+       (pref p 0))))
+ (test_void_value_tail)
+ 9)

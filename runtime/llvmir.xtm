@@ -3259,7 +3259,18 @@
            (val (impc:ir:gname))
            (os (make-string 0)))
       (emit str os)
-      (if (impc:ir:void? (cadr (impc:ir:gname)))
+      ;; A void-returning function discards its body's tail value: the body IR is
+      ;; already emitted (for its side effects), so emit `ret void' rather than
+      ;; coercing a value-yielding tail (e.g. pset!, which returns the set value)
+      ;; with an invalid `bitcast <val> to void'.  Either the value itself is
+      ;; void, or the declared return type is --- but only for a genuine body
+      ;; return: the closure _maker reuses this compiler to return the closure
+      ;; pointer, where hinttype? is the closure's (void) return type yet the
+      ;; value is the pointer.  That case has (cadr ast) = (caddr ast), the same
+      ;; outer-let marker the bitcast guard below uses.
+      (if (or (impc:ir:void? (cadr (impc:ir:gname)))
+              (and (impc:ir:void? hinttype?)
+                   (not (equal? (cadr ast) (caddr ast)))))
           (emit "ret void\n" os)
           (let ((type (cadr (cdr (assoc-strcmp (cadr ast) types)))))
                                         ;(println 'type: type)

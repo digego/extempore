@@ -291,10 +291,11 @@
 ;; as one identity at a structural pointer depth (so !a and !a* are the same
 ;; variable, X vs X*, not two symbols reconciled by stripping/adding stars).
 ;;
-;; The repros below are written value-returning rather than void.  The original
-;; characterisation used void-returning put functions, whose value-yielding tail
-;; tripped an unrelated codegen bug (task-057); returning the stored value
-;; isolates the #315 behaviour cleanly.
+;; Each repro appears twice.  The value-returning form (put returns the stored
+;; value) isolates the #315 type-path cleanly.  The void-returning form (a put
+;; that mutates and returns nothing) is the original, idiomatic shape; it also
+;; needs the void-return codegen fix (task-057), since a value-yielding tail in
+;; a void function was miscompiled, and so exercises both fixes together.
 
 ;; Positive lock (FIXED): a type variable at depth-1 (!a*) and depth-0 (!a) in
 ;; one generic-function signature now binds consistently -- !a* against i64*
@@ -358,6 +359,54 @@
        (csntwo_put t 3 7)
        (pref (tref t 0) 3))))
  (csntwo_use)
+ 7)
+
+;; void-returning companions (task-057 + this type-path fix): the same four
+;; repros in their original void+value-yielding-tail shape -- a put that mutates
+;; and returns nothing.  These need both fixes at once: the type path (so the
+;; depth-bearing field reifies) and the void-return codegen (so the value tail
+;; is discarded rather than coerced).  They reuse the types and constructors
+;; defined above.
+(bind-func csn315_putv:[void,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val)))
+(xtmtest
+ (bind-func csn315_usev
+   (lambda ()
+     (let ((t:Csn315{i64}* (Csn315 16)))
+       (csn315_putv t 6 4)
+       (pref (tref t 0) 6))))
+ (csn315_usev)
+ 4)
+
+(bind-func csn_notuplev:[void,!a*,!a]* (lambda (p v) (pset! p 0 v)))
+(xtmtest
+ (bind-func csn_notuplev_use
+   (lambda ()
+     (let ((p:i64* (halloc)))
+       (csn_notuplev p 5)
+       (pref p 0))))
+ (csn_notuplev_use)
+ 5)
+
+(bind-func csndeep_putv:[void,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(xtmtest
+ (bind-func csndeep_usev
+   (lambda ()
+     (let ((t:CsnDeep{i64}* (CsnDeep 4))
+           (p:i64* (halloc)))
+       (pset! p 0 42)
+       (csndeep_putv t 1 p)
+       (pref (pref (tref t 0) 1) 0))))
+ (csndeep_usev)
+ 42)
+
+(bind-func csntwo_putv:[void,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v)))
+(xtmtest
+ (bind-func csntwo_usev
+   (lambda ()
+     (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
+       (csntwo_putv t 3 7)
+       (pref (tref t 0) 3))))
+ (csntwo_usev)
  7)
 
 ;; boundary lock (must keep PASSING): a depth-0 type-variable tuple field is fine
