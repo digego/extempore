@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 09:03'
+updated_date: '2026-06-08 09:17'
 labels:
   - xtlang
   - compiler
@@ -30,10 +30,13 @@ Phase 1 of the task-054 redesign (see backlog/docs/doc-001). Localised fix for #
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-TYPE-PATH FINDINGS (generic-TYPE path of #315, still open). The function path is fixed+committed (see prior note). For the type path (a depth-bearing type variable in a tuple field, e.g. bind-type Box <!a*,i64>):
-- parse fix + update-var normalisation move it PAST the pset! type error (baseline) to 'could not resolve types' at reification.
-- Site 1: impc:ti:reify-generic-type-expand (transforms ~1140-1143) drops pointer stars during template substitution: (regex:replace-all type (string-append base "[*]*") tl) replaces !a* with the base value tl and discards the matched stars. Fix: capture them -- (string-append "(" base ")([*]*)") with replacement (string-append tl "$2"). Correct but insufficient alone.
-- Site 2 (the real blocker): at reification time the template's type variable is UNBOUND. Probe of reify-generic-type-expand output: '<!gxa_33*,i64>' -- !gxa_33 is never substituted because !a=i64 is not in vars (or under a mismatched key) when expand runs. This is the reverse-set-bangs-from-reified (typecheck ~1030) + nativef-generics matchup flow.
-- Also observed: template field !a* (depth 1) appearing as !ga_31** (depth 2) for the !ga_ type-var family -- an extra pointer++ somewhere.
-NEXT PHASE: route the generic-TYPE reification binding (reverse-set-bangs + matchup + reify-generic-type-expand) through the canonical core (impc:type: apply-subst / reduce-ptr-depth), so the type variable is bound depth-correctly and substituted with stars preserved -- the same approach that fixed the function path, applied to the reification machinery. This is the attempt-2 '-98' territory; the canonical reduce-ptr-depth already handles the underflow that produced -98.
+TYPE-PATH DEEP MAP (this session). The generic-TYPE path is a multi-site chain in the reification machinery, confirmed via live probes on bind-type Box315 <!a*,i64>:
+
+SITE A -- parameter double-counts depth. The generic-type instance carries its parameter as the FIELD's depth-bearing var, not the bare var: reify sees 'Box315{!ga_31*}*##6' (param !ga_31*, depth 1) which makes the template field '<!ga_31**,i64>' (depth 2) instead of '<!ga_31*,i64>' (depth 1). The param should be the bare !ga_31. This star is NOT from llvmir:591 (refined guard, commit 379ea606, leaves generic instances alone and didn't change it); it comes from the param/candidate derivation in register-new-generictype / maximize-generic-type / nativef-generics-make-gtypes-unique reading the now-depth-bearing field.
+
+SITE B -- reify-generic-type-expand (transforms ~1140) drops stars on substitution: regex replace-all of (base '[*]*') with tl discards the matched stars. Fix: capture them, '(' base ')([*]*)' with replacement (tl ''). Correct but moot until A is fixed and the var is bound.
+
+SITE C -- binding flow / timing. At the first expand call the !ga_31 vars are all unbound; the base binding (!ga_31##6 <= 2) appears at a later reify iteration, and only the BASE var is ever bound -- the depth-bearing forms (!ga_31*, !ga_31**) stay unbound, so a depth-2 template field never resolves -> 'could not resolve types'.
+
+RECOMMENDED FIX: route generic-type reification through the canonical core's apply-subst rather than regex substitution -- parse the template to a term, build the substitution from the base-var bindings, apply-subst (pointer depth derived structurally, so SITE A/B/C dissolve by construction), render back to a type string. Prereq: a pretty-string->term parser (deferred from the bridge; int-code->term exists) and fixing the param derivation to collect BARE vars. This is the proper holistic completion; the function path (done) is the template for the approach.
 <!-- SECTION:NOTES:END -->
