@@ -147,14 +147,17 @@
     ;; CsnD0{!a}* whose trailing star is the tuple pointer, not a variable depth.
     (if (and (symbol? sym)
              (impc:type:bare-bang-var? sym)
-             (> (impc:ir:get-ptr-depth (symbol->string sym)) 0))
-        (begin
-          (if (impc:ir:type? t)
-              (let ((reduced (impc:type:reduce-ptr-depth
-                              t (impc:ir:get-ptr-depth (symbol->string sym)))))
-                (if (not (eq? reduced 'fail))
-                    (set! t reduced))))
-          (set! sym (impc:type:bang-base-key sym))))
+             (> (impc:ir:get-ptr-depth (symbol->string sym)) 0)
+             (impc:ir:type? t))
+        (let ((reduced (impc:type:reduce-ptr-depth
+                        t (impc:ir:get-ptr-depth (symbol->string sym)))))
+          ;; Normalise the key to its star-free form only when the value was
+          ;; concretely reduced.  Leaving a still-symbolic value under the base
+          ;; key would bind !a to !a* --- a cycle that pollutes the union-find.
+          (if (and (not (eq? reduced 'fail))
+                   (not (eq? reduced t)))
+              (begin (set! t reduced)
+                     (set! sym (impc:type:bang-base-key sym))))))
     (if (or (null? t)
             (equal? t #f)
             (impc:ti:occurs-in-type? sym t)

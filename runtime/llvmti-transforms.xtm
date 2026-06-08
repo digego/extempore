@@ -1139,8 +1139,12 @@ Continue executing `body' forms until `test-expression' returns #f"
              (if (not (null? tl))
                  (let* ((xx (car (regex:type-split (symbol->string (car v)) "##")))
                         (base (impc:ir:get-base-type xx))
-                        (xxx (string-append base "[*]*")))
-                   (set! type (regex:replace-all type xxx tl)))))
+                        ;; #315: capture the template's pointer stars and carry
+                        ;; them onto the substituted type, so a tuple field !a*
+                        ;; reifies to i64* rather than i64.  The base variable
+                        ;; holds the depth-0 value (see impc:ti:update-var).
+                        (xxx (string-append "(" base ")([*]*)")))
+                   (set! type (regex:replace-all type xxx (string-append tl "$2"))))))
            #f))
      vars)
     ;; (println 'reifyout: type 'gnum: gnum)
@@ -1173,7 +1177,14 @@ Continue executing `body' forms until `test-expression' returns #f"
                                             (impc:ti:maximize-generic-type x)
                                             (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
                                                 #f
-                                                x)))
+                                                ;; #315: a bang-variable argument is the
+                                                ;; type parameter's identity; its pointer
+                                                ;; depth (if any) is spurious, since the
+                                                ;; template field supplies the depth.  A
+                                                ;; concrete argument keeps its depth.
+                                                (if (char=? (string-ref x 0) #\!)
+                                                    (impc:type:strip-trailing-stars x)
+                                                    x))))
                                       (impc:ir:get-pretty-tuple-arg-strings argstr)))) ;)
                      (named_ags (cl:remove
                                  #f
