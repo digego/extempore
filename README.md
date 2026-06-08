@@ -1,4 +1,8 @@
-# Extempore ![Build & test](https://github.com/digego/extempore/workflows/Build%20&%20test/badge.svg?branch=master) ![Release](https://github.com/digego/extempore/workflows/Release/badge.svg)
+# Extempore
+
+[![Build & test](https://github.com/digego/extempore/actions/workflows/build-and-test.yml/badge.svg?branch=master)](https://github.com/digego/extempore/actions/workflows/build-and-test.yml)
+[![Sanitizers](https://github.com/digego/extempore/actions/workflows/sanitizers.yml/badge.svg?branch=master)](https://github.com/digego/extempore/actions/workflows/sanitizers.yml)
+[![Release](https://github.com/digego/extempore/actions/workflows/release-binary.yml/badge.svg)](https://github.com/digego/extempore/actions/workflows/release-binary.yml)
 
 Extempore is a live-coding environment for music, audio and graphics. It pairs
 a Scheme interpreter with _xtlang_---a statically-typed lisp that compiles to
