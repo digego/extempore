@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 09:43'
+updated_date: '2026-06-08 09:58'
 labels:
   - xtlang
   - compiler
@@ -30,9 +30,12 @@ Phase 1 of the task-054 redesign (see backlog/docs/doc-001). Localised fix for #
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-TYPE-PATH PROGRESS (commit 563c5edf). Fixed three reification sites so a depth-bearing tuple field carries its depth through type RESOLUTION: maximize-generic-type strips spurious depth from bang-var params (was double-counting -> <!a**,...>); reify-generic-type-expand captures+re-applies the template field stars on substitution; update-var only normalises a starred key when the value concretely reduces (a symbolic value under the base key bound !a to !a*, a union-find cycle). All suites green; Box315 advanced from the pointer-set error -> 'could not resolve' -> now a remaining conflict 'i64* with i64 in (tuple-set! obj 0 arg_0)'.
+FOUNDATION BUILT (commits f0ad6388, 543d0a53). Added the canonical pretty<->term parser/renderer (impc:type:from-pretty / to-pretty, surface round-trip tested incl. bang vars) -- the prereq for routing reification through apply-subst. Fixed the data-constructor return-type parameter (gather-all-gvars was collecting depth-bearing field vars -> Box{!a*}; now bare Box{!a}).
 
-REMAINING -- SITE D: the auto-generated data constructor. The generic struct reifies correctly now (reify-generic-type and the llvmir make-new-type path both yield {i64*,i64}), but the instantiated data constructor's tuple-set! still sees a field/arg depth mismatch (conflict surfaces via print-type-conflict-error from the binary/unify path, typecheck ~623/707, with the tuple-set! ast). Likely the data-constructor's field/arg types come from yet another reification that loses the field depth, OR the namedtype struct store (get-namedtype-type, used by tuple-set-check) differs from the resolved struct.
+KEY REALISATION: the generic-TYPE path of #315 spans THREE subsystems, each with its OWN hand-rolled depth bookkeeping, not one:
+  1. Reification (reify-generic-type, maximize-generic-type, reify-generic-type-expand) -- FIXED (commit 563c5edf). Routing these through canonical apply-subst would consolidate them, but it only covers subsystem 1.
+  2. Data-constructor generation (compile-type-dataconstructors, llvmti-bind) -- ctype param FIXED (543d0a53); field-type list 'a' was already correct.
+  3. Codegen (impc:ir:compiler:tuple-set, llvmir ~3201) -- SITE E, OPEN: in the generated constructor body (tuple-set! obj 0 arg_0), element-type (struct field 0) reifies to i64* but the value arg_0 codegens to i64. So the constructor's field-0 PARAMETER (!ga_29*) loses its depth at specialisation/codegen -- the param is resolved as the bare !ga_29 (i64) rather than !ga_29* (i64*). Likely the same param-vs-field-identity confusion, now in the codegen-time reification of the constructor's argument types.
 
-RECOMMENDATION: this is now clearly a 4-5 site chain all doing the same depth bookkeeping by hand. The clean completion is to route ALL reification (reify-generic-type, the llvmir make-new-type path, and the data-constructor field/arg derivation) through ONE canonical apply-subst (runtime/llvmti-types.xtm) -- parse template to a term, substitute, render -- so every site shares one depth-correct implementation. Prereq: a pretty-string->term parser (compose existing get-type-from-pretty-str with impc:type:from-intcode). The per-site patching works but the chain is long; the rewrite dissolves it.
+ASSESSMENT: the function path of #315 is fully fixed and validated. The type path is advancing site-by-site (now ~5 sites, into codegen) but spans reification + data-constructor-gen + codegen, each independent. The clean completion needs a representation that distinguishes a generic type's PARAMETER (a bare variable identity) from its FIELD usage (the variable at depth) -- right now they share one symbol and every subsystem re-derives the relationship by stripping/adding stars. That split is the real fix; the canonical apply-subst handles it for subsystem 1 but 2 and 3 need the same discipline. Recommend treating the type-path as its own follow-up rather than continuing to grind sites.
 <!-- SECTION:NOTES:END -->
