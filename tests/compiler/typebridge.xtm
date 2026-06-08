@@ -1,0 +1,115 @@
+;;; tests/compiler/typebridge.xtm -- conversions between canonical terms and
+;;; the live int-code representation (runtime/llvmti-types-bridge.xtm)
+;;;
+;;; The corpus below is ground truth taken from the existing parser
+;;; (impc:ir:get-type-from-pretty-str), so a passing round-trip certifies that
+;;; the canonical representation is faithful to the encoding the rest of the
+;;; compiler already uses.
+
+(sys:load "libs/core/test.xtm")
+(sys:load "runtime/llvmti-types.xtm")
+(sys:load "runtime/llvmti-types-bridge.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; round-trip corpus   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; For every int-code, decoding to a term then re-encoding must be the
+;; identity.  The test returns the codes that fail to round-trip, so a failure
+;; names exactly which encodings broke; an empty list means all passed.
+(xtmtest-result
+ (let ((corpus (list 2 102 202 0 1 4 108 10
+                     '(14 2 0) '(114 2 0) '(214 2 0)
+                     '(15 4 2) '(115 4 2) '(16 4 1)
+                     '(113 2 2) '(213 2 2) '(313 2 2)
+                     '(14 2 (14 0 1)) '(14 2 (114 0 1))
+                     '(213 2 (114 0 1))
+                     '(15 3 (14 2 0)))))
+   (cl:remove-if
+    (lambda (ic)
+      (equal? ic (impc:type:to-intcode (impc:type:from-intcode ic (make-hashtable)))))
+    corpus))
+ '()
+ "intcode-roundtrip")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; explicit decode     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (impc:type:from-intcode 102 (make-hashtable))
+                (impc:type:ptr 'i64)
+                "decode-pointer")
+
+(xtmtest-result (impc:type:from-intcode '(114 2 0) (make-hashtable))
+                (impc:type:ptr (impc:type:tuple 'i64 'f64))
+                "decode-pointer-tuple")
+
+;; the everyday boxed closure decodes to a pointer-to-closure
+(xtmtest-result (impc:type:from-intcode '(213 2 2) (make-hashtable))
+                (impc:type:ptr (impc:type:closure 'i64 'i64))
+                "decode-boxed-closure")
+
+;; the bare (unboxed) closure has no extra pointer
+(xtmtest-result (impc:type:from-intcode '(113 2 2) (make-hashtable))
+                (impc:type:closure 'i64 'i64)
+                "decode-bare-closure")
+
+(xtmtest-result (impc:type:from-intcode '(15 4 2) (make-hashtable))
+                (impc:type:array 4 'i64)
+                "decode-array")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; explicit encode     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:tuple 'i64 'f64)))
+                '(114 2 0)
+                "encode-pointer-tuple")
+
+(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:closure 'i64 'i64)))
+                '(213 2 2)
+                "encode-boxed-closure")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; named types         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (impc:type:from-intcode "%string" (make-hashtable))
+                (impc:type:named "string")
+                "decode-named")
+
+(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:named "string")))
+                "%string*"
+                "encode-named-pointer")
+
+(xtmtest-result (impc:type:to-intcode
+                 (impc:type:from-intcode "%foo**" (make-hashtable)))
+                "%foo**"
+                "named-roundtrip")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; bang-variable intern ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; !a and !a* share one variable (the inner term of !a* is !a) --- this is the
+;; pointer-depth-bearing variable whose absence causes #315.
+(xtmtest-result (let ((tbl (make-hashtable)))
+                  (let ((a  (impc:type:from-intcode '!a tbl))
+                        (a* (impc:type:from-intcode '!a* tbl)))
+                    (equal? a (impc:type:ptr-to a*))))
+                #t
+                "bang-shares-across-depth")
+
+;; the same call-site suffix interns to the same variable ...
+(xtmtest-result (let ((tbl (make-hashtable)))
+                  (equal? (impc:type:from-intcode (string->symbol "!a##3") tbl)
+                          (impc:type:from-intcode (string->symbol "!a##3") tbl)))
+                #t
+                "bang-same-callsite")
+
+;; ... but distinct call sites do not.
+(xtmtest-result (let ((tbl (make-hashtable)))
+                  (equal? (impc:type:from-intcode (string->symbol "!a##3") tbl)
+                          (impc:type:from-intcode (string->symbol "!a##7") tbl)))
+                #f
+                "bang-distinct-callsites")

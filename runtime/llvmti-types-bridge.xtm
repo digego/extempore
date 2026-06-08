@@ -1,0 +1,232 @@
+;;; llvmti-types-bridge.xtm --- conversions between canonical terms and the
+;;; live int-code / pretty representations
+;;;
+;;; The canonical core (llvmti-types.xtm) is deliberately ignorant of how types
+;;; are encoded elsewhere in the compiler.  This file is the boundary: it turns
+;;; the existing int-code representation into canonical terms and back.  Unlike
+;;; the core it depends on llvmti-globals.xtm (for the type-code constants) and
+;;; on a handful of runtime string helpers.
+;;;
+;;; The int-code representation, for reference:
+;;;
+;;;   2              i64                 base code
+;;;   102            i64*                base code + 100 * pointer-depth
+;;;   (14 2 0)       <i64,double>        (tuple-tag . field-codes)
+;;;   (114 2 0)      <i64,double>*       tuple-tag + 100 per pointer level
+;;;   (15 4 2)       |4,i64|             (array-tag size elt-code)
+;;;   (16 4 1)       /4,float/           (vector-tag size elt-code)
+;;;   (113 2 2)      [i64,i64]           closure carries an intrinsic +100 box
+;;;   (213 2 2)      [i64,i64]*          ... so the usual boxed closure is 213
+;;;   "%string"      a named (nominal) type, depth from trailing stars
+;;;   !a / !a*       a type variable, depth from trailing stars
+;;;
+;;; A closure's intrinsic +100 means head 113 is the bare function type and 213
+;;; the boxed pointer you actually pass around; the bridge models the former as
+;;; (closure ...) and the latter as (ptr (closure ...)), which is honest --- a
+;;; boxed closure is a pointer to a closure environment --- and round-trips.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; base-type table     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Code <-> canonical base symbol.  Built lazily from the globals so the file
+;; carries no top-level dependency (and so the codes stay single-sourced).
+(define *impc:type:base-table-cache* #f)
+
+(define impc:type:base-table
+  (lambda ()
+    (or *impc:type:base-table-cache*
+        (begin
+          (set! *impc:type:base-table-cache*
+                (list (cons *impc:ir:void*    'void)
+                      (cons *impc:ir:notype*  'notype)
+                      (cons *impc:ir:badtype* 'badtype)
+                      (cons *impc:ir:fp64*    'f64)
+                      (cons *impc:ir:fp32*    'f32)
+                      (cons *impc:ir:si64*    'i64)
+                      (cons *impc:ir:ui64*    'u64)
+                      (cons *impc:ir:si32*    'i32)
+                      (cons *impc:ir:ui32*    'u32)
+                      (cons *impc:ir:si16*    'i16)
+                      (cons *impc:ir:ui16*    'u16)
+                      (cons *impc:ir:si8*     'i8)
+                      (cons *impc:ir:ui8*     'u8)
+                      (cons *impc:ir:i1*      'i1)
+                      (cons *impc:ir:char*    'char)
+                      (cons *impc:ir:null*    'null)
+                      (cons *impc:ir:other*   'other)))
+          *impc:type:base-table-cache*))))
+
+(define impc:type:code->base
+  (lambda (code)
+    (let ((entry (assv code (impc:type:base-table))))
+      (if entry (cdr entry) #f))))
+
+(define impc:type:base->code
+  (lambda (sym)
+    (let loop ((tbl (impc:type:base-table)))
+      (cond ((null? tbl) #f)
+            ((eq? (cdar tbl) sym) (caar tbl))
+            (else (loop (cdr tbl)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pointer helpers     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define impc:type:wrap-ptr
+  (lambda (depth t)
+    (if (<= depth 0)
+        t
+        (impc:type:wrap-ptr (- depth 1) (impc:type:ptr t)))))
+
+;; Strip a leading pointer chain, returning (depth . base-term).
+(define impc:type:strip-ptr
+  (lambda (t)
+    (let loop ((t t) (d 0))
+      (if (impc:type:ptr? t)
+          (loop (impc:type:ptr-to t) (+ d 1))
+          (cons d t)))))
+
+(define impc:type:trailing-stars
+  (lambda (s)
+    (let loop ((i (- (string-length s) 1)) (n 0))
+      (if (and (>= i 0) (char=? (string-ref s i) #\*))
+          (loop (- i 1) (+ n 1))
+          n))))
+
+(define impc:type:strip-trailing-stars
+  (lambda (s)
+    (substring s 0 (- (string-length s) (impc:type:trailing-stars s)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; int-code -> term    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Intern a bang-variable name to a canonical type variable.  `intern' is a
+;; hashtable mapping the (star-stripped, ##-suffix-bearing) name to a variable,
+;; so that the two occurrences of !a in a signature --- and !a and !a* --- map
+;; to the same variable, while !a##3 and !a##7 (two call sites) stay distinct.
+(define impc:type:intern-var
+  (lambda (name intern)
+    (or (hashtable-ref intern name)
+        (let ((v (impc:type:fresh-var)))
+          (hashtable-set! intern name v)
+          v))))
+
+(define impc:type:from-intcode-bang
+  (lambda (sym intern)
+    (let* ((str (symbol->string sym))
+           (parts (string-split-on str "##"))
+           (head (car parts))
+           (suffix (if (> (length parts) 1)
+                       (string-append "##" (cadr parts))
+                       ""))
+           (depth (impc:type:trailing-stars head))
+           (name (string-append (impc:type:strip-trailing-stars head) suffix)))
+      (impc:type:wrap-ptr depth (impc:type:intern-var name intern)))))
+
+(define impc:type:from-intcode-string
+  (lambda (s)
+    (if (and (> (string-length s) 0) (char=? (string-ref s 0) #\%))
+        (let* ((depth (impc:type:trailing-stars s))
+               (stripped (impc:type:strip-trailing-stars s))
+               (name (substring stripped 1 (string-length stripped))))
+          (impc:type:wrap-ptr depth (impc:type:named name)))
+        (impc:compiler:print-compiler-error
+         (string-append "cannot decode type string " s)))))
+
+(define impc:type:from-intcode-number
+  (lambda (n)
+    (let ((exact (assv n (impc:type:base-table))))
+      (if exact
+          (cdr exact)
+          (let ((depth (quotient n *impc:ir:pointer*))
+                (code (modulo n *impc:ir:pointer*)))
+            (let ((base (impc:type:code->base code)))
+              (if base
+                  (impc:type:wrap-ptr depth base)
+                  (impc:compiler:print-compiler-error
+                   (string-append "cannot decode int-code type "
+                                  (number->string n))))))))))
+
+(define impc:type:from-intcode-compound
+  (lambda (ic intern)
+    (let* ((head (car ic))
+           (tag (modulo head *impc:ir:pointer*))
+           (rawdepth (quotient head *impc:ir:pointer*))
+           (fields (cdr ic))
+           (decode (lambda (f) (impc:type:from-intcode f intern))))
+      (cond
+        ((= tag *impc:ir:tuple*)
+         (impc:type:wrap-ptr rawdepth (cons 'tuple (map decode fields))))
+        ((= tag *impc:ir:closure*)
+         (impc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
+        ((= tag *impc:ir:array*)
+         (impc:type:wrap-ptr rawdepth
+           (list 'array (car fields) (decode (cadr fields)))))
+        ((= tag *impc:ir:vector*)
+         (impc:type:wrap-ptr rawdepth
+           (list 'vector (car fields) (decode (cadr fields)))))
+        (else
+         (impc:compiler:print-compiler-error
+          (string-append "cannot decode compound int-code with tag "
+                         (number->string tag))))))))
+
+;; Decode a live int-code value into a canonical term.  `intern' is the
+;; bang-variable table (see impc:type:intern-var); pass a fresh (make-hashtable)
+;; when the value is known to be concrete.
+(define impc:type:from-intcode
+  (lambda (ic intern)
+    (cond ((number? ic) (impc:type:from-intcode-number ic))
+          ((symbol? ic) (impc:type:from-intcode-bang ic intern))
+          ((string? ic) (impc:type:from-intcode-string ic))
+          ((pair? ic)   (impc:type:from-intcode-compound ic intern))
+          (else (impc:compiler:print-compiler-error
+                 (string-append "cannot decode int-code type "
+                                (sexpr->string ic)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; term -> int-code    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Encode a *concrete* canonical term (no free variables) back into the live
+;; int-code representation.  A residual type variable is a compiler bug --- a
+;; type that should have been resolved by unification was not --- so we error
+;; loudly rather than invent an encoding for it.
+(define impc:type:to-intcode
+  (lambda (t)
+    (let* ((sp (impc:type:strip-ptr t))
+           (depth (car sp))
+           (base (cdr sp))
+           (off (* depth *impc:ir:pointer*)))
+      (cond
+        ((impc:type:var? base)
+         (impc:compiler:print-compiler-error
+          (string-append "unresolved type variable "
+                         (impc:type:term->string base))))
+        ((symbol? base)
+         (let ((code (impc:type:base->code base)))
+           (if code
+               (+ code off)
+               (impc:compiler:print-compiler-error
+                (string-append "unknown base type " (symbol->string base))))))
+        ((impc:type:named? base)
+         (string-append "%" (impc:type:named-name base) (make-string depth #\*)))
+        ((impc:type:tuple? base)
+         (cons (+ *impc:ir:tuple* off)
+               (map impc:type:to-intcode (cdr base))))
+        ((impc:type:array? base)
+         (list (+ *impc:ir:array* off)
+               (impc:type:array-size base)
+               (impc:type:to-intcode (impc:type:array-elt base))))
+        ((impc:type:vector? base)
+         (list (+ *impc:ir:vector* off)
+               (impc:type:vector-size base)
+               (impc:type:to-intcode (impc:type:vector-elt base))))
+        ((impc:type:closure? base)
+         ;; a closure carries an intrinsic box, hence (+ depth 1)
+         (cons (+ *impc:ir:closure* (* (+ depth 1) *impc:ir:pointer*))
+               (map impc:type:to-intcode (cdr base))))
+        (else
+         (impc:compiler:print-compiler-error
+          (string-append "cannot encode term " (impc:type:term->string base))))))))
