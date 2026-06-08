@@ -1,0 +1,279 @@
+;;; llvmti-types.xtm --- canonical type representation and unification
+;;;
+;;; This module is the type-theoretic core of the xtlang type checker.  It
+;;; replaces the historical "string soup" --- where a single type might be a
+;;; raw int code, a tagged int-code list, a pretty-printed string, an LLVM IR
+;;; string, or a bang-symbol with its pointer depth smuggled in as trailing
+;;; `*' characters --- with one algebraic representation and a textbook
+;;; unifier.
+;;;
+;;; Type terms (monotypes), after Hindley--Milner / Robinson:
+;;;
+;;;   tau ::= sym                     base type        i64, f64, void, i1, ...
+;;;         | n                       size literal     array / vector lengths
+;;;         | (var id)                type variable    alpha
+;;;         | (ptr tau)               pointer          tau*
+;;;         | (tuple tau ...)         tuple / struct   <tau,...>
+;;;         | (array n tau)           fixed array      |n,tau|
+;;;         | (vector n tau)          SIMD vector      /n,tau/
+;;;         | (closure tr ta ...)     function         [tr,ta,...]
+;;;         | (named name)            nominal type     %name
+;;;
+;;; The decisive difference from the old representation is that a type variable
+;;; is a *node* --- (var id) --- and pointer indirection is *structure* ---
+;;; (ptr tau).  A variable beneath a pointer is (ptr (var id)); its depth can
+;;; no more be lost than the car of a pair can.  The absence of exactly this
+;;; property is the root cause of issue #315: in the old representation `!a*'
+;;; and `!a' are two symbols whose relationship the compiler has to reconstruct
+;;; by string surgery, and it does so inconsistently.
+;;;
+;;; A substitution maps variable ids to terms.  Unification is Robinson's
+;;; algorithm with an occurs check.  Instantiation freshens a polymorphic
+;;; signature by consistently replacing its variables with fresh ones --- the
+;;; principled replacement for the ad-hoc `##gnum' name-suffixing.
+;;;
+;;; The module is deliberately self-contained (pure Scheme over lists, symbols,
+;;; numbers and strings) so that it can be loaded and unit-tested in isolation;
+;;; see tests/compiler/typecore.xtm.  Conversions to and from the int-code and
+;;; pretty-string representations live alongside, at the boundary, so that this
+;;; core never has to know about them.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; type variables      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define impc:type:var
+  (lambda (id) (list 'var id)))
+
+(define impc:type:var?
+  (lambda (t) (and (pair? t) (eq? (car t) 'var))))
+
+(define impc:type:var-id
+  (lambda (t) (cadr t)))
+
+;; A single monotonically increasing source of fresh variable identity.  This
+;; replaces the old triumvirate of `*impc:ti:generic-count*', the `!ga_N' /
+;; `!gxa_N' name minting, and the per-call-site `##gnum' suffix, all of which
+;; had to agree for a generic instantiation to type-check.
+
+(define *impc:type:fresh-counter* 0)
+
+(define impc:type:reset-fresh!
+  (lambda () (set! *impc:type:fresh-counter* 0)))
+
+(define impc:type:fresh-var
+  (lambda ()
+    (set! *impc:type:fresh-counter* (+ *impc:type:fresh-counter* 1))
+    (impc:type:var *impc:type:fresh-counter*)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; type constructors   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A base type is a bare symbol; every compound type is a tagged list whose
+;; car names the constructor.  The accessors below are thin, but naming them
+;; keeps call sites readable and the representation in one place.
+
+(define impc:type:ptr     (lambda (t) (list 'ptr t)))
+(define impc:type:ptr?    (lambda (t) (and (pair? t) (eq? (car t) 'ptr))))
+(define impc:type:ptr-to  (lambda (t) (cadr t)))
+
+(define impc:type:tuple        (lambda fields (cons 'tuple fields)))
+(define impc:type:tuple?       (lambda (t) (and (pair? t) (eq? (car t) 'tuple))))
+(define impc:type:tuple-fields (lambda (t) (cdr t)))
+
+(define impc:type:array       (lambda (n t) (list 'array n t)))
+(define impc:type:array?      (lambda (t) (and (pair? t) (eq? (car t) 'array))))
+(define impc:type:array-size  (lambda (t) (cadr t)))
+(define impc:type:array-elt   (lambda (t) (caddr t)))
+
+(define impc:type:vector      (lambda (n t) (list 'vector n t)))
+(define impc:type:vector?     (lambda (t) (and (pair? t) (eq? (car t) 'vector))))
+(define impc:type:vector-size (lambda (t) (cadr t)))
+(define impc:type:vector-elt  (lambda (t) (caddr t)))
+
+;; A closure / function type: (closure return-type arg-type ...).
+(define impc:type:closure      (lambda (ret . args) (cons 'closure (cons ret args))))
+(define impc:type:closure?     (lambda (t) (and (pair? t) (eq? (car t) 'closure))))
+(define impc:type:closure-ret  (lambda (t) (cadr t)))
+(define impc:type:closure-args (lambda (t) (cddr t)))
+
+(define impc:type:named      (lambda (name) (list 'named name)))
+(define impc:type:named?     (lambda (t) (and (pair? t) (eq? (car t) 'named))))
+(define impc:type:named-name (lambda (t) (cadr t)))
+
+;; A base (nullary) type is any symbol --- the constructor tags above only ever
+;; appear as the head of a list, never as a term in their own right.
+(define impc:type:base?
+  (lambda (t) (symbol? t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; substitutions       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A substitution is an immutable association list mapping variable ids to
+;; terms.  It is threaded through unification functionally; the empty
+;; substitution is the empty list, which --- unlike #f --- is a true value, so
+;; "unified with no new bindings" and "failed to unify" stay distinct.
+
+(define impc:type:empty-subst '())
+
+(define impc:type:subst-ref
+  (lambda (id subst)
+    (let ((cell (assv id subst)))
+      (if cell (cdr cell) #f))))
+
+(define impc:type:subst-extend
+  (lambda (id t subst)
+    (cons (cons id t) subst)))
+
+;; Follow the substitution chain for a variable to the term it currently
+;; stands for, stopping at the first non-variable or unbound variable.  This is
+;; the shallow walk unification needs; apply-subst below does the deep one.
+(define impc:type:resolve
+  (lambda (t subst)
+    (if (impc:type:var? t)
+        (let ((binding (impc:type:subst-ref (impc:type:var-id t) subst)))
+          (if binding
+              (impc:type:resolve binding subst)
+              t))
+        t)))
+
+;; Apply a substitution throughout a term, yielding a term in which every bound
+;; variable has been replaced by its (recursively resolved) binding.  Unbound
+;; variables, base types and size literals are returned unchanged.
+(define impc:type:apply-subst
+  (lambda (t subst)
+    (let ((t (impc:type:resolve t subst)))
+      (if (and (pair? t) (not (eq? (car t) 'var)))
+          (cons (car t)
+                (map (lambda (x) (impc:type:apply-subst x subst)) (cdr t)))
+          t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; unification         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Does variable `id' occur anywhere in `t' (after resolving through subst)?
+;; Binding a variable to a term that mentions it would build an infinite type,
+;; so unify refuses to do so.
+(define impc:type:occurs?
+  (lambda (id t subst)
+    (let ((t (impc:type:resolve t subst)))
+      (cond ((impc:type:var? t) (= (impc:type:var-id t) id))
+            ((pair? t)
+             (let loop ((args (cdr t)))
+               (and (pair? args)
+                    (or (impc:type:occurs? id (car args) subst)
+                        (loop (cdr args))))))
+            (else #f)))))
+
+;; Bind variable `id' to term `t', failing (#f) on the occurs check.  `t' is
+;; assumed already resolved by the caller.
+(define impc:type:bind
+  (lambda (id t subst)
+    (cond ((and (impc:type:var? t) (= (impc:type:var-id t) id)) subst)
+          ((impc:type:occurs? id t subst) #f)
+          (else (impc:type:subst-extend id t subst)))))
+
+;; Unify two terms, returning an extended substitution on success or #f on
+;; failure.  Robinson's algorithm: variables bind, equal atoms agree,
+;; same-shaped constructors recurse on their arguments, everything else fails.
+(define impc:type:unify
+  (lambda (s t subst)
+    (let ((s (impc:type:resolve s subst))
+          (t (impc:type:resolve t subst)))
+      (cond
+        ((and (impc:type:var? s) (impc:type:var? t)
+              (= (impc:type:var-id s) (impc:type:var-id t)))
+         subst)
+        ((impc:type:var? s) (impc:type:bind (impc:type:var-id s) t subst))
+        ((impc:type:var? t) (impc:type:bind (impc:type:var-id t) s subst))
+        ((and (pair? s) (pair? t))
+         (if (and (eq? (car s) (car t))
+                  (= (length s) (length t)))
+             (impc:type:unify-args (cdr s) (cdr t) subst)
+             #f))
+        ((and (atom? s) (atom? t))
+         (if (equal? s t) subst #f))
+        (else #f)))))
+
+;; Unify two equal-length argument lists left to right, threading the
+;; substitution.  Size literals and named-type names ride through as atoms.
+(define impc:type:unify-args
+  (lambda (ss ts subst)
+    (if (null? ss)
+        subst
+        (let ((subst2 (impc:type:unify (car ss) (car ts) subst)))
+          (and subst2 (impc:type:unify-args (cdr ss) (cdr ts) subst2))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; instantiation       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Freshen a polymorphic type: replace every variable with a fresh one,
+;; consistently, so shared variables stay shared.  This is how a generic
+;; signature is specialised at a call site.  Because identity is an integer
+;; minted from one counter, two independent instantiations can never collide
+;; --- the defect the `##gnum' suffixing tried, and failed, to prevent.
+(define impc:type:instantiate
+  (lambda (t)
+    (let ((mapping '()))
+      (let walk ((t t))
+        (cond ((impc:type:var? t)
+               (let ((cell (assv (impc:type:var-id t) mapping)))
+                 (if cell
+                     (cdr cell)
+                     (let ((fresh (impc:type:fresh-var)))
+                       (set! mapping (cons (cons (impc:type:var-id t) fresh) mapping))
+                       fresh))))
+              ((pair? t) (cons (car t) (map walk (cdr t))))
+              (else t))))))
+
+;; The variable ids occurring free in a term, in first-seen order.
+(define impc:type:free-vars
+  (lambda (t)
+    (let ((ids '()))
+      (let walk ((t t))
+        (cond ((impc:type:var? t)
+               (if (not (memv (impc:type:var-id t) ids))
+                   (set! ids (cons (impc:type:var-id t) ids))))
+              ((pair? t) (for-each walk (cdr t)))
+              (else #f)))
+      (reverse ids))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; rendering (debug)   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A readable rendering of a term, close to xtlang surface syntax.  This is for
+;; diagnostics and test output only; the authoritative pretty <-> term
+;; conversions live at the representation boundary.
+(define impc:type:term->string
+  (lambda (t)
+    (cond ((impc:type:var? t) (string-append "?" (number->string (impc:type:var-id t))))
+          ((symbol? t) (symbol->string t))
+          ((number? t) (number->string t))
+          ((string? t) t)
+          ((impc:type:ptr? t) (string-append (impc:type:term->string (impc:type:ptr-to t)) "*"))
+          ((impc:type:named? t) (string-append "%" (impc:type:term->string (impc:type:named-name t))))
+          ((impc:type:tuple? t)
+           (string-append "<" (impc:type:term->string-list (cdr t)) ">"))
+          ((impc:type:closure? t)
+           (string-append "[" (impc:type:term->string-list (cdr t)) "]"))
+          ((impc:type:array? t)
+           (string-append "|" (impc:type:term->string-list (cdr t)) "|"))
+          ((impc:type:vector? t)
+           (string-append "/" (impc:type:term->string-list (cdr t)) "/"))
+          (else (format #f "~a" t)))))
+
+(define impc:type:term->string-list
+  (lambda (ts)
+    (if (null? ts)
+        ""
+        (let loop ((acc (impc:type:term->string (car ts)))
+                   (rest (cdr ts)))
+          (if (null? rest)
+              acc
+              (loop (string-append acc "," (impc:type:term->string (car rest)))
+                    (cdr rest)))))))

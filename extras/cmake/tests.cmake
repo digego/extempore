@@ -90,6 +90,7 @@ extempore_add_test(tests/core/scheme-compat.xtm libs-core)
 
 # Compiler unit tests
 extempore_add_test(tests/compiler/transforms.xtm compiler-unit)
+extempore_add_test(tests/compiler/typecore.xtm compiler-unit)
 extempore_add_test(tests/compiler/typeunify.xtm compiler-unit)
 extempore_add_test(tests/compiler/typecheck.xtm compiler-unit)
 extempore_add_test(tests/compiler/pipeline.xtm compiler-unit)
