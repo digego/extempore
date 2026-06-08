@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 09:17'
+updated_date: '2026-06-08 09:43'
 labels:
   - xtlang
   - compiler
@@ -30,13 +30,9 @@ Phase 1 of the task-054 redesign (see backlog/docs/doc-001). Localised fix for #
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-TYPE-PATH DEEP MAP (this session). The generic-TYPE path is a multi-site chain in the reification machinery, confirmed via live probes on bind-type Box315 <!a*,i64>:
+TYPE-PATH PROGRESS (commit 563c5edf). Fixed three reification sites so a depth-bearing tuple field carries its depth through type RESOLUTION: maximize-generic-type strips spurious depth from bang-var params (was double-counting -> <!a**,...>); reify-generic-type-expand captures+re-applies the template field stars on substitution; update-var only normalises a starred key when the value concretely reduces (a symbolic value under the base key bound !a to !a*, a union-find cycle). All suites green; Box315 advanced from the pointer-set error -> 'could not resolve' -> now a remaining conflict 'i64* with i64 in (tuple-set! obj 0 arg_0)'.
 
-SITE A -- parameter double-counts depth. The generic-type instance carries its parameter as the FIELD's depth-bearing var, not the bare var: reify sees 'Box315{!ga_31*}*##6' (param !ga_31*, depth 1) which makes the template field '<!ga_31**,i64>' (depth 2) instead of '<!ga_31*,i64>' (depth 1). The param should be the bare !ga_31. This star is NOT from llvmir:591 (refined guard, commit 379ea606, leaves generic instances alone and didn't change it); it comes from the param/candidate derivation in register-new-generictype / maximize-generic-type / nativef-generics-make-gtypes-unique reading the now-depth-bearing field.
+REMAINING -- SITE D: the auto-generated data constructor. The generic struct reifies correctly now (reify-generic-type and the llvmir make-new-type path both yield {i64*,i64}), but the instantiated data constructor's tuple-set! still sees a field/arg depth mismatch (conflict surfaces via print-type-conflict-error from the binary/unify path, typecheck ~623/707, with the tuple-set! ast). Likely the data-constructor's field/arg types come from yet another reification that loses the field depth, OR the namedtype struct store (get-namedtype-type, used by tuple-set-check) differs from the resolved struct.
 
-SITE B -- reify-generic-type-expand (transforms ~1140) drops stars on substitution: regex replace-all of (base '[*]*') with tl discards the matched stars. Fix: capture them, '(' base ')([*]*)' with replacement (tl ''). Correct but moot until A is fixed and the var is bound.
-
-SITE C -- binding flow / timing. At the first expand call the !ga_31 vars are all unbound; the base binding (!ga_31##6 <= 2) appears at a later reify iteration, and only the BASE var is ever bound -- the depth-bearing forms (!ga_31*, !ga_31**) stay unbound, so a depth-2 template field never resolves -> 'could not resolve types'.
-
-RECOMMENDED FIX: route generic-type reification through the canonical core's apply-subst rather than regex substitution -- parse the template to a term, build the substitution from the base-var bindings, apply-subst (pointer depth derived structurally, so SITE A/B/C dissolve by construction), render back to a type string. Prereq: a pretty-string->term parser (deferred from the bridge; int-code->term exists) and fixing the param derivation to collect BARE vars. This is the proper holistic completion; the function path (done) is the template for the approach.
+RECOMMENDATION: this is now clearly a 4-5 site chain all doing the same depth bookkeeping by hand. The clean completion is to route ALL reification (reify-generic-type, the llvmir make-new-type path, and the data-constructor field/arg derivation) through ONE canonical apply-subst (runtime/llvmti-types.xtm) -- parse template to a term, substitute, render -- so every site shares one depth-correct implementation. Prereq: a pretty-string->term parser (compose existing get-type-from-pretty-str with impc:type:from-intcode). The per-site patching works but the chain is long; the rewrite dissolves it.
 <!-- SECTION:NOTES:END -->
