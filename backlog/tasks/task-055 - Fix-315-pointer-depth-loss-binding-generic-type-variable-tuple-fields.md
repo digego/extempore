@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 07:11'
+updated_date: '2026-06-08 07:41'
 labels:
   - xtlang
   - compiler
@@ -63,4 +63,11 @@ REMAINING PATHS needing the SAME base-key/depth normalization (the fix is multi-
 - likely several get-base-type-then-resolve sites (any code that strips stars before resolving loses the depth).
 
 NEXT: apply the patch, then extend the depth-normalization to check-args + the constructor path, validating against the characterisation net (csn315/csndeep/csntwo/csn_notuple flip from compile-should-fail to their expected values; csnd0 + the libs stay green) after each change.
+
+ATTEMPT 2 DIAGNOSIS (deeper finding; reverted to clean, libs-core 9/9). Instrumented update-var/type-unify on the live #315 repro. The blocker is an INCONSISTENT typevar depth/key CONVENTION across binding sites, not a missing-depth bug:
+- variable-substitution and nativef-generics-check-args already store the BASE value but under a DEPTH-BEARING key, e.g. (update-var !gxa_34*##7 <= (2))  -- base value i64 under the starred key.
+- reverse-set-bangs stores a FULL-depth value; adding a depth strip there OVER-COUNTS depth in nested/pointer contexts and produces corrupt codes, e.g. (update-var !ga_31**##9 <= (-98)) -- pointer-- stripped past zero (102 - 200).
+- the type-side var (!ga_31, from register-new-generictype) and the function-side var (!gxa_34, from register-new-genericfunc) are reconciled through reification, each with its own depth bookkeeping.
+
+A CORRECT fix needs ONE convention applied at EVERY site: store the depth-0 base value under the base (star-stripped) key, and re-apply the use-site depth at resolution. That means coordinated changes to: parse (keep depth, done/validated), the update-var/vars chokepoint (normalise key), variable-substitution, check-args, reverse-set-bangs (correct per-site depth -- derive from the type definition, not the maximised form), inject-missing-vars, and the !ga/!gxa reconciliation. This is the audit's Phase 2/3 (canonical representation + single substitution map + consistent fresh-variable identity), now confirmed REQUIRED -- a half-fix silently miscompiles nested generics (the -98), which is worse than the current loud type error. WIP patch (attempt-1 design) remains at backlog/docs/task-055-phase1-wip.patch as the starting scaffold.
 <!-- SECTION:NOTES:END -->
