@@ -4,7 +4,7 @@ title: 'Fix #315: pointer-depth loss binding generic type-variable tuple fields'
 status: To Do
 assignee: []
 created_date: '2026-06-08 06:10'
-updated_date: '2026-06-08 07:41'
+updated_date: '2026-06-08 08:58'
 labels:
   - xtlang
   - compiler
@@ -30,44 +30,7 @@ Phase 1 of the task-054 redesign (see backlog/docs/doc-001). Localised fix for #
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-ATTEMPTED the localised binding-site fix (strip the field's declared pointer depth in impc:ti:reverse-set-bangs-from-reified before binding the typevar). Implemented, tested against build/extempore, then REVERTED (git restore; tree clean, original #315 error reproduces).
+PROGRESS (canonical-core refactor). Built the isolated type core (runtime/llvmti-types.xtm: term algebra + Robinson unifier + occurs check + instantiation; 28 unit tests in tests/compiler/typecore.xtm) and the int-code<->term bridge (runtime/llvmti-types-bridge.xtm; 14 round-trip tests in tests/compiler/typebridge.xtm). Then fixed the generic-FUNCTION path of #315 (commit: typecheck: fix #315 ...): parser keeps the star (llvmir:591), and update-var normalises depth-bearing bare type variables at the single binding chokepoint via impc:type:reduce-ptr-depth (unifier-backed, so depth underflow fails cleanly instead of the -98). Validated: gsig315_use => 42 (was the #315 type error). All suites green (compiler-unit, libs-core, libs-external).
 
-RESULT: the binding patch does NOT fix #315 -- it RELOCATES the error. With !a bound to i64 (stripped), the canonical repro's pset! error is replaced by 'Type Error conflicting i64* with i64 in (tuple-set! obj 0 arg_0)' inside the auto-generated tuple constructor. Cause: vars[!a] is overloaded across pointer depths -- the tuple field !a* needs i64*, the bare param !a needs i64; one binding can't serve both because the typevar symbol carries no depth (dropped at llvmir.xtm:591).
-
-Minimal repro proving it's NOT tuple-specific (no tuple at all):
-  (bind-func depthtest:[void,!a*,!a]* (lambda (p v) (pset! p 0 v)))
-  ($ (let ((p:i64* (halloc))) (depthtest p 5) (println (pref p 0))))
-  ;; -> Type Error: bad type i64, Cannot de-reference non-pointer type
-This goes through nativef-generics (function path), not reverse-set-bangs (tuple path), so the defect is in the SHARED typevar representation, spanning both paths.
-
-RE-SCOPE: #315 cannot be fixed by a binding-site patch. The fix is the type-variable-carries-pointer-depth slice of the audit's Phase 2 (doc-001 section 4.4 / Phase 1): make a typevar retain declared pointer depth at parse time (llvmir.xtm:591) and have type-unify (~1872) strip+reapply it. Higher risk (touches the ##gnum/freshening string machinery); must land behind the Phase-0 characterisation net. libs-core stayed green (8/8) under the reverted patch.
-
-PAUSED pending direction on whether to take on the representation change now.
-
-PHASE-1 ATTEMPT 2 (representation fix) -- design validated, reverted (tree clean, libs-core 9/9 green). WIP saved at backlog/docs/task-055-phase1-wip.patch.
-
-INVARIANT chosen: a type variable's value is stored depth-0 under its BASE name (!a##gnum); every USE re-applies its own declared pointer depth. So !a* and !a are distinguishable and a single binding serves both.
-
-THREE coordinated changes made (all in the patch), CONFIRMED individually:
-1. Parse (llvmir.xtm ~591): bang branch keeps the stars -- (string-append base (make-string ptr-depth #\*)). Verified: get-type-from-pretty-str '<!a*,i64>' -> (14 !a* 2); depth-0 !a unchanged.
-2. Resolve (type-unify, transforms.xtm ~1823): new branch -- if t is a bang at ptr-depth>0, look up the base key (strip stars, keep ##gnum) and pointer++ the result by the depth.
-3. Bind (reverse-set-bangs-from-reified, typecheck.xtm ~1033): bind under get-base-type(b)##gnum with pointer--(a, depth).
-
-RESULT: runtime loads fine (parens OK); both failures MOVED but not fixed.
-- #315 (tuple) now errors in the auto-generated constructor: 'conflicting i64* with i64 in (tuple-set! obj 0 arg_0)' -- the constructor's !a* arg type resolves to i64 (base) without depth re-applied.
-- no-tuple [void,!a*,!a]* now mis-codegens: 'LLVM IR: void type only allowed for function results / bitcast i64 to void'.
-
-REMAINING PATHS needing the SAME base-key/depth normalization (the fix is multi-path, as the audit predicted):
-- nativef-generics-check-args (typecheck.xtm ~915-930): function-arg binding (binds gt:=tt under the starred key; needs base-key + pointer-- like change 3).
-- the constructor / tuple-set! field-type resolution that raises print-type-conflict-error (globals.xtm:407) -- find where the auto-generated constructor's !a* param/field types are resolved and ensure depth is re-applied.
-- likely several get-base-type-then-resolve sites (any code that strips stars before resolving loses the depth).
-
-NEXT: apply the patch, then extend the depth-normalization to check-args + the constructor path, validating against the characterisation net (csn315/csndeep/csntwo/csn_notuple flip from compile-should-fail to their expected values; csnd0 + the libs stay green) after each change.
-
-ATTEMPT 2 DIAGNOSIS (deeper finding; reverted to clean, libs-core 9/9). Instrumented update-var/type-unify on the live #315 repro. The blocker is an INCONSISTENT typevar depth/key CONVENTION across binding sites, not a missing-depth bug:
-- variable-substitution and nativef-generics-check-args already store the BASE value but under a DEPTH-BEARING key, e.g. (update-var !gxa_34*##7 <= (2))  -- base value i64 under the starred key.
-- reverse-set-bangs stores a FULL-depth value; adding a depth strip there OVER-COUNTS depth in nested/pointer contexts and produces corrupt codes, e.g. (update-var !ga_31**##9 <= (-98)) -- pointer-- stripped past zero (102 - 200).
-- the type-side var (!ga_31, from register-new-generictype) and the function-side var (!gxa_34, from register-new-genericfunc) are reconciled through reification, each with its own depth bookkeeping.
-
-A CORRECT fix needs ONE convention applied at EVERY site: store the depth-0 base value under the base (star-stripped) key, and re-apply the use-site depth at resolution. That means coordinated changes to: parse (keep depth, done/validated), the update-var/vars chokepoint (normalise key), variable-substitution, check-args, reverse-set-bangs (correct per-site depth -- derive from the type definition, not the maximised form), inject-missing-vars, and the !ga/!gxa reconciliation. This is the audit's Phase 2/3 (canonical representation + single substitution map + consistent fresh-variable identity), now confirmed REQUIRED -- a half-fix silently miscompiles nested generics (the -98), which is worse than the current loud type error. WIP patch (attempt-1 design) remains at backlog/docs/task-055-phase1-wip.patch as the starting scaffold.
+REMAINING: (1) the generic-TYPE path -- a depth-bearing type variable in a tuple field, e.g. bind-type <!a*,i64> -- still fails; my fix moves it past the pset! type error to 'could not resolve types' at the reification site (reverse-set-bangs-from-reified). Needs the same canonical treatment there. (2) task-057 (unrelated void-return codegen bug) blocks the void-pattern characterisation repros from becoming clean passing tests.
 <!-- SECTION:NOTES:END -->
