@@ -1,0 +1,114 @@
+;;; tests/compiler/solve.xtm -- the constraint-solving engine (runtime/xtc-solve.xtm)
+;;;
+;;; These prove, on the canonical core in isolation, the behaviours the live
+;;; inference pipeline relies on: numeric defaulting, equality propagation, the
+;;; #315 pointer-depth property, honest conflict detection, and --- crucially ---
+;;; that forward constraint propagation subsumes the old enumeration retry loop
+;;; (a width fixed by a downstream use beats the default without backtracking).
+
+(sys:load "libs/core/test.xtm")
+(sys:load "runtime/xtc-types.xtm")
+(sys:load "runtime/xtc-types-bridge.xtm")
+(sys:load "runtime/xtc-solve.xtm")
+
+;; convenience: solve a constraint list and read one variable's resolved code
+(define solve1
+  (lambda (constraints sym)
+    (let ((intern (make-hashtable)))
+      (xtc:solve:type-of sym (xtc:solve:run constraints intern) intern))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; numeric defaulting  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; an unconstrained integer literal defaults to si64 (code 2), propagated
+;; through an equality to the variable that names the expression's result
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-default 'lit (list 2 4 6 9))
+               (xtc:solve:c-eq 'result 'lit))
+         'result)
+ 2
+ "default-int-propagates")
+
+;; an unconstrained float literal defaults to fp64 (code 0)
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-default 'lit (list 0 1))
+               (xtc:solve:c-eq 'result 'lit))
+         'result)
+ 0
+ "default-float-propagates")
+
+;; the old backtracking enumeration existed to rescue a literal whose width is
+;; fixed only by a downstream use; here forward unification fixes it to si32
+;; (code 4) BEFORE defaulting, so the default never fires --- no search needed
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'lit 4)
+               (xtc:solve:c-default 'lit (list 2 4 6 9)))
+         'lit)
+ 4
+ "downstream-constraint-beats-default")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; equality            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a chain of equalities carries a concrete type the length of the chain
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 'b)
+               (xtc:solve:c-eq 'b 'c)
+               (xtc:solve:c-eq 'c 102))
+         'a)
+ 102
+ "equality-chain")
+
+;; structural unification of a compound type through a variable
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 't2 't1)
+               (xtc:solve:c-eq 't1 '(14 2 0)))
+         't2)
+ '(14 2 0)
+ "equality-tuple")
+
+;; genuinely distinct concrete types are a conflict, not a retained union
+(xtmtest-result
+ (let ((intern (make-hashtable)))
+   (eq? 'conflict
+        (xtc:solve:run (list (xtc:solve:c-eq 'x 2)
+                             (xtc:solve:c-eq 'x 4))
+                       intern)))
+ #t
+ "equality-conflict-detected")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; #315 pointer depth  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a field written as !a* is the variable !a at a pointer depth; binding !a to
+;; i64 (code 2) reifies the field as i64* (code 102), structurally --- the
+;; depth cannot be lost because it is a ptr node, not trailing string stars.
+;; This is the issue the whole canonical core was built to fix.
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'field '!a*)
+               (xtc:solve:c-eq '!a 2))
+         'field)
+ 102
+ "pointer-depth-315")
+
+;; conversely the base variable resolves to the bare type
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'field '!a*)
+               (xtc:solve:c-eq 'field 102))
+         '!a)
+ 2
+ "pointer-depth-315-reverse")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; unresolved          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a variable with no constraint at all stays unresolved (#f), distinct from a
+;; conflict --- the engine never invents a type it cannot justify
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 'b)) 'a)
+ #f
+ "unconstrained-is-unresolved")

@@ -1,0 +1,139 @@
+;;; xtc-solve.xtm --- constraint solving over the canonical type core
+;;;
+;;; This module is the inference *engine*: it consumes a list of type
+;;; constraints and produces a substitution, from which each program
+;;; variable's resolved type can be read back.  It sits above the canonical
+;;; representation (xtc-types.xtm) and its int-code boundary (xtc-types-bridge.xtm),
+;;; and it is the principled replacement for the old candidate-list collapse
+;;; (xtc:desugar:type-unify / complex-unify / sym-unify / unity?) plus the
+;;; enumeration retry loop in run-type-check*.
+;;;
+;;; The old solver stored, per program variable, a *list* of candidate types in
+;;; a union-find cell, then collapsed that list with a pile of heuristics.  The
+;;; list conflated three genuinely different things:
+;;;
+;;;   - equality      two uses assert the variable has the same type      -> unify
+;;;   - default       a bare literal could be any of several widths       -> default rule
+;;;   - overload      a poly symbol has several candidate signatures      -> choose (elsewhere)
+;;;
+;;; This engine separates them.  Equality is Robinson unification of two
+;;; canonical terms, threaded as one substitution; the number-crunch
+;;; tie-breaking disappears because genuinely-equal things simply unify and
+;;; genuinely-distinct things are a type error rather than a retained "union".
+;;; Numeric defaulting becomes one explicit rule applied *after* unification:
+;;; an unconstrained numeric variable takes the head (the minimal code, by the
+;;; xtc-globals ordering fp64<fp32<si64<...) of its candidate class.  Because
+;;; unification has already propagated every downstream constraint into the
+;;; variable, a literal whose width is fixed by a later use is no longer free,
+;;; so the default does not fire --- which is exactly the case the old
+;;; backtracking enumeration existed to rescue.
+;;;
+;;; Constraints speak the live int-code representation (2, 102, (14 2 0),
+;;; "%string", !a, ...) so the traversal that emits them needs no new vocabulary;
+;;; the bridge interns every symbol (program variable or !bang type variable)
+;;; to a canonical type variable, sharing one intern table across the whole
+;;; solve so that two occurrences of a name --- and !a versus !a* --- denote the
+;;; same variable at the same or differing pointer depth.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; constraints         ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A constraint is a tagged list.  Two kinds suffice for the core:
+;;
+;;   (eq lhs rhs)        lhs and rhs (each an int-code type or a variable
+;;                       symbol) denote the same type; unify them.  A user
+;;                       signature is just an eq processed like any other ---
+;;                       Robinson makes it rigid for free, since once the
+;;                       variable is bound to a concrete type a conflicting eq
+;;                       fails rather than silently widening.
+;;
+;;   (default sym class) if sym is still unbound after all equalities, bind it
+;;                       to the default member of `class' (a list of candidate
+;;                       int-codes, default = minimum by the globals ordering).
+
+(define xtc:solve:c-eq
+  (lambda (lhs rhs) (list 'eq lhs rhs)))
+
+(define xtc:solve:c-default
+  (lambda (sym class) (list 'default sym class)))
+
+(define xtc:solve:eq? (lambda (c) (eq? (car c) 'eq)))
+(define xtc:solve:default? (lambda (c) (eq? (car c) 'default)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; solving             ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Solve in two passes over one substitution.  Pass one unifies every equality;
+;; a single failure collapses the whole solve to the symbol 'conflict (the
+;; honest report that the program is ill-typed --- the old path would have
+;; retained an unresolvable union and limped on).  Pass two applies defaulting
+;; to any numeric variable left unbound, threading each choice into the
+;; substitution so an earlier default can satisfy a later one.
+;;
+;; `intern' is a caller-supplied hashtable; the same table must be handed to
+;; xtc:solve:type-of afterwards so that a variable's identity at read-back
+;; matches the one used here.
+(define xtc:solve:run
+  (lambda (constraints intern)
+    (let ((subst (xtc:solve:unify-equalities constraints intern)))
+      (if (eq? subst 'conflict)
+          'conflict
+          (xtc:solve:apply-defaults constraints intern subst)))))
+
+(define xtc:solve:unify-equalities
+  (lambda (constraints intern)
+    (let loop ((cs constraints) (subst xtc:type:empty-subst))
+      (cond ((null? cs) subst)
+            ((xtc:solve:eq? (car cs))
+             (let* ((c (car cs))
+                    (t1 (xtc:type:from-intcode (cadr c) intern))
+                    (t2 (xtc:type:from-intcode (caddr c) intern))
+                    (subst2 (xtc:type:unify t1 t2 subst)))
+               (if subst2
+                   (loop (cdr cs) subst2)
+                   'conflict)))
+            (else (loop (cdr cs) subst))))))
+
+(define xtc:solve:apply-defaults
+  (lambda (constraints intern subst)
+    (let loop ((cs constraints) (subst subst))
+      (cond ((null? cs) subst)
+            ((xtc:solve:default? (car cs))
+             (let* ((c (car cs))
+                    (var (xtc:type:from-intcode (cadr c) intern))
+                    (resolved (xtc:type:resolve var subst)))
+               ;; only a still-free variable defaults; one already pinned by a
+               ;; downstream equality keeps the width that use demanded
+               (if (xtc:type:var? resolved)
+                   (let* ((default-code (apply min (caddr c)))
+                          (subst2 (xtc:type:unify
+                                   resolved
+                                   (xtc:type:from-intcode default-code intern)
+                                   subst)))
+                     (loop (cdr cs) (if subst2 subst2 subst)))
+                   (loop (cdr cs) subst))))
+            (else (loop (cdr cs) subst))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading back        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The resolved int-code type of a variable, or #f if the solve failed or the
+;; variable is still free (its type was never determined).  Pass the same
+;; `intern' table used for the solve.
+(define xtc:solve:type-of
+  (lambda (sym subst intern)
+    (if (eq? subst 'conflict)
+        #f
+        (let ((term (xtc:type:apply-subst
+                     (xtc:type:from-intcode sym intern) subst)))
+          (if (pair? (xtc:type:free-vars term))
+              #f
+              (xtc:type:to-intcode-open term intern))))))
+
+;; Did the solve fully determine `sym'?
+(define xtc:solve:resolved?
+  (lambda (sym subst intern)
+    (and (xtc:solve:type-of sym subst intern) #t)))
