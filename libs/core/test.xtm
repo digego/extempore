@@ -36,12 +36,12 @@
 ;;     (is? (double 3) 6)
 ;;     (is? (double 0) 0 "zero"))
 ;;
+;; When a call's only point is that it compiles and runs without error (no
+;; value to check), use `xtmtest-runs`.
+;;
 ;; For tests about compilation itself, use `xtmtest-compile` (asserts a form
 ;; compiles) or `xtmtest-compile-fails` (asserts it does NOT -- e.g. a type
 ;; error the checker is meant to catch).
-;;
-;; `xtmtest` is the older "define, call, and check in one form" macro, kept for
-;; the existing test corpus; new tests should prefer `xtmtest-result`.
 
 ;;; Code:
 
@@ -111,31 +111,19 @@
 (define-macro (xtmtest-result call expected . extra)
   (xtmtest-result-body call expected extra))
 
-;; older style: compile FORM, then evaluate CALL and (optionally) check it.
-;; Passing 'compile-should-fail as the expected result inverts the compile
-;; step -- a compile failure becomes a pass (prefer xtmtest-compile-fails).
-;; The compile-should-fail test is made at RUNTIME, on the evaluated expected
-;; value, so it doesn't depend on how the quote is read at expansion time.
-(define-macro (xtmtest form call . expected-result)
-  `(let* ((name ',(car call))
-          (has-exp ,(not (null? expected-result)))
-          (exp-res ,(if (null? expected-result) #f (car expected-result)))
-          (want-compile-fail (and has-exp (symbol? exp-res)
-                                  (eq? exp-res 'compile-should-fail))))
-     (xtmtest:announce name)
-     (catch (if want-compile-fail
-                (xtmtest-record name 'pass ',call 'compile-should-fail 'did-not-compile)
-                (xtmtest-record name 'compile-error ',call #f #f))
-            (eval ',form (interaction-environment))
-            (if want-compile-fail
-                (xtmtest-record name 'fail ',call 'compile-should-fail 'compiled)
-                (catch (xtmtest-record name 'runtime-error ',call #f #f)
-                       (let ((got (eval ',call (interaction-environment))))
-                         (if has-exp
-                             (if (xtmtest:equal? exp-res got)
-                                 (xtmtest-record name 'pass ',call exp-res got)
-                                 (xtmtest-record name 'fail ',call exp-res got))
-                             (xtmtest-record name 'pass ',call 'any got))))))))
+;; assert that CALL evaluates without error (no value check) -- the modern form
+;; of an xtmtest whose only point is that the code compiles and runs.
+(define (xtmtest-runs-body call extra)
+  (let ((label (if (null? extra) #f (car extra))))
+    `(let ((env (current-environment))
+           (name ,(if label label `(quote ,(if (pair? call) (car call) call)))))
+       (xtmtest:announce name)
+       (catch (xtmtest-record name 'runtime-error ',call #f #f)
+              (let ((got (eval ',call env)))
+                (xtmtest-record name 'pass ',call 'any got))))))
+
+(define-macro (xtmtest-runs call . extra)
+  (xtmtest-runs-body call extra))
 
 ;; assert that FORM (a bind-func/bind-type) compiles
 (define-macro (xtmtest-compile form)
@@ -149,9 +137,9 @@
 (define-macro (xtmtest-compile-fails form)
   `(let ((name ',(cadr form)))
      (xtmtest:announce name)
-     (catch (xtmtest-record name 'pass 'compile-should-fail 'did-not-compile)
+     (catch (xtmtest-record name 'pass 'compile-only 'compile-should-fail 'did-not-compile)
             (eval ',form (interaction-environment))
-            (xtmtest-record name 'fail 'compile-should-fail 'compiled))))
+            (xtmtest-record name 'fail 'compile-only 'compile-should-fail 'compiled))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; fixtures            ;;

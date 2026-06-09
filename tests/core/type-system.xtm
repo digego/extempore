@@ -25,13 +25,11 @@
 (bind-type T371a <i64,i64,double>)
 (bind-type T371b <i64,i64>)
 
-(xtmtest
+(xtmtest-compile-fails
  (bind-func test_return_type_mismatch:[T371a*]*
    (lambda ()
      (let ((x:T371b* (T371b 1 2)))
-       x)))
- (test_return_type_mismatch)
- 'compile-should-fail)
+       x))))
 
 ;; the matching-return-type version must still compile, and reading it back
 ;; through a wrapper confirms the check is not a false positive
@@ -39,11 +37,9 @@
  (bind-func make_t371b:[T371b*]*
    (lambda () (T371b 3 4))))
 
-(xtmtest
- (bind-func read_t371b
-   (lambda () (tref (make_t371b) 1)))
- (read_t371b)
- 4)
+(bind-func read_t371b
+  (lambda () (tref (make_t371b) 1)))
+(xtmtest-result (read_t371b) 4)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -62,20 +58,16 @@
 
 (bind-alias MyI64 i64)
 
-(xtmtest
- (bind-func test_alias_scalar:[MyI64,MyI64]*
-   (lambda (x) (+ x 1)))
- (test_alias_scalar 41)
- 42)
+(bind-func test_alias_scalar:[MyI64,MyI64]*
+  (lambda (x) (+ x 1)))
+(xtmtest-result (test_alias_scalar 41) 42)
 
 ;; alias of a named tuple type, used in a typed let binding
 (bind-type AliasedPair <i64,i64>)
 (bind-alias PairAlias AliasedPair)
 
-(xtmtest
- (bind-func test_alias_named
-   (lambda ()
-     (let ((p:PairAlias* (AliasedPair 5 9)))
-       (tref p 1))))
- (test_alias_named)
- 9)
+(bind-func test_alias_named
+  (lambda ()
+    (let ((p:PairAlias* (AliasedPair 5 9)))
+      (tref p 1))))
+(xtmtest-result (test_alias_named) 9)

@@ -59,11 +59,10 @@
 ;; (bind-val NUM_f64 NUM{[double,double,double]*}*)
 (bind-val NUM_f64 NUM{double}*)
 
-(xtmtest
- (bind-func init_num_f64_dict
-    (lambda ()
-      (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
- (init_num_f64_dict))
+(bind-func init_num_f64_dict
+   (lambda ()
+     (set! NUM_f64 (NUM_h num_f64_plus num_f64_minus num_f64_mul num_f64_div))))
+(xtmtest-runs (init_num_f64_dict))
 ;; finished instance of NUM_double
 
 ;; i64 INSTANCE of NUM
@@ -85,11 +84,10 @@
 
 (bind-val NUM_i64 NUM{i64}*)
 
-(xtmtest
- (bind-func init_num_i64_dict
-    (lambda ()
-      (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
- (init_num_i64_dict))
+(bind-func init_num_i64_dict
+   (lambda ()
+     (set! NUM_i64 (NUM_h num_i64_plus num_i64_minus num_i64_mul num_i64_div))))
+(xtmtest-runs (init_num_i64_dict))
 ;; finished instance of NUM_i64
 
 ;; i32 INSTANCE of NUM
@@ -111,11 +109,10 @@
 
 (bind-val NUM_i32 NUM{i32}*)
 
-(xtmtest
- (bind-func init_num_i32_dict
-    (lambda ()
-      (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
- (init_num_i32_dict))
+(bind-func init_num_i32_dict
+   (lambda ()
+     (set! NUM_i32 (NUM_h num_i32_plus num_i32_minus num_i32_mul num_i32_div))))
+(xtmtest-runs (init_num_i32_dict))
 ;; finished instance of NUM_i32
 
 ;; f32 INSTANCE of NUM
@@ -137,11 +134,10 @@
 
 (bind-val NUM_f32 NUM{float}*)
 
-(xtmtest
- (bind-func init_num_f32_dict
-    (lambda ()
-      (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
- (init_num_f32_dict))
+(bind-func init_num_f32_dict
+   (lambda ()
+     (set! NUM_f32 (NUM_h num_f32_plus num_f32_minus num_f32_mul num_f32_div))))
+(xtmtest-runs (init_num_f32_dict))
 ;; finished instance of f32 NUM
 
 
@@ -149,14 +145,14 @@
 ;; now test the two instances
 ;;;;
 
-(xtmtest (bind-func type_class_test
-            (lambda ()
-              (println (plus NUM_f32 3.0:f 2.0:f)
-                       (minus NUM_f32 3.0:f 2.0:f)
-                       (mul NUM_f64 3.0 2.0)
-                       (div NUM_i64 12 3))
-              (plus NUM_i32 3:i32 2:i32)))
-         (type_class_test) 5)
+(bind-func type_class_test
+   (lambda ()
+     (println (plus NUM_f32 3.0:f 2.0:f)
+              (minus NUM_f32 3.0:f 2.0:f)
+              (mul NUM_f64 3.0 2.0)
+              (div NUM_i64 12 3))
+     (plus NUM_i32 3:i32 2:i32)))
+(xtmtest-result (type_class_test) 5)
 
 
 
@@ -237,16 +233,15 @@
         (fail)
         (success))))
 
-(xtmtest
- (bind-func make_shapes
-   (lambda ()
-     (let ((s1 (Circle 1.0 2.0 3.0))
-           (s2 (Rectangle 1.0 2.0 3.0 4.0))
-           (s3 (Blob))
-           (lst (list s1 s2 s3)))
-       (for-each (lambda (x) (println x)) lst)
-       lst)))
- (make_shapes))
+(bind-func make_shapes
+  (lambda ()
+    (let ((s1 (Circle 1.0 2.0 3.0))
+          (s2 (Rectangle 1.0 2.0 3.0 4.0))
+          (s3 (Blob))
+          (lst (list s1 s2 s3)))
+      (for-each (lambda (x) (println x)) lst)
+      lst)))
+(xtmtest-runs (make_shapes))
 
 
 
@@ -301,65 +296,55 @@
 ;; one generic-function signature now binds consistently -- !a* against i64*
 ;; binds !a to i64, not i64*.
 (bind-func gsig315:[!a,!a*,!a]* (lambda (p v) (pset! p 0 v) (pref p 0)))
-(xtmtest
- (bind-func gsig315_use
-   (lambda ()
-     (let ((p:i64* (halloc)))
-       (gsig315 p 42))))
- (gsig315_use)
- 42)
+(bind-func gsig315_use
+  (lambda ()
+    (let ((p:i64* (halloc)))
+      (gsig315 p 42))))
+(xtmtest-result (gsig315_use) 42)
 
 ;; #315 itself: depth-1 type-variable tuple field + bare !a parameter, via pset!
 (bind-type Csn315 <!a*,i64> (printer? . #f))
 (bind-func Csn315:[Csn315{!a}*,i64]* (lambda (x) (let ((arr:!a* (halloc x))) (Csn315_z arr x))))
 (bind-func csn315_put:[!a,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val) val))
-(xtmtest
- (bind-func csn315_use
-   (lambda ()
-     (let ((t:Csn315{i64}* (Csn315 16)))
-       (csn315_put t 6 4)
-       (pref (tref t 0) 6))))
- (csn315_use)
- 4)
+(bind-func csn315_use
+  (lambda ()
+    (let ((t:Csn315{i64}* (Csn315 16)))
+      (csn315_put t 6 4)
+      (pref (tref t 0) 6))))
+(xtmtest-result (csn315_use) 4)
 
 ;; the same defect with NO tuple: a type variable at depth 1 and depth 0
 (bind-func csn_notuple:[!a,!a*,!a]* (lambda (p v) (pset! p 0 v) v))
-(xtmtest
- (bind-func csn_notuple_use
-   (lambda ()
-     (let ((p:i64* (halloc)))
-       (csn_notuple p 5)
-       (pref p 0))))
- (csn_notuple_use)
- 5)
+(bind-func csn_notuple_use
+  (lambda ()
+    (let ((p:i64* (halloc)))
+      (csn_notuple p 5)
+      (pref p 0))))
+(xtmtest-result (csn_notuple_use) 5)
 
 ;; depth-2 type-variable tuple field
 (bind-type CsnDeep <!a**,i64> (printer? . #f))
 (bind-func CsnDeep:[CsnDeep{!a}*,i64]* (lambda (n) (let ((arr:!a** (halloc n))) (CsnDeep_z arr n))))
 (bind-func csndeep_put:[!a*,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v) v))
-(xtmtest
- (bind-func csndeep_use
-   (lambda ()
-     (let ((t:CsnDeep{i64}* (CsnDeep 4))
-           (p:i64* (halloc)))
-       (pset! p 0 42)
-       (csndeep_put t 1 p)
-       (pref (pref (tref t 0) 1) 0))))
- (csndeep_use)
- 42)
+(bind-func csndeep_use
+  (lambda ()
+    (let ((t:CsnDeep{i64}* (CsnDeep 4))
+          (p:i64* (halloc)))
+      (pset! p 0 42)
+      (csndeep_put t 1 p)
+      (pref (pref (tref t 0) 1) 0))))
+(xtmtest-result (csndeep_use) 42)
 
 ;; two type variables, mixed depth (!a* depth-1 was the bug; !b depth-0 is fine)
 (bind-type CsnTwo <!a*,!b> (printer? . #f))
 (bind-func CsnTwo:[CsnTwo{!a,!b}*,i64,!b]* (lambda (n b) (let ((arr:!a* (halloc n))) (CsnTwo_z arr b))))
 (bind-func csntwo_put:[!a,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v) v))
-(xtmtest
- (bind-func csntwo_use
-   (lambda ()
-     (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
-       (csntwo_put t 3 7)
-       (pref (tref t 0) 3))))
- (csntwo_use)
- 7)
+(bind-func csntwo_use
+  (lambda ()
+    (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
+      (csntwo_put t 3 7)
+      (pref (tref t 0) 3))))
+(xtmtest-result (csntwo_use) 7)
 
 ;; void-returning companions (task-057 + this type-path fix): the same four
 ;; repros in their original void+value-yielding-tail shape -- a put that mutates
@@ -368,58 +353,48 @@
 ;; is discarded rather than coerced).  They reuse the types and constructors
 ;; defined above.
 (bind-func csn315_putv:[void,Csn315{!a}*,i64,!a]* (lambda (t idx val) (pset! (tref t 0) idx val)))
-(xtmtest
- (bind-func csn315_usev
-   (lambda ()
-     (let ((t:Csn315{i64}* (Csn315 16)))
-       (csn315_putv t 6 4)
-       (pref (tref t 0) 6))))
- (csn315_usev)
- 4)
+(bind-func csn315_usev
+  (lambda ()
+    (let ((t:Csn315{i64}* (Csn315 16)))
+      (csn315_putv t 6 4)
+      (pref (tref t 0) 6))))
+(xtmtest-result (csn315_usev) 4)
 
 (bind-func csn_notuplev:[void,!a*,!a]* (lambda (p v) (pset! p 0 v)))
-(xtmtest
- (bind-func csn_notuplev_use
-   (lambda ()
-     (let ((p:i64* (halloc)))
-       (csn_notuplev p 5)
-       (pref p 0))))
- (csn_notuplev_use)
- 5)
+(bind-func csn_notuplev_use
+  (lambda ()
+    (let ((p:i64* (halloc)))
+      (csn_notuplev p 5)
+      (pref p 0))))
+(xtmtest-result (csn_notuplev_use) 5)
 
 (bind-func csndeep_putv:[void,CsnDeep{!a}*,i64,!a*]* (lambda (t idx v) (pset! (tref t 0) idx v)))
-(xtmtest
- (bind-func csndeep_usev
-   (lambda ()
-     (let ((t:CsnDeep{i64}* (CsnDeep 4))
-           (p:i64* (halloc)))
-       (pset! p 0 42)
-       (csndeep_putv t 1 p)
-       (pref (pref (tref t 0) 1) 0))))
- (csndeep_usev)
- 42)
+(bind-func csndeep_usev
+  (lambda ()
+    (let ((t:CsnDeep{i64}* (CsnDeep 4))
+          (p:i64* (halloc)))
+      (pset! p 0 42)
+      (csndeep_putv t 1 p)
+      (pref (pref (tref t 0) 1) 0))))
+(xtmtest-result (csndeep_usev) 42)
 
 (bind-func csntwo_putv:[void,CsnTwo{!a,!b}*,i64,!a]* (lambda (t idx v) (pset! (tref t 0) idx v)))
-(xtmtest
- (bind-func csntwo_usev
-   (lambda ()
-     (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
-       (csntwo_putv t 3 7)
-       (pref (tref t 0) 3))))
- (csntwo_usev)
- 7)
+(bind-func csntwo_usev
+  (lambda ()
+    (let ((t:CsnTwo{i64,double}* (CsnTwo 8 2.0)))
+      (csntwo_putv t 3 7)
+      (pref (tref t 0) 3))))
+(xtmtest-result (csntwo_usev) 7)
 
 ;; boundary lock (must keep PASSING): a depth-0 type-variable tuple field is fine
 (bind-type CsnD0 <!a,i64> (printer? . #f))
 (bind-func CsnD0:[CsnD0{!a}*,!a]* (lambda (v) (CsnD0_z v 1)))
 (bind-func csnd0_get:[!a,CsnD0{!a}*]* (lambda (t) (tref t 0)))
-(xtmtest
- (bind-func csnd0_use
-   (lambda ()
-     (let ((t:CsnD0{i64}* (CsnD0 7)))
-       (csnd0_get t))))
- (csnd0_use)
- 7)
+(bind-func csnd0_use
+  (lambda ()
+    (let ((t:CsnD0{i64}* (CsnD0 7)))
+      (csnd0_get t))))
+(xtmtest-result (csnd0_use) 7)
 
 ;; boundary lock (must keep PASSING): a type variable nested inside a closure
 ;; field of a generic tuple sits at depth 0 inside the closure, so it is matched
@@ -427,11 +402,9 @@
 (bind-type Csn315F <[!a,!a]*,i64> (printer? . #f))
 (bind-func Csn315F:[Csn315F{!a}*,[!a,!a]*]* (lambda (f) (Csn315F_z f 1)))
 (bind-func csn315F_call:[!a,Csn315F{!a}*,!a]* (lambda (t v) ((tref t 0) v)))
-(xtmtest
- (bind-func csn315F_use
-   (lambda ()
-     (let ((dbl:[i64,i64]* (lambda (x) (* x 2)))
-           (t:Csn315F{i64}* (Csn315F dbl)))
-       (csn315F_call t 5))))
- (csn315F_use)
- 10)
+(bind-func csn315F_use
+  (lambda ()
+    (let ((dbl:[i64,i64]* (lambda (x) (* x 2)))
+          (t:Csn315F{i64}* (Csn315F dbl)))
+      (csn315F_call t 5))))
+(xtmtest-result (csn315F_use) 10)
