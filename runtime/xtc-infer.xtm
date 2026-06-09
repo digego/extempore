@@ -195,6 +195,67 @@
 ;; the traversal       ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; A symbol in value position.  A local variable denotes its own type variable.
+;; Otherwise the symbol must name something already known --- a bound closure
+;; (its boxed-closure type), a global variable (its cell type, less the cell's
+;; own pointer), or a type-annotated generic / poly reference (the annotation
+;; IS its type) --- and contributes that known type directly, keyless.  Anything
+;; else is the same hard "cannot find symbol" the old checker raises: inference
+;; must not invent a type for an undeclared variable (a typo would otherwise
+;; surface only at codegen, or worse, compile wrongly).
+(define xtc:infer:collect-symbol
+  (lambda (ast bound)
+    (if (member ast bound)
+        (cons ast '())
+        (let* ((name (symbol->string ast))
+               (unmarked (car (string-split-on name "##"))))
+          (cond
+            ((xtc:cache:globalvar-exists? name)
+             (cons (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type name))
+                   '()))
+            ((xtc:cache:nativefunc-exists? name)
+             (cons (xtc:cache:get-nativefunc-type name) '()))
+            ((xtc:cache:closure-exists? name)
+             (cons (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
+                         (map xtc:codegen:get-type-from-str
+                              (xtc:cache:get-closure-arg-types name)))
+                   '()))
+            ;; a type-annotated generic / poly reference (name:type): the
+            ;; annotation IS its type
+            ((string-contains? unmarked ":")
+             (let ((p (regex:type-split unmarked ":")))
+               (if (or (xtc:cache:genericfunc-exists? (string->symbol (car p)))
+                       (xtc:cache:polyfunc-exists? (car p)))
+                   (cons (xtc:codegen:get-type-from-pretty-str
+                          (if (xtc:cache:typealias-exists? (cadr p))
+                              (xtc:codegen:pretty-print-type
+                               (xtc:cache:get-typealias-type (cadr p)))
+                              (cadr p)))
+                         '())
+                   (xtc:diagnostics:print-missing-identifier-error ast 'symbol))))
+            ;; a poly reference, bare or ##-marked (a closure passed as an
+            ;; argument, stored in a binding...): its type is one of the poly's
+            ;; candidate closure types --- the standard overload, with a result /
+            ;; parameter key synthesised per slot and the site symbol tied to
+            ;; the assembled closure, so the context it flows into (the
+            ;; receiving parameter's type) picks the candidate.
+            ((xtc:cache:polyfunc-exists? unmarked)
+             (let ((cands (xtc:infer:poly-candidates unmarked)))
+               (if (not (= 1 (length (cl:remove-duplicates (map length cands)))))
+                   (xtc:diagnostics:print-compiler-error
+                    "Try forcing a type? Ambiguous polymorphic function as a value" ast)
+                   (let ((rk (xtc:infer:fresh-key))
+                         (aks (map (lambda (_) (xtc:infer:fresh-key))
+                                   (cdr (car cands)))))
+                     (cons ast
+                           (list (xtc:solve:c-eq ast (xtc:infer:closure-code rk aks))
+                                 (xtc:solve:c-overload rk aks cands)))))))
+            ((xtc:cache:genericfunc-exists? (string->symbol unmarked))
+             (xtc:diagnostics:print-compiler-error
+              "Try forcing a type? Ambiguous generic function as value" ast))
+            (else
+             (xtc:diagnostics:print-missing-identifier-error ast 'symbol)))))))
+
 ;; Collect constraints for one (already desugared) AST node, given the set of
 ;; lexically in-scope local variables.  Returns (cons result-key constraints).
 (define xtc:infer:collect
@@ -210,8 +271,8 @@
          (cons k (list (xtc:solve:c-default k (xtc:infer:float-class))))))
       ;; a string literal is an i8* (a pointer to its bytes)
       ((string? ast) (cons (+ *xtc:codegen:pointer* *xtc:codegen:si8*) '()))
-      ;; a symbol denotes its own type variable
-      ((symbol? ast) (cons ast '()))
+      ;; a symbol: a local variable's type variable, or a known global's type
+      ((symbol? ast) (xtc:infer:collect-symbol ast bound))
       ;; desugared boolean literals are i1
       ((and (pair? ast) (eq? (car ast) 'impc_true))  (cons *xtc:codegen:i1* '()))
       ((and (pair? ast) (eq? (car ast) 'impc_false)) (cons *xtc:codegen:i1* '()))
@@ -291,11 +352,19 @@
            (xtc:infer:collect-generic-call ast bound)
            (let ((cands (or (xtc:infer:generic-candidates (car ast) (length (cdr ast)))
                             (xtc:infer:global-candidates (car ast)))))
-             (if cands
-                 (xtc:infer:collect-global-call ast cands bound)
-                 (xtc:diagnostics:print-compiler-error
-                  (string-append "xtc:infer: unhandled call --- deferred (generic) or unknown symbol: "
-                                 (sexpr->string ast)))))))
+             (cond (cands
+                    (xtc:infer:collect-global-call ast cands bound))
+                   ;; the symbol names a generic whose only specialisations are
+                   ;; a kind this path defers (constraint-guarded): a loud gap
+                   ((xtc:cache:genericfunc-exists?
+                     (string->symbol (xtc:codegen:get-base-type (symbol->string (car ast)))))
+                    (xtc:diagnostics:print-compiler-error
+                     (string-append "xtc:infer: deferred generic kind: "
+                                    (sexpr->string ast))))
+                   ;; parity with the old checker: an unknown call-position
+                   ;; symbol is an undefined function
+                   (else
+                    (xtc:diagnostics:print-missing-identifier-error (car ast) 'symbol))))))
       (else
        (xtc:diagnostics:print-compiler-error
         (string-append "xtc:infer: unhandled form (increment 2 covers a core subset): "
@@ -563,6 +632,7 @@
          (if specs
              (let ((rk (xtc:infer:fresh-key)))
                (cons rk (append argcons
+                                (xtc:infer:site-constraint sym rk (map car rcs))
                                 (list (xtc:solve:c-overload rk (map car rcs) specs)))))
              (xtc:diagnostics:print-compiler-error
               (string-append "xtc:infer: free-return generic with non-ground arguments --- deferred: "
@@ -572,10 +642,24 @@
                 (proj (xtc:infer:project-fallback (cdr fb) argterms)))
            (if proj
                (let ((rk (xtc:infer:fresh-key)))
-                 (cons rk (append argcons (list (xtc:solve:c-eq rk proj)))))
+                 (cons rk (append argcons
+                                  (xtc:infer:site-constraint sym rk (map car rcs))
+                                  (list (xtc:solve:c-eq rk proj)))))
                (xtc:diagnostics:print-compiler-error
                 (string-append "xtc:infer: cannot reify free-return generic body --- deferred: "
                                (sexpr->string ast))))))))))
+
+;; A ##-marked call-site symbol (the dispatch marker desugaring stamps on a
+;; poly / generic callee) is a variable in its own right: the old checker
+;; resolves it to the chosen signature's full closure type, and
+;; add-types-to-source reads that alist entry to pick (or compile) the concrete
+;; instance the call dispatches to.  Tie the site symbol to the call's
+;; assembled closure type so the entry comes out of the solve with it.
+(define xtc:infer:site-constraint
+  (lambda (sym result-key arg-keys)
+    (if (string-contains? (symbol->string sym) "##")
+        (list (xtc:solve:c-eq sym (xtc:infer:closure-code result-key arg-keys)))
+        '())))
 
 ;; (f arg ...) with f a global function: the call's type is a fresh result that,
 ;; with the argument types, must match exactly one of f's candidate signatures.
@@ -590,6 +674,7 @@
            (rk (xtc:infer:fresh-key)))
       (cons rk
             (append (apply append (map cdr args))
+                    (xtc:infer:site-constraint (car ast) rk (map car args))
                     (list (xtc:solve:c-overload rk (map car args) cands)))))))
 
 ;; A sequence's type is its last expression's; the earlier expressions still
@@ -674,12 +759,16 @@
   (lambda (ast bound)
     (cons *xtc:codegen:i1* (cdr (xtc:infer:collect (cadr ast) bound)))))
 
-;; (set! v e): v takes e's type, and the form's value is e's.
+;; (set! v e): v takes e's type, and the form's value is e's.  The target is
+;; collected as an ordinary symbol, so writing an undeclared variable errors
+;; here (and a global target carries its cached type) just as a read would.
 (define xtc:infer:collect-set!
   (lambda (ast bound)
-    (let ((rc (xtc:infer:collect (ast:set!-expr ast) bound)))
+    (let ((rc-v (xtc:infer:collect (ast:set!-var ast) bound))
+          (rc (xtc:infer:collect (ast:set!-expr ast) bound)))
       (cons (car rc)
-            (cons (xtc:solve:c-eq (ast:set!-var ast) (car rc)) (cdr rc))))))
+            (cons (xtc:solve:c-eq (car rc-v) (car rc))
+                  (append (cdr rc-v) (cdr rc)))))))
 
 ;; (stack-alloc) / (heap-alloc) / (zone-alloc), with an optional element-count
 ;; argument: the result is a pointer the surrounding binding's forced type fixes,
@@ -695,7 +784,8 @@
 ;; (ref v): a pointer to v --- v's type with one more pointer level.
 (define xtc:infer:collect-ref
   (lambda (ast bound)
-    (cons (xtc:infer:ptr-of (cadr ast)) '())))
+    (let ((rc (xtc:infer:collect (cadr ast) bound)))
+      (cons (xtc:infer:ptr-of (car rc)) (cdr rc)))))
 
 ;; (pref p): one more pointer level on p; (pointer-ref p i) / (pdref p): one less
 ;; (the pointee), via a fresh pointee variable.
@@ -819,19 +909,24 @@
             (append (cdr rc-c) (cdr rc-b)
                     (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)))))))
 
-;; (dotimes (i n) body): i is a loop counter the same type as the count n (the
-;; old check unifies the two), in scope for the body; the body runs for effect
-;; and the form is void.
+;; (dotimes (i n) body) / (dotimes (i start n) body): i is a loop counter the
+;; same type as the count (and the start, when given); the body runs for effect
+;; and the form is void.  The counter is NOT a binding site --- like the old
+;; checker (and codegen, which allocates no slot for it), it must already be
+;; declared as an argument or let binding, so it is collected as an ordinary
+;; symbol and an undeclared counter errors here.
 (define xtc:infer:collect-dotimes
   (lambda (ast bound)
     (let* ((spec (cadr ast))
-           (ivar (car spec))
-           (inner (cons ivar bound))
-           (rc-n (xtc:infer:collect (cadr spec) inner))
-           (rc-b (xtc:infer:collect (caddr ast) inner)))
+           (rc-i (xtc:infer:collect (car spec) bound))
+           (rests (map (lambda (e) (xtc:infer:collect e bound)) (cdr spec)))
+           (rc-b (xtc:infer:collect (caddr ast) bound)))
       (cons *xtc:codegen:void*
-            (append (cdr rc-n) (cdr rc-b)
-                    (list (xtc:solve:c-eq ivar (car rc-n))))))))
+            (append (cdr rc-i)
+                    (apply append (map cdr rests))
+                    (cdr rc-b)
+                    (map (lambda (rc) (xtc:solve:c-eq (car rc-i) (car rc)))
+                         rests))))))
 
 ;; (bitcast v T) / (bitconvert v T): a reinterpretation / numeric conversion whose
 ;; result type is the explicit target T (a coercion is a deliberate type hole, so
@@ -889,14 +984,6 @@
 ;; for a scalar and (var code...) for a compound, and in both cases its cdr is the
 ;; int-code, so one c-eq form serves both.  This is shadow-validated against
 ;; run-type-check (tests/compiler/inferfn.xtm) before it is flipped live.
-;; Drop alist entries with a duplicate key, keeping the first.
-(define xtc:infer:dedup-alist
-  (lambda (al)
-    (let loop ((al al) (seen '()) (out '()))
-      (cond ((null? al) (reverse out))
-            ((memq (caar al) seen) (loop (cdr al) seen out))
-            (else (loop (cdr al) (cons (caar al) seen) (cons (car al) out)))))))
-
 (define xtc:infer:check-function
   (lambda (vars forced-types ast)
     (xtc:infer:reset-fresh!)
@@ -906,25 +993,16 @@
            (subst (xtc:solve:run (append forced (cdr rc)) intern)))
       (if (eq? subst 'conflict)
           #f
-          ;; Read back the union of the initial var table and the program
-          ;; variables the constraints actually referenced --- the latter (interned
-          ;; by name, a string key not beginning with the bang/fresh marker `!')
-          ;; catches vars a form introduces mid-traversal, e.g. a dotimes counter,
-          ;; that the initial table does not list but codegen still resolves by name.
-          (let ((syms (append (hashtable-keys vars)
-                              (map string->symbol
-                                   (cl:remove-if-not
-                                    (lambda (k) (and (string? k)
-                                                     (> (string-length k) 0)
-                                                     (not (char=? (string-ref k 0) #\!))))
-                                    (hashtable-keys intern))))))
-            (xtc:infer:dedup-alist
-             (cl:remove
-              #f
-              (map (lambda (sym)
-                     (let ((ty (xtc:solve:type-of sym subst intern)))
-                       (and ty (cons sym ty))))
-                   syms))))))))
+          ;; Read back exactly the declared variables --- the var table's keys.
+          ;; A symbol the constraints referenced that the table does not list (a
+          ;; global variable, a cached closure) is NOT a local: the alist marks
+          ;; locals, which codegen scope-checks against its sym-name-stack, so an
+          ;; entry here would shadow the cache resolution those symbols get.
+          (cl:remove #f
+                     (map (lambda (sym)
+                            (let ((ty (xtc:solve:type-of sym subst intern)))
+                              (and ty (cons sym ty))))
+                          (hashtable-keys vars)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; live shadow check   ;;

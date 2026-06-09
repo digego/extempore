@@ -3290,7 +3290,9 @@ xtlang's `let' syntax is the same as Scheme"
     ;; are bypassed entirely.  Default off until a full shadow-clean build clears
     ;; the flip; until then the old path runs and shadow mode (above) cross-checks.
     (if *xtc:infer:live?*
-        (xtc:infer:check-function vars forced-types ast)
+        (or (xtc:infer:check-function vars forced-types ast)
+            ;; a solver conflict: the constraints are unsatisfiable
+            (xtc:diagnostics:print-could-not-resolve-type-error (caaadr ast)))
         (let ((typelist (call/cc (lambda (k) (set! *type-check-continuation* k) '()))))
           (if (null? typelist)
               (set! typelist (xtc:typecheck:run-type-check* vars forced-types ast)))
