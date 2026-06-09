@@ -80,7 +80,19 @@
 (bind-type IPair <!a,!b>)
 (bind-func gfirst:[!a,!b]*           (lambda (a) (tref a 0)))
 (bind-func gfirst:[!a,IPair{!a,!b}*]*  (lambda (a) (tref a 0)))
+(bind-func gsecond:[!a,!b]*            (lambda (a) (tref a 1)))
 (bind-func gsecond:[!b,IPair{!a,!b}*]* (lambda (a) (tref a 1)))
+
+;; A FREE-RETURN fallback ([!a,!b]*, return bound nowhere in the parameters) is
+;; reified by exercising its body --- a field projection (tref a i) --- against
+;; the concrete argument type, the structural analogue of the old path's
+;; "exercise the generic code".  gfirst/gsecond above carry that fallback; below,
+;; a plain (non-generic) tuple type stands in for an argument that matches NO
+;; specialisation, so only the fallback applies.  Calls over a napp instance
+;; (IList, Gx) reuse the same projection through the nominal bridge.
+(bind-type bare2 <i64,double>)
+(bind-func mk_bare2:[bare2*,i64,double]*
+  (lambda (x y) (let ((b:bare2* (halloc))) (tset! b 0 x) (tset! b 1 y) b)))
 
 ;; Nominal disambiguation: Gx{!a} (<!a,double>) and Gy{!a,!b} (<!a,!b>) have the
 ;; SAME shape, and gpick has a specialisation for each returning a DIFFERENT
@@ -194,6 +206,15 @@
 ;; reduces to the element scalar
 (xtmtest-result (infer-expr '(ilist_head (ilist_cons 8 (mk_ilist 9)))) 2 "named-generic-container-return")
 
+;; free-return fallback: no specialisation matches, so the [!a,!b]* fallback is
+;; reified by projecting its body's field (tref a i) against the concrete tuple.
+;; A plain named tuple, then nominal (napp) instances; field 0 and field 1.
+(xtmtest-result (infer-expr '(gfirst (mk_bare2 5 6.0)))   2 "free-return-named-field0")
+(xtmtest-result (infer-expr '(gsecond (mk_bare2 5 6.0)))  0 "free-return-named-field1")
+(xtmtest-result (infer-expr '(gfirst (mk_ilist 7)))       2 "free-return-napp-i64")
+(xtmtest-result (infer-expr '(gfirst (mk_ilist 7.0)))     0 "free-return-napp-f64")
+(xtmtest-result (infer-expr '(gfirst (mk_gx 5)))          2 "free-return-napp-gx")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -266,7 +287,17 @@
                      ;; a generic that RETURNS its generic instance: the reified
                      ;; napp reads back as the same poly c-name the old path emits
                      '(ilist_cons 8 (mk_ilist 9))
-                     '(ilist_head (ilist_cons 8 (mk_ilist 9))))))
+                     '(ilist_head (ilist_cons 8 (mk_ilist 9)))
+                     ;; free-return fallback ([!a,!b]*) reified by body projection
+                     ;; when no specialisation matches: a plain named tuple, nominal
+                     ;; (napp) instances, field 0 and field 1, and composed
+                     '(gfirst (mk_bare2 5 6.0))
+                     '(gsecond (mk_bare2 5 6.0))
+                     '(gfirst (mk_ilist 7))
+                     '(gfirst (mk_ilist 7.0))
+                     '(gfirst (mk_gx 5))
+                     '(+ (gfirst (mk_bare2 3 6.0)) (gfirst (mk_bare2 4 6.0)))
+                     '(if (< (gfirst (mk_bare2 1 2.0)) 5) 10 20))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))

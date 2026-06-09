@@ -46,17 +46,21 @@
 ;;; (Name{!a,...}) to a (napp name arg...) term, so List{i64} and a same-shaped
 ;;; Pair{i64,i64} do NOT cross-unify (their napp names differ) and a recursive
 ;;; type like List needs no expansion --- the name carries the recursion.  When
-;;; several specialisations share a name the overload picks the one that unifies;
-;;; a fully-general fallback whose return is free (first's [!a,!b]*) is filtered
-;;; out (xtc:infer:sig-reifiable?) so it does not shadow the specific one.  A
+;;; several specialisations share a name the overload picks the one that unifies.
+;;; A fully-general fallback whose return is free (first's [!a,!b]*) is filtered
+;;; out of the overload (xtc:infer:sig-reifiable?) so it does not shadow a
+;;; specific one; when NO specialisation matches the argument, that fallback is
+;;; reified instead by exercising its body --- a field projection (tref a i) ---
+;;; against the concrete argument type (xtc:infer:collect-generic-call), the
+;;; structural analogue of the old path's "exercise the generic code".  A
 ;;; genericfunc is preferred over its compiled monomorphic instances, which cover
 ;;; only the types already specialised.
 ;;;
 ;;; Deferred, a loud gap kept out of the corpus: constraint-guarded
-;;; specialisations (the cache's predicate field), and a free return that no
-;;; specialisation reifies --- e.g. (first someList), whose only matching
-;;; signature is the [!a,!b]* fallback --- which needs expected-type direction or
-;;; body reification (the old "exercise the generic code" path).
+;;; specialisations (the cache's predicate field), and a free-return fallback
+;;; whose argument is NON-ground --- one referring to an outer variable not bound
+;;; here, so its body cannot be exercised --- which awaits the expected-type
+;;; direction that increment 3's live entry point supplies.
 ;;;
 ;;; The clean unifier is intentionally
 ;;; stricter than the old candidate-list path on implicit numeric coercion, so
@@ -218,17 +222,22 @@
       ;; symbol, or a generic kind not yet handled (a constraint-guarded or
       ;; free-return specialisation), is a loud gap.
       ((and (pair? ast) (symbol? (car ast)))
-       ;; a genericfunc is resolved through its generic signatures FIRST: it may
-       ;; also carry compiled monomorphic instances (a polyfunc), but those cover
-       ;; only the types already specialised, whereas the generic reifies any
-       ;; argument type --- so prefer it, falling back to the plain global path.
-       (let ((cands (or (xtc:infer:generic-candidates (car ast) (length (cdr ast)))
-                        (xtc:infer:global-candidates (car ast)))))
-         (if cands
-             (xtc:infer:collect-global-call ast cands bound)
-             (xtc:diagnostics:print-compiler-error
-              (string-append "xtc:infer: unhandled call --- deferred (generic) or unknown symbol: "
-                             (sexpr->string ast))))))
+       ;; a genericfunc carrying a free-return fallback (first/second's [!a,!b]*)
+       ;; is routed through collect-generic-call, which reifies the fallback by
+       ;; projection when no specialisation matches.  Otherwise a genericfunc is
+       ;; resolved through its generic signatures FIRST: it may also carry compiled
+       ;; monomorphic instances (a polyfunc), but those cover only the types
+       ;; already specialised, whereas the generic reifies any argument type --- so
+       ;; prefer it, falling back to the plain global path.
+       (if (xtc:infer:generic-fallback-entry (car ast) (length (cdr ast)))
+           (xtc:infer:collect-generic-call ast bound)
+           (let ((cands (or (xtc:infer:generic-candidates (car ast) (length (cdr ast)))
+                            (xtc:infer:global-candidates (car ast)))))
+             (if cands
+                 (xtc:infer:collect-global-call ast cands bound)
+                 (xtc:diagnostics:print-compiler-error
+                  (string-append "xtc:infer: unhandled call --- deferred (generic) or unknown symbol: "
+                                 (sexpr->string ast)))))))
       (else
        (xtc:diagnostics:print-compiler-error
         (string-append "xtc:infer: unhandled form (increment 2 covers a core subset): "
@@ -368,6 +377,173 @@
                                       (and (xtc:infer:sig-reifiable? sig) sig))))
                              entries))))
              (and (not (null? sigs)) sigs))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; free-return generics ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; A genericfunc may carry a fully-general FALLBACK specialisation whose return
+;; is free --- first/second's [!a,!b]*, body (tref a i) --- which the reifiable
+;; overload (generic-candidates) deliberately filters out, because the signature
+;; alone cannot reify its return (the return variable is bound nowhere in the
+;; parameters).  The old path handles such a call by "exercising the generic
+;; code": it type-checks the body with the parameters pinned to the concrete
+;; argument types, reading the return off the result.  We do the same, but
+;; structurally: when no reifiable specialisation matches the (resolved) argument
+;; types, we reify the fallback by PROJECTING its body's field access against the
+;; concrete argument --- field i of the argument tuple, exactly what (tref a i)
+;; computes.  The argument types are obtained by a local solve of the argument
+;; sub-expressions; a non-ground argument (one referring to an outer variable not
+;; bound here) leaves the body unexercisable, so it is deferred to the lazy
+;; overload (where, in increment 3, an expected return type will direct it).
+
+;; All unconstrained generic entries for `sym' at `arity', each as (sig . body)
+;; --- the candidate signature paired with its raw source lambda (lambda (p...)
+;; expr), which projection reads to learn which field the fallback returns.
+(define xtc:infer:generic-entries
+  (lambda (sym arity)
+    (let* ((base (xtc:codegen:get-base-type (symbol->string sym)))
+           (entries (hashtable-ref *xtc:cache:genericfunc-cache* base)))
+      (and entries
+           (cl:remove
+            #f
+            (map (lambda (e)
+                   (and (= (cadr e) arity)
+                        (not (list-ref e 5))
+                        (cons (xtc:infer:pretty-sig->candidate
+                               (symbol->string (caddr e)))
+                              (caddr (cadddr e)))))
+                 entries))))))
+
+;; The free-return fallback entry (sig . body) for `sym' at `arity', or #f ---
+;; the one whose signature is not return-reifiable (see sig-reifiable?).
+(define xtc:infer:generic-fallback-entry
+  (lambda (sym arity)
+    (let ((es (xtc:infer:generic-entries sym arity)))
+      (and es (cl:find-if (lambda (e) (not (xtc:infer:sig-reifiable? (car e)))) es)))))
+
+;; Solve a sub-expression's constraints in isolation and return its resolved
+;; canonical TERM, or #f if it does not fully determine (a conflict, or a residual
+;; variable --- e.g. the sub-expression refers to an outer program variable).
+(define xtc:infer:resolve-subterm
+  (lambda (key constraints)
+    (let* ((intern (make-hashtable))
+           (subst (xtc:solve:run constraints intern)))
+      (if (eq? subst 'conflict)
+          #f
+          (let ((term (xtc:type:apply-subst
+                       (xtc:type:from-intcode key intern) subst)))
+            (if (pair? (xtc:type:free-vars term)) #f term))))))
+
+;; Does candidate signature `sig' (ret p...) accept the concrete argument terms?
+;; Its parameters are freshened through a per-signature intern so its bang
+;; variables instantiate independently, then unified with the arguments.
+(define xtc:infer:spec-matches?
+  (lambda (sig argterms)
+    (let ((fresh (make-hashtable)))
+      (let loop ((ps (cdr sig)) (as argterms) (s xtc:type:empty-subst))
+        (cond ((null? ps) (null? as))
+              ((null? as) #f)
+              (else
+               (let ((s2 (xtc:type:unify (xtc:type:from-intcode (car ps) fresh)
+                                         (car as) s)))
+                 (and s2 (loop (cdr ps) (cdr as) s2)))))))))
+
+(define xtc:infer:any-spec-matches?
+  (lambda (specs argterms)
+    (and (cl:find-if (lambda (sig) (xtc:infer:spec-matches? sig argterms)) specs) #t)))
+
+;; The structural tuple int-code of a (deref'd) tuple-like term: an anonymous
+;; tuple is already structural, a named type and a nominal parametric instance
+;; are expanded through the existing registry helpers (the latter substituting
+;; its type arguments), so a field can be read off by index.
+(define xtc:infer:expand-to-tuple
+  (lambda (t)
+    (cond
+      ((xtc:type:napp? t)
+       (xtc:desugar:get-generic-type-as-tuple
+        (string-append (xtc:type:napp-name t) "{"
+                       (string-join (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
+                                         (xtc:type:napp-args t))
+                                    ",")
+                       "}")))
+      ((xtc:type:named? t)
+       (xtc:cache:get-namedtype-type (xtc:type:named-name t)))
+      ((xtc:type:tuple? t)
+       (xtc:type:to-intcode t))
+      (else #f))))
+
+;; Field `idx' of the tuple `argterm' points at (tref derefs the pointer first),
+;; as an int-code, or #f if the term is not a tuple or the index is out of range.
+(define xtc:infer:project-field
+  (lambda (argterm idx)
+    (let* ((t (if (xtc:type:ptr? argterm) (xtc:type:ptr-to argterm) argterm))
+           (tuple (xtc:infer:expand-to-tuple t)))
+      (and tuple
+           (xtc:codegen:tuple? tuple)
+           (> (length tuple) (+ 1 idx))
+           (list-ref tuple (+ 1 idx))))))
+
+;; A lambda parameter's name, dropping any :type annotation.
+(define xtc:infer:param-name
+  (lambda (p)
+    (string->symbol (car (string-split-on (symbol->string p) ":")))))
+
+(define xtc:infer:index-of
+  (lambda (x xs)
+    (let loop ((xs xs) (i 0))
+      (cond ((null? xs) #f)
+            ((eq? (car xs) x) i)
+            (else (loop (cdr xs) (+ i 1)))))))
+
+;; Reify a free-return fallback by exercising its body against the concrete
+;; argument terms.  The real fallbacks are field accessors --- (lambda (p...)
+;; (tref pj i)) --- so the return is field i of the tuple argument bound to pj;
+;; we project it directly.  A body of any other shape is not yet handled (a loud
+;; gap, returned as #f).
+(define xtc:infer:project-fallback
+  (lambda (body argterms)
+    (and (pair? body) (eq? (car body) 'lambda)
+         (let ((params (map xtc:infer:param-name (cadr body)))
+               (expr (caddr body)))
+           (and (pair? expr) (member (car expr) '(tref tuple-ref))
+                (integer? (caddr expr))
+                (let ((pos (xtc:infer:index-of (xtc:infer:param-name (cadr expr)) params)))
+                  (and pos (xtc:infer:project-field (list-ref argterms pos) (caddr expr)))))))))
+
+;; (g arg ...) with g a genericfunc carrying a free-return fallback.  We collect
+;; the arguments, resolve them to concrete types, and either route to the lazy
+;; reifiable overload (a specialisation matches, or an argument is non-ground) ---
+;; the fallback never shadows a matching specialisation --- or, when only the
+;; fallback applies, reify it by projecting its body's field against the
+;; arguments and pin the call's result to that concrete type.
+(define xtc:infer:collect-generic-call
+  (lambda (ast bound)
+    (let* ((sym (car ast))
+           (arity (length (cdr ast)))
+           (rcs (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast)))
+           (argcons (apply append (map cdr rcs)))
+           (argterms (map (lambda (rc) (xtc:infer:resolve-subterm (car rc) (cdr rc))) rcs))
+           (specs (xtc:infer:generic-candidates sym arity)))
+      (cond
+        ((or (member #f argterms)
+             (and specs (xtc:infer:any-spec-matches? specs argterms)))
+         (if specs
+             (let ((rk (xtc:infer:fresh-key)))
+               (cons rk (append argcons
+                                (list (xtc:solve:c-overload rk (map car rcs) specs)))))
+             (xtc:diagnostics:print-compiler-error
+              (string-append "xtc:infer: free-return generic with non-ground arguments --- deferred: "
+                             (sexpr->string ast)))))
+        (else
+         (let* ((fb (xtc:infer:generic-fallback-entry sym arity))
+                (proj (xtc:infer:project-fallback (cdr fb) argterms)))
+           (if proj
+               (let ((rk (xtc:infer:fresh-key)))
+                 (cons rk (append argcons (list (xtc:solve:c-eq rk proj)))))
+               (xtc:diagnostics:print-compiler-error
+                (string-append "xtc:infer: cannot reify free-return generic body --- deferred: "
+                               (sexpr->string ast))))))))))
 
 ;; (f arg ...) with f a global function: the call's type is a fresh result that,
 ;; with the argument types, must match exactly one of f's candidate signatures.
