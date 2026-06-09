@@ -199,6 +199,8 @@
       ((number? ast)
        (let ((k (xtc:infer:fresh-key)))
          (cons k (list (xtc:solve:c-default k (xtc:infer:float-class))))))
+      ;; a string literal is an i8* (a pointer to its bytes)
+      ((string? ast) (cons (+ *xtc:codegen:pointer* *xtc:codegen:si8*) '()))
       ;; a symbol denotes its own type variable
       ((symbol? ast) (cons ast '()))
       ;; desugared boolean literals are i1
@@ -241,6 +243,11 @@
        (xtc:infer:collect-aggregate-ref-ptr ast bound))
       ((and (pair? ast) (eq? (car ast) 'make-tuple))
        (xtc:infer:collect-make-tuple ast bound))
+      ((and (pair? ast) (eq? (car ast) 'while))     (xtc:infer:collect-while ast bound))
+      ((and (pair? ast) (eq? (car ast) 'dotimes))   (xtc:infer:collect-dotimes ast bound))
+      ((and (pair? ast) (member (car ast) '(bitcast bitconvert)))
+       (xtc:infer:collect-bitcast ast bound))
+      ((and (pair? ast) (eq? (car ast) 'printf))    (xtc:infer:collect-printf ast bound))
       ;; a local variable in call position is a closure call
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
@@ -743,6 +750,53 @@
     (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
       (cons (cons *xtc:codegen:tuple* (map car rcs))
             (apply append (map cdr rcs))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; control / misc      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (while cond body): the condition is i1, the body runs for effect; a while
+;; evaluates to void.
+(define xtc:infer:collect-while
+  (lambda (ast bound)
+    (let ((rc-c (xtc:infer:collect (cadr ast) bound))
+          (rc-b (xtc:infer:collect (caddr ast) bound)))
+      (cons *xtc:codegen:void*
+            (append (cdr rc-c) (cdr rc-b)
+                    (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)))))))
+
+;; (dotimes (i n) body): i is a loop counter the same type as the count n (the
+;; old check unifies the two), in scope for the body; the body runs for effect
+;; and the form is void.
+(define xtc:infer:collect-dotimes
+  (lambda (ast bound)
+    (let* ((spec (cadr ast))
+           (ivar (car spec))
+           (inner (cons ivar bound))
+           (rc-n (xtc:infer:collect (cadr spec) inner))
+           (rc-b (xtc:infer:collect (caddr ast) inner)))
+      (cons *xtc:codegen:void*
+            (append (cdr rc-n) (cdr rc-b)
+                    (list (xtc:solve:c-eq ivar (car rc-n))))))))
+
+;; (bitcast v T) / (bitconvert v T): a reinterpretation / numeric conversion whose
+;; result type is the explicit target T (a coercion is a deliberate type hole, so
+;; the operand does not constrain the result); we still collect the operand.  With
+;; no target the result is fixed by context, a fresh variable.
+(define xtc:infer:collect-bitcast
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (cadr ast) bound)))
+      (cons (if (null? (cddr ast))
+                (xtc:infer:fresh-key)
+                (xtc:codegen:convert-from-pretty-types (caddr ast)))
+            (cdr rc)))))
+
+;; (printf fmt arg ...): returns i32; the format string and arguments are
+;; collected for their own constraints.
+(define xtc:infer:collect-printf
+  (lambda (ast bound)
+    (let ((rcs (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast))))
+      (cons *xtc:codegen:si32* (apply append (map cdr rcs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; driver              ;;

@@ -127,3 +127,23 @@
                 '() "fn-pointer-ref")
 (xtmtest-result (inferfn:disagreements 'tf_pset '(lambda (p:i64* x:i64) (pset! p 0 x)))
                 '() "fn-pointer-set")
+
+;; control / misc forms (stage 3b cont.): while, dotimes, string literal,
+;; numeric conversion, printf, closure application, array.
+(xtmtest-result (inferfn:disagreements 'tf_while
+                  '(lambda (n:i64) (let ((i:i64 0)) (while (< i n) (set! i (+ i 1))) i)))
+                '() "fn-while")
+;; (dotimes is validated by the live shadow, not here: the standalone prep does
+;; not register the dotimes loop counter the way the live pipeline does, so the
+;; OLD oracle itself errors on it --- a harness-fidelity gap, not a divergence.)
+(xtmtest-result (inferfn:disagreements 'tf_str '(lambda () "hello"))
+                '() "fn-string-literal")
+(xtmtest-result (inferfn:disagreements 'tf_conv '(lambda (x:i64) (convert x double)))
+                '() "fn-convert")
+(xtmtest-result (inferfn:disagreements 'tf_printf '(lambda (x:i64) (printf "%d" x)))
+                '() "fn-printf")
+(xtmtest-result (inferfn:disagreements 'tf_apply '(lambda (f:[i64,i64]* x:i64) (f x)))
+                '() "fn-closure-apply")
+(xtmtest-result (inferfn:disagreements 'tf_arr
+                  '(lambda (n:i64) (let ((a:|4,i64|* (salloc))) (aset! a 0 n) (aref a 0))))
+                '() "fn-array")
