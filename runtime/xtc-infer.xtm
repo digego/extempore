@@ -121,8 +121,17 @@
           *xtc:codegen:si8*  *xtc:codegen:ui8*
           *xtc:codegen:i1*   *xtc:codegen:char*)))
 
+;; The binary arithmetic / bitwise operators (+ - * / % modulo bitwise-*): each is
+;; an overloaded call whose operands share a numeric width.  Only the five
+;; arithmetic ones carry a user xtm_ overload (for tuple operands); modulo and the
+;; bitwise ops range over the integer widths alone.
 (define xtc:infer:math-op?
-  (lambda (s) (and (member s '(+ - * / %)) #t)))
+  (lambda (s) (and (member s *xtc:globals:mathbinaryaritylist*) #t)))
+
+;; The unary/binary/ternary real-valued math intrinsics (sqrt sin pow fma ...):
+;; every argument and the result share one (real) type.
+(define xtc:infer:math-intrinsic?
+  (lambda (s) (and (member s *xtc:globals:mathintrinsicslist*) #t)))
 
 (define xtc:infer:compare-op?
   (lambda (s) (and (member s '(< > = <>)) #t)))
@@ -247,7 +256,10 @@
       ((and (pair? ast) (eq? (car ast) 'dotimes))   (xtc:infer:collect-dotimes ast bound))
       ((and (pair? ast) (member (car ast) '(bitcast bitconvert)))
        (xtc:infer:collect-bitcast ast bound))
-      ((and (pair? ast) (eq? (car ast) 'printf))    (xtc:infer:collect-printf ast bound))
+      ((and (pair? ast) (member (car ast) '(printf sprintf fprintf sscanf fscanf)))
+       (xtc:infer:collect-printf ast bound))
+      ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-intrinsic? (car ast)))
+       (xtc:infer:collect-math-intrinsic ast bound))
       ;; a local variable in call position is a closure call
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
@@ -791,12 +803,24 @@
                 (xtc:codegen:convert-from-pretty-types (caddr ast)))
             (cdr rc)))))
 
-;; (printf fmt arg ...): returns i32; the format string and arguments are
-;; collected for their own constraints.
+;; (printf fmt arg ...) and the sprintf / fprintf / sscanf / fscanf family: each
+;; returns i32; the format string and arguments are collected for their own
+;; constraints.
 (define xtc:infer:collect-printf
   (lambda (ast bound)
     (let ((rcs (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast))))
       (cons *xtc:codegen:si32* (apply append (map cdr rcs))))))
+
+;; (sqrt x) / (pow x y) / (fma x y z) ...: a real-valued intrinsic whose result
+;; and every argument are the one type --- so the arguments unify with the first,
+;; whose type is the result.
+(define xtc:infer:collect-math-intrinsic
+  (lambda (ast bound)
+    (let ((rcs (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast))))
+      (cons (car (car rcs))
+            (append (apply append (map cdr rcs))
+                    (map (lambda (rc) (xtc:solve:c-eq (car (car rcs)) (car rc)))
+                         (cdr rcs)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; driver              ;;
