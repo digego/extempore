@@ -245,7 +245,7 @@
         (let ((types (xtc:typecheck:vars-ref vars sym)))
           (if (not types)
               (if (xtc:cache:globalvar-exists? (symbol->string sym))
-                  (cons sym (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type (symbol->string sym))))
+                  (cons sym (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string sym))))
                   (xtc:diagnostics:print-missing-identifier-error sym 'variable))
               (cons sym types))))))
 
@@ -339,7 +339,7 @@
     (if (string? t)
         (let ((t (xtc:cache:get-namedtype-type t))
               (ptr-level (xtc:codegen:get-ptr-depth t)))
-          (dotimes (i ptr-level) (set! t (xtc:codegen:pointer++ t)))
+          (dotimes (i ptr-level) (set! t (xtc:codegen:add-ptr-depth t)))
           (list t))
         (if (symbol? t)
             (let ((types (xtc:typecheck:vars-ref vars t)))
@@ -457,7 +457,7 @@
 ;;                                     (hashtable-ref vars ast)
 ;;                                     (if (xtc:cache:closure-exists? (symbol->string ast))
 ;;                                         (list (cons (+ *xtc:codegen:closure* *xtc:codegen:pointer* *xtc:codegen:pointer*) (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types (symbol->string ast)))))
-;;                                         (list (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type (symbol->string ast)))))))))
+;;                                         (list (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string ast)))))))))
 ;;                   ;; (println '---------- (member ast kts) 'type: type (xtc:codegen:type? type))
 ;;                   (if (and expected
 ;;                            (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
@@ -495,7 +495,7 @@
                       #t))
                  (tc-result (list (xtc:desugar:type-unify (xtc:typecheck:vars-ref vars ast) vars)) vars))
                 ((xtc:cache:globalvar-exists? ast-str)
-                 (tc-result (list (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type ast-str))) vars))
+                 (tc-result (list (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type ast-str))) vars))
                 ((xtc:cache:nativefunc-exists? ast-str)
                  (tc-result (list (xtc:cache:get-nativefunc-type ast-str)) vars))
                 ((xtc:cache:closure-exists? ast-str)
@@ -547,7 +547,7 @@
                                          (xtc:typecheck:vars-ref vars ast)
                                          (if (xtc:cache:closure-exists? ast-str)
                                              (list (cons (+ *xtc:codegen:closure* *xtc:codegen:pointer* *xtc:codegen:pointer*) (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types ast-str))))
-                                             (list (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type ast-str))))))))
+                                             (list (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type ast-str))))))))
                        (if (and expected
                                 (not (member ast kts))
                                 (not (null? expected)))
@@ -642,15 +642,15 @@
                            (xtc:codegen:type? t)
                            (xtc:codegen:vector? t) ;; we want to do this because these vectors are always stack allocated
                            (xtc:codegen:pointer? t)) ;; also these vectors are immutable (i.e. cannot use vector-set!)
-                      (xtc:codegen:pointer-- t)
+                      (xtc:codegen:strip-ptr-depth t)
                       t)
                   vars))
           (cond ((xtc:codegen:vector? a)
                  (if (symbol? (cadr ast)) (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts a)))
-                 (tc-result (if (xtc:codegen:pointer? a) (xtc:codegen:pointer-- a) a) vars))
+                 (tc-result (if (xtc:codegen:pointer? a) (xtc:codegen:strip-ptr-depth a) a) vars))
                 ((xtc:codegen:vector? b)
                  (if (symbol? (caddr ast)) (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts b)))
-                 (tc-result (if (xtc:codegen:pointer? b) (xtc:codegen:pointer-- b) b) vars))
+                 (tc-result (if (xtc:codegen:pointer? b) (xtc:codegen:strip-ptr-depth b) b) vars))
                 ((not (cl:find-if symbol? (cdr ast))) (tc-result t vars)) ;; return t
                 ((and (symbol? (cadr ast))
                       (symbol? (caddr ast))
@@ -758,11 +758,11 @@
                   vars))
           (cond ((xtc:codegen:vector? a)
                  (if (symbol? (cadr ast)) (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts a)))
-                 (let ((retvec (if (xtc:codegen:pointer? a) (xtc:codegen:pointer-- a) a)))
+                 (let ((retvec (if (xtc:codegen:pointer? a) (xtc:codegen:strip-ptr-depth a) a)))
                    (tc-result (list (car retvec) (cadr retvec) *xtc:codegen:i1*) vars)))
                 ((xtc:codegen:vector? b)
                  (if (symbol? (caddr ast)) (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts b)))
-                 (let ((retvec (if (xtc:codegen:pointer? b) (xtc:codegen:pointer-- b) b)))
+                 (let ((retvec (if (xtc:codegen:pointer? b) (xtc:codegen:strip-ptr-depth b) b)))
                    (tc-result (list (car retvec) (cadr retvec) *xtc:codegen:i1*) vars)))
                 ;; ((or (and (xtc:codegen:tuple? a) (not (xtc:codegen:pointer? a)))
                 ;;      (and (xtc:codegen:tuple? b) (not (xtc:codegen:pointer? b))))
@@ -1732,9 +1732,9 @@
 ;;                                                      (not (xtc:codegen:type? aa)))
 ;;                                                 aa
 ;;                                                 (if (string? aa)
-;;                                                     (xtc:codegen:pointer++ aa aptrdepth)
+;;                                                     (xtc:codegen:add-ptr-depth aa aptrdepth)
 ;;                                                     (xtc:codegen:pretty-print-type aa)))
-;;                                             (xtc:codegen:pointer++ bb ptrdepth)
+;;                                             (xtc:codegen:add-ptr-depth bb ptrdepth)
 ;;                                             (car (regex:type-split (symbol->string (car ast)) "##")))))))))
 ;;                     (cdr ast)
 ;;                     (cddr gpoly-type))
@@ -2376,7 +2376,7 @@ xtlang's `let' syntax is the same as Scheme"
               ;; else the return value is not a symbol
               ;; and we should use it's value to update the lambda's type
               (set! vars (xtc:typecheck:vars-update (car sym) vars kts
-                                  (list (xtc:codegen:pointer++ (xtc:codegen:pointer++ (list* *xtc:codegen:closure* a (cddr t)))))))))
+                                  (list (xtc:codegen:add-ptr-depth (xtc:codegen:add-ptr-depth (list* *xtc:codegen:closure* a (cddr t)))))))))
       ;; (println 'ret: a)
       (tc-result a vars))))
 
@@ -2501,7 +2501,7 @@ xtlang's `let' syntax is the same as Scheme"
           (if (or (not (xtc:codegen:array? (car a)))
                   (> (xtc:codegen:get-ptr-depth (car a)) 1))
               (xtc:diagnostics:print-bad-type-error (xtc:codegen:get-type-str (car a)))
-              (list (xtc:codegen:pointer++ (caddr (car a))))))
+              (list (xtc:codegen:add-ptr-depth (caddr (car a))))))
       vars))))
 
 
@@ -2579,7 +2579,7 @@ xtlang's `let' syntax is the same as Scheme"
       (if (xtc:codegen:type? a) (set! a (list a)))
       (tc-result
       (if (xtc:codegen:pointer? (car a))
-          (xtc:codegen:pointer-- (car a))
+          (xtc:codegen:strip-ptr-depth (car a))
           (car a))
       vars))))
 
@@ -2595,15 +2595,15 @@ xtlang's `let' syntax is the same as Scheme"
            ;; c should be of type *a
            (c (xtc:typecheck:type-check (cadddr ast) vars kts (if (null? a) #f
                                                             (if (atom? a)
-                                                                (list (xtc:codegen:pointer-- a))
-                                                                (list (xtc:codegen:pointer-- (car a))))))))
+                                                                (list (xtc:codegen:strip-ptr-depth a))
+                                                                (list (xtc:codegen:strip-ptr-depth (car a))))))))
       ;; try running type check on a if C exists! but a does not
       (if (and (null? a)
                (not (null? c)))
            (begin ;; (println 'bingo c)
              (if (atom? c) (set! c (list c)))
             (set! a (xtc:typecheck:type-check (cadr ast) vars kts
-                                        (map (lambda (k) (xtc:codegen:pointer++ k))
+                                        (map (lambda (k) (xtc:codegen:add-ptr-depth k))
                                              (cl:remove-if-not xtc:codegen:type? c))))))
 
       (if (not (null? a))
@@ -2619,7 +2619,7 @@ xtlang's `let' syntax is the same as Scheme"
                (xtc:codegen:type? c))
           (if (string? c)
               (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts (string-append c "*")))
-              (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts (xtc:codegen:pointer++ c)))))
+              (set! vars (xtc:typecheck:vars-update (cadr ast) vars kts (xtc:codegen:add-ptr-depth c)))))
       ;; array set check will return the type of the value set
       (tc-result c vars))))
 
@@ -2650,7 +2650,7 @@ xtlang's `let' syntax is the same as Scheme"
         (xtc:diagnostics:print-bad-arity-error ast))
     (if (or (xtc:codegen:type? expected) (atom? expected)) (set! expected (list expected)))
     (let ((a (xtc:typecheck:type-check (cadr ast) vars kts ;; '())) ;expected))
-                                 (map (lambda (k) (xtc:codegen:pointer++ k))
+                                 (map (lambda (k) (xtc:codegen:add-ptr-depth k))
                                       (cl:remove-if-not xtc:codegen:type? expected))))
           ;; b should be fixed point
           (b (xtc:typecheck:type-check (caddr ast) vars kts (list *xtc:codegen:si64* *xtc:codegen:si32*))))
@@ -2662,7 +2662,7 @@ xtlang's `let' syntax is the same as Scheme"
       (tc-result
       (if (null? a)
           a
-          (list (xtc:codegen:pointer-- (car a))))
+          (list (xtc:codegen:strip-ptr-depth (car a))))
       vars))))
 
 
@@ -2735,7 +2735,7 @@ xtlang's `let' syntax is the same as Scheme"
   (lambda (ast vars kts expected)
     (if (not (xtc:typecheck:vars-ref vars (cadr ast)))
         (xtc:diagnostics:print-compiler-error "no valid local variable found in call to ref" ast))
-    (tc-result (list (xtc:codegen:pointer++ (car (xtc:typecheck:vars-ref vars (cadr ast))))) vars)))
+    (tc-result (list (xtc:codegen:add-ptr-depth (car (xtc:typecheck:vars-ref vars (cadr ast))))) vars)))
 
 (define xtc:typecheck:make-tuple-check
   (lambda (ast vars kts expected)
@@ -2763,7 +2763,7 @@ xtlang's `let' syntax is the same as Scheme"
                     (if (and (string? (car res))
                              (char=? (string-ref (car res) 0) #\%))
                         (let ((t (xtc:cache:get-namedtype-type (xtc:codegen:get-base-type (car res)))))
-                          (dotimes (i (xtc:codegen:get-ptr-depth (car res))) (set! t (xtc:codegen:pointer++ t)))
+                          (dotimes (i (xtc:codegen:get-ptr-depth (car res))) (set! t (xtc:codegen:add-ptr-depth t)))
                           (list t))
                         res))))
            ;; b should be 32bit fixed point type -- llvm structs only support 32bit indexes
@@ -2829,7 +2829,7 @@ xtlang's `let' syntax is the same as Scheme"
       (if (and (not (null? a))
                (list? a)
                (xtc:codegen:tuple? (car a)))
-          (list (xtc:codegen:pointer++ (list-ref (car a) (+ 1 (caddr ast)))))
+          (list (xtc:codegen:add-ptr-depth (list-ref (car a) (+ 1 (caddr ast)))))
           ;;'()))))
           (tc-result
           (if (null? a)
@@ -2937,7 +2937,7 @@ xtlang's `let' syntax is the same as Scheme"
                   #t ; // yes (cadr ast) is a globally defined closure or single-candidate polyfunc
                   (xtc:typecheck:type-check (cadr ast) vars kts #f))) ;; do NOT check against request!
            ;; b should be a string (the var's name)
-           (b (xtc:typecheck:type-check (caddr ast) vars kts (xtc:codegen:pointer++ (list *xtc:codegen:si8*)))))
+           (b (xtc:typecheck:type-check (caddr ast) vars kts (xtc:codegen:add-ptr-depth (list *xtc:codegen:si8*)))))
       (tc-result
       (if (null? (cadddr ast))
           (if expected
@@ -2993,7 +2993,7 @@ xtlang's `let' syntax is the same as Scheme"
       (tc-result
        (if (and (xtc:codegen:type? a)
                 (xtc:codegen:pointer? a))
-           (xtc:codegen:pointer-- a)
+           (xtc:codegen:strip-ptr-depth a)
            (xtc:diagnostics:print-bad-type-error a "pref needs a pointer argument"))
        vars))))
 
@@ -3008,7 +3008,7 @@ xtlang's `let' syntax is the same as Scheme"
       (tc-result
        (if (and (xtc:codegen:type? a)
                 (xtc:codegen:pointer? a))
-           (xtc:codegen:pointer++ a)
+           (xtc:codegen:add-ptr-depth a)
            (xtc:diagnostics:print-bad-type-error a "pref needs a pointer argument"))
        vars))))
 
@@ -3080,7 +3080,7 @@ xtlang's `let' syntax is the same as Scheme"
            (ast:lambda-body ast)))
       ;; return lambda type which is made up of
       ;; argument symbols plus return type from last body expression
-      (let* ((ret (list (xtc:codegen:pointer++ (list* *xtc:codegen:closure* res (ast:lambda-params ast)) 2)))
+      (let* ((ret (list (xtc:codegen:add-ptr-depth (list* *xtc:codegen:closure* res (ast:lambda-params ast)) 2)))
              (uret (xtc:desugar:type-unify ret vars)))
         (if (not (null? uret))
             (for-each (lambda (sym req)
@@ -3157,7 +3157,7 @@ xtlang's `let' syntax is the same as Scheme"
       (if *xtc:globals:print-sub-checks* (println 'closure:> 'ast: ast 'res: res 'ret: ret))
       (if (xtc:typecheck:vars-ref vars (car ast))
           (set! vars (xtc:typecheck:vars-update (car ast) vars kts
-                              (list (xtc:codegen:pointer++ (list* *xtc:codegen:closure* ret res) 2)))))
+                              (list (xtc:codegen:add-ptr-depth (list* *xtc:codegen:closure* ret res) 2)))))
       (tc-result (if (list? ret) ret
                      (list ret)) vars))))
 
@@ -3292,7 +3292,7 @@ xtlang's `let' syntax is the same as Scheme"
 (define xtc:typecheck:carcdr-check
   (lambda (ast vars kts expected)
     ;; check that we are getter a pair as an argument
-    (xtc:typecheck:type-check (cadr ast) vars kts (list (xtc:codegen:pointer++ *xtc:codegen:pair*)))
+    (xtc:typecheck:type-check (cadr ast) vars kts (list (xtc:codegen:add-ptr-depth *xtc:codegen:pair*)))
     ;; don't do anything about return type yet
     (tc-result '() vars)))
 
@@ -4180,7 +4180,7 @@ xtlang's `let' syntax is the same as Scheme"
                                     (if (string? (xtc:codegen:get-type-from-pretty-str x))
                                         (xtc:codegen:get-type-from-pretty-str x)
                                         (if (regex:match? x (string-append "^" name "\\**"))
-                                            (xtc:codegen:pointer++ (string-append "%" basename)
+                                            (xtc:codegen:add-ptr-depth (string-append "%" basename)
                                                                (xtc:codegen:get-ptr-depth x))
                                             (xtc:codegen:get-type-from-pretty-str x))))
                                   t3b)))
@@ -4317,7 +4317,7 @@ xtlang's `let' syntax is the same as Scheme"
     (let* ((os (make-string 0))
            (n1 (substring n 1 (string-length n)))
            (name-str (xtc:codegen:make-const-string (string-append closure-name " Scheme wrapper error: check the arg arity and types\n")))
-           (name (xtc:codegen:gname)))
+           (name (xtc:codegen:ssa-temp)))
       (emit n "_bool = icmp ne i32 " n "_rt_check, 0\n" os)
       (emit "br i1 " n "_bool, label " n "_true, label " n "_false\n" os)
       (emit "\n" n1 "_true:\n" os)

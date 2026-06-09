@@ -154,8 +154,8 @@
                         (set! gtype (regex:replace-all gtype x y)))
                       gvars xvars)
             (if func?
-                (string->symbol (xtc:codegen:pointer++ (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
-                (string->symbol (xtc:codegen:pointer++ (string-append (car p) ":" gtype) ptrdepth))))))))
+                (string->symbol (xtc:codegen:add-ptr-depth (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
+                (string->symbol (xtc:codegen:add-ptr-depth (string-append (car p) ":" gtype) ptrdepth))))))))
 
 
 (define xtc:desugar:expand-generic-types
@@ -170,7 +170,7 @@
      (string-join
       (map (lambda (x)
              (if (string-contains? x ":")
-                 (xtc:codegen:pointer++ (car (regex:type-split x ":"))
+                 (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
                                     (xtc:codegen:get-ptr-depth x))
                  x))
            (xtc:codegen:get-pretty-closure-arg-strings pretty-type))
@@ -184,7 +184,7 @@
      (string-join
       (map (lambda (x)
              (if (string-contains? x ":")
-                 (xtc:codegen:pointer++ (car (regex:type-split x ":"))
+                 (xtc:codegen:add-ptr-depth (car (regex:type-split x ":"))
                                     (xtc:codegen:get-ptr-depth x))
                  x))
            (xtc:codegen:get-pretty-tuple-arg-strings pretty-type))
@@ -804,7 +804,7 @@ Continue executing `body' forms until `test-expression' returns #f"
         (let ((ptrdepth (xtc:codegen:get-ptr-depth (cadr p))))
           (xtc:bind:specialize-genericfunc (car p) (cadr p))
           (cons
-           (string->symbol (xtc:codegen:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
+           (string->symbol (xtc:codegen:add-ptr-depth (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
            (xtc:desugar:first-transform (cdr ast) inbody?))))
        ((xtc:cache:polyfunc-exists? (car p))
         (let* ((t (if (xtc:cache:typealias-exists? (cadr p))
@@ -906,7 +906,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (cadr ast)
                      (if etype
                          (string->symbol
-                          (xtc:codegen:pointer++ (string-append "%" (car p) "_poly_" etype)
+                          (xtc:codegen:add-ptr-depth (string-append "%" (car p) "_poly_" etype)
                                              ptrdepth))
                          (string->symbol (car p))))
                inbody?))))
@@ -1507,7 +1507,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                    (if (string? (xtc:codegen:get-type-from-pretty-str x))
                                                        (xtc:codegen:get-type-from-pretty-str x)
                                                        (if (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                           (xtc:codegen:pointer++ (string-append "%" newname) (xtc:codegen:get-ptr-depth x))
+                                                           (xtc:codegen:add-ptr-depth (string-append "%" newname) (xtc:codegen:get-ptr-depth x))
                                                            (xtc:codegen:get-type-from-pretty-str x))))
                                                  elements)))
                          (newtype3 (xtc:codegen:get-type-str newtype2)))
@@ -1531,7 +1531,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                 (callback (now) 'xtc:bind:compile-type-dataconstructors (string->symbol newname) newtype1 #f #t #t #t)
                                 'done)
                               (xtc:diagnostics:print-compiler-failed-error))))
-                    (let ((rettype (xtc:codegen:pointer++ (string-append "%" newname) ptrdepth)))
+                    (let ((rettype (xtc:codegen:add-ptr-depth (string-append "%" newname) ptrdepth)))
                       ;; (println 'oldvs: vs)
                       ;; (set! vs (string->symbol
                       ;;           (string-append base ":" gtype

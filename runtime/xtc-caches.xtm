@@ -162,7 +162,7 @@
     (if (string? namedtype-name)
         (let ((ptr-depth (xtc:codegen:get-ptr-depth namedtype-name))
               (namedtype-data (hashtable-ref *xtc:cache:namedtype-cache* (xtc:codegen:clean-named-type namedtype-name))))
-          (if namedtype-data (xtc:codegen:pointer++ (vector-ref namedtype-data 0) ptr-depth) #f))
+          (if namedtype-data (xtc:codegen:add-ptr-depth (vector-ref namedtype-data 0) ptr-depth) #f))
         #f)))
 
 (define xtc:cache:namedtype-exists?
@@ -217,7 +217,7 @@
     (if (string? typealias-name)
         (let ((ptr-depth (xtc:codegen:get-ptr-depth typealias-name))
               (typealias-data (hashtable-ref *xtc:cache:typealias-cache* (xtc:codegen:clean-named-type typealias-name))))
-          (if typealias-data (xtc:codegen:pointer++ (vector-ref typealias-data 0) ptr-depth) #f))
+          (if typealias-data (xtc:codegen:add-ptr-depth (vector-ref typealias-data 0) ptr-depth) #f))
         #f)))
 
 ;; as above but returns pretty type
@@ -226,7 +226,7 @@
     (if (string? typealias-name)
         (let ((ptr-depth (xtc:codegen:get-ptr-depth typealias-name))
               (typealias-data (hashtable-ref *xtc:cache:typealias-cache* (xtc:codegen:clean-named-type typealias-name))))
-          (if typealias-data (xtc:codegen:pretty-print-type (xtc:codegen:pointer++ (vector-ref typealias-data 0) ptr-depth))
+          (if typealias-data (xtc:codegen:pretty-print-type (xtc:codegen:add-ptr-depth (vector-ref typealias-data 0) ptr-depth))
               #f))
         #f)))
 
@@ -1192,12 +1192,12 @@
 (define-macro (remove-func name type)
   `(xtc:cache:remove-polyfunc-candidate
     ,(symbol->string name)
-    ',(xtc:codegen:pointer++ (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
+    ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
 
 (define-macro (unique-func name type)
   `(xtc:cache:unique-polyfunc-candidate
     ,(symbol->string name)
-    ',(xtc:codegen:pointer++ (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
+    ',(xtc:codegen:add-ptr-depth (xtc:codegen:get-type-from-pretty-str (xtc:codegen:get-base-type (symbol->string type))))))
 
 (define-macro (clear-session)
   (hashtable-clear! *xtc:cache:polyfunc-cache*))
@@ -1844,7 +1844,7 @@
 (define xtc:cache:register-new-globalvar
   (lambda (globalvar-name type docstring)
     (if (xtc:cache:globalvar-exists? globalvar-name)
-        (xtc:diagnostics:print-already-bound-error (string->symbol globalvar-name) (xtc:codegen:pretty-print-type (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type globalvar-name))))
+        (xtc:diagnostics:print-already-bound-error (string->symbol globalvar-name) (xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type globalvar-name))))
         ;; check arg types
         (if (not (and (or (string? globalvar-name) (begin (println 'bad 'globalvar-name: globalvar-name) #f))
                       (or (list? type)
@@ -1859,7 +1859,7 @@
             ;; return type "i64*"), so we increment the
             ;; "pointerlyness" by one level here to mimic this
             ;; behaviour
-            (hashtable-set! *xtc:cache:globalvar-cache* globalvar-name (vector (xtc:codegen:pointer++ type) docstring))))))
+            (hashtable-set! *xtc:cache:globalvar-cache* globalvar-name (vector (xtc:codegen:add-ptr-depth type) docstring))))))
 
 (define xtc:cache:get-globalvar-docstring
   (lambda (globalvar-name)

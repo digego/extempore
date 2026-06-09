@@ -22,7 +22,7 @@
     (if (atom? ast)
         (if (and (symbol? ast)
                  (xtc:cache:globalvar-exists? (symbol->string ast)))
-            (cons ast (string->symbol (xtc:codegen:pretty-print-type (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type (symbol->string ast))))))
+            (cons ast (string->symbol (xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string ast))))))
             #f)
         (if (pair? ast)
             (list (xtc:bind:get-global-var-types (car ast))
@@ -34,7 +34,7 @@
   (lambda (symname-string closure-type)
     (let* ((stub-type (xtc:codegen:get-closure-type-from-str closure-type))
            (scheme-stub-valid? #t)
-          (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:pointer-- (xtc:codegen:get-type-from-str closure-type))))
+          (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
           (ir (string-append "define dllexport ccc i8* "
           " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
           "{\nentry:\n"
@@ -335,7 +335,7 @@
       ;;
       ;; now compile ir to x86 and make stub code
       (if static ;; static function or normal closure?
-          (let* ((closure-type (cadr (xtc:codegen:gname)))
+          (let* ((closure-type (cadr (xtc:codegen:ssa-temp)))
                  ;; compile scheme_ir specifically for static functions
                  (scheme_ir (make_static_scheme_wrapper_ir (symbol->string symname) closure-type)))
             (xtc:cache:register-new-nativefunc (symbol->string symname) (xtc:codegen:get-type-from-str closure-type) "" '())
@@ -364,8 +364,8 @@
                       symname ;(string->symbol (car (regex:split symname-string "_adhoc_")))
                       (xtc:codegen:pretty-print-type closure-type)
                       0 "[static]"))
-          (let* ((closure-type (cadr (xtc:codegen:gname))) ;; normal closure
-             (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:pointer-- (xtc:codegen:get-type-from-str closure-type))))
+          (let* ((closure-type (cadr (xtc:codegen:ssa-temp))) ;; normal closure
+             (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
              ;; Check if closure has a type. If not, this is first compilation and we need stubs.
              (compile-stub? (or (not (xtc:cache:closure-exists? symname-string))
                                 (null? (xtc:cache:get-closure-type symname-string))))
@@ -406,9 +406,9 @@
                                        "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
                                        "store i8* %_impz, i8** %oldzone1\n"
                                         ; existing code
-                                       "%closure = call ccc " (cadr (xtc:codegen:gname))
+                                       "%closure = call ccc " (cadr (xtc:codegen:ssa-temp))
                                        " @" symname-string "_maker" "(i8* %_impz)\n"
-                                       "%ptr = bitcast " (cadr (xtc:codegen:gname)) " %closure to i8*\n"
+                                       "%ptr = bitcast " (cadr (xtc:codegen:ssa-temp)) " %closure to i8*\n"
                                        "%varptr = bitcast [1 x i8*]* @" symname-string "_var to i8**\n"
                                        "store i8* %ptr, i8** %varptr\n"
                                        ;; new code
@@ -441,7 +441,7 @@
                                                                                           "%fstruct = select i1 true, i8* %dat, i8* %dat\n"
                                                                                           (string-append "%fstruct = bitcast i8* %dat to " cb-struct-type "\n"))
                                                                                       (apply string-append (map (lambda (n t ap a)
-                                                                                                                  (string-append ap " = getelementptr " (xtc:codegen:pointer-- cb-struct-type) ", " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
+                                                                                                                  (string-append ap " = getelementptr " (xtc:codegen:strip-ptr-depth cb-struct-type) ", " cb-struct-type " %fstruct, i32 0, i32 " (number->string n) "\n"
                                                                                                                                  a " = load " (xtc:codegen:get-type-str t) ", " (xtc:codegen:get-type-str t) "* " ap "\n"))
                                                                                                                 (make-list-with-proc (- (length stub-type) 1) (lambda (i) i)) ;(+ i 1)))
                                                                                                                 (cdr stub-type)
@@ -458,8 +458,8 @@
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"
                                                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
                                                                                       "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                                                      "%fPtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                                      "%ePtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                                      "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                                      "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                                                       "%ff = load "
                                                                                       (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                                                       (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
@@ -557,8 +557,8 @@
                                                                 "%ptrvar = load i8*, i8** %ptr\n"
                                                                 "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
                                                                 "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                                "%fPtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                                "%ePtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                                "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                                "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                                 "%ff = load "
                                                                 (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                                 (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
@@ -621,8 +621,8 @@
                                                          "%ptrvar = load i8*, i8** %ptr\n"
                                                          "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
                                                          "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                         "%fPtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                         "%ePtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                         "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                         "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                          "%ff = load "
                                                          (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                          (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
@@ -657,8 +657,8 @@
                                                            "%ptrvar = load i8*, i8** %ptr\n"
                                                            "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
                                                            "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                           "%fPtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                           "%ePtr = getelementptr " (xtc:codegen:pointer-- closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                                                           "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                                                           "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
                                                            "%ff = load "
                                                            (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
                                                            (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
@@ -849,7 +849,7 @@
                    ;; i.e. expand list* into list:<!a,list*>*
                    (expand-polys (map (lambda (k)
                                         (if (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
-                                            (xtc:codegen:pointer++
+                                            (xtc:codegen:add-ptr-depth
                                              (string-append (xtc:codegen:get-base-type k) ":"
                                                             (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
                                              (xtc:codegen:get-ptr-depth k))
@@ -943,7 +943,7 @@
                    ;; i.e. expand list* into list:<!a,list*>*
                    (expand-polys (map (lambda (k)
                                         (if (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
-                                            (xtc:codegen:pointer++
+                                            (xtc:codegen:add-ptr-depth
                                              (string-append (xtc:codegen:get-base-type k) ":"
                                                             (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
                                              (xtc:codegen:get-ptr-depth k))
@@ -1191,7 +1191,7 @@
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
                                                (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
                                                  (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
-                                                         ,(xtc:codegen:get-type-size (xtc:codegen:pointer-- a)))
+                                                         ,(xtc:codegen:get-type-size (xtc:codegen:strip-ptr-depth a)))
                                                  (tset! obj ,b newptr))
                                                (tset! obj ,b (tref x ,c)))
                                           `(begin
@@ -1341,7 +1341,7 @@
               (expand-polys (map (lambda (k)
                                    (if (and (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
                                             (not (equal? (xtc:codegen:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                       (xtc:codegen:pointer++
+                                       (xtc:codegen:add-ptr-depth
                                         (string-append (xtc:codegen:get-base-type k) ":"
                                                        (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
                                         (xtc:codegen:get-ptr-depth k))
@@ -1430,7 +1430,7 @@
     ;; will construct it if it doesn't yet exist
     (if (string? t) (xtc:codegen:get-type-from-pretty-str t))
     (cond (oldt
-           `(xtc:diagnostics:print-already-bound-error ',symbol ,(xtc:codegen:pretty-print-type (xtc:codegen:pointer-- oldt))))
+           `(xtc:diagnostics:print-already-bound-error ',symbol ,(xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth oldt))))
           ;; string literal
           (string-literal?
            `(begin
@@ -2377,7 +2377,7 @@ e.g.
      (cons 'name (symbol->string name-sym))
      (list 'args)
      ;; rememeber that global vars need to be "depointerised" by one level
-     (cons 'type (xtc:codegen:pretty-print-type (xtc:codegen:pointer-- (xtc:cache:get-globalvar-type (symbol->string name-sym)))))
+     (cons 'type (xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string name-sym)))))
      (cons 'docstring
            (let ((docstring (xtc:cache:get-globalvar-docstring (symbol->string name-sym))))
              (if (string=? docstring "") '() docstring))))))
@@ -2735,7 +2735,7 @@ e.g.
 ;;     (let* ((nt (xtc:cache:get-named-type (xtc:codegen:get-base-type (xtc:codegen:clean-named-type a))))
 ;;            (bt (xtc:codegen:get-base-type (xtc:codegen:clean-named-type a)))
 ;;            (ptrdepth (xtc:codegen:get-ptr-depth a))
-;;            (strtype (xtc:codegen:pointer++ nt ptrdepth)))
+;;            (strtype (xtc:codegen:add-ptr-depth nt ptrdepth)))
 ;;       ;; (println 'bt bt 'ptrdepth ptrdepth 'nt nt 'strtype strtype)
 ;;       (apply string-append bt (make-list ptrdepth "*")))))
 
@@ -2748,7 +2748,7 @@ e.g.
 (define reduce-ptrdepth-to-zero
   (lambda (t)
     (if (> (xtc:codegen:get-ptr-depth t) 0)
-        (reduce-ptrdepth-to-zero (xtc:codegen:pointer-- t))
+        (reduce-ptrdepth-to-zero (xtc:codegen:strip-ptr-depth t))
         t)))
 
 (define t:named? (lambda (x y)
