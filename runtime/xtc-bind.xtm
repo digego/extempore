@@ -2052,18 +2052,6 @@ e.g.
 ;; they should succeed against *xtc:codegen:notype*
 ;;
 
-;; (define t:integer? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:fixed-point? x))))
-;; (define t:float? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:floating-point? x))))
-;; (define t:number? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:number? x))))
-;; (define t:void? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:void? x))))
-;; (define t:signed? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:signed? x))))
-;; (define t:closure? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:closure? x))))
-;; (define t:vector? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:vector? x))))
-;; (define t:array? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:array? x))))
-;; (define t:tuple? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:tuple? x))))
-;; (define t:scalar? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:scalar? x))))
-;; (define t:pointer? (lambda (x) (or (equal? x *xtc:codegen:notype*) (xtc:codegen:pointer? x))))
-;; (define t:notype? (lambda (x) (equal? x *xtc:codegen:notype*)))
 
 (define t:integer? (lambda (x) (if (string? x) (set! x (xtc:codegen:get-type-from-pretty-str x))) (xtc:codegen:fixed-point? x)))
 (define t:float? (lambda (x) (if (string? x) (set! x (xtc:codegen:get-type-from-pretty-str x))) (xtc:codegen:floating-point? x)))
@@ -2100,14 +2088,6 @@ e.g.
 
 ;; named type check strips pointers!
 ;; (you can use t:pointer? fo
-;; (define t:cleanup-string-type
-;;   (lambda (a)
-;;     (let* ((nt (xtc:cache:get-named-type (xtc:codegen:get-base-type (xtc:codegen:clean-named-type a))))
-;;            (bt (xtc:codegen:get-base-type (xtc:codegen:clean-named-type a)))
-;;            (ptrdepth (xtc:codegen:get-ptr-depth a))
-;;            (strtype (xtc:codegen:add-ptr-depth nt ptrdepth)))
-;;       ;; (println 'bt bt 'ptrdepth ptrdepth 'nt nt 'strtype strtype)
-;;       (apply string-append bt (make-list ptrdepth "*")))))
 
 (define t:cleanup-string-type
   (lambda (a)
@@ -2138,17 +2118,6 @@ e.g.
                                  #f)
                              (xtc:codegen:types-equal? x y))))))
 
-;; (define t:named? (lambda (x y)
-;;                    (if (or (t:notype? x) (t:notype? y))
-;;                        #t
-;;                        (begin
-;;                          (if (symbol? x) (set! x (symbol->string x)))
-;;                          (if (symbol? y) (set! y (symbol->string y)))
-;;                          (if (not (and (string? x) (string? y)))
-;;                              (xtc:diagnostics:print-compiler-error "poorly formed t:named? constraint args" (list x y)))
-;;                          (if (string=? (t:cleanup-string-type-b x) (t:cleanup-string-type-b y))
-;;                                  #t
-;;                                  #f)))))
 
 
 (define t:poly-exists?

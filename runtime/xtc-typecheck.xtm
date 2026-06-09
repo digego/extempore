@@ -390,93 +390,6 @@
             (list *xtc:codegen:fp64* *xtc:codegen:fp32*)))))
 
 
-;; IS NEW
-;; (define xtc:typecheck:symbol-check
-;;   (lambda (ast vars kts expected)
-;;     ;; (println 'symchk ast 'vars: vars 'req: expected)
-;;     (if (not (symbol? ast))
-;;         (xtc:diagnostics:print-compiler-error "Trying to symbol check a non-symbol" ast))
-;;     ;; (println 'symcheck 'ast: ast 'expected expected (xtc:codegen:get-base-type (symbol->string ast)))
-;;     (if (assoc-strcmp ast kts)
-;;         (list (hashtable-ref vars ast))
-;;         (if (and
-;;              (hashtable-ref vars ast)
-;;              (xtc:codegen:type? (xtc:desugar:type-unify (hashtable-ref vars ast) vars))
-;;              (if expected
-;;                  (equal? expected (xtc:desugar:type-unify (hashtable-ref vars ast) vars))
-;;                  #t))
-;;             (begin ;;(println '.................really-saving-time! 'ast ast 'res: (xtc:desugar:type-unify (hashtable-ref vars ast) vars) 'r expected)
-;;               (list (xtc:desugar:type-unify (hashtable-ref vars ast) vars)))
-;;             (begin
-;;               (if (and (symbol? ast)
-;;                        (xtc:cache:genericfunc-exists? (string->symbol (xtc:codegen:get-base-type (symbol->string ast)))))
-;;                   (begin
-;;                     (xtc:diagnostics:print-compiler-error "Try forcing a type? Ambiguous generic function as value" ast)))
-;;               (if (and (symbol? ast)
-;;                        (xtc:cache:polyfunc-exists? (xtc:codegen:get-base-type (symbol->string ast))))
-;;                   (let ((pt (xtc:cache:get-polyfunc-candidate-types (xtc:codegen:get-base-type (symbol->string ast)))))
-;;                     (cond ((and (> (length pt) 1)
-;;                                 (assoc expected pt))
-;;                            (if (hashtable-ref vars ast) (xtc:typecheck:update-var ast vars kts (list expected)))
-;;                            (set! ast (string->symbol (string-append (xtc:codegen:get-base-type (symbol->string ast))
-;;                                                                     ":" (xtc:codegen:pretty-print-type expected)))))
-;;                           ((= (length pt) 1)
-;;                            (if (hashtable-ref vars ast) (xtc:typecheck:update-var ast vars kts pt))
-;;                            (set! ast (string->symbol (string-append (xtc:codegen:get-base-type (symbol->string ast))
-;;                                                                     ":" (xtc:codegen:pretty-print-type (car pt))))))
-;;                           (else
-;;                            (xtc:diagnostics:print-compiler-error
-;;                             "Try forcing a type? Ambiguous polymorphic function as a value" ast)))))
-;;               (if *xtc:globals:print-sub-checks* (println 'sym:> 'ast: ast 'expected expected))
-;;               ;; if a request is made - assume it's forced
-;;               ;; find the intersection between the request
-;;               ;; and the current values and force that intersection
-;;               (let ((polytype #f))
-;;                 (if (and (not (hashtable-ref vars ast))
-;;                          (not (xtc:cache:closure-exists? (symbol->string ast)))
-;;                          (not (xtc:cache:globalvar-exists? (symbol->string ast))))
-;;                     (if (and (regex:match? (symbol->string ast) ":")
-;;                              (or (xtc:cache:genericfunc-exists?
-;;                                   (string->symbol (car (regex:type-split (symbol->string ast) ":"))))
-;;                                  (xtc:cache:polyfunc-exists? (car (regex:type-split (symbol->string ast) ":")))))
-;;                         (let* ((p (regex:type-split (symbol->string ast) ":"))
-;;                                (t (if (xtc:cache:typealias-exists? (cadr p))
-;;                                       (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-type (cadr p)))
-;;                                       (cadr p)))
-;;                                (etype (cname-encode (xtc:codegen:get-base-type t))))
-;;                           ;; (println 'ast: ast 'etype: etype)
-;;                           (begin
-;;                             (set! expected #f)
-;;                             (if (xtc:cache:polyfunc-exists? (car p))
-;;                                 (set! ast (string->symbol (string-append (car p) "_adhoc_" etype)))
-;;                                 (set! ast (string->symbol (string-append (car p) "_poly_" etype))))
-;;                             (set! polytype (xtc:codegen:get-type-from-pretty-str t))))
-;;                         (begin (xtc:diagnostics:print-missing-identifier-error ast 'symbol))))
-;;                 (let ((type (if polytype polytype
-;;                                 (if (hashtable-ref vars ast)
-;;                                     (hashtable-ref vars ast)
-;;                                     (if (xtc:cache:closure-exists? (symbol->string ast))
-;;                                         (list (cons (+ *xtc:codegen:closure* *xtc:codegen:pointer* *xtc:codegen:pointer*) (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types (symbol->string ast)))))
-;;                                         (list (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string ast)))))))))
-;;                   ;; (println '---------- (member ast kts) 'type: type (xtc:codegen:type? type))
-;;                   (if (and expected
-;;                            (not (member ast kts)) ;; if we're in KTS then we should ignore requests!
-;;                            (not (null? expected)))
-;;                       (if (null? type)
-;;                           (begin
-;;                             (xtc:typecheck:update-var ast vars kts (list expected))
-;;                             expected)
-;;                           (let ((intersection (xtc:desugar:type-unify (list expected type) vars)))
-;;                             ;; (println 'intersection intersection 'expected expected 'type: type 'ast: ast)
-;;                             (if (not (null? intersection))
-;;                                 (begin
-;;                                   ;; andrew change
-;;                                   (xtc:typecheck:force-var ast vars kts (list intersection))
-;;                                   ;;(xtc:typecheck:force-var ast vars kts (list expected)) ;(list intersection))
-;;                                   ;;(xtc:typecheck:update-var ast vars kts (list intersection))
-;;                                   (list intersection))
-;;                                 type)))
-;;                       type))))))))
 
 
 
@@ -1637,41 +1550,6 @@
 
 
 ;; generics check
-;; (define xtc:typecheck:nativef-generics
-;;   (lambda (ast vars kts expected)
-;;     (set! *xtc:typecheck:nativef-generics:calls* (+ *xtc:typecheck:nativef-generics:calls* 1))
-;;     ;; (println 'native: *xtc:typecheck:nativef-generics:calls* ast 'request: expected)
-;;     ;; (println 'generics-check (car ast) 'request: expected)
-;;     ;; (println 'vars: vars)
-;;     ;; (println 'genericf-in: (hashtable-ref vars (car ast)) 'expected)
-;;     (set! xtc:codegen:get-type-expand-poly #f)
-;;     (if (or (null? expected)
-;;             (and (list? expected)
-;;                  (equal? (car expected) *xtc:codegen:notype*)))
-;;         (set! expected #f))
-;;     ;; only check if not already fully formed!
-;;     (if (xtc:codegen:type? (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars))
-;;         (begin
-;;           (for-each (lambda (x r)
-;;                       (xtc:desugar:type-unify (xtc:typecheck:type-check x vars kts r) vars))
-;;                     (cdr ast)
-;;                     (cddr (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars)))
-;;           (list (cadr (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars))))
-;;         (let* ((args (map (lambda (x)
-;;                             (xtc:desugar:type-unify (xtc:typecheck:type-check x vars kts #f) vars))
-;;                           (cdr ast)))
-;;                ;; (llllll (println 'nargs: (car ast) ': args))
-;;                (gname (string->symbol (car (regex:split (symbol->string (car ast)) "##"))))
-;;                (gnum (string->number (cadr (regex:split (symbol->string (car ast)) "##"))))
-;;                (arity (- (length ast) 1))
-;;                (gpt (xtc:cache:genericfunc-types gname arity (if expected (cons expected args) args)))
-;;                ;; expected expected args)))
-;;                (gpoly-code (cadr gpt))
-;;                (lambda-code (caddr gpoly-code))
-;;                (gtype (xtc:codegen:get-type-from-pretty-str (symbol->string (car gpt))))
-;;                (gpoly-type (xtc:typecheck:get-type-for-gpoly
-;;                             (cadr (regex:type-split (symbol->string (cadr gpoly-code)) ":"))))
-;;                (gpoly-type-orig (xtc:typecheck:nativef-generics-make-gtypes-unique gpoly-type gnum)))
 
 ;;           ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;           ;; it is possible for some generic types to be missed from 'vars'
@@ -1935,44 +1813,6 @@
 
 
 
-;; (define xtc:typecheck:nativef-poly-check-valid-args
-;;   (lambda (ast vars kts expected ftypes valid-lgth)
-;;     (map (lambda (type valid)
-;;            ;; (println 'type: type 'valid: valid)
-;;            (if valid
-;;                (let* ((checked-types
-;;                        (map (lambda (a t)
-;;                               ;; (println 'a a 't t)
-;;                               ;; andrew's change here!
-;;                               (let ((t2 (xtc:desugar:type-unify
-;;                                          (xtc:typecheck:type-check a vars kts
-;;                                                              (if (xtc:codegen:type? t)
-;;                                                                  t
-;;                                                                  #f))
-;;                                          vars)))
-;;                                 ;; (println 'a: a 't: t 't2: t2)
-;;                                 t2))
-;;                             (cdr ast)
-;;                             (cddr type)))
-;;                       (ct2 (map (lambda (ct ft) ;; checked type against poly type
-;;                                   ;; (println 'ct: ct 'ft: ft)
-;;                                   (if (and (number? ct) (number? ft))
-;;                                       (if (= ct ft) #t #f)
-;;                                       (if (and (string? ct) (string? ft))
-;;                                           (if (string=? ct ft) #t #f)
-;;                                           (if (list? ct)
-;;                                               (if (member ft ct) #t #f) ;; #f
-;;                                               #f))))
-;;                                 (if expected
-;;                                     (cons expected checked-types)
-;;                                     checked-types)
-;;                                 (if expected
-;;                                     (cdr type)
-;;                                     (cddr type)))))
-;;                  ct2)
-;;                (list #f)))
-;;          ftypes
-;;          valid-lgth)))
 
 (define xtc:typecheck:nativef-poly-check-match-ftypes
   (lambda (args ftypes expected)
@@ -2046,83 +1886,6 @@
 
 
 ;; polymorphic version
-;; (define xtc:typecheck:nativef-poly-check
-;;   (lambda (ast vars kts expected)
-;;     ;; (println 'poly-checking: ast 'req? expected 'kts kts) ;; 'v: vars)
-;;     (if (assoc-strcmp (car ast) kts)
-;;         (begin
-;;           (for-each (lambda (a r)
-;;                       (xtc:desugar:type-unify (xtc:typecheck:type-check a vars kts r) vars))
-;;                     (cdr ast)
-;;                     (cddr (hashtable-ref vars (car ast)) vars))
-;;           (list (cadr (cdr (assoc-strcmp (car ast) kts)))))
-;;         (if (and (xtc:codegen:type? (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars))
-;;                  (or (equal? expected #f)
-;;                      (equal? expected (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars))))
-;;             (begin
-;;               ;; (println 'bingo: 'saving 'time!)
-;;               (for-each (lambda (a r)
-;;                           (xtc:desugar:type-unify (xtc:typecheck:type-check a vars kts r) vars))
-;;                         (cdr ast)
-;;                         (cddr (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars)))
-;;               (list (cadr (xtc:desugar:type-unify (hashtable-ref vars (car ast)) vars))))
-;;             (let* ((polyf (string->symbol (car (regex:split (symbol->string (car ast)) "##")))) ;"\\$\\$\\$"))))
-;;                    (ftypes (xtc:cache:get-polyfunc-candidate-types (symbol->string polyf)))
-;;                    (valid-lgth (map (lambda (type)
-;;                                       (if (<> (length (cdr type))
-;;                                               (length ast)) #f #t))
-;;                                     ftypes))
-;;                    ;;(tmpvars (cl:tree-copy vars))
-;;                    (valid-args (map (lambda (type valid)
-;;                                       ;; (println 'type: type 'valid: valid)
-;;                                       (if valid
-;;                                           (let* ((checked-types
-;;                                                   (map (lambda (a t)
-;;                                                          ;; (println 'a a 't t)
-;;                                                          ;; andrew's change here!
-;;                                                          (let ((t2 (xtc:desugar:type-unify
-;;                                                                     (xtc:typecheck:type-check a vars kts
-;;                                                                                         (if (xtc:codegen:type? t)
-;;                                                                                             t
-;;                                                                                             #f))
-;;                                                                     vars)))
-;;                                                            ;; (println 'a: a 't: t 't2: t2)
-;;                                                            t2))
-;;                                                        (cdr ast)
-;;                                                        (cddr type)))
-;;                                                  (ct2 (map (lambda (ct ft) ;; checked type against poly type
-;;                                                              ;; (println 'ct: ct 'ft: ft)
-;;                                                              (if (and (number? ct) (number? ft))
-;;                                                                  (if (= ct ft) #t #f)
-;;                                                                  (if (and (string? ct) (string? ft))
-;;                                                                      (if (string=? ct ft) #t #f)
-;;                                                                      (if (list? ct)
-;;                                                                          (if (member ft ct) #t #f) ;; #f
-;;                                                                          #f))))
-;;                                                            (if expected
-;;                                                                (cons expected checked-types)
-;;                                                                checked-types)
-;;                                                            (if expected
-;;                                                                (cdr type)
-;;                                                                (cddr type)))))
-;;                                             ct2)
-;;                                           (list #f)))
-;;                                     ftypes
-;;                                     valid-lgth))
-;;                    (weighted-choices (map (lambda (l) (length (cl:remove #f l))) valid-args))
-;;                    (best-result (apply max weighted-choices))
-;;                    (valid-polys
-;;                     (cl:remove #f (map (lambda (type weight)
-;;                                          (if (or
-;;                                               (= weight 0)
-;;                                               (< weight best-result)) #f
-;;                                               type))
-;;                                        ftypes
-;;                                        weighted-choices))))
-;;               ;;(println 'ftypes: ftypes)
-;;               ;; (println 'weighted-choices: weighted-choices 'expected expected)
-;;               ;; (println 'va valid-args)
-;;               ;; (println '-> ast 'valid-polys: valid-polys 'request: expected)
 
 ;;               (if (null? valid-polys)
 ;;                   (set! valid-polys
@@ -3301,26 +3064,6 @@ xtlang's `let' syntax is the same as Scheme"
     (xtc:typecheck:type-check (cadr ast) vars kts #f)
     (tc-result (list (caddr ast)) vars)))
 
-;; (define xtc:typecheck:closure-in-first-position
-;;   (lambda (ast vars kts expected)
-;;     ;; first check return type of car ast (which will be a closure)
-;;     ;; then check against it's arg types
-;;     (let ((type (xtc:typecheck:type-check (car ast) vars kts expected)))
-;;       (if (null? type)
-;;           (xtc:diagnostics:print-bad-type-error "unknown-type" ast))
-;;       (if (not (xtc:codegen:type? type))
-;;           (set! type (car type)))
-;;       (if (not (list? type))
-;;           (xtc:diagnostics:print-bad-type-error (xtc:codegen:pretty-print-type type) ast))
-;;       (if (<> (length (cddr type)) (length (cdr ast)))
-;;           (xtc:diagnostics:print-bad-arity-error ast))
-;;       (if (<> (+ *xtc:codegen:closure* *xtc:codegen:pointer* *xtc:codegen:pointer*) (car type))
-;;           (xtc:diagnostics:print-bad-type-error (xtc:codegen:pretty-print-type (car type)) ast)
-;;           (begin (map (lambda (a b)
-;;                         (xtc:typecheck:type-check b vars kts a))
-;;                       (cddr type)
-;;                       (cdr ast))
-;;                  (cadr type))))))
 
 (define xtc:typecheck:closure-in-first-position
   (lambda (ast vars kts expected)

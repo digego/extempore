@@ -192,9 +192,6 @@
      ">")))
 
 ;; this currently doesn't work for multiple "replace" instances
-;; (define xtc:desugar:get-initial-generic-pretty-type
-;;   (lambda (pretty-type)
-;;     (regex:replace-all pretty-type "!g([a-zA-Z_]+)_[0-9]+" "!$1")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -1413,14 +1410,6 @@ Continue executing `body' forms until `test-expression' returns #f"
       (cname-encode (string-append "<" (string-join mint ",") ">")))))
 
 
-;; (define xtc:codegen:split-squig
-;;   (lambda (x)
-;;     (let* ((base (xtc:codegen:get-base-type x))
-;;            (ptrs (xtc:codegen:get-ptr-depth x))
-;;            (p (regex:type-split base "{"))
-;;            (argstr (substring (cadr p) 0 (- (string-length (cadr p)) 1))))
-;;       (list (car p)
-;;             (apply string-append "<" argstr ">" (make-list ptrs "*"))))))
 
 ;; this will basically try to turn xlist*##664 into "%xlist--adoOmdroIRU*"
 ;;
@@ -1547,14 +1536,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 ;; trys to type unify vs against any other
 ;; choices available in all-vs
-;; (define xtc:desugar:symbol-expand-reverse-check
-;;   (lambda (vs vars all-vs)
-;;     ;; (println 'vs vs 'all-vs all-vs 'vars vars)
-;;     (xtc:desugar:type-unify all-vs vars)
-;;     ;; (println 'vs: vs 'vars: vars)
-;;     (if (not (null? (hashtable-ref vars vs)))
-;;         (hashtable-ref vars vs)
-;;         vs)))
 
 
 ;; takes types with symbols and expands them
@@ -1563,35 +1544,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; then we try to reverse expand
 ;; (i.e. look at other closure options that may include type values
 ;; and assign those values into vars)
-;; (define xtc:desugar:symbol-expand
-;;   (lambda (vs vars all-vs)
-;;     ;; (println 'symbol-expand: vs 'allvs: all-vs) ; 'vars: vars)
-;;     ;; (println 'vars: vars)
-;;     ;; (println 'all-vs: all-vs)
-;;     (if (atom? vs)
-;;         (if (symbol? vs)
-;;             (if (or (xtc:cache:get-generictype-candidate-types (string->symbol (xtc:codegen:get-base-type (car (regex:split (car (regex:split (symbol->string vs) "##")) "%"))))) ;"\\$\\$\\$")) "%")))))
-;;                     (if (and (regex:match? (symbol->string vs) ":")
-;;                              (xtc:cache:get-generictype-candidate-types
-;;                               (string->symbol (car (regex:type-split (symbol->string vs) ":")))))
-;;                         #t #f))
-;;                 (xtc:desugar:reify-generic-type vs vars all-vs)
-;;                 (if (not (hashtable-ref vars vs)) ;; if not in vars
-;;                     (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
-;;                         vs
-;;                         ;; (xtc:diagnostics:print-variable-not-marked-as-free-error vs))
-;;                         vs)
-;;                     ;; check to see a type has been defined
-;;                     ;; otherwise return null
-;;                     (let ((t (hashtable-ref vars vs)))
-;;                       ;; first check to see if the symbol vs has a value
-;;                       (if (null? t) ;; if it doesn't we might need to reverse match!
-;;                           (xtc:desugar:symbol-expand-reverse-check vs vars all-vs)
-;;                           t))))
-;;             (begin ;(println 'ccc: vs)
-;;               vs))
-;;         (cons (xtc:desugar:symbol-expand (car vs) vars all-vs)
-;;               (xtc:desugar:symbol-expand (cdr vs) vars all-vs)))))
 
 
 ;; xtc:desugar:intersection* is cl:intersection for
@@ -2076,19 +2028,6 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;
 ;; i.e. (211 (2) (211 3 3) (xlist*##123)) should be
 ;; (211 2 (211 3 3) xlist*##123)
-;; (define xtc:desugar:type-clean
-;;   (lambda (type)
-;;     (if (or (null? type)
-;;             (atom? type)
-;;             (xtc:codegen:type? type)) ;; (note to andrew) remove this line for GC crash!
-;;  type
-;;         (map (lambda (k)
-;;                (if (list? k)
-;;                    (if (= (length k) 1)
-;;                        (car k)
-;;                        k)
-;;                    k))
-;;              type))))
 
 (define xtc:desugar:type-clean
   (lambda (type)
