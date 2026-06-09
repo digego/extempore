@@ -96,16 +96,16 @@ declare i8** @rsplit(i8*, i8*, i8**, i64) nounwind
 declare i8* @rreplace(i8*, i8*, i8*) nounwind
 
 ; Random number generators (implemented in C++)
-declare double @imp_randd() nounwind
-declare float @imp_randf() nounwind
-declare i64 @imp_rand1_i64(i64) nounwind
-declare i64 @imp_rand2_i64(i64, i64) nounwind
-declare i32 @imp_rand1_i32(i32) nounwind
-declare i32 @imp_rand2_i32(i32, i32) nounwind
-declare double @imp_rand1_d(double) nounwind
-declare double @imp_rand2_d(double, double) nounwind
-declare float @imp_rand1_f(float) nounwind
-declare float @imp_rand2_f(float, float) nounwind
+declare double @xtc_randd() nounwind
+declare float @xtc_randf() nounwind
+declare i64 @xtc_rand1_i64(i64) nounwind
+declare i64 @xtc_rand2_i64(i64, i64) nounwind
+declare i32 @xtc_rand1_i32(i32) nounwind
+declare i32 @xtc_rand2_i32(i32, i32) nounwind
+declare double @xtc_rand1_d(double) nounwind
+declare double @xtc_rand2_d(double, double) nounwind
+declare float @xtc_rand1_f(float) nounwind
+declare float @xtc_rand2_f(float, float) nounwind
 
 ; Standard math library functions
 declare double @atan2(double, double) nounwind

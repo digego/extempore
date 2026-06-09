@@ -379,46 +379,46 @@ EXPORT void llvm_print_f64(double num) {
 static thread_local std::minstd_rand sRandGen{
     static_cast<std::minstd_rand::result_type>(std::time(nullptr))};
 
-EXPORT double imp_randd() {
+EXPORT double xtc_randd() {
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was
     // intended
     return std::uniform_real_distribution<double>()(sRandGen);
 }
 
-EXPORT float imp_randf() {
-    return imp_randd();
+EXPORT float xtc_randf() {
+    return xtc_randd();
 }
 
-EXPORT int64_t imp_rand1_i64(int64_t Limit) {
-    return imp_randd() * Limit;
+EXPORT int64_t xtc_rand1_i64(int64_t Limit) {
+    return xtc_randd() * Limit;
 }
 
-EXPORT int64_t imp_rand2_i64(int64_t Start, int64_t Limit) {
-    return imp_randd() * (Limit - Start) + Start;
+EXPORT int64_t xtc_rand2_i64(int64_t Start, int64_t Limit) {
+    return xtc_randd() * (Limit - Start) + Start;
 }
 
-EXPORT int32_t imp_rand1_i32(int32_t Limit) {
-    return imp_randd() * Limit;
+EXPORT int32_t xtc_rand1_i32(int32_t Limit) {
+    return xtc_randd() * Limit;
 }
 
-EXPORT int32_t imp_rand2_i32(int32_t Start, int32_t Limit) {
-    return imp_randd() * (Limit - Start) + Start;
+EXPORT int32_t xtc_rand2_i32(int32_t Start, int32_t Limit) {
+    return xtc_randd() * (Limit - Start) + Start;
 }
 
-EXPORT double imp_rand1_d(double Limit) {
-    return imp_randd() * Limit;
+EXPORT double xtc_rand1_d(double Limit) {
+    return xtc_randd() * Limit;
 }
 
-EXPORT double imp_rand2_d(double Start, double Limit) {
-    return imp_randd() * (Limit - Start) + Start;
+EXPORT double xtc_rand2_d(double Start, double Limit) {
+    return xtc_randd() * (Limit - Start) + Start;
 }
 
-EXPORT float imp_rand1_f(float Limit) {
-    return imp_randf() * Limit;
+EXPORT float xtc_rand1_f(float Limit) {
+    return xtc_randf() * Limit;
 }
 
-EXPORT float imp_rand2_f(float Start, float Limit) {
-    return imp_randf() * (Limit - Start) + Start;
+EXPORT float xtc_rand2_f(float Start, float Limit) {
+    return xtc_randf() * (Limit - Start) + Start;
 }
 
 ///////////////////////////////////

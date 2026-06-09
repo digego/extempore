@@ -989,7 +989,21 @@ Continue executing `body' forms until `test-expression' returns #f"
           ((eq? ast 'halloc) 'heap-alloc)
           ((eq? ast 'zalloc) 'zone-alloc)
           ((eq? ast 'alloc) 'zone-alloc)
-          ((eq? ast 'randomf) 'imp_randf)
+          ((eq? ast 'randomf) 'xtc_randf)
+          ;; Deprecated imp_rand* spellings of the RNG builtins (renamed to
+          ;; xtc_rand* in TASK-061; the Impromptu prefix is dropped).  Kept as
+          ;; desugar-time aliases for one release so existing user code that
+          ;; calls them directly still compiles --- remove next release.
+          ((eq? ast 'imp_randf)    'xtc_randf)
+          ((eq? ast 'imp_randd)    'xtc_randd)
+          ((eq? ast 'imp_rand1_i64) 'xtc_rand1_i64)
+          ((eq? ast 'imp_rand2_i64) 'xtc_rand2_i64)
+          ((eq? ast 'imp_rand1_i32) 'xtc_rand1_i32)
+          ((eq? ast 'imp_rand2_i32) 'xtc_rand2_i32)
+          ((eq? ast 'imp_rand1_d)  'xtc_rand1_d)
+          ((eq? ast 'imp_rand2_d)  'xtc_rand2_d)
+          ((eq? ast 'imp_rand1_f)  'xtc_rand1_f)
+          ((eq? ast 'imp_rand2_f)  'xtc_rand2_f)
           ((eq? ast 'void) '(void))
           ((and (complex? ast) (not (real? ast)))
            (xtc:desugar:first-transform `(Cpxd ,(real-part ast) ,(imag-part ast)) inbody?))
