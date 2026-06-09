@@ -43,7 +43,7 @@
 %wts_f = type float (i8*, i8*, float*, i64, i64, float*)
 
 ;; Double-precision sample DSP wrapper
-define dllexport double @imp_dsp_wrapper(i8* %_impz, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
+define dllexport double @imp_dsp_wrapper(i8* %_zonei8, i8* %closure, double %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
   %closureVal = bitcast i8* %closure to { i8*, i8*, %wt* }*
@@ -51,12 +51,12 @@ entry:
   %ePtr = getelementptr { i8*, i8*, %wt* }, { i8*, i8*, %wt* }* %closureVal, i32 0, i32 1
   %f = load %wt*, %wt** %fPtr
   %e = load i8*, i8** %ePtr
-  %result = tail call fastcc double %f(i8* %_impz, i8* %e, double %sample, i64 %time, i64 %channel, double* %data)
+  %result = tail call fastcc double %f(i8* %_zonei8, i8* %e, double %sample, i64 %time, i64 %channel, double* %data)
   ret double %result
 }
 
 ;; Double-precision multi-channel sum DSP wrapper
-define dllexport double @imp_dsp_sum_wrapper(i8* %_impz, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data)
+define dllexport double @imp_dsp_sum_wrapper(i8* %_zonei8, i8* %closure, double* %sample, i64 %time, i64 %channel, double* %data)
 {
 entry:
   %closureVal = bitcast i8* %closure to { i8*, i8*, %wts* }*
@@ -64,12 +64,12 @@ entry:
   %ePtr = getelementptr { i8*, i8*, %wts* }, { i8*, i8*, %wts* }* %closureVal, i32 0, i32 1
   %f = load %wts*, %wts** %fPtr
   %e = load i8*, i8** %ePtr
-  %result = tail call fastcc double %f(i8* %_impz, i8* %e, double* %sample, i64 %time, i64 %channel, double* %data)
+  %result = tail call fastcc double %f(i8* %_zonei8, i8* %e, double* %sample, i64 %time, i64 %channel, double* %data)
   ret double %result
 }
 
 ;; Single-precision sample DSP wrapper
-define dllexport float @imp_dspf_wrapper(i8* %_impz, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data)
+define dllexport float @imp_dspf_wrapper(i8* %_zonei8, i8* %closure, float %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
   %closureVal = bitcast i8* %closure to { i8*, i8*, %wt_f* }*
@@ -77,12 +77,12 @@ entry:
   %ePtr = getelementptr { i8*, i8*, %wt_f* }, { i8*, i8*, %wt_f* }* %closureVal, i32 0, i32 1
   %f = load %wt_f*, %wt_f** %fPtr
   %e = load i8*, i8** %ePtr
-  %result = tail call fastcc float %f(i8* %_impz, i8* %e, float %sample, i64 %time, i64 %channel, float* %data)
+  %result = tail call fastcc float %f(i8* %_zonei8, i8* %e, float %sample, i64 %time, i64 %channel, float* %data)
   ret float %result
 }
 
 ;; Single-precision multi-channel sum DSP wrapper
-define dllexport float @imp_dspf_sum_wrapper(i8* %_impz, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data)
+define dllexport float @imp_dspf_sum_wrapper(i8* %_zonei8, i8* %closure, float* %sample, i64 %time, i64 %channel, float* %data)
 {
 entry:
   %closureVal = bitcast i8* %closure to { i8*, i8*, %wts_f* }*
@@ -90,7 +90,7 @@ entry:
   %ePtr = getelementptr { i8*, i8*, %wts_f* }, { i8*, i8*, %wts_f* }* %closureVal, i32 0, i32 1
   %f = load %wts_f*, %wts_f** %fPtr
   %e = load i8*, i8** %ePtr
-  %result = tail call fastcc float %f(i8* %_impz, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
+  %result = tail call fastcc float %f(i8* %_zonei8, i8* %e, float* %sample, i64 %time, i64 %channel, float* %data)
   ret float %result
 }
 

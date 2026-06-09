@@ -256,12 +256,12 @@
                           (llvm:erase-function (string-append symname-string "_maker"))))
                     #f))
              (maker-ir (string-append "define dllexport ccc " closure-type " @" symname-string "_maker"
-                                      "(i8* %_impz) nounwind {\nentry:\n"
-                                      ;; "%_zone = bitcast i8* %_impz to %mzone*\n"
+                                      "(i8* %_zonei8) nounwind {\nentry:\n"
+                                      ;; "%_zone = bitcast i8* %_zonei8 to %mzone*\n"
                                       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                       ;; ;; new lines for impz
-                                      "%_impzPtr = alloca i8*\n"
-                                      "store i8* %_impz, i8** %_impzPtr\n"
+                                      "%_zonei8Ptr = alloca i8*\n"
+                                      "store i8* %_zonei8, i8** %_zonei8Ptr\n"
                                       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                       fstr "}\n\n"))
              (setter-ir (string-append (if compile-stub?
@@ -271,14 +271,14 @@
                                        "define dllexport ccc void @" (string-append symname-string "_setter")
                                        "() alwaysinline nounwind {\nentry:\n"
                                        "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                       "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                       "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
                                        "%oldzone1 = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var_zone, i32 0, i32 0\n"
                                        "%oldzone2 = load i8*, i8** %oldzone1\n"
                                        "%oldzone3 = bitcast i8* %oldzone2 to %mzone*\n"
-                                       "store i8* %_impz, i8** %oldzone1\n"
+                                       "store i8* %_zonei8, i8** %oldzone1\n"
                                         ; existing code
                                        "%closure = call ccc " (cadr (xtc:codegen:ssa-temp))
-                                       " @" symname-string "_maker" "(i8* %_impz)\n"
+                                       " @" symname-string "_maker" "(i8* %_zonei8)\n"
                                        "%ptr = bitcast " (cadr (xtc:codegen:ssa-temp)) " %closure to i8*\n"
                                        "%varptr = bitcast [1 x i8*]* @" symname-string "_var to i8**\n"
                                        "store i8* %ptr, i8** %varptr\n"
@@ -322,9 +322,9 @@
                                                                                                                                      (lambda (i) (string-append "%arg_" (atom->string i))))))
                                         ;"%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
                                                                                       ;"%_zone = call ccc %mzone* @llvm_zone_callback_setup()\n"
-                                                                                      ;"%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                                      ;"%_zonei8 = bitcast %mzone* %_zone to i8*\n"
                                                                                       "call ccc void @llvm_push_zone_stack(%mzone* %inzone)\n"
-                                                                                      "%_impz = bitcast %mzone* %inzone to i8*\n"
+                                                                                      "%_zonei8 = bitcast %mzone* %inzone to i8*\n"
                                                                                       "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                                                       "%ptrvar = load i8*, i8** %ptr\n"
                                                                                       "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
@@ -337,8 +337,8 @@
                                                                                       "* %fPtr\n"
                                                                                       "%ee = load i8*, i8** %ePtr\n"
                                                                                       (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                                                      "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
-                                                                                      ;;"call ccc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                                                      "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
+                                                                                      ;;"call ccc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
                                                                                       (apply string-append (map (lambda (t n)
                                                                                                                   (string-append ", "
                                                                                                                                  (xtc:codegen:get-type-str t)
@@ -356,7 +356,7 @@
                                             " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
                                                                 "{\nentry:\n"
                                                                 "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                                "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                                "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
 
                                         ;(begin (println 'aaaaa) "")
 
@@ -436,7 +436,7 @@
                                                                 "* %fPtr\n"
                                                                 "%ee = load i8*, i8** %ePtr\n"
                                                                 (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                                "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                                "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
 
                                                                 (apply string-append
                                                                        (map (lambda (t n)
@@ -487,7 +487,7 @@
                                                          ") alwaysinline nounwind \n"
                                                          "{\nentry:\n"
                                                          "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                         "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                         "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
                                                          "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                          "%ptrvar = load i8*, i8** %ptr\n"
                                                          "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
@@ -500,7 +500,7 @@
                                                          "* %fPtr\n"
                                                          "%ee = load i8*, i8** %ePtr\n"
                                                          (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                         "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                         "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
                                                          (apply string-append (map (lambda (t n)
                                                                                      (string-append ", "
                                                                                                     (xtc:codegen:get-type-str t)
@@ -523,7 +523,7 @@
                                                            ") alwaysinline nounwind \n"
                                                            "{\nentry:\n"
                                                            "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                           "%_impz = bitcast %mzone* %_zone to i8*\n"
+                                                           "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
                                                            "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
                                                            "%ptrvar = load i8*, i8** %ptr\n"
                                                            "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
@@ -536,7 +536,7 @@
                                                            "* %fPtr\n"
                                                            "%ee = load i8*, i8** %ePtr\n"
                                                            (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                           "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_impz, i8* %ee"
+                                                           "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
                                                            (apply string-append (map (lambda (t n)
                                                                                        (string-append ", "
                                                                                                       (xtc:codegen:get-type-str t)

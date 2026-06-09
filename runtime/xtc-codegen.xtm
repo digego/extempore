@@ -1269,7 +1269,7 @@
   (lambda (ast)
     (let* ((os (make-string 0))
            (cnt 0))
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
             (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
             os)
                                         ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
@@ -1337,7 +1337,7 @@
       (define closure-struct-str
         (string-append "{ i8*, i8*, " func-type-str "*}"))
 
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
             (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
             os2)
       ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os2)
@@ -1494,23 +1494,23 @@
       ;; define fastcc function with return type
       (emit  "define dllexport fastcc " (xtc:codegen:get-type-str rettype) " @" name "(" os)
                                         ;(if (not (null? env)) (emit "i8* %_impenv" os))
-      (emit "i8* %_impz," os)
+      (emit "i8* %_zonei8," os)
       (emit "i8* %_impenv" os)
       (if (not (null? args)) (emit  ", " (xtc:codegen:make-arglist-str args #t) os))
       ;; close off function opening
       (emit ") nounwind {\n" os)
       (emit "entry:\n" os)
       ;;(emit "; setup zone\n" os)
-      ;;(emit "%_zone = bitcast i8* %_impz to %mzone*\n" os)
+      ;;(emit "%_zone = bitcast i8* %_zonei8 to %mzone*\n" os)
 
       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; ;; new for impz stuff
-      (emit "%_impzPtr = alloca i8*\n" os)
-      (emit "store i8* %_impz, i8** %_impzPtr\n" os)
-      ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
+      (emit "%_zonei8Ptr = alloca i8*\n" os)
+      (emit "store i8* %_zonei8, i8** %_zonei8Ptr\n" os)
+      ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_zonei8 to %mzone*\n" os)
       ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_impz to %mzone*\n" os)
+      (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* %_zonei8 to %mzone*\n" os)
       ;; (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
 
       ;; first we need to pull evironment values
@@ -1563,7 +1563,7 @@
       ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
@@ -1622,9 +1622,9 @@
 
       ;; mem zone
       (emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call ccc %mzone* @llvm_peek_zone_stack()\n" os)
-      (emit "%_impz = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
-      (emit "%_impzPtr = alloca i8*\n" os)
-      (emit "store i8* %_impz, i8** %_impzPtr\n" os)
+      (emit "%_zonei8 = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
+      (emit "%_zonei8Ptr = alloca i8*\n" os)
+      (emit "store i8* %_zonei8, i8** %_zonei8Ptr\n" os)
 
       ;; next we pull the function arguments
       (emit "\n; setup arguments\n" os)
@@ -1657,7 +1657,7 @@
                                         ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
@@ -1716,7 +1716,7 @@
                                         ;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
                                         ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
                                         ;(emit "call ccc void @llvm_print_i32(i32 111)\n" os)
-                     (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+                     (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
                            (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                            os)
                      (emit  "\n; let assign value to symbol " symstr "\n" os)
@@ -1795,7 +1795,7 @@
                                         ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
           (begin (emit "; promote local stack var allocations\n" os)
-                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+                 (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
                        (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
                        os)
                  (map (lambda (v)
@@ -2175,7 +2175,7 @@
             " = call %mzone* @llvm_zone_create(i64 " (car size) ")\n" os)
       (emit "call void @llvm_push_zone_stack(%mzone* " (car (xtc:codegen:ssa-temp)) ")\n" os)
       (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_impzPtr\n" os)
+      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
 
       (let ((zone (xtc:codegen:ssa-temp "zone")))
         (xtc:codegen:ssa-temp "ret" (car zone) (cadr zone)))
@@ -2189,7 +2189,7 @@
       (emit zone-str os)
       (emit "call void @llvm_push_zone_stack(%mzone* " (car zone) ")\n" os)
       (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car zone) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_impzPtr\n" os)
+      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
       (xtc:codegen:ssa-temp "voidmark" (xtc:codegen:get-type-str *xtc:codegen:void*))
       (xtc:codegen:strip-space os))))
 
@@ -2212,7 +2212,7 @@
       (emit (xtc:codegen:ssa-temp "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
       (emit (xtc:codegen:ssa-temp "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
       (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "newzone")) " to i8*\n" os)
-      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_impzPtr\n" os)
+      (emit "store i8* " (car (xtc:codegen:ssa-temp "zone_ptr")) ", i8** %_zonei8Ptr\n" os)
       (let ((zone (xtc:codegen:ssa-temp "oldzone")))
         (xtc:codegen:ssa-temp "ret" (car zone) (cadr zone)))
       (xtc:codegen:strip-space os))))
@@ -2262,7 +2262,7 @@
       (emit (string-append (xtc:codegen:ssa-temp "e" "i8*")
                            " = load i8*, i8** " (car (xtc:codegen:ssa-temp "ePtr")) "\n") os)
 
-      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+      (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
             (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
             os)
                                         ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
@@ -2886,7 +2886,7 @@
     (let* ((os (make-string 0)))
       (let*      ;((t (xtc:codegen:convert-from-pretty-types (cadr ast))))
           ((t (xtc:codegen:strip-ptr-depth (car hint?))))
-        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
               (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
               os)
         (emit (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", "
@@ -2927,7 +2927,7 @@
         ;;       (car idx) "\n" os)
         (emit (xtc:codegen:ssa-temp "zonesize" "i64") " = mul " (cadr idx) " " typesize ", " (car idx) "\n" os)
 
-        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+        (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
               (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
               os)
         (emit
@@ -3611,7 +3611,7 @@
         ;;  (let* ((mathval (xtc:codegen:ssa-temp "val"))
         ;;         (mathtype (xtc:codegen:get-type-from-str (cadr mathval)))
         ;;         (zallocsize (xtc:codegen:get-type-size mathtype)))
-        ;;    (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+        ;;    (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
         ;;    (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
         ;;    os)
         ;;    (emit (xtc:codegen:ssa-temp "newdat" "i8*") " = call i8* @llvm_zone_malloc(%mzone* "
@@ -4029,7 +4029,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
       ;; new for impz stuff
-      ;; (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_impzPtr\n"
+      ;; (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
       ;;       (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
       ;;       os)
       ;; (if closurecall (emit (xtc:codegen:ssa-temp "tmp_zone" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "zone")) " to i8*\n" os))
