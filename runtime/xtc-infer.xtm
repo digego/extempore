@@ -1,0 +1,155 @@
+;;; xtc-infer.xtm --- constraint-emitting inference traversal (TASK-059 increment 2)
+;;;
+;;; This is the strangler replacement for the candidate-list traversal in
+;;; xtc:typecheck:type-check.  Where the old traversal walks the AST mutating a
+;;; union-find store of candidate type lists, this one walks the AST and emits a
+;;; flat list of clean constraints (eq / default --- see xtc-solve.xtm) which the
+;;; substitution solver then discharges in one pass.  No candidate sets, no
+;;; number-crunch, no enumeration retry loop.
+;;;
+;;; It is deliberately NOT wired into the live compiler yet: increment 2 builds
+;;; and shadow-validates the new traversal against the old one (tests/compiler/
+;;; infer.xtm asserts it agrees with xtc:bind:get-expression-type), increment 3
+;;; flips the live entry point, increment 4 deletes the old family.  Accordingly
+;;; this module covers a core subset of forms and errors loudly on anything it
+;;; does not yet handle --- so coverage gaps are visible, never silent.
+;;;
+;;; A form's *result* is named by a key: either a fresh type variable (a
+;;; !infer_N symbol), a program variable symbol (which is its own type
+;;; variable), or a concrete int-code for a form whose type is already known
+;;; (e.g. a boolean is i1).  xtc:infer:collect returns (cons result-key
+;;; constraints); constraints relate keys via the int-code vocabulary the solver
+;;; already speaks, so the traversal needs no new representation.
+
+;; A monotonic source of fresh result-variable names, distinct (the !infer_
+;; prefix) from any program or bang variable so they never collide in the solve.
+(define *xtc:infer:fresh-counter* 0)
+
+(define xtc:infer:reset-fresh!
+  (lambda () (set! *xtc:infer:fresh-counter* 0)))
+
+(define xtc:infer:fresh-key
+  (lambda ()
+    (set! *xtc:infer:fresh-counter* (+ *xtc:infer:fresh-counter* 1))
+    (string->symbol (string-append "!infer_" (number->string *xtc:infer:fresh-counter*)))))
+
+;; The numeric defaulting classes, single-sourced from the codegen constants and
+;; ordered so the solver's (apply min) picks the canonical default (si64 / fp64).
+(define xtc:infer:int-class
+  (lambda () (list *xtc:codegen:si64* *xtc:codegen:si32* *xtc:codegen:si16* *xtc:codegen:ui8*)))
+
+(define xtc:infer:float-class
+  (lambda () (list *xtc:codegen:fp64* *xtc:codegen:fp32*)))
+
+(define xtc:infer:math-op?
+  (lambda (s) (and (member s '(+ - * / %)) #t)))
+
+(define xtc:infer:compare-op?
+  (lambda (s) (and (member s '(< > = <>)) #t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the traversal       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Collect constraints for one (already desugared) AST node.  Returns
+;; (cons result-key constraints).
+(define xtc:infer:collect
+  (lambda (ast)
+    (cond
+      ;; integer literal: a fresh variable defaulting to the integer class
+      ((and (number? ast) (integer? ast))
+       (let ((k (xtc:infer:fresh-key)))
+         (cons k (list (xtc:solve:c-default k (xtc:infer:int-class))))))
+      ;; floating-point literal: defaults to the float class
+      ((number? ast)
+       (let ((k (xtc:infer:fresh-key)))
+         (cons k (list (xtc:solve:c-default k (xtc:infer:float-class))))))
+      ;; a symbol denotes its own type variable
+      ((symbol? ast) (cons ast '()))
+      ;; desugared boolean literals are i1
+      ((and (pair? ast) (eq? (car ast) 'impc_true))  (cons *xtc:codegen:i1* '()))
+      ((and (pair? ast) (eq? (car ast) 'impc_false)) (cons *xtc:codegen:i1* '()))
+      ((and (pair? ast) (eq? (car ast) 'let))   (xtc:infer:collect-let ast))
+      ((and (pair? ast) (eq? (car ast) 'begin)) (xtc:infer:collect-seq (cdr ast)))
+      ((and (pair? ast) (eq? (car ast) 'if))    (xtc:infer:collect-if ast))
+      ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-op? (car ast)))
+       (xtc:infer:collect-math ast))
+      ((and (pair? ast) (symbol? (car ast)) (xtc:infer:compare-op? (car ast)))
+       (xtc:infer:collect-compare ast))
+      (else
+       (xtc:diagnostics:print-compiler-error
+        (string-append "xtc:infer: unhandled form (increment 2 covers a core subset): "
+                       (sexpr->string ast)))))))
+
+;; A binding (v e) constrains v to e's type; the let's type is its body's.
+(define xtc:infer:collect-let
+  (lambda (ast)
+    (let loop ((bindings (cadr ast)) (cs '()))
+      (if (null? bindings)
+          (let ((body (xtc:infer:collect-seq (cddr ast))))
+            (cons (car body) (append cs (cdr body))))
+          (let* ((b (car bindings))
+                 (v (car b))
+                 (rc (xtc:infer:collect (cadr b))))
+            (loop (cdr bindings)
+                  (append cs (cons (xtc:solve:c-eq v (car rc)) (cdr rc)))))))))
+
+;; A sequence's type is its last expression's; the earlier expressions still
+;; contribute their own constraints (so their literals default, etc.).
+(define xtc:infer:collect-seq
+  (lambda (exprs)
+    (if (null? exprs)
+        (cons *xtc:codegen:void* '())
+        (let loop ((es exprs) (cs '()))
+          (let ((rc (xtc:infer:collect (car es))))
+            (if (null? (cdr es))
+                (cons (car rc) (append cs (cdr rc)))
+                (loop (cdr es) (append cs (cdr rc)))))))))
+
+;; (if c t e): the condition is i1, the two branches unify, the result is the
+;; branch type.
+(define xtc:infer:collect-if
+  (lambda (ast)
+    (let* ((rc-c (xtc:infer:collect (cadr ast)))
+           (rc-t (xtc:infer:collect (caddr ast)))
+           (rc-e (xtc:infer:collect (cadddr ast))))
+      (cons (car rc-t)
+            (append (cdr rc-c) (cdr rc-t) (cdr rc-e)
+                    (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)
+                          (xtc:solve:c-eq (car rc-t) (car rc-e))))))))
+
+;; (op a b): the operands unify and the result carries the operand type.
+(define xtc:infer:collect-math
+  (lambda (ast)
+    (let* ((rc-a (xtc:infer:collect (cadr ast)))
+           (rc-b (xtc:infer:collect (caddr ast)))
+           (kr (xtc:infer:fresh-key)))
+      (cons kr
+            (append (cdr rc-a) (cdr rc-b)
+                    (list (xtc:solve:c-eq (car rc-a) (car rc-b))
+                          (xtc:solve:c-eq kr (car rc-a))))))))
+
+;; (cmp a b): the operands unify, but the result is always i1 --- the first
+;; non-numeric result type to flow through the traversal.
+(define xtc:infer:collect-compare
+  (lambda (ast)
+    (let* ((rc-a (xtc:infer:collect (cadr ast)))
+           (rc-b (xtc:infer:collect (caddr ast))))
+      (cons *xtc:codegen:i1*
+            (append (cdr rc-a) (cdr rc-b)
+                    (list (xtc:solve:c-eq (car rc-a) (car rc-b))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; driver              ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Infer the int-code type of an already-desugared AST node by collecting its
+;; constraints and solving them.  This is the constraint-based analogue of a
+;; run-type-check + read-off, scoped to one expression.
+(define xtc:infer:type-of
+  (lambda (ast)
+    (xtc:infer:reset-fresh!)
+    (let* ((rc (xtc:infer:collect ast))
+           (intern (make-hashtable))
+           (subst (xtc:solve:run (cdr rc) intern)))
+      (xtc:solve:type-of (car rc) subst intern))))

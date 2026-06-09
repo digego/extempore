@@ -1,0 +1,64 @@
+;;; tests/compiler/infer.xtm -- the constraint-emitting inference traversal
+;;; (runtime/xtc-infer.xtm), TASK-059 increment 2.
+;;;
+;;; The decisive test is a SHADOW COMPARISON: for a corpus of expressions, the
+;;; new constraint path (desugar -> xtc:infer:collect -> xtc:solve) must agree
+;;; with the live candidate-list checker (xtc:bind:get-expression-type) on the
+;;; resulting type.  Both start from the same front-end (syntactic-phase), so any
+;;; disagreement is a real divergence in the new traversal --- this is how the
+;;; migration stays honest before the live entry point is flipped (increment 3).
+
+(sys:load "libs/core/test.xtm")
+(sys:load "runtime/xtc-solve.xtm")
+(sys:load "runtime/xtc-infer.xtm")
+
+;; Drive the new traversal through the SAME wrap + desugar the old entry point
+;; uses, then solve --- the new analogue of xtc:bind:get-expression-type.
+(define infer-expr
+  (lambda (ast)
+    (let* ((c (list 'let (list (list 'xtm_exp_result ast)) 'xtm_exp_result))
+           (syn (xtc:driver:syntactic-phase 'nosuchname c))
+           (t1 (car syn)))
+      (xtc:infer:type-of t1))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; explicit types      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A handful pinned directly, so the file documents the expected outcomes (codes:
+;; 2 = i64, 0 = f64, 10 = i1).
+(xtmtest-result (infer-expr 42)                          2  "int-literal")
+(xtmtest-result (infer-expr 4.0)                         0  "float-literal")
+(xtmtest-result (infer-expr #t)                          10 "bool-literal")
+(xtmtest-result (infer-expr '(+ 1 2))                    2  "math-int")
+(xtmtest-result (infer-expr '(+ 1.0 2.0))                0  "math-float")
+(xtmtest-result (infer-expr '(if #t 1 2))                2  "if-branches")
+(xtmtest-result (infer-expr '(let ((x:i64 1)) x))        2  "let-bound-var")
+(xtmtest-result (infer-expr '(let ((x:i64 1)) (+ x 2)))  2  "let-then-use")
+(xtmtest-result (infer-expr '(< 1 2))                    10 "compare-int")
+(xtmtest-result (infer-expr '(if (< 1 2) 3 4))           2  "compare-in-if")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; shadow comparison   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The corpus is restricted to the forms the traversal covers so far; the test
+;; returns the expressions on which the new path disagrees with the old checker,
+;; so an empty result certifies agreement and a failure names the divergence.
+(xtmtest-result
+ (let ((corpus (list 0 1 42 99 4.0 1.5
+                     '(+ 1 2) '(* 3 4) '(- 10 5)
+                     '(+ 1.0 2.0) '(* 2.0 3.0)
+                     '(if #t 1 2) '(if #f 5 6)
+                     '(let ((x:i64 1)) x)
+                     '(let ((x:i64 1) (y:i64 2)) (+ x y))
+                     '(let ((x:i64 1)) (+ x 2))
+                     '(begin 1 2 3)
+                     '(< 1 2) '(> 3 4) '(= 5 5)
+                     '(if (< 1 2) 3 4)
+                     '(let ((x:i64 1)) (< x 2)))))
+   (cl:remove-if
+    (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
+    corpus))
+ '()
+ "infer-agrees-with-old-checker")
