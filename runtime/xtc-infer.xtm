@@ -252,6 +252,16 @@
        (xtc:infer:collect-aggregate-ref-ptr ast bound))
       ((and (pair? ast) (eq? (car ast) 'make-tuple))
        (xtc:infer:collect-make-tuple ast bound))
+      ((and (pair? ast) (eq? (car ast) 'make-array))
+       (xtc:infer:collect-make-homogeneous ast bound *xtc:codegen:array*))
+      ((and (pair? ast) (eq? (car ast) 'make-vector))
+       (xtc:infer:collect-make-homogeneous ast bound *xtc:codegen:vector*))
+      ((and (pair? ast) (eq? (car ast) 'vector-shuffle))
+       (xtc:infer:collect-vector-shuffle ast bound))
+      ((and (pair? ast) (member (car ast) '(push_zone pop_zone push_new_zone create_zone)))
+       (xtc:infer:collect-zone ast bound))
+      ((and (pair? ast) (member (car ast) '(num-of-elts obj-size)))
+       (xtc:infer:collect-size-query ast bound))
       ((and (pair? ast) (eq? (car ast) 'while))     (xtc:infer:collect-while ast bound))
       ((and (pair? ast) (eq? (car ast) 'dotimes))   (xtc:infer:collect-dotimes ast bound))
       ((and (pair? ast) (member (car ast) '(bitcast bitconvert)))
@@ -762,6 +772,38 @@
     (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
       (cons (cons *xtc:codegen:tuple* (map car rcs))
             (apply append (map cdr rcs))))))
+
+;; (make-array e ...) / (make-vector e ...): a fixed array / SIMD vector of the
+;; (uniform) element type --- the elements unify with the first, whose type is the
+;; element.  `tag' is the array or vector int-code head.
+(define xtc:infer:collect-make-homogeneous
+  (lambda (ast bound tag)
+    (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
+      (cons (list tag (length (cdr ast)) (car (car rcs)))
+            (append (apply append (map cdr rcs))
+                    (map (lambda (rc) (xtc:solve:c-eq (car (car rcs)) (car rc)))
+                         (cdr rcs)))))))
+
+;; (vector-shuffle a b ...): the result is a vector like the first operand.
+(define xtc:infer:collect-vector-shuffle
+  (lambda (ast bound)
+    (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
+      (cons (car (car rcs)) (apply append (map cdr rcs))))))
+
+;; push_zone / pop_zone / push_new_zone / create_zone: each yields a memory-zone
+;; pointer (%mzone*); a size argument, when present, is collected.
+(define xtc:infer:collect-zone
+  (lambda (ast bound)
+    (cons "%mzone*"
+          (if (> (length ast) 1)
+              (cdr (xtc:infer:collect (cadr ast) bound))
+              '()))))
+
+;; (num-of-elts x) / (obj-size x): a count, i64; the operand is collected.
+(define xtc:infer:collect-size-query
+  (lambda (ast bound)
+    (cons *xtc:codegen:si64*
+          (apply append (map (lambda (a) (cdr (xtc:infer:collect a bound))) (cdr ast))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; control / misc      ;;
