@@ -233,6 +233,7 @@ void* SchemeProcess::taskImpl() {
     loadFile("runtime/xtc-transforms.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-ast.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-typecheck.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-driver.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-codegen.xtm", UNIV::SHARE_DIR);
     m_libsLoaded = true;
