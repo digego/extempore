@@ -1,9 +1,10 @@
 ---
 id: TASK-060
 title: Rename the _impz implicit-zone IR pointer to _zone
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-09 01:35'
+updated_date: '2026-06-09 03:10'
 labels:
   - codegen
   - cleanup
@@ -23,7 +24,7 @@ Do it by hand: pick a non-colliding name (e.g. _mzone or _zoneptr) or carefully 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No self-referential IR produced (no %X = ... %X)
-- [ ] #2 _impz renamed consistently across init.ll and all IR emitters; AOT cache regenerated
-- [ ] #3 Full suite green incl. audio-offline + aot-compilation
+- [x] #1 No self-referential IR produced (no %X = ... %X)
+- [x] #2 _impz renamed consistently across init.ll and all IR emitters; AOT cache regenerated
+- [x] #3 Full suite green incl. audio-offline + aot-compilation
 <!-- AC:END -->

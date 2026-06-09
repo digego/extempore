@@ -1,9 +1,10 @@
 ---
 id: TASK-061
 title: Rename the imp_rand* builtins (C++ ABI) to drop the Impromptu prefix
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-09 01:35'
+updated_date: '2026-06-09 03:29'
 labels:
   - builtins
   - abi
@@ -24,7 +25,7 @@ Decide compatibility: hard break to xtc_rand* vs keep old names as deprecated al
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Compatibility decision (break vs deprecated alias) made and documented
-- [ ] #2 Renamed in lockstep across EXTLLVM.cpp/.h, bitcode.ll, number.inc, transform-atom, caches, base.xtm, tests
-- [ ] #3 EXTLLVM rebuilt; full suite green
+- [x] #1 Compatibility decision (break vs deprecated alias) made and documented
+- [x] #2 Renamed in lockstep across EXTLLVM.cpp/.h, bitcode.ll, number.inc, transform-atom, caches, base.xtm, tests
+- [x] #3 EXTLLVM rebuilt; full suite green
 <!-- AC:END -->

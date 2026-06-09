@@ -1,9 +1,10 @@
 ---
 id: TASK-062
 title: Fix latent undefined-call in the already-bound builtin error path
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-09 01:35'
+updated_date: '2026-06-09 03:04'
 labels:
   - compiler
   - bug
@@ -19,6 +20,6 @@ Found during the impc->xtc rename. runtime/xtc-caches.xtm (the register-new-buil
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Error path no longer references an undefined symbol
-- [ ] #2 The already-bound diagnostic renders correctly when triggered
+- [x] #1 Error path no longer references an undefined symbol
+- [x] #2 The already-bound diagnostic renders correctly when triggered
 <!-- AC:END -->
