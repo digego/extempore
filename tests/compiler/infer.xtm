@@ -96,10 +96,14 @@
 
 ;; A RECURSIVE generic type (IList references itself); the name carries the
 ;; recursion, so the nominal term needs no expansion and the accessor reifies.
+;; ilist_cons RETURNS the generic instance --- the reified napp result reads back
+;; as the same poly c-name the old path produces (the bridge re-encode).
 (bind-type IList <!a,IList*>)
 (bind-func ilist_head:[!a,IList{!a}*]* (lambda (l) (tref l 0)))
 (bind-func mk_ilist:[IList{!a}*,!a]*
   (lambda (x) (let ((l:IList{!a}* (halloc))) (tset! l 0 x) l)))
+(bind-func ilist_cons:[IList{!a}*,!a,IList{!a}*]*
+  (lambda (x l) (let ((n:IList{!a}* (halloc))) (tset! n 0 x) (tset! n 1 l) n)))
 (bind-func mk_ipair:[IPair{!a,!b}*,!a,!b]*
   (lambda (x y) (let ((p:IPair{!a,!b}* (halloc))) (tset! p 0 x) (tset! p 1 y) p)))
 
@@ -186,6 +190,9 @@
 (xtmtest-result (infer-expr '(gpick (mk_gx 5)))           2 "named-generic-nominal-disambiguation")
 (xtmtest-result (infer-expr '(ilist_head (mk_ilist 7)))   2 "named-generic-recursive-i64")
 (xtmtest-result (infer-expr '(ilist_head (mk_ilist 7.0))) 0 "named-generic-recursive-f64")
+;; a generic that RETURNS its generic instance: the head of a consed list still
+;; reduces to the element scalar
+(xtmtest-result (infer-expr '(ilist_head (ilist_cons 8 (mk_ilist 9)))) 2 "named-generic-container-return")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
@@ -255,7 +262,11 @@
                      '(gpick (mk_gx 5))
                      '(ilist_head (mk_ilist 7))
                      '(ilist_head (mk_ilist 7.0))
-                     '(+ (ilist_head (mk_ilist 3)) (ilist_head (mk_ilist 4))))))
+                     '(+ (ilist_head (mk_ilist 3)) (ilist_head (mk_ilist 4)))
+                     ;; a generic that RETURNS its generic instance: the reified
+                     ;; napp reads back as the same poly c-name the old path emits
+                     '(ilist_cons 8 (mk_ilist 9))
+                     '(ilist_head (ilist_cons 8 (mk_ilist 9))))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))

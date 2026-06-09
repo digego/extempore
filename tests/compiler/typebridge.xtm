@@ -183,3 +183,34 @@
 (xtmtest-result (xtc:type:pretty-type-params "<!a**,i64>") '("!a")      "params-depth2")
 (xtmtest-result (xtc:type:pretty-type-params "<!a*,!b>")   '("!a" "!b") "params-two")
 (xtmtest-result (xtc:type:pretty-type-params "<!a,!a*>")   '("!a")      "params-shared")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; nominal generics    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A generic-instance type round-trips through a nominal (napp name arg...) term:
+;; the opaque poly c-name %List_poly_<base64-of-"<i64>"> decodes to (napp "List"
+;; i64) under its pointer, and re-encodes to exactly the same c-name --- so a
+;; generic that returns a container reads back as the live compiler spells it.
+;; PGk2ND4 is the (deterministic) base64 of the type-argument string "<i64>".
+(xtmtest-result (xtc:type:from-intcode "%List_poly_PGk2ND4*" (make-hashtable))
+                (xtc:type:ptr (xtc:type:napp "List" 'i64))
+                "napp-decode")
+
+(xtmtest-result (xtc:type:to-intcode (xtc:type:ptr (xtc:type:napp "List" 'i64)))
+                "%List_poly_PGk2ND4*"
+                "napp-encode")
+
+;; a candidate pattern (carrying a bang variable) decodes --- via split-namedtype,
+;; needing no registered generictype --- to a napp with a variable argument, which
+;; unifies with the concrete instance to reify it back to the same c-name: the
+;; generic-call reification, in miniature.
+(xtmtest-result (let* ((intern (make-hashtable))
+                       (pat (xtc:type:from-intcode "List{!a}*" intern))
+                       (subst (xtc:type:unify
+                               pat
+                               (xtc:type:from-intcode "%List_poly_PGk2ND4*" intern)
+                               xtc:type:empty-subst)))
+                  (xtc:type:to-intcode (xtc:type:apply-subst pat subst)))
+                "%List_poly_PGk2ND4*"
+                "napp-pattern-reifies")

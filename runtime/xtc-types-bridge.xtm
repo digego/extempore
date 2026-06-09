@@ -318,6 +318,22 @@
                 (string-append "unknown base type " (symbol->string base))))))
         ((xtc:type:named? base)
          (string-append "%" (xtc:type:named-name base) (make-string depth #\*)))
+        ;; a nominal parametric type re-encodes to its concrete poly c-name ---
+        ;; %Name_poly_<base64-of-"<args>"> --- the inverse of the decode in
+        ;; from-intcode-string, so a reified generic instance (a container a
+        ;; generic returns, e.g. cdr's List{i64}*) reads back exactly as the live
+        ;; compiler spells it.  The arguments are concrete here (type-of declines
+        ;; a term with free variables before encoding).
+        ((xtc:type:napp? base)
+         (string-append
+          "%" (xtc:type:napp-name base) "_poly_"
+          (cname-encode
+           (string-append "<"
+                          (string-join (map (lambda (a) (xtc:type:to-pretty a intern))
+                                            (xtc:type:napp-args base))
+                                       ",")
+                          ">"))
+          (make-string depth #\*)))
         ((xtc:type:tuple? base)
          (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
         ((xtc:type:array? base)
