@@ -21,6 +21,15 @@
            (t1 (car syn)))
       (xtc:infer:type-of t1))))
 
+;; A few monomorphic helpers so the corpus can exercise global-function
+;; application.  Each bind-func registers a single-candidate polyfunc, which is
+;; the signature the traversal reads back; their parameter and return types are
+;; chosen so the call sites below match exactly (no implicit numeric widening,
+;; which the clean unifier does not model --- see the module header).
+(bind-func infer_add_i32 (lambda (a:i32 b:i32) (+ a b)))
+(bind-func infer_is_pos  (lambda (x:double) (> x 0.0)))
+(bind-func infer_id_i64  (lambda (x:i64) x))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -58,6 +67,17 @@
 (xtmtest-result (infer-expr '(let ((f (lambda () 42))) (f)))                 2  "call-no-arg")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; global application  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A call to a global function reads its single signature: arguments unify with
+;; the parameter types (forcing the literals) and the result is the return type.
+(xtmtest-result (infer-expr '(infer_add_i32 1 2))                      4  "global-call-i32")
+(xtmtest-result (infer-expr '(infer_is_pos 1.0))                       10 "global-call-bool")
+(xtmtest-result (infer-expr '(infer_id_i64 5))                         2  "global-call-i64")
+(xtmtest-result (infer-expr '(infer_add_i32 (infer_add_i32 1 2) 3))    4  "global-call-nested")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -85,7 +105,16 @@
                      '(let ((h (lambda (x:i64) (< x 0)))) (h 5))
                      '(let ((f (lambda (x:i64) (+ x 1)))) (+ (f 5) (f 6)))
                      '(let ((f (lambda () 42))) (f))
-                     '(let ((f (lambda (x:i64) (+ x 1)))) (let ((y:i64 (f 3))) (+ y 1))))))
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (let ((y:i64 (f 3))) (+ y 1)))
+                     ;; global-function application (single known signature),
+                     ;; including a global call nested inside other forms
+                     '(infer_add_i32 1 2)
+                     '(infer_is_pos 1.0)
+                     '(infer_id_i64 5)
+                     '(infer_add_i32 (infer_add_i32 1 2) 3)
+                     '(if (infer_is_pos 2.0) 1 0)
+                     '(+ (infer_add_i32 1 2) (infer_add_i32 3 4))
+                     '(let ((r:i32 (infer_add_i32 1 2))) (infer_add_i32 r 4)))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))
