@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 07:02'
+updated_date: '2026-06-09 07:36'
 labels:
   - compiler
   - types
@@ -80,4 +80,10 @@ STATUS / RESUME POINT (as of 2026-06-09, session end): all commits through ba427
 The authoritative state is the 'Increment 2 CONTINUED further' stanza and its 'REMAINING increment-2 forms' list directly above (the two earlier 'Remaining' lists are superseded). To resume, start there: next is (1) the math/compare overload specialisation, then (2) generics, then increment 3 (flip run-type-check*) and 4 (delete the old six + retry loop).
 
 xtc-infer.xtm and xtc-solve.xtm both carry up-to-date module headers describing coverage and the deferred/curated boundaries; tests/compiler/{infer,solve}.xtm are the shadow/isolation suites (22 + 22 tests, green). Run via: ctest --label-regex compiler-unit -j4 (from build/), or ./build/extempore --batch '(xtmtest-run-tests "tests/compiler/infer.xtm" #t #t)'. Note xtc-infer.xtm is still loaded only by its test, not live (increment 3 wires it in).
+
+Increment 2 CONTINUED further still (commit d3f84510, local/unpushed): the math/compare OVERLOAD specialisation is DONE. A binary arithmetic or comparison operator is now emitted as an overload constraint (not a bare equality): its candidates are the builtin numeric widths --- (w w w) for arithmetic, (i1 w w) for comparison --- plus any registered xtm_addition / xtm_lessthan / ... overloads for non-numeric operands (xtc:infer:math-candidates / compare-candidates, via xtc:infer:poly-candidates reading the polyfunc cache). The solver picks by operand type with NO solver change --- the candidate shapes are all already exercised in solve.xtm: (+ 1 2) selects a numeric width, (+ c1 c2) on two tuples selects the tuple xtm_addition candidate, exactly as the old xtm_addition## rewrite did. A free literal transiently matches several widths; the literal's default then pins it and the ambiguity collapses (the defaulting interleave already in the solver). The numeric shadow corpus is unchanged; new tuple-operand cases (a minimal two-field tuple infer_pair with xtm_addition / xtm_equal instances, standing in for the unloaded Complexd) agree with the old checker. infer.xtm is 24 tests; all 10 compiler-unit tests green.
+
+CURATED BOUNDARY: a fully-unconstrained (+ a b) --- a generic-lambda body with no operand evidence --- now resolves to a numeric width via the overload tie-break (finish-pending) rather than declining (#f). This is a test-harness artifact (infer-expr wraps a bare lambda); in real compilation operands are concrete or literal-defaulted at check time, and a genuinely generic math body goes through the genericfunc path, so the case does not arise. Kept out of the corpus, as before. If it ever bites, the alternative is a numeric-sentinel candidate guarded to be viable only on numeric evidence (a small solver addition) instead of enumerating widths.
+
+STATUS / RESUME POINT (updated, supersedes the earlier 'REMAINING increment-2 forms' and STATUS/RESUME POINT stanzas above): commits through ba42773b are PUSHED; d3f84510 (this increment) is committed LOCALLY, unpushed. Resume at (2) generics: a genericfunc whose return type is REIFIED from the argument types (not selected from candidates) --- keep the _poly_ reification, codegen depends on it. Then increment 3 (flip run-type-check* to collect+solve; forced-types become eq constraints; remember closure:convert + the scope/alpha-rename concern for shadowed let vars) and increment 4 (delete the six old functions --- type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? --- plus the retry loop). xtc-infer.xtm still loaded only by its test, not live (increment 3 wires it in).
 <!-- SECTION:NOTES:END -->
