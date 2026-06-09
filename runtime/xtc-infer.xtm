@@ -36,8 +36,17 @@
 ;;; ambiguity collapses --- the same defaulting interleave the solver already
 ;;; uses for any overload.)
 ;;;
-;;; Still deferred to a later increment: generics whose return type is reified
-;;; from the argument types (genericfunc, not polyfunc).  The clean unifier is intentionally
+;;; A generic function (genericfunc, not polyfunc) is also resolved through the
+;;; overload: its candidate signatures carry bang variables --- (!a !a),
+;;; (!a !a*) --- which the solver freshens per candidate and unifies with the
+;;; arguments, so the return type is REIFIED from the args rather than selected.
+;;; Only the kinds that reify by plain unification are handled: unconstrained
+;;; specialisations free of named generic types.  Deferred (a loud gap, kept out
+;;; of the corpus): named generic types like List{!a} --- which need the
+;;; generictype instantiation machinery the old path carries --- constraint-
+;;; guarded specialisations, and a free return needing expected-type direction.
+;;;
+;;; The clean unifier is intentionally
 ;;; stricter than the old candidate-list path on implicit numeric coercion, so
 ;;; the curated shadow corpus stays clear of two cases the old path silently
 ;;; coerces: a narrower numeric *result* flowing into a wider parameter (an i32
@@ -190,11 +199,14 @@
       ;; a local variable in call position is a closure call
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
-      ;; otherwise a symbol in call position is a global function: resolved
-      ;; through its candidate signatures, a loud gap otherwise (a generic, whose
-      ;; return type is reified rather than selected, is deferred --- see header)
+      ;; otherwise a symbol in call position is a global function (its candidate
+      ;; signatures) or a generic function whose return reifies from the argument
+      ;; types by unification --- the same overload, only its candidates carry
+      ;; bang variables.  An unknown symbol, or a generic kind not yet handled
+      ;; (named generic types, constraints, a free return), is a loud gap.
       ((and (pair? ast) (symbol? (car ast)))
-       (let ((cands (xtc:infer:global-candidates (car ast))))
+       (let ((cands (or (xtc:infer:global-candidates (car ast))
+                        (xtc:infer:generic-candidates (car ast) (length (cdr ast))))))
          (if cands
              (xtc:infer:collect-global-call ast cands bound)
              (xtc:diagnostics:print-compiler-error
@@ -269,6 +281,35 @@
                   ;; a candidate is the closure (head ret p...); its cdr is the
                   ;; (ret p...) signature the overload constraint speaks
                   (and candidates (map cdr candidates))))))))))
+
+;; The bang-variable candidate signatures of a generic function named `sym' at
+;; the given arity, or #f if none applies here.  A genericfunc's return type is
+;; reified from its arguments: a signature like (!a !a) or (!a !a*) instantiates
+;; through the overload exactly as a generic poly candidate does (the solver
+;; freshens each candidate's variables and unifies them with the arguments).
+;;
+;; Deliberately handles only the cases that reify by plain unification: each
+;; specialisation of the right arity that is UNCONSTRAINED and free of named
+;; generic types (no `{' --- those, e.g. List{!a}, need the generictype
+;; instantiation machinery the old path carries and are deferred).  A generic
+;; whose return variable never appears in a parameter (a free return needing
+;; expected-type direction) is admitted here but simply resolves to #f; such
+;; calls stay out of the shadow corpus, as the header notes.
+(define xtc:infer:generic-candidates
+  (lambda (sym arity)
+    (let* ((base (xtc:codegen:get-base-type (symbol->string sym)))
+           (entries (hashtable-ref *xtc:cache:genericfunc-cache* base)))
+      (and entries
+           (let ((sigs (cl:remove
+                        #f
+                        (map (lambda (e)
+                               (and (= (cadr e) arity)
+                                    (not (list-ref e 5))
+                                    (not (string-contains? (symbol->string (caddr e)) "{"))
+                                    (cdr (xtc:codegen:get-type-from-pretty-str
+                                          (symbol->string (caddr e))))))
+                             entries))))
+             (and (not (null? sigs)) sigs))))))
 
 ;; (f arg ...) with f a global function: the call's type is a fresh result that,
 ;; with the argument types, must match exactly one of f's candidate signatures.

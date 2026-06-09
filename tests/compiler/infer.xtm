@@ -59,6 +59,14 @@
     (and (= (tref a 0) (tref b 0))
          (= (tref a 1) (tref b 1)))))
 
+;; Generic functions whose return type is REIFIED from the arguments: the
+;; bang-variable signature instantiates through the overload by unification
+;; (identity reifies the result from its one argument; "first of two" from its
+;; first).  Named-generic-type generics (List{!a} etc.) are deferred --- see the
+;; module header --- so the corpus keeps to these plain bang-var kinds.
+(bind-func infer_gid:[!a,!a]*       (lambda (x) x))
+(bind-func infer_gfirst:[!a,!a,!b]* (lambda (x y) x))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -122,6 +130,16 @@
 (xtmtest-result (infer-expr '(= (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))) 10            "tuple-equal-returns-bool")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; generic functions   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A generic call reifies its return type from the arguments by unification ---
+;; the same overload constraint, only its candidate carries bang variables.
+(xtmtest-result (infer-expr '(infer_gid 5))         2 "generic-identity-i64")
+(xtmtest-result (infer-expr '(infer_gid 5.0))       0 "generic-identity-f64")
+(xtmtest-result (infer-expr '(infer_gfirst 5 6.0))  2 "generic-first-of-two")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -169,7 +187,14 @@
                      ;; math / comparison on tuple operands, dispatched to the
                      ;; user xtm_addition / xtm_equal overload
                      '(+ (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))
-                     '(= (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0)))))
+                     '(= (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))
+                     ;; generic functions, return type reified from the arguments
+                     '(infer_gid 5)
+                     '(infer_gid 5.0)
+                     '(infer_gid (infer_gid 7))
+                     '(infer_gfirst 5 6.0)
+                     '(infer_gfirst 5.0 6)
+                     '(+ (infer_gid 3) (infer_gid 4)))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))
