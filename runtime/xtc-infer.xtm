@@ -889,6 +889,14 @@
 ;; for a scalar and (var code...) for a compound, and in both cases its cdr is the
 ;; int-code, so one c-eq form serves both.  This is shadow-validated against
 ;; run-type-check (tests/compiler/inferfn.xtm) before it is flipped live.
+;; Drop alist entries with a duplicate key, keeping the first.
+(define xtc:infer:dedup-alist
+  (lambda (al)
+    (let loop ((al al) (seen '()) (out '()))
+      (cond ((null? al) (reverse out))
+            ((memq (caar al) seen) (loop (cdr al) seen out))
+            (else (loop (cdr al) (cons (caar al) seen) (cons (car al) out)))))))
+
 (define xtc:infer:check-function
   (lambda (vars forced-types ast)
     (xtc:infer:reset-fresh!)
@@ -898,12 +906,25 @@
            (subst (xtc:solve:run (append forced (cdr rc)) intern)))
       (if (eq? subst 'conflict)
           #f
-          (cl:remove
-           #f
-           (map (lambda (sym)
-                  (let ((ty (xtc:solve:type-of sym subst intern)))
-                    (and ty (cons sym ty))))
-                (hashtable-keys vars)))))))
+          ;; Read back the union of the initial var table and the program
+          ;; variables the constraints actually referenced --- the latter (interned
+          ;; by name, a string key not beginning with the bang/fresh marker `!')
+          ;; catches vars a form introduces mid-traversal, e.g. a dotimes counter,
+          ;; that the initial table does not list but codegen still resolves by name.
+          (let ((syms (append (hashtable-keys vars)
+                              (map string->symbol
+                                   (cl:remove-if-not
+                                    (lambda (k) (and (string? k)
+                                                     (> (string-length k) 0)
+                                                     (not (char=? (string-ref k 0) #\!))))
+                                    (hashtable-keys intern))))))
+            (xtc:infer:dedup-alist
+             (cl:remove
+              #f
+              (map (lambda (sym)
+                     (let ((ty (xtc:solve:type-of sym subst intern)))
+                       (and ty (cons sym ty))))
+                   syms))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; live shadow check   ;;
@@ -920,6 +941,11 @@
 ;; effect on normal compilation.
 (define *xtc:infer:shadow?* #f)
 (define *xtc:infer:shadow-count* 0)   ; functions shadowed (for build-coverage reporting)
+
+;; When set, run-type-check returns check-function's result directly --- the
+;; constraint path drives compilation, the old traversal is bypassed.  Default
+;; off; the flip to default is gated on a full shadow-clean build (stage 3d).
+(define *xtc:infer:live?* #f)
 
 (define xtc:infer:shadow-norm
   (lambda (t) (if (and (list? t) (= (length t) 1)) (car t) t)))

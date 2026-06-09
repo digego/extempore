@@ -3285,15 +3285,19 @@ xtlang's `let' syntax is the same as Scheme"
     ;; (println 'run-type-check 'ast: ast)
     ;; (println 'forced-types forced-types)
     ;; (println 'vars: vars)
-    (let ((typelist (call/cc (lambda (k) (set! *type-check-continuation* k) '()))))
-      (if (null? typelist)
-          (set! typelist (xtc:typecheck:run-type-check* vars forced-types ast)))
-      ;; (println 'unified 'types: typelist)
-      ;; TASK-059 increment 3: when shadow mode is on, cross-check the
-      ;; constraint path against this result without affecting it.
-      (if *xtc:infer:shadow?*
-          (xtc:infer:shadow-check vars forced-types ast typelist (caaadr ast)))
-      typelist)))
+    ;; TASK-059 increment 3 stage 3d: when the constraint path is live, IT
+    ;; produces the result --- the old candidate-list traversal and its retry loop
+    ;; are bypassed entirely.  Default off until a full shadow-clean build clears
+    ;; the flip; until then the old path runs and shadow mode (above) cross-checks.
+    (if *xtc:infer:live?*
+        (xtc:infer:check-function vars forced-types ast)
+        (let ((typelist (call/cc (lambda (k) (set! *type-check-continuation* k) '()))))
+          (if (null? typelist)
+              (set! typelist (xtc:typecheck:run-type-check* vars forced-types ast)))
+          ;; (println 'unified 'types: typelist)
+          (if *xtc:infer:shadow?*
+              (xtc:infer:shadow-check vars forced-types ast typelist (caaadr ast)))
+          typelist))))
 
 (define *xtc:typecheck:type-check-function-symbol* #f)
 (define *xtc:typecheck:type-check-function-symbol-short* #f)
