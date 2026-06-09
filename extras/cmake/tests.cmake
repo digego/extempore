@@ -11,6 +11,12 @@ add_subdirectory(tests/cpp-unit)
 
 set(EXTEMPORE_TEST_PORT_COUNTER 17099 CACHE INTERNAL "")
 
+# Per-assertion JUnit XML reports are written here, one file per test file, so
+# ctest and CI can surface individual assertion failures (not just which .xtm
+# file failed). Safe to upload as a CI test-report artifact.
+set(EXTEMPORE_TEST_RESULTS_DIR ${CMAKE_CURRENT_BINARY_DIR}/test-results)
+file(MAKE_DIRECTORY ${EXTEMPORE_TEST_RESULTS_DIR})
+
 function(extempore_get_next_port OUT_VAR)
     set(${OUT_VAR} ${EXTEMPORE_TEST_PORT_COUNTER} PARENT_SCOPE)
     math(EXPR _new_port "${EXTEMPORE_TEST_PORT_COUNTER} - 2")
@@ -19,9 +25,10 @@ endfunction()
 
 macro(extempore_add_test testfile label)
     extempore_get_next_port(_port)
+    string(REPLACE "/" "_" _safe "${testfile}")
     add_test(NAME ${testfile}
         COMMAND extempore --term nocolor --port=${_port}
-            --batch "(xtmtest-run-tests \"${testfile}\" #t #t)")
+            --batch "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         LABELS ${label})
@@ -29,9 +36,10 @@ endmacro()
 
 macro(extempore_add_ipc_test testfile label)
     extempore_get_next_port(_port)
+    string(REPLACE "/" "_" _safe "${testfile}")
     add_test(NAME ${testfile}
         COMMAND extempore --noaudio --term nocolor --port=${_port}
-            --eval "(xtmtest-run-tests \"${testfile}\" #t #t)")
+            --eval "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         LABELS ${label})
@@ -77,28 +85,50 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
         LABELS ${label})
 endmacro()
 
-# Core library tests
-extempore_add_ipc_test(tests/core/system.xtm libs-core)
-extempore_add_test(tests/core/adt.xtm libs-core)
-extempore_add_test(tests/core/math.xtm libs-core)
-extempore_add_test(tests/core/std.xtm libs-core)
-extempore_add_test(tests/core/xtlang.xtm libs-core)
-extempore_add_test(tests/core/generics.xtm libs-core)
-extempore_add_test(tests/core/type-system.xtm libs-core)
-extempore_add_test(tests/core/pattern-language.xtm libs-core)
-extempore_add_test(tests/core/scheme-compat.xtm libs-core)
+# Core and compiler xtlang tests are auto-discovered: every tests/core/*.xtm
+# and tests/compiler/*.xtm runs as a batch test, labelled by its directory. The
+# few that need a bespoke harness (or aren't standalone) are excluded here and
+# registered explicitly below. CONFIGURE_DEPENDS re-globs when a test file is
+# added or removed, so new tests are picked up without editing this file.
+cmake_policy(SET CMP0057 NEW) # enable IN_LIST
+file(GLOB _core_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/tests/core/*.xtm)
+file(GLOB _compiler_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/tests/compiler/*.xtm)
 
-# Compiler unit tests
-extempore_add_test(tests/compiler/transforms.xtm compiler-unit)
-extempore_add_test(tests/compiler/typecore.xtm compiler-unit)
-extempore_add_test(tests/compiler/typebridge.xtm compiler-unit)
-extempore_add_test(tests/compiler/solve.xtm compiler-unit)
-extempore_add_test(tests/compiler/infer.xtm compiler-unit)
-extempore_add_test(tests/compiler/inferfn.xtm compiler-unit)
-extempore_add_test(tests/compiler/typeunify.xtm compiler-unit)
-extempore_add_test(tests/compiler/typecheck.xtm compiler-unit)
-extempore_add_test(tests/compiler/pipeline.xtm compiler-unit)
-extempore_add_test(tests/compiler/constraints.xtm compiler-unit)
+# excluded from batch auto-registration (handled specially below, or fixtures)
+set(_xtm_special_tests
+    tests/core/system.xtm              # IPC test, driven with --eval
+    tests/core/aot-compilation.xtm     # two-phase AOT round-trip
+    tests/core/aot-compilation-lib.xtm) # fixture library for the AOT test
+
+foreach(_t ${_core_tests})
+    if(NOT _t IN_LIST _xtm_special_tests)
+        extempore_add_test(${_t} libs-core)
+    endif()
+endforeach()
+foreach(_t ${_compiler_tests})
+    if(NOT _t IN_LIST _xtm_special_tests)
+        extempore_add_test(${_t} compiler-unit)
+    endif()
+endforeach()
+
+# system.xtm exercises inter-process eval, so it needs --eval not --batch
+extempore_add_ipc_test(tests/core/system.xtm libs-core)
+
+# failing.xtm is the quarantine for known-broken tests (see docs/reference/
+# testing.md). Registered as an EXPECTED failure: ctest stays green while the
+# bugs persist, and flips to failing the moment a fix makes the file pass --
+# the cue to move that test into its proper home.
+extempore_get_next_port(_failing_port)
+add_test(NAME tests/failing.xtm
+    COMMAND extempore --term nocolor --port=${_failing_port}
+        --batch "(xtmtest-run-tests \"tests/failing.xtm\" #t #t)")
+set_tests_properties(tests/failing.xtm PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    LABELS libs-core
+    TIMEOUT 120
+    WILL_FAIL TRUE)
 
 # AOT compilation round-trip test (two-phase): AOT-compile a fixture library,
 # then in a fresh process load it from its precompiled cache and assert the
