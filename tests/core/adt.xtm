@@ -721,14 +721,13 @@ but we'll use a let style form mlet for monadic-let---bad name :("
 (xtmtest-result (test_point_2) 13.9)
 
 ;; this currently hangs during compilation
-;; (xtmtest (bind-func test_list_ptr
-;;             (lambda ()
-;;               (let ((lst_ptr:List** (alloc 2)))
-;;                 (pset! lst_ptr 0 (list 1 2 3))
-;;                 (pset! lst_ptr 1 (list 4 5 6))
-;;                 (nth (pref lst_ptr 1) 1))))
-
-;;          (test_list_ptr) 5)
+;; (bind-func test_list_ptr
+;;   (lambda ()
+;;     (let ((lst_ptr:List** (alloc 2)))
+;;       (pset! lst_ptr 0 (list 1 2 3))
+;;       (pset! lst_ptr 1 (list 4 5 6))
+;;       (nth (pref lst_ptr 1) 1))))
+;; (xtmtest-result (test_list_ptr) 5)
 
 (bind-func test_list_ptr_2
    (lambda ()
@@ -752,21 +751,19 @@ but we'll use a let style form mlet for monadic-let---bad name :("
        (length (nth_tail lst 6)))))
 (xtmtest-result (test_nth_tail) 0)
 
-;; (xtmtest (bind-func test_nth_tailr
-;;             (lambda ()
-;;               (let ((lst (list 1 2 3)))
-;;                 (nth_tailr lst -3)
-;;                 (length (nth_tailr lst 6)))))
+;; (bind-func test_nth_tailr
+;;   (lambda ()
+;;     (let ((lst (list 1 2 3)))
+;;       (nth_tailr lst -3)
+;;       (length (nth_tailr lst 6)))))
+;; (xtmtest-result (test_nth_tailr) 0)
 
-;;          (test_nth_tailr) 0)
-
-;; (xtmtest (bind-func test_nth_tail_both
-;;             (lambda ()
-;;               (let ((lst (list 1 2 3)))
-;;                 (equal (nth_tail lst 1)
-;;                        (nth_tailr lst 1)))))
-
-;;          (test_nth_tail_both) 1)
+;; (bind-func test_nth_tail_both
+;;   (lambda ()
+;;     (let ((lst (list 1 2 3)))
+;;       (equal (nth_tail lst 1)
+;;              (nth_tailr lst 1)))))
+;; (xtmtest-result (test_nth_tail_both) 1)
 
 (bind-func test_list_take
    (lambda ()
@@ -830,10 +827,7 @@ but we'll use a let style form mlet for monadic-let---bad name :("
 (xtmtest-result (test_dict_set_2) 1)
 
 ;; this next one currently causes an infinite loop in the compiler
-
-;; (xtmtest
-
-;; (test-xtfunc (test_dict_set_3) 1))
+;; (xtmtest-result (test_dict_set_3) 1)
 
 (bind-func test_dict_update_1
    (lambda ()
@@ -883,14 +877,13 @@ but we'll use a let style form mlet for monadic-let---bad name :("
        (equal (union l1 l2) (list 3 1 4 2)))))
 (xtmtest-result (test_list_union) 1)
 
-;; (xtmtest
-;;  '(bind-func test_list_push_1
-;;     (lambda ()
-;;       (let ((l1 (list 1 2 3)))
-;;         ;; probably should do a sorted compare here
-;;         (push 42 l1)
-;;         (car l1))))
-;;  (test_list_push_1) 42)
+;; (bind-func test_list_push_1
+;;   (lambda ()
+;;     (let ((l1 (list 1 2 3)))
+;;       ;; probably should do a sorted compare here
+;;       (push 42 l1)
+;;       (car l1))))
+;; (xtmtest-result (test_list_push_1) 42)
 
 (bind-func test_list_pop_1
    (lambda ()
@@ -919,9 +912,8 @@ but we'll use a let style form mlet for monadic-let---bad name :("
 ;;       (println "functor passes composition test" t2 "==" t3)
 ;;       void)))
 
-;; (xtmtest
-;;  '(bind-func test_btree_1
-;;     (lambda ()
-;;       (let ((tree (BTree 42 (BTree_leaf 23) (BTree_leaf 2))))
-;;         (BTree_walk_postorder tree (lambda (x) (println x))))))
-;;  (test_btree_1))
+;; (bind-func test_btree_1
+;;   (lambda ()
+;;     (let ((tree (BTree 42 (BTree_leaf 23) (BTree_leaf 2))))
+;;       (BTree_walk_postorder tree (lambda (x) (println x))))))
+;; (xtmtest-runs (test_btree_1))
