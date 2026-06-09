@@ -14,12 +14,29 @@
 ;;; this module covers a core subset of forms and errors loudly on anything it
 ;;; does not yet handle --- so coverage gaps are visible, never silent.
 ;;;
+;;; Covered so far: numeric/bool literals, symbols, let, begin, if, binary
+;;; arithmetic, comparison, lambda, and the application of a *local* closure (a
+;;; let-bound or lambda-bound variable in call position).  Still deferred to a
+;;; later increment: application of a global function --- a user bind-func is
+;;; registered as a polyfunc, so its call site routes through the overload
+;;; machinery, not a plain signature lookup --- plus the math/compare overload
+;;; specialisation and generics.
+;;;
 ;;; A form's *result* is named by a key: either a fresh type variable (a
 ;;; !infer_N symbol), a program variable symbol (which is its own type
 ;;; variable), or a concrete int-code for a form whose type is already known
-;;; (e.g. a boolean is i1).  xtc:infer:collect returns (cons result-key
-;;; constraints); constraints relate keys via the int-code vocabulary the solver
-;;; already speaks, so the traversal needs no new representation.
+;;; (e.g. a boolean is i1).  A closure's key is a closure int-code whose return
+;;; and argument slots are themselves keys --- (213 result-key arg-key ...) ---
+;;; so a lambda and a call to it relate through ordinary Robinson unification of
+;;; two closure terms, no separate function-type vocabulary required.
+;;; xtc:infer:collect returns (cons result-key constraints); constraints relate
+;;; keys via the int-code vocabulary the solver already speaks.
+;;;
+;;; The traversal threads a `bound' set --- the lexically in-scope local
+;;; variables --- purely to decide whether a symbol in call position is a local
+;;; closure (handled here) or something global (a coverage gap, so a loud
+;;; error).  Types still flow through constraints, never through `bound'; it
+;;; carries identity, not type.
 
 ;; A monotonic source of fresh result-variable names, distinct (the !infer_
 ;; prefix) from any program or bang variable so they never collide in the solve.
@@ -47,14 +64,23 @@
 (define xtc:infer:compare-op?
   (lambda (s) (and (member s '(< > = <>)) #t)))
 
+;; The boxed-closure int-code head: the closure tag carries an intrinsic box, so
+;; the pointer you pass around sits at depth 2 (213 = 13 + 2*100).  A closure key
+;; is (closure-head result-key arg-key ...) --- the same shape lambda-check emits
+;; --- so it decodes through the bridge as (ptr (closure ...)) and round-trips.
+(define xtc:infer:closure-code
+  (lambda (result-key arg-keys)
+    (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
+          (cons result-key arg-keys))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; the traversal       ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Collect constraints for one (already desugared) AST node.  Returns
-;; (cons result-key constraints).
+;; Collect constraints for one (already desugared) AST node, given the set of
+;; lexically in-scope local variables.  Returns (cons result-key constraints).
 (define xtc:infer:collect
-  (lambda (ast)
+  (lambda (ast bound)
     (cond
       ;; integer literal: a fresh variable defaulting to the integer class
       ((and (number? ast) (integer? ast))
@@ -69,39 +95,75 @@
       ;; desugared boolean literals are i1
       ((and (pair? ast) (eq? (car ast) 'impc_true))  (cons *xtc:codegen:i1* '()))
       ((and (pair? ast) (eq? (car ast) 'impc_false)) (cons *xtc:codegen:i1* '()))
-      ((and (pair? ast) (eq? (car ast) 'let))   (xtc:infer:collect-let ast))
-      ((and (pair? ast) (eq? (car ast) 'begin)) (xtc:infer:collect-seq (cdr ast)))
-      ((and (pair? ast) (eq? (car ast) 'if))    (xtc:infer:collect-if ast))
+      ((ast:let? ast)    (xtc:infer:collect-let ast bound))
+      ((ast:lambda? ast) (xtc:infer:collect-lambda ast bound))
+      ((ast:begin? ast)  (xtc:infer:collect-seq (cdr ast) bound))
+      ((ast:if? ast)     (xtc:infer:collect-if ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-op? (car ast)))
-       (xtc:infer:collect-math ast))
+       (xtc:infer:collect-math ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:compare-op? (car ast)))
-       (xtc:infer:collect-compare ast))
+       (xtc:infer:collect-compare ast bound))
+      ;; a local variable in call position is a closure call; a global symbol
+      ;; here is not yet handled (see the module header) so it must fall through
+      ;; to the loud error rather than being mistaken for a local closure
+      ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
+       (xtc:infer:collect-closure-call ast bound))
       (else
        (xtc:diagnostics:print-compiler-error
         (string-append "xtc:infer: unhandled form (increment 2 covers a core subset): "
                        (sexpr->string ast)))))))
 
-;; A binding (v e) constrains v to e's type; the let's type is its body's.
+;; A binding (v e) constrains v to e's type; the let's type is its body's.  The
+;; bound vars are in scope for the body and (let*-style, harmlessly wider than
+;; plain let) for the binding right-hand sides too.
 (define xtc:infer:collect-let
-  (lambda (ast)
-    (let loop ((bindings (cadr ast)) (cs '()))
-      (if (null? bindings)
-          (let ((body (xtc:infer:collect-seq (cddr ast))))
-            (cons (car body) (append cs (cdr body))))
-          (let* ((b (car bindings))
-                 (v (car b))
-                 (rc (xtc:infer:collect (cadr b))))
-            (loop (cdr bindings)
-                  (append cs (cons (xtc:solve:c-eq v (car rc)) (cdr rc)))))))))
+  (lambda (ast bound)
+    (let* ((bindings (cadr ast))
+           (inner (append (map car bindings) bound)))
+      (let loop ((bs bindings) (cs '()))
+        (if (null? bs)
+            (let ((body (xtc:infer:collect-seq (cddr ast) inner)))
+              (cons (car body) (append cs (cdr body))))
+            (let* ((b (car bs))
+                   (v (car b))
+                   (rc (xtc:infer:collect (cadr b) inner)))
+              (loop (cdr bs)
+                    (append cs (cons (xtc:solve:c-eq v (car rc)) (cdr rc))))))))))
+
+;; (lambda (p ...) body): the parameters are local variables (their own type
+;; variables, shared by name with their uses in the body), the result is the
+;; body's, and the lambda's type is the closure assembled from them.  Because
+;; the parameter slots and the body's uses intern to the same variables, a use
+;; that pins a parameter's type pins the corresponding argument slot too.
+(define xtc:infer:collect-lambda
+  (lambda (ast bound)
+    (let* ((params (ast:lambda-params ast))
+           (body (xtc:infer:collect (ast:lambda-body ast) (append params bound))))
+      (cons (xtc:infer:closure-code (car body) params)
+            (cdr body)))))
+
+;; (f arg ...) with f a local closure: f must be a closure whose argument slots
+;; are the argument types and whose result is fresh; the call's type is that
+;; result.  Unifying f against this synthesised closure is the instantiate-and-
+;; unify step --- the call site's argument types flow into f's signature and f's
+;; return type flows back out, in one equality.
+(define xtc:infer:collect-closure-call
+  (lambda (ast bound)
+    (let* ((args (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast)))
+           (rk (xtc:infer:fresh-key)))
+      (cons rk
+            (append (apply append (map cdr args))
+                    (list (xtc:solve:c-eq (car ast)
+                                          (xtc:infer:closure-code rk (map car args)))))))))
 
 ;; A sequence's type is its last expression's; the earlier expressions still
 ;; contribute their own constraints (so their literals default, etc.).
 (define xtc:infer:collect-seq
-  (lambda (exprs)
+  (lambda (exprs bound)
     (if (null? exprs)
         (cons *xtc:codegen:void* '())
         (let loop ((es exprs) (cs '()))
-          (let ((rc (xtc:infer:collect (car es))))
+          (let ((rc (xtc:infer:collect (car es) bound)))
             (if (null? (cdr es))
                 (cons (car rc) (append cs (cdr rc)))
                 (loop (cdr es) (append cs (cdr rc)))))))))
@@ -109,10 +171,10 @@
 ;; (if c t e): the condition is i1, the two branches unify, the result is the
 ;; branch type.
 (define xtc:infer:collect-if
-  (lambda (ast)
-    (let* ((rc-c (xtc:infer:collect (cadr ast)))
-           (rc-t (xtc:infer:collect (caddr ast)))
-           (rc-e (xtc:infer:collect (cadddr ast))))
+  (lambda (ast bound)
+    (let* ((rc-c (xtc:infer:collect (cadr ast) bound))
+           (rc-t (xtc:infer:collect (caddr ast) bound))
+           (rc-e (xtc:infer:collect (cadddr ast) bound)))
       (cons (car rc-t)
             (append (cdr rc-c) (cdr rc-t) (cdr rc-e)
                     (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)
@@ -120,9 +182,9 @@
 
 ;; (op a b): the operands unify and the result carries the operand type.
 (define xtc:infer:collect-math
-  (lambda (ast)
-    (let* ((rc-a (xtc:infer:collect (cadr ast)))
-           (rc-b (xtc:infer:collect (caddr ast)))
+  (lambda (ast bound)
+    (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
+           (rc-b (xtc:infer:collect (caddr ast) bound))
            (kr (xtc:infer:fresh-key)))
       (cons kr
             (append (cdr rc-a) (cdr rc-b)
@@ -132,9 +194,9 @@
 ;; (cmp a b): the operands unify, but the result is always i1 --- the first
 ;; non-numeric result type to flow through the traversal.
 (define xtc:infer:collect-compare
-  (lambda (ast)
-    (let* ((rc-a (xtc:infer:collect (cadr ast)))
-           (rc-b (xtc:infer:collect (caddr ast))))
+  (lambda (ast bound)
+    (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
+           (rc-b (xtc:infer:collect (caddr ast) bound)))
       (cons *xtc:codegen:i1*
             (append (cdr rc-a) (cdr rc-b)
                     (list (xtc:solve:c-eq (car rc-a) (car rc-b))))))))
@@ -149,7 +211,7 @@
 (define xtc:infer:type-of
   (lambda (ast)
     (xtc:infer:reset-fresh!)
-    (let* ((rc (xtc:infer:collect ast))
+    (let* ((rc (xtc:infer:collect ast '()))
            (intern (make-hashtable))
            (subst (xtc:solve:run (cdr rc) intern)))
       (xtc:solve:type-of (car rc) subst intern))))

@@ -39,6 +39,25 @@
 (xtmtest-result (infer-expr '(if (< 1 2) 3 4))           2  "compare-in-if")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; lambdas and calls   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A lambda's type is the closure (213 ret arg...).  A bare lambda only resolves
+;; when the body pins every parameter --- here the literal 1 fixes x at i64.  A
+;; lambda with a parameter the body never constrains stays generic; the new path
+;; declines it (#f) where the old path emits the raw parameter symbol, so such
+;; lambdas are deliberately kept out of the shadow corpus below (generalising
+;; them is a later increment).
+(xtmtest-result (infer-expr '(lambda (x:i64) (+ x 1)))   '(213 2 2) "lambda-pinned")
+(xtmtest-result (infer-expr '(lambda () 42))             '(213 2)   "lambda-no-arg")
+
+;; Applying a local closure resolves through the call's argument types: the
+;; literal 5 flows into the parameter and the return type flows back out.
+(xtmtest-result (infer-expr '(let ((f (lambda (x:i64) (+ x 1)))) (f 5)))     2  "call-monomorphic")
+(xtmtest-result (infer-expr '(let ((h (lambda (x:i64) (< x 0)))) (h 5)))     10 "call-returns-bool")
+(xtmtest-result (infer-expr '(let ((f (lambda () 42))) (f)))                 2  "call-no-arg")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -56,7 +75,17 @@
                      '(begin 1 2 3)
                      '(< 1 2) '(> 3 4) '(= 5 5)
                      '(if (< 1 2) 3 4)
-                     '(let ((x:i64 1)) (< x 2)))))
+                     '(let ((x:i64 1)) (< x 2))
+                     ;; lambdas (every parameter pinned by the body) and the
+                     ;; application of a local closure
+                     '(lambda (x:i64) (+ x 1))
+                     '(lambda () 42)
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (f 5))
+                     '(let ((g (lambda (a:double b:double) (+ a b)))) (g 1.0 2.0))
+                     '(let ((h (lambda (x:i64) (< x 0)))) (h 5))
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (+ (f 5) (f 6)))
+                     '(let ((f (lambda () 42))) (f))
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (let ((y:i64 (f 3))) (+ y 1))))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))
