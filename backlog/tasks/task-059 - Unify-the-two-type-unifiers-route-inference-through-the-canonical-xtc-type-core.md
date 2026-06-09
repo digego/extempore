@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 13:13'
+updated_date: '2026-06-09 14:15'
 labels:
   - compiler
   - types
@@ -211,4 +211,43 @@ NEXT (3b cont.): control forms (dotimes, while, proper multi-return ret->),
 then bitcast/bitconvert, the printf/scanf format family, zones, math-intrinsics
 -- then start pulling REAL libs/core functions into the corpus.  Then 3c (shadow
 MODE across a full aot build), 3d (flip), increment 4 (delete old machinery).
+
+## Increment 3 stages 3b/3c/3d -- traversal complete, shadow-clean, flip gated
+
+TRAVERSAL (3b): collect now covers the full common surface + long tail --- all the
+old type-check special forms.  Beyond increments 1-2: ret->, set!, void, null?,
+impc_null, string literals; alloc (stack/heap/zone), tuple/array/vector
+ref+set!+ref-ptr, make-tuple/array/vector, ref, pref, pointer-ref/pdref,
+pointer-set!, vector-shuffle; while, dotimes; bitcast/bitconvert; printf family;
+math intrinsics (sqrt/sin/pow/...) and the full mathbinaryaritylist (modulo +
+bitwise); zones; num-of-elts/obj-size.  A deferred 'project' constraint
+(xtc:solve:c-project + discharge-projects, field engine xtc:type:project-field-term
+in the bridge) handles tuple/array/vector indexing; the free-return reifier shares it.
+
+SHADOW (3c): xtc-infer loaded live (from xtc-globals); run-type-check shadow-checks
+against check-function when *xtc:infer:shadow?* is on (catch-guarded, observational).
+Validated ZERO divergence on extensive real bind-funcs: recursion (fib, list-sum),
+generics over concrete lists (car/cdr/cons/nil/list/length/reverse), closures as
+values+args, while/dotimes loops with pointer access, tuples, named types, math,
+strings (printf %s, cat).  Force a from-source compile with (set! *xtc:globals:with-cache*
+#f); --nobase compiles a whole lib from source.
+
+FLIP (3d): GATED behind *xtc:infer:live?* (default #f).  When on, run-type-check
+returns check-function directly.  check-function read-back is now the UNION of the
+var table and the program vars the constraints referenced (interned by name) so a
+dotimes counter etc. is not dropped.  With the flip on the common surface compiles
+AND runs correctly (lv1-lv3: arithmetic, tuples, alloc).
+
+REMAINING BLOCKER (precise): dotimes (and likely similar) fail under the flip in
+CODEGEN, not inference.  The new types are correct (shadow shows i->i64) but
+xtc:codegen:compiler (xtc-codegen.xtm:4119-4125) errors 'cannot find variable i'
+because i is in  yet not on *xtc:codegen:sym-name-stack*: codegen's scope
+tracking depends on a structural property of the result alist the new path spells
+differently (note it keys the fn as lv4_adhoc_8).  NEXT: reconcile check-function's
+alist shape/keys with what codegen+semantic-phase expect (the function-symbol key,
+the entry format, possibly entry order), re-verify lv4/while drive correctly, then
+a full from-source shadow-clean sweep, THEN flip default + increment 4 (delete the
+six old unifiers, the retry loop, the ~45 *-check handlers) --- all gated on full
+CI (Linux/macOS/Windows).  All work so far is committed green, default-off, live
+path unchanged (compiler-unit 11/11 incl aot).
 <!-- SECTION:NOTES:END -->
