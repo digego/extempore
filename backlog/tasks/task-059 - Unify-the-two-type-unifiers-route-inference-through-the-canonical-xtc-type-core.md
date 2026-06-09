@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 03:30'
+updated_date: '2026-06-09 04:22'
 labels:
   - compiler
   - types
@@ -49,3 +49,11 @@ NEXT (the bulk, multi-session):
 - Increment 3: flip run-type-check* (xtc-typecheck.xtm:3300) to the new solve.
 - Increment 4 (AC#2): delete the six functions (type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity?) + the retry loop.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Increment 2 STARTED (commit 0162d3d8, local/unpushed): runtime/xtc-infer.xtm --- the constraint-emitting traversal, the strangler replacement for the candidate-list type-check. Covers a core subset (numeric/bool literals, symbols, let, begin, if, binary arithmetic, comparison ops), errors loudly on unhandled forms. Shadow-validated against the live xtc:bind:get-expression-type over a 22-expression corpus in tests/compiler/infer.xtm (green). Not wired into the live compiler yet.
+
+Remaining increment-2 forms (the substantial part, for dedicated sessions): lambda/closure (closure-tag encoding + arg vars), function application (native-func + closure-call signature lookup -> instantiate-and-unify), the math/compare OVERLOAD specialisation (xtm_addition## etc. for non-numeric operands), and generics (nativef-generics + reify-generic-type --- keep the _poly_ reification). Then increment 3 (flip run-type-check* to collect+solve) and increment 4 (delete the six old functions + retry loop).
+<!-- SECTION:NOTES:END -->
