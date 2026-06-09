@@ -38,22 +38,25 @@
 ;;;
 ;;; A generic function (genericfunc, not polyfunc) is also resolved through the
 ;;; overload: its candidate signatures carry bang variables --- (!a !a),
-;;; (!a !a*), or a named generic type like (!a IPair{!a,!b}*) --- which the
+;;; (!a !a*), or a named generic type like (!a "IPair{!a,!b}*") --- which the
 ;;; solver freshens per candidate and unifies with the arguments, so the return
-;;; type is REIFIED from the args rather than selected.  A named generic type is
-;;; handled because the int-code bridge decodes a concrete instance (an opaque
-;;; poly c-name) to its structural tuple, so it unifies with the candidate's
-;;; instance pattern.  When several specialisations share a name the overload
-;;; picks the one that unifies; a fully-general fallback whose return is free
-;;; (first's [!a,!b]*) is filtered out (xtc:infer:sig-reifiable?) so it does not
-;;; shadow the specific one.
+;;; type is REIFIED from the args rather than selected.  A named generic type
+;;; argument unifies NOMINALLY: the int-code bridge decodes both a concrete
+;;; instance (the opaque poly c-name %Name_poly_<...>) and a candidate's pattern
+;;; (Name{!a,...}) to a (napp name arg...) term, so List{i64} and a same-shaped
+;;; Pair{i64,i64} do NOT cross-unify (their napp names differ) and a recursive
+;;; type like List needs no expansion --- the name carries the recursion.  When
+;;; several specialisations share a name the overload picks the one that unifies;
+;;; a fully-general fallback whose return is free (first's [!a,!b]*) is filtered
+;;; out (xtc:infer:sig-reifiable?) so it does not shadow the specific one.  A
+;;; genericfunc is preferred over its compiled monomorphic instances, which cover
+;;; only the types already specialised.
 ;;;
-;;; Deferred, a loud gap kept out of the corpus: RECURSIVE named generic types
-;;; (List = <!a,List*>), whose instance does not expand to a finite structural
-;;; tuple and is left opaque; constraint-guarded specialisations (the cache's
-;;; predicate field); and a free return that no specialisation reifies (needs
-;;; expected-type direction or body reification, the old "exercise the generic
-;;; code" path).
+;;; Deferred, a loud gap kept out of the corpus: constraint-guarded
+;;; specialisations (the cache's predicate field), and a free return that no
+;;; specialisation reifies --- e.g. (first someList), whose only matching
+;;; signature is the [!a,!b]* fallback --- which needs expected-type direction or
+;;; body reification (the old "exercise the generic code" path).
 ;;;
 ;;; The clean unifier is intentionally
 ;;; stricter than the old candidate-list path on implicit numeric coercion, so
@@ -211,11 +214,16 @@
       ;; otherwise a symbol in call position is a global function (its candidate
       ;; signatures) or a generic function whose return reifies from the argument
       ;; types by unification --- the same overload, only its candidates carry
-      ;; bang variables.  An unknown symbol, or a generic kind not yet handled
-      ;; (named generic types, constraints, a free return), is a loud gap.
+      ;; bang variables (and named generic types as nominal patterns).  An unknown
+      ;; symbol, or a generic kind not yet handled (a constraint-guarded or
+      ;; free-return specialisation), is a loud gap.
       ((and (pair? ast) (symbol? (car ast)))
-       (let ((cands (or (xtc:infer:global-candidates (car ast))
-                        (xtc:infer:generic-candidates (car ast) (length (cdr ast))))))
+       ;; a genericfunc is resolved through its generic signatures FIRST: it may
+       ;; also carry compiled monomorphic instances (a polyfunc), but those cover
+       ;; only the types already specialised, whereas the generic reifies any
+       ;; argument type --- so prefer it, falling back to the plain global path.
+       (let ((cands (or (xtc:infer:generic-candidates (car ast) (length (cdr ast)))
+                        (xtc:infer:global-candidates (car ast)))))
          (if cands
              (xtc:infer:collect-global-call ast cands bound)
              (xtc:diagnostics:print-compiler-error
@@ -293,13 +301,20 @@
 
 ;; The bang (type) variables of an int-code type, each canonicalised (trailing
 ;; pointer stars and any ## suffix dropped) so !a, !a* and !a##3 count as one.
+;; A generic-instance component rides as a pretty string (e.g. "List{!a}*"); its
+;; variables are the bang tokens it contains.
+(define xtc:infer:bang-canon
+  (lambda (s) (xtc:type:strip-trailing-stars (car (string-split-on s "##")))))
+
 (define xtc:infer:bang-vars
   (lambda (ic)
     (cond ((symbol? ic)
            (let ((s (symbol->string ic)))
              (if (and (> (string-length s) 0) (char=? (string-ref s 0) #\!))
-                 (list (xtc:type:strip-trailing-stars (car (string-split-on s "##"))))
+                 (list (xtc:infer:bang-canon s))
                  '())))
+          ((string? ic)
+           (map xtc:infer:bang-canon (regex:match-all ic "![a-zA-Z0-9_]*")))
           ((pair? ic) (apply append (map xtc:infer:bang-vars ic)))
           (else '()))))
 
@@ -313,13 +328,27 @@
       (cl:every (lambda (b) (and (member b param-bangs) #t))
                 (xtc:infer:bang-vars (car sig))))))
 
+;; The (ret param ...) signature of a generic specialisation, read from its
+;; pretty closure type.  A named generic-type component (List{!a}, Pair{!a,!b})
+;; is KEPT as its pretty string so the int-code bridge decodes it to a nominal
+;; napp term --- not expanded to a structural tuple, which would lose the name
+;; and let distinct same-shaped generics (List vs Pair) cross-unify.  Every other
+;; component is parsed to an int-code as usual.
+(define xtc:infer:pretty-sig->candidate
+  (lambda (pretty)
+    (map (lambda (c)
+           (if (string-contains? c "{")
+               c
+               (xtc:codegen:get-type-from-pretty-str c)))
+         (xtc:codegen:get-pretty-closure-arg-strings pretty))))
+
 ;; The candidate signatures of a generic function named `sym' at the given
 ;; arity, or #f if none applies here.  A genericfunc's return type is reified
-;; from its arguments: a signature like (!a !a), (!a !a*) or (!a (tuple !a ...))
-;; instantiates through the overload exactly as a generic poly candidate does
-;; (the solver freshens each candidate's variables and unifies them with the
-;; arguments).  A named generic type in the signature (List{!a} etc.) is decoded
-;; to its structural tuple by the int-code bridge, so it unifies too.
+;; from its arguments: the solver freshens each candidate's variables and
+;; unifies them with the arguments, so a signature like (!a !a), (!a !a*), or
+;; (!a "List{!a}*") carries the return type back out.  A named generic type
+;; argument unifies NOMINALLY (List{i64} is napp "List" i64, distinct from a
+;; same-shaped Pair) --- see the bridge.
 ;;
 ;; Restricted to the unconstrained, return-reifiable specialisations: a
 ;; constraint-guarded one (the cache's predicate field) and a free return (see
@@ -334,8 +363,8 @@
                         (map (lambda (e)
                                (and (= (cadr e) arity)
                                     (not (list-ref e 5))
-                                    (let ((sig (cdr (xtc:codegen:get-type-from-pretty-str
-                                                     (symbol->string (caddr e))))))
+                                    (let ((sig (xtc:infer:pretty-sig->candidate
+                                                (symbol->string (caddr e)))))
                                       (and (xtc:infer:sig-reifiable? sig) sig))))
                              entries))))
              (and (not (null? sigs)) sigs))))))

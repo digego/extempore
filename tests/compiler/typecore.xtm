@@ -199,6 +199,32 @@
                 #f
                 "named-mismatch")
 
+;; nominal parametric types (napp): the name guards the match and the type
+;; arguments unify pairwise.  List{!a} reifies !a from List{i64} ...
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:napp "List" (xtc:type:var 1))
+                                 (xtc:type:napp "List" 'i64)
+                                 xtc:type:empty-subst))
+                'i64
+                "napp-reify-arg")
+
+;; ... but two distinct single-argument generics --- same arity, underlying
+;; shape identical --- do NOT unify, because their names differ.  This is exactly
+;; the property a structural decode (both become the same tuple) would lose.
+(xtmtest-result (xtc:type:unify (xtc:type:napp "List" 'i64)
+                                 (xtc:type:napp "Stack" 'i64)
+                                 xtc:type:empty-subst)
+                #f
+                "napp-nominal-distinct")
+
+;; a parametric type and a same-name plain named type are still distinct shapes.
+(xtmtest-result (xtc:type:unify (xtc:type:napp "List" 'i64)
+                                 (xtc:type:named "List")
+                                 xtc:type:empty-subst)
+                #f
+                "napp-vs-named")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; instantiation       ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -102,6 +102,19 @@
 (define xtc:type:named?     (lambda (t) (and (pair? t) (eq? (car t) 'named))))
 (define xtc:type:named-name (lambda (t) (cadr t)))
 
+;; A nominal parametric type: a named generic type applied to type arguments ---
+;; List{i64} is (napp "List" i64), Pair{!a,!b} is (napp "Pair" (var.) (var.)).
+;; Keeping the name (rather than expanding to the underlying tuple) is what makes
+;; the generic NOMINAL: List{i64} and Pair{i64,i64} have the same shape but must
+;; not unify.  No special unifier support is needed --- the generic unify above
+;; already compares the head ('napp) and then unify-args runs down the list, so
+;; the name rides through as an atom (mismatched names fail) and the type
+;; arguments unify pairwise (so List{!a} reifies !a from List{i64}).
+(define xtc:type:napp      (lambda (name . args) (cons 'napp (cons name args))))
+(define xtc:type:napp?     (lambda (t) (and (pair? t) (eq? (car t) 'napp))))
+(define xtc:type:napp-name (lambda (t) (cadr t)))
+(define xtc:type:napp-args (lambda (t) (cddr t)))
+
 ;; A base (nullary) type is any symbol --- the constructor tags above only ever
 ;; appear as the head of a list, never as a term in their own right.
 (define xtc:type:base?
@@ -257,6 +270,9 @@
           ((string? t) t)
           ((xtc:type:ptr? t) (string-append (xtc:type:term->string (xtc:type:ptr-to t)) "*"))
           ((xtc:type:named? t) (string-append "%" (xtc:type:term->string (xtc:type:named-name t))))
+          ((xtc:type:napp? t)
+           (string-append (xtc:type:term->string (xtc:type:napp-name t))
+                          "{" (xtc:type:term->string-list (xtc:type:napp-args t)) "}"))
           ((xtc:type:tuple? t)
            (string-append "<" (xtc:type:term->string-list (cdr t)) ">"))
           ((xtc:type:closure? t)

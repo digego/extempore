@@ -62,18 +62,17 @@
 ;; Generic functions whose return type is REIFIED from the arguments: the
 ;; bang-variable signature instantiates through the overload by unification
 ;; (identity reifies the result from its one argument; "first of two" from its
-;; first).  Named-generic-type generics (List{!a} etc.) are deferred --- see the
-;; module header --- so the corpus keeps to these plain bang-var kinds.
+;; first).  Named generic types follow below.
 (bind-func infer_gid:[!a,!a]*       (lambda (x) x))
 (bind-func infer_gfirst:[!a,!a,!b]* (lambda (x y) x))
 
-;; Named generic types (e.g. List{!a}): a concrete instance is stored as an
-;; opaque poly c-name, which the int-code bridge decodes to its structural tuple
-;; so a generic accessor reifies its return by unification.  IBox is a single
-;; specialisation; gfirst/gsecond add the multi-specialisation case --- gfirst's
-;; fully-general [!a,!b]* fallback (a free return) is filtered out, leaving the
-;; IPair specialisation to reify.  (Recursive named types like List are deferred,
-;; see the module header, so these stand-ins are non-recursive.)
+;; Named generic types: a concrete instance is an opaque poly c-name, a
+;; candidate's pattern is Name{!a,...}; the int-code bridge decodes BOTH to a
+;; nominal (napp name arg...) term, so an accessor reifies its return by
+;; unification and distinct same-shaped types do not cross-match.  IBox is a
+;; single specialisation; gfirst/gsecond add the multi-specialisation case ---
+;; gfirst's fully-general [!a,!b]* fallback (a free return) is filtered out,
+;; leaving the IPair specialisation to reify.
 (bind-type IBox <!a,i64>)
 (bind-func ibox_get:[!a,IBox{!a}*]* (lambda (b) (tref b 0)))
 (bind-func mk_ibox:[IBox{!a}*,!a]*
@@ -82,6 +81,25 @@
 (bind-func gfirst:[!a,!b]*           (lambda (a) (tref a 0)))
 (bind-func gfirst:[!a,IPair{!a,!b}*]*  (lambda (a) (tref a 0)))
 (bind-func gsecond:[!b,IPair{!a,!b}*]* (lambda (a) (tref a 1)))
+
+;; Nominal disambiguation: Gx{!a} (<!a,double>) and Gy{!a,!b} (<!a,!b>) have the
+;; SAME shape, and gpick has a specialisation for each returning a DIFFERENT
+;; field.  A Gx argument must select the Gx specialisation (field 0 = the
+;; element) --- a structural decode would cross-match Gy and return field 1
+;; (double).  This is the case that makes the nominal representation necessary.
+(bind-type Gx <!a,double>)
+(bind-type Gy <!a,!b>)
+(bind-func gpick:[!a,Gx{!a}*]*       (lambda (g) (tref g 0)))
+(bind-func gpick:[!b,Gy{!a,!b}*]*    (lambda (g) (tref g 1)))
+(bind-func mk_gx:[Gx{!a}*,!a]*
+  (lambda (x) (let ((g:Gx{!a}* (halloc))) (tset! g 0 x) g)))
+
+;; A RECURSIVE generic type (IList references itself); the name carries the
+;; recursion, so the nominal term needs no expansion and the accessor reifies.
+(bind-type IList <!a,IList*>)
+(bind-func ilist_head:[!a,IList{!a}*]* (lambda (l) (tref l 0)))
+(bind-func mk_ilist:[IList{!a}*,!a]*
+  (lambda (x) (let ((l:IList{!a}* (halloc))) (tset! l 0 x) l)))
 (bind-func mk_ipair:[IPair{!a,!b}*,!a,!b]*
   (lambda (x y) (let ((p:IPair{!a,!b}* (halloc))) (tset! p 0 x) (tset! p 1 y) p)))
 
@@ -157,12 +175,17 @@
 (xtmtest-result (infer-expr '(infer_gid 5.0))       0 "generic-identity-f64")
 (xtmtest-result (infer-expr '(infer_gfirst 5 6.0))  2 "generic-first-of-two")
 
-;; Named-type generics: a generic accessor over a (non-recursive) generic-type
-;; instance reifies its return through the c-name -> structural bridge.
+;; Named-type generics: a generic accessor over a generic-type instance reifies
+;; its return through the nominal (napp) bridge decode.
 (xtmtest-result (infer-expr '(ibox_get (mk_ibox 5)))      2 "named-generic-single-spec")
 (xtmtest-result (infer-expr '(ibox_get (mk_ibox 5.0)))    0 "named-generic-single-spec-f64")
 (xtmtest-result (infer-expr '(gfirst (mk_ipair 5 6.0)))   2 "named-generic-multi-spec-first")
 (xtmtest-result (infer-expr '(gsecond (mk_ipair 5 6.0)))  0 "named-generic-multi-spec-second")
+;; nominal disambiguation (would be double=0 under a structural decode) and a
+;; recursive generic type
+(xtmtest-result (infer-expr '(gpick (mk_gx 5)))           2 "named-generic-nominal-disambiguation")
+(xtmtest-result (infer-expr '(ilist_head (mk_ilist 7)))   2 "named-generic-recursive-i64")
+(xtmtest-result (infer-expr '(ilist_head (mk_ilist 7.0))) 0 "named-generic-recursive-f64")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
@@ -227,7 +250,12 @@
                      '(gfirst (mk_ipair 5 6.0))
                      '(gsecond (mk_ipair 5 6.0))
                      '(+ (ibox_get (mk_ibox 3)) (ibox_get (mk_ibox 4)))
-                     '(if (< (gfirst (mk_ipair 1 2.0)) 5) 10 20))))
+                     '(if (< (gfirst (mk_ipair 1 2.0)) 5) 10 20)
+                     ;; nominal disambiguation and a recursive generic type
+                     '(gpick (mk_gx 5))
+                     '(ilist_head (mk_ilist 7))
+                     '(ilist_head (mk_ilist 7.0))
+                     '(+ (ilist_head (mk_ilist 3)) (ilist_head (mk_ilist 4))))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))
