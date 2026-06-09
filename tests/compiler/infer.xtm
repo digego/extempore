@@ -37,6 +37,28 @@
 (bind-func infer_poly:[i32,i32]*       (lambda (x) (+ x 1)))
 (bind-func infer_poly:[double,double]* (lambda (x) (* x 2.0)))
 
+;; A non-numeric operand makes a math/comparison operator dispatch to a user
+;; overload (the old path's xtm_addition## / xtm_equal## rewrite).  A minimal
+;; two-field tuple with xtm_addition and xtm_equal instances stands in for the
+;; Complexd in math.xtm (not loaded here): the operator's overload constraint
+;; carries these candidates alongside the numeric widths, and the solver selects
+;; the tuple candidate when both operands are that tuple.
+(bind-type infer_pair <double,double> (printer? . #f))
+(bind-func infer_mkpair
+  (lambda (re:double im:double)
+    (let ((c:infer_pair* (salloc)))
+      (tset! c 0 re)
+      (tset! c 1 im)
+      (pref c 0))))
+(bind-func xtm_addition
+  (lambda (a:infer_pair b:infer_pair)
+    (infer_mkpair (+ (tref a 0) (tref b 0))
+                  (+ (tref a 1) (tref b 1)))))
+(bind-func xtm_equal
+  (lambda (a:infer_pair b:infer_pair)
+    (and (= (tref a 0) (tref b 0))
+         (= (tref a 1) (tref b 1)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -89,6 +111,17 @@
 (xtmtest-result (infer-expr '(infer_poly 5.0))                         0  "overload-selects-f64")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; tuple operands      ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A math/comparison operator on tuple operands dispatches to its user overload:
+;; (+ pair pair) selects the xtm_addition candidate and carries the tuple type;
+;; (= pair pair) selects xtm_equal and still returns i1.  A named tuple resolves
+;; to its string code ("%infer_pair"); booleans are i1 = 10.
+(xtmtest-result (infer-expr '(+ (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))) "%infer_pair" "tuple-addition")
+(xtmtest-result (infer-expr '(= (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))) 10            "tuple-equal-returns-bool")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -132,7 +165,11 @@
                      '(infer_poly 5.0)
                      '(+ (infer_poly 3) (infer_poly 4))
                      '(if (infer_is_pos 1.0) (infer_poly 2) (infer_poly 3))
-                     '(let ((f (lambda (x:i64) (+ x 1)))) (infer_id_i64 (f 5))))))
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (infer_id_i64 (f 5)))
+                     ;; math / comparison on tuple operands, dispatched to the
+                     ;; user xtm_addition / xtm_equal overload
+                     '(+ (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0))
+                     '(= (infer_mkpair 1.0 2.0) (infer_mkpair 3.0 4.0)))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))

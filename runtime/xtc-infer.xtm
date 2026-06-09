@@ -25,9 +25,19 @@
 ;;; carries the class check, so an integer literal will not silently bind to a
 ;;; floating-point parameter (the candidate's class excludes it).
 ;;;
-;;; Still deferred to a later increment: the math/compare overload
-;;; specialisation, and generics whose return type is reified from the argument
-;;; types (genericfunc, not polyfunc).  The clean unifier is intentionally
+;;; A binary arithmetic or comparison operator is itself an overloaded call: its
+;;; candidates are the builtin numeric widths --- (w w w) for arithmetic, (i1 w w)
+;;; for comparison --- plus any user xtm_addition / xtm_lessthan / ... overloads
+;;; registered for non-numeric operands.  So (+ 1 2) selects a numeric width and
+;;; (+ c1 c2) on two Complexd tuples selects the Complexd xtm_addition candidate,
+;;; exactly as the old path's xtm_addition## rewrite did --- one overload
+;;; constraint, resolved by the operand types.  (A free literal transiently
+;;; matches more than one width; the literal's default then pins it and the
+;;; ambiguity collapses --- the same defaulting interleave the solver already
+;;; uses for any overload.)
+;;;
+;;; Still deferred to a later increment: generics whose return type is reified
+;;; from the argument types (genericfunc, not polyfunc).  The clean unifier is intentionally
 ;;; stricter than the old candidate-list path on implicit numeric coercion, so
 ;;; the curated shadow corpus stays clear of two cases the old path silently
 ;;; coerces: a narrower numeric *result* flowing into a wider parameter (an i32
@@ -73,6 +83,19 @@
 (define xtc:infer:float-class
   (lambda () (list *xtc:codegen:fp64* *xtc:codegen:fp32*)))
 
+;; Every scalar numeric width, the candidate parameter types a builtin math or
+;; comparison operator ranges over (matching xtc:codegen:number?).  A literal is
+;; held to its own narrower default class; a concrete operand selects its exact
+;; width; the surplus widths are simply never viable.
+(define xtc:infer:numeric-class
+  (lambda ()
+    (list *xtc:codegen:fp64* *xtc:codegen:fp32*
+          *xtc:codegen:si64* *xtc:codegen:ui64*
+          *xtc:codegen:si32* *xtc:codegen:ui32*
+          *xtc:codegen:si16* *xtc:codegen:ui16*
+          *xtc:codegen:si8*  *xtc:codegen:ui8*
+          *xtc:codegen:i1*   *xtc:codegen:char*)))
+
 (define xtc:infer:math-op?
   (lambda (s) (and (member s '(+ - * / %)) #t)))
 
@@ -87,6 +110,52 @@
   (lambda (result-key arg-keys)
     (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
           (cons result-key arg-keys))))
+
+;; The user-overload name a math / comparison operator dispatches to when its
+;; operands are non-numeric --- the same names the old path rewrites the operator
+;; to (xtm_addition## etc.) before resolving the poly.
+(define xtc:infer:math-poly-name
+  (lambda (op)
+    (cond ((eq? op '+) "xtm_addition")
+          ((eq? op '-) "xtm_subtraction")
+          ((eq? op '*) "xtm_multiplication")
+          ((eq? op '/) "xtm_division")
+          ((eq? op '%) "xtm_modulo")
+          (else #f))))
+
+(define xtc:infer:compare-poly-name
+  (lambda (op)
+    (cond ((eq? op '<)  "xtm_lessthan")
+          ((eq? op '>)  "xtm_greaterthan")
+          ((eq? op '=)  "xtm_equal")
+          ((eq? op '<>) "xtm_notequal")
+          (else #f))))
+
+;; The candidate signatures (ret param ...) of a registered overload, or '() if
+;; none is registered (no library has defined one for these operands --- then the
+;; operator is purely numeric).  Each polyfunc candidate is a closure int-code
+;; (head ret p...); its cdr is the signature the overload constraint speaks.
+(define xtc:infer:poly-candidates
+  (lambda (name)
+    (if (and name (xtc:cache:polyfunc-exists? name))
+        (let ((cands (xtc:cache:get-polyfunc-candidate-types name)))
+          (if cands (map cdr cands) '()))
+        '())))
+
+;; The full candidate set for a math operator: one (w w w) numeric width per
+;; scalar type, then any user xtm_addition / ... overloads for tuple operands.
+(define xtc:infer:math-candidates
+  (lambda (op)
+    (append (map (lambda (w) (list w w w)) (xtc:infer:numeric-class))
+            (xtc:infer:poly-candidates (xtc:infer:math-poly-name op)))))
+
+;; The candidate set for a comparison: one (i1 w w) per numeric width --- the
+;; result is i1 however wide the operands --- then any user xtm_lessthan / ...
+;; overloads, which likewise return i1.
+(define xtc:infer:compare-candidates
+  (lambda (op)
+    (append (map (lambda (w) (list *xtc:codegen:i1* w w)) (xtc:infer:numeric-class))
+            (xtc:infer:poly-candidates (xtc:infer:compare-poly-name op)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; the traversal       ;;
@@ -240,7 +309,9 @@
                     (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)
                           (xtc:solve:c-eq (car rc-t) (car rc-e))))))))
 
-;; (op a b): the operands unify and the result carries the operand type.
+;; (op a b): an overloaded call.  The numeric candidates make it the operand
+;; width (forcing the two operands equal); a registered xtm_addition / ...
+;; candidate makes it the tuple result --- the solver picks by the operand types.
 (define xtc:infer:collect-math
   (lambda (ast bound)
     (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
@@ -248,18 +319,23 @@
            (kr (xtc:infer:fresh-key)))
       (cons kr
             (append (cdr rc-a) (cdr rc-b)
-                    (list (xtc:solve:c-eq (car rc-a) (car rc-b))
-                          (xtc:solve:c-eq kr (car rc-a))))))))
+                    (list (xtc:solve:c-overload kr
+                                                (list (car rc-a) (car rc-b))
+                                                (xtc:infer:math-candidates (car ast)))))))))
 
-;; (cmp a b): the operands unify, but the result is always i1 --- the first
-;; non-numeric result type to flow through the traversal.
+;; (cmp a b): an overloaded call whose result is always i1 --- every candidate,
+;; numeric or user xtm_lessthan / ..., returns i1; the overload still has to find
+;; one, so it validates that the operands are comparable (and dispatches a tuple
+;; comparison to its overload exactly as the old xtm_lessthan## rewrite did).
 (define xtc:infer:collect-compare
   (lambda (ast bound)
     (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
            (rc-b (xtc:infer:collect (caddr ast) bound)))
       (cons *xtc:codegen:i1*
             (append (cdr rc-a) (cdr rc-b)
-                    (list (xtc:solve:c-eq (car rc-a) (car rc-b))))))))
+                    (list (xtc:solve:c-overload *xtc:codegen:i1*
+                                                (list (car rc-a) (car rc-b))
+                                                (xtc:infer:compare-candidates (car ast)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; driver              ;;
