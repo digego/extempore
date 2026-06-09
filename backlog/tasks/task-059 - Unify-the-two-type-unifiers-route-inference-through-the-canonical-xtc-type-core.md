@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 04:22'
+updated_date: '2026-06-09 05:07'
 labels:
   - compiler
   - types
@@ -56,4 +56,10 @@ NEXT (the bulk, multi-session):
 Increment 2 STARTED (commit 0162d3d8, local/unpushed): runtime/xtc-infer.xtm --- the constraint-emitting traversal, the strangler replacement for the candidate-list type-check. Covers a core subset (numeric/bool literals, symbols, let, begin, if, binary arithmetic, comparison ops), errors loudly on unhandled forms. Shadow-validated against the live xtc:bind:get-expression-type over a 22-expression corpus in tests/compiler/infer.xtm (green). Not wired into the live compiler yet.
 
 Remaining increment-2 forms (the substantial part, for dedicated sessions): lambda/closure (closure-tag encoding + arg vars), function application (native-func + closure-call signature lookup -> instantiate-and-unify), the math/compare OVERLOAD specialisation (xtm_addition## etc. for non-numeric operands), and generics (nativef-generics + reify-generic-type --- keep the _poly_ reification). Then increment 3 (flip run-type-check* to collect+solve) and increment 4 (delete the six old functions + retry loop).
+
+Increment 2 CONTINUED (commit 761646d3, local/unpushed): xtc-infer.xtm now also covers lambda and the application of a LOCAL closure (let-/lambda-bound var in call position). A closure key is the closure int-code (213 ret arg...) with nested keys, so lambda and call relate by Robinson unification of two closure terms --- no separate function-type vocabulary. Parameter slots share interned variables with their body uses (pinning a use pins the arg slot); a call's arg types flow in and the return flows out in one equality (instantiate-and-unify). The traversal now threads a lexical 'bound' set to read a symbol-in-call-position as local-closure (handled) vs global (loud error). Shadow-validated over a 30-expr corpus (tests/compiler/infer.xtm, 16 tests green).
+
+Discovered while doing this: a user bind-func is registered as a POLYFUNC (polyfunc-exists? true, get-polyfunc-candidate-types returns its one closure candidate), NOT a nativefunc/closure --- so a call to a user function routes through symbol-check's poly resolution / nativef-poly-check, not the plain nativef-check signature lookup. nativef-check is for bind-lib C natives. This means 'function application' splits: local closures (DONE, clean Robinson) vs global user functions (the poly path, deferred with the overload work).
+
+Remaining increment-2 forms: global-function application via the poly path; the math/compare OVERLOAD specialisation (xtm_addition## etc. for non-numeric operands); generics (nativef-generics + reify-generic-type, keep the _poly_ reification). Known boundary deferred to a later generalisation pass: a bare lambda whose body leaves a parameter unconstrained --- new path declines it (#f, genuinely generic) where the old path emits the raw parameter symbol (213 0 0 b); such lambdas are kept out of the shadow corpus. Then increment 3 (flip run-type-check*) and 4 (delete the six old functions + retry loop).
 <!-- SECTION:NOTES:END -->
