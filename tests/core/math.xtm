@@ -275,4 +275,35 @@
  (test-integrate2) 1)
 
 
+;; RNG builtins.  Salvaged here (the only place they now run in CI) when the
+;; decade-orphaned tests/core/builtins.xtm was retired.  The xtc_rand* family
+;; was renamed from imp_rand* in TASK-061.
+(xtmtest
+ (bind-func test-xtc-rand
+    (lambda ()
+      (if (and (< (xtc_rand2_f 0. 10.) 10.)
+               (< (xtc_rand1_f 10.) 10.)
+               (< (xtc_rand2_d 0. 10.) 10.)
+               (< (xtc_rand1_d 10.) 10.)
+               (< (xtc_rand2_i32 0 10) 10)
+               (< (xtc_rand1_i32 10) 10)
+               (< (xtc_rand2_i64 0 10) 10)
+               (< (xtc_rand1_i64 10) 10)
+               (< (xtc_randf) 1.0)
+               (< (xtc_randd) 1.0))
+          1 0)))
+ (test-xtc-rand) 1)
+
+;; the deprecated imp_rand* spellings still resolve via the desugar aliases in
+;; xtc:desugar:transform-atom (TASK-061; aliases removed in TASK-063)
+(xtmtest
+ (bind-func test-imp-rand-alias
+    (lambda ()
+      (if (and (< (imp_rand2_f 0. 10.) 10.)
+               (< (imp_rand1_i64 10) 10)
+               (< (imp_randd) 1.0))
+          1 0)))
+ (test-imp-rand-alias) 1)
+
+
 (xtmtest-print-results)
