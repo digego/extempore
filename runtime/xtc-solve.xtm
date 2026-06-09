@@ -167,18 +167,64 @@
 ;; free literal may only take a type from its own class (an integer literal an
 ;; integer width, etc.), so a candidate whose parameter falls outside that class
 ;; is rejected --- the bound the old candidate-list carried, here read off the
-;; literal's default.  An argument already fixed to a concrete type carries no
-;; such restriction (the equality that fixed it already had the final say), and
-;; an argument with no class ranges freely.
+;; literal's default.  A non-numeric parameter --- a named type ("%Complexf"), a
+;; tuple, a compound --- is likewise rejected for a classed variable (a numeric
+;; literal is never one of those; admitting it would hold every literal-argument
+;; overload ambiguous whenever some library registers such an operator overload,
+;; blocking resolution until defaulting fires at the wrong width).  A generic's
+;; !bang parameter stays admissible: it unifies freely and the candidate's other
+;; positions decide.  An argument already fixed to a concrete type carries no
+;; restriction (the equality that fixed it already had the final say), and an
+;; argument with no class ranges freely.
 (define xtc:solve:arg-admits?
   (lambda (akey pcode subst intern classes)
     (let ((resolved (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
       (if (xtc:type:var? resolved)
           (let ((cell (assoc akey classes)))
-            (if (and cell (number? pcode))
-                (and (member pcode (cdr cell)) #t)
-                #t))
+            (if (not cell)
+                #t
+                (cond ((number? pcode) (and (member pcode (cdr cell)) #t))
+                      ((symbol? pcode)
+                       (let ((s (symbol->string pcode)))
+                         (and (> (string-length s) 0)
+                              (char=? (string-ref s 0) #\!))))
+                      (else #f))))
           #t))))
+
+;; The vector-math rule: the old math-check lets a binary operator combine a
+;; SIMD vector with a vector of the same base type at either pointer depth
+;; ("we are allowed to multiply a Vector by a Vector*"), the result being the
+;; VALUE vector (math always returns a non-pointer vector).  A structural rule,
+;; not a fixed signature, so it rides the overload as the marker candidate
+;; `vecmath: viable only once some argument has resolved to a vector or vector
+;; pointer --- and a grounded vector argument kills every numeric candidate, so
+;; the marker is then the unique survivor commit-one picks.  On commit the
+;; other operand takes the base (value) vector if still free, or must share
+;; the base if grounded, and the result is the base vector.
+(define xtc:solve:vecmath-base
+  (lambda (t)
+    (cond ((xtc:type:vector? t) t)
+          ((and (xtc:type:ptr? t) (xtc:type:vector? (xtc:type:ptr-to t)))
+           (xtc:type:ptr-to t))
+          (else #f))))
+
+(define xtc:solve:vecmath-viable
+  (lambda (rkey akeys intern subst)
+    (let* ((terms (map (lambda (k)
+                         (xtc:type:apply-subst (xtc:type:from-intcode k intern) subst))
+                       akeys))
+           (bases (map xtc:solve:vecmath-base terms))
+           (base (cl:find-if (lambda (b) b) bases)))
+      (if (not base)
+          #f
+          (let loop ((ts terms) (bs bases)
+                     (s (xtc:type:unify (xtc:type:from-intcode rkey intern) base subst)))
+            (cond ((not s) #f)
+                  ((null? ts) (cons 'vecmath s))
+                  ((car bs)  ;; grounded vector(-ptr): bases must agree
+                   (loop (cdr ts) (cdr bs) (xtc:type:unify (car bs) base s)))
+                  (else      ;; still free (or must unify with the value vector)
+                   (loop (cdr ts) (cdr bs) (xtc:type:unify (car ts) base s)))))))))
 
 ;; The candidates of overload `c' that unify with its result and argument keys
 ;; under `subst', each paired with the substitution that unifying it produces:
@@ -194,24 +240,28 @@
       (cl:remove
        #f
        (map (lambda (cand)
-              (if (<> (length (cdr cand)) (length akeys))
-                  #f
-                  (let* ((fresh (make-hashtable))
-                         (s1 (xtc:type:unify (xtc:type:from-intcode rkey intern)
-                                             (xtc:type:from-intcode (car cand) fresh)
-                                             subst)))
-                    (if (not s1)
-                        #f
-                        (let loop ((as akeys) (ps (cdr cand)) (s s1))
-                          (if (null? as)
-                              (cons cand s)
-                              (if (not (xtc:solve:arg-admits? (car as) (car ps) s intern classes))
-                                  #f
-                                  (let ((s2 (xtc:type:unify
-                                             (xtc:type:from-intcode (car as) intern)
-                                             (xtc:type:from-intcode (car ps) fresh)
-                                             s)))
-                                    (if s2 (loop (cdr as) (cdr ps) s2) #f)))))))))
+              (cond
+                ((eq? cand 'vecmath)
+                 (xtc:solve:vecmath-viable rkey akeys intern subst))
+                ((<> (length (cdr cand)) (length akeys))
+                 #f)
+                (else
+                 (let* ((fresh (make-hashtable))
+                        (s1 (xtc:type:unify (xtc:type:from-intcode rkey intern)
+                                            (xtc:type:from-intcode (car cand) fresh)
+                                            subst)))
+                   (if (not s1)
+                       #f
+                       (let loop ((as akeys) (ps (cdr cand)) (s s1))
+                         (if (null? as)
+                             (cons cand s)
+                             (if (not (xtc:solve:arg-admits? (car as) (car ps) s intern classes))
+                                 #f
+                                 (let ((s2 (xtc:type:unify
+                                            (xtc:type:from-intcode (car as) intern)
+                                            (xtc:type:from-intcode (car ps) fresh)
+                                            s)))
+                                   (if s2 (loop (cdr as) (cdr ps) s2) #f))))))))))
             cands)))))
 
 ;; One scan of the pending overloads: commit the first that has a unique viable

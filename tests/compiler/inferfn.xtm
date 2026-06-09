@@ -133,9 +133,11 @@
 (xtmtest-result (inferfn:disagreements 'tf_while
                   '(lambda (n:i64) (let ((i:i64 0)) (while (< i n) (set! i (+ i 1))) i)))
                 '() "fn-while")
-;; (dotimes is validated by the live shadow, not here: the standalone prep does
-;; not register the dotimes loop counter the way the live pipeline does, so the
-;; OLD oracle itself errors on it --- a harness-fidelity gap, not a divergence.)
+;; the dotimes counter is not a binding site on either path --- both error on an
+;; undeclared counter --- so it is declared in the let, the documented usage
+(xtmtest-result (inferfn:disagreements 'tf_dot
+                  '(lambda (n:i64) (let ((s:i64 0) (i:i64 0)) (dotimes (i n) (set! s (+ s i))) s)))
+                '() "fn-dotimes-declared-counter")
 (xtmtest-result (inferfn:disagreements 'tf_str '(lambda () "hello"))
                 '() "fn-string-literal")
 (xtmtest-result (inferfn:disagreements 'tf_conv '(lambda (x:i64) (convert x double)))
@@ -155,3 +157,32 @@
                 '() "fn-modulo")
 (xtmtest-result (inferfn:disagreements 'tf_spr '(lambda (s:i8* x:i64) (sprintf s "%d" x)))
                 '() "fn-sprintf")
+
+;; the from-source sweep's regression cases: a one-armed if (its value is the
+;; then-branch's, never car-of-nil), pref-ptr (pointer-ref-ptr keeps the
+;; pointer's own type), a global variable read and write (resolved through the
+;; cache, NOT an alist local), SIMD vector math at mixed pointer depth and
+;; vshuffle (both yield the VALUE vector), and an i8-typed comparison against an
+;; int literal (the literal's viability class reaches the 8-bit widths).
+(xtmtest-result (inferfn:disagreements 'tf_if1
+                  '(lambda (x:i64) (let ((y:i64 0)) (if (> x 0) (set! y x)) y)))
+                '() "fn-one-armed-if")
+(xtmtest-result (inferfn:disagreements 'tf_prefptr
+                  '(lambda (p:double* n:i64) (pref-ptr p n)))
+                '() "fn-pref-ptr")
+(bind-val inferfn_gv i64 7)
+(xtmtest-result (inferfn:disagreements 'tf_gread '(lambda (x:i64) (+ x inferfn_gv)))
+                '() "fn-global-read")
+(xtmtest-result (inferfn:disagreements 'tf_gwrite '(lambda (x:i64) (set! inferfn_gv x) inferfn_gv))
+                '() "fn-global-write")
+(xtmtest-result (inferfn:disagreements 'tf_vmath
+                  '(lambda (a:/4,float/* b:/4,float/*)
+                     (let ((v:/4,float/ (* (pref a 0) b))) v)))
+                '() "fn-vector-math-mixed-depth")
+(xtmtest-result (inferfn:disagreements 'tf_vshuf
+                  '(lambda (a:/4,float/*)
+                     (let ((v:/4,float/ (vshuffle a null 0 0 1 1))) v)))
+                '() "fn-vector-shuffle")
+(xtmtest-result (inferfn:disagreements 'tf_i8cmp
+                  '(lambda (s:i8* i:i64) (if (= (pref s i) 32) 1 0)))
+                '() "fn-i8-literal-compare")

@@ -102,8 +102,22 @@
 
 ;; The numeric defaulting classes, single-sourced from the codegen constants and
 ;; ordered so the solver's (apply min) picks the canonical default (si64 / fp64).
+;; The class is also the literal's VIABILITY bound (what widths it may take when
+;; a use demands one --- the old path's number-check + crunch), so an integer
+;; literal ranges over every integer width its value fits: 0 and 1 reach down to
+;; i1, anything under 256 fits the 8-bit widths, everything else stops at 16
+;; bits.  Float widths are deliberately absent --- a bare int literal does not
+;; implicitly become a float (the one place this path is stricter by design).
 (define xtc:infer:int-class
-  (lambda () (list *xtc:codegen:si64* *xtc:codegen:si32* *xtc:codegen:si16* *xtc:codegen:ui8*)))
+  (lambda (v)
+    (let ((wide (list *xtc:codegen:si64* *xtc:codegen:ui64*
+                      *xtc:codegen:si32* *xtc:codegen:ui32*
+                      *xtc:codegen:si16* *xtc:codegen:ui16*)))
+      (cond ((or (= v 0) (= v 1))
+             (append wide (list *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:i1*)))
+            ((< v 256)
+             (append wide (list *xtc:codegen:si8* *xtc:codegen:ui8*)))
+            (else wide)))))
 
 (define xtc:infer:float-class
   (lambda () (list *xtc:codegen:fp64* *xtc:codegen:fp32*)))
@@ -177,11 +191,14 @@
         '())))
 
 ;; The full candidate set for a math operator: one (w w w) numeric width per
-;; scalar type, then any user xtm_addition / ... overloads for tuple operands.
+;; scalar type, then any user xtm_addition / ... overloads for tuple operands,
+;; then the structural SIMD-vector rule (see xtc:solve:vecmath-viable), which
+;; only an operand grounded to a vector can select.
 (define xtc:infer:math-candidates
   (lambda (op)
     (append (map (lambda (w) (list w w w)) (xtc:infer:numeric-class))
-            (xtc:infer:poly-candidates (xtc:infer:math-poly-name op)))))
+            (xtc:infer:poly-candidates (xtc:infer:math-poly-name op))
+            (list 'vecmath))))
 
 ;; The candidate set for a comparison: one (i1 w w) per numeric width --- the
 ;; result is i1 however wide the operands --- then any user xtm_lessthan / ...
@@ -261,10 +278,13 @@
 (define xtc:infer:collect
   (lambda (ast bound)
     (cond
+      ;; an empty form (e.g. a bind-type generator splicing nothing for a
+      ;; scalar field) contributes nothing, like the old checker's '() case
+      ((null? ast) (cons *xtc:codegen:void* '()))
       ;; integer literal: a fresh variable defaulting to the integer class
       ((and (number? ast) (integer? ast))
        (let ((k (xtc:infer:fresh-key)))
-         (cons k (list (xtc:solve:c-default k (xtc:infer:int-class))))))
+         (cons k (list (xtc:solve:c-default k (xtc:infer:int-class ast))))))
       ;; floating-point literal: defaults to the float class
       ((number? ast)
        (let ((k (xtc:infer:fresh-key)))
@@ -303,6 +323,8 @@
       ((and (pair? ast) (eq? (car ast) 'pref))      (xtc:infer:collect-pref ast bound))
       ((and (pair? ast) (member (car ast) '(pointer-ref pdref)))
        (xtc:infer:collect-deref ast bound))
+      ((and (pair? ast) (eq? (car ast) 'pointer-ref-ptr))
+       (xtc:infer:collect-pointer-ref-ptr ast bound))
       ((and (pair? ast) (eq? (car ast) 'pointer-set!))
        (xtc:infer:collect-pointer-set! ast bound))
       ((and (pair? ast) (member (car ast) '(tuple-ref array-ref vector-ref)))
@@ -690,16 +712,21 @@
                 (loop (cdr es) (append cs (cdr rc)))))))))
 
 ;; (if c t e): the condition is i1, the two branches unify, the result is the
-;; branch type.
+;; branch type.  A one-armed (if c t) runs t for effect; like the old check its
+;; type is t's, with no else to unify against.
 (define xtc:infer:collect-if
   (lambda (ast bound)
     (let* ((rc-c (xtc:infer:collect (cadr ast) bound))
            (rc-t (xtc:infer:collect (caddr ast) bound))
-           (rc-e (xtc:infer:collect (cadddr ast) bound)))
-      (cons (car rc-t)
-            (append (cdr rc-c) (cdr rc-t) (cdr rc-e)
-                    (list (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)
-                          (xtc:solve:c-eq (car rc-t) (car rc-e))))))))
+           (cond-c (xtc:solve:c-eq (car rc-c) *xtc:codegen:i1*)))
+      (if (null? (cdddr ast))
+          (cons (car rc-t)
+                (append (cdr rc-c) (cdr rc-t) (list cond-c)))
+          (let ((rc-e (xtc:infer:collect (cadddr ast) bound)))
+            (cons (car rc-t)
+                  (append (cdr rc-c) (cdr rc-t) (cdr rc-e)
+                          (list cond-c
+                                (xtc:solve:c-eq (car rc-t) (car rc-e))))))))))
 
 ;; (op a b): an overloaded call.  The numeric candidates make it the operand
 ;; width (forcing the two operands equal); a registered xtm_addition / ...
@@ -753,6 +780,14 @@
           ((pair? k)   (cons (+ (car k) *xtc:codegen:pointer*) (cdr k)))
           (else k))))
 
+;; A pointer / aggregate index is integral: the old checks direct every index
+;; position to (si64 si32), so an otherwise-unconstrained index --- a bare
+;; counter argument, an arithmetic result over untyped vars --- defaults to
+;; si64 instead of the numeric tie-break (which would pick a float).
+(define xtc:infer:index-default
+  (lambda (k)
+    (xtc:solve:c-default k (list *xtc:codegen:si64* *xtc:codegen:si32*))))
+
 ;; (null? p): p is some pointer; the result is i1.  We still collect p so its own
 ;; type is constrained.
 (define xtc:infer:collect-null?
@@ -803,7 +838,20 @@
            (e (xtc:infer:fresh-key)))
       (cons e
             (append (cdr rc) (cdr rc-i)
+                    (if (car rc-i) (list (xtc:infer:index-default (car rc-i))) '())
                     (list (xtc:solve:c-eq (car rc) (xtc:infer:ptr-of e))))))))
+
+;; (pointer-ref-ptr p i): a pointer to element i of p --- p's own (pointer)
+;; type, like the old check; the index is collected for its own constraints.
+(define xtc:infer:collect-pointer-ref-ptr
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (cadr ast) bound))
+          (rc-i (xtc:infer:collect (caddr ast) bound))
+          (e (xtc:infer:fresh-key)))
+      (cons (car rc)
+            (append (cdr rc) (cdr rc-i)
+                    (list (xtc:infer:index-default (car rc-i))
+                          (xtc:solve:c-eq (car rc) (xtc:infer:ptr-of e))))))))
 
 ;; (pointer-set! p i v): p points at v's type; the form's value is v's.
 (define xtc:infer:collect-pointer-set!
@@ -813,7 +861,8 @@
            (rc-v (xtc:infer:collect (cadddr ast) bound)))
       (cons (car rc-v)
             (append (cdr rc-p) (cdr rc-i) (cdr rc-v)
-                    (list (xtc:solve:c-eq (car rc-p) (xtc:infer:ptr-of (car rc-v)))))))))
+                    (list (xtc:infer:index-default (car rc-i))
+                          (xtc:solve:c-eq (car rc-p) (xtc:infer:ptr-of (car rc-v)))))))))
 
 ;; A literal field index, or 0 for an array/vector whose index is a runtime value
 ;; (the projection ignores the index for those --- the element type is uniform).
@@ -829,7 +878,8 @@
           (k (xtc:infer:fresh-key)))
       (cons k
             (append (cdr rc-a) (cdr rc-i)
-                    (list (xtc:solve:c-project k (car rc-a)
+                    (list (xtc:infer:index-default (car rc-i))
+                          (xtc:solve:c-project k (car rc-a)
                                                (xtc:infer:ref-index (caddr ast)))))))))
 
 ;; (tuple-set! a i v) / (array-set! a i v) / (vector-set! a i v): v IS field i of
@@ -841,7 +891,8 @@
           (rc-v (xtc:infer:collect (cadddr ast) bound)))
       (cons (car rc-v)
             (append (cdr rc-a) (cdr rc-i) (cdr rc-v)
-                    (list (xtc:solve:c-project (car rc-v) (car rc-a)
+                    (list (xtc:infer:index-default (car rc-i))
+                          (xtc:solve:c-project (car rc-v) (car rc-a)
                                                (xtc:infer:ref-index (caddr ast)))))))))
 
 ;; (tuple-ref-ptr a i) / (array-ref-ptr a i): a pointer to field i --- the
@@ -853,7 +904,8 @@
           (f (xtc:infer:fresh-key)))
       (cons (xtc:infer:ptr-of f)
             (append (cdr rc-a) (cdr rc-i)
-                    (list (xtc:solve:c-project f (car rc-a)
+                    (list (xtc:infer:index-default (car rc-i))
+                          (xtc:solve:c-project f (car rc-a)
                                                (xtc:infer:ref-index (caddr ast)))))))))
 
 ;; (make-tuple e ...): a tuple of the element types.
@@ -874,11 +926,20 @@
                     (map (lambda (rc) (xtc:solve:c-eq (car (car rcs)) (car rc)))
                          (cdr rcs)))))))
 
-;; (vector-shuffle a b ...): the result is a vector like the first operand.
+;; (vector-shuffle a b mask...): the result is the first operand's VALUE
+;; vector --- a pointer operand is stripped, exactly the old check --- expressed
+;; through the same structural vecmath rule the math overload uses, over the
+;; two vector operands; the mask indices are collected for their own
+;; constraints only.
 (define xtc:infer:collect-vector-shuffle
   (lambda (ast bound)
-    (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
-      (cons (car (car rcs)) (apply append (map cdr rcs))))))
+    (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast)))
+          (kr (xtc:infer:fresh-key)))
+      (cons kr
+            (append (apply append (map cdr rcs))
+                    (list (xtc:solve:c-overload kr
+                                                (list (car (car rcs)) (car (cadr rcs)))
+                                                (list 'vecmath))))))))
 
 ;; push_zone / pop_zone / push_new_zone / create_zone: each yields a memory-zone
 ;; pointer (%mzone*); a size argument, when present, is collected.
