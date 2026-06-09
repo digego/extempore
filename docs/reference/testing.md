@@ -50,14 +50,13 @@ the checker is meant to catch):
    (lambda () 3.5)))
 ```
 
-`xtmtest` is the older "define, call, and check in one form" macro, still used by
-much of the existing corpus. New tests should prefer `xtmtest-result`.
+When a call's only point is that it compiles and runs without error (no value to
+check), use `xtmtest-runs`.
 
 ```xtlang
-(xtmtest
- (bind-func add_three (lambda (a:i64 b:i64 c:i64) (+ a (+ b c))))
- (add_three 1 2 3)
- 6)
+(bind-func print_banner
+  (lambda () (println "ready")))
+(xtmtest-runs (print_banner))
 ```
 
 ## Outcomes {#outcomes}
