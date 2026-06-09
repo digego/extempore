@@ -150,15 +150,56 @@
  2
  "overload-disambiguated-by-equality")
 
-;; the same two candidates, but the argument is a bare literal: both are viable
-;; until defaulting pins the literal to i64, which then selects the i64
-;; candidate --- the default is the tie-breaker no equality supplied
+;; the same two candidates, but the argument is a bare integer literal: its class
+;; (integer widths) excludes the f64 candidate outright, so the i64 candidate is
+;; selected without even needing to default --- a literal matches a candidate at
+;; any width in its class, the bound the old candidate-list carried
 (xtmtest-result
  (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0)))
                (xtc:solve:c-default 'a (list 2 4 6 9)))
          'r)
  2
- "overload-disambiguated-by-default")
+ "overload-literal-excludes-float-candidate")
+
+;; an integer literal selects the i32 candidate over the f64 one --- i32 is in
+;; its class though it is NOT the width defaulting would choose (i64).  This is
+;; the case plain defaulting gets wrong: it would pin the literal to i64, which
+;; matches neither candidate; reading the class instead matches the old checker.
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
+               (xtc:solve:c-default 'a (list 2 4 6 9)))
+         'r)
+ 4
+ "overload-literal-matches-non-default-width")
+
+;; a float literal selects the f64 candidate by the same class reasoning
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 0 0) (list 4 4)))
+               (xtc:solve:c-default 'a (list 0 1)))
+         'r)
+ 0
+ "overload-float-literal-matches-by-class")
+
+;; when BOTH candidates are in the literal's class (i64 and i32), the class
+;; cannot decide; defaulting then breaks the tie at the class's canonical width
+;; (i64) --- the genuine default tie-break, distinct from the class filter above
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4)))
+               (xtc:solve:c-default 'a (list 2 4 6 9)))
+         'r)
+ 2
+ "overload-default-breaks-in-class-tie")
+
+;; a bare literal cannot be passed where a pointer is required: the parameter
+;; (i64*) is outside the integer class, so no candidate admits the literal
+(xtmtest-result
+ (let ((intern (make-hashtable)))
+   (eq? 'conflict
+        (xtc:solve:run (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 102)))
+                             (xtc:solve:c-default 'a (list 2 4 6 9)))
+                       intern)))
+ #t
+ "overload-literal-rejects-pointer-parameter")
 
 ;; an argument fixed to i32 selects the i32 candidate over the i64 one
 (xtmtest-result

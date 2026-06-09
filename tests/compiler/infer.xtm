@@ -30,6 +30,13 @@
 (bind-func infer_is_pos  (lambda (x:double) (> x 0.0)))
 (bind-func infer_id_i64  (lambda (x:i64) x))
 
+;; An overloaded (multi-candidate) function: one i32 and one f64 instance.  A
+;; call is resolved by the argument's class --- an integer literal selects the
+;; i32 candidate, a floating-point literal the f64 candidate --- which is the
+;; overload constraint's job in the solver.
+(bind-func infer_poly:[i32,i32]*       (lambda (x) (+ x 1)))
+(bind-func infer_poly:[double,double]* (lambda (x) (* x 2.0)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -77,6 +84,10 @@
 (xtmtest-result (infer-expr '(infer_id_i64 5))                         2  "global-call-i64")
 (xtmtest-result (infer-expr '(infer_add_i32 (infer_add_i32 1 2) 3))    4  "global-call-nested")
 
+;; An overloaded call resolves to the candidate the argument's class selects.
+(xtmtest-result (infer-expr '(infer_poly 5))                           4  "overload-selects-i32")
+(xtmtest-result (infer-expr '(infer_poly 5.0))                         0  "overload-selects-f64")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -114,7 +125,14 @@
                      '(infer_add_i32 (infer_add_i32 1 2) 3)
                      '(if (infer_is_pos 2.0) 1 0)
                      '(+ (infer_add_i32 1 2) (infer_add_i32 3 4))
-                     '(let ((r:i32 (infer_add_i32 1 2))) (infer_add_i32 r 4)))))
+                     '(let ((r:i32 (infer_add_i32 1 2))) (infer_add_i32 r 4))
+                     ;; overloaded (multi-candidate) application, resolved by the
+                     ;; argument's class, and composed with the other forms
+                     '(infer_poly 5)
+                     '(infer_poly 5.0)
+                     '(+ (infer_poly 3) (infer_poly 4))
+                     '(if (infer_is_pos 1.0) (infer_poly 2) (infer_poly 3))
+                     '(let ((f (lambda (x:i64) (+ x 1)))) (infer_id_i64 (f 5))))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))

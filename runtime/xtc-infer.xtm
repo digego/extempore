@@ -17,22 +17,25 @@
 ;;; Covered so far: numeric/bool literals, symbols, let, begin, if, binary
 ;;; arithmetic, comparison, lambda, the application of a *local* closure (a
 ;;; let-bound or lambda-bound variable in call position), and the application of
-;;; a *global* function that has a single known signature --- a bind-lib native,
-;;; a bound closure, or a monomorphic bind-func (which is registered as a
-;;; one-candidate polyfunc).  A single signature reduces to ordinary equality
-;;; application: each argument unifies with its parameter type and the call's
-;;; type is the return type.
+;;; a *global* function --- a bind-lib native, a bound closure, or a bind-func
+;;; (registered as a polyfunc, monomorphic or overloaded).  A global call emits
+;;; one overload constraint over the callee's candidate signatures (see
+;;; xtc-solve.xtm); the solver picks the candidate the arguments select.  A
+;;; monomorphic function is just the one-candidate case --- the overload still
+;;; carries the class check, so an integer literal will not silently bind to a
+;;; floating-point parameter (the candidate's class excludes it).
 ;;;
-;;; Still deferred to a later increment: a *multi-candidate* global (genuine
-;;; ad-hoc overloading --- a disjunctive/deferred choice that needs solver
-;;; support beyond eq/default), the math/compare overload specialisation, and
-;;; generics.  Two semantic gaps where the clean unifier is intentionally
-;;; stricter than the old candidate-list path, so the curated shadow corpus
-;;; stays clear of them: the old path coerces a narrower numeric result to a
-;;; wider parameter (i32 result into an i64 parameter) where Robinson reports a
-;;; conflict, and it confines an integer literal to integer widths where the
-;;; defaulting rule here lets a literal unify with a float.  Both are the same
-;;; implicit-numeric-coercion question the migration sets out to replace.
+;;; Still deferred to a later increment: the math/compare overload
+;;; specialisation, and generics whose return type is reified from the argument
+;;; types (genericfunc, not polyfunc).  The clean unifier is intentionally
+;;; stricter than the old candidate-list path on implicit numeric coercion, so
+;;; the curated shadow corpus stays clear of two cases the old path silently
+;;; coerces: a narrower numeric *result* flowing into a wider parameter (an i32
+;;; result into an i64 parameter), and a bare integer *literal* passed where a
+;;; floating-point parameter is wanted (the old single-candidate path forces the
+;;; literal across; the overload's class check declines it, since an integer
+;;; literal does not range over the float widths).  Both are the same
+;;; coercion-versus-conflict question the migration sets out to replace.
 ;;;
 ;;; A form's *result* is named by a key: either a fresh type variable (a
 ;;; !infer_N symbol), a program variable symbol (which is its own type
@@ -118,15 +121,15 @@
       ;; a local variable in call position is a closure call
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
-      ;; otherwise a symbol in call position is a global function: handled when
-      ;; it has a single known signature, a loud gap otherwise (multi-candidate
-      ;; overload and generics are deferred --- see the module header)
+      ;; otherwise a symbol in call position is a global function: resolved
+      ;; through its candidate signatures, a loud gap otherwise (a generic, whose
+      ;; return type is reified rather than selected, is deferred --- see header)
       ((and (pair? ast) (symbol? (car ast)))
-       (let ((sig (xtc:infer:global-signature (car ast))))
-         (if sig
-             (xtc:infer:collect-global-call ast sig bound)
+       (let ((cands (xtc:infer:global-candidates (car ast))))
+         (if cands
+             (xtc:infer:collect-global-call ast cands bound)
              (xtc:diagnostics:print-compiler-error
-              (string-append "xtc:infer: unhandled call --- deferred (multi-candidate poly / generic) or unknown symbol: "
+              (string-append "xtc:infer: unhandled call --- deferred (generic) or unknown symbol: "
                              (sexpr->string ast))))))
       (else
        (xtc:diagnostics:print-compiler-error
@@ -176,44 +179,42 @@
                     (list (xtc:solve:c-eq (car ast)
                                           (xtc:infer:closure-code rk (map car args)))))))))
 
-;; The single known signature of a global function named `sym', as the int-code
-;; list (return-type param-type ...), or #f if `sym' has no such signature ---
-;; it is unknown, or a multi-candidate overload, or a generic (all deferred).  A
-;; bind-lib native and a bound closure each carry one signature directly; a
-;; monomorphic bind-func is registered as a polyfunc with a single candidate, so
-;; its lone candidate (a closure int-code) yields its signature too.
-(define xtc:infer:global-signature
+;; The candidate signatures of a global function named `sym', each the int-code
+;; list (return-type param-type ...), or #f if `sym' is not a global function
+;; whose signatures are known here (it is unknown, or a generic --- both
+;; deferred).  A bind-lib native and a bound closure each contribute their one
+;; signature; a bind-func is registered as a polyfunc, so its candidate list ---
+;; one entry when monomorphic, several when overloaded --- supplies the rest.
+(define xtc:infer:global-candidates
   (lambda (sym)
     (let ((name (symbol->string sym)))
       (cond
         ((xtc:cache:nativefunc-exists? name)
-         (map xtc:codegen:get-type-from-str (xtc:cache:get-nativefunc-arg-types name)))
+         (list (map xtc:codegen:get-type-from-str (xtc:cache:get-nativefunc-arg-types name))))
         ((xtc:cache:closure-exists? name)
-         (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types name)))
+         (list (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types name))))
         (else
          (let ((base (xtc:codegen:get-base-type name)))
            (and (xtc:cache:polyfunc-exists? base)
                 (let ((candidates (xtc:cache:get-polyfunc-candidate-types base)))
-                  (and candidates
-                       (= (length candidates) 1)
-                       ;; a candidate is the closure (head ret p...); its cdr is
-                       ;; the (ret p...) signature
-                       (cdr (car candidates)))))))))))
+                  ;; a candidate is the closure (head ret p...); its cdr is the
+                  ;; (ret p...) signature the overload constraint speaks
+                  (and candidates (map cdr candidates))))))))))
 
-;; (f arg ...) with f a global function of signature (ret p ...): each argument
-;; unifies with its parameter type and the call's type is the return.  This is
-;; the application of a *fixed* signature --- the single-candidate case --- so
-;; it is plain equality, no overload choice.
+;; (f arg ...) with f a global function: the call's type is a fresh result that,
+;; with the argument types, must match exactly one of f's candidate signatures.
+;; A monomorphic callee has a single candidate, so the overload resolves to it
+;; at once; an overloaded callee is resolved by the arguments (the solver's
+;; deferred choice).  Routing the monomorphic case through the same overload ---
+;; rather than a bare equality --- is deliberate: the overload's class check
+;; keeps an integer literal from binding to a floating-point parameter.
 (define xtc:infer:collect-global-call
-  (lambda (ast sig bound)
-    (let ((ret (car sig))
-          (params (cdr sig))
-          (args (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast))))
-      (if (<> (length params) (length args))
-          (xtc:diagnostics:print-bad-arity-error ast))
-      (cons ret
+  (lambda (ast cands bound)
+    (let* ((args (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast)))
+           (rk (xtc:infer:fresh-key)))
+      (cons rk
             (append (apply append (map cdr args))
-                    (map (lambda (a p) (xtc:solve:c-eq (car a) p)) args params))))))
+                    (list (xtc:solve:c-overload rk (map car args) cands)))))))
 
 ;; A sequence's type is its last expression's; the earlier expressions still
 ;; contribute their own constraints (so their literals default, etc.).

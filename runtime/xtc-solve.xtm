@@ -136,15 +136,45 @@
 ;; overloads           ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The class (the candidate int-codes of a default constraint) each defaultable
+;; key ranges over, as an alist key -> class gathered from the default
+;; constraints.  This is the bound a bare literal carries; overload resolution
+;; reads it so a literal can match a candidate at any width in its class, not
+;; only at the width defaulting would eventually choose.
+(define xtc:solve:class-map
+  (lambda (constraints)
+    (cl:remove #f
+      (map (lambda (c)
+             (if (xtc:solve:default? c) (cons (cadr c) (caddr c)) #f))
+           constraints))))
+
+;; May argument key `akey' take parameter type `pcode' in a candidate?  A still-
+;; free literal may only take a type from its own class (an integer literal an
+;; integer width, etc.), so a candidate whose parameter falls outside that class
+;; is rejected --- the bound the old candidate-list carried, here read off the
+;; literal's default.  An argument already fixed to a concrete type carries no
+;; such restriction (the equality that fixed it already had the final say), and
+;; an argument with no class ranges freely.
+(define xtc:solve:arg-admits?
+  (lambda (akey pcode subst intern classes)
+    (let ((resolved (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
+      (if (xtc:type:var? resolved)
+          (let ((cell (assoc akey classes)))
+            (if (and cell (number? pcode))
+                (and (member pcode (cdr cell)) #t)
+                #t))
+          #t))))
+
 ;; The candidates of overload `c' that unify with its result and argument keys
 ;; under `subst', each paired with the substitution that unifying it produces:
 ;; ((candidate . subst2) ...).  A candidate is the int-code signature (ret p...);
 ;; its own type variables are interned through a FRESH table so they instantiate
 ;; independently of the call site and of the other candidates --- the principled
 ;; freshening a generic candidate needs.  The result and argument keys use the
-;; shared `intern', so they denote the call's own variables.
+;; shared `intern', so they denote the call's own variables.  A still-free
+;; literal argument is held to its class (see arg-admits?).
 (define xtc:solve:overload-viable
-  (lambda (c intern subst)
+  (lambda (c intern subst classes)
     (let ((rkey (cadr c)) (akeys (caddr c)) (cands (cadddr c)))
       (cl:remove
        #f
@@ -160,11 +190,13 @@
                         (let loop ((as akeys) (ps (cdr cand)) (s s1))
                           (if (null? as)
                               (cons cand s)
-                              (let ((s2 (xtc:type:unify
-                                         (xtc:type:from-intcode (car as) intern)
-                                         (xtc:type:from-intcode (car ps) fresh)
-                                         s)))
-                                (if s2 (loop (cdr as) (cdr ps) s2) #f))))))))
+                              (if (not (xtc:solve:arg-admits? (car as) (car ps) s intern classes))
+                                  #f
+                                  (let ((s2 (xtc:type:unify
+                                             (xtc:type:from-intcode (car as) intern)
+                                             (xtc:type:from-intcode (car ps) fresh)
+                                             s)))
+                                    (if s2 (loop (cdr as) (cdr ps) s2) #f)))))))))
             cands)))))
 
 ;; One scan of the pending overloads: commit the first that has a unique viable
@@ -173,11 +205,11 @@
 ;; further constraints only narrow it); or #f if every pending overload is still
 ;; ambiguous (two or more viable).
 (define xtc:solve:commit-one
-  (lambda (pending intern subst)
+  (lambda (pending intern subst classes)
     (let loop ((ps pending) (seen '()))
       (if (null? ps)
           #f
-          (let ((viable (xtc:solve:overload-viable (car ps) intern subst)))
+          (let ((viable (xtc:solve:overload-viable (car ps) intern subst classes)))
             (cond ((null? viable) 'conflict)
                   ((null? (cdr viable))
                    (cons (cdr (car viable)) (append (reverse seen) (cdr ps))))
@@ -188,11 +220,11 @@
 ;; genuinely ambiguous call (expected-type-directed selection is a later
 ;; refinement).  A pending overload with no viable candidate is a conflict.
 (define xtc:solve:finish-pending
-  (lambda (pending intern subst)
+  (lambda (pending intern subst classes)
     (let loop ((ps pending) (subst subst))
       (if (null? ps)
           subst
-          (let ((viable (xtc:solve:overload-viable (car ps) intern subst)))
+          (let ((viable (xtc:solve:overload-viable (car ps) intern subst classes)))
             (if (null? viable)
                 'conflict
                 (loop (cdr ps) (cdr (car viable)))))))))
@@ -207,9 +239,10 @@
 ;; enumeration with no search.
 (define xtc:solve:resolve
   (lambda (constraints intern subst)
-    (let ((pending0 (cl:remove-if-not xtc:solve:overload? constraints)))
+    (let ((pending0 (cl:remove-if-not xtc:solve:overload? constraints))
+          (classes (xtc:solve:class-map constraints)))
       (let loop ((subst subst) (pending pending0))
-        (let ((step (xtc:solve:commit-one pending intern subst)))
+        (let ((step (xtc:solve:commit-one pending intern subst classes)))
           (cond
             ((eq? step 'conflict) 'conflict)
             (step (loop (car step) (cdr step)))
@@ -217,7 +250,7 @@
              (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
                (if (> (length subst2) (length subst))
                    (loop subst2 pending)
-                   (xtc:solve:finish-pending pending intern subst2))))))))))
+                   (xtc:solve:finish-pending pending intern subst2 classes))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;
