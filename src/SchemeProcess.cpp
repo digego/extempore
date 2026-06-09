@@ -227,14 +227,14 @@ void* SchemeProcess::taskImpl() {
     while (!m_running) {
     }
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-globals.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-caches.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-aot.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-transforms.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-ast.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-typecheck.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmti-bind.xtm", UNIV::SHARE_DIR);
-    loadFile("runtime/llvmir.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-globals.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-caches.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-aot.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-transforms.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-ast.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-typecheck.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-bind.xtm", UNIV::SHARE_DIR);
+    loadFile("runtime/xtc-codegen.xtm", UNIV::SHARE_DIR);
     m_libsLoaded = true;
     std::this_thread::sleep_for(std::chrono::seconds(2));  // give time for NSApp etc. to init
     // only load extempore.xtm in primary process
