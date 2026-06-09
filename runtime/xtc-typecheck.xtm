@@ -3289,6 +3289,10 @@ xtlang's `let' syntax is the same as Scheme"
       (if (null? typelist)
           (set! typelist (xtc:typecheck:run-type-check* vars forced-types ast)))
       ;; (println 'unified 'types: typelist)
+      ;; TASK-059 increment 3: when shadow mode is on, cross-check the
+      ;; constraint path against this result without affecting it.
+      (if *xtc:infer:shadow?*
+          (xtc:infer:shadow-check vars forced-types ast typelist (caaadr ast)))
       typelist)))
 
 (define *xtc:typecheck:type-check-function-symbol* #f)

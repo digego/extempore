@@ -784,3 +784,44 @@
                   (let ((ty (xtc:solve:type-of sym subst intern)))
                     (and ty (cons sym ty))))
                 (hashtable-keys vars)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; live shadow check   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Stage 3c: run-type-check, when *xtc:infer:shadow?* is set, calls shadow-check
+;; with the same (vars forced-types ast) and the result it just computed.  We
+;; recompute the type via check-function and report --- without affecting the
+;; live result --- every var on which the two paths resolve a concrete type but
+;; disagree, plus the functions on which the new path errors (an unhandled form)
+;; or conflicts.  The recompute is wrapped in `catch' so a coverage gap logs a
+;; line rather than aborting the build, making a full aot build under shadow the
+;; data source that drives the traversal to completeness.  Default off: zero
+;; effect on normal compilation.
+(define *xtc:infer:shadow?* #f)
+(define *xtc:infer:shadow-count* 0)   ; functions shadowed (for build-coverage reporting)
+
+(define xtc:infer:shadow-norm
+  (lambda (t) (if (and (list? t) (= (length t) 1)) (car t) t)))
+
+(define xtc:infer:shadow-check
+  (lambda (vars forced-types ast oldA fname)
+    (set! *xtc:infer:shadow-count* (+ *xtc:infer:shadow-count* 1))
+    (let ((newA (catch 'shadow-error
+                       (xtc:infer:check-function vars forced-types ast))))
+      (cond
+        ((eq? newA 'shadow-error) (println 'SHADOW-ERROR fname))
+        ((not newA) (println 'SHADOW-CONFLICT fname))
+        (else
+         (for-each
+          (lambda (e)
+            (let* ((sym (car e))
+                   (nt (xtc:infer:shadow-norm (cdr e)))
+                   (oc (assoc-strcmp sym oldA)))
+              (if (and oc
+                       (xtc:codegen:type? nt)
+                       (xtc:codegen:type? (xtc:infer:shadow-norm (cdr oc)))
+                       (not (equal? nt (xtc:infer:shadow-norm (cdr oc)))))
+                  (println 'SHADOW-DIVERGE fname sym
+                           'old (xtc:infer:shadow-norm (cdr oc)) 'new nt))))
+          newA))))))
