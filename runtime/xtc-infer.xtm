@@ -38,13 +38,22 @@
 ;;;
 ;;; A generic function (genericfunc, not polyfunc) is also resolved through the
 ;;; overload: its candidate signatures carry bang variables --- (!a !a),
-;;; (!a !a*) --- which the solver freshens per candidate and unifies with the
-;;; arguments, so the return type is REIFIED from the args rather than selected.
-;;; Only the kinds that reify by plain unification are handled: unconstrained
-;;; specialisations free of named generic types.  Deferred (a loud gap, kept out
-;;; of the corpus): named generic types like List{!a} --- which need the
-;;; generictype instantiation machinery the old path carries --- constraint-
-;;; guarded specialisations, and a free return needing expected-type direction.
+;;; (!a !a*), or a named generic type like (!a IPair{!a,!b}*) --- which the
+;;; solver freshens per candidate and unifies with the arguments, so the return
+;;; type is REIFIED from the args rather than selected.  A named generic type is
+;;; handled because the int-code bridge decodes a concrete instance (an opaque
+;;; poly c-name) to its structural tuple, so it unifies with the candidate's
+;;; instance pattern.  When several specialisations share a name the overload
+;;; picks the one that unifies; a fully-general fallback whose return is free
+;;; (first's [!a,!b]*) is filtered out (xtc:infer:sig-reifiable?) so it does not
+;;; shadow the specific one.
+;;;
+;;; Deferred, a loud gap kept out of the corpus: RECURSIVE named generic types
+;;; (List = <!a,List*>), whose instance does not expand to a finite structural
+;;; tuple and is left opaque; constraint-guarded specialisations (the cache's
+;;; predicate field); and a free return that no specialisation reifies (needs
+;;; expected-type direction or body reification, the old "exercise the generic
+;;; code" path).
 ;;;
 ;;; The clean unifier is intentionally
 ;;; stricter than the old candidate-list path on implicit numeric coercion, so
@@ -282,19 +291,39 @@
                   ;; (ret p...) signature the overload constraint speaks
                   (and candidates (map cdr candidates))))))))))
 
-;; The bang-variable candidate signatures of a generic function named `sym' at
-;; the given arity, or #f if none applies here.  A genericfunc's return type is
-;; reified from its arguments: a signature like (!a !a) or (!a !a*) instantiates
-;; through the overload exactly as a generic poly candidate does (the solver
-;; freshens each candidate's variables and unifies them with the arguments).
+;; The bang (type) variables of an int-code type, each canonicalised (trailing
+;; pointer stars and any ## suffix dropped) so !a, !a* and !a##3 count as one.
+(define xtc:infer:bang-vars
+  (lambda (ic)
+    (cond ((symbol? ic)
+           (let ((s (symbol->string ic)))
+             (if (and (> (string-length s) 0) (char=? (string-ref s 0) #\!))
+                 (list (xtc:type:strip-trailing-stars (car (string-split-on s "##"))))
+                 '())))
+          ((pair? ic) (apply append (map xtc:infer:bang-vars ic)))
+          (else '()))))
+
+;; Can a candidate signature (ret param ...) reify its return by unification?
+;; Only if every variable in the return type is bound by some parameter; a
+;; signature whose return is free (e.g. first's fallback [!a,!b]*, !a nowhere in
+;; the args) needs expected-type direction or body reification and is deferred.
+(define xtc:infer:sig-reifiable?
+  (lambda (sig)
+    (let ((param-bangs (xtc:infer:bang-vars (cdr sig))))
+      (cl:every (lambda (b) (and (member b param-bangs) #t))
+                (xtc:infer:bang-vars (car sig))))))
+
+;; The candidate signatures of a generic function named `sym' at the given
+;; arity, or #f if none applies here.  A genericfunc's return type is reified
+;; from its arguments: a signature like (!a !a), (!a !a*) or (!a (tuple !a ...))
+;; instantiates through the overload exactly as a generic poly candidate does
+;; (the solver freshens each candidate's variables and unifies them with the
+;; arguments).  A named generic type in the signature (List{!a} etc.) is decoded
+;; to its structural tuple by the int-code bridge, so it unifies too.
 ;;
-;; Deliberately handles only the cases that reify by plain unification: each
-;; specialisation of the right arity that is UNCONSTRAINED and free of named
-;; generic types (no `{' --- those, e.g. List{!a}, need the generictype
-;; instantiation machinery the old path carries and are deferred).  A generic
-;; whose return variable never appears in a parameter (a free return needing
-;; expected-type direction) is admitted here but simply resolves to #f; such
-;; calls stay out of the shadow corpus, as the header notes.
+;; Restricted to the unconstrained, return-reifiable specialisations: a
+;; constraint-guarded one (the cache's predicate field) and a free return (see
+;; sig-reifiable?) are deferred --- a loud gap, kept out of the corpus.
 (define xtc:infer:generic-candidates
   (lambda (sym arity)
     (let* ((base (xtc:codegen:get-base-type (symbol->string sym)))
@@ -305,9 +334,9 @@
                         (map (lambda (e)
                                (and (= (cadr e) arity)
                                     (not (list-ref e 5))
-                                    (not (string-contains? (symbol->string (caddr e)) "{"))
-                                    (cdr (xtc:codegen:get-type-from-pretty-str
-                                          (symbol->string (caddr e))))))
+                                    (let ((sig (cdr (xtc:codegen:get-type-from-pretty-str
+                                                     (symbol->string (caddr e))))))
+                                      (and (xtc:infer:sig-reifiable? sig) sig))))
                              entries))))
              (and (not (null? sigs)) sigs))))))
 

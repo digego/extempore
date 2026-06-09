@@ -67,6 +67,24 @@
 (bind-func infer_gid:[!a,!a]*       (lambda (x) x))
 (bind-func infer_gfirst:[!a,!a,!b]* (lambda (x y) x))
 
+;; Named generic types (e.g. List{!a}): a concrete instance is stored as an
+;; opaque poly c-name, which the int-code bridge decodes to its structural tuple
+;; so a generic accessor reifies its return by unification.  IBox is a single
+;; specialisation; gfirst/gsecond add the multi-specialisation case --- gfirst's
+;; fully-general [!a,!b]* fallback (a free return) is filtered out, leaving the
+;; IPair specialisation to reify.  (Recursive named types like List are deferred,
+;; see the module header, so these stand-ins are non-recursive.)
+(bind-type IBox <!a,i64>)
+(bind-func ibox_get:[!a,IBox{!a}*]* (lambda (b) (tref b 0)))
+(bind-func mk_ibox:[IBox{!a}*,!a]*
+  (lambda (x) (let ((b:IBox{!a}* (halloc))) (tset! b 0 x) b)))
+(bind-type IPair <!a,!b>)
+(bind-func gfirst:[!a,!b]*           (lambda (a) (tref a 0)))
+(bind-func gfirst:[!a,IPair{!a,!b}*]*  (lambda (a) (tref a 0)))
+(bind-func gsecond:[!b,IPair{!a,!b}*]* (lambda (a) (tref a 1)))
+(bind-func mk_ipair:[IPair{!a,!b}*,!a,!b]*
+  (lambda (x y) (let ((p:IPair{!a,!b}* (halloc))) (tset! p 0 x) (tset! p 1 y) p)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -139,6 +157,13 @@
 (xtmtest-result (infer-expr '(infer_gid 5.0))       0 "generic-identity-f64")
 (xtmtest-result (infer-expr '(infer_gfirst 5 6.0))  2 "generic-first-of-two")
 
+;; Named-type generics: a generic accessor over a (non-recursive) generic-type
+;; instance reifies its return through the c-name -> structural bridge.
+(xtmtest-result (infer-expr '(ibox_get (mk_ibox 5)))      2 "named-generic-single-spec")
+(xtmtest-result (infer-expr '(ibox_get (mk_ibox 5.0)))    0 "named-generic-single-spec-f64")
+(xtmtest-result (infer-expr '(gfirst (mk_ipair 5 6.0)))   2 "named-generic-multi-spec-first")
+(xtmtest-result (infer-expr '(gsecond (mk_ipair 5 6.0)))  0 "named-generic-multi-spec-second")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -194,7 +219,15 @@
                      '(infer_gid (infer_gid 7))
                      '(infer_gfirst 5 6.0)
                      '(infer_gfirst 5.0 6)
-                     '(+ (infer_gid 3) (infer_gid 4)))))
+                     '(+ (infer_gid 3) (infer_gid 4))
+                     ;; named-type generics (accessor over a generic instance),
+                     ;; reducing to a scalar, composed with math / comparison
+                     '(ibox_get (mk_ibox 5))
+                     '(ibox_get (mk_ibox 5.0))
+                     '(gfirst (mk_ipair 5 6.0))
+                     '(gsecond (mk_ipair 5 6.0))
+                     '(+ (ibox_get (mk_ibox 3)) (ibox_get (mk_ibox 4)))
+                     '(if (< (gfirst (mk_ipair 1 2.0)) 5) 10 20))))
    (cl:remove-if
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))

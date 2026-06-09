@@ -189,13 +189,43 @@
            (name (string-append (xtc:type:strip-trailing-stars head) suffix)))
       (xtc:type:wrap-ptr depth (xtc:type:intern-var name intern)))))
 
+;; A generic-instance type is stored as an opaque poly/adhoc c-name
+;; (%Name_poly_<base64-of-typeargs>); decode it to the structural tuple the
+;; solver can unify (and so reify a generic call).  The instance's type
+;; arguments are recovered from the c-name and substituted into the generictype
+;; template.  Returns the structural int-code, or #f if `cname' is not a generic
+;; instance, or if the type is RECURSIVE (its template names itself, e.g.
+;; List = <!a,List*>): a recursive instance does not expand to a finite
+;; structural tuple this way, so it is left opaque and its generics deferred ---
+;; a documented boundary, not a partial (wrong-depth) expansion.
+(define xtc:type:expand-poly-cname
+  (lambda (cname ptr-depth)
+    (let ((dec (and (xtc:codegen:poly-or-adhoc? cname)
+                    (xtc:codegen:split-and-decode-poly-adhoc-name cname))))
+      (and dec
+           (let* ((base (regex:replace (car dec) "^%" ""))
+                  (tmpl (xtc:cache:get-generictype-candidate-types base)))
+             (and tmpl
+                  (not (regex:match? (symbol->string tmpl) ;; recursive self-reference?
+                                     (string-append base "[*{,>]")))
+                  (let* ((args (xtc:codegen:get-pretty-tuple-arg-strings (cadr dec)))
+                         (bangs (cl:remove-duplicates
+                                 (regex:match-all (symbol->string tmpl) "![a-zA-Z0-9_]*")))
+                         (structural (regex:replace-everything
+                                      (symbol->string tmpl) bangs args)))
+                    (xtc:codegen:get-type-from-pretty-str
+                     (xtc:codegen:add-ptr-depth structural ptr-depth)))))))))
+
 (define xtc:type:from-intcode-string
   (lambda (s)
     (if (and (> (string-length s) 0) (char=? (string-ref s 0) #\%))
         (let* ((depth (xtc:type:trailing-stars s))
                (stripped (xtc:type:strip-trailing-stars s))
-               (name (substring stripped 1 (string-length stripped))))
-          (xtc:type:wrap-ptr depth (xtc:type:named name)))
+               (name (substring stripped 1 (string-length stripped)))
+               (expanded (xtc:type:expand-poly-cname stripped depth)))
+          (if expanded
+              (xtc:type:from-intcode expanded (make-hashtable))
+              (xtc:type:wrap-ptr depth (xtc:type:named name))))
         (xtc:diagnostics:print-compiler-error
          (string-append "cannot decode type string " s)))))
 
