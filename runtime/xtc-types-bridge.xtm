@@ -422,3 +422,57 @@
     (let* ((intern (make-hashtable))
            (term (xtc:type:from-pretty s intern)))
       (map (lambda (id) (hashtable-ref intern id)) (xtc:type:free-vars term)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; field projection    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Field `idx' of an aggregate TERM, as a term, or #f if the term is not a
+;; (recognised, sufficiently-resolved) aggregate.  A tuple-ref / array-ref /
+;; vector-ref auto-dereferences a pointer to the aggregate, so a leading ptr is
+;; stripped first.  A tuple indexes its fields; an array or vector yields its
+;; (uniform) element regardless of index; a named or nominal (napp) type is
+;; expanded to its underlying tuple through the existing registry helpers (the
+;; napp substituting its type arguments) and then indexed.  A napp is expanded
+;; only once its arguments are concrete --- an unresolved argument returns #f so
+;; the caller defers --- which keeps the projection sound under inference.
+;; This is the shared engine for both the eager free-return reification in
+;; xtc-infer and the deferred `project' constraint in xtc-solve.
+(define xtc:type:field-from-tuplecode
+  (lambda (tc idx)
+    (and (pair? tc)
+         (let ((tag (modulo (car tc) *xtc:codegen:pointer*))
+               (fresh (make-hashtable)))
+           (cond
+             ((= tag *xtc:codegen:tuple*)
+              (and (> (length tc) (+ 1 idx))
+                   (xtc:type:from-intcode (list-ref tc (+ 1 idx)) fresh)))
+             ((= tag *xtc:codegen:array*)
+              (xtc:type:from-intcode (caddr tc) fresh))
+             ((= tag *xtc:codegen:vector*)
+              (xtc:type:from-intcode (caddr tc) fresh))
+             (else #f))))))
+
+(define xtc:type:project-field-term
+  (lambda (aggterm idx)
+    (let ((t (if (xtc:type:ptr? aggterm) (xtc:type:ptr-to aggterm) aggterm)))
+      (cond
+        ((xtc:type:tuple? t)
+         (let ((fs (xtc:type:tuple-fields t)))
+           (and (> (length fs) idx) (list-ref fs idx))))
+        ((xtc:type:array? t)  (xtc:type:array-elt t))
+        ((xtc:type:vector? t) (xtc:type:vector-elt t))
+        ((xtc:type:named? t)
+         (let ((tc (xtc:cache:get-namedtype-type (xtc:type:named-name t))))
+           (and tc (xtc:type:field-from-tuplecode tc idx))))
+        ((xtc:type:napp? t)
+         (and (null? (xtc:type:free-vars t))
+              (let ((tc (xtc:desugar:get-generic-type-as-tuple
+                         (string-append
+                          (xtc:type:napp-name t) "{"
+                          (string-join (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
+                                            (xtc:type:napp-args t))
+                                       ",")
+                          "}"))))
+                (and tc (xtc:type:field-from-tuplecode tc idx)))))
+        (else #f)))))

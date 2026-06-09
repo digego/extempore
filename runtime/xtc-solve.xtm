@@ -60,6 +60,16 @@
 ;;                       This is the deferred choice --- it cannot always be
 ;;                       decided in one pass, so the solver commits a candidate
 ;;                       only once it is the unique viable one (see below).
+;;
+;;   (project result agg index)
+;;                       result is field `index' of the aggregate `agg' (a
+;;                       tuple-ref / array-ref / vector-ref): once agg resolves to
+;;                       a concrete aggregate type (a tuple, array or vector,
+;;                       possibly under a pointer, or a named / nominal type that
+;;                       expands to one) the field's type is read off and unified
+;;                       with result.  Like an overload it is deferred --- it
+;;                       cannot fire until agg is known --- and discharged in the
+;;                       same fixpoint.
 
 (define xtc:solve:c-eq
   (lambda (lhs rhs) (list 'eq lhs rhs)))
@@ -72,9 +82,14 @@
 (define xtc:solve:c-overload
   (lambda (result args cands) (list 'overload result args cands)))
 
+;; result is field `index' (a literal) of aggregate key `agg'.
+(define xtc:solve:c-project
+  (lambda (result agg index) (list 'project result agg index)))
+
 (define xtc:solve:eq? (lambda (c) (eq? (car c) 'eq)))
 (define xtc:solve:default? (lambda (c) (eq? (car c) 'default)))
 (define xtc:solve:overload? (lambda (c) (eq? (car c) 'overload)))
+(define xtc:solve:project? (lambda (c) (eq? (car c) 'project)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; solving             ;;
@@ -229,28 +244,61 @@
                 'conflict
                 (loop (cdr ps) (cdr (car viable)))))))))
 
-;; Discharge overloads and defaults to a fixpoint.  Each round first commits
-;; every overload that has become unambiguous, narrowing the substitution; when
-;; none is unambiguous it applies one pass of numeric defaulting, which can pin a
-;; free literal argument and so disambiguate an overload on the next round.  This
+;; One pass over the pending projections: discharge every one whose aggregate has
+;; resolved enough to read field `index' off as a ground type, unifying it with
+;; the projection's result; the rest stay pending for a later round (their
+;; aggregate is still a variable, or its field is not yet ground).  Returns
+;; (subst still-pending progress?), or 'conflict if a field type contradicts a
+;; prior use of the result.  Threading the substitution across the pass lets one
+;; projection feed the next within the round.
+(define xtc:solve:discharge-projects
+  (lambda (pending intern subst)
+    (let loop ((ps pending) (subst subst) (still '()) (progress #f))
+      (if (null? ps)
+          (list subst (reverse still) progress)
+          (let* ((c (car ps))
+                 (aggterm (xtc:type:apply-subst
+                           (xtc:type:from-intcode (caddr c) intern) subst))
+                 (field (xtc:type:project-field-term aggterm (cadddr c))))
+            (if (and field (null? (xtc:type:free-vars field)))
+                (let ((s2 (xtc:type:unify
+                           (xtc:type:from-intcode (cadr c) intern) field subst)))
+                  (if s2
+                      (loop (cdr ps) s2 still #t)
+                      'conflict))
+                (loop (cdr ps) subst (cons c still) progress)))))))
+
+;; Discharge projections, overloads and defaults to a fixpoint.  Each round first
+;; discharges every projection whose aggregate has resolved (which can concretise
+;; a key and so enable an overload); then commits every overload that has become
+;; unambiguous, narrowing the substitution; when neither makes progress it applies
+;; one pass of numeric defaulting, which can pin a free literal argument and so
+;; disambiguate an overload or feed a projection on the next round.  This
 ;; interleaving is what lets a downstream signature beat the default (an
 ;; unambiguous overload commits first, forcing its argument) while a default
 ;; still breaks a tie no signature can --- subsuming the old backtracking
-;; enumeration with no search.
+;; enumeration with no search.  A projection still pending at the fixpoint (its
+;; aggregate never resolved) simply leaves its result undetermined.
 (define xtc:solve:resolve
   (lambda (constraints intern subst)
     (let ((pending0 (cl:remove-if-not xtc:solve:overload? constraints))
+          (projects0 (cl:remove-if-not xtc:solve:project? constraints))
           (classes (xtc:solve:class-map constraints)))
-      (let loop ((subst subst) (pending pending0))
-        (let ((step (xtc:solve:commit-one pending intern subst classes)))
+      (let loop ((subst subst) (pending pending0) (projects projects0))
+        (let ((pr (xtc:solve:discharge-projects projects intern subst)))
           (cond
-            ((eq? step 'conflict) 'conflict)
-            (step (loop (car step) (cdr step)))
+            ((eq? pr 'conflict) 'conflict)
+            ((caddr pr) (loop (car pr) pending (cadr pr)))
             (else
-             (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
-               (if (> (length subst2) (length subst))
-                   (loop subst2 pending)
-                   (xtc:solve:finish-pending pending intern subst2 classes))))))))))
+             (let ((step (xtc:solve:commit-one pending intern subst classes)))
+               (cond
+                 ((eq? step 'conflict) 'conflict)
+                 (step (loop (car step) (cdr step) projects))
+                 (else
+                  (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
+                    (if (> (length subst2) (length subst))
+                        (loop subst2 pending projects)
+                        (xtc:solve:finish-pending pending intern subst2 classes)))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;

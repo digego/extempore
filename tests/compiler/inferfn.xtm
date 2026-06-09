@@ -74,6 +74,9 @@
 (bind-func inferfn_add_i32 (lambda (a:i32 b:i32) (+ a b)))
 (bind-func inferfn_pos     (lambda (x:double) (> x 0.0)))
 
+;; A named tuple type for the aggregate cases.
+(bind-type ifn_pair <i64,double>)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; shadow comparison   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -96,3 +99,31 @@
                 '() "fn-global-call-in-if")
 (xtmtest-result (inferfn:disagreements 'tf_comp '(lambda (x:i64) (let ((a:i64 (+ x 1))) (if (< a 10) a (+ a 1)))))
                 '() "fn-composed")
+
+;; memory / aggregate forms (stage 3b): allocation, tuple build + read (anonymous
+;; and named), set!, null?, pointer read/write.
+(xtmtest-result (inferfn:disagreements 'tf_tup
+                  '(lambda (x:i64 y:double)
+                     (let ((t:<i64,double>* (salloc)))
+                       (tset! t 0 x) (tset! t 1 y) (tref t 0))))
+                '() "fn-tuple-build-read")
+(xtmtest-result (inferfn:disagreements 'tf_tup1
+                  '(lambda (x:i64 y:double)
+                     (let ((t:<i64,double>* (salloc)))
+                       (tset! t 0 x) (tset! t 1 y) (tref t 1))))
+                '() "fn-tuple-field1")
+(xtmtest-result (inferfn:disagreements 'tf_named '(lambda (p:ifn_pair*) (tref p 0)))
+                '() "fn-named-tuple-field0")
+(xtmtest-result (inferfn:disagreements 'tf_named1 '(lambda (p:ifn_pair*) (tref p 1)))
+                '() "fn-named-tuple-field1")
+(xtmtest-result (inferfn:disagreements 'tf_heap
+                  '(lambda (x:i64) (let ((t:<i64,i64>* (halloc))) (tset! t 0 x) (tref t 0))))
+                '() "fn-heap-alloc")
+(xtmtest-result (inferfn:disagreements 'tf_set '(lambda (x:i64) (let ((y:i64 0)) (set! y x) y)))
+                '() "fn-set-bang")
+(xtmtest-result (inferfn:disagreements 'tf_null '(lambda (p:i64*) (null? p)))
+                '() "fn-null-pred")
+(xtmtest-result (inferfn:disagreements 'tf_pref '(lambda (p:i64*) (pref p 0)))
+                '() "fn-pointer-ref")
+(xtmtest-result (inferfn:disagreements 'tf_pset '(lambda (p:i64* x:i64) (pset! p 0 x)))
+                '() "fn-pointer-set")

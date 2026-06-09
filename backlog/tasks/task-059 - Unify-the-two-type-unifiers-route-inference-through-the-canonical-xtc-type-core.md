@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 12:55'
+updated_date: '2026-06-09 13:13'
 labels:
   - compiler
   - types
@@ -180,4 +180,35 @@ printf-family/zones -- each batch shadow-validated against a growing corpus of
 REAL stdlib functions.  Then 3c (shadow MODE in run-type-check* across a full aot
 build -> zero divergence), 3d (flip behind a revertible flag), increment 4
 (delete the six old unifiers + retry loop + ~45 old *-check handlers).
+
+## Increment 3 stage 3b batch 1+2 -- memory/aggregate forms DONE
+
+collect now covers the trivial forms (void, null?, impc_null, set!) and the
+memory/aggregate families: allocation (stack/heap/zone-alloc -> a fresh var the
+binding's forced type fixes), tuple/array/vector ref + set! + ref-ptr, make-tuple,
+ref, pref, pointer-ref/pdref (deref), pointer-set!.
+
+Two shapes: a DEREF relates pointer<->pointee structurally (operand = E*, result
+E, by unification); a PROJECTION (tuple/array/vector ref) cannot be structural (a
+tuple's fields are heterogeneous, an array's size isn't known), so it emits a new
+deferred 'project' constraint discharged in the solver fixpoint once the
+aggregate resolves.  Added xtc:solve:c-project + xtc:solve:discharge-projects
+(interleaved with overloads/defaults; a still-pending project at the fixpoint
+just leaves its result undetermined).  The field engine xtc:type:project-field-term
+lives in the bridge (it needs codegen/cache): derefs a ptr, indexes a tuple,
+yields an array/vector's uniform element, or expands a named/napp type (napp only
+once its args are concrete) via get-namedtype-type / get-generic-type-as-tuple.
+The free-return reifier now shares this engine (removed the infer-local
+expand-to-tuple/project-field duplicates).
+
+inferfn.xtm grew to 18 functions incl tuple build+read (anon + named, field 0/1),
+heap-alloc, set!, null?, pointer-ref/set!.  Verified non-vacuous: (lambda (x:i64
+y:double) (let ((t:<i64,double>* (salloc))) (tset! t 0 x) (tset! t 1 y) (tref t 0)))
+-> both paths give _anon (213 2 2 0), t (114 2 0), x 2, y 0.  compiler-unit 11/11
+green incl aot (live path untouched).
+
+NEXT (3b cont.): control forms (dotimes, while, proper multi-return ret->),
+then bitcast/bitconvert, the printf/scanf format family, zones, math-intrinsics
+-- then start pulling REAL libs/core functions into the corpus.  Then 3c (shadow
+MODE across a full aot build), 3d (flip), increment 4 (delete old machinery).
 <!-- SECTION:NOTES:END -->

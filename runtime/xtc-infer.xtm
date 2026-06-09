@@ -220,6 +220,27 @@
        (xtc:infer:collect-math ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:compare-op? (car ast)))
        (xtc:infer:collect-compare ast bound))
+      ;; memory / aggregate forms
+      ((and (pair? ast) (eq? (car ast) 'void))      (cons *xtc:codegen:void* '()))
+      ((and (pair? ast) (eq? (car ast) 'null?))     (xtc:infer:collect-null? ast bound))
+      ((and (pair? ast) (eq? (car ast) 'impc_null)) (cons (xtc:infer:fresh-key) '()))
+      ((ast:set!? ast)                              (xtc:infer:collect-set! ast bound))
+      ((and (pair? ast) (member (car ast) '(stack-alloc heap-alloc zone-alloc)))
+       (xtc:infer:collect-alloc ast bound))
+      ((and (pair? ast) (eq? (car ast) 'ref))       (xtc:infer:collect-ref ast bound))
+      ((and (pair? ast) (eq? (car ast) 'pref))      (xtc:infer:collect-pref ast bound))
+      ((and (pair? ast) (member (car ast) '(pointer-ref pdref)))
+       (xtc:infer:collect-deref ast bound))
+      ((and (pair? ast) (eq? (car ast) 'pointer-set!))
+       (xtc:infer:collect-pointer-set! ast bound))
+      ((and (pair? ast) (member (car ast) '(tuple-ref array-ref vector-ref)))
+       (xtc:infer:collect-aggregate-ref ast bound))
+      ((and (pair? ast) (member (car ast) '(tuple-set! array-set! vector-set!)))
+       (xtc:infer:collect-aggregate-set! ast bound))
+      ((and (pair? ast) (member (car ast) '(tuple-ref-ptr array-ref-ptr)))
+       (xtc:infer:collect-aggregate-ref-ptr ast bound))
+      ((and (pair? ast) (eq? (car ast) 'make-tuple))
+       (xtc:infer:collect-make-tuple ast bound))
       ;; a local variable in call position is a closure call
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
@@ -461,37 +482,6 @@
   (lambda (specs argterms)
     (and (cl:find-if (lambda (sig) (xtc:infer:spec-matches? sig argterms)) specs) #t)))
 
-;; The structural tuple int-code of a (deref'd) tuple-like term: an anonymous
-;; tuple is already structural, a named type and a nominal parametric instance
-;; are expanded through the existing registry helpers (the latter substituting
-;; its type arguments), so a field can be read off by index.
-(define xtc:infer:expand-to-tuple
-  (lambda (t)
-    (cond
-      ((xtc:type:napp? t)
-       (xtc:desugar:get-generic-type-as-tuple
-        (string-append (xtc:type:napp-name t) "{"
-                       (string-join (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
-                                         (xtc:type:napp-args t))
-                                    ",")
-                       "}")))
-      ((xtc:type:named? t)
-       (xtc:cache:get-namedtype-type (xtc:type:named-name t)))
-      ((xtc:type:tuple? t)
-       (xtc:type:to-intcode t))
-      (else #f))))
-
-;; Field `idx' of the tuple `argterm' points at (tref derefs the pointer first),
-;; as an int-code, or #f if the term is not a tuple or the index is out of range.
-(define xtc:infer:project-field
-  (lambda (argterm idx)
-    (let* ((t (if (xtc:type:ptr? argterm) (xtc:type:ptr-to argterm) argterm))
-           (tuple (xtc:infer:expand-to-tuple t)))
-      (and tuple
-           (xtc:codegen:tuple? tuple)
-           (> (length tuple) (+ 1 idx))
-           (list-ref tuple (+ 1 idx))))))
-
 ;; A lambda parameter's name, dropping any :type annotation.
 (define xtc:infer:param-name
   (lambda (p)
@@ -507,8 +497,8 @@
 ;; Reify a free-return fallback by exercising its body against the concrete
 ;; argument terms.  The real fallbacks are field accessors --- (lambda (p...)
 ;; (tref pj i)) --- so the return is field i of the tuple argument bound to pj;
-;; we project it directly.  A body of any other shape is not yet handled (a loud
-;; gap, returned as #f).
+;; we project it (through the shared bridge engine) directly.  A body of any other
+;; shape is not yet handled (a loud gap, returned as #f).
 (define xtc:infer:project-fallback
   (lambda (body argterms)
     (and (pair? body) (eq? (car body) 'lambda)
@@ -517,7 +507,12 @@
            (and (pair? expr) (member (car expr) '(tref tuple-ref))
                 (integer? (caddr expr))
                 (let ((pos (xtc:infer:index-of (xtc:infer:param-name (cadr expr)) params)))
-                  (and pos (xtc:infer:project-field (list-ref argterms pos) (caddr expr)))))))))
+                  (and pos
+                       (let ((field (xtc:type:project-field-term
+                                     (list-ref argterms pos) (caddr expr))))
+                         (and field
+                              (null? (xtc:type:free-vars field))
+                              (xtc:type:to-intcode field))))))))))
 
 ;; (g arg ...) with g a genericfunc carrying a free-return fallback.  We collect
 ;; the arguments, resolve them to concrete types, and either route to the lazy
@@ -619,6 +614,135 @@
                     (list (xtc:solve:c-overload *xtc:codegen:i1*
                                                 (list (car rc-a) (car rc-b))
                                                 (xtc:infer:compare-candidates (car ast)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; memory / aggregates ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; The forms that read, write, allocate and build aggregate and pointer values.
+;; Two shapes recur.  A *deref* (pointer-ref / pdref) relates a pointer to its
+;; pointee structurally: a fresh pointee variable E with the operand constrained
+;; to E* (a star on E's symbol), the result E --- so when the operand resolves to
+;; i64* the pointee falls out as i64, by ordinary unification.  A *projection*
+;; (tuple/array/vector ref) cannot be expressed that way --- a tuple's fields are
+;; heterogeneous and an array's size is not known structurally --- so it emits the
+;; deferred `project' constraint, which the solver discharges once the aggregate
+;; resolves (see xtc-solve.xtm).  An allocation's result type is whatever the
+;; context (a let binding's forced type) demands, so it is a fresh variable.
+
+;; A key wrapped in one more pointer level: a star on a symbol, +pointer on a
+;; scalar code, +pointer on a compound's head.
+(define xtc:infer:ptr-of
+  (lambda (k)
+    (cond ((symbol? k) (string->symbol (string-append (symbol->string k) "*")))
+          ((number? k) (+ k *xtc:codegen:pointer*))
+          ((pair? k)   (cons (+ (car k) *xtc:codegen:pointer*) (cdr k)))
+          (else k))))
+
+;; (null? p): p is some pointer; the result is i1.  We still collect p so its own
+;; type is constrained.
+(define xtc:infer:collect-null?
+  (lambda (ast bound)
+    (cons *xtc:codegen:i1* (cdr (xtc:infer:collect (cadr ast) bound)))))
+
+;; (set! v e): v takes e's type, and the form's value is e's.
+(define xtc:infer:collect-set!
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (ast:set!-expr ast) bound)))
+      (cons (car rc)
+            (cons (xtc:solve:c-eq (ast:set!-var ast) (car rc)) (cdr rc))))))
+
+;; (stack-alloc) / (heap-alloc) / (zone-alloc), with an optional element-count
+;; argument: the result is a pointer the surrounding binding's forced type fixes,
+;; so it is a fresh variable; the count, if present, is collected for its own
+;; constraints.
+(define xtc:infer:collect-alloc
+  (lambda (ast bound)
+    (let ((k (xtc:infer:fresh-key)))
+      (if (> (length ast) 1)
+          (cons k (cdr (xtc:infer:collect (cadr ast) bound)))
+          (cons k '())))))
+
+;; (ref v): a pointer to v --- v's type with one more pointer level.
+(define xtc:infer:collect-ref
+  (lambda (ast bound)
+    (cons (xtc:infer:ptr-of (cadr ast)) '())))
+
+;; (pref p): one more pointer level on p; (pointer-ref p i) / (pdref p): one less
+;; (the pointee), via a fresh pointee variable.
+(define xtc:infer:collect-pref
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (cadr ast) bound)))
+      (cons (xtc:infer:ptr-of (car rc)) (cdr rc)))))
+
+(define xtc:infer:collect-deref
+  (lambda (ast bound)
+    (let* ((rc (xtc:infer:collect (cadr ast) bound))
+           (rc-i (if (> (length ast) 2)
+                     (xtc:infer:collect (caddr ast) bound)
+                     (cons #f '())))
+           (e (xtc:infer:fresh-key)))
+      (cons e
+            (append (cdr rc) (cdr rc-i)
+                    (list (xtc:solve:c-eq (car rc) (xtc:infer:ptr-of e))))))))
+
+;; (pointer-set! p i v): p points at v's type; the form's value is v's.
+(define xtc:infer:collect-pointer-set!
+  (lambda (ast bound)
+    (let* ((rc-p (xtc:infer:collect (cadr ast) bound))
+           (rc-i (xtc:infer:collect (caddr ast) bound))
+           (rc-v (xtc:infer:collect (cadddr ast) bound)))
+      (cons (car rc-v)
+            (append (cdr rc-p) (cdr rc-i) (cdr rc-v)
+                    (list (xtc:solve:c-eq (car rc-p) (xtc:infer:ptr-of (car rc-v)))))))))
+
+;; A literal field index, or 0 for an array/vector whose index is a runtime value
+;; (the projection ignores the index for those --- the element type is uniform).
+(define xtc:infer:ref-index
+  (lambda (i) (if (integer? i) i 0)))
+
+;; (tuple-ref a i) / (array-ref a i) / (vector-ref a i): the result is field i of
+;; the aggregate a, a deferred projection.
+(define xtc:infer:collect-aggregate-ref
+  (lambda (ast bound)
+    (let ((rc-a (xtc:infer:collect (cadr ast) bound))
+          (rc-i (xtc:infer:collect (caddr ast) bound))
+          (k (xtc:infer:fresh-key)))
+      (cons k
+            (append (cdr rc-a) (cdr rc-i)
+                    (list (xtc:solve:c-project k (car rc-a)
+                                               (xtc:infer:ref-index (caddr ast)))))))))
+
+;; (tuple-set! a i v) / (array-set! a i v) / (vector-set! a i v): v IS field i of
+;; a (so the projection binds v's type), and the form's value is v's.
+(define xtc:infer:collect-aggregate-set!
+  (lambda (ast bound)
+    (let ((rc-a (xtc:infer:collect (cadr ast) bound))
+          (rc-i (xtc:infer:collect (caddr ast) bound))
+          (rc-v (xtc:infer:collect (cadddr ast) bound)))
+      (cons (car rc-v)
+            (append (cdr rc-a) (cdr rc-i) (cdr rc-v)
+                    (list (xtc:solve:c-project (car rc-v) (car rc-a)
+                                               (xtc:infer:ref-index (caddr ast)))))))))
+
+;; (tuple-ref-ptr a i) / (array-ref-ptr a i): a pointer to field i --- the
+;; projected field wrapped in one pointer level.
+(define xtc:infer:collect-aggregate-ref-ptr
+  (lambda (ast bound)
+    (let ((rc-a (xtc:infer:collect (cadr ast) bound))
+          (rc-i (xtc:infer:collect (caddr ast) bound))
+          (f (xtc:infer:fresh-key)))
+      (cons (xtc:infer:ptr-of f)
+            (append (cdr rc-a) (cdr rc-i)
+                    (list (xtc:solve:c-project f (car rc-a)
+                                               (xtc:infer:ref-index (caddr ast)))))))))
+
+;; (make-tuple e ...): a tuple of the element types.
+(define xtc:infer:collect-make-tuple
+  (lambda (ast bound)
+    (let ((rcs (map (lambda (e) (xtc:infer:collect e bound)) (cdr ast))))
+      (cons (cons *xtc:codegen:tuple* (map car rcs))
+            (apply append (map cdr rcs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; driver              ;;
