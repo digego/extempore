@@ -39,7 +39,7 @@
 ;; constraints         ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A constraint is a tagged list.  Two kinds suffice for the core:
+;; A constraint is a tagged list.  Three kinds:
 ;;
 ;;   (eq lhs rhs)        lhs and rhs (each an int-code type or a variable
 ;;                       symbol) denote the same type; unify them.  A user
@@ -51,6 +51,15 @@
 ;;   (default sym class) if sym is still unbound after all equalities, bind it
 ;;                       to the default member of `class' (a list of candidate
 ;;                       int-codes, default = minimum by the globals ordering).
+;;
+;;   (overload result args cands)
+;;                       a call whose callee has several candidate signatures
+;;                       (each an int-code closure (head ret p...)): result and
+;;                       args (lists of int-code keys) must unify with the
+;;                       return and parameter types of exactly one candidate.
+;;                       This is the deferred choice --- it cannot always be
+;;                       decided in one pass, so the solver commits a candidate
+;;                       only once it is the unique viable one (see below).
 
 (define xtc:solve:c-eq
   (lambda (lhs rhs) (list 'eq lhs rhs)))
@@ -58,19 +67,26 @@
 (define xtc:solve:c-default
   (lambda (sym class) (list 'default sym class)))
 
+;; `cands' is a list of candidate signatures, each the int-code list
+;; (return-type param-type ...) --- i.e. the cdr of a closure int-code.
+(define xtc:solve:c-overload
+  (lambda (result args cands) (list 'overload result args cands)))
+
 (define xtc:solve:eq? (lambda (c) (eq? (car c) 'eq)))
 (define xtc:solve:default? (lambda (c) (eq? (car c) 'default)))
+(define xtc:solve:overload? (lambda (c) (eq? (car c) 'overload)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; solving             ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Solve in two passes over one substitution.  Pass one unifies every equality;
-;; a single failure collapses the whole solve to the symbol 'conflict (the
-;; honest report that the program is ill-typed --- the old path would have
-;; retained an unresolvable union and limped on).  Pass two applies defaulting
-;; to any numeric variable left unbound, threading each choice into the
-;; substitution so an earlier default can satisfy a later one.
+;; Solve over one substitution.  First unify every equality; a single failure
+;; collapses the whole solve to the symbol 'conflict (the honest report that the
+;; program is ill-typed --- the old path would have retained an unresolvable
+;; union and limped on).  Then discharge overloads and defaults together (see
+;; xtc:solve:resolve): forward propagation from the equalities has already fixed
+;; whatever it can, so an overload whose arguments are now concrete resolves to
+;; its one viable candidate without any search.
 ;;
 ;; `intern' is a caller-supplied hashtable; the same table must be handed to
 ;; xtc:solve:type-of afterwards so that a variable's identity at read-back
@@ -80,7 +96,7 @@
     (let ((subst (xtc:solve:unify-equalities constraints intern)))
       (if (eq? subst 'conflict)
           'conflict
-          (xtc:solve:apply-defaults constraints intern subst)))))
+          (xtc:solve:resolve constraints intern subst)))))
 
 (define xtc:solve:unify-equalities
   (lambda (constraints intern)
@@ -115,6 +131,93 @@
                      (loop (cdr cs) (if subst2 subst2 subst)))
                    (loop (cdr cs) subst))))
             (else (loop (cdr cs) subst))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; overloads           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The candidates of overload `c' that unify with its result and argument keys
+;; under `subst', each paired with the substitution that unifying it produces:
+;; ((candidate . subst2) ...).  A candidate is the int-code signature (ret p...);
+;; its own type variables are interned through a FRESH table so they instantiate
+;; independently of the call site and of the other candidates --- the principled
+;; freshening a generic candidate needs.  The result and argument keys use the
+;; shared `intern', so they denote the call's own variables.
+(define xtc:solve:overload-viable
+  (lambda (c intern subst)
+    (let ((rkey (cadr c)) (akeys (caddr c)) (cands (cadddr c)))
+      (cl:remove
+       #f
+       (map (lambda (cand)
+              (if (<> (length (cdr cand)) (length akeys))
+                  #f
+                  (let* ((fresh (make-hashtable))
+                         (s1 (xtc:type:unify (xtc:type:from-intcode rkey intern)
+                                             (xtc:type:from-intcode (car cand) fresh)
+                                             subst)))
+                    (if (not s1)
+                        #f
+                        (let loop ((as akeys) (ps (cdr cand)) (s s1))
+                          (if (null? as)
+                              (cons cand s)
+                              (let ((s2 (xtc:type:unify
+                                         (xtc:type:from-intcode (car as) intern)
+                                         (xtc:type:from-intcode (car ps) fresh)
+                                         s)))
+                                (if s2 (loop (cdr as) (cdr ps) s2) #f))))))))
+            cands)))))
+
+;; One scan of the pending overloads: commit the first that has a unique viable
+;; candidate, returning (cons subst2 remaining-pending); report 'conflict if any
+;; has none (no later binding can rescue an already-empty candidate set, since
+;; further constraints only narrow it); or #f if every pending overload is still
+;; ambiguous (two or more viable).
+(define xtc:solve:commit-one
+  (lambda (pending intern subst)
+    (let loop ((ps pending) (seen '()))
+      (if (null? ps)
+          #f
+          (let ((viable (xtc:solve:overload-viable (car ps) intern subst)))
+            (cond ((null? viable) 'conflict)
+                  ((null? (cdr viable))
+                   (cons (cdr (car viable)) (append (reverse seen) (cdr ps))))
+                  (else (loop (cdr ps) (cons (car ps) seen)))))))))
+
+;; With no overload unambiguous and defaulting exhausted, commit each remaining
+;; overload to its first viable candidate --- a deterministic tie-break for a
+;; genuinely ambiguous call (expected-type-directed selection is a later
+;; refinement).  A pending overload with no viable candidate is a conflict.
+(define xtc:solve:finish-pending
+  (lambda (pending intern subst)
+    (let loop ((ps pending) (subst subst))
+      (if (null? ps)
+          subst
+          (let ((viable (xtc:solve:overload-viable (car ps) intern subst)))
+            (if (null? viable)
+                'conflict
+                (loop (cdr ps) (cdr (car viable)))))))))
+
+;; Discharge overloads and defaults to a fixpoint.  Each round first commits
+;; every overload that has become unambiguous, narrowing the substitution; when
+;; none is unambiguous it applies one pass of numeric defaulting, which can pin a
+;; free literal argument and so disambiguate an overload on the next round.  This
+;; interleaving is what lets a downstream signature beat the default (an
+;; unambiguous overload commits first, forcing its argument) while a default
+;; still breaks a tie no signature can --- subsuming the old backtracking
+;; enumeration with no search.
+(define xtc:solve:resolve
+  (lambda (constraints intern subst)
+    (let ((pending0 (cl:remove-if-not xtc:solve:overload? constraints)))
+      (let loop ((subst subst) (pending pending0))
+        (let ((step (xtc:solve:commit-one pending intern subst)))
+          (cond
+            ((eq? step 'conflict) 'conflict)
+            (step (loop (car step) (cdr step)))
+            (else
+             (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
+               (if (> (length subst2) (length subst))
+                   (loop subst2 pending)
+                   (xtc:solve:finish-pending pending intern subst2))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;

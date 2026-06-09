@@ -112,3 +112,98 @@
  (solve1 (list (xtc:solve:c-eq 'a 'b)) 'a)
  #f
  "unconstrained-is-unresolved")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; overloads           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; An overloaded call must match exactly one candidate signature, each the
+;; int-code (return param ...).  Codes below: i64 = 2, i32 = 4, f64 = 0, i1 = 10.
+;; The engine commits a candidate only once it is the unique viable one, so the
+;; choice is principled rather than a guess --- and it interleaves with
+;; defaulting so the right thing happens whether the disambiguator is a signature
+;; or a literal's default.
+
+;; a single candidate is unambiguous and commits at once, forcing the argument to
+;; the parameter type (i32) and PRE-EMPTING the default that would otherwise make
+;; the literal i64 --- the overloaded analogue of downstream-constraint-beats-default
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
+               (xtc:solve:c-default 'a (list 2 4 6 9)))
+         'a)
+ 4
+ "overload-single-candidate-forces-arg")
+
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 4 4)))
+               (xtc:solve:c-default 'a (list 2 4 6 9)))
+         'r)
+ 4
+ "overload-single-candidate-return")
+
+;; two candidates (i64->i64 and f64->f64); a downstream equality fixes the
+;; argument to i64, so only the first candidate is viable --- no search
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 2)
+               (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0))))
+         'r)
+ 2
+ "overload-disambiguated-by-equality")
+
+;; the same two candidates, but the argument is a bare literal: both are viable
+;; until defaulting pins the literal to i64, which then selects the i64
+;; candidate --- the default is the tie-breaker no equality supplied
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 0 0)))
+               (xtc:solve:c-default 'a (list 2 4 6 9)))
+         'r)
+ 2
+ "overload-disambiguated-by-default")
+
+;; an argument fixed to i32 selects the i32 candidate over the i64 one
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 4)
+               (xtc:solve:c-overload 'r (list 'a) (list (list 2 2) (list 4 4))))
+         'r)
+ 4
+ "overload-picks-matching-width")
+
+;; no candidate matches a concrete argument: an honest conflict, not a guess
+(xtmtest-result
+ (let ((intern (make-hashtable)))
+   (eq? 'conflict
+        (xtc:solve:run (list (xtc:solve:c-eq 'a 2)
+                             (xtc:solve:c-overload 'r (list 'a) (list (list 0 0))))
+                       intern)))
+ #t
+ "overload-no-candidate-conflicts")
+
+;; a comparison-shaped candidate: two f64 arguments but an i1 result --- the
+;; return type need not relate to the argument types
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-overload 'r (list 'a 'b) (list (list 10 0 0)))
+               (xtc:solve:c-default 'a (list 0 1))
+               (xtc:solve:c-default 'b (list 0 1)))
+         'r)
+ 10
+ "overload-result-independent-of-args")
+
+;; a generic candidate ([!t,!t]: return equals parameter) instantiates to the
+;; argument's type --- its variable, freshened per candidate, unifies with the
+;; i64 argument and carries i64 back out as the result
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 2)
+               (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t))))
+         'r)
+ 2
+ "overload-generic-candidate-instantiates")
+
+;; a generic candidate at a pointer depth ([!t,!t*]: dereference): an i64*
+;; argument reifies the result as i64, structurally --- the #315 property
+;; surviving through overload instantiation
+(xtmtest-result
+ (solve1 (list (xtc:solve:c-eq 'a 102)
+               (xtc:solve:c-overload 'r (list 'a) (list (list '!t '!t*))))
+         'r)
+ 2
+ "overload-generic-candidate-pointer-depth")
