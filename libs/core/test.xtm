@@ -1,222 +1,296 @@
-;;; tests/test.xtm -- testing framework for Extempore
+;;; libs/core/test.xtm -- the unit-testing framework for Extempore
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs:
 
 ;;; Commentary:
 
-;; These functions & macros provide a basic unit testing framework for
-;; Extempore - load before running any of the other .xtm files in
-;; tests/
+;; This file is the SINGLE SOURCE OF TRUTH for the test framework. It is
+;; loaded once at startup from runtime/scheme.xtm, so the macros below are
+;; available both in `--batch` test runs and interactively. Do not embed a
+;; copy elsewhere -- edit it here.
 
-;; To write a test, use the xtmtest macro. Usage examples:
+;; The framework records each assertion as one result in *xtmtest-results*.
+;; Every result has an OUTCOME drawn from this vocabulary:
+;;
+;;   pass           the call ran and its value matched the expectation
+;;   fail           the call ran but its value did not match
+;;   runtime-error  it compiled, but evaluating the call threw
+;;   compile-error  the definition (bind-func/bind-type) failed to compile
+;;   compile-ok     a compile-only test compiled successfully
+;;   fixture-error  a fixture's setup threw
+;;
+;; A run "fails" (non-zero exit) if any result is not a pass or compile-ok.
 
-;; (xtmtest '(bind-func compile_fn ; this is the function definition
-;;             (lambda ()               ; this is the function definition
-;;               (* 3 8)))         ; this is the function definition
-;;          (compile_fn))          ; this is how to call it
-
-;; (xtmtest '(bind-func no_compile_fn ; this is the function definition
-;;             (lambda ()                  ; this is the function definition
-;;               (* 3 8.0)))          ; this is the function definition
-;;          (no_compile_fn))          ; this is how to call it
-
-;; (xtmtest '(bind-func incorrect_fn ; this is the function definition
-;;             (lambda ()                 ; this is the function definition
-;;               (* 3 4)))           ; this is the function definition
-;;          (incorrect_fn)           ; this is how to call it
-;;          13)                      ; this is the expected return value
-
-;; (xtmtest '(bind-func correct_fn ; this is the function definition
-;;             (lambda ()               ; this is the function definition
-;;               (* 3 4)))         ; this is the function definition
-;;          (correct_fn)           ; this is how to call it
-;;          12)                    ; this is the expected return value
-
-;; ;; print the results
-;; (xtmtest-print-results)
-
-;; For more examples, see the test files in the tests/ subdirectory
+;; The preferred way to write a test is `xtmtest-result`: define the xtlang
+;; you want to exercise with a normal `bind-func`, then assert on a call.
+;;
+;;   (bind-func add_two (lambda (a:i64 b:i64) (+ a b)))
+;;   (xtmtest-result (add_two 2 3) 5 "add-two")   ; the label is optional
+;;
+;; Group related assertions under a shared fixture with `xtmtest-with-fixture`,
+;; which makes an `is?` macro available inside the suite:
+;;
+;;   (xtmtest-with-fixture arithmetic
+;;     (bind-func double (lambda (x:i64) (* x 2)))
+;;     (is? (double 3) 6)
+;;     (is? (double 0) 0 "zero"))
+;;
+;; For tests about compilation itself, use `xtmtest-compile` (asserts a form
+;; compiles) or `xtmtest-compile-fails` (asserts it does NOT -- e.g. a type
+;; error the checker is meant to catch).
+;;
+;; `xtmtest` is the older "define, call, and check in one form" macro, kept for
+;; the existing test corpus; new tests should prefer `xtmtest-result`.
 
 ;;; Code:
 
-(define xtmtest-reset-results
-  (lambda ()
-    (set! *xtmtest-results*
-          (list (list 'correct)
-                (list 'incorrect)
-                (list 'compile)
-                (list 'no-compile)))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; result model        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; *xtmtest-results* is an append-only list of records, most-recent-first.
+;; Each record is (name outcome call expected got).
 (define *xtmtest-results* '())
 
-(xtmtest-reset-results)
+(define (xtmtest-reset-results)
+  (set! *xtmtest-results* '()))
 
-(define xtmtest-update-test-result
-  (lambda (func-sym label call expected got)
-    ;; rebuilt functionally, NOT via set-cdr! on the existing entry: s7 can
-    ;; allocate a closure's freshly-built constants outside the heap
-    ;; (semipermanent), and the GC does not trace through such cells --- a
-    ;; heap value smuggled in via set-cdr! is collected while referenced
-    (let ((reslist (list func-sym call expected got)))
-      (set! *xtmtest-results*
-            (map (lambda (entry)
-                   (if (eq? (car entry) label)
-                       (cons label
-                             (cons reslist
-                                   (cl:remove-if (lambda (res) (equal? res reslist))
-                                                 (cdr entry))))
-                       entry))
-                 *xtmtest-results*)))
-    (print "result: ")
-    (print-with-colors (case label
-                         ('correct 'green)
-                         ('incorrect 'magenta)
-                         ('compile 'yellow)
-                         ('no-compile ' red))
-                       'default #t (print label "\n"))))
+(define (xtmtest:pass? outcome)
+  (if (memq outcome '(pass compile-ok)) #t #f))
 
-;; some tests are supposed to fail compilation (type check catch for example)
-;; by passing 'copmile-should-fail as expected-result the failure will be marked as success
+(define (xtmtest:outcome-colour outcome)
+  (case outcome
+    ((pass compile-ok) 'green)
+    ((fail) 'magenta)
+    ((runtime-error) 'yellow)
+    (else 'red))) ;; compile-error, fixture-error
+
+;; numbers compare with = (so 4 and 4.0 agree); everything else with equal?
+(define (xtmtest:equal? expected got)
+  (if (and (number? expected) (number? got))
+      (= expected got)
+      (equal? expected got)))
+
+(define (xtmtest-record name outcome call expected got)
+  (set! *xtmtest-results*
+        (cons (list name outcome call expected got) *xtmtest-results*))
+  (print "result: ")
+  (print-with-colors (xtmtest:outcome-colour outcome) 'default #t
+                     (print outcome "\n"))
+  outcome)
+
+(define (xtmtest:announce name)
+  (print-with-colors 'cyan 'default #t (print "xtmtest "))
+  (print-with-colors 'black 'cyan #t (print "" name ""))
+  (println))
+
+(define (xtmtest:any-failures?)
+  (cl:some (lambda (r) (not (xtmtest:pass? (cadr r)))) *xtmtest-results*))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; assertions          ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the core assertion: evaluate CALL, compare to EXPECTED. EXTRA, if present,
+;; is a one-element list holding a label string (used by is? to qualify the
+;; name with its suite). This is a plain function returning the expansion so
+;; both xtmtest-result and is? can share it.
+(define (xtmtest-result-body call expected extra)
+  (let ((label (if (null? extra) #f (car extra))))
+    `(let ((env (current-environment))
+           (name ,(if label label `(quote ,(if (pair? call) (car call) call)))))
+       (xtmtest:announce name)
+       (catch (xtmtest-record name 'runtime-error ',call #f #f)
+              (let* ((got (eval ',call env))
+                     (expected-val ,expected))
+                (if (xtmtest:equal? expected-val got)
+                    (xtmtest-record name 'pass ',call expected-val got)
+                    (xtmtest-record name 'fail ',call expected-val got)))))))
+
+(define-macro (xtmtest-result call expected . extra)
+  (xtmtest-result-body call expected extra))
+
+;; older style: compile FORM, then evaluate CALL and (optionally) check it.
+;; Passing 'compile-should-fail as the expected result inverts the compile
+;; step -- a compile failure becomes a pass (prefer xtmtest-compile-fails).
+;; The compile-should-fail test is made at RUNTIME, on the evaluated expected
+;; value, so it doesn't depend on how the quote is read at expansion time.
 (define-macro (xtmtest form call . expected-result)
-  `(let ((func-sym (quote ,(car call)))
-         (exp-res ,(if (null? expected-result)
-                       #f
-                       (car expected-result))))
-     (print-with-colors 'cyan 'default #t (print "xtmtest "))
-     (print-with-colors 'black 'cyan #t (print "" func-sym ""))
-     (println)
-     (catch (if (and (symbol? exp-res)
-                     (equal? exp-res 'compile-should-fail))
-                (xtmtest-update-test-result func-sym 'correct ',call #f #f)
-                (xtmtest-update-test-result func-sym 'no-compile ',call #f #f))
+  `(let* ((name ',(car call))
+          (has-exp ,(not (null? expected-result)))
+          (exp-res ,(if (null? expected-result) #f (car expected-result)))
+          (want-compile-fail (and has-exp (symbol? exp-res)
+                                  (eq? exp-res 'compile-should-fail))))
+     (xtmtest:announce name)
+     (catch (if want-compile-fail
+                (xtmtest-record name 'pass ',call 'compile-should-fail 'did-not-compile)
+                (xtmtest-record name 'compile-error ',call #f #f))
             (eval ',form (interaction-environment))
-            (catch (xtmtest-update-test-result func-sym 'compile ',call #f #f)
-                   (let ((result (eval ',call (interaction-environment))))
-                     (if (or (not exp-res)
-                             (if (and (number? exp-res) (number? result))
-                                 (= exp-res result)
-                                 (equal? exp-res result)))
-                         (xtmtest-update-test-result func-sym 'correct ',call exp-res result)
-                         (xtmtest-update-test-result func-sym 'incorrect ',call exp-res result)))))))
+            (if want-compile-fail
+                (xtmtest-record name 'fail ',call 'compile-should-fail 'compiled)
+                (catch (xtmtest-record name 'runtime-error ',call #f #f)
+                       (let ((got (eval ',call (interaction-environment))))
+                         (if has-exp
+                             (if (xtmtest:equal? exp-res got)
+                                 (xtmtest-record name 'pass ',call exp-res got)
+                                 (xtmtest-record name 'fail ',call exp-res got))
+                             (xtmtest-record name 'pass ',call 'any got))))))))
 
+;; assert that FORM (a bind-func/bind-type) compiles
 (define-macro (xtmtest-compile form)
-  `(let ((func-sym (quote ,(cadr form))))
-     (print-with-colors 'cyan 'default #t (print "xtmtest "))
-     (print-with-colors 'black 'cyan #t (print "" func-sym ""))
-     (println)
-     (catch (xtmtest-update-test-result func-sym 'no-compile 'compile-only #f #f)
+  `(let ((name ',(cadr form)))
+     (xtmtest:announce name)
+     (catch (xtmtest-record name 'compile-error 'compile-only #f #f)
             (eval ',form (interaction-environment))
-            (xtmtest-update-test-result func-sym 'correct 'compile-only #t #t))))
+            (xtmtest-record name 'compile-ok 'compile-only #t #t))))
 
-(define (xtmtest-result-body call expected-result extra)
-  (let ((prefix (if (null? extra) "" (format "~a: " (car extra)))))
-    `(let ((evaluation-environment (current-environment))
-           (test-name (format "~a ~a" ,prefix ',(if (pair? call) (car call) call))))
-       (print-with-colors 'cyan 'default #t (print "xtmtest "))
-       (print-with-colors 'black 'cyan #t (print "" test-name ))
-       (println)
-       (catch (xtmtest-update-test-result test-name ',call 'compile #f #f)
-              (let ((result (eval ',call evaluation-environment)))
-                (if (equal? ,expected-result result)
-                    (xtmtest-update-test-result ',prefix 'correct ',call ,expected-result result)
-                    (xtmtest-update-test-result ',prefix 'incorrect ',call ,expected-result result))))))  )
+;; assert that FORM does NOT compile (e.g. a deliberate type error)
+(define-macro (xtmtest-compile-fails form)
+  `(let ((name ',(cadr form)))
+     (xtmtest:announce name)
+     (catch (xtmtest-record name 'pass 'compile-should-fail 'did-not-compile)
+            (eval ',form (interaction-environment))
+            (xtmtest-record name 'fail 'compile-should-fail 'compiled))))
 
-(define-macro (xtmtest-result call expected-result . extra)
-  (xtmtest-result-body call expected-result extra))
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; fixtures            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-(define xtmtest-print-results
-  (lambda ()
-    (println)
-    (print-with-colors 'black 'blue #t (print " Test results "))
-    (print "\n\n")
-    (for-each (lambda (label-list)
-                (if (> (length label-list) 1)
-                    (begin
-                      (print-with-colors 'blue 'default #t (print (car label-list) "\n\n"))
-                      (for-each (lambda (reslist)
-                                  (print "  name: ")
-                                  (print-with-colors (case (car label-list)
-                                                       ('correct 'green)
-                                                       ('incorrect 'magenta)
-                                                       ('compile 'yellow)
-                                                       ('no-compile ' red))
-                                                     'default #f (print (car reslist)))
-                                  (print " call: ")
-                                  (print-with-colors 'blue 'default #f (print (cadr reslist)))
-                                  (if (caddr reslist)
-                                      (begin (print " result:" (caddr reslist))
-                                             (if (not (equal? (car label-list) 'correct))
-                                                 (print " expecting:" (cadddr reslist)))))
-                                  (println))
-                                (cdr label-list))))
-                (println))
-              *xtmtest-results*)))
-
-
-;; a helper for running test files (in tests/)
-
-(define xtmtest-run-tests
-  (lambda (test-files print? quit-on-exit?)
-    (let ((timeout (sys:get-default-timeout)))
-      (sys:set-default-timeout (* 60 44100 60)) ;; 1 hour timeout
-      (sys:load "libs/core/test.xtm" 'quiet)
-      (xtmtest-reset-results)
-      (if (string? test-files)
-          (set! test-files (list test-files)))
-      (let ((start (now)))
-        (for-each (lambda (tf)
-                    (sys:load tf))
-                  test-files)
-        (if print? (xtmtest-print-results))
-        (print "\nCompleted ")
-        (print-with-colors 'blue 'default #t
-                           (print (apply + (map (lambda (lab) (- (length lab) 1))
-                                                *xtmtest-results*))))
-        (print " tests in ")
-        (let ((dur-sec (/ (- (now) start) *au:samplerate* 1.0)))
-          (print-with-colors 'yellow 'default #t
-                             (print (if (> dur-sec 60) (/ dur-sec 60) dur-sec)))
-          (print (if (> dur-sec 60)
-                     " minutes.\n\n"
-                     " seconds.\n\n"))))
-      (if quit-on-exit?
-          (quit (if (cl:some (lambda (label-list)
-                               (and (not (equal? (car label-list) 'correct))
-                                    (> (length label-list) 1)))
-                             *xtmtest-results*)
-                    (begin (print-with-colors 'red 'default #t
-                                              (print "Some tests failed :(\n"))
-                           1)
-                    (begin (print-with-colors 'green 'default #t
-                                              (print "All tests passed :)\n"))
-                           0)))
-          ;; if not quitting, set the timeout back
-          (sys:set-default-timeout timeout)))))
-
-;;; xmttest-with-fixture
-
+;; run FIXTURE (setup) then TESTS in a fresh environment, with an `is?` macro
+;; in scope that records under "SUITE.label" (or "SUITE.is?"). Fixtures nest.
 (define (xtmtest-with-fixture-body name fixture tests)
   `(let ((fixture-environment ((lambda () (current-environment)))))
      (let ((suite-name ',name))
-       (print-with-colors 'cyan 'default #t (print "xtmtest "))
-       (print-with-colors 'black 'cyan #t (print "" suite-name))
-       (println)
+       (xtmtest:announce suite-name)
        (eval `(begin
                 (define-macro (is? call expected-result . args)
-                  (xtmtest-result-body call
-                                       expected-result
-                                       (list (if (not (null? args))
-                                                 (format "~a.~a" ',suite-name (car args))
-                                                 (format "~a.is?" ',suite-name))))))
+                  (xtmtest-result-body
+                   call expected-result
+                   (list (if (not (null? args))
+                             (format "~a.~a" ',suite-name (car args))
+                             (format "~a.is?" ',suite-name))))))
              fixture-environment)
-       (catch (xtmtest-update-test-result suite-name 'no-compile ',fixture #f #f)
+       (catch (xtmtest-record suite-name 'fixture-error ',fixture #f #f)
               (eval ',fixture fixture-environment)
               (eval '(begin ,@tests) fixture-environment)))))
-
 
 (define-macro (xtmtest-with-fixture name fixture . tests)
   (xtmtest-with-fixture-body name fixture tests))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reporting           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; print results grouped by outcome, failures first so they're easy to spot
+(define (xtmtest-print-results)
+  (println)
+  (print-with-colors 'black 'blue #t (print " Test results "))
+  (print "\n\n")
+  (for-each
+   (lambda (outcome)
+     (let ((records (cl:remove-if-not (lambda (r) (eq? (cadr r) outcome))
+                                      (reverse *xtmtest-results*))))
+       (if (not (null? records))
+           (begin
+             (print-with-colors 'blue 'default #t (print outcome "\n\n"))
+             (for-each
+              (lambda (r)
+                (print "  name: ")
+                (print-with-colors (xtmtest:outcome-colour outcome) 'default #f
+                                   (print (car r)))
+                (print " call: ")
+                (print-with-colors 'blue 'default #f (print (caddr r)))
+                (if (not (xtmtest:pass? outcome))
+                    (print " expected: " (cadddr r) " got: " (list-ref r 4)))
+                (println))
+              records)
+             (println)))))
+   '(fail compile-error runtime-error fixture-error pass compile-ok)))
+
+(define (xtmtest:print-summary start)
+  (print "\nCompleted ")
+  (print-with-colors 'blue 'default #t (print (length *xtmtest-results*)))
+  (print " tests in ")
+  (let ((dur-sec (/ (- (now) start) *au:samplerate* 1.0)))
+    (print-with-colors 'yellow 'default #t
+                       (print (if (> dur-sec 60) (/ dur-sec 60) dur-sec)))
+    (print (if (> dur-sec 60) " minutes.\n\n" " seconds.\n\n")))
+  (if (xtmtest:any-failures?)
+      (print-with-colors 'red 'default #t (print "Some tests failed :(\n"))
+      (print-with-colors 'green 'default #t (print "All tests passed :)\n"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; JUnit XML output    ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (xtmtest:xml-escape obj)
+  (let loop ((chars (string->list (if (string? obj) obj (format "~a" obj))))
+             (acc '()))
+    (if (null? chars)
+        (apply string-append (reverse acc))
+        (loop (cdr chars)
+              (cons (case (car chars)
+                      ((#\<) "&lt;")
+                      ((#\>) "&gt;")
+                      ((#\&) "&amp;")
+                      ((#\") "&quot;")
+                      ((#\') "&apos;")
+                      (else (string (car chars))))
+                    acc)))))
+
+;; write the results as a JUnit XML file, which CI can surface as a per-test
+;; report (each assertion becomes a <testcase>). Called by xtmtest-run-tests
+;; when a path is supplied.
+(define (xtmtest:write-junit path)
+  (let ((failures (cl:remove-if (lambda (r) (xtmtest:pass? (cadr r)))
+                                *xtmtest-results*)))
+    (sys:dump-string-to-file
+     path
+     (apply string-append
+            (append
+             (list "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                   (format "<testsuite name=\"xtmtest\" tests=\"~a\" failures=\"~a\">\n"
+                           (length *xtmtest-results*) (length failures)))
+             (map (lambda (r)
+                    (let ((name (xtmtest:xml-escape (car r)))
+                          (outcome (cadr r)))
+                      (if (xtmtest:pass? outcome)
+                          (format "  <testcase name=\"~a\" classname=\"xtmtest\"/>\n" name)
+                          (string-append
+                           (format "  <testcase name=\"~a\" classname=\"xtmtest\">\n" name)
+                           (format "    <failure type=\"~a\">call ~a expected ~a got ~a</failure>\n"
+                                   outcome
+                                   (xtmtest:xml-escape (caddr r))
+                                   (xtmtest:xml-escape (cadddr r))
+                                   (xtmtest:xml-escape (list-ref r 4)))
+                           "  </testcase>\n"))))
+                  (reverse *xtmtest-results*))
+             (list "</testsuite>\n"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; runner              ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; load and run TEST-FILES (a path or list of paths). PRINT? prints the result
+;; table; QUIT-ON-EXIT? quits with 0/1 for CI. The optional JUNIT-PATH writes a
+;; JUnit XML report. The SchemeProcess watchdog (sys:*-default-timeout) is the
+;; in-engine guard on a single evaluation's duration -- distinct from ctest's
+;; process-level TIMEOUT -- and is bumped here so slow compiles aren't killed.
+(define (xtmtest-run-tests test-files print? quit-on-exit? . junit-path)
+  (let ((saved-timeout (sys:get-default-timeout))
+        (junit (if (and (pair? junit-path) (string? (car junit-path)))
+                   (car junit-path)
+                   #f)))
+    (sys:set-default-timeout (* 60 44100 60)) ;; 1 hour
+    (xtmtest-reset-results)
+    (if (string? test-files)
+        (set! test-files (list test-files)))
+    (let ((start (now)))
+      (for-each (lambda (tf) (sys:load tf)) test-files)
+      (if print? (xtmtest-print-results))
+      (if junit (xtmtest:write-junit junit))
+      (xtmtest:print-summary start))
+    (if quit-on-exit?
+        (quit (if (xtmtest:any-failures?) 1 0))
+        (sys:set-default-timeout saved-timeout))))
