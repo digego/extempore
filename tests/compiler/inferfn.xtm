@@ -1,0 +1,98 @@
+;;; tests/compiler/inferfn.xtm -- function-level shadow comparison for the
+;;; constraint inference path (TASK-059 increment 3, stage 3a).
+;;;
+;;; Where infer.xtm shadows the new traversal at the granularity of a single
+;;; expression, this file shadows it at the granularity of a whole FUNCTION
+;;; definition --- the unit xtc:typecheck:run-type-check actually operates on.
+;;; For each function body it replicates the driver's phases up to t4 (the AST
+;;; run-type-check receives: mark-returns'd, coercion-run'd, pre-closure-convert),
+;;; then asserts the new collect+solve path (xtc:infer:check-function) agrees with
+;;; the live run-type-check on every var both resolve to a concrete type.  This is
+;;; the validator the increment-3 live flip rides on; the live entry point is not
+;;; flipped here (that is stage 3d), so this changes no compiler behaviour.
+;;;
+;;; Stage 3a covers functions whose bodies stay within the forms collect already
+;;; handles (literals, let, lambda, begin, if, arithmetic, comparison, the three
+;;; call kinds) plus the ret-> return marker every function carries.  The
+;;; allocation / tuple / array / pointer form handlers --- and the real stdlib
+;;; functions that need them --- arrive in stage 3b.
+
+(sys:load "libs/core/test.xtm")
+(sys:load "runtime/xtc-solve.xtm")
+(sys:load "runtime/xtc-infer.xtm")
+
+;; Replicate the driver's phases up to (vars forced-types t4) for one function
+;; definition --- exactly the triple xtc:typecheck:run-type-check is called with.
+(define inferfn:prep
+  (lambda (symname code . args)
+    (let* ((syn (xtc:driver:syntactic-phase symname code))
+           (t1 (car syn))
+           (cc (cadr syn))
+           (ann (xtc:driver:annotation-phase t1 symname))
+           (t2 (car ann))
+           (vars (cadr ann))
+           (forced-types (apply xtc:typecheck:handle-forced-types t1 (append cc args)))
+           (t4 (xtc:typecheck:coercion-run t2 forced-types)))
+      ;; the outer (ret-> symname ...) marker references the function name, which
+      ;; the live driver has registered; add it here so both paths see it (the
+      ;; shadow compares them on identical inputs).
+      (if (not (hashtable-ref vars symname))
+          (hashtable-set! vars symname (xtc:typecheck:make-uf-cell '())))
+      (list vars forced-types t4))))
+
+;; A var's type as the comparison reads it: a 1-element candidate list unwraps to
+;; its sole member, so the old (list-valued) and new (int-code-valued) alists meet
+;; in the same vocabulary.
+(define inferfn:norm
+  (lambda (t) (if (and (list? t) (= (length t) 1)) (car t) t)))
+
+;; The vars on which the NEW path resolved a concrete type that the OLD path
+;; resolves differently --- the divergences.  An empty result certifies the two
+;; agree everywhere both decide a concrete type; a non-empty one names each
+;; disagreeing var with both verdicts.  (A var only one path resolves is not a
+;; divergence: it is coverage still to come, not a conflict.)
+(define inferfn:disagreements
+  (lambda (symname code . args)
+    (let* ((p (apply inferfn:prep symname code args))
+           (oldA (xtc:typecheck:run-type-check (car p) (cadr p) (caddr p)))
+           (newA (xtc:infer:check-function (car p) (cadr p) (caddr p))))
+      (cl:remove
+       #f
+       (map (lambda (e)
+              (let* ((sym (car e))
+                     (nt (inferfn:norm (cdr e)))
+                     (oc (assoc-strcmp sym oldA)))
+                (if (and oc
+                         (xtc:codegen:type? nt)
+                         (xtc:codegen:type? (inferfn:norm (cdr oc)))
+                         (not (equal? nt (inferfn:norm (cdr oc)))))
+                    (list sym 'old (inferfn:norm (cdr oc)) 'new nt)
+                    #f)))
+            newA)))))
+
+;; A couple of monomorphic globals so a function body can call out.
+(bind-func inferfn_add_i32 (lambda (a:i32 b:i32) (+ a b)))
+(bind-func inferfn_pos     (lambda (x:double) (> x 0.0)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; shadow comparison   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (inferfn:disagreements 'tf_add1 '(lambda (x:i64) (+ x 1)))
+                '() "fn-add1")
+(xtmtest-result (inferfn:disagreements 'tf_add2 '(lambda (x:i64 y:i64) (+ x y)))
+                '() "fn-add-two")
+(xtmtest-result (inferfn:disagreements 'tf_fadd '(lambda (a:double b:double) (* a b)))
+                '() "fn-float-mul")
+(xtmtest-result (inferfn:disagreements 'tf_cmp  '(lambda (x:i64) (< x 0)))
+                '() "fn-compare-returns-bool")
+(xtmtest-result (inferfn:disagreements 'tf_if   '(lambda (x:i64) (if (< x 0) 0 x)))
+                '() "fn-if-branches")
+(xtmtest-result (inferfn:disagreements 'tf_let  '(lambda (x:i64) (let ((y:i64 (+ x 1))) (+ y y))))
+                '() "fn-let-local")
+(xtmtest-result (inferfn:disagreements 'tf_call '(lambda (x:i32) (inferfn_add_i32 x 1)))
+                '() "fn-global-call")
+(xtmtest-result (inferfn:disagreements 'tf_nest '(lambda (x:double) (if (inferfn_pos x) 1 0)))
+                '() "fn-global-call-in-if")
+(xtmtest-result (inferfn:disagreements 'tf_comp '(lambda (x:i64) (let ((a:i64 (+ x 1))) (if (< a 10) a (+ a 1)))))
+                '() "fn-composed")

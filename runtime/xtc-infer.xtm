@@ -208,6 +208,14 @@
       ((ast:lambda? ast) (xtc:infer:collect-lambda ast bound))
       ((ast:begin? ast)  (xtc:infer:collect-seq (cdr ast) bound))
       ((ast:if? ast)     (xtc:infer:collect-if ast bound))
+      ;; (ret-> fn expr): a return marker mark-returns inserts.  The marked expr
+      ;; IS the value flowing to the function's return, and collect-lambda already
+      ;; ties a lambda's return to its body's result, so the marker is transparent
+      ;; to inference --- its type is the expr's.  (The old ret-check additionally
+      ;; uses the function's known return type to direct the expr; the solver
+      ;; propagates that relationship either way, so no direction is needed here.)
+      ((and (pair? ast) (eq? (car ast) 'ret->))
+       (xtc:infer:collect (caddr ast) bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-op? (car ast)))
        (xtc:infer:collect-math ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:compare-op? (car ast)))
@@ -626,3 +634,29 @@
            (intern (make-hashtable))
            (subst (xtc:solve:run (cdr rc) intern)))
       (xtc:solve:type-of (car rc) subst intern))))
+
+;; The whole-function analogue of xtc:typecheck:run-type-check, and the
+;; increment-3 entry point: given the var table, the forced (source-annotated)
+;; types, and the function's t4 AST, collect the AST's constraints, seed each
+;; forced type as an equality, solve once, and read every var's resolved type
+;; back into the (var . type) alist the driver's later phases consume.  The old
+;; entry's enumeration retry loop has no analogue --- the solver's defaulting and
+;; overload fixpoint already subsumes it.  A forced-type entry is (var . code)
+;; for a scalar and (var code...) for a compound, and in both cases its cdr is the
+;; int-code, so one c-eq form serves both.  This is shadow-validated against
+;; run-type-check (tests/compiler/inferfn.xtm) before it is flipped live.
+(define xtc:infer:check-function
+  (lambda (vars forced-types ast)
+    (xtc:infer:reset-fresh!)
+    (let* ((rc (xtc:infer:collect ast '()))
+           (forced (map (lambda (ft) (xtc:solve:c-eq (car ft) (cdr ft))) forced-types))
+           (intern (make-hashtable))
+           (subst (xtc:solve:run (append forced (cdr rc)) intern)))
+      (if (eq? subst 'conflict)
+          #f
+          (cl:remove
+           #f
+           (map (lambda (sym)
+                  (let ((ty (xtc:solve:type-of sym subst intern)))
+                    (and ty (cons sym ty))))
+                (hashtable-keys vars)))))))

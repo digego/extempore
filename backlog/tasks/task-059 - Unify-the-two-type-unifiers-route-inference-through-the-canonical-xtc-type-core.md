@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 11:10'
+updated_date: '2026-06-09 12:55'
 labels:
   - compiler
   - types
@@ -117,4 +117,67 @@ COVERAGE (all shadow-validated vs the old checker, incl. real adt.xtm Pair first
 DEFERRED (a loud gap, kept out of the corpus): constraint-guarded specialisations (the cache's 6th predicate field); and a FREE RETURN that no specialisation reifies --- e.g. (first someList), whose only matching signature is the [!a,!b]* fallback whose return !a is bound only by the body. The old path body-reifies it ("exercise the generic code"); the constraint path would need expected-type direction or a body pass. These two are the remaining generic prerequisites for going fully live.
 
 STATUS / RESUME POINT (supersedes all earlier RESUME stanzas): through ba42773b PUSHED; d3f84510 (math/compare), b82b8607 (simple generics), d62bd8a9 (structural named-generics, now superseded by the nominal rework), 27210008, 1b2788ec (nominal types), 60c19e97 (napp c-name re-encode) committed LOCALLY, unpushed. Resume at: the two deferred generic cases above IF needed for live (free-return body-reification is the substantive one), then increment 3 --- flip run-type-check* to collect+solve (forced-types become eq constraints; remember closure:convert + the scope/alpha-rename concern for shadowed let vars) --- then increment 4 (delete the six old functions type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? + the retry loop). xtc-infer.xtm still loaded only by its test, not live.
+
+## Increment 2 -- free-return generics DONE (commit 19986c13)
+
+A genericfunc's fully-general fallback ([!a,!b]*, first/second) whose return is
+bound nowhere in its parameters is now reified by body projection: when no
+reifiable specialisation matches the resolved argument types,
+xtc:infer:collect-generic-call exercises the fallback body --- a field access
+(tref a i) --- against the concrete argument (deref, expand the named or napp
+tuple via get-namedtype-type / get-generic-type-as-tuple, read field i).  The
+structural analogue of the old 'exercise the generic code' path.  It never
+shadows a matching specialisation: a genericfunc carrying a fallback routes
+through collect-generic-call, which prefers the lazy reifiable overload when a
+spec matches (any-spec-matches?) and only projects the fallback otherwise.
+
+NO solver/core/bridge change -- confined to xtc-infer.xtm (inert traversal) +
+its test.  Shadow-validated vs the old checker over a named tuple (bare2) and
+napp instances (IList i64/f64, Gx), field 0 AND field 1, composed with math/if.
+infer.xtm now 40 tests; compiler-unit 10/10 green; aot/typecheck/pipeline green
+(live path untouched).
+
+Deferred (loud gaps, out of corpus): constraint-guarded specialisations (cache
+predicate field); a free-return fallback over a NON-ground argument (refers to
+an outer var) -- its body can't be exercised standalone, awaits increment 3's
+expected-type direction.
+
+## Resume: increment 3 -- go live
+Flip run-type-check* (xtc-typecheck.xtm ~3300) to collect+solve; forced-types
+become eq constraints; remember closure:convert + the scope/alpha-rename concern
+for shadowed let vars.  xtc-infer.xtm gets wired live here (the non-ground
+free-return case resolves naturally once expected types flow in).  Then
+increment 4 (AC#2): delete the six old unifiers + the retry loop.
+
+## Increment 3 stage 3a -- scaffold + function-level shadow harness DONE
+
+The whole-function entry point xtc:infer:check-function (vars forced-types ast)
+is built and shadow-validated against the live xtc:typecheck:run-type-check: it
+collects constraints over the t4 AST, seeds each forced-type as a c-eq, solves
+once (NO retry loop -- the solver fixpoint subsumes it), and reads every var's
+resolved type back into the (var . type) alist the driver's later phases consume.
+A forced-type's cdr is the int-code for both scalar (x . 2) and compound
+(c 115 2 0) entries, so one c-eq serves both.  collect gained a ret-> case
+(pass-through: the marked expr's type is the value; collect-lambda already ties a
+lambda's return to its body, and the solver propagates the relationship either
+way, so no expected-type direction is needed).
+
+New test tests/compiler/inferfn.xtm shadows run-type-check at FUNCTION
+granularity (vs infer.xtm's expression granularity): for 9 functions it
+replicates the driver up to t4 and asserts check-function agrees with
+run-type-check on every var both resolve.  Verified non-vacuous: e.g. (lambda
+(x:i64) (+ x 1)) -> both resolve the anon lambda to (213 2 2).  prep adds the
+outer function symbol to vars (the live driver has it registered; the shadow
+compares both paths on identical inputs).  Registered in extras/cmake/tests.cmake;
+compiler-unit now 11/11 green incl aot (live path untouched -- xtc-infer.xtm is
+test-only).
+
+Stage 3a covers functions within collect's existing forms + ret->.  NEXT (3b):
+build out the form handlers in difficulty order -- ret->/set!/void/null? then the
+tuple/array/vector/pointer/alloc families (the projection machinery from the
+free-return work already does field access), then dotimes/while, bitcast,
+printf-family/zones -- each batch shadow-validated against a growing corpus of
+REAL stdlib functions.  Then 3c (shadow MODE in run-type-check* across a full aot
+build -> zero divergence), 3d (flip behind a revertible flag), increment 4
+(delete the six old unifiers + retry loop + ~45 old *-check handlers).
 <!-- SECTION:NOTES:END -->
