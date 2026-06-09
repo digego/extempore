@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 05:44'
+updated_date: '2026-06-09 07:02'
 labels:
   - compiler
   - types
@@ -74,4 +74,10 @@ MULTI-CANDIDATE WIRING (bc9dd6bc): a global call emits one overload over the cal
 KEY FINDING: a user bind-func is a polyfunc; single-candidate calls go through symbol-check (which COERCES an int literal to a float param --- (is_pos 5) => i1 in the oracle), multi-candidate through match-ftypes (class membership). The new path is uniformly class-checked, so it declines the int->float coercion: an intended strictness, documented and kept out of the corpus alongside the result-widening case.
 
 REMAINING increment-2 forms: (1) math/compare OVERLOAD specialisation --- (+ a b) on non-numeric/tuple operands rewrites to xtm_addition##N and dispatches poly; does NOT fit the type-agnostic collection cleanly (needs operand types to decide), the trickier of the two. (2) generics (genericfunc, return type REIFIED from args, not selected --- keep _poly_ reification, codegen depends on it). Then increment 3 (flip run-type-check* to collect+solve; forced-types become eq constraints; remember closure:convert + the scope/alpha-rename concern for shadowed let vars) and increment 4 (delete the six old functions + retry loop).
+
+STATUS / RESUME POINT (as of 2026-06-09, session end): all commits through ba42773b are PUSHED to origin/master --- the 'local/unpushed' tags in the stanzas above are historical, not current. HEAD = ba42773b.
+
+The authoritative state is the 'Increment 2 CONTINUED further' stanza and its 'REMAINING increment-2 forms' list directly above (the two earlier 'Remaining' lists are superseded). To resume, start there: next is (1) the math/compare overload specialisation, then (2) generics, then increment 3 (flip run-type-check*) and 4 (delete the old six + retry loop).
+
+xtc-infer.xtm and xtc-solve.xtm both carry up-to-date module headers describing coverage and the deferred/curated boundaries; tests/compiler/{infer,solve}.xtm are the shadow/isolation suites (22 + 22 tests, green). Run via: ctest --label-regex compiler-unit -j4 (from build/), or ./build/extempore --batch '(xtmtest-run-tests "tests/compiler/infer.xtm" #t #t)'. Note xtc-infer.xtm is still loaded only by its test, not live (increment 3 wires it in).
 <!-- SECTION:NOTES:END -->
