@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 05:07'
+updated_date: '2026-06-09 05:44'
 labels:
   - compiler
   - types
@@ -62,4 +62,16 @@ Increment 2 CONTINUED (commit 761646d3, local/unpushed): xtc-infer.xtm now also 
 Discovered while doing this: a user bind-func is registered as a POLYFUNC (polyfunc-exists? true, get-polyfunc-candidate-types returns its one closure candidate), NOT a nativefunc/closure --- so a call to a user function routes through symbol-check's poly resolution / nativef-poly-check, not the plain nativef-check signature lookup. nativef-check is for bind-lib C natives. This means 'function application' splits: local closures (DONE, clean Robinson) vs global user functions (the poly path, deferred with the overload work).
 
 Remaining increment-2 forms: global-function application via the poly path; the math/compare OVERLOAD specialisation (xtm_addition## etc. for non-numeric operands); generics (nativef-generics + reify-generic-type, keep the _poly_ reification). Known boundary deferred to a later generalisation pass: a bare lambda whose body leaves a parameter unconstrained --- new path declines it (#f, genuinely generic) where the old path emits the raw parameter symbol (213 0 0 b); such lambdas are kept out of the shadow corpus. Then increment 3 (flip run-type-check*) and 4 (delete the six old functions + retry loop).
+
+Increment 2 CONTINUED further (commits 6d831d29, ee42fd1d, bc9dd6bc; local/unpushed). Global-function application now fully handled, built on a new solver primitive.
+
+OVERLOAD CONSTRAINT (ee42fd1d): added the deferred-choice third constraint kind to xtc-solve (eq/default were the only two). A call with several candidate signatures must match exactly one; xtc:solve:run is now a fixpoint --- commit unambiguous overloads first (narrowing the subst), then apply one defaulting pass as a tie-breaker, repeat. This subsumes the old retry loop with no search: an unambiguous signature commits first and forces its arg (downstream beats default), a default breaks a tie no signature can. Candidate vars intern through a fresh table per trial, so generic candidates instantiate independently (incl. the #315 [!t,!t*] deref). Zero-viable = honest conflict. 9 isolation tests in solve.xtm.
+
+CLASS-AWARE VIABILITY (bc9dd6bc): a still-free literal arg may only take a type from its own class (the bound the old candidate-list carried, read off the default constraint via xtc:solve:class-map/arg-admits?). This is what makes an int literal select an i32 candidate over an f64 one --- plain defaulting would pin it to i64 and match neither. 4 more solve.xtm tests (22 total).
+
+MULTI-CANDIDATE WIRING (bc9dd6bc): a global call emits one overload over the callee's candidates (xtc:infer:global-candidates/collect-global-call), replacing the earlier single-signature eq path. Monomorphic = one-candidate case, still resolves at once but now class-checked. Shadow corpus is 42 exprs incl. overloaded calls composed with arithmetic/if/let/local-closure; 22 infer tests green.
+
+KEY FINDING: a user bind-func is a polyfunc; single-candidate calls go through symbol-check (which COERCES an int literal to a float param --- (is_pos 5) => i1 in the oracle), multi-candidate through match-ftypes (class membership). The new path is uniformly class-checked, so it declines the int->float coercion: an intended strictness, documented and kept out of the corpus alongside the result-widening case.
+
+REMAINING increment-2 forms: (1) math/compare OVERLOAD specialisation --- (+ a b) on non-numeric/tuple operands rewrites to xtm_addition##N and dispatches poly; does NOT fit the type-agnostic collection cleanly (needs operand types to decide), the trickier of the two. (2) generics (genericfunc, return type REIFIED from args, not selected --- keep _poly_ reification, codegen depends on it). Then increment 3 (flip run-type-check* to collect+solve; forced-types become eq constraints; remember closure:convert + the scope/alpha-rename concern for shadowed let vars) and increment 4 (delete the six old functions + retry loop).
 <!-- SECTION:NOTES:END -->
