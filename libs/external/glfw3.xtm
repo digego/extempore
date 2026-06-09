@@ -12,16 +12,16 @@
 
 ;;; Code:
 
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/glfw3.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/glfw3.xtm" 'quiet))
 (sys:load-preload-check 'glfw3)
 (define *xtmlib-glfw3-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/base/base.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmglfw3")
+(xtc:aot:insert-header "xtmglfw3")
 
 (bind-dylib libglfw
   (cond ((string=? (sys:platform) "OSX")
@@ -30,7 +30,7 @@
         ((string=? (sys:platform) "Windows") "glfw3.dll"))
   "xtmglfw3")
 
-(impc:aot:import-ll "xtmglfw3")
+(xtc:aot:import-ll "xtmglfw3")
 
 ;; opaque pointers
 (bind-alias GLFWmonitor i8)
@@ -899,5 +899,5 @@
     (glfw_init)
     (glfw_create_webgpu_window width height)))
 
-(impc:aot:insert-footer "xtmglfw3")
+(xtc:aot:insert-footer "xtmglfw3")
 (define *xtmlib-glfw3-loaded* #t)

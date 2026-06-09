@@ -225,7 +225,7 @@ EXPORT int extempore_init(int argc, char** argv) {
             case OPT_COMPILE_STR: {
                 std::string str = escape_backslashes(args.OptionArg());
                 extemp::UNIV::EXT_LOADBASE = false;  // never load base when compiling
-                initexpr = std::string("(impc:aot:compile-xtm-exe \"") + str + std::string("\")");
+                initexpr = std::string("(xtc:aot:compile-xtm-exe \"") + str + std::string("\")");
             } break;
             case OPT_SHAREDIR:
                 extemp::UNIV::SHARE_DIR = std::string(args.OptionArg());

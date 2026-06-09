@@ -42,29 +42,29 @@
 ;; type variables      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define impc:type:var
+(define xtc:type:var
   (lambda (id) (list 'var id)))
 
-(define impc:type:var?
+(define xtc:type:var?
   (lambda (t) (and (pair? t) (eq? (car t) 'var))))
 
-(define impc:type:var-id
+(define xtc:type:var-id
   (lambda (t) (cadr t)))
 
 ;; A single monotonically increasing source of fresh variable identity.  This
-;; replaces the old triumvirate of `*impc:ti:generic-count*', the `!ga_N' /
+;; replaces the old triumvirate of `*xtc:cache:generic-count*', the `!ga_N' /
 ;; `!gxa_N' name minting, and the per-call-site `##gnum' suffix, all of which
 ;; had to agree for a generic instantiation to type-check.
 
-(define *impc:type:fresh-counter* 0)
+(define *xtc:type:fresh-counter* 0)
 
-(define impc:type:reset-fresh!
-  (lambda () (set! *impc:type:fresh-counter* 0)))
+(define xtc:type:reset-fresh!
+  (lambda () (set! *xtc:type:fresh-counter* 0)))
 
-(define impc:type:fresh-var
+(define xtc:type:fresh-var
   (lambda ()
-    (set! *impc:type:fresh-counter* (+ *impc:type:fresh-counter* 1))
-    (impc:type:var *impc:type:fresh-counter*)))
+    (set! *xtc:type:fresh-counter* (+ *xtc:type:fresh-counter* 1))
+    (xtc:type:var *xtc:type:fresh-counter*)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; type constructors   ;;
@@ -74,37 +74,37 @@
 ;; car names the constructor.  The accessors below are thin, but naming them
 ;; keeps call sites readable and the representation in one place.
 
-(define impc:type:ptr     (lambda (t) (list 'ptr t)))
-(define impc:type:ptr?    (lambda (t) (and (pair? t) (eq? (car t) 'ptr))))
-(define impc:type:ptr-to  (lambda (t) (cadr t)))
+(define xtc:type:ptr     (lambda (t) (list 'ptr t)))
+(define xtc:type:ptr?    (lambda (t) (and (pair? t) (eq? (car t) 'ptr))))
+(define xtc:type:ptr-to  (lambda (t) (cadr t)))
 
-(define impc:type:tuple        (lambda fields (cons 'tuple fields)))
-(define impc:type:tuple?       (lambda (t) (and (pair? t) (eq? (car t) 'tuple))))
-(define impc:type:tuple-fields (lambda (t) (cdr t)))
+(define xtc:type:tuple        (lambda fields (cons 'tuple fields)))
+(define xtc:type:tuple?       (lambda (t) (and (pair? t) (eq? (car t) 'tuple))))
+(define xtc:type:tuple-fields (lambda (t) (cdr t)))
 
-(define impc:type:array       (lambda (n t) (list 'array n t)))
-(define impc:type:array?      (lambda (t) (and (pair? t) (eq? (car t) 'array))))
-(define impc:type:array-size  (lambda (t) (cadr t)))
-(define impc:type:array-elt   (lambda (t) (caddr t)))
+(define xtc:type:array       (lambda (n t) (list 'array n t)))
+(define xtc:type:array?      (lambda (t) (and (pair? t) (eq? (car t) 'array))))
+(define xtc:type:array-size  (lambda (t) (cadr t)))
+(define xtc:type:array-elt   (lambda (t) (caddr t)))
 
-(define impc:type:vector      (lambda (n t) (list 'vector n t)))
-(define impc:type:vector?     (lambda (t) (and (pair? t) (eq? (car t) 'vector))))
-(define impc:type:vector-size (lambda (t) (cadr t)))
-(define impc:type:vector-elt  (lambda (t) (caddr t)))
+(define xtc:type:vector      (lambda (n t) (list 'vector n t)))
+(define xtc:type:vector?     (lambda (t) (and (pair? t) (eq? (car t) 'vector))))
+(define xtc:type:vector-size (lambda (t) (cadr t)))
+(define xtc:type:vector-elt  (lambda (t) (caddr t)))
 
 ;; A closure / function type: (closure return-type arg-type ...).
-(define impc:type:closure      (lambda (ret . args) (cons 'closure (cons ret args))))
-(define impc:type:closure?     (lambda (t) (and (pair? t) (eq? (car t) 'closure))))
-(define impc:type:closure-ret  (lambda (t) (cadr t)))
-(define impc:type:closure-args (lambda (t) (cddr t)))
+(define xtc:type:closure      (lambda (ret . args) (cons 'closure (cons ret args))))
+(define xtc:type:closure?     (lambda (t) (and (pair? t) (eq? (car t) 'closure))))
+(define xtc:type:closure-ret  (lambda (t) (cadr t)))
+(define xtc:type:closure-args (lambda (t) (cddr t)))
 
-(define impc:type:named      (lambda (name) (list 'named name)))
-(define impc:type:named?     (lambda (t) (and (pair? t) (eq? (car t) 'named))))
-(define impc:type:named-name (lambda (t) (cadr t)))
+(define xtc:type:named      (lambda (name) (list 'named name)))
+(define xtc:type:named?     (lambda (t) (and (pair? t) (eq? (car t) 'named))))
+(define xtc:type:named-name (lambda (t) (cadr t)))
 
 ;; A base (nullary) type is any symbol --- the constructor tags above only ever
 ;; appear as the head of a list, never as a term in their own right.
-(define impc:type:base?
+(define xtc:type:base?
   (lambda (t) (symbol? t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -116,38 +116,38 @@
 ;; substitution is the empty list, which --- unlike #f --- is a true value, so
 ;; "unified with no new bindings" and "failed to unify" stay distinct.
 
-(define impc:type:empty-subst '())
+(define xtc:type:empty-subst '())
 
-(define impc:type:subst-ref
+(define xtc:type:subst-ref
   (lambda (id subst)
     (let ((cell (assv id subst)))
       (if cell (cdr cell) #f))))
 
-(define impc:type:subst-extend
+(define xtc:type:subst-extend
   (lambda (id t subst)
     (cons (cons id t) subst)))
 
 ;; Follow the substitution chain for a variable to the term it currently
 ;; stands for, stopping at the first non-variable or unbound variable.  This is
 ;; the shallow walk unification needs; apply-subst below does the deep one.
-(define impc:type:resolve
+(define xtc:type:resolve
   (lambda (t subst)
-    (if (impc:type:var? t)
-        (let ((binding (impc:type:subst-ref (impc:type:var-id t) subst)))
+    (if (xtc:type:var? t)
+        (let ((binding (xtc:type:subst-ref (xtc:type:var-id t) subst)))
           (if binding
-              (impc:type:resolve binding subst)
+              (xtc:type:resolve binding subst)
               t))
         t)))
 
 ;; Apply a substitution throughout a term, yielding a term in which every bound
 ;; variable has been replaced by its (recursively resolved) binding.  Unbound
 ;; variables, base types and size literals are returned unchanged.
-(define impc:type:apply-subst
+(define xtc:type:apply-subst
   (lambda (t subst)
-    (let ((t (impc:type:resolve t subst)))
+    (let ((t (xtc:type:resolve t subst)))
       (if (and (pair? t) (not (eq? (car t) 'var)))
           (cons (car t)
-                (map (lambda (x) (impc:type:apply-subst x subst)) (cdr t)))
+                (map (lambda (x) (xtc:type:apply-subst x subst)) (cdr t)))
           t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,42 +157,42 @@
 ;; Does variable `id' occur anywhere in `t' (after resolving through subst)?
 ;; Binding a variable to a term that mentions it would build an infinite type,
 ;; so unify refuses to do so.
-(define impc:type:occurs?
+(define xtc:type:occurs?
   (lambda (id t subst)
-    (let ((t (impc:type:resolve t subst)))
-      (cond ((impc:type:var? t) (= (impc:type:var-id t) id))
+    (let ((t (xtc:type:resolve t subst)))
+      (cond ((xtc:type:var? t) (= (xtc:type:var-id t) id))
             ((pair? t)
              (let loop ((args (cdr t)))
                (and (pair? args)
-                    (or (impc:type:occurs? id (car args) subst)
+                    (or (xtc:type:occurs? id (car args) subst)
                         (loop (cdr args))))))
             (else #f)))))
 
 ;; Bind variable `id' to term `t', failing (#f) on the occurs check.  `t' is
 ;; assumed already resolved by the caller.
-(define impc:type:bind
+(define xtc:type:bind
   (lambda (id t subst)
-    (cond ((and (impc:type:var? t) (= (impc:type:var-id t) id)) subst)
-          ((impc:type:occurs? id t subst) #f)
-          (else (impc:type:subst-extend id t subst)))))
+    (cond ((and (xtc:type:var? t) (= (xtc:type:var-id t) id)) subst)
+          ((xtc:type:occurs? id t subst) #f)
+          (else (xtc:type:subst-extend id t subst)))))
 
 ;; Unify two terms, returning an extended substitution on success or #f on
 ;; failure.  Robinson's algorithm: variables bind, equal atoms agree,
 ;; same-shaped constructors recurse on their arguments, everything else fails.
-(define impc:type:unify
+(define xtc:type:unify
   (lambda (s t subst)
-    (let ((s (impc:type:resolve s subst))
-          (t (impc:type:resolve t subst)))
+    (let ((s (xtc:type:resolve s subst))
+          (t (xtc:type:resolve t subst)))
       (cond
-        ((and (impc:type:var? s) (impc:type:var? t)
-              (= (impc:type:var-id s) (impc:type:var-id t)))
+        ((and (xtc:type:var? s) (xtc:type:var? t)
+              (= (xtc:type:var-id s) (xtc:type:var-id t)))
          subst)
-        ((impc:type:var? s) (impc:type:bind (impc:type:var-id s) t subst))
-        ((impc:type:var? t) (impc:type:bind (impc:type:var-id t) s subst))
+        ((xtc:type:var? s) (xtc:type:bind (xtc:type:var-id s) t subst))
+        ((xtc:type:var? t) (xtc:type:bind (xtc:type:var-id t) s subst))
         ((and (pair? s) (pair? t))
          (if (and (eq? (car s) (car t))
                   (= (length s) (length t)))
-             (impc:type:unify-args (cdr s) (cdr t) subst)
+             (xtc:type:unify-args (cdr s) (cdr t) subst)
              #f))
         ((and (atom? s) (atom? t))
          (if (equal? s t) subst #f))
@@ -200,12 +200,12 @@
 
 ;; Unify two equal-length argument lists left to right, threading the
 ;; substitution.  Size literals and named-type names ride through as atoms.
-(define impc:type:unify-args
+(define xtc:type:unify-args
   (lambda (ss ts subst)
     (if (null? ss)
         subst
-        (let ((subst2 (impc:type:unify (car ss) (car ts) subst)))
-          (and subst2 (impc:type:unify-args (cdr ss) (cdr ts) subst2))))))
+        (let ((subst2 (xtc:type:unify (car ss) (car ts) subst)))
+          (and subst2 (xtc:type:unify-args (cdr ss) (cdr ts) subst2))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; instantiation       ;;
@@ -216,28 +216,28 @@
 ;; signature is specialised at a call site.  Because identity is an integer
 ;; minted from one counter, two independent instantiations can never collide
 ;; --- the defect the `##gnum' suffixing tried, and failed, to prevent.
-(define impc:type:instantiate
+(define xtc:type:instantiate
   (lambda (t)
     (let ((mapping '()))
       (let walk ((t t))
-        (cond ((impc:type:var? t)
-               (let ((cell (assv (impc:type:var-id t) mapping)))
+        (cond ((xtc:type:var? t)
+               (let ((cell (assv (xtc:type:var-id t) mapping)))
                  (if cell
                      (cdr cell)
-                     (let ((fresh (impc:type:fresh-var)))
-                       (set! mapping (cons (cons (impc:type:var-id t) fresh) mapping))
+                     (let ((fresh (xtc:type:fresh-var)))
+                       (set! mapping (cons (cons (xtc:type:var-id t) fresh) mapping))
                        fresh))))
               ((pair? t) (cons (car t) (map walk (cdr t))))
               (else t))))))
 
 ;; The variable ids occurring free in a term, in first-seen order.
-(define impc:type:free-vars
+(define xtc:type:free-vars
   (lambda (t)
     (let ((ids '()))
       (let walk ((t t))
-        (cond ((impc:type:var? t)
-               (if (not (memv (impc:type:var-id t) ids))
-                   (set! ids (cons (impc:type:var-id t) ids))))
+        (cond ((xtc:type:var? t)
+               (if (not (memv (xtc:type:var-id t) ids))
+                   (set! ids (cons (xtc:type:var-id t) ids))))
               ((pair? t) (for-each walk (cdr t)))
               (else #f)))
       (reverse ids))))
@@ -249,31 +249,31 @@
 ;; A readable rendering of a term, close to xtlang surface syntax.  This is for
 ;; diagnostics and test output only; the authoritative pretty <-> term
 ;; conversions live at the representation boundary.
-(define impc:type:term->string
+(define xtc:type:term->string
   (lambda (t)
-    (cond ((impc:type:var? t) (string-append "?" (number->string (impc:type:var-id t))))
+    (cond ((xtc:type:var? t) (string-append "?" (number->string (xtc:type:var-id t))))
           ((symbol? t) (symbol->string t))
           ((number? t) (number->string t))
           ((string? t) t)
-          ((impc:type:ptr? t) (string-append (impc:type:term->string (impc:type:ptr-to t)) "*"))
-          ((impc:type:named? t) (string-append "%" (impc:type:term->string (impc:type:named-name t))))
-          ((impc:type:tuple? t)
-           (string-append "<" (impc:type:term->string-list (cdr t)) ">"))
-          ((impc:type:closure? t)
-           (string-append "[" (impc:type:term->string-list (cdr t)) "]"))
-          ((impc:type:array? t)
-           (string-append "|" (impc:type:term->string-list (cdr t)) "|"))
-          ((impc:type:vector? t)
-           (string-append "/" (impc:type:term->string-list (cdr t)) "/"))
+          ((xtc:type:ptr? t) (string-append (xtc:type:term->string (xtc:type:ptr-to t)) "*"))
+          ((xtc:type:named? t) (string-append "%" (xtc:type:term->string (xtc:type:named-name t))))
+          ((xtc:type:tuple? t)
+           (string-append "<" (xtc:type:term->string-list (cdr t)) ">"))
+          ((xtc:type:closure? t)
+           (string-append "[" (xtc:type:term->string-list (cdr t)) "]"))
+          ((xtc:type:array? t)
+           (string-append "|" (xtc:type:term->string-list (cdr t)) "|"))
+          ((xtc:type:vector? t)
+           (string-append "/" (xtc:type:term->string-list (cdr t)) "/"))
           (else (format #f "~a" t)))))
 
-(define impc:type:term->string-list
+(define xtc:type:term->string-list
   (lambda (ts)
     (if (null? ts)
         ""
-        (let loop ((acc (impc:type:term->string (car ts)))
+        (let loop ((acc (xtc:type:term->string (car ts)))
                    (rest (cdr ts)))
           (if (null? rest)
               acc
-              (loop (string-append acc "," (impc:type:term->string (car rest)))
+              (loop (string-append acc "," (xtc:type:term->string (car rest)))
                     (cdr rest)))))))

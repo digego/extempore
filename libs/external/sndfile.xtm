@@ -33,15 +33,15 @@
 
 ;;; Code:
 
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/sndfile.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/sndfile.xtm" 'quiet))
 (sys:load-preload-check 'sndfile)
 (define *xtmlib-sndfile-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
-(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmsndfile")
+(xtc:aot:insert-header "xtmsndfile")
 
 (bind-dylib libsndfile
   (cond ((string=? (sys:platform) "OSX") "libsndfile.dylib")
@@ -49,7 +49,7 @@
         ((string=? (sys:platform) "Windows") "sndfile.dll"))
   "xtmsndfile")
 
-(impc:aot:import-ll "xtmsndfile")
+(xtc:aot:import-ll "xtmsndfile")
 
 ;; /* The following file types can be read and written.
 ;; ** A file type would consist of a major type (ie SF_FORMAT_WAV) bitwise
@@ -743,5 +743,5 @@
             (sf_close audiofile)
             void)))))
 
-(impc:aot:insert-footer "xtmsndfile")
+(xtc:aot:insert-footer "xtmsndfile")
 (define *xtmlib-sndfile-loaded* #t)

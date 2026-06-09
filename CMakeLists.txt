@@ -456,7 +456,7 @@ macro(aotcompile_lib libfile group)
 
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
         COMMAND ${_extempore_cmd} --nobase
-            --batch "(impc:aot:compile-xtm-file \"${libfile}\")"
+            --batch "(xtc:aot:compile-xtm-file \"${libfile}\")"
         DEPENDS ${libfile} ${_dep_files}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         VERBATIM)

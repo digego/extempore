@@ -1,39 +1,39 @@
 (define icr:new-zone
   (lambda args
     (if (null? args)
-        (sys:create-mzone *impc:default-zone-size*)
+        (sys:create-mzone *xtc:globals:default-zone-size*)
         (sys:create-mzone (car args)))))
 
 (define icr:destroy-zone
   (lambda (zone)
-    (if (equal? *impc:zone* zone)
-        (set! *impc:zone* (sys:default-mzone)))
+    (if (equal? *xtc:globals:zone* zone)
+        (set! *xtc:globals:zone* (sys:default-mzone)))
     (if (equal? zone (sys:default-mzone))
         (log-info "You are not allowed to destroy the default zone")
         (sys:destrop-mzone zone))))
 
 (define icr:set-zone
   (lambda (zone)
-    (set! *impc:zone* zone)))
+    (set! *xtc:globals:zone* zone)))
 
 (define icr:set-zone-default
   (lambda ()
-    (set! *impc:zone* (sys:default-mzone))))
+    (set! *xtc:globals:zone* (sys:default-mzone))))
 
 (define regex:type-split string-split-on)
 
-(define impc:ti:split-namedfunc
+(define xtc:desugar:split-namedfunc
   (lambda (str)
     (if (symbol? str) (set! str (symbol->string str)))
     (string-split-on str ":")))
 
-(define impc:ti:split-namedtype
+(define xtc:desugar:split-namedtype
   (lambda (str)
     (if (symbol? str) (set! str (symbol->string str)))
     (if (string-contains? str "{")
         (let* ((p (string-split-on str "{"))
-               (ptrd (impc:ir:get-ptr-depth (cadr p)))
-               (base (impc:ir:get-base-type (cadr p))))
+               (ptrd (xtc:codegen:get-ptr-depth (cadr p)))
+               (base (xtc:codegen:get-base-type (cadr p))))
           (list (car p) (apply string-append "<" (substring base 0 (- (string-length base) 1)) ">"
                                (make-list ptrd "*"))))
         (if (string-contains? str ":")
@@ -45,19 +45,19 @@
 ;; strips pretty-types from source code
 ;; returns a cons of (the-new-ast any-explicit-types)
 ;;
-(define impc:ti:get-var-types
+(define xtc:desugar:get-var-types
   (lambda (ast)
     (let ((types '()))
      (letrec ((f (lambda (ast)
                 ;;(print 'ast: ast 'types: types)
                 (cond ((null? ast) '())
                       ((atom? ast) ast)
-                      ((member (car ast) *impc:lambdaslist*)
+                      ((member (car ast) *xtc:globals:lambdaslist*)
                        (list* (car ast) ;; 'lambda
                               (map (lambda (a)
                                      (if (and (list? a)
                                               (eq? (car a) '*colon-hook*))
-                                         (impc:compiler:print-double-colon-error (caddr a)))
+                                         (xtc:diagnostics:print-double-colon-error (caddr a)))
                                      (let ((a-str (symbol->string a)))
                                        (if (string-contains? a-str ":")
                                            (let ((t (string-split-on a-str ":")))
@@ -65,23 +65,23 @@
                                                    (or (char=? c #\<) (char=? c #\[)))
                                                  (if (not (or (string-contains? (cadr t) ">")
                                                               (string-contains? (cadr t) "]")))
-                                                     (impc:compiler:print-bad-type-error (cadr t))))
+                                                     (xtc:diagnostics:print-bad-type-error (cadr t))))
                                              (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
                                              (string->symbol (car t)))
                                            a)))
                                    (cadr ast))
                               (f (cddr ast))))
-                      ((member (car ast) *impc:letslist*)
+                      ((member (car ast) *xtc:globals:letslist*)
                        (list* (car ast)
                               (map (lambda (a)
                                      (if (or (atom? a)
                                              (null? (cdr a))
                                              (list? (car a))
                                              (> (length (cdr a)) 1))
-                                         (impc:compiler:print-badly-formed-expression-error 'let a))
+                                         (xtc:diagnostics:print-badly-formed-expression-error 'let a))
                                      (if (and (list? (car a))
                                               (eq? (car (car a)) '*colon-hook*))
-                                         (impc:compiler:print-double-colon-error (caddr (car a))))
+                                         (xtc:diagnostics:print-double-colon-error (caddr (car a))))
                                      (let ((ca-str (symbol->string (car a))))
                                        (if (string-contains? ca-str ":")
                                            (let ((t (string-split-on ca-str ":")))
@@ -89,7 +89,7 @@
                                                    (or (char=? c #\<) (char=? c #\[)))
                                                  (if (not (or (string-contains? (cadr t) ">")
                                                               (string-contains? (cadr t) "]")))
-                                                     (impc:compiler:print-bad-type-error (cadr t))))
+                                                     (xtc:diagnostics:print-bad-type-error (cadr t))))
                                              (set! types (cons (cons (string->symbol (car t)) (string->symbol (cadr t))) types))
                                              (list (string->symbol (car t)) (car (f (cdr a)))))
                                            (list (car a) (car (f (cdr a)))))))
@@ -110,9 +110,9 @@
 ;; types must be generic
 ;;
 
-(define impc:ti:expand-generic-type-func-gpoly-arity
+(define xtc:desugar:expand-generic-type-func-gpoly-arity
   (lambda (name xvararity)
-    (let* ((all-gpolys (or (hashtable-ref *impc:ti:genericfunc-cache* (symbol->string name)) '()))
+    (let* ((all-gpolys (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string name)) '()))
            (all-gtypes (map (lambda (x) (caddr x)) all-gpolys))
            (all-type-arity (map (lambda (x) (length
                                              (cl:remove-duplicates
@@ -121,11 +121,11 @@
                                 all-gtypes))
            (res (cl:remove #f (map (lambda (x y) (if (= x xvararity) y #f)) all-type-arity all-gtypes))))
       (if (<> (length res) 1)
-          (impc:compiler:print-expansion-arity-error name (string->symbol (string-append "no_valid_arity_for_" (atom->string xvararity) "_gvar")))
+          (xtc:diagnostics:print-expansion-arity-error name (string->symbol (string-append "no_valid_arity_for_" (atom->string xvararity) "_gvar")))
           res))))
 
 
-(define impc:ti:expand-generic-type
+(define xtc:desugar:expand-generic-type
   (lambda (t)
     (let* ((t2 (symbol->string t))
            (p (regex:type-split t2 ":"))
@@ -135,64 +135,64 @@
           t
           (let* ((func? (char=? #\[ (string-ref (cadr p) 1)))
                  (xtype (substring (cadr p) 1 (string-length (cadr p))))
-                 (ptrdepth (impc:ir:get-ptr-depth xtype))
-                 (base (impc:ir:get-base-type xtype))
+                 (ptrdepth (xtc:codegen:get-ptr-depth xtype))
+                 (base (xtc:codegen:get-base-type xtype))
                  (xvars (if func?
-                            (impc:ir:get-pretty-closure-arg-strings base)
-                            (impc:ir:get-pretty-tuple-arg-strings base)))
+                            (xtc:codegen:get-pretty-closure-arg-strings base)
+                            (xtc:codegen:get-pretty-tuple-arg-strings base)))
                  (gtt (if func?
-                          (impc:ti:expand-generic-type-func-gpoly-arity (string->symbol name) (length xvars))
-                          (hashtable-ref *impc:ti:generictype-cache* name)))
+                          (xtc:desugar:expand-generic-type-func-gpoly-arity (string->symbol name) (length xvars))
+                          (hashtable-ref *xtc:cache:generictype-cache* name)))
                  (gtype (if gtt
                             (symbol->string (if func? (car gtt) gtt))
-                            (impc:compiler:print-cannot-expand-non-generic-error name)))
+                            (xtc:diagnostics:print-cannot-expand-non-generic-error name)))
                  (_gvars (regex:match-all gtype "(![A-Za-z0-9_]*)"))
                  (gvars (cl:remove-duplicates _gvars)))
             (if (<> (length gvars) (length xvars))
-                (impc:compiler:print-expansion-arity-error (cdr t) (string->symbol (string-append (car p) ":" gtype))))
+                (xtc:diagnostics:print-expansion-arity-error (cdr t) (string->symbol (string-append (car p) ":" gtype))))
             (for-each (lambda (x y)
                         (set! gtype (regex:replace-all gtype x y)))
                       gvars xvars)
             (if func?
-                (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
-                (string->symbol (impc:ir:pointer++ (string-append (car p) ":" gtype) ptrdepth))))))))
+                (string->symbol (xtc:codegen:pointer++ (string-append (car p) "_poly_" (cname-encode gtype)) (- ptrdepth 1)))
+                (string->symbol (xtc:codegen:pointer++ (string-append (car p) ":" gtype) ptrdepth))))))))
 
 
-(define impc:ti:expand-generic-types
+(define xtc:desugar:expand-generic-types
   (lambda (types)
     (map (lambda (t)
-           (cons (car t) (impc:ti:expand-generic-type (cdr t)))) types)))
+           (cons (car t) (xtc:desugar:expand-generic-type (cdr t)))) types)))
 
-(define impc:ti:simplify-genericfunc-pretty-type
+(define xtc:desugar:simplify-genericfunc-pretty-type
   (lambda (pretty-type)
     (string-append
      "["
      (string-join
       (map (lambda (x)
              (if (string-contains? x ":")
-                 (impc:ir:pointer++ (car (regex:type-split x ":"))
-                                    (impc:ir:get-ptr-depth x))
+                 (xtc:codegen:pointer++ (car (regex:type-split x ":"))
+                                    (xtc:codegen:get-ptr-depth x))
                  x))
-           (impc:ir:get-pretty-closure-arg-strings pretty-type))
+           (xtc:codegen:get-pretty-closure-arg-strings pretty-type))
       ",")
      "]*")))
 
-(define impc:ti:simplify-generictype-pretty-type
+(define xtc:desugar:simplify-generictype-pretty-type
   (lambda (pretty-type)
     (string-append
      "<"
      (string-join
       (map (lambda (x)
              (if (string-contains? x ":")
-                 (impc:ir:pointer++ (car (regex:type-split x ":"))
-                                    (impc:ir:get-ptr-depth x))
+                 (xtc:codegen:pointer++ (car (regex:type-split x ":"))
+                                    (xtc:codegen:get-ptr-depth x))
                  x))
-           (impc:ir:get-pretty-tuple-arg-strings pretty-type))
+           (xtc:codegen:get-pretty-tuple-arg-strings pretty-type))
       ",")
      ">")))
 
 ;; this currently doesn't work for multiple "replace" instances
-;; (define impc:ti:get-initial-generic-pretty-type
+;; (define xtc:desugar:get-initial-generic-pretty-type
 ;;   (lambda (pretty-type)
 ;;     (regex:replace-all pretty-type "!g([a-zA-Z_]+)_[0-9]+" "!$1")))
 
@@ -203,23 +203,23 @@
 ;; return new 'renamed' ast
 ;;
 
-(define impc:ti:gen-shadow
+(define xtc:desugar:gen-shadow
   (let ((n 0))
     (lambda (x)
       (set! n (+ n 1))
       (string->symbol (string-append (symbol->string x) "_s_" (number->string n))))))
 
-(define *impc:letslist* '(let let* letrec))
+(define *xtc:globals:letslist* '(let let* letrec))
 
 ;; this code expects that all pretty types
 ;; have already been removed from the ast!
-(define impc:ti:rename-all-shadow-vars
+(define xtc:desugar:rename-all-shadow-vars
   (lambda (symname full-ast syms)
     (letrec ((f (lambda (ast fname)
                   (cond ((atom? ast) ast)
                         ((null? ast) ast)
                         ((list? ast)
-                         (cond ((member (car ast) *impc:letslist*)
+                         (cond ((member (car ast) *xtc:globals:letslist*)
                                 ;; first find and replace all shadow vars
                                 (let* ((replace-pairs
                                         (cl:remove
@@ -230,14 +230,14 @@
                                                         (sym (string->symbol (car pair))))
                                                    (if (and (not (equal? sym symname))
                                                             (or (member sym syms)
-                                                                (impc:ti:namedtype-exists? (symbol->string sym))
-                                                                (impc:ti:genericfunc-exists? sym)
-                                                                (impc:ti:xtmacro-exists? (symbol->string sym))
-                                                                (impc:ti:polyfunc-exists? (symbol->string sym))
+                                                                (xtc:cache:namedtype-exists? (symbol->string sym))
+                                                                (xtc:cache:genericfunc-exists? sym)
+                                                                (xtc:cache:xtmacro-exists? (symbol->string sym))
+                                                                (xtc:cache:polyfunc-exists? (symbol->string sym))
                                                                 (and (not (equal? sym fname))
-                                                                     (impc:ti:closure-exists? (symbol->string sym)))
-                                                                (impc:ti:globalvar-exists? (symbol->string sym))))
-                                                       (let ((shadow (impc:ti:gen-shadow sym)))
+                                                                     (xtc:cache:closure-exists? (symbol->string sym)))
+                                                                (xtc:cache:globalvar-exists? (symbol->string sym))))
+                                                       (let ((shadow (xtc:desugar:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
                                                              (cons sym shadow)
@@ -255,7 +255,7 @@
                                   (cons (car newast)
                                         (cons (map (lambda (x) (cons (car x) (f (cdr x) fname))) (cadr newast))
                                               (f (cddr newast) fname)))))
-                               ((member (car ast) *impc:lambdaslist*)
+                               ((member (car ast) *xtc:globals:lambdaslist*)
                                 (let* ((replace-pairs
                                         (cl:remove
                                          #f
@@ -264,14 +264,14 @@
                                                  (let* ((pair (regex:type-split (symbol->string x) ":"))
                                                         (sym (string->symbol (car pair))))
                                                    (if (or (member sym syms)
-                                                           (impc:ti:namedtype-exists? (symbol->string sym))
-                                                           (impc:ti:genericfunc-exists? sym)
-                                                           (impc:ti:xtmacro-exists? (symbol->string sym))
-                                                           (impc:ti:polyfunc-exists? (symbol->string sym))
+                                                           (xtc:cache:namedtype-exists? (symbol->string sym))
+                                                           (xtc:cache:genericfunc-exists? sym)
+                                                           (xtc:cache:xtmacro-exists? (symbol->string sym))
+                                                           (xtc:cache:polyfunc-exists? (symbol->string sym))
                                                            (and (not (equal? sym fname))
-                                                                (impc:ti:closure-exists? (symbol->string sym)))
-                                                           (impc:ti:globalvar-exists? (symbol->string sym)))
-                                                       (let ((shadow (impc:ti:gen-shadow sym)))
+                                                                (xtc:cache:closure-exists? (symbol->string sym)))
+                                                           (xtc:cache:globalvar-exists? (symbol->string sym)))
+                                                       (let ((shadow (xtc:desugar:gen-shadow sym)))
                                                          (set! syms (cons shadow syms))
                                                          (if (null? (cdr pair))
                                                              (cons x shadow)
@@ -305,49 +305,49 @@
 ;; a simpler but still valid R5RS scheme code
 ;;
 
-(define impc:ti:and
+(define xtc:desugar:and
   (lambda (ast)
     (if (pair? ast)
         (ast:make-if (car ast)
               (if (null? (cdr ast))
                   (car ast)
-                  (impc:ti:and (cdr ast)))
+                  (xtc:desugar:and (cdr ast)))
               #f))))
 
-(define impc:ti:or
+(define xtc:desugar:or
   (lambda (ast)
     (if (pair? ast)
         (ast:make-if (car ast)
               (car ast)
               (if (null? (cdr ast))
                   #f
-                  (impc:ti:or (cdr ast)))))))
+                  (xtc:desugar:or (cdr ast)))))))
 
-(define impc:ti:cond
+(define xtc:desugar:cond
   (lambda (ast)
     (cl:remove '()
                (if (null? ast) '()
                    (ast:make-if (caar ast)
                          (if (null? (cdar ast))
-                             (impc:compiler:print-badly-formed-expression-error 'cond ast)
+                             (xtc:diagnostics:print-badly-formed-expression-error 'cond ast)
                              (ast:make-begin (cdar ast)))
                          (if (and
                               (not (null? (cdr ast)))
                               (eq? (caadr ast) 'else))
                              (ast:make-begin (cdadr ast))
                              (if (not (null? (cdr ast)))
-                                 (impc:ti:cond (cdr ast)))))))))
+                                 (xtc:desugar:cond (cdr ast)))))))))
 
 
-(define impc:ti:list
+(define xtc:desugar:list
   (lambda (ast)
     (if (null? ast) 'null
         (list 'cons
               (car ast)
-              (impc:ti:list (cdr ast))))))
+              (xtc:desugar:list (cdr ast))))))
 
 
-(define impc:ti:println
+(define xtc:desugar:println
   (lambda (ast)
     (if (null? ast)
         `(print_return)
@@ -366,7 +366,7 @@
                              (cdr ast)))
            (print_return)))))
 
-(define impc:ti:println2
+(define xtc:desugar:println2
   (lambda (ast)
     (if (null? ast)
         `(print_return)
@@ -385,7 +385,7 @@
                              (cdr ast)))
            void))))
 
-(define impc:ti:sprintln
+(define xtc:desugar:sprintln
   (lambda (ast)
     (if (null? ast)
         (String "")
@@ -407,7 +407,7 @@
                               (cdr ast))))))))
 
 
-(define impc:ti:sprintln2
+(define xtc:desugar:sprintln2
   (lambda (ast)
     (if (null? ast)
         (String "")
@@ -422,21 +422,21 @@
                    ast))))))
 
 
-(define impc:ti:format
+(define xtc:desugar:format
   (lambda (ast)
     (if (null? ast) 'null
         (list 'cat
               (if (string? (car ast))
                   (list 'Str (car ast))
                   (list 'format (car ast)))
-              (impc:ti:format (cdr ast))))))
+              (xtc:desugar:format (cdr ast))))))
 
 
-(define impc:ti:not
+(define xtc:desugar:not
   (lambda (ast)
     (ast:make-if ast #f #t)))
 
-(define impc:ti:quote
+(define xtc:desugar:quote
   (lambda (ast)
     (cond ((null? ast) '(impc_null)) ;(list))
           ((symbol? ast)
@@ -457,39 +457,39 @@
 (define *anonlambdanum* 0)
 
 ;; no anonymous lambdas !!!
-(define impc:ti:lambda
+(define xtc:desugar:lambda
   (lambda (ast)
     (set! *anonlambdanum* (+ 1 *anonlambdanum*))
     (let* ((fname (string->symbol (string-append "_anon_lambda_" (number->string *anonlambdanum*))))
            (expr (ast:make-lambda (car ast)
-                                  (impc:ti:first-transform (cadr ast) #t)
-                                  (ast:make-begin (impc:ti:first-transform (cddr ast) #t)))))
+                                  (xtc:desugar:first-transform (cadr ast) #t)
+                                  (ast:make-begin (xtc:desugar:first-transform (cddr ast) #t)))))
       `(let ((,fname ,expr))
          (begin ,fname)))))
 
 
 ;; replace (* 2 3 4 5) or (+ 2 3 4 5)
 ;; with (* 2 (* 3 (* 4 5))) etc..
-(define impc:ti:binary-arity
+(define xtc:desugar:binary-arity
   (lambda (ast inbody?)
     (let ((op (car ast))
           (inlst (cdr ast)))
       (if (< (length inlst) 2)
-          (impc:compiler:print-bad-arity-error ast))
+          (xtc:diagnostics:print-bad-arity-error ast))
       (let loop ((rest (cddr inlst))
                  (lst (list op
-                            (impc:ti:first-transform (car inlst) inbody?)
-                            (impc:ti:first-transform (cadr inlst) inbody?))))
+                            (xtc:desugar:first-transform (car inlst) inbody?)
+                            (xtc:desugar:first-transform (cadr inlst) inbody?))))
         (if (null? rest) lst
-            (loop (cdr rest) (list op lst (impc:ti:first-transform (car rest) inbody?))))))))
+            (loop (cdr rest) (list op lst (xtc:desugar:first-transform (car rest) inbody?))))))))
 
 
-(define impc:ti:bitwise-not-to-eor
+(define xtc:desugar:bitwise-not-to-eor
   (lambda (ast inbody?)
     (list 'bitwise-eor (cadr ast) -1)))
 
 
-(define impc:ti:afill!
+(define xtc:desugar:afill!
   (lambda (ast)
     (append '(begin)
             (map (lambda (arg idx)
@@ -498,7 +498,7 @@
                  (make-list-with-proc (length ast) (lambda (i) i))))))
 
 
-(define impc:ti:pfill!
+(define xtc:desugar:pfill!
   (lambda (ast)
     (append '(begin)
             (map (lambda (arg idx)
@@ -507,7 +507,7 @@
                  (make-list-with-proc (length ast) (lambda (i) i))))))
 
 
-(define impc:ti:tfill!
+(define xtc:desugar:tfill!
   (lambda (ast)
     (append '(begin)
             (map (lambda (arg idx)
@@ -515,7 +515,7 @@
                  (cdr ast)
                  (make-list-with-proc (length ast) (lambda (i) i))))))
 
-(define impc:ti:vfill!
+(define xtc:desugar:vfill!
   (lambda (ast)
     (append '(begin)
             (map (lambda (arg idx)
@@ -527,7 +527,7 @@
 
 ;; #150: a builtin type string like "[void,!v...]*" has a void return type
 ;; exactly when it opens with "[void" immediately followed by "," or "]".
-(define impc:ti:type-str-void-return?
+(define xtc:desugar:type-str-void-return?
   (lambda (ts)
     (and (string? ts)
          (> (string-length ts) 5)
@@ -540,15 +540,15 @@
 ;; recognises the void-yielding loop forms and any call to a builtin whose
 ;; registered return type is void (e.g. println). Anything else is left to the
 ;; caller's descent, so this only ever *adds* void classifications.
-(define impc:ti:memzone-tail-returns-void?
+(define xtc:desugar:memzone-tail-returns-void?
   (lambda (form)
     (and (pair? form)
          (symbol? (car form))
          (or (memq (car form) '(dotimes doloop while))
-             (impc:ti:type-str-void-return?
-              (impc:ti:get-builtin-type-str (symbol->string (car form))))))))
+             (xtc:desugar:type-str-void-return?
+              (xtc:cache:get-builtin-type-str (symbol->string (car form))))))))
 
-(define impc:ti:check-memzone-void?
+(define xtc:desugar:check-memzone-void?
   (lambda (ast)
     (if (atom? ast)
         (if (equal? ast 'void) #t #f)
@@ -559,14 +559,14 @@
                   ;; a void-yielding tail call (e.g. println) settles it; for
                   ;; sequencing forms (begin/let/...) the tail is their result,
                   ;; so keep descending as before.
-                  (if (impc:ti:memzone-tail-returns-void? tail)
+                  (if (xtc:desugar:memzone-tail-returns-void? tail)
                       #t
-                      (impc:ti:check-memzone-void? tail))))
+                      (xtc:desugar:check-memzone-void? tail))))
             #f))))
 
-(define impc:ti:memzone
+(define xtc:desugar:memzone
   (lambda (ast)
-    (define zone_returns_void? (impc:ti:check-memzone-void? ast))
+    (define zone_returns_void? (xtc:desugar:check-memzone-void? ast))
     (if zone_returns_void?
         `(begin (push_new_zone ,(cadr ast))
                 ,(if (= (length ast) 3) (caddr ast) (cadddr ast))
@@ -588,7 +588,7 @@
           (set! *xtm_mz_num* (+ *xtm_mz_num* 1))
           (if (or (> (length ast) 4)
                   (< (length ast) 3))
-              (impc:compiler:print-bad-arity-error ast))
+              (xtc:diagnostics:print-bad-arity-error ast))
           `(begin (push_new_zone ,(cadr ast))
                   (let ((,resname ,(if (= (length ast) 3) (caddr ast) (cadddr ast)))
                         (,zonename (pop_zone))
@@ -611,22 +611,22 @@
                            `(llvm_destroy_zone_after_delay ,zonename ,(caddr ast)))
                       ,rescopyname)))))))
 
-(define impc:ti:beginz
+(define xtc:desugar:beginz
   (lambda (ast)
-    (impc:ti:memzone `(memzone ,(* 1024 4) (begin ,@(cdr ast))))))
+    (xtc:desugar:memzone `(memzone ,(* 1024 4) (begin ,@(cdr ast))))))
 
-(define impc:ti:letz
+(define xtc:desugar:letz
   (lambda (ast)
     ;; (if (not (number? (eval (cadr ast))))
-    ;;     (impc:compiler:print-needs-zone-size-error 'letz)
+    ;;     (xtc:diagnostics:print-needs-zone-size-error 'letz)
     (if (and (list? (cadr ast))
              (list? (caadr ast)))
-        (impc:ti:memzone `(memzone ,(* 1024 4)
+        (xtc:desugar:memzone `(memzone ,(* 1024 4)
                                    (let ,(cadr ast) ,@(cddr ast))))
-        (impc:ti:memzone `(memzone ,(cadr ast)
+        (xtc:desugar:memzone `(memzone ,(cadr ast)
                                    (let ,(caddr ast) ,@(cdddr ast)))))))
 
-(impc:ti:register-new-builtin
+(xtc:cache:register-new-builtin
  "letz"
  ""
  "let-bind temporary variables
@@ -652,7 +652,7 @@ e.g.
 `letz' is the same as `let', with the addition of the new memzone"
  '(bindings [zone-size] body))
 
-(define impc:ti:zone_cleanup
+(define xtc:desugar:zone_cleanup
   (lambda (ast)
     `(let ((zone (llvm_peek_zone_stack))
            (hooks:<i64,i8*,i8*>* (cast (tref zone 4)))
@@ -662,7 +662,7 @@ e.g.
        (tset! zone 4 (cast hook i8*))
        void)))
 
-(define impc:ti:callback
+(define xtc:desugar:callback
   (lambda (ast)
     `(let ((zold (llvm_peek_zone_stack))
            (znew (create_zone (* 1024 4))))
@@ -670,11 +670,11 @@ e.g.
                       ,(cadr ast)
                       znew
                       ,@(map (lambda (x)
-                               (impc:ti:first-transform `(zcopy ,x zold znew) #t))
+                               (xtc:desugar:first-transform `(zcopy ,x zold znew) #t))
                              (cddr ast)))
        void)))
 
-(define (impc:ti:multicref args)
+(define (xtc:desugar:multicref args)
   `(let ,(append (map (lambda (a b n)
                         (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
                               (list (string->symbol
@@ -691,7 +691,7 @@ e.g.
                                                                   (symbol->string (cadr (reverse args)))))))))
          v))
 
-(define (impc:ti:multicset args)
+(define (xtc:desugar:multicset args)
   `(let ,(map (lambda (a b n)
                 (list (string->symbol (string-append "f" (number->string n) ":[void]*"))
                       (list (string->symbol
@@ -709,19 +709,19 @@ e.g.
           ,(car (reverse args)))))
 
 
-(define impc:ti:gteq
+(define xtc:desugar:gteq
   (lambda (ast)
     `(or (> ,(cadr ast) ,(caddr ast))
          (= ,(cadr ast) ,(caddr ast)))))
 
-(define impc:ti:lteq
+(define xtc:desugar:lteq
   (lambda (ast)
     `(or (< ,(cadr ast) ,(caddr ast))
          (= ,(cadr ast) ,(caddr ast)))))
 
 
 ;; This to auto surround dotimes with a let
-(define impc:ti:doloop
+(define xtc:desugar:doloop
   (lambda (ast inbody?)
     ;; (println 'doloop 'ast: ast)
     (let* ((pair (regex:type-split (symbol->string (caadr ast)) ":"))
@@ -730,12 +730,12 @@ e.g.
          (begin
            (dotimes
                ,(if (null? (cddr (cadr ast)))
-                    `(,sym ,(impc:ti:first-transform (cadr (cadr ast)) inbody?))
-                    `(,sym ,(impc:ti:first-transform (cadr (cadr ast)) inbody?)
-                           ,(impc:ti:first-transform (caddr (cadr ast)) inbody?)))
-             (begin ,@(impc:ti:first-transform (cddr ast) inbody?))))))))
+                    `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?))
+                    `(,sym ,(xtc:desugar:first-transform (cadr (cadr ast)) inbody?)
+                           ,(xtc:desugar:first-transform (caddr (cadr ast)) inbody?)))
+             (begin ,@(xtc:desugar:first-transform (cddr ast) inbody?))))))))
 
-(impc:ti:register-new-builtin
+(xtc:cache:register-new-builtin
  "doloop"
  ""
  "doloop
@@ -749,14 +749,14 @@ of type i32, i64, float or double - the type will be inferred from the
 types of `start' and `count'"
  '(index-variable [start] count body))
 
-(define impc:ti:dotimes
+(define xtc:desugar:dotimes
   (lambda (ast inbody?)
     (list 'dotimes
-          (impc:ti:first-transform (cadr ast) inbody?)
-          (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
+          (xtc:desugar:first-transform (cadr ast) inbody?)
+          (cons 'begin (xtc:desugar:first-transform (cddr ast) inbody?)))))
 
 
-(impc:ti:register-new-builtin
+(xtc:cache:register-new-builtin
  "dotimes"
  ""
  "dotimes loop
@@ -770,13 +770,13 @@ defined outside the loop. For a loop where the index variable is
 automatically bound as a temporary variable, see `doloop'."
  '(index-variable [start] count body))
 
-(define impc:ti:while
+(define xtc:desugar:while
   (lambda (ast inbody?)
     (list 'while
-          (impc:ti:first-transform (cadr ast) inbody?)
-          (cons 'begin (impc:ti:first-transform (cddr ast) inbody?)))))
+          (xtc:desugar:first-transform (cadr ast) inbody?)
+          (cons 'begin (xtc:desugar:first-transform (cddr ast) inbody?)))))
 
-(impc:ti:register-new-builtin
+(xtc:cache:register-new-builtin
  "while"
  ""
  "while loop
@@ -786,143 +786,143 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 (define *unique-polynum* 0)
 
-(define *impc:mathintrinsicslist* '(sin cos ceil floor exp pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi))
-(define *impc:mathbinaryaritylist* '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
-(define *impc:lambdaslist* '(lambda lambdas lambdaz lambdah))
+(define *xtc:globals:mathintrinsicslist* '(sin cos ceil floor exp pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi))
+(define *xtc:globals:mathbinaryaritylist* '(* - / + % modulo bitwise-and bitwise-or bitwise-eor bitwise-shift-left bitwise-shift-right))
+(define *xtc:globals:lambdaslist* '(lambda lambdas lambdaz lambdah))
 
-(define impc:ti:transform-typed-poly
+(define xtc:desugar:transform-typed-poly
   (lambda (ast inbody?)
     (let* ((head-str (symbol->string (car ast)))
            (p (regex:type-split head-str ":")))
       (cond
-       ((impc:ti:get-polyfunc-candidate
-         (car p) (impc:ir:get-type-from-pretty-str (cadr p)))
-        (cons (impc:ti:get-polyfunc-candidate
-               (car p) (impc:ir:get-type-from-pretty-str (cadr p)))
-              (impc:ti:first-transform (cdr ast) inbody?)))
-       ((impc:ti:genericfunc-exists? (car p))
-        (let ((ptrdepth (impc:ir:get-ptr-depth (cadr p))))
-          (impc:ti:specialize-genericfunc (car p) (cadr p))
+       ((xtc:cache:get-polyfunc-candidate
+         (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
+        (cons (xtc:cache:get-polyfunc-candidate
+               (car p) (xtc:codegen:get-type-from-pretty-str (cadr p)))
+              (xtc:desugar:first-transform (cdr ast) inbody?)))
+       ((xtc:cache:genericfunc-exists? (car p))
+        (let ((ptrdepth (xtc:codegen:get-ptr-depth (cadr p))))
+          (xtc:bind:specialize-genericfunc (car p) (cadr p))
           (cons
-           (string->symbol (impc:ir:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
-           (impc:ti:first-transform (cdr ast) inbody?))))
-       ((impc:ti:polyfunc-exists? (car p))
-        (let* ((t (if (impc:ti:typealias-exists? (cadr p))
-                      (impc:ti:get-typealias-type (cadr p))
+           (string->symbol (xtc:codegen:pointer++ (string-append (car p) "_poly_" (cname-encode (cadr p))) (- ptrdepth 1)))
+           (xtc:desugar:first-transform (cdr ast) inbody?))))
+       ((xtc:cache:polyfunc-exists? (car p))
+        (let* ((t (if (xtc:cache:typealias-exists? (cadr p))
+                      (xtc:cache:get-typealias-type (cadr p))
                       (cadr p)))
-               (cname (cname-encode (impc:ir:get-base-type t)))
-               (ptrdepth (impc:ir:get-ptr-depth t)))
+               (cname (cname-encode (xtc:codegen:get-base-type t)))
+               (ptrdepth (xtc:codegen:get-ptr-depth t)))
           (cons
            (string->symbol (string-append (car p) "_adhoc_" cname))
-           (impc:ti:first-transform (cdr ast) inbody?))))
+           (xtc:desugar:first-transform (cdr ast) inbody?))))
        (else #f)))))
 
-(define impc:ti:transform-special-form
+(define xtc:desugar:transform-special-form
   (lambda (ast inbody?)
     (let ((head (car ast)))
       (cond
-       ((eq? head 'letz) (impc:ti:first-transform (impc:ti:letz ast) inbody?))
-       ((eq? head 'memzone) (impc:ti:first-transform (impc:ti:memzone ast) inbody?))
-       ((eq? head 'beginz) (impc:ti:first-transform (impc:ti:beginz ast) inbody?))
-       ((eq? head 'zone_cleanup) (impc:ti:first-transform (impc:ti:zone_cleanup ast) inbody?))
-       ((eq? head '>=) (impc:ti:first-transform (impc:ti:gteq ast) inbody?))
-       ((eq? head '<=) (impc:ti:first-transform (impc:ti:lteq ast) inbody?))
-       ((eq? head 'and) (impc:ti:first-transform (impc:ti:and (cdr ast)) inbody?))
-       ((eq? head 'or) (impc:ti:first-transform (impc:ti:or (cdr ast)) inbody?))
-       ((eq? head 'not) (impc:ti:first-transform (impc:ti:not (cadr ast)) inbody?))
-       ((eq? head 'quote) (impc:ti:first-transform (impc:ti:quote (cadr ast)) inbody?))
-       ((eq? head 'list) (impc:ti:first-transform (impc:ti:list (cdr ast)) inbody?))
+       ((eq? head 'letz) (xtc:desugar:first-transform (xtc:desugar:letz ast) inbody?))
+       ((eq? head 'memzone) (xtc:desugar:first-transform (xtc:desugar:memzone ast) inbody?))
+       ((eq? head 'beginz) (xtc:desugar:first-transform (xtc:desugar:beginz ast) inbody?))
+       ((eq? head 'zone_cleanup) (xtc:desugar:first-transform (xtc:desugar:zone_cleanup ast) inbody?))
+       ((eq? head '>=) (xtc:desugar:first-transform (xtc:desugar:gteq ast) inbody?))
+       ((eq? head '<=) (xtc:desugar:first-transform (xtc:desugar:lteq ast) inbody?))
+       ((eq? head 'and) (xtc:desugar:first-transform (xtc:desugar:and (cdr ast)) inbody?))
+       ((eq? head 'or) (xtc:desugar:first-transform (xtc:desugar:or (cdr ast)) inbody?))
+       ((eq? head 'not) (xtc:desugar:first-transform (xtc:desugar:not (cadr ast)) inbody?))
+       ((eq? head 'quote) (xtc:desugar:first-transform (xtc:desugar:quote (cadr ast)) inbody?))
+       ((eq? head 'list) (xtc:desugar:first-transform (xtc:desugar:list (cdr ast)) inbody?))
        ((or (eq? head 'strln) (eq? head 'strj))
-        (impc:ti:first-transform (impc:ti:format (cdr ast)) inbody?))
-       ((eq? head 'sprintln) (impc:ti:first-transform (impc:ti:sprintln (cdr ast)) inbody?))
-       ((eq? head 'sprintout) (impc:ti:first-transform (impc:ti:sprintln2 (cdr ast)) inbody?))
-       ((eq? head 'println) (impc:ti:first-transform (impc:ti:println (cdr ast)) inbody?))
-       ((eq? head 'printout) (impc:ti:first-transform (impc:ti:println2 (cdr ast)) inbody?))
-       ((eq? head 'afill!) (impc:ti:first-transform (impc:ti:afill! (cdr ast)) inbody?))
-       ((eq? head 'pfill!) (impc:ti:first-transform (impc:ti:pfill! (cdr ast)) inbody?))
-       ((eq? head 'tfill!) (impc:ti:first-transform (impc:ti:tfill! (cdr ast)) inbody?))
-       ((eq? head 'vfill!) (impc:ti:first-transform (impc:ti:vfill! (cdr ast)) inbody?))
+        (xtc:desugar:first-transform (xtc:desugar:format (cdr ast)) inbody?))
+       ((eq? head 'sprintln) (xtc:desugar:first-transform (xtc:desugar:sprintln (cdr ast)) inbody?))
+       ((eq? head 'sprintout) (xtc:desugar:first-transform (xtc:desugar:sprintln2 (cdr ast)) inbody?))
+       ((eq? head 'println) (xtc:desugar:first-transform (xtc:desugar:println (cdr ast)) inbody?))
+       ((eq? head 'printout) (xtc:desugar:first-transform (xtc:desugar:println2 (cdr ast)) inbody?))
+       ((eq? head 'afill!) (xtc:desugar:first-transform (xtc:desugar:afill! (cdr ast)) inbody?))
+       ((eq? head 'pfill!) (xtc:desugar:first-transform (xtc:desugar:pfill! (cdr ast)) inbody?))
+       ((eq? head 'tfill!) (xtc:desugar:first-transform (xtc:desugar:tfill! (cdr ast)) inbody?))
+       ((eq? head 'vfill!) (xtc:desugar:first-transform (xtc:desugar:vfill! (cdr ast)) inbody?))
        ((eq? head 'free)
-        (list 'free (list 'bitcast (impc:ti:first-transform (cadr ast) inbody?) 'i8*)))
+        (list 'free (list 'bitcast (xtc:desugar:first-transform (cadr ast) inbody?) 'i8*)))
        ((eq? head 'vector_ref)
-        (impc:ti:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(cdr ast)))) (pset! v1 0 v2) v1) inbody?))
+        (xtc:desugar:first-transform `(let ((v1 (alloc)) (v2 (vector ,@(cdr ast)))) (pset! v1 0 v2) v1) inbody?))
        ((eq? head 'array_ref)
-        (impc:ti:first-transform `(let ((a1 (alloc)) (a2 (array ,@(cdr ast)))) (pset! a1 0 a2) a1) inbody?))
+        (xtc:desugar:first-transform `(let ((a1 (alloc)) (a2 (array ,@(cdr ast)))) (pset! a1 0 a2) a1) inbody?))
        ((eq? head 'tuple_ref)
-        (impc:ti:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(cdr ast)))) (pset! t1 0 t2) t1) inbody?))
+        (xtc:desugar:first-transform `(let ((t1 (alloc)) (t2 (tuple ,@(cdr ast)))) (pset! t1 0 t2) t1) inbody?))
        ((eq? head 'vector)
-        `(make-vector ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
+        `(make-vector ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (cdr ast))))
        ((eq? head 'array)
-        `(make-array ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
+        `(make-array ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (cdr ast))))
        ((eq? head 'tuple)
-        `(make-tuple ,@(map (lambda (x) (impc:ti:first-transform x inbody?)) (cdr ast))))
+        `(make-tuple ,@(map (lambda (x) (xtc:desugar:first-transform x inbody?)) (cdr ast))))
        ((member head '(callback schedule))
-        (impc:ti:first-transform (impc:ti:callback (impc:ti:first-transform (cdr ast) inbody?)) inbody?))
-       ((and (member head *impc:mathbinaryaritylist*) (<> (length ast) 3))
-        (impc:ti:first-transform (impc:ti:binary-arity ast inbody?) inbody?))
+        (xtc:desugar:first-transform (xtc:desugar:callback (xtc:desugar:first-transform (cdr ast) inbody?)) inbody?))
+       ((and (member head *xtc:globals:mathbinaryaritylist*) (<> (length ast) 3))
+        (xtc:desugar:first-transform (xtc:desugar:binary-arity ast inbody?) inbody?))
        ((member head '(bitwise-not ~))
-        (impc:ti:bitwise-not-to-eor ast inbody?))
+        (xtc:desugar:bitwise-not-to-eor ast inbody?))
        (else #f)))))
 
-(define impc:ti:transform-definition
+(define xtc:desugar:transform-definition
   (lambda (ast inbody?)
     (let ((head (car ast)))
       (cond
-       ((member head *impc:lambdaslist*)
+       ((member head *xtc:globals:lambdaslist*)
         (if inbody?
-            (impc:ti:lambda ast)
-            (ast:make-lambda (impc:ti:first-transform head inbody?)
-                             (impc:ti:first-transform (cadr ast) #t)
-                             (ast:make-begin (impc:ti:first-transform (cddr ast) #t)))))
+            (xtc:desugar:lambda ast)
+            (ast:make-lambda (xtc:desugar:first-transform head inbody?)
+                             (xtc:desugar:first-transform (cadr ast) #t)
+                             (ast:make-begin (xtc:desugar:first-transform (cddr ast) #t)))))
        ((eq? head 'cond)
-        (impc:ti:first-transform (impc:ti:cond (cdr ast)) inbody?))
+        (xtc:desugar:first-transform (xtc:desugar:cond (cdr ast)) inbody?))
        ((eq? head 'cset!)
         (list 'closure-set!
-              (impc:ti:first-transform (cadr ast) inbody?)
+              (xtc:desugar:first-transform (cadr ast) inbody?)
               (symbol->string (caddr ast))
-              (impc:ti:first-transform (cadddr ast) inbody?)
+              (xtc:desugar:first-transform (cadddr ast) inbody?)
               (if (not (null? (cddddr ast)))
-                  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (car (cddddr ast)))))))
+                  (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (car (cddddr ast)))))))
        ((eq? head 'cref)
         (list 'closure-ref
-              (impc:ti:first-transform (cadr ast) inbody?)
+              (xtc:desugar:first-transform (cadr ast) inbody?)
               (symbol->string (caddr ast))
               (if (not (null? (cdddr ast)))
-                  (impc:ir:get-type-str (impc:ir:convert-from-pretty-types (cadddr ast))))))
+                  (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (cadddr ast))))))
        ((eq? head 'refcheck)
         (list 'closure-refcheck
-              (impc:ti:first-transform (cadr ast) inbody?)
+              (xtc:desugar:first-transform (cadr ast) inbody?)
               (symbol->string (caddr ast))))
        ((member head '(cast convert))
         (if (= (length ast) 2)
-            (impc:ti:first-transform (list (if (eq? head 'cast) 'bitcast 'bitconvert)
+            (xtc:desugar:first-transform (list (if (eq? head 'cast) 'bitcast 'bitconvert)
                                            (cadr ast)) inbody?)
             (let* ((p (regex:type-split (symbol->string (caddr ast)) ":"))
-                   (ptrdepth (impc:ir:get-ptr-depth (caddr ast)))
-                   (basetype (if (null? (cdr p)) #f (impc:ir:get-base-type (cadr p))))
+                   (ptrdepth (xtc:codegen:get-ptr-depth (caddr ast)))
+                   (basetype (if (null? (cdr p)) #f (xtc:codegen:get-base-type (cadr p))))
                    (etype (if (null? (cdr p)) #f (cname-encode basetype))))
-              (impc:ti:first-transform
+              (xtc:desugar:first-transform
                (list (if (eq? head 'cast) 'bitcast 'bitconvert)
                      (cadr ast)
                      (if etype
                          (string->symbol
-                          (impc:ir:pointer++ (string-append "%" (car p) "_poly_" etype)
+                          (xtc:codegen:pointer++ (string-append "%" (car p) "_poly_" etype)
                                              ptrdepth))
                          (string->symbol (car p))))
                inbody?))))
-       ((eq? head 'doloop) (impc:ti:doloop ast inbody?))
-       ((eq? head 'dotimes) (impc:ti:dotimes ast inbody?))
-       ((eq? head 'while) (impc:ti:while ast inbody?))
-       ((member head *impc:letslist*)
-        (ast:make-let (impc:ti:first-transform head inbody?)
+       ((eq? head 'doloop) (xtc:desugar:doloop ast inbody?))
+       ((eq? head 'dotimes) (xtc:desugar:dotimes ast inbody?))
+       ((eq? head 'while) (xtc:desugar:while ast inbody?))
+       ((member head *xtc:globals:letslist*)
+        (ast:make-let (xtc:desugar:first-transform head inbody?)
                       (map (lambda (p)
-                             (list (impc:ti:first-transform (car p) #f)
-                                   (impc:ti:first-transform (cadr p) #f)))
+                             (list (xtc:desugar:first-transform (car p) #f)
+                                   (xtc:desugar:first-transform (cadr p) #f)))
                            (cadr ast))
-                      (ast:make-begin (impc:ti:first-transform (cddr ast) #t))))
+                      (ast:make-begin (xtc:desugar:first-transform (cddr ast) #t))))
        (else #f)))))
 
-(define impc:ti:transform-dot-syntax
+(define xtc:desugar:transform-dot-syntax
   (lambda (ast inbody?)
     (let ((head-str (symbol->string (car ast))))
       (if (and (string-contains? head-str ".")
@@ -935,36 +935,36 @@ Continue executing `body' forms until `test-expression' returns #f"
                      (b (string->symbol (car subs2)))
                      (c (string->symbol (cadr subs2))))
                 (cond ((and (= (length ast) 1) (= (length subs) 2))
-                       (impc:ti:first-transform (list 'cref a b c) inbody?))
+                       (xtc:desugar:first-transform (list 'cref a b c) inbody?))
                       ((= (length subs) 2)
-                       (impc:ti:first-transform (list 'cset! a b (cadr ast) c) inbody?))
+                       (xtc:desugar:first-transform (list 'cset! a b (cadr ast) c) inbody?))
                       ((and (> (length subs) 2) (= (length ast) 2))
-                       (impc:ti:first-transform
-                        (impc:ti:multicset
+                       (xtc:desugar:first-transform
+                        (xtc:desugar:multicset
                          (append (map (lambda (x) (string->symbol x))
                                       (append (reverse (cdr (reverse subs))) subs2))
                                  (cdr ast)))
                         inbody?))
                       ((and (> (length subs) 2) (= (length ast) 1))
-                       (impc:ti:first-transform
-                        (impc:ti:multicref
+                       (xtc:desugar:first-transform
+                        (xtc:desugar:multicref
                          (map (lambda (x) (string->symbol x))
                               (append (reverse (cdr (reverse subs))) subs2)))
                         inbody?))
                       (else
-                       (impc:compiler:print-compiler-error "Bad form!" ast))))
+                       (xtc:diagnostics:print-compiler-error "Bad form!" ast))))
               (let* ((subs (regex:split head-str "\\."))
                      (a (string->symbol (car subs)))
                      (b (string->symbol (cadr subs))))
                 (if (= (length ast) 1)
-                    (impc:ti:first-transform (list 'cref a b) inbody?)
-                    (impc:ti:first-transform (list 'cset! a b (cadr ast)) inbody?))))
+                    (xtc:desugar:first-transform (list 'cref a b) inbody?)
+                    (xtc:desugar:first-transform (list 'cset! a b (cadr ast)) inbody?))))
           #f))))
 
-(define impc:ti:transform-atom
+(define xtc:desugar:transform-atom
   (lambda (ast inbody?)
     (cond ((and (rational? ast) (not (integer? ast)))
-           (impc:ti:first-transform `(Rat ,(rational->n ast) ,(rational->d ast)) inbody?))
+           (xtc:desugar:first-transform `(Rat ,(rational->n ast) ,(rational->d ast)) inbody?))
           ((eq? ast #f) '(impc_false))
           ((eq? ast #t) '(impc_true))
           ((eq? ast '&) 'bitwise-and)
@@ -995,18 +995,18 @@ Continue executing `body' forms until `test-expression' returns #f"
           ((eq? ast 'randomf) 'imp_randf)
           ((eq? ast 'void) '(void))
           ((and (complex? ast) (not (real? ast)))
-           (impc:ti:first-transform `(Cpxd ,(real-part ast) ,(imag-part ast)) inbody?))
+           (xtc:desugar:first-transform `(Cpxd ,(real-part ast) ,(imag-part ast)) inbody?))
           ((and (symbol? ast)
                 (regex:match? (symbol->string ast) "^[+-]?[0-9]*\\.?[0-9]*[+-][0-9]*\\.?[0-9]*i$"))
            (let ((p (regex:matched (symbol->string ast) "^([+-]?[0-9]*\\.?[0-9]*)([+-][0-9]*\\.?[0-9]*)i$")))
-             (impc:ti:first-transform `(Cpxd ,(* 1.0 (string->number (cadr p))) ,(* 1.0 (string->number (caddr p)))) inbody?)))
+             (xtc:desugar:first-transform `(Cpxd ,(* 1.0 (string->number (cadr p))) ,(* 1.0 (string->number (caddr p)))) inbody?)))
           ((and (symbol? ast)
                 (regex:match? (symbol->string ast) ":\\$(\\[|<)"))
-           (let ((t (impc:ti:expand-generic-type ast)))
-             (if (impc:ti:closure-exists? (symbol->string t))
+           (let ((t (xtc:desugar:expand-generic-type ast)))
+             (if (xtc:cache:closure-exists? (symbol->string t))
                  t
                  (let ((p (regex:type-split (symbol->string t) "_poly_")))
-                   (impc:ti:specialize-genericfunc (car p) (cname-decode (cadr p)))
+                   (xtc:bind:specialize-genericfunc (car p) (cname-decode (cadr p)))
                    t))))
           ((and (symbol? ast)
                 (regex:match? (symbol->string ast) ":(f)|(i)|(f32)|(f64)|(float)|(double)|(i1)|(i8)|(i64)|(i32)|(i64)"))
@@ -1025,7 +1025,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                         (list 'bitconvert (string->atom (car p)) (string->symbol (cadr p))))))))
           (else ast))))
 
-(define impc:ti:first-transform
+(define xtc:desugar:first-transform
   (lambda (ast inbody?)
     (if (null? ast) '()
         (cond ((list? ast)
@@ -1036,32 +1036,32 @@ Continue executing `body' forms until `test-expression' returns #f"
                       (ast (if (syntax? h) (cons head (cdr ast)) ast)))
                  (cond
                   ((and (symbol? head)
-                        (or (impc:ti:get-polyfunc-candidate-types (symbol->string head))
-                            (impc:ti:genericfunc-exists? head)))
+                        (or (xtc:cache:get-polyfunc-candidate-types (symbol->string head))
+                            (xtc:cache:genericfunc-exists? head)))
                    (set! *unique-polynum* (+ 1 *unique-polynum*))
                    (cons (string->symbol (string-append (symbol->string head)
                                                         "##"
                                                         (number->string *unique-polynum*)))
-                         (impc:ti:first-transform (cdr ast) inbody?)))
+                         (xtc:desugar:first-transform (cdr ast) inbody?)))
                   ((and (symbol? head)
                         (string-contains? (symbol->string head) ":[")
 
-                        (impc:ti:transform-typed-poly ast inbody?)))
-                  ((impc:ti:transform-special-form ast inbody?))
-                  ((impc:ti:transform-definition ast inbody?))
-                  ((and (symbol? head) (impc:ti:transform-dot-syntax ast inbody?)))
+                        (xtc:desugar:transform-typed-poly ast inbody?)))
+                  ((xtc:desugar:transform-special-form ast inbody?))
+                  ((xtc:desugar:transform-definition ast inbody?))
+                  ((and (symbol? head) (xtc:desugar:transform-dot-syntax ast inbody?)))
                   ((and (symbol? head)
-                        (impc:ti:xtmacro-exists? (symbol->string head)))
-                   (impc:ti:first-transform
+                        (xtc:cache:xtmacro-exists? (symbol->string head)))
+                   (xtc:desugar:first-transform
                     (macro-expand (cons (string->symbol
                                          (string-append "xtmacro_"
                                                         (symbol->string head)))
                                         (cdr ast)))
                     'inbody?))
                   (else
-                   (cons (impc:ti:first-transform head #t)
-                         (impc:ti:first-transform (cdr ast) #t))))))
-              (else (impc:ti:transform-atom ast inbody?))))))
+                   (cons (xtc:desugar:first-transform head #t)
+                         (xtc:desugar:first-transform (cdr ast) #t))))))
+              (else (xtc:desugar:transform-atom ast inbody?))))))
 
 
 ;;
@@ -1072,30 +1072,30 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;
 
 ;; is 't' a complex type?
-(define impc:ti:complex-type?
+(define xtc:desugar:complex-type?
   (lambda (t)
     (if (and (atom? t)
              (not (string? t)))
         #f
         (if (string? t) #t
             (if (and (number? (car t))           ;; if list starts with a number (i.e. not a symbol)
-                     (<> (car t) *impc:ir:void*) ;; if not void
+                     (<> (car t) *xtc:codegen:void*) ;; if not void
                      ;; if proper complex type (tuple,array,closure)
-                     (member (modulo (car t) *impc:ir:pointer*)
-                             (list *impc:ir:tuple* *impc:ir:array* *impc:ir:vector* *impc:ir:closure*)))
+                     (member (modulo (car t) *xtc:codegen:pointer*)
+                             (list *xtc:codegen:tuple* *xtc:codegen:array* *xtc:codegen:vector* *xtc:codegen:closure*)))
                 #t
                 #f)))))
 
-;; should this be called impc:ti:generic-type? is the presence of a
+;; should this be called xtc:desugar:generic-type? is the presence of a
 ;; bang (!) the only thing to check?
-(define impc:ti:bang-type?
+(define xtc:desugar:bang-type?
   (lambda (type)
     (string-contains? (atom->string type) "!")))
 
 ;; newname mappings is an assoc list
 ;; containing xlist*##105 -> "xlist--3823948324392" mappings
 ;; it is reset by llvm:ti:run
-(define *impc:ti:generic-type-mappings* '())
+(define *xtc:desugar:generic-type-mappings* '())
 
 
 (define regex:replace-all
@@ -1109,7 +1109,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 (define regex:replace-everything
   (lambda (str finds replaces)
     (if (<> (length finds) (length replaces))
-        (impc:compiler:print-compiler-error "regex:replace-everything expects an equal number of finds and replaces"))
+        (xtc:diagnostics:print-compiler-error "regex:replace-everything expects an equal number of finds and replaces"))
     (for-each (lambda (find replace)
                 (if (not (string=? find replace))
                     (let ((s (regex:replace-all str find replace)))
@@ -1122,23 +1122,23 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; in other words try to change
 ;; this <!head,xlist*> into <i64,xlist*>
 ;; return #f or an expanded
-(define impc:ti:reify-generic-type-expand
+(define xtc:desugar:reify-generic-type-expand
   (lambda (type gnum spec vars)
     ;; (println 'reifyin: type 'gnum: gnum 'spec: spec) ; 'vars: vars)
-    (impc:ti:vars-for-each
+    (xtc:typecheck:vars-for-each
      (lambda (v)
-       (if (and (impc:ti:bang-type? (car v))
+       (if (and (xtc:desugar:bang-type? (car v))
                 (if (not gnum) #t
                     (regex:match? (symbol->string (car v)) (string-append "##" gnum)))
                 (regex:match? type (car (regex:split (symbol->string (car v)) "(##)|(%)")))
                 (not (null? (cdr v))))
-           (let* ((t (impc:ti:type-normalize (impc:ti:type-unify (cdr v) vars)))
-                  (tl (if (impc:ir:type? t)
-                          (impc:ir:pretty-print-type t)
+           (let* ((t (xtc:desugar:type-normalize (xtc:desugar:type-unify (cdr v) vars)))
+                  (tl (if (xtc:codegen:type? t)
+                          (xtc:codegen:pretty-print-type t)
                           '())))
              (if (not (null? tl))
                  (let* ((xx (car (regex:type-split (symbol->string (car v)) "##")))
-                        (base (impc:ir:get-base-type xx))
+                        (base (xtc:codegen:get-base-type xx))
                         (xxx (string-append base "[*]*")))
                    (set! type (regex:replace-all type xxx tl)))))
            #f))
@@ -1147,18 +1147,18 @@ Continue executing `body' forms until `test-expression' returns #f"
     type))
 
 
-(define impc:ti:maximize-generic-type
+(define xtc:desugar:maximize-generic-type
   (lambda (string-type)
     ;; (println 'maxtypein: string-type)
-    (let* ((ptr-depth (impc:ir:get-ptr-depth string-type))
-           (p (impc:ti:split-namedtype string-type)))
+    (let* ((ptr-depth (xtc:codegen:get-ptr-depth string-type))
+           (p (xtc:desugar:split-namedtype string-type)))
       ;; first check of we are asking for a fully generic type definition (i.e. List*)
       (if (and (null? (cdr p))
-               (impc:ti:get-generictype-candidate-types (car p))) ;; not generic!
-          (apply string-append (car p) ":" (symbol->string (impc:ti:get-generictype-candidate-types (car p)))
-                 (make-list (impc:ir:get-ptr-depth string-type) "*"))
+               (xtc:cache:get-generictype-candidate-types (car p))) ;; not generic!
+          (apply string-append (car p) ":" (symbol->string (xtc:cache:get-generictype-candidate-types (car p)))
+                 (make-list (xtc:codegen:get-ptr-depth string-type) "*"))
           ;; next check if type is already maximized!
-          (if (or (not (impc:ti:get-generictype-candidate-types (car p)))  ;; not generic!
+          (if (or (not (xtc:cache:get-generictype-candidate-types (car p)))  ;; not generic!
                   (and (not (or (string-contains? (cadr p) "{")
                                 (string-contains? (cadr p) "!")))
                        (not (string-contains? string-type "{"))))
@@ -1170,26 +1170,26 @@ Continue executing `body' forms until `test-expression' returns #f"
                       (cl:remove #f
                                  (map (lambda (x)
                                         (if (string-contains? x "{")
-                                            (impc:ti:maximize-generic-type x)
+                                            (xtc:desugar:maximize-generic-type x)
                                             (if (regex:match? x (string-append "^" name "[^A-Za-z0-9_]"))
                                                 #f
                                                 x)))
-                                      (impc:ir:get-pretty-tuple-arg-strings argstr)))) ;)
+                                      (xtc:codegen:get-pretty-tuple-arg-strings argstr)))) ;)
                      (named_ags (cl:remove
                                  #f
                                  (map (lambda (x)
                                         (if (string-contains? x "{")
-                                            (impc:ti:maximize-generic-type x)
+                                            (xtc:desugar:maximize-generic-type x)
                                             #f))
-                                      (impc:ir:get-pretty-tuple-arg-strings argstr))))
+                                      (xtc:codegen:get-pretty-tuple-arg-strings argstr))))
                      (ags_a (cl:remove-duplicates (regex:match-all argstr "![A-Za-z_0-9]*")))
-                     (gtype (symbol->string (impc:ti:get-generictype-candidate-types (car p))))
-                     ;; (plst (impc:ir:get-pretty-tuple-arg-strings gtype))
+                     (gtype (symbol->string (xtc:cache:get-generictype-candidate-types (car p))))
+                     ;; (plst (xtc:codegen:get-pretty-tuple-arg-strings gtype))
                      ;; (plst (map (lambda (x)
                      ;;              (if (regex:match? x "^[A-Za-z0-9_]*{")
-                     ;;                  (impc:ti:maximize-generic-type x)
+                     ;;                  (xtc:desugar:maximize-generic-type x)
                      ;;                  x))
-                     ;;            (impc:ir:get-pretty-tuple-arg-strings gtype)))
+                     ;;            (xtc:codegen:get-pretty-tuple-arg-strings gtype)))
                      (named_gags (cl:remove
                                   #f
                                   (map (lambda (x)
@@ -1197,7 +1197,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                  (string-contains? x ":<"))
                                              (string-append "\\Q" x "\\E")
                                              #f))
-                                       (impc:ir:get-pretty-tuple-arg-strings gtype))))
+                                       (xtc:codegen:get-pretty-tuple-arg-strings gtype))))
                      (gags (cl:remove-duplicates (regex:match-all gtype "![A-Za-z_0-9]*"))))
                 ;; (println 'maximize: string-type 'gtype gtype 'ags ags 'gags gags 'named: named_ags named_gags)
                 (let* ((gt2 (if (<> (length named_gags)
@@ -1214,9 +1214,9 @@ Continue executing `body' forms until `test-expression' returns #f"
                                      (if (string-contains? x "{")
                                          (if (regex:match? x (string-append string-type "\\**"))
                                              (regex:replace x "^([^{]*).+(\\*+)$" "$1$2")
-                                             (impc:ti:maximize-generic-type x))
+                                             (xtc:desugar:maximize-generic-type x))
                                          x))
-                                   (impc:ir:get-pretty-tuple-arg-strings newt)))
+                                   (xtc:codegen:get-pretty-tuple-arg-strings newt)))
                        ;; (lllllllll (println 'newt2 newt2))
                        (newtype_c (apply string-append (car p) ":<" (string-join newt2 ",") ">"
                                          (make-list ptr-depth "*"))))
@@ -1224,29 +1224,29 @@ Continue executing `body' forms until `test-expression' returns #f"
                   newtype_c)))))))
 
 
-(define impc:ti:get-generic-type-as-tuple
+(define xtc:desugar:get-generic-type-as-tuple
   (lambda (string-type)
-    (set! string-type (impc:ir:pretty-print-type string-type))
-    (let* ((a (impc:ti:maximize-generic-type string-type))
-           (b (impc:ti:split-namedtype a))
-           (t (impc:ir:get-type-from-pretty-str (cadr b))))
+    (set! string-type (xtc:codegen:pretty-print-type string-type))
+    (let* ((a (xtc:desugar:maximize-generic-type string-type))
+           (b (xtc:desugar:split-namedtype a))
+           (t (xtc:codegen:get-type-from-pretty-str (cadr b))))
       t)))
 
 
-(define impc:ti:minimize-generic-type
+(define xtc:desugar:minimize-generic-type
   (lambda (t gtype)
     ;; (println 'minimize t gtype)
     (let* ((ags (map (lambda (x)
-                       (if (impc:ti:generictype-exists? (car (impc:ti:split-namedtype x)))
-                           (impc:ti:maximize-generic-type x)
+                       (if (xtc:cache:generictype-exists? (car (xtc:desugar:split-namedtype x)))
+                           (xtc:desugar:maximize-generic-type x)
                            x))
-                     (impc:ir:get-pretty-tuple-arg-strings t)))
+                     (xtc:codegen:get-pretty-tuple-arg-strings t)))
            ;; (llll (println 'ags: ags))
            (gags (map (lambda (x)
-                        (if (impc:ti:generictype-exists? (car (impc:ti:split-namedtype x)))
-                            (impc:ti:maximize-generic-type x)
+                        (if (xtc:cache:generictype-exists? (car (xtc:desugar:split-namedtype x)))
+                            (xtc:desugar:maximize-generic-type x)
                             x))
-                      (impc:ir:get-pretty-tuple-arg-strings gtype)))
+                      (xtc:codegen:get-pretty-tuple-arg-strings gtype)))
            ;; (lllllll (println 'gags: gags))
            (plst (map (lambda (x y) (cons x y))
                       gags
@@ -1259,8 +1259,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                                       (let ((cx (string-ref (car x) 0)))
                                         (and (not (char=? cx #\!))            ;; typevar
                                              (not (and (char-alphabetic? cx) ;; or generic type
-                                                       (impc:ti:generictype-exists?
-                                                        (car (impc:ti:split-namedtype (car x))))))
+                                                       (xtc:cache:generictype-exists?
+                                                        (car (xtc:desugar:split-namedtype (car x))))))
                                              (not (and (char=? cx #\[)
                                                        (string-contains? (car x) "!"))))))
                                     plst)))
@@ -1269,16 +1269,16 @@ Continue executing `body' forms until `test-expression' returns #f"
                        ;; (println 'x: x)
                        (if (string-contains? (cdr x) ":")
                            (if (string-contains? (car x) ":")
-                               (let* ((pdth (impc:ir:get-ptr-depth (cdr x)))
-                                      (splita (impc:ti:split-namedtype (car x)))
-                                      (splitb (impc:ti:split-namedtype (cdr x)))
+                               (let* ((pdth (xtc:codegen:get-ptr-depth (cdr x)))
+                                      (splita (xtc:desugar:split-namedtype (car x)))
+                                      (splitb (xtc:desugar:split-namedtype (cdr x)))
                                       (sa (cadr splita))
                                       (sb (cadr splitb))
                                       (tvars (cl:remove-duplicates (regex:match-all sa "![A-Za-z_0-9]*")))
                                       ;; (lllll (println '--> sa sb gtype tvars))
                                       (minargs (if (string=? sb gtype) ;; for recursive types!
                                                    '() ;;(cl:remove-duplicates (regex:match-all sa "![A-Za-z_0-9]*")) ;; '()
-                                                   (impc:ti:minimize-generic-type sb sa)))
+                                                   (xtc:desugar:minimize-generic-type sb sa)))
                                       (res (cl:remove
                                             #f (map (lambda (x y) (if (equal? x y) #f (cons x y)))
                                                     (cl:remove-duplicates minargs)
@@ -1288,27 +1288,27 @@ Continue executing `body' forms until `test-expression' returns #f"
                                (let* ((xd-split (string-split-on (cdr x) ":"))
                                       (xd-name (car xd-split))
                                       (xd-type (cadr xd-split)))
-                                 (if (not (impc:ti:get-generictype-candidate-types
+                                 (if (not (xtc:cache:get-generictype-candidate-types
                                            (string->symbol xd-name)))
-                                     (impc:compiler:print-bad-type-error (string->symbol xd-name) "type is undefined"))
+                                     (xtc:diagnostics:print-bad-type-error (string->symbol xd-name) "type is undefined"))
                                  (apply string-append
                                         xd-name
                                         "{"
-                                        (string-join (impc:ti:minimize-generic-type
+                                        (string-join (xtc:desugar:minimize-generic-type
                                                       xd-type
                                                       (if (string-contains? (car x) ":")
                                                           (cadr (string-split-on (car x) ":"))
-                                                          (symbol->string (impc:ti:get-generictype-candidate-types
+                                                          (symbol->string (xtc:cache:get-generictype-candidate-types
                                                                            (string->symbol xd-name)))))
                                                      ",")
                                         "}"
-                                        (make-list (impc:ir:get-ptr-depth (cdr x)) "*"))))
+                                        (make-list (xtc:codegen:get-ptr-depth (cdr x)) "*"))))
                            (if (and (let ((c (string-ref (cdr x) 0))) (or (char=? c #\[) (char=? c #\<)))
                                     (let ((c (string-ref (car x) 0))) (or (char=? c #\[) (char=? c #\<))))
-                               (let ((ptrd (impc:ir:get-ptr-depth (cdr x)))
-                                     (b1 (impc:ir:get-base-type (cdr x)))
-                                     (b2 (impc:ir:get-base-type (car x))))
-                                 (impc:ti:minimize-generic-type
+                               (let ((ptrd (xtc:codegen:get-ptr-depth (cdr x)))
+                                     (b1 (xtc:codegen:get-base-type (cdr x)))
+                                     (b2 (xtc:codegen:get-base-type (car x))))
+                                 (xtc:desugar:minimize-generic-type
                                   (string-append "<" (substring b1 1 (- (string-length b1) 1)) ">")
                                   (string-append "<" (substring b2 1 (- (string-length b2) 1)) ">")))
                                (begin
@@ -1330,7 +1330,7 @@ Continue executing `body' forms until `test-expression' returns #f"
       tv5)))
 
 
-(define impc:ti:minimize-gen-type-finalize-x
+(define xtc:desugar:minimize-gen-type-finalize-x
   (lambda (typevars lst)
     ;; (println 'finalize: lst)
     (let* ((newl1 (car lst))
@@ -1353,7 +1353,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                             #f)
                      #t))
            (errchk (if (<> (length ret) (length typevars))
-                       (begin (impc:compiler:print-compiler-error "Type Vars and Ret should be same length in Minimize Finalize X"
+                       (begin (xtc:diagnostics:print-compiler-error "Type Vars and Ret should be same length in Minimize Finalize X"
                                                                   (list ret typevars))
                               #f)
                        #t))
@@ -1363,60 +1363,60 @@ Continue executing `body' forms until `test-expression' returns #f"
       ;; (println '>> 'new1 newl1 'new2 newl2 'res res 'mem mem 'ret ret 'typevars typevars 'result result)
       (if (null? result)
           result
-          (map (lambda (x) (impc:ir:pretty-print-type x)) result)))))
+          (map (lambda (x) (xtc:codegen:pretty-print-type x)) result)))))
 
 
-(define impc:ti:minimize-gen-type-x
+(define xtc:desugar:minimize-gen-type-x
   (lambda (l1 newl1 l2 newl2)
 ;    (println 'l1 l1 'nl1 newl1 'l2 l2 'nlw newl2)
-    (if (string? l2) (set! l2 (impc:ti:get-generic-type-as-tuple l2)))
+    (if (string? l2) (set! l2 (xtc:desugar:get-generic-type-as-tuple l2)))
     (if (null? l1)
         (cons (reverse newl1) (reverse newl2))
         (if (list? (car l1))
-            (let ((res (impc:ti:minimize-gen-type-x (car l1) '() (car l2) '())))
-              (impc:ti:minimize-gen-type-x
+            (let ((res (xtc:desugar:minimize-gen-type-x (car l1) '() (car l2) '())))
+              (xtc:desugar:minimize-gen-type-x
                (cdr l1) (append (car res) newl1)
                (cdr l2) (append (cdr res) newl2)))
             (if (and (symbol? (car l1))
                      (char=? (string-ref (symbol->string (car l1)) 0) #\!))
-                (impc:ti:minimize-gen-type-x (cdr l1) (cons (car l1) newl1)
+                (xtc:desugar:minimize-gen-type-x (cdr l1) (cons (car l1) newl1)
                         (cdr l2) (cons (car l2) newl2))
-                (impc:ti:minimize-gen-type-x (cdr l1) newl1
+                (xtc:desugar:minimize-gen-type-x (cdr l1) newl1
                                              (cdr l2) newl2))))))
 
 
-(define impc:ti:minimized-gen-type
+(define xtc:desugar:minimized-gen-type
   (lambda (type gtype)
-    (impc:ti:minimize-gen-type-finalize-x
+    (xtc:desugar:minimize-gen-type-finalize-x
      (map (lambda (x) (string->symbol x)) (regex:match-all gtype "\\![a-zA-Z0-9_]*"))
-     (impc:ti:minimize-gen-type-x (impc:ir:get-type-from-pretty-str gtype) '()
-                                  (impc:ir:get-type-from-pretty-str type) '()))))
+     (xtc:desugar:minimize-gen-type-x (xtc:codegen:get-type-from-pretty-str gtype) '()
+                                  (xtc:codegen:get-type-from-pretty-str type) '()))))
 
 
 
-(define impc:ti:tuple-list-from-pretty-tuple-str
+(define xtc:desugar:tuple-list-from-pretty-tuple-str
   (lambda (str)
-    (impc:ir:get-pretty-tuple-arg-strings str)))
+    (xtc:codegen:get-pretty-tuple-arg-strings str)))
 
-(define impc:ti:generate-generic-type-cname
+(define xtc:desugar:generate-generic-type-cname
   (lambda (t gtype)
     ;; (println 'gentypecname: t gtype)
-    (let (;(mint (impc:ti:minimize-generic-type t gtype)))
-          (mint (impc:ti:minimized-gen-type t gtype)))
+    (let (;(mint (xtc:desugar:minimize-generic-type t gtype)))
+          (mint (xtc:desugar:minimized-gen-type t gtype)))
       ;; (println 'generatecname: t 'gtype gtype 'min mint)
       (for-each (lambda (x)
                   (if (string-contains? x "!")
-                      (impc:compiler:print-bad-type-error t
+                      (xtc:diagnostics:print-bad-type-error t
                                                           (string-append "Could not generate type cname:" (sexpr->string mint)))))
                 mint)
       ;; (println 'new_cname_for: 't: t 'is (string-append "<" (string-join mint ",") ">"))
       (cname-encode (string-append "<" (string-join mint ",") ">")))))
 
 
-;; (define impc:ir:split-squig
+;; (define xtc:codegen:split-squig
 ;;   (lambda (x)
-;;     (let* ((base (impc:ir:get-base-type x))
-;;            (ptrs (impc:ir:get-ptr-depth x))
+;;     (let* ((base (xtc:codegen:get-base-type x))
+;;            (ptrs (xtc:codegen:get-ptr-depth x))
 ;;            (p (regex:type-split base "{"))
 ;;            (argstr (substring (cadr p) 0 (- (string-length (cadr p)) 1))))
 ;;       (list (car p)
@@ -1429,54 +1429,54 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; 3. if 2. exists then return the typename of the specification of the generic type
 ;; 4. if 2. does not exist then create specific type, add it to type polys and return it
 ;; 5. if type cannot be unified throw compiler error.
-(define impc:ti:reify-generic-type
+(define xtc:desugar:reify-generic-type
   (lambda (vs vars all-vs)
     ;; (println 'reify-generic-type: vs) ;; (symbol? vs)
     ;; (println 'vars: vars)
     ;; (println 'all-vs: all-vs)
     ;; (println 'gtype: vs 'vars: vars 'allvs: all-vs)
     ;; (println '-> (hashtable-ref vars vs))
-    (if (and (impc:ti:vars-ref vars vs)
-             (not (null? (impc:ti:vars-ref vars vs)))
-             (impc:ir:type? (car (impc:ti:vars-ref vars vs))))
-        (car (impc:ti:vars-ref vars vs))
+    (if (and (xtc:typecheck:vars-ref vars vs)
+             (not (null? (xtc:typecheck:vars-ref vars vs)))
+             (xtc:codegen:type? (car (xtc:typecheck:vars-ref vars vs))))
+        (car (xtc:typecheck:vars-ref vars vs))
         (if (and (symbol? vs)
                  (string-contains? (symbol->string vs) "##")
                  (not (char=? (string-ref (symbol->string vs) 0) #\!)))
             (let* ((rsplit1a (string-split-on (symbol->string vs) "##"))
                    (rsplit1 (if (string-contains? (car rsplit1a) "{")
-                                (cons (impc:ti:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
+                                (cons (xtc:desugar:maximize-generic-type (car rsplit1a)) (cdr rsplit1a))
                                 rsplit1a))
                    (gnum (if (> (length rsplit1) 1) (cadr rsplit1) #f))
-                   (rsplit2 (impc:ti:split-namedtype (car rsplit1)))
+                   (rsplit2 (xtc:desugar:split-namedtype (car rsplit1)))
                    (gpolyname (car rsplit2))
                    (gtype-explicit (if (null? (cdr rsplit2)) '()
-                                       (impc:ir:get-base-type (cadr rsplit2))))
+                                       (xtc:codegen:get-base-type (cadr rsplit2))))
                    ;; (llllll (println 'gpolyname: gpolyname 'gtype: gtype-explicit))
                    (spec (if (> (length rsplit2) 1) (cadr rsplit2) #f))
-                   (ptrdepth (impc:ir:get-ptr-depth (car rsplit1)))
+                   (ptrdepth (xtc:codegen:get-ptr-depth (car rsplit1)))
                    (elements '())
                    (validelements? #f)
-                   (t1 (symbol->string (impc:ti:get-generictype-candidate-types (string->symbol (impc:ir:get-base-type gpolyname)))))
+                   (t1 (symbol->string (xtc:cache:get-generictype-candidate-types (string->symbol (xtc:codegen:get-base-type gpolyname)))))
                    (gtype t1))
               ;; (println 'reifyts gtype 'vs gtype-explicit)
               (if (and (not (null? gtype-explicit))
-                       (impc:ti:bang-type? gtype-explicit))
+                       (xtc:desugar:bang-type? gtype-explicit))
                   (set! t1 gtype-explicit))
               ;; go through and check that there are NO non-explicit gpoly's at top level of type
               ;; (println '%%%%%%%%%%%%%%%%%%%%%%%% gnum)
               ;; (println '->A: t1 'gtype: gtype 'explict: gtype-explicit 'ptrdepth: ptrdepth 'gpoly: gpolyname 'gnum: gnum)
               ;; (println '->VARS: vars 'all-vs all-vs)
               ;; attempt to expand any <!head,xlist*> into <i64,xlist*>
-              (set! t1 (impc:ti:reify-generic-type-expand t1 gnum spec vars))
+              (set! t1 (xtc:desugar:reify-generic-type-expand t1 gnum spec vars))
               ;; (println '->B: t1 'ptrdepth: ptrdepth 'gpoly: gpolyname)
               (let* ((s1 (regex:replace t1 "\\<(.*)\\>?.*" "$1"))
-                     (es2 (impc:ir:get-type-joiner
+                     (es2 (xtc:codegen:get-type-joiner
                            (cl:remove-if (lambda (x) (string=? x ""))
                                          ;;  (regex:match? x gpolyname)))
-                                         (regex:match-all s1 impc:ir:regex-tc-or-a))))
-                     (es (map (lambda (x) (if (string? (impc:ir:get-type-from-pretty-str x))
-                                         (impc:ir:get-type-from-pretty-str x) x))
+                                         (regex:match-all s1 xtc:codegen:regex-tc-or-a))))
+                     (es (map (lambda (x) (if (string? (xtc:codegen:get-type-from-pretty-str x))
+                                         (xtc:codegen:get-type-from-pretty-str x) x))
                               es2))
                      (tr (cl:remove-if (lambda (x)
                                          ;; (println 'x: x 'gpolyname: gpolyname)
@@ -1485,60 +1485,60 @@ Continue executing `body' forms until `test-expression' returns #f"
                                                     (string-contains? x ":"))
                                                (let ((p (string-split-on x ":")))
                                                  (or (string=? (car p) gpolyname)
-                                                     (impc:ir:type? (impc:ir:get-type-from-pretty-str (cadr p)))))
+                                                     (xtc:codegen:type? (xtc:codegen:get-type-from-pretty-str (cadr p)))))
                                                (if (char=? c #\!)
                                                    #f
                                                    (or (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                       (impc:ir:type? (impc:ir:get-type-from-pretty-str x)))))))
-                                       ;; (impc:ir:type? x)))))
+                                                       (xtc:codegen:type? (xtc:codegen:get-type-from-pretty-str x)))))))
+                                       ;; (xtc:codegen:type? x)))))
                                        es)))
                 (if (null? tr) (set! validelements? #t))
                 (set! elements es))
-              ;; (println '->C: t1 (impc:ti:type-normalize t1))
+              ;; (println '->C: t1 (xtc:desugar:type-normalize t1))
               ;; (println 'elements: elements 'tr: validelements? 't1: t1 'vs: vs (regex:match? t1 "!"))
               (if (and validelements?
                        (not (string-contains? t1 "!")))
-                  (let* ((base (impc:ir:get-base-type gpolyname)) ;(symbol->string vs)))
+                  (let* ((base (xtc:codegen:get-base-type gpolyname)) ;(symbol->string vs)))
                          ;; (newname (string-append base "_poly_" (cname-encode t1)))
-                         (newname (string-append base "_poly_" (impc:ti:generate-generic-type-cname t1 gtype)))
-                         (max (impc:ti:maximize-generic-type (impc:ir:pretty-print-type (string-append "%" newname))))
+                         (newname (string-append base "_poly_" (xtc:desugar:generate-generic-type-cname t1 gtype)))
+                         (max (xtc:desugar:maximize-generic-type (xtc:codegen:pretty-print-type (string-append "%" newname))))
                          (newtype1 t1) ;;(regex:replace t2 (string-append base "([^-][^-])") (string-append newname "$1")))
                          (newtype2 (cons 14 (map (lambda (x)
-                                                   (if (string? (impc:ir:get-type-from-pretty-str x))
-                                                       (impc:ir:get-type-from-pretty-str x)
+                                                   (if (string? (xtc:codegen:get-type-from-pretty-str x))
+                                                       (xtc:codegen:get-type-from-pretty-str x)
                                                        (if (regex:match? x (string-append gpolyname "([{},:*#]|$)"))
-                                                           (impc:ir:pointer++ (string-append "%" newname) (impc:ir:get-ptr-depth x))
-                                                           (impc:ir:get-type-from-pretty-str x))))
+                                                           (xtc:codegen:pointer++ (string-append "%" newname) (xtc:codegen:get-ptr-depth x))
+                                                           (xtc:codegen:get-type-from-pretty-str x))))
                                                  elements)))
-                         (newtype3 (impc:ir:get-type-str newtype2)))
+                         (newtype3 (xtc:codegen:get-type-str newtype2)))
                     ;; (println 'base: base 't1: t1 'gt: gtype 'nt1 newtype1 'nt2 newtype2 'nt3 newtype3 'nn: newname)
                     ;; ok now we have a type we need to add it to llvm and
                     ;; polytype
                     ;; (println 'newtype! newname 'totype: newtype3)
-                    (if (not (impc:ti:namedtype-exists? newname))
+                    (if (not (xtc:cache:namedtype-exists? newname))
                         (begin ;; if this is a new reification of a generic type then ...
                           ;; (println 'compile-type! newname 'totype: newtype3 'type: t1 'gt: gtype )
                           (if (llvm:compile-ir (string-append "%" newname " = type " newtype3))
                               (begin
-                                (impc:ti:register-new-polytype base
+                                (xtc:cache:register-new-polytype base
                                                                newname
                                                                newtype2
                                                                "")
                                 ;; we should probably also build dataconstructors for the new
                                 ;; concrete type?? (at least for printing reasons)
-                                ;; because impc:ti:compile-type-dataconstructors needs to be called from
+                                ;; because xtc:bind:compile-type-dataconstructors needs to be called from
                                 ;; the top level, we should call use callback to add to queue
-                                (callback (now) 'impc:ti:compile-type-dataconstructors (string->symbol newname) newtype1 #f #t #t #t)
+                                (callback (now) 'xtc:bind:compile-type-dataconstructors (string->symbol newname) newtype1 #f #t #t #t)
                                 'done)
-                              (impc:compiler:print-compiler-failed-error))))
-                    (let ((rettype (impc:ir:pointer++ (string-append "%" newname) ptrdepth)))
+                              (xtc:diagnostics:print-compiler-failed-error))))
+                    (let ((rettype (xtc:codegen:pointer++ (string-append "%" newname) ptrdepth)))
                       ;; (println 'oldvs: vs)
                       ;; (set! vs (string->symbol
                       ;;           (string-append base ":" gtype
                       ;;                          (apply string-append (make-list ptrdepth "*"))
                       ;;                          "##" gnum)))
                       ;; (println 'updatevar: vs 'with rettype)
-                      (set! vars (impc:ti:vars-update vs vars '() rettype))
+                      (set! vars (xtc:typecheck:vars-update vs vars '() rettype))
                       rettype))
                   vs))
             vs))))
@@ -1547,10 +1547,10 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 ;; trys to type unify vs against any other
 ;; choices available in all-vs
-;; (define impc:ti:symbol-expand-reverse-check
+;; (define xtc:desugar:symbol-expand-reverse-check
 ;;   (lambda (vs vars all-vs)
 ;;     ;; (println 'vs vs 'all-vs all-vs 'vars vars)
-;;     (impc:ti:type-unify all-vs vars)
+;;     (xtc:desugar:type-unify all-vs vars)
 ;;     ;; (println 'vs: vs 'vars: vars)
 ;;     (if (not (null? (hashtable-ref vars vs)))
 ;;         (hashtable-ref vars vs)
@@ -1563,42 +1563,42 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; then we try to reverse expand
 ;; (i.e. look at other closure options that may include type values
 ;; and assign those values into vars)
-;; (define impc:ti:symbol-expand
+;; (define xtc:desugar:symbol-expand
 ;;   (lambda (vs vars all-vs)
 ;;     ;; (println 'symbol-expand: vs 'allvs: all-vs) ; 'vars: vars)
 ;;     ;; (println 'vars: vars)
 ;;     ;; (println 'all-vs: all-vs)
 ;;     (if (atom? vs)
 ;;         (if (symbol? vs)
-;;             (if (or (impc:ti:get-generictype-candidate-types (string->symbol (impc:ir:get-base-type (car (regex:split (car (regex:split (symbol->string vs) "##")) "%"))))) ;"\\$\\$\\$")) "%")))))
+;;             (if (or (xtc:cache:get-generictype-candidate-types (string->symbol (xtc:codegen:get-base-type (car (regex:split (car (regex:split (symbol->string vs) "##")) "%"))))) ;"\\$\\$\\$")) "%")))))
 ;;                     (if (and (regex:match? (symbol->string vs) ":")
-;;                              (impc:ti:get-generictype-candidate-types
+;;                              (xtc:cache:get-generictype-candidate-types
 ;;                               (string->symbol (car (regex:type-split (symbol->string vs) ":")))))
 ;;                         #t #f))
-;;                 (impc:ti:reify-generic-type vs vars all-vs)
+;;                 (xtc:desugar:reify-generic-type vs vars all-vs)
 ;;                 (if (not (hashtable-ref vars vs)) ;; if not in vars
 ;;                     (if (regex:match? (symbol->string vs) "^![^#]*$") ;; then check to see if symbol is a !gvar
 ;;                         vs
-;;                         ;; (impc:compiler:print-variable-not-marked-as-free-error vs))
+;;                         ;; (xtc:diagnostics:print-variable-not-marked-as-free-error vs))
 ;;                         vs)
 ;;                     ;; check to see a type has been defined
 ;;                     ;; otherwise return null
 ;;                     (let ((t (hashtable-ref vars vs)))
 ;;                       ;; first check to see if the symbol vs has a value
 ;;                       (if (null? t) ;; if it doesn't we might need to reverse match!
-;;                           (impc:ti:symbol-expand-reverse-check vs vars all-vs)
+;;                           (xtc:desugar:symbol-expand-reverse-check vs vars all-vs)
 ;;                           t))))
 ;;             (begin ;(println 'ccc: vs)
 ;;               vs))
-;;         (cons (impc:ti:symbol-expand (car vs) vars all-vs)
-;;               (impc:ti:symbol-expand (cdr vs) vars all-vs)))))
+;;         (cons (xtc:desugar:symbol-expand (car vs) vars all-vs)
+;;               (xtc:desugar:symbol-expand (cdr vs) vars all-vs)))))
 
 
-;; impc:ti:intersection* is cl:intersection for
+;; xtc:desugar:intersection* is cl:intersection for
 ;; an arbirary number of sets (i.e. args)
-;; also handles *impc:ir:other* which we want
+;; also handles *xtc:codegen:other* which we want
 ;; to match against anything.
-(define impc:ti:intersection*
+(define xtc:desugar:intersection*
   (lambda args
     (let loop ((a args)
                (res '()))
@@ -1614,7 +1614,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 
 
-(define impc:ti:complex-unify
+(define xtc:desugar:complex-unify
   (lambda (sym types vars)
     ;; (println 1 'sym: sym 'types: types)
 
@@ -1636,7 +1636,7 @@ Continue executing `body' forms until `test-expression' returns #f"
 
     ;; (println 3 'sym: sym 'types: types)
 
-    (set! types (impc:ti:type-unify types vars))
+    (set! types (xtc:desugar:type-unify types vars))
 
     ;; (println 4 'sym: sym 'types: types)
 
@@ -1646,9 +1646,9 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; this goes through IN ORDER and returns either:
 ;; NULL if the lists don't match
 ;; or
-(define impc:ti:unify-lists
+(define xtc:desugar:unify-lists
   (lambda args
-                                        ;(println 'unify: args 'norm: (impc:ti:type-normalize args))
+                                        ;(println 'unify: args 'norm: (xtc:desugar:type-normalize args))
     (if (null? args)
         args
         (let ((lgths (map (lambda (k) (length k)) args)))
@@ -1677,28 +1677,28 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; i.e. put them in their simplist "named" form
 ;; you can pass in a a complete list of types
 ;; at the end and have this normalize them
-(define impc:ti:type-normalize
+(define xtc:desugar:type-normalize
   (lambda (t)
     (cond ((atom? t) t)
           ((and (list? t)
                 (not (null? t))
-                (not (impc:ir:type? (car t)))
+                (not (xtc:codegen:type? (car t)))
                 (number? (car t))
-                ;;(= *impc:ir:tuple* (modulo (car t) *impc:ir:pointer*)))
-                (impc:ir:tuple? (car t)))
+                ;;(= *xtc:codegen:tuple* (modulo (car t) *xtc:codegen:pointer*)))
+                (xtc:codegen:tuple? (car t)))
            ;; first check all sub tuples for possible normalization!
-           (set! t (map (lambda (a) (impc:ti:type-normalize a)) t))
+           (set! t (map (lambda (a) (xtc:desugar:type-normalize a)) t))
            (let ((named-types (cl:remove-if-not string? t)))
              (if (null? named-types)
                  t
                  (let ((res (map (lambda (k)
                                    ;; (println 'k: k)
                                    (let* ((split (regex:split k "%|(_poly_)"))
-                                          (gen-type (if (impc:ti:get-generictype-candidate-types (cadr split))
-                                                        (symbol->string (impc:ti:get-generictype-candidate-types (cadr split)))
+                                          (gen-type (if (xtc:cache:get-generictype-candidate-types (cadr split))
+                                                        (symbol->string (xtc:cache:get-generictype-candidate-types (cadr split)))
                                                         ""))
-                                          ;; (gen-type (symbol->string (impc:ti:get-generictype-candidate-types (cadr split))))
-                                          (named-type (impc:ti:get-namedtype-type k))
+                                          ;; (gen-type (symbol->string (xtc:cache:get-generictype-candidate-types (cadr split))))
+                                          (named-type (xtc:cache:get-namedtype-type k))
                                           (domatch? (if (and (list? named-type)
                                                              (= (length named-type) (length t)))
                                                         #t #f))
@@ -1717,13 +1717,13 @@ Continue executing `body' forms until `test-expression' returns #f"
                                  named-types)))
                    (set! res (cl:remove-if-not string? res))
                    (if (null? res)
-                       (impc:ti:type-normalize (cdr t))
+                       (xtc:desugar:type-normalize (cdr t))
                        (if (car res)
                            (car res)
                            t))))))
           ((pair? t)
-           (cons (impc:ti:type-normalize (car t))
-                 (impc:ti:type-normalize (cdr t)))))))
+           (cons (xtc:desugar:type-normalize (car t))
+                 (xtc:desugar:type-normalize (cdr t)))))))
 
 
 ;; this function is here to support type-unify
@@ -1740,11 +1740,11 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; any possible vars (such as !head##829) which could get
 ;; useful information from the "%list--3834748*" before
 ;; they get thrown away.
-(define impc:ti:check-to-update-generic-vars
+(define xtc:desugar:check-to-update-generic-vars
   (lambda (atom lists vars)
     ;; (println 'checktoupdategenericvars: atom 'lists lists 'vars: vars)
     (let ((atom-type (if (string? atom)
-                         (impc:ti:get-namedtype-type atom)
+                         (xtc:cache:get-namedtype-type atom)
                          atom)))
       ;; (println 'atom: atom 'atom-type atom-type 'lists lists)
       (if (list? atom-type)
@@ -1757,14 +1757,14 @@ Continue executing `body' forms until `test-expression' returns #f"
                               (= (car e) (car atom-type)))
                          (map (lambda (a b)
                                 (if (and (symbol? a)
-                                         (impc:ti:vars-ref vars a))
-                                    (set! vars (impc:ti:vars-update a vars '() b))))
+                                         (xtc:typecheck:vars-ref vars a))
+                                    (set! vars (xtc:typecheck:vars-update a vars '() b))))
                               (cdr e)
                               (cdr atom-type)))))
                lists))
       #t)))
 
-(define impc:ti:type-unify-closure
+(define xtc:desugar:type-unify-closure
   (lambda (t vars)
     ;; (println 'cls: t (flatten-1 t))
     (if (or (null? t)
@@ -1782,51 +1782,51 @@ Continue executing `body' forms until `test-expression' returns #f"
                                  (list-ref x i))
                                t2))
                         (range 1 lgth)))
-               (p3 (map (lambda (x) (impc:ti:type-unify (cl:remove-duplicates x) vars)) p2))
+               (p3 (map (lambda (x) (xtc:desugar:type-unify (cl:remove-duplicates x) vars)) p2))
                (p4 (cons 213 p3)))
           ;; (println 'p2 p2 'p3 p3 'p4 p4 't t)
           (set! p4 '())
           (if (null? p4) t2 p4)))))
 
-(define impc:ti:occurs-in-type?
+(define xtc:desugar:occurs-in-type?
   (lambda (sym type)
     (cond ((null? type) #f)
           ((symbol? type) (equal? sym type))
           ((string? type) #f)
           ((number? type) #f)
-          ((list? type) (cl:some (lambda (t) (impc:ti:occurs-in-type? sym t)) type))
-          ((pair? type) (or (impc:ti:occurs-in-type? sym (car type))
-                            (impc:ti:occurs-in-type? sym (cdr type))))
+          ((list? type) (cl:some (lambda (t) (xtc:desugar:occurs-in-type? sym t)) type))
+          ((pair? type) (or (xtc:desugar:occurs-in-type? sym (car type))
+                            (xtc:desugar:occurs-in-type? sym (cdr type))))
           (else #f))))
 
 ;;
 ;; IF TYPE CANNOT BE UNIFIED SUCCESSFULLY THEN WE SHOULD RETURN NULL '()
 ;; i.e. if we have ((114 0 0) (14 0 0)) don't return this -> return '()
 ;;
-(define impc:ti:type-unify
+(define xtc:desugar:type-unify
   (lambda (t vars)
     ;; (println 't: t 'vars: vars)
     (cond ((atom? t)
            (if (and (symbol? t)
                     #t
-                    (or (impc:ti:get-generictype-candidate-types
+                    (or (xtc:cache:get-generictype-candidate-types
                          (string->symbol
-                          (impc:ir:get-base-type
+                          (xtc:codegen:get-base-type
                            (car (string-split-on (car (string-split-on (symbol->string t) "##")) "%")))))
                         (if (and (or (string-contains? (symbol->string t) ":")
                                      (string-contains? (symbol->string t) "{"))
-                                 (impc:ti:get-generictype-candidate-types
-                                  (string->symbol (car (impc:ti:split-namedtype t)))))
+                                 (xtc:cache:get-generictype-candidate-types
+                                  (string->symbol (car (xtc:desugar:split-namedtype t)))))
                             #t
                             #f)))
-               (impc:ti:reify-generic-type t vars '())
-               (let ((val (and (symbol? t) (impc:ti:vars-ref vars t))))
+               (xtc:desugar:reify-generic-type t vars '())
+               (let ((val (and (symbol? t) (xtc:typecheck:vars-ref vars t))))
                  (if (and val (not (null? val)))
                      ;; directly bound (bare variable, or a symbolic chain):
                      ;; resolve through its value as usual
-                     (if (impc:ti:occurs-in-type? t val)
+                     (if (xtc:desugar:occurs-in-type? t val)
                          t
-                         (let ((r (impc:ti:type-unify val vars)))
+                         (let ((r (xtc:desugar:type-unify val vars)))
                            (if (null? r) t r)))
                      ;; #315: a starred occurrence (!a*) carries no binding of its
                      ;; own --- it is the base variable (!a) at a pointer depth.
@@ -1834,32 +1834,32 @@ Continue executing `body' forms until `test-expression' returns #f"
                      ;; !a* reifies to i64* when !a = i64 (the field/parameter
                      ;; relationship is X vs X*, never derived by string surgery).
                      (let ((depth (and (symbol? t)
-                                       (impc:type:bare-bang-var? t)
-                                       (impc:ir:get-ptr-depth (symbol->string t)))))
+                                       (xtc:type:bare-bang-var? t)
+                                       (xtc:codegen:get-ptr-depth (symbol->string t)))))
                        (if (and depth (> depth 0))
-                           (let ((base (impc:ti:type-unify (impc:type:bang-base-key t) vars)))
-                             (if (impc:ir:type? base)
-                                 (impc:type:deepen-ptr-depth base depth)
+                           (let ((base (xtc:desugar:type-unify (xtc:type:bang-base-key t) vars)))
+                             (if (xtc:codegen:type? base)
+                                 (xtc:type:deepen-ptr-depth base depth)
                                  t))
                            t))))))
           ((list? t)
-           (cond ((impc:ti:complex-type? t)
-                  (map (lambda (v) (impc:ti:type-unify v vars)) t))
+           (cond ((xtc:desugar:complex-type? t)
+                  (map (lambda (v) (xtc:desugar:type-unify v vars)) t))
                  ((= (length t) 1)
-                  (impc:ti:type-unify (car t) vars))
+                  (xtc:desugar:type-unify (car t) vars))
                  (else
-                  (let* ((ts (impc:ti:type-normalize
+                  (let* ((ts (xtc:desugar:type-normalize
                               (map (lambda (v)
-                                     (let ((vvv (impc:ti:type-unify v vars)))
+                                     (let ((vvv (xtc:desugar:type-unify v vars)))
                                        ;; (println 'vvv: vvv)
-                                       (impc:ti:type-clean vvv)))
+                                       (xtc:desugar:type-clean vvv)))
                                    t)))
                          (ts1 (cl:remove #f ts))
                          (ts2 (cl:remove-duplicates ts1))
                          (result ts2))
                     ;; (println 1 t 'unified: result)
                     (if (and (= (length result) 1)
-                             (impc:ir:type? (car result)))
+                             (xtc:codegen:type? (car result)))
                         (car result) ;; return immediately if we have a result
                         (begin
                           ;; first check result to see if we have a valid named-type (i.e. "%string")
@@ -1872,7 +1872,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                           ;; (println 2 t 'unified: result)
                           ;; this is here for cases like
                           ;; (!head%a##287 0 1) ;; which should resolve to (0 1) if !head%a##287 has no type
-                          (if (and (not (cl:find-if impc:ti:complex-type? result))
+                          (if (and (not (cl:find-if xtc:desugar:complex-type? result))
                                    (not (cl:find-if string? result))
                                    (cl:find-if symbol? result))
                               (set! result (cl:remove-if symbol? result)))
@@ -1884,7 +1884,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                           ;; (0 (0 1) (0 1 2)) which should resolve to 0
                           ;; ((0 1) (0 1 2)) sould resolve to (0 1 2)
                           (if (and (cl:find-if list? result)
-                                   (not (cl:find-if impc:ti:complex-type? result)))
+                                   (not (cl:find-if xtc:desugar:complex-type? result)))
                               (let ((non-choices (cl:remove-duplicates (cl:remove-if list? result)))
                                     (choices (cl:remove-duplicates (flatten (cl:remove-if atom? ts2)))))
                                 (if (and (= (length non-choices) 1)
@@ -1898,8 +1898,8 @@ Continue executing `body' forms until `test-expression' returns #f"
                           (if (list? result)
                               (let ((resolved (cl:remove-duplicates
                                                (cl:remove-if-not (lambda (k)
-                                                                   (if (and (impc:ir:type? k)
-                                                                            (impc:ti:complex-type? k))
+                                                                   (if (and (xtc:codegen:type? k)
+                                                                            (xtc:desugar:complex-type? k))
                                                                        #t #f))
                                                                  result))))
                                 (if (not (null? resolved))
@@ -1911,16 +1911,16 @@ Continue executing `body' forms until `test-expression' returns #f"
                           (if (null? result)
                               result
                               (if (and (not (number? result))
-                                       (not (impc:ir:type? result))
+                                       (not (xtc:codegen:type? result))
                                        (list? result)
-                                       (impc:ir:tuple? (car result)))
-                                  (let* ((r1 (cl:remove-if (lambda (x) (not (impc:ir:type? x))) result))
+                                       (xtc:codegen:tuple? (car result)))
+                                  (let* ((r1 (cl:remove-if (lambda (x) (not (xtc:codegen:type? x))) result))
                                          (res (cl:remove-duplicates r1))
                                          (resl (length res)))
                                     ;; (println 'res: res)
                                     (if (= resl 1)
                                         (begin
-                                          (impc:ti:check-to-update-generic-vars (car res) t vars)
+                                          (xtc:desugar:check-to-update-generic-vars (car res) t vars)
                                           (car res))
                                         r1))
                                     ;; (if res res
@@ -1928,51 +1928,51 @@ Continue executing `body' forms until `test-expression' returns #f"
                                   (if (and (list? result)
                                            (= (length result) 1))
                                       (begin
-                                        (impc:ti:check-to-update-generic-vars (car result) t vars)
+                                        (xtc:desugar:check-to-update-generic-vars (car result) t vars)
                                         (car result)) ;; if result only has 1 element then return that
                                       ;; result)))))))))
                                       (if (and (list? result)
-                                               (impc:ir:closure? (car result)))
-                                          (impc:ti:type-unify-closure result vars)
-                                          (if (or (impc:ir:type? result) ;; either result is a propert type
+                                               (xtc:codegen:closure? (car result)))
+                                          (xtc:desugar:type-unify-closure result vars)
+                                          (if (or (xtc:codegen:type? result) ;; either result is a propert type
                                                   (not (cl:find-if (lambda (k) (not (number? k))) result))) ;; or list of number '(0 1 2 3) for example
                                               result ;; if list is either a propert type OR a list of numeric types (i.e. '(0 1 2))
                                               '()))))))))))) ;; if we still have mixed choice of complex types then return NULL
           ((pair? t)
-           (impc:ti:type-unify (cdr t) vars))
-          (else (impc:compiler:print-bad-type-error t)))))
+           (xtc:desugar:type-unify (cdr t) vars))
+          (else (xtc:diagnostics:print-bad-type-error t)))))
 
 
-(define impc:ti:generic-type-details
+(define xtc:desugar:generic-type-details
   (lambda (a)
     (if (and (symbol? a)
              (string-contains? (symbol->string a) "##"))
         (let* ((a-parts (string-split-on (symbol->string a) "##"))
                (gname (car a-parts))
                (gnum (string->number (cadr a-parts)))
-               (_basename (impc:ir:get-base-type gname))
-               (name_and_type (impc:ti:split-namedtype _basename))
+               (_basename (xtc:codegen:get-base-type gname))
+               (name_and_type (xtc:desugar:split-namedtype _basename))
                (basename (car name_and_type))
                (gtype (if (null? (cdr name_and_type)) #f (cadr name_and_type)))
                (b-parts (string-split-on basename "%"))
                (gchar (cdr b-parts))
                (gname2 (car b-parts))
-               (gpt (impc:ti:get-generictype-candidate-types gname2)))
+               (gpt (xtc:cache:get-generictype-candidate-types gname2)))
           (if gpt
-              (list (string->symbol gname2) gnum (if (null? gchar) "" (car gchar)) (impc:ir:get-type-from-pretty-str (symbol->string gpt)) gtype)
+              (list (string->symbol gname2) gnum (if (null? gchar) "" (car gchar)) (xtc:codegen:get-type-from-pretty-str (symbol->string gpt)) gtype)
               (list (string->symbol gname2) gnum (if (null? gchar) "" (car gchar)) '() gtype)))
         #f)))
 
 ;; try to find a type for a !bang from a reified type
 ;;
-;; example use is in impc:ti:sym-unify
-(define impc:ti:check-bang-against-reified
+;; example use is in xtc:desugar:sym-unify
+(define xtc:desugar:check-bang-against-reified
   (lambda (bang-sym reified-sym vars)
-    (let ((type (impc:ti:vars-ref vars reified-sym)))
+    (let ((type (xtc:typecheck:vars-ref vars reified-sym)))
       (if (or (not type) (null? type))
           #f
-          (let* ((gtd (impc:ti:generic-type-details reified-sym))
-                 (gtd2 (impc:ti:generic-type-details bang-sym))
+          (let* ((gtd (xtc:desugar:generic-type-details reified-sym))
+                 (gtd2 (xtc:desugar:generic-type-details bang-sym))
                  (gtype (cadddr gtd))
                  (pos (cl:position (car gtd2) gtype)))
             (if (and type pos (list? (car type)) (> (length (car type)) pos))
@@ -1991,40 +1991,40 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 
 
-(define impc:ti:sym-unify
+(define xtc:desugar:sym-unify
   (lambda (sym types vars)
     ;; if sym is a !bang symbol and has no type set
     ;; then we trawl through vars looking for reified
     ;; types which we might be able to match it against.
     (if (and (null? types)
              (char=? (string-ref (symbol->string sym) 0) #\!))
-        (let ((gtd (impc:ti:generic-type-details sym)))
+        (let ((gtd (xtc:desugar:generic-type-details sym)))
           (if gtd
-              (impc:ti:vars-for-each
+              (xtc:typecheck:vars-for-each
                (lambda (k)
                  (let ((k-types (cdr k)))
                    (if (and (not (null? k-types))
-                            (impc:ir:type? (car k-types)))
-                       (let ((gtd2 (impc:ti:generic-type-details (car k))))
+                            (xtc:codegen:type? (car k-types)))
+                       (let ((gtd2 (xtc:desugar:generic-type-details (car k))))
                          (if (and gtd2 (= (cadr gtd) (cadr gtd2)))
-                             (let ((val (impc:ti:check-bang-against-reified sym (car k) vars)))
+                             (let ((val (xtc:desugar:check-bang-against-reified sym (car k) vars)))
                                (if val
-                                   (set! vars (impc:ti:vars-update sym vars '() val)))))))))
+                                   (set! vars (xtc:typecheck:vars-update sym vars '() val)))))))))
                vars))))
 
     ;; (if (not (cl:find-if list? types))
     ;;    (begin (set! types (cl:remove-duplicates types)) ;; first normalize and check for duplicates
     ;;     (if (= (length types) 1)
     ;;         (car types) ;; if only 1 element in list return as atom
-    ;;         (impc:ti:complex-unify types types vars)))
-    ;;    (impc:ti:complex-unify sym types vars))))
+    ;;         (xtc:desugar:complex-unify types types vars)))
+    ;;    (xtc:desugar:complex-unify sym types vars))))
 
-    (let ((result (impc:ti:complex-unify sym types vars)))
+    (let ((result (xtc:desugar:complex-unify sym types vars)))
       ;; (println 'sym: sym 't: types 'result result 'vars: vars)
       (if (and (list? result)
                (= (length result) 1))
           (car result)
-          (impc:ti:type-clean result)))))
+          (xtc:desugar:type-clean result)))))
 
 
 
@@ -2034,17 +2034,17 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;; 3rd because step 2 may have made changes for the better we should do a final symbol check
 ;; basically means going through the final result list to see if any symbols left in complex
 ;; types can be given types.
-(define impc:ti:unify
+(define xtc:desugar:unify
   (lambda (vars)
-    (let* ((pairs (impc:ti:vars->alist vars))
+    (let* ((pairs (xtc:typecheck:vars->alist vars))
            (result (map (lambda (v)
                           (let* ((sym (car v))
                                  (pre (cdr v))
-                                 (types-unified (impc:ti:sym-unify sym pre vars)))
+                                 (types-unified (xtc:desugar:sym-unify sym pre vars)))
                             (cons sym types-unified)))
                         pairs)))
       (let ((result2 (map (lambda (a)
-                            (let ((b-types (impc:ti:vars-ref vars (car a))))
+                            (let ((b-types (xtc:typecheck:vars-ref vars (car a))))
                               (if (null? (cdr a))
                                   (if (and b-types (not (null? b-types)))
                                       (if (= (length b-types) 1)
@@ -2057,15 +2057,15 @@ Continue executing `body' forms until `test-expression' returns #f"
 
 
 ;; checks to see if a type system is completely unified
-(define impc:ti:unity?
+(define xtc:desugar:unity?
   (lambda (vars)
     (map (lambda (x)
-           (if (impc:ir:type? (cdr x)) #t #f))
+           (if (xtc:codegen:type? (cdr x)) #t #f))
          vars)))
 
 
 ;; join elements into a list (without including nulls)
-(define impc:ti:join
+(define xtc:desugar:join
   (lambda args
     (cl:remove-if null? args)))
 
@@ -2076,11 +2076,11 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;
 ;; i.e. (211 (2) (211 3 3) (xlist*##123)) should be
 ;; (211 2 (211 3 3) xlist*##123)
-;; (define impc:ti:type-clean
+;; (define xtc:desugar:type-clean
 ;;   (lambda (type)
 ;;     (if (or (null? type)
 ;;             (atom? type)
-;;             (impc:ir:type? type)) ;; (note to andrew) remove this line for GC crash!
+;;             (xtc:codegen:type? type)) ;; (note to andrew) remove this line for GC crash!
 ;;  type
 ;;         (map (lambda (k)
 ;;                (if (list? k)
@@ -2090,17 +2090,17 @@ Continue executing `body' forms until `test-expression' returns #f"
 ;;                    k))
 ;;              type))))
 
-(define impc:ti:type-clean
+(define xtc:desugar:type-clean
   (lambda (type)
     (if (or (null? type)
             (atom? type)
-            (impc:ir:type? type)) ;; (note to andrew) remove this line for GC crash!
+            (xtc:codegen:type? type)) ;; (note to andrew) remove this line for GC crash!
         type
         (map (lambda (k)
                (if (list? k)
                    (if (= (length k) 1)
-                       (impc:ti:type-clean (car k))
-                       (impc:ti:type-clean k))
+                       (xtc:desugar:type-clean (car k))
+                       (xtc:desugar:type-clean k))
                    k))
              type))))
 

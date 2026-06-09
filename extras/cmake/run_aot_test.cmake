@@ -22,7 +22,7 @@ endforeach()
 file(REMOVE "${WORK_DIR}/${CACHE_LL}")
 execute_process(
     COMMAND "${EXTEMPORE}" --nobase --term nocolor
-        --batch "(impc:aot:compile-xtm-file \"${LIB_XTM}\")"
+        --batch "(xtc:aot:compile-xtm-file \"${LIB_XTM}\")"
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE compile_rc
     TIMEOUT ${COMPILE_TIMEOUT})

@@ -15,15 +15,15 @@
 
 ;;; Code:
 
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/portmidi.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/portmidi.xtm" 'quiet))
 (sys:load-preload-check 'portmidi)
 (define *xtmlib-portmidi-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm"))
-(impc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmportmidi")
+(xtc:aot:insert-header "xtmportmidi")
 
 ;; set up the current dylib name and path (for AOT compilation)
 (bind-dylib libportmidi
@@ -35,7 +35,7 @@
          "portmidi.dll"))
   "xtmportmidi")
 
-(impc:aot:import-ll "xtmportmidi")
+(xtc:aot:import-ll "xtmportmidi")
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; begin portmidi.h ;;
@@ -707,27 +707,27 @@ Scheme)"
 
 ;; bind them in scheme, too
 
-(impc:aot:do-or-emit (define *midi-note-on* #x90))
-(impc:aot:do-or-emit (define *midi-note-off* #x80))
-(impc:aot:do-or-emit (define *midi-channel-aftertouch* #xD0))
-(impc:aot:do-or-emit (define *midi-poly-aftertouch* #xA0))
-(impc:aot:do-or-emit (define *midi-program-change* #xC0))
-(impc:aot:do-or-emit (define *midi-control-change* #xB0))
-(impc:aot:do-or-emit (define *midi-cc* #xB0))
-(impc:aot:do-or-emit (define *midi-pitch-bend* #xE0))
+(xtc:aot:do-or-emit (define *midi-note-on* #x90))
+(xtc:aot:do-or-emit (define *midi-note-off* #x80))
+(xtc:aot:do-or-emit (define *midi-channel-aftertouch* #xD0))
+(xtc:aot:do-or-emit (define *midi-poly-aftertouch* #xA0))
+(xtc:aot:do-or-emit (define *midi-program-change* #xC0))
+(xtc:aot:do-or-emit (define *midi-control-change* #xB0))
+(xtc:aot:do-or-emit (define *midi-cc* #xB0))
+(xtc:aot:do-or-emit (define *midi-pitch-bend* #xE0))
 
-(impc:aot:do-or-emit (define *midi-sysex* #xF0))
-(impc:aot:do-or-emit (define *midi-time-code* #xF1))
-(impc:aot:do-or-emit (define *midi-song-position* #xF2))
-(impc:aot:do-or-emit (define *midi-song-select* #xF3))
-(impc:aot:do-or-emit (define *midi-tune* #xF6))
-(impc:aot:do-or-emit (define *midi-sysex-end* #xF7))
-(impc:aot:do-or-emit (define *midi-timiing-clock* #xF8))
-(impc:aot:do-or-emit (define *midi-start* #xFA))
-(impc:aot:do-or-emit (define *midi-continue* #xFB))
-(impc:aot:do-or-emit (define *midi-stop* #xFC))
-(impc:aot:do-or-emit (define *midi-active-sensing* #xFE))
-(impc:aot:do-or-emit (define *midi-reset* #xFF))
+(xtc:aot:do-or-emit (define *midi-sysex* #xF0))
+(xtc:aot:do-or-emit (define *midi-time-code* #xF1))
+(xtc:aot:do-or-emit (define *midi-song-position* #xF2))
+(xtc:aot:do-or-emit (define *midi-song-select* #xF3))
+(xtc:aot:do-or-emit (define *midi-tune* #xF6))
+(xtc:aot:do-or-emit (define *midi-sysex-end* #xF7))
+(xtc:aot:do-or-emit (define *midi-timiing-clock* #xF8))
+(xtc:aot:do-or-emit (define *midi-start* #xFA))
+(xtc:aot:do-or-emit (define *midi-continue* #xFB))
+(xtc:aot:do-or-emit (define *midi-stop* #xFC))
+(xtc:aot:do-or-emit (define *midi-active-sensing* #xFE))
+(xtc:aot:do-or-emit (define *midi-reset* #xFF))
 
 ;; xtlang wrapper functions
 
@@ -871,19 +871,19 @@ output device(s)
 
 ;; scheme helper functions
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define play-midi-note
    (lambda (time device pitch velocity duration channel)
      (callback time 'pm_send device *midi-note-on* channel pitch velocity)
      (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define send-midi-cc
    (lambda (time device cc val channel)
      (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))
 
 ;; homophonic playnote
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define homo-play-midi-note
    (let ((notes (make-vector 127 0)))
      (lambda (time device pitch velocity duration channel)
@@ -894,10 +894,10 @@ output device(s)
              (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
 
 ;; A midi-specific play macro
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
   (define *midioffset* 0))
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define-macro (mplay . args)
    (if (symbol? (car args))
        `(if (list? ,(cadr args))
@@ -927,7 +927,7 @@ output device(s)
                                 (*metro* 'dur ,(cadr (cdddr args)))
                                 (real->integer , (cadr (cddddr args))))))))
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
   (define-macro (mcc . args)
     (if (symbol? (car args))
         `(send-midi-cc (+ (*metro* beat) *midioffset*) ,(car args)
@@ -940,20 +940,20 @@ output device(s)
                         (real->integer ,(car (cddddr args)))))))
 
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define-macro (mplayob o b . args)
    `(if (= 0 (modulo (+ ,o beat) ,b))
         (mplay ,@args)
         #f)))
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
  (define-macro (mplayobs l b . args)
    `(if (member (modulo beat ,b) ,l)
         (mplay ,@args)
         #f)))
 
 ;; ;; uncomment if you want to use play instead of mplay
-;; (impc:aot:do-or-emit
+;; (xtc:aot:do-or-emit
 ;;  (define-macro (play . args)
 ;;    (if (symbol? (car args))
 ;;        `(play-midi-note (*metro* beat) ,(car args)
@@ -967,5 +967,5 @@ output device(s)
 ;;                         (*metro* 'dur ,(cadr (cdddr args)))
 ;;                         (real->integer , (cadr (cddddr args)))))))
 
-(impc:aot:insert-footer "xtmportmidi")
+(xtc:aot:insert-footer "xtmportmidi")
 (define *xtmlib-portmidi-loaded* #t)

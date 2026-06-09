@@ -14,17 +14,17 @@
 ;;; Code:
 
 ;; lib-loading config
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/instruments.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/instruments.xtm" 'quiet))
 (sys:load-preload-check 'instruments)
 
 (define *xtmlib-instruments-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/core/audio_dsp.xtm"))
-(impc:aot:insert-forms (sys:load "libs/core/audio_dsp.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/core/audio_dsp.xtm" 'quiet))
 
-(impc:aot:insert-header "xtminstruments")
-(impc:aot:import-ll "xtminstruments")
+(xtc:aot:insert-header "xtminstruments")
+(xtc:aot:import-ll "xtminstruments")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -224,7 +224,7 @@
 ;; load the scheme macros (e.g. bind-instrument)
 (sys:load "libs/core/instruments-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/core/instruments-scm.xtm"))
 
 ;; load global instrument params (and build into aot)
@@ -238,6 +238,6 @@
 (sys:load "libs/core/instruments/dlogue.xtm")
 (sys:load "libs/core/instruments/analogue_midi.xtm")
 
-(impc:aot:insert-footer "xtminstruments")
+(xtc:aot:insert-footer "xtminstruments")
 
 (define *xtmlib-instruments-loaded* #t)

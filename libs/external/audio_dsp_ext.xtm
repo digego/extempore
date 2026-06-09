@@ -18,19 +18,19 @@
 ;;; Code:
 
 ;; lib-loading config
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/audio_dsp_ext.xtm" 'quiet))
 (sys:load-preload-check 'audio_dsp_ext)
 (define *xtmlib-audio_dsp_ext-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/external/fft.xtm")
  (sys:load "libs/external/sndfile.xtm"))
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/external/fft.xtm" 'quiet)
  (sys:load "libs/external/sndfile.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmaudio_dsp_ext")
-(impc:aot:import-ll "xtmaudio_dsp_ext")
+(xtc:aot:insert-header "xtmaudio_dsp_ext")
+(xtc:aot:import-ll "xtmaudio_dsp_ext")
 
 ;; are we using float or double precision complex numbers for our
 ;; samples?
@@ -203,5 +203,5 @@
   (lambda (pathl pathr)
     (creverb_st_c:[[float,i64,float,float,float]*,i8*,i8*,i64]* pathl pathr (* (convert FRAMES) 4))))
 
-(impc:aot:insert-footer "xtmaudio_dsp_ext")
+(xtc:aot:insert-footer "xtmaudio_dsp_ext")
 (define *xtmlib-audio_dsp_ext-loaded* #t)

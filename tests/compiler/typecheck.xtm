@@ -4,125 +4,125 @@
 
 ;; literal types
 
-(xtmtest-result (impc:ti:get-expression-type 42)
+(xtmtest-result (xtc:bind:get-expression-type 42)
                 2
                 "integer-literal")
 
-(xtmtest-result (impc:ti:get-expression-type 4.0)
+(xtmtest-result (xtc:bind:get-expression-type 4.0)
                 0
                 "float-literal")
 
-(xtmtest-result (impc:ti:get-expression-type #t)
+(xtmtest-result (xtc:bind:get-expression-type #t)
                 10
                 "boolean-literal")
 
 ;; arithmetic
 
-(xtmtest-result (impc:ti:get-expression-type '(+ 1 2))
+(xtmtest-result (xtc:bind:get-expression-type '(+ 1 2))
                 2
                 "arithmetic")
 
-(xtmtest-result (impc:ti:get-expression-type '(* 3 4))
+(xtmtest-result (xtc:bind:get-expression-type '(* 3 4))
                 2
                 "multiply")
 
-(xtmtest-result (impc:ti:get-expression-type '(- 10 5))
+(xtmtest-result (xtc:bind:get-expression-type '(- 10 5))
                 2
                 "subtract")
 
 ;; if expression
 
-(xtmtest-result (impc:ti:get-expression-type '(if #t 1 2))
+(xtmtest-result (xtc:bind:get-expression-type '(if #t 1 2))
                 2
                 "if-expression")
 
 ;; let expression
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) x))
+(xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1)) x))
                 2
                 "let-expression")
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
+(xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1) (y:i64 2)) (+ x y)))
                 2
                 "nested-let")
 
 ;; lambda
 
-(xtmtest-result (impc:ti:get-expression-type '(lambda (x:i64) (+ x 1)))
+(xtmtest-result (xtc:bind:get-expression-type '(lambda (x:i64) (+ x 1)))
                 '(213 2 2)
                 "lambda")
 
 (xtmtest-with-fixture lambda-two-args
-  (define typ (impc:ti:get-expression-type '(lambda (x:i64 y:i64) (+ x y))))
+  (define typ (xtc:bind:get-expression-type '(lambda (x:i64 y:i64) (+ x y))))
   (is? (car typ) 213 "closure-tag")
   (is? (length typ) 4 "three-type-slots"))
 
 ;; nested let
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) (let ((y:i64 2)) (+ x y))))
+(xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1)) (let ((y:i64 2)) (+ x y))))
                 2
                 "nested-let-scopes")
 
 ;; boolean operations via if
 
-(xtmtest-result (impc:ti:get-expression-type '(if #t #t #f))
+(xtmtest-result (xtc:bind:get-expression-type '(if #t #t #f))
                 10
                 "if-boolean-result")
 
 ;; multi-arg arithmetic (binary arity normalisation)
 
-(xtmtest-result (impc:ti:get-expression-type '(+ 1 2 3))
+(xtmtest-result (xtc:bind:get-expression-type '(+ 1 2 3))
                 2
                 "multi-arg-add")
 
-(xtmtest-result (impc:ti:get-expression-type '(* 1 2 3 4))
+(xtmtest-result (xtc:bind:get-expression-type '(* 1 2 3 4))
                 2
                 "multi-arg-mul")
 
 ;; float arithmetic
 
-(xtmtest-result (impc:ti:get-expression-type '(+ 1.0 2.0))
+(xtmtest-result (xtc:bind:get-expression-type '(+ 1.0 2.0))
                 0
                 "float-add")
 
 ;; let with float
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:double 1.0)) (+ x 2.0)))
+(xtmtest-result (xtc:bind:get-expression-type '(let ((x:double 1.0)) (+ x 2.0)))
                 0
                 "let-float")
 
 ;; begin expression (type of last expression)
 
-(xtmtest-result (impc:ti:get-expression-type '(let ((x:i64 1)) (begin x)))
+(xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1)) (begin x)))
                 2
                 "begin-expr")
 
 ;; bidirectional mode helpers
 
-(xtmtest-result (impc:ti:synth-mode? #f) #t "synth-mode-false")
-(xtmtest-result (impc:ti:synth-mode? '()) #t "synth-mode-null")
-(xtmtest-result (impc:ti:synth-mode? *impc:ir:notype*) #t "synth-mode-notype")
-(xtmtest-result (impc:ti:synth-mode? (list *impc:ir:notype*)) #t "synth-mode-notype-list")
-(xtmtest-result (impc:ti:synth-mode? *impc:ir:si64*) #f "synth-mode-concrete-type")
-(xtmtest-result (impc:ti:synth-mode? "i64") #f "synth-mode-string-type")
+(xtmtest-result (xtc:typecheck:synth-mode? #f) #t "synth-mode-false")
+(xtmtest-result (xtc:typecheck:synth-mode? '()) #t "synth-mode-null")
+(xtmtest-result (xtc:typecheck:synth-mode? *xtc:codegen:notype*) #t "synth-mode-notype")
+(xtmtest-result (xtc:typecheck:synth-mode? (list *xtc:codegen:notype*)) #t "synth-mode-notype-list")
+(xtmtest-result (xtc:typecheck:synth-mode? *xtc:codegen:si64*) #f "synth-mode-concrete-type")
+(xtmtest-result (xtc:typecheck:synth-mode? "i64") #f "synth-mode-string-type")
 
-(xtmtest-result (impc:ti:normalise-expected #f) #f "normalise-false")
-(xtmtest-result (impc:ti:normalise-expected '()) #f "normalise-null")
-(xtmtest-result (impc:ti:normalise-expected *impc:ir:notype*) #f "normalise-notype")
-(xtmtest-result (impc:ti:normalise-expected (list *impc:ir:notype*)) #f "normalise-notype-list")
-(xtmtest-result (impc:ti:normalise-expected (list *impc:ir:si64*)) *impc:ir:si64* "normalise-unwrap-singleton")
-(xtmtest-result (impc:ti:normalise-expected *impc:ir:si64*) *impc:ir:si64* "normalise-pass-through")
+(xtmtest-result (xtc:typecheck:normalise-expected #f) #f "normalise-false")
+(xtmtest-result (xtc:typecheck:normalise-expected '()) #f "normalise-null")
+(xtmtest-result (xtc:typecheck:normalise-expected *xtc:codegen:notype*) #f "normalise-notype")
+(xtmtest-result (xtc:typecheck:normalise-expected (list *xtc:codegen:notype*)) #f "normalise-notype-list")
+(xtmtest-result (xtc:typecheck:normalise-expected (list *xtc:codegen:si64*)) *xtc:codegen:si64* "normalise-unwrap-singleton")
+(xtmtest-result (xtc:typecheck:normalise-expected *xtc:codegen:si64*) *xtc:codegen:si64* "normalise-pass-through")
 
-(xtmtest-result (impc:ti:check-type #f) #f "check-type-synth")
-(xtmtest-result (impc:ti:check-type *impc:ir:si64*) *impc:ir:si64* "check-type-concrete")
-(xtmtest-result (impc:ti:check-type *impc:ir:notype*) #f "check-type-notype")
+(xtmtest-result (xtc:typecheck:check-type #f) #f "check-type-synth")
+(xtmtest-result (xtc:typecheck:check-type *xtc:codegen:si64*) *xtc:codegen:si64* "check-type-concrete")
+(xtmtest-result (xtc:typecheck:check-type *xtc:codegen:notype*) #f "check-type-notype")
 
 ;; subsumption helper
 
-(xtmtest-result (impc:ti:subsume *impc:ir:si64* #f (make-hashtable 8))
-                *impc:ir:si64*
+(xtmtest-result (xtc:typecheck:subsume *xtc:codegen:si64* #f (make-hashtable 8))
+                *xtc:codegen:si64*
                 "subsume-synth-mode")
 
-(xtmtest-result (impc:ti:subsume *impc:ir:si64* *impc:ir:si64* (make-hashtable 8))
-                *impc:ir:si64*
+(xtmtest-result (xtc:typecheck:subsume *xtc:codegen:si64* *xtc:codegen:si64* (make-hashtable 8))
+                *xtc:codegen:si64*
                 "subsume-same-type")

@@ -32,18 +32,18 @@
 ;; midi_cc
 ;; midi_msg
 
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/midi.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/midi.xtm" 'quiet))
 (sys:load-preload-check 'midi)
 (define *xtmlib-midi-loaded* #t)
 
-(impc:aot:suppress-aot-do (sys:load "libs/core/scheduler.xtm"))
-(impc:aot:suppress-aot-do (sys:load "libs/external/portmidi.xtm"))
+(xtc:aot:suppress-aot-do (sys:load "libs/core/scheduler.xtm"))
+(xtc:aot:suppress-aot-do (sys:load "libs/external/portmidi.xtm"))
 
-(impc:aot:insert-forms (sys:load "libs/core/scheduler.xtm" 'quiet))
-(impc:aot:insert-forms (sys:load "libs/external/portmidi.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/core/scheduler.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/external/portmidi.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmmidi")
-(impc:aot:import-ll "xtmmidi")
+(xtc:aot:insert-header "xtmmidi")
+(xtc:aot:import-ll "xtmmidi")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -312,13 +312,13 @@
     (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 ;; startup
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
   (begin (pm_initialize)
          (pm_print_devices)))
 
-; (impc:aot:do-or-emit
+; (xtc:aot:do-or-emit
 ;   ($ (midi_input_polling (+ (midi_clock_sched.time) 1.0))))
 
 (define *xtmlib-midi-loaded* #t)
 
-(impc:aot:insert-footer "xtmmidi")
+(xtc:aot:insert-footer "xtmmidi")

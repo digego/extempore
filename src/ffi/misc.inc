@@ -317,6 +317,6 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
         { "print-warn", &printWarn },			   \
         { "get-closure-env", &getClosureEnv }, \
         { "mk-ff", &scmAddForeignFunc }, \
-        { "impc:ir:getname", &impcirGetName }, \
-        { "impc:ir:gettype", &impcirGetType }, \
-        { "impc:ir:addtodict", &impcirAdd }
+        { "xtc:codegen:getname", &impcirGetName }, \
+        { "xtc:codegen:gettype", &impcirGetType }, \
+        { "xtc:codegen:addtodict", &impcirAdd }

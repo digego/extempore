@@ -31,40 +31,40 @@
 
 ;; Code <-> canonical base symbol.  Built lazily from the globals so the file
 ;; carries no top-level dependency (and so the codes stay single-sourced).
-(define *impc:type:base-table-cache* #f)
+(define *xtc:type:base-table-cache* #f)
 
-(define impc:type:base-table
+(define xtc:type:base-table
   (lambda ()
-    (or *impc:type:base-table-cache*
+    (or *xtc:type:base-table-cache*
         (begin
-          (set! *impc:type:base-table-cache*
-                (list (cons *impc:ir:void*    'void)
-                      (cons *impc:ir:notype*  'notype)
-                      (cons *impc:ir:badtype* 'badtype)
-                      (cons *impc:ir:fp64*    'f64)
-                      (cons *impc:ir:fp32*    'f32)
-                      (cons *impc:ir:si64*    'i64)
-                      (cons *impc:ir:ui64*    'u64)
-                      (cons *impc:ir:si32*    'i32)
-                      (cons *impc:ir:ui32*    'u32)
-                      (cons *impc:ir:si16*    'i16)
-                      (cons *impc:ir:ui16*    'u16)
-                      (cons *impc:ir:si8*     'i8)
-                      (cons *impc:ir:ui8*     'u8)
-                      (cons *impc:ir:i1*      'i1)
-                      (cons *impc:ir:char*    'char)
-                      (cons *impc:ir:null*    'null)
-                      (cons *impc:ir:other*   'other)))
-          *impc:type:base-table-cache*))))
+          (set! *xtc:type:base-table-cache*
+                (list (cons *xtc:codegen:void*    'void)
+                      (cons *xtc:codegen:notype*  'notype)
+                      (cons *xtc:codegen:badtype* 'badtype)
+                      (cons *xtc:codegen:fp64*    'f64)
+                      (cons *xtc:codegen:fp32*    'f32)
+                      (cons *xtc:codegen:si64*    'i64)
+                      (cons *xtc:codegen:ui64*    'u64)
+                      (cons *xtc:codegen:si32*    'i32)
+                      (cons *xtc:codegen:ui32*    'u32)
+                      (cons *xtc:codegen:si16*    'i16)
+                      (cons *xtc:codegen:ui16*    'u16)
+                      (cons *xtc:codegen:si8*     'i8)
+                      (cons *xtc:codegen:ui8*     'u8)
+                      (cons *xtc:codegen:i1*      'i1)
+                      (cons *xtc:codegen:char*    'char)
+                      (cons *xtc:codegen:null*    'null)
+                      (cons *xtc:codegen:other*   'other)))
+          *xtc:type:base-table-cache*))))
 
-(define impc:type:code->base
+(define xtc:type:code->base
   (lambda (code)
-    (let ((entry (assv code (impc:type:base-table))))
+    (let ((entry (assv code (xtc:type:base-table))))
       (if entry (cdr entry) #f))))
 
-(define impc:type:base->code
+(define xtc:type:base->code
   (lambda (sym)
-    (let loop ((tbl (impc:type:base-table)))
+    (let loop ((tbl (xtc:type:base-table)))
       (cond ((null? tbl) #f)
             ((eq? (cdar tbl) sym) (caar tbl))
             (else (loop (cdr tbl)))))))
@@ -73,36 +73,36 @@
 ;; pointer helpers     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define impc:type:wrap-ptr
+(define xtc:type:wrap-ptr
   (lambda (depth t)
     (if (<= depth 0)
         t
-        (impc:type:wrap-ptr (- depth 1) (impc:type:ptr t)))))
+        (xtc:type:wrap-ptr (- depth 1) (xtc:type:ptr t)))))
 
 ;; Strip a leading pointer chain, returning (depth . base-term).
-(define impc:type:strip-ptr
+(define xtc:type:strip-ptr
   (lambda (t)
     (let loop ((t t) (d 0))
-      (if (impc:type:ptr? t)
-          (loop (impc:type:ptr-to t) (+ d 1))
+      (if (xtc:type:ptr? t)
+          (loop (xtc:type:ptr-to t) (+ d 1))
           (cons d t)))))
 
-(define impc:type:trailing-stars
+(define xtc:type:trailing-stars
   (lambda (s)
     (let loop ((i (- (string-length s) 1)) (n 0))
       (if (and (>= i 0) (char=? (string-ref s i) #\*))
           (loop (- i 1) (+ n 1))
           n))))
 
-(define impc:type:strip-trailing-stars
+(define xtc:type:strip-trailing-stars
   (lambda (s)
-    (substring s 0 (- (string-length s) (impc:type:trailing-stars s)))))
+    (substring s 0 (- (string-length s) (xtc:type:trailing-stars s)))))
 
 ;; A *bare* type variable: a symbol whose name starts with `!'.  This is
-;; stricter than impc:ti:bang-type? (which only asks whether `!' occurs
+;; stricter than xtc:desugar:bang-type? (which only asks whether `!' occurs
 ;; somewhere) so that a generic-type instance like CsnD0{!a}* --- whose name
 ;; merely contains a bang --- is not mistaken for a variable.
-(define impc:type:bare-bang-var?
+(define xtc:type:bare-bang-var?
   (lambda (sym)
     (and (symbol? sym)
          (let ((s (symbol->string sym)))
@@ -113,7 +113,7 @@
 ;; ##gnum call-site suffix: !gxa_29*##3 -> !gxa_29##3.  This is the key under
 ;; which a bang-variable's binding is stored, regardless of the pointer depth
 ;; at which it was written.
-(define impc:type:bang-base-key
+(define xtc:type:bang-base-key
   (lambda (sym)
     (let* ((str (symbol->string sym))
            (parts (string-split-on str "##"))
@@ -121,7 +121,7 @@
            (suffix (if (> (length parts) 1)
                        (string-append "##" (cadr parts))
                        "")))
-      (string->symbol (string-append (impc:type:strip-trailing-stars head) suffix)))))
+      (string->symbol (string-append (xtc:type:strip-trailing-stars head) suffix)))))
 
 ;; Remove `d' pointer levels from a concrete int-code type, via the unifier so
 ;; that an impossible reduction (the value is shallower than d) fails cleanly
@@ -129,19 +129,19 @@
 ;; string arithmetic.  Returns the reduced int-code, or the symbol 'fail.  A
 ;; type that still contains variables is returned unchanged, leaving its depth
 ;; to be reconciled through the substitution store.
-(define impc:type:reduce-ptr-depth
+(define xtc:type:reduce-ptr-depth
   (lambda (t d)
     (if (<= d 0)
         t
         (let* ((intern (make-hashtable))
-               (term (impc:type:from-intcode t intern)))
-          (if (pair? (impc:type:free-vars term))
+               (term (xtc:type:from-intcode t intern)))
+          (if (pair? (xtc:type:free-vars term))
               t
-              (let* ((v (impc:type:fresh-var))
-                     (subst (impc:type:unify (impc:type:wrap-ptr d v) term
-                                             impc:type:empty-subst)))
+              (let* ((v (xtc:type:fresh-var))
+                     (subst (xtc:type:unify (xtc:type:wrap-ptr d v) term
+                                             xtc:type:empty-subst)))
                 (if subst
-                    (impc:type:to-intcode (impc:type:apply-subst v subst))
+                    (xtc:type:to-intcode (xtc:type:apply-subst v subst))
                     'fail)))))))
 
 ;; Add `d' pointer levels to an int-code type --- the structural inverse of
@@ -151,13 +151,13 @@
 ;; (X vs X*) rather than symbolic (!a vs !a*).  Routed through the canonical
 ;; core so tuple/named/closure encodings deepen correctly in one place; a
 ;; residual variable is interned so it can render back to its bang name.
-(define impc:type:deepen-ptr-depth
+(define xtc:type:deepen-ptr-depth
   (lambda (t d)
     (if (<= d 0)
         t
         (let* ((intern (make-hashtable))
-               (term (impc:type:from-intcode t intern)))
-          (impc:type:to-intcode-open (impc:type:wrap-ptr d term) intern)))))
+               (term (xtc:type:from-intcode t intern)))
+          (xtc:type:to-intcode-open (xtc:type:wrap-ptr d term) intern)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; int-code -> term    ;;
@@ -169,15 +169,15 @@
 ;; to the same variable, while !a##3 and !a##7 (two call sites) stay distinct.
 ;; The reverse map (variable id -> name) is recorded too, keyed by the integer
 ;; id, so a residual variable can be rendered back to its bang-symbol.
-(define impc:type:intern-var
+(define xtc:type:intern-var
   (lambda (name intern)
     (or (hashtable-ref intern name)
-        (let ((v (impc:type:fresh-var)))
+        (let ((v (xtc:type:fresh-var)))
           (hashtable-set! intern name v)
-          (hashtable-set! intern (impc:type:var-id v) name)
+          (hashtable-set! intern (xtc:type:var-id v) name)
           v))))
 
-(define impc:type:from-intcode-bang
+(define xtc:type:from-intcode-bang
   (lambda (sym intern)
     (let* ((str (symbol->string sym))
            (parts (string-split-on str "##"))
@@ -185,67 +185,67 @@
            (suffix (if (> (length parts) 1)
                        (string-append "##" (cadr parts))
                        ""))
-           (depth (impc:type:trailing-stars head))
-           (name (string-append (impc:type:strip-trailing-stars head) suffix)))
-      (impc:type:wrap-ptr depth (impc:type:intern-var name intern)))))
+           (depth (xtc:type:trailing-stars head))
+           (name (string-append (xtc:type:strip-trailing-stars head) suffix)))
+      (xtc:type:wrap-ptr depth (xtc:type:intern-var name intern)))))
 
-(define impc:type:from-intcode-string
+(define xtc:type:from-intcode-string
   (lambda (s)
     (if (and (> (string-length s) 0) (char=? (string-ref s 0) #\%))
-        (let* ((depth (impc:type:trailing-stars s))
-               (stripped (impc:type:strip-trailing-stars s))
+        (let* ((depth (xtc:type:trailing-stars s))
+               (stripped (xtc:type:strip-trailing-stars s))
                (name (substring stripped 1 (string-length stripped))))
-          (impc:type:wrap-ptr depth (impc:type:named name)))
-        (impc:compiler:print-compiler-error
+          (xtc:type:wrap-ptr depth (xtc:type:named name)))
+        (xtc:diagnostics:print-compiler-error
          (string-append "cannot decode type string " s)))))
 
-(define impc:type:from-intcode-number
+(define xtc:type:from-intcode-number
   (lambda (n)
-    (let ((exact (assv n (impc:type:base-table))))
+    (let ((exact (assv n (xtc:type:base-table))))
       (if exact
           (cdr exact)
-          (let ((depth (quotient n *impc:ir:pointer*))
-                (code (modulo n *impc:ir:pointer*)))
-            (let ((base (impc:type:code->base code)))
+          (let ((depth (quotient n *xtc:codegen:pointer*))
+                (code (modulo n *xtc:codegen:pointer*)))
+            (let ((base (xtc:type:code->base code)))
               (if base
-                  (impc:type:wrap-ptr depth base)
-                  (impc:compiler:print-compiler-error
+                  (xtc:type:wrap-ptr depth base)
+                  (xtc:diagnostics:print-compiler-error
                    (string-append "cannot decode int-code type "
                                   (number->string n))))))))))
 
-(define impc:type:from-intcode-compound
+(define xtc:type:from-intcode-compound
   (lambda (ic intern)
     (let* ((head (car ic))
-           (tag (modulo head *impc:ir:pointer*))
-           (rawdepth (quotient head *impc:ir:pointer*))
+           (tag (modulo head *xtc:codegen:pointer*))
+           (rawdepth (quotient head *xtc:codegen:pointer*))
            (fields (cdr ic))
-           (decode (lambda (f) (impc:type:from-intcode f intern))))
+           (decode (lambda (f) (xtc:type:from-intcode f intern))))
       (cond
-        ((= tag *impc:ir:tuple*)
-         (impc:type:wrap-ptr rawdepth (cons 'tuple (map decode fields))))
-        ((= tag *impc:ir:closure*)
-         (impc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
-        ((= tag *impc:ir:array*)
-         (impc:type:wrap-ptr rawdepth
+        ((= tag *xtc:codegen:tuple*)
+         (xtc:type:wrap-ptr rawdepth (cons 'tuple (map decode fields))))
+        ((= tag *xtc:codegen:closure*)
+         (xtc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
+        ((= tag *xtc:codegen:array*)
+         (xtc:type:wrap-ptr rawdepth
            (list 'array (car fields) (decode (cadr fields)))))
-        ((= tag *impc:ir:vector*)
-         (impc:type:wrap-ptr rawdepth
+        ((= tag *xtc:codegen:vector*)
+         (xtc:type:wrap-ptr rawdepth
            (list 'vector (car fields) (decode (cadr fields)))))
         (else
-         (impc:compiler:print-compiler-error
+         (xtc:diagnostics:print-compiler-error
           (string-append "cannot decode compound int-code with tag "
                          (number->string tag))))))))
 
 ;; Decode a live int-code value into a canonical term.  `intern' is the
-;; bang-variable table (see impc:type:intern-var); pass a fresh (make-hashtable)
+;; bang-variable table (see xtc:type:intern-var); pass a fresh (make-hashtable)
 ;; when the value is known to be concrete.
-(define impc:type:from-intcode
+(define xtc:type:from-intcode
   (lambda (ic intern)
-    (cond ((number? ic) (impc:type:from-intcode-number ic))
-          ((symbol? ic) (impc:type:from-intcode-bang ic intern))
-          ((string? ic) (impc:type:from-intcode-string ic))
-          ((pair? ic)   (impc:type:from-intcode-compound ic intern))
-          (else (impc:compiler:print-compiler-error
+    (cond ((number? ic) (xtc:type:from-intcode-number ic))
+          ((symbol? ic) (xtc:type:from-intcode-bang ic intern))
+          ((string? ic) (xtc:type:from-intcode-string ic))
+          ((pair? ic)   (xtc:type:from-intcode-compound ic intern))
+          (else (xtc:diagnostics:print-compiler-error
                  (string-append "cannot decode int-code type "
                                 (sexpr->string ic)))))))
 
@@ -255,54 +255,54 @@
 
 ;; Encode a canonical term back into the live int-code representation.  With a
 ;; non-#f `intern' a residual type variable is rendered as its bang-symbol (via
-;; the reverse name map recorded by impc:type:intern-var); with #f a residual
+;; the reverse name map recorded by xtc:type:intern-var); with #f a residual
 ;; variable is a compiler bug --- a type that should have been resolved by
 ;; unification was not --- so we error loudly rather than invent an encoding.
-(define impc:type:to-intcode-open
+(define xtc:type:to-intcode-open
   (lambda (t intern)
-    (let* ((sp (impc:type:strip-ptr t))
+    (let* ((sp (xtc:type:strip-ptr t))
            (depth (car sp))
            (base (cdr sp))
-           (off (* depth *impc:ir:pointer*))
-           (rec (lambda (x) (impc:type:to-intcode-open x intern))))
+           (off (* depth *xtc:codegen:pointer*))
+           (rec (lambda (x) (xtc:type:to-intcode-open x intern))))
       (cond
-        ((impc:type:var? base)
+        ((xtc:type:var? base)
          (if intern
-             (let ((name (hashtable-ref intern (impc:type:var-id base))))
+             (let ((name (hashtable-ref intern (xtc:type:var-id base))))
                (string->symbol
                 (string-append (if name name "!gx_unresolved")
                                (make-string depth #\*))))
-             (impc:compiler:print-compiler-error
+             (xtc:diagnostics:print-compiler-error
               (string-append "unresolved type variable "
-                             (impc:type:term->string base)))))
+                             (xtc:type:term->string base)))))
         ((symbol? base)
-         (let ((code (impc:type:base->code base)))
+         (let ((code (xtc:type:base->code base)))
            (if code
                (+ code off)
-               (impc:compiler:print-compiler-error
+               (xtc:diagnostics:print-compiler-error
                 (string-append "unknown base type " (symbol->string base))))))
-        ((impc:type:named? base)
-         (string-append "%" (impc:type:named-name base) (make-string depth #\*)))
-        ((impc:type:tuple? base)
-         (cons (+ *impc:ir:tuple* off) (map rec (cdr base))))
-        ((impc:type:array? base)
-         (list (+ *impc:ir:array* off)
-               (impc:type:array-size base)
-               (rec (impc:type:array-elt base))))
-        ((impc:type:vector? base)
-         (list (+ *impc:ir:vector* off)
-               (impc:type:vector-size base)
-               (rec (impc:type:vector-elt base))))
-        ((impc:type:closure? base)
+        ((xtc:type:named? base)
+         (string-append "%" (xtc:type:named-name base) (make-string depth #\*)))
+        ((xtc:type:tuple? base)
+         (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
+        ((xtc:type:array? base)
+         (list (+ *xtc:codegen:array* off)
+               (xtc:type:array-size base)
+               (rec (xtc:type:array-elt base))))
+        ((xtc:type:vector? base)
+         (list (+ *xtc:codegen:vector* off)
+               (xtc:type:vector-size base)
+               (rec (xtc:type:vector-elt base))))
+        ((xtc:type:closure? base)
          ;; a closure carries an intrinsic box, hence (+ depth 1)
-         (cons (+ *impc:ir:closure* (* (+ depth 1) *impc:ir:pointer*))
+         (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
                (map rec (cdr base))))
         (else
-         (impc:compiler:print-compiler-error
-          (string-append "cannot encode term " (impc:type:term->string base))))))))
+         (xtc:diagnostics:print-compiler-error
+          (string-append "cannot encode term " (xtc:type:term->string base))))))))
 
-(define impc:type:to-intcode
-  (lambda (t) (impc:type:to-intcode-open t #f)))
+(define xtc:type:to-intcode
+  (lambda (t) (xtc:type:to-intcode-open t #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; pretty <-> term     ;;
@@ -312,51 +312,51 @@
 ;; variables through `intern' (so repeated names share a variable and the
 ;; reverse map is available for rendering).  Composes the existing surface
 ;; parser with the int-code bridge.
-(define impc:type:from-pretty
+(define xtc:type:from-pretty
   (lambda (s intern)
-    (impc:type:from-intcode (impc:ir:get-type-from-pretty-str s) intern)))
+    (xtc:type:from-intcode (xtc:codegen:get-type-from-pretty-str s) intern)))
 
 ;; Render a canonical term back to an xtlang *surface* type string (tuples
 ;; <...>, arrays |n,t|, closures [r,a], pointers trailing *), so the result can
 ;; be re-parsed by get-type-from-pretty-str.  Residual variables render as their
 ;; bang names (pointer depth comes from the enclosing ptr wrappers); base types
 ;; go through pretty-print-type for their canonical surface spelling.
-(define impc:type:to-pretty
+(define xtc:type:to-pretty
   (lambda (t intern)
     (cond
-      ((impc:type:var? t)
-       (let ((name (hashtable-ref intern (impc:type:var-id t))))
+      ((xtc:type:var? t)
+       (let ((name (hashtable-ref intern (xtc:type:var-id t))))
          (if name name "!gx_unresolved")))
       ((symbol? t)
-       (let ((code (impc:type:base->code t)))
-         (if code (impc:ir:pretty-print-type code) (symbol->string t))))
+       (let ((code (xtc:type:base->code t)))
+         (if code (xtc:codegen:pretty-print-type code) (symbol->string t))))
       ((number? t) (number->string t))
-      ((impc:type:ptr? t)
-       (string-append (impc:type:to-pretty (impc:type:ptr-to t) intern) "*"))
-      ((impc:type:named? t)
-       (string-append "%" (impc:type:named-name t)))
-      ((impc:type:tuple? t)
-       (string-append "<" (impc:type:to-pretty-list (cdr t) intern) ">"))
-      ((impc:type:array? t)
-       (string-append "|" (number->string (impc:type:array-size t)) ","
-                      (impc:type:to-pretty (impc:type:array-elt t) intern) "|"))
-      ((impc:type:vector? t)
-       (string-append "/" (number->string (impc:type:vector-size t)) ","
-                      (impc:type:to-pretty (impc:type:vector-elt t) intern) "/"))
-      ((impc:type:closure? t)
-       (string-append "[" (impc:type:to-pretty-list (cdr t) intern) "]"))
-      (else (impc:compiler:print-compiler-error
-             (string-append "cannot render term " (impc:type:term->string t)))))))
+      ((xtc:type:ptr? t)
+       (string-append (xtc:type:to-pretty (xtc:type:ptr-to t) intern) "*"))
+      ((xtc:type:named? t)
+       (string-append "%" (xtc:type:named-name t)))
+      ((xtc:type:tuple? t)
+       (string-append "<" (xtc:type:to-pretty-list (cdr t) intern) ">"))
+      ((xtc:type:array? t)
+       (string-append "|" (number->string (xtc:type:array-size t)) ","
+                      (xtc:type:to-pretty (xtc:type:array-elt t) intern) "|"))
+      ((xtc:type:vector? t)
+       (string-append "/" (number->string (xtc:type:vector-size t)) ","
+                      (xtc:type:to-pretty (xtc:type:vector-elt t) intern) "/"))
+      ((xtc:type:closure? t)
+       (string-append "[" (xtc:type:to-pretty-list (cdr t) intern) "]"))
+      (else (xtc:diagnostics:print-compiler-error
+             (string-append "cannot render term " (xtc:type:term->string t)))))))
 
-(define impc:type:to-pretty-list
+(define xtc:type:to-pretty-list
   (lambda (ts intern)
     (if (null? ts)
         ""
-        (let loop ((acc (impc:type:to-pretty (car ts) intern))
+        (let loop ((acc (xtc:type:to-pretty (car ts) intern))
                    (rest (cdr ts)))
           (if (null? rest)
               acc
-              (loop (string-append acc "," (impc:type:to-pretty (car rest) intern))
+              (loop (string-append acc "," (xtc:type:to-pretty (car rest) intern))
                     (cdr rest)))))))
 
 ;; The type parameters of a generic template (a pretty tuple type): the
@@ -366,8 +366,8 @@
 ;; symbols and stripping their pointer stars by hand: a variable's identity is
 ;; structural (its node) rather than its surface spelling, so the type parameter
 ;; (the identity !a) is cleanly distinct from a field usage (!a* at depth).
-(define impc:type:pretty-type-params
+(define xtc:type:pretty-type-params
   (lambda (s)
     (let* ((intern (make-hashtable))
-           (term (impc:type:from-pretty s intern)))
-      (map (lambda (id) (hashtable-ref intern id)) (impc:type:free-vars term)))))
+           (term (xtc:type:from-pretty s intern)))
+      (map (lambda (id) (hashtable-ref intern id)) (xtc:type:free-vars term)))))

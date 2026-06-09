@@ -25,19 +25,19 @@
 ;;; Code:
 
 ;; lib-loading config
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/audio_dsp.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/audio_dsp.xtm" 'quiet))
 (sys:load-preload-check 'audio_dsp)
 (define *xtmlib-audio_dsp-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/core/rational.xtm")
  (sys:load "libs/core/audiobuffer.xtm"))
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/core/rational.xtm" 'quiet)
  (sys:load "libs/core/audiobuffer.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmaudio_dsp")
-(impc:aot:import-ll "xtmaudio_dsp")
+(xtc:aot:insert-header "xtmaudio_dsp")
+(xtc:aot:import-ll "xtmaudio_dsp")
 
 (bind-func print_audio_state
   (lambda ()
@@ -468,7 +468,7 @@
             (set! fBLEPTable_8_BLKHAR (convert (pref-ptr data offset)))
             void)))))
 
-(impc:aot:do-or-emit
+(xtc:aot:do-or-emit
   ($ (load_blep_tables_from_blob "libs/core/bleptables.dump")))
 
 (bind-func static LinTerp
@@ -3485,4 +3485,4 @@ but v1 and v2 can be computed in parallel"
 
 (define *xtmlib-audio_dsp-loaded* #t)
 
-(impc:aot:insert-footer "xtmaudio_dsp")
+(xtc:aot:insert-footer "xtmaudio_dsp")

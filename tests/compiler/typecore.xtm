@@ -14,11 +14,11 @@
 ;; base types          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (if (impc:type:unify 'i64 'i64 impc:type:empty-subst) 1 0)
+(xtmtest-result (if (xtc:type:unify 'i64 'i64 xtc:type:empty-subst) 1 0)
                 1
                 "base-identity")
 
-(xtmtest-result (impc:type:unify 'i64 'i32 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify 'i64 'i32 xtc:type:empty-subst)
                 #f
                 "base-mismatch")
 
@@ -26,28 +26,28 @@
 ;; variable binding    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:var 1) 'i64 impc:type:empty-subst))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:var 1) 'i64 xtc:type:empty-subst))
                 'i64
                 "var-binds-base")
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify 'i64 (impc:type:var 1) impc:type:empty-subst))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify 'i64 (xtc:type:var 1) xtc:type:empty-subst))
                 'i64
                 "base-binds-var")
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:var 1) (impc:type:var 2) impc:type:empty-subst))
-                (impc:type:var 2)
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:var 1) (xtc:type:var 2) xtc:type:empty-subst))
+                (xtc:type:var 2)
                 "var-binds-var")
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:subst-extend 1 (impc:type:var 2)
-                   (impc:type:subst-extend 2 'i64 impc:type:empty-subst)))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:subst-extend 1 (xtc:type:var 2)
+                   (xtc:type:subst-extend 2 'i64 xtc:type:empty-subst)))
                 'i64
                 "resolve-chain")
 
@@ -56,51 +56,51 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; `!a*' unified with `i64*' keeps its pointer structure ...
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:ptr (impc:type:var 1))
-                 (impc:type:unify (impc:type:ptr (impc:type:var 1))
-                                  (impc:type:ptr 'i64)
-                                  impc:type:empty-subst))
-                (impc:type:ptr 'i64)
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:ptr (xtc:type:var 1))
+                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr 'i64)
+                                  xtc:type:empty-subst))
+                (xtc:type:ptr 'i64)
                 "ptr-depth-preserved")
 
 ;; ... and binds the inner variable to the pointee, not the pointer.
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:ptr (impc:type:var 1))
-                                  (impc:type:ptr 'i64)
-                                  impc:type:empty-subst))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr 'i64)
+                                  xtc:type:empty-subst))
                 'i64
                 "ptr-binds-pointee")
 
 ;; `!a*' unified with `i64**' binds the variable to `i64*' --- depth is
 ;; arithmetic over structure, not asterisk-counting in a symbol name.
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:ptr (impc:type:var 1))
-                                  (impc:type:ptr (impc:type:ptr 'i64))
-                                  impc:type:empty-subst))
-                (impc:type:ptr 'i64)
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                  (xtc:type:ptr (xtc:type:ptr 'i64))
+                                  xtc:type:empty-subst))
+                (xtc:type:ptr 'i64)
                 "ptr-binds-deeper")
 
 ;; The crux of #315: a generic signature (!a, !a*) applied to (i64, i64*).
 ;; Binding !a=i64 from the first argument and !a*=i64* from the second must
 ;; stay consistent.  The old representation corrupted this to a bogus -98.
-(xtmtest-result (let* ((s1 (impc:type:unify (impc:type:var 1) 'i64
-                                            impc:type:empty-subst))
-                       (s2 (impc:type:unify (impc:type:ptr (impc:type:var 1))
-                                            (impc:type:ptr 'i64)
+(xtmtest-result (let* ((s1 (xtc:type:unify (xtc:type:var 1) 'i64
+                                            xtc:type:empty-subst))
+                       (s2 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                            (xtc:type:ptr 'i64)
                                             s1)))
-                  (and s2 (impc:type:apply-subst (impc:type:var 1) s2)))
+                  (and s2 (xtc:type:apply-subst (xtc:type:var 1) s2)))
                 'i64
                 "generic-two-arg-consistent")
 
 ;; The same signature applied to (i64, i32*) is a genuine conflict and must be
 ;; rejected, not silently unified.
-(xtmtest-result (let* ((s1 (impc:type:unify (impc:type:var 1) 'i64
-                                            impc:type:empty-subst))
-                       (s2 (impc:type:unify (impc:type:ptr (impc:type:var 1))
-                                            (impc:type:ptr 'i32)
+(xtmtest-result (let* ((s1 (xtc:type:unify (xtc:type:var 1) 'i64
+                                            xtc:type:empty-subst))
+                       (s2 (xtc:type:unify (xtc:type:ptr (xtc:type:var 1))
+                                            (xtc:type:ptr 'i32)
                                             s1)))
                   s2)
                 #f
@@ -108,8 +108,8 @@
 
 ;; A pointer type does not unify with a scalar: `!a*' is not `i64'.  The old
 ;; `!a*' -> `!a' collapse would have wrongly accepted this.
-(xtmtest-result (impc:type:unify (impc:type:ptr (impc:type:var 1)) 'i64
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:ptr (xtc:type:var 1)) 'i64
+                                 xtc:type:empty-subst)
                 #f
                 "ptr-not-scalar")
 
@@ -117,15 +117,15 @@
 ;; occurs check        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:unify (impc:type:var 1)
-                                 (impc:type:ptr (impc:type:var 1))
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:var 1)
+                                 (xtc:type:ptr (xtc:type:var 1))
+                                 xtc:type:empty-subst)
                 #f
                 "occurs-direct")
 
-(xtmtest-result (impc:type:unify (impc:type:var 1)
-                                 (impc:type:tuple 'i64 (impc:type:var 1))
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:var 1)
+                                 (xtc:type:tuple 'i64 (xtc:type:var 1))
+                                 xtc:type:empty-subst)
                 #f
                 "occurs-nested")
 
@@ -133,69 +133,69 @@
 ;; compound types      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:tuple (impc:type:var 1) (impc:type:var 2))
-                 (impc:type:unify (impc:type:tuple (impc:type:var 1) 'i64)
-                                  (impc:type:tuple 'f64 (impc:type:var 2))
-                                  impc:type:empty-subst))
-                (impc:type:tuple 'f64 'i64)
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:tuple (xtc:type:var 1) (xtc:type:var 2))
+                 (xtc:type:unify (xtc:type:tuple (xtc:type:var 1) 'i64)
+                                  (xtc:type:tuple 'f64 (xtc:type:var 2))
+                                  xtc:type:empty-subst))
+                (xtc:type:tuple 'f64 'i64)
                 "tuple-unify")
 
-(xtmtest-result (impc:type:unify (impc:type:tuple 'i64)
-                                 (impc:type:tuple 'i64 'i64)
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:tuple 'i64)
+                                 (xtc:type:tuple 'i64 'i64)
+                                 xtc:type:empty-subst)
                 #f
                 "tuple-arity-mismatch")
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:closure (impc:type:var 1) (impc:type:var 2))
-                 (impc:type:unify (impc:type:closure (impc:type:var 1) 'i64)
-                                  (impc:type:closure 'f64 (impc:type:var 2))
-                                  impc:type:empty-subst))
-                (impc:type:closure 'f64 'i64)
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:closure (xtc:type:var 1) (xtc:type:var 2))
+                 (xtc:type:unify (xtc:type:closure (xtc:type:var 1) 'i64)
+                                  (xtc:type:closure 'f64 (xtc:type:var 2))
+                                  xtc:type:empty-subst))
+                (xtc:type:closure 'f64 'i64)
                 "closure-unify")
 
-(xtmtest-result (impc:type:unify (impc:type:closure 'i64 'i64)
-                                 (impc:type:closure 'i64 'i64 'i64)
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:closure 'i64 'i64)
+                                 (xtc:type:closure 'i64 'i64 'i64)
+                                 xtc:type:empty-subst)
                 #f
                 "closure-arity-mismatch")
 
 ;; array / vector sizes ride through unification as literals: equal sizes
 ;; agree, unequal sizes fail, and the element type still unifies.
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:array 3 (impc:type:var 1))
-                                  (impc:type:array 3 'i64)
-                                  impc:type:empty-subst))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:array 3 (xtc:type:var 1))
+                                  (xtc:type:array 3 'i64)
+                                  xtc:type:empty-subst))
                 'i64
                 "array-size-match")
 
-(xtmtest-result (impc:type:unify (impc:type:array 3 'i64)
-                                 (impc:type:array 4 'i64)
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:array 3 'i64)
+                                 (xtc:type:array 4 'i64)
+                                 xtc:type:empty-subst)
                 #f
                 "array-size-mismatch")
 
-(xtmtest-result (impc:type:apply-subst
-                 (impc:type:var 1)
-                 (impc:type:unify (impc:type:vector 4 (impc:type:var 1))
-                                  (impc:type:vector 4 'f32)
-                                  impc:type:empty-subst))
+(xtmtest-result (xtc:type:apply-subst
+                 (xtc:type:var 1)
+                 (xtc:type:unify (xtc:type:vector 4 (xtc:type:var 1))
+                                  (xtc:type:vector 4 'f32)
+                                  xtc:type:empty-subst))
                 'f32
                 "vector-elt-unify")
 
 ;; named (nominal) types unify by name.
-(xtmtest-result (if (impc:type:unify (impc:type:named "string")
-                                     (impc:type:named "string")
-                                     impc:type:empty-subst)
+(xtmtest-result (if (xtc:type:unify (xtc:type:named "string")
+                                     (xtc:type:named "string")
+                                     xtc:type:empty-subst)
                     1 0)
                 1
                 "named-match")
 
-(xtmtest-result (impc:type:unify (impc:type:named "string")
-                                 (impc:type:named "list")
-                                 impc:type:empty-subst)
+(xtmtest-result (xtc:type:unify (xtc:type:named "string")
+                                 (xtc:type:named "list")
+                                 xtc:type:empty-subst)
                 #f
                 "named-mismatch")
 
@@ -205,24 +205,24 @@
 
 ;; Freshening preserves sharing within a single instantiation: both positions
 ;; of (closure !a !a) become the same fresh variable.
-(xtmtest-result (begin (impc:type:reset-fresh!)
-                       (impc:type:instantiate
-                        (impc:type:closure (impc:type:var 5) (impc:type:var 5))))
-                (impc:type:closure (impc:type:var 1) (impc:type:var 1))
+(xtmtest-result (begin (xtc:type:reset-fresh!)
+                       (xtc:type:instantiate
+                        (xtc:type:closure (xtc:type:var 5) (xtc:type:var 5))))
+                (xtc:type:closure (xtc:type:var 1) (xtc:type:var 1))
                 "instantiate-shares")
 
 ;; Distinct variables stay distinct.
-(xtmtest-result (begin (impc:type:reset-fresh!)
-                       (impc:type:instantiate
-                        (impc:type:closure (impc:type:var 5) (impc:type:var 6))))
-                (impc:type:closure (impc:type:var 1) (impc:type:var 2))
+(xtmtest-result (begin (xtc:type:reset-fresh!)
+                       (xtc:type:instantiate
+                        (xtc:type:closure (xtc:type:var 5) (xtc:type:var 6))))
+                (xtc:type:closure (xtc:type:var 1) (xtc:type:var 2))
                 "instantiate-distinct")
 
 ;; Two independent instantiations of the same scheme never share variables ---
 ;; the property `##gnum' suffixing was meant to guarantee and sometimes broke.
-(xtmtest-result (begin (impc:type:reset-fresh!)
-                       (let ((a (impc:type:instantiate (impc:type:ptr (impc:type:var 9))))
-                             (b (impc:type:instantiate (impc:type:ptr (impc:type:var 9)))))
+(xtmtest-result (begin (xtc:type:reset-fresh!)
+                       (let ((a (xtc:type:instantiate (xtc:type:ptr (xtc:type:var 9))))
+                             (b (xtc:type:instantiate (xtc:type:ptr (xtc:type:var 9)))))
                          (equal? a b)))
                 #f
                 "instantiate-no-collision")
@@ -231,13 +231,13 @@
 ;; free variables      ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:free-vars
-                 (impc:type:tuple (impc:type:var 3)
-                                  (impc:type:ptr (impc:type:var 7))
+(xtmtest-result (xtc:type:free-vars
+                 (xtc:type:tuple (xtc:type:var 3)
+                                  (xtc:type:ptr (xtc:type:var 7))
                                   'i64))
                 '(3 7)
                 "free-vars-collect")
 
-(xtmtest-result (impc:type:free-vars (impc:type:tuple 'i64 'f64))
+(xtmtest-result (xtc:type:free-vars (xtc:type:tuple 'i64 'f64))
                 '()
                 "free-vars-none")

@@ -14,18 +14,18 @@
 
 ;;; Code:
 
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/webgpu.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/webgpu.xtm" 'quiet))
 (sys:load-preload-check 'webgpu)
 (define *xtmlib-webgpu-loaded* #t)
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/base/base.xtm")
  (sys:load "libs/external/glfw3.xtm"))
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/base/base.xtm" 'quiet)
  (sys:load "libs/external/glfw3.xtm" 'quiet))
 
-(impc:aot:insert-header "xtmwebgpu")
+(xtc:aot:insert-header "xtmwebgpu")
 
 ;;;;;;;;;;;;;
 ;; dylibs  ;;
@@ -43,7 +43,7 @@
         ((string=? (sys:platform) "Windows") "xtmwebgpu.dll"))
   "xtmwebgpu")
 
-(impc:aot:import-ll "xtmwebgpu")
+(xtc:aot:import-ll "xtmwebgpu")
 
 ;;;;;;;;;;;;;;;;;
 ;; opaque types ;;
@@ -139,5 +139,5 @@
             (xtm_wgpu_end_frame surface queue encoder pass view)))
       void)))
 
-(impc:aot:insert-footer "xtmwebgpu")
+(xtc:aot:insert-footer "xtmwebgpu")
 (define *xtmlib-webgpu-loaded* #t)

@@ -2,116 +2,116 @@
 ;; AOT-compilation ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-(define *impc:aot:current-output-port* #f)
-(define *impc:aot:current-lib-name* "xtmdylib")
-(define *impc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
-(define *impc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
-(define *impc:aot:unix-link-libraries* '("-lextempore -lm"))
-(define *impc:aot:unix-link-libraries-exe* '("-lextempore -lm"))
+(define *xtc:aot:current-output-port* #f)
+(define *xtc:aot:current-lib-name* "xtmdylib")
+(define *xtc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
+(define *xtc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
+(define *xtc:aot:unix-link-libraries* '("-lextempore -lm"))
+(define *xtc:aot:unix-link-libraries-exe* '("-lextempore -lm"))
 
-(define *impc:aot:func-defs-in-mod* '())
+(define *xtc:aot:func-defs-in-mod* '())
 ;; should be a cons pair e.g. '(libGLU .
 ;; "/System/Library/Frameworks/OpenGL.framework/OpenGL")
-(define *impc:aot:current-load-dylib-info* #f)
+(define *xtc:aot:current-load-dylib-info* #f)
 
-(define impc:aot:add-win-link-library
+(define xtc:aot:add-win-link-library
   (lambda (libname)
     (if (not (string-contains? libname "opengl32"))
-        (set! *impc:aot:win-link-libraries*
+        (set! *xtc:aot:win-link-libraries*
               (cons (regex:replace (sanitize-platform-path libname) "dll$" "lib")
-                    *impc:aot:win-link-libraries*)))))
+                    *xtc:aot:win-link-libraries*)))))
 
-(define impc:aot:currently-compiling?
+(define xtc:aot:currently-compiling?
   (lambda ()
-    (or (output-port? *impc:aot:current-output-port*)
+    (or (output-port? *xtc:aot:current-output-port*)
         ;; this will be #t in a suppress-aot-do form
-        *impc:aot:current-output-port*)))
+        *xtc:aot:current-output-port*)))
 
 ;; helpers for putting the correct info into the aot-header file
 
-(define impc:aot:insert-typealias-binding-details
+(define xtc:aot:insert-typealias-binding-details
   (lambda (name type docstring)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
            (list
             'bind-alias
             (string->symbol name)
-            (string->symbol (impc:ir:pretty-print-type type))
+            (string->symbol (xtc:codegen:pretty-print-type type))
             docstring)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-xtmacro-binding-details
+(define xtc:aot:insert-xtmacro-binding-details
   (lambda (name-and-args docstring body)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
            (if (string=? docstring "")
                (list 'bind-macro name-and-args body)
                (list 'bind-macro docstring name-and-args body))
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-generic-func
+(define xtc:aot:insert-generic-func
   (lambda (expr)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           ;; (println 'inserting 'generic 'func: expr)
-          (write expr *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+          (write expr *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-generic-type
+(define xtc:aot:insert-generic-type
   (lambda (expr)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           ;; (println 'inserting 'generic 'type: expr)
-          (write expr *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+          (write expr *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-namedtype-binding-details
+(define xtc:aot:insert-namedtype-binding-details
   (lambda (name type docstring)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
            (list
-            (if *impc:compiler:aot:dll* 'bind-lib-type 'register-lib-type)
-            (string->symbol *impc:aot:current-lib-name*)
+            (if *xtc:aot:dll* 'bind-lib-type 'register-lib-type)
+            (string->symbol *xtc:aot:current-lib-name*)
             (string->symbol name)
-            (string->symbol (impc:ir:pretty-print-type type))
+            (string->symbol (xtc:codegen:pretty-print-type type))
             docstring)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-closure-binding-details
+(define xtc:aot:insert-closure-binding-details
   (lambda (name type zone-size docstring body)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
            (list
-            (if *impc:compiler:aot:dll* 'bind-lib-func 'register-lib-func)
-            (string->symbol *impc:aot:current-lib-name*)
+            (if *xtc:aot:dll* 'bind-lib-func 'register-lib-func)
+            (string->symbol *xtc:aot:current-lib-name*)
             (string->symbol name)
-            (string->symbol (impc:ir:pretty-print-type type))
+            (string->symbol (xtc:codegen:pretty-print-type type))
             zone-size
             docstring
             (list 'quote body))
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-static-binding-details
+(define xtc:aot:insert-static-binding-details
   (lambda (name type)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
-          (write (list 'bind-lib (string->symbol *impc:aot:current-lib-name*) name type)
-                 *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+          (write (list 'bind-lib (string->symbol *xtc:aot:current-lib-name*) name type)
+                 *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-nativefunc-binding-details
+(define xtc:aot:insert-nativefunc-binding-details
   (lambda (lib-name func-name type docstring)
-    (if (and (output-port? *impc:aot:current-output-port*)
+    (if (and (output-port? *xtc:aot:current-output-port*)
              ;; ignore if not dll
-             ;; *impc:compiler:aot:dll*
+             ;; *xtc:aot:dll*
              ;; ignore the binding if we're just binding something
              ;; from an Extempore AOT-compiled library
              (not (and (>= (string-length (atom->string lib-name)) 3)
@@ -119,12 +119,12 @@
         (begin
           (write
            (list 'bind-lib lib-name func-name type)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-polyfunc-binding-details
+(define xtc:aot:insert-polyfunc-binding-details
   (lambda (poly-name func-name docstring)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
            (list
@@ -132,56 +132,56 @@
             (string->symbol poly-name)
             (string->symbol func-name)
             docstring)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-globalvar-binding-details
+(define xtc:aot:insert-globalvar-binding-details
   (lambda (library name type docstring)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
-           (list (if *impc:compiler:aot:dll* 'bind-lib-val 'register-lib-val)
+           (list (if *xtc:aot:dll* 'bind-lib-val 'register-lib-val)
                  (string->symbol library)
                  (string->symbol name)
-                 (string->symbol (impc:ir:pretty-print-type type))
+                 (string->symbol (xtc:codegen:pretty-print-type type))
                  docstring)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-ext-globalvar-binding-details
+(define xtc:aot:insert-ext-globalvar-binding-details
   (lambda (name type docstring)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (write
-           (list (if *impc:compiler:aot:dll* 'bind-ext-val 'register-ext-val)
+           (list (if *xtc:aot:dll* 'bind-ext-val 'register-ext-val)
                  (string->symbol name)
-                 (string->symbol (impc:ir:pretty-print-type type))
+                 (string->symbol (xtc:codegen:pretty-print-type type))
                  docstring)
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)))))
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-load-dylib-details
+(define xtc:aot:insert-load-dylib-details
   (lambda (library lib-path . args)
-    (if (and (output-port? *impc:aot:current-output-port*)
-             #t) ;*impc:compiler:aot:dll*)
+    (if (and (output-port? *xtc:aot:current-output-port*)
+             #t) ;*xtc:aot:dll*)
         (begin
           (write
            (list 'bind-dylib library `(list ,@lib-path))
-           *impc:aot:current-output-port*)
+           *xtc:aot:current-output-port*)
           (write
            `(if (not ',library)
                 (begin
-                  (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                  (print-with-colors '*xtc:globals:pretty-print-error-color* 'default #t (print "Error"))
                   (print ": could not load the " ',library
                          " dynamic library - perhaps you can install it through your package manager?\n")
                   (error "")))
-           *impc:aot:current-output-port*)
-          (newline *impc:aot:current-output-port*)
+           *xtc:aot:current-output-port*)
+          (newline *xtc:aot:current-output-port*)
           (if (and (not (null? args)) (string? (car args)))
               (begin
                 (write (list 'bind-external-dylib-declarations (symbol->string library) (car args))
-                       *impc:aot:current-output-port*)
-                (newline  *impc:aot:current-output-port*)))
+                       *xtc:aot:current-output-port*)
+                (newline  *xtc:aot:current-output-port*)))
           ))))
 
 ;; don't need specialised ones for these:
@@ -205,46 +205,46 @@
 
 ;; insert arbitrary sexp into the AOT-compilation
 ;; file, otherwise do nothing
-(define-macro (impc:aot:insert-forms . forms)
-  (if (output-port? *impc:aot:current-output-port*)
+(define-macro (xtc:aot:insert-forms . forms)
+  (if (output-port? *xtc:aot:current-output-port*)
       `(begin
          ,@(map (lambda (sexp)
-                  `(begin (write ',sexp *impc:aot:current-output-port*)
-                          (newline *impc:aot:current-output-port*)))
+                  `(begin (write ',sexp *xtc:aot:current-output-port*)
+                          (newline *xtc:aot:current-output-port*)))
                 forms))))
 
 ;; insert arbitrary sexp into the AOT-compilation
-(define impc:aot:insert-sexpr
+(define xtc:aot:insert-sexpr
   (lambda (sexpr)
-    (if (output-port? *impc:aot:current-output-port*)
-        (begin (write sexpr *impc:aot:current-output-port*)
-               (newline *impc:aot:current-output-port*)))))
+    (if (output-port? *xtc:aot:current-output-port*)
+        (begin (write sexpr *xtc:aot:current-output-port*)
+               (newline *xtc:aot:current-output-port*)))))
 
-(define-macro (impc:aot:do-and-emit . forms)
+(define-macro (xtc:aot:do-and-emit . forms)
   `(begin
      ,@forms
-     (impc:aot:insert-forms ,@forms)))
+     (xtc:aot:insert-forms ,@forms)))
 
-(define-macro (impc:aot:do-or-emit . forms)
-  (if (not (output-port? *impc:aot:current-output-port*))
+(define-macro (xtc:aot:do-or-emit . forms)
+  (if (not (output-port? *xtc:aot:current-output-port*))
       `(begin ,@forms)
-      `(impc:aot:insert-forms ,@forms)))
+      `(xtc:aot:insert-forms ,@forms)))
 
-(define-macro (impc:aot:do-at-runtime . forms)
-  `(impc:aot:do-or-emit
-    (if (not (output-port? *impc:aot:current-output-port*))
+(define-macro (xtc:aot:do-at-runtime . forms)
+  `(xtc:aot:do-or-emit
+    (if (not (output-port? *xtc:aot:current-output-port*))
         (begin ,@forms))))
 
-(define-macro (impc:aot:suppress-aot-do . forms)
-  `(if ,*impc:aot:current-output-port*
-       (let ((aot-compilation-port *impc:aot:current-output-port*))
-         (set! *impc:aot:current-output-port* #t)
+(define-macro (xtc:aot:suppress-aot-do . forms)
+  `(if ,*xtc:aot:current-output-port*
+       (let ((aot-compilation-port *xtc:aot:current-output-port*))
+         (set! *xtc:aot:current-output-port* #t)
          (begin ,@forms)
          ;; whatever happens, set the port back to the original value
-         (set! *impc:aot:current-output-port* aot-compilation-port))
+         (set! *xtc:aot:current-output-port* aot-compilation-port))
        (begin ,@forms)))
 
-(define impc:aot:compile-exe
+(define xtc:aot:compile-exe
   (lambda (module-name module libs asdll?)
     (let* ((platform (sys:platform))
            (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
@@ -255,8 +255,8 @@
                                                  ((string=? platform "OSX") "")
                                                  ((string=? platform "Windows") (if asdll? ".dll" ".exe")))))
            (link-libs (if (string=? platform "Windows")
-                          *impc:aot:win-link-libraries-exe*
-                          *impc:aot:unix-link-libraries-exe*))
+                          *xtc:aot:win-link-libraries-exe*
+                          *xtc:aot:unix-link-libraries-exe*))
            (optimize-compiles? #t)
            (link-command
             (unix-or-Windows (string-append
@@ -303,7 +303,7 @@
               (print-with-colors 'black 'green #t (print " Successfully compiled "))
               (print "\n  " output-exe-path "\n\n")))))))
 
-(define impc:aot:compile-module
+(define xtc:aot:compile-module
   (lambda (module-name module)
     (let* ((platform (sys:platform))
            (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
@@ -314,7 +314,7 @@
                                                    ((string=? platform "OSX") ".dylib")
                                                    ((string=? platform "Windows") ".dll"))))
            (link-libs (if (string=? platform "Windows")
-                          *impc:aot:win-link-libraries*
+                          *xtc:aot:win-link-libraries*
                           '()))
            (optimize-compiles? #t)
            (link-command
@@ -357,74 +357,74 @@
               (print-with-colors 'black 'green #t (print " Successfully compiled "))
               (print "\n  " output-shlib-path "\n\n")))))))
 
-(define impc:aot:insert-header
+(define xtc:aot:insert-header
   (lambda (libname)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (display (string-append "(sys:load-preload-check '" (substring libname 3) ")\n")
-                   *impc:aot:current-output-port*)
+                   *xtc:aot:current-output-port*)
           (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded* #t)\n")
-                   *impc:aot:current-output-port*)
+                   *xtc:aot:current-output-port*)
           (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
-                   *impc:aot:current-output-port*)
-          (display "(set! *impc:aot:prev-compiler-message-level* *impc:compiler:message:level*)\n(set! *impc:compiler:message:level* 'low)\n"
-                   *impc:aot:current-output-port*)
+                   *xtc:aot:current-output-port*)
+          (display "(set! *xtc:aot:prev-compiler-message-level* *xtc:globals:message:level*)\n(set! *xtc:globals:message:level* 'low)\n"
+                   *xtc:aot:current-output-port*)
           (display (string-append "\n(print \"Loading \")\n(print-with-colors 'blue 'default #t (print '"
                           libname "))\n(print \" library... \")\n")
-                   *impc:aot:current-output-port*)
-          (if *impc:compiler:aot:dll*
+                   *xtc:aot:current-output-port*)
+          (if *xtc:aot:dll*
               (begin
                 (display (string-append "(bind-dylib " libname " \"" libname
                                         (cond ((string=? (sys:platform) "Linux") ".so\")\n")
                                               ((string=? (sys:platform) "Windows") ".dll\")\n")
                                               ((string=? (sys:platform) "OSX") ".dylib\")\n")))
-                        *impc:aot:current-output-port*)
+                        *xtc:aot:current-output-port*)
                 (write
                 `(if (not ,(string->symbol libname))
                       (begin
-                        (print-with-colors '*impc:compiler:pretty-print-error-color* 'default #t (print "Error"))
+                        (print-with-colors '*xtc:globals:pretty-print-error-color* 'default #t (print "Error"))
                         (print ": could not load the AOT-compilied " ,libname
                               " dynamic library\n")
                         (error "")))
-                 *impc:aot:current-output-port*)
+                 *xtc:aot:current-output-port*)
                 (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
-                                  "(impc:compiler:flush-jit-compilation-queue)\n")
-                   *impc:aot:current-output-port*)))))))
+                                  "(xtc:codegen:flush-jit-compilation-queue)\n")
+                   *xtc:aot:current-output-port*)))))))
 
-(define impc:aot:import-ll
+(define xtc:aot:import-ll
   (lambda (libname)
-    (if (and (output-port? *impc:aot:current-output-port*)
-             (not *impc:compiler:aot:dll*))
+    (if (and (output-port? *xtc:aot:current-output-port*)
+             (not *xtc:aot:dll*))
         (begin
           (write `(llvm:compile-ir (sys:slurp-file ,(string-append "libs/aot-cache/" libname ".ll")))
-                  *impc:aot:current-output-port*)
+                  *xtc:aot:current-output-port*)
           (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
-                                  "(impc:compiler:flush-jit-compilation-queue)\n")
-                   *impc:aot:current-output-port*)))))
+                                  "(xtc:codegen:flush-jit-compilation-queue)\n")
+                   *xtc:aot:current-output-port*)))))
 
-(define impc:aot:insert-footer
+(define xtc:aot:insert-footer
   (lambda (libname)
-    (if (output-port? *impc:aot:current-output-port*)
+    (if (output-port? *xtc:aot:current-output-port*)
         (begin
           (display (string-append "(print-with-colors 'green 'default #t (print \"done\"))")
-                   *impc:aot:current-output-port*)
+                   *xtc:aot:current-output-port*)
           (display (string-append "(print \" in\" (- (clock:clock) *xtmlib-" (substring libname 3) "-loaded-timer*) \"seconds\\n\")\n")
-                   *impc:aot:current-output-port*)
+                   *xtc:aot:current-output-port*)
           (display (string-append "(define *xtmlib-" (substring libname 3) "-loaded-timer* (clock:clock))\n")
-                   *impc:aot:current-output-port*)
-          (display "(set! *impc:compiler:message:level* *impc:aot:prev-compiler-message-level*)\n"
-                   *impc:aot:current-output-port*)))))
+                   *xtc:aot:current-output-port*)
+          (display "(set! *xtc:globals:message:level* *xtc:aot:prev-compiler-message-level*)\n"
+                   *xtc:aot:current-output-port*)))))
 
-(define impc:aot:print-compilation-details
+(define xtc:aot:print-compilation-details
   (lambda (start-time)
     (log-info "Total compile time:" (real->integer (- (clock:clock) start-time)) "seconds")
-    (log-info "type aliases:" (hashtable-count *impc:ti:typealias-cache*))
-    (log-info "named types:" (hashtable-count *impc:ti:namedtype-cache*))
-    (log-info "generic types:" (hashtable-count *impc:ti:generictype-cache*))
-    (log-info "type specialisations:" (hashtable-count *impc:ti:polytype-cache*))
-    (log-info "top-level closures:" (hashtable-count *impc:ti:closure-cache*))
-    (log-info "generic functions:" (hashtable-count *impc:ti:genericfunc-cache*))
-    (log-info "function specialisations:" (hashtable-count *impc:ti:polyfunc-cache*))))
+    (log-info "type aliases:" (hashtable-count *xtc:cache:typealias-cache*))
+    (log-info "named types:" (hashtable-count *xtc:cache:namedtype-cache*))
+    (log-info "generic types:" (hashtable-count *xtc:cache:generictype-cache*))
+    (log-info "type specialisations:" (hashtable-count *xtc:cache:polytype-cache*))
+    (log-info "top-level closures:" (hashtable-count *xtc:cache:closure-cache*))
+    (log-info "generic functions:" (hashtable-count *xtc:cache:genericfunc-cache*))
+    (log-info "function specialisations:" (hashtable-count *xtc:cache:polyfunc-cache*))))
 
 (define-macro (unix-or-Windows unix-expr win-expr)
   (if (string=? (sys:platform) "Windows")
@@ -450,7 +450,7 @@
 (if (string=? (sys:platform) "Windows")
     (Windows-add-libdir-to-PATH))
 
-(define impc:aot:compile-xtm-exe
+(define xtc:aot:compile-xtm-exe
   (lambda (file-path)
     (let* ((start-time (clock:clock))
            (libs (if (sys:cmdarg "link") (sys:cmdarg "link") ""))
@@ -458,23 +458,23 @@
            (file-no-extension (filename-strip-extension (filename-from-path file-path)))
            (aot-compilation-file (string-append file-no-extension ".exe"))
            (in-file-port (open-input-file (sanitize-platform-path file-path))))
-      (set! *impc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
-      (set! *impc:aot:func-defs-in-mod* '())
-      (if (impc:aot:currently-compiling?)
+      (set! *xtc:aot:current-output-port* #t) ;;(open-output-file aot-compilation-file))
+      (set! *xtc:aot:func-defs-in-mod* '())
+      (if (xtc:aot:currently-compiling?)
           (begin
             (llvm:optimize #t); // should this be restored later?
             ;; this is the 'success' branch
-            (set! *impc:aot:current-lib-name* file-no-extension)
-            ;; (impc:aot:insert-header libname-no-extension)
+            (set! *xtc:aot:current-lib-name* file-no-extension)
+            ;; (xtc:aot:insert-header libname-no-extension)
             ;; turn off scheme stubs!
-            (set! *impc:compile:scheme-stubs* #f)
+            (set! *xtc:globals:scheme-stubs* #f)
             ;; turn off aot-cache loading
-            (set! *impc:compiler:with-cache* #f)
+            (set! *xtc:globals:with-cache* #f)
             (log-info "Started compiling: ")
             (if asdll? ;; need to preregister init function
-                (impc:ti:register-new-nativefunc
+                (xtc:cache:register-new-nativefunc
                      (string-append file-no-extension "_init")
-                     (impc:ir:get-type-from-pretty-str "[void]*") "" '()))
+                     (xtc:codegen:get-type-from-pretty-str "[void]*") "" '()))
             (println)
             (sys:load file-path)
             (println)
@@ -485,9 +485,9 @@
                      (map (lambda (name)
                             (string-append "call void @" name "_setter();\n"))
                           (filter (lambda (name)
-                                    (let ((data (hashtable-ref *impc:ti:closure-cache* name)))
-                                      (and data (impc:ir:type? (vector-ref data 0)))))
-                                  (reverse *impc:ti:closure-cache-order*)))))
+                                    (let ((data (hashtable-ref *xtc:cache:closure-cache* name)))
+                                      (and data (xtc:codegen:type? (vector-ref data 0)))))
+                                  (reverse *xtc:cache:closure-cache-order*)))))
             (if asdll?
               (llvm:compile-ir
                 (string-append "define dllexport void @" file-no-extension "_init() {\n"
@@ -505,16 +505,16 @@
             (log-info "Finished compiling:" file-path)
             (println file-path)
             ;; turn back on scheme stubs
-            (set! *impc:compile:scheme-stubs* #t)
+            (set! *xtc:globals:scheme-stubs* #t)
             ;; turn back on cache loading
-            (set! *impc:compiler:with-cache* #t)
+            (set! *xtc:globals:with-cache* #t)
             (log-info "JIT-compiling IR...")
-            (let ((module (impc:compiler:flush-jit-compilation-queue)))
+            (let ((module (xtc:codegen:flush-jit-compilation-queue)))
               (if (not module)
-                  (impc:compiler:print-compiler-error "Failed compiling LLVM IR"))
-                (impc:aot:compile-exe file-no-extension module libs asdll?))
-            (set! *impc:aot:current-output-port* #f)
-            ;; (close-port *impc:aot:current-output-port*)
+                  (xtc:diagnostics:print-compiler-error "Failed compiling LLVM IR"))
+                (xtc:aot:compile-exe file-no-extension module libs asdll?))
+            (set! *xtc:aot:current-output-port* #f)
+            ;; (close-port *xtc:aot:current-output-port*)
             (quit 0))
           (begin
             (begin (print-with-colors 'black 'red #t (print " Error "))
@@ -535,9 +535,9 @@
     #t))
 
 ;; aot compile llvm bitcode (bc)
-(define impc:aot:compile-xtm-ll
+(define xtc:aot:compile-xtm-ll
   (lambda (lib-path)
-    (set! *impc:compiler:aot:dll* #f)
+    (set! *xtc:aot:dll* #f)
     (let ((start-time (clock:clock))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
@@ -554,8 +554,8 @@
                  (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
-                       (close-port *impc:aot:current-output-port*)
-                       (set! *impc:aot:current-output-port* #f))
+                       (close-port *xtc:aot:current-output-port*)
+                       (set! *xtc:aot:current-output-port* #f))
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
@@ -567,29 +567,29 @@
                   (if (file-exists? ll-path)
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") ll-path)))
                   ;; open output file, ready for writing
-                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
-                  (set! *impc:aot:func-defs-in-mod* '())
-                  (if (impc:aot:currently-compiling?)
+                  (set! *xtc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *xtc:aot:func-defs-in-mod* '())
+                  (if (xtc:aot:currently-compiling?)
                       (begin
                         (llvm:optimize #t); // should this be restored later?
                         ;; this is the 'success' branch
-                        (set! *impc:aot:current-lib-name* libname-no-extension)
+                        (set! *xtc:aot:current-lib-name* libname-no-extension)
                         ;; module name for globals
-                        (set! *impc:compiler:global-module-name* libname-no-extension)
-                        ;; (impc:aot:insert-header libname-no-extension)
+                        (set! *xtc:globals:global-module-name* libname-no-extension)
+                        ;; (xtc:aot:insert-header libname-no-extension)
                         (log-info "started compiling" lib-path)
                         (sys:load lib-path)
                         (log-info "finished compiling" lib-path)
                         (log-info "JIT-compiling IR...")
-                        (sys:dump-string-to-file ll-path (emit-buffer->string *impc:compiler:queued-llvm-ir-string*))
-                        (close-port *impc:aot:current-output-port*)
-                        (set! *impc:compiler:global-module-name* #f)
-                        (set! *impc:aot:current-lib-name* "xtmdylib")
-                        (if  *impc:aot:current-output-port*
-                             (begin (set! *impc:aot:current-output-port* #f)
+                        (sys:dump-string-to-file ll-path (emit-buffer->string *xtc:codegen:queued-llvm-ir-string*))
+                        (close-port *xtc:aot:current-output-port*)
+                        (set! *xtc:globals:global-module-name* #f)
+                        (set! *xtc:aot:current-lib-name* "xtmdylib")
+                        (if  *xtc:aot:current-output-port*
+                             (begin (set! *xtc:aot:current-output-port* #f)
                                     (print "Successfully wrote file to ")
                                     (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
-                                    (impc:aot:print-compilation-details start-time)
+                                    (xtc:aot:print-compilation-details start-time)
                                     (quit 0))
                              (begin (print-with-colors 'black 'red #t (print " Error "))
                                     (print "\n\nsomething went wrong in writing the output file ")
@@ -600,9 +600,9 @@
                              (quit 2))))))))))
 
 
-(define impc:aot:compile-xtm-dll
+(define xtc:aot:compile-xtm-dll
   (lambda (lib-path)
-    (set! *impc:compiler:aot:dll* #t)
+    (set! *xtc:aot:dll* #t)
     (let ((start-time (clock:clock))
           (in-file-port (or
                          (open-input-file (sanitize-platform-path lib-path))
@@ -619,8 +619,8 @@
                  (original-opt-level (llvm:optimization-level)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
                 (begin (print "AOT-compilation file not written ")
-                       (close-port *impc:aot:current-output-port*)
-                       (set! *impc:aot:current-output-port* #f))
+                       (close-port *xtc:aot:current-output-port*)
+                       (set! *xtc:aot:current-output-port* #f))
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
@@ -629,16 +629,16 @@
                   (if (file-exists? aot-compilation-file-path)
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))
                   ;; open output file, ready for writing
-                  (set! *impc:aot:current-output-port* (open-output-file aot-compilation-file-path))
-                  (set! *impc:aot:func-defs-in-mod* '())
-                  (if (impc:aot:currently-compiling?)
+                  (set! *xtc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *xtc:aot:func-defs-in-mod* '())
+                  (if (xtc:aot:currently-compiling?)
                       (begin
                         (llvm:optimize #t); // should this be restored later?
                         ;; Use O3 optimization for AOT compilation.
                         (llvm:optimization-level 3)
                         ;; this is the 'success' branch
-                        (set! *impc:aot:current-lib-name* libname-no-extension)
-                        ;; (impc:aot:insert-header libname-no-extension)
+                        (set! *xtc:aot:current-lib-name* libname-no-extension)
+                        ;; (xtc:aot:insert-header libname-no-extension)
                         (print-with-colors 'cyan 'black #t (print "Started compiling: "))
                         (println lib-path)
                         (println)
@@ -651,20 +651,20 @@
                           (println)
                           (print-with-colors 'black 'yellow #t (print " JIT-compiling IR "))
                           (print "\n"))
-                        (let ((module (impc:compiler:flush-jit-compilation-queue)))
+                        (let ((module (xtc:codegen:flush-jit-compilation-queue)))
                           (if (not module)
-                              (impc:compiler:print-compiler-error "Failed compiling LLVM IR")
-                              (impc:aot:compile-module libname-no-extension module)))
+                              (xtc:diagnostics:print-compiler-error "Failed compiling LLVM IR")
+                              (xtc:aot:compile-module libname-no-extension module)))
                         ;; Restore configured optimization level after AOT completes
                         (llvm:optimization-level original-opt-level)
-                        ;; (impc:aot:insert-footer libname-no-extension)
-                        (close-port *impc:aot:current-output-port*)
-                        (set! *impc:aot:current-lib-name* "xtmdylib")
-                        (if  *impc:aot:current-output-port*
-                             (begin (set! *impc:aot:current-output-port* #f)
+                        ;; (xtc:aot:insert-footer libname-no-extension)
+                        (close-port *xtc:aot:current-output-port*)
+                        (set! *xtc:aot:current-lib-name* "xtmdylib")
+                        (if  *xtc:aot:current-output-port*
+                             (begin (set! *xtc:aot:current-output-port* #f)
                                     (print "Successfully wrote AOT-compilation file to ")
                                     (print-with-colors 'green 'default #f (print aot-compilation-file-path "\n\n"))
-                                    (impc:aot:print-compilation-details start-time)
+                                    (xtc:aot:print-compilation-details start-time)
                                     (quit 0))
                              (begin (print-with-colors 'black 'red #t (print " Error "))
                                     (print "\n\nsomething went wrong in writing the output file ")
@@ -674,9 +674,9 @@
                              (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                              (quit 2))))))))))
 
-(define impc:aot:compile-xtm-file
+(define xtc:aot:compile-xtm-file
   (lambda (lib-path . dll)
     (if (and (not (null? dll)) (car dll))
-        (impc:aot:compile-xtm-dll lib-path)
-        (impc:aot:compile-xtm-ll lib-path))))
+        (xtc:aot:compile-xtm-dll lib-path)
+        (xtc:aot:compile-xtm-ll lib-path))))
 

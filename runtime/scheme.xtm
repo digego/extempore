@@ -691,16 +691,16 @@
 
 (define ipc:set-local-remote-mapping
    (lambda (local-name remote-name)
-     (let ((res (assoc *impc:remote-process-name-map* local-name)))
+     (let ((res (assoc *xtc:globals:remote-process-name-map* local-name)))
        (if res
      (set-cdr! res remote-name)
-     (set! *impc:remote-process-name-map*
+     (set! *xtc:globals:remote-process-name-map*
      (cons (cons local-name remote-name)
-           *impc:remote-process-name-map*))))))
+           *xtc:globals:remote-process-name-map*))))))
 
 (define ipc:proc-name-with-mapping
    (lambda ()
-     (let ((pair (assoc *impc:remote-process-name-map* (ipc:get-process-name))))
+     (let ((pair (assoc *xtc:globals:remote-process-name-map* (ipc:get-process-name))))
        (if pair
      (car pair)
      (ipc:get-process-name)))))
@@ -1171,40 +1171,40 @@
   (lambda (zerolatency? name . args)
     (println 'zerolatency: zerolatency?)
     (let* ((nn (if (symbol? name) (symbol->string name) name))
-           (ft (impc:ti:get-closure-arg-types nn))
+           (ft (xtc:cache:get-closure-arg-types nn))
            (ct (if ft
-                   (map (lambda (x) (impc:ir:get-type-from-str x)) ft)
+                   (map (lambda (x) (xtc:codegen:get-type-from-str x)) ft)
                    (log-error 'Function name 'does 'not 'exist 'or 'is 'not 'compiled))))
-      (cond ((equal? ct (list *impc:ir:double*
-                              *impc:ir:double*
-                              *impc:ir:si64*
-                              *impc:ir:si64*
-                              (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
+      (cond ((equal? ct (list *xtc:codegen:double*
+                              *xtc:codegen:double*
+                              *xtc:codegen:si64*
+                              *xtc:codegen:si64*
+                              (+ *xtc:codegen:double* *xtc:codegen:pointer*))) ;; sample by sample form FX
              (sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dsp_wrapper"))
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
-            ((equal? ct (list *impc:ir:double*
-                              (+ *impc:ir:double* *impc:ir:pointer*)
-                              *impc:ir:si64*
-                              *impc:ir:si64*
-                              (+ *impc:ir:double* *impc:ir:pointer*))) ;; sample by sample form FX
+            ((equal? ct (list *xtc:codegen:double*
+                              (+ *xtc:codegen:double* *xtc:codegen:pointer*)
+                              *xtc:codegen:si64*
+                              *xtc:codegen:si64*
+                              (+ *xtc:codegen:double* *xtc:codegen:pointer*))) ;; sample by sample form FX
              (sys:set-dspmt-wrapper (llvm:get-function-pointer "imp_dsp_sum_wrapper")
                                     (llvm:get-function-pointer "imp_dsp_wrapper"))
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))
              (dotimes (i (length args))
                (sys:set-dspmt-closure (llvm:get-function-pointer (string-append (list-ref args i) "_getter")) i))
              (sys:init-mt-audio (length args) zerolatency?))
-            ((equal? ct (list *impc:ir:float*
-                              *impc:ir:float*
-                              *impc:ir:si64*
-                              *impc:ir:si64*
-                              (+ *impc:ir:float* *impc:ir:pointer*))) ;; sample by sample form FX
+            ((equal? ct (list *xtc:codegen:float*
+                              *xtc:codegen:float*
+                              *xtc:codegen:si64*
+                              *xtc:codegen:si64*
+                              (+ *xtc:codegen:float* *xtc:codegen:pointer*))) ;; sample by sample form FX
              (sys:set-dsp-wrapper (llvm:get-function-pointer "imp_dspf_wrapper"))
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter"))))
-            ((equal? ct (list *impc:ir:float*
-                              (+ *impc:ir:float* *impc:ir:pointer*)
-                              *impc:ir:si64*
-                              *impc:ir:si64*
-                              (+ *impc:ir:float* *impc:ir:pointer*))) ;; sample by sample form FX
+            ((equal? ct (list *xtc:codegen:float*
+                              (+ *xtc:codegen:float* *xtc:codegen:pointer*)
+                              *xtc:codegen:si64*
+                              *xtc:codegen:si64*
+                              (+ *xtc:codegen:float* *xtc:codegen:pointer*))) ;; sample by sample form FX
              (sys:set-dspmt-wrapper (llvm:get-function-pointer "imp_dspf_sum_wrapper")
                                     (llvm:get-function-pointer "imp_dspf_wrapper"))
              (sys:set-dsp-closure (llvm:get-function-pointer (string-append nn "_getter")))

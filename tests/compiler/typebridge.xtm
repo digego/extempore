@@ -2,7 +2,7 @@
 ;;; the live int-code representation (runtime/xtc-types-bridge.xtm)
 ;;;
 ;;; The corpus below is ground truth taken from the existing parser
-;;; (impc:ir:get-type-from-pretty-str), so a passing round-trip certifies that
+;;; (xtc:codegen:get-type-from-pretty-str), so a passing round-trip certifies that
 ;;; the canonical representation is faithful to the encoding the rest of the
 ;;; compiler already uses.
 
@@ -27,7 +27,7 @@
                      '(15 3 (14 2 0)))))
    (cl:remove-if
     (lambda (ic)
-      (equal? ic (impc:type:to-intcode (impc:type:from-intcode ic (make-hashtable)))))
+      (equal? ic (xtc:type:to-intcode (xtc:type:from-intcode ic (make-hashtable)))))
     corpus))
  '()
  "intcode-roundtrip")
@@ -36,37 +36,37 @@
 ;; explicit decode     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:from-intcode 102 (make-hashtable))
-                (impc:type:ptr 'i64)
+(xtmtest-result (xtc:type:from-intcode 102 (make-hashtable))
+                (xtc:type:ptr 'i64)
                 "decode-pointer")
 
-(xtmtest-result (impc:type:from-intcode '(114 2 0) (make-hashtable))
-                (impc:type:ptr (impc:type:tuple 'i64 'f64))
+(xtmtest-result (xtc:type:from-intcode '(114 2 0) (make-hashtable))
+                (xtc:type:ptr (xtc:type:tuple 'i64 'f64))
                 "decode-pointer-tuple")
 
 ;; the everyday boxed closure decodes to a pointer-to-closure
-(xtmtest-result (impc:type:from-intcode '(213 2 2) (make-hashtable))
-                (impc:type:ptr (impc:type:closure 'i64 'i64))
+(xtmtest-result (xtc:type:from-intcode '(213 2 2) (make-hashtable))
+                (xtc:type:ptr (xtc:type:closure 'i64 'i64))
                 "decode-boxed-closure")
 
 ;; the bare (unboxed) closure has no extra pointer
-(xtmtest-result (impc:type:from-intcode '(113 2 2) (make-hashtable))
-                (impc:type:closure 'i64 'i64)
+(xtmtest-result (xtc:type:from-intcode '(113 2 2) (make-hashtable))
+                (xtc:type:closure 'i64 'i64)
                 "decode-bare-closure")
 
-(xtmtest-result (impc:type:from-intcode '(15 4 2) (make-hashtable))
-                (impc:type:array 4 'i64)
+(xtmtest-result (xtc:type:from-intcode '(15 4 2) (make-hashtable))
+                (xtc:type:array 4 'i64)
                 "decode-array")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit encode     ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:tuple 'i64 'f64)))
+(xtmtest-result (xtc:type:to-intcode (xtc:type:ptr (xtc:type:tuple 'i64 'f64)))
                 '(114 2 0)
                 "encode-pointer-tuple")
 
-(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:closure 'i64 'i64)))
+(xtmtest-result (xtc:type:to-intcode (xtc:type:ptr (xtc:type:closure 'i64 'i64)))
                 '(213 2 2)
                 "encode-boxed-closure")
 
@@ -74,16 +74,16 @@
 ;; named types         ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(xtmtest-result (impc:type:from-intcode "%string" (make-hashtable))
-                (impc:type:named "string")
+(xtmtest-result (xtc:type:from-intcode "%string" (make-hashtable))
+                (xtc:type:named "string")
                 "decode-named")
 
-(xtmtest-result (impc:type:to-intcode (impc:type:ptr (impc:type:named "string")))
+(xtmtest-result (xtc:type:to-intcode (xtc:type:ptr (xtc:type:named "string")))
                 "%string*"
                 "encode-named-pointer")
 
-(xtmtest-result (impc:type:to-intcode
-                 (impc:type:from-intcode "%foo**" (make-hashtable)))
+(xtmtest-result (xtc:type:to-intcode
+                 (xtc:type:from-intcode "%foo**" (make-hashtable)))
                 "%foo**"
                 "named-roundtrip")
 
@@ -94,23 +94,23 @@
 ;; !a and !a* share one variable (the inner term of !a* is !a) --- this is the
 ;; pointer-depth-bearing variable whose absence causes #315.
 (xtmtest-result (let ((tbl (make-hashtable)))
-                  (let ((a  (impc:type:from-intcode '!a tbl))
-                        (a* (impc:type:from-intcode '!a* tbl)))
-                    (equal? a (impc:type:ptr-to a*))))
+                  (let ((a  (xtc:type:from-intcode '!a tbl))
+                        (a* (xtc:type:from-intcode '!a* tbl)))
+                    (equal? a (xtc:type:ptr-to a*))))
                 #t
                 "bang-shares-across-depth")
 
 ;; the same call-site suffix interns to the same variable ...
 (xtmtest-result (let ((tbl (make-hashtable)))
-                  (equal? (impc:type:from-intcode (string->symbol "!a##3") tbl)
-                          (impc:type:from-intcode (string->symbol "!a##3") tbl)))
+                  (equal? (xtc:type:from-intcode (string->symbol "!a##3") tbl)
+                          (xtc:type:from-intcode (string->symbol "!a##3") tbl)))
                 #t
                 "bang-same-callsite")
 
 ;; ... but distinct call sites do not.
 (xtmtest-result (let ((tbl (make-hashtable)))
-                  (equal? (impc:type:from-intcode (string->symbol "!a##3") tbl)
-                          (impc:type:from-intcode (string->symbol "!a##7") tbl)))
+                  (equal? (xtc:type:from-intcode (string->symbol "!a##3") tbl)
+                          (xtc:type:from-intcode (string->symbol "!a##7") tbl)))
                 #f
                 "bang-distinct-callsites")
 
@@ -127,31 +127,31 @@
                      "!a*" "<!a*,i64>" "<!a*,!b>" "<!a,<!b,i64>>")))
    (cl:remove-if
     (lambda (s)
-      (let* ((tbl (make-hashtable)) (term (impc:type:from-pretty s tbl)))
-        (string=? s (impc:type:to-pretty term tbl))))
+      (let* ((tbl (make-hashtable)) (term (xtc:type:from-pretty s tbl)))
+        (string=? s (xtc:type:to-pretty term tbl))))
     corpus))
  '()
  "pretty-roundtrip")
 
 ;; a tuple field !a* parses to a pointer-to-variable
 (xtmtest-result (let ((tbl (make-hashtable)))
-                  (impc:type:ptr? (cadr (impc:type:from-pretty "<!a*,i64>" tbl))))
+                  (xtc:type:ptr? (cadr (xtc:type:from-pretty "<!a*,i64>" tbl))))
                 #t
                 "pretty-field-is-pointer")
 
 ;; !a and !a* in one type share a single variable
 (xtmtest-result (let* ((tbl (make-hashtable))
-                       (term (impc:type:from-pretty "<!a,!a*>" tbl)))
-                  (equal? (cadr term) (impc:type:ptr-to (caddr term))))
+                       (term (xtc:type:from-pretty "<!a,!a*>" tbl)))
+                  (equal? (cadr term) (xtc:type:ptr-to (caddr term))))
                 #t
                 "pretty-shares-variable")
 
 ;; substituting the variable's binding reifies the field with its depth intact
 (xtmtest-result (let* ((tbl (make-hashtable))
-                       (term (impc:type:from-pretty "<!a*,i64>" tbl))
-                       (v (impc:type:from-pretty "!a" tbl))
-                       (subst (impc:type:unify v 'i64 impc:type:empty-subst)))
-                  (impc:type:to-pretty (impc:type:apply-subst term subst) tbl))
+                       (term (xtc:type:from-pretty "<!a*,i64>" tbl))
+                       (v (xtc:type:from-pretty "!a" tbl))
+                       (subst (xtc:type:unify v 'i64 xtc:type:empty-subst)))
+                  (xtc:type:to-pretty (xtc:type:apply-subst term subst) tbl))
                 "<i64*,i64>"
                 "reify-keeps-depth")
 
@@ -164,22 +164,22 @@
 ;; binding (its base, !a = i64) re-deepens to the starred occurrence (!a* =
 ;; i64*), and a depth-1 value strips back to the base, both via the unifier
 ;; rather than star arithmetic.
-(xtmtest-result (impc:type:deepen-ptr-depth 2 1) 102 "deepen-base")
-(xtmtest-result (impc:type:deepen-ptr-depth 2 2) 202 "deepen-twice")
-(xtmtest-result (impc:type:deepen-ptr-depth '(14 2 0) 1) '(114 2 0) "deepen-tuple")
-(xtmtest-result (impc:type:deepen-ptr-depth "%Foo" 1) "%Foo*" "deepen-named")
-(xtmtest-result (impc:type:reduce-ptr-depth (impc:type:deepen-ptr-depth 2 2) 2)
+(xtmtest-result (xtc:type:deepen-ptr-depth 2 1) 102 "deepen-base")
+(xtmtest-result (xtc:type:deepen-ptr-depth 2 2) 202 "deepen-twice")
+(xtmtest-result (xtc:type:deepen-ptr-depth '(14 2 0) 1) '(114 2 0) "deepen-tuple")
+(xtmtest-result (xtc:type:deepen-ptr-depth "%Foo" 1) "%Foo*" "deepen-named")
+(xtmtest-result (xtc:type:reduce-ptr-depth (xtc:type:deepen-ptr-depth 2 2) 2)
                 2 "deepen-reduce-roundtrip")
 
 ;; a concrete value shallower than the requested reduction has no inverse: the
 ;; unifier reports 'fail rather than underflowing to a bogus code.  (update-var
 ;; reads this to drop the #315 conflation of !a* with a depth-0 value.)
-(xtmtest-result (impc:type:reduce-ptr-depth 2 1) 'fail "reduce-underflow-fails")
+(xtmtest-result (xtc:type:reduce-ptr-depth 2 1) 'fail "reduce-underflow-fails")
 
 ;; the type parameters of a template are its free variables by identity ---
 ;; depth-independent, deduplicated, in first-seen order --- the bare !a, never
 ;; the field usage !a*.
-(xtmtest-result (impc:type:pretty-type-params "<!a*,i64>")  '("!a")      "params-depth1")
-(xtmtest-result (impc:type:pretty-type-params "<!a**,i64>") '("!a")      "params-depth2")
-(xtmtest-result (impc:type:pretty-type-params "<!a*,!b>")   '("!a" "!b") "params-two")
-(xtmtest-result (impc:type:pretty-type-params "<!a,!a*>")   '("!a")      "params-shared")
+(xtmtest-result (xtc:type:pretty-type-params "<!a*,i64>")  '("!a")      "params-depth1")
+(xtmtest-result (xtc:type:pretty-type-params "<!a**,i64>") '("!a")      "params-depth2")
+(xtmtest-result (xtc:type:pretty-type-params "<!a*,!b>")   '("!a" "!b") "params-two")
+(xtmtest-result (xtc:type:pretty-type-params "<!a,!a*>")   '("!a")      "params-shared")

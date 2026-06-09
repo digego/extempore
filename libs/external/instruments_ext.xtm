@@ -17,7 +17,7 @@
 ;;; Code:
 
 ;; lib-loading config
-(if *impc:compiler:with-cache* (sys:load "libs/aot-cache/instruments_ext.xtm" 'quiet))
+(if *xtc:globals:with-cache* (sys:load "libs/aot-cache/instruments_ext.xtm" 'quiet))
 (sys:load-preload-check 'instruments_ext)
 (define *xtmlib-instruments_ext-loaded* #t)
 
@@ -27,14 +27,14 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(impc:aot:suppress-aot-do
+(xtc:aot:suppress-aot-do
  (sys:load "libs/core/instruments.xtm")
  (sys:load "libs/external/sndfile.xtm"))
-(impc:aot:insert-forms (sys:load "libs/core/instruments.xtm" 'quiet))
-(impc:aot:insert-forms (sys:load "libs/external/sndfile.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/core/instruments.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/external/sndfile.xtm" 'quiet))
 
-(impc:aot:insert-header "xtminstruments_ext")
-(impc:aot:import-ll "xtminstruments_ext")
+(xtc:aot:insert-header "xtminstruments_ext")
+(xtc:aot:import-ll "xtminstruments_ext")
 
 ;; helper function for adding sample data to sampler
 ;; this assumes stereo files at the moment!!
@@ -338,11 +338,11 @@
 
 (sys:load "libs/external/instruments_ext-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
-(impc:aot:insert-forms
+(xtc:aot:insert-forms
  (sys:load "libs/external/instruments_ext-scm.xtm"))
 
 ;; (println 'Establish 'audio 'on 'utility 'process)
 ;; (ipc:audio-setup "utility")
 
 (define *xtmlib-instruments_ext-loaded* #t)
-(impc:aot:insert-footer "xtminstruments_ext")
+(xtc:aot:insert-footer "xtminstruments_ext")
