@@ -222,6 +222,26 @@
            (xtc:type:ptr-to t))
           (else #f))))
 
+;; The pointer-comparison rule: the old math/compare check lets (= p q) and
+;; friends compare two pointers of one type, the result i1.  Like vecmath it
+;; rides the overload as a structural marker, viable only once some operand
+;; has resolved to a pointer (so it never holds a numeric compare ambiguous);
+;; the other operand then takes the same pointer type.
+(define xtc:solve:ptrcmp-viable
+  (lambda (rkey akeys intern subst)
+    (let* ((terms (map (lambda (k)
+                         (xtc:type:apply-subst (xtc:type:from-intcode k intern) subst))
+                       akeys))
+           (anchor (cl:find-if xtc:type:ptr? terms)))
+      (and anchor
+           (let loop ((ts terms)
+                      (s (xtc:type:unify (xtc:type:from-intcode rkey intern)
+                                         (xtc:type:from-intcode *xtc:codegen:i1* intern)
+                                         subst)))
+             (cond ((not s) #f)
+                   ((null? ts) (cons 'ptrcmp s))
+                   (else (loop (cdr ts) (xtc:type:unify (car ts) anchor s)))))))))
+
 (define xtc:solve:vecmath-viable
   (lambda (rkey akeys intern subst)
     (let* ((terms (map (lambda (k)
@@ -257,6 +277,8 @@
               (cond
                 ((eq? cand 'vecmath)
                  (xtc:solve:vecmath-viable rkey akeys intern subst))
+                ((eq? cand 'ptrcmp)
+                 (xtc:solve:ptrcmp-viable rkey akeys intern subst))
                 ((<> (length (cdr cand)) (length akeys))
                  #f)
                 ;; the result key is held to its class exactly like an argument:

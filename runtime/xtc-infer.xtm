@@ -202,11 +202,13 @@
 
 ;; The candidate set for a comparison: one (i1 w w) per numeric width --- the
 ;; result is i1 however wide the operands --- then any user xtm_lessthan / ...
-;; overloads, which likewise return i1.
+;; overloads, which likewise return i1, then the structural pointer-comparison
+;; rule (two pointers of one type, selected only by a grounded pointer operand).
 (define xtc:infer:compare-candidates
   (lambda (op)
     (append (map (lambda (w) (list *xtc:codegen:i1* w w)) (xtc:infer:numeric-class))
-            (xtc:infer:poly-candidates (xtc:infer:compare-poly-name op)))))
+            (xtc:infer:poly-candidates (xtc:infer:compare-poly-name op))
+            (list 'ptrcmp))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; the traversal       ;;
