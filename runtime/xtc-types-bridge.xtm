@@ -323,17 +323,23 @@
         ;; from-intcode-string, so a reified generic instance (a container a
         ;; generic returns, e.g. cdr's List{i64}*) reads back exactly as the live
         ;; compiler spells it.  The arguments are concrete here (type-of declines
-        ;; a term with free variables before encoding).
+        ;; a term with free variables before encoding).  The instance TYPE is
+        ;; registered on first encode by running the instance's pretty spelling
+        ;; through the old parser, whose side effects (the LLVM type, the
+        ;; namedtype-cache entry, the data constructors) the rest of the
+        ;; compiler relies on --- without the entry, type? on the c-name never
+        ;; resolves.  The nominal decode bypasses that parser, so the encode,
+        ;; where the c-name is minted, is the one choke point.
         ((xtc:type:napp? base)
-         (string-append
-          "%" (xtc:type:napp-name base) "_poly_"
-          (cname-encode
-           (string-append "<"
-                          (string-join (map (lambda (a) (xtc:type:to-pretty a intern))
-                                            (xtc:type:napp-args base))
-                                       ",")
-                          ">"))
-          (make-string depth #\*)))
+         (let* ((argstr (string-join (map (lambda (a) (xtc:type:to-pretty a intern))
+                                          (xtc:type:napp-args base))
+                                     ","))
+                (name1 (string-append (xtc:type:napp-name base) "_poly_"
+                                      (cname-encode (string-append "<" argstr ">")))))
+           (if (not (xtc:cache:namedtype-exists? name1))
+               (xtc:codegen:get-type-from-pretty-str
+                (string-append (xtc:type:napp-name base) "{" argstr "}")))
+           (string-append "%" name1 (make-string depth #\*))))
         ((xtc:type:tuple? base)
          (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
         ((xtc:type:array? base)

@@ -628,10 +628,19 @@
          (string-append "%" c))
         (else (xtc:codegen:get-type-from-pretty-str c))))))
 
+;; Memoised: the same registered signature strings decode at every call site
+;; of every function compile, and the decode (string scans, registry lookups,
+;; the surface parser) is pure in its input string --- a generic type used in a
+;; signature is always registered before any code can spell the signature.
+(define *xtc:infer:sig-cache* (make-hashtable 512))
+
 (define xtc:infer:pretty-sig->candidate
   (lambda (pretty)
-    (map xtc:infer:component->candidate
-         (xtc:codegen:get-pretty-closure-arg-strings pretty))))
+    (or (hashtable-ref *xtc:infer:sig-cache* pretty)
+        (let ((sig (map xtc:infer:component->candidate
+                        (xtc:codegen:get-pretty-closure-arg-strings pretty))))
+          (hashtable-set! *xtc:infer:sig-cache* pretty sig)
+          sig))))
 
 ;; The candidate signatures of a generic function named `sym' at the given
 ;; arity, or #f if none applies here.  A genericfunc's return type is reified
@@ -821,10 +830,18 @@
 ;; add-types-to-source reads that alist entry to pick (or compile) the concrete
 ;; instance the call dispatches to.  Tie the site symbol to the call's
 ;; assembled closure type so the entry comes out of the solve with it.
+;; The ## call-site symbols this check-function run constrained: the read-back
+;; must include them even when find-all-vars did not table them (it skips a
+;; generic callee whose arity check it cannot match), because
+;; add-types-to-source resolves every ## site through its alist entry.
+(define *xtc:infer:call-sites* '())
+
 (define xtc:infer:site-constraint
   (lambda (sym result-key arg-keys)
     (if (string-contains? (symbol->string sym) "##")
-        (list (xtc:solve:c-eq sym (xtc:infer:closure-code result-key arg-keys)))
+        (begin
+          (set! *xtc:infer:call-sites* (cons sym *xtc:infer:call-sites*))
+          (list (xtc:solve:c-eq sym (xtc:infer:closure-code result-key arg-keys))))
         '())))
 
 ;; (f arg ...) with f a global function: the call's type is a fresh result that,
@@ -872,6 +889,21 @@
                           (list cond-c
                                 (xtc:solve:c-eq (car rc-t) (car rc-e))))))))))
 
+;; The math / comparison sites collected during one check-function run.  When
+;; the solve commits a site to a USER overload (a named/tuple operand --- a
+;; Rational +, a tuple <), the op node must be REWRITTEN to the xtm_NAME##N
+;; dispatch symbol and that symbol's closure type added to the alist, exactly
+;; the destructive rewrite the old type-check performed in place --- codegen's
+;; scalar math compiler only handles numeric (and SIMD-vector) operands, and
+;; add-types-to-source resolves the ## symbol to the registered poly instance.
+(define *xtc:infer:op-sites* '())
+(define *xtc:infer:op-counter* 0)
+
+(define xtc:infer:record-op-site!
+  (lambda (ast kind rk akeys)
+    (set! *xtc:infer:op-sites*
+          (cons (vector ast kind rk akeys) *xtc:infer:op-sites*))))
+
 ;; (op a b): an overloaded call.  The numeric candidates make it the operand
 ;; width (forcing the two operands equal); a registered xtm_addition / ...
 ;; candidate makes it the tuple result --- the solver picks by the operand types.
@@ -880,6 +912,7 @@
     (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
            (rc-b (xtc:infer:collect (caddr ast) bound))
            (kr (xtc:infer:fresh-key)))
+      (xtc:infer:record-op-site! ast 'math kr (list (car rc-a) (car rc-b)))
       (cons kr
             (append (cdr rc-a) (cdr rc-b)
                     (list (xtc:solve:c-overload kr
@@ -894,6 +927,8 @@
   (lambda (ast bound)
     (let* ((rc-a (xtc:infer:collect (cadr ast) bound))
            (rc-b (xtc:infer:collect (caddr ast) bound)))
+      (xtc:infer:record-op-site! ast 'cmp *xtc:codegen:i1*
+                                 (list (car rc-a) (car rc-b)))
       (cons *xtc:codegen:i1*
             (append (cdr rc-a) (cdr rc-b)
                     (list (xtc:solve:c-overload *xtc:codegen:i1*
@@ -1236,25 +1271,82 @@
 ;; for a scalar and (var code...) for a compound, and in both cases its cdr is the
 ;; int-code, so one c-eq form serves both.  This is shadow-validated against
 ;; run-type-check (tests/compiler/inferfn.xtm) before it is flipped live.
+;; Rewrite the math / comparison sites the solve committed to a USER overload
+;; (a named/tuple operand) into their xtm_NAME##N dispatch symbols --- the same
+;; destructive set-car! the old type-check performed --- returning the alist
+;; entries those symbols need (the chosen overload's closure type, which
+;; add-types-to-source reads to inject the registered poly instance).
+(define xtc:infer:rewrite-op-sites!
+  (lambda (subst intern)
+    (cl:remove
+     #f
+     (map (lambda (site)
+            (let* ((ast (vector-ref site 0))
+                   (kind (vector-ref site 1))
+                   (rk (vector-ref site 2))
+                   (akeys (vector-ref site 3))
+                   (atypes (map (lambda (k) (xtc:solve:type-of k subst intern)) akeys))
+                   (rtype (if (eq? kind 'cmp)
+                              *xtc:codegen:i1*
+                              (xtc:solve:type-of rk subst intern)))
+                   (pname (if (eq? kind 'cmp)
+                              (xtc:infer:compare-poly-name (car ast))
+                              (xtc:infer:math-poly-name (car ast)))))
+              (and pname rtype
+                   (not (member #f atypes))
+                   (xtc:codegen:tuple? (car atypes))
+                   (begin
+                     (set! *xtc:infer:op-counter* (+ *xtc:infer:op-counter* 1))
+                     (let ((m (string->symbol
+                               (string-append pname "##"
+                                              (number->string
+                                               (+ 7000000 *xtc:infer:op-counter*))))))
+                       (set-car! ast m)
+                       (cons m (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
+                                     (cons rtype atypes))))))))
+          *xtc:infer:op-sites*))))
+
+;; REENTRANT: encoding a fresh generic instance during the read-back triggers
+;; the instance type's data-constructor compiles, each a full nested driver
+;; run through this very function --- so the per-run state (the op/call site
+;; lists, the fresh-key counter) is saved and restored around the body.
 (define xtc:infer:check-function
   (lambda (vars forced-types ast)
-    (xtc:infer:reset-fresh!)
-    (let* ((rc (xtc:infer:collect ast '()))
-           (forced (map (lambda (ft) (xtc:solve:c-eq (car ft) (cdr ft))) forced-types))
-           (intern (make-hashtable))
-           (subst (xtc:solve:run (append forced (cdr rc)) intern)))
-      (if (eq? subst 'conflict)
-          #f
-          ;; Read back exactly the declared variables --- the var table's keys.
-          ;; A symbol the constraints referenced that the table does not list (a
-          ;; global variable, a cached closure) is NOT a local: the alist marks
-          ;; locals, which codegen scope-checks against its sym-name-stack, so an
-          ;; entry here would shadow the cache resolution those symbols get.
-          (cl:remove #f
-                     (map (lambda (sym)
-                            (let ((ty (xtc:solve:type-of sym subst intern)))
-                              (and ty (cons sym ty))))
-                          (hashtable-keys vars)))))))
+    (let ((saved-fresh *xtc:infer:fresh-counter*)
+          (saved-ops *xtc:infer:op-sites*)
+          (saved-calls *xtc:infer:call-sites*))
+      (xtc:infer:reset-fresh!)
+      (set! *xtc:infer:op-sites* '())
+      (set! *xtc:infer:call-sites* '())
+      (let* ((rc (xtc:infer:collect ast '()))
+             (forced (map (lambda (ft) (xtc:solve:c-eq (car ft) (cdr ft))) forced-types))
+             (intern (make-hashtable))
+             (subst (xtc:solve:run (append forced (cdr rc)) intern))
+             (call-sites *xtc:infer:call-sites*)
+             (result
+              (if (eq? subst 'conflict)
+                  #f
+                  ;; Read back the declared variables (the var table's keys)
+                  ;; plus the ## call-site symbols this run constrained ---
+                  ;; nothing else.  A symbol the constraints referenced that
+                  ;; neither lists (a global variable, a cached closure) is NOT
+                  ;; a local: the alist marks locals, which codegen scope-checks
+                  ;; against its sym-name-stack, so an entry would shadow the
+                  ;; cache resolution those symbols get.  The user-overload op
+                  ;; sites rewrite first; their dispatch symbols' entries join
+                  ;; the alist.
+                  (append
+                   (xtc:infer:rewrite-op-sites! subst intern)
+                   (cl:remove #f
+                              (map (lambda (sym)
+                                     (let ((ty (xtc:solve:type-of sym subst intern)))
+                                       (and ty (cons sym ty))))
+                                   (cl:remove-duplicates
+                                    (append (hashtable-keys vars) call-sites))))))))
+        (set! *xtc:infer:fresh-counter* saved-fresh)
+        (set! *xtc:infer:op-sites* saved-ops)
+        (set! *xtc:infer:call-sites* saved-calls)
+        result))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; live shadow check   ;;
@@ -1273,8 +1365,11 @@
 (define *xtc:infer:shadow-count* 0)   ; functions shadowed (for build-coverage reporting)
 
 ;; When set, run-type-check returns check-function's result directly --- the
-;; constraint path drives compilation, the old traversal is bypassed.  Default
-;; off; the flip to default is gated on a full shadow-clean build (stage 3d).
+;; constraint path drives compilation, the old traversal is bypassed.  The
+;; full from-source shadow sweep (every core and external lib, the test
+;; corpus, the examples) is clean and most of the flip validation passes;
+;; still default-OFF pending the last flip blockers (sequence-dependent
+;; failures in tests/core/{xtlang,adt} under the flip --- see TASK-059).
 (define *xtc:infer:live?* #f)
 
 (define xtc:infer:shadow-norm
@@ -1283,8 +1378,11 @@
 (define xtc:infer:shadow-check
   (lambda (vars forced-types ast oldA fname)
     (set! *xtc:infer:shadow-count* (+ *xtc:infer:shadow-count* 1))
+    ;; a COPY of the ast: check-function rewrites user-overload op sites in
+    ;; place (set-car!), and in shadow mode the old path's codegen still
+    ;; consumes the original
     (let ((newA (catch 'shadow-error
-                       (xtc:infer:check-function vars forced-types ast))))
+                       (xtc:infer:check-function vars forced-types (cl:tree-copy ast)))))
       (cond
         ((eq? newA 'shadow-error) (println 'SHADOW-ERROR fname))
         ((not newA) (println 'SHADOW-CONFLICT fname))
