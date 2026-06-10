@@ -35,17 +35,23 @@ static pointer regex_matched(scheme* Scheme, pointer Args)
     int* p = ovector;
     for (int i = 0; i < rc; ++i, p += 2)
     {
+        // cons itself can trigger GC before storing its arguments (new_cell
+        // -> try_to_call_gc), and the GC cannot see C-frame locals: BOTH the
+        // list and the just-allocated string need protection across the cons
         if (p[0] == -1) {
             EnvInjector injector(Scheme, list);
-            list = cons(Scheme, mk_string(Scheme, ""), list);
+            pointer s = mk_string(Scheme, "");
+            EnvInjector injector2(Scheme, s);
+            list = cons(Scheme, s, list);
         } else {
             int range = p[1] - p[0];
             char* b = (char*) alloca(range + 1);
             memcpy(b, data + p[0], range);
             b[range] = '\0';
             EnvInjector injector(Scheme, list);
-            pointer tlist = cons(Scheme, mk_string(Scheme, b), list);
-            list = tlist;
+            pointer s = mk_string(Scheme, b);
+            EnvInjector injector2(Scheme, s);
+            list = cons(Scheme, s, list);
         }
     }
     return reverse_in_place(Scheme, Scheme->NIL, list);
@@ -67,7 +73,9 @@ static pointer regex_match_all(scheme* Scheme, pointer Args)
         memcpy(b, data + ovector[0], range);
         b[range] = '\0';
         EnvInjector injector(Scheme, list);
-        list = cons(Scheme, mk_string(Scheme, b), list);
+        pointer s = mk_string(Scheme, b);
+        EnvInjector injector2(Scheme, s);
+        list = cons(Scheme, s, list);
         data += ovector[1];
     }
     // shouldn't ever reach here!
@@ -85,7 +93,14 @@ static pointer regex_split(scheme* Scheme, pointer Args)
         if (rc < 1) {
             if (data[0]) // append remaining chars if any left
             {
-                list = cons(Scheme, mk_string(Scheme, data), list);
+                // mk_string and cons can each trigger GC: without protection,
+                // `list` and the fresh string (referenced only from this C
+                // frame) are collected and the cons links freed cells,
+                // corrupting whatever reuses them
+                EnvInjector injector(Scheme, list);
+                pointer s = mk_string(Scheme, data);
+                EnvInjector injector2(Scheme, s);
+                list = cons(Scheme, s, list);
             }
             return reverse_in_place(Scheme, Scheme->NIL, list);
         }
@@ -93,7 +108,9 @@ static pointer regex_split(scheme* Scheme, pointer Args)
         memcpy(b, data, ovector[0]);
         b[ovector[0]] = '\0';
         EnvInjector injector(Scheme, list);
-        list = cons(Scheme, mk_string(Scheme,b),list);
+        pointer s = mk_string(Scheme, b);
+        EnvInjector injector2(Scheme, s);
+        list = cons(Scheme, s, list);
         data += ovector[1];
     }
     // shouldn't ever reach here!

@@ -15,7 +15,11 @@
            (typespre (xtc:typecheck:run-type-check vars forced-types t1))
            (t5 (xtc:typecheck:closure:convert t4 (list symname)))
            (types (xtc:desugar:type-normalize typespre)))
-      (cdr (assoc 'xtm_exp_result types)))))
+      ;; an undetermined expression type is '() --- the old checker returned a
+      ;; present-but-empty entry, the constraint path omits the entry; both
+      ;; mean "not void, let the real compile decide"
+      (let ((entry (assoc 'xtm_exp_result types)))
+        (if entry (cdr entry) '())))))
 
 (define xtc:bind:get-global-var-types
   (lambda (ast)

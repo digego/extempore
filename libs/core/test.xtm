@@ -55,12 +55,20 @@
 
 (define xtmtest-update-test-result
   (lambda (func-sym label call expected got)
-    (let ((tail (assoc label *xtmtest-results*))
-          (reslist (list func-sym call expected got)))
-      (set-cdr! tail
-                (cons reslist
-                      (cl:remove-if (lambda (res) (equal? res reslist))
-                                    (cdr tail)))))
+    ;; rebuilt functionally, NOT via set-cdr! on the existing entry: s7 can
+    ;; allocate a closure's freshly-built constants outside the heap
+    ;; (semipermanent), and the GC does not trace through such cells --- a
+    ;; heap value smuggled in via set-cdr! is collected while referenced
+    (let ((reslist (list func-sym call expected got)))
+      (set! *xtmtest-results*
+            (map (lambda (entry)
+                   (if (eq? (car entry) label)
+                       (cons label
+                             (cons reslist
+                                   (cl:remove-if (lambda (res) (equal? res reslist))
+                                                 (cdr entry))))
+                       entry))
+                 *xtmtest-results*)))
     (print "result: ")
     (print-with-colors (case label
                          ('correct 'green)

@@ -244,6 +244,10 @@ static pointer scmAddForeignFunc(scheme* sc, pointer Args) {
     char* symbol_name = string_value(pair_car(Args));
     foreign_func func = foreign_func(cptr_value(pair_cadr(Args)));
     pointer ffunc = mk_foreign_func(sc, func);
+    // mk_symbol can allocate and trigger GC; without protection the fresh
+    // ffunc (referenced only from this frame) is collected and the symbol
+    // gets bound to a freed cell --- calls then die on whatever reuses it
+    EnvInjector injector(sc, ffunc);
     scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), ffunc);
     return ffunc;
 }

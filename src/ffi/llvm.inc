@@ -124,10 +124,11 @@ static pointer get_function_args(scheme* Scheme, pointer Args)
     pointer str = mk_string(Scheme, formatLLVMType(func->getReturnType()).c_str());
     pointer p = cons(Scheme, str, Scheme->NIL);
     for (const auto& arg : func->args()) {
-        {
-            EnvInjector injector(Scheme, p);
-            str = mk_string(Scheme, formatLLVMType(arg.getType()).c_str());
-        }
+        // the injector must span the cons too: cons can itself trigger GC,
+        // and p is only referenced from this frame
+        EnvInjector injector(Scheme, p);
+        str = mk_string(Scheme, formatLLVMType(arg.getType()).c_str());
+        EnvInjector injector2(Scheme, str);
         p = cons(Scheme, str, p);
     }
     return reverse_in_place(Scheme, Scheme->NIL, p);
@@ -699,7 +700,9 @@ static pointer list_modules(scheme* Scheme, pointer Args)
     pointer p = Scheme->NIL;
     for (auto module : EXTLLVM::getModules()) {
         EnvInjector injector(Scheme, p);
-        p = cons(Scheme, mk_cptr(Scheme, module), p);
+        pointer c = mk_cptr(Scheme, module);
+        EnvInjector injector2(Scheme, c);
+        p = cons(Scheme, c, p);
     }
     return reverse_in_place(Scheme, Scheme->NIL, p);
 }

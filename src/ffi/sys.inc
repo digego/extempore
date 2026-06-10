@@ -146,8 +146,9 @@ static pointer dirlist(scheme* Scheme, pointer Args)
     pointer list = Scheme->NIL;
     for (std::filesystem::directory_iterator it(bpath); it != end_it; ++it) {
         EnvInjector injector(Scheme, list);
-        pointer tlist = cons(Scheme, mk_string(Scheme, it->path().string().c_str()), list);
-        list = tlist;
+        pointer s = mk_string(Scheme, it->path().string().c_str());
+        EnvInjector injector2(Scheme, s);
+        list = cons(Scheme, s, list);
     }
 #else
     DIR* dp;
@@ -157,8 +158,9 @@ static pointer dirlist(scheme* Scheme, pointer Args)
         struct dirent* ep;
         while ((ep = readdir(dp))) {
             EnvInjector injector(Scheme, list);
-            pointer tlist = cons(Scheme, mk_string(Scheme, ep->d_name), list);
-            list = tlist;
+            pointer s = mk_string(Scheme, ep->d_name);
+            EnvInjector injector2(Scheme, s);
+            list = cons(Scheme, s, list);
         }
         closedir(dp);
     } else {

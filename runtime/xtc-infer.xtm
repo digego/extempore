@@ -1335,14 +1335,28 @@
                   ;; cache resolution those symbols get.  The user-overload op
                   ;; sites rewrite first; their dispatch symbols' entries join
                   ;; the alist.
-                  (append
-                   (xtc:infer:rewrite-op-sites! subst intern)
-                   (cl:remove #f
-                              (map (lambda (sym)
-                                     (let ((ty (xtc:solve:type-of sym subst intern)))
-                                       (and ty (cons sym ty))))
-                                   (cl:remove-duplicates
-                                    (append (hashtable-keys vars) call-sites))))))))
+                  (let ((pattern-vars
+                         ;; vars whose FORCED annotation carried bang variables
+                         ;; (a constructor argument spelled with a recursive
+                         ;; type's bare expansion): a residual variable in
+                         ;; their type renders as its bang, like the old
+                         ;; checker's pattern-typed entries, instead of
+                         ;; dropping the entry
+                         (cl:remove #f
+                                    (map (lambda (ft)
+                                           (and (pair? (xtc:infer:bang-vars (cdr ft)))
+                                                (car ft)))
+                                         forced-types))))
+                    (append
+                     (xtc:infer:rewrite-op-sites! subst intern)
+                     (cl:remove #f
+                                (map (lambda (sym)
+                                       (let ((ty (or (xtc:solve:type-of sym subst intern)
+                                                     (and (memq sym pattern-vars)
+                                                          (xtc:solve:type-of-open sym subst intern)))))
+                                         (and ty (cons sym ty))))
+                                     (cl:remove-duplicates
+                                      (append (hashtable-keys vars) call-sites)))))))))
         (set! *xtc:infer:fresh-counter* saved-fresh)
         (set! *xtc:infer:op-sites* saved-ops)
         (set! *xtc:infer:call-sites* saved-calls)
@@ -1366,10 +1380,11 @@
 
 ;; When set, run-type-check returns check-function's result directly --- the
 ;; constraint path drives compilation, the old traversal is bypassed.  The
-;; full from-source shadow sweep (every core and external lib, the test
-;; corpus, the examples) is clean and most of the flip validation passes;
-;; still default-OFF pending the last flip blockers (sequence-dependent
-;; failures in tests/core/{xtlang,adt} under the flip --- see TASK-059).
+;; from-source shadow sweep (every core and external lib, the test corpus,
+;; the examples) is clean and the whole suite minus ONE test function passes
+;; through this path; default stays OFF pending the last blocker (nested
+;; generic call sites inside a recursive-ADT print instance --- see TASK-059
+;; resume notes).
 (define *xtc:infer:live?* #f)
 
 (define xtc:infer:shadow-norm

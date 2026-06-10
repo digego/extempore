@@ -3556,6 +3556,7 @@ xtlang's `let' syntax is the same as Scheme"
                      ;; global name
                      (string-append (symbol->string symname) "__" (number->string (llvm:count++)))
                      (if (or (null? prev) ;; this adds return type
+                             (not (assoc-strcmp (car prev) types))
                              (null? (cdr (assoc-strcmp (car prev) types))))
                          *xtc:codegen:other*
                          (caddr (assoc-strcmp (car prev) types)))
@@ -3602,7 +3603,8 @@ xtlang's `let' syntax is the same as Scheme"
                ;; (println 'gpoly: (xtc:cache:genericfunc-types (string->symbol (car (string-split-on (symbol->string (car ast)) "##")))))
                ;; (println 'compile 'generic? ast)
                ;; (println 'types types)
-               (if (null? (cdr (assoc-strcmp (car ast) types)))
+               (if (or (not (assoc-strcmp (car ast) types))
+                       (null? (cdr (assoc-strcmp (car ast) types))))
                    (xtc:diagnostics:print-could-not-resolve-generic-type-error types ast))
 
                (let* ((polyname-str (car (string-split-on (symbol->string (car ast)) "##")))

@@ -639,3 +639,25 @@
                       (xtc:codegen:pretty-print-type closure-type)
                       zone-size)))))
         symname-string)))))
+
+;; Reentrant wrapper: an instance compile can be triggered MID-PIPELINE --- a
+;; generic instance type registered during inference read-back, an instance
+;; injected during add-types-to-source --- and recursively enters the driver,
+;; whose entry CLEARS the pipeline globals.  Save and restore them around
+;; every run so the outer pipeline resumes undisturbed.  (On a throw the
+;; restore is skipped, but the outer compile is aborting anyway.)
+(define xtc:driver:run
+  (let ((run-fresh xtc:driver:run))
+    (lambda args
+      (let ((saved-stack *xtc:codegen:sym-name-stack*)
+            (saved-ls *xtc:codegen:ls_var*)
+            (saved-bl *xtc:globals:bound-lambdas*)
+            (saved-gtm *xtc:desugar:generic-type-mappings*)
+            (saved-rt *xtc:typecheck:nativef-generics-recurse-test*))
+        (let ((r (apply run-fresh args)))
+          (set! *xtc:codegen:sym-name-stack* saved-stack)
+          (set! *xtc:codegen:ls_var* saved-ls)
+          (set! *xtc:globals:bound-lambdas* saved-bl)
+          (set! *xtc:desugar:generic-type-mappings* saved-gtm)
+          (set! *xtc:typecheck:nativef-generics-recurse-test* saved-rt)
+          r)))))

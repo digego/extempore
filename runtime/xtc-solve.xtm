@@ -467,6 +467,18 @@
               #f
               (xtc:type:to-intcode-open term intern))))))
 
+;; Like type-of but a residual variable renders as its bang-symbol instead of
+;; refusing: the read-back for a variable whose FORCED annotation was itself a
+;; bang pattern (a data-constructor argument annotated with a recursive
+;; type's bare expansion) --- the old checker kept such pattern-typed entries.
+(define xtc:solve:type-of-open
+  (lambda (sym subst intern)
+    (if (eq? subst 'conflict)
+        #f
+        (xtc:type:to-intcode-open
+         (xtc:type:apply-subst (xtc:type:from-intcode sym intern) subst)
+         intern))))
+
 ;; Did the solve fully determine `sym'?
 (define xtc:solve:resolved?
   (lambda (sym subst intern)

@@ -186,8 +186,21 @@
                        (string-append "##" (cadr parts))
                        ""))
            (depth (xtc:type:trailing-stars head))
-           (name (string-append (xtc:type:strip-trailing-stars head) suffix)))
-      (xtc:type:wrap-ptr depth (xtc:type:intern-var name intern)))))
+           (base (xtc:type:strip-trailing-stars head)))
+      ;; a suffix-free symbol naming a registered GENERIC TYPE is a recursive
+      ;; type's bare self-reference (the Tree* inside Tree's own expansion, a
+      ;; constructor argument annotated with the bare name): it is the NAMED
+      ;; term --- compatible with any instance --- not a type variable, which
+      ;; would never ground and leave the whole signature unresolved.  A
+      ;; ##-suffixed occurrence is a CALL-SITE variable (the constructor
+      ;; CsnD0##7) and must stay a variable.
+      (if (and (null? (cdr parts))
+               (> (string-length base) 0)
+               (not (char=? (string-ref base 0) #\!))
+               (xtc:cache:generictype-exists? base))
+          (xtc:type:wrap-ptr depth (xtc:type:named base))
+          (xtc:type:wrap-ptr depth
+                             (xtc:type:intern-var (string-append base suffix) intern))))))
 
 ;; A generic-instance type --- List{i64}, Pair{!a,!b} --- decodes to a NOMINAL
 ;; parametric term (napp name arg...), NOT to the underlying tuple.  Keeping the
@@ -493,12 +506,19 @@
            (and tc (xtc:type:field-from-tuplecode tc idx))))
         ((xtc:type:napp? t)
          (and (null? (xtc:type:free-vars t))
-              (let ((tc (xtc:desugar:get-generic-type-as-tuple
-                         (string-append
-                          (xtc:type:napp-name t) "{"
-                          (string-join (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
-                                            (xtc:type:napp-args t))
-                                       ",")
-                          "}"))))
+              (let* ((argstr (string-join
+                              (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
+                                   (xtc:type:napp-args t))
+                              ","))
+                     ;; prefer the REGISTERED instance's tuplecode: its fields
+                     ;; are fully instantiated (a recursive field is the
+                     ;; instance's own c-name).  The declaration-expansion
+                     ;; fallback leaves the recursive type's own variables
+                     ;; free, so a projected field never grounds.
+                     (name1 (string-append (xtc:type:napp-name t) "_poly_"
+                                           (cname-encode (string-append "<" argstr ">"))))
+                     (tc (or (xtc:cache:get-namedtype-type name1)
+                             (xtc:desugar:get-generic-type-as-tuple
+                              (string-append (xtc:type:napp-name t) "{" argstr "}")))))
                 (and tc (xtc:type:field-from-tuplecode tc idx)))))
         (else #f)))))
