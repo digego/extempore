@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-09 21:40'
+updated_date: '2026-06-10 06:41'
 labels:
   - compiler
   - types
@@ -31,7 +31,7 @@ Goal: route all unification through the canonical core and delete the old family
 <!-- AC:BEGIN -->
 - [x] #1 Old behaviour (incl. union-type simplification/pruning) characterised by tests before any change
 - [ ] #2 All xtc:desugar:type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? sites migrated or removed
-- [ ] #3 Live inference unifies via xtc:type:unify + the int-code/pretty bridges
+- [x] #3 Live inference unifies via xtc:type:unify + the int-code/pretty bridges
 - [ ] #4 No regression in generic/poly inference (esp. the #315 pointer-depth class); full suite green
 <!-- AC:END -->
 
@@ -49,197 +49,102 @@ REMAINING (see Implementation Notes 'START HERE'): (1) reconcile check-function'
 
 <!-- SECTION:NOTES:BEGIN -->
 ══════════════════════════════════════════════════════════════════════════════
-CURRENT STATE & RESUME POINT — authoritative as of 2026-06-10 (session 2).
-Supersedes every dated "STATUS / RESUME POINT" stanza in the History section below.
+CURRENT STATE & RESUME POINT — authoritative as of 2026-06-10 (session 3).
+Supersedes every earlier dated stanza.
 ══════════════════════════════════════════════════════════════════════════════
 
-All work committed LOCALLY and GREEN (compiler-unit 11/11 incl. the real aot
-compile; libs-core ctest 9/9). Nothing pushed — pushing is Ben's deliberate
-step. The live compiler is UNCHANGED by default: the new path sits behind two
-default-off flags (*xtc:infer:shadow?*, *xtc:infer:live?*).
+THE FLIP IS ON: *xtc:infer:live?* defaults to #t (commit c5a7f3fa) — the
+constraint engine drives all compilation; the old candidate-list traversal and
+its retry loop are bypassed (still present, deletion is increment 4).  All work
+committed LOCALLY; nothing pushed — pushing is Ben's deliberate step.
 
-SESSION-2 RESOLUTION OF THE OLD "ONE REMAINING BLOCKER": the dotimes repro in
-the previous notes was INVALID xtlang (an undeclared counter is a compile
-error on the old path too — counters must be let/arg-declared, see the
-dotimes docstring; doloop is the auto-binding variant). The real codegen
-integration gaps were (a) the read-back leaking non-locals (globals, ## call
-sites read by name) into the types alist, which codegen scope-checks against
-its sym-name-stack, and (b) missing old-path symbol discipline in collect.
-Both fixed; the flip now compiles and runs the full common surface, generics,
-poly overloads, closure values, globals, convert/coercions.
+Validated locally, all through the flipped compiler:
+- full AOT rebuild: clean_aot + aot_external_audio, exit 0, no errors
+- ctest: compiler-unit 11/11, libs-core 9/9 (incl. the previously failing
+  tests/core/adt.xtm), libs-external 1/1
 
-FROM-SOURCE SHADOW SWEEP (cache off, *xtc:infer:shadow?* on, per-lib
-extempore --nobase): base 106, math 307, adt 147, math_ext 307, rational 219,
-audiobuffer 195, audio_dsp 478, instruments 830, scheduler 225,
-pattern-language 0 (pure scheme), fft 351, sndfile 188, audio_dsp_ext 440,
-portmidi 203, stb_image 107 functions; PLUS the test corpus run under shadow
-(tests/core/{xtlang 233, generics 125, adt 254, type-system 41, std 2}) —
-ALL ZERO SHADOW-ERROR/CONFLICT/DIVERGE except (a) ONE accepted benign class:
-an UNUSED float-literal binding's width (blsaw_c/blsawXAnalogue_c `(t 0.0)`,
-never read: old fp32 via the retry loop's accidental ordering, new fp64
-default; observationally identical — no reads, alloca width only), and
-(b) analogue_fx (instruments) still CONFLICT — the one remaining function,
-under investigation.
+SESSION-3 FIXES (commits bfc91815, 9a305942, c5a7f3fa):
+1. THE OLD FLIP BLOCKER (recursive-ADT print instance): a free-return generic
+   call whose argument is not ground at collect time (tree_value## inside the
+   print instance) emitted only the context-directed overload, leaving the
+   fallback's return free; the surrounding print## overload greedily picked
+   [void,Tree*], and the residual silently DROPPED both sites from the
+   read-back (which is also why the shadow sweep never flagged it — missing
+   entries don't count as DIVERGE).  Fix: the fallback's field projection now
+   rides the deferred branch as a c-project constraint; when the argument
+   grounds mid-solve the return pins to its field and the search prunes wrong
+   picks.  A call site dropped for a residual type now also warns loudly.
+2. SOLVER PERFORMANCE (instruments AOT was >10min, vs old path 7.7s — hit the
+   300s AOT timeout): commit-pass replaces commit-one (commits every
+   currently-unique overload per pass, threads subst, keeps NARROWED candidate
+   lists — pruning is permanent since substs only extend; narrowing is
+   functional so search branches can't leak prunes); overload-viable hoists
+   all (key,subst)-only work out of the candidate loop (key decodes,
+   resolutions, class-table representatives — old arg-class rescanned the
+   class table per candidate ARGUMENT).  instruments AOT now ~11s; audio_dsp
+   first-100-fn solve 8.6s → 0.4s.  If perf regresses, profile via
+   overload-viable: it was ~99% of solve time.
+3. CALL-VALUE LENIENCY: dlogue's (if (FM) ...) calls an i1 local; the old
+   checker reads (v) over a non-closure as v itself.  New 'callval deferred
+   constraint (zero-arg application of a local symbol): once the head grounds
+   — closure: its return; closure with params: conflict; else: the value.
+4. analogue_fx (the last shadow CONFLICT) compiles clean under the flip —
+   resolved by fix 1/2, no separate change needed.
 
-The sweep drove a dozen fixes (see git log this session), the structural ones:
-- xtc:solve:search — backtracking search over pending-overload candidate
-  choices (cascade uniques, split on the first ambiguous, prune on conflict,
-  candidate order = default order so greedy first-success ≡ defaulting for
-  genuinely free ties). This is the honest replacement for the old retry
-  loop: real library code (cstring/String str elections; SAMPLE=float filter
-  coefficient chains vs libc double natives; Rational/Complex operator
-  overloads) NEEDS joint choice — one-step and cascade-lookahead horizons
-  both failed on audio_dsp. Replaces lookahead/finish-pending; defaults now
-  run only after all overloads resolve.
-- to-pretty renders SURFACE spelling (named types unprefixed) — the %-form
-  napp re-encode minted poly c-names that don't exist, and walking one hung
-  the old typechecker's resolver (the "adt hang").
-- global-candidates UNIONS native+closure+poly sources (tan is a double
-  native AND carries a float poly overload).
-- value-aware int literal classes, (si64 si32) index defaults, vecmath
-  structural candidate (V ⊕ V* → V), result-key class admissibility,
-  arg-class by canonical variable, one-armed if, '() forms, pointer-ref-ptr,
-  closure-ref/set!/refcheck, compound-head application ((pref buf i) x).
+Diagnostics added: xtc:solve:explain-conflict (replays equalities naming the
+first failure, or names every overload with no viable candidate) runs on
+check-function's error path; unresolved-call-site dropped warning in the
+read-back.
 
-WHAT THE TASK IS: replace the old string/int-code candidate-list unifier
-(xtc:desugar:type-unify family + the enumeration retry loop in run-type-check*)
-with the canonical Robinson core (xtc:type:unify), routing live inference through
-a clean constraint engine and then deleting the old family.
-
-──────────────────────────── DONE ────────────────────────────
-- Inc 0/1: old pruning contract frozen (tests/compiler/typeunify.xtm); xtc-solve.xtm
-  built — the constraint engine over the canonical core (eq / default / overload).
-- Inc 2: xtc-infer.xtm — the constraint-EMITTING traversal. Full form coverage +
-  all generics. Generics use NOMINAL parametric types: a new canonical term
-  (napp name arg...) keeps the generic name, so List{i64} != same-shaped Stack{i64}
-  and recursive types need no expansion; the bridge decodes both a concrete
-  instance's poly c-name and a candidate's Name{!a} pattern to napp, and re-encodes
-  a concrete napp back to the exact c-name. Free-return fallbacks (first/second's
-  [!a,!b]*) reify by projecting the body's field. Shadow-validated vs the old
-  checker (xtc:bind:get-expression-type) in tests/compiler/infer.xtm.
-- Inc 3:
-  * 3a — xtc:infer:check-function (vars forced-types ast): the whole-function
-    analogue of run-type-check. Collect constraints over the t4 AST, seed each
-    forced-type as a c-eq, solve once (NO retry loop — the solver fixpoint subsumes
-    it), read every var's type into the (var . type) alist the driver consumes.
-    tests/compiler/inferfn.xtm shadows run-type-check at function granularity.
-  * 3b — collect covers the FULL common surface + long tail: ret->, set!, void,
-    null?, impc_null, string literals; alloc (stack/heap/zone), tuple/array/vector
-    ref+set!+ref-ptr, make-tuple/array/vector, ref, pref, pointer-ref/pdref,
-    pointer-set!, vector-shuffle; while, dotimes; bitcast/bitconvert; printf family;
-    math intrinsics (sqrt/sin/pow/...) + the full mathbinaryaritylist (modulo +
-    bitwise); zones; num-of-elts/obj-size. Tuple/array/vector indexing needed the
-    one solver extension this migration added: a DEFERRED 'project' constraint
-    (xtc:solve:c-project + xtc:solve:discharge-projects, interleaved in the fixpoint)
-    with the field engine xtc:type:project-field-term in the bridge; the free-return
-    reifier shares it.
-  * 3c — live shadow: xtc-infer is loaded live (sys:load in xtc-globals.xtm, after
-    solve); run-type-check cross-checks check-function when *xtc:infer:shadow?* is on
-    (catch-guarded, observational, logs SHADOW-ERROR/CONFLICT/DIVERGE). Validated
-    ZERO divergence over extensive real bind-funcs: recursion (fib, list-sum),
-    generics over concrete lists (car/cdr/cons/nil/list/length/reverse), closures as
-    values + args, while/dotimes with pointer access, tuples, named types, math,
-    strings (printf %s, cat).
-  * 3d — the flip, GATED behind *xtc:infer:live?* (default #f). When on,
-    run-type-check returns check-function's result directly (old traversal + retry
-    loop bypassed). check-function's read-back is the UNION of the var table and the
-    program vars the constraints referenced (interned by name) so a form-introduced
-    var (dotimes counter) is not dropped. With the flip on the common surface
-    COMPILES AND RUNS correctly via the new path (verified: arithmetic, tuples,
-    alloc, conditionals).
-
-──────────────────────────── REMAINING — START HERE ────────────────────────────
-ONE flip blocker left.  With *xtc:infer:live?* flipped to #t (one line in
-runtime/xtc-infer.xtm), the suite is: compiler-unit 11/11, libs-core 8/9 —
-the only failure is tests/core/adt.xtm's tree_test, with a now-PRECISE error.
-
-THE BLOCKER (exact repro below): compiling the print instance for a recursive
-ADT over a generic payload (print_poly over Tree{Point{double}*}) errors
-"couldn't resolve generic types" — the instance body's NESTED generic call
-sites (print##85 (tree_value##86 t2)) don't resolve.  tree_value's signature
-is [!a,Tree*]* (free return, bare recursive param) and its body (tref t 0) IS
-projectable, but inside THIS instance the projection/lookup chain leaves the
-##-site entries unresolved in the alist (the dump shows print_return##87 and
-the sites at (213 -1 ...) with the !a never grounding to Point{double}*).
-Investigate collect-generic-call's path for tree_value## here: argterm t2 =
-napp Tree{Point{double}*} is ground, so project-fallback should reify field 0
-= Point{double}* — check why it doesn't (probably the eager projection runs,
-but print##85's overload then can't pick the [void,Point*] instance, or the
-reified value never reaches the site constraint).
-
-Repro (10s, batch):
-  extempore --batch with: load libs/core/adt.xtm; eval the Point/Tree decls +
-  custom print:[void,Tree*]*/tree_value:[!a,Tree*]*/Leaf from
-  tests/core/adt.xtm lines ~100-160; then
-  (bind-func ztree3 (lambda () (let ((t5 (Leaf (Point 3.0 4.0)))
-    (t6 (Tree (Point 1.0 2.0) t5 null))) (printout "Point Tree: " t6) 1)))
-  under (set! *xtc:infer:live?* #t).  The error names the unresolved alist.
-
-FIXED THIS SESSION EN ROUTE (commits 8be9f68d..bf1dcfc1) — context that will
-save the next session real time:
-- REAL GC BUGS, not type bugs, caused the "sequence-dependent" xtmtest
-  failures: s7_cons can GC before storing its args and the GC can't see
-  C-frame locals.  All FFI list-builders + mk-ff now protect both halves
-  (src/ffi/{regex,sys,llvm,misc}.inc).  Found with an S7_DEBUGGING=1 build
-  of src/s7.c (flag now back to 0) — that build traps freed-cell use and
-  was the decisive tool; re-enable it if anything smells like corruption.
-- libs/core/test.xtm's results alist set-cdr!'d into s7 SEMIPERMANENT
-  (non-heap, untraced) pairs → heap entries collected while referenced;
-  now rebuilt functionally.  NOTE: Ben's xtm-test-review WORKTREE holds a
-  principled xtmtest refactor that RETIRES this harness — merge it after
-  this task lands (it's based on an older master; do not merge before).
-- driver reentrancy (instance compiles mid-pipeline), bare-generic-name
-  symbols decode as named terms, project-field-term uses the registered
-  instance tuplecode, pattern-typed read-back (type-of-open), and the two
-  raw (cdr (assoc ...)) crash sites now produce real diagnostics.
-
-THEN (unchanged):
-1. Full ctest labels + clean_aot + aot_external_audio rebuilt THROUGH the flip
-   (expect a benign cache diff: blsaw `t` allocas double vs float).
-2. Increment 4 (AC#2/#3): delete the six old unifiers, the retry loop in
-   run-type-check*, the ~45 old xtc:typecheck:*-check handlers, the shadow
-   scaffolding (both flags), get-expression-type's old-path internals.
-   semantic-phase's unity? check is replaced by the live branch erroring on
-   unresolved vars.  Delete tests/compiler/{constraints,typeunify}.xtm and
-   rework infer/inferfn (their oracle IS the new path once the old is gone).
-3. Gated on full CI (Linux/macOS/Windows) — Ben's push.
+──────────────────────────── REMAINING ────────────────────────────
+1. CI (Linux/macOS/Windows) on Ben's push — gates everything below.
+   (Expect possible benign cache diff: blsaw `t` allocas double vs float —
+   an UNUSED binding, observationally identical.)
+2. AC#4 check after CI is green.
+3. Increment 4 (AC#2): delete the six old unifiers
+   (xtc:desugar:type-unify / complex-unify / unify-lists / sym-unify /
+   occurs-in-type? / unity?), the retry loop in run-type-check*, the ~45 old
+   xtc:typecheck:*-check handlers, the shadow scaffolding (both flags),
+   get-expression-type's old-path internals.  semantic-phase's unity? check is
+   replaced by the live branch erroring on unresolved vars.  Delete
+   tests/compiler/{constraints,typeunify}.xtm and rework infer/inferfn (their
+   oracle IS the new path once the old is gone).
+4. AFTER this task lands: merge Ben's xtm-test-review worktree (principled
+   xtmtest refactor retiring the GC-fragile harness; based on older master,
+   do not merge before).
 
 ──────────────────────── KEY FILES, FLAGS, COMMANDS ────────────────────────
-- runtime/xtc-infer.xtm — the traversal; xtc:infer:collect (the form dispatch),
-  check-function, shadow-check; flags *xtc:infer:shadow?* / *xtc:infer:live?* /
-  counter *xtc:infer:shadow-count*.
-- runtime/xtc-solve.xtm — the solver: eq / default / overload / project constraints
-  + the resolve fixpoint.
-- runtime/xtc-types.xtm + xtc-types-bridge.xtm — canonical core + int-code/pretty
-  bridge (napp term, xtc:type:project-field-term).
-- runtime/xtc-typecheck.xtm:3282 xtc:typecheck:run-type-check — the flip branch +
-  the shadow hook.
-- runtime/xtc-globals.xtm — loads xtc-infer live.
-- Tests: tests/compiler/{infer,inferfn,solve,typecore,typebridge}.xtm. Run from
-  build/: ctest --label-regex compiler-unit -j4. (11/11 green incl aot.)
-  Note: inferfn's standalone prep cannot register a self-symbol or a dotimes
-  counter the way the live pipeline does, so recursion and dotimes are validated by
-  the LIVE shadow, not by inferfn.
+- runtime/xtc-infer.xtm — traversal (xtc:infer:collect), check-function,
+  fallback-recipe/project-fallback (free-return generics), flags
+  *xtc:infer:shadow?* / *xtc:infer:live?* (now #t).
+- runtime/xtc-solve.xtm — solver: eq / default / overload / project / callval;
+  commit-pass + search (backtracking, most-constrained split);
+  explain-conflict.
+- runtime/xtc-types.xtm + xtc-types-bridge.xtm — canonical core + bridges.
+- runtime/xtc-typecheck.xtm:3282 run-type-check — the flip branch.
+- Tests from build/: ctest --label-regex "compiler-unit|libs-core|libs-external" -j4.
+- AOT through flip: cmake --build . --target clean_aot && cmake --build . --target aot_external_audio -j.
+- Old path for comparison: (set! *xtc:infer:live?* #f) at runtime, or the
+  define in xtc-infer.xtm.  Per-lib from-source: *xtc:globals:with-cache* #f.
 
 ══════════════════════════════════════════════════════════════════════════════
-HISTORY / RATIONALE (context only; not needed to resume — full detail in git log)
+HISTORY / RATIONALE (context only; full detail in git log)
 ══════════════════════════════════════════════════════════════════════════════
-- Ben chose a full rewrite (delete the candidate-list union-find + number-crunch +
-  enumeration retry loop) over a site-by-site port.
-- The solver splits the old conflated candidate list into three constraint kinds:
-  equality (Robinson unify), numeric default (one post-unify rule), overload
-  (deferred choice, a fixpoint that commits unambiguous overloads then defaults as
-  tie-break — subsumes the retry loop with no search). Class-aware viability keeps
-  an int literal from binding to a float param.
-- Generics went through a structural decode first; that was found UNSOUND (List,
-  Pair, Point all expand to the same shape, so distinct generics cross-unified, and
-  container-returning generics diverged from the old c-name). Reworked to NOMINAL
-  napp types (above) — the sound foundation; no unifier change needed.
-- SAFETY MARGIN that held until 3c: from-intcode/to-intcode and the solver were
-  reached only by the inert canonical core, so changes could not alter live
-  behaviour. 3c loaded xtc-infer live but kept it inert behind the shadow flag; 3d's
-  flip is likewise default-off. So every commit kept the live compiler unchanged.
-- The clean unifier is intentionally STRICTER than the old path on implicit numeric
-  coercion (a narrower result into a wider param; a bare int literal into a float
-  param). Those two coercions are kept out of the shadow corpus by design.
+- Ben chose a full rewrite (delete the candidate-list union-find + number-crunch
+  + enumeration retry loop) over a site-by-site port.
+- Increments 0–3 (sessions 1–2): old pruning contract frozen
+  (tests/compiler/typeunify.xtm); xtc-solve.xtm constraint engine; xtc-infer.xtm
+  constraint-emitting traversal (full form coverage, nominal napp generics,
+  free-return body projection); check-function whole-function entry; live
+  shadow hook; from-source shadow sweep over every core/external lib + test
+  corpus, all clean except the two items fixed in session 3.
+- Session-2 en-route fixes: real GC bugs in FFI list-builders (s7_cons GC'ing
+  before storing args — S7_DEBUGGING=1 build of src/s7.c is the decisive tool
+  if corruption ever smells again); test.xtm results alist set-cdr! into
+  SEMIPERMANENT pairs; driver reentrancy; bare-generic-name decode;
+  pattern-typed read-back.
+- xtc:solve:search rationale: real library code NEEDS joint overload choice
+  (cstring/String str elections; SAMPLE=float coefficient chains vs libc
+  double natives; Rational/Complex operators) — one-step and cascade-lookahead
+  horizons both failed on audio_dsp.
 <!-- SECTION:NOTES:END -->
