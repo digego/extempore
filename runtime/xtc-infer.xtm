@@ -469,8 +469,15 @@
       (cons rk
             (append (cdr rc-f)
                     (apply append (map cdr args))
-                    (list (xtc:solve:c-eq (car rc-f)
-                                          (xtc:infer:closure-code rk (map car args)))))))))
+                    ;; a ZERO-argument application of a local cannot assert a
+                    ;; closure type: the old checker reads (v) over a
+                    ;; non-closure v as v itself ((if (FM) ...) over an i1 ---
+                    ;; dlogue relies on it), so which reading applies is
+                    ;; deferred until the head's type grounds
+                    (if (and (null? (cdr ast)) (symbol? (car ast)))
+                        (list (xtc:solve:c-callval rk (car rc-f)))
+                        (list (xtc:solve:c-eq (car rc-f)
+                                              (xtc:infer:closure-code rk (map car args))))))))))
 
 ;; The candidate signatures of a global function named `sym', each the int-code
 ;; list (return-type param-type ...), or #f if `sym' is not a global function
@@ -1347,7 +1354,9 @@
              (call-sites *xtc:infer:call-sites*)
              (result
               (if (eq? subst 'conflict)
-                  #f
+                  (begin
+                    (xtc:solve:explain-conflict (append forced (cdr rc)) intern)
+                    #f)
                   ;; Read back the declared variables (the var table's keys)
                   ;; plus the ## call-site symbols this run constrained ---
                   ;; nothing else.  A symbol the constraints referenced that
