@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-10 07:53'
+updated_date: '2026-06-10 09:37'
 labels:
   - compiler
   - types
@@ -32,7 +32,7 @@ Goal: route all unification through the canonical core and delete the old family
 - [x] #1 Old behaviour (incl. union-type simplification/pruning) characterised by tests before any change
 - [ ] #2 All xtc:desugar:type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? sites migrated or removed
 - [x] #3 Live inference unifies via xtc:type:unify + the int-code/pretty bridges
-- [ ] #4 No regression in generic/poly inference (esp. the #315 pointer-depth class); full suite green
+- [x] #4 No regression in generic/poly inference (esp. the #315 pointer-depth class); full suite green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -167,4 +167,6 @@ Suite re-validated at dde9dfb0 through the flipped compiler: compiler-unit
 11/11, libs-core 9/9, libs-external 1/1 (21/21).  Local master is 43 commits
 ahead of origin/master, nothing pushed.  NOTHING BLOCKS push → CI → AC#4 →
 increment 4 (the deletion).
+
+CI run 27261868361 green on all four platforms (Linux x86_64/aarch64, macOS aarch64, Windows x86_64) for the full pushed stack incl. the flip — AC#4 satisfied. Only increment 4 (the deletion, AC#2) remains.
 <!-- SECTION:NOTES:END -->
