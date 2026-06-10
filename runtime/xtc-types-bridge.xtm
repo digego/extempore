@@ -384,8 +384,12 @@
       ((number? t) (number->string t))
       ((xtc:type:ptr? t)
        (string-append (xtc:type:to-pretty (xtc:type:ptr-to t) intern) "*"))
+      ;; surface form, no % prefix: the spelling cname-encode and the generic
+      ;; registry expect (the %-form is the INT-CODE spelling, to-intcode's job).
+      ;; Rendering it here once made a napp re-encode mint a poly c-name
+      ;; (List_poly_<base64 of "<%String*>">) the live compiler never creates.
       ((xtc:type:named? t)
-       (string-append "%" (xtc:type:named-name t)))
+       (xtc:type:named-name t))
       ((xtc:type:tuple? t)
        (string-append "<" (xtc:type:to-pretty-list (cdr t) intern) ">"))
       ((xtc:type:array? t)

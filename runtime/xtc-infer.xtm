@@ -341,6 +341,13 @@
        (xtc:infer:collect-make-homogeneous ast bound *xtc:codegen:vector*))
       ((and (pair? ast) (eq? (car ast) 'vector-shuffle))
        (xtc:infer:collect-vector-shuffle ast bound))
+      ((and (pair? ast) (eq? (car ast) 'closure-ref))
+       (xtc:infer:collect-closure-ref ast bound))
+      ((and (pair? ast) (eq? (car ast) 'closure-set!))
+       (xtc:infer:collect-closure-set! ast bound))
+      ((and (pair? ast) (eq? (car ast) 'closure-refcheck))
+       (cons *xtc:codegen:i1*
+             (cdr (xtc:infer:collect (cadr ast) bound))))
       ((and (pair? ast) (member (car ast) '(push_zone pop_zone push_new_zone create_zone)))
        (xtc:infer:collect-zone ast bound))
       ((and (pair? ast) (member (car ast) '(num-of-elts obj-size)))
@@ -353,8 +360,11 @@
        (xtc:infer:collect-printf ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-intrinsic? (car ast)))
        (xtc:infer:collect-math-intrinsic ast bound))
-      ;; a local variable in call position is a closure call
+      ;; a local variable in call position is a closure call; so is an
+      ;; application whose head is itself an expression (a computed closure)
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
+       (xtc:infer:collect-closure-call ast bound))
+      ((and (pair? ast) (pair? (car ast)))
        (xtc:infer:collect-closure-call ast bound))
       ;; otherwise a symbol in call position is a global function (its candidate
       ;; signatures) or a generic function whose return reifies from the argument
@@ -421,18 +431,22 @@
       (cons (xtc:infer:closure-code (car body) params)
             (cdr body)))))
 
-;; (f arg ...) with f a local closure: f must be a closure whose argument slots
-;; are the argument types and whose result is fresh; the call's type is that
-;; result.  Unifying f against this synthesised closure is the instantiate-and-
-;; unify step --- the call site's argument types flow into f's signature and f's
-;; return type flows back out, in one equality.
+;; (f arg ...) with f a local closure --- or ((f-expr) arg ...) with a computed
+;; head, e.g. ((pref closure-buf i) x y): the head must be a closure whose
+;; argument slots are the argument types and whose result is fresh; the call's
+;; type is that result.  Unifying the head against this synthesised closure is
+;; the instantiate-and-unify step --- the call site's argument types flow into
+;; its signature and its return type flows back out, in one equality.  The head
+;; is collected like any expression (a bound symbol denotes its own variable).
 (define xtc:infer:collect-closure-call
   (lambda (ast bound)
-    (let* ((args (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast)))
+    (let* ((rc-f (xtc:infer:collect (car ast) bound))
+           (args (map (lambda (a) (xtc:infer:collect a bound)) (cdr ast)))
            (rk (xtc:infer:fresh-key)))
       (cons rk
-            (append (apply append (map cdr args))
-                    (list (xtc:solve:c-eq (car ast)
+            (append (cdr rc-f)
+                    (apply append (map cdr args))
+                    (list (xtc:solve:c-eq (car rc-f)
                                           (xtc:infer:closure-code rk (map car args)))))))))
 
 ;; The candidate signatures of a global function named `sym', each the int-code
@@ -940,6 +954,34 @@
                     (list (xtc:solve:c-overload kr
                                                 (list (car (car rcs)) (car (cadr rcs)))
                                                 (list 'vecmath))))))))
+
+;; The closure environment-slot forms the dot syntax (clos.slot:type) desugars
+;; to.  (closure-ref clos "slot" lltype): the result is the slot's explicit
+;; LLVM type string (the annotation), decoded; with no annotation the context
+;; fixes it, a fresh variable.  (closure-set! clos "slot" v lltype): v takes
+;; the slot type, and the form's value is v's.  (closure-refcheck clos "slot"):
+;; a slot-existence test, i1.  The closure operand is collected as an ordinary
+;; expression (a global closure / poly reference resolves through the caches);
+;; the slot-name string is a literal and carries no constraint.
+(define xtc:infer:collect-closure-ref
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (cadr ast) bound)))
+      (cons (if (null? (cadddr ast))
+                (xtc:infer:fresh-key)
+                (xtc:codegen:get-type-from-str (cadddr ast)))
+            (cdr rc)))))
+
+(define xtc:infer:collect-closure-set!
+  (lambda (ast bound)
+    (let ((rc (xtc:infer:collect (cadr ast) bound))
+          (rc-v (xtc:infer:collect (cadddr ast) bound)))
+      (cons (car rc-v)
+            (append (cdr rc) (cdr rc-v)
+                    (if (null? (car (cddddr ast)))
+                        '()
+                        (list (xtc:solve:c-eq
+                               (car rc-v)
+                               (xtc:codegen:get-type-from-str (car (cddddr ast)))))))))))
 
 ;; push_zone / pop_zone / push_new_zone / create_zone: each yields a memory-zone
 ;; pointer (%mzone*); a size argument, when present, is collected.

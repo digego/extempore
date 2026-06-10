@@ -163,6 +163,20 @@
              (if (xtc:solve:default? c) (cons (cadr c) (caddr c)) #f))
            constraints))))
 
+;; The class of argument key `akey', looked up by canonical VARIABLE rather
+;; than by syntactic key: a let-bound name unified with a literal (inv ~ -1.0)
+;; is the same variable as the literal's fresh key, so it carries the
+;; literal's class even though the default constraint is keyed differently.
+(define xtc:solve:arg-class
+  (lambda (akey subst intern classes)
+    (let ((rep (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
+      (let loop ((cs classes))
+        (cond ((null? cs) #f)
+              ((equal? rep (xtc:type:resolve
+                            (xtc:type:from-intcode (caar cs) intern) subst))
+               (cdar cs))
+              (else (loop (cdr cs))))))))
+
 ;; May argument key `akey' take parameter type `pcode' in a candidate?  A still-
 ;; free literal may only take a type from its own class (an integer literal an
 ;; integer width, etc.), so a candidate whose parameter falls outside that class
@@ -180,10 +194,10 @@
   (lambda (akey pcode subst intern classes)
     (let ((resolved (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
       (if (xtc:type:var? resolved)
-          (let ((cell (assoc akey classes)))
-            (if (not cell)
+          (let ((class (xtc:solve:arg-class akey subst intern classes)))
+            (if (not class)
                 #t
-                (cond ((number? pcode) (and (member pcode (cdr cell)) #t))
+                (cond ((number? pcode) (and (member pcode class) #t))
                       ((symbol? pcode)
                        (let ((s (symbol->string pcode)))
                          (and (> (string-length s) 0)
@@ -280,10 +294,40 @@
                    (cons (cdr (car viable)) (append (reverse seen) (cdr ps))))
                   (else (loop (cdr ps) (cons (car ps) seen)))))))))
 
-;; With no overload unambiguous and defaulting exhausted, commit each remaining
-;; overload to its first viable candidate --- a deterministic tie-break for a
-;; genuinely ambiguous call (expected-type-directed selection is a later
-;; refinement).  A pending overload with no viable candidate is a conflict.
+;; At a stall (no overload uniquely viable), commit the first pending overload
+;; to its first viable candidate THAT LEAVES EVERY OTHER PENDING OVERLOAD
+;; VIABLE --- one step of lookahead, the analogue of the old path's
+;; per-variable candidate-set intersection, which let two uses of one variable
+;; narrow each other (e.g. (cstring str) admitting String*/Symbol* against
+;; (String str) admitting String*/i8*: only String* survives both).  Trying
+;; candidates in order keeps the choice aligned with the defaulting order
+;; (fp64/si64 head their classes), so a genuinely tie-broken variable gets the
+;; width the default rule would give it, while a variable whose other uses are
+;; still pending propagates through them instead of defaulting at the wrong
+;; width.  Returns (cons subst2 remaining), or #f when no candidate of any
+;; pending overload survives the lookahead.
+(define xtc:solve:lookahead-commit-one
+  (lambda (pending intern subst classes)
+    (let loop ((ps pending) (seen '()))
+      (if (null? ps)
+          #f
+          (let* ((viable (xtc:solve:overload-viable (car ps) intern subst classes))
+                 (rest (append (reverse seen) (cdr ps)))
+                 (ok (cl:find-if
+                      (lambda (v)
+                        (cl:every (lambda (p)
+                                    (pair? (xtc:solve:overload-viable
+                                            p intern (cdr v) classes)))
+                                  rest))
+                      viable)))
+            (if ok
+                (cons (cdr ok) rest)
+                (loop (cdr ps) (cons (car ps) seen))))))))
+
+;; With no overload unambiguous, the lookahead exhausted and defaulting done,
+;; commit each remaining overload to its first viable candidate --- the last-
+;; resort deterministic tie-break.  A pending overload with no viable candidate
+;; is a conflict.
 (define xtc:solve:finish-pending
   (lambda (pending intern subst classes)
     (let loop ((ps pending) (subst subst))
@@ -345,10 +389,17 @@
                  ((eq? step 'conflict) 'conflict)
                  (step (loop (car step) (cdr step) projects))
                  (else
-                  (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
-                    (if (> (length subst2) (length subst))
-                        (loop subst2 pending projects)
-                        (xtc:solve:finish-pending pending intern subst2 classes)))))))))))))
+                  ;; stall: lookahead-guided commit first --- propagating a
+                  ;; choice consistent with the other pending overloads ---
+                  ;; and only then numeric defaulting, so a default cannot
+                  ;; pin a literal at a width its pending uses contradict
+                  (let ((la (xtc:solve:lookahead-commit-one pending intern subst classes)))
+                    (if la
+                        (loop (car la) (cdr la) projects)
+                        (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
+                          (if (> (length subst2) (length subst))
+                              (loop subst2 pending projects)
+                              (xtc:solve:finish-pending pending intern subst2 classes)))))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;
