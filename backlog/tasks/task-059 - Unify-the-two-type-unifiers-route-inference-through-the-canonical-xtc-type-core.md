@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-10 06:41'
+updated_date: '2026-06-10 07:53'
 labels:
   - compiler
   - types
@@ -147,4 +147,24 @@ HISTORY / RATIONALE (context only; full detail in git log)
   (cstring/String str elections; SAMPLE=float coefficient chains vs libc
   double natives; Rational/Complex operators) — one-step and cascade-lookahead
   horizons both failed on audio_dsp.
+
+─────────────── SESSION-4 ADDENDUM (2026-06-10) ───────────────
+Two state changes since the session-3 stanza above:
+1. The xtm-test-review worktree ALREADY LANDED on local master (commits
+   7251cca8..99c7c85e, on top of the flip) — the 'merge after this task'
+   ordering in REMAINING item 4 is moot.  The branch worktree now points at
+   the same commit as master.
+2. The new harness exposed two genuinely-broken typebridge assertions
+   (napp-encode, napp-pattern-reifies): encode needs the List generictype
+   registered (the c-name choke point runs List{i64} through the old parser),
+   never true in the test's bare process.  The OLD harness had silently
+   dropped error results (catch branch passed args out of order into
+   xtmtest-update-test-result, label position got the call form, matched no
+   group) — so these had NEVER passed; the old green was a lie.  Fixed in
+   dde9dfb0 by mirroring adt.xtm's (bind-type List <!a,List*>) before the
+   encode assertions.
+Suite re-validated at dde9dfb0 through the flipped compiler: compiler-unit
+11/11, libs-core 9/9, libs-external 1/1 (21/21).  Local master is 43 commits
+ahead of origin/master, nothing pushed.  NOTHING BLOCKS push → CI → AC#4 →
+increment 4 (the deletion).
 <!-- SECTION:NOTES:END -->
