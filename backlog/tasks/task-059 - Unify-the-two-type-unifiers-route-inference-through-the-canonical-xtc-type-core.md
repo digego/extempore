@@ -149,40 +149,59 @@ a clean constraint engine and then deleting the old family.
     alloc, conditionals).
 
 ──────────────────────────── REMAINING — START HERE ────────────────────────────
-The flip TRIAL (default #t) is nearly green; the default is back to #f so the
-tree stays releasable.  State of the trial:
+ONE flip blocker left.  With *xtc:infer:live?* flipped to #t (one line in
+runtime/xtc-infer.xtm), the suite is: compiler-unit 11/11, libs-core 8/9 —
+the only failure is tests/core/adt.xtm's tree_test, with a now-PRECISE error.
 
-- compiler-unit 11/11 under the flip.  libs-core 7/9: tests/core/{adt,xtlang}
-  fail with SEQUENCE-DEPENDENT failures (~11 across both).  Everything those
-  files exercise passes when run in isolation OR re-typed verbatim through the
-  same xtmtest macro in a fresh process — including the file's own first three
-  tests, copied character-for-character.  In the file, the first divergence is
-  test_bit_twiddle_2: it COMPILES, then CALLING it from scheme throws (xtmtest
-  label 'compile'), and subsequent results misattribute/cascade
-  (no-compile/incorrect).  tests/core/adt.xtm's analogue: a 'Scheme wrapper
-  error: check the arg arity and types' on test_map_pair.  NOT the bytecode
-  cache (fails with *xtc:globals:with-cache* #f too).  Suspect surface: the
-  scheme-stub/wrapper IR for recompiled-name closures under the flip, or
-  result-label misattribution in xtmtest-update-test-result keyed by func-sym.
-  Reproduce: flip the default to #t, ctest -R "tests/core/xtlang".
+THE BLOCKER (exact repro below): compiling the print instance for a recursive
+ADT over a generic payload (print_poly over Tree{Point{double}*}) errors
+"couldn't resolve generic types" — the instance body's NESTED generic call
+sites (print##85 (tree_value##86 t2)) don't resolve.  tree_value's signature
+is [!a,Tree*]* (free return, bare recursive param) and its body (tref t 0) IS
+projectable, but inside THIS instance the projection/lookup chain leaves the
+##-site entries unresolved in the alist (the dump shows print_return##87 and
+the sites at (213 -1 ...) with the !a never grounding to Point{double}*).
+Investigate collect-generic-call's path for tree_value## here: argterm t2 =
+napp Tree{Point{double}*} is ground, so project-fallback should reify field 0
+= Point{double}* — check why it doesn't (probably the eager projection runs,
+but print##85's overload then can't pick the [void,Point*] instance, or the
+reified value never reaches the site constraint).
 
-- The big flip blockers ARE fixed this session (see commit 8be9f68d): instance
-  type registration in the napp re-encode (the type? hang on unknown c-names),
-  check-function reentrancy (nested data-constructor compiles mid-read-back),
-  ## call-site keys in the alist, and the post-solve xtm_NAME## rewrite for
-  tuple/named operand math (Rational works).  adt.xtm compiles from source
-  through the flip in ~2s compile time vs ~6s old.
+Repro (10s, batch):
+  extempore --batch with: load libs/core/adt.xtm; eval the Point/Tree decls +
+  custom print:[void,Tree*]*/tree_value:[!a,Tree*]*/Leaf from
+  tests/core/adt.xtm lines ~100-160; then
+  (bind-func ztree3 (lambda () (let ((t5 (Leaf (Point 3.0 4.0)))
+    (t6 (Tree (Point 1.0 2.0) t5 null))) (printout "Point Tree: " t6) 1)))
+  under (set! *xtc:infer:live?* #t).  The error names the unresolved alist.
 
-After the flip validates:
+FIXED THIS SESSION EN ROUTE (commits 8be9f68d..bf1dcfc1) — context that will
+save the next session real time:
+- REAL GC BUGS, not type bugs, caused the "sequence-dependent" xtmtest
+  failures: s7_cons can GC before storing its args and the GC can't see
+  C-frame locals.  All FFI list-builders + mk-ff now protect both halves
+  (src/ffi/{regex,sys,llvm,misc}.inc).  Found with an S7_DEBUGGING=1 build
+  of src/s7.c (flag now back to 0) — that build traps freed-cell use and
+  was the decisive tool; re-enable it if anything smells like corruption.
+- libs/core/test.xtm's results alist set-cdr!'d into s7 SEMIPERMANENT
+  (non-heap, untraced) pairs → heap entries collected while referenced;
+  now rebuilt functionally.  NOTE: Ben's xtm-test-review WORKTREE holds a
+  principled xtmtest refactor that RETIRES this harness — merge it after
+  this task lands (it's based on an older master; do not merge before).
+- driver reentrancy (instance compiles mid-pipeline), bare-generic-name
+  symbols decode as named terms, project-field-term uses the registered
+  instance tuplecode, pattern-typed read-back (type-of-open), and the two
+  raw (cdr (assoc ...)) crash sites now produce real diagnostics.
+
+THEN (unchanged):
 1. Full ctest labels + clean_aot + aot_external_audio rebuilt THROUGH the flip
    (expect a benign cache diff: blsaw `t` allocas double vs float).
-2. Increment 4 (AC#2/#3): delete the six old unifiers (type-unify, complex-unify,
-   unify-lists, sym-unify, occurs-in-type?, unity?), the retry loop in
-   run-type-check*, the ~45 old xtc:typecheck:*-check handlers, and the shadow
-   scaffolding (shadow-check + both flags). semantic-phase's unity? check is
-   replaced by the live branch erroring on unresolved vars.  Delete
-   tests/compiler/{constraints,typeunify}.xtm (they test the old machinery) and
-   rework infer/inferfn (their oracle IS the new path once the old one is gone).
+2. Increment 4 (AC#2/#3): delete the six old unifiers, the retry loop in
+   run-type-check*, the ~45 old xtc:typecheck:*-check handlers, the shadow
+   scaffolding (both flags), get-expression-type's old-path internals.
+   semantic-phase's unity? check is replaced by the live branch erroring on
+   unresolved vars.  Delete tests/compiler/{constraints,typeunify}.xtm and
+   rework infer/inferfn (their oracle IS the new path once the old is gone).
 3. Gated on full CI (Linux/macOS/Windows) — Ben's push.
 
 ──────────────────────── KEY FILES, FLAGS, COMMANDS ────────────────────────
