@@ -313,25 +313,36 @@
 ;; Because each candidate list is ordered with its class default first
 ;; (fp64/si64 head the numeric widths), the greedy first-success policy gives a
 ;; genuinely tie-broken variable exactly the width the default rule would.
+;; Returns (subst . remaining-projects), or 'conflict.  Projections discharge
+;; INSIDE the cascade: a tref on a value some candidate choice grounds (a
+;; typeclass dictionary's field, a generic instance's slot) must contradict
+;; that choice within the search, where it prunes the branch --- not after it,
+;; where nothing can backtrack.
 (define xtc:solve:search
-  (lambda (pending intern subst classes)
-    (let cascade ((subst subst) (pending pending))
-      (let ((step (xtc:solve:commit-one pending intern subst classes)))
+  (lambda (pending projects intern subst classes)
+    (let cascade ((subst subst) (pending pending) (projects projects))
+      (let ((pr (xtc:solve:discharge-projects projects intern subst)))
         (cond
-          ((eq? step 'conflict) 'conflict)
-          (step (cascade (car step) (cdr step)))
-          ((null? pending) subst)
+          ((eq? pr 'conflict) 'conflict)
+          ((caddr pr) (cascade (car pr) pending (cadr pr)))
           (else
-           (let* ((o (car pending))
-                  (rest (cdr pending))
-                  (viable (xtc:solve:overload-viable o intern subst classes)))
-             (let try ((vs viable))
-               (if (null? vs)
-                   'conflict
-                   (let ((r (xtc:solve:search rest intern (cdr (car vs)) classes)))
-                     (if (eq? r 'conflict)
-                         (try (cdr vs))
-                         r)))))))))))
+           (let ((step (xtc:solve:commit-one pending intern subst classes)))
+             (cond
+               ((eq? step 'conflict) 'conflict)
+               (step (cascade (car step) (cdr step) projects))
+               ((null? pending) (cons subst projects))
+               (else
+                (let* ((o (car pending))
+                       (rest (cdr pending))
+                       (viable (xtc:solve:overload-viable o intern subst classes)))
+                  (let try ((vs viable))
+                    (if (null? vs)
+                        'conflict
+                        (let ((r (xtc:solve:search rest projects intern
+                                                   (cdr (car vs)) classes)))
+                          (if (eq? r 'conflict)
+                              (try (cdr vs))
+                              r))))))))))))))
 
 ;; One pass over the pending projections: discharge every one whose aggregate has
 ;; resolved enough to read field `index' off as a ground type, unifying it with
@@ -387,10 +398,10 @@
                   ;; a stall with overloads still pending: resolve them all by
                   ;; search --- choices propagate through each other, so a
                   ;; default cannot pin a literal at a width its uses contradict
-                  (let ((r (xtc:solve:search pending intern subst classes)))
+                  (let ((r (xtc:solve:search pending projects intern subst classes)))
                     (if (eq? r 'conflict)
                         'conflict
-                        (loop r '() projects))))
+                        (loop (car r) '() (cdr r)))))
                  (else
                   ;; overloads done: numeric defaulting for whatever literals
                   ;; no use ever pinned (it can wake a pending projection)

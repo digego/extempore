@@ -218,12 +218,22 @@
                 #f
                 "napp-nominal-distinct")
 
-;; a parametric type and a same-name plain named type are still distinct shapes.
+;; a BARE generic name is compatible with any instance of the same name: under
+;; the old structural model the bare form (Blob's [Shape*]* against Circle's
+;; Shape{double}*) expanded with a free type variable that bound and vanished,
+;; so the two were one type --- the nominal core renders that as name equality.
+(xtmtest-result (if (xtc:type:unify (xtc:type:napp "List" 'i64)
+                                    (xtc:type:named "List")
+                                    xtc:type:empty-subst)
+                    #t #f)
+                #t
+                "napp-vs-bare-name-compatible")
+;; ... but DIFFERENT names still refuse.
 (xtmtest-result (xtc:type:unify (xtc:type:napp "List" 'i64)
-                                 (xtc:type:named "List")
+                                 (xtc:type:named "Stack")
                                  xtc:type:empty-subst)
                 #f
-                "napp-vs-named")
+                "napp-vs-other-name-distinct")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; instantiation       ;;

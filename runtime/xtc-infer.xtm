@@ -360,11 +360,19 @@
        (xtc:infer:collect-printf ast bound))
       ((and (pair? ast) (symbol? (car ast)) (xtc:infer:math-intrinsic? (car ast)))
        (xtc:infer:collect-math-intrinsic ast bound))
+      ((and (pair? ast) (eq? (car ast) 'llvm_callback))
+       (xtc:infer:collect-callback ast bound))
       ;; a local variable in call position is a closure call; so is an
-      ;; application whose head is itself an expression (a computed closure)
+      ;; application whose head is itself an expression (a computed closure),
+      ;; and so is a GLOBAL VARIABLE of closure type (a bind-val'd closure)
       ((and (pair? ast) (symbol? (car ast)) (member (car ast) bound))
        (xtc:infer:collect-closure-call ast bound))
       ((and (pair? ast) (pair? (car ast)))
+       (xtc:infer:collect-closure-call ast bound))
+      ((and (pair? ast) (symbol? (car ast))
+            (xtc:cache:globalvar-exists? (symbol->string (car ast)))
+            (xtc:codegen:closure? (xtc:codegen:strip-ptr-depth
+                                   (xtc:cache:get-globalvar-type (symbol->string (car ast))))))
        (xtc:infer:collect-closure-call ast bound))
       ;; otherwise a symbol in call position is a global function (its candidate
       ;; signatures) or a generic function whose return reifies from the argument
@@ -424,12 +432,21 @@
 ;; body's, and the lambda's type is the closure assembled from them.  Because
 ;; the parameter slots and the body's uses intern to the same variables, a use
 ;; that pins a parameter's type pins the corresponding argument slot too.
+;; The return is tied to the body through a tiny overload rather than a bare
+;; equality: either the two are the same type (the inference case, tried
+;; first), or the return is VOID and the body's tail value is discarded ---
+;; the old checker lets a [void,...]* function end in any expression
+;; ((lambda (p v) (pset! p 0 v)) under a void signature).
 (define xtc:infer:collect-lambda
   (lambda (ast bound)
     (let* ((params (ast:lambda-params ast))
-           (body (xtc:infer:collect (ast:lambda-body ast) (append params bound))))
-      (cons (xtc:infer:closure-code (car body) params)
-            (cdr body)))))
+           (body (xtc:infer:collect (ast:lambda-body ast) (append params bound)))
+           (rk (xtc:infer:fresh-key)))
+      (cons (xtc:infer:closure-code rk params)
+            (cons (xtc:solve:c-overload rk (list (car body))
+                                        (list '(!gxret !gxret)
+                                              (list *xtc:codegen:void* '!gxret)))
+                  (cdr body))))))
 
 ;; (f arg ...) with f a local closure --- or ((f-expr) arg ...) with a computed
 ;; head, e.g. ((pref closure-buf i) x y): the head must be a closure whose
@@ -513,14 +530,26 @@
 ;; pretty closure type.  A named generic-type component (List{!a}, Pair{!a,!b})
 ;; is KEPT as its pretty string so the int-code bridge decodes it to a nominal
 ;; napp term --- not expanded to a structural tuple, which would lose the name
-;; and let distinct same-shaped generics (List vs Pair) cross-unify.  Every other
-;; component is parsed to an int-code as usual.
+;; and let distinct same-shaped generics (List vs Pair) cross-unify.  The
+;; registration sometimes leaves an instance in its ANNOTATED-EXPANSION
+;; spelling instead (NUM:<[!a,!a,!a]*,...>*); that is the same nominal type, so
+;; it is reconstructed as Name{vars} from the expansion's type variables
+;; (first-seen order, the declaration's order) at the component's pointer
+;; depth.  Every other component is parsed to an int-code as usual.
 (define xtc:infer:pretty-sig->candidate
   (lambda (pretty)
     (map (lambda (c)
-           (if (string-contains? c "{")
-               c
-               (xtc:codegen:get-type-from-pretty-str c)))
+           (cond
+             ((string-contains? c "{") c)
+             ((and (string-contains? c ":")
+                   (xtc:cache:generictype-exists? (car (regex:type-split c ":"))))
+              (let* ((p (regex:type-split c ":"))
+                     (stripped (xtc:type:strip-trailing-stars (cadr p)))
+                     (depth (- (string-length (cadr p)) (string-length stripped)))
+                     (params (xtc:type:pretty-type-params stripped)))
+                (string-append (car p) "{" (string-join params ",") "}"
+                               (make-string depth #\*))))
+             (else (xtc:codegen:get-type-from-pretty-str c))))
          (xtc:codegen:get-pretty-closure-arg-strings pretty))))
 
 ;; The candidate signatures of a generic function named `sym' at the given
@@ -672,27 +701,38 @@
            (argterms (map (lambda (rc) (xtc:infer:resolve-subterm (car rc) (cdr rc))) rcs))
            (specs (xtc:infer:generic-candidates sym arity)))
       (cond
-        ((or (member #f argterms)
-             (and specs (xtc:infer:any-spec-matches? specs argterms)))
-         (if specs
-             (let ((rk (xtc:infer:fresh-key)))
+        ((and specs (not (member #f argterms))
+              (xtc:infer:any-spec-matches? specs argterms))
+         ;; a return-reifiable specialisation matches the (ground) arguments:
+         ;; the ordinary overload carries the return out
+         (let ((rk (xtc:infer:fresh-key)))
+           (cons rk (append argcons
+                            (xtc:infer:site-constraint sym rk (map car rcs))
+                            (list (xtc:solve:c-overload rk (map car rcs) specs))))))
+        ((and (not (member #f argterms))
+              (let* ((fb (xtc:infer:generic-fallback-entry sym arity))
+                     (proj (and fb (xtc:infer:project-fallback (cdr fb) argterms))))
+                (and proj
+                     (let ((rk (xtc:infer:fresh-key)))
+                       (cons rk (append argcons
+                                        (xtc:infer:site-constraint sym rk (map car rcs))
+                                        (list (xtc:solve:c-eq rk proj)))))))))
+        (else
+         ;; no specialisation matches by arguments alone and the body is not a
+         ;; projectable field access: the call's CONTEXT directs the return ---
+         ;; the result key, tied by the surrounding binding or use, unifies
+         ;; with the signature's (napp-patterned) return and carries the type
+         ;; variables back into the parameter slots, the same way the old
+         ;; checker's expected type directed a free-return generic
+         (let ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
+               (rk (xtc:infer:fresh-key)))
+           (if (null? sigs)
+               (xtc:diagnostics:print-compiler-error
+                (string-append "xtc:infer: no unconstrained specialisation --- deferred: "
+                               (sexpr->string ast)))
                (cons rk (append argcons
                                 (xtc:infer:site-constraint sym rk (map car rcs))
-                                (list (xtc:solve:c-overload rk (map car rcs) specs)))))
-             (xtc:diagnostics:print-compiler-error
-              (string-append "xtc:infer: free-return generic with non-ground arguments --- deferred: "
-                             (sexpr->string ast)))))
-        (else
-         (let* ((fb (xtc:infer:generic-fallback-entry sym arity))
-                (proj (xtc:infer:project-fallback (cdr fb) argterms)))
-           (if proj
-               (let ((rk (xtc:infer:fresh-key)))
-                 (cons rk (append argcons
-                                  (xtc:infer:site-constraint sym rk (map car rcs))
-                                  (list (xtc:solve:c-eq rk proj)))))
-               (xtc:diagnostics:print-compiler-error
-                (string-append "xtc:infer: cannot reify free-return generic body --- deferred: "
-                               (sexpr->string ast))))))))))
+                                (list (xtc:solve:c-overload rk (map car rcs) sigs)))))))))))
 
 ;; A ##-marked call-site symbol (the dispatch marker desugaring stamps on a
 ;; poly / generic callee) is a variable in its own right: the old checker
@@ -963,6 +1003,25 @@
                     (list (xtc:solve:c-overload kr
                                                 (list (car (car rcs)) (car (cadr rcs)))
                                                 (list 'vecmath))))))))
+
+;; (llvm_callback time fn znew arg ...) --- what (callback ...) desugars to,
+;; the args wrapped in zcopy## calls and znew a fresh zone: time is i64
+;; (samples, like the old check directs it), fn a closure whose parameter
+;; slots take the argument types (the same synthesised-closure equality a
+;; call uses; its return is unconstrained); the form itself is void.
+(define xtc:infer:collect-callback
+  (lambda (ast bound)
+    (let* ((rc-t (xtc:infer:collect (cadr ast) bound))
+           (rc-f (xtc:infer:collect (caddr ast) bound))
+           (rc-z (xtc:infer:collect (cadddr ast) bound))
+           (args (map (lambda (a) (xtc:infer:collect a bound)) (cddddr ast)))
+           (rk (xtc:infer:fresh-key)))
+      (cons *xtc:codegen:void*
+            (append (cdr rc-t) (cdr rc-f) (cdr rc-z)
+                    (apply append (map cdr args))
+                    (list (xtc:solve:c-eq (car rc-t) *xtc:codegen:si64*)
+                          (xtc:solve:c-eq (car rc-f)
+                                          (xtc:infer:closure-code rk (map car args)))))))))
 
 ;; The closure environment-slot forms the dot syntax (clos.slot:type) desugars
 ;; to.  (closure-ref clos "slot" lltype): the result is the slot's explicit

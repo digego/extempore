@@ -390,6 +390,12 @@
       ;; (List_poly_<base64 of "<%String*>">) the live compiler never creates.
       ((xtc:type:named? t)
        (xtc:type:named-name t))
+      ;; a nominal parametric instance renders as its surface instantiation ---
+      ;; nested generics (List{Pair{i64,double}*}) recurse through their args
+      ((xtc:type:napp? t)
+       (string-append (xtc:type:napp-name t) "{"
+                      (xtc:type:to-pretty-list (xtc:type:napp-args t) intern)
+                      "}"))
       ((xtc:type:tuple? t)
        (string-append "<" (xtc:type:to-pretty-list (cdr t) intern) ">"))
       ((xtc:type:array? t)

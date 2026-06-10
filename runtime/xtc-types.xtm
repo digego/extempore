@@ -202,6 +202,17 @@
          subst)
         ((xtc:type:var? s) (xtc:type:bind (xtc:type:var-id s) t subst))
         ((xtc:type:var? t) (xtc:type:bind (xtc:type:var-id t) s subst))
+        ;; a BARE generic name (Blob's [Shape*]*) is compatible with any
+        ;; instance of the same name (Shape{double}): under the old structural
+        ;; model the bare form expanded with a free type variable that bound
+        ;; and vanished, so the two were literally one type --- name equality
+        ;; is the nominal rendering of that
+        ((and (xtc:type:named? s) (xtc:type:napp? t)
+              (string=? (xtc:type:named-name s) (xtc:type:napp-name t)))
+         subst)
+        ((and (xtc:type:napp? s) (xtc:type:named? t)
+              (string=? (xtc:type:napp-name s) (xtc:type:named-name t)))
+         subst)
         ((and (pair? s) (pair? t))
          (if (and (eq? (car s) (car t))
                   (= (length s) (length t)))
