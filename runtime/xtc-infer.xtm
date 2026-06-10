@@ -1,20 +1,15 @@
-;;; xtc-infer.xtm --- constraint-emitting inference traversal (TASK-059 increment 2)
+;;; xtc-infer.xtm --- constraint-emitting inference traversal
 ;;;
-;;; This is the strangler replacement for the candidate-list traversal in
-;;; xtc:typecheck:type-check.  Where the old traversal walks the AST mutating a
-;;; union-find store of candidate type lists, this one walks the AST and emits a
+;;; This is the compiler's type-inference front: it walks the AST and emits a
 ;;; flat list of clean constraints (eq / default --- see xtc-solve.xtm) which the
 ;;; substitution solver then discharges in one pass.  No candidate sets, no
-;;; number-crunch, no enumeration retry loop.
+;;; number-crunch, no enumeration retry loop.  (It began as the strangler
+;;; replacement for the candidate-list traversal in xtc:typecheck:type-check,
+;;; shadow-validated against it and then flipped live; the old family is
+;;; deleted --- TASK-059.)  It errors loudly on any form it does not handle ---
+;;; so a coverage gap is visible, never silent.
 ;;;
-;;; It is deliberately NOT wired into the live compiler yet: increment 2 builds
-;;; and shadow-validates the new traversal against the old one (tests/compiler/
-;;; infer.xtm asserts it agrees with xtc:bind:get-expression-type), increment 3
-;;; flips the live entry point, increment 4 deletes the old family.  Accordingly
-;;; this module covers a core subset of forms and errors loudly on anything it
-;;; does not yet handle --- so coverage gaps are visible, never silent.
-;;;
-;;; Covered so far: numeric/bool literals, symbols, let, begin, if, binary
+;;; Covered: numeric/bool literals, symbols, let, begin, if, binary
 ;;; arithmetic, comparison, lambda, the application of a *local* closure (a
 ;;; let-bound or lambda-bound variable in call position), and the application of
 ;;; a *global* function --- a bind-lib native, a bound closure, or a bind-func
@@ -59,13 +54,13 @@
 ;;; Deferred, a loud gap kept out of the corpus: constraint-guarded
 ;;; specialisations (the cache's predicate field), and a free-return fallback
 ;;; whose argument is NON-ground --- one referring to an outer variable not bound
-;;; here, so its body cannot be exercised --- which awaits the expected-type
-;;; direction that increment 3's live entry point supplies.
+;;; here, so its body cannot be exercised --- which awaits expected-type
+;;; direction from the surrounding context.
 ;;;
 ;;; The clean unifier is intentionally
-;;; stricter than the old candidate-list path on implicit numeric coercion, so
-;;; the curated shadow corpus stays clear of two cases the old path silently
-;;; coerces: a narrower numeric *result* flowing into a wider parameter (an i32
+;;; stricter than the old candidate-list path was on implicit numeric coercion;
+;;; two cases the old path silently
+;;; coerced: a narrower numeric *result* flowing into a wider parameter (an i32
 ;;; result into an i64 parameter), and a bare integer *literal* passed where a
 ;;; floating-point parameter is wanted (the old single-candidate path forces the
 ;;; literal across; the overload's class check declines it, since an integer
@@ -413,7 +408,7 @@
                     (xtc:diagnostics:print-missing-identifier-error (car ast) 'symbol))))))
       (else
        (xtc:diagnostics:print-compiler-error
-        (string-append "xtc:infer: unhandled form (increment 2 covers a core subset): "
+        (string-append "xtc:infer: unhandled form: "
                        (sexpr->string ast)))))))
 
 ;; A binding (v e) constrains v to e's type; the let's type is its body's.  The
@@ -693,7 +688,7 @@
 ;; computes.  The argument types are obtained by a local solve of the argument
 ;; sub-expressions; a non-ground argument (one referring to an outer variable not
 ;; bound here) leaves the body unexercisable, so it is deferred to the lazy
-;; overload (where, in increment 3, an expected return type will direct it).
+;; overload (where an expected return type can direct it).
 
 ;; All unconstrained generic entries for `sym' at `arity', each as (sig . body)
 ;; --- the candidate signature paired with its raw source lambda (lambda (p...)
@@ -1290,16 +1285,15 @@
            (subst (xtc:solve:run (cdr rc) intern)))
       (xtc:solve:type-of (car rc) subst intern))))
 
-;; The whole-function analogue of xtc:typecheck:run-type-check, and the
-;; increment-3 entry point: given the var table, the forced (source-annotated)
+;; The engine behind xtc:typecheck:run-type-check --- the whole-function
+;; entry point: given the var table, the forced (source-annotated)
 ;; types, and the function's t4 AST, collect the AST's constraints, seed each
 ;; forced type as an equality, solve once, and read every var's resolved type
 ;; back into the (var . type) alist the driver's later phases consume.  The old
 ;; entry's enumeration retry loop has no analogue --- the solver's defaulting and
 ;; overload fixpoint already subsumes it.  A forced-type entry is (var . code)
 ;; for a scalar and (var code...) for a compound, and in both cases its cdr is the
-;; int-code, so one c-eq form serves both.  This is shadow-validated against
-;; run-type-check (tests/compiler/inferfn.xtm) before it is flipped live.
+;; int-code, so one c-eq form serves both.
 ;; Rewrite the math / comparison sites the solve committed to a USER overload
 ;; (a named/tuple operand) into their xtm_NAME##N dispatch symbols --- the same
 ;; destructive set-car! the old type-check performed --- returning the alist
@@ -1406,54 +1400,3 @@
         (set! *xtc:infer:call-sites* saved-calls)
         result))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; live shadow check   ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;; Stage 3c: run-type-check, when *xtc:infer:shadow?* is set, calls shadow-check
-;; with the same (vars forced-types ast) and the result it just computed.  We
-;; recompute the type via check-function and report --- without affecting the
-;; live result --- every var on which the two paths resolve a concrete type but
-;; disagree, plus the functions on which the new path errors (an unhandled form)
-;; or conflicts.  The recompute is wrapped in `catch' so a coverage gap logs a
-;; line rather than aborting the build, making a full aot build under shadow the
-;; data source that drives the traversal to completeness.  Default off: zero
-;; effect on normal compilation.
-(define *xtc:infer:shadow?* #f)
-(define *xtc:infer:shadow-count* 0)   ; functions shadowed (for build-coverage reporting)
-
-;; When set, run-type-check returns check-function's result directly --- the
-;; constraint path drives compilation, the old traversal is bypassed.  The
-;; from-source shadow sweep (every core and external lib, the test corpus,
-;; the examples) is clean and the whole suite passes through this path, so
-;; the constraint engine is now the default; set to #f to fall back to the
-;; old candidate-list checker (to be deleted --- TASK-059 increment 4).
-(define *xtc:infer:live?* #t)
-
-(define xtc:infer:shadow-norm
-  (lambda (t) (if (and (list? t) (= (length t) 1)) (car t) t)))
-
-(define xtc:infer:shadow-check
-  (lambda (vars forced-types ast oldA fname)
-    (set! *xtc:infer:shadow-count* (+ *xtc:infer:shadow-count* 1))
-    ;; a COPY of the ast: check-function rewrites user-overload op sites in
-    ;; place (set-car!), and in shadow mode the old path's codegen still
-    ;; consumes the original
-    (let ((newA (catch 'shadow-error
-                       (xtc:infer:check-function vars forced-types (cl:tree-copy ast)))))
-      (cond
-        ((eq? newA 'shadow-error) (println 'SHADOW-ERROR fname))
-        ((not newA) (println 'SHADOW-CONFLICT fname))
-        (else
-         (for-each
-          (lambda (e)
-            (let* ((sym (car e))
-                   (nt (xtc:infer:shadow-norm (cdr e)))
-                   (oc (assoc-strcmp sym oldA)))
-              (if (and oc
-                       (xtc:codegen:type? nt)
-                       (xtc:codegen:type? (xtc:infer:shadow-norm (cdr oc)))
-                       (not (equal? nt (xtc:infer:shadow-norm (cdr oc)))))
-                  (println 'SHADOW-DIVERGE fname sym
-                           'old (xtc:infer:shadow-norm (cdr oc)) 'new nt))))
-          newA))))))

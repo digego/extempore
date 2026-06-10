@@ -96,33 +96,3 @@
 (xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1)) (begin x)))
                 2
                 "begin-expr")
-
-;; bidirectional mode helpers
-
-(xtmtest-result (xtc:typecheck:synth-mode? #f) #t "synth-mode-false")
-(xtmtest-result (xtc:typecheck:synth-mode? '()) #t "synth-mode-null")
-(xtmtest-result (xtc:typecheck:synth-mode? *xtc:codegen:notype*) #t "synth-mode-notype")
-(xtmtest-result (xtc:typecheck:synth-mode? (list *xtc:codegen:notype*)) #t "synth-mode-notype-list")
-(xtmtest-result (xtc:typecheck:synth-mode? *xtc:codegen:si64*) #f "synth-mode-concrete-type")
-(xtmtest-result (xtc:typecheck:synth-mode? "i64") #f "synth-mode-string-type")
-
-(xtmtest-result (xtc:typecheck:normalise-expected #f) #f "normalise-false")
-(xtmtest-result (xtc:typecheck:normalise-expected '()) #f "normalise-null")
-(xtmtest-result (xtc:typecheck:normalise-expected *xtc:codegen:notype*) #f "normalise-notype")
-(xtmtest-result (xtc:typecheck:normalise-expected (list *xtc:codegen:notype*)) #f "normalise-notype-list")
-(xtmtest-result (xtc:typecheck:normalise-expected (list *xtc:codegen:si64*)) *xtc:codegen:si64* "normalise-unwrap-singleton")
-(xtmtest-result (xtc:typecheck:normalise-expected *xtc:codegen:si64*) *xtc:codegen:si64* "normalise-pass-through")
-
-(xtmtest-result (xtc:typecheck:check-type #f) #f "check-type-synth")
-(xtmtest-result (xtc:typecheck:check-type *xtc:codegen:si64*) *xtc:codegen:si64* "check-type-concrete")
-(xtmtest-result (xtc:typecheck:check-type *xtc:codegen:notype*) #f "check-type-notype")
-
-;; subsumption helper
-
-(xtmtest-result (xtc:typecheck:subsume *xtc:codegen:si64* #f (make-hashtable 8))
-                *xtc:codegen:si64*
-                "subsume-synth-mode")
-
-(xtmtest-result (xtc:typecheck:subsume *xtc:codegen:si64* *xtc:codegen:si64* (make-hashtable 8))
-                *xtc:codegen:si64*
-                "subsume-same-type")

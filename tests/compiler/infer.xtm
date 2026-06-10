@@ -1,19 +1,19 @@
 ;;; tests/compiler/infer.xtm -- the constraint-emitting inference traversal
-;;; (runtime/xtc-infer.xtm), TASK-059 increment 2.
+;;; (runtime/xtc-infer.xtm) at expression granularity.
 ;;;
-;;; The decisive test is a SHADOW COMPARISON: for a corpus of expressions, the
-;;; new constraint path (desugar -> xtc:infer:collect -> xtc:solve) must agree
-;;; with the live candidate-list checker (xtc:bind:get-expression-type) on the
-;;; resulting type.  Both start from the same front-end (syntactic-phase), so any
-;;; disagreement is a real divergence in the new traversal --- this is how the
-;;; migration stays honest before the live entry point is flipped (increment 3).
+;;; The explicit assertions pin the type each expression resolves to through
+;;; xtc:infer:type-of (collect -> solve -> read-off).  The closing corpus then
+;;; cross-checks type-of against xtc:bind:get-expression-type --- the driver's
+;;; expression entry, which routes through check-function --- so the two
+;;; entry points into the same engine cannot drift apart.
 
 (sys:load "libs/core/test.xtm")
 (sys:load "runtime/xtc-solve.xtm")
 (sys:load "runtime/xtc-infer.xtm")
 
-;; Drive the new traversal through the SAME wrap + desugar the old entry point
-;; uses, then solve --- the new analogue of xtc:bind:get-expression-type.
+;; Drive the traversal through the SAME wrap + desugar the driver's expression
+;; entry uses, then solve --- the expression-scoped analogue of
+;; xtc:bind:get-expression-type.
 (define infer-expr
   (lambda (ast)
     (let* ((c (list 'let (list (list 'xtm_exp_result ast)) 'xtm_exp_result))
@@ -142,10 +142,9 @@
 
 ;; A lambda's type is the closure (213 ret arg...).  A bare lambda only resolves
 ;; when the body pins every parameter --- here the literal 1 fixes x at i64.  A
-;; lambda with a parameter the body never constrains stays generic; the new path
-;; declines it (#f) where the old path emits the raw parameter symbol, so such
-;; lambdas are deliberately kept out of the shadow corpus below (generalising
-;; them is a later increment).
+;; lambda with a parameter the body never constrains stays generic and type-of
+;; declines it (#f), so such lambdas are deliberately kept out of the parity
+;; corpus below (generalising them is a later increment).
 (xtmtest-result (infer-expr '(lambda (x:i64) (+ x 1)))   '(213 2 2) "lambda-pinned")
 (xtmtest-result (infer-expr '(lambda () 42))             '(213 2)   "lambda-no-arg")
 
@@ -216,12 +215,13 @@
 (xtmtest-result (infer-expr '(gfirst (mk_gx 5)))          2 "free-return-napp-gx")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; shadow comparison   ;;
+;; entry-point parity  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The corpus is restricted to the forms the traversal covers so far; the test
-;; returns the expressions on which the new path disagrees with the old checker,
-;; so an empty result certifies agreement and a failure names the divergence.
+;; The corpus cross-checks the expression-scoped type-of against the driver's
+;; expression entry (get-expression-type, through check-function); the test
+;; returns the expressions on which the two disagree, so an empty result
+;; certifies parity and a failure names the divergence.
 (xtmtest-result
  (let ((corpus (list 0 1 42 99 4.0 1.5
                      '(+ 1 2) '(* 3 4) '(- 10 5)
@@ -302,4 +302,4 @@
     (lambda (e) (equal? (infer-expr e) (xtc:bind:get-expression-type e)))
     corpus))
  '()
- "infer-agrees-with-old-checker")
+ "infer-entry-point-parity")

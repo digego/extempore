@@ -18,8 +18,7 @@
     (set! *xtc:codegen:sym-name-stack* '())
     (set! *xtc:codegen:ls_var* '())
     (set! *xtc:globals:bound-lambdas* '())
-    (set! *xtc:desugar:generic-type-mappings* '())
-    (set! *xtc:typecheck:nativef-generics-recurse-test* 0)))
+    (set! *xtc:desugar:generic-type-mappings* '())))
 
 (define xtc:driver:adhoc-poly-setup
   (lambda (symname code poly args)
@@ -85,13 +84,10 @@
                                    types)))
     (if (null? types)
         (xtc:diagnostics:print-could-not-resolve-type-error symname))
-    (if (not (cl:every (lambda (x) x) (xtc:desugar:unity? types)))
-        (let* ((sname (symbol->string symname))
-               (name (car (string-split-on sname (if (string-contains? sname "_poly_") "_poly_" "_adhoc_")))))
-          (xtc:diagnostics:print-could-not-resolve-types
-           types
-           (car (cdaadr t1))
-           name)))
+    ;; no residual-type check here: the constraint engine's read-back only
+    ;; returns resolved entries (run-type-check errors on conflict, and an
+    ;; unresolved call site is dropped with a warning, erroring at the site
+    ;; in add-types-to-source)
     ;; remove t: annotations from AST (purely for type check stage)
     (letrec ((f (lambda (lst)
                   (if (or (atom? lst) (null? lst)) 'done
@@ -652,12 +648,10 @@
       (let ((saved-stack *xtc:codegen:sym-name-stack*)
             (saved-ls *xtc:codegen:ls_var*)
             (saved-bl *xtc:globals:bound-lambdas*)
-            (saved-gtm *xtc:desugar:generic-type-mappings*)
-            (saved-rt *xtc:typecheck:nativef-generics-recurse-test*))
+            (saved-gtm *xtc:desugar:generic-type-mappings*))
         (let ((r (apply run-fresh args)))
           (set! *xtc:codegen:sym-name-stack* saved-stack)
           (set! *xtc:codegen:ls_var* saved-ls)
           (set! *xtc:globals:bound-lambdas* saved-bl)
           (set! *xtc:desugar:generic-type-mappings* saved-gtm)
-          (set! *xtc:typecheck:nativef-generics-recurse-test* saved-rt)
           r)))))
