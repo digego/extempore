@@ -354,9 +354,27 @@
                (step (cascade (car step) (cdr step) projects))
                ((null? pending) (cons subst projects))
                (else
-                (let* ((o (car pending))
-                       (rest (cdr pending))
-                       (viable (xtc:solve:overload-viable o intern subst classes)))
+                ;; split on the MOST CONSTRAINED overload (fewest viable
+                ;; candidates): nearly-forced choices first, so the branching
+                ;; a large function's many independent chains would otherwise
+                ;; multiply collapses --- without this, a 500-line instrument
+                ;; constructor's search runs for minutes instead of millis
+                (let* ((viables (map (lambda (p)
+                                       (xtc:solve:overload-viable p intern subst classes))
+                                     pending))
+                       (idx (let imin ((i 0) (vs viables) (bi 0) (bn 1000000))
+                              (if (null? vs)
+                                  bi
+                                  (let ((n (length (car vs))))
+                                    (if (< n bn)
+                                        (imin (+ i 1) (cdr vs) i n)
+                                        (imin (+ i 1) (cdr vs) bi bn))))))
+                       (viable (list-ref viables idx))
+                       (rest (let split ((i 0) (ps pending) (acc '()))
+                               (cond ((null? ps) (reverse acc))
+                                     ((= i idx) (split (+ i 1) (cdr ps) acc))
+                                     (else (split (+ i 1) (cdr ps)
+                                                  (cons (car ps) acc)))))))
                   (let try ((vs viable))
                     (if (null? vs)
                         'conflict
