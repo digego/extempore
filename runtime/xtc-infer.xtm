@@ -756,25 +756,32 @@
             ((eq? (car xs) x) i)
             (else (loop (cdr xs) (+ i 1)))))))
 
-;; Reify a free-return fallback by exercising its body against the concrete
-;; argument terms.  The real fallbacks are field accessors --- (lambda (p...)
-;; (tref pj i)) --- so the return is field i of the tuple argument bound to pj;
-;; we project it (through the shared bridge engine) directly.  A body of any other
-;; shape is not yet handled (a loud gap, returned as #f).
-(define xtc:infer:project-fallback
-  (lambda (body argterms)
+;; The projection recipe (param-position . field-index) a fallback body
+;; describes.  The real fallbacks are field accessors --- (lambda (p...)
+;; (tref pj i)) --- so the return is field i of the tuple argument bound to
+;; pj.  A body of any other shape is not yet handled (a loud gap, #f).
+(define xtc:infer:fallback-recipe
+  (lambda (body)
     (and (pair? body) (eq? (car body) 'lambda)
          (let ((params (map xtc:infer:param-name (cadr body)))
                (expr (caddr body)))
            (and (pair? expr) (member (car expr) '(tref tuple-ref))
                 (integer? (caddr expr))
                 (let ((pos (xtc:infer:index-of (xtc:infer:param-name (cadr expr)) params)))
-                  (and pos
-                       (let ((field (xtc:type:project-field-term
-                                     (list-ref argterms pos) (caddr expr))))
-                         (and field
-                              (null? (xtc:type:free-vars field))
-                              (xtc:type:to-intcode field))))))))))
+                  (and pos (cons pos (caddr expr)))))))))
+
+;; Reify a free-return fallback by exercising its body against the concrete
+;; argument terms: project the recipe's field (through the shared bridge
+;; engine) directly.
+(define xtc:infer:project-fallback
+  (lambda (body argterms)
+    (let ((recipe (xtc:infer:fallback-recipe body)))
+      (and recipe
+           (let ((field (xtc:type:project-field-term
+                         (list-ref argterms (car recipe)) (cdr recipe))))
+             (and field
+                  (null? (xtc:type:free-vars field))
+                  (xtc:type:to-intcode field)))))))
 
 ;; (g arg ...) with g a genericfunc carrying a free-return fallback.  We collect
 ;; the arguments, resolve them to concrete types, and either route to the lazy
@@ -808,21 +815,36 @@
                                         (xtc:infer:site-constraint sym rk (map car rcs))
                                         (list (xtc:solve:c-eq rk proj)))))))))
         (else
-         ;; no specialisation matches by arguments alone and the body is not a
-         ;; projectable field access: the call's CONTEXT directs the return ---
-         ;; the result key, tied by the surrounding binding or use, unifies
-         ;; with the signature's (napp-patterned) return and carries the type
-         ;; variables back into the parameter slots, the same way the old
-         ;; checker's expected type directed a free-return generic
-         (let ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
-               (rk (xtc:infer:fresh-key)))
+         ;; no specialisation matches by arguments alone (an argument is not
+         ;; ground at collect time, or the eager projection could not fire):
+         ;; the call's CONTEXT directs the return --- the result key, tied by
+         ;; the surrounding binding or use, unifies with the signature's
+         ;; (napp-patterned) return and carries the type variables back into
+         ;; the parameter slots, the same way the old checker's expected type
+         ;; directed a free-return generic.  The fallback's field projection
+         ;; rides along as a DEFERRED project constraint: when the argument
+         ;; grounds during the solve, the result pins to its field --- without
+         ;; it the fallback's free return satisfies any candidate the
+         ;; surrounding overload greedily picks, and the residual variable
+         ;; silently drops the site from the read-back (the recursive-ADT
+         ;; print instance: (print## (tree_value## t)) chose [void,Tree*]).
+         (let* ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
+                (rk (xtc:infer:fresh-key))
+                (fb (xtc:infer:generic-fallback-entry sym arity))
+                (recipe (and fb (xtc:infer:fallback-recipe (cdr fb))))
+                (proj (if recipe
+                          (list (xtc:solve:c-project
+                                 rk (list-ref (map car rcs) (car recipe))
+                                 (cdr recipe)))
+                          '())))
            (if (null? sigs)
                (xtc:diagnostics:print-compiler-error
                 (string-append "xtc:infer: no unconstrained specialisation --- deferred: "
                                (sexpr->string ast)))
                (cons rk (append argcons
                                 (xtc:infer:site-constraint sym rk (map car rcs))
-                                (list (xtc:solve:c-overload rk (map car rcs) sigs)))))))))))
+                                (list (xtc:solve:c-overload rk (map car rcs) sigs))
+                                proj)))))))))
 
 ;; A ##-marked call-site symbol (the dispatch marker desugaring stamps on a
 ;; poly / generic callee) is a variable in its own right: the old checker
@@ -1354,6 +1376,19 @@
                                        (let ((ty (or (xtc:solve:type-of sym subst intern)
                                                      (and (memq sym pattern-vars)
                                                           (xtc:solve:type-of-open sym subst intern)))))
+                                         ;; a call site whose type retains a residual
+                                         ;; variable cannot be read back; the entry is
+                                         ;; dropped and add-types-to-source errors at the
+                                         ;; site --- name the site and the open type here,
+                                         ;; because the downstream error's alist cannot
+                                         (if (and (not ty) (memq sym call-sites))
+                                             (xtc:diagnostics:print-compiler-warning
+                                              (string-append
+                                               "xtc:infer: unresolved call site dropped: "
+                                               (symbol->string sym) " : "
+                                               (sexpr->string
+                                                (xtc:type:apply-subst
+                                                 (xtc:type:from-intcode sym intern) subst)))))
                                          (and ty (cons sym ty))))
                                      (cl:remove-duplicates
                                       (append (hashtable-keys vars) call-sites)))))))))
@@ -1381,10 +1416,9 @@
 ;; When set, run-type-check returns check-function's result directly --- the
 ;; constraint path drives compilation, the old traversal is bypassed.  The
 ;; from-source shadow sweep (every core and external lib, the test corpus,
-;; the examples) is clean and the whole suite minus ONE test function passes
-;; through this path; default stays OFF pending the last blocker (nested
-;; generic call sites inside a recursive-ADT print instance --- see TASK-059
-;; resume notes).
+;; the examples) is clean and the whole suite passes through this path, so
+;; the constraint engine is now the default; set to #f to fall back to the
+;; old candidate-list checker (to be deleted --- TASK-059 increment 4).
 (define *xtc:infer:live?* #f)
 
 (define xtc:infer:shadow-norm
