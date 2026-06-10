@@ -197,6 +197,13 @@
                 (xtc:type:ptr (xtc:type:napp "List" 'i64))
                 "napp-decode")
 
+;; the ENCODE, by contrast, registers the instance type on first use by running
+;; its pretty spelling through the old parser (the c-name choke point in
+;; xtc-types-bridge.xtm), so it needs the List generictype itself registered ---
+;; in live compilation it always is, because a napp term for List can only
+;; arise after (bind-type List ...).  Mirror adt.xtm's definition here.
+(bind-type List <!a,List*>)
+
 (xtmtest-result (xtc:type:to-intcode (xtc:type:ptr (xtc:type:napp "List" 'i64)))
                 "%List_poly_PGk2ND4*"
                 "napp-encode")
