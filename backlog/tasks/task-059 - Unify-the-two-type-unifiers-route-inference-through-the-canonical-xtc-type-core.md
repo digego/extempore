@@ -3,10 +3,10 @@ id: TASK-059
 title: >-
   Unify the two type unifiers: route inference through the canonical xtc:type:
   core
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-10 09:53'
+updated_date: '2026-06-10 11:36'
 labels:
   - compiler
   - types
@@ -186,4 +186,8 @@ Deletion set computed by reachability from externally-referenced roots
 Validated: full AOT rebuild clean, ctest 21/21. AC#2 checked — all four
 ACs now done. Remaining before Done: push + CI green on the deletion
 commit (same gate as the flip), then mark Done.
+
+CI run 27268223707 green on all four platforms (Linux x86_64 58m41s, Linux aarch64 1h4m39s, macOS aarch64 58m28s, Windows x86_64 1h32m25s) for the increment-4 deletion (da69096d). All four ACs checked, full suite green locally and on CI through the constraint-engine-only compiler. TASK COMPLETE: the compiler has ONE unifier --- the canonical xtc:type: core driven through xtc-infer/xtc-solve --- and the old candidate-list family is deleted.
+
+Post-task follow-up noted during the work (not part of this task): the retired old harness's catch branch had silently dropped error results for years (fixed context in dde9dfb0's message); tests/compiler scripts /tmp/xtc-reach.py and /tmp/xtc-delete.py were session-local tooling, not committed.
 <!-- SECTION:NOTES:END -->
