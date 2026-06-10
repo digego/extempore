@@ -362,6 +362,10 @@
        (xtc:infer:collect-math-intrinsic ast bound))
       ((and (pair? ast) (eq? (car ast) 'llvm_callback))
        (xtc:infer:collect-callback ast bound))
+      ;; (fptrcall fp arg ...) is a call through a raw function pointer: fp is
+      ;; a closure whose slots take the args, exactly a computed-head call
+      ((and (pair? ast) (eq? (car ast) 'fptrcall))
+       (xtc:infer:collect-closure-call (cdr ast) bound))
       ;; a local variable in call position is a closure call; so is an
       ;; application whose head is itself an expression (a computed closure),
       ;; and so is a GLOBAL VARIABLE of closure type (a bind-val'd closure)
@@ -536,20 +540,95 @@
 ;; it is reconstructed as Name{vars} from the expansion's type variables
 ;; (first-seen order, the declaration's order) at the component's pointer
 ;; depth.  Every other component is parsed to an int-code as usual.
+;; Rewrite every annotated-expansion substring Name:<...> --- the spelling
+;; registration leaves for a nominal instance, including NESTED inside a
+;; closure or tuple component (bind's [Maybe:<i1,!b>*,!a]* parameter) --- to
+;; the nominal pattern Name{bangs}, the bangs read TEXTUALLY from the
+;; expansion (parsing it would drag in the extra variables a recursive type's
+;; bare self-reference expands to).  Bracket-matched by hand; restarts after
+;; each splice so nested occurrences all normalise.
+(define xtc:infer:nominalise-annotations
+  (lambda (s)
+    (let scan ((i 0))
+      (cond
+        ((>= i (- (string-length s) 1)) s)
+        ((and (char=? (string-ref s i) #\:)
+              (char=? (string-ref s (+ i 1)) #\<))
+         (let back ((j (- i 1)))
+           (if (and (>= j 0)
+                    (let ((ch (string-ref s j)))
+                      (or (char-alphabetic? ch) (char-numeric? ch)
+                          (char=? ch #\_) (char=? ch #\-))))
+               (back (- j 1))
+               (let ((name (substring s (+ j 1) i)))
+                 (if (and (> (string-length name) 0)
+                          (xtc:cache:generictype-exists? name))
+                     (let fwd ((k (+ i 2)) (depth 1))
+                       (cond
+                         ((>= k (string-length s)) s)
+                         ((char=? (string-ref s k) #\<) (fwd (+ k 1) (+ depth 1)))
+                         ((char=? (string-ref s k) #\>)
+                          (if (= depth 1)
+                              (let* ((inner (substring s (+ i 2) k))
+                                     (params (cl:remove-duplicates
+                                              (map xtc:infer:bang-canon
+                                                   (regex:match-all inner "![a-zA-Z0-9_]*")))))
+                                (xtc:infer:nominalise-annotations
+                                 (string-append
+                                  (substring s 0 (+ j 1))
+                                  name "{" (string-join params ",") "}"
+                                  (substring s (+ k 1) (string-length s)))))
+                              (fwd (+ k 1) (- depth 1))))
+                         (else (fwd (+ k 1) depth))))
+                     (scan (+ i 1)))))))
+        (else (scan (+ i 1)))))))
+
+;; One signature component to its candidate int-code, keeping every nominal
+;; instance nominal.  A closure or tuple component CONTAINING braced instances
+;; recurses per sub-component (the old parser would expand the inner instance
+;; structurally); a braced pattern rides as a string for the bridge, with any
+;; recursive self-name leaked as a spurious extra argument (Tree{!a,Tree} for
+;; the 1-parameter Tree) dropped so the pattern's arity matches the instances';
+;; a BARE registered generic name (a recursive type's self-reference, Blob's
+;; Shape*) rides as the named term, compatible with any instance of the name.
+(define xtc:infer:component->candidate
+  (lambda (c0)
+    (let* ((c (xtc:infer:nominalise-annotations c0))
+           (base (xtc:type:strip-trailing-stars c))
+           (depth (- (string-length c) (string-length base))))
+      (cond
+        ((and (> (string-length base) 0)
+              (char=? (string-ref base 0) #\[)
+              (string-contains? base "{"))
+         (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
+               (map xtc:infer:component->candidate
+                    (xtc:codegen:get-pretty-closure-arg-strings base))))
+        ((and (> (string-length base) 0)
+              (char=? (string-ref base 0) #\<)
+              (string-contains? base "{"))
+         (cons (+ *xtc:codegen:tuple* (* depth *xtc:codegen:pointer*))
+               (map xtc:infer:component->candidate
+                    (xtc:codegen:get-pretty-tuple-arg-strings base))))
+        ((string-contains? c "{")
+         (let ((name (car (string-split-on c "{"))))
+           (if (and (xtc:cache:generictype-exists? name)
+                    (char=? (string-ref base (- (string-length base) 1)) #\}))
+               (let* ((inner (substring base (+ 1 (string-length name))
+                                        (- (string-length base) 1)))
+                      (args (cl:remove-if
+                             (lambda (a) (string=? (xtc:type:strip-trailing-stars a) name))
+                             (xtc:codegen:get-pretty-tuple-arg-strings
+                              (string-append "<" inner ">")))))
+                 (string-append name "{" (string-join args ",") "}"
+                                (make-string depth #\*)))
+               c)))
+        ((xtc:cache:generictype-exists? base)
+         (string-append "%" c))
+        (else (xtc:codegen:get-type-from-pretty-str c))))))
+
 (define xtc:infer:pretty-sig->candidate
   (lambda (pretty)
-    (map (lambda (c)
-           (cond
-             ((string-contains? c "{") c)
-             ((and (string-contains? c ":")
-                   (xtc:cache:generictype-exists? (car (regex:type-split c ":"))))
-              (let* ((p (regex:type-split c ":"))
-                     (stripped (xtc:type:strip-trailing-stars (cadr p)))
-                     (depth (- (string-length (cadr p)) (string-length stripped)))
-                     (params (xtc:type:pretty-type-params stripped)))
-                (string-append (car p) "{" (string-join params ",") "}"
-                               (make-string depth #\*))))
-             (else (xtc:codegen:get-type-from-pretty-str c))))
+    (map xtc:infer:component->candidate
          (xtc:codegen:get-pretty-closure-arg-strings pretty))))
 
 ;; The candidate signatures of a generic function named `sym' at the given

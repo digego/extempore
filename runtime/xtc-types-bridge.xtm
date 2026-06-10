@@ -361,11 +361,21 @@
 
 ;; Parse a pretty type string into a canonical term, interning its bang
 ;; variables through `intern' (so repeated names share a variable and the
-;; reverse map is available for rendering).  Composes the existing surface
-;; parser with the int-code bridge.
+;; reverse map is available for rendering).  A generic-instance string ---
+;; Name{...}, possibly nested (List{Pair{!a,!b}*}*) --- decodes NOMINALLY
+;; before the surface parser can expand it structurally (expansion loses the
+;; names, and a nested pattern could then never unify with a nominal
+;; argument); everything else composes the existing surface parser with the
+;; int-code bridge.
 (define xtc:type:from-pretty
   (lambda (s intern)
-    (xtc:type:from-intcode (xtc:codegen:get-type-from-pretty-str s) intern)))
+    (let* ((depth (xtc:type:trailing-stars s))
+           (stripped (xtc:type:strip-trailing-stars s))
+           (napp (and (regex:match? stripped "^[A-Za-z0-9_-]+\\{")
+                      (char=? (string-ref stripped (- (string-length stripped) 1)) #\})
+                      (xtc:type:generic-instance->napp stripped depth intern))))
+      (or napp
+          (xtc:type:from-intcode (xtc:codegen:get-type-from-pretty-str s) intern)))))
 
 ;; Render a canonical term back to an xtlang *surface* type string (tuples
 ;; <...>, arrays |n,t|, closures [r,a], pointers trailing *), so the result can
