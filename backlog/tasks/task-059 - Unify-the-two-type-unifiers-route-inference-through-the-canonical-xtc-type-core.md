@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-06-09 01:35'
-updated_date: '2026-06-10 09:37'
+updated_date: '2026-06-10 09:53'
 labels:
   - compiler
   - types
@@ -30,7 +30,7 @@ Goal: route all unification through the canonical core and delete the old family
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Old behaviour (incl. union-type simplification/pruning) characterised by tests before any change
-- [ ] #2 All xtc:desugar:type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? sites migrated or removed
+- [x] #2 All xtc:desugar:type-unify/complex-unify/unify-lists/sym-unify/occurs-in-type?/unity? sites migrated or removed
 - [x] #3 Live inference unifies via xtc:type:unify + the int-code/pretty bridges
 - [x] #4 No regression in generic/poly inference (esp. the #315 pointer-depth class); full suite green
 <!-- AC:END -->
@@ -169,4 +169,21 @@ ahead of origin/master, nothing pushed.  NOTHING BLOCKS push → CI → AC#4 →
 increment 4 (the deletion).
 
 CI run 27261868361 green on all four platforms (Linux x86_64/aarch64, macOS aarch64, Windows x86_64) for the full pushed stack incl. the flip — AC#4 satisfied. Only increment 4 (the deletion, AC#2) remains.
+
+─────────────── INCREMENT 4 DONE (2026-06-10, session 4) ───────────────
+da69096d deletes the old path: run-type-check is the constraint-engine entry
+alone (retry loop + call/cc continuation gone); the six unifiers + helper
+family deleted from xtc-transforms; the ~45 *-check handlers + dispatch +
+candidate-list machinery deleted from xtc-typecheck (4088→645 lines);
+shadow scaffolding (both flags) removed from xtc-infer; semantic-phase's
+unity? check dropped (read-back returns only resolved entries; conflicts
+error in run-type-check; dropped call sites error at the site).
+Tests: typeunify.xtm + constraints.xtm deleted; inferfn.xtm asserts full
+concrete resolution via check-function directly; infer.xtm's corpus is now
+an entry-point parity check; typecheck.xtm drops the deleted helpers.
+Deletion set computed by reachability from externally-referenced roots
+(scripts in /tmp/xtc-reach.py, /tmp/xtc-delete.py, session-local).
+Validated: full AOT rebuild clean, ctest 21/21. AC#2 checked — all four
+ACs now done. Remaining before Done: push + CI green on the deletion
+commit (same gate as the flip), then mark Done.
 <!-- SECTION:NOTES:END -->
