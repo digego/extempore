@@ -455,21 +455,30 @@
 ;; deferred).  A bind-lib native and a bound closure each contribute their one
 ;; signature; a bind-func is registered as a polyfunc, so its candidate list ---
 ;; one entry when monomorphic, several when overloaded --- supplies the rest.
+;; The sources are UNIONED, not chosen between: a name can be a native AND
+;; carry poly overloads (tan: the libc double native plus a float overload),
+;; and dropping the poly's float candidate forces a float operand to double.
+;; The native leads so an unconstrained tie still breaks its way.
 (define xtc:infer:global-candidates
   (lambda (sym)
-    (let ((name (symbol->string sym)))
-      (cond
-        ((xtc:cache:nativefunc-exists? name)
-         (list (map xtc:codegen:get-type-from-str (xtc:cache:get-nativefunc-arg-types name))))
-        ((xtc:cache:closure-exists? name)
-         (list (map xtc:codegen:get-type-from-str (xtc:cache:get-closure-arg-types name))))
-        (else
-         (let ((base (xtc:codegen:get-base-type name)))
-           (and (xtc:cache:polyfunc-exists? base)
-                (let ((candidates (xtc:cache:get-polyfunc-candidate-types base)))
-                  ;; a candidate is the closure (head ret p...); its cdr is the
-                  ;; (ret p...) signature the overload constraint speaks
-                  (and candidates (map cdr candidates))))))))))
+    (let* ((name (symbol->string sym))
+           (native (if (xtc:cache:nativefunc-exists? name)
+                       (list (map xtc:codegen:get-type-from-str
+                                  (xtc:cache:get-nativefunc-arg-types name)))
+                       '()))
+           (closure (if (xtc:cache:closure-exists? name)
+                        (list (map xtc:codegen:get-type-from-str
+                                   (xtc:cache:get-closure-arg-types name)))
+                        '()))
+           (base (xtc:codegen:get-base-type name))
+           (poly (if (xtc:cache:polyfunc-exists? base)
+                     (let ((candidates (xtc:cache:get-polyfunc-candidate-types base)))
+                       ;; a candidate is the closure (head ret p...); its cdr is
+                       ;; the (ret p...) signature the overload constraint speaks
+                       (if candidates (map cdr candidates) '()))
+                     '()))
+           (all (cl:remove-duplicates (append native closure poly))))
+      (and (not (null? all)) all))))
 
 ;; The bang (type) variables of an int-code type, each canonicalised (trailing
 ;; pointer stars and any ## suffix dropped) so !a, !a* and !a##3 count as one.

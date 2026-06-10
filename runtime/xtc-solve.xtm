@@ -259,6 +259,11 @@
                  (xtc:solve:vecmath-viable rkey akeys intern subst))
                 ((<> (length (cdr cand)) (length akeys))
                  #f)
+                ;; the result key is held to its class exactly like an argument:
+                ;; an index expression's (si64 si32) bound must reject the
+                ;; floating candidates or the lookahead would happily commit them
+                ((not (xtc:solve:arg-admits? rkey (car cand) subst intern classes))
+                 #f)
                 (else
                  (let* ((fresh (make-hashtable))
                         (s1 (xtc:type:unify (xtc:type:from-intcode rkey intern)
@@ -294,49 +299,39 @@
                    (cons (cdr (car viable)) (append (reverse seen) (cdr ps))))
                   (else (loop (cdr ps) (cons (car ps) seen)))))))))
 
-;; At a stall (no overload uniquely viable), commit the first pending overload
-;; to its first viable candidate THAT LEAVES EVERY OTHER PENDING OVERLOAD
-;; VIABLE --- one step of lookahead, the analogue of the old path's
-;; per-variable candidate-set intersection, which let two uses of one variable
-;; narrow each other (e.g. (cstring str) admitting String*/Symbol* against
-;; (String str) admitting String*/i8*: only String* survives both).  Trying
-;; candidates in order keeps the choice aligned with the defaulting order
-;; (fp64/si64 head their classes), so a genuinely tie-broken variable gets the
-;; width the default rule would give it, while a variable whose other uses are
-;; still pending propagates through them instead of defaulting at the wrong
-;; width.  Returns (cons subst2 remaining), or #f when no candidate of any
-;; pending overload survives the lookahead.
-(define xtc:solve:lookahead-commit-one
+;; Resolve every pending overload by backtracking search: cascade whichever
+;; overloads are uniquely viable, then split on the first still-ambiguous one,
+;; trying its candidates in order and recursing into the remainder; the first
+;; choice under which everything else resolves wins, and a conflict anywhere
+;; prunes that branch immediately.  This is the principled form of the old
+;; enumeration retry loop --- the same search over the same choices, but driven
+;; through the constraint graph rather than re-running the whole checker per
+;; guess, and needed for the same reason: a use chain can determine a variable
+;; only through the JOINT choice of several overloads ((cstring str) admitting
+;; String*/Symbol* against (String str) admitting String*/i8*; an untyped
+;; filter coefficient whose fp32-ness arrives two commits down a chain).
+;; Because each candidate list is ordered with its class default first
+;; (fp64/si64 head the numeric widths), the greedy first-success policy gives a
+;; genuinely tie-broken variable exactly the width the default rule would.
+(define xtc:solve:search
   (lambda (pending intern subst classes)
-    (let loop ((ps pending) (seen '()))
-      (if (null? ps)
-          #f
-          (let* ((viable (xtc:solve:overload-viable (car ps) intern subst classes))
-                 (rest (append (reverse seen) (cdr ps)))
-                 (ok (cl:find-if
-                      (lambda (v)
-                        (cl:every (lambda (p)
-                                    (pair? (xtc:solve:overload-viable
-                                            p intern (cdr v) classes)))
-                                  rest))
-                      viable)))
-            (if ok
-                (cons (cdr ok) rest)
-                (loop (cdr ps) (cons (car ps) seen))))))))
-
-;; With no overload unambiguous, the lookahead exhausted and defaulting done,
-;; commit each remaining overload to its first viable candidate --- the last-
-;; resort deterministic tie-break.  A pending overload with no viable candidate
-;; is a conflict.
-(define xtc:solve:finish-pending
-  (lambda (pending intern subst classes)
-    (let loop ((ps pending) (subst subst))
-      (if (null? ps)
-          subst
-          (let ((viable (xtc:solve:overload-viable (car ps) intern subst classes)))
-            (if (null? viable)
-                'conflict
-                (loop (cdr ps) (cdr (car viable)))))))))
+    (let cascade ((subst subst) (pending pending))
+      (let ((step (xtc:solve:commit-one pending intern subst classes)))
+        (cond
+          ((eq? step 'conflict) 'conflict)
+          (step (cascade (car step) (cdr step)))
+          ((null? pending) subst)
+          (else
+           (let* ((o (car pending))
+                  (rest (cdr pending))
+                  (viable (xtc:solve:overload-viable o intern subst classes)))
+             (let try ((vs viable))
+               (if (null? vs)
+                   'conflict
+                   (let ((r (xtc:solve:search rest intern (cdr (car vs)) classes)))
+                     (if (eq? r 'conflict)
+                         (try (cdr vs))
+                         r)))))))))))
 
 ;; One pass over the pending projections: discharge every one whose aggregate has
 ;; resolved enough to read field `index' off as a ground type, unifying it with
@@ -388,18 +383,21 @@
                (cond
                  ((eq? step 'conflict) 'conflict)
                  (step (loop (car step) (cdr step) projects))
+                 ((pair? pending)
+                  ;; a stall with overloads still pending: resolve them all by
+                  ;; search --- choices propagate through each other, so a
+                  ;; default cannot pin a literal at a width its uses contradict
+                  (let ((r (xtc:solve:search pending intern subst classes)))
+                    (if (eq? r 'conflict)
+                        'conflict
+                        (loop r '() projects))))
                  (else
-                  ;; stall: lookahead-guided commit first --- propagating a
-                  ;; choice consistent with the other pending overloads ---
-                  ;; and only then numeric defaulting, so a default cannot
-                  ;; pin a literal at a width its pending uses contradict
-                  (let ((la (xtc:solve:lookahead-commit-one pending intern subst classes)))
-                    (if la
-                        (loop (car la) (cdr la) projects)
-                        (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
-                          (if (> (length subst2) (length subst))
-                              (loop subst2 pending projects)
-                              (xtc:solve:finish-pending pending intern subst2 classes)))))))))))))))
+                  ;; overloads done: numeric defaulting for whatever literals
+                  ;; no use ever pinned (it can wake a pending projection)
+                  (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
+                    (if (> (length subst2) (length subst))
+                        (loop subst2 pending projects)
+                        subst2))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;
