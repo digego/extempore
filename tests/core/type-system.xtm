@@ -9,8 +9,9 @@
 ;;
 ;; Coverage for type-system behaviours that previously had no test: the return
 ;; type soundness check (#371), auto-generated tuple copy/free for opaque
-;; pointer fields (#316), and type aliases. See backlog/docs/doc-001 (task-054)
-;; for the wider generic-type-compiler audit.
+;; pointer fields (#316), type aliases, and inference of a typed count through
+;; doloop. See backlog/docs/doc-001 (task-054) for the wider
+;; generic-type-compiler audit.
 
 ;;; Code:
 
@@ -71,3 +72,20 @@
     (let ((p:PairAlias* (AliasedPair 5 9)))
       (tref p 1))))
 (xtmtest-result (test_alias_named) 9)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Inference through a doloop count
+;;
+;; A typed i64 argument used as a doloop bound must stay i64 and flow through to
+;; the function's result. This previously lived in tests/failing.xtm (the loop
+;; count was mis-inferred); the constraint engine now resolves it. The
+;; untyped-argument sibling -- where the count's type must be inferred from the
+;; doloop alone -- still fails and remains quarantined in tests/failing.xtm.
+
+(bind-func doloop_typed_count
+  (lambda (nx:i64)
+    (doloop (x nx)
+      x)
+    nx))
+(xtmtest-result (integer? (doloop_typed_count 2)) #t)

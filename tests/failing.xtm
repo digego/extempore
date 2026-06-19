@@ -11,17 +11,13 @@
 
 ;;; Code:
 
-;; why does it think the type of nx is double?
+;; An untyped argument used only as a doloop bound is not pinned to an integer:
+;; the constraint engine reports "couldn't resolve type" rather than inferring
+;; nx:i64 from the loop count. (The typed-count sibling now compiles and lives
+;; in tests/core/type-system.xtm.)
 (bind-func dotimes_type_quirk_1
   (lambda (nx)
     (doloop (x nx)
       x)
     nx))
 (xtmtest-result (integer? (dotimes_type_quirk_1 2)) #t)
-
-(bind-func dotimes_type_quirk_2
-  (lambda (nx:i64)
-    (doloop (x nx)
-      x)
-    nx))
-(xtmtest-result (integer? (dotimes_type_quirk_2 2)) #t)
