@@ -129,9 +129,9 @@ EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length
 
     // char *encoded_data = (char*) malloc(*output_length);
     char* encoded_data = (char*)malloc(*output_length + 1);
-    encoded_data[*output_length] = 0;
     if (encoded_data == nullptr)
         return nullptr;
+    encoded_data[*output_length] = 0;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
@@ -222,10 +222,10 @@ EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_
     *output_length = 4 * ((input_length + 2) / 3);
 
     char* encoded_data = (char*)malloc(*output_length + 1);
-    encoded_data[*output_length] = 0;
-
     if (encoded_data == nullptr)
         return nullptr;
+
+    encoded_data[*output_length] = 0;
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 

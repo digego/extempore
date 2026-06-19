@@ -74,28 +74,40 @@ static pointer Base64Encode(scheme* Scheme, pointer Args)
     auto dat(reinterpret_cast<unsigned char*>(cptr_value(pair_car(Args))));
     size_t datlength = ivalue(pair_cadr(Args));
     size_t lth = 0;
-    return mk_string(Scheme, base64_encode(dat, datlength, &lth));
+    char* encoded = base64_encode(dat, datlength, &lth);
+    pointer result = mk_string(Scheme, encoded);
+    free(encoded);
+    return result;
 }
 
 static pointer Base64Decode(scheme* Scheme, pointer Args)
 {
     char* str = string_value(pair_car(Args));
     size_t lth = 0;
-    return mk_string(Scheme, reinterpret_cast<char*>(base64_decode(str, strlen(str), &lth)));
+    char* decoded = reinterpret_cast<char*>(base64_decode(str, strlen(str), &lth));
+    pointer result = mk_string(Scheme, decoded);
+    free(decoded);
+    return result;
 }
 
 static pointer CNameEncode(scheme* Scheme, pointer Args)
 {
     char* str = string_value(pair_car(Args));
     size_t lth = 0;
-    return mk_string(Scheme, cname_encode(str, strlen(str), &lth));
+    char* encoded = cname_encode(str, strlen(str), &lth);
+    pointer result = mk_string(Scheme, encoded);
+    free(encoded);
+    return result;
 }
 
 static pointer CNameDecode(scheme* Scheme, pointer Args)
 {
     char* str = string_value(pair_car(Args));
     size_t lth = 0;
-    return mk_string(Scheme, cname_decode(str, strlen(str), &lth));
+    char* decoded = cname_decode(str, strlen(str), &lth);
+    pointer result = mk_string(Scheme, decoded);
+    free(decoded);
+    return result;
 }
 
 static pointer stringJoin(scheme* Scheme, pointer Args)
