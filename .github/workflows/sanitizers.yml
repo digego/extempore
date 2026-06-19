@@ -69,7 +69,11 @@ jobs:
         # would otherwise flag.
         env:
           TSAN_OPTIONS: "exitcode=0"
-          ASAN_OPTIONS: "exitcode=0:detect_leaks=0"
+          # detect_container_overflow=0: Extempore's instrumented std::vector/
+          # std::string buffers cross into the uninstrumented cached LLVM libs,
+          # which ASan can't see, producing false-positive container-overflow
+          # reports. Disable that one check; all other ASan checks stay on.
+          ASAN_OPTIONS: "exitcode=0:detect_leaks=0:detect_container_overflow=0"
           UBSAN_OPTIONS: "exitcode=0"
         run: setarch -R cmake --build build --parallel 2
 
@@ -80,7 +84,7 @@ jobs:
         # would trip, drowning real findings in spurious timeouts.
         env:
           TSAN_OPTIONS: "halt_on_error=0 second_deadlock_stack=1"
-          ASAN_OPTIONS: "halt_on_error=0:detect_leaks=0:abort_on_error=1"
+          ASAN_OPTIONS: "halt_on_error=0:detect_leaks=0:abort_on_error=1:detect_container_overflow=0"
           UBSAN_OPTIONS: "halt_on_error=0:print_stacktrace=1"
         run: setarch -R ctest --test-dir build --build-config Release --label-regex "libs-core|cpp-unit" --output-on-failure
 
