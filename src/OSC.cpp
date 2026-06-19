@@ -46,6 +46,8 @@
 #include <cstddef>
 #include <cstring>
 
+#include <oscpp/server.hpp>
+
 #include <chrono>
 #include <thread>
 
@@ -149,150 +151,124 @@ namespace extemp {
 
 std::map<scheme*, OSC*> OSC::SCHEME_MAP;
 
-int send_scheme_call(scheme* _sc, char* fname, double t, std::string& address,
-                     std::string& typetags, std::string& netaddy, int netport, char* args) {
-#ifdef _OSC_DEBUG_
-    std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
-#endif
+// ---------------------------------------------------------------------------
+// OSC receive path (oscpp).
+//
+// Incoming packets are untrusted network data, so parsing goes through oscpp's
+// bounds-checked reader: every read validates the remaining length, and a
+// malformed packet throws OSCPP::UnderrunError / ParseError, which
+// osc_dispatch_packet() catches and drops. This replaces the hand-rolled
+// getOSC* parser, which over-read on malformed input.
+// ---------------------------------------------------------------------------
 
-    int pos = 0;
-    std::stringstream ss;
-    if (OSC::I(_sc)->msg_include_netaddr) {
-        ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t
-           << " \"" << address << "\" \"" << netaddy << "\" " << netport;
-    } else {
-        ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t
-           << " \"" << address << "\"";
-    }
-    // ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << "
-    // \"" << address << "\"";
-    for (unsigned i = 1; i < typetags.size(); ++i) {
-        if (typetags[i] == 'i') {
-            int osc_int = 0;
-            pos += OSC::getOSCInt(args + pos, &osc_int);
-            ss << " " << osc_int;
-        } else if (typetags[i] == 'f') {
-            float osc_float = 0.0f;
-            pos += OSC::getOSCfloat(args + pos, &osc_float);
-            ss << " " << osc_float;
-        } else if (typetags[i] == 'd') {
-            double osc_double = 0.0;
-            pos += OSC::getOSCdouble(args + pos, &osc_double);
-            ss << " " << osc_double;
-        } else if (typetags[i] == 's') {
-            std::string osc_str;
-            pos += OSC::getOSCString(args + pos, &osc_str);
-            ss << " \"" << osc_str << "\"";
-        } else if (typetags[i] == 'h') {
-            int64_t osc_long = 0;
-            pos += OSC::getOSCLong(args + pos, &osc_long);
-            ss << " " << osc_long;
-        } else if (typetags[i] == 't') {
-            double timestamp = 0.0;
-            pos += OSC::getOSCTimestamp(args + pos, &timestamp);
-            ss << " " << timestamp;
-            // }else if(typetags[i] == 'b'){
-            //  NSData* osc_data;
-            //  pos += OSC::getOSCData(args+pos, &osc_data);
-            //  char str[64];
-            //  sprintf(str,"%p",osc_data);
-            //  ss << " \"" << str << "\"";
-
-            //}else if(typetags[i] == ',') {
-            // if it's a comma just skip over it
-            //}else if (typetags[i] == ' ') {
-            // if it's a space just skip over it
-        } else if (typetags[i] == '[') {
-            ss << " (list ";
-        } else if (typetags[i] == ']') {
-            ss << ")";
-        } else {
-            printf("Bad or unsuppored argument type (%c) - dropping message\n", typetags[i]);
-            return -1;
-        }
-    }
-    ss << ")";
-    if (_sc != nullptr) {
-#ifdef _OSC_DEBUG_
-        std::cout << "SEND SCHEME: " << ss.str() << std::endl;
-#endif
-        _sc->m_process->createSchemeTask(new std::string(ss.str()), "OSC TASK",
-                                         SchemeTask::Type::LOCAL_PROCESS_STRING);
-    } else {
-        printf("No OSC Registered\n");
-    }
-    return pos;
+// Convert a 64-bit NTP timetag to seconds; (0, 1) is the OSC "immediately" tag.
+static double osc_ntp_to_seconds(uint64_t timetag) {
+    int64_t seconds = static_cast<int64_t>(timetag >> 32);
+    uint32_t fractional = static_cast<uint32_t>(timetag & 0xFFFFFFFFu);
+    if (seconds == 0 && fractional == 1)
+        return 0.0;
+    seconds -= 3187296000ul;
+    return static_cast<double>(seconds) + static_cast<double>(fractional) / 4294967296.0;
 }
 
-// this is a filthy hack.
-int send_scheme_process_call(SchemeProcess* scm, char* fname, double t, std::string& address,
-                             std::string& typetags, char* args) {
-#ifdef _OSC_DEBUG_
-    std::cout << "[OSC]  ADDRESS: " << address << "  TAGS: " << typetags << std::endl;
-#endif
+// Backslash-escape double quotes so a string can be embedded in the Scheme
+// expression handed to the interpreter.
+static void osc_escape_quotes(std::string& str) {
+    for (unsigned i = 0; i < str.length(); i++) {
+        if (str.at(i) == '"') {
+            if (i == 0 || str.at(i - 1) != '\\') {
+                str.insert(i, "\\");
+                i++;
+            }
+        }
+    }
+}
 
-    int pos = 0;
+// Build the Scheme call string for one parsed message and queue it. Argument
+// reads go through oscpp's bounds-checked stream, so a truncated argument throws
+// and the message is dropped by the caller.
+static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, double t,
+                                    const char* address, OSCPP::Server::ArgStream argv,
+                                    bool include_netaddr, const std::string& netaddy, int netport) {
     std::stringstream ss;
     ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \""
        << address << "\"";
-    // ss << "(io:osc:receive " << std::fixed << std::showpoint << std::setprecision(23) << t << "
-    // \"" << address << "\"";
-    for (unsigned i = 1; i < typetags.size(); ++i) {
-        if (typetags[i] == 'i') {
-            int osc_int = 0;
-            pos += OSC::getOSCInt(args + pos, &osc_int);
-            ss << " " << osc_int;
-        } else if (typetags[i] == 'f') {
-            float osc_float = 0.0f;
-            pos += OSC::getOSCfloat(args + pos, &osc_float);
-            ss << " " << osc_float;
-        } else if (typetags[i] == 'd') {
-            double osc_double = 0.0;
-            pos += OSC::getOSCdouble(args + pos, &osc_double);
-            ss << " " << osc_double;
-        } else if (typetags[i] == 's') {
-            std::string osc_str;
-            pos += OSC::getOSCString(args + pos, &osc_str);
-            ss << " \"" << osc_str << "\"";
-        } else if (typetags[i] == 'h') {
-            int64_t osc_long = 0;
-            pos += OSC::getOSCLong(args + pos, &osc_long);
-            ss << " " << osc_long;
-        } else if (typetags[i] == 't') {
-            double timestamp = 0.0;
-            pos += OSC::getOSCTimestamp(args + pos, &timestamp);
-            ss << " " << timestamp;
-            // }else if(typetags[i] == 'b'){
-            //  NSData* osc_data;
-            //  pos += OSC::getOSCData(args+pos, &osc_data);
-            //  char str[64];
-            //  sprintf(str,"%p",osc_data);
-            //  ss << " \"" << str << "\"";
-
-            //}else if(typetags[i] == ',') {
-            // if it's a comma just skip over it
-            //}else if (typetags[i] == ' ') {
-            // if it's a space just skip over it
-        } else if (typetags[i] == '[') {
-            ss << " (list ";
-        } else if (typetags[i] == ']') {
-            ss << ")";
-        } else {
-            printf("Bad or unsuppored argument type (%c) - dropping message\n", typetags[i]);
-            return -1;
+    if (include_netaddr)
+        ss << " \"" << netaddy << "\" " << netport;
+    auto streams = argv.state();
+    auto tags = std::get<0>(streams);
+    auto args = std::get<1>(streams);
+    while (!tags.atEnd()) {
+        switch (tags.getChar()) {
+            case 'i': ss << " " << args.getInt32(); break;
+            case 'f': ss << " " << args.getFloat32(); break;
+            case 'd': ss << " " << args.getFloat64(); break;
+            case 'h': ss << " " << static_cast<int64_t>(args.getUInt64()); break;
+            case 't': ss << " " << osc_ntp_to_seconds(args.getUInt64()); break;
+            case 's': {
+                std::string s(args.getString());
+                osc_escape_quotes(s);
+                ss << " \"" << s << "\"";
+                break;
+            }
+            case '[': ss << " (list "; break;
+            case ']': ss << ")"; break;
+            default: return;  // unsupported type tag: drop the message
         }
     }
     ss << ")";
-    if (scm != nullptr) {
-#ifdef _OSC_DEBUG_
-        std::cout << "SEND SCHEME: " << ss.str() << std::endl;
-#endif
-        scm->createSchemeTask(new std::string(ss.str()), "OSC TASK",
-                              SchemeTask::Type::LOCAL_PROCESS_STRING);
+    if (proc != nullptr)
+        proc->createSchemeTask(new std::string(ss.str()), "OSC TASK",
+                               SchemeTask::Type::LOCAL_PROCESS_STRING);
+}
+
+// Dispatch one parsed message to the native callback or the Scheme interpreter.
+static void osc_handle_message(OSC* osc, SchemeProcess* proc, double t,
+                               const OSCPP::Server::Message& msg, bool include_netaddr,
+                               const std::string& netaddy, int netport) {
+    auto nativeOSC = osc->getNativeOSC();
+    if (nativeOSC != nullptr) {
+        // oscpp has validated the address and type-tag string lie within the
+        // packet; hand the native callback the address, the reconstructed
+        // ",..." tag string and the (bounded) raw argument bytes.
+        auto streams = msg.args().state();
+        auto tags = std::get<0>(streams);
+        auto args = std::get<1>(streams);
+        std::string typetags(",");
+        typetags.append(tags.begin(), tags.capacity());
+        nativeOSC(const_cast<char*>(msg.address()), const_cast<char*>(typetags.c_str()),
+                  const_cast<char*>(args.pos()), static_cast<int>(args.consumable()));
     } else {
-        printf("No OSC Registered\n");
+        osc_emit_scheme_message(proc, osc->fname, t, msg.address(), msg.args(), include_netaddr,
+                                netaddy, netport);
     }
-    return pos;
+}
+
+// Parse an incoming OSC packet (message or bundle) and dispatch each message.
+// All reads are bounds-checked by oscpp, so a malformed/hostile packet throws
+// and is dropped here rather than over-reading the receive buffer.
+static void osc_dispatch_packet(OSC* osc, SchemeProcess* proc, char* buf, int len,
+                                bool include_netaddr, const std::string& netaddy, int netport) {
+    try {
+        OSCPP::Server::Packet packet(buf, static_cast<size_t>(len));
+        if (packet.isBundle()) {
+            auto bundle = static_cast<OSCPP::Server::Bundle>(packet);
+            double t = osc_ntp_to_seconds(bundle.time());
+            auto stream = bundle.packets();
+            while (!stream.atEnd()) {
+                auto element = stream.next();  // bundle element size is bounds-checked
+                if (element.isMessage())
+                    osc_handle_message(osc, proc, t, static_cast<OSCPP::Server::Message>(element),
+                                       include_netaddr, netaddy, netport);
+                // nested bundles are unsupported, as in the previous parser
+            }
+        } else {
+            osc_handle_message(osc, proc, 0.0, static_cast<OSCPP::Server::Message>(packet),
+                               include_netaddr, netaddy, netport);
+        }
+    } catch (const std::exception&) {
+        // malformed or hostile packet -- drop it (no over-read, no crash)
+    }
 }
 
 void* osc_mesg_callback(void* obj_p) {
@@ -332,94 +308,9 @@ void* osc_mesg_callback(void* obj_p) {
             // printf("udp packet size(%lld)\n",bytes_read);
             // std::cout << "OSC from client port: " << osc->getClientAddress() << " " <<
             // osc->getAddress() <<  std::endl;
-            char* args = osc->getMessageData();
-            long length = bytes_read;  // osc->getMessageLength();
-            double timestamp;
-            long pos = 0;
-            long used = 0;
-            std::string address;   // = new std::string;
-            std::string typetags;  // = new std::string;
-            pos += OSC::getOSCString(args + pos, &address);
-            used += pos;
-            if (address.find("#bundle") != std::string::npos) {
-#ifdef _OSC_DEBUG_
-                std::cout << "OSC BUNDLE:: " << length << "  args: " << args << std::endl;
-#endif
-                pos += OSC::getOSCTimestamp(args + pos, &timestamp);  // skip time tag
-                while (pos < length) {
-                    // A bundle element is a 4-byte size prefix followed by
-                    // `size` bytes; bail on a truncated size field.
-                    if (length - pos < 4)
-                        break;
-                    int size = 0;
-                    used = 0;
-                    int res = OSC::getOSCInt(args + pos, &size);
-                    // Used += res;
-                    // don't add res from getting size to used
-                    pos += res;
-#ifdef _OSC_DEBUG_
-                    std::cout << "\t--> bundle msg   size(" << size << ") pos(" << pos - 4 << ")"
-                              << std::endl;
-#endif
-                    // pos += 4; // skip element size
-                    address.clear();
-                    typetags.clear();
-                    res = OSC::getOSCString(args + pos, &address);
-                    if (address.find("#bundle") != std::string::npos) {
-                        std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!"
-                                  << std::endl;
-                        return 0;
-                    }
-                    used += res;
-                    pos += res;
-                    res = OSC::getOSCString(args + pos, &typetags);
-                    used += res;
-                    pos += res;
-                    // The element size is attacker-controlled; reject a value
-                    // that would drive pos before the element or past the packet
-                    // end, so the jump below can't run wild out of bounds.
-                    if (size < used || size - used > length - pos)
-                        break;
-                    if (osc->getNativeOSC() == nullptr) {
-                        int ret_from_call =
-                            send_scheme_call(osc->sc, osc->fname, timestamp, address, typetags,
-                                             netaddy, netport, args + pos);
-                        if (ret_from_call < 0)
-                            break;
-                        else
-                            pos += size - used;  // ret_from_call;
-                    } else {
-                        int (*nativeOSC)(char*, char*, char*, int) = osc->getNativeOSC();
-                        nativeOSC((char*)address.c_str(), (char*)typetags.c_str(), args + pos,
-                                  size - used);
-                        pos += size - used;  // get_message_length(typetags, args);
-                    }
-                }
-            } else {
-                if (osc->getNativeOSC() == nullptr) {
-                    pos += OSC::getOSCString(args + pos, &typetags);
-                    pos += send_scheme_call(osc->sc, osc->fname, 0.0, address, typetags, netaddy,
-                                            netport, args + pos);
-                } else {
-                    int res = OSC::getOSCString(args + pos, &typetags);
-                    pos += res;
-                    used += res;
-                    int (*nativeOSC)(char*, char*, char*, int) = osc->getNativeOSC();
-                    nativeOSC((char*)address.c_str(), (char*)typetags.c_str(), args + pos,
-                              length - used);
-                }
-            }
-            char reply[256];
-            memset(reply, 0, 256);
-#ifdef _WIN32
-            std::string caller = osc->getClientAddress()->address().to_string();
-#else
-            std::string caller(inet_ntoa((*osc->getClientAddress()).sin_addr));
-#endif
-            // osc->getCallback()(address,typetags,args,(bytes_read - (typetags_length +
-            // address_length)),reply,&reply_length,&caller); if(reply_length > 0)
-            // sendto(osc->getSocketFD(), reply, reply_length, 0, (struct
-            // sockaddr*)osc->getClientAddress(), osc->sizeOfClientAddress());
+            osc_dispatch_packet(osc, osc->sc != nullptr ? osc->sc->m_process : nullptr,
+                                osc->getMessageData(), static_cast<int>(bytes_read),
+                                osc->msg_include_netaddr, netaddy, netport);
         } else {
             std::this_thread::sleep_for(std::chrono::microseconds(1000));
         }
@@ -474,78 +365,7 @@ int process_osc_data(SchemeProcess* scm, OSC* osc, struct sockaddr_in client_add
     // printf("Processing osc data %lld:%p\n",length,args);
     if (length > 0 && args != nullptr) {
         // process the OSC data (should be its own method)
-        double timestamp;
-        long oscpos = 0;
-        long used = 0;
-        std::string address;   // = new std::string;
-        std::string typetags;  // = new std::string;
-        oscpos += OSC::getOSCString(args + oscpos, &address);
-        used += oscpos;
-        if (address.find("#bundle") != std::string::npos) {
-#ifdef _OSC_DEBUG_
-            std::cout << "OSC BUNDLE:: " << length << "  args: " << args << std::endl;
-#endif
-            oscpos += OSC::getOSCTimestamp(args + oscpos, &timestamp);  // skip time tag
-            while (oscpos < length) {
-                int size = 0;
-                used = 0;
-                int res = OSC::getOSCInt(args + oscpos, &size);
-                // Used += res;
-                // don't add res from getting size to used
-                oscpos += res;
-#ifdef _OSC_DEBUG_
-                std::cout << "\t--> bundle msg   size(" << size << ") oscpos(" << oscpos - 4 << ")"
-                          << std::endl;
-#endif
-                // oscpos += 4; // skip element size
-                address.clear();
-                typetags.clear();
-                res = OSC::getOSCString(args + oscpos, &address);
-                if (address.find("#bundle") != std::string::npos) {
-                    std::cout << "WARNING!!!!! Extempore OSC doesn't support recursive bundles!"
-                              << std::endl;
-                    return 0;
-                }
-                used += res;
-                oscpos += res;
-                res = OSC::getOSCString(args + oscpos, &typetags);
-                used += res;
-                oscpos += res;
-                if (osc->getNativeOSC() == nullptr) {
-                    int ret_from_call = send_scheme_process_call(scm, osc->fname, timestamp,
-                                                                 address, typetags, args + oscpos);
-                    if (ret_from_call < 0)
-                        break;
-                    else
-                        oscpos += size - used;  // ret_from_call;
-                } else {
-                    int (*nativeOSC)(char*, char*, char*, int) = osc->getNativeOSC();
-                    nativeOSC((char*)address.c_str(), (char*)typetags.c_str(), args + oscpos,
-                              size - used);
-                    oscpos += size - used;  // get_message_length(typetags, args);
-                }
-            }
-        } else {
-            if (osc->getNativeOSC() == nullptr) {
-                oscpos += OSC::getOSCString(args + oscpos, &typetags);
-                oscpos += send_scheme_process_call(scm, osc->fname, 0.0, address, typetags,
-                                                   args + oscpos);
-            } else {
-                int res = OSC::getOSCString(args + oscpos, &typetags);
-                oscpos += res;
-                used += res;
-                int (*nativeOSC)(char*, char*, char*, int) = osc->getNativeOSC();
-                nativeOSC((char*)address.c_str(), (char*)typetags.c_str(), args + oscpos,
-                          length - used);
-            }
-        }
-        char reply[256];
-        memset(reply, 0, 256);
-#ifdef _WIN32
-        std::string caller = osc->getClientAddress()->address().to_string();
-#else
-        std::string caller(inet_ntoa(client_address.sin_addr));
-#endif
+        osc_dispatch_packet(osc, scm, args, static_cast<int>(length), false, std::string(), 0);
     }
     return 0;
 }
@@ -786,31 +606,6 @@ int OSC::setOSCString(char* data, std::string* str) {
     return str->length();
 }
 
-int OSC::getOSCString(const char* data, std::string* str) {
-    int str_cnt = 0;
-    for (; str_cnt < 4096; ++str_cnt) {
-        if (data[str_cnt] == '\0')
-            break;
-        str->push_back(data[str_cnt]);
-    }
-    str_cnt += (4 - (int)fmod((double)str_cnt, 4.0));
-
-    // added because we need to quote quotes to add to scheme expressions
-    for (unsigned i = 0; i < str->length(); i++) {
-        if (str->at(i) == '"') {
-            if (i == 0 || str->at(i - 1) != '\\') {
-                str->insert(i, "\\");
-                i++;
-            }
-        }
-    }
-
-#ifdef _OSC_DEBUG_
-    std::cout << "GET OSC STRING = " << *str << std::endl;
-#endif
-    return str_cnt;
-}
-
 int OSC::setOSCfloat(char* data, float* f) {
 #ifdef _OSC_DEBUG_
     std::cout << "SET OSC FLOAT 32 = " << *f << std::endl;
@@ -823,16 +618,6 @@ int OSC::setOSCfloat(char* data, float* f) {
     return 4;
 }
 
-int OSC::getOSCfloat(const char* data, float* f) {
-    uint32_t raw;
-    std::memcpy(&raw, data, sizeof(raw));
-    *f = unswap32f(raw);
-#ifdef _OSC_DEBUG_
-    std::cout << "OSC FLOAT 32 = " << *f << std::endl;
-#endif
-    return 4;
-}
-
 int OSC::setOSCdouble(char* data, double* f) {
 #ifdef _OSC_DEBUG_
     std::cout << "SET OSC FLOAT 64 = " << *f << std::endl;
@@ -842,33 +627,6 @@ int OSC::setOSCdouble(char* data, double* f) {
     for (int i = 0; i < 8; ++i) {
         data[i] = byte_array[i];
     }
-    return 8;
-}
-
-int OSC::getOSCdouble(const char* data, double* f) {
-    uint64_t raw;
-    std::memcpy(&raw, data, sizeof(raw));
-    *f = unswap64f(raw);
-#ifdef _OSC_DEBUG_
-    std::cout << "OSC FLOAT 64 = " << *f << std::endl;
-#endif
-    return 8;
-}
-
-int OSC::getOSCTimestamp(const char* data, double* d) {
-    uint32_t dat[2];
-    std::memcpy(dat, data, sizeof(dat));
-    int64_t seconds = unswap32i(dat[0]);
-    uint32_t fractional = unswap32i(dat[1]);
-
-    if ((seconds == 0) && (fractional == 1)) {
-        *d = 0.0;
-        return 8;
-    }
-    // std::cout << "seconds:" << seconds << " fraction:" << fractional << std::endl;
-    seconds -= 3187296000ul;
-    double dfraction = fractional / 4294967296.0;  // 32 bit unsigned
-    *d = ((double)seconds) + dfraction;
     return 8;
 }
 
@@ -899,32 +657,12 @@ int OSC::setOSCInt(char* data, int* i) {
     return 4;
 }
 
-int OSC::getOSCInt(const char* data, int* i) {
-    uint32_t raw;
-    std::memcpy(&raw, data, sizeof(raw));
-    *i = unswap32i(raw);
-#ifdef _OSC_DEBUG_
-    std::cout << "OSC INT = " << *i << std::endl;
-#endif
-    return 4;
-}
-
 int OSC::setOSCLong(char* data, int64_t* l) {
     *l = swap64i(*l);
     char* byte_array = (char*)l;
     for (int i = 0; i < 8; ++i) {
         data[i] = byte_array[i];
     }
-    return 8;
-}
-
-int OSC::getOSCLong(const char* data, int64_t* l) {
-    uint64_t raw;
-    std::memcpy(&raw, data, sizeof(raw));
-    *l = unswap64i(raw);
-#ifdef _OSC_DEBUG_
-    std::cout << "OSC LONG = " << *l << std::endl;
-#endif
     return 8;
 }
 

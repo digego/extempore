@@ -86,17 +86,11 @@ class OSC {
     static void schemeInit(SchemeProcess* scm);
     // void getMessage();
     static int setOSCTimestamp(char* data, double d);
-    static int getOSCTimestamp(const char* data, double* d);
     static int setOSCString(char* data, std::string* str);
-    static int getOSCString(const char* data, std::string* str);
     static int setOSCfloat(char* data, float* f);
-    static int getOSCfloat(const char* data, float* f);
     static int setOSCdouble(char* data, double* f);
-    static int getOSCdouble(const char* data, double* f);
     static int setOSCInt(char* data, int* i);
-    static int getOSCInt(const char* data, int* i);
     static int setOSCLong(char* data, int64_t* l);
-    static int getOSCLong(const char* data, int64_t* l);
     // static int setOSCData(char* data, NSData* data);
     // static int getOSCData(const char* data, NSData** data);
     static void processArgs(pointer arg, char** tmp, char** ptr, int* lgth, std::string& typetags,
