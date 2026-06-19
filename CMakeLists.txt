@@ -256,6 +256,7 @@ target_include_directories(extempore PRIVATE
     ${CMAKE_BINARY_DIR}/generated)
 
 target_include_directories(extempore SYSTEM PRIVATE
+    src/oscpp/include
     ${CMAKE_BINARY_DIR}/portaudio/include
     ${LLVM_INCLUDE_DIRS})
 
