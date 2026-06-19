@@ -3,7 +3,7 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## Unreleased
+## v0.10.0 (unreleased)
 
 A broad modernisation of the C++ runtime. None of it changes what Extempore
 does --- every test suite stays green on Linux (x64 and arm64), macOS (arm64)
