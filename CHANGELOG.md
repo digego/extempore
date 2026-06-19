@@ -114,7 +114,8 @@ Patch release fixing a critical packaging bug in the v0.9.0 binary release.
 
 ## v0.9.0
 
-A major release. See `MERGE_CHANGELOG.md` for the full breakdown.
+A major release --- the long-running `aarch64` branch (~185 commits) merged
+back into master.
 
 ### Platforms
 
