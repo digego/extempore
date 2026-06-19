@@ -347,6 +347,10 @@ void* osc_mesg_callback(void* obj_p) {
 #endif
                 pos += OSC::getOSCTimestamp(args + pos, &timestamp);  // skip time tag
                 while (pos < length) {
+                    // A bundle element is a 4-byte size prefix followed by
+                    // `size` bytes; bail on a truncated size field.
+                    if (length - pos < 4)
+                        break;
                     int size = 0;
                     used = 0;
                     int res = OSC::getOSCInt(args + pos, &size);
@@ -371,6 +375,11 @@ void* osc_mesg_callback(void* obj_p) {
                     res = OSC::getOSCString(args + pos, &typetags);
                     used += res;
                     pos += res;
+                    // The element size is attacker-controlled; reject a value
+                    // that would drive pos before the element or past the packet
+                    // end, so the jump below can't run wild out of bounds.
+                    if (size < used || size - used > length - pos)
+                        break;
                     if (osc->getNativeOSC() == nullptr) {
                         int ret_from_call =
                             send_scheme_call(osc->sc, osc->fname, timestamp, address, typetags,
@@ -789,7 +798,7 @@ int OSC::getOSCString(const char* data, std::string* str) {
     // added because we need to quote quotes to add to scheme expressions
     for (unsigned i = 0; i < str->length(); i++) {
         if (str->at(i) == '"') {
-            if (str->at(i - 1) != '\\') {
+            if (i == 0 || str->at(i - 1) != '\\') {
                 str->insert(i, "\\");
                 i++;
             }
