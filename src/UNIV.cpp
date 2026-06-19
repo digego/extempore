@@ -345,21 +345,26 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
 }
 
 EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
+    // Callers (libs/core/adt.xtm) allocate a 4096-byte result buffer and read
+    // it directly, so always write a valid NUL-terminated string and never run
+    // past the buffer --- truncate rather than overflow. A capacity-aware API
+    // is tracked as a follow-up backlog task.
+    constexpr size_t kAssumedBufSize = 4096;
+    const char* out = str; // fall back to the original on oversize / regex error
+    std::string res;
     try {
-        std::string s(str);
         std::regex re(regex);
-        std::string res = std::regex_replace(s, re, std::string(replacement),
-                                             std::regex_constants::format_first_only);
-        if (res.length() >= 4096) {
-            strcpy(result, str);
-            return result;
-        }
-        strcpy(result, res.c_str());
-        return result;
+        res = std::regex_replace(std::string(str), re, std::string(replacement),
+                                 std::regex_constants::format_first_only);
+        if (res.length() < kAssumedBufSize)
+            out = res.c_str();
     } catch (const std::regex_error&) {
-        strcpy(result, str);
-        return result;
+        // out stays pointed at str
     }
+    size_t n = strnlen(out, kAssumedBufSize - 1);
+    memcpy(result, out, n);
+    result[n] = '\0';
+    return result;
 }
 
 EXPORT const char* sys_sharedir() {

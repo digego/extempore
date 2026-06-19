@@ -430,8 +430,13 @@ bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
         // printf("Eval error: not valid dot syntax\n");
         return false;
     }
-    strncpy(c, symbol, pos - symbol);
-    c[pos - symbol] = '\0';
+    size_t prefix_len = pos - symbol;
+    // Need room for the prefix, the "_xtlang_name" suffix appended below, and a NUL.
+    if (prefix_len + sizeof("_xtlang_name") > sizeof(c)) {
+        return false;
+    }
+    strncpy(c, symbol, prefix_len);
+    c[prefix_len] = '\0';
     pointer x = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
     if (x == sc->NIL) {
         return false;
@@ -455,12 +460,15 @@ static char* get_address_type(uint64_t id,
 
 pointer llvm_scheme_env_set(scheme* _sc, char* sym) {
     using namespace llvm;
-    char fname[256];
-    char tmp[256];
-    char vname[256];
-    char tname[256];
+    // rsplit() assumes 2048-byte output buffers (see UNIV.cpp); give it that
+    // much so a long symbol can't overflow the stack. c holds fname plus the
+    // "_xtlang_name" suffix and a NUL.
+    char fname[2048];
+    char tmp[2048];
+    char vname[2048];
+    char tname[2048];
 
-    char c[1024];
+    char c[2048 + 16];
     c[0] = '\0';
     const char* d = "_xtlang_name";
 
@@ -470,7 +478,7 @@ pointer llvm_scheme_env_set(scheme* _sc, char* sym) {
     }
     if (!rsplit((char*)":", tmp, (char*)vname, (char*)tname)) {
         tname[0] = '\0';
-        std::memcpy(vname, tmp, 256);
+        strcpy(vname, tmp);
     }
     strcat(c, fname);
     strcat(c, d);
