@@ -7,9 +7,12 @@ xtlang---a statically-typed lisp that compiles to LLVM IR at runtime.
 
 ```bash
 mkdir build && cd build
-cmake ..
+cmake .. -G Ninja
 cmake --build . -j$(nproc)
 ```
+
+Use the Ninja generator (as CI does); it keeps all cores busy far better than
+Make on the LLVM build and makes incremental rebuilds near-instant.
 
 Key options: `-DASSETS=ON` (download multimedia assets), `-DBUILD_TESTS=ON`
 (default).
