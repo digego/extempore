@@ -18,12 +18,16 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86_64
+            build_jobs: 4
           - os: ubuntu-24.04-arm
             name: Linux aarch64
+            build_jobs: 4
           - os: macos-15
             name: macOS aarch64
+            build_jobs: 2
           - os: windows-2022
             name: Windows x86_64
+            build_jobs: 4
 
     name: ${{ matrix.name }}
 
@@ -79,7 +83,12 @@ jobs:
             ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-
 
       - name: Build
-        run: cmake --build build --parallel 2
+        # Parallelism is per-platform (matrix.build_jobs). The Linux/Windows
+        # runners are 4 vCPU / 16 GB, but the macOS arm runner is smaller
+        # (3 vCPU / 7 GB) and the AOT step spawns extempore+LLVM-JIT processes
+        # that are memory-hungry, so it stays at 2 to avoid OOM. (LLVM itself
+        # builds at Ninja's default full parallelism in the step above.)
+        run: cmake --build build --parallel ${{ matrix.build_jobs }}
 
       - name: Save AOT cache
         if: steps.cache-aot.outputs.cache-hit != 'true'
