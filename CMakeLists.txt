@@ -62,6 +62,26 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
     endif()
 endif()
 
+##########
+# ccache #
+##########
+
+# Route C/C++ compilation through ccache when it's installed. Set before the
+# LLVM FetchContent below so the sub-build inherits it. This is the big
+# repeat-build win: a sanitizer build only instruments Extempore's own objects,
+# so LLVM's ~1800 translation units are byte-identical across build dirs, and a
+# warm cache turns a from-scratch LLVM rebuild from minutes into seconds. Opt
+# out with -DEXTEMPORE_CCACHE=OFF.
+option(EXTEMPORE_CCACHE "use ccache as the compiler launcher when available" ON)
+if(EXTEMPORE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+        message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
+        set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    endif()
+endif()
+
 #############################
 # dependency version pinning #
 #############################
