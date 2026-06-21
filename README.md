@@ -128,8 +128,10 @@ Check out these videos:
 
 The Extempore core team is [Andrew Sorensen](https://github.com/digego) &
 [Ben Swift](https://github.com/benswift). Andrew created Extempore and remains
-its BDFL; Ben is the current maintainer, so please direct issues, questions and
-emails his way. Many others have contributed to Extempore's development
+its BDFL; Ben is the current maintainer. For issues and questions the
+[mailing list](http://groups.google.com/group/extemporelang) is the best place
+to start, but you can also email Ben directly. Many others have contributed to
+Extempore's development
 ([see the full list](https://github.com/digego/extempore/graphs/contributors))
 --- including [Jim Kuhn](https://github.com/JimKuhn), whose significant
 performance improvements don't show up in the commit logs but for which we're
