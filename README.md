@@ -4,11 +4,11 @@
 [![Sanitizers](https://github.com/digego/extempore/actions/workflows/sanitizers.yml/badge.svg?branch=master)](https://github.com/digego/extempore/actions/workflows/sanitizers.yml)
 [![Release](https://github.com/digego/extempore/actions/workflows/release-binary.yml/badge.svg)](https://github.com/digego/extempore/actions/workflows/release-binary.yml)
 
-Extempore is a live-coding environment for music, audio and graphics. It pairs
-a Scheme interpreter with _xtlang_---a statically-typed lisp that compiles to
-LLVM IR at runtime---so you can reshape a running program while it keeps
-making sound. Runs on Linux (x86_64 and aarch64), macOS (Apple Silicon) and
-Windows (x86_64).
+Extempore is a live-coding environment for music, audio and graphics. It pairs a
+Scheme interpreter with _xtlang_---a statically-typed lisp that compiles to LLVM
+IR at runtime---so you can reshape a running program while it keeps making
+sound. Runs on Linux (x86_64 and aarch64), macOS (Apple Silicon) and Windows
+(x86_64).
 
 ## What's new in v0.9.0
 
@@ -50,15 +50,15 @@ _Note_: the VSCode extension used to offer an _Extempore: Download binary_
 command for one-click setup. It hasn't been updated for v0.9.0 and may not work
 --- downloading the release manually is the safest option for now.
 
-_Note on macOS first launch_: the binaries aren't signed with an Apple
-Developer ID, so on first launch macOS will refuse to run them ("apple could
-not verify ... is free of malware"). Despite the wording, this means Apple
-hasn't _checked_ the binary, not that anything malicious has been _detected_
---- the release is built in public from the source in this repository by the
+_Note on macOS first launch_: the binaries aren't signed with an Apple Developer
+ID, so on first launch macOS will refuse to run them ("apple could not verify
+... is free of malware"). Despite the wording, this means Apple hasn't _checked_
+the binary, not that anything malicious has been _detected_ --- the release is
+built in public from the source in this repository by the
 [Release workflow](https://github.com/digego/extempore/actions/workflows/release-binary.yml),
-and you can rebuild it yourself from source if you'd prefer (see below).
-Signing with a Developer ID requires a paid Apple Developer account, which
-Extempore (as a research project) doesn't currently maintain.
+and you can rebuild it yourself from source if you'd prefer (see below). Signing
+with a Developer ID requires a paid Apple Developer account, which Extempore (as
+a research project) doesn't currently maintain.
 
 To clear the quarantine flag on the whole unzipped folder in one go, run:
 
@@ -93,15 +93,14 @@ many of the examples, but adds a ~250MB download to the build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
 
-_Note on running_: the `extempore` binary locates its runtime files
-(`runtime/`, `libs/`, `examples/`) relative to the source tree at build time.
-Run it from the build directory (`./extempore`) rather than installing it to a
-system location.
+_Note on running_: the `extempore` binary locates its runtime files (`runtime/`,
+`libs/`, `examples/`) relative to the source tree at build time. Run it from the
+build directory (`./extempore`) rather than installing it to a system location.
 
 ### Hear your first sine wave
 
-With Extempore running and an editor connected to port 7099, evaluate this
-and you should hear a 440 Hz tone:
+With Extempore running and an editor connected to port 7099, evaluate this and
+you should hear a 440 Hz tone:
 
 ```scheme
 (bind-func dsp:DSP
