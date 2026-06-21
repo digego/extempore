@@ -63,8 +63,9 @@ running. If you see something like this, everything's working---nice one.
 
 ```
 ------------- Extempore --------------
-Andrew Sorensen (c) 2010-2020
-andrew@moso.com.au, @digego
+0.9.0
+(c) Andrew Sorensen, Ben Swift
+ben@benswift.me
 
 ARCH           : x86_64-apple-darwin18.7.0
 CPU            : broadwell
