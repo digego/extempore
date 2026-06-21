@@ -2,24 +2,22 @@
 title: Making an instrument
 ---
 
-::: info
-This is currently out of date---so it's not listed in the docs "menu". It should
-be fixed though, because it's useful. So fixes are welcome!
+::: info This is currently out of date---so it's not listed in the docs "menu".
+It should be fixed though, because it's useful. So fixes are welcome!
 
 This guide refers to the values in the DSP signal chain as `double`, whereas
-they are now `SAMPLE`, which is aliased to `float` by default.
-:::
+they are now `SAMPLE`, which is aliased to `float` by default. :::
 
-This covers the basics of creating an *instrument* in Extempore. While there are
-[other docs](audio-signal-processing.md)
-which cover audio digital signal processing (DSP) at a lower level---from the
-basic building blocks of oscillators and filters, this tutorial covers the
-process of building an instrument which can be played using the conventional
-midi parameters of pitch and velocity. There'll be some DSP required to build
-the instrument, but playing it becomes just like playing any other soft synth or
-sampler plugin. The reason to build instruments is so that you don't *have* to
-construct your audio synthesis chain from scratch each time, sometimes you just
-want to load a plugin and start playing.
+This covers the basics of creating an _instrument_ in Extempore. While there are
+[other docs](audio-signal-processing.md) which cover audio digital signal
+processing (DSP) at a lower level---from the basic building blocks of
+oscillators and filters, this tutorial covers the process of building an
+instrument which can be played using the conventional midi parameters of pitch
+and velocity. There'll be some DSP required to build the instrument, but playing
+it becomes just like playing any other soft synth or sampler plugin. The reason
+to build instruments is so that you don't _have_ to construct your audio
+synthesis chain from scratch each time, sometimes you just want to load a plugin
+and start playing.
 
 Like everything in Extempore, though, we're going to build the instrument in
 xtlang and compile it at run-time. If you want the simple 'load up a patch and
@@ -29,24 +27,24 @@ bring up the code, change it around, re-compile it, and you'll hear the results
 straight away.
 
 This is a also a fairly long and detailed post. If you're interested in just
-*playing* instruments rather than writing them, you don't need to know all this
-and can jump ahead to [note-level music](note-level-music.md). If you want to come back later to find out
-in a bit more detail exactly what's going on with Extempore instruments then
-this is the place to find out.
+_playing_ instruments rather than writing them, you don't need to know all this
+and can jump ahead to [note-level music](note-level-music.md). If you want to
+come back later to find out in a bit more detail exactly what's going on with
+Extempore instruments then this is the place to find out.
 
 ## The Hammond organ {#the-hammond-organ}
 
-The instrument we're going to build in this tutorial is a [hammond
-organ](http://en.wikipedia.org/wiki/Hammond_organ). Firstly, because the Hammond
-organ is an iconic sound---widely used in many genres of music since its
-invention in 1934. Any digital synthesis environment worth it's salt has to
+The instrument we're going to build in this tutorial is a
+[hammond organ](http://en.wikipedia.org/wiki/Hammond_organ). Firstly, because
+the Hammond organ is an iconic sound---widely used in many genres of music since
+its invention in 1934. Any digital synthesis environment worth it's salt has to
 provide a hammond patch of some description :) And secondly, because the hammond
 organ is actually not too tricky to sythesize, at least in a simplified way. The
 organ's tone is basically the result of the superposition of 9 sinusoids (one
 for each tonewheel), and so it's a nice way to introduce the basics of additive
 synthesis.
 
-Any commercial Hammond organ modelling synth will add *heaps* of other stuff to
+Any commercial Hammond organ modelling synth will add _heaps_ of other stuff to
 this basic tone, to faithfully recreate the nuances and quirks of the real
 physical instrument, even down to the details of the specific model being
 emulated. We won't try to do too much of that in this tutorial, but again, if
@@ -82,25 +80,25 @@ anyway, if we're modelling the organ digitally then there aren't any real
 tonewheels either :)
 
 To change the tone of the organ, the organist can adjust the positions of the
-drawbars. Fully 'out' (*down* in this diagram) means that the frequency
-associated with that tonewheel is at its maximum, whereas fully 'in' (*up* in
+drawbars. Fully 'out' (_down_ in this diagram) means that the frequency
+associated with that tonewheel is at its maximum, whereas fully 'in' (_up_ in
 this diagram) means that that frequency is silent. The colours of the drawbar
 ends also give information about that harmonic: red drawbars for sub-harmonics,
 grey for even harmonics and black for the odd harmonics. Confusingly, by
 convention the left-most drawbar isn't the fundamental frequency of the note,
-it's an octave below the fundamental (which is controlled by the *third*
+it's an octave below the fundamental (which is controlled by the _third_
 drawbar, indicated by the orange box in the diagram). It's also important to
 remember that the drawbars don't represent specific pitches, because the
 absolute pitch each drawbar is mapped to depends on the note being played (in
 the original tonewheel design, this is controlled by how fast the axle with the
 tonewheels on it is rotating). The ratios between the frequencies are the
-important part, because they define how the organ sounds---the organ's *timbre*.
+important part, because they define how the organ sounds---the organ's _timbre_.
 
 Now, this is probably more information than is absolutely necessary to construct
 a simple model of the organ---at a bare minimum all we really needed to know was
 that the organ tone is a sum of sinusoids and the frequency relationships
 between those sinusoids. Still, a bit more context is helpful in understanding
-*why* the organ's tone is produced like it is, and helps us think about how to
+_why_ the organ's tone is produced like it is, and helps us think about how to
 represent and produce the tone digitally.
 
 ## Making a drone organ {#making-a-drone-organ}
@@ -157,9 +155,9 @@ Compiling the function `organ_drone` does three things:
 - **allocate memory** to store the data associated with our sine oscillators.
   For each oscillator, this is `freq_ratio` (the frequency relationship to the
   fundamental), `drawbar_pos` (the amplitude of the sine tone) and `tonewheel`
-  (the oscillator closure itself). This data is all stored via [pointers to zone
-  memory](../reference/memory-management.md)
-  through the calls to `zalloc`.
+  (the oscillator closure itself). This data is all stored via
+  [pointers to zone memory](../reference/memory-management.md) through the calls
+  to `zalloc`.
 
 - **fill memory** with the appropriate values. For `freq_ratio` and
   `drawbar_pos`, the values are set 'manually' using `pfill!`, while for filling
@@ -172,8 +170,8 @@ Compiling the function `organ_drone` does three things:
 
 When we call the `organ_drone` closure in the `dsp` callback, we hear a droning
 organ tone. It should be really obvious at this point that the closure
-`organ_drone` doesn't represent a *pure* function: one that stateless and always
-returns the same output value for a given input value. If it *were* a pure
+`organ_drone` doesn't represent a _pure_ function: one that stateless and always
+returns the same output value for a given input value. If it _were_ a pure
 function, then calling it in the dsp callback above with an argument of `200.0`
 would always return the same value. This wouldn't be very interesting in an
 audio output scenario---audio is only interesting when the waveforms are
@@ -203,9 +201,9 @@ In an xtlang type diagram, `osc_c` looks like this
 ![image](/images/making-an-instrument/osc_c.png)
 
 `osc_c` is a higher-order closure, because it returns a closure, as indicated by
-the *two* `lambda` forms: the outer one (with one `phase` argument) defines the
+the _two_ `lambda` forms: the outer one (with one `phase` argument) defines the
 `osc_c` closure itself, while the inner one (with `amp` and `freq` arguments)
-creates the closure which is returned by `osc_c`. *That's* the closure that gets
+creates the closure which is returned by `osc_c`. _That's_ the closure that gets
 stored in the `tonewheel` array when we perform the loop:
 
 ```xtlang
@@ -222,7 +220,7 @@ any other oscillators which might be floating around. This is super handy,
 because it allows each oscillator to do its own 'bookkeeping'---keeping track of
 where it is in its cycle, while taking more meaningful frequency arguments at
 'call-time', so that they can be easily modulated. This is what allows us to
-create *buffers* of closures which we can access and modify via pointers, which
+create _buffers_ of closures which we can access and modify via pointers, which
 is exactly what we're doing with `tonewheel`.
 
 Going back up to the `organ_drone` above, there's one more point worth making
@@ -238,7 +236,7 @@ code begins executing from the first line inside the `lambda` form, which
 happens to be `(let ((sum 0.0))`. The values in the `freq_ratio`, `drawbar_pos`
 and `tonewheel` buffers will be either in the state they were in when the
 closure was compiled, or as they were left by the last closure invocation which
-modified them (which, in the case of the `tonewheel` buffer, is *every*
+modified them (which, in the case of the `tonewheel` buffer, is _every_
 invocation, because of the call to each oscillator and its subsequent phase
 incrementing).
 
@@ -260,21 +258,21 @@ listen to the difference in the playback pitch of the organ tone.
 
 ## Instruments and note-level control {#instruments-and-note-level-control}
 
-::: info
-You can probably skim over this section if you're not concerned about the
-low-level details of how Extempore's instrument infrastructure. Still, if you've
-read this far then I can probably assume you have at least some interest :)
+::: info You can probably skim over this section if you're not concerned about
+the low-level details of how Extempore's instrument infrastructure. Still, if
+you've read this far then I can probably assume you have at least some interest
+:)
 
 Making this `organ_drone` closure has really just been a prelude to the real
-business of making an *instrument* in Extempore. An Extempore instrument can be
+business of making an _instrument_ in Extempore. An Extempore instrument can be
 played like a midi soft-synth. Individual notes can be triggered with an
 amplitude, a pitch and a duration. The only difference is that the whole signal
 chain is now written in xtlang and dynamically compiled at run-time. You can
 have a look at it in `libs/core/audio_dsp.xtm` if you want to see the nuts and
 bolts of how it works.
 
-This notion of *note-level* control is the key difference between an Extempore
-*instrument* and the type of audio DSP covered in <span
+This notion of _note-level_ control is the key difference between an Extempore
+_instrument_ and the type of audio DSP covered in <span
 role="doc">audio-signal-processing</span>, which were just writing audio
 continuously to the sound card through the `dsp` callback. An instrument still
 needs to be in the `dsp` callback somewhere: otherwise it can't play its audio
@@ -284,14 +282,12 @@ maintaining the state of all the notes being played at any given time.
 `make-instrument` takes two arguments:
 
 1.  a name for the instrument
-2.  a prefix for the **note kernel** and **effect kernel** closures,
-    which must have the signatures
-    `[[[float,i64,i64]*,NoteData*,i64,float*]*]*`, and
+2.  a prefix for the **note kernel** and **effect kernel** closures, which must
+    have the signatures `[[[float,i64,i64]*,NoteData*,i64,float*]*]*`, and
     `[[float,float,i64,i64,float*]*]*`
 
 So, when we finally define our hammond organ instrument, the definition will
-look like this
-:::
+look like this :::
 
 ```xtlang
 (make-instrument organ organ)
@@ -314,7 +310,7 @@ The xtlang source code for all the functions I mention are in
 
 The first thing that needs to happen before you can start playing notes on an
 Extempore instrument is that the instrument needs to be called in the `dsp`
-callback. If we *only* want our organ in the audio output, then that's as simple
+callback. If we _only_ want our organ in the audio output, then that's as simple
 as
 
 ```xtlang
@@ -328,7 +324,7 @@ as
 
 Once the DSP closure is set (with `(dsp:set! dsp)`), the `dsp` closure is called
 for every audio sample, so in this case the audio output is just the return
-value of the `organ` closure. But we *don't* just want a constant organ drone
+value of the `organ` closure. But we _don't_ just want a constant organ drone
 this time around, we want to be able to play notes, and to have silence when
 notes aren't being played. But how does the `organ` closure know what its output
 should be and which notes it should be playing?
@@ -339,29 +335,29 @@ The playing of a note happens through a function called `xtm_play_note`.
 
 which takes four arguments:
 
--   `time`: the time at which to start playing the note (this can either
-    be right `(now)` or at some point in the future)
--   `inst`: the instrument to play the note on
--   `freq`: the frequency (pitch) of the note
--   `amp`: the volume/loudness of the note
--   `dur`: the duration of the note
+- `time`: the time at which to start playing the note (this can either be right
+  `(now)` or at some point in the future)
+- `inst`: the instrument to play the note on
+- `freq`: the frequency (pitch) of the note
+- `amp`: the volume/loudness of the note
+- `dur`: the duration of the note
 
 Hopefully you can see how `xtm_play_note` provides all the control required to
-*schedule* (via the `time` argument) notes of any pitch, loudness and duration.
+_schedule_ (via the `time` argument) notes of any pitch, loudness and duration.
 All you need to play the `organ` like a MIDI soft synth. Actually, you'll mostly
 use the Scheme wrapper function `play-note` (note the lack of a leading
 underscore) which takes pitch and velocity arguments (with ranges from 0 to 127)
 instead of raw frequency and amplitude values. But `play-note` just does some
-simple argument transformations and then passes control to `xtm_play_note`, which
-does the work, so it's `xtm_play_note` that I'll explain first.
+simple argument transformations and then passes control to `xtm_play_note`,
+which does the work, so it's `xtm_play_note` that I'll explain first.
 
-So how does it work? When `xtm_play_note` is called with `organ` as the instrument,
-the note kernel `organ_note_c` is called which returns an anonymous closure
-that, when called once per audio sample, will generate the basic (drone) tone of
-the instrument. This closure is then turned into *another* anonymous closure
-(which additionally applies an [ADSR
-envelope](http://en.wikipedia.org/wiki/ADSR_envelope#ADSR_envelope) to the audio
-output of the note kernel) which is added to `notes`: a buffer of 'note
+So how does it work? When `xtm_play_note` is called with `organ` as the
+instrument, the note kernel `organ_note_c` is called which returns an anonymous
+closure that, when called once per audio sample, will generate the basic (drone)
+tone of the instrument. This closure is then turned into _another_ anonymous
+closure (which additionally applies an
+[ADSR envelope](http://en.wikipedia.org/wiki/ADSR_envelope#ADSR_envelope) to the
+audio output of the note kernel) which is added to `notes`: a buffer of 'note
 closures' which is `let`-bound in the top-level of our `organ` closure. This is
 how polyphony is achieved: there's one active note closure in `notes` for each
 note which is currently sounding, e.g.if a triad is being played there will be
@@ -374,11 +370,11 @@ here's the same explanation in (pretty) pictures:
 
 Don't be overwhelmed if you don't understand the whole thing---you don't need to
 if you just want to play the instrument like a regular soft synth. In fact, you
-don't even need to understand it to *write* an instrument, as long as you follow
+don't even need to understand it to _write_ an instrument, as long as you follow
 the template and define your note kernel and effect kernel with the right type
 signatures.
 
-Also the diagrams aren't *complete*---they don't show all the types and code
+Also the diagrams aren't _complete_---they don't show all the types and code
 involved in this process, and they contain some (slight) simplifications.
 They're designed to explain the key aspects of how the code works.
 
@@ -465,47 +461,44 @@ still allocate a `tonewheel` a buffer of closures to keep track of our
 oscillators, and we still sum them all together with relative amplitudes based
 on the drawbar position. However, there are noticeable important differences:
 
--   some parameters specific to each note at its execution are handled. These
-    are `start_time`, `freq`, `amp` and `dur`, which are loaded from the `data`
-    argument used to provide the note with init values.
--   the note kernel must handle the termination of the note after it has
-    exceeded its duration. This is done in the first row of the most internal
-    closure, where the time delta is compared with the requested duration, and a
-    termination is executed accordingly by changing the active state of the note
-    to `#f`.
+- some parameters specific to each note at its execution are handled. These are
+  `start_time`, `freq`, `amp` and `dur`, which are loaded from the `data`
+  argument used to provide the note with init values.
+- the note kernel must handle the termination of the note after it has exceeded
+  its duration. This is done in the first row of the most internal closure,
+  where the time delta is compared with the requested duration, and a
+  termination is executed accordingly by changing the active state of the note
+  to `#f`.
 
 Additionally, there are some improvements
 
--   the instrument is now stereo, so the `tonewheel` buffer is now twice as big
-    (`(zalloc (* 2 num_drawbars))`). This gives us two oscillator closures per
-    tonewheel, one for L and one for R.
--   a 'smudge factor' (`freq_smudge`) has been added to the tonewheel
-    frequencies. This is to make it sound a bit more 'organic', because
-    in a physical instrument the frequency ratios between the tonewheels
-    aren't perfect.
--   `organ_drone` only received frequency as a control argument, but now also
-    amplitude is applied.
+- the instrument is now stereo, so the `tonewheel` buffer is now twice as big
+  (`(zalloc (* 2 num_drawbars))`). This gives us two oscillator closures per
+  tonewheel, one for L and one for R.
+- a 'smudge factor' (`freq_smudge`) has been added to the tonewheel frequencies.
+  This is to make it sound a bit more 'organic', because in a physical
+  instrument the frequency ratios between the tonewheels aren't perfect.
+- `organ_drone` only received frequency as a control argument, but now also
+  amplitude is applied.
 
 The other important difference between `organ_note` and `organ_drone` is that
 while `organ_drone` returns a double value (and so can be called directly for
-playback in the `dsp` closure), `organ_note` returns a *closure*. A type
-diagram highlights the difference:
+playback in the `dsp` closure), `organ_note` returns a _closure_. A type diagram
+highlights the difference:
 
-::: info
-This diagram is outdated
+::: info This diagram is outdated
 
 ![image](/images/making-an-instrument/organ-drone-vs-note.png)
 
 As I described in the previous section, this provides the flexibility required
-to manage note scheduling (via `xtm_play_note`) and polyphony.
-:::
+to manage note scheduling (via `xtm_play_note`) and polyphony. :::
 
 ## Step three: the effect kernel {#step-three-the-effect-kernel}
 
 The final piece of the puzzle is the effect kernel `organ_fx`. In a tonewheel
-organ, the main effect which we want to model is the [Leslie
-speaker](http://en.wikipedia.org/wiki/Leslie_speaker). The warbling Leslie
-speaker is key part of the classic hammond sound.
+organ, the main effect which we want to model is the
+[Leslie speaker](http://en.wikipedia.org/wiki/Leslie_speaker). The warbling
+Leslie speaker is key part of the classic hammond sound.
 
 A Leslie speaker worked by having speaker drivers which were motorised and would
 rotate as the sound was being played through them. This produced a warbling,
@@ -531,7 +524,7 @@ speaker.
                (* in
                   (+ 1.0 (treml trem_amp trem_freq))))
               ((= chan 1)
-               (* in 
+               (* in
                   (+ 1.0 (tremr trem_amp (* 1.1 trem_freq)))))
               (else 0.0))))))
 ```
@@ -574,22 +567,22 @@ above you should hear a 440Hz (the A below middle C) organ note which plays for
 one second (44100 samples). Try changing the frequency, amplitude and loudness
 values and see how the note changes.
 
-**Troubleshooting** if this *didn't* work, there are a few possible causes:
+**Troubleshooting** if this _didn't_ work, there are a few possible causes:
 
--   is your audio interface configured properly? Running the `./extempore
-    --print-deivces` at the command line will print a list of all the audio
-    devices the system knows about. Make sure that you're using the right
-    one---you can specify which device Extempore should use with the `--device`
-    argument e.g. `./extempore --device 2`, where `2` is the index (in the
-    output of `--print-devices`) of the device you want to use.
--   did the `organ`, `organ_note_c` and `organ_fx` closures all compile
-    properly? Check the log output to find out. If the compiler can't find the
-    definition of some functions (e.g. `osc_c`) then you might not have loaded
-    all the libraries that you need.
--   is `organ` in your `dsp` callback? Because you can schedule all the notes
-    you like with `play-note`, if the return values of `organ` aren't getting
-    passed to the audio output then you won't hear anything!
+- is your audio interface configured properly? Running the
+  `./extempore --print-deivces` at the command line will print a list of all the
+  audio devices the system knows about. Make sure that you're using the right
+  one---you can specify which device Extempore should use with the `--device`
+  argument e.g. `./extempore --device 2`, where `2` is the index (in the output
+  of `--print-devices`) of the device you want to use.
+- did the `organ`, `organ_note_c` and `organ_fx` closures all compile properly?
+  Check the log output to find out. If the compiler can't find the definition of
+  some functions (e.g. `osc_c`) then you might not have loaded all the libraries
+  that you need.
+- is `organ` in your `dsp` callback? Because you can schedule all the notes you
+  like with `play-note`, if the return values of `organ` aren't getting passed
+  to the audio output then you won't hear anything!
 
-Stay tuned for the next exciting instalment, where we'll actually *play* our
-instrument in some more interesting ways: like *actual music*. We'll get there,
+Stay tuned for the next exciting instalment, where we'll actually _play_ our
+instrument in some more interesting ways: like _actual music_. We'll get there,
 I promise!

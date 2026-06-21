@@ -2,17 +2,16 @@
 title: The Extempore analogue synth
 ---
 
-Before we start, make sure you've read at least the [quickstart
-guide](../overview/quickstart.md) and you can set
-up & evaluate Extempore code on your machine.
+Before we start, make sure you've read at least the
+[quickstart guide](../overview/quickstart.md) and you can set up & evaluate
+Extempore code on your machine.
 
 ## Introduction
 
 The analogue synth is part of the Extempore "sharedsystem", an easy-to-set-up
 signal chain with three configurable analogue synth instruments (including the
-ability to load & store presets). The name is inspired by the [**Make Noise**
-_Shared
-System_](http://www.makenoisemusic.com/synthesizers/black-and-gold-shared-system-plus)
+ability to load & store presets). The name is inspired by the
+[**Make Noise** _Shared System_](http://www.makenoisemusic.com/synthesizers/black-and-gold-shared-system-plus)
 series of modular synths. _That_ synth is
 [Eurorack](https://en.wikipedia.org/wiki/Eurorack)-based, so _in principle_ it
 could have any/all sorts of different components, but Make Noise chose a
@@ -51,21 +50,18 @@ You've just loaded
 
 Don't worry about how to use them just yet, you'll see how in a minute.
 
-::: info
-Loading the `examples/sharedsystem/audiosetup.xtm` library will also load up the
-Extempore pattern language stuff, which is covered in more detail in [this
-guide](pattern-language.md). These two
-things are conceptually independent---you certainly don't have to understand the
-sharedsystem's analogue synths in depth if you just want to make bangin' loops
-with the pattern language (or vice versa).
+::: info Loading the `examples/sharedsystem/audiosetup.xtm` library will also
+load up the Extempore pattern language stuff, which is covered in more detail in
+[this guide](pattern-language.md). These two things are conceptually
+independent---you certainly don't have to understand the sharedsystem's analogue
+synths in depth if you just want to make bangin' loops with the pattern language
+(or vice versa).
 
 However, even if you're mostly interested in the sharedsystem it's still handy
 to understand a bit about the pattern language for making noise with your synths
 & samplers. That's the approach we'll take in this guide---we won't necessarily
-explain the pattern language stuff, but you can always jump over to the [pattern
-language docs](pattern-language.md) to
-go deeper.
-:::
+explain the pattern language stuff, but you can always jump over to the
+[pattern language docs](pattern-language.md) to go deeper. :::
 
 The interface for configuring the synths and the samplers is a bit different, so
 we'll look a them individually. Like all things in music-making, different folks
@@ -73,26 +69,24 @@ want to explore different things, so if you don't care about synths at all then
 you can skip straight to the [sampler](#playing-the-sampler) part (or vice
 versa).
 
-Finally, as mentioned earlier this guide will use the [pattern
-language](pattern-language.md) to play
-some loops on your samplers & synths (so that you can actually hear them make
-noise). So if you're curious about how that works then check out that guide as
-well.
+Finally, as mentioned earlier this guide will use the
+[pattern language](pattern-language.md) to play some loops on your samplers &
+synths (so that you can actually hear them make noise). So if you're curious
+about how that works then check out that guide as well.
 
 ## Configuring & playing the synth {#playing-the-synth}
 
 The "analogue" synth is the real workhorse of the sharedsystem audio signal
 chain. It's an xtlang implementation of a flexible, modular analogue synth.
 
-::: info
-As you've probably figured out, it's not actually an _analogue_ synth, it's
-purely software, and purely digital---you can see (and modify) the source code
-for the whole thing in the `libs/core/instruments/analogue.xtm` file. But it's
-conceptually the same as an analogue modular synth, with multiple oscillators,
-filters, LFOS, etc. Furthermore, the oscillators are designed to faithfully
-replicate the oscillators of an analogue synth; the saw wave has messy
-"corners", there's slop in the oscillator frequency, and lots of other things
-like that. So that's why it's called `analogue`.
+::: info As you've probably figured out, it's not actually an _analogue_ synth,
+it's purely software, and purely digital---you can see (and modify) the source
+code for the whole thing in the `libs/core/instruments/analogue.xtm` file. But
+it's conceptually the same as an analogue modular synth, with multiple
+oscillators, filters, LFOS, etc. Furthermore, the oscillators are designed to
+faithfully replicate the oscillators of an analogue synth; the saw wave has
+messy "corners", there's slop in the oscillator frequency, and lots of other
+things like that. So that's why it's called `analogue`.
 
 Since you've already loaded the sharedsystem, you've already got three analogue
 synth instruments (`syn1`, `syn2` and `syn3`) connected and ready to play notes
@@ -113,14 +107,14 @@ Each analogue synth has:
 Some things are better explained with sample code, so the next phase of this
 guide is in the example file `examples/sharedsystem/analogue_synth_basics.xtm`.
 Open that file up in your text editor, play around, and see what noises you can
-make 😊
-:::
+make 😊 :::
 
 ## FAQ
 
 ### Why aren't there more presets?
 
-This comes up a bit---it's discussed in the [pattern language FAQ](pattern-language.md#changing-the-sound).
+This comes up a bit---it's discussed in the
+[pattern language FAQ](pattern-language.md#changing-the-sound).
 
 ### Are there any more example files which are helpful for learning about instruments in Extempore?
 

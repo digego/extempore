@@ -154,7 +154,6 @@ The JIT refactoring is now working correctly. All core tests pass.
    `LinkOnceODRLinkage` so the linker can deduplicate across modules
 
 3. **Type definitions accumulation**: `sTypeDefinitions` string accumulates:
-
    - Type definitions from bitcode.ll
    - Type definitions from user IR strings (forward declarations, opaque types)
    - Function declarations for compiled functions

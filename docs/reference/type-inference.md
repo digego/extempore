@@ -5,10 +5,9 @@ title: Type inferencing
 In xtlang, type annotations can be attached to the declaration of any variable
 using a colon, e.g.
 
--   `int_var:i64` (64-bit integer)
--   `double_ptr:double*` (pointer to a double precision float)
--   `closure_ptr:[i64,i32,i32]*` (pointer to a closure with two
-    arguments)
+- `int_var:i64` (64-bit integer)
+- `double_ptr:double*` (pointer to a double precision float)
+- `closure_ptr:[i64,i32,i32]*` (pointer to a closure with two arguments)
 
 Now, most of the examples in this file have been fairly explicit about the types
 of the variables. Look at the code for `xt_add` above---in the argument list
@@ -27,13 +26,14 @@ we take out just one of these type annotations?
 
 Even though we didn't specify the type of `b`, everything still compiled fine
 and the closure returns the correct result. What's the go with that? Well, it's
-because the xtlang compiler in Extempore is a [type
-inferencing](http://en.wikipedia.org/wiki/Type_inference) compiler. The addition
-function `+` in the body of `xt_add2` can only add values of the *same* type.
-Since the compiler knows the type of `a`, things will only work out if `b` is
-also an `i64`. And since this guess doesn't conflict with any other information
-it has about `b` (because there isn't any), then the compiler can infer that the
-only acceptable type signature for the closure pointer is `[i64,i64,i64]*`.
+because the xtlang compiler in Extempore is a
+[type inferencing](http://en.wikipedia.org/wiki/Type_inference) compiler. The
+addition function `+` in the body of `xt_add2` can only add values of the _same_
+type. Since the compiler knows the type of `a`, things will only work out if `b`
+is also an `i64`. And since this guess doesn't conflict with any other
+information it has about `b` (because there isn't any), then the compiler can
+infer that the only acceptable type signature for the closure pointer is
+`[i64,i64,i64]*`.
 
 How about if we try removing the `a` type annotation as well?
 
@@ -69,13 +69,13 @@ directly with the definition of the `xt_add3` symbol
 
 Extempore can run both Scheme and xtlang code, but Scheme doesn't know anything
 about xtlang's types---things like tuples, arrays, vectors, closures, and
-user-defined types through `bind-type`. Scheme only knows about [Scheme
-types](https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48)
+user-defined types through `bind-type`. Scheme only knows about
+[Scheme types](https://groups.csail.mit.edu/mac/ftpdir/scheme-reports/r5rs-html/r5rs_8.html#SEC48)
 like symbols, integers, reals, strings, c pointers, etc.
 
 There is some (approximate) overlap in these type systems, for ints, floats,
 strings and c pointers, although even in these cases there are some caveats,
-e.g. Scheme only supports *double precision* floats, while Extempore can work
+e.g. Scheme only supports _double precision_ floats, while Extempore can work
 with both `floats` and `doubles` natively. Similarly, xtlang's pointers are
 typed, but Scheme only supports void (opaque) c pointers. Where possible,
 Extempore will do the work to allow xtlang code from Scheme (coercing argument

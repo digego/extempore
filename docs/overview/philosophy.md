@@ -2,7 +2,7 @@
 title: Philosophy
 ---
 
-Extempore is a programming language and runtime environment designed with *live*
+Extempore is a programming language and runtime environment designed with _live_
 programming in mind. It supports interactive programming in a REPL style,
 compiling and binding code just-in-time. Although Extempore has its roots in
 'live coding' of audiovisual media art, it is suitable for any task domain where
@@ -17,9 +17,8 @@ language (Scheme) and a low-level 'C like' language (xtlang) simultaneously,
 with tight integration and transparency between the two. A running Extempore
 process will compile both valid scheme and xtlang forms. Scheme objects (lists,
 closures, continuations, etc.) coexist with the xtlang types and pointers to
-them to [allocated memory](/reference/memory-management),
-and with a few 'helper functions' data can even flow naturally between both
-languages.
+them to [allocated memory](/reference/memory-management), and with a few 'helper
+functions' data can even flow naturally between both languages.
 
 ## What's scheme, and what's xtlang? {#whats-scheme-and-whats-xtlang}
 
@@ -45,15 +44,15 @@ This is all a bit abstract, so let's look at a couple of examples:
 ```
 
 Here, `scheme-closure` is a Scheme
-[closure](http://en.wikipedia.org/wiki/Closure_(computer_science)) (a closure is
-a function along with its enclosing scope). It's just a regular Scheme closure,
-it takes two arguments (`a` and `b`), which can be any number; anything for
-which `number?` returns `#t`. Closures are first-class objects in Scheme, and
-`scheme-closure` is no exception. It can be passed to `map`, `apply`, and
+[closure](<http://en.wikipedia.org/wiki/Closure_(computer_science)>) (a closure
+is a function along with its enclosing scope). It's just a regular Scheme
+closure, it takes two arguments (`a` and `b`), which can be any number; anything
+for which `number?` returns `#t`. Closures are first-class objects in Scheme,
+and `scheme-closure` is no exception. It can be passed to `map`, `apply`, and
 friends.
 
 `xtlang_closure`, on the other hand, is an xtlang closure. xtlang (unlike
-Scheme) is a *new* language, and the Extempore executable provides the xtlang
+Scheme) is a _new_ language, and the Extempore executable provides the xtlang
 compiler. Like Scheme, xtlang has an
 [s-expression](http://en.wikipedia.org/wiki/S-expression) based syntax.
 
@@ -67,7 +66,7 @@ following the colon. The types should be familiar: `double` for a
 double-precision floating point number, and `i64` for a 64-bit (signed) integer.
 Unlike Scheme---which is dynamically typed, and will silently coerce floats into
 ints and other things like that---xtlang is statically typed. Not every type
-needs to be specified, the compiler will infer types when it is *unambiguous*,
+needs to be specified, the compiler will infer types when it is _unambiguous_,
 but the compiler will never silently coerce types. This is by design---the whole
 point of using xtlang in Extempore is to make things explicit. If you want more
 dynamic typing, then there's always Scheme.
@@ -151,7 +150,7 @@ about 2 seconds :)
 Now, this comparison is one datapoint: it isn't meant to start a flame war about
 dynamic vs statically typed languages or anything like that. It's a brute-force
 algorithm for a problem with many more elegant algorithms. What it does show,
-though, is that *Extempore's* Scheme interpreter is *slow*. There are some crazy
+though, is that _Extempore's_ Scheme interpreter is _slow_. There are some crazy
 fast and efficient Scheme compilers, but Extempore's isn't one of them---it's
 dog slow.
 
@@ -160,7 +159,7 @@ computationally intensive in Extempore, such as audio and graphics. Well, late
 one night in about 2010 [Andrew](https://twitter.com/digego) (Extempore's
 creator) had pretty much the same realisation. At the time he was working on
 Impromptu, Extempore's predecessor, which had the same Scheme interpreter. And
-he realised that the Scheme interpreter would need some *serious* work to bring
+he realised that the Scheme interpreter would need some _serious_ work to bring
 it up to speed if it was going to be used for any number-crunching. At that
 point, he figured that he might as well write a new language, leveraging the
 LLVM compiler. And lo, xtlang was born (although it wasn't called that straight
@@ -184,8 +183,8 @@ system (like C) is that it's easy to bind to shared libraries (`.dll`, `.so` or
 `.dylib` depending on your platform) and then call into them in xtlang. You can
 even bind and rebind these shared libraries dynamically, switching the bindings
 around as you please. There's more details about binding to C shared libraries
-in the `examples/external` directory, and in [C-xtlang
-interop](/reference/c-xtlang-interop).
+in the `examples/external` directory, and in
+[C-xtlang interop](/reference/c-xtlang-interop).
 
 There's heaps more to say about the Scheme/xtlang interop in Extempore (as well
 as the details of xtlang itself!), but the key point is that it's nice to have
@@ -204,7 +203,7 @@ better to catch type mismatches earlier rather than later.
 
 Remember the claim in the opening paragraph that Extempore is a language
 designed with 'live programming' in mind? Now, 'live programming' is a pretty
-loaded term (is the insinuation that all other programming is *dead?*) and as
+loaded term (is the insinuation that all other programming is _dead?_) and as
 such needs some unpacking. Extempore is designed to support (and indeed make it
 easy for) the programmer to interact with, modify, and extend their program as
 it runs.
@@ -237,13 +236,12 @@ This 'everything should be hot-swappable at runtime' philosophy has a couple of
 implications for the architecture of the Extempore compiler and programming
 environment:
 
-1.  Compilation/binding should happen as late as possible. Extempore has
-    a couple of static dependencies baked in at compile time, but the
-    rest of the functionality is loaded on-the-fly.
-2.  Compiler-as-a-service (CaaS): the Extempore compiler is a running
-    process, and compilation happens by interactively sending Scheme or
-    xtlang code to the appropriate address/port. The compiler need not
-    be running on the same machine as the programmer, and the code can
-    also be executed in any number of running Extempore processes. And
-    because it's written in Scheme, even the compiler *itself* is
-    reconfigurable at runtime.
+1.  Compilation/binding should happen as late as possible. Extempore has a
+    couple of static dependencies baked in at compile time, but the rest of the
+    functionality is loaded on-the-fly.
+2.  Compiler-as-a-service (CaaS): the Extempore compiler is a running process,
+    and compilation happens by interactively sending Scheme or xtlang code to
+    the appropriate address/port. The compiler need not be running on the same
+    machine as the programmer, and the code can also be executed in any number
+    of running Extempore processes. And because it's written in Scheme, even the
+    compiler _itself_ is reconfigurable at runtime.

@@ -2,9 +2,9 @@
 title: Pattern language
 ---
 
-Before we start, make sure you've read at least the [quickstart
-guide](../overview/quickstart.md) and you can set
-up & evaluate Extempore code on your machine.
+Before we start, make sure you've read at least the
+[quickstart guide](../overview/quickstart.md) and you can set up & evaluate
+Extempore code on your machine.
 
 ## Introduction
 
@@ -45,12 +45,11 @@ You've just loaded
 
 Don't worry about how to use them just yet, you'll see how in a minute.
 
-::: info
-Extempore's audio signal chain is highly flexible, so you can set up your
-noisemaking infrastructure in a way which suits you. However, if you're new to
-all this and just want to load up a few synths and samplers, then the best way
-to do this is to load the Extempore sharedsystem---including the analogue synth
-& built-in samplers as covered in [this guide](analogue-synth.md).
+::: info Extempore's audio signal chain is highly flexible, so you can set up
+your noisemaking infrastructure in a way which suits you. However, if you're new
+to all this and just want to load up a few synths and samplers, then the best
+way to do this is to load the Extempore sharedsystem---including the analogue
+synth & built-in samplers as covered in [this guide](analogue-synth.md).
 
 These pattern language and the sharedsystem are conceptually independent---you
 certainly don't have to understand the pattern language in depth if you just
@@ -60,8 +59,8 @@ However, even if you're mostly interested in the pattern language it's still
 handy to understand a bit about the analogue synth for e.g. using loops to
 change synth parameters with musically meaningful timings. That's the approach
 we'll take in this guide---we won't necessarily explain the sharedsystem stuff,
-but you can always jump over to e.g. the [analogue synth
-guide](analogue-synth.md) to go deeper.
+but you can always jump over to e.g. the
+[analogue synth guide](analogue-synth.md) to go deeper.
 
 Finally, if you _don't_ load the sharedsystem, then make sure you at least load:
 
@@ -70,8 +69,7 @@ Finally, if you _don't_ load the sharedsystem, then make sure you at least load:
 ```
 
 because that's the actual file where the important functions and macros
-associated with the pattern language live.
-:::
+associated with the pattern language live. :::
 
 ## Pattern basics
 
@@ -96,7 +94,7 @@ The parts of this pattern are:
 - the "pattern expression" (in this case `(play syn1 @1 80 dur)`) which is the
   expression which is evaluated at each "triggering" of the pattern
 
-- one (or more) "pattern lists" (in this case ``(list 60 58 60 63)``); these are
+- one (or more) "pattern lists" (in this case `(list 60 58 60 63)`); these are
   lists of values which the pattern will loop through
 
 If you eval the above pattern in Extempore, you'll hear a repeated synth line.
@@ -115,12 +113,12 @@ will be.
 
 For now you don't have to understand exactly what every part of the pattern
 expression `(play syn1 @1 80 dur)` means (in short, the arguments represent
-_instrument_, _pitch_, _velocity_ and _duration_; there are [other
-guides](note-level-music.md) which
-explain it in much detail). The main thing to know is that each time the pattern
-expression is triggered the `@1` will be replaced by successive values from the
-pattern list. First `60`, then `58`, then `60`, then `63`, then back to the
-beginning---in fact it will keep cycling through that list forever.
+_instrument_, _pitch_, _velocity_ and _duration_; there are
+[other guides](note-level-music.md) which explain it in much detail). The main
+thing to know is that each time the pattern expression is triggered the `@1`
+will be replaced by successive values from the pattern list. First `60`, then
+`58`, then `60`, then `63`, then back to the beginning---in fact it will keep
+cycling through that list forever.
 
 One more note about timing: there's a global metronome in Extempore (which
 defaults to 120bpm at startup). But you can change it at any time (changing the
@@ -144,14 +142,13 @@ you'll hear blessed silence 😉 This small `:>` -> `:|` change means that it's
 easy to stop a pattern and re-start it again; just change back to `:>` and
 re-eval the code.
 
-::: info
-If you're familiar with MIDI note numbers those numbers are probably pretty
-familiar (60 for middle C, etc). If you're more familiar with 12-tone note
-names, [a little later on in this
-guide](#using-note-names-instead-of-midi-note-numbers) you'll see that you can
-use symbols like `bb3`, `b`, `c4`, `c#4`, `d4` instead. But for now let's stick
-with the note numbers and get our head around the timing stuff.
-:::
+::: info If you're familiar with MIDI note numbers those numbers are probably
+pretty familiar (60 for middle C, etc). If you're more familiar with 12-tone
+note names,
+[a little later on in this guide](#using-note-names-instead-of-midi-note-numbers)
+you'll see that you can use symbols like `bb3`, `b`, `c4`, `c#4`, `d4` instead.
+But for now let's stick with the note numbers and get our head around the timing
+stuff. :::
 
 ### How does the timing work?
 
@@ -263,9 +260,8 @@ these can even "stack", just like musical ties
 ### Sublists for sub-dividing the beats
 
 These patterns aren't very rhythmically interesting; you might be wondering how
-you move beyond these plodding equal-duration loops.
-The pattern language allows you to sub-divide the beats using sub-lists in the
-pattern list.
+you move beyond these plodding equal-duration loops. The pattern language allows
+you to sub-divide the beats using sub-lists in the pattern list.
 
 Assuming that `pat-1` is running as before, change `pat-2` to:
 
@@ -280,8 +276,8 @@ This can go on recursively:
 (:> pat-3 4 0 (play syn1 @1 80 dur) '(48 (46 (49 46))))
 ```
 
-The lists (and sub-lists) in the pattern language aren't required to have nice round (or
-even) numbers of elements: you can have triplets.
+The lists (and sub-lists) in the pattern language aren't required to have nice
+round (or even) numbers of elements: you can have triplets.
 
 ```extempore
 (:> pat-3 4 0 (play syn1 @1 80 dur) '(48 (54 _ 46)))
@@ -296,8 +292,8 @@ durations---these two will sound identical:
 (:> option-2 4 0 (play syn1 @1 80 dur) '(60 (48 61)))
 ```
 
-Which one you prefer is up to you. My advice; don't agonise over optimality in the pattern
-stuff, just make some noise which sounds good 😉
+Which one you prefer is up to you. My advice; don't agonise over optimality in
+the pattern stuff, just make some noise which sounds good 😉
 
 ### Playing multiple notes at once
 
@@ -320,10 +316,9 @@ the same C-minor chord from the previous example:
 (:> chord-all 4 0 (play syn1 @1 80 dur) '(#(60 63 67)))
 ```
 
-::: info
-Again, Scheme---the programming language that we're using here---considers
-[lists](https://www.scheme.com/tspl4/objects.html#./objects:h3) and
-[vectors](https://www.scheme.com/tspl4/objects.html#./objects:h9) to be
+::: info Again, Scheme---the programming language that we're using
+here---considers [lists](https://www.scheme.com/tspl4/objects.html#./objects:h3)
+and [vectors](https://www.scheme.com/tspl4/objects.html#./objects:h9) to be
 different types of collections. However, if you don't care about the subtleties
 and just want to make bangers remember that lists will either look like e.g.
 this `(list 1 2 3)` or this `'(1 2 3)` (or occasionally this `` `(1 2 3)``),
@@ -336,8 +331,7 @@ pattern then the chord will play for 4 beats before re-triggering.
 
 Like with all this stuff, you can in general combine the different features of
 the pattern language together to play classic vi-IV-I-V pop anthems (including a
-nice suspended 4th---and resolution---on chord V).
-:::
+nice suspended 4th---and resolution---on chord V). :::
 
 ```extempore
 (:> chord-progression 16 0 (play syn1 @1 80 dur)
@@ -430,11 +424,10 @@ so in this guide sometimes we'll use that language. Just remember that your
 expression doesn't have to be triggering a musical note in the traditional
 sense.
 
-::: info
-We can use this to our advantage for debugging: if you replace the `(play ...)`
-pattern expression with something like `(println @1)` you can see what the value
-of `@1` (i.e. the component of the first pattern list) is printed to the log
-each time through the list.
+::: info We can use this to our advantage for debugging: if you replace the
+`(play ...)` pattern expression with something like `(println @1)` you can see
+what the value of `@1` (i.e. the component of the first pattern list) is printed
+to the log each time through the list.
 
 There are a couple of other variables which are bound inside the pattern
 expression:
@@ -455,8 +448,7 @@ expression:
 All of these variables can be super-useful for making interesting musical
 patterns. For example, say you want to (for a particular part of the pattern)
 alternate between two notes each time through the pattern. You could do a modulo
-arithmetic checks on the `LC` (loop count) variable like so:
-:::
+arithmetic checks on the `LC` (loop count) variable like so: :::
 
 ```extempore
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (if (= (% LC 2) 0) 66 63)))
@@ -470,18 +462,15 @@ same thing, so the previous pattern is equivalent to
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (orb LC 2 66 63)))
 ```
 
-::: info
-Note that we've gone back to using `(list ...)` rather than the quote operator
-`'`. This is because with an expression like `(list 1 2 (orb LC 2 66))` you
-_don't_ want the `orb` function to just be "quoted" as-is, you want it to be
+::: info Note that we've gone back to using `(list ...)` rather than the quote
+operator `'`. This is because with an expression like `(list 1 2 (orb LC 2 66))`
+you _don't_ want the `orb` function to just be "quoted" as-is, you want it to be
 evaluated (so that the pitch orbit actually happens). Sometimes it'll be more
 convenient to use `(list ...)`, and sometimes to quote things `'(... )`. You can
-[do whole courses on this
-stuff](https://courses.cs.washington.edu/courses/cse341/04wi/lectures/14-scheme-quote.html).
+[do whole courses on this stuff](https://courses.cs.washington.edu/courses/cse341/04wi/lectures/14-scheme-quote.html).
 
 You don't have to do it every _second_ time through the loop, either; you can do
-it every 3rd (or 4th, or 5th...)
-:::
+it every 3rd (or 4th, or 5th...) :::
 
 ```extempore
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (orb LC 3 66 63)))
@@ -530,9 +519,9 @@ musical patterns.
 
 As mentioned [earlier in this guide](#midi-note-number-teaser-box), in your
 pattern expression you can use symbols like `c4` (which evaluates to 60; it's
-middle C) to specify notes (so-called [scientific pitch
-notation](https://en.wikipedia.org/wiki/Scientific_pitch_notation)). These
-special pitch variables are all 2 or 3 characters long:
+middle C) to specify notes (so-called
+[scientific pitch notation](https://en.wikipedia.org/wiki/Scientific_pitch_notation)).
+These special pitch variables are all 2 or 3 characters long:
 
 1. the first character is the note letter (pitch class), e.g. `a`--`g`
 2. the middle (optional) character is the accidental modifier, either `#` for
@@ -543,7 +532,8 @@ special pitch variables are all 2 or 3 characters long:
 A couple of examples:
 
 - `c#4` is one semitone above middle C
-- `a4` is the A above middle C ([A440](https://en.wikipedia.org/wiki/A440_(pitch_standard)))
+- `a4` is the A above middle C
+  ([A440](<https://en.wikipedia.org/wiki/A440_(pitch_standard)>))
 - `bb5` is a Bb nearly 2 octaves above middle C
 - `c2` is a C two octaves below middle C
 
@@ -553,7 +543,8 @@ with this stuff you're probably used to that anyway.
 
 Again, these are special variables which are only bound in the context of a
 pattern expression (just like `beat`, `dur`, `LC` etc). But if you want to put
-them in your pattern lists then they can be really handy. One more quick example:
+them in your pattern lists then they can be really handy. One more quick
+example:
 
 ```extempore
 (:> cello-suites 4 0 (play syn1 @1 80 dur) '(c3 e3 g3 c4 e4 g3 c4 e4))
@@ -580,18 +571,20 @@ notes, chords, melody, harmony, and all those things[^eurocentric].
 [^eurocentric]:
     The eurocentric nature of all these music theory helper functions and
     variables isn't lost on me; if you'd like to discuss how to build a set of
-    post-colonial extensions to the pattern language then [get in
-    touch](mailto:ben.swift@anu.edu.au).
+    post-colonial extensions to the pattern language then
+    [get in touch](mailto:ben.swift@anu.edu.au).
 
 To generate a pattern list which plays a scale, there's a `scale` function. For
-example, to play a scale which starts in the 3rd octave and goes for 8 notes, use:
+example, to play a scale which starts in the 3rd octave and goes for 8 notes,
+use:
 
 ```extempore
 (:> asc-scale 2 0 (play syn1 @1 80 dur) (scale 3 8))
 ```
 
-You'll hear an ascending natural minor (i.e. the [aeolian
-mode](https://en.wikipedia.org/wiki/Aeolian_mode)) scale starting on `c3`.
+You'll hear an ascending natural minor (i.e. the
+[aeolian mode](https://en.wikipedia.org/wiki/Aeolian_mode)) scale starting on
+`c3`.
 
 You can see the pattern list directly by evaluating something like this
 _outside_ a pattern expression
@@ -607,9 +600,8 @@ the pattern list, and (as always) that pattern will loop forever.
 
 If you're wondering why it plays that specific scale---and how you could play a
 _different_ scale---then the reason is that there are two more "special"
-variables, `*root*` and `*scale*`, which are [initialised to the following
-values at
-start-up](https://github.com/digego/extempore/blob/master/libs/core/pattern-language.xtm):
+variables, `*root*` and `*scale*`, which are
+[initialised to the following values at start-up](https://github.com/digego/extempore/blob/master/libs/core/pattern-language.xtm):
 
 ```extempore
 (define *root* 0)
@@ -617,20 +609,18 @@ start-up](https://github.com/digego/extempore/blob/master/libs/core/pattern-lang
 (define *scale* (pc:scale 0 'aeolian)) ;; 0 for the C pitch class (C# would be 1, etc.)
 ```
 
-::: info
-These are almost like the [previous special
-variables](#special-pattern-expression-variables) (`dur`, `LC` etc.) with the
-exception that these ones _do_ exist (and can be modified) outside a pattern
-expression. This is because while `dur` (potentially) changes every time through
-the pattern list, things like chords, roots and scales _usually_ are held
-consistent on slightly larger timescales (bars, etc.) and so we define them
-outside an individual pattern expression, and can also change them outside the
-expression with `set!`.
+::: info These are almost like the
+[previous special variables](#special-pattern-expression-variables) (`dur`, `LC`
+etc.) with the exception that these ones _do_ exist (and can be modified)
+outside a pattern expression. This is because while `dur` (potentially) changes
+every time through the pattern list, things like chords, roots and scales
+_usually_ are held consistent on slightly larger timescales (bars, etc.) and so
+we define them outside an individual pattern expression, and can also change
+them outside the expression with `set!`.
 
 By default, `scale` (and the related `qnt` and `rel` functions we'll look at
 shortly) use the value of the `*scale*` variable. If you want to use a different
-scale, you can change the value of the `*scale*` variable:
-:::
+scale, you can change the value of the `*scale*` variable: :::
 
 ```extempore
 (set! *scale* (pc:scale 0 'phrygian))
@@ -718,7 +708,7 @@ _outside_ the pattern first. Other than that, they look pretty similar to the
 Note that we just wrapped the `(nof 4 ...)` expression in a `(hold h1 4 ...)`
 one; so the "generate 4 new pitches for the pattern expression" thing will only
 happen once every four loops. And obviously this is handy when you put it
-against a 
+against a
 
 You can define & use as many holders as you like, just make sure they all have
 distinct names (e.g. `h1`, `h2`).
@@ -763,16 +753,21 @@ Here are a few other list-processing functions which come in handy for
 generating pattern lists---try them out and see what they sound like.
 
 - `jumble`: randomize a list, e.g. `(jumble '(1 2 3 4))`
-- `rotate`: cycle elements from the front of the list to the end, or vice versa, e.g. `(rotate '(1 2 3 4) 1)` => `(4 1 2 3)`, `(rotate '(1 2 3 4) -1)` => `(2 3 4 1)`
+- `rotate`: cycle elements from the front of the list to the end, or vice versa,
+  e.g. `(rotate '(1 2 3 4) 1)` => `(4 1 2 3)`, `(rotate '(1 2 3 4) -1)` =>
+  `(2 3 4 1)`
 - `zip`: interleave two lists, e.g. `(zip '(1 2) '(3 4))` => `(1 3 2 4)`
-- `pedal`: similar to zip, but insert a "pedal point" into a second list , e.g. `(pedal 1 '(2 3))` => `(1 2 1 3)`
-- `take`: get just the first `n` elements of a list, e.g. `(take 2 '(1 2 3 4))` => `(1 2)`
-- `flatten`: flatten a nested list e.g. `(flatten '((1) (2 ((3))) 4))` => `(1 2 3 4)`
+- `pedal`: similar to zip, but insert a "pedal point" into a second list , e.g.
+  `(pedal 1 '(2 3))` => `(1 2 1 3)`
+- `take`: get just the first `n` elements of a list, e.g. `(take 2 '(1 2 3 4))`
+  => `(1 2)`
+- `flatten`: flatten a nested list e.g. `(flatten '((1) (2 ((3))) 4))` =>
+  `(1 2 3 4)`
 
 ### I'm so sick of the default chiptune synth sound, how do I change it? {#changing-the-sound}
 
-This is covered in the [analogue-synth tutorial](analogue-synth.md), but if you can load a synth preset with
-`analogue-load-preset` like so:
+This is covered in the [analogue-synth tutorial](analogue-synth.md), but if you
+can load a synth preset with `analogue-load-preset` like so:
 
 ```xtlang
 (analogue-load-preset syn1 "examples/sharedsystem/presets/organ1.xtmpreset")
@@ -818,11 +813,12 @@ above actually expands out to:
 (+ 50 (* 20 (cos (* TWOPI beat 1/2))))
 ```
 
-If you use it inside either a pattern (or a [temporal recursion](../overview/time.md#temporal-recursion)) then this will be fine, because
-`beat` will be defined to be the current beat (as a rational number). If you
-want to use it _outside_ of one of those contexts, make sure that you've bound
-`beat` to a sensible value for your purposes. Otherwise, you'll get an error
-message like:
+If you use it inside either a pattern (or a
+[temporal recursion](../overview/time.md#temporal-recursion)) then this will be
+fine, because `beat` will be defined to be the current beat (as a rational
+number). If you want to use it _outside_ of one of those contexts, make sure
+that you've bound `beat` to a sensible value for your purposes. Otherwise,
+you'll get an error message like:
 
 ```
 stack-catch: ()
@@ -840,7 +836,8 @@ that it's because Extempore's pattern language is deliberately designed to work
 with regular Scheme lists. You can use all the rest of the Extempore "world"
 inside these patterns---you can pass higher-order functions, you can define and
 call your own library code (as long as it returns lists), you can call
-[xtlang](../reference/scheme-xtlang-interop.md)---there's nothing you can do in Extempore that you can't do inside a pattern.
+[xtlang](../reference/scheme-xtlang-interop.md)---there's nothing you can do in
+Extempore that you can't do inside a pattern.
 
 So Extempore's pattern language isn't really a
 [DSL](https://en.wikipedia.org/wiki/Domain-specific_language), it's more of a
@@ -851,8 +848,8 @@ songs have been sung and wars fought) but that's the reason it's the way is is.
 ### How can I learn Scheme properly?
 
 There are lots of good (free) online resources for learning Scheme. One good
-option is _The Scheme Programming Language_ by R. Kent Dybvig, which is [freely
-available online](https://www.scheme.com/tspl4/). You could also work through
-the famous _Structure and Interpretation of Computer Programs, by Abelson,
-Sussman, and Sussman_ (often referred to as SICP), again [freely available
-online](https://mitpress.mit.edu/sites/default/files/sicp/full-text/book/book.html).
+option is _The Scheme Programming Language_ by R. Kent Dybvig, which is
+[freely available online](https://www.scheme.com/tspl4/). You could also work
+through the famous _Structure and Interpretation of Computer Programs, by
+Abelson, Sussman, and Sussman_ (often referred to as SICP), again
+[freely available online](https://mitpress.mit.edu/sites/default/files/sicp/full-text/book/book.html).

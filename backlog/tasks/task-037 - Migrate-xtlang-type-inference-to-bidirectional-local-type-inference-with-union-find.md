@@ -5,8 +5,8 @@ title: >-
   union-find
 status: Done
 assignee: []
-created_date: '2026-02-27 21:43'
-updated_date: '2026-02-28 06:37'
+created_date: "2026-02-27 21:43"
+updated_date: "2026-02-28 06:37"
 labels:
   - compiler
   - type-inference
@@ -17,25 +17,42 @@ priority: high
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Replace the current ad-hoc iterative constraint propagation algorithm in the xtlang compiler with a principled bidirectional local type inference algorithm (Pierce & Turner 2000) using union-find unification.
 
-The current algorithm (in runtime/llvmti-typecheck.xtm and runtime/llvmti-transforms.xtm) has these problems:
-- Iterative retry loop with no formal convergence guarantee (run-type-check* walks the AST 1-N times)
+Replace the current ad-hoc iterative constraint propagation algorithm in the
+xtlang compiler with a principled bidirectional local type inference algorithm
+(Pierce & Turner 2000) using union-find unification.
+
+The current algorithm (in runtime/llvmti-typecheck.xtm and
+runtime/llvmti-transforms.xtm) has these problems:
+
+- Iterative retry loop with no formal convergence guarantee (run-type-check\*
+  walks the AST 1-N times)
 - No occurs check (infinite types not detected)
 - O(n²) list dedup per variable per pass in vars-update
 - Full hash table copy (vars-snapshot) for every generic function check
 - ~400-line nativef-generics function that's hard to reason about
 - Pervasive mutation of the vars hash table during the AST walk
 
-Migration is done in 4 incremental stages (subtasks), each independently testable. Must not change language semantics (monomorphic-by-default, no let-polymorphism). Must preserve bind-poly/bind-func overloading, !bang generics, and type inference / IR generation separation. Numeric coercion defaulting rules must be replicated exactly.
+Migration is done in 4 incremental stages (subtasks), each independently
+testable. Must not change language semantics (monomorphic-by-default, no
+let-polymorphism). Must preserve bind-poly/bind-func overloading, !bang
+generics, and type inference / IR generation separation. Numeric coercion
+defaulting rules must be replicated exactly.
 
-Key files: runtime/llvmti-typecheck.xtm, runtime/llvmti-transforms.xtm, runtime/llvmti-bind.xtm, runtime/llvmti-caches.xtm, runtime/llvmti-globals.xtm, runtime/llvmti-ast.xtm
+Key files: runtime/llvmti-typecheck.xtm, runtime/llvmti-transforms.xtm,
+runtime/llvmti-bind.xtm, runtime/llvmti-caches.xtm, runtime/llvmti-globals.xtm,
+runtime/llvmti-ast.xtm
 
-References: Pierce & Turner (Local Type Inference, 2000), Dunfield & Krishnaswami (Bidirectional Typing, 2021), Conchon & Filliâtre (A Persistent Union-Find Data Structure, 2007)
+References: Pierce & Turner (Local Type Inference, 2000), Dunfield &
+Krishnaswami (Bidirectional Typing, 2021), Conchon & Filliâtre (A Persistent
+Union-Find Data Structure, 2007)
+
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
+
 - [x] #1 All 4 stages completed as subtasks
 - [x] #2 All existing tests pass (ctest -L libs-core, libs-external, examples)
 - [x] #3 No change to language semantics
@@ -45,5 +62,10 @@ References: Pierce & Turner (Local Type Inference, 2000), Dunfield & Krishnaswam
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-All 4 subtasks completed: occurs check (037.01), union-find (037.02), constraint store (037.03), bidirectional modes (037.04). All tests pass. Remaining potential improvements (retry loop elimination, subsume wiring, scope chain) tracked implicitly.
+
+All 4 subtasks completed: occurs check (037.01), union-find (037.02), constraint
+store (037.03), bidirectional modes (037.04). All tests pass. Remaining
+potential improvements (retry loop elimination, subsume wiring, scope chain)
+tracked implicitly.
+
 <!-- SECTION:NOTES:END -->

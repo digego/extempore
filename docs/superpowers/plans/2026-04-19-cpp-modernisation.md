@@ -1,19 +1,30 @@
 # C++ modernisation implementation plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Apply findings from the 2026-04-19 C++ audit to Extempore's runtime, in CI-gated phases that keep Linux x64 / Linux arm64 / macOS arm64 / Windows x64 green at every commit.
+**Goal:** Apply findings from the 2026-04-19 C++ audit to Extempore's runtime,
+in CI-gated phases that keep Linux x64 / Linux arm64 / macOS arm64 / Windows x64
+green at every commit.
 
-**Architecture:** Work in a `cpp-modernisation` branch, ship each phase as a small commit series, push after every phase, wait for `build-and-test.yml` to go green on all four platforms before starting the next. Phases are ordered so the highest-leverage work (compiler warnings) runs first — every subsequent phase benefits from it. A minimal C++ unit-test target (`tests/cpp-unit/`) is added in Phase 2 and grows throughout.
+**Architecture:** Work in a `cpp-modernisation` branch, ship each phase as a
+small commit series, push after every phase, wait for `build-and-test.yml` to go
+green on all four platforms before starting the next. Phases are ordered so the
+highest-leverage work (compiler warnings) runs first — every subsequent phase
+benefits from it. A minimal C++ unit-test target (`tests/cpp-unit/`) is added in
+Phase 2 and grows throughout.
 
-**Tech Stack:** C++17, CMake + Ninja, ctest, LLVM 22 ORC, portaudio, s7 Scheme, GoogleTest via FetchContent (added in Phase 2).
+**Tech Stack:** C++17, CMake + Ninja, ctest, LLVM 22 ORC, portaudio, s7 Scheme,
+GoogleTest via FetchContent (added in Phase 2).
 
 ---
 
 ## Phase summary
 
 | Phase | Focus                            | Outcome                                                              |
-|-------|----------------------------------|----------------------------------------------------------------------|
+| ----- | -------------------------------- | -------------------------------------------------------------------- |
 | 1     | Build hygiene                    | `-Wall -Wextra`, `.clang-format`, `.clang-tidy`, sanitizer build opt |
 | 2     | Critical UNIV.cpp correctness    | Fix UB + memory bugs in `UNIV.cpp`; add cpp-unit test harness        |
 | 3     | Kill hand-rolled sync primitives | Delete `EXTMutex`/`EXTMonitor`/`EXTCondition`/`EXTThread`            |
@@ -43,24 +54,30 @@ git push -u origin cpp-modernisation
 gh run list --branch cpp-modernisation --limit 3
 ```
 
-Expected: `build-and-test.yml` queued for all 4 matrix entries (builds pass; the branch hasn't changed anything yet).
+Expected: `build-and-test.yml` queued for all 4 matrix entries (builds pass; the
+branch hasn't changed anything yet).
 
 ---
 
 ## Phase 1: Build hygiene
 
 **Files:**
-- Modify: `CMakeLists.txt:271-276` (UNIX compile options) and `CMakeLists.txt:283` (Windows compile options)
+
+- Modify: `CMakeLists.txt:271-276` (UNIX compile options) and
+  `CMakeLists.txt:283` (Windows compile options)
 - Create: `.clang-format`
 - Create: `.clang-tidy`
 
 ### Task 1.1: Turn on the warning flags that find bugs
 
-Rationale: `-Wall -Wextra` as warnings (not errors) shows us the lay of the land without blocking the build. `-Werror=` on a small set of *always bugs* gives us a regression gate.
+Rationale: `-Wall -Wextra` as warnings (not errors) shows us the lay of the land
+without blocking the build. `-Werror=` on a small set of _always bugs_ gives us
+a regression gate.
 
 - [ ] **Step 1: Edit `CMakeLists.txt` UNIX block**
 
-In the `if(UNIX)` branch around line 271, replace the existing `target_compile_options(extempore PRIVATE ...)` block with:
+In the `if(UNIX)` branch around line 271, replace the existing
+`target_compile_options(extempore PRIVATE ...)` block with:
 
 ```cmake
 target_compile_options(extempore PRIVATE
@@ -81,9 +98,13 @@ target_compile_options(extempore PRIVATE
     -Werror=return-stack-address)
 ```
 
-The `-Wno-*` suppressions are the load-bearing ones: we're turning on `-Wall -Wextra` but silencing the categories that produce thousands of hits on vendored s7/pcre/LLVM code without pointing at real bugs. We can remove suppressions one at a time in follow-up tasks.
+The `-Wno-*` suppressions are the load-bearing ones: we're turning on
+`-Wall -Wextra` but silencing the categories that produce thousands of hits on
+vendored s7/pcre/LLVM code without pointing at real bugs. We can remove
+suppressions one at a time in follow-up tasks.
 
-`-Werror=` on `return-type`, `uninitialized`, `sometimes-uninitialized`, `return-stack-address` turns always-bugs into build failures.
+`-Werror=` on `return-type`, `uninitialized`, `sometimes-uninitialized`,
+`return-stack-address` turns always-bugs into build failures.
 
 - [ ] **Step 2: Edit `CMakeLists.txt` Windows block**
 
@@ -93,7 +114,8 @@ In the `if(WIN32)` block around line 283-284, append warning flags:
 target_compile_options(extempore PRIVATE /bigobj /W3 /wd4244 /wd4267 /wd4018 /we4715)
 ```
 
-`/we4715` promotes "not all paths return a value" to an error (matches the UNIX `-Werror=return-type`).
+`/we4715` promotes "not all paths return a value" to an error (matches the UNIX
+`-Werror=return-type`).
 
 - [ ] **Step 3: Configure + build locally to see the warning volume**
 
@@ -102,11 +124,14 @@ cmake --build build --parallel 2 2>&1 | tee /tmp/warn.log
 grep -cE "warning:|error:" /tmp/warn.log
 ```
 
-Expected: build succeeds (errors should be zero, barring a real bug caught by `-Werror=return-type`). Warnings likely 50-500.
+Expected: build succeeds (errors should be zero, barring a real bug caught by
+`-Werror=return-type`). Warnings likely 50-500.
 
 - [ ] **Step 4: If a `-Werror=` category fires, investigate**
 
-If the build fails with one of the promoted-to-error warnings, read the error, fix the root cause, do *not* disable the error. Commit the fix alongside the flag change.
+If the build fails with one of the promoted-to-error warnings, read the error,
+fix the root cause, do _not_ disable the error. Commit the fix alongside the
+flag change.
 
 - [ ] **Step 5: Commit**
 
@@ -161,7 +186,8 @@ cmake --build build-asan --target extempore --parallel 2
 ./build-asan/extempore --batch "(begin (println 'hello) (quit 0))"
 ```
 
-Expected: build succeeds; batch run either completes cleanly or reports real ASan findings. Record findings.
+Expected: build succeeds; batch run either completes cleanly or reports real
+ASan findings. Record findings.
 
 - [ ] **Step 4: Commit**
 
@@ -195,11 +221,14 @@ IncludeBlocks: Preserve
 SortIncludes: Never
 ```
 
-`SortIncludes: Never` is deliberate — header order in this codebase matters (Windows headers before POSIX headers in several TUs).
+`SortIncludes: Never` is deliberate — header order in this codebase matters
+(Windows headers before POSIX headers in several TUs).
 
 - [ ] **Step 2: Do NOT mass-reformat the codebase yet**
 
-A reformat-everything commit pollutes `git blame`. Keep `.clang-format` available for incremental use (editor-on-save, `clang-format-diff` on new changes). A full reformat is TASK-023 in the backlog — leave it there.
+A reformat-everything commit pollutes `git blame`. Keep `.clang-format`
+available for incremental use (editor-on-save, `clang-format-diff` on new
+changes). A full reformat is TASK-023 in the backlog — leave it there.
 
 - [ ] **Step 3: Commit**
 
@@ -217,21 +246,14 @@ Start conservative — only the bug-finding checks, not style or modernize yet:
 ```yaml
 ---
 Checks: >
-  -*,
-  bugprone-*,
-  -bugprone-easily-swappable-parameters,
-  -bugprone-macro-parentheses,
-  -bugprone-narrowing-conversions,
-  cppcoreguidelines-pro-type-static-cast-downcast,
-  cppcoreguidelines-slicing,
-  misc-const-correctness,
-  misc-misplaced-const,
-  performance-*,
-  -performance-no-int-to-ptr,
-  readability-misleading-indentation,
+  -*, bugprone-*, -bugprone-easily-swappable-parameters,
+  -bugprone-macro-parentheses, -bugprone-narrowing-conversions,
+  cppcoreguidelines-pro-type-static-cast-downcast, cppcoreguidelines-slicing,
+  misc-const-correctness, misc-misplaced-const, performance-*,
+  -performance-no-int-to-ptr, readability-misleading-indentation,
   readability-redundant-smartptr-get
-WarningsAsErrors: ''
-HeaderFilterRegex: '^(src|include)/(?!pcre|s7|networking-ts-impl|ffi|shims|linenoise).*'
+WarningsAsErrors: ""
+HeaderFilterRegex: "^(src|include)/(?!pcre|s7|networking-ts-impl|ffi|shims|linenoise).*"
 ```
 
 - [ ] **Step 2: Add a CMake target for running clang-tidy**
@@ -245,7 +267,8 @@ add_custom_target(tidy
     COMMENT "Running clang-tidy on Extempore sources")
 ```
 
-This depends on CMake generating `compile_commands.json`, which Ninja does automatically.
+This depends on CMake generating `compile_commands.json`, which Ninja does
+automatically.
 
 - [ ] **Step 3: Run it locally to see the output volume**
 
@@ -277,23 +300,32 @@ git push
 gh run watch --branch cpp-modernisation --exit-status
 ```
 
-Expected: all 4 matrix platforms green. If Linux or macOS fails on a new warning, that's a bug — fix it and push again. If Windows fails on `/we4715`, investigate the missing-return path and fix.
+Expected: all 4 matrix platforms green. If Linux or macOS fails on a new
+warning, that's a bug — fix it and push again. If Windows fails on `/we4715`,
+investigate the missing-return path and fix.
 
 ---
 
 ## Phase 2: Critical UNIV.cpp correctness + cpp-unit test harness
 
 **Files:**
-- Modify: `src/UNIV.cpp:159-210` (`cname_decode`), `src/UNIV.cpp:212-265` (`base64_decode`), `src/UNIV.cpp:326-343` (`rreplace`/`rsplit`), `src/UNIV.cpp:349-372` (`sys_slurp_file`)
+
+- Modify: `src/UNIV.cpp:159-210` (`cname_decode`), `src/UNIV.cpp:212-265`
+  (`base64_decode`), `src/UNIV.cpp:326-343` (`rreplace`/`rsplit`),
+  `src/UNIV.cpp:349-372` (`sys_slurp_file`)
 - Create: `tests/cpp-unit/CMakeLists.txt`, `tests/cpp-unit/univ_test.cpp`
-- Modify: `CMakeLists.txt` (add GoogleTest via FetchContent and `add_subdirectory(tests/cpp-unit)`)
-- Modify: `.github/workflows/build-and-test.yml:75` (add `compiler-unit|cpp-unit` to the ctest label regex — it's `compiler-unit` already; add `|cpp-unit`)
+- Modify: `CMakeLists.txt` (add GoogleTest via FetchContent and
+  `add_subdirectory(tests/cpp-unit)`)
+- Modify: `.github/workflows/build-and-test.yml:75` (add
+  `compiler-unit|cpp-unit` to the ctest label regex — it's `compiler-unit`
+  already; add `|cpp-unit`)
 
 ### Task 2.1: Add GoogleTest and the cpp-unit subdirectory
 
 - [ ] **Step 1: Add GoogleTest to `CMakeLists.txt` via FetchContent**
 
-Near the top where other `FetchContent_Declare`s live (grep for `FetchContent_Declare(llvm`), add:
+Near the top where other `FetchContent_Declare`s live (grep for
+`FetchContent_Declare(llvm`), add:
 
 ```cmake
 if(BUILD_TESTS)
@@ -320,7 +352,8 @@ if(BUILD_TESTS)
 endif()
 ```
 
-Check that `enable_testing()` isn't already there — if it is, leave the existing call.
+Check that `enable_testing()` isn't already there — if it is, leave the existing
+call.
 
 - [ ] **Step 3: Create `tests/cpp-unit/CMakeLists.txt`**
 
@@ -368,13 +401,19 @@ Expected: the smoke test passes.
 In `.github/workflows/build-and-test.yml:75`, change:
 
 ```yaml
-run: ctest --test-dir build --build-config Release --label-regex "libs-core|libs-external|compiler-unit|examples-core|examples-audio" --output-on-failure
+run:
+  ctest --test-dir build --build-config Release --label-regex
+  "libs-core|libs-external|compiler-unit|examples-core|examples-audio"
+  --output-on-failure
 ```
 
 to:
 
 ```yaml
-run: ctest --test-dir build --build-config Release --label-regex "libs-core|libs-external|compiler-unit|cpp-unit|examples-core|examples-audio" --output-on-failure
+run:
+  ctest --test-dir build --build-config Release --label-regex
+  "libs-core|libs-external|compiler-unit|cpp-unit|examples-core|examples-audio"
+  --output-on-failure
 ```
 
 - [ ] **Step 7: Commit**
@@ -390,7 +429,11 @@ git commit -m "test: add cpp-unit test target with GoogleTest"
 
 - [ ] **Step 1: Expose a testable signature**
 
-`sys_slurp_file` currently lives in the `extemp::UNIV` namespace (check `include/UNIV.h`). If it's already exposed as `extemp::UNIV::sys_slurp_file(const char*)`, no change needed. Otherwise add a declaration to `include/UNIV.h` in the namespace block (grep `rreplace` — it's declared nearby).
+`sys_slurp_file` currently lives in the `extemp::UNIV` namespace (check
+`include/UNIV.h`). If it's already exposed as
+`extemp::UNIV::sys_slurp_file(const char*)`, no change needed. Otherwise add a
+declaration to `include/UNIV.h` in the namespace block (grep `rreplace` — it's
+declared nearby).
 
 - [ ] **Step 2: Write failing tests in `tests/cpp-unit/univ_test.cpp`**
 
@@ -446,14 +489,16 @@ TEST(SysSlurpFile, HandlesBinaryWithEmbeddedZero) {
 }
 ```
 
-- [ ] **Step 3: Run — the `PreservesAllBytes` test will fail because current impl truncates**
+- [ ] **Step 3: Run — the `PreservesAllBytes` test will fail because current
+      impl truncates**
 
 ```bash
 cmake --build build --target extempore_cpp_unit
 ctest --test-dir build --label-regex cpp-unit --output-on-failure
 ```
 
-Expected: `PreservesAllBytes` reports `out = "hell"` (last byte truncated by `buf[file_size-1] = '\0'`).
+Expected: `PreservesAllBytes` reports `out = "hell"` (last byte truncated by
+`buf[file_size-1] = '\0'`).
 
 - [ ] **Step 4: Fix `sys_slurp_file` in `src/UNIV.cpp`**
 
@@ -501,7 +546,9 @@ git commit -m "fix(univ): sys_slurp_file off-by-one and unchecked fread
 
 **Files:** `src/UNIV.cpp:159-210`, `tests/cpp-unit/univ_test.cpp`
 
-The outer `char* d2 = nullptr` is shadowed by an inner `char* d2 = ...` inside the padding branch (line ~173). The outer `free(d2)` (line 207) is always a no-op; the inner `d2` leaks.
+The outer `char* d2 = nullptr` is shadowed by an inner `char* d2 = ...` inside
+the padding branch (line ~173). The outer `free(d2)` (line 207) is always a
+no-op; the inner `d2` leaks.
 
 - [ ] **Step 1: Write a failing test**
 
@@ -519,7 +566,8 @@ TEST(CnameDecode, PadBranchDoesNotLeak) {
 }
 ```
 
-(If the real signature differs, adjust — check `include/UNIV.h` for the declaration.)
+(If the real signature differs, adjust — check `include/UNIV.h` for the
+declaration.)
 
 - [ ] **Step 2: Run — expect a correctness failure or leak under ASan**
 
@@ -549,7 +597,9 @@ data = pad_buf;  // or whatever the original assignment was
 // OR keep pad_buf local and free it before the branch exits.
 ```
 
-Exact structure depends on the function flow — read lines 159-210 carefully. The goal: outer scope variable names no longer shadow, every `malloc` has a matching `free`.
+Exact structure depends on the function flow — read lines 159-210 carefully. The
+goal: outer scope variable names no longer shadow, every `malloc` has a matching
+`free`.
 
 - [ ] **Step 4: Re-run under ASan**
 
@@ -571,7 +621,8 @@ git commit -m "fix(univ): cname_decode pad-branch leak and variable shadow"
 
 **Files:** `src/UNIV.cpp:193-196, 257-260`, `tests/cpp-unit/univ_test.cpp`
 
-The expression `data[i] == '=' ? 0 & i++ : table[unsigned(data[i++])]` evaluates `i++` in multiple sub-expressions without sequencing → UB.
+The expression `data[i] == '=' ? 0 & i++ : table[unsigned(data[i++])]` evaluates
+`i++` in multiple sub-expressions without sequencing → UB.
 
 - [ ] **Step 1: Fix by splitting into explicit statements**
 
@@ -606,7 +657,8 @@ cmake --build build-ubsan --target extempore_cpp_unit
 ctest --test-dir build-ubsan --label-regex cpp-unit --output-on-failure
 ```
 
-Expected: pre-fix, UBSan reports unsequenced modification; post-fix, passes cleanly.
+Expected: pre-fix, UBSan reports unsequenced modification; post-fix, passes
+cleanly.
 
 - [ ] **Step 4: Commit**
 
@@ -617,9 +669,11 @@ git commit -m "fix(univ): sequence data[i++] reads in base64/cname decode"
 
 ### Task 2.5: Test + fix `rreplace` / `rsplit` buffer overrun
 
-**Files:** `src/UNIV.cpp:326-343`, `include/UNIV.h`, `tests/cpp-unit/univ_test.cpp`
+**Files:** `src/UNIV.cpp:326-343`, `include/UNIV.h`,
+`tests/cpp-unit/univ_test.cpp`
 
-Current signatures write into a caller-supplied `char*` with a post-hoc 4096 check. Change to return `std::string`.
+Current signatures write into a caller-supplied `char*` with a post-hoc 4096
+check. Change to return `std::string`.
 
 - [ ] **Step 1: Add new overloads returning `std::string`**
 
@@ -633,7 +687,8 @@ std::vector<std::string> rsplit(const std::string& pattern,
                                 const std::string& input);
 ```
 
-In `src/UNIV.cpp`, implement both using `std::regex_replace` and `std::sregex_token_iterator` respectively.
+In `src/UNIV.cpp`, implement both using `std::regex_replace` and
+`std::sregex_token_iterator` respectively.
 
 - [ ] **Step 2: Deprecate the raw-pointer versions**
 
@@ -692,10 +747,16 @@ Expected: all 4 platforms green. `cpp-unit` tests now run as part of `ctest`.
 
 ## Phase 3: Kill hand-rolled sync primitives
 
-**Files to delete:** `include/EXTMutex.h`, `src/EXTThread.cpp`, `include/EXTThread.h`, `include/EXTMonitor.h`, `include/EXTCondition.h`
-**Files to modify:** every include site — use `grep -rn "EXTMutex\|EXTThread\|EXTMonitor\|EXTCondition" src/ include/` for the full list. Known users:
-- `src/SchemeProcess.cpp`, `src/SchemeREPL.cpp`, `src/AudioDevice.cpp`, `src/TaskScheduler.cpp`, `src/EXTZones.cpp`, `src/EXTLLVM.cpp`
-- `include/SchemeProcess.h`, `include/SchemeREPL.h`, `include/AudioDevice.h`, `include/TaskScheduler.h`
+**Files to delete:** `include/EXTMutex.h`, `src/EXTThread.cpp`,
+`include/EXTThread.h`, `include/EXTMonitor.h`, `include/EXTCondition.h` **Files
+to modify:** every include site — use
+`grep -rn "EXTMutex\|EXTThread\|EXTMonitor\|EXTCondition" src/ include/` for the
+full list. Known users:
+
+- `src/SchemeProcess.cpp`, `src/SchemeREPL.cpp`, `src/AudioDevice.cpp`,
+  `src/TaskScheduler.cpp`, `src/EXTZones.cpp`, `src/EXTLLVM.cpp`
+- `include/SchemeProcess.h`, `include/SchemeREPL.h`, `include/AudioDevice.h`,
+  `include/TaskScheduler.h`
 
 ### Task 3.1: Enumerate call sites
 
@@ -707,17 +768,24 @@ wc -l /tmp/sync_sites.txt
 ```
 
 Review the file. Group by pattern:
+
 1. `EXTMutex m; m.lock(); ...; m.unlock();` → `std::mutex` + `std::lock_guard`
 2. `EXTMutex::ScopedLock l(m);` → `std::lock_guard<std::mutex> l(m);`
-3. `EXTMonitor` (mutex + condvar bundle) → `std::mutex` + `std::condition_variable`
-4. `EXTCondition c; c.wait(m); c.signal();` → `std::condition_variable c; c.wait(lock); c.notify_one();`
+3. `EXTMonitor` (mutex + condvar bundle) → `std::mutex` +
+   `std::condition_variable`
+4. `EXTCondition c; c.wait(m); c.signal();` →
+   `std::condition_variable c; c.wait(lock); c.notify_one();`
 5. `EXTThread t(fn, arg); t.start(); t.stop();` → `std::thread`
 
 ### Task 3.2: Replace `EXTMutex`
 
-- [ ] **Step 1: Read `include/EXTMutex.h` to confirm it's a pure `std::recursive_mutex` wrapper**
+- [ ] **Step 1: Read `include/EXTMutex.h` to confirm it's a pure
+      `std::recursive_mutex` wrapper**
 
-Confirm the semantics — it uses `std::recursive_mutex` unconditionally. Most call sites probably don't need recursion. Be careful: if a call site locks the same mutex from within the lock's critical section, we must keep `std::recursive_mutex` there.
+Confirm the semantics — it uses `std::recursive_mutex` unconditionally. Most
+call sites probably don't need recursion. Be careful: if a call site locks the
+same mutex from within the lock's critical section, we must keep
+`std::recursive_mutex` there.
 
 - [ ] **Step 2: For each call site, pick the right mutex type**
 
@@ -745,7 +813,8 @@ std::lock_guard<std::mutex> lock(m_mutex);
 cmake --build build --target extempore --parallel 2
 ```
 
-Commit every 1-3 files — small commits make bisection cheap. Suggested commit cadence:
+Commit every 1-3 files — small commits make bisection cheap. Suggested commit
+cadence:
 
 ```bash
 git add src/SchemeProcess.cpp include/SchemeProcess.h
@@ -754,7 +823,9 @@ git commit -m "refactor(sync): SchemeProcess uses std::mutex directly"
 
 ### Task 3.3: Replace `EXTMonitor` / `EXTCondition`
 
-Same pattern as 3.2. `EXTMonitor` becomes `std::mutex m; std::condition_variable cv;` as members; `wait` becomes `cv.wait(lock, pred)`.
+Same pattern as 3.2. `EXTMonitor` becomes
+`std::mutex m; std::condition_variable cv;` as members; `wait` becomes
+`cv.wait(lock, pred)`.
 
 Commit per-file.
 
@@ -762,11 +833,17 @@ Commit per-file.
 
 - [ ] **Step 1: Read `src/EXTThread.cpp` and `include/EXTThread.h`**
 
-Identify its API surface — most likely `start(fn, arg)`, `stop()`, `join()`, `detach()`, priority setting. Note any custom-stack-size or realtime-priority logic — `std::thread` doesn't natively support RT priority, so check if that needs preserving via `pthread_setschedparam` on the native handle.
+Identify its API surface — most likely `start(fn, arg)`, `stop()`, `join()`,
+`detach()`, priority setting. Note any custom-stack-size or realtime-priority
+logic — `std::thread` doesn't natively support RT priority, so check if that
+needs preserving via `pthread_setschedparam` on the native handle.
 
 - [ ] **Step 2: Pick a migration strategy**
 
-If `EXTThread` does have RT-priority logic we need, don't delete the file yet — reduce it to a thin helper around `std::thread::native_handle()`. Name it `ext::rt_thread` and keep the file if it's genuinely pulling weight. Otherwise delete.
+If `EXTThread` does have RT-priority logic we need, don't delete the file yet —
+reduce it to a thin helper around `std::thread::native_handle()`. Name it
+`ext::rt_thread` and keep the file if it's genuinely pulling weight. Otherwise
+delete.
 
 - [ ] **Step 3: Replace call sites**
 
@@ -782,7 +859,8 @@ std::jthread t([arg] { func(arg); });
 // (assuming func signature suits the lambda)
 ```
 
-For long-lived threads owned by singletons, prefer `std::jthread` (stops on destruction) over raw `std::thread`.
+For long-lived threads owned by singletons, prefer `std::jthread` (stops on
+destruction) over raw `std::thread`.
 
 ### Task 3.5: Delete the headers
 
@@ -800,7 +878,8 @@ Expected: nothing except file-deletion candidates themselves.
 git rm include/EXTMutex.h include/EXTMonitor.h include/EXTCondition.h include/EXTThread.h src/EXTThread.cpp
 ```
 
-Remove these from any `EXTEMPORE_SOURCES` list in `CMakeLists.txt` or explicit source lists.
+Remove these from any `EXTEMPORE_SOURCES` list in `CMakeLists.txt` or explicit
+source lists.
 
 - [ ] **Step 3: Commit**
 
@@ -823,7 +902,8 @@ cmake --build build --target extempore --parallel 2
 ctest --test-dir build --label-regex "libs-core|compiler-unit|cpp-unit" -j4 --output-on-failure
 ```
 
-Expected: green. If failures occur, most likely a subtle lock-scope change during migration.
+Expected: green. If failures occur, most likely a subtle lock-scope change
+during migration.
 
 ### Task 3.7: CI gate
 
@@ -834,15 +914,20 @@ git push
 gh run watch --branch cpp-modernisation --exit-status
 ```
 
-Expected: all 4 platforms green. Windows is highest risk — `std::thread::native_handle()` and recursive mutex semantics differ subtly. Read any Windows failure output carefully.
+Expected: all 4 platforms green. Windows is highest risk —
+`std::thread::native_handle()` and recursive mutex semantics differ subtly. Read
+any Windows failure output carefully.
 
 ---
 
 ## Phase 4: Networking safety
 
 **Files:**
-- Modify: `src/OSC.cpp:1109`, `src/SchemeREPL.cpp:135`, `src/EXTLLVM.cpp:286`, `src/LinenoiseREPL.cpp:21`
-- Modify: `src/Extempore.cpp:112-117` (signal handler) and `src/Extempore.cpp:176` (`freopen(stderr)`)
+
+- Modify: `src/OSC.cpp:1109`, `src/SchemeREPL.cpp:135`, `src/EXTLLVM.cpp:286`,
+  `src/LinenoiseREPL.cpp:21`
+- Modify: `src/Extempore.cpp:112-117` (signal handler) and
+  `src/Extempore.cpp:176` (`freopen(stderr)`)
 - Modify: `src/SchemeREPL.cpp:208-222` (FD sentinel)
 
 ### Task 4.1: Replace `gethostbyname` with `getaddrinfo`
@@ -897,7 +982,8 @@ TEST(ResolveIpv4, BogusHostReturnsZero) {
 
 - [ ] **Step 3: Replace each call site**
 
-`src/OSC.cpp:1109`, `src/EXTLLVM.cpp:286`, `src/SchemeREPL.cpp:135`, `src/LinenoiseREPL.cpp:21`:
+`src/OSC.cpp:1109`, `src/EXTLLVM.cpp:286`, `src/SchemeREPL.cpp:135`,
+`src/LinenoiseREPL.cpp:21`:
 
 ```cpp
 // before:
@@ -933,11 +1019,13 @@ preserve existing callers' expected layout."
 grep -n "m_serverSocket" src/SchemeREPL.cpp include/SchemeREPL.h
 ```
 
-If `m_serverSocket` defaults to `0`, change to `-1`. Update every check from `m_serverSocket > 0` or `!= 0` to `!= -1`.
+If `m_serverSocket` defaults to `0`, change to `-1`. Update every check from
+`m_serverSocket > 0` or `!= 0` to `!= -1`.
 
 - [ ] **Step 2: Wrap the close path**
 
-In `closeREPL` (lines ~208-222), change `close(m_serverSocket)` to guard against `-1`:
+In `closeREPL` (lines ~208-222), change `close(m_serverSocket)` to guard against
+`-1`:
 
 ```cpp
 if (m_serverSocket != -1) {
@@ -970,7 +1058,8 @@ static void sig_handler(int sig) {
 }
 ```
 
-Include `<unistd.h>` (POSIX) and `<cstdlib>` (for `_Exit`). On Windows, keep whatever the existing `#ifdef _WIN32` guard expects.
+Include `<unistd.h>` (POSIX) and `<cstdlib>` (for `_Exit`). On Windows, keep
+whatever the existing `#ifdef _WIN32` guard expects.
 
 - [ ] **Step 2: Commit**
 
@@ -985,9 +1074,12 @@ git commit -m "fix: make sig_handler async-signal-safe"
 
 - [ ] **Step 1: Gate behind a command-line flag**
 
-Add a `--quiet` option or simply remove the line. The line silences all LLVM diagnostics for the life of the process, making crash investigation nearly impossible.
+Add a `--quiet` option or simply remove the line. The line silences all LLVM
+diagnostics for the life of the process, making crash investigation nearly
+impossible.
 
-Recommendation: remove outright. If a user wants quiet stderr, they can shell-redirect.
+Recommendation: remove outright. If a user wants quiet stderr, they can
+shell-redirect.
 
 - [ ] **Step 2: Commit**
 
@@ -1005,13 +1097,16 @@ git push
 gh run watch --branch cpp-modernisation --exit-status
 ```
 
-Expected: all green. Network-stack changes are the most platform-sensitive work in the whole plan; Windows `winsock2.h` header ordering is fragile. Be ready to add a `#define WIN32_LEAN_AND_MEAN` or reorder includes if Windows explodes.
+Expected: all green. Network-stack changes are the most platform-sensitive work
+in the whole plan; Windows `winsock2.h` header ordering is fragile. Be ready to
+add a `#define WIN32_LEAN_AND_MEAN` or reorder includes if Windows explodes.
 
 ---
 
 ## Phase 5: Convert deferred findings to backlog tasks
 
-For the audit items too large or design-sensitive for this refactor, create focused backlog tasks so they aren't forgotten.
+For the audit items too large or design-sensitive for this refactor, create
+focused backlog tasks so they aren't forgotten.
 
 ### Task 5.1: Create backlog entries
 
@@ -1118,6 +1213,7 @@ Deliberately left for the follow-up backlog tasks created in Task 5.1:
 - `select()` → `poll`/`epoll`
 - Mass clang-format of the codebase (already tracked as TASK-023)
 - Full clang-tidy fixup wave (already tracked as TASK-030)
-- `typedef` → `using`, `NULL` → `nullptr` cleanup (mechanical, large diff — separate pass)
+- `typedef` → `using`, `NULL` → `nullptr` cleanup (mechanical, large diff —
+  separate pass)
 
 These are each independently valuable and each warrants its own focused PR.

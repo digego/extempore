@@ -5,9 +5,9 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ## v0.10.0 (unreleased)
 
-A broad modernisation of the C++ runtime. None of it changes what Extempore
-does --- every test suite stays green on Linux (x64 and arm64), macOS (arm64)
-and Windows --- but the codebase now needs a C++20 compiler (GCC 13+, a recent
+A broad modernisation of the C++ runtime. None of it changes what Extempore does
+--- every test suite stays green on Linux (x64 and arm64), macOS (arm64) and
+Windows --- but the codebase now needs a C++20 compiler (GCC 13+, a recent
 Clang, or MSVC from Visual Studio 2022), and a good deal of dead code, platform
 `#ifdef`s and latent bugs went out with the tide.
 
@@ -69,31 +69,31 @@ since the s7 swap in v0.9.0.
 Patch release fixing the pattern language, broken since the s7 swap in v0.9.0.
 
 - **Pattern language**: the `:>` (start/modify) and `:|` (stop) pattern
-  operators stopped working in v0.9.0 --- evaluating e.g. `(:> A 4 0 (play syn1
-  @1 80 dur) (list 60 63 67 72))` raised `Unbound variable A`, as did every
-  `examples/sharedsystem/pattern_basics.xtm` line. s7 (unlike the old
-  TinyScheme reader) treats any symbol that begins or ends with a colon as a
-  self-evaluating keyword constant, and a keyword can't be bound with
-  `define-macro`, so the operator definitions silently failed and `(:> ...)`
-  was read as an ordinary application. Fixed by narrowing s7's keyword rule (in
-  our vendored `src/s7.c`) so a colon only marks a keyword when the character
-  adjacent to it is a letter: genuine keywords (`:readable`, `foo:`, `define*`
-  keyword args --- all alphabetic) are unaffected, while operator-style names
-  like `:>` and `:|` stay ordinary, macro-bindable symbols. This is a
-  deliberate extempore-local divergence from stock s7 --- we can't rename the
-  operators without breaking pattern-language code already out in the wild, so
-  we adapt the reader instead. New `tests/core/pattern-language.xtm` guards it.
-  Reported on the mailing list by George.
+  operators stopped working in v0.9.0 --- evaluating e.g.
+  `(:> A 4 0 (play syn1 @1 80 dur) (list 60 63 67 72))` raised
+  `Unbound variable A`, as did every `examples/sharedsystem/pattern_basics.xtm`
+  line. s7 (unlike the old TinyScheme reader) treats any symbol that begins or
+  ends with a colon as a self-evaluating keyword constant, and a keyword can't
+  be bound with `define-macro`, so the operator definitions silently failed and
+  `(:> ...)` was read as an ordinary application. Fixed by narrowing s7's
+  keyword rule (in our vendored `src/s7.c`) so a colon only marks a keyword when
+  the character adjacent to it is a letter: genuine keywords (`:readable`,
+  `foo:`, `define*` keyword args --- all alphabetic) are unaffected, while
+  operator-style names like `:>` and `:|` stay ordinary, macro-bindable symbols.
+  This is a deliberate extempore-local divergence from stock s7 --- we can't
+  rename the operators without breaking pattern-language code already out in the
+  wild, so we adapt the reader instead. New `tests/core/pattern-language.xtm`
+  guards it. Reported on the mailing list by George.
 
 ## v0.9.2
 
 Patch release fixing a multi-form REPL eval regression introduced with the s7
 swap in v0.9.0.
 
-- **Multi-form eval**: selecting and evaluating multiple top-level
-  s-expressions in one go (over the eval socket or via `--batch`/`--eval`)
-  previously ran only the first form and silently discarded the rest. The
-  s7-backed `eval_with_error_trap` was using `s7_eval_c_string` (single-form
+- **Multi-form eval**: selecting and evaluating multiple top-level s-expressions
+  in one go (over the eval socket or via `--batch`/`--eval`) previously ran only
+  the first form and silently discarded the rest. The s7-backed
+  `eval_with_error_trap` was using `s7_eval_c_string` (single-form
   read-and-eval) instead of `s7_load_c_string` (the `load` equivalent that
   iterates every top-level form). Reported on the mailing list by George.
 
@@ -101,21 +101,21 @@ swap in v0.9.0.
 
 Patch release fixing a critical packaging bug in the v0.9.0 binary release.
 
-- **Release packaging**: the v0.9.0 binary release had `EXT_SHARE_DIR`
-  hardcoded to the GitHub Actions runner's ephemeral source path, so
-  downloaded binaries aborted with `could not locate file init.xtm` on every
-  user's machine. The release workflow now passes `-DEXT_SHARE_DIR=.` so the
-  binary locates `runtime/`, `libs/` etc. relative to the current working
-  directory --- matching what the README already tells users to do (run
-  `./extempore` from inside the unzipped folder).
+- **Release packaging**: the v0.9.0 binary release had `EXT_SHARE_DIR` hardcoded
+  to the GitHub Actions runner's ephemeral source path, so downloaded binaries
+  aborted with `could not locate file init.xtm` on every user's machine. The
+  release workflow now passes `-DEXT_SHARE_DIR=.` so the binary locates
+  `runtime/`, `libs/` etc. relative to the current working directory ---
+  matching what the README already tells users to do (run `./extempore` from
+  inside the unzipped folder).
 
   Workaround for anyone stuck on a v0.9.0 download: run
   `./extempore --sharedir .` from inside the extempore folder.
 
 ## v0.9.0
 
-A major release --- the long-running `aarch64` branch (~185 commits) merged
-back into master.
+A major release --- the long-running `aarch64` branch (~185 commits) merged back
+into master.
 
 ### Platforms
 
@@ -124,8 +124,8 @@ back into master.
 
 ### Toolchain
 
-- LLVM upgraded from 17 to **22.1.1**. JIT migrated from the legacy JIT to
-  **ORC JIT**.
+- LLVM upgraded from 17 to **22.1.1**. JIT migrated from the legacy JIT to **ORC
+  JIT**.
 - LLVM is now fetched and built in-tree via CMake's `FetchContent` (replacing
   `ExternalProject`); only the components Extempore uses are built.
 - Minimum CMake 3.28. Builds use the Ninja generator.
@@ -147,16 +147,16 @@ back into master.
 
 - Major refactor of `runtime/llvmti.xtm` into separate modules.
 - Converted caches to hashtables, replaced regex with string ops, added
-  structured error handling. `sTypeDefinitions` string accumulator replaced
-  with structured maps.
+  structured error handling. `sTypeDefinitions` string accumulator replaced with
+  structured maps.
 - New compiler unit test suite (`tests/compiler/`).
 
 ### Runtime
 
 - New `--repl` flag: interactive linenoise-based REPL (Linux/macOS).
 - DSP hot-swap fixed after the ORC JIT migration.
-- Many C++ modernisations (`nullptr`, `std::vector`, `std::string_view`,
-  C++17 stdlib replacing platform ifdefs).
+- Many C++ modernisations (`nullptr`, `std::vector`, `std::string_view`, C++17
+  stdlib replacing platform ifdefs).
 
 ### Docs
 
@@ -166,16 +166,16 @@ back into master.
 ### Assets
 
 - The assets tarball (`ASSETS=ON`) now comes from a GitHub release asset on
-  `extemporelang/extempore-assets` (tag `v0.9.0`), ~250 MB of audio samples
-  and impulse responses. Unused fonts, images, 3D models and the duplicate
-  Christmas Carol sample have been trimmed out.
+  `extemporelang/extempore-assets` (tag `v0.9.0`), ~250 MB of audio samples and
+  impulse responses. Unused fonts, images, 3D models and the duplicate Christmas
+  Carol sample have been trimmed out.
 
 ### Examples
 
 - `examples/contrib/` removed (legacy graphics, unmaintained externals).
 - Core/external example set slimmed to only those that load cleanly in CI.
-- Full working set registered in `extras/cmake/tests.cmake` and tested on
-  every push.
+- Full working set registered in `extras/cmake/tests.cmake` and tested on every
+  push.
 
 ### Stability
 
@@ -188,9 +188,9 @@ Post-beta hardening before cutting the stable release:
   `EXTMutex`/`EXTMonitor`/`EXTCondition` wrappers removed.
 - **Buffer/UB fixes**: `sys_slurp_file` off-by-one and unchecked `fread`,
   `rsplit` buffer overrun, `cname_decode` leak.
-- **Tooling**: `-Wall -Wextra` with bug-finding warnings promoted to errors;
-  new `EXTEMPORE_SANITIZE` build option for ASan/UBSan/TSan; `.clang-format`
-  and `.clang-tidy` configs (LLVM-based, no mass reformat).
+- **Tooling**: `-Wall -Wextra` with bug-finding warnings promoted to errors; new
+  `EXTEMPORE_SANITIZE` build option for ASan/UBSan/TSan; `.clang-format` and
+  `.clang-tidy` configs (LLVM-based, no mass reformat).
 - **Headless audio**: new `--audio-outfile` offline file driver renders DSP to
   WAV without an OS audio device, enabling audio-assertion tests in CI.
 - **Docs**: xtlang tutorial and error-message glossary; new-user onboarding
@@ -203,7 +203,8 @@ Post-beta hardening before cutting the stable release:
 ## v0.8.8
 
 - upgrade PortAudio (to fix a build error on macOS Big Sur)
-- refactoring of LLVM stuff (in preparation for the LLVM 11 upgrade from nicdonaldson)
+- refactoring of LLVM stuff (in preparation for the LLVM 11 upgrade from
+  nicdonaldson)
 - improvements to the GitHub actinos CI test matrix
 
 ## v0.8.7
@@ -237,11 +238,11 @@ Post-beta hardening before cutting the stable release:
   argument to `load-sampler` (which maps filenames to sample slots). In
   particular, the parser function used to have to map a list of filenames to a
   list of "parsed" slots/banks, but now just maps a single filename to a single
-  slot/bank (see [the
-  docs](https://extemporelang.github.io/docs/guides/sampler/), which have been
-  updated to reflect the new behaviour). In general if you had some existing
-  sample loading code (pre v0.8.4) and it's now broken then have a look to see
-  if that's the problem.
+  slot/bank (see
+  [the docs](https://extemporelang.github.io/docs/guides/sampler/), which have
+  been updated to reflect the new behaviour). In general if you had some
+  existing sample loading code (pre v0.8.4) and it's now broken then have a look
+  to see if that's the problem.
 
 ## v0.8
 
@@ -253,8 +254,8 @@ Post-beta hardening before cutting the stable release:
 
 ### Removed
 
-- out of date guff, including long-deprecated and non-working AOT
-  compilation scripts, the old `extempore.el` (just use MELPA)
+- out of date guff, including long-deprecated and non-working AOT compilation
+  scripts, the old `extempore.el` (just use MELPA)
 
 ### Changed
 
@@ -297,5 +298,5 @@ Post-beta hardening before cutting the stable release:
 - change auto-compiled type dataconstructors: now, the default zalloc
   constructor is TypeName_z, which is bind-poly'd to TypeName
 - add bind-dylib macro, which automatically sets the variable
-  *impc:aot:current-load-dylib-info*
+  _impc:aot:current-load-dylib-info_
 - bring PCRE in-tree, remove libpcre.a as a static dependency

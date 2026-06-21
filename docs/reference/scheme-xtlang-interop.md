@@ -3,9 +3,8 @@ title: Scheme-xtlang interop
 ---
 
 The rationale behind having the two languages is covered in
-[philosophy](../overview/philosophy.md), but there
-are a few other things worth knowing about the relationship between Scheme and
-xtlang in Extempore.
+[philosophy](../overview/philosophy.md), but there are a few other things worth
+knowing about the relationship between Scheme and xtlang in Extempore.
 
 The **tl;dr** of this page is: at the top-level (i.e. not called by/in another
 function) all the `bind-*` forms (e.g. `bind-func`, `bind-val`) are xtlang, as
@@ -59,8 +58,7 @@ typed, so when you `bind-func` a new closure you must specify the type of the
 input arguments and the return argument. Because closures in xtlang are
 "first-class citizens", the newly created closures itself has a type (which is
 basically a closure type with certain input types and return type). Again, see
-[types](types.md) for a more detailed
-discussion.
+[types](types.md) for a more detailed discussion.
 
 ## More caveats {#more-caveats}
 

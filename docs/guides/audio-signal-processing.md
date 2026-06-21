@@ -25,13 +25,12 @@ arguments:
 
 This `dsp` function takes as input:
 
--   `in`: the input audio sample, e.g. from the microphone
--   `time`: an `i64` representing the time
--   `chan`: another `i64` which represents the channel index (`0` for L,
-    `1` for R, etc.). Extempore can handle any number of channels.
--   `data`: this is a *pointer* to a `SAMPLE` type (which is `float` by
-    default), and can be used to pass arbitrary data into the `dsp`
-    function.
+- `in`: the input audio sample, e.g. from the microphone
+- `time`: an `i64` representing the time
+- `chan`: another `i64` which represents the channel index (`0` for L, `1` for
+  R, etc.). Extempore can handle any number of channels.
+- `data`: this is a _pointer_ to a `SAMPLE` type (which is `float` by default),
+  and can be used to pass arbitrary data into the `dsp` function.
 
 By default, the type of `SAMPLE` is `float`, it's just a type alias:
 
@@ -74,11 +73,11 @@ Let's create some oscillators:
         (* amp (sin phase))))))
 ```
 
-This `osc_c` function doesn't return a primitive (int/float) value.
-Rather, it returns a (pointer to a) closure, which is our 'oscillator'
-and takes an amplitude and a phase argument. This idiom is a useful one,
-and comes up so much in xtlang code that by convention we give any
-closure which returns another closure a `_c` suffix.
+This `osc_c` function doesn't return a primitive (int/float) value. Rather, it
+returns a (pointer to a) closure, which is our 'oscillator' and takes an
+amplitude and a phase argument. This idiom is a useful one, and comes up so much
+in xtlang code that by convention we give any closure which returns another
+closure a `_c` suffix.
 
 The type message printed by the compiler when we evaluate `osc_c` is:
 
@@ -107,14 +106,14 @@ oscillators as we need:
 The `phase` variable in each of our oscillator closures is how we maintain state
 between calls to `osc1` or `osc2`. Each time the closure is called, `phase` gets
 incremented (see the definition of `osc_c` above), and because `phase` is bound
-within a let that is local to the returned closure, each osc has its *own*
+within a let that is local to the returned closure, each osc has its _own_
 `phase` value, so the oscillators created by `osc_c` are independent. In the
 case above, they are each called with different frequencies to produce sine
 tones of different pitch for each ear. This is closures in action, and it's an
 example of how the 'scheme-like' aspect of xtlang can simplify the job of
 maintaining state.
 
-It doesn't take much imagination to see that *much* cooler stuff can be done in
+It doesn't take much imagination to see that _much_ cooler stuff can be done in
 `dsp` than just playing two sine tones. AM synthesis, FM synthesis, granular and
 wavetable synthesis, as well as sampling and sample manipulation---these are all
 possible. It's worth noting that there are heaps better/easier ways to achieve a
@@ -125,7 +124,7 @@ principles to show how it all works.
 
 ## Beyond pure tones {#beyond-pure-tones}
 
-Playing a single sine tone is boring. Now, instead of just using the *one*
+Playing a single sine tone is boring. Now, instead of just using the _one_
 oscillator, let's use a few of them to generate a whole bunch of sine tones of
 different frequencies:
 
@@ -166,14 +165,15 @@ brings us to a couple of new (compound) types: tuples, and arrays.
 
 ## Tuples in xtlang {#tuples-in-xtlang}
 
-As a refresher, [tuples](../reference/types.md#tuples) in xtlang are heterogeneous groupings of any xtlang types (just like a C
-struct). They're still statically typed, either explicitly or with the types
-inferred from the types of other variables and literals. Syntactically, tuples
-use angle brackets (`<>`).
+As a refresher, [tuples](../reference/types.md#tuples) in xtlang are
+heterogeneous groupings of any xtlang types (just like a C struct). They're
+still statically typed, either explicitly or with the types inferred from the
+types of other variables and literals. Syntactically, tuples use angle brackets
+(`<>`).
 
-When programming in xtlang you don't really ever deal with tuples
-directly---you deal with them by *reference* through pointers. There are
-no 'literals' for tuples either---you can't just go
+When programming in xtlang you don't really ever deal with tuples directly---you
+deal with them by _reference_ through pointers. There are no 'literals' for
+tuples either---you can't just go
 
 ```xtlang
 (bind-func tuple_maker
@@ -184,8 +184,8 @@ no 'literals' for tuples either---you can't just go
 ;; Compiler Error: unbound symbol: <a,a>
 ```
 
-Instead, this time in the `let` we get a pointer to a tuple through a
-call to `alloc`.
+Instead, this time in the `let` we get a pointer to a tuple through a call to
+`alloc`.
 
 ```xtlang
 (bind-func tuple_maker
@@ -196,24 +196,23 @@ call to `alloc`.
       tup)))
 ```
 
-[memory management](/reference/memory-management) goes into more detail about this stuff,
-but for now the key point is that the call to `alloc` returns a
-*pointer* to a tuple of the specified type.
+[memory management](/reference/memory-management) goes into more detail about
+this stuff, but for now the key point is that the call to `alloc` returns a
+_pointer_ to a tuple of the specified type.
 
-Notice the `tset!` function, which takes three arguments: a pointer to a
-tuple (in the case above, that's `tup`), an `i64` (0-based) index for
-specifying which 'slot' in the tuple we're setting, and finally the
-value to set it to (which must be of the appropriate type, otherwise
-you'll get a type error).
+Notice the `tset!` function, which takes three arguments: a pointer to a tuple
+(in the case above, that's `tup`), an `i64` (0-based) index for specifying which
+'slot' in the tuple we're setting, and finally the value to set it to (which
+must be of the appropriate type, otherwise you'll get a type error).
 
-This new version of `tuple_maker` compiles---hooray! The type signature
-printed by the compiler is `Compiled tuple_maker >>> [<i64,i64>*,i64]*`
-and the type of `tuple_maker` is a pointer (denoted by the `*`) to a
-closure (denoted by the `[]`) which takes one `i64` argument and returns
-a pointer to a tuple of two `i64` values.
+This new version of `tuple_maker` compiles---hooray! The type signature printed
+by the compiler is `Compiled tuple_maker >>> [<i64,i64>*,i64]*` and the type of
+`tuple_maker` is a pointer (denoted by the `*`) to a closure (denoted by the
+`[]`) which takes one `i64` argument and returns a pointer to a tuple of two
+`i64` values.
 
-Just to check that everything's working properly, let's write a little
-`test` function
+Just to check that everything's working properly, let's write a little `test`
+function
 
 ```xtlang
 (bind-func test
@@ -227,9 +226,8 @@ Just to check that everything's working properly, let's write a little
 (test 4) ; prints <4,4> (as it should!)
 ```
 
-Tuples come in handy in lots of places, for instance we can use them to
-rewrite one of the `dsp` functions from earlier (the one with the three
-oscs)
+Tuples come in handy in lots of places, for instance we can use them to rewrite
+one of the `dsp` functions from earlier (the one with the three oscs)
 
 ```xtlang
 (bind-alias osc_t [SAMPLE,SAMPLE,SAMPLE]*)
@@ -246,38 +244,37 @@ oscs)
             (else 0.0)))))
 ```
 
-This time, instead of binding each osc to its own symbol (`osc1`, `osc2`
-and `osc3`), we created `osc_tuple`, a (pointer to a) tuple, which held
-all the oscs. We filled it with `tfill!`, which takes as a first
-argument the pointer to the tuple, and then enough additional arguments
-to fill out the tuple. Equivalently, we could have set each element in
-the tuple manually with `(tset! osc_tuple 0 (osc_c 0.0))` etc.
+This time, instead of binding each osc to its own symbol (`osc1`, `osc2` and
+`osc3`), we created `osc_tuple`, a (pointer to a) tuple, which held all the
+oscs. We filled it with `tfill!`, which takes as a first argument the pointer to
+the tuple, and then enough additional arguments to fill out the tuple.
+Equivalently, we could have set each element in the tuple manually with
+`(tset! osc_tuple 0 (osc_c 0.0))` etc.
 
-Also, the use of `bind-alias` is helpful here, because it allows us to
-condense the verbose type of the closure oscs
-(`[SAMPLE,SAMPLE,SAMPLE]*`) down to the more manageable `osc_t`, handy
-when we then need to type the `osc_tuple` with three of them.
+Also, the use of `bind-alias` is helpful here, because it allows us to condense
+the verbose type of the closure oscs (`[SAMPLE,SAMPLE,SAMPLE]*`) down to the
+more manageable `osc_t`, handy when we then need to type the `osc_tuple` with
+three of them.
 
-There's no reason why the types in the tuple have to be the same.
-Indeed, usually they won't be---tuples allow us to define more complex
-data structures which are suitable for the task at hand.
+There's no reason why the types in the tuple have to be the same. Indeed,
+usually they won't be---tuples allow us to define more complex data structures
+which are suitable for the task at hand.
 
 ## Arrays in DSP code {#arrays-in-dsp-code}
 
-If tuples are xtlang's structs, then arrays are (funnily enough)
-xtlang's arrays. Unlike tuples, which can be composed of heterogeneous
-xtlang types, arrays are homogeneous (like a C array). The elements of
-the array can be tuples, closures, or any valid xtlang type.
-Syntactically, arrays are marked by pipes (`|`). Again, we access and
-manipulate arrays through pointers returned by calls to the various
-memory allocation functions (e.g. `alloc`). Instead of `tref` and
-`tset!` (which we used for tuples), we use `aref` and `aset!`.
+If tuples are xtlang's structs, then arrays are (funnily enough) xtlang's
+arrays. Unlike tuples, which can be composed of heterogeneous xtlang types,
+arrays are homogeneous (like a C array). The elements of the array can be
+tuples, closures, or any valid xtlang type. Syntactically, arrays are marked by
+pipes (`|`). Again, we access and manipulate arrays through pointers returned by
+calls to the various memory allocation functions (e.g. `alloc`). Instead of
+`tref` and `tset!` (which we used for tuples), we use `aref` and `aset!`.
 
-So, to bring this discussion back to the practical art of noise-making,
-let's create a `dsp` function which makes use of arrays and tuples to do
-some additive synthesis. We'll make an array `osc_array`, and then two
-more arrays (`amp_array` and `freq_array`) to keep track of the
-amplitude and frequency values.
+So, to bring this discussion back to the practical art of noise-making, let's
+create a `dsp` function which makes use of arrays and tuples to do some additive
+synthesis. We'll make an array `osc_array`, and then two more arrays
+(`amp_array` and `freq_array`) to keep track of the amplitude and frequency
+values.
 
 ```xtlang
 (bind-func dsp:DSP
@@ -309,27 +306,25 @@ amplitude and frequency values.
             (else 0.0))))) ; any remaining channels
 ```
 
-This code is a bit more complex than the previous examples. Initially,
-pointers to the three arrays (for the oscs, the amps and the freqs) are
-set up in the `let`, then a `dotimes` goes through and sets them up with
-the relevant data. The amplitudes and frequencies are chosen at random
-(within sensible ranges). After the arrays have all been initialised in
-the `dotimes`, the dsp `lambda` sums the output from the oscillators
-(the first 15 oscs for the left channel and the last 15 oscs for the
-right channel). That's why the second `dotimes` takes an extra value in
-the parens, this is an initial value (which defaults to zero) for the
-loop variable to be bound to.
+This code is a bit more complex than the previous examples. Initially, pointers
+to the three arrays (for the oscs, the amps and the freqs) are set up in the
+`let`, then a `dotimes` goes through and sets them up with the relevant data.
+The amplitudes and frequencies are chosen at random (within sensible ranges).
+After the arrays have all been initialised in the `dotimes`, the dsp `lambda`
+sums the output from the oscillators (the first 15 oscs for the left channel and
+the last 15 oscs for the right channel). That's why the second `dotimes` takes
+an extra value in the parens, this is an initial value (which defaults to zero)
+for the loop variable to be bound to.
 
-Remember that everything can be JIT-compiled whenever you like, so each
-time the `dsp` closure is re-evaluated new random values will go into
-the amp and freq arrays, and the additive `dsp` function will make a
-different sound which you'll hear straight away.
+Remember that everything can be JIT-compiled whenever you like, so each time the
+`dsp` closure is re-evaluated new random values will go into the amp and freq
+arrays, and the additive `dsp` function will make a different sound which you'll
+hear straight away.
 
-Now, choosing these values at random doesn't necessarily lead to the
-most musical results, so it's a good idea to choose them in some sort of
-systematic way. In our last example, we'll play only the *even*
-harmonics of a given base frequency (I've also simplified the output to
-one channel for clarity).
+Now, choosing these values at random doesn't necessarily lead to the most
+musical results, so it's a good idea to choose them in some sort of systematic
+way. In our last example, we'll play only the _even_ harmonics of a given base
+frequency (I've also simplified the output to one channel for clarity).
 
 ```xtlang
 (bind-func dsp:DSP
@@ -356,49 +351,46 @@ one channel for clarity).
         (/ sum 30.0))))) ; normalise over all oscs
 ```
 
-See how we're using the same arrays as last time (for osc, amp and freq)
-but instead of randomly picking frequencies and amplitudes, we're
-generating a harmonic series with a fundamental of 110Hz, and only
-playing the even harmonics (check the equality test in the
-initialisation of `amp_array`). For fun, change that equality test to an
-inequality test (`<>`) and listen to the result!
+See how we're using the same arrays as last time (for osc, amp and freq) but
+instead of randomly picking frequencies and amplitudes, we're generating a
+harmonic series with a fundamental of 110Hz, and only playing the even harmonics
+(check the equality test in the initialisation of `amp_array`). For fun, change
+that equality test to an inequality test (`<>`) and listen to the result!
 
 ## Packaging noise into instruments {#packaging-noise-into-instruments}
 
-This is hopefully beginning to flesh out the practice of doing real-time
-DSP in Extempore. It might seem like reinventing the wheel, building all
-the oscillators from scratch, but there are xtlang libraries for all of
-this, so there's no need to mess around with the low-level synthesis
-stuff if you don't want to. But the point is that you *can*, and it's
-all hot-swappable, and written in the same language and environment that
-you use even if you just want to trigger pre-made instruments. These
-examples show how to do things from first principles, but feel free to
-mess around at whatever level of abstraction tickles your creative
-fancy.
+This is hopefully beginning to flesh out the practice of doing real-time DSP in
+Extempore. It might seem like reinventing the wheel, building all the
+oscillators from scratch, but there are xtlang libraries for all of this, so
+there's no need to mess around with the low-level synthesis stuff if you don't
+want to. But the point is that you _can_, and it's all hot-swappable, and
+written in the same language and environment that you use even if you just want
+to trigger pre-made instruments. These examples show how to do things from first
+principles, but feel free to mess around at whatever level of abstraction
+tickles your creative fancy.
 
-To finish, we'll make a really basic `saw_synth` instrument. An
-*instrument* in Extempore allows you to trigger 'notes' like a MIDI soft
-synth. [note-level music](note-level-music.md) goes into a lot more
-detail about how Extempore's instrument infrastructure works, so this is
-more of a 'quick and dirty' example instrument just to get a feel for
-things. All the instrument code is just regular xtlang, and this
-instrument (and others) can be found in `libs/core/instruments.xtm` and
-`libs/external/instruments_ext.xtm`.
+To finish, we'll make a really basic `saw_synth` instrument. An _instrument_ in
+Extempore allows you to trigger 'notes' like a MIDI soft synth.
+[note-level music](note-level-music.md) goes into a lot more detail about how
+Extempore's instrument infrastructure works, so this is more of a 'quick and
+dirty' example instrument just to get a feel for things. All the instrument code
+is just regular xtlang, and this instrument (and others) can be found in
+`libs/core/instruments.xtm` and `libs/external/instruments_ext.xtm`.
 
-An instrument is basically two xtlang closures: a **note kernel
-closure** and an **fx closure**. These closures must have specific type
-signatures to play nice with the instrument signal chain.
+An instrument is basically two xtlang closures: a **note kernel closure** and an
+**fx closure**. These closures must have specific type signatures to play nice
+with the instrument signal chain.
 
 ### Note kernel {#note-kernel}
 
-First, let's examine the note kernel closure. This closure takes *zero*
+First, let's examine the note kernel closure. This closure takes _zero_
 arguments, and returns another closure which takes two arguments:
 
--   `time`: the current (sample) time in Extempore
--   `chan`: the channel number
+- `time`: the current (sample) time in Extempore
+- `chan`: the channel number
 
-The *returned* closure will be called to provide the basic audio signal
-for the note, so that's where we put our code to generate the saw wave.
+The _returned_ closure will be called to provide the basic audio signal for the
+note, so that's where we put our code to generate the saw wave.
 
 ```xtlang
 (sys:load "libs/core/instruments.xtm")
@@ -432,31 +424,29 @@ for the note, so that's where we put our code to generate the saw wave.
 ```
 
 Notice that the saw
-[unit-generator](http://en.wikipedia.org/wiki/Unit_generator) (ugen)
-`saw` is bound (by calling `saw_c`) *outside* the inner `lambda` form.
-This inner `lambda` defines the closure which will be *returned* by
-`saw_synth_note`. In this returned closure, the ugen `saw` (which is
-itself an xtlang closure) is called with the amplitude and frequency
-values which are hard coded in the outer `lambda` form. The value
-returned by the `saw` closure (as it is called repeatedly, once per
-audio sample) will trace out a [sawtooth
-wave](http://en.wikipedia.org/wiki/Sawtooth_wave).
+[unit-generator](http://en.wikipedia.org/wiki/Unit_generator) (ugen) `saw` is
+bound (by calling `saw_c`) _outside_ the inner `lambda` form. This inner
+`lambda` defines the closure which will be _returned_ by `saw_synth_note`. In
+this returned closure, the ugen `saw` (which is itself an xtlang closure) is
+called with the amplitude and frequency values which are hard coded in the outer
+`lambda` form. The value returned by the `saw` closure (as it is called
+repeatedly, once per audio sample) will trace out a
+[sawtooth wave](http://en.wikipedia.org/wiki/Sawtooth_wave).
 
-You might be wondering about the `data:NoteData*` argument that is
-passed as the first argument to the note kernel closure. When a note is
-played, this structure will contain information about the note: when the
-note was started, what frequency the note should be played at, how loud,
-and how long to play the note for. In this example we are only using it
-to determine the start time because we need that to disable the note
-when it is finished.
+You might be wondering about the `data:NoteData*` argument that is passed as the
+first argument to the note kernel closure. When a note is played, this structure
+will contain information about the note: when the note was started, what
+frequency the note should be played at, how loud, and how long to play the note
+for. In this example we are only using it to determine the start time because we
+need that to disable the note when it is finished.
 
-This is just a mono note kernel at this stage, because `saw` is only
-called when `chan` is equal to `0`. The note kernel closure will
-actually be called once for *each* output channel, and the `chan`
-argument will range from `0` for the first output channel to `n - 1` for
-the nth output channel (the number of output channels you have will
-depend on your audio device). It's therefore easy to generalise our note
-kernel to multiple channels, so let's make it a stereo note kernel
+This is just a mono note kernel at this stage, because `saw` is only called when
+`chan` is equal to `0`. The note kernel closure will actually be called once for
+_each_ output channel, and the `chan` argument will range from `0` for the first
+output channel to `n - 1` for the nth output channel (the number of output
+channels you have will depend on your audio device). It's therefore easy to
+generalise our note kernel to multiple channels, so let's make it a stereo note
+kernel
 
 ```xtlang
 (bind-func saw_synth_note
@@ -478,25 +468,24 @@ kernel to multiple channels, so let's make it a stereo note kernel
                 (else 0.0)))))))
 ```
 
-Now we make two saw ugens (`sawl` and `sawr`), and call the appropriate
-one depending on the `chan` argument. Notice that we're getting our note
-information from the `data` argument instead of hard-coding it. Our
-stereo saw note kernel is now ready to play!
+Now we make two saw ugens (`sawl` and `sawr`), and call the appropriate one
+depending on the `chan` argument. Notice that we're getting our note information
+from the `data` argument instead of hard-coding it. Our stereo saw note kernel
+is now ready to play!
 
 ### Adding fx to the instrument {#adding-fx-to-the-instrument}
 
-Often, you'll want to add an audio effect to the instrument's
-output---maybe a delay, a reverb, or some more outlandish audio
-processing. But we don't want to apply the fx processing to each note
-individually, but rather to the total audio output of the instrument.
-And that's where the **fx closure** comes in.
+Often, you'll want to add an audio effect to the instrument's output---maybe a
+delay, a reverb, or some more outlandish audio processing. But we don't want to
+apply the fx processing to each note individually, but rather to the total audio
+output of the instrument. And that's where the **fx closure** comes in.
 
 ![image](/images/simple-instrument/fx.png)
 
-The most important argument to the fx closure is the `in` argument,
-which represents the (dry) input signal that you want to process. It
-*is* necessary to have an fx closure in your Extempore instrument,
-although it may just pass its input through untouched:
+The most important argument to the fx closure is the `in` argument, which
+represents the (dry) input signal that you want to process. It _is_ necessary to
+have an fx closure in your Extempore instrument, although it may just pass its
+input through untouched:
 
 ```xtlang
 (bind-func saw_synth_fx
@@ -505,7 +494,7 @@ although it may just pass its input through untouched:
       (lambda (in:SAMPLE time:i64 chan:i64 dat:SAMPLE*)
         in))))
 
-;; when we evaluate saw_synth_fx, the compiler prints:  
+;; when we evaluate saw_synth_fx, the compiler prints:
 ;; Compiled saw_synth_fx >>> [i64,i64,i64,float,float*]*
 ```
 
@@ -525,13 +514,12 @@ Let's add a stereo delay to make things a bit more interesting
               (else 0.0))))))
 ```
 
-Nice one. Also, remember that you change the fx closure at any time
-(just edit the code and re-evaluate it).
+Nice one. Also, remember that you change the fx closure at any time (just edit
+the code and re-evaluate it).
 
 ## Putting it all together {#putting-it-all-together}
 
-Finally, to complete the instrument, we use a special `make-instrument`
-macro
+Finally, to complete the instrument, we use a special `make-instrument` macro
 
 ```xtlang
 (make-instrument saw_synth saw_synth)
@@ -539,9 +527,8 @@ macro
 
 ![image](/images/simple-instrument/whole-instrument.png)
 
-As long as your kernel (`saw_synth_note`) and fx (`saw_synth_fx`)
-closures have the right signature, then evaluating the above line should
-print for you
+As long as your kernel (`saw_synth_note`) and fx (`saw_synth_fx`) closures have
+the right signature, then evaluating the above line should print for you
 
 ```
 New instrument bound as saw_synth in both scheme and xtlang
@@ -549,10 +536,10 @@ New instrument bound as saw_synth in both scheme and xtlang
 
 and now the instrument is ready to play.
 
-What---is that the end? Well, that's a bit frustrating: we haven't even
-got to *play* our instrument yet! Don't worry, we'll use our `saw_synth`
-instrument in [note-level music](note-level-music.md). Here's a sneak
-peek so you can hear it now though:
+What---is that the end? Well, that's a bit frustrating: we haven't even got to
+_play_ our instrument yet! Don't worry, we'll use our `saw_synth` instrument in
+[note-level music](note-level-music.md). Here's a sneak peek so you can hear it
+now though:
 
 ```xtlang
 (bind-func dsp:DSP
@@ -566,20 +553,19 @@ peek so you can hear it now though:
 (play-note (now) saw_synth (random 60 90) 80 44100)
 ```
 
-There are a couple of things to note which might be helpful for when you
-want to build your *own* instruments
+There are a couple of things to note which might be helpful for when you want to
+build your _own_ instruments
 
--   The note kernel closure (in this example `saw_synth_note`) returns a
-    closure for each note: multiple notes may be playing simultaneously
-    (polyphony), so you want to make sure that each closure keeps track
-    of the state it needs and doesn't leak that state to any of the
-    other notes which are playing simultaneously.
--   Each note kernel returns it's output *one sample at a time*. So it's
-    up to you to make sure that these samples (when streamed to the
-    audio hardware as an audio signal) make the audio waveform you're
-    after.
+- The note kernel closure (in this example `saw_synth_note`) returns a closure
+  for each note: multiple notes may be playing simultaneously (polyphony), so
+  you want to make sure that each closure keeps track of the state it needs and
+  doesn't leak that state to any of the other notes which are playing
+  simultaneously.
+- Each note kernel returns it's output _one sample at a time_. So it's up to you
+  to make sure that these samples (when streamed to the audio hardware as an
+  audio signal) make the audio waveform you're after.
 
-If you're interested in a more in-depth explanation of Extempore's
-instrument infrastructure, then you can <span
-role="doc">go and build your own
-tonewheel organ &lt;making-an-instrument&gt;</span>.
+If you're interested in a more in-depth explanation of Extempore's instrument
+infrastructure, then you can <span
+role="doc">go and build your own tonewheel organ
+&lt;making-an-instrument&gt;</span>.

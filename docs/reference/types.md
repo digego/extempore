@@ -2,11 +2,10 @@
 title: xtlang types
 ---
 
-::: info
-It's not really possible to explain Extempore's types without a detour into some
-[memory stuff](memory-management.md),
-so we'll cover some of that as well. For more info on how xtlang fits into the
-big picture of Extempore, see [philosophy](../overview/philosophy.md).
+::: info It's not really possible to explain Extempore's types without a detour
+into some [memory stuff](memory-management.md), so we'll cover some of that as
+well. For more info on how xtlang fits into the big picture of Extempore, see
+[philosophy](../overview/philosophy.md).
 
 xtlang code is statically typed---the types are determined at compile time, and
 the compiler checks that the types of the arguments to a function match the type
@@ -27,10 +26,9 @@ compiler will complain and you have to fix it, either with an explicit coercion
 or by changing the structure of the code.
 
 The examples here use a lot of these type annotations. This is for
-clarity---some of these aren't strictly necessary (*as I'll show later*) because
+clarity---some of these aren't strictly necessary (_as I'll show later_) because
 the type inferencing compiler will figure out the types of variables in many
-cases.
-:::
+cases. :::
 
 ## Primitive types {#primitive-types}
 
@@ -40,19 +38,19 @@ cases.
 
 Extempore supports signed integers of various different sizes:
 
--   `i1` (boolean)
--   `i8` (char)
--   `i32`
--   `i64` (default)
+- `i1` (boolean)
+- `i8` (char)
+- `i32`
+- `i64` (default)
 
 A couple of gotchas:
 
--   the default integer size is `i64`, so int literals in the code will be
-    interpreted as `i64`, *unless* the function signature suggests otherwise
-    e.g. if the signature is `[double,i32]*`, then a (single) int literal
-    argument will be read as an `i32`.
--   there is no `char` type, only `i8`. In xtlang, strings are null-terminated
-    char arrays/pointers with the signature `i8*`.
+- the default integer size is `i64`, so int literals in the code will be
+  interpreted as `i64`, _unless_ the function signature suggests otherwise e.g.
+  if the signature is `[double,i32]*`, then a (single) int literal argument will
+  be read as an `i32`.
+- there is no `char` type, only `i8`. In xtlang, strings are null-terminated
+  char arrays/pointers with the signature `i8*`.
 
 ### Floats {#floats}
 
@@ -60,8 +58,8 @@ A couple of gotchas:
 
 There are two sizes of floating point number:
 
--   `float` (32 bit)
--   `double` (64 bit, default)
+- `float` (32 bit)
+- `double` (64 bit, default)
 
 Float literals in xtlang code (e.g. `4.2`) are interpreted as `double` unless
 the type signatures suggest otherwise (as is the case with `i64` int literals).
@@ -71,29 +69,29 @@ the type signatures suggest otherwise (as is the case with `i64` int literals).
 ![image](/images/pointer-examples.png)
 
 xtlang supports
-[pointers](http://en.wikipedia.org/wiki/Pointer_(computer_programming)) to any
+[pointers](<http://en.wikipedia.org/wiki/Pointer_(computer_programming)>) to any
 type, in fact some types (such as closures) are almost always handled by
 reference (that is, through pointers). Pointers in xtlang are indicated by the
 usual `*` syntax.
 
 Examples:
 
--   `double*`: a pointer to a double
--   `i64**`: a pointer to a pointer to a 64-bit integer
+- `double*`: a pointer to a double
+- `i64**`: a pointer to a pointer to a 64-bit integer
 
-Pointers represent *memory addresses*, and the use of pointers in xtlang is one
+Pointers represent _memory addresses_, and the use of pointers in xtlang is one
 of the key differences between xtlang and Scheme (and indeed between xtlang and
 any high-level language). C programmers will be (intimately) familiar with the
 concept of pointers, and xtlang's pointers are the same (you can `printf` them
 with `%p`) For others, though, a more in-depth explanation of the concept of
-pointers can be found [the memory management docs](memory-management.md#pointers). If
-you've never encountered pointers before then I suggest you check it out before
-continuing.
+pointers can be found
+[the memory management docs](memory-management.md#pointers). If you've never
+encountered pointers before then I suggest you check it out before continuing.
 
 The way to allocate (and store a pointer to) memory is through a call to one of
 xtlang's 'alloc' functions. Extempore has 3 different alloc functions: `salloc`,
 `halloc` and `zalloc`. They all allocate a chunk of memory and return a pointer
-type, but they differ in *where* that memory is allocated from. In order of how
+type, but they differ in _where_ that memory is allocated from. In order of how
 'long-lived' the memory will be: `salloc` allocates memory on the stack
 (shortest-lived), `zalloc` allocates memory from the current zone, and `halloc`
 allocates memory from the heap (longest-lived). Finally, `alloc` is an alias for
@@ -121,15 +119,15 @@ Pointers aren't very interesting, though, if you can't read and write to the
 values they point to. That's where the xtlang functions `pref`, `pset!` and
 `pref-ptr` come in.
 
-Unlike in C, `*` is not a dereference *operator*, it's just the syntax for the
-specifying pointer types. Instead, there's a function `pref` for *dereferencing*
+Unlike in C, `*` is not a dereference _operator_, it's just the syntax for the
+specifying pointer types. Instead, there's a function `pref` for _dereferencing_
 a pointer (getting the value the pointer 'points' to). `pref` takes two
 arguments: the pointer, and an (integer) offset. So if `a` is a pointer to a
 chunk of 10 `double` in memory (such as returned by `zalloc`, for instance),
 then `(pref a 2)` in xtlang is the value of the third (`pref` uses 0-based
 indexing) of those `double` (equivalent to `a[2]` in C).
 
-To *set* the value associated with a pointer, there's `pset!`. Like `pref`,
+To _set_ the value associated with a pointer, there's `pset!`. Like `pref`,
 `pset!` takes a pointer as the first argument, and offset as the second
 argument, but it also takes an additional third argument---the value to set into
 that memory location. This must be of the appropriate type: so if the pointer is
@@ -189,10 +187,10 @@ loop.
 ```
 
 There's one more useful function for working with pointers: `pref-ptr`. Where
-`(pref a 3)` returns the *value* of the 4th element of the chunk of memory
-pointed to by `a`, `(pref-ptr a 3)` returns a *pointer* to that value. This also
+`(pref a 3)` returns the _value_ of the 4th element of the chunk of memory
+pointed to by `a`, `(pref-ptr a 3)` returns a _pointer_ to that value. This also
 implies that `(pref (pref-ptr a n))` is the same as `(pref (pref-ptr a 0) n)`
-for any integer *n*.
+for any integer _n_.
 
 One final note for C programmers: there is no `void*` in xtlang, use an `i8*`
 instead.
@@ -210,7 +208,7 @@ String literals in xtlang are bound globally (allocated on the heap). So you can
 safely set and store pointers to them without worrying about then disappearing
 on you.
 
-```xtlang
+````xtlang
 (bind-func string_literals
   (lambda ()
     (let ((str "Vive le tour!"))
@@ -396,7 +394,7 @@ using `bind-func`
     (+ a b)))
 
 (xt_add 3 6) ;; returns 9
-```
+````
 
 `xt_add` takes two int arguments (see how the `i64` type annotations are
 provided in the initial argument list) and returns their sum. It's also worth
@@ -435,7 +433,7 @@ exactly like you would do it in Scheme:
 ```
 
 This example is a bit more complicated: the first closure (`make_xt_adder`)
-takes one argument `a` and returns a closure (notice the *second* `lambda` form
+takes one argument `a` and returns a closure (notice the _second_ `lambda` form
 inside the toplevel one) which takes one argument `b` and adds it to `a`. Note
 that `a` is 'baked in' to this closure---it's not passed in directly, but it's
 referenced from the outside scope. We say that this closure (which has no
@@ -526,7 +524,7 @@ Compiler Error: Type Error: (euclid_distance bot_left top_right)
  function argument does not match. Expected "%point*" but got "{double,double}*"
 ```
 
-Even though `point` *is* just a `<double,double>` (check the `bind-type`
+Even though `point` _is_ just a `<double,double>` (check the `bind-type`
 definition above), the compiler won't let us compile the function. This is a
 good thing most of the time, because it makes us be more explicit about what we
 actually mean in our code, and saves us from the silly mistakes that can happen
@@ -556,9 +554,9 @@ later. This is all still compiled code, and it's all still very efficient (no
 boxing/unboxing going on). It's just nice to not have to write a separate `sort`
 function for lists of `i32` and `i64` for example.
 
-::: info
-This section is under construction, but for now have a look in
-`libs/core/adt.xtm` for Extempore's [abstract data
-type](https://en.wikipedia.org/wiki/Abstract_data_type) (ADT) functionality.
+::: info This section is under construction, but for now have a look in
+`libs/core/adt.xtm` for Extempore's
+[abstract data type](https://en.wikipedia.org/wiki/Abstract_data_type) (ADT)
+functionality.
 
 :::

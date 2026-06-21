@@ -3,8 +3,8 @@ id: task-9
 title: ORC JIT symbol lookup fails despite successful compilation
 status: Done
 assignee: []
-created_date: '2025-12-17 17:30'
-updated_date: '2025-12-17 22:41'
+created_date: "2025-12-17 17:30"
+updated_date: "2025-12-17 22:41"
 labels:
   - llvm
   - jit
@@ -16,6 +16,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+
 After upgrading to LLVM 21 ORC JIT, functions compile and execute correctly but
 `llvm:get-function-pointer` returns `#f` (not found). This breaks AOT loading
 because it relies on `mk-ff` which calls `llvm:get-function-pointer` to bind
@@ -23,10 +24,13 @@ Scheme functions to compiled xtlang code.
 
 The underlying `JIT->lookup(name)` call in `getFunctionAddress()` fails to find
 symbols that were just added via `JIT->addIRModule()`.
+
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
+
 - [x] #1 `llvm:get-function-pointer` returns valid cptr for functions compiled
       via `bind-func`
 - [x] #2 `llvm:get-function-pointer` returns valid cptr for functions loaded
@@ -38,6 +42,7 @@ symbols that were just added via `JIT->addIRModule()`.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+
 ## Technical Analysis
 
 ### Call Flow
@@ -224,6 +229,7 @@ Since macOS works but Linux fails, the issue is likely related to:
 
 Next step: Check if the lookup is failing due to symbol mangling or if symbols
 are not being properly added to the JITDylib on Linux.
+
 <!-- SECTION:NOTES:END -->
 
 ## Minimal Reproduction

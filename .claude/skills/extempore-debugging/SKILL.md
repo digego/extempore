@@ -1,6 +1,9 @@
 ---
 name: extempore-debugging
-description: Debugging and development guide for Extempore. Use when debugging JIT compilation issues, understanding symbol tracking, or testing compilation in different modes (batch, eval, interactive).
+description:
+  Debugging and development guide for Extempore. Use when debugging JIT
+  compilation issues, understanding symbol tracking, or testing compilation in
+  different modes (batch, eval, interactive).
 ---
 
 # Extempore debugging skill
@@ -57,10 +60,9 @@ impc:compiler:flush-jit-compilation-queue
 
 - `--nobase`: Skip loading base library (useful for debugging JIT in isolation)
 - `--noaudio`: Disable audio (required for headless/CI testing)
-- `--batch "expr"`: Batch mode (no server, single process); exits only
-  if the expression calls `(quit ...)`. Implies `--noaudio` **unless
-  `--audio-outfile` is also given** — in that case the offline file driver
-  handles audio output.
+- `--batch "expr"`: Batch mode (no server, single process); exits only if the
+  expression calls `(quit ...)`. Implies `--noaudio` **unless `--audio-outfile`
+  is also given** — in that case the offline file driver handles audio output.
 - `--eval "expr"`: Evaluate expression at startup but keep full server running
   (utility + primary processes, TCP server on port 7099).
 - `--audio-outfile <path>`: render DSP output to a float32 WAV file via an
@@ -76,10 +78,10 @@ full two-process setup (utility + primary) with TCP server, then evaluates the
 expression as a `LOCAL_PROCESS_STRING` task.
 
 **Bugs may reproduce in one mode but not the other.** The xtlang compiler's type
-inference state can differ because `--eval` has a utility process that also loads
-the base library into shared C++ statics (`sTypeDefinitions`, `sGlobalMap`).
-Always try both modes when investigating user-reported bugs, since users
-typically work interactively (equivalent to `--eval` / TCP eval).
+inference state can differ because `--eval` has a utility process that also
+loads the base library into shared C++ statics (`sTypeDefinitions`,
+`sGlobalMap`). Always try both modes when investigating user-reported bugs,
+since users typically work interactively (equivalent to `--eval` / TCP eval).
 
 ## Symbol tracking
 
@@ -111,8 +113,8 @@ something already defined in the template module, the parse fails silently
 
 ## Adhoc polymorphism names
 
-The xtlang compiler generates specialised function names for ad-hoc
-polymorphism using the pattern:
+The xtlang compiler generates specialised function names for ad-hoc polymorphism
+using the pattern:
 
 ```
 <basename>_adhoc_<counter>_<base64-encoded-type-signature>
@@ -170,8 +172,8 @@ When a user reports a bug from interactive use:
 ### Calling xtlang functions from Scheme
 
 A top-level `bind-func` makes the function name callable from the Scheme
-interaction environment. `(bind-func foo ...)` → `(foo arg1 arg2)` works.
-Return values flow back (i64 → Scheme integer, double → real, etc.).
+interaction environment. `(bind-func foo ...)` → `(foo arg1 arg2)` works. Return
+values flow back (i64 → Scheme integer, double → real, etc.).
 
 ### `--batch` evaluates a single expression
 
@@ -190,15 +192,15 @@ all run — wrap them in `(begin ...)`:
 
 `exit_extempore` in `src/ffi/utility.inc` calls `std::_Exit(rc)`, which bypasses
 destructors **and discards stdio buffers**. It explicitly `fflush(stdout)`
-before `_Exit` so xtlang `printf` output isn't lost. If you add another
-pre-exit cleanup step there, keep it short — `_Exit` runs right after.
+before `_Exit` so xtlang `printf` output isn't lost. If you add another pre-exit
+cleanup step there, keep it short — `_Exit` runs right after.
 
 ### xtlang `set!` returns the assigned value
 
 Unlike Scheme where `set!` is effectively void, xtlang `set!` returns the new
-value. This breaks the common pattern `(if cond (set! x v))` with no else
-branch — the type inferencer sees `then: (type of v)` vs. implicit `else:
-void` and errors. Fixes: add explicit `void` branches, or wrap in `begin`:
+value. This breaks the common pattern `(if cond (set! x v))` with no else branch
+— the type inferencer sees `then: (type of v)` vs. implicit `else: void` and
+errors. Fixes: add explicit `void` branches, or wrap in `begin`:
 
 ```scheme
 ;; WRONG: type error "float vs void"
@@ -211,9 +213,9 @@ void` and errors. Fixes: add explicit `void` branches, or wrap in `begin`:
 ### Mis-reading shell exit codes behind `|`
 
 `cmd | tail` puts `tail` as the last pipeline member, so `$?` is tail's exit
-code, not `cmd`'s. To check the actual program's exit status, either avoid
-the pipe (`cmd > file 2>&1; echo $?`) or use `PIPESTATUS[0]` in bash/zsh.
-This bit me while verifying `(quit 1)` propagation.
+code, not `cmd`'s. To check the actual program's exit status, either avoid the
+pipe (`cmd > file 2>&1; echo $?`) or use `PIPESTATUS[0]` in bash/zsh. This bit
+me while verifying `(quit 1)` propagation.
 
 ## Debugging commands
 
@@ -282,12 +284,12 @@ tail /tmp/xtm_output.log
 
 Key runtime functions to instrument:
 
-| Function                       | File              | Purpose                            |
-| ------------------------------ | ----------------- | ---------------------------------- |
-| `impc:ti:callback-check`      | `llvmti.xtm:7583` | callback arity/type checking      |
-| `impc:ti:first-transform`     | `llvmti.xtm`      | AST transformation (macro expand) |
-| `impc:ir:compiler:callback`   | `llvmir.xtm:4029`  | callback IR generation            |
-| `impc:ti:get-closure-arg-types`| `llvmti.xtm`     | closure type lookup               |
+| Function                        | File              | Purpose                           |
+| ------------------------------- | ----------------- | --------------------------------- |
+| `impc:ti:callback-check`        | `llvmti.xtm:7583` | callback arity/type checking      |
+| `impc:ti:first-transform`       | `llvmti.xtm`      | AST transformation (macro expand) |
+| `impc:ir:compiler:callback`     | `llvmir.xtm:4029` | callback IR generation            |
+| `impc:ti:get-closure-arg-types` | `llvmti.xtm`      | closure type lookup               |
 
 ## Testing in isolation
 
@@ -306,7 +308,8 @@ Key runtime functions to instrument:
 `std::cerr`, `fprintf(stderr, ...)`, nor any amount of flushing will produce
 visible output. Options:
 
-- Write to a file: `FILE* f = fopen("/tmp/xtm_debug.log", "a"); fprintf(f, ...); fflush(f);`
+- Write to a file:
+  `FILE* f = fopen("/tmp/xtm_debug.log", "a"); fprintf(f, ...); fflush(f);`
 - Write to stdout: `printf(...); fflush(stdout);` (mixes with Scheme output)
 - Temporarily comment out the `freopen` line for a debug build
 
@@ -333,15 +336,16 @@ timeout 120 ./build/extempore --noaudio --batch \
 Test labels: `libs-core`, `libs-external`, `examples-audio`, `examples-core`,
 `examples-graphics`, `audio-offline`. Defined in `extras/cmake/tests.cmake`.
 
-The `audio-offline` label covers two-phase tests that render a DSP file to a
-WAV via `--audio-outfile` and then assert on it with `libs/core/audiotest.xtm`.
-Register via `extempore_add_audio_offline_test(name render_xtm duration freq label)`.
+The `audio-offline` label covers two-phase tests that render a DSP file to a WAV
+via `--audio-outfile` and then assert on it with `libs/core/audiotest.xtm`.
+Register via
+`extempore_add_audio_offline_test(name render_xtm duration freq label)`.
 
 ### Examples as tests
 
-Examples are registered as tests via the `extempore_add_example_as_test` macro in
-`extras/cmake/tests.cmake`. They run with `--batch` (which implies `--noaudio`)
-using `sys:load-then-quit`:
+Examples are registered as tests via the `extempore_add_example_as_test` macro
+in `extras/cmake/tests.cmake`. They run with `--batch` (which implies
+`--noaudio`) using `sys:load-then-quit`:
 
 ```cmake
 extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
@@ -363,8 +367,8 @@ registration, hot-swap). To test with audio enabled, use `--eval` instead of
 
 ### Offline rendering with `--audio-outfile` (preferred)
 
-The offline file driver renders DSP output directly to a float32 WAV without
-any OS audio subsystem. Works in `--batch` mode, so it's suitable for CI:
+The offline file driver renders DSP output directly to a float32 WAV without any
+OS audio subsystem. Works in `--batch` mode, so it's suitable for CI:
 
 ```bash
 ./build/extempore --batch '(sys:load "examples/core/hello-sine.xtm")' \
@@ -378,8 +382,8 @@ simple sine). Key semantics:
   compile-path latency doesn't eat the render window.
 - On `--duration` reached, the driver finalizes the WAV header and calls
   `std::_Exit(0)`. User script doesn't need to quit itself.
-- On user `(quit rc)`, `exit_extempore` calls `stopFileDriver()` before
-  `_Exit`, so the WAV is finalized in either path.
+- On user `(quit rc)`, `exit_extempore` calls `stopFileDriver()` before `_Exit`,
+  so the WAV is finalized in either path.
 - Not realtime — anything that uses wall-clock (`clock:clock`, MIDI I/O,
   network) will drift because `getRealTime()` is still real time while
   `UNIV::TIME` free-runs. DSP that depends only on the `time` sample counter
@@ -387,10 +391,10 @@ simple sine). Key semantics:
 
 ### Asserting on offline output
 
-`libs/core/audiotest.xtm` provides `audiotest_assert_sine`,
-`audiotest_rms`, `audiotest_peak`, `audiotest_goertzel`. Call from Scheme with
-the xtlang function name directly; pipe the return through `(quit ...)` so the
-process exit code matches the assertion outcome:
+`libs/core/audiotest.xtm` provides `audiotest_assert_sine`, `audiotest_rms`,
+`audiotest_peak`, `audiotest_goertzel`. Call from Scheme with the xtlang
+function name directly; pipe the return through `(quit ...)` so the process exit
+code matches the assertion outcome:
 
 ```bash
 ./build/extempore --batch '(begin (sys:load "libs/core/audiotest.xtm")
@@ -406,7 +410,7 @@ platforms CTest supports.
 
 ### Live capture from a real audio output (pw-record fallback)
 
-When you need to verify the *realtime* path (not offline), use PipeWire's
+When you need to verify the _realtime_ path (not offline), use PipeWire's
 `pw-record` with `--eval` (which keeps audio enabled).
 
 ### Prerequisites

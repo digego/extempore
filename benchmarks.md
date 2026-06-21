@@ -20,20 +20,20 @@ Wall clock times include ~3s of startup overhead per invocation (hard-coded
 
 ## Results
 
-| Library | Baseline | Current | Speedup |
-| --- | ---: | ---: | ---: |
-| `libs/base/base.xtm` | 5.59s | 3.24s | 1.7x |
-| `libs/core/math.xtm` | 16.57s | 4.04s | 4.1x |
-| `libs/core/rational.xtm` | 6.47s | 3.47s | 1.9x |
-| `libs/core/audiobuffer.xtm` | 7.45s | 3.49s | 2.1x |
-| `libs/core/audio_dsp.xtm` | 32.14s | 5.71s | 5.6x |
-| `libs/core/instruments.xtm` | 109.83s | 8.38s | 13.1x |
-| `libs/external/fft.xtm` | 5.71s | 3.99s | 1.4x |
-| `libs/external/sndfile.xtm` | 9.17s | 3.64s | 2.5x |
-| `libs/external/audio_dsp_ext.xtm` | 5.51s | 4.28s | 1.3x |
-| `libs/external/instruments_ext.xtm` | 12.57s | 9.26s | 1.4x |
-| `libs/external/portmidi.xtm` | 4.86s | 3.35s | 1.5x |
-| **Total** | **215.96s** | **52.94s** | **4.1x** |
+| Library                             |    Baseline |    Current |  Speedup |
+| ----------------------------------- | ----------: | ---------: | -------: |
+| `libs/base/base.xtm`                |       5.59s |      3.24s |     1.7x |
+| `libs/core/math.xtm`                |      16.57s |      4.04s |     4.1x |
+| `libs/core/rational.xtm`            |       6.47s |      3.47s |     1.9x |
+| `libs/core/audiobuffer.xtm`         |       7.45s |      3.49s |     2.1x |
+| `libs/core/audio_dsp.xtm`           |      32.14s |      5.71s |     5.6x |
+| `libs/core/instruments.xtm`         |     109.83s |      8.38s |    13.1x |
+| `libs/external/fft.xtm`             |       5.71s |      3.99s |     1.4x |
+| `libs/external/sndfile.xtm`         |       9.17s |      3.64s |     2.5x |
+| `libs/external/audio_dsp_ext.xtm`   |       5.51s |      4.28s |     1.3x |
+| `libs/external/instruments_ext.xtm` |      12.57s |      9.26s |     1.4x |
+| `libs/external/portmidi.xtm`        |       4.86s |      3.35s |     1.5x |
+| **Total**                           | **215.96s** | **52.94s** | **4.1x** |
 
 Subtracting ~3s startup overhead per invocation (33s total), the pure compile
 time went from ~183s to ~20s --- a **9x speedup**.

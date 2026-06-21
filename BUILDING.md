@@ -18,17 +18,17 @@ See the top of `CMakeLists.txt` for all the available options. The ones most
 users will care about:
 
 - `ASSETS` (default `OFF`) --- download the multimedia assets (audio samples,
-  impulse responses) needed to run many of the examples. ~250MB download. If
-  you don't set `-DASSETS=ON` at configure time, CMake still creates an
-  `assets` target you can build afterwards.
+  impulse responses) needed to run many of the examples. ~250MB download. If you
+  don't set `-DASSETS=ON` at configure time, CMake still creates an `assets`
+  target you can build afterwards.
 - `BUILD_TESTS` (default `ON`) --- build the test targets (including examples
   registered as ctest tests).
 - `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
   (portaudio, portmidi, sndfile, kissfft).
-- `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics
-  stack (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
-- `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead
-  of ALSA.
+- `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics stack
+  (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
+- `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
+  ALSA.
 
 ## LLVM
 
@@ -41,7 +41,8 @@ Subsequent builds reuse the cached artifacts under `build/_deps/llvm-*`. Only
 the components Extempore needs are built (OrcJIT, target codegen, AsmParser,
 Passes, MCDisassembler, IRPrinter).
 
-CI caches `build/_deps/` across runs --- see `.github/workflows/build-and-test.yml`.
+CI caches `build/_deps/` across runs --- see
+`.github/workflows/build-and-test.yml`.
 
 ## Targets
 
@@ -97,7 +98,8 @@ You'll need the ALSA dev headers for PortAudio. On Ubuntu:
 
     sudo apt-get install libasound2-dev
 
-For the WebGPU graphics build (`-DEXTERNAL_SHLIBS_GRAPHICS=ON`) you'll also need:
+For the WebGPU graphics build (`-DEXTERNAL_SHLIBS_GRAPHICS=ON`) you'll also
+need:
 
     sudo apt-get install xorg-dev libglu1-mesa-dev
 

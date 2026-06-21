@@ -2,16 +2,14 @@
 title: Concurrency
 ---
 
-::: info
-Some of the threading stuff (particularly in xtlang) has changed slightly since
-this was written, although as a high-level overview it's still accurate. It'll
-be brought up to date as soon as possible, but if you find anything in here
-which isn't clear or doesn't work, [let us
-know](mailto:extemporelang@googlegroups.com)
-:::
+::: info Some of the threading stuff (particularly in xtlang) has changed
+slightly since this was written, although as a high-level overview it's still
+accurate. It'll be brought up to date as soon as possible, but if you find
+anything in here which isn't clear or doesn't work,
+[let us know](mailto:extemporelang@googlegroups.com) :::
 
-Every Extempore *process* (e.g. the "primary process" or "utility process") is a
-*Scheme process*, which is actually an operating-system (OS) thread running in
+Every Extempore _process_ (e.g. the "primary process" or "utility process") is a
+_Scheme process_, which is actually an operating-system (OS) thread running in
 the main Extempore OS process (i.e. the thing with the PID number). Each top
 level Scheme process runs its own scheme interpreter with its own managed
 memory, own garbage collector etc. Additionally, each Scheme process has its own
@@ -21,12 +19,12 @@ a nice inter-process communication (IPC) layer to make communication between
 Scheme processes reasonably straightforward, regardless of whether they are
 running locally or remotely.
 
-To summarize, each *Scheme process* is an OS thread, but in reality behaves more
+To summarize, each _Scheme process_ is an OS thread, but in reality behaves more
 like an OS process because it has its own managed memory, scheme process
 control, etc..
 
 Here is a starting example of a Scheme function that mutates a Scheme global
-variable. The function includes a *blocking* sleep---it will `println` then
+variable. The function includes a _blocking_ sleep---it will `println` then
 sleep for one second, test conditional and repeat.
 
 ```xtlang
@@ -62,7 +60,7 @@ Extempore's libraries are built around this type of cooperative concurrency
 (i.e. `sys:sleep` above, which makes this example possible).
 
 However, one downside to this approach is that it is only able to utilizes a
-single CPU core. So, Extempore also supports *multiple* Scheme processes. There
+single CPU core. So, Extempore also supports _multiple_ Scheme processes. There
 are always two started by default (primary and utility), but you can spawn as
 many as you like at runtime, although these are relatively heavy-weight so
 generally you are not likely to want any more processes than your total number
@@ -81,8 +79,8 @@ or you can connect to a remote process like this:
 (ipc:connect "192.168.1.1" "myproc" 7099)
 ```
 
-Either way, *myproc* is now a local name which defines a process running
-*somewhere*. IPC calls work regardless of whether the process is local or
+Either way, _myproc_ is now a local name which defines a process running
+_somewhere_. IPC calls work regardless of whether the process is local or
 remote.
 
 You can explicitly call into `my-scm-func` in the primary process like so:
@@ -92,20 +90,20 @@ You can explicitly call into `my-scm-func` in the primary process like so:
 ```
 
 which is essentially the same thing as calling `(my-scm-func 'a 5)` while
-*connected* to the primary process. Being explicit though, means that we can
+_connected_ to the primary process. Being explicit though, means that we can
 make this call into primary no matter what scheme process we are currently
-*connected* to.
+_connected_ to.
 
-We can try to run `my-scm-func` in the *myproc* process as follows:
+We can try to run `my-scm-func` in the _myproc_ process as follows:
 
 ```xtlang
 (ipc:call "myproc" 'my-scm-func 'a 5)
 ```
 
 but we will get an error, because `my-scm-func` (and `global-val` for that
-matter) do not exist in the memory space of *myproc*. We can fix that using
+matter) do not exist in the memory space of _myproc_. We can fix that using
 Extempore's IPC infrastructure simply enough by defining both `global-val` and
-`my-scm-func` in *myproc*.
+`my-scm-func` in _myproc_.
 
 ```xtlang
 (ipc:define "myproc" 'global-val global-val)
@@ -113,12 +111,12 @@ Extempore's IPC infrastructure simply enough by defining both `global-val` and
 ```
 
 now the `ipc:call` works as expected---i.e. executing `my-scm-func` in the
-*myproc* process.
+_myproc_ process.
 
-Note that we defined `global-val` in *myproc* to be whatever value `global-val`
-was currently bound to in our *connected* process, which in this instance was
-*primary* but could be whatever process our text buffer was connected to. We
-could just as easily have defined a different value into *myproc*, e.g.
+Note that we defined `global-val` in _myproc_ to be whatever value `global-val`
+was currently bound to in our _connected_ process, which in this instance was
+_primary_ but could be whatever process our text buffer was connected to. We
+could just as easily have defined a different value into _myproc_, e.g.
 
 ```xtlang
 (ipc:define "myproc" 'global-val 0)
@@ -143,11 +141,12 @@ Extempore's IPC layer for communication between Scheme processes.
 Things get more interesting when we introduce xtlang.
 
 Firstly, all calls into xtlang code are always initiated at some point by a top
-level scheme expression (see [C-xtlang interop](c-xtlang-interop.md) for more detail). Under normal Extempore
-operating conditions, xtlang code is always executing in some Scheme process or
-other. Generally this xtlang code will behave as expected with regards to
-concurrency, i.e. will generally behave as if it were just another Scheme call
-inside the Scheme process. As a trivial example, consider the xtlang function:
+level scheme expression (see [C-xtlang interop](c-xtlang-interop.md) for more
+detail). Under normal Extempore operating conditions, xtlang code is always
+executing in some Scheme process or other. Generally this xtlang code will
+behave as expected with regards to concurrency, i.e. will generally behave as if
+it were just another Scheme call inside the Scheme process. As a trivial
+example, consider the xtlang function:
 
 ```xtlang
 (bind-func times2
@@ -185,8 +184,8 @@ concurrency as before:
 (my-scm-func 'b 10)
 ```
 
-also using IPC, although we will need to re-define `my-scm-func` in *myproc*
-because we have changed its definition. Also note that we need to tell *myproc*
+also using IPC, although we will need to re-define `my-scm-func` in _myproc_
+because we have changed its definition. Also note that we need to tell _myproc_
 about `times2` (note that `ipc:bind-func` has a slightly different signature
 from `ipc:define`):
 
@@ -210,10 +209,10 @@ both Extempore's cooperative concurrency and Extempore's Scheme process
 architecture. Now things will begin to diverge somewhat.
 
 Firstly, the `(ipc:bind-func "myproc" 'times2)` call from above is needed to
-define the "scheme times2 wrapper" in *myproc*---**not** the xtlang times2
+define the "scheme times2 wrapper" in _myproc_---**not** the xtlang times2
 function itself which is bound globally across the entire Extempore OS process
 and so is automatically available to all Scheme processes, and indeed
-potentially to *any* other OS thread running in the Extempore OS process (the
+potentially to _any_ other OS thread running in the Extempore OS process (the
 thing with the PID). In practice this means that if an xtlang function closes
 over some value at the top level, then that closed value is shared between all
 Scheme processes (which is not the case with a Scheme closure which is unique in
@@ -233,7 +232,7 @@ For example:
 (println (ipc:call "myproc" 'xtlang_inc 1))
 ```
 
-Note that `xtlang_inc` is shared between primary and *myproc* and therefore `y`
+Note that `xtlang_inc` is shared between primary and _myproc_ and therefore `y`
 is shared data, and is therefore subject to all of the potential pitfalls
 associated with shared mutable memory (as well as all of the potential
 performance optimizations etc.
@@ -267,13 +266,13 @@ example.
 So Scheme is all about message passing, and xtlang is all about shared memory.
 This is by design, as xtlang is there to let you break all the rules when
 performance matters. Now this does not mean that your xtlang code is definitely
-*not* Scheme process (i.e. thread) safe. xtlang code can be Scheme process (i.e.
+_not_ Scheme process (i.e. thread) safe. xtlang code can be Scheme process (i.e.
 thread) safe if you stick to the following three principles:
 
 1.  Don't access global xtlang variables in your xtlang functions.
 2.  Don't close over variables with top-level xtlang functions.
-3.  Don't allocate heap [memory](memory-management.md) in xtlang functions (zone and stack
-    memory is OK)
+3.  Don't allocate heap [memory](memory-management.md) in xtlang functions (zone
+    and stack memory is OK)
 
 If you stick to those three principles then your xtlang code should be Scheme
 process safe, although obviously you also need to be careful about what
@@ -281,7 +280,7 @@ process safe, although obviously you also need to be careful about what
 
 Having said that, xtlang is there to allow you to break the rules---with great
 power comes great responsibility, and all that rubbish. Indeed xtlang allows you
-to *completely* break the rules by giving you direct access to native threads.
+to _completely_ break the rules by giving you direct access to native threads.
 Here's an xtlang example that completely breaks out of Extempore's "normal
 environment" by managing its own native OS threads using standard fork/join
 semantics.
@@ -313,13 +312,13 @@ Note the use of `(llvm_get_function_ptr "my_os_thread_native")`. This call
 returns a sanitized C wrapper function around our xtlang closure `my_os_thread`.
 Like Scheme wrappers, C wrappers are also automatically generated for toplevel
 xtlang closures, and are required if you wish to call an xtlang closure from an
-external C library---[xtlang knows how to call C natively](c-xtlang-interop.md) but C cannot call an xtlang closure
-without an appropriate C wrapper. C wrappers have the same name as the xtlang
-closure with `_native` appended to the end. By passing a C wrapper around we can
-have the OS callback into native xtlang code and still enjoy full on-the-fly
-hot-swappability. In other words, once you have passed the C wrapper as a
-callback you can re-compile (change the behaviour) of the original xtlang
-closure on-the-fly, whenever you like!
+external C library---[xtlang knows how to call C natively](c-xtlang-interop.md)
+but C cannot call an xtlang closure without an appropriate C wrapper. C wrappers
+have the same name as the xtlang closure with `_native` appended to the end. By
+passing a C wrapper around we can have the OS callback into native xtlang code
+and still enjoy full on-the-fly hot-swappability. In other words, once you have
+passed the C wrapper as a callback you can re-compile (change the behaviour) of
+the original xtlang closure on-the-fly, whenever you like!
 
 The same principle applies to any other C library code that you may pass xtlang
 closure C wrappers to. These callbacks are then subject to whatever threading

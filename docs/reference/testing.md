@@ -8,9 +8,9 @@ about xtlang code, and a runner (`xtmtest-run-tests`) that CMake/CTest drives.
 
 ## Writing tests {#writing-tests}
 
-The preferred way to write a test is `xtmtest-result`: define the xtlang you want
-to exercise with a normal `bind-func`, then assert on a call. The third argument
-is an optional label.
+The preferred way to write a test is `xtmtest-result`: define the xtlang you
+want to exercise with a normal `bind-func`, then assert on a call. The third
+argument is an optional label.
 
 ```xtlang
 (bind-func add_two_integers
@@ -38,8 +38,8 @@ suite). Fixtures nest.
 ```
 
 For tests about compilation itself, use `xtmtest-compile` (asserts a form
-compiles) or `xtmtest-compile-fails` (asserts it does *not* --- e.g. a type error
-the checker is meant to catch):
+compiles) or `xtmtest-compile-fails` (asserts it does _not_ --- e.g. a type
+error the checker is meant to catch):
 
 ```xtlang
 (xtmtest-compile
@@ -63,12 +63,12 @@ check), use `xtmtest-runs`.
 
 Each assertion records one of these outcomes:
 
--   `pass` --- the call ran and its value matched
--   `fail` --- the call ran but its value did not match
--   `runtime-error` --- it compiled, but evaluating the call threw
--   `compile-error` --- the definition failed to compile
--   `compile-ok` --- a compile-only test compiled
--   `fixture-error` --- a fixture's setup threw
+- `pass` --- the call ran and its value matched
+- `fail` --- the call ran but its value did not match
+- `runtime-error` --- it compiled, but evaluating the call threw
+- `compile-error` --- the definition failed to compile
+- `compile-ok` --- a compile-only test compiled
+- `fixture-error` --- a fixture's setup threw
 
 A run fails (non-zero exit) if any outcome is not a `pass` or `compile-ok`.
 
@@ -86,8 +86,8 @@ in `extras/cmake/tests.cmake`.)
 
 The examples in `examples/core` and `examples/external` are also run as a
 coarser level of testing: loading each one top-to-bottom and checking it doesn't
-crash. The offline audio-rendering tests go further, rendering a DSP to a WAV and
-asserting on its frequency content.
+crash. The offline audio-rendering tests go further, rendering a DSP to a WAV
+and asserting on its frequency content.
 
 ## Running the tests {#running-the-tests}
 
@@ -107,14 +107,14 @@ directly in your build directory and filter by label:
 
 The labels are:
 
--   `libs-core` --- core standard-library tests
--   `compiler-unit` --- compiler-internal unit tests (including the AOT
-    round-trip)
--   `libs-external` --- external-library tests
--   `cpp-unit` --- C++ unit tests (GoogleTest)
--   `examples-core`, `examples-audio`, `examples-graphics` --- examples run as
-    smoke tests
--   `audio-offline` --- offline WAV-rendering assertions
+- `libs-core` --- core standard-library tests
+- `compiler-unit` --- compiler-internal unit tests (including the AOT
+  round-trip)
+- `libs-external` --- external-library tests
+- `cpp-unit` --- C++ unit tests (GoogleTest)
+- `examples-core`, `examples-audio`, `examples-graphics` --- examples run as
+  smoke tests
+- `audio-offline` --- offline WAV-rendering assertions
 
 Use `-L <regex>` to include, or `-LE <regex>` to exclude, matching labels.
 
@@ -125,14 +125,14 @@ failures rather than just which `.xtm` file failed.
 ## Failing tests {#failing-tests}
 
 `tests/failing.xtm` is a quarantine for known-broken tests. It is registered as
-an *expected* failure: CTest stays green while the bugs persist, and flips to
+an _expected_ failure: CTest stays green while the bugs persist, and flips to
 failing the moment a fix makes the file pass --- the cue to move that test into
 its proper home.
 
 ## Get involved {#get-involved}
 
 We really appreciate [bug reports](https://github.com/digego/extempore/issues),
-and the best way to submit one is as a failing test. Open a pull request with the
-test added to the bottom of `tests/failing.xtm`; if you're not sure where it
+and the best way to submit one is as a failing test. Open a pull request with
+the test added to the bottom of `tests/failing.xtm`; if you're not sure where it
 should eventually live, that's fine --- we'll find it a home when the bug is
 fixed.

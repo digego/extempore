@@ -10,7 +10,7 @@ First, we load in the DSP library:
 (sys:load "libs/core/audio_dsp.xtm")
 ```
 
-We need a *master* DSP callback. We can call it whatever we like, but by
+We need a _master_ DSP callback. We can call it whatever we like, but by
 convention we call it `dsp`. It's type **must** be
 `[float,float,i64,i64,float*]*`
 

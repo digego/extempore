@@ -21,8 +21,8 @@ in Extempore.
 
 ## Automatic garbage collection in Scheme {#automatic-garbage-collection-in-scheme}
 
-Scheme objects (lists, closures, numbers, etc.) are automatically [garbage
-collected](http://en.wikipedia.org/wiki/Garbage_collection_(computer_science))
+Scheme objects (lists, closures, numbers, etc.) are automatically
+[garbage collected](<http://en.wikipedia.org/wiki/Garbage_collection_(computer_science)>)
 by the Extempore run-time garbage collector (GC). This means that when new
 objects are created, memory is automatically allocated to store those objects,
 and as objects are destroyed or go out of scope (that is, there are no longer
@@ -39,7 +39,7 @@ value to a symbol.
 
 The fact that we can use the symbol `a` and have it evaluate to `5` (as it
 should) means that the value (`5`) must be stored in memory somewhere. It
-doesn't matter *where* in memory (what the address is), because we can always
+doesn't matter _where_ in memory (what the address is), because we can always
 refer to the value using the symbol `a`. But it's good to remember that the
 `define` form is allocating some memory, storing the value `5` in that memory,
 and binding a reference to the value in the symbol `a`.
@@ -54,7 +54,7 @@ We can redefine the symbol `a` to be some other Scheme object, say, a list.
 
 The three-element list `(1 2 3)` takes up more memory than the number `5`. So
 `define` can't just write the new value of `a` over the top of the old one. What
-it does (and in fact what re-defining things *always* does) is allocate some new
+it does (and in fact what re-defining things _always_ does) is allocate some new
 memory to store the new value into, and change the variable `a` to point to that
 new value.
 
@@ -68,7 +68,7 @@ That's where the garbage collector comes in. Every now and then the garbage
 collector checks all the Scheme objects in the world, determines which of them
 are no longer reachable, and then frees up that memory to be used for other
 things. While I don't recommend this harsh utilitarian approach to dealing with
-relatives who are down on their luck, it *is* good idea in a computer program.
+relatives who are down on their luck, it _is_ good idea in a computer program.
 Memory is a finite resource, and the more efficiently we can get rid of memory
 that's not being used the better.
 
@@ -87,45 +87,44 @@ domains where timing is critical, such as real-time audio and video.
 ## Manual memory management in xtlang {#manual-memory-management-in-xtlang}
 
 Hang on a sec---isn't working with real-time audio and video xtlang (and
-therefore Extempore's) *raison d'etre?* Well, yes is is---the sluggishness (and
+therefore Extempore's) _raison d'etre?_ Well, yes is is---the sluggishness (and
 non-determinism) of Impromptu's Scheme interpreter was the spark which ignited
-the development of xtlang (as mentioned in [philosophy](../overview/philosophy.md)). Again, this isn't a knock on Scheme in
+the development of xtlang (as mentioned in
+[philosophy](../overview/philosophy.md)). Again, this isn't a knock on Scheme in
 general as slow---there are some very sprightly Scheme compilers, but
 Impromptu's one was slow. The non-determinism was even more of a problem,
 because the last thing you want when you're generating audio or video is a 'stop
 the world' GC pause, which will lead to clicks and pops in audio or dropped
 frames in video. Real-time systems and garbage collection are uneasy bedfellows.
 
-So, xtlang requires [manual memory
-management](http://en.wikipedia.org/wiki/Manual_memory_management). In general,
-this means that when you want some memory you ask the compiler for it, it's
-yours for a time and you can do whatever you want with it, and then you know
-when it's going to be 'given back'. It doesn't necessarily mean that you have it
-forever (in fact in many cases the memory is quite short-lived), but it does
-mean that there are no surprises---you specify exactly how much memory you'll
-get and you know it's going to hang around for. This determinism an important
-benefit of manual memory management in xtlang---especially in a real-time
-systems context.
+So, xtlang requires
+[manual memory management](http://en.wikipedia.org/wiki/Manual_memory_management).
+In general, this means that when you want some memory you ask the compiler for
+it, it's yours for a time and you can do whatever you want with it, and then you
+know when it's going to be 'given back'. It doesn't necessarily mean that you
+have it forever (in fact in many cases the memory is quite short-lived), but it
+does mean that there are no surprises---you specify exactly how much memory
+you'll get and you know it's going to hang around for. This determinism an
+important benefit of manual memory management in xtlang---especially in a
+real-time systems context.
 
 Zooming out for a second, a running program has access to and uses two main
 regions of memory: the **stack** and the **heap**. There's lots of material on
-the web about the differences between these two a ([here's an explanation at
-stackoverflow](http://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap)),
+the web about the differences between these two a
+([here's an explanation at stackoverflow](http://stackoverflow.com/questions/79923/what-and-where-are-the-stack-and-heap)),
 but I'll give a quick summary here.
 
--   The **stack** is for dealing with function arguments and local
-    variables. Each function call 'pushes' some new data onto the stack,
-    and when the function returns it 'pops' off any local variables and
-    leaves its return value. The stack is therefore generally changing
-    pretty quickly.
--   The **heap**, on the other hand, is for longer-lived data. Buffers
-    of audio, video, or any data which you want to have around for a
-    while: these are the sort of things you'll generally want to store
-    on the heap.
+- The **stack** is for dealing with function arguments and local variables. Each
+  function call 'pushes' some new data onto the stack, and when the function
+  returns it 'pops' off any local variables and leaves its return value. The
+  stack is therefore generally changing pretty quickly.
+- The **heap**, on the other hand, is for longer-lived data. Buffers of audio,
+  video, or any data which you want to have around for a while: these are the
+  sort of things you'll generally want to store on the heap.
 
 I should also point out that the stack and heap aren't actually different types
 of memory in the computer---they're just different areas in the computer's RAM.
-The difference is in the way the program *uses* the different regions. Each
+The difference is in the way the program _uses_ the different regions. Each
 running process has its own stack(s) and heap, and they are just regions of
 memory given to the process by the OS.
 
@@ -143,7 +142,7 @@ zone. There can be multiple zones in existence at once, and they don't interfere
 So, in accordance with the three different memory 'types' (stack, heap, and
 zone) there are three memory allocation functions in xtlang: `salloc`, `halloc`
 and `zalloc`. They all return a pointer to some allocated memory, but they
-differ in *where* that memory is allocated from, and there are no prizes in
+differ in _where_ that memory is allocated from, and there are no prizes in
 guessing which function is paired with which type of memory :)
 
 Also, `alloc` in xtlang is an alias for `zalloc`. So if you ever see an `alloc`
@@ -153,11 +152,11 @@ in xtlang code it's grabbing memory from a zone.
 
 As I mentioned above, the stack is associated with function calls, their
 arguments and local variables. Because xtlang uses (in general)
-[closures](types.md#closures) rather
-than just plain functions, stack allocation and `salloc` in xtlang is used in
-the body of a closure. Remember that closures are just functions with their
-enclosing scope: think of a function which has packaged up any variables it
-references and carries them around in its saddlebags.
+[closures](types.md#closures) rather than just plain functions, stack allocation
+and `salloc` in xtlang is used in the body of a closure. Remember that closures
+are just functions with their enclosing scope: think of a function which has
+packaged up any variables it references and carries them around in its
+saddlebags.
 
 Well, that's as clear as mud. Let's have an example.
 
@@ -180,11 +179,11 @@ and int literals is allocated from in xtlang. String literals are bound globally
 which is bound in a `let` inside an xtlang `lambda` will be stack allocated,
 unless you explicitly request otherwise with `halloc` or `zalloc`.
 
-[String](types.md#string) literals
-are the exception to the "all literals are on the stack" rule. String literals
-are actually stored as `i8*` on the heap (as though they were *halloced*). If
-you capture a pointer to one of these strings (e.g. with `pref-ptr`), then you
-can pass it around and dereference it from anywhere.
+[String](types.md#string) literals are the exception to the "all literals are on
+the stack" rule. String literals are actually stored as `i8*` on the heap (as
+though they were _halloced_). If you capture a pointer to one of these strings
+(e.g. with `pref-ptr`), then you can pass it around and dereference it from
+anywhere.
 
 This 'implicit stack allocation' works for int and float literals, but how about
 aggregate and other higher-order types? In those cases, we call `salloc`
@@ -206,14 +205,14 @@ explicitly.
 
 This `double_tuple` closure takes an `i64` argument, and creates a 2-tuple which
 contains the input value and also its double. Think of it as creating
-input-output pairs for the function *f(x) = 2x*.
+input-output pairs for the function _f(x) = 2x_.
 
 Notice how the tuple pointer `tup:<i64,i64>*` was `let`-bound to the return
-value of the call to `salloc`. Initially, the memory was uninitialised ([see
-here](types.md#pointers) for more
-background about pointers), then two `i64` values were filled into it with
-`tfill!`. This is basically all the closure does, apart from the `printf` calls
-which are just reading and printing out what's going on.
+value of the call to `salloc`. Initially, the memory was uninitialised
+([see here](types.md#pointers) for more background about pointers), then two
+`i64` values were filled into it with `tfill!`. This is basically all the
+closure does, apart from the `printf` calls which are just reading and printing
+out what's going on.
 
 The printout confirms that the doubling is working correctly: `6` is indeed what
 you get when you double `3`, so the output value of `<3,6>` is spot on. The
@@ -286,15 +285,15 @@ Finally, consider this example:
 ;; tup* = <0,4508736416>
 ```
 
-Wow. That's not just wrong, that's *super wrong*. What's going on is that the
+Wow. That's not just wrong, that's _super wrong_. What's going on is that the
 call to `salloc` inside the closure `double_tuple` doesn't keep the memory after
 the closure returns, because at this point all the local variables get popped
-off the stack. Subsequent calls to *any* closure will push new arguments and
-local variables *onto* the stack and overwrite the memory that `tup` points to.
+off the stack. Subsequent calls to _any_ closure will push new arguments and
+local variables _onto_ the stack and overwrite the memory that `tup` points to.
 
-That's what deallocating memory *means*: it doesn't mean that the memory gets
+That's what deallocating memory _means_: it doesn't mean that the memory gets
 set to zero, or that new values will be written in straight away, but it means
-that the memory *might* be overwritten at any stage. Which, from a programming
+that the memory _might_ be overwritten at any stage. Which, from a programming
 perspective, is just as bad as having new data written into it, because if you
 can't trust that your pointer still points to the value(s) you think it does
 then it's pretty useless.
@@ -312,9 +311,9 @@ and pop zones off of a stack of memory zones of user-defined size.
 
 A memory zone can be created using the special `memzone` form. `memzone` takes
 as a first argument a zone size in bytes, and then an arbitrary number of other
-forms (s-expressions) which make up the body of the `memzone`. The *extent* of
+forms (s-expressions) which make up the body of the `memzone`. The _extent_ of
 the zone is defined by `memzone`'s s-expression. Anything within the body of the
-`memzone` s-expression is *in scope*.
+`memzone` s-expression is _in scope_.
 
 Say we want to fill a memory region with `i64` values which just count from `0`
 up to the length of the region (`region_length`). We'll need to allocate the
@@ -339,7 +338,7 @@ this using `zalloc` inside a `memzone`.
 The code works as it should: as confirmed by the print statement. Notice how the
 call to `zalloc` took an argument (`region_length`). This tells `zalloc` how
 much memory to allocate from the zone. If we hadn't passed this argument (and it
-*is* optional), the default length is `1`, to allocate enough memory for *one*
+_is_ optional), the default length is `1`, to allocate enough memory for _one_
 `i64`. All of the alloc functions (`salloc`, `halloc` and `zalloc`) can take
 this optional size argument, and they all default to `1` if no argument is
 passed.
@@ -395,7 +394,7 @@ two special zones.
 
 To allocate memory from a closure's zone, we need a `let` outside the `lambda`.
 Anything `zalloc`'ed from there will come from the closure's zone. Anything
-`zalloc`'ed from *inside* the closure will come from whatever the top zone is at
+`zalloc`'ed from _inside_ the closure will come from whatever the top zone is at
 the time---usually the default zone (unless you're in an enclosing `memzone`).
 
 As an example, note the 'zone size' argument to `bind-func`
@@ -456,7 +455,7 @@ replace the `salloc` with a `halloc`:
 ```
 
 Now, the returned tuple pointer `tup` is a heap pointer, so we can refer to it
-from *anywhere* without any issues. In fact, the only way to deallocate memory
+from _anywhere_ without any issues. In fact, the only way to deallocate memory
 which has been `halloc`'ed and free it up for re-use is to use the xtlang
 function `free` (which is the same as calling `free` in C).
 
@@ -467,7 +466,7 @@ example above. This has the added advantage that if you re-compile the closure,
 because you've changed the functionality or whatever, all the memory in the zone
 is freed and re-bound, which is often what you want.
 
-Where you *may* want to use `halloc` to allocate memory on the heap, is in
+Where you _may_ want to use `halloc` to allocate memory on the heap, is in
 binding global data structures which you want to have accessible from anywhere
 in your xtlang code. Binding global xtlang variables is the job of `bind-val`.
 
@@ -475,7 +474,7 @@ in your xtlang code. Binding global xtlang variables is the job of `bind-val`.
 
 Each different alloc function is good for different things, and the general idea
 to keep in mind is that you want your memory to hang around for as long as you
-need it to---and *no longer*. Sometimes you only need data in the body of a
+need it to---and _no longer_. Sometimes you only need data in the body of a
 closure---then `salloc` is the way to go. Other times you want it to be around
 for as long as the closure remains unchanged, then `zalloc` is the right choice.
 Also, if you're going to be alloc'ing a whole lot of objects for a specific
@@ -516,7 +515,7 @@ Process extempore segmentation fault: 11
 
 If you're not used to working directly with memory, you'll almost certainly
 crash (segfault) Extempore when you start out. In fact, be prepared to crash
-things *a lot* at first. Don't be discouraged: once you get your head around the
+things _a lot_ at first. Don't be discouraged: once you get your head around the
 three-fold memory model and where each allocation function is getting its memory
 from, it's much easier to write clean and performant code in xtlang. And from
 there, the performance and control of working with 'bare metal' types opens up
@@ -526,15 +525,15 @@ lots of cool possibilities.
 
 xtlang's pointer types may cause some confusion for those who aren't used to
 (explicitly) working with reference types. That's nothing to be ashamed of---the
-whole [pass by
-value](http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_value) / [pass
-by
-reference](http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_reference)
+whole
+[pass by value](http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_value)
+/
+[pass by reference](http://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_reference)
 thing can take a bit to get your head around.
 
 So what does it mean to say that xtlang supports pointer types? Simply put, this
 means that we can use variables in our program to store not just values, but the
-*addresses* of values in memory. A few examples might help to clarify things.
+_addresses_ of values in memory. A few examples might help to clarify things.
 
 The `let` form in xtlang (as in Scheme) is a way of binding or assigning
 variables: giving a name to a particular value. If we want to keep track of the
@@ -554,7 +553,7 @@ What's happening here is that the `let` assigns the value `4` to the variable
 `num_cats`, so that whenever the program sees the variable `num_cats` it'll look
 in the `num_cats` 'place' in memory and use whatever value is stored there. The
 computer's memory is laid out like a row of little boxes, and each box has an
-address (the location of the box) and also a value (what's *in* the box).
+address (the location of the box) and also a value (what's _in_ the box).
 
 ![image](/images/pointer-tut-1.png)
 
@@ -605,14 +604,14 @@ is exited (that is, when the paren matching the opening paren is reached).
 What we've done so far is store the value (how many cats we have) into the
 variable `num_cats`. The value has an address in memory, but as a programmer we
 don't necessarily know what that address is, just that we can refer to the value
-using the name `num_cats`. It's important to note that the *compiler* knows what
+using the name `num_cats`. It's important to note that the _compiler_ knows what
 the address is---in fact as far as the compiler is concerned every variable is
 just an address. But the compiler allows us to give these variables names, which
 makes the code much easier to write and understand.
 
 Pointer types in xtlang are indicated with an asterisk (`*`), for example the
 type `i64*` represents a pointer to a 64-bit integer (sometimes called an
-`i64`-pointer). With pointers, we actually assign the *address itself* in a
+`i64`-pointer). With pointers, we actually assign the _address itself_ in a
 variable. That's the reason it's called a pointer: because it points to (is a
 reference to) the value.
 
@@ -633,16 +632,16 @@ There are a couple of other changes to the code. Firstly, we no longer bind the
 value straight away (as we were doing with `(num_cats:i64 4)`), but instead we
 make a call to `zalloc`. This is the way to get pointers in xtlang: through a
 call to an 'alloc' function. `zalloc` is a function which 'allocates' and
-returns the *address* (i.e. a pointer) of some memory which can be used to store
+returns the _address_ (i.e. a pointer) of some memory which can be used to store
 the value in. This address is the assigned to the variable `num_cats_ptr`, just
 like the number `4` was assigned to `num_cats` in the earlier examples. The
 orange bar on the variable name indicates that it's a pointer.
 
 So why does `print_num_cats3` print such a weird (on my machine: 4555984976
-cats!) answer? Well, it's because we're trying to print it as an `i64` *value*
+cats!) answer? Well, it's because we're trying to print it as an `i64` _value_
 (using `%lld` in the `printf` format string), but it's not an `i64` value---it's
-the *address* of a memory location where an `i64` value is located. On a 64-bit
-system (such as the laptop I'm writing this blog post on) the pointers *are*
+the _address_ of a memory location where an `i64` value is located. On a 64-bit
+system (such as the laptop I'm writing this blog post on) the pointers _are_
 actually 64-bit integers, because an integer is a pretty sensible way to store
 an address.
 
@@ -653,12 +652,12 @@ a pointer is a 32 bit integer, then you can only 'address' about 4.3 billion
 more and more computers came with more than 4.3Gb of RAM installed, so the need
 for 64-bit pointers became more pressing. There are workarounds, but having a
 larger addressable space is a key benefit of 64-bit architectures. And it helps
-to remember that pointers *are* just integers, but they're not like the int
+to remember that pointers _are_ just integers, but they're not like the int
 types that we use to store and manipulate data.
 
 In `print_num_cats3` we don't set any value into that location, we only deal
 with the address. In fact, the memory this address points to is referred to as
-*uninitialised*, which is a name for memory that has been allocated but hasn't
+_uninitialised_, which is a name for memory that has been allocated but hasn't
 had any values set into it. In Extempore, uninitialised memory will be 'zeroed
 out', meaning all of the bits will be set to `0`. So for an `i64` this will be
 the integer value `0`.
@@ -700,7 +699,7 @@ Notice also that in `print_num_cats4` we don't pass `num_cats_ptr` directly to
 `printf`, we do it through a call to `pref`. Whereas `pset!` is for writing
 values into memory locations, `pref` is for reading them out. Like `pset!`, pref
 takes a pointer as the first argument and an offset for the second argument. In
-this way, we can read *and* write `i64` values to the memory location without
+this way, we can read _and_ write `i64` values to the memory location without
 actually having a variable of type `i64` (which we did with `num_cats` in the
 `print_num_cats` and `print_num_cats2`). All this is possible because we have a
 pointer variable (`num_cats_ptr`) which gives us a place to load and store the
@@ -714,7 +713,7 @@ assigning values directly to variables (as we did in the first couple of
 examples) seemed to work just fine.
 
 One thing that pointers and alloc'ing allows us to do is work with whole regions
-in memory, in which we can store *lots* of values. Say we want to be able to
+in memory, in which we can store _lots_ of values. Say we want to be able to
 determine the mean (average) of 3 numbers. One way to do this is to store each
 of the different numbers with its own name.
 
@@ -735,7 +734,7 @@ The `let` form binds the (`double`) values `4.5`, `3.3` and `7.9` to the names
 `num1`, `num2` and `num3`. Then, all three values are added together (with `+`)
 and then divided by `3.0` (with `/`). Now, this code does give the right answer,
 but it's easy to see how things would get out of hand if we wanted to find the
-mean of 5, 20 or one million values. What we really want is a way to give *one*
+mean of 5, 20 or one million values. What we really want is a way to give _one_
 name to all the values we're interested in, rather than having to refer to all
 the values by name individually. And to do that, we can use a pointer.
 
@@ -757,11 +756,10 @@ the values by name individually. And to do that, we can use a pointer.
 (mean2) ;; returns 5.233333
 ```
 
-In `mean2`, we pass an integer argument (in this case `3`) to `zalloc`.
-`zalloc` then allocates enough memory to fit 3 `double` values. The
-pointer that gets returned is still only a pointer to the first of these
-memory slots. And this is where the second 'offset' argument to `pref`
-and `pset!` come in.
+In `mean2`, we pass an integer argument (in this case `3`) to `zalloc`. `zalloc`
+then allocates enough memory to fit 3 `double` values. The pointer that gets
+returned is still only a pointer to the first of these memory slots. And this is
+where the second 'offset' argument to `pref` and `pset!` come in.
 
 ![image](/images/pointer-tut-5.png)
 
@@ -813,19 +811,19 @@ After the `dotimes` the memory will look like this:
 ![image](/images/pointer-tut-6.png)
 
 There's one more useful function for working with pointers: `pref-ptr`. Where
-`(pref num_ptr 3)` returns the *value* of the 4th element of the chunk of memory
+`(pref num_ptr 3)` returns the _value_ of the 4th element of the chunk of memory
 pointed to by `num_ptr`, `(pref-ptr num_ptr 3)` returns the address of that
 value (a pointer to that value). So, in the example above, `num_ptr` points to
 memory address 27, so `(pref num_ptr 2)` would point to memory address 29.
 `(pref (pref-ptr num_ptr n) 0)` is the same as `(pref (pref-ptr num_ptr 0) n)`
-for any integer *n*.
+for any integer _n_.
 
 ## Pointers to higher-order types {#pointers-to-higher-order-types}
 
-The [xtlang type system](types.md) has both primitive
-types (floats and ints) and higher-order types like tuples, arrays and closures.
-Higher-order in this instance just means that they are made up of other types,
-although these component types may be themselves higher-order types.
+The [xtlang type system](types.md) has both primitive types (floats and ints)
+and higher-order types like tuples, arrays and closures. Higher-order in this
+instance just means that they are made up of other types, although these
+component types may be themselves higher-order types.
 
 As an example of an aggregate type, consider a 2 element tuple. Tuples are
 (fixed-length) n-element structures, and are declared with angle brackes (`<>`).
@@ -883,20 +881,19 @@ Step 3 simply reads these values back out---it doesn't change the memory.
 
 There are a couple of other things worth discussing about this example.
 
--   We used `pref_ptr` rather than `pref` in both step 2 and step 3. That's
-    because `tset!` and `tref` need a *pointer to* a tuple as their first
-    argument, and if we had used regular `pref` we would have got the tuple
-    itself. This means that we could have just used `tup_ptr` directly instead
-    of `(pref-ptr tup_ptr 0)` in a couple of places, because these two pointers
-    will always be equal (have a think about why this is true).
--   There are a few bits of repeated code, for example `(pref-ptr tup_ptr 1)`
-    gets called 4 times. We could have stored this pointer in a temporary
-    variable to prevent these multiple dereferences, how could we have done that
-    (hint: create the new 'tmp' pointer in the `let`---make sure it's of the
-    right type).
+- We used `pref_ptr` rather than `pref` in both step 2 and step 3. That's
+  because `tset!` and `tref` need a _pointer to_ a tuple as their first
+  argument, and if we had used regular `pref` we would have got the tuple
+  itself. This means that we could have just used `tup_ptr` directly instead of
+  `(pref-ptr tup_ptr 0)` in a couple of places, because these two pointers will
+  always be equal (have a think about why this is true).
+- There are a few bits of repeated code, for example `(pref-ptr tup_ptr 1)` gets
+  called 4 times. We could have stored this pointer in a temporary variable to
+  prevent these multiple dereferences, how could we have done that (hint: create
+  the new 'tmp' pointer in the `let`---make sure it's of the right type).
 
 There's one final thing worth saying about pointers in xtlang. Why do pointers
-even *have* types? Isn't the address the same whether it's an int, a float, a
+even _have_ types? Isn't the address the same whether it's an int, a float, a
 tuple, or some complex custom type stored at that memory address? The reason is
 to do with something all this talk of memory locations as 'boxes' has glossed
 over: that different types require different amounts of memory to store.
@@ -906,7 +903,7 @@ think of the boxes as 8-bit bytes. One bit (a binary digit) is just a `0` or a
 `1`, and a byte is made up of 8 bits, for example `11001011`. These are just
 [base-2 numerals](http://en.wikipedia.org/wiki/Binary_numeral_system), so `5` in
 decimal is `101`, and although they are difficult for humans to read (unless
-you're used to them), computers *live and breathe* binary digits.
+you're used to them), computers _live and breathe_ binary digits.
 
 This is why the integer types all have numbers associated with them---the number
 represents the number of bytes used to store the integer. So `i64` requires 64
@@ -948,12 +945,12 @@ like `<i32,i8,|17,double|*,double>` and calculate the stride manually.
 There are a few other situations where being able to pass pointers around is
 really handy.
 
--   When the chunks of memory we're dealing with are large, copying them around
-    in memory becomes expensive (in the 'time taken' sense). So, if lots of
-    different functions need to work on the same data, instead of copying it
-    around so that each function has its own copy of the data, they can just
-    pass around pointers to the same chunk of data. This means that each
-    function needs to be a good citizen and not stuff up things for the others,
-    but if you're careful this can be a huge performance benefit.
--   You can programatically determine the amount of memory to allocate, which is
-    something you can't to with xtlang's array types.
+- When the chunks of memory we're dealing with are large, copying them around in
+  memory becomes expensive (in the 'time taken' sense). So, if lots of different
+  functions need to work on the same data, instead of copying it around so that
+  each function has its own copy of the data, they can just pass around pointers
+  to the same chunk of data. This means that each function needs to be a good
+  citizen and not stuff up things for the others, but if you're careful this can
+  be a huge performance benefit.
+- You can programatically determine the amount of memory to allocate, which is
+  something you can't to with xtlang's array types.

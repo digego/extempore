@@ -26,13 +26,13 @@ The important thing to keep in mind for the present is that Extempore is a
 program that is already running. Extempore isn't just a programming language, or
 just a compiler, it's a run-time as well. And one of the primary differences
 between Extempore and most other general purpose programming environments is an
-emphasis on *precisely scheduled code execution*.
+emphasis on _precisely scheduled code execution_.
 
 Each `extempore` process has a scheduling engine built-in, allowing tasks to be
 scheduled for execution at a precise time in the future. Unlike threading
 constructs such as `sleep()` or `wait()`, which don't provide strong guarantees
 about temporal accuracy (i.e. the time they'll sleep/wait for), Extempore's
-scheduling engine is *guaranteed* to execute its tasks at the requested time
+scheduling engine is _guaranteed_ to execute its tasks at the requested time
 (the number of audio samples since Extempore was started). This temporal
 guarantee is significant for time critical domains such as audio and graphic,
 and real-time systems programming.
@@ -42,13 +42,13 @@ by the audio device which the Extempore process connected to upon startup. This
 isn't the same as the time value on the system clock, although you can access
 the system clock as well through `(clock:clock)`. Instead, the audio device will
 (usually) have a much more accurate clock, running at the audio sample rate
-(which will usually be 44.1kHz). That's why Extempore *always* connects to an
+(which will usually be 44.1kHz). That's why Extempore _always_ connects to an
 audio device on startup---even if you're not producing any audio output.
 
 ## Scheduling events for future execution {#scheduling-events-for-future-execution}
 
 Being able to schedule events (e.g. for music playback or even arbitrary code
-execution) for execution in the future is *super handy*. As an example, let's
+execution) for execution in the future is _super handy_. As an example, let's
 load up the default synth instrument and play three notes in sequence (an
 arpeggiated triad).
 
@@ -80,7 +80,7 @@ arpeggiated triad).
 Extempore uses an asynchronous 'schedule and forget' style of programming, often
 in conjunction with a design pattern called temporal recursion---a concept I'll
 come back to shortly. This is different from languages such as ChucK which use a
-synchronous approach. What *is* the difference? Synchronous timing works by
+synchronous approach. What _is_ the difference? Synchronous timing works by
 holding up code until some specified time in the future. This is basically the
 same concept as using `sleep()`, although strongly timed languages like ChucK
 guarantee the length of the sleep. Extempore, on the other hand, works by
@@ -114,7 +114,7 @@ This turns out to be very useful in time-based programming.
 ## Temporal recursion {#temporal-recursion}
 
 There is a common design pattern in Extempore programming called **temporal
-recursion**. By writing a function which *schedules itself* as its final action,
+recursion**. By writing a function which _schedules itself_ as its final action,
 a temporally recursive callback loop is established. Here is an example
 demonstrating a `foo` function that will play a note and then schedule itself to
 be called back in one second (this loop will continue indefinitely).
@@ -131,7 +131,7 @@ be called back in one second (this loop will continue indefinitely).
 You can create as many of these temporal recursion loops as you like---try
 evaluating `foo` multiple times. Notice that you get multitasking for free, you
 don't need to do anything special to run two event streams. You can even create
-temporal recursions *inside* temporal recursions.
+temporal recursions _inside_ temporal recursions.
 
 A temporal recursion need not 'recur' at a constant rate. By adjusting the time
 increment on each cycle the `callback` rate (control rate) can be constantly
@@ -165,7 +165,7 @@ one minute from `(now)`.
 
 There are a couple of gotchas to keep in mind when doing 'schedule and forget'
 programming. The first is that `(now)` can be a slippery thing. In the example
-below, the two notes *may* be scheduled to play on the same sample, but then
+below, the two notes _may_ be scheduled to play on the same sample, but then
 again, they may not! `(now)` may have moved forward in time between the two
 calls, even if they were evaluated at the same time.
 
@@ -207,11 +207,11 @@ arguments required by the function being called back must also be passed to
 (loop (now))
 ```
 
-The second major gotcha in recursive callback loops is that `(now)` is *now*.
+The second major gotcha in recursive callback loops is that `(now)` is _now_.
 Code requires some time to execute. If you are executing a call to evaluate a
 note `(now)`, by the time the code is evaluated it will already be late: `(now)`
 will have moved on. You should always try to schedule your code execution
-*ahead* of the scheduled time of your tasks.
+_ahead_ of the scheduled time of your tasks.
 
 ```xtlang
 ;; This is best (callback happens 4100 samples earlier than new time)
@@ -228,7 +228,6 @@ exactly the same time as the scheduled callback time. The problem with this is
 that the next note needs to be scheduled at exactly the same time that the
 function is called. The note will always be late. The 'best' version schedules
 the callback just ahead of the time that you want the note to play. This gives
-Extempore `4100` samples to execute the code to schedule the note before the note
-is required to sound.
-Notice `*second*` has been replaced by its actual value in samples to make
-the time difference explicit.
+Extempore `4100` samples to execute the code to schedule the note before the
+note is required to sound. Notice `*second*` has been replaced by its actual
+value in samples to make the time difference explicit.

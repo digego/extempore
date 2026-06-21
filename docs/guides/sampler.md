@@ -3,9 +3,9 @@ title: Loading and using a sampler
 ---
 
 A sampler is an instrument which stores chunks of audio which can be
-*triggered*---played back. Samplers are used in many different ways, such as
+_triggered_---played back. Samplers are used in many different ways, such as
 providing digital simulations of acoustic instruments (e.g. a piano sampler
-which plays recorded samples of a *real* piano when triggered by messages from a
+which plays recorded samples of a _real_ piano when triggered by messages from a
 MIDI keyboard) or they can be used to play and manipulate non-acoustic sounds.
 Since samplers are so useful, Extempore provides a built-in sampler in
 `libs/external/instruments_ext.xtm`.
@@ -23,23 +23,24 @@ duration. There are lots of subtleties to this process, such as what to do when
 the duration is longer than the sample length, what to do if there isn't a
 sample at the given index, etc., but at a high level that's how it works.
 
-If you look at the filenames in each slot (although it's the audio *data* in the
+If you look at the filenames in each slot (although it's the audio _data_ in the
 slots, not the filename strings), you'll notice that they refer to
-[wave](http://en.wikipedia.org/wiki/WAV) (audio) files named with [scientific
-pitch notation](http://en.wikipedia.org/wiki/Scientific_pitch_notation). These
-wave files could be recordings of a piano, or of a violin, or even of abstract
-sound effects (although at that point we'd have to wonder why they were named
-with pitches from the musical scale). The sampler doesn't care what audio data
-is stored in each slot, and it's up to you to make sure that both the slot the
-audio is stored in and the audio data itself make sense for whatever musical
+[wave](http://en.wikipedia.org/wiki/WAV) (audio) files named with
+[scientific pitch notation](http://en.wikipedia.org/wiki/Scientific_pitch_notation).
+These wave files could be recordings of a piano, or of a violin, or even of
+abstract sound effects (although at that point we'd have to wonder why they were
+named with pitches from the musical scale). The sampler doesn't care what audio
+data is stored in each slot, and it's up to you to make sure that both the slot
+the audio is stored in and the audio data itself make sense for whatever musical
 purpose you have in mind.
 
-For sampling pitched instruments, using [MIDI note
-numbers](http://www.phys.unsw.edu.au/jw/notes.html) (middle C = 60) make sense,
-and that's the convention I've used in the diagram above. If you want to trigger
-the sample for middle C, just use `play-note` with a pitch argument of `60`.
+For sampling pitched instruments, using
+[MIDI note numbers](http://www.phys.unsw.edu.au/jw/notes.html) (middle C = 60)
+make sense, and that's the convention I've used in the diagram above. If you
+want to trigger the sample for middle C, just use `play-note` with a pitch
+argument of `60`.
 
-The Extempore sampler doesn't *have* to be full---there can be empty slots.
+The Extempore sampler doesn't _have_ to be full---there can be empty slots.
 
 ![image](/images/sampler/piano-gaps.png)
 
@@ -52,7 +53,7 @@ middle C). If the closest filled slot was middle C (slot `60`), then the sampler
 would play the middle C audio file pitch-shifted up one octave. If you've ever
 looked into the maths behind musical notes, you'll know that for every octave
 increase in pitch, the frequency of the waveform doubles. So, to play a sample
-*up an octave*, we play it back at double speed. In practice, because the audio
+_up an octave_, we play it back at double speed. In practice, because the audio
 sample rate is constant, we only play every second sample, which has the same
 effect---we're progressing through the audio data twice as fast. This is the
 same reason that when you hit fast-forward on a tape player (do people still
@@ -64,7 +65,7 @@ If we're not pitch-shifting by a whole octave, then the maths is a bit trickier
 takes care of that for us (including all sorts of fancy stuff like interpolating
 between individual audio samples). When `play-note` calls an empty slot in the
 sampler, the pitch-shifting up or down is taken care of, and it works as though
-we *did* have an audio file in that slot. The exception to this rule is if the
+we _did_ have an audio file in that slot. The exception to this rule is if the
 audio sample has a meaningful tempo---such as a full drum loop. In this case,
 because the pitch-shifting is also speeding up or slowing down the sample
 playback, the tempo will be altered as well. Which may be fine, but it may also
@@ -79,19 +80,18 @@ important, use fewer slots and let the sampler interpolate in the gaps.
 
 ## Creating a drum sampler {#creating-a-drum-sampler}
 
-::: info
-If you've loaded the sharedsystem (i.e. with `(sys:load
-"examples/sharedsystem/setup.xtm")`) then you don't have to do any of the "DSP"
-signal chain setup stuff (i.e. you don't have to load the `instruments_ext.xtm`
-file, create the sampler `samp1`, evaluate the `dsp` closure, or call
-`dsp:set!`). Basically you can just ignore the following code block, although
-the ones after that are still relevant---we'll try and make it clear 😜
+::: info If you've loaded the sharedsystem (i.e. with
+`(sys:load "examples/sharedsystem/setup.xtm")`) then you don't have to do any of
+the "DSP" signal chain setup stuff (i.e. you don't have to load the
+`instruments_ext.xtm` file, create the sampler `samp1`, evaluate the `dsp`
+closure, or call `dsp:set!`). Basically you can just ignore the following code
+block, although the ones after that are still relevant---we'll try and make it
+clear 😜
 
 Ok, enough background material---let's make some noise. We'll create an instance
 of Extempore's sampler called `samp1`. To do this, we use the `make-instrument`
 Scheme macro (once we've loaded it from the `libs/external/instruments_ext.xtm`
-library file).
-:::
+library file). :::
 
 ```xtlang
 (sys:load "libs/external/instruments_ext.xtm")
@@ -115,9 +115,8 @@ then. Extempore (by default) ships with a set of
 [808](https://en.wikipedia.org/wiki/Roland_TR-808) samples (in the
 `assets/samples/808` folder) which will do the job nicely.
 
-::: info
-If you want to use other drum samples, e.g. the [Salamander
-drumkit](http://download.linuxaudio.org/musical-instrument-libraries/sfz/salamander_drumkit_v1.tar.7z)
+::: info If you want to use other drum samples, e.g. the
+[Salamander drumkit](http://download.linuxaudio.org/musical-instrument-libraries/sfz/salamander_drumkit_v1.tar.7z)
 then it shouldn't be too hard to modify these steps---although obviously the
 filenames will be different.
 
@@ -129,10 +128,9 @@ you like. Just make sure that you set the right path in your code if you're
 following along.
 
 We're going to load (some of) these files into our `samp1` sampler one at a time
-using the `sampler-populate-slot` function (note that the path to each `.aif` file
-is relative to your Extempore folder---if you're loading samples from somewhere
-else you'll need to include the full path).
-:::
+using the `sampler-populate-slot` function (note that the path to each `.aif`
+file is relative to your Extempore folder---if you're loading samples from
+somewhere else you'll need to include the full path). :::
 
 ```xtlang
 (sampler-populate-slot samp1 "assets/samples/808/36.aif" *gm-kick-2* 0 0 0 1)
@@ -192,9 +190,9 @@ and lots more like this ...
 If the log doesn't show something like that, then there are a few things which
 could have gone wrong:
 
--   have you set up `libsndfile` properly on your system?
--   are the pathnames to to samples correct?
--   did you define the `samp1` sampler and did it compile properly?
+- have you set up `libsndfile` properly on your system?
+- are the pathnames to to samples correct?
+- did you define the `samp1` sampler and did it compile properly?
 
 Assuming things worked properly, we should be able to play our `samp1` sampler.
 
@@ -205,9 +203,10 @@ Assuming things worked properly, we should be able to play our `samp1` sampler.
 (play-note (now) samp1 *gm-closed-hi-hat* 80 44100)
 ```
 
-Using the extempore [pattern language](pattern-language.md) you can make loops really easily. The
-[pattern language guide](pattern-language.md) has much more info on how it all works, but
-if you just want a teaser here's a standard back-beat pattern.
+Using the extempore [pattern language](pattern-language.md) you can make loops
+really easily. The [pattern language guide](pattern-language.md) has much more
+info on how it all works, but if you just want a teaser here's a standard
+back-beat pattern.
 
 ```xtlang
 (sys:load "libs/core/pattern-language.xtm")
@@ -230,7 +229,8 @@ features of the sampler which are relevant here:
 2. during playback, you can provide three _extra_ arguments to
    `play`/`play-note` (i.e. after the `dur` argument):
    1. pan (0--1)
-   2. offset (in samples) to specify how far into the audio file to start playback
+   2. offset (in samples) to specify how far into the audio file to start
+      playback
    3. reverse? (yes for value > 0) to reverse playback
 
 If you want to see how this might work, try loading just _one_ of the drum
@@ -242,7 +242,7 @@ all into bank 0) of our `samp1` sampler:
 ```
 
 Then, we can mess around with the playback:
-   
+
 ```xtlang
 ;; this is just "normal" playback
 (play-note (now) samp1 *gm-snare* 80 44100 1 0.5 0 0)
@@ -260,14 +260,12 @@ fun if you load & manipulate your own samples.
 
 ## Creating a piano sampler {#creating-a-piano-sampler}
 
-::: info
-Note: Extempore actually ships with a bunch of piano samples in
+::: info Note: Extempore actually ships with a bunch of piano samples in
 `assets/samples/piano/`, which are loaded by default as part of the
 sharedsystem. But this example is instructive if you want to load some other
 samples.
 
-Let's add one more sampler---this time a `samp2`.
-:::
+Let's add one more sampler---this time a `samp2`. :::
 
 ```xtlang
 (make-instrument samp2 sampler)
@@ -317,8 +315,8 @@ one to play based on the velocity argument in the triggering call. Not all
 sample libraries will have multiple velocity layers, but they're a way of
 capturing the differences in sound between soft notes and loud
 notes---particularly on instruments where the difference between soft and loud
-is in more than just volume (such as a [Fender
-Rhodes](http://en.wikipedia.org/wiki/Rhodes_piano)).
+is in more than just volume (such as a
+[Fender Rhodes](http://en.wikipedia.org/wiki/Rhodes_piano)).
 
 Extempore's built-in sampler doesn't support layers, in that you can't load up a
 bunch of sound files (with multiple layer files per note) and have it
@@ -361,10 +359,10 @@ list with four elements:
 
 1.  the filename
 2.  the slot (midi note number) to load the file into
-3.  the sample offset (i.e. if the sample should start playing part-way
-    into the audio file)
-4.  the sample length (or `0` to load the whole file, which is what
-    you'll want to do in most cases).
+3.  the sample offset (i.e. if the sample should start playing part-way into the
+    audio file)
+4.  the sample length (or `0` to load the whole file, which is what you'll want
+    to do in most cases).
 
 So, going back to our filename example earlier, we want a filename like
 `C4v5.wav` to get mapped into a list like `("C4v5.wav" 60 0 0)`. The `60` is for
@@ -408,7 +406,7 @@ Awesome, we've got a piano. Success!
 
 There are lots of possibilities at this stage. If you're interested in seeing
 how to make vaguely 'conventional' musical material, then learning about the
-[pattern language](pattern-language.md)
-or [note-level music](note-level-music.md) would be good next steps. And if you'd like to see all this in an example
-code file, see `examples/external/sampler.xtm` and other files in that
-directory.
+[pattern language](pattern-language.md) or
+[note-level music](note-level-music.md) would be good next steps. And if you'd
+like to see all this in an example code file, see
+`examples/external/sampler.xtm` and other files in that directory.

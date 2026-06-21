@@ -3,21 +3,17 @@ title: Quickstart
 ---
 
 Welcome, Extempore traveller. If you don't have a favourite text editor or don't
-usually [build things from
-source](https://github.com/digego/extempore/blob/master/BUILDING.md) (or
-don't know what those things even _mean_) then these instructions will get you
-up & running asap.
+usually
+[build things from source](https://github.com/digego/extempore/blob/master/BUILDING.md)
+(or don't know what those things even _mean_) then these instructions will get
+you up & running asap.
 
-::: details Non-VSCode editors
-This quickstart guide is based on VSCode. If you'd prefer to use another editor
-(e.g. Emacs, Atom, ST, Vim) then that's fine as well---these boxes will explain
-how your setup process will be different.
-:::
+::: details Non-VSCode editors This quickstart guide is based on VSCode. If
+you'd prefer to use another editor (e.g. Emacs, Atom, ST, Vim) then that's fine
+as well---these boxes will explain how your setup process will be different. :::
 
-::: info
-With everything on this page, if you run in to problems make sure you check the
-[Troubleshooting](#troubleshooting) section at the end.
-:::
+::: info With everything on this page, if you run in to problems make sure you
+check the [Troubleshooting](#troubleshooting) section at the end. :::
 
 ## Setup
 
@@ -29,34 +25,30 @@ Here's the stuff you only need to do once.
 systems that Extempore runs on (macOS, Windows & Linux). To install VSCode, go
 to the [homepage](https://code.visualstudio.com/) and hit the big "Download"
 button (you can't miss it). Once you've installed VSCode, you need to install
-the [VSCode Extempore
-extension](https://github.com/extemporelang/vscode-extempore)---this tells
-VSCode how to deal with Extempore code.
+the
+[VSCode Extempore extension](https://github.com/extemporelang/vscode-extempore)---this
+tells VSCode how to deal with Extempore code.
 
 Open the _Command Palette_, type in a few characters of the command _Extensions:
 Install Extensions_ until it shows up, then hit <kbd>return</kbd>. Then, search
 for "Extempore" and install the extension.
 
-::: info
-The main way to run commands (in other words, to "do things") in VSCode is
-through the _Command Palette_, which you can open up with
-<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>P</kbd> (or through the menu `View >
-Command Palette...`).
-:::
+::: info The main way to run commands (in other words, to "do things") in VSCode
+is through the _Command Palette_, which you can open up with
+<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>P</kbd> (or through the menu
+`View > Command Palette...`). :::
 
 ### Download Extempore
 
-Grab the latest release from the [GitHub releases
-page](https://github.com/digego/extempore/releases), unzip it and put it
-wherever you like (e.g. in your _Documents_ folder). Then set the _Extempore:
-Sharedir_ VSCode config setting to point at that folder---this lets VSCode
-start Extempore for you (we'll do that in the next step).
+Grab the latest release from the
+[GitHub releases page](https://github.com/digego/extempore/releases), unzip it
+and put it wherever you like (e.g. in your _Documents_ folder). Then set the
+_Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
+VSCode start Extempore for you (we'll do that in the next step).
 
-::: warning
-The VSCode extension used to offer an _Extempore: Download binary_ command
-for one-click setup. It hasn't been updated for v0.9.0, so download the
-release archive manually for now.
-:::
+::: warning The VSCode extension used to offer an _Extempore: Download binary_
+command for one-click setup. It hasn't been updated for v0.9.0, so download the
+release archive manually for now. :::
 
 ## Using Extempore {#using-extempore}
 
@@ -85,15 +77,13 @@ INFO: server: accepted new connection to primary process
 Loading xtmbase library... done in 1.633086 seconds
 ```
 
-::: info
-If you can't (or don't want to) start Extempore using the _Extempore: Start_
-VSCode command, then open a terminal in your Extempore directory (VSCode has a
-built-in terminal which you can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>)
-and type `./extempore` (or `.\extempore.exe` if you're on Windows---note the
-backslash instead of the forward slash) and hit <kbd>return</kbd>. Extempore
-supports a bunch of command line options---try `./extempore
---help`/`.\extempore.exe --help` to see the full list.
-:::
+::: info If you can't (or don't want to) start Extempore using the _Extempore:
+Start_ VSCode command, then open a terminal in your Extempore directory (VSCode
+has a built-in terminal which you can bring up with
+<kbd>CTRL</kbd>+<kbd>&#96;</kbd>) and type `./extempore` (or `.\extempore.exe`
+if you're on Windows---note the backslash instead of the forward slash) and hit
+<kbd>return</kbd>. Extempore supports a bunch of command line options---try
+`./extempore --help`/`.\extempore.exe --help` to see the full list. :::
 
 ### Step 2: connect your text editor
 
@@ -120,12 +110,11 @@ INFO: server: accepted new connection to primary process
 
 Congrats, you're connected... and almost there.
 
-::: details Non-VSCode editors
-Remember, if you're not using VSCode, all the concepts are the same, but the
-names of the commands or the keyboard shortcuts might be different---I'm sure
-you'll manage 😉, and you can find the specific details for your editor in the
-[editor support guide](../guides/editor-support.md).
-:::
+::: details Non-VSCode editors Remember, if you're not using VSCode, all the
+concepts are the same, but the names of the commands or the keyboard shortcuts
+might be different---I'm sure you'll manage 😉, and you can find the specific
+details for your editor in the
+[editor support guide](../guides/editor-support.md). :::
 
 ### Step 3: evaluate some code {#step-3}
 
@@ -152,13 +141,12 @@ INFO: server: accepted new connection to primary process
 Try modifying the code and re-evaluating it---the code is live, so you can
 change and re-evaluate things without having to re-start Extempore.
 
-::: info
-One "gotcha" if you're new to this sort of thing is the difference between the
-_return value_ of a function and any _side effects_ that it triggers. In the
-above example, the "Hello, World!" which you saw in the terminal is a side
-effect (making a sound through the speakers would be a side effect as well). The
-actual return value of the `println` function is the value "true" (which is
-represented as `#t` in Extempore).
+::: info One "gotcha" if you're new to this sort of thing is the difference
+between the _return value_ of a function and any _side effects_ that it
+triggers. In the above example, the "Hello, World!" which you saw in the
+terminal is a side effect (making a sound through the speakers would be a side
+effect as well). The actual return value of the `println` function is the value
+"true" (which is represented as `#t` in Extempore).
 
 This is just a quickstart, so we won't go down the rabbit hole, but the rule of
 thumb is that when you call a print function (e.g. `println`)
@@ -175,16 +163,16 @@ thumb is that when you call a print function (e.g. `println`)
 
 If you want to stop the Extempore process, just <kbd
 class="nopretty">ctrl</kbd>+<kbd>c</kbd> in the terminal where `extempore` is
-running to kill it. If you want to start it up again, then go back to [step
-1](#step-1) (you'll have to re-connect VSCode to the new Extempore process again
-as well).
+running to kill it. If you want to start it up again, then go back to
+[step 1](#step-1) (you'll have to re-connect VSCode to the new Extempore process
+again as well).
 
 ## Simple examples
 
 ### "Hello, Sine!" {#hello-sine}
 
-Since Extempore has multimedia programming as a core part of its DNA,
-here's "Hello, Sine!"---the full version lives at
+Since Extempore has multimedia programming as a core part of its DNA, here's
+"Hello, Sine!"---the full version lives at
 [`examples/core/hello-sine.xtm`](https://github.com/digego/extempore/blob/master/examples/core/hello-sine.xtm).
 
 ```xtlang
@@ -214,8 +202,8 @@ If you're more interested in playing "notes" than doing lower-level DSP stuff,
 then there's an Extempore library which is designed to get you up and running
 quickly with a couple of synths & samplers.
 
-Here's a one-liner example (using Extempore's built-in [pattern
-language](../guides/pattern-language.md)) of how to
+Here's a one-liner example (using Extempore's built-in
+[pattern language](../guides/pattern-language.md)) of how to
 
 ```xtlang
 ;; need to load this first, but only once
@@ -227,7 +215,8 @@ language](../guides/pattern-language.md)) of how to
 
 Feel free to play around with (and re-evaluate) some of the parameters in that
 `ascending-scale` and try and figure out how it all fits together, and when you
-want to go further check out the [pattern language](../guides/pattern-language.md) guide.
+want to go further check out the
+[pattern language](../guides/pattern-language.md) guide.
 
 ## Beyond "Hello..." {#beyond-hello}
 
@@ -238,8 +227,7 @@ the documentation is for 😊
 
 ## Troubleshooting
 
-> When you're chewing on life's gristle<br/>
-> Don't grumble, give a whistle<br/>
+> When you're chewing on life's gristle<br/> Don't grumble, give a whistle<br/>
 > And this'll help things turn out for the best<br/>
 
 ### All platforms
@@ -251,9 +239,10 @@ always. So if you're not getting any sound, it could be because Extempore is
 sending sound output to the wrong audio device.
 
 To print the list of audio devices that Extempore can "see", open a terminal and
-type the command `./extempore --print-devices` (or `./extempore.exe
---print-devices` if you're on Windows) and hit <kbd>return</kbd>. On my machine
-right now it says this, but yours will (almost certainly) be different.
+type the command `./extempore --print-devices` (or
+`./extempore.exe --print-devices` if you're on Windows) and hit
+<kbd>return</kbd>. On my machine right now it says this, but yours will (almost
+certainly) be different.
 
 ```
 -----Available Audio Devices-----------------------------
@@ -274,13 +263,11 @@ work (again, remember to use `./extempore.exe` if you're on Windows):
 ./extempore --device-name "MacBook Pro Speakers"
 ```
 
-::: info
-The order of your audio devices can change at any time, especially when you're
-plugging and unplugging devices. So the device number (i.e. the `5` in the
-example above) won't always correspond to the _MacBook Pro Speakers_. In a gig
-situation it's always safer to use `--device-name` to be sure that you're using
-the correct audio device.
-:::
+::: info The order of your audio devices can change at any time, especially when
+you're plugging and unplugging devices. So the device number (i.e. the `5` in
+the example above) won't always correspond to the _MacBook Pro Speakers_. In a
+gig situation it's always safer to use `--device-name` to be sure that you're
+using the correct audio device. :::
 
 #### Glitchy sound? "Audio underflow" warning messages in the terminal? {#glitchy-sound}
 
@@ -304,11 +291,12 @@ in order of easiest fixes to most difficult:
 1. don't run any other software on your machine that you don't absolutely need
    for the gig
 
-2. try starting Extempore with a larger frame size (e.g. `./extempore --frames 8192`)
+2. try starting Extempore with a larger frame size (e.g.
+   `./extempore --frames 8192`)
 
-3. if you don't need MIDI I/O, just load `(sys:load
-   "examples/sharedsystem/audiosetup.xtm")` instead of `(sys:load
-   "examples/sharedsystem/setup.xtm")`
+3. if you don't need MIDI I/O, just load
+   `(sys:load "examples/sharedsystem/audiosetup.xtm")` instead of
+   `(sys:load "examples/sharedsystem/setup.xtm")`
 
 4. remove some of the `dspN` (for `N` = 1..5) functions from the signal chain in
    `examples/sharedsystem/audiosetup.xtm` (e.g. if you're only using `syn1` and
@@ -329,8 +317,7 @@ get a "pristine" version at any time from
 
 **Windows users**: if you ever see the error message _VCRUNTIME140_1.dll was not
 found_, then you'll need to download the x64 `vc_redist.x64.exe`---make sure you
-get it from the official [Windows
-website](https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads),
+get it from the official
+[Windows website](https://support.microsoft.com/en-au/help/2977003/the-latest-supported-visual-c-downloads),
 because there are lots of sketchy places on the web which will try and get you
 to download theirs, and who knows what they've done with it?
-

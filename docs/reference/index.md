@@ -10,8 +10,8 @@ and xtlang---and for the systems that sit between them.
 If you're new, start with the [quickstart](../overview/quickstart.md) and the
 [philosophy](../overview/philosophy.md) pages. Once the quickstart is working,
 the [tutorial](./tutorial.md) walks through xtlang's core ideas with runnable
-examples. Come back to the rest of this section when you want to look up how
-a particular piece works.
+examples. Come back to the rest of this section when you want to look up how a
+particular piece works.
 
 ## xtlang language
 
@@ -32,8 +32,8 @@ a particular piece works.
 
 ## Interop
 
-- [Scheme-xtlang interop](./scheme-xtlang-interop.md) --- how Scheme and
-  xtlang code call each other, and where the boundary sits.
+- [Scheme-xtlang interop](./scheme-xtlang-interop.md) --- how Scheme and xtlang
+  code call each other, and where the boundary sits.
 - [C-xtlang interop](./c-xtlang-interop.md) --- binding to C libraries from
   xtlang.
 

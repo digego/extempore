@@ -6,8 +6,9 @@ This guide covers the basics of how to play instruments at a "note-level" (e.g.
 play the G above middle C for 2 beats) in Extempore. If you're satisfied with
 just playing Extempore's built-in instruments (which can be found in
 `libs/core/instruments.xtm`) then you can just start at this guide. Finally,
-this guide complements the [pattern language](pattern-language.md) one (an alternate way of triggering notes,
-loops & patterns) and you can mix and match both approaches.
+this guide complements the [pattern language](pattern-language.md) one (an
+alternate way of triggering notes, loops & patterns) and you can mix and match
+both approaches.
 
 ## Setting up an instrument {#setting-up-an-instrument}
 
@@ -68,7 +69,7 @@ major chord. Try changing the pitch arguments to make different chords.
 
 In keeping with traditions laid down in ages past by folks much smarter than me,
 I should also provide a "Hello World" example. Because we're in Extempore,
-though, let's add a bit of a twist: we'll *listen* to the string "Hello World"
+though, let's add a bit of a twist: we'll _listen_ to the string "Hello World"
 instead of printing it to the log.
 
 Following on from the code we evaluated before to set up the `synth`
@@ -124,18 +125,18 @@ goal with the `pc_ivl.xtm` Scheme library provide a musical framework that's as
 'unopinionated' as possible. Of course this is a somewhat ridiculous statement
 given that straight out of the gate Extempore's use of MIDI note numbers for
 pitches strongly preferences a traditional diatonic tonal system. Having said
-that, as shown in [other guides](audio-signal-processing.md), you can generate tones of any
-frequency---quarter tone composers should not despair!
+that, as shown in [other guides](audio-signal-processing.md), you can generate
+tones of any frequency---quarter tone composers should not despair!
 
-So with these thoughts in mind I want to stress that this guide shows *some*
-ways of representing musical processes & data; not *the* way. For example, MIDI
+So with these thoughts in mind I want to stress that this guide shows _some_
+ways of representing musical processes & data; not _the_ way. For example, MIDI
 pitch numbers are certainly not the only way to represent or control pitch in
 Extempore---you are just as free to call the xtlang function `_play_note` (which
 takes a frequency argument in Hz) instead of the Scheme wrapper `play-note`. As
-I constantly harp on about, it's *xtlang turtles all the way down* with all the
+I constantly harp on about, it's _xtlang turtles all the way down_ with all the
 DSP code I use in this guide, so if you want to hack them to suit your needs you
 can---even in the middle of a performance. Still, the musical frameworks exist
-so that you don't *have to* do the low level DSP stuff if you don't want to, all
+so that you don't _have to_ do the low level DSP stuff if you don't want to, all
 you have to think about is writing useful musical processes & representations!
 
 I should also note that most of the music libraries are written in Scheme
@@ -188,9 +189,9 @@ newbies, time find out about
   (if (< i 9) (loop (+ i 2))))
 ```
 
-I'm sure there are a few people whispering *he could have done that
-with* `dotimes`, but this is Scheme, so the quicker we move onto
-recursion the better :)
+I'm sure there are a few people whispering _he could have done that with_
+`dotimes`, but this is Scheme, so the quicker we move onto recursion the better
+:)
 
 So, linear sequences don't seem to present a problem. How about a major scale?
 Recursion can handle this for us
@@ -275,16 +276,15 @@ this instance). So if you don't need to return a list, use `for-each` instead of
 ```
 
 Ok, now we've covered the basics. Before we move on, if you haven't read the
-[time documentation](../overview/time.md) it's
-probably a good idea to go and read it now.
+[time documentation](../overview/time.md) it's probably a good idea to go and
+read it now.
 
 ## Temporal recursion {#temporal-recursion}
 
-Once you've read the [time](../overview/time.md)
-docs, you'll be all set to start using `callback`. We've already looked at
-various ways to play a sequence of notes, and we're now going to expand on that
-theme. Let's define a function that uses `callback` to temporally recurse
-through a list of pitch values.
+Once you've read the [time](../overview/time.md) docs, you'll be all set to
+start using `callback`. We've already looked at various ways to play a sequence
+of notes, and we're now going to expand on that theme. Let's define a function
+that uses `callback` to temporally recurse through a list of pitch values.
 
 ```xtlang
 ;; plays a sequence of pitches
@@ -340,7 +340,7 @@ Let's extend `play-seq` to include a rhythm list (`rlst`) as well.
 ```
 
 Note that our pitch list and our rhythm list are different lengths. Unlike
-`for-each` (and `map`) we can iterate through these two lists *independently*,
+`for-each` (and `map`) we can iterate through these two lists _independently_,
 so they can be of different lengths. This allows us to play with various phasing
 techniques. Have a play, change the lengths/values of both lists inside the
 `play-seq` function, and remember to re-evaluate `play-seq` when you are ready
@@ -352,7 +352,7 @@ sequence, both running instances of `play-seq` will assume the same lists
 lists). As an exercise for the reader, think about how you could avoid that
 problem (i.e. keep the lists independent for each instance of `play-seq`).
 
-Ok, so we can now *manually* change the lists that `play-seq` cycles through,
+Ok, so we can now _manually_ change the lists that `play-seq` cycles through,
 but what if we would like to change the list programmatically. No problem, just
 use a function instead of a literal list---of course this is now no longer an
 ostinati!
@@ -399,9 +399,9 @@ demonstrate this simple little cheat. Also we'll shorten the durations a little
 
 ## Pitch classes {#pitch-classes}
 
-If you've read many 20th Century composition texts on [pitch
-classes](http://en.wikipedia.org/wiki/Pitch_class), you could be forgiven for
-thinking pitch class sets a rather dry subject and of limited compositional
+If you've read many 20th Century composition texts on
+[pitch classes](http://en.wikipedia.org/wiki/Pitch_class), you could be forgiven
+for thinking pitch class sets a rather dry subject and of limited compositional
 value. Oh, how wrong you would be! Pitch classes are actually not too tricky to
 understand and fantastically useful for the music programmer.
 
@@ -485,7 +485,7 @@ everything:
 Based on a C-major key pitch class set, `B` up 7 semitones (a perfect 5th) gives
 us `F#`. `F` up by 5 semitones (a perfect 4th) gives `Bb` and if we have the
 audacity to try 4 semitones (a major 3rd)---well basically nothing works. Notice
-that we do use map here instead of for-each because we *do* want to return a
+that we do use map here instead of for-each because we _do_ want to return a
 list (of boolean values). So the answer is to use `pc:relative`, which will
 choose a pitch value from the pitch class relative to our current pitch.
 
@@ -616,8 +616,8 @@ change the number of notes being generated for our chord---try changing `3` to
 
 I'm getting a little sick of C-major, so let's add chord `IV` (F major) and `V`
 (G major) to the progression and make a random chord change one in five
-callbacks. Note that `random` can just as easily choose a *list* from a list as
-an *atom* from a list.
+callbacks. Note that `random` can just as easily choose a _list_ from a list as
+an _atom_ from a list.
 
 ```xtlang
 ;; I IV V
@@ -644,7 +644,7 @@ diatonic harmony :)
 
 Now everyone knows that you don't follow `V` with `ii`, at least this is
 probably what your music teacher tried to tell you :) 18thC Harmony lessons
-aside, it *is* worth questioning the validity of making random chord changes a
+aside, it _is_ worth questioning the validity of making random chord changes a
 progression.
 
 A Russian mathematician named Andrey Markov came up with one neat solution which
@@ -672,10 +672,10 @@ but we'll stick with it for today.
 
 Now for the cool part: we can use `random` and `assoc` to trivially implement
 this markov matrix in Extempore (if you don't know what `assoc` does then
-Dybvig's [The Scheme Programming
-Language](http://www.scheme.com/tspl3/objects.html) is a good online resource).
-For this first effort we're going to assume the key of C major and I'm going to
-limit the example to the `I`, `IV` and `V` chords only.
+Dybvig's
+[The Scheme Programming Language](http://www.scheme.com/tspl3/objects.html) is a
+good online resource). For this first effort we're going to assume the key of C
+major and I'm going to limit the example to the `I`, `IV` and `V` chords only.
 
 ```xtlang
 ;; markov chord progression I IV V
@@ -770,12 +770,12 @@ changes:
 (progression (now) 'i)
 ```
 
-If you had any temporal recursion-based music (e.g. the *previous* `progression`
-callback loop) playing when you evaluated the `define-instrument` form, then
-you may have heard a pause in the audio output while the xtlang code compiled.
-This is because the compilation of `organ` was happening in the same Scheme
-process as the `progression` callback loop. The Scheme process has to wait until
-the compiler is done before it can continue with other Scheme code execution.
+If you had any temporal recursion-based music (e.g. the _previous_ `progression`
+callback loop) playing when you evaluated the `define-instrument` form, then you
+may have heard a pause in the audio output while the xtlang code compiled. This
+is because the compilation of `organ` was happening in the same Scheme process
+as the `progression` callback loop. The Scheme process has to wait until the
+compiler is done before it can continue with other Scheme code execution.
 
 The solution to this problem is to run the `progression` callback in a separate
 process. There's a blog guide in the works about how Extempore handles multiple
@@ -784,13 +784,13 @@ at the stuff at the bottom of the `examples/contrib/horde3d_knight.xtm` example
 file. The `ipc:`-prefixed functions create and manage multiple processes in
 Extempore. If you're just mucking around at home, it's probably not a big
 problem to have a small pause in the audio output when you re-compile things.
-But if it *is* a problem, take heart that there are fairly straightforward ways
+But if it _is_ a problem, take heart that there are fairly straightforward ways
 to get around the problem.
 
 Ok so, as a final exercise let's try to make a simple `organ` ditty for 5 parts,
 and we should try to have some simple part movement (i.e. not just block chords
 everywhere). Now to do this, we're going to cheat and use `pc:relative` to move
-from our chord tones on *off beats*---Schoenberg would be most displeased! We'll
+from our chord tones on _off beats_---Schoenberg would be most displeased! We'll
 also add an even longer duration option for `I` and `IV`.
 
 ```xtlang
@@ -830,8 +830,8 @@ also add an even longer duration option for `I` and `IV`.
 "Bring back the beat" I hear you say. OK, on to beat & tempo. In this section
 we're going to need a drum instrument.
 
-::: info
-To set up a drumkit you can either follow the [sampler guide](sampler.md) which shows you how can set up your own sampler
+::: info To set up a drumkit you can either follow the
+[sampler guide](sampler.md) which shows you how can set up your own sampler
 instrument (and guides you through making a drum sampler). Or you could just
 load `(sys:load "examples/sharedsystem/setup.xtm")` and it'll be done for you.
 
@@ -840,8 +840,7 @@ time standard---samples per second---to control rhythm and duration information.
 As musicians though, we are more used to working with beats and tempo. Here's a
 simple example working with samples. At the end of this page you'll find a list
 of general MIDI drum numbers which I'll be using in this tutorial:
-`*gm-cowbell*`, etc...
-:::
+`*gm-cowbell*`, etc... :::
 
 ```xtlang
 ;; assuming you've set up and loaded the drums sampler
@@ -878,8 +877,8 @@ actually two big advantages:
 
 1.  Ratios are easier to deal with than samples: `0.25` is easier to remember
     than `11025` (assuming a samplerate of `44100`)
-2.  this system supports alternate tempos, so we can change tempo
-    without having to change any rhythm values.
+2.  this system supports alternate tempos, so we can change tempo without having
+    to change any rhythm values.
 
 Let's play back the same example at 120 beats per minute (bpm)---remembering
 that by default the Extempore metronome runs at 60 bpm. We'll also add triplets
@@ -914,7 +913,7 @@ time.
 
 All values are now 0.5 so we should get a nice even rhythm with a tempo change
 over time. But if you're evaluating and listening to the results of `drum-loop`,
-it's obvious that it *doesn't* sound very even! It turns out that tempo is a lot
+it's obvious that it _doesn't_ sound very even! It turns out that tempo is a lot
 more subtle than you might expect. What we actually need is a linear function
 that can more evenly distribute our beats with respect to tempo changes.
 
@@ -945,8 +944,9 @@ let me demonstrate.
 You should notice a couple of things:
 
 1.  We start our loop by calling `(*metro* 'get-beat)`. This asks our `*metro*`
-    closure to return the next available beat number to us, i.e. `(fmod beat
-    1.0)`. `*metro*` starts ticking over beats as soon as it's initialized
+    closure to return the next available beat number to us, i.e.
+    `(fmod beat 1.0)`. `*metro*` starts ticking over beats as soon as it's
+    initialized
 2.  `time` is now in beats (not in samples) and is cumulative. Check your
     logview for an idea about what the value of `time` is each time through the
     drum-loop. Also remember that floating point is subject to rounding
@@ -1021,20 +1021,18 @@ based on a simple query: given an accumulated beat, are we on a certain metric
 pulse? A practical demo should make this a little clearer.
 
 First though, a brief explanation of `make-metre` initial arguments. The first
-argument is *a list of* numerators and the second argument is a *single*
+argument is _a list of_ numerators and the second argument is a _single_
 denominator. What this implies is that `make-metre` can work with a series of
 revolving metres. Some examples:
 
--   `(make-metre '(4) 1.0)` gives us `4` times `1.0` metric pulses
-    (recurring every `4/4` bars);
--   `(make-metre '(3) 0.5)` gives us `3` times `0.5` metric pulses
-    (recurring every `3/8` bars)
--   `(make-metre '(2 3) 0.5)` gives us `2` times `0.5` then `3` times
-    `0.5` metric pulses (a recurring series of `2/8` `3/8` `2/8` `3/8`
-    `2/8` `3/8`...).
+- `(make-metre '(4) 1.0)` gives us `4` times `1.0` metric pulses (recurring
+  every `4/4` bars);
+- `(make-metre '(3) 0.5)` gives us `3` times `0.5` metric pulses (recurring
+  every `3/8` bars)
+- `(make-metre '(2 3) 0.5)` gives us `2` times `0.5` then `3` times `0.5` metric
+  pulses (a recurring series of `2/8` `3/8` `2/8` `3/8` `2/8` `3/8`...).
 
-Let's try using a `make-metre`. We'll only play the first beat of each
-bar.
+Let's try using a `make-metre`. We'll only play the first beat of each bar.
 
 ```xtlang
 (define *metro* (make-metro 90))
@@ -1081,10 +1079,10 @@ second metre.
 The French composer Olivier Messiaen is well known for (amongst other things)
 symmetrical metric structures. Let's follow his lead and build up a relatively
 complex poly-symmetric drum pattern. Again, we're going to work with two
-competing metric structures---both of which will be symmetric `(2/8 3/8 4/8 3/8
-2/8)` and `(3/8 5/8 7/8 5/8 3/8)`. Because the second metric structure is uneven
-in length we should get some nice phasing effects, *a la* Steve Reich. I'm also
-going to add some hi-hats to give it a constant pulse.
+competing metric structures---both of which will be symmetric
+`(2/8 3/8 4/8 3/8 2/8)` and `(3/8 5/8 7/8 5/8 3/8)`. Because the second metric
+structure is uneven in length we should get some nice phasing effects, _a la_
+Steve Reich. I'm also going to add some hi-hats to give it a constant pulse.
 
 ```xtlang
 ;; messiaen drum kit
@@ -1176,5 +1174,5 @@ interesting parameters & code chunks to tweak. Get in there and try it, and
 don't be afraid to break things :)
 
 And remember, the note-level control that we've looked at in this tutorial is
-just *one* way to use Extempore. You can also do DSP, graphics, distributed
+just _one_ way to use Extempore. You can also do DSP, graphics, distributed
 computing, network IO, high-performance number-crunching, and many other things.

@@ -3,8 +3,8 @@ id: task-5
 title: sort out EXT_SHARE_DIR and other env vars
 status: To Do
 assignee: []
-created_date: '2025-12-16 10:38'
-updated_date: '2025-12-17 05:52'
+created_date: "2025-12-16 10:38"
+updated_date: "2025-12-17 05:52"
 labels: []
 dependencies: []
 ---
@@ -12,7 +12,11 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Consolidate environment variables to use consistent `EXTEMPORE_*` naming, add runtime path override via `EXTEMPORE_PATH`, and implement default CLI args via `EXTEMPORE_ARGS`.
+
+Consolidate environment variables to use consistent `EXTEMPORE_*` naming, add
+runtime path override via `EXTEMPORE_PATH`, and implement default CLI args via
+`EXTEMPORE_ARGS`.
+
 <!-- SECTION:DESCRIPTION:END -->
 
 It'd be simpler to just move to:
@@ -27,56 +31,67 @@ runtime as well I think...) and we should do a thorough audit to see if they're
 still needed or can be removed.
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
+
 - [ ] #1 EXTEMPORE_PATH env var sets share directory at runtime
-- [ ] #2 Deprecated EXT_SHARE_DIR env var still works but prints warning to stderr
+- [ ] #2 Deprecated EXT_SHARE_DIR env var still works but prints warning to
+      stderr
 - [ ] #3 --sharedir CLI arg overrides both env vars
 - [ ] #4 EXTEMPORE_ARGS env var provides default arguments
 - [ ] #5 CLI arguments override values from EXTEMPORE_ARGS
-- [ ] #6 EXTEMPORE_MIDI_{IN,OUT}_DEVICE env vars work with deprecation fallback to old names
-- [ ] #7 Dead get-llvm-path function and EXT_LLVM_DIR reference removed from runtime/llvmti.xtm
-- [ ] #8 --help output documents all EXTEMPORE_* env vars
+- [ ] #6 EXTEMPORE*MIDI*{IN,OUT}\_DEVICE env vars work with deprecation fallback
+      to old names
+- [ ] #7 Dead get-llvm-path function and EXT_LLVM_DIR reference removed from
+      runtime/llvmti.xtm
+- [ ] #8 --help output documents all EXTEMPORE\_\* env vars
 - [ ] #9 All existing tests pass
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
+
 ## Background
 
 ### Current state of SHARE_DIR
 
-The share directory (containing `runtime/`, `libs/`, `examples/`, etc.) is currently handled as follows:
+The share directory (containing `runtime/`, `libs/`, `examples/`, etc.) is
+currently handled as follows:
 
-1. **Compile-time default**: CMake defines `EXT_SHARE_DIR` macro (usually `CMAKE_SOURCE_DIR` for dev builds)
-2. **Runtime initialisation**: `src/UNIV.cpp:562` initialises `SHARE_DIR` from this macro
-3. **CLI override**: `--sharedir` flag can override at runtime (`src/Extempore.cpp:208`)
+1. **Compile-time default**: CMake defines `EXT_SHARE_DIR` macro (usually
+   `CMAKE_SOURCE_DIR` for dev builds)
+2. **Runtime initialisation**: `src/UNIV.cpp:562` initialises `SHARE_DIR` from
+   this macro
+3. **CLI override**: `--sharedir` flag can override at runtime
+   (`src/Extempore.cpp:208`)
 
-The compile-time default works for development but is fragile for distributed binaries --- if the binary is moved, it won't find its resources unless `--sharedir` is explicitly passed.
+The compile-time default works for development but is fragile for distributed
+binaries --- if the binary is moved, it won't find its resources unless
+`--sharedir` is explicitly passed.
 
 ### Audit results
 
-**Runtime environment variables (currently used):**
-| Variable | Location | Status |
-|----------|----------|--------|
-| `EXT_LLVM_DIR` | `runtime/llvmti.xtm` | Dead code --- `get-llvm-path` is defined but never called. Delete. |
-| `EXT_MIDI_IN_DEVICE_NAME` | `examples/sharedsystem/midisetup.xtm` | Rename to `EXTEMPORE_MIDI_IN_DEVICE` |
-| `EXT_MIDI_OUT_DEVICE_NAME` | `examples/sharedsystem/midisetup.xtm` | Rename to `EXTEMPORE_MIDI_OUT_DEVICE` |
+**Runtime environment variables (currently used):** | Variable | Location |
+Status | |----------|----------|--------| | `EXT_LLVM_DIR` |
+`runtime/llvmti.xtm` | Dead code --- `get-llvm-path` is defined but never
+called. Delete. | | `EXT_MIDI_IN_DEVICE_NAME` |
+`examples/sharedsystem/midisetup.xtm` | Rename to `EXTEMPORE_MIDI_IN_DEVICE` | |
+`EXT_MIDI_OUT_DEVICE_NAME` | `examples/sharedsystem/midisetup.xtm` | Rename to
+`EXTEMPORE_MIDI_OUT_DEVICE` |
 
-**Build-time CMake variables (no changes needed):**
-| Variable | Purpose |
-|----------|---------|
-| `EXT_SHARE_DIR` | CMake define for compile-time default path |
-| `EXT_DYLIB` | CMake option to build as dynamic library |
-| `EXTEMPORE_FORCE_GL_GETPROCADDRESS` | Build-time env var (already uses new naming) |
+**Build-time CMake variables (no changes needed):** | Variable | Purpose |
+|----------|---------| | `EXT_SHARE_DIR` | CMake define for compile-time default
+path | | `EXT_DYLIB` | CMake option to build as dynamic library | |
+`EXTEMPORE_FORCE_GL_GETPROCADDRESS` | Build-time env var (already uses new
+naming) |
 
-**Internal C++ identifiers (not environment variables, no changes needed):**
-| Identifier | Purpose |
-|------------|---------|
-| `EXT_TERM` | Terminal colour mode (0=ansi, 1=cmd, 2=basic, 3=nocolor) |
-| `EXT_LOADBASE` | Whether to load base library at startup |
-| `EXT_INITEXPR_BUFLEN` | Buffer size constant |
-| `EXT_Thread/Mutex/Condition/Monitor` | Header guard macros for threading classes |
+**Internal C++ identifiers (not environment variables, no changes needed):** |
+Identifier | Purpose | |------------|---------| | `EXT_TERM` | Terminal colour
+mode (0=ansi, 1=cmd, 2=basic, 3=nocolor) | | `EXT_LOADBASE` | Whether to load
+base library at startup | | `EXT_INITEXPR_BUFLEN` | Buffer size constant | |
+`EXT_Thread/Mutex/Condition/Monitor` | Header guard macros for threading classes
+|
 
 ---
 
@@ -84,9 +99,11 @@ The compile-time default works for development but is fragile for distributed bi
 
 ### Phase 1: add EXTEMPORE_PATH runtime env var
 
-**Goal:** Allow setting the share directory via environment variable, with backwards compatibility.
+**Goal:** Allow setting the share directory via environment variable, with
+backwards compatibility.
 
 **Files to modify:**
+
 - `src/Extempore.cpp`
 
 **Changes:**
@@ -113,6 +130,7 @@ if (env_path && strlen(env_path) > 0) {
 ```
 
 **Priority order (highest wins):**
+
 1. `--sharedir` CLI argument
 2. `EXTEMPORE_PATH` env var
 3. `EXT_SHARE_DIR` env var (deprecated, prints warning)
@@ -123,6 +141,7 @@ if (env_path && strlen(env_path) > 0) {
 **Goal:** Allow setting default CLI arguments via environment variable.
 
 **Files to modify:**
+
 - `src/Extempore.cpp`
 
 **Changes:**
@@ -164,7 +183,7 @@ std::vector<std::string> tokenize_args(const char* str) {
     std::vector<std::string> tokens;
     std::string current;
     bool in_quotes = false;
-    
+
     for (const char* p = str; *p; ++p) {
         if (*p == '"') {
             in_quotes = !in_quotes;
@@ -185,6 +204,7 @@ std::vector<std::string> tokenize_args(const char* str) {
 ```
 
 **Example usage:**
+
 ```bash
 export EXTEMPORE_ARGS="--noaudio --port 7100"
 ./extempore  # runs with --noaudio --port 7100
@@ -197,6 +217,7 @@ export EXTEMPORE_ARGS="--noaudio --port 7100"
 **Goal:** Consistent `EXTEMPORE_*` naming with deprecation support.
 
 **Files to modify:**
+
 - `examples/sharedsystem/midisetup.xtm`
 
 **Changes:**
@@ -226,15 +247,19 @@ Replace direct `sys:get-env` calls with a helper that checks both names:
 **Goal:** Clean up unused `get-llvm-path` function.
 
 **Files to modify:**
+
 - `runtime/llvmti.xtm`
 
 **Changes:**
 
-Delete the `get-llvm-path` function (lines ~2857-2869). It references `EXT_LLVM_DIR` but is never called anywhere in the codebase. LLVM is linked at build time; there's no runtime need to locate LLVM files.
+Delete the `get-llvm-path` function (lines ~2857-2869). It references
+`EXT_LLVM_DIR` but is never called anywhere in the codebase. LLVM is linked at
+build time; there's no runtime need to locate LLVM files.
 
 ### Phase 5: update documentation
 
 **Files to modify:**
+
 - `src/Extempore.cpp` (the `--help` output)
 
 **Changes to `--help`:**
@@ -254,16 +279,17 @@ std::cout << "  EXTEMPORE_MIDI_OUT_DEVICE: default MIDI output device name" << s
 
 ## Final environment variables
 
-| Variable | Purpose | Fallback chain |
-|----------|---------|----------------|
-| `EXTEMPORE_PATH` | Share directory path | → `EXT_SHARE_DIR` env (deprecated) → compile-time default |
-| `EXTEMPORE_ARGS` | Default CLI arguments | (none) |
-| `EXTEMPORE_MIDI_IN_DEVICE` | MIDI input device name | → `EXT_MIDI_IN_DEVICE_NAME` (deprecated) → (none) |
-| `EXTEMPORE_MIDI_OUT_DEVICE` | MIDI output device name | → `EXT_MIDI_OUT_DEVICE_NAME` (deprecated) → (none) |
+| Variable                    | Purpose                 | Fallback chain                                            |
+| --------------------------- | ----------------------- | --------------------------------------------------------- |
+| `EXTEMPORE_PATH`            | Share directory path    | → `EXT_SHARE_DIR` env (deprecated) → compile-time default |
+| `EXTEMPORE_ARGS`            | Default CLI arguments   | (none)                                                    |
+| `EXTEMPORE_MIDI_IN_DEVICE`  | MIDI input device name  | → `EXT_MIDI_IN_DEVICE_NAME` (deprecated) → (none)         |
+| `EXTEMPORE_MIDI_OUT_DEVICE` | MIDI output device name | → `EXT_MIDI_OUT_DEVICE_NAME` (deprecated) → (none)        |
 
 ## Removed
 
-| Variable | Reason |
-|----------|--------|
+| Variable       | Reason                                                                |
+| -------------- | --------------------------------------------------------------------- |
 | `EXT_LLVM_DIR` | Dead code --- `get-llvm-path` never called; LLVM linked at build time |
+
 <!-- SECTION:PLAN:END -->

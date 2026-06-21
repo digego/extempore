@@ -3,8 +3,8 @@ id: task-018
 title: Modernize LLVM IR and ORC JIT integration for opaque pointers
 status: Done
 assignee: []
-created_date: '2025-12-19 09:53'
-updated_date: '2025-12-19 22:57'
+created_date: "2025-12-19 09:53"
+updated_date: "2025-12-19 22:57"
 labels:
   - llvm
   - jit
@@ -17,6 +17,7 @@ priority: high
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+
 LLVM 21 uses opaque pointers as the only supported pointer model. Extempore
 still emits typed pointer IR (i8*, %mzone*, etc) and composes JIT modules using
 regex-driven string munging. This is fragile and not cross-platform safe.
@@ -25,10 +26,13 @@ Goal: keep the xtlang IR generator largely intact, but modernize the C++ LLVM
 integration and migrate IR emission to opaque pointers with minimal, mechanical
 changes. The result should build and run on macOS/Linux/Windows and on both
 x86_64 and arm64 with stock LLVM 21.
+
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
+
 - [ ] #1 JIT module composition no longer relies on regex/string preambles; it
       uses LLVM APIs (Linker or direct IR construction) to add runtime types,
       externs, and declarations.
@@ -47,6 +51,7 @@ x86_64 and arm64 with stock LLVM 21.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+
 ## Phase 0 - Baseline and capability detection
 
 1. Confirm LLVM source is unpatched:
@@ -132,7 +137,9 @@ x86_64 and arm64 with stock LLVM 21.
 
 ### Key Finding: Typed Pointer IR Still Works in LLVM 21
 
-Contrary to the documentation stating "LLVM 17+ only supports opaque pointers", **LLVM 21's textual IR parser still accepts and auto-upgrades typed pointer syntax**. This was verified empirically:
+Contrary to the documentation stating "LLVM 17+ only supports opaque pointers",
+**LLVM 21's textual IR parser still accepts and auto-upgrades typed pointer
+syntax**. This was verified empirically:
 
 ```scheme
 ;; Both syntaxes accepted by LLVM 21:
@@ -154,35 +161,52 @@ Contrary to the documentation stating "LLVM 17+ only supports opaque pointers", 
 
 Migrating to opaque pointers would require changes to:
 
-| File | Typed pointer occurrences |
-|------|---------------------------|
-| runtime/llvmir.xtm | 182 |
-| runtime/llvmti.xtm | 205 |
-| runtime/bitcode.ll | 118 |
-| src/SchemeFFI.cpp | Multiple regex patterns |
+| File               | Typed pointer occurrences |
+| ------------------ | ------------------------- |
+| runtime/llvmir.xtm | 182                       |
+| runtime/llvmti.xtm | 205                       |
+| runtime/bitcode.ll | 118                       |
+| src/SchemeFFI.cpp  | Multiple regex patterns   |
 
-The central function `impc:ir:get-type-str` appends `*` characters based on pointer depth. For opaque pointers, all `T*` would become `ptr`, but element types must still be preserved for `load`, `store`, `getelementptr`, and `bitcast` instructions.
+The central function `impc:ir:get-type-str` appends `*` characters based on
+pointer depth. For opaque pointers, all `T*` would become `ptr`, but element
+types must still be preserved for `load`, `store`, `getelementptr`, and
+`bitcast` instructions.
 
 ### Decision: Close Without Migration
 
 **Rationale:**
 
-1. **No functional issue exists** - LLVM 21 auto-upgrades typed pointer textual IR. The system works correctly on all platforms.
+1. **No functional issue exists** - LLVM 21 auto-upgrades typed pointer textual
+   IR. The system works correctly on all platforms.
 
-2. **Risk exceeds benefit** - Changing ~500 IR emission sites risks introducing subtle bugs for no functional gain. The typed syntax is actually more readable and debuggable.
+2. **Risk exceeds benefit** - Changing ~500 IR emission sites risks introducing
+   subtle bugs for no functional gain. The typed syntax is actually more
+   readable and debuggable.
 
-3. **Typed syntax already includes element types** - Instructions like `load i64, i64* %ptr` already specify the element type, which is what LLVM needs internally. The "upgrade" is purely syntactic (changing `i64*` to `ptr` in the pointer position).
+3. **Typed syntax already includes element types** - Instructions like
+   `load i64, i64* %ptr` already specify the element type, which is what LLVM
+   needs internally. The "upgrade" is purely syntactic (changing `i64*` to `ptr`
+   in the pointer position).
 
-4. **LLVM maintains backward compatibility for textual IR** - While the C++ API removed typed pointer support, the textual IR parser continues to accept the old syntax for compatibility with existing tooling and IR files.
+4. **LLVM maintains backward compatibility for textual IR** - While the C++ API
+   removed typed pointer support, the textual IR parser continues to accept the
+   old syntax for compatibility with existing tooling and IR files.
 
-5. **Future-proofing is speculative** - If LLVM eventually removes textual IR auto-upgrade (unlikely given the ecosystem), migration can be done then with better tooling.
+5. **Future-proofing is speculative** - If LLVM eventually removes textual IR
+   auto-upgrade (unlikely given the ecosystem), migration can be done then with
+   better tooling.
 
 ### Separated Concern: C++ String Munging
 
-The task's Phase 1 (replacing regex-driven string composition with LLVM APIs) remains valuable independently of opaque pointers. This has been split into a new task focused on:
+The task's Phase 1 (replacing regex-driven string composition with LLVM APIs)
+remains valuable independently of opaque pointers. This has been split into a
+new task focused on:
+
 - Using LLVM's Linker API instead of string concatenation
 - Structured declaration storage instead of regex extraction
 - Cleaner, more maintainable JIT compilation flow
 
 See: task-021 for the focused C++ refactoring effort.
+
 <!-- SECTION:NOTES:END -->

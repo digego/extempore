@@ -4,7 +4,9 @@ layout: home
 hero:
   name: Extempore
   text: Multimedia livecoding environment
-  tagline: Write code that makes sound, music, and visually interesting things --- and change it while it runs.
+  tagline:
+    Write code that makes sound, music, and visually interesting things --- and
+    change it while it runs.
   actions:
     - theme: brand
       text: Get started
@@ -15,13 +17,19 @@ hero:
 
 features:
   - title: Overview
-    details: Key concepts in Extempore/xtlang programming, and a good place to find out why things are the way they are.
+    details:
+      Key concepts in Extempore/xtlang programming, and a good place to find out
+      why things are the way they are.
     link: /overview/quickstart
   - title: Reference
-    details: The main xtlang language reference covering types, memory management, concurrency, and interop.
+    details:
+      The main xtlang language reference covering types, memory management,
+      concurrency, and interop.
     link: /reference/types
   - title: Guides
-    details: Longer-form tutorials for musicians, programmers, and newcomers to livecoding.
+    details:
+      Longer-form tutorials for musicians, programmers, and newcomers to
+      livecoding.
     link: /guides/editor-support
 ---
 

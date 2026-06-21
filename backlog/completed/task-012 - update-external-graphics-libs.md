@@ -3,8 +3,8 @@ id: task-012
 title: update external graphics libs
 status: Done
 assignee: []
-created_date: '2025-12-18 00:35'
-updated_date: '2025-12-18 03:01'
+created_date: "2025-12-18 00:35"
+updated_date: "2025-12-18 03:01"
 labels: []
 dependencies: []
 ---
@@ -26,6 +26,7 @@ graphics libs and see how we go.
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+
 ## Progress
 
 ### Completed updates
@@ -35,13 +36,20 @@ graphics libs and see how we go.
 
 ### Blocked updates
 
-- **stb**: The extemporelang/stb fork includes `stb_image_resize.h`, but upstream stb has replaced it with `stb_image_resize2.h` which has a completely different API. The xtlang bindings in `libs/external/stb_image.xtm` use the old resize functions (`stbir_resize_uint8`, `stbir_resize_float`, etc.). Updating would require:
+- **stb**: The extemporelang/stb fork includes `stb_image_resize.h`, but
+  upstream stb has replaced it with `stb_image_resize2.h` which has a completely
+  different API. The xtlang bindings in `libs/external/stb_image.xtm` use the
+  old resize functions (`stbir_resize_uint8`, `stbir_resize_float`, etc.).
+  Updating would require:
   1. Updating the C wrapper in the fork (`stb_image.c`)
   2. Updating the xtlang bindings to use the new API signatures
-  
-  The new API returns pointers instead of int, and has different function names/signatures.
 
-- **nanovg**: The upstream (memononen/nanovg) is explicitly "not actively maintained". The extemporelang fork has custom CMake build integration. No benefit to updating.
+  The new API returns pointers instead of int, and has different function
+  names/signatures.
+
+- **nanovg**: The upstream (memononen/nanovg) is explicitly "not actively
+  maintained". The extemporelang fork has custom CMake build integration. No
+  benefit to updating.
 
 ### Still to do
 
@@ -52,7 +60,9 @@ graphics libs and see how we go.
 
 - GLFW 3.4 library loads successfully, all function bindings work
 - Assimp 5.4.3 compiles successfully
-- Found pre-existing bug: `register_for_window_events` is called in `libs/external/glfw3.xtm` but never defined anywhere. This prevents graphics examples from running but is unrelated to the version updates.
+- Found pre-existing bug: `register_for_window_events` is called in
+  `libs/external/glfw3.xtm` but never defined anywhere. This prevents graphics
+  examples from running but is unrelated to the version updates.
 
 ## Final commits
 
@@ -60,5 +70,9 @@ graphics libs and see how we go.
 - `8cb6feef` - update Assimp to 5.4.3
 - `a9b75296` - remove obsolete register_for_window_events calls from glfw3.xtm
 
-The `register_for_window_events` issue was not a breaking change from GLFW - it was a pre-existing bug where the function was called but defined in C++ code that wasn't being linked properly. The fix was to simply remove the calls since GLFW handles application activation internally.
+The `register_for_window_events` issue was not a breaking change from GLFW - it
+was a pre-existing bug where the function was called but defined in C++ code
+that wasn't being linked properly. The fix was to simply remove the calls since
+GLFW handles application activation internally.
+
 <!-- SECTION:NOTES:END -->
