@@ -303,6 +303,33 @@
                   (else      ;; still free (or must unify with the value vector)
                    (loop (cdr ts) (cdr bs) (xtc:type:unify (car ts) base s)))))))))
 
+;; The class alist with each key resolved to its canonical representative under
+;; `subst': (rep . class) ...  This is a pure function of (classes, intern,
+;; subst), and overload-viable needs it on every call --- but across a
+;; commit-pass sweep, and across the most-constrained selection in the search,
+;; every overload is tested against the SAME subst object, so resolving all the
+;; function's default-constraint keys was redone once per overload (1.7M resolves
+;; over instruments.xtm) when the result changes only when subst does.  A
+;; single-entry cache keyed on the identities of all three inputs collapses that
+;; to one rebuild per distinct substitution.  Safety: classes and intern are one
+;; object each per solve, so a stale empty-subst '() carried over from a previous
+;; solve cannot match (its classes/intern differ); within a solve the rep list is
+;; read-only, so sharing it across overloads is sound.
+(define *xtc:solve:class-reps-cache* #f)
+
+(define xtc:solve:class-reps
+  (lambda (classes intern subst)
+    (let ((c *xtc:solve:class-reps-cache*))
+      (if (and c (eq? (car c) subst) (eq? (cadr c) classes) (eq? (caddr c) intern))
+          (cadddr c)
+          (let ((reps (map (lambda (cl)
+                             (cons (xtc:type:resolve
+                                    (xtc:type:from-intcode (car cl) intern) subst)
+                                   (cdr cl)))
+                           classes)))
+            (set! *xtc:solve:class-reps-cache* (list subst classes intern reps))
+            reps)))))
+
 ;; The candidates of overload `c' that unify with its result and argument keys
 ;; under `subst', each paired with the substitution that unifying it produces:
 ;; ((candidate . subst2) ...).  A candidate is the int-code signature (ret p...);
@@ -322,11 +349,7 @@
            ;; that made a big DSP constructor's solve run for seconds)
            (rterm (xtc:type:from-intcode rkey intern))
            (aterms (map (lambda (k) (xtc:type:from-intcode k intern)) akeys))
-           (class-reps (map (lambda (cl)
-                              (cons (xtc:type:resolve
-                                     (xtc:type:from-intcode (car cl) intern) subst)
-                                    (cdr cl)))
-                            classes))
+           (class-reps (xtc:solve:class-reps classes intern subst))
            ;; a key's admissibility datum: #f for a ground argument (no
            ;; restriction), else (cons 'classed class-or-#f) for a still-free
            ;; variable
