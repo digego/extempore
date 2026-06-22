@@ -71,7 +71,7 @@ class AudioDevice {
     bool m_started;
     PaStream* stream;
     float* buffer;
-    closure_getter_fn_type m_dsp_closure;
+    std::atomic<closure_getter_fn_type> m_dsp_closure;
     closure_getter_fn_type m_dsp_mt_closure[128];
     dsp_f_ptr dsp_wrapper;
     dsp_f_ptr_sum dsp_wrapper_sum;
@@ -79,6 +79,12 @@ class AudioDevice {
     SAMPLE* inbuf;
     std::array<std::unique_ptr<EXTThread>, MAX_RT_AUDIO_THREADS> m_threads;
     std::atomic<unsigned> m_numThreads;
+    // Published true by initMTAudio() only after the MT buffers, thread count
+    // and worker threads are fully set up; read (acquire) by processFrames() to
+    // gate the MT branch. Closes a race where the free-running offline driver
+    // could enter the MT path mid-dsp:set! — after the sum wrapper was set but
+    // before outbuf/m_numThreads/threads existed — and dereference a null outbuf.
+    std::atomic<bool> m_mtReady{false};
     bool m_zeroLatency;
     bool m_toggle;
 
@@ -117,10 +123,13 @@ class AudioDevice {
     }
 
     void setDSPClosure(void* Function) {
-        m_dsp_closure = reinterpret_cast<closure_getter_fn_type>(Function);
+        // Release: this is the gate processFrames() checks first, so storing it
+        // last (with release) publishes the wrapper pointers written before it.
+        m_dsp_closure.store(reinterpret_cast<closure_getter_fn_type>(Function),
+                            std::memory_order_release);
     }
     closure_getter_fn_type getDSPClosure() {
-        return m_dsp_closure;
+        return m_dsp_closure.load(std::memory_order_acquire);
     }
     void setDSPMTClosure(void* Function, int Index) {
         m_dsp_mt_closure[Index] = reinterpret_cast<closure_getter_fn_type>(Function);
@@ -147,6 +156,12 @@ class AudioDevice {
 
     int getNumThreads() const {
         return int(m_numThreads.load(std::memory_order_acquire));
+    }
+    bool getMTReady() const {
+        return m_mtReady.load(std::memory_order_acquire);
+    }
+    void setMTReady(bool Val) {
+        m_mtReady.store(Val, std::memory_order_release);
     }
     dsp_f_ptr getDSPWrapper() {
         return dsp_wrapper;

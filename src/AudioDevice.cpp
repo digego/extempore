@@ -299,7 +299,8 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         }
         return;
     }
-    if (AudioDevice::I()->getDSPSUMWrapper()) {  // multi-threaded sample-by-sample
+    if (AudioDevice::I()->getDSPSUMWrapper() &&
+        AudioDevice::I()->getMTReady()) {  // multi-threaded sample-by-sample
         const unsigned numthreads = unsigned(AudioDevice::I()->getNumThreads());
         const bool zerolatency = AudioDevice::I()->getZeroLatency();
         SAMPLE in[32];
@@ -778,6 +779,10 @@ void AudioDevice::initMTAudio(int Num, bool ZeroLatency) {
         exit(1);
     }
     const unsigned n = unsigned(Num);
+    // Take the MT path offline while we (re)build its state, so a concurrent
+    // free-running processFrames() can't dispatch against half-initialised
+    // buffers/threads. Republished true once everything below is in place.
+    setMTReady(false);
     m_numThreads.store(n, std::memory_order_release);
     m_zeroLatency = ZeroLatency;
     m_toggle = true;
@@ -791,6 +796,9 @@ void AudioDevice::initMTAudio(int Num, bool ZeroLatency) {
                                         std::string("MT_AUD_") + char('A' + i));
         m_threads[i]->start();
     }
+    // Release: buffers, thread count and workers are all up — publish them as a
+    // unit to processFrames(), which gates the MT branch on getMTReady().
+    setMTReady(true);
 }
 
 double AudioDevice::getCPULoad() {
