@@ -156,10 +156,19 @@
 (define xtc:codegen:get-ptr-depth
   (lambda (t)
     (if (string? t)
-        (let ((m (regex:matched t "([*]*)($|#)")))
-          (if (null? m)
-              0
-              (string-length (cadr m))))
+        ;; the pointer depth is the run of trailing `*' before the first `#'
+        ;; (the ##-suffix boundary) or end of string --- a direct character scan,
+        ;; equivalent to the old regex "([*]*)($|#)" but far cheaper on the
+        ;; hundreds of thousands of calls a compile makes
+        (let* ((len (string-length t))
+               (end (let loop ((i 0))
+                      (cond ((>= i len) len)
+                            ((char=? (string-ref t i) #\#) i)
+                            (else (loop (+ i 1)))))))
+          (let loop ((i (- end 1)) (n 0))
+            (if (and (>= i 0) (char=? (string-ref t i) #\*))
+                (loop (- i 1) (+ n 1))
+                n)))
         (let ((slc (xtc:codegen:str-list-check t)))
           (if (string? slc)
               (xtc:codegen:get-ptr-depth slc)
@@ -830,6 +839,14 @@
                             (xtc:diagnostics:print-bad-type-error string-type)))))))))
 
 
+;; A scalar int-code (double, float, iN, including pointer depth) renders to an
+;; LLVM type string that depends only on the code --- not on `args', which carry
+;; a name only for the %named-type branch.  Compiling instruments.xtm calls
+;; get-type-str ~770k times on just 26 distinct scalar codes, so caching the
+;; scalar result by its int-code spares the repeated string-build.  The codegen
+;; type constants are fixed for the process, so the cache never goes stale.
+(define *xtc:codegen:type-str-cache* (make-hashtable 64))
+
 (define xtc:codegen:get-type-str
   (lambda (type . args)
     ;; (println 'ir:get-type-str 'type: type 'args: args)
@@ -857,19 +874,32 @@
                (let ((base (* -1 (modulo type (* -1 *xtc:codegen:pointer*))))
                      (ptr-depth (real->integer (floor (/ type (* -1 *xtc:codegen:pointer*))))))
                  (string-append "\\" (number->string base) (make-string ptr-depth #\*))))
-              (else (let ((base (modulo type *xtc:codegen:pointer*))
-                          (ptr-depth (real->integer (floor (/ type *xtc:codegen:pointer*)))))
-                      (string-append (cond ((= base *xtc:codegen:fp64*) "double")
-                                           ((= base *xtc:codegen:fp32*) "float")
-                                           ((member base (list *xtc:codegen:si64* *xtc:codegen:ui64*)) "i64")
-                                           ((member base (list *xtc:codegen:si32* *xtc:codegen:ui32*)) "i32")
-                                           ((member base (list *xtc:codegen:si16* *xtc:codegen:ui16*)) "i16")
-                                           ((member base (list *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:char*)) "i8")
-                                           ((= base *xtc:codegen:i1*) "i1")
-                                           ((string? (car args))
-                                            (string-append "%" (car args)))
-                                           (else (xtc:diagnostics:print-bad-type-error (if (null? args) type (car args)))))
-                                     (make-string ptr-depth #\*))))))))
+              (else
+               (let ((cached (hashtable-ref *xtc:codegen:type-str-cache* type)))
+                 (if cached
+                     cached
+                     (let* ((base (modulo type *xtc:codegen:pointer*))
+                            (ptr-depth (real->integer (floor (/ type *xtc:codegen:pointer*))))
+                            (scalar (cond ((= base *xtc:codegen:fp64*) "double")
+                                          ((= base *xtc:codegen:fp32*) "float")
+                                          ((member base (list *xtc:codegen:si64* *xtc:codegen:ui64*)) "i64")
+                                          ((member base (list *xtc:codegen:si32* *xtc:codegen:ui32*)) "i32")
+                                          ((member base (list *xtc:codegen:si16* *xtc:codegen:ui16*)) "i16")
+                                          ((member base (list *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:char*)) "i8")
+                                          ((= base *xtc:codegen:i1*) "i1")
+                                          (else #f))))
+                       (if scalar
+                           ;; pure function of the int-code: cache by `type'
+                           (let ((s (string-append scalar (make-string ptr-depth #\*))))
+                             (hashtable-set! *xtc:codegen:type-str-cache* type s)
+                             s)
+                           ;; a %named type --- the rendering needs the name from
+                           ;; `args', so it is not a function of `type' alone and
+                           ;; must not be cached
+                           (string-append (if (string? (car args))
+                                              (string-append "%" (car args))
+                                              (xtc:diagnostics:print-bad-type-error (if (null? args) type (car args))))
+                                          (make-string ptr-depth #\*)))))))))))
 
 
 (define xtc:codegen:convert-types
