@@ -4,34 +4,39 @@
 [![Sanitizers](https://github.com/digego/extempore/actions/workflows/sanitizers.yml/badge.svg?branch=master)](https://github.com/digego/extempore/actions/workflows/sanitizers.yml)
 [![Release](https://github.com/digego/extempore/actions/workflows/release-binary.yml/badge.svg)](https://github.com/digego/extempore/actions/workflows/release-binary.yml)
 
-Extempore is a live-coding environment for music, audio and graphics. It pairs a
-Scheme interpreter with _xtlang_---a statically-typed lisp that compiles to LLVM
-IR at runtime---so you can reshape a running program while it keeps making
-sound. Runs on Linux (x86_64 and aarch64), macOS (Apple Silicon) and Windows
-(x86_64).
+Extempore is a live-coding environment for music and audio. It pairs a Scheme
+interpreter with _xtlang_---a statically-typed lisp that compiles to LLVM IR at
+runtime---so you can reshape a running program while it keeps making sound. Runs
+on Linux (x86_64 and aarch64), macOS (Apple Silicon) and Windows (x86_64).
 
-## What's new in v0.9.0
+## What's new in v0.10.0
 
-v0.9.0 is a large release. The highlights:
+v0.10.0 is a consolidation release---nothing changes about what Extempore does,
+but a lot got faster, safer and tidier under the hood:
 
-- **LLVM 22** --- bumped from LLVM 17, fetched and built in-tree via CMake's
-  `FetchContent` (no separate LLVM install required).
-- **ORC JIT** --- replaces the legacy MCJIT, including DSP hot-swap and module
-  tracking.
-- **s7 Scheme** --- replaces TinyScheme as the Scheme interpreter.
-- **WebGPU graphics** --- the OpenGL stack has been replaced with WebGPU via
-  `wgpu-native`. Enable with `-DEXTERNAL_SHLIBS_GRAPHICS=ON`.
-- **Linux aarch64** --- first-class support, alongside macOS arm64, Linux x64
-  and Windows x64. All four platforms are tested in CI.
-- **Interactive REPL** --- pass `--repl` for a linenoise-based REPL (Linux and
-  macOS only).
+- **Unified type inference** --- the xtlang compiler now drives every
+  compilation through a single constraint-based inference engine. Overload
+  resolution is near-linear (no more compile-time blow-ups on heavily-overloaded
+  call sites) and conflicting constraints report a clearer diagnostic.
+- **C++20 runtime** --- a broad modernisation that retires hand-rolled stand-ins
+  in favour of the standard library and fixes a clutch of latent cross-platform
+  bugs. Building now needs a C++20 compiler (GCC 13+, a recent Clang, or MSVC
+  from Visual Studio 2022).
+- **Hardened OSC** --- the memory-unsafe hand-rolled OSC receive parser is
+  replaced with the bounds-checked `oscpp` reader, so a malformed or hostile
+  packet is dropped rather than crashing the process.
+- **`--version`** --- the git tag is now the single source of truth for the
+  version, and a running Extempore can report its own.
+- **LLVM 22.1.6** --- verified green on all four CI platforms.
 
-v0.9.0 reworks a lot under the hood, so expect some rough edges. The old
-OpenGL-based graphics stack will not work, and isn't likely to anytime soon ---
-although a couple of new minimal WebGPU examples may suggest a way forward. If
-you hit core audio breakage, please
+Extempore's current stack came together in v0.9.0: LLVM 22 with the ORC JIT (in
+place of the legacy MCJIT), s7 Scheme (in place of TinyScheme), first-class
+Linux aarch64, and an interactive `--repl` (Linux and macOS only). Graphics is
+now a lean set of WebGPU bindings (via `wgpu-native`, enabled with
+`-DEXTERNAL_SHLIBS_GRAPHICS=ON`); the old OpenGL stack has been retired. If you
+hit any breakage, please
 [file an issue](https://github.com/digego/extempore/issues) with a minimal
-reproducible example where possible.
+reproducible example where you can.
 
 ## Getting started
 
@@ -47,8 +52,8 @@ Then,
 and away you go.
 
 _Note_: the VSCode extension used to offer an _Extempore: Download binary_
-command for one-click setup. It hasn't been updated for v0.9.0 and may not work
---- downloading the release manually is the safest option for now.
+command for one-click setup. It hasn't been updated for the current releases and
+may not work --- downloading the release manually is the safest option for now.
 
 _Note on macOS first launch_: the binaries aren't signed with an Apple Developer
 ID, so on first launch macOS will refuse to run them ("apple could not verify
