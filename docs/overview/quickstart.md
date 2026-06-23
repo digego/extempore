@@ -47,8 +47,8 @@ _Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
 VSCode start Extempore for you (we'll do that in the next step).
 
 ::: warning The VSCode extension used to offer an _Extempore: Download binary_
-command for one-click setup. It hasn't been updated for v0.9.0, so download the
-release archive manually for now. :::
+command for one-click setup. It hasn't been updated for the current releases, so
+download the release archive manually for now. :::
 
 ## Using Extempore {#using-extempore}
 
@@ -63,12 +63,12 @@ running. If you see something like this, everything's working---nice one.
 
 ```
 ------------- Extempore --------------
-0.9.0
+0.10.0
 (c) Andrew Sorensen, Ben Swift
 ben@benswift.me
 
-ARCH           : x86_64-apple-darwin18.7.0
-CPU            : broadwell
+ARCH           : arm64-apple-darwin23.6.0
+CPU            : apple-m1
 SampleRate     : 44100
 Channels Out   : 2
 Frames         : 1024

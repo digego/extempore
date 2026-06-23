@@ -880,9 +880,9 @@ actually two big advantages:
 2.  this system supports alternate tempos, so we can change tempo without having
     to change any rhythm values.
 
-Let's play back the same example at 120 beats per minute (bpm)---remembering
-that by default the Extempore metronome runs at 60 bpm. We'll also add triplets
-to our quavers and semi-quavers.
+Let's play back the same example at 120 beats per minute (bpm)---which is also
+the default tempo of Extempore's global metronome. We'll also add triplets to
+our quavers and semi-quavers.
 
 ```xtlang
 ;; beat loop at 120bpm
