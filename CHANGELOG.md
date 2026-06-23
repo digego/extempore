@@ -3,13 +3,107 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## v0.10.0 (unreleased)
+## v0.10.0
 
-A broad modernisation of the C++ runtime. None of it changes what Extempore does
---- every test suite stays green on Linux (x64 and arm64), macOS (arm64) and
-Windows --- but the codebase now needs a C++20 compiler (GCC 13+, a recent
-Clang, or MSVC from Visual Studio 2022), and a good deal of dead code, platform
-`#ifdef`s and latent bugs went out with the tide.
+Two large strands of work land together: the xtlang compiler now drives every
+compilation through a single constraint-based type-inference engine, and the C++
+runtime gets a broad modernisation. None of it changes what Extempore does ---
+every test suite stays green on Linux (x64 and arm64), macOS (arm64) and Windows
+--- but the runtime now needs a C++20 compiler (GCC 13+, a recent Clang, or MSVC
+from Visual Studio 2022), and a good deal of dead code, platform `#ifdef`s and
+latent bugs went out with the tide. There are also two xtlang-visible renames
+(see below); one keeps backwards-compatible aliases for this release, the other
+only affects code that reached into compiler internals.
+
+### Compiler and type system
+
+- **Unified type inference**: xtlang had two type unifiers --- the old
+  candidate-list traversal with its enumeration retry loop, and the newer
+  canonical type-term core --- and they could disagree. Inference now runs
+  entirely through the canonical core (`xtc:typecheck:` over the `xtc:solve:`
+  constraint solver): it produces every function's types, and the old
+  candidate-list checker and its retry machinery have been deleted. The change
+  is behaviour-preserving --- the whole test suite stays green across all four
+  platforms --- but it is the largest internal change in the release, so it is
+  worth knowing where new type errors would be coming from if you hit one.
+  Overload resolution is now near-linear rather than re-enumerating candidates,
+  which removes a compile-time blow-up on heavily overloaded call sites, and
+  conflicting constraints now report a clearer diagnostic.
+
+- **Generic type variables (#315)**: binding a generic type variable to a tuple
+  field lost its pointer depth, so a `i8**` field could be reified as `i8*` and
+  miscompile. Pointer depth is now carried structurally through type-variable
+  reification, both for function type variables and for data-constructor return
+  types.
+
+- **Void-return codegen**: a `void`-returning function whose body ended in a
+  value-yielding tail expression emitted invalid LLVM IR; it now correctly emits
+  `ret void`.
+
+### xtlang API changes
+
+- **`imp_rand*` RNG builtins renamed to `xtc_rand*`**: the random-number
+  builtins (`imp_randf`/`imp_randd`, `imp_rand1_*`/`imp_rand2_*` over
+  `f`/`d`/`i32`/`i64`) lose their Impromptu-era prefix. They cross the C++/ABI
+  boundary and are a public xtlang API, so the old `imp_rand*` spellings keep
+  working as **deprecated aliases** for this release (resolved at desugar time)
+  and will be removed in the next one --- existing code that calls them directly
+  still compiles, but should be updated.
+
+- **Compiler internals re-namespaced `impc:*` to `xtc:*`**: the compiler's own
+  symbols moved from the Impromptu-era `impc:` prefix to `xtc:` (extempore
+  compiler), regrouped by compilation phase (`xtc:codegen:`, `xtc:desugar:`,
+  `xtc:typecheck:`, `xtc:bind:`, `xtc:driver:`, `xtc:type:`, `xtc:aot:`,
+  `xtc:diagnostics:`, `xtc:cache:`, `xtc:globals:`). This is
+  behaviour-preserving and affects only code that referenced compiler internals
+  directly --- ordinary xtlang and Scheme user code is unchanged.
+
+### Networking
+
+- **OSC parser replaced with oscpp**: the hand-rolled OSC receive parser was
+  memory-unsafe on malformed input --- fuzzing found single-packet remote
+  crashes (a wild bundle size-jump, an out-of-range abort on a malformed string)
+  and a family of over-reads, all reachable from one UDP datagram. Incoming
+  packets are now parsed with the vendored, bounds-checked `oscpp` reader (Boost
+  licence) inside a single try/catch; a malformed or hostile packet is dropped
+  rather than crashing. The xtlang `io:osc` API is unchanged --- addresses, the
+  `i/f/d/s/h/t` arg types, `[`/`]` lists, the native-handler path and the NTP
+  timetag conversion are all preserved. A libFuzzer harness finds zero crashes
+  across the 1713 inputs that crashed the old parser.
+
+### Toolchain and build
+
+- **LLVM 22.1.6**: bumped from 22.1.1, verified green on all CI platforms.
+- **PortAudio** updated to a current master snapshot.
+- **ccache** is auto-detected and used as the compiler launcher when present,
+  making repeat builds much faster.
+- **Versioning**: the git tag is now the single source of truth for the version.
+  CMake derives it via `git describe` at configure time (CI passes it explicitly
+  for its shallow checkout; git-less source builds fall back to `unknown`). A
+  running Extempore can finally report itself --- a new `--version` flag and the
+  version in the startup banner.
+- **`release.sh`**: a new script to cut a release --- it validates the branch,
+  working tree and CHANGELOG section, then creates the annotated tag (it
+  deliberately does not push; pushing the tag is what publishes the release).
+
+### Testing
+
+- **One test framework**: the harness was duplicated in `runtime/scheme.xtm` and
+  `libs/core/test.xtm` and the copies had drifted; `test.xtm` is now the single
+  source of truth, rewritten around a flat, append-only result list with a clear
+  outcome vocabulary (pass / fail / runtime-error / compile-error / compile-ok /
+  fixture-error). The retired `xtmtest` idiom is gone and the suite uses
+  single-idiom assertion macros.
+- **Auto-discovered tests**: CMake now globs `tests/core` and `tests/compiler`
+  rather than carrying a hand-maintained list, so new tests are picked up
+  automatically; each run emits a JUnit XML report for per-assertion failures in
+  ctest and CI, and the known-broken quarantine (`failing.xtm`) runs as an
+  expected failure so it stays green until a fix flips it.
+
+### C++ runtime
+
+A broad modernisation of the C++ runtime; none of it changes what Extempore
+does.
 
 - **C++20**: the required standard moves from C++17 to C++20, which lets a few
   hand-rolled stand-ins retire to the standard library. `MtSemaphore` --- whose
