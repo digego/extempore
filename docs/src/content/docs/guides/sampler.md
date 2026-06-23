@@ -350,9 +350,9 @@ time-consuming---not to mention error-prone! How do we take a list of files
 (such as the output of `ls` above) and tell our sampler which files to load into
 which slots?
 
-To do this, `external/instruments.xtm` provides a helper macro called
-`load-sampler`. Looking at the definition for `load-sampler`, we see that it
-takes the three arguments:
+To do this, `libs/external/instruments_ext.xtm` provides a helper function
+called `load-sampler`. Looking at the definition for `load-sampler`, we see that
+it takes the three arguments:
 
 1.  `sampler`, the sampler closure
 2.  `path`, the path to the directory where the audio files are

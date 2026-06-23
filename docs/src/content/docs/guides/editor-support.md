@@ -56,7 +56,7 @@ manual setup stuff to get it working).
 
 | command                                                              | keybinding                                                |
 | -------------------------------------------------------------------- | --------------------------------------------------------- |
-| `switch-to-extempore` (or start Extermpore if it's not running)      | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>Z</kbd> |
+| `switch-to-extempore` (or start Extempore if it's not running)       | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>Z</kbd> |
 | `extempore-connect-or-disconnect`                                    | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>J</kbd> |
 | `extempore-send-dwim` (to evaluate current top-level form or region) | <kbd>CTRL</kbd>+<kbd>META</kbd>+<kbd>X</kbd>              |
 | `extempore-send-region`                                              | <kbd>CTRL</kbd>+<kbd>C</kbd> <kbd>CTRL</kbd>+<kbd>R</kbd> |
@@ -68,27 +68,13 @@ class="nopretty">CTRL</kbd>+<kbd>C</kbd> in the `*extempore*` buffer where
 `extempore` is running to kill it, then start it up again with
 `switch-to-extempore`.
 
-## Atom {#atom}
-
-Extempore's [Atom](https://atom.io) package is available from
-[GitHub](https://github.com/extempore-lang/extempore-atom).
-
-| command                | keybinding                  |
-| ---------------------- | --------------------------- |
-| `Extempore Connect`    | <kbd>ALT</kbd>+<kbd>O</kbd> |
-| `Extempore Disconnect` | <kbd>ALT</kbd>+<kbd>X</kbd> |
-| `Extempore Evaluate`   | <kbd>ALT</kbd>+<kbd>S</kbd> |
-
 ## Sublime Text {#sublime-text}
 
 Extempore's [Sublime Text](https://www.sublimetext.com) plugin is available from
 [GitHub](https://github.com/benswift/extempore-sublime).
 
-| command                | keybinding |
-| ---------------------- | ---------- |
-| `extempore_connect`    |            |
-| `extempore_disconnect` |            |
-| `extempore_evaluate`   |            |
+The plugin's commands and key bindings are documented in its
+[own repo](https://github.com/benswift/extempore-sublime).
 
 ### Known issues {#known-issues}
 

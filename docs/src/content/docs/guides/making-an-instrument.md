@@ -4,11 +4,9 @@ title: Making an instrument
 
 :::note
 
-This is currently out of date---so it's not listed in the docs "menu". It should
-be fixed though, because it's useful. So fixes are welcome!
-
-This guide refers to the values in the DSP signal chain as `double`, whereas
-they are now `SAMPLE`, which is aliased to `float` by default.
+Some of the prose in this guide refers to the values in the DSP signal chain as
+`double`, whereas they are now `SAMPLE`, which is aliased to `float` by default.
+Fixes are welcome!
 
 :::
 
@@ -273,7 +271,7 @@ business of making an _instrument_ in Extempore. An Extempore instrument can be
 played like a midi soft-synth. Individual notes can be triggered with an
 amplitude, a pitch and a duration. The only difference is that the whole signal
 chain is now written in xtlang and dynamically compiled at run-time. You can
-have a look at it in `libs/core/audio_dsp.xtm` if you want to see the nuts and
+have a look at it in `libs/core/instruments.xtm` if you want to see the nuts and
 bolts of how it works.
 
 This notion of _note-level_ control is the key difference between an Extempore
@@ -580,7 +578,7 @@ values and see how the note changes.
 **Troubleshooting** if this _didn't_ work, there are a few possible causes:
 
 - is your audio interface configured properly? Running the
-  `./extempore --print-deivces` at the command line will print a list of all the
+  `./extempore --print-devices` at the command line will print a list of all the
   audio devices the system knows about. Make sure that you're using the right
   one---you can specify which device Extempore should use with the `--device`
   argument e.g. `./extempore --device 2`, where `2` is the index (in the output

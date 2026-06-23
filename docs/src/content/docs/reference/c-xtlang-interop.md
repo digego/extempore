@@ -85,7 +85,7 @@ Not the most useful library in the world, to be sure, but let's compile it as a
 shared library anyway. Shared libraries have different file extensions on the
 different platforms that Extempore runs on:
 
-- **OSX**: `libname.dylib`
+- **macOS**: `libname.dylib`
 - **Linux**: `libname.so`
 - **Windows**: `libname.dll`
 
@@ -96,9 +96,9 @@ was compiled for the platform you're on. It's not just a matter of renaming the
 file to right file extension, either: the guts of the file are different between
 the platforms as well.
 
-From here on I'll assume you're on OSX, so I'll refer to libraries with the
+From here on I'll assume you're on macOS, so I'll refer to libraries with the
 `.dylib` extension, but just substitute in the appropriate extension for your
-platform. To build the shared library on OSX, move into libfoo's directory and
+platform. To build the shared library on macOS, move into libfoo's directory and
 build it with the `-dynamiclib` flag:
 
 ```
@@ -150,7 +150,7 @@ signature (square brackets) of an xtlang _closure_? Well, this is a bit of a
 cheat on xtlang's part---the bound function `foo` _is_ just the plain C function
 from the library. But we do have to specify its type signature (argument and
 return types), and because xtlang doesn't provide a syntax for functions (only
-closures), then `bind-val` just takes a closure signature and interprets it as a
+closures), then `bind-lib` just takes a closure signature and interprets it as a
 function signature (which are the same).
 
 It really is just a C function, though, and there is **no performance penalty**
@@ -171,7 +171,7 @@ library is quite small and clean, and is spread over only a few source
 files---the main ones being `kiss_fft.h` & `kiss_fft.c`. There's gonna be a bit
 of C in this section. Nothing too complicated, but if you're rusty it might be
 worth picking up a copy of
-[K&R](http://www.iu.hio.no/~mark/CTutorial/CTutorial.html) or your to flip
+[K&R](http://www.iu.hio.no/~mark/CTutorial/CTutorial.html) for you to flip
 through if necessary.
 
 If you're playing along at home, then you'll need to download the
@@ -243,7 +243,7 @@ So now we can just go ahead and turn the signature of `kiss_fft` into a
 `i8*` in place of C's `void` type)
 
 ```xtlang
-(define kissfft (bind-dylib "kiss_fft.dylib"))
+(bind-dylib kissfft "kiss_fft.dylib")
 
 (bind-lib kissfft kiss_fft [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*)
 ```
@@ -289,10 +289,10 @@ So the `kiss_fft_state` struct has four members:
 
 - `nfft` (an `int`)
 - `inverse` (an `int`)
-- `factors` (an `int` array of length `2` ×=MAXFACTORS=)
+- `factors` (an `int` array of length `2 * MAXFACTORS`)
 - `twiddles` (a `kiss_fft_cpx` array of length `1`)
 
-Earlier in that header `MAXFACTORS` is defined to be 32, so the `factos` array
+Earlier in that header `MAXFACTORS` is defined to be 32, so the `factors` array
 will be of length `64`. Also, in `twiddles`, the `kiss_fft_cpx` type is new---we
 haven't found a definition for it yet. So we need to do that before we can tell
 the xtlang compiler about the `kiss_fft_state` struct.

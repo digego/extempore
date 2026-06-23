@@ -76,6 +76,7 @@ export default defineConfig({
         {
           label: 'xtlang reference',
           items: [
+            { label: 'Overview', slug: 'reference' },
             { label: 'Types', slug: 'reference/types' },
             { label: 'Memory management', slug: 'reference/memory-management' },
             { label: 'Concurrency', slug: 'reference/concurrency' },
@@ -89,6 +90,7 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
+            { label: 'Overview', slug: 'guides' },
             { label: 'Editor support', slug: 'guides/editor-support' },
             { label: 'Pattern language', slug: 'guides/pattern-language' },
             { label: 'Analogue synth', slug: 'guides/analogue-synth' },

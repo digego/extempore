@@ -206,9 +206,9 @@ with (hint: the only change is to `pat-2`)
 (:> pat-2 4 1 (play syn1 @1 80 dur) (list 67 67 67 48 36 65))
 ```
 
-There are a couple of special symbols in the which are helpful in understanding
-how the timing works (i.e. when the pattern expression is actually called to
-play the note).
+There are a couple of special symbols in the pattern language which are helpful
+in understanding how the timing works (i.e. when the pattern expression is
+actually called to play the note).
 
 If an element of the list is the underscore symbol (`_`) then the pattern will
 "skip" that execution (in musical terms, it's a _rest_). Try replacing one (or
@@ -537,9 +537,9 @@ musical patterns.
 
 ### Using note names instead of midi note numbers {#using-note-names-instead-of-midi-note-numbers}
 
-As mentioned [earlier in this guide](#midi-note-number-teaser-box), in your
-pattern expression you can use symbols like `c4` (which evaluates to 60; it's
-middle C) to specify notes (so-called
+As mentioned [earlier in this guide](#pattern-basics), in your pattern
+expression you can use symbols like `c4` (which evaluates to 60; it's middle C)
+to specify notes (so-called
 [scientific pitch notation](https://en.wikipedia.org/wiki/Scientific_pitch_notation)).
 These special pitch variables are all 2 or 3 characters long:
 
@@ -731,8 +731,7 @@ _outside_ the pattern first. Other than that, they look pretty similar to the
 
 Note that we just wrapped the `(nof 4 ...)` expression in a `(hold h1 4 ...)`
 one; so the "generate 4 new pitches for the pattern expression" thing will only
-happen once every four loops. And obviously this is handy when you put it
-against a
+happen once every four loops.
 
 You can define & use as many holders as you like, just make sure they all have
 distinct names (e.g. `h1`, `h2`).

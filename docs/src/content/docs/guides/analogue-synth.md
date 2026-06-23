@@ -129,7 +129,7 @@ This comes up a bit---it's discussed in the
 Yep, you could have a look at `examples/core/synth.xtm`. In addition, all of the
 covers in `examples/sharedsystem/covers/` use the synth, although in most cases
 they just load a preset (as you've already seen in
-`examples/sharedsystem/audio_synth_basics.xtm`). Finally, the instruments
+`examples/sharedsystem/analogue_synth_basics.xtm`). Finally, the instruments
 themselves are defined in the `.xtm` files in the `libs/core/instruments/`
 folder.
 

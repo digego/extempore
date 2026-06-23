@@ -39,7 +39,9 @@ approach will only advance the playhead 10% of the time:
 
 All the `AudioBuffer_read` functions will stop playback when they reach the end
 of the audio data from the file. If you'd like to _loop_ the audio file instead,
-you can use `AudioBuffer_read_looped`
+you can use `AudioBuffer_read_looped`, which wraps the playhead back to the
+start of the buffer when it reaches the end so the audio plays in a continuous
+loop.
 
 One other thing to say here is that `AudioBuffer` is both the name of the
 (overloaded) constructor function and the name of the type which holds the audio

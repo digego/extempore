@@ -232,7 +232,8 @@ then there's an Extempore library which is designed to get you up and running
 quickly with a couple of synths & samplers.
 
 Here's a one-liner example (using Extempore's built-in
-[pattern language](/guides/pattern-language/)) of how to
+[pattern language](/guides/pattern-language/)) of how to play an ascending scale
+loop:
 
 ```xtlang
 ;; need to load this first, but only once
