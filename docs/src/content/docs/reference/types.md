@@ -453,6 +453,106 @@ adds 3 to that argument. This (returned) function then gets passed the argument
 3 + 5 = 8. Whew! That's confusing to read in words, but if you stare at the code
 long enough you'll reach enlightenment. Or something.
 
+## Type inferencing {#type-inferencing}
+
+Type annotations can be attached to the declaration of any variable using a
+colon, e.g.
+
+- `int_var:i64` (64-bit integer)
+- `double_ptr:double*` (pointer to a double precision float)
+- `closure_ptr:[i64,i32,i32]*` (pointer to a closure with two arguments)
+
+So far the examples have been fairly explicit about the types of their
+variables. Look back at the code for `xt_add` above---in the argument list
+`(a:i64 b:i64)` both arguments are identified as `i64`. What happens, though, if
+we take out just one of these type annotations?
+
+```xtlang
+(bind-func xt_add2
+  (lambda (a:i64 b)
+    (+ a b)))
+
+;; log shows "Compiled xt_add2 >>> [i64,i64,i64]*"
+
+(xt_add2 2 4) ;; returns 6
+```
+
+Even though we didn't specify the type of `b`, everything still compiled fine
+and the closure returns the correct result. What's the go with that? Well, it's
+because the xtlang compiler in Extempore is a
+[type inferencing](http://en.wikipedia.org/wiki/Type_inference) compiler. The
+addition function `+` in the body of `xt_add2` can only add values of the _same_
+type. Since the compiler knows the type of `a`, things will only work out if `b`
+is also an `i64`. And since this guess doesn't conflict with any other
+information it has about `b` (because there isn't any), the compiler can infer
+that the only acceptable type signature for the closure pointer is
+`[i64,i64,i64]*`.
+
+How about if we try removing the `a` type annotation as well?
+
+```xtlang
+(bind-func xt_add3
+  (lambda (a b)
+    (+ a b)))
+```
+
+This time there isn't enough information to unambiguously determine the types of
+`a` and `b`---they could both be `i32`, or both `double`---so rather than guess,
+the compiler throws a compile error. See
+[error messages](/reference/error-messages/#could-not-resolve-types) for what
+that looks like and how to fix it.
+
+We could also have specified the closure's type directly in the definition of
+the `xt_add4` symbol:
+
+```xtlang
+(bind-func xt_add4:[i64,i64,i64]*
+  (lambda (a b)
+    (+ a b)))
+
+(xt_add4 2 9) ;; returns 11
+```
+
+### Scheme and xtlang types {#scheme-and-xtlang-types}
+
+Extempore can run both Scheme and xtlang code, but Scheme doesn't know anything
+about xtlang's types---things like tuples, arrays, vectors, closures, and
+user-defined types through `bind-type`. Scheme only knows about Scheme types
+like symbols, integers, reals, strings and c pointers.
+
+There is some (approximate) overlap in these type systems---for ints, floats,
+strings and c pointers---although even there are caveats: e.g. Scheme only
+supports _double precision_ floats, while Extempore can work with both `float`
+and `double` natively, and xtlang's pointers are typed where Scheme only has
+void (opaque) c pointers. Where possible, Extempore will do the work to call
+xtlang code from Scheme (coercing argument types), but for any composite type
+(e.g. a list) you can't. See
+[Scheme-xtlang interop](/reference/scheme-xtlang-interop/) for the full story.
+
+Here's an example to make things a bit clearer:
+
+```xtlang
+;; tuple_maker returns a pointer to a tuple, and tuple_taker takes
+;; a pointer to a tuple as an argument.
+
+(bind-func tuple_maker
+  (lambda ()
+    (let ((a:<i64,double>* (alloc)))
+      (tset! a 0 42)
+      a)))
+
+(bind-func tuple_taker
+  (lambda (a:<i64,double>*)
+    (tref a 0)))
+
+(tuple_maker)               ;; returns a CPTR (to a tuple, but Scheme doesn't know that)
+(tref (tuple_maker) 0)      ;; error, Scheme doesn't know about xtlang types
+(tuple_taker (tuple_maker)) ;; returns 42; Scheme can pass *pointers* to tuples around
+                            ;; as void pointers, but you lose the type checking
+```
+
+Have a look at `examples/core/extempore_lang.xtm` for more examples.
+
 ## Named types {#named-types}
 
 To round it off, you can also define your own types. This is convenient: it's

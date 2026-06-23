@@ -47,8 +47,8 @@ type---the compiler has nothing to pin them down.
     (+ a b)))
 ```
 
-See [type inference](/reference/type-inference/) for when annotations are
-necessary and when they're redundant.
+See [type inference](/reference/types/#type-inferencing) for when annotations
+are necessary and when they're redundant.
 
 ### `Type Error bad numeric value`
 

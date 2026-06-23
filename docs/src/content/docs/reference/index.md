@@ -17,8 +17,8 @@ particular piece works.
   types, closures, and memory zones; every snippet is verified to run.
 - [Types](/reference/types/) --- the xtlang type system: primitive types,
   tuples, arrays, pointers, named types, and how they compose.
-- [Type inferencing](/reference/type-inference/) --- how xtlang infers types
-  when you leave them off, and when you need to annotate.
+- [Type inferencing](/reference/types/#type-inferencing) --- how xtlang infers
+  types when you leave them off, and when you need to annotate.
 - [Memory management](/reference/memory-management/) --- stack, zone and heap
   allocation, and when to reach for each.
 - [Error messages](/reference/error-messages/) --- common compiler and JIT error

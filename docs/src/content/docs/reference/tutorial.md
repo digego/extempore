@@ -414,8 +414,8 @@ From here:
   vectors, and generics
 - [memory-management](/reference/memory-management/) --- more depth on zones,
   `memzone`, and the audio zone
-- [type inference](/reference/type-inference/) --- when you need annotations and
-  when you don't
+- [type inference](/reference/types/#type-inferencing) --- when you need
+  annotations and when you don't
 - [error messages](/reference/error-messages/) --- common compiler errors and
   how to read them
 - [testing](/reference/testing/) --- the `xtmtest` harness if you want to write

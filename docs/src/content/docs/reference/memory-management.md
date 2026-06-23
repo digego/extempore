@@ -180,7 +180,7 @@ and int literals is allocated from in xtlang. String literals are bound globally
 which is bound in a `let` inside an xtlang `lambda` will be stack allocated,
 unless you explicitly request otherwise with `halloc` or `zalloc`.
 
-[String](/reference/types/#string) literals are the exception to the "all
+[String](/reference/types/#c-strings) literals are the exception to the "all
 literals are on the stack" rule. String literals are actually stored as `i8*` on
 the heap (as though they were _halloced_). If you capture a pointer to one of
 these strings (e.g. with `pref-ptr`), then you can pass it around and
@@ -210,10 +210,10 @@ input-output pairs for the function _f(x) = 2x_.
 
 Notice how the tuple pointer `tup:<i64,i64>*` was `let`-bound to the return
 value of the call to `salloc`. Initially, the memory was uninitialised
-([see here](/reference/types/#pointers) for more background about pointers),
-then two `i64` values were filled into it with `tfill!`. This is basically all
-the closure does, apart from the `printf` calls which are just reading and
-printing out what's going on.
+([see here](/reference/types/#pointer-types) for more background about
+pointers), then two `i64` values were filled into it with `tfill!`. This is
+basically all the closure does, apart from the `printf` calls which are just
+reading and printing out what's going on.
 
 The printout confirms that the doubling is working correctly: `6` is indeed what
 you get when you double `3`, so the output value of `<3,6>` is spot on. The

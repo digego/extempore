@@ -1,10 +1,38 @@
 import { defineConfig } from 'astro/config'
 import starlight from '@astrojs/starlight'
 
+// Honour `## Heading {#custom-id}` syntax (supported by the old VitePress site,
+// not by Astro out of the box): strip the marker and set the heading's id.
+function remarkHeadingIds() {
+  const walk = (node) => {
+    if (node.type === 'heading' && node.children?.length) {
+      const last = node.children[node.children.length - 1]
+      if (last.type === 'text') {
+        const m = last.value.match(/\s*\{#([\w-]+)\}\s*$/)
+        if (m) {
+          last.value = last.value.slice(0, last.value.length - m[0].length)
+          node.data = node.data || {}
+          node.data.hProperties = { ...(node.data.hProperties || {}), id: m[1] }
+          node.data.id = m[1]
+        }
+      }
+    }
+    if (node.children) node.children.forEach(walk)
+  }
+  return (tree) => walk(tree)
+}
+
 // https://astro.build/config
 export default defineConfig({
+  markdown: {
+    remarkPlugins: [remarkHeadingIds],
+  },
   site: 'https://extemporelang.github.io',
   base: '/',
+  // type-inference was folded into the types reference page; keep the old URL working.
+  redirects: {
+    '/reference/type-inference/': '/reference/types/#type-inferencing',
+  },
   integrations: [
     starlight({
       title: 'Extempore',
@@ -49,7 +77,6 @@ export default defineConfig({
           label: 'xtlang reference',
           items: [
             { label: 'Types', slug: 'reference/types' },
-            { label: 'Type inferencing', slug: 'reference/type-inference' },
             { label: 'Memory management', slug: 'reference/memory-management' },
             { label: 'Concurrency', slug: 'reference/concurrency' },
             { label: 'Scheme-xtlang interop', slug: 'reference/scheme-xtlang-interop' },
@@ -70,8 +97,6 @@ export default defineConfig({
             { label: 'Making an instrument', slug: 'guides/making-an-instrument' },
             { label: 'Note-level music', slug: 'guides/note-level-music' },
             { label: 'Sampler', slug: 'guides/sampler' },
-            { label: 'Common Lisp Music', slug: 'guides/common-lisp-music' },
-            { label: 'Impromptu users', slug: 'guides/impromptu-users' },
           ],
         },
         {
