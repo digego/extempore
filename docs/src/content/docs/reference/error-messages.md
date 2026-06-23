@@ -16,35 +16,36 @@ different message from the same code, please
 
 ## Type errors
 
-### `Could not resolve types!`
+### `Type Error couldn't resolve type` {#could-not-resolve-types}
 
 **Snippet**
 
 ```xtlang
 (bind-func unresolved_example
-  (lambda (a b)
-    (+ a b)))
+  (lambda (f)
+    (f)))
 ```
 
 **Error**
 
 ```
-Could not resolve types!::unresolved_example
-unresolved: a
-unresolved: b
-------------------------
+Type Error couldn't resolve type: unresolved_example_adhoc_8
 ```
 
-**What it means.** The type inferencer couldn't figure out the types of `a` and
-`b` from context. `+` is polymorphic, so both arguments could be any numeric
-type---the compiler has nothing to pin them down.
+(the `_adhoc_N` suffix is an internal name; the number will vary).
 
-**Fix.** Annotate at least one argument (the other can usually be inferred):
+**What it means.** The type inferencer couldn't pin down a type. Here `f` is
+called but never given a concrete type, so there's nothing to infer from. Note
+that fully-unconstrained _numeric_ code does **not** error---the inferencer
+defaults an unconstrained number to `double`---so this only bites when there is
+genuinely no information to go on.
+
+**Fix.** Annotate the argument so the compiler knows its type:
 
 ```xtlang
 (bind-func unresolved_example
-  (lambda (a:i64 b)
-    (+ a b)))
+  (lambda (f:[i64]*)
+    (f)))
 ```
 
 See [type inference](/reference/types/#type-inferencing) for when annotations

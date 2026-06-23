@@ -142,7 +142,7 @@ representing the radius of a circle and returns the area of that circle (another
 The closure compiled successfully, and the compiler prints
 
 ```
-    Compiled circle_area >>> [double,double]*
+    Compiled:  circle_area >>> [double,double]*
 ```
 
 to the log. If there was a problem with the compilation, then the compiler would

@@ -82,7 +82,7 @@ closure a `_c` suffix.
 The type message printed by the compiler when we evaluate `osc_c` is:
 
 ```
-    Compiled osc_c >>> [[float,float,float]*,float]*
+    Compiled:  osc_c >>> [[float,float,float]*,float]*
 ```
 
 See that the return type of the `osc_c` function is `[float,float,float]*`: a
@@ -205,8 +205,8 @@ Notice the `tset!` function, which takes three arguments: a pointer to a tuple
 must be of the appropriate type, otherwise you'll get a type error).
 
 This new version of `tuple_maker` compiles---hooray! The type signature printed
-by the compiler is `Compiled tuple_maker >>> [<i64,i64>*,i64]*` and the type of
-`tuple_maker` is a pointer (denoted by the `*`) to a closure (denoted by the
+by the compiler is `Compiled:  tuple_maker >>> [<i64,i64>*,i64]*` and the type
+of `tuple_maker` is a pointer (denoted by the `*`) to a closure (denoted by the
 `[]`) which takes one `i64` argument and returns a pointer to a tuple of two
 `i64` values.
 
@@ -494,7 +494,7 @@ input through untouched:
         in))))
 
 ;; when we evaluate saw_synth_fx, the compiler prints:
-;; Compiled saw_synth_fx >>> [i64,i64,i64,float,float*]*
+;; Compiled:  saw_synth_fx >>> [i64,i64,i64,float,float*]*
 ```
 
 Let's add a stereo delay to make things a bit more interesting

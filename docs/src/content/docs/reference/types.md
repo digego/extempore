@@ -409,7 +409,7 @@ noting that when we compile `xt_add` the log view prints the closure's type
 signature:
 
 ```
-Compiled xt_add >>> [i64,i64,i64]*
+Compiled:  xt_add >>> [i64,i64,i64]*
 ```
 
 `bind-func` is xtlang's equivalent to Scheme's `define`, although with the
@@ -472,7 +472,7 @@ we take out just one of these type annotations?
   (lambda (a:i64 b)
     (+ a b)))
 
-;; log shows "Compiled xt_add2 >>> [i64,i64,i64]*"
+;; log shows "Compiled:  xt_add2 >>> [i64,i64,i64]*"
 
 (xt_add2 2 4) ;; returns 6
 ```
@@ -494,16 +494,20 @@ How about if we try removing the `a` type annotation as well?
 (bind-func xt_add3
   (lambda (a b)
     (+ a b)))
+
+;; log shows "Compiled:  xt_add3 >>> [double,double,double]*"
 ```
 
-This time there isn't enough information to unambiguously determine the types of
-`a` and `b`---they could both be `i32`, or both `double`---so rather than guess,
-the compiler throws a compile error. See
-[error messages](/reference/error-messages/#could-not-resolve-types) for what
-that looks like and how to fix it.
+This still compiles. With nothing to pin the types down, the inferencer falls
+back to its default for an unconstrained numeric---`double`---so `xt_add3` comes
+out as `[double,double,double]*`. The compiler only gives up when there is
+genuinely no way to choose a type (for example a closure argument that you call
+but never give a concrete type), and then you'll see a
+[`Type Error couldn't resolve type`](/reference/error-messages/#could-not-resolve-types),
+which you fix by adding an annotation.
 
-We could also have specified the closure's type directly in the definition of
-the `xt_add4` symbol:
+If you want `xt_add3` to use a particular type rather than the default, you can
+specify the closure's type directly in the definition of the `xt_add4` symbol:
 
 ```xtlang
 (bind-func xt_add4:[i64,i64,i64]*
