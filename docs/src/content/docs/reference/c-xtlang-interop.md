@@ -38,7 +38,7 @@ reasons why C and xtlang should play nicely together.
 Having said that, there are some key differences between C and xtlang. C is the
 archetype of the 'static language', while xtlang is designed to allow the
 programmer to redefine core parts of the program _while it is executing_ (see
-[philosophy](../overview/philosophy.md) for more details). Extempore supports
+[philosophy](/overview/philosophy/) for more details). Extempore supports
 REPL-style development, with the programmer interacting with the source code,
 evaluating and compiling parts of it in a non-linear fashion, and then modifying
 and recompiling it as necessary. There are a few quirky projects which allow
@@ -229,13 +229,14 @@ better not be important.
 Why is the library written this way? Well, one of the key benefits of this "pass
 in a location for the answer to be written to" approach is that the memory with
 the answer in it can be managed by the calling function (that is, the function
-which calls `kiss_fft`). As discussed in the [memory](memory-management.md), the
-explicit nature of memory allocation and deallocation in xtlang (and in C) gives
-the programmer great control over the lifetime of any memory the program
-allocates. The function which _calls_ `kiss_fft` will have a much better idea of
-what it wants to do with the output values than `kiss_fft` does, so it makes
-sense to have this calling function allocate some memory of the appropriate size
-and type, and then just pass in a pointer to this memory in `fout`.
+which calls `kiss_fft`). As discussed in the
+[memory](/reference/memory-management/), the explicit nature of memory
+allocation and deallocation in xtlang (and in C) gives the programmer great
+control over the lifetime of any memory the program allocates. The function
+which _calls_ `kiss_fft` will have a much better idea of what it wants to do
+with the output values than `kiss_fft` does, so it makes sense to have this
+calling function allocate some memory of the appropriate size and type, and then
+just pass in a pointer to this memory in `fout`.
 
 So now we can just go ahead and turn the signature of `kiss_fft` into a
 `bind-lib` and we're done, right? Something like (remembering that xtlang uses

@@ -2,9 +2,9 @@
 title: xtlang tutorial
 ---
 
-This tutorial picks up where the [quickstart](../overview/quickstart.md) leaves
-off. You've got Extempore running, you can send `(println "Hello, World!")` to
-it from your editor, and now you want to actually write xtlang---the
+This tutorial picks up where the [quickstart](/overview/quickstart/) leaves off.
+You've got Extempore running, you can send `(println "Hello, World!")` to it
+from your editor, and now you want to actually write xtlang---the
 statically-typed language that compiles to LLVM IR at runtime.
 
 By the end of this tutorial you'll know how to:
@@ -15,9 +15,9 @@ By the end of this tutorial you'll know how to:
 - write closures that carry state between calls
 - choose between stack, zone, and heap allocation
 
-When you're done, the [types](./types.md) and
-[memory-management](./memory-management.md) reference pages cover everything
-here in more depth.
+When you're done, the [types](/reference/types/) and
+[memory-management](/reference/memory-management/) reference pages cover
+everything here in more depth.
 
 :::note[Code snippets are verified]
 
@@ -130,7 +130,8 @@ Type Error bad numeric value 3.000000, should be i64
 coerce, so you either change the literal (`3`) or convert explicitly
 (`(dtoi64 3.0)`).
 
-The [error-messages glossary](./error-messages.md) catalogues more of these.
+The [error-messages glossary](/reference/error-messages/) catalogues more of
+these.
 
 ## Pointers and memory
 
@@ -218,7 +219,7 @@ equivalents for arrays are `aref` / `aset!` / `afill!`, and for vectors `vref` /
 Notice that `make_point` returns a `point2d*`---a pointer---not a tuple by
 value. Almost all aggregate data in xtlang is passed around by pointer. The full
 range of type signatures and their meanings is in the
-[types reference](./types.md).
+[types reference](/reference/types/).
 
 ## Closures
 
@@ -409,15 +410,16 @@ You've now seen the core of the language:
 
 From here:
 
-- [types](./types.md) --- full tour of the type system, including arrays,
+- [types](/reference/types/) --- full tour of the type system, including arrays,
   vectors, and generics
-- [memory-management](./memory-management.md) --- more depth on zones,
+- [memory-management](/reference/memory-management/) --- more depth on zones,
   `memzone`, and the audio zone
-- [type inference](./type-inference.md) --- when you need annotations and when
-  you don't
-- [error messages](./error-messages.md) --- common compiler errors and how to
-  read them
-- [testing](./testing.md) --- the `xtmtest` harness if you want to write tests
+- [type inference](/reference/type-inference/) --- when you need annotations and
+  when you don't
+- [error messages](/reference/error-messages/) --- common compiler errors and
+  how to read them
+- [testing](/reference/testing/) --- the `xtmtest` harness if you want to write
+  tests
 
 For full working programs, the `examples/core/` directory has plenty of small,
 focused `.xtm` files that show these ideas in use.

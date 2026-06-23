@@ -165,11 +165,10 @@ brings us to a couple of new (compound) types: tuples, and arrays.
 
 ## Tuples in xtlang {#tuples-in-xtlang}
 
-As a refresher, [tuples](../reference/types.md#tuples) in xtlang are
-heterogeneous groupings of any xtlang types (just like a C struct). They're
-still statically typed, either explicitly or with the types inferred from the
-types of other variables and literals. Syntactically, tuples use angle brackets
-(`<>`).
+As a refresher, [tuples](/reference/types/#tuples) in xtlang are heterogeneous
+groupings of any xtlang types (just like a C struct). They're still statically
+typed, either explicitly or with the types inferred from the types of other
+variables and literals. Syntactically, tuples use angle brackets (`<>`).
 
 When programming in xtlang you don't really ever deal with tuples directly---you
 deal with them by _reference_ through pointers. There are no 'literals' for
@@ -371,8 +370,8 @@ tickles your creative fancy.
 
 To finish, we'll make a really basic `saw_synth` instrument. An _instrument_ in
 Extempore allows you to trigger 'notes' like a MIDI soft synth.
-[note-level music](note-level-music.md) goes into a lot more detail about how
-Extempore's instrument infrastructure works, so this is more of a 'quick and
+[note-level music](/guides/note-level-music/) goes into a lot more detail about
+how Extempore's instrument infrastructure works, so this is more of a 'quick and
 dirty' example instrument just to get a feel for things. All the instrument code
 is just regular xtlang, and this instrument (and others) can be found in
 `libs/core/instruments.xtm` and `libs/external/instruments_ext.xtm`.
@@ -538,8 +537,8 @@ and now the instrument is ready to play.
 
 What---is that the end? Well, that's a bit frustrating: we haven't even got to
 _play_ our instrument yet! Don't worry, we'll use our `saw_synth` instrument in
-[note-level music](note-level-music.md). Here's a sneak peek so you can hear it
-now though:
+[note-level music](/guides/note-level-music/). Here's a sneak peek so you can
+hear it now though:
 
 ```xtlang
 (bind-func dsp:DSP

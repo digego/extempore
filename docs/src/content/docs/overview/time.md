@@ -10,7 +10,7 @@ program, etc…
 Extempore is different. Extempore is a dynamic, interactive programming
 environment where programs are modified and extended while they are running. As
 a simple example: type the following code into your editor and
-[evaluate](quickstart.md#step-3) it:
+[evaluate](/overview/quickstart/#step-3) it:
 
 ```xtlang
 (now)

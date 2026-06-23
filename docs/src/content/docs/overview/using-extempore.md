@@ -5,8 +5,8 @@ title: Extempore's Compiler-as-a-Service
 :::note
 
 This document is a deeper dive on what's going on when you use Extempore; if
-you're just after the quick version then the [quickstart guide](quickstart.md)
-might be what you're after.
+you're just after the quick version then the
+[quickstart guide](/overview/quickstart/) might be what you're after.
 
 :::
 
@@ -22,8 +22,8 @@ The 'chunks' of code (serialised as strings) which are sent to the xtlang
 compiler may be anything from small one-liners to whole source files (via the
 `load` function). The functions and data (often referred to collectively as the
 _environment_) persist for as long as the `extempore` process is running. As
-discussed in the [philosophy](philosophy.md) page, the Extempore compiler
-actually compiles _two_ languages: Scheme and xtlang (Extempore's own
+discussed in the [philosophy](/overview/philosophy/) page, the Extempore
+compiler actually compiles _two_ languages: Scheme and xtlang (Extempore's own
 programming language). The process of evaluating them is the same---just sending
 strings to the compiler over the TCP port.
 
@@ -34,7 +34,7 @@ So, to do anything in Extempore you need a text editor which can
 3.  send that string over the TCP connection
 
 There are already Extempore modes/plugins for VSCode, Emacs, Atom, vim and
-Sublime Text (see [editor support](../guides/editor-support.md)). If you already
+Sublime Text (see [editor support](/guides/editor-support/)). If you already
 have a favourite text editor, then you'll probably want to use that one. If you
 don't, then VSCode is a good choice. In the end it doesn't matter too much which
 editor you use, so pick the one that makes you happiest.
@@ -42,8 +42,8 @@ editor you use, so pick the one that makes you happiest.
 ## Starting Extempore {#running-extempore}
 
 The instructions for starting an Extempore "session" are listed on the
-[quickstart](quickstart.md#using-extempore) page, so we won't duplicate them
-here.
+[quickstart](/overview/quickstart/#using-extempore) page, so we won't duplicate
+them here.
 
 One thing about the Extempore startup process which is relevant here is the way
 the compiler prints some information about starting up some processes, namely a
@@ -63,7 +63,7 @@ waiting to be given some code to evaluate. That's where the text editor part of
 the equation comes in.
 
 When you open up a file ending in `.xtm` (Extempore's default file extension),
-your [editor](../guides/editor-support.md) should detect that you're editing
+your [editor](/guides/editor-support/) should detect that you're editing
 Extempore source code, and load the appropriate Extempore plugin. Here's a
 (short) example file containing some Extempore code:
 
@@ -156,7 +156,7 @@ Let's find out the area of a circle of radius `5.0` units. We need to call
 When we evaluate the `(circle_area 5.0)` expression, a couple of things happen.
 The code is sent to the compiler, which returns the value `78.539816` to the
 editor. In addition, a message about creating a new
-[memory zone](../reference/memory-management.md) is printed to the log. That's
+[memory zone](/reference/memory-management/) is printed to the log. That's
 because this is the first time we've _called_ some xtlang code, and so a memory
 zone needs to be set up to provide any `zalloc` memory. This zone allocation
 won't happen if we evaluate the same code again, because the default zone

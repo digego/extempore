@@ -5,9 +5,9 @@ title: Extempore for Impromptu users
 If you're an [Impromptu](http://impromptu.moso.com.au/) user and you're thinking
 about making the switch to Extempore, you've probably got a few questions about
 what the difference is between Impromptu and Extempore.
-[Philosophy](../overview/philosophy.md) covers this to some extent, but this
-post is designed to be short and sweet, answering three questions that Impromptu
-users might have:
+[Philosophy](/overview/philosophy/) covers this to some extent, but this post is
+designed to be short and sweet, answering three questions that Impromptu users
+might have:
 
 1.  what's the same
 2.  what's new or different
@@ -18,7 +18,7 @@ users might have:
 - Impromptu's Scheme interpreter has been brought into Extempore largely
   unchanged. So any vanilla Scheme code or libraries should work fine (e.g. the
   pitch class library `pc_ivl.xtm` is unchanged).
-- [time](../overview/time.md) (including `(now)`, `callback`, temporal recursion
+- [time](/overview/time/) (including `(now)`, `callback`, temporal recursion
   etc.) is exactly the same as it was in Impromptu.
 
 ## What's new or different {#whats-new-or-different}
@@ -28,7 +28,7 @@ There are some obvious 'big picture' differences:
 - Extempore is cross-platform (OS X, Linux & Windows)
 - Extempore is [open source](https://github.com/digego/extempore)
 - Extempore is now just an executable, it no longer has a built in editor & log
-  view (so [you can use your favourite editor](editor-support.md))
+  view (so [you can use your favourite editor](/guides/editor-support/))
 
 The biggest difference, though, is the addition of _xtlang_: a new programming
 language (and compiler). Whereas Scheme was the _only_ language supported in

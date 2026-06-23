@@ -47,8 +47,8 @@ type---the compiler has nothing to pin them down.
     (+ a b)))
 ```
 
-See [type inference](./type-inference.md) for when annotations are necessary and
-when they're redundant.
+See [type inference](/reference/type-inference/) for when annotations are
+necessary and when they're redundant.
 
 ### `Type Error bad numeric value`
 
@@ -126,7 +126,8 @@ though `coord2d` is defined as `<double,double>`, the compiler treats them as
 distinct types.
 
 **Fix.** Allocate the right type, or use a named type/alias if you genuinely
-need to treat two types as compatible. See [types](./types.md#named-types).
+need to treat two types as compatible. See
+[types](/reference/types/#named-types).
 
 ### `Cannot de-reference non-pointer type`
 
@@ -344,7 +345,7 @@ untested scripts.
 
 Some of the nastiest bugs in xtlang don't produce any error message at all---
 the compiler accepts your code, it runs, and it just returns wrong answers. The
-[tutorial](./tutorial.md#why-salloc-is-dangerous-for-return-values) walks
+[tutorial](/reference/tutorial/#why-salloc-is-dangerous-for-return-values) walks
 through one: a `salloc`'d pointer returned from a function points into stack
 memory that gets reused as soon as the function returns, so subsequent calls
 overwrite it.
@@ -355,12 +356,12 @@ invalidated when the zone exits, but nothing stops you from holding on to it.
 **Rule of thumb.** If a pointer needs to outlive the function that created it,
 don't use `salloc`. Use `zalloc` from a zone that you know lives long enough
 (often the enclosing closure's zone), or `halloc` for heap memory. See
-[memory management](./memory-management.md) for the full picture.
+[memory management](/reference/memory-management/) for the full picture.
 
 ## Can't find your error here?
 
-- Check the [tutorial](./tutorial.md) for the concepts, especially the sections
-  on types and allocators.
+- Check the [tutorial](/reference/tutorial/) for the concepts, especially the
+  sections on types and allocators.
 - Search the `tests/` and `examples/` directories for similar constructs that
   compile cleanly---a diff against working code is often the fastest way to
   isolate an error.

@@ -3,7 +3,7 @@ title: Pattern language
 ---
 
 Before we start, make sure you've read at least the
-[quickstart guide](../overview/quickstart.md) and you can set up & evaluate
+[quickstart guide](/overview/quickstart/) and you can set up & evaluate
 Extempore code on your machine.
 
 ## Introduction
@@ -51,7 +51,7 @@ Extempore's audio signal chain is highly flexible, so you can set up your
 noisemaking infrastructure in a way which suits you. However, if you're new to
 all this and just want to load up a few synths and samplers, then the best way
 to do this is to load the Extempore sharedsystem---including the analogue synth
-& built-in samplers as covered in [this guide](analogue-synth.md).
+& built-in samplers as covered in [this guide](/guides/analogue-synth/).
 
 These pattern language and the sharedsystem are conceptually independent---you
 certainly don't have to understand the pattern language in depth if you just
@@ -62,7 +62,7 @@ handy to understand a bit about the analogue synth for e.g. using loops to
 change synth parameters with musically meaningful timings. That's the approach
 we'll take in this guide---we won't necessarily explain the sharedsystem stuff,
 but you can always jump over to e.g. the
-[analogue synth guide](analogue-synth.md) to go deeper.
+[analogue synth guide](/guides/analogue-synth/) to go deeper.
 
 Finally, if you _don't_ load the sharedsystem, then make sure you at least load:
 
@@ -118,11 +118,11 @@ will be.
 For now you don't have to understand exactly what every part of the pattern
 expression `(play syn1 @1 80 dur)` means (in short, the arguments represent
 _instrument_, _pitch_, _velocity_ and _duration_; there are
-[other guides](note-level-music.md) which explain it in much detail). The main
-thing to know is that each time the pattern expression is triggered the `@1`
-will be replaced by successive values from the pattern list. First `60`, then
-`58`, then `60`, then `63`, then back to the beginning---in fact it will keep
-cycling through that list forever.
+[other guides](/guides/note-level-music/) which explain it in much detail). The
+main thing to know is that each time the pattern expression is triggered the
+`@1` will be replaced by successive values from the pattern list. First `60`,
+then `58`, then `60`, then `63`, then back to the beginning---in fact it will
+keep cycling through that list forever.
 
 One more note about timing: there's a global metronome in Extempore (which
 defaults to 120bpm at startup). But you can change it at any time (changing the
@@ -790,8 +790,8 @@ generating pattern lists---try them out and see what they sound like.
 
 ### I'm so sick of the default chiptune synth sound, how do I change it? {#changing-the-sound}
 
-This is covered in the [analogue-synth tutorial](analogue-synth.md), but if you
-can load a synth preset with `analogue-load-preset` like so:
+This is covered in the [analogue-synth tutorial](/guides/analogue-synth/), but
+if you can load a synth preset with `analogue-load-preset` like so:
 
 ```xtlang
 (analogue-load-preset syn1 "examples/sharedsystem/presets/organ1.xtmpreset")
@@ -838,7 +838,7 @@ above actually expands out to:
 ```
 
 If you use it inside either a pattern (or a
-[temporal recursion](../overview/time.md#temporal-recursion)) then this will be
+[temporal recursion](/overview/time/#temporal-recursion)) then this will be
 fine, because `beat` will be defined to be the current beat (as a rational
 number). If you want to use it _outside_ of one of those contexts, make sure
 that you've bound `beat` to a sensible value for your purposes. Otherwise,
@@ -860,7 +860,7 @@ that it's because Extempore's pattern language is deliberately designed to work
 with regular Scheme lists. You can use all the rest of the Extempore "world"
 inside these patterns---you can pass higher-order functions, you can define and
 call your own library code (as long as it returns lists), you can call
-[xtlang](../reference/scheme-xtlang-interop.md)---there's nothing you can do in
+[xtlang](/reference/scheme-xtlang-interop/)---there's nothing you can do in
 Extempore that you can't do inside a pattern.
 
 So Extempore's pattern language isn't really a

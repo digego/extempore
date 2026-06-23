@@ -2,10 +2,10 @@
 title: Editor support
 ---
 
-As discussed in the [quickstart](../overview/quickstart.md#editor-setup) there
-are Extempore plugins for several popular editors. This page shows how to set
-things up and lists any editor-specific instructions (e.g. the specific names of
-the commands & keybindings).
+As discussed in the [quickstart](/overview/quickstart/#editor-setup) there are
+Extempore plugins for several popular editors. This page shows how to set things
+up and lists any editor-specific instructions (e.g. the specific names of the
+commands & keybindings).
 
 :::note
 
@@ -25,8 +25,8 @@ general introduction to VSCode, check out the excellent
 VSCode has an
 [Extempore extension](https://github.com/extemporelang/vscode-extempore), so it
 knows how to work with Extempore code. The VSCode setup instructions are
-actually listed in the [quickstart](../overview/quickstart.md#editor-setup)
-guide already, so you should head over there and get started.
+actually listed in the [quickstart](/overview/quickstart/#editor-setup) guide
+already, so you should head over there and get started.
 
 ## Emacs {#emacs}
 

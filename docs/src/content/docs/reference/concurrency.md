@@ -145,11 +145,11 @@ Extempore's IPC layer for communication between Scheme processes.
 Things get more interesting when we introduce xtlang.
 
 Firstly, all calls into xtlang code are always initiated at some point by a top
-level scheme expression (see [C-xtlang interop](c-xtlang-interop.md) for more
-detail). Under normal Extempore operating conditions, xtlang code is always
-executing in some Scheme process or other. Generally this xtlang code will
-behave as expected with regards to concurrency, i.e. will generally behave as if
-it were just another Scheme call inside the Scheme process. As a trivial
+level scheme expression (see [C-xtlang interop](/reference/c-xtlang-interop/)
+for more detail). Under normal Extempore operating conditions, xtlang code is
+always executing in some Scheme process or other. Generally this xtlang code
+will behave as expected with regards to concurrency, i.e. will generally behave
+as if it were just another Scheme call inside the Scheme process. As a trivial
 example, consider the xtlang function:
 
 ```xtlang
@@ -275,8 +275,8 @@ thread) safe if you stick to the following three principles:
 
 1.  Don't access global xtlang variables in your xtlang functions.
 2.  Don't close over variables with top-level xtlang functions.
-3.  Don't allocate heap [memory](memory-management.md) in xtlang functions (zone
-    and stack memory is OK)
+3.  Don't allocate heap [memory](/reference/memory-management/) in xtlang
+    functions (zone and stack memory is OK)
 
 If you stick to those three principles then your xtlang code should be Scheme
 process safe, although obviously you also need to be careful about what
@@ -316,7 +316,8 @@ Note the use of `(llvm_get_function_ptr "my_os_thread_native")`. This call
 returns a sanitized C wrapper function around our xtlang closure `my_os_thread`.
 Like Scheme wrappers, C wrappers are also automatically generated for toplevel
 xtlang closures, and are required if you wish to call an xtlang closure from an
-external C library---[xtlang knows how to call C natively](c-xtlang-interop.md)
+external C
+library---[xtlang knows how to call C natively](/reference/c-xtlang-interop/)
 but C cannot call an xtlang closure without an appropriate C wrapper. C wrappers
 have the same name as the xtlang closure with `_native` appended to the end. By
 passing a C wrapper around we can have the OS callback into native xtlang code

@@ -3,7 +3,8 @@ title: Memory management in Extempore
 ---
 
 It's not really possible to explain Extempore's memory allocation story without
-a detour into [xtlang types](types.md), so we'll cover some of that as well.
+a detour into [xtlang types](/reference/types/), so we'll cover some of that as
+well.
 
 The two languages hosted by the Extempore compiler, xtlang and Scheme, have
 different approaches to allocating & managing memory. Both languages ultimately
@@ -89,13 +90,13 @@ domains where timing is critical, such as real-time audio and video.
 Hang on a sec---isn't working with real-time audio and video xtlang (and
 therefore Extempore's) _raison d'etre?_ Well, yes is is---the sluggishness (and
 non-determinism) of Impromptu's Scheme interpreter was the spark which ignited
-the development of xtlang (as mentioned in
-[philosophy](../overview/philosophy.md)). Again, this isn't a knock on Scheme in
-general as slow---there are some very sprightly Scheme compilers, but
-Impromptu's one was slow. The non-determinism was even more of a problem,
-because the last thing you want when you're generating audio or video is a 'stop
-the world' GC pause, which will lead to clicks and pops in audio or dropped
-frames in video. Real-time systems and garbage collection are uneasy bedfellows.
+the development of xtlang (as mentioned in [philosophy](/overview/philosophy/)).
+Again, this isn't a knock on Scheme in general as slow---there are some very
+sprightly Scheme compilers, but Impromptu's one was slow. The non-determinism
+was even more of a problem, because the last thing you want when you're
+generating audio or video is a 'stop the world' GC pause, which will lead to
+clicks and pops in audio or dropped frames in video. Real-time systems and
+garbage collection are uneasy bedfellows.
 
 So, xtlang requires
 [manual memory management](http://en.wikipedia.org/wiki/Manual_memory_management).
@@ -152,10 +153,10 @@ in xtlang code it's grabbing memory from a zone.
 
 As I mentioned above, the stack is associated with function calls, their
 arguments and local variables. Because xtlang uses (in general)
-[closures](types.md#closures) rather than just plain functions, stack allocation
-and `salloc` in xtlang is used in the body of a closure. Remember that closures
-are just functions with their enclosing scope: think of a function which has
-packaged up any variables it references and carries them around in its
+[closures](/reference/types/#closures) rather than just plain functions, stack
+allocation and `salloc` in xtlang is used in the body of a closure. Remember
+that closures are just functions with their enclosing scope: think of a function
+which has packaged up any variables it references and carries them around in its
 saddlebags.
 
 Well, that's as clear as mud. Let's have an example.
@@ -179,11 +180,11 @@ and int literals is allocated from in xtlang. String literals are bound globally
 which is bound in a `let` inside an xtlang `lambda` will be stack allocated,
 unless you explicitly request otherwise with `halloc` or `zalloc`.
 
-[String](types.md#string) literals are the exception to the "all literals are on
-the stack" rule. String literals are actually stored as `i8*` on the heap (as
-though they were _halloced_). If you capture a pointer to one of these strings
-(e.g. with `pref-ptr`), then you can pass it around and dereference it from
-anywhere.
+[String](/reference/types/#string) literals are the exception to the "all
+literals are on the stack" rule. String literals are actually stored as `i8*` on
+the heap (as though they were _halloced_). If you capture a pointer to one of
+these strings (e.g. with `pref-ptr`), then you can pass it around and
+dereference it from anywhere.
 
 This 'implicit stack allocation' works for int and float literals, but how about
 aggregate and other higher-order types? In those cases, we call `salloc`
@@ -209,10 +210,10 @@ input-output pairs for the function _f(x) = 2x_.
 
 Notice how the tuple pointer `tup:<i64,i64>*` was `let`-bound to the return
 value of the call to `salloc`. Initially, the memory was uninitialised
-([see here](types.md#pointers) for more background about pointers), then two
-`i64` values were filled into it with `tfill!`. This is basically all the
-closure does, apart from the `printf` calls which are just reading and printing
-out what's going on.
+([see here](/reference/types/#pointers) for more background about pointers),
+then two `i64` values were filled into it with `tfill!`. This is basically all
+the closure does, apart from the `printf` calls which are just reading and
+printing out what's going on.
 
 The printout confirms that the doubling is working correctly: `6` is indeed what
 you get when you double `3`, so the output value of `<3,6>` is spot on. The
@@ -820,9 +821,9 @@ for any integer _n_.
 
 ## Pointers to higher-order types {#pointers-to-higher-order-types}
 
-The [xtlang type system](types.md) has both primitive types (floats and ints)
-and higher-order types like tuples, arrays and closures. Higher-order in this
-instance just means that they are made up of other types, although these
+The [xtlang type system](/reference/types/) has both primitive types (floats and
+ints) and higher-order types like tuples, arrays and closures. Higher-order in
+this instance just means that they are made up of other types, although these
 component types may be themselves higher-order types.
 
 As an example of an aggregate type, consider a 2 element tuple. Tuples are

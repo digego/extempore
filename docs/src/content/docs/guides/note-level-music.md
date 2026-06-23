@@ -6,7 +6,7 @@ This guide covers the basics of how to play instruments at a "note-level" (e.g.
 play the G above middle C for 2 beats) in Extempore. If you're satisfied with
 just playing Extempore's built-in instruments (which can be found in
 `libs/core/instruments.xtm`) then you can just start at this guide. Finally,
-this guide complements the [pattern language](pattern-language.md) one (an
+this guide complements the [pattern language](/guides/pattern-language/) one (an
 alternate way of triggering notes, loops & patterns) and you can mix and match
 both approaches.
 
@@ -125,8 +125,8 @@ goal with the `pc_ivl.xtm` Scheme library provide a musical framework that's as
 'unopinionated' as possible. Of course this is a somewhat ridiculous statement
 given that straight out of the gate Extempore's use of MIDI note numbers for
 pitches strongly preferences a traditional diatonic tonal system. Having said
-that, as shown in [other guides](audio-signal-processing.md), you can generate
-tones of any frequency---quarter tone composers should not despair!
+that, as shown in [other guides](/guides/audio-signal-processing/), you can
+generate tones of any frequency---quarter tone composers should not despair!
 
 So with these thoughts in mind I want to stress that this guide shows _some_
 ways of representing musical processes & data; not _the_ way. For example, MIDI
@@ -276,15 +276,15 @@ this instance). So if you don't need to return a list, use `for-each` instead of
 ```
 
 Ok, now we've covered the basics. Before we move on, if you haven't read the
-[time documentation](../overview/time.md) it's probably a good idea to go and
-read it now.
+[time documentation](/overview/time/) it's probably a good idea to go and read
+it now.
 
 ## Temporal recursion {#temporal-recursion}
 
-Once you've read the [time](../overview/time.md) docs, you'll be all set to
-start using `callback`. We've already looked at various ways to play a sequence
-of notes, and we're now going to expand on that theme. Let's define a function
-that uses `callback` to temporally recurse through a list of pitch values.
+Once you've read the [time](/overview/time/) docs, you'll be all set to start
+using `callback`. We've already looked at various ways to play a sequence of
+notes, and we're now going to expand on that theme. Let's define a function that
+uses `callback` to temporally recurse through a list of pitch values.
 
 ```xtlang
 ;; plays a sequence of pitches
@@ -832,9 +832,9 @@ we're going to need a drum instrument.
 
 :::note
 
-To set up a drumkit you can either follow the [sampler guide](sampler.md) which
-shows you how can set up your own sampler instrument (and guides you through
-making a drum sampler). Or you could just load
+To set up a drumkit you can either follow the [sampler guide](/guides/sampler/)
+which shows you how can set up your own sampler instrument (and guides you
+through making a drum sampler). Or you could just load
 `(sys:load "examples/sharedsystem/setup.xtm")` and it'll be done for you.
 
 Got a drum sampler set up? Great. So far we have been using Extempore's default

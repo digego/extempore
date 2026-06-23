@@ -138,7 +138,7 @@ Congrats, you're connected... and almost there.
 Remember, if you're not using VSCode, all the concepts are the same, but the
 names of the commands or the keyboard shortcuts might be different---I'm sure
 you'll manage 😉, and you can find the specific details for your editor in the
-[editor support guide](../guides/editor-support.md).
+[editor support guide](/guides/editor-support/).
 
 </details>
 
@@ -232,7 +232,7 @@ then there's an Extempore library which is designed to get you up and running
 quickly with a couple of synths & samplers.
 
 Here's a one-liner example (using Extempore's built-in
-[pattern language](../guides/pattern-language.md)) of how to
+[pattern language](/guides/pattern-language/)) of how to
 
 ```xtlang
 ;; need to load this first, but only once
@@ -244,8 +244,8 @@ Here's a one-liner example (using Extempore's built-in
 
 Feel free to play around with (and re-evaluate) some of the parameters in that
 `ascending-scale` and try and figure out how it all fits together, and when you
-want to go further check out the
-[pattern language](../guides/pattern-language.md) guide.
+want to go further check out the [pattern language](/guides/pattern-language/)
+guide.
 
 ## Beyond "Hello..." {#beyond-hello}
 

@@ -89,8 +89,9 @@ any high-level language). C programmers will be (intimately) familiar with the
 concept of pointers, and xtlang's pointers are the same (you can `printf` them
 with `%p`) For others, though, a more in-depth explanation of the concept of
 pointers can be found
-[the memory management docs](memory-management.md#pointers). If you've never
-encountered pointers before then I suggest you check it out before continuing.
+[the memory management docs](/reference/memory-management/#pointers). If you've
+never encountered pointers before then I suggest you check it out before
+continuing.
 
 The way to allocate (and store a pointer to) memory is through a call to one of
 xtlang's 'alloc' functions. Extempore has 3 different alloc functions: `salloc`,
