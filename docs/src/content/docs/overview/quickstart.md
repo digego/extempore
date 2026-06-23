@@ -8,12 +8,21 @@ usually
 (or don't know what those things even _mean_) then these instructions will get
 you up & running asap.
 
-::: details Non-VSCode editors This quickstart guide is based on VSCode. If
-you'd prefer to use another editor (e.g. Emacs, Atom, ST, Vim) then that's fine
-as well---these boxes will explain how your setup process will be different. :::
+<details>
+<summary>Non-VSCode editors</summary>
 
-::: info With everything on this page, if you run in to problems make sure you
-check the [Troubleshooting](#troubleshooting) section at the end. :::
+This quickstart guide is based on VSCode. If you'd prefer to use another editor
+(e.g. Emacs, Atom, ST, Vim) then that's fine as well---these boxes will explain
+how your setup process will be different.
+
+</details>
+
+:::note
+
+With everything on this page, if you run in to problems make sure you check the
+[Troubleshooting](#troubleshooting) section at the end.
+
+:::
 
 ## Setup
 
@@ -33,10 +42,14 @@ Open the _Command Palette_, type in a few characters of the command _Extensions:
 Install Extensions_ until it shows up, then hit <kbd>return</kbd>. Then, search
 for "Extempore" and install the extension.
 
-::: info The main way to run commands (in other words, to "do things") in VSCode
-is through the _Command Palette_, which you can open up with
+:::note
+
+The main way to run commands (in other words, to "do things") in VSCode is
+through the _Command Palette_, which you can open up with
 <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>P</kbd> (or through the menu
-`View > Command Palette...`). :::
+`View > Command Palette...`).
+
+:::
 
 ### Download Extempore
 
@@ -46,9 +59,13 @@ and put it wherever you like (e.g. in your _Documents_ folder). Then set the
 _Extempore: Sharedir_ VSCode config setting to point at that folder---this lets
 VSCode start Extempore for you (we'll do that in the next step).
 
-::: warning The VSCode extension used to offer an _Extempore: Download binary_
-command for one-click setup. It hasn't been updated for the current releases, so
-download the release archive manually for now. :::
+:::caution
+
+The VSCode extension used to offer an _Extempore: Download binary_ command for
+one-click setup. It hasn't been updated for the current releases, so download
+the release archive manually for now.
+
+:::
 
 ## Using Extempore {#using-extempore}
 
@@ -78,13 +95,17 @@ INFO: server: accepted new connection to primary process
 Loading xtmbase library... done in 1.633086 seconds
 ```
 
-::: info If you can't (or don't want to) start Extempore using the _Extempore:
-Start_ VSCode command, then open a terminal in your Extempore directory (VSCode
-has a built-in terminal which you can bring up with
-<kbd>CTRL</kbd>+<kbd>&#96;</kbd>) and type `./extempore` (or `.\extempore.exe`
-if you're on Windows---note the backslash instead of the forward slash) and hit
-<kbd>return</kbd>. Extempore supports a bunch of command line options---try
-`./extempore --help`/`.\extempore.exe --help` to see the full list. :::
+:::note
+
+If you can't (or don't want to) start Extempore using the _Extempore: Start_
+VSCode command, then open a terminal in your Extempore directory (VSCode has a
+built-in terminal which you can bring up with <kbd>CTRL</kbd>+<kbd>&#96;</kbd>)
+and type `./extempore` (or `.\extempore.exe` if you're on Windows---note the
+backslash instead of the forward slash) and hit <kbd>return</kbd>. Extempore
+supports a bunch of command line options---try
+`./extempore --help`/`.\extempore.exe --help` to see the full list.
+
+:::
 
 ### Step 2: connect your text editor
 
@@ -111,11 +132,15 @@ INFO: server: accepted new connection to primary process
 
 Congrats, you're connected... and almost there.
 
-::: details Non-VSCode editors Remember, if you're not using VSCode, all the
-concepts are the same, but the names of the commands or the keyboard shortcuts
-might be different---I'm sure you'll manage 😉, and you can find the specific
-details for your editor in the
-[editor support guide](../guides/editor-support.md). :::
+<details>
+<summary>Non-VSCode editors</summary>
+
+Remember, if you're not using VSCode, all the concepts are the same, but the
+names of the commands or the keyboard shortcuts might be different---I'm sure
+you'll manage 😉, and you can find the specific details for your editor in the
+[editor support guide](../guides/editor-support.md).
+
+</details>
 
 ### Step 3: evaluate some code {#step-3}
 
@@ -142,12 +167,14 @@ INFO: server: accepted new connection to primary process
 Try modifying the code and re-evaluating it---the code is live, so you can
 change and re-evaluate things without having to re-start Extempore.
 
-::: info One "gotcha" if you're new to this sort of thing is the difference
-between the _return value_ of a function and any _side effects_ that it
-triggers. In the above example, the "Hello, World!" which you saw in the
-terminal is a side effect (making a sound through the speakers would be a side
-effect as well). The actual return value of the `println` function is the value
-"true" (which is represented as `#t` in Extempore).
+:::note
+
+One "gotcha" if you're new to this sort of thing is the difference between the
+_return value_ of a function and any _side effects_ that it triggers. In the
+above example, the "Hello, World!" which you saw in the terminal is a side
+effect (making a sound through the speakers would be a side effect as well). The
+actual return value of the `println` function is the value "true" (which is
+represented as `#t` in Extempore).
 
 This is just a quickstart, so we won't go down the rabbit hole, but the rule of
 thumb is that when you call a print function (e.g. `println`)
@@ -158,6 +185,7 @@ thumb is that when you call a print function (e.g. `println`)
   background---I've added an orange arrow to point it out).
 
 ![Extempore return value as shown in VSCode](/images/vscode-hello-world-echo-area.png)
+
 :::
 
 ### Step 4: stopping Extempore
@@ -264,11 +292,15 @@ work (again, remember to use `./extempore.exe` if you're on Windows):
 ./extempore --device-name "MacBook Pro Speakers"
 ```
 
-::: info The order of your audio devices can change at any time, especially when
-you're plugging and unplugging devices. So the device number (i.e. the `5` in
-the example above) won't always correspond to the _MacBook Pro Speakers_. In a
-gig situation it's always safer to use `--device-name` to be sure that you're
-using the correct audio device. :::
+:::note
+
+The order of your audio devices can change at any time, especially when you're
+plugging and unplugging devices. So the device number (i.e. the `5` in the
+example above) won't always correspond to the _MacBook Pro Speakers_. In a gig
+situation it's always safer to use `--device-name` to be sure that you're using
+the correct audio device.
+
+:::
 
 #### Glitchy sound? "Audio underflow" warning messages in the terminal? {#glitchy-sound}
 

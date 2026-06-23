@@ -566,6 +566,5 @@ build your _own_ instruments
   audio signal) make the audio waveform you're after.
 
 If you're interested in a more in-depth explanation of Extempore's instrument
-infrastructure, then you can <span
-role="doc">go and build your own tonewheel organ
-&lt;making-an-instrument&gt;</span>.
+infrastructure, then you can
+[go and build your own tonewheel organ](/guides/making-an-instrument/).

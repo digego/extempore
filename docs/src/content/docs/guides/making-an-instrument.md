@@ -2,11 +2,15 @@
 title: Making an instrument
 ---
 
-::: info This is currently out of date---so it's not listed in the docs "menu".
-It should be fixed though, because it's useful. So fixes are welcome!
+:::note
+
+This is currently out of date---so it's not listed in the docs "menu". It should
+be fixed though, because it's useful. So fixes are welcome!
 
 This guide refers to the values in the DSP signal chain as `double`, whereas
-they are now `SAMPLE`, which is aliased to `float` by default. :::
+they are now `SAMPLE`, which is aliased to `float` by default.
+
+:::
 
 This covers the basics of creating an _instrument_ in Extempore. While there are
 [other docs](audio-signal-processing.md) which cover audio digital signal
@@ -258,10 +262,11 @@ listen to the difference in the playback pitch of the organ tone.
 
 ## Instruments and note-level control {#instruments-and-note-level-control}
 
-::: info You can probably skim over this section if you're not concerned about
-the low-level details of how Extempore's instrument infrastructure. Still, if
-you've read this far then I can probably assume you have at least some interest
-:)
+:::note
+
+You can probably skim over this section if you're not concerned about the
+low-level details of how Extempore's instrument infrastructure. Still, if you've
+read this far then I can probably assume you have at least some interest :)
 
 Making this `organ_drone` closure has really just been a prelude to the real
 business of making an _instrument_ in Extempore. An Extempore instrument can be
@@ -272,12 +277,13 @@ have a look at it in `libs/core/audio_dsp.xtm` if you want to see the nuts and
 bolts of how it works.
 
 This notion of _note-level_ control is the key difference between an Extempore
-_instrument_ and the type of audio DSP covered in <span
-role="doc">audio-signal-processing</span>, which were just writing audio
-continuously to the sound card through the `dsp` callback. An instrument still
-needs to be in the `dsp` callback somewhere: otherwise it can't play its audio
-out through the speakers. But it also needs some way of triggering notes and
-maintaining the state of all the notes being played at any given time.
+_instrument_ and the type of audio DSP covered in
+[audio signal processing](/guides/audio-signal-processing/), which were just
+writing audio continuously to the sound card through the `dsp` callback. An
+instrument still needs to be in the `dsp` callback somewhere: otherwise it can't
+play its audio out through the speakers. But it also needs some way of
+triggering notes and maintaining the state of all the notes being played at any
+given time.
 
 `make-instrument` takes two arguments:
 
@@ -287,7 +293,9 @@ maintaining the state of all the notes being played at any given time.
     `[[float,float,i64,i64,float*]*]*`
 
 So, when we finally define our hammond organ instrument, the definition will
-look like this :::
+look like this
+
+:::
 
 ```xtlang
 (make-instrument organ organ)
@@ -486,12 +494,14 @@ while `organ_drone` returns a double value (and so can be called directly for
 playback in the `dsp` closure), `organ_note` returns a _closure_. A type diagram
 highlights the difference:
 
-::: info This diagram is outdated
+:::note[This diagram is outdated]
 
 ![image](/images/making-an-instrument/organ-drone-vs-note.png)
 
 As I described in the previous section, this provides the flexibility required
-to manage note scheduling (via `xtm_play_note`) and polyphony. :::
+to manage note scheduling (via `xtm_play_note`) and polyphony.
+
+:::
 
 ## Step three: the effect kernel {#step-three-the-effect-kernel}
 

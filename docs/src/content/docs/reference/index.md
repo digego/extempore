@@ -2,8 +2,6 @@
 title: Reference
 ---
 
-# Reference
-
 This section is the reference material for Extempore's two languages---Scheme
 and xtlang---and for the systems that sit between them.
 

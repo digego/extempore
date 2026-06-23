@@ -80,7 +80,9 @@ important, use fewer slots and let the sampler interpolate in the gaps.
 
 ## Creating a drum sampler {#creating-a-drum-sampler}
 
-::: info If you've loaded the sharedsystem (i.e. with
+:::note
+
+If you've loaded the sharedsystem (i.e. with
 `(sys:load "examples/sharedsystem/setup.xtm")`) then you don't have to do any of
 the "DSP" signal chain setup stuff (i.e. you don't have to load the
 `instruments_ext.xtm` file, create the sampler `samp1`, evaluate the `dsp`
@@ -91,7 +93,9 @@ clear 😜
 Ok, enough background material---let's make some noise. We'll create an instance
 of Extempore's sampler called `samp1`. To do this, we use the `make-instrument`
 Scheme macro (once we've loaded it from the `libs/external/instruments_ext.xtm`
-library file). :::
+library file).
+
+:::
 
 ```xtlang
 (sys:load "libs/external/instruments_ext.xtm")
@@ -115,7 +119,9 @@ then. Extempore (by default) ships with a set of
 [808](https://en.wikipedia.org/wiki/Roland_TR-808) samples (in the
 `assets/samples/808` folder) which will do the job nicely.
 
-::: info If you want to use other drum samples, e.g. the
+:::note
+
+If you want to use other drum samples, e.g. the
 [Salamander drumkit](http://download.linuxaudio.org/musical-instrument-libraries/sfz/salamander_drumkit_v1.tar.7z)
 then it shouldn't be too hard to modify these steps---although obviously the
 filenames will be different.
@@ -130,7 +136,9 @@ following along.
 We're going to load (some of) these files into our `samp1` sampler one at a time
 using the `sampler-populate-slot` function (note that the path to each `.aif`
 file is relative to your Extempore folder---if you're loading samples from
-somewhere else you'll need to include the full path). :::
+somewhere else you'll need to include the full path).
+
+:::
 
 ```xtlang
 (sampler-populate-slot samp1 "assets/samples/808/36.aif" *gm-kick-2* 0 0 0 1)
@@ -260,12 +268,16 @@ fun if you load & manipulate your own samples.
 
 ## Creating a piano sampler {#creating-a-piano-sampler}
 
-::: info Note: Extempore actually ships with a bunch of piano samples in
+:::note
+
+Note: Extempore actually ships with a bunch of piano samples in
 `assets/samples/piano/`, which are loaded by default as part of the
 sharedsystem. But this example is instructive if you want to load some other
 samples.
 
-Let's add one more sampler---this time a `samp2`. :::
+Let's add one more sampler---this time a `samp2`.
+
+:::
 
 ```xtlang
 (make-instrument samp2 sampler)

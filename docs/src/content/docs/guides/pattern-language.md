@@ -45,11 +45,13 @@ You've just loaded
 
 Don't worry about how to use them just yet, you'll see how in a minute.
 
-::: info Extempore's audio signal chain is highly flexible, so you can set up
-your noisemaking infrastructure in a way which suits you. However, if you're new
-to all this and just want to load up a few synths and samplers, then the best
-way to do this is to load the Extempore sharedsystem---including the analogue
-synth & built-in samplers as covered in [this guide](analogue-synth.md).
+:::note
+
+Extempore's audio signal chain is highly flexible, so you can set up your
+noisemaking infrastructure in a way which suits you. However, if you're new to
+all this and just want to load up a few synths and samplers, then the best way
+to do this is to load the Extempore sharedsystem---including the analogue synth
+& built-in samplers as covered in [this guide](analogue-synth.md).
 
 These pattern language and the sharedsystem are conceptually independent---you
 certainly don't have to understand the pattern language in depth if you just
@@ -69,7 +71,9 @@ Finally, if you _don't_ load the sharedsystem, then make sure you at least load:
 ```
 
 because that's the actual file where the important functions and macros
-associated with the pattern language live. :::
+associated with the pattern language live.
+
+:::
 
 ## Pattern basics
 
@@ -142,13 +146,17 @@ you'll hear blessed silence 😉 This small `:>` -> `:|` change means that it's
 easy to stop a pattern and re-start it again; just change back to `:>` and
 re-eval the code.
 
-::: info If you're familiar with MIDI note numbers those numbers are probably
-pretty familiar (60 for middle C, etc). If you're more familiar with 12-tone
-note names,
+:::note
+
+If you're familiar with MIDI note numbers those numbers are probably pretty
+familiar (60 for middle C, etc). If you're more familiar with 12-tone note
+names,
 [a little later on in this guide](#using-note-names-instead-of-midi-note-numbers)
 you'll see that you can use symbols like `bb3`, `b`, `c4`, `c#4`, `d4` instead.
 But for now let's stick with the note numbers and get our head around the timing
-stuff. :::
+stuff.
+
+:::
 
 ### How does the timing work?
 
@@ -316,9 +324,11 @@ the same C-minor chord from the previous example:
 (:> chord-all 4 0 (play syn1 @1 80 dur) '(#(60 63 67)))
 ```
 
-::: info Again, Scheme---the programming language that we're using
-here---considers [lists](https://www.scheme.com/tspl4/objects.html#./objects:h3)
-and [vectors](https://www.scheme.com/tspl4/objects.html#./objects:h9) to be
+:::note
+
+Again, Scheme---the programming language that we're using here---considers
+[lists](https://www.scheme.com/tspl4/objects.html#./objects:h3) and
+[vectors](https://www.scheme.com/tspl4/objects.html#./objects:h9) to be
 different types of collections. However, if you don't care about the subtleties
 and just want to make bangers remember that lists will either look like e.g.
 this `(list 1 2 3)` or this `'(1 2 3)` (or occasionally this `` `(1 2 3)``),
@@ -331,7 +341,9 @@ pattern then the chord will play for 4 beats before re-triggering.
 
 Like with all this stuff, you can in general combine the different features of
 the pattern language together to play classic vi-IV-I-V pop anthems (including a
-nice suspended 4th---and resolution---on chord V). :::
+nice suspended 4th---and resolution---on chord V).
+
+:::
 
 ```extempore
 (:> chord-progression 16 0 (play syn1 @1 80 dur)
@@ -424,10 +436,12 @@ so in this guide sometimes we'll use that language. Just remember that your
 expression doesn't have to be triggering a musical note in the traditional
 sense.
 
-::: info We can use this to our advantage for debugging: if you replace the
-`(play ...)` pattern expression with something like `(println @1)` you can see
-what the value of `@1` (i.e. the component of the first pattern list) is printed
-to the log each time through the list.
+:::note
+
+We can use this to our advantage for debugging: if you replace the `(play ...)`
+pattern expression with something like `(println @1)` you can see what the value
+of `@1` (i.e. the component of the first pattern list) is printed to the log
+each time through the list.
 
 There are a couple of other variables which are bound inside the pattern
 expression:
@@ -448,7 +462,9 @@ expression:
 All of these variables can be super-useful for making interesting musical
 patterns. For example, say you want to (for a particular part of the pattern)
 alternate between two notes each time through the pattern. You could do a modulo
-arithmetic checks on the `LC` (loop count) variable like so: :::
+arithmetic checks on the `LC` (loop count) variable like so:
+
+:::
 
 ```extempore
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (if (= (% LC 2) 0) 66 63)))
@@ -462,15 +478,19 @@ same thing, so the previous pattern is equivalent to
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (orb LC 2 66 63)))
 ```
 
-::: info Note that we've gone back to using `(list ...)` rather than the quote
-operator `'`. This is because with an expression like `(list 1 2 (orb LC 2 66))`
-you _don't_ want the `orb` function to just be "quoted" as-is, you want it to be
+:::note
+
+Note that we've gone back to using `(list ...)` rather than the quote operator
+`'`. This is because with an expression like `(list 1 2 (orb LC 2 66))` you
+_don't_ want the `orb` function to just be "quoted" as-is, you want it to be
 evaluated (so that the pitch orbit actually happens). Sometimes it'll be more
 convenient to use `(list ...)`, and sometimes to quote things `'(... )`. You can
 [do whole courses on this stuff](https://courses.cs.washington.edu/courses/cse341/04wi/lectures/14-scheme-quote.html).
 
 You don't have to do it every _second_ time through the loop, either; you can do
-it every 3rd (or 4th, or 5th...) :::
+it every 3rd (or 4th, or 5th...)
+
+:::
 
 ```extempore
 (:> pat-1 2 0 (play syn1 @1 80 dur) (list 60 58 60 (orb LC 3 66 63)))
@@ -609,7 +629,9 @@ variables, `*root*` and `*scale*`, which are
 (define *scale* (pc:scale 0 'aeolian)) ;; 0 for the C pitch class (C# would be 1, etc.)
 ```
 
-::: info These are almost like the
+:::note
+
+These are almost like the
 [previous special variables](#special-pattern-expression-variables) (`dur`, `LC`
 etc.) with the exception that these ones _do_ exist (and can be modified)
 outside a pattern expression. This is because while `dur` (potentially) changes
@@ -620,7 +642,9 @@ them outside the expression with `set!`.
 
 By default, `scale` (and the related `qnt` and `rel` functions we'll look at
 shortly) use the value of the `*scale*` variable. If you want to use a different
-scale, you can change the value of the `*scale*` variable: :::
+scale, you can change the value of the `*scale*` variable:
+
+:::
 
 ```extempore
 (set! *scale* (pc:scale 0 'phrygian))

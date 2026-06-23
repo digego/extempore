@@ -48,7 +48,7 @@ platform, unzip it and run `extempore` (`extempore.exe` on Windows) from inside
 the `extempore` folder.
 
 Then,
-[set up your text editor of choice](https://extemporelang.github.io/docs/guides/editor-support/)
+[set up your text editor of choice](https://extemporelang.github.io/guides/editor-support/)
 and away you go.
 
 _Note_: the VSCode extension used to offer an _Extempore: Download binary_
@@ -144,7 +144,7 @@ very grateful.
 
 ## Docs & Community
 
-Extempore documentation can be found at <https://extemporelang.github.io/docs/>
+Extempore documentation can be found at <https://extemporelang.github.io/>
 
 You can also join the Extempore community:
 

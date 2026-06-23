@@ -2,9 +2,13 @@
 title: Extempore's Compiler-as-a-Service
 ---
 
-::: info This document is a deeper dive on what's going on when you use
-Extempore; if you're just after the quick version then the
-[quickstart guide](quickstart.md) might be what you're after.
+:::note
+
+This document is a deeper dive on what's going on when you use Extempore; if
+you're just after the quick version then the [quickstart guide](quickstart.md)
+might be what you're after.
+
+:::
 
 The best way to think about programming and evaluating code in Extempore is to
 think of it as a _compiler-as-a-service_ (CaaS). The compiler (provided by the
@@ -33,7 +37,7 @@ There are already Extempore modes/plugins for VSCode, Emacs, Atom, vim and
 Sublime Text (see [editor support](../guides/editor-support.md)). If you already
 have a favourite text editor, then you'll probably want to use that one. If you
 don't, then VSCode is a good choice. In the end it doesn't matter too much which
-editor you use, so pick the one that makes you happiest. :::
+editor you use, so pick the one that makes you happiest.
 
 ## Starting Extempore {#running-extempore}
 

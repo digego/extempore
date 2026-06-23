@@ -2,11 +2,15 @@
 title: Concurrency
 ---
 
-::: info Some of the threading stuff (particularly in xtlang) has changed
-slightly since this was written, although as a high-level overview it's still
-accurate. It'll be brought up to date as soon as possible, but if you find
-anything in here which isn't clear or doesn't work,
-[let us know](mailto:extemporelang@googlegroups.com) :::
+:::caution
+
+Some of the threading stuff (particularly in xtlang) has changed slightly since
+this was written, although as a high-level overview it's still accurate. It'll
+be brought up to date as soon as possible, but if you find anything in here
+which isn't clear or doesn't work,
+[let us know](mailto:extemporelang@googlegroups.com)
+
+:::
 
 Every Extempore _process_ (e.g. the "primary process" or "utility process") is a
 _Scheme process_, which is actually an operating-system (OS) thread running in

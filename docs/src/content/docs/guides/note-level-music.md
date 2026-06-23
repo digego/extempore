@@ -830,17 +830,21 @@ also add an even longer duration option for `I` and `IV`.
 "Bring back the beat" I hear you say. OK, on to beat & tempo. In this section
 we're going to need a drum instrument.
 
-::: info To set up a drumkit you can either follow the
-[sampler guide](sampler.md) which shows you how can set up your own sampler
-instrument (and guides you through making a drum sampler). Or you could just
-load `(sys:load "examples/sharedsystem/setup.xtm")` and it'll be done for you.
+:::note
+
+To set up a drumkit you can either follow the [sampler guide](sampler.md) which
+shows you how can set up your own sampler instrument (and guides you through
+making a drum sampler). Or you could just load
+`(sys:load "examples/sharedsystem/setup.xtm")` and it'll be done for you.
 
 Got a drum sampler set up? Great. So far we have been using Extempore's default
 time standard---samples per second---to control rhythm and duration information.
 As musicians though, we are more used to working with beats and tempo. Here's a
 simple example working with samples. At the end of this page you'll find a list
 of general MIDI drum numbers which I'll be using in this tutorial:
-`*gm-cowbell*`, etc... :::
+`*gm-cowbell*`, etc...
+
+:::
 
 ```xtlang
 ;; assuming you've set up and loaded the drums sampler

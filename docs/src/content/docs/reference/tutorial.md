@@ -2,8 +2,6 @@
 title: xtlang tutorial
 ---
 
-# xtlang tutorial
-
 This tutorial picks up where the [quickstart](../overview/quickstart.md) leaves
 off. You've got Extempore running, you can send `(println "Hello, World!")` to
 it from your editor, and now you want to actually write xtlang---the
@@ -21,10 +19,13 @@ When you're done, the [types](./types.md) and
 [memory-management](./memory-management.md) reference pages cover everything
 here in more depth.
 
-::: info Code snippets are verified Every snippet in this tutorial is run
-through `./extempore --batch` and the output shown is what it actually prints.
-If something here doesn't work, that's a bug---please
-[open an issue](https://github.com/digego/extempore/issues). :::
+:::note[Code snippets are verified]
+
+Every snippet in this tutorial is run through `./extempore --batch` and the
+output shown is what it actually prints. If something here doesn't work, that's
+a bug---please [open an issue](https://github.com/digego/extempore/issues).
+
+:::
 
 ## Your first bind-func
 
@@ -52,10 +53,14 @@ with the first slot as the return type: "a pointer to a closure that takes two
 
 Second, the call `(xt_add 3 6)` returns `9`.
 
-::: info Why the colons? `a:i64` means "the argument `a` is an `i64`". xtlang is
-statically typed, so the compiler needs to know the type of everything. For
-function arguments you usually say so explicitly; for locals, the compiler can
-often figure it out (next section). :::
+:::note[Why the colons?]
+
+`a:i64` means "the argument `a` is an `i64`". xtlang is statically typed, so the
+compiler needs to know the type of everything. For function arguments you
+usually say so explicitly; for locals, the compiler can often figure it out
+(next section).
+
+:::
 
 ## Types and inference
 

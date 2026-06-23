@@ -2,10 +2,14 @@
 title: xtlang types
 ---
 
-::: info It's not really possible to explain Extempore's types without a detour
-into some [memory stuff](memory-management.md), so we'll cover some of that as
+:::note
+
+It's not really possible to explain Extempore's types without a detour into some
+[memory stuff](/reference/memory-management/), so we'll cover some of that as
 well. For more info on how xtlang fits into the big picture of Extempore, see
-[philosophy](../overview/philosophy.md).
+[philosophy](/overview/philosophy/).
+
+:::
 
 xtlang code is statically typed---the types are determined at compile time, and
 the compiler checks that the types of the arguments to a function match the type
@@ -28,7 +32,7 @@ or by changing the structure of the code.
 The examples here use a lot of these type annotations. This is for
 clarity---some of these aren't strictly necessary (_as I'll show later_) because
 the type inferencing compiler will figure out the types of variables in many
-cases. :::
+cases.
 
 ## Primitive types {#primitive-types}
 
@@ -98,9 +102,10 @@ allocates memory from the heap (longest-lived). Finally, `alloc` is an alias for
 `zalloc`.
 
 More detail about the Extempore's memory architecture (and the difference
-between `salloc`, `halloc` and `zalloc`) can be found in <span
-role="doc">memory</span>. For now, though, we'll just use `zalloc`, which
-allocates memory from the current zone, which for these examples will work fine.
+between `salloc`, `halloc` and `zalloc`) can be found in
+[memory management](/reference/memory-management/). For now, though, we'll just
+use `zalloc`, which allocates memory from the current zone, which for these
+examples will work fine.
 
 ```xtlang
 (bind-func ptr_test
@@ -208,15 +213,16 @@ String literals in xtlang are bound globally (allocated on the heap). So you can
 safely set and store pointers to them without worrying about then disappearing
 on you.
 
-````xtlang
+```xtlang
 (bind-func string_literals
   (lambda ()
     (let ((str "Vive le tour!"))
       (printf "%s\n" str))))
 
 (string_literals) ;; prints "Vive le tour!"
-```xtlang does have a nicer `String` type, defined in `libs/base/base.xtm` (TODO
-more docs coming soon!).
+```
+
+There's also a nicer `String` type, defined in `libs/base/base.xtm`.
 
 ## Aggregate types {#aggregate-types}
 
@@ -226,13 +232,13 @@ languages.
 
 Normally the best way to work with these types is by reference (that is, through
 pointers). Allocating memory for a tuples, array or vector is done through a
-call to one of the *alloc* functions, as in the [example above](#pointer-types)
+call to one of the _alloc_ functions, as in the [example above](#pointer-types)
 with pointers to primitive types.
 
 ### Tuples {#tuples}
 
-An n-tuple is a fixed-length structure with n elements. *Different* tuples can
-have different lengths (different values of *n*), but a particular tuple always
+An n-tuple is a fixed-length structure with n elements. _Different_ tuples can
+have different lengths (different values of _n_), but a particular tuple always
 has the same fixed length.
 
 The elements of a tuple need not be of the same type, tuples are heterogeneous.
@@ -248,17 +254,17 @@ Examples:
 
 ![image](/images/tuple-examples.png)
 
--   `<double,i32>*` is a pointer to a 2-tuple: the first element is a `double`
-    and the second element is an `i32`
--   `<i64*,i64,float**>*` is a pointer to a 3 tuple: the first element is a
-    pointer to an `i64`, the second is an `i64`, and the third is a *pointer to
-    a pointer to* a `float`
--   `<double,<i64*>*>*` is a pointer to a 2-tuple, with a `double` as the first
-    element and a pointer to a 1-tuple as the second
+- `<double,i32>*` is a pointer to a 2-tuple: the first element is a `double` and
+  the second element is an `i32`
+- `<i64*,i64,float**>*` is a pointer to a 3 tuple: the first element is a
+  pointer to an `i64`, the second is an `i64`, and the third is a _pointer to a
+  pointer to_ a `float`
+- `<double,<i64*>*>*` is a pointer to a 2-tuple, with a `double` as the first
+  element and a pointer to a 1-tuple as the second
 
 Like `pref` for pointers, getting an element from a tuple involves a function
 called `tref`. So, to get element number `i` from a tuple pointer `t`, use
-`(tref t i)`. If `tref` doesn't have an *i* th element, the compiler will
+`(tref t i)`. If `tref` doesn't have an _i_ th element, the compiler will
 complain (as it should). The first argument to `tref` should be a pointer to a
 tuple rather than the tuple itself, and this holds for the array and vector
 equivalents as well. In fact, you'll almost never work with aggregate data types
@@ -275,7 +281,7 @@ sure that you pass values of the correct types into the different slots. But if
 you don't, at least you get a compile time error rather than weird behaviour at
 runtime.
 
-And finally, if you want a *reference to* (rather than the value of) an element
+And finally, if you want a _reference to_ (rather than the value of) an element
 in the tuple, use `tref-ptr` instead of `tref`.
 
 All of these tuple ref/ref-ptr/set!/fill! functions have the same syntax as the
@@ -298,14 +304,14 @@ performance standpoint.
 
 The syntax for vector types looks just like the array syntax, except the pipes
 (`|`) are replaced with slashes (`/`), presumably because they're going
-*faster*.
+_faster_.
 
 Examples:
 
 ![image](/images/vector-examples.png)
 
--   `/4,float/*`: a pointer to a vector of four floats
--   `/256,i32/*`: a pointer to a vector of 256 ints
+- `/4,float/*`: a pointer to a vector of four floats
+- `/256,i32/*`: a pointer to a vector of 256 ints
 
 In general, if you're working with vector types you'll know what you're doing,
 and pick algorithms and word sizes which make good use of the vector hardware on
@@ -323,15 +329,15 @@ Examples:
 
 ![image](/images/array-examples.png)
 
--   `|4,double|*`: a pointer to an array of 4 `double`
--   `|10000000,i32|*`: a pointer to an array of one million `i32`
--   `|3,<double,|15,float*|*>*|**`: a pointer to a pointer to an array of
-    pointers to 2-tuples, the second element of which is a pointer to an array
-    of 15 float pointers. Whew!
+- `|4,double|*`: a pointer to an array of 4 `double`
+- `|10000000,i32|*`: a pointer to an array of one million `i32`
+- `|3,<double,|15,float*|*>*|**`: a pointer to a pointer to an array of pointers
+  to 2-tuples, the second element of which is a pointer to an array of 15 float
+  pointers. Whew!
 
 It's probably clear at this point that the combinations of types allow for heaps
 of flexibility, but can get pretty confusing if you use lots of nesting of
-aggregate types within one another. If you *do* need to use complex types, then
+aggregate types within one another. If you _do_ need to use complex types, then
 you can define your own types and the compiler can do some of the bookkeeping
 for you (more on this below).
 
@@ -343,7 +349,7 @@ not to the first element but to some element further into the array), use
 ### Closures {#closures}
 
 The final important type in xtlang is the
-[closure](http://en.wikipedia.org/wiki/Closure_(computer_science)) type, and
+[closure](<http://en.wikipedia.org/wiki/Closure_(computer_science)>) type, and
 understanding closures is crucial to understanding how xtlang works as a whole.
 
 xtlang's closures are lexical closures (like in Scheme), which means that they
@@ -361,27 +367,27 @@ Examples:
 
 ![image](/images/closure-examples.png)
 
--   `[i64]*`: a pointer to a closure which takes no arguments and returns a
-    single `i64`
--   `[i64,double,double]*`: a pointer to a closure which takes two `double`
-    arguments and returns a single `i64`
--   `[<i64,i32>*,|8,double|*]*`: a pointer to a closure which takes as a n
-    argument a pointer to an 8-element `double` array and returns a pointer to a
-    2-tuple
--   `[[i64,i32]*,[double]*]*`: a pointer to a closure which takes a pointer to a
-    closure (which returns a `double`) as an argument and returns a pointer to
-    another closure
+- `[i64]*`: a pointer to a closure which takes no arguments and returns a single
+  `i64`
+- `[i64,double,double]*`: a pointer to a closure which takes two `double`
+  arguments and returns a single `i64`
+- `[<i64,i32>*,|8,double|*]*`: a pointer to a closure which takes as a n
+  argument a pointer to an 8-element `double` array and returns a pointer to a
+  2-tuple
+- `[[i64,i32]*,[double]*]*`: a pointer to a closure which takes a pointer to a
+  closure (which returns a `double`) as an argument and returns a pointer to
+  another closure
 
 The last example in particular is interesting: closures can take closures as
 arguments, and closures can return other closures. This comes in handy in lots
 of situations, as lots of the files in Extempore's `examples` directory show.
 
-The way to make closures in xtlang is with a [lambda
-form](http://en.wikipedia.org/wiki/Lambda_(programming)), just like in Scheme. A
-`lambda` returns an *anonymous* function closure---that's what it means for
-xtlang to have 'first class' functions/closures. Closures don't have to have
-names, they can be elements of lists and arrays, they can be passed to and
-returned from other closures, they can do anything any other type can do.
+The way to make closures in xtlang is with a
+[lambda form](<http://en.wikipedia.org/wiki/Lambda_(programming)>), just like in
+Scheme. A `lambda` returns an _anonymous_ function closure---that's what it
+means for xtlang to have 'first class' functions/closures. Closures don't have
+to have names, they can be elements of lists and arrays, they can be passed to
+and returned from other closures, they can do anything any other type can do.
 
 Sometimes, though, we want to give a closure a name, and that's where
 `bind-func` comes in. `bind-func` is the (only) way in xtlang to assign a global
@@ -394,7 +400,7 @@ using `bind-func`
     (+ a b)))
 
 (xt_add 3 6) ;; returns 9
-````
+```
 
 `xt_add` takes two int arguments (see how the `i64` type annotations are
 provided in the initial argument list) and returns their sum. It's also worth
@@ -554,7 +560,9 @@ later. This is all still compiled code, and it's all still very efficient (no
 boxing/unboxing going on). It's just nice to not have to write a separate `sort`
 function for lists of `i32` and `i64` for example.
 
-::: info This section is under construction, but for now have a look in
+:::note
+
+This section is under construction, but for now have a look in
 `libs/core/adt.xtm` for Extempore's
 [abstract data type](https://en.wikipedia.org/wiki/Abstract_data_type) (ADT)
 functionality.

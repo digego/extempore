@@ -1,4 +1,7 @@
-# Introduction
+---
+title: Core
+description: Core xtlang functions and variables that load at launch.
+---
 
 The core functions and variables that load at launch.
 

@@ -7,9 +7,13 @@ are Extempore plugins for several popular editors. This page shows how to set
 things up and lists any editor-specific instructions (e.g. the specific names of
 the commands & keybindings).
 
-::: info If you don't have a favourite text editor, or don't really know what a
-text editor is, then that's ok! [VSCode](#vscode) is probably the text editor
-for you. :::
+:::note
+
+If you don't have a favourite text editor, or don't really know what a text
+editor is, then that's ok! [VSCode](#vscode) is probably the text editor for
+you.
+
+:::
 
 ## VSCode {#vscode}
 

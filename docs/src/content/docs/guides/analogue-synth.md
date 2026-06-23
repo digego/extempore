@@ -50,8 +50,10 @@ You've just loaded
 
 Don't worry about how to use them just yet, you'll see how in a minute.
 
-::: info Loading the `examples/sharedsystem/audiosetup.xtm` library will also
-load up the Extempore pattern language stuff, which is covered in more detail in
+:::note
+
+Loading the `examples/sharedsystem/audiosetup.xtm` library will also load up the
+Extempore pattern language stuff, which is covered in more detail in
 [this guide](pattern-language.md). These two things are conceptually
 independent---you certainly don't have to understand the sharedsystem's analogue
 synths in depth if you just want to make bangin' loops with the pattern language
@@ -61,7 +63,9 @@ However, even if you're mostly interested in the sharedsystem it's still handy
 to understand a bit about the pattern language for making noise with your synths
 & samplers. That's the approach we'll take in this guide---we won't necessarily
 explain the pattern language stuff, but you can always jump over to the
-[pattern language docs](pattern-language.md) to go deeper. :::
+[pattern language docs](pattern-language.md) to go deeper.
+
+:::
 
 The interface for configuring the synths and the samplers is a bit different, so
 we'll look a them individually. Like all things in music-making, different folks
@@ -79,14 +83,16 @@ about how that works then check out that guide as well.
 The "analogue" synth is the real workhorse of the sharedsystem audio signal
 chain. It's an xtlang implementation of a flexible, modular analogue synth.
 
-::: info As you've probably figured out, it's not actually an _analogue_ synth,
-it's purely software, and purely digital---you can see (and modify) the source
-code for the whole thing in the `libs/core/instruments/analogue.xtm` file. But
-it's conceptually the same as an analogue modular synth, with multiple
-oscillators, filters, LFOS, etc. Furthermore, the oscillators are designed to
-faithfully replicate the oscillators of an analogue synth; the saw wave has
-messy "corners", there's slop in the oscillator frequency, and lots of other
-things like that. So that's why it's called `analogue`.
+:::note
+
+As you've probably figured out, it's not actually an _analogue_ synth, it's
+purely software, and purely digital---you can see (and modify) the source code
+for the whole thing in the `libs/core/instruments/analogue.xtm` file. But it's
+conceptually the same as an analogue modular synth, with multiple oscillators,
+filters, LFOS, etc. Furthermore, the oscillators are designed to faithfully
+replicate the oscillators of an analogue synth; the saw wave has messy
+"corners", there's slop in the oscillator frequency, and lots of other things
+like that. So that's why it's called `analogue`.
 
 Since you've already loaded the sharedsystem, you've already got three analogue
 synth instruments (`syn1`, `syn2` and `syn3`) connected and ready to play notes
@@ -107,7 +113,9 @@ Each analogue synth has:
 Some things are better explained with sample code, so the next phase of this
 guide is in the example file `examples/sharedsystem/analogue_synth_basics.xtm`.
 Open that file up in your text editor, play around, and see what noises you can
-make 😊 :::
+make 😊
+
+:::
 
 ## FAQ
 
