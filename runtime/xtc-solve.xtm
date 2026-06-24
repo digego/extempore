@@ -525,6 +525,24 @@
 ;; or 'conflict if a decided type contradicts a prior use of the result.
 ;; Threading the substitution across the pass lets one discharge feed the next
 ;; within the round.
+;; A projection whose aggregate is a fully-resolved tuple but whose (literal)
+;; index is past the last field is a genuine out-of-bounds error, not a
+;; not-yet-resolved projection.  Detecting it here lets us report a clean
+;; compile error instead of leaving the type unresolved (which crashes
+;; downstream in the driver's semantic phase with an internal car-of-#f).
+(define xtc:solve:tuple-index-oob?
+  (lambda (aggterm idx)
+    (let ((t (if (xtc:type:ptr? aggterm) (xtc:type:ptr-to aggterm) aggterm)))
+      ;; a ground tuple-like aggregate (a bare tuple, or a named/generic type
+      ;; that expands to one) whose field projection comes back empty: the
+      ;; index is past the last field
+      (and (integer? idx)
+           (null? (xtc:type:free-vars t))
+           (or (xtc:type:tuple? t)
+               (xtc:type:named? t)
+               (xtc:type:napp? t))
+           (not (xtc:type:project-field-term aggterm idx))))))
+
 (define xtc:solve:discharge-projects
   (lambda (pending intern subst)
     (let loop ((ps pending) (subst subst) (still '()) (progress #f))
@@ -552,13 +570,17 @@
                 (let* ((aggterm (xtc:type:apply-subst
                                  (xtc:type:from-intcode (caddr c) intern) subst))
                        (field (xtc:type:project-field-term aggterm (cadddr c))))
-                  (if (and field (null? (xtc:type:free-vars field)))
-                      (let ((s2 (xtc:type:unify
-                                 (xtc:type:from-intcode (cadr c) intern) field subst)))
-                        (if s2
-                            (loop (cdr ps) s2 still #t)
-                            'conflict))
-                      (loop (cdr ps) subst (cons c still) progress)))))))))
+                  (cond
+                    ((and field (null? (xtc:type:free-vars field)))
+                     (let ((s2 (xtc:type:unify
+                                (xtc:type:from-intcode (cadr c) intern) field subst)))
+                       (if s2
+                           (loop (cdr ps) s2 still #t)
+                           'conflict)))
+                    ((xtc:solve:tuple-index-oob? aggterm (cadddr c))
+                     (xtc:diagnostics:print-index-oob-error 'tuple (cadddr c)))
+                    (else
+                     (loop (cdr ps) subst (cons c still) progress))))))))))
 
 ;; Discharge projections, overloads and defaults to a fixpoint.  Each round first
 ;; discharges every projection whose aggregate has resolved (which can concretise
