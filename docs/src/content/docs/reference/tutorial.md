@@ -94,7 +94,8 @@ Compiled:  xt_add_partial >>> [i64,i64,i64]*
 Since `a` is `i64` and `b` is being added to it, `b` must also be `i64`. The
 compiler fills in the gap.
 
-But drop _all_ the annotations and there's nothing for it to go on:
+Drop _all_ the annotations and the compiler falls back to its defaults---an
+unconstrained number becomes a `double`:
 
 ```xtlang
 (bind-func xt_add_bad
@@ -103,18 +104,22 @@ But drop _all_ the annotations and there's nothing for it to go on:
 ```
 
 ```
-Could not resolve types!::xt_add_bad
-unresolved: a
-unresolved: b
+Compiled:  xt_add_bad >>> [double,double,double]*
 ```
 
-A good rule of thumb: annotate at the edges (function arguments, `bind-val`
-globals, places where you allocate memory). The middle usually takes care of
-itself.
+That compiles, but as a `double` adder---probably not what you wanted if you
+were after `i64`. A good rule of thumb: annotate at the edges (function
+arguments, `bind-val` globals, places where you allocate memory) so you get the
+types you mean; the middle usually takes care of itself. (Genuinely
+unconstrained _non-numeric_ code---a bare argument you only ever call, say---has
+no default to fall back on and _does_ fail, with
+[`couldn't resolve type`](/reference/error-messages/#could-not-resolve-types).)
 
 ### Deliberate type errors
 
 If you give the compiler conflicting information, it will tell you so:
+
+<!-- verify: expect-error -->
 
 ```xtlang
 (bind-func type_mismatch
@@ -123,12 +128,13 @@ If you give the compiler conflicting information, it will tell you so:
 ```
 
 ```
-Type Error bad numeric value 3.000000, should be i64
+Type Error: no overload matches the argument types [double,double] --- candidates are [i64,i64,i64]
+Type Error couldn't resolve type: type_mismatch_adhoc_N
 ```
 
-`xt_add` wants `i64` arguments; `3.0` is a `double`. xtlang won't silently
-coerce, so you either change the literal (`3`) or convert explicitly
-(`(dtoi64 3.0)`).
+`xt_add` wants `i64` arguments (its only candidate is `[i64,i64,i64]`); `3.0` is
+a `double`. xtlang won't silently coerce, so you either change the literal (`3`)
+or convert explicitly (`(dtoi64 3.0)`).
 
 The [error-messages glossary](/reference/error-messages/) catalogues more of
 these.

@@ -22,17 +22,20 @@ genuinely different message from the same code, please
 
 In the v0.10.0 compiler, inference runs through a single constraint solver, and
 when the constraints can't be satisfied most type errors surface the same way: a
-`CONFLICT-…` line naming what clashed, followed by
+`Type Error:` line saying what couldn't be reconciled, followed by
 
 ```
 Type Error couldn't resolve type: NAME_adhoc_N
 ```
 
 where `NAME` is the function being compiled and `_adhoc_N` is an internal suffix
-whose number varies run to run. The `CONFLICT-` line is the useful part---it
-names the two things the solver couldn't reconcile---but it is fairly low-level;
-read it together with the snippet that produced it. A handful of errors (literal
-mismatches, unbound names, parse errors) still have their own specific messages,
+whose number varies run to run. The first line is the useful one---it either
+names the clashing types directly
+(`type mismatch --- T is not compatible with U`) or, for a call, the argument
+types and the candidate signatures that didn't match
+(`no overload matches the argument types [...] --- candidates are [...]`). The
+second line just says which definition failed. A handful of errors (literal
+mismatches, unbound names, parse errors) have their own specific messages,
 covered below.
 
 :::
@@ -73,8 +76,8 @@ are necessary and when they're redundant.
 ### `couldn't resolve type` (a conflict) {#type-conflict}
 
 Passing the wrong type to a function, mixing up pointer types, or calling with
-the wrong number of arguments all produce a `CONFLICT-…` line and then
-`couldn't resolve type`. The CONFLICT line tells you which it was.
+the wrong number of arguments all produce a `Type Error:` line saying what
+clashed and then `couldn't resolve type`.
 
 **Wrong argument type** --- here `takes_i64` wants an `i64` but gets the float
 literal `3.0` (xtlang never silently coerces):
@@ -91,12 +94,13 @@ literal `3.0` (xtlang never silently coerces):
 
 ```
 Compiled:  takes_i64 >>> [i64,i64]*
+Type Error: no overload matches the argument types [double] --- candidates are [i64,i64]
 Type Error couldn't resolve type: caller_bad_numeric_adhoc_N
 ```
 
-The `couldn't resolve type` line is preceded by a `CONFLICT-OVERLOAD` line ---
-meaning no overload of the called function matched the argument types you
-supplied. Fix: pass `3` instead of `3.0`, or convert with `dtoi64`.
+No overload of the called function matched the argument types you supplied: you
+passed a `double`, but the only candidate is `[i64,i64]` (an `i64` argument
+returning `i64`). Fix: pass `3` instead of `3.0`, or convert with `dtoi64`.
 
 **Wrong pointer type** --- passing a `coord2d*` where a `coord3d*` is wanted.
 Note that even though `coord2d` is structurally `<double,double>`, the compiler
@@ -117,14 +121,15 @@ treats named types as distinct:
 ```
 
 ```
+Type Error: no overload matches the argument types [coord2d*] --- candidates are [double,coord3d*]
 Type Error couldn't resolve type: pass_wrong_type_adhoc_N
 ```
 
-The preceding `CONFLICT-OVERLOAD` line names both sides: the argument is a
-`coord2d` pointer, while the only candidate wants `coord3d*`.
+The message names both sides: the argument is a `coord2d*`, while the only
+candidate, `[double,coord3d*]`, wants a `coord3d*`.
 
 **Dereferencing a non-pointer** --- `pref`/`pset!` and friends expect a pointer
-(`double*`, `i64*`, `<...>*`); given a plain value you get a `CONFLICT-EQ`
+(`double*`, `i64*`, `<...>*`); given a plain value you get a type mismatch
 between the value's type and the pointer the solver needed:
 
 ```xtlang
@@ -135,15 +140,16 @@ between the value's type and the pointer the solver needed:
 ```
 
 ```
+Type Error: type mismatch --- i64 is not compatible with !infer_N*
 Type Error couldn't resolve type: pref_non_pointer_adhoc_N
 ```
 
-Here the preceding line is a `CONFLICT-EQ` between `x`'s type (`i64`) and the
-pointer the dereference required.
+Here `x`'s type (`i64`) clashes with the pointer the dereference required (the
+`!infer_N*` is the solver's name for "a pointer to something").
 
-**Fix.** Read the CONFLICT line for the clashing types, then make them agree:
-pass the right type, allocate the right pointer type, or `zalloc` a pointer
-before dereferencing it.
+**Fix.** Read the `Type Error:` line for the clashing types, then make them
+agree: pass the right type, allocate the right pointer type, or `zalloc` a
+pointer before dereferencing it.
 
 ### `bad numeric value` (literal vs annotation)
 
@@ -257,17 +263,19 @@ clause shows the arities the compiler knows about) followed by
 ```
 
 ```
+Type Error: no overload matches the argument types [i64] --- candidates are [i64,i64,i64]
 Type Error couldn't resolve type: call_too_few_adhoc_N
 ```
 
-(preceded by a `CONFLICT-OVERLOAD` line whose `cands` clause lists the arities
-the compiler knows about). **Too many arguments** produces the same shape of
+The `candidates are` clause shows the signature you missed: `[i64,i64,i64]` is a
+two-argument function (return type first, then the two `i64` parameters), but
+you supplied one argument. **Too many arguments** produces the same shape of
 error.
 
 **What it means.** `bind-func` is polymorphic---you can define several versions
 with the same name and different signatures---so when a call matches none of
-them by arity or type, the solver reports a conflict rather than a specific
-"wrong arity" message.
+them by arity or type, the solver reports it as an unmatched overload rather
+than a specific "wrong arity" message.
 
 **Fix.** Check the function's type signature (the `Compiled:  NAME >>> ...` log
 line) and match the argument count and types, or define another `bind-func`
@@ -287,17 +295,15 @@ variant with the signature you want.
 ```
 
 `small_tuple` has two fields (indices `0` and `1`), so index `5` is out of
-bounds.
+bounds:
 
-:::caution[Currently reports an internal error]
+```
+Syntax Error tuple index out of bounds: 5
+```
 
-In the current build an out-of-bounds literal tuple index does **not** produce a
-clean "tuple index out of bounds" message---it surfaces as an internal Scheme
-error (`;car argument, #f, is boolean but should be a pair`). Treat any such
-internal error from a `tref`/`tset!` as a likely bad index. This is a rough edge
-worth fixing in the compiler.
-
-:::
+The index must be a literal (you can't `tref` a tuple with a runtime variable),
+so the compiler checks it against the tuple's field count and reports a bad one
+directly. A negative literal index is caught the same way.
 
 **Fix.** Use a valid index, or reach for an array (`|n,type|*`) if you need
 indexed access with a variable. Note that array indexing via `aref` with an

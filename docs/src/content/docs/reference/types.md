@@ -535,6 +535,8 @@ xtlang code from Scheme (coercing argument types), but for any composite type
 
 Here's an example to make things a bit clearer:
 
+<!-- verify: skip -->
+
 ```xtlang
 ;; tuple_maker returns a pointer to a tuple, and tuple_taker takes
 ;; a pointer to a tuple as an argument.
@@ -616,6 +618,8 @@ Now, what happens if we change this testing example to make `top_right` and
 `bot_left` just plain tuples of type `<double,double>` instead of being our new
 `point` type.
 
+<!-- verify: expect-error -->
+
 ```xtlang
 (bind-func test_unit_square_diagonal_2
   (lambda ()
@@ -631,15 +635,16 @@ Now, what happens if we change this testing example to make `top_right` and
 Now, instead of compiling nicely, we get the compiler error:
 
 ```
-Compiler Error: Type Error: (euclid_distance bot_left top_right)
- function argument does not match. Expected "%point*" but got "{double,double}*"
+Type Error: no overload matches the argument types [<double,double>*,<double,double>*] --- candidates are [double,point*,point*]
+Type Error couldn't resolve type: test_unit_square_diagonal_2_adhoc_N
 ```
 
 Even though `point` _is_ just a `<double,double>` (check the `bind-type`
-definition above), the compiler won't let us compile the function. This is a
-good thing most of the time, because it makes us be more explicit about what we
-actually mean in our code, and saves us from the silly mistakes that can happen
-when we're not clear about what we want.
+definition above), the compiler won't let us pass a bare `<double,double>*`
+where a `point*` is wanted---the candidate signature `[double,point*,point*]`
+names what it expected. This is a good thing most of the time, because it makes
+us be more explicit about what we actually mean in our code, and saves us from
+the silly mistakes that can happen when we're not clear about what we want.
 
 There are lots of possibilities for the use of custom types, and there's no
 problem with binding as many as you need to make your code and intention
