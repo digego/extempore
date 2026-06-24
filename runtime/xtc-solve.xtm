@@ -124,24 +124,47 @@
           'conflict
           (xtc:solve:resolve constraints intern subst)))))
 
+;; Render a candidate signature (an int-code list: return, params...) the way a
+;; closure type prints, "[ret,param,...]", resolved as far as the substitution
+;; allows.
+(define xtc:solve:pretty-sig
+  (lambda (intcodes intern subst)
+    (string-append
+     "[" (xtc:type:to-pretty-list
+          (map (lambda (k) (xtc:type:apply-subst
+                            (xtc:type:from-intcode k intern) subst))
+               intcodes)
+          intern)
+     "]")))
+
 ;; A conflict's WHY, for the error path only (the solve itself stays silent):
-;; replay the equalities one at a time naming the first that fails, or name
-;; every overload with no viable candidate under the equality substitution.
+;; replay the equalities one at a time, reporting the first that fails as a
+;; readable type mismatch; or, when no single equality fails, report each
+;; overloaded call whose argument types match none of its candidates.  These
+;; messages precede the driver's "couldn't resolve type: NAME" line, which says
+;; which definition failed --- this line says why.
 (define xtc:solve:explain-conflict
   (lambda (constraints intern)
     (let loop ((cs constraints) (subst xtc:type:empty-subst))
       (cond
         ((null? cs)
-         (let ((classes (xtc:solve:class-map constraints)))
+         ;; apply numeric defaults first so a literal argument renders as its
+         ;; concrete type (double/i64) rather than an unresolved variable
+         (let* ((subst (xtc:solve:apply-defaults constraints intern subst))
+                (classes (xtc:solve:class-map constraints)))
            (for-each
             (lambda (c)
               (if (null? (xtc:solve:overload-viable c intern subst classes))
-                  (println 'CONFLICT-OVERLOAD: (cadr c)
-                           'args (map (lambda (k)
-                                        (xtc:type:apply-subst
-                                         (xtc:type:from-intcode k intern) subst))
-                                      (caddr c))
-                           'cands (cadddr c))))
+                  (print
+                   (string-append
+                    "Type Error: no overload matches the argument types "
+                    (xtc:solve:pretty-sig (caddr c) intern subst)
+                    " --- candidates are "
+                    (string-join
+                     (map (lambda (sig) (xtc:solve:pretty-sig sig intern subst))
+                          (cadddr c))
+                     " ")
+                    "\n"))))
             (cl:remove-if-not xtc:solve:overload? constraints))))
         ((xtc:solve:eq? (car cs))
          (let* ((c (car cs))
@@ -150,10 +173,13 @@
                 (subst2 (xtc:type:unify t1 t2 subst)))
            (if subst2
                (loop (cdr cs) subst2)
-               (println 'CONFLICT-EQ: (cadr c) '=
-                        (xtc:type:apply-subst t1 subst)
-                        'vs (caddr c) '=
-                        (xtc:type:apply-subst t2 subst)))))
+               (print
+                (string-append
+                 "Type Error: type mismatch --- "
+                 (xtc:type:to-pretty (xtc:type:apply-subst t1 subst) intern)
+                 " is not compatible with "
+                 (xtc:type:to-pretty (xtc:type:apply-subst t2 subst) intern)
+                 "\n")))))
         (else (loop (cdr cs) subst))))))
 
 (define xtc:solve:unify-equalities
