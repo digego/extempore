@@ -62,7 +62,23 @@ CONFIG = {
     "reference/types.md": "accumulate",
     "reference/memory-management.md": "accumulate",
     "guides/audio-file-io.md": "accumulate",
+    "guides/audio-signal-processing.md": "accumulate",
+    "guides/making-an-instrument.md": "accumulate",
 }
+
+# Deliberately *not* covered (sharedsystem / pattern-language guides):
+#   guides/note-level-music.md, guides/sampler.md, guides/pattern-language.md,
+#   guides/analogue-synth.md
+# These centre on `play-note`/pattern scheduling, which needs the audio clock to
+# actually advance --- nothing audible (or assertable) happens in --batch. They
+# also load the sharedsystem (examples/sharedsystem/audiosetup.xtm): it *does*
+# load headless, but the `Compiled:  NAME >>> SIG` lines the guides quote come
+# from a cold compile, whereas a built tree serves those libs from the AOT cache
+# and never reprints them, so the claims can never match. Sample loading also
+# fails without a real device ("Not a valid SNDFILE* pointer"). Covering these
+# would need a headless setup shim that drives the clock and disables the AOT
+# cache --- out of scope here; left to a future task if the guides grow runnable,
+# self-contained snippets.
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 DIRECTIVE = re.compile(r"<!--\s*verify:\s*(expect-error|skip)\s*-->")
@@ -200,8 +216,8 @@ def check_expect_errors(bs):
     return results
 
 
-def claims_in(text):
-    """Harvest `Compiled: NAME >>> SIG` and `;; prints "..."` claims."""
+def _scan_claims(text):
+    """Harvest `Compiled: NAME >>> SIG` and `;; prints "..."` claims from text."""
     claims = []
     for line in text.splitlines():
         m = re.search(r"Compiled:\s+\w+ >>> \S+", line)
@@ -213,13 +229,40 @@ def claims_in(text):
     return claims
 
 
-def check_accumulate(bs, text):
+def claims_in_blocks(bs):
+    """Harvest claims block-aware: only from output that a runnable block produces.
+
+    A `Compiled: NAME >>> SIG` (or `;; prints "..."`) claim is trusted only when
+    the block that would emit it actually runs in the accumulated session ---
+    either a `;;`-comment line inside a runnable xtlang block, or a plain output
+    block immediately following one. Claims sitting in prose, or after a skipped
+    or expect-error block, are ignored: nothing in the session emits them, so
+    harvesting them would manufacture false 'not found' failures (the guides'
+    illustrative `osc_c`/`tuple_maker` output blocks were exactly this).
+    """
+    claims = []
+    prev_runnable = False
+    for b in bs:
+        if b["lang"] == "xtlang":
+            runnable = b["directive"] not in ("skip", "expect-error")
+            if runnable:
+                claims += _scan_claims(b["code"])
+            prev_runnable = runnable
+        elif b["lang"] == "" and prev_runnable:
+            claims += _scan_claims(b["code"])
+            prev_runnable = False
+        else:
+            prev_runnable = False
+    return claims
+
+
+def check_accumulate(bs):
     """Run all non-skip, non-expect-error xtlang blocks in one session."""
     runnable = [b["code"] for b in bs
                 if b["lang"] == "xtlang" and b["directive"] not in ("skip", "expect-error")]
     actual = run("\n".join(runnable))
     results = []
-    claims = claims_in(text)
+    claims = claims_in_blocks(bs)
     for c in claims:
         if isinstance(c, tuple):
             ok = c[1] in actual
@@ -271,7 +314,7 @@ def main():
                 else:
                     print(f"  ok    {snippet_id}")
         else:
-            results, n = check_accumulate(bs, text)
+            results, n = check_accumulate(bs)
             for label, missing, actual in results:
                 fail += 1
                 print(f"  FAIL  {label}")

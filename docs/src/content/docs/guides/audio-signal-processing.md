@@ -34,6 +34,8 @@ This `dsp` function takes as input:
 
 By default, the type of `SAMPLE` is `float`, it's just a type alias:
 
+<!-- verify: skip -->
+
 ```xtlang
 (bind-alias SAMPLE float)
 ```
@@ -174,13 +176,15 @@ When programming in xtlang you don't really ever deal with tuples directly---you
 deal with them by _reference_ through pointers. There are no 'literals' for
 tuples either---you can't just go
 
+<!-- verify: expect-error -->
+
 ```xtlang
 (bind-func tuple_maker
   (lambda (a:i64)
     (let ((tup:<i64,i64> <a,a>))
       tup)))
 
-;; Compiler Error: unbound symbol: <a,a>
+;; Compiler Error cannot find symbol <a,a>
 ```
 
 Instead, this time in the `let` we get a pointer to a tuple through a call to
@@ -539,6 +543,8 @@ What---is that the end? Well, that's a bit frustrating: we haven't even got to
 _play_ our instrument yet! Don't worry, we'll use our `saw_synth` instrument in
 [note-level music](/guides/note-level-music/). Here's a sneak peek so you can
 hear it now though:
+
+<!-- verify: skip -->
 
 ```xtlang
 (bind-func dsp:DSP

@@ -188,6 +188,8 @@ are in the memory pointed to by `tonewheel`), you'd be right. Each closure
 'closes over' a state variable called `phase`, which you can see in the source
 for `osc_c` (which is in `libs/core/audio_dsp.xtm`)
 
+<!-- verify: skip -->
+
 ```xtlang
 (bind-func osc_c
   (lambda (phase)
@@ -207,6 +209,8 @@ the _two_ `lambda` forms: the outer one (with one `phase` argument) defines the
 `osc_c` closure itself, while the inner one (with `amp` and `freq` arguments)
 creates the closure which is returned by `osc_c`. _That's_ the closure that gets
 stored in the `tonewheel` array when we perform the loop:
+
+<!-- verify: skip -->
 
 ```xtlang
 (dotimes (i num_drawbars)
@@ -295,6 +299,8 @@ look like this
 
 :::
 
+<!-- verify: skip -->
+
 ```xtlang
 (make-instrument organ organ)
 ```
@@ -318,6 +324,8 @@ The first thing that needs to happen before you can start playing notes on an
 Extempore instrument is that the instrument needs to be called in the `dsp`
 callback. If we _only_ want our organ in the audio output, then that's as simple
 as
+
+<!-- verify: skip -->
 
 ```xtlang
 (bind-func dsp:DSP
@@ -393,6 +401,8 @@ we've been pursuing since the beginning.
 
 The 'template' for the note kernel and effects kernel is something like this
 (this is just a skeleton---it won't compile)
+
+<!-- verify: skip -->
 
 ```xtlang
 (bind-func organ_note
@@ -561,6 +571,8 @@ hammond organ
 ```
 
 and the moment of truth...
+
+<!-- verify: skip -->
 
 ```xtlang
 (play-note (now)   ;; time
