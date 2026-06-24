@@ -498,7 +498,7 @@ input through untouched:
         in))))
 
 ;; when we evaluate saw_synth_fx, the compiler prints:
-;; Compiled:  saw_synth_fx >>> [i64,i64,i64,float,float*]*
+;; Compiled:  saw_synth_fx >>> [[float,float,i64,i64,float*]*]*
 ```
 
 Let's add a stereo delay to make things a bit more interesting

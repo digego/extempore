@@ -149,8 +149,10 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
 
 # Documentation example verifier: run every xtlang snippet in the docs through
 # extempore --batch and check its claimed output, so doc code that drifts from
-# the compiler fails the build. Labelled `docs` (kept out of the libs-core /
-# libs-external runs); CI invokes it with `ctest -L docs`.
+# the compiler can be caught. Labelled `docs` (kept out of the libs-core /
+# libs-external runs). This is a LOCAL tool, deliberately excluded from CI (the
+# build-and-test workflow's label-regex omits `docs`) --- run it on Linux with
+# `ctest --test-dir build -L docs` before changing the docs.
 find_program(PYTHON3_EXECUTABLE NAMES python3 python)
 if(PYTHON3_EXECUTABLE)
     add_test(NAME docs/verify-examples

@@ -491,6 +491,8 @@ in a way that's trickier to do in higher-level languages. Remember that memory
 is a finite resource. Don't try and allocate a memory region of 10<sup>15</sup>
 8-byte `i64`:
 
+<!-- verify: skip -->
+
 ```xtlang
 (bind-func fill_massive_buffer
   (lambda ()
@@ -619,6 +621,8 @@ reference to) the value.
 Let's update our code for printing the number of cats to use a pointer to the
 value, rather than the value itself. Notice how the type of `num_cats_ptr` is
 `i64*` (a pointer to an `i64`) rather than just an `i64` like it was before.
+
+<!-- verify: skip -->
 
 ```xtlang
 (bind-func print_num_cats3

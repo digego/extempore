@@ -13,7 +13,16 @@ output against what the compiler actually emits. Two kinds of claim are checked:
                     `Compiled:  NAME >>> SIG` line and every `;; prints "..."`
                     claim found in the file must appear in the output, and the
                     accumulated session must not raise an unexpected compiler
-                    error.
+                    error.  `--batch` echoes the snippet back before running it,
+                    so the echo is subtracted first (see `deecho`) and claims are
+                    matched only against genuine program output --- otherwise a
+                    `;; prints "..."` comment would vacuously match itself.
+
+This is a local-only tool: it is registered as the `docs` ctest label but kept
+out of CI (the GNU `timeout` it once needed isn't on the macOS/Windows runners,
+and the claims it checks --- type signatures, error text --- are platform-
+independent anyway). Run it on Linux against a built extempore before changing
+the docs.
 
 Per-block directives
 --------------------
@@ -91,22 +100,34 @@ def norm(s):
     s = re.sub(r"_adhoc_[A-Za-z0-9_]+", "_adhoc_*", s)
     s = re.sub(r"##\d+", "##N", s)
     s = re.sub(r"!infer_\d+", "!infer_N", s)
+    s = re.sub(r"0x[0-9A-Fa-f]+", "0xADDR", s)  # pointer values vary run-to-run
     return s.strip()
 
 
 def run(code, timeout_s=TIMEOUT):
-    """Run xtlang `code` through --batch, return de-ANSI'd combined output."""
+    """Run xtlang `code` through --batch, return de-ANSI'd combined output.
+
+    A snippet that errors prints its message and then, in --batch, hangs awaiting
+    input rather than exiting; we rely on subprocess's own timeout to kill it.
+    (An earlier version wrapped the command in the GNU `timeout` binary, but that
+    isn't present on the macOS/Windows CI runners --- subprocess's timeout is
+    cross-platform and does the same job.)
+    """
     snippet = code if "(quit" in code else code + "\n(quit 0)\n"
     try:
         p = subprocess.run(
-            ["timeout", str(timeout_s), BIN, "--batch", snippet],
-            capture_output=True, text=True, cwd=ROOT, timeout=timeout_s + 30,
+            [BIN, "--batch", snippet],
+            capture_output=True, text=True, cwd=ROOT, timeout=timeout_s,
         )
         out = p.stdout + p.stderr
     except subprocess.TimeoutExpired as e:
-        out = (e.stdout or "") + (e.stderr or "")
-        if isinstance(out, bytes):
-            out = out.decode("utf-8", "replace")
+        # on timeout the captured streams come back raw (bytes) even under
+        # text=True, and either may be None --- decode each before joining
+        def _dec(x):
+            if x is None:
+                return ""
+            return x.decode("utf-8", "replace") if isinstance(x, bytes) else x
+        out = _dec(e.stdout) + _dec(e.stderr)
     return ANSI.sub("", out)
 
 
@@ -220,7 +241,10 @@ def _scan_claims(text):
     """Harvest `Compiled: NAME >>> SIG` and `;; prints "..."` claims from text."""
     claims = []
     for line in text.splitlines():
-        m = re.search(r"Compiled:\s+\w+ >>> \S+", line)
+        # stop the signature at whitespace or a closing quote, so a claim quoted
+        # in prose (`;; log shows "Compiled:  f >>> [...]*"`) doesn't drag the "
+        # into the captured signature
+        m = re.search(r'Compiled:\s+\w+ >>> [^\s"]+', line)
         if m:
             claims.append(m.group(0))
         m = re.search(r';;\s*prints\s+"([^"]+)"', line)
@@ -256,19 +280,38 @@ def claims_in_blocks(bs):
     return claims
 
 
+def deecho(actual, source):
+    """Drop lines of `actual` that are just `source` echoed back.
+
+    --batch prints `Evaluating expression: <source>` before running it, so the
+    source (including the `;; prints "..."` / `;; Compiled: ...` comments the
+    claims are harvested from) appears verbatim in the output. Matching a claim
+    against that echo is vacuous --- it would pass even when the runtime printed
+    something else. Subtract any output line that exactly matches a source line
+    so claims are checked only against what the program actually emitted.
+    """
+    src_lines = {l.strip() for l in source.splitlines() if l.strip()}
+    kept = [l for l in actual.splitlines() if l.strip() not in src_lines]
+    return "\n".join(kept)
+
+
 def check_accumulate(bs):
     """Run all non-skip, non-expect-error xtlang blocks in one session."""
     runnable = [b["code"] for b in bs
                 if b["lang"] == "xtlang" and b["directive"] not in ("skip", "expect-error")]
-    actual = run("\n".join(runnable))
+    source = "\n".join(runnable)
+    actual = run(source)
+    # claims live in the doc source as comments, which --batch echoes back; match
+    # them only against genuine program output, not the echoed source
+    emitted = deecho(actual, source)
     results = []
     claims = claims_in_blocks(bs)
     for c in claims:
         if isinstance(c, tuple):
-            ok = c[1] in actual
+            ok = norm(c[1]) in norm(emitted)
             label = f'prints "{c[1]}"'
         else:
-            ok = norm(c) in norm(actual)
+            ok = norm(c) in norm(emitted)
             label = c
         if not ok:
             results.append((label, ["<not found in output>"], ""))
