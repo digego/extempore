@@ -19,9 +19,9 @@ change, get in touch on the
 
 ## Documentation
 
-These docs are built with [VitePress](https://vitepress.dev). The sources live
-in [`docs/`](https://github.com/digego/extempore/tree/master/docs) in the main
-repo---just markdown files, easy to edit.
+These docs are built with [Astro Starlight](https://starlight.astro.build). The
+sources live in [`docs/`](https://github.com/digego/extempore/tree/master/docs)
+in the main repo---just markdown files, easy to edit.
 
 ### Editing
 
@@ -40,9 +40,36 @@ From the repo root:
 cd docs
 npm install
 npm run dev       # live-reloading dev server
-npm run build     # production build into docs/.vitepress/dist
+npm run build     # production build into docs/dist
 npm run preview   # preview the production build
 ```
+
+### Verifying code snippets
+
+The xtlang code in the reference pages is checked against the real compiler by
+`docs/verify-examples.py`, which runs each snippet through `extempore --batch`
+and compares the output to what the docs claim (a `Compiled:  NAME >>> SIG`
+line, a `;; prints "..."` comment, or---for `error-messages.md`---the error
+block that follows the snippet). It runs in CI as the `docs` ctest label:
+
+```sh
+ctest --test-dir build -L docs --output-on-failure
+```
+
+Two HTML-comment directives (invisible in the rendered page) tell the verifier
+how to treat a block that can't just be run and checked:
+
+- `<!-- verify: expect-error -->` --- the block is _meant_ to fail to compile.
+  It's run on top of the preceding blocks and the verifier asserts it really
+  errors and that the error block shown matches; it's also kept out of the
+  shared session so it can't derail later snippets.
+- `<!-- verify: skip -->` --- the block can't be auto-run headless (it needs the
+  audio device or the sharedsystem, or it's an illustrative fragment). It's left
+  out of the run entirely.
+
+Put the comment on its own line immediately before the block's opening fence. If
+you add or change a reference snippet, run the verifier locally before opening
+the PR.
 
 ### Style
 

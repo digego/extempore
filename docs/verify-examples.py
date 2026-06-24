@@ -11,7 +11,26 @@ output against what the compiler actually emits. Two kinds of claim are checked:
   * accumulate   -- all ```xtlang blocks in the file are run together in one
                     session (later blocks depend on earlier ones); every
                     `Compiled:  NAME >>> SIG` line and every `;; prints "..."`
-                    claim found in the file must appear in the output.
+                    claim found in the file must appear in the output, and the
+                    accumulated session must not raise an unexpected compiler
+                    error.
+
+Per-block directives
+--------------------
+A block can be annotated with an HTML comment immediately before its opening
+fence (invisible in the rendered docs):
+
+  <!-- verify: expect-error -->  the block is *meant* to fail to compile. It is
+                                 left out of the accumulated session (so it
+                                 can't poison later blocks) and instead run in
+                                 isolation, where the verifier asserts it really
+                                 does error and that the plain block following it
+                                 matches the error message shown.
+
+  <!-- verify: skip -->          the block can't be auto-run headless (needs the
+                                 audio device, the sharedsystem, or is an
+                                 illustrative fragment). It is excluded from the
+                                 session and not checked.
 
 Internal mangled names vary run-to-run, so `_adhoc_<stuff>` and `##<n>` are
 normalised before comparing.
@@ -27,8 +46,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs/src/content/docs")
-BIN = os.path.join(ROOT, "build/extempore")
+# the built extempore: $EXTEMPORE_BIN (set by the ctest target) or build/extempore
+BIN = os.environ.get("EXTEMPORE_BIN") or os.path.join(ROOT, "build/extempore")
 TIMEOUT = 90
+# a snippet that errors prints its message within a second or two and then, in
+# --batch, hangs awaiting input rather than exiting (see error-messages.md). For
+# the error/expect-error snippets we only need that message, so cap them short
+# instead of waiting out the full timeout on every one.
+ERROR_TIMEOUT = 20
 
 # filename (relative to DOCS) -> verification mode
 CONFIG = {
@@ -36,25 +61,30 @@ CONFIG = {
     "reference/tutorial.md": "accumulate",
     "reference/types.md": "accumulate",
     "reference/memory-management.md": "accumulate",
+    "guides/audio-file-io.md": "accumulate",
 }
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
+DIRECTIVE = re.compile(r"<!--\s*verify:\s*(expect-error|skip)\s*-->")
+# strong markers that a compile genuinely failed (not just prose mentioning them)
+ERROR_MARKER = re.compile(r"Compiler Error|Type Error|Could not resolve types")
 
 
 def norm(s):
     """Normalise volatile compiler internals so comparisons are stable."""
     s = re.sub(r"_adhoc_[A-Za-z0-9_]+", "_adhoc_*", s)
     s = re.sub(r"##\d+", "##N", s)
+    s = re.sub(r"!infer_\d+", "!infer_N", s)
     return s.strip()
 
 
-def run(code):
+def run(code, timeout_s=TIMEOUT):
     """Run xtlang `code` through --batch, return de-ANSI'd combined output."""
     snippet = code if "(quit" in code else code + "\n(quit 0)\n"
     try:
         p = subprocess.run(
-            ["timeout", str(TIMEOUT), BIN, "--batch", snippet],
-            capture_output=True, text=True, cwd=ROOT, timeout=TIMEOUT + 30,
+            ["timeout", str(timeout_s), BIN, "--batch", snippet],
+            capture_output=True, text=True, cwd=ROOT, timeout=timeout_s + 30,
         )
         out = p.stdout + p.stderr
     except subprocess.TimeoutExpired as e:
@@ -65,11 +95,21 @@ def run(code):
 
 
 def blocks(text):
-    """Yield (lang, code) for every fenced block, lang='' for plain fences."""
+    """Yield {lang, code, directive} for every fenced block.
+
+    `directive` is the verify directive ('expect-error'/'skip') from an HTML
+    comment immediately preceding the block, else None.
+    """
     fence = re.compile(r"^([`~]{3,})([\w-]*)\s*$")
     lines = text.splitlines()
     i = 0
+    pending = None
     while i < len(lines):
+        dm = DIRECTIVE.search(lines[i])
+        if dm:
+            pending = dm.group(1)
+            i += 1
+            continue
         m = fence.match(lines[i])
         if m:
             marker, lang = m.group(1), m.group(2)
@@ -78,23 +118,34 @@ def blocks(text):
             while i < len(lines) and not lines[i].startswith(marker[0] * 3):
                 body.append(lines[i])
                 i += 1
-            yield lang, "\n".join(body)
+            yield {"lang": lang, "code": "\n".join(body), "directive": pending}
+            pending = None
+            i += 1
+            continue
+        if lines[i].strip():
+            pending = None  # a directive only attaches to the block right after it
         i += 1
 
 
-def check_error_pairs(text):
-    """Pair each xtlang block with the next plain block (its expected output)."""
-    bs = list(blocks(text))
-    results = []
-    pending = None  # (index, code)
+def _error_pairs(bs):
+    """Pair each xtlang block with the plain block that follows it."""
     pairs = []
-    for lang, body in bs:
-        if lang == "xtlang":
-            pending = body
-        elif lang == "" and pending is not None:
-            pairs.append((pending, body))
+    pending = None
+    for b in bs:
+        if b["lang"] == "xtlang":
+            pending = b
+        elif b["lang"] == "" and pending is not None:
+            pairs.append((pending, b["code"]))
             pending = None
-    outs = list(EXEC.map(run, [c for c, _ in pairs]))
+    return pairs
+
+
+def check_error_pairs(bs):
+    """Run each (xtlang, expected-output) pair in isolation and diff."""
+    pairs = [(b["code"], expected) for b, expected in _error_pairs(bs)
+             if b["directive"] != "skip"]
+    outs = list(EXEC.map(lambda c: run(c, ERROR_TIMEOUT), [c for c, _ in pairs]))
+    results = []
     for (code, expected), actual in zip(pairs, outs):
         missing = []
         for line in expected.splitlines():
@@ -107,10 +158,50 @@ def check_error_pairs(text):
     return results
 
 
-def check_accumulate(text):
-    code = "\n".join(b for lang, b in blocks(text) if lang == "xtlang")
-    actual = run(code)
+def _next_plain(bs, idx):
+    """The plain output block following block `idx` (its expected output)."""
+    for nb in bs[idx + 1:]:
+        if nb["lang"] == "":
+            return nb["code"]
+        if nb["lang"] == "xtlang":
+            break
+    return ""
+
+
+def check_expect_errors(bs):
+    """Each expect-error block: assert it errors and matches the shown message.
+
+    The block is run on top of the preceding runnable blocks (the deliberate
+    error usually depends on earlier definitions), but is itself kept out of the
+    accumulated session so it can't poison later blocks.
+    """
+    prefix, tasks = [], []
+    for idx, b in enumerate(bs):
+        if b["lang"] != "xtlang":
+            continue
+        if b["directive"] == "expect-error":
+            sid = b["code"].strip().splitlines()[0][:60]
+            code = "\n".join(prefix + [b["code"]])
+            tasks.append((sid, _next_plain(bs, idx), code))
+        elif b["directive"] != "skip":
+            prefix.append(b["code"])
+    # like the error pairs, these hang after erroring; give them a little more
+    # headroom than a bare snippet since they compile the preceding blocks first
+    outs = list(EXEC.map(lambda c: run(c, 2 * ERROR_TIMEOUT), [c for _, _, c in tasks]))
     results = []
+    for (sid, expected, _), actual in zip(tasks, outs):
+        missing = []
+        if not ERROR_MARKER.search(actual):
+            missing.append("<expected a compiler error, but none was raised>")
+        for line in expected.splitlines():
+            if line.strip() and norm(line) not in norm(actual):
+                missing.append(line)
+        results.append((sid, missing, actual if missing else ""))
+    return results
+
+
+def claims_in(text):
+    """Harvest `Compiled: NAME >>> SIG` and `;; prints "..."` claims."""
     claims = []
     for line in text.splitlines():
         m = re.search(r"Compiled:\s+\w+ >>> \S+", line)
@@ -119,6 +210,16 @@ def check_accumulate(text):
         m = re.search(r';;\s*prints\s+"([^"]+)"', line)
         if m:
             claims.append(("prints", m.group(1)))
+    return claims
+
+
+def check_accumulate(bs, text):
+    """Run all non-skip, non-expect-error xtlang blocks in one session."""
+    runnable = [b["code"] for b in bs
+                if b["lang"] == "xtlang" and b["directive"] not in ("skip", "expect-error")]
+    actual = run("\n".join(runnable))
+    results = []
+    claims = claims_in(text)
     for c in claims:
         if isinstance(c, tuple):
             ok = c[1] in actual
@@ -128,6 +229,16 @@ def check_accumulate(text):
             label = c
         if not ok:
             results.append((label, ["<not found in output>"], ""))
+    # the accumulated session excludes the deliberate-error blocks, so any
+    # compiler error left in the output is a genuine regression
+    err = ERROR_MARKER.search(actual)
+    if err:
+        ctx = [l for l in actual.splitlines() if ERROR_MARKER.search(l)]
+        results.append(("unexpected compiler error in accumulated run",
+                        ctx[:4] or ["<error>"], actual))
+    # deliberate-error blocks: verify they really fail (keep only the ones that
+    # didn't error as claimed --- a clean pass returns empty `missing`)
+    results += [(sid, miss, act) for sid, miss, act in check_expect_errors(bs) if miss]
     return results, len(claims)
 
 
@@ -145,9 +256,10 @@ def main():
             print(f"SKIP {rel} (no config / missing)")
             continue
         text = open(path, encoding="utf-8").read()
-        print(f"\n=== {rel}  [{mode}] ===")
+        bs = list(blocks(text))
+        print(f"\n=== {rel}  [{mode}] ===", flush=True)
         if mode == "error-pairs":
-            for snippet_id, missing, actual in check_error_pairs(text):
+            for snippet_id, missing, actual in check_error_pairs(bs):
                 if missing:
                     fail += 1
                     print(f"  FAIL  {snippet_id}")
@@ -159,11 +271,17 @@ def main():
                 else:
                     print(f"  ok    {snippet_id}")
         else:
-            results, n = check_accumulate(text)
-            for label, missing, _ in results:
+            results, n = check_accumulate(bs, text)
+            for label, missing, actual in results:
                 fail += 1
-                print(f"  FAIL  claim not in output: {label}")
-            print(f"  checked {n} claims, {len(results)} failed")
+                print(f"  FAIL  {label}")
+                for m in missing:
+                    print(f"        {m!r}")
+                if actual:
+                    print("        --- actual (tail) ---")
+                    for l in actual.strip().splitlines()[-6:]:
+                        print(f"        | {l}")
+            print(f"  checked {n} claims, {len(results)} issue(s)")
     print(f"\n{'FAILURES: ' + str(fail) if fail else 'all checked claims verified'}")
     return 1 if fail else 0
 

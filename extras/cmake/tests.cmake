@@ -147,6 +147,23 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
     TIMEOUT 200
     LABELS compiler-unit)
 
+# Documentation example verifier: run every xtlang snippet in the docs through
+# extempore --batch and check its claimed output, so doc code that drifts from
+# the compiler fails the build. Labelled `docs` (kept out of the libs-core /
+# libs-external runs); CI invokes it with `ctest -L docs`.
+find_program(PYTHON3_EXECUTABLE NAMES python3 python)
+if(PYTHON3_EXECUTABLE)
+    add_test(NAME docs/verify-examples
+        COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/docs/verify-examples.py)
+    set_tests_properties(docs/verify-examples PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
+        LABELS docs
+        TIMEOUT 900)
+else()
+    message(STATUS "python3 not found --- skipping docs/verify-examples test")
+endif()
+
 # External library tests
 extempore_add_test(tests/external/fft.xtm libs-external)
 
