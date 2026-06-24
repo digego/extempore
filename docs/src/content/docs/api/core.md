@@ -56,7 +56,7 @@ Increments x by y.
 
 ### Example
 
-TODO
+`($ (let ((x 5)) (inc x 1))) ;; returns 6`
 
 ## dec
 
@@ -78,7 +78,7 @@ Decrements x by y.
 
 ### Example
 
-TODO
+`($ (let ((x 5)) (dec x 1))) ;; returns 4`
 
 ## min
 
@@ -100,7 +100,7 @@ Minimum of `x` and `y`.
 
 ### Example
 
-TODO
+`($ (min 3 7)) ;; returns 3`
 
 ## max
 
@@ -122,7 +122,7 @@ Returns the largest of the two values.
 
 ### Example
 
-TODO
+`($ (max 3 7)) ;; returns 7`
 
 ## clamp
 
@@ -141,11 +141,11 @@ Type: Macro
 ### Description
 
 Clamp input value to range. If `x < minval` it will return minval, if
-`y > maxval` it will return maxval. Otherwise it returns x.
+`x > maxval` it will return maxval. Otherwise it returns x.
 
 ### Example
 
-TODO
+`($ (clamp 12 0 10)) ;; returns 10`
 
 ## log
 
@@ -205,7 +205,7 @@ Converts a value in degrees to radians.
 
 ### Example
 
-TODO
+`($ (deg2rad 180.0)) ;; returns 3.141593 (pi)`
 
 ## rad2deg
 
@@ -230,7 +230,7 @@ Converts a value in radians to degrees.
 
 ### Example
 
-TODO
+`($ (rad2deg PI)) ;; returns 180.0`
 
 ## evenp
 
@@ -285,22 +285,6 @@ Constant Type: float Value: Single precision not-a-number
 ## NaN
 
 Constant Type: double Value: Double precision not a number
-
-## nan32
-
-Constant Type: i32 Value: Integer not a number TODO
-
-## nan64
-
-Constant Type: i64 Value: Integer not a number TODO
-
-## n32
-
-Constant Type: i32\* Value: TODO Integer not a number TODO
-
-## n64
-
-Constant Type: i64\* Value: TODO Integer not a number TODO
 
 ## PIf
 
@@ -529,15 +513,15 @@ Type Alias Type: float Value Audio I/O sample type in the dsp processing chain
 
 ## DSP
 
-**Type Alias** : [SAMPLE,SAMPLE,i64,i64,SAMPLE]
+**Type Alias** : [SAMPLE,SAMPLE,i64,i64,SAMPLE\*]\*
 
 ### Parameters
 
-1. **in:SAMPLE** : input sample from sound card
-2. **chan:i64** : the channel that the current sample comes from, and the
+1. **in:SAMPLE** : input sample from the sound card
+2. **time:i64** : the current time, in samples (the audio sample clock)
+3. **chan:i64** : the channel that the current sample comes from, and the
    corresponding channel that the current sample will go to.
-3. **TODO:i64** : TODO what is this?
-4. **data:SAMPLE** : TODO currently unused.
+4. **dat:SAMPLE\*** : pointer to user data passed through to the callback.
 
 ### Returns
 
@@ -545,24 +529,29 @@ Type Alias Type: float Value Audio I/O sample type in the dsp processing chain
 
 ### Description
 
-Audio call back function that is single sample and single threaded.
+Audio callback function that is single sample and single threaded. A dsp closure
+has the signature `(lambda (in time chan dat) ...)`.
 
 ### Example
 
-TODO
+```extempore
+(bind-func dsp:DSP
+  (lambda (in time chan dat)
+    (* 0.1 (random))))
+```
 
 ## DSPMT
 
-**Type Alias** : [SAMPLE,SAMPLE*,i64,i64,SAMPLE]
+**Type Alias** : [SAMPLE,SAMPLE\*,i64,i64,SAMPLE\*]\*
 
 ### Parameters
 
-1. **in:SAMPLE\*** : TODO Is this correct? input sample from sound card. Think
-   it's actually multiple inputs.
-2. **chan:i64** : the channel that the current sample comes from, and the
+1. **in:SAMPLE\*** : pointer to the block of input samples (one per input
+   channel).
+2. **time:i64** : the current time, in samples (the audio sample clock)
+3. **chan:i64** : the channel that the current sample comes from, and the
    corresponding channel that the current sample will go to.
-3. **TODO:i64** : TODO what is this?
-4. **data:SAMPLE** : TODO currently unused.
+4. **dat:SAMPLE\*** : pointer to user data passed through to the callback.
 
 ### Returns
 
@@ -570,11 +559,16 @@ TODO
 
 ### Description
 
-Audio call back function that is single sample and multi threaded.
+The multithreaded variant of [DSP](#dsp): the `in` argument is a pointer to the
+block of input samples rather than a single sample.
 
 ### Example
 
-TODO
+```extempore
+(bind-func dsp:DSPMT
+  (lambda (in time chan dat)
+    (* 0.1 (random))))
+```
 
 ## SPI
 
@@ -814,11 +808,11 @@ A 'thread-first' macro.
 This macro can help make code more readable by removing nesting. Threads the
 first expr passed to the macro into the first position in the second sexp.
 Recursively continues to thread the resultant sexp into any further sexp
-arguments."
+arguments.
 
 ### Examples
 
-TODO - Quite badly needed really...
+`($ (-> 5 (+ 3) (* 2))) ;; (* (+ 5 3) 2), returns 16`
 
 ## ->>
 
@@ -831,11 +825,11 @@ A 'thread-last' macro.
 This macro can help make code more readable by removing nesting. Threads the
 first expr passed to the macro into the last position in the second sexp.
 Recursively continues to thread the resultant sexp into any further sexp
-arguments."
+arguments.
 
 ### Examples
 
-TODO - Quite badly needed really...
+`($ (->> 5 (- 10))) ;; (- 10 5), returns 5`
 
 # Interop
 

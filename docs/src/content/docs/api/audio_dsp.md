@@ -28,11 +28,7 @@ dsp_randn:[float]*
 
 This returns a Gaussian distributed random number between 0.0 and 1.0
 
-It uses the Marasaglia algorithm (http://c-faq.com/lib/gaussian.html).
-
-**TODO** There may be a bug in the implementation... Need to look at this again.
-This feels suboptimal. Why call dsp_randn, and that's not going to change the
-values here. Think there's a better solution.
+It uses the Marsaglia algorithm (http://c-faq.com/lib/gaussian.html).
 
 ## parabolicSineHP
 
@@ -98,7 +94,7 @@ values.
 ## fasttanh
 
 ```extempore
-fasttan:[SAMPLE,SAMPLE]*
+fasttanh:[SAMPLE,SAMPLE]*
 ```
 
 ### Parameters
@@ -119,7 +115,7 @@ values.
 ## fastsin
 
 ```extempore
-fasttan:[SAMPLE,SAMPLE]*
+fastsin:[SAMPLE,SAMPLE]*
 ```
 
 ### Parameters
@@ -178,7 +174,7 @@ described in the next section.
 ## sin_c
 
 ```extempore
-osc_c:[[SAMPLE,SAMPLE,SAMPLE]*,SAMPLE]*
+sin_c:[[SAMPLE,SAMPLE,SAMPLE]*,SAMPLE]*
 ```
 
 **TODO** I feel this should probably have sin in there somewhere.
@@ -500,11 +496,14 @@ hermite_interp:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*
 
 ### Parameters
 
-1. **fractional:SAMPLE** : TODO.
-2. **y1:SAMPLE** : TODO
-3. **x0:SAMPLE** : TODO
-4. **x1:SAMPLE** : TODO
-5. **x2:SAMPLE** : TODO
+1. **fractional:SAMPLE** : position within the interval `[x0, x1]`, in the range
+   0.0 to 1.0.
+2. **y1:SAMPLE** : the sample immediately before the interval (i.e. `x[n-1]`).
+3. **x0:SAMPLE** : the sample at the start of the interval; returned when
+   `fractional` is 0.0.
+4. **x1:SAMPLE** : the sample at the end of the interval; returned when
+   `fractional` is 1.0.
+5. **x2:SAMPLE** : the sample immediately after the interval (i.e. `x[n+2]`).
 
 ### Returns
 
@@ -512,9 +511,12 @@ hermite_interp:[SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE,SAMPLE]*
 
 ### Description
 
-TODO
+Four-point cubic Hermite interpolation. Interpolates between `x0` and `x1`,
+using the surrounding samples `y1` and `x2` to shape the curve.
 
 ### Example
+
+`($ (hermite_interp 0.5 0.0 1.0 2.0 3.0)) ;; returns 1.5`
 
 # Conversion Utilities
 
@@ -812,7 +814,7 @@ the correct output for the desired `channel`.
 ## hann
 
 ```extempore
-panner::[SAMPLE,i64,i64,i64]*
+hann:[SAMPLE,i64,i64,i64]*
 ```
 
 ### Parameters
@@ -1115,7 +1117,7 @@ pass filter. Not sure if this is analog modelled, or not.
 ## lpf2_c
 
 ```extempore
-lpf_c::[[SAMPLE,SAMPLE,SAMPLE,SAMPLE]*]*
+lpf2_c:[[SAMPLE,SAMPLE,SAMPLE,SAMPLE]*]*
 ```
 
 ### Returns
@@ -1218,7 +1220,7 @@ pass filter. Not sure if this is analog modelled, or not.
 ## notch_c
 
 ```extempore
-hpf_c::[[SAMPLE,SAMPLE,SAMPLE,SAMPLE]*]*
+notch_c:[[SAMPLE,SAMPLE,SAMPLE,SAMPLE]*]*
 ```
 
 ### Returns
