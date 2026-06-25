@@ -58,14 +58,14 @@
       (if (not alist)
           'conflict
           (cl:remove
-           #f
-           (map (lambda (sym)
-                  (let ((e (assoc-strcmp sym alist)))
-                    (if (or (eq? sym symname)
-                            (and e (xtc:codegen:type? (inferfn:norm (cdr e)))))
-                        #f
-                        sym)))
-                (hashtable-keys (car p))))))))
+            #f
+            (map (lambda (sym)
+                   (let ((e (assoc-strcmp sym alist)))
+                     (if (or (eq? sym symname)
+                             (and e (xtc:codegen:type? (inferfn:norm (cdr e)))))
+                         #f
+                         sym)))
+                 (hashtable-keys (car p))))))))
 
 ;; A couple of monomorphic globals so a function body can call out.
 (bind-func inferfn_add_i32 (lambda (a:i32 b:i32) (+ a b)))
@@ -100,21 +100,21 @@
 ;; memory / aggregate forms (stage 3b): allocation, tuple build + read (anonymous
 ;; and named), set!, null?, pointer read/write.
 (xtmtest-result (inferfn:residuals 'tf_tup
-                  '(lambda (x:i64 y:double)
-                     (let ((t:<i64,double>* (salloc)))
-                       (tset! t 0 x) (tset! t 1 y) (tref t 0))))
+                                   '(lambda (x:i64 y:double)
+                                     (let ((t:<i64,double>* (salloc)))
+                                       (tset! t 0 x) (tset! t 1 y) (tref t 0))))
                 '() "fn-tuple-build-read")
 (xtmtest-result (inferfn:residuals 'tf_tup1
-                  '(lambda (x:i64 y:double)
-                     (let ((t:<i64,double>* (salloc)))
-                       (tset! t 0 x) (tset! t 1 y) (tref t 1))))
+                                   '(lambda (x:i64 y:double)
+                                     (let ((t:<i64,double>* (salloc)))
+                                       (tset! t 0 x) (tset! t 1 y) (tref t 1))))
                 '() "fn-tuple-field1")
 (xtmtest-result (inferfn:residuals 'tf_named '(lambda (p:ifn_pair*) (tref p 0)))
                 '() "fn-named-tuple-field0")
 (xtmtest-result (inferfn:residuals 'tf_named1 '(lambda (p:ifn_pair*) (tref p 1)))
                 '() "fn-named-tuple-field1")
 (xtmtest-result (inferfn:residuals 'tf_heap
-                  '(lambda (x:i64) (let ((t:<i64,i64>* (halloc))) (tset! t 0 x) (tref t 0))))
+                                   '(lambda (x:i64) (let ((t:<i64,i64>* (halloc))) (tset! t 0 x) (tref t 0))))
                 '() "fn-heap-alloc")
 (xtmtest-result (inferfn:residuals 'tf_set '(lambda (x:i64) (let ((y:i64 0)) (set! y x) y)))
                 '() "fn-set-bang")
@@ -128,12 +128,12 @@
 ;; control / misc forms (stage 3b cont.): while, dotimes, string literal,
 ;; numeric conversion, printf, closure application, array.
 (xtmtest-result (inferfn:residuals 'tf_while
-                  '(lambda (n:i64) (let ((i:i64 0)) (while (< i n) (set! i (+ i 1))) i)))
+                                   '(lambda (n:i64) (let ((i:i64 0)) (while (< i n) (set! i (+ i 1))) i)))
                 '() "fn-while")
 ;; the dotimes counter is not a binding site on either path --- both error on an
 ;; undeclared counter --- so it is declared in the let, the documented usage
 (xtmtest-result (inferfn:residuals 'tf_dot
-                  '(lambda (n:i64) (let ((s:i64 0) (i:i64 0)) (dotimes (i n) (set! s (+ s i))) s)))
+                                   '(lambda (n:i64) (let ((s:i64 0) (i:i64 0)) (dotimes (i n) (set! s (+ s i))) s)))
                 '() "fn-dotimes-declared-counter")
 (xtmtest-result (inferfn:residuals 'tf_str '(lambda () "hello"))
                 '() "fn-string-literal")
@@ -144,7 +144,7 @@
 (xtmtest-result (inferfn:residuals 'tf_apply '(lambda (f:[i64,i64]* x:i64) (f x)))
                 '() "fn-closure-apply")
 (xtmtest-result (inferfn:residuals 'tf_arr
-                  '(lambda (n:i64) (let ((a:|4,i64|* (salloc))) (aset! a 0 n) (aref a 0))))
+                                   '(lambda (n:i64) (let ((a:|4,i64|* (salloc))) (aset! a 0 n) (aref a 0))))
                 '() "fn-array")
 (xtmtest-result (inferfn:residuals 'tf_sqrt '(lambda (x:double) (sqrt x)))
                 '() "fn-math-intrinsic")
@@ -162,10 +162,10 @@
 ;; vshuffle (both yield the VALUE vector), and an i8-typed comparison against an
 ;; int literal (the literal's viability class reaches the 8-bit widths).
 (xtmtest-result (inferfn:residuals 'tf_if1
-                  '(lambda (x:i64) (let ((y:i64 0)) (if (> x 0) (set! y x)) y)))
+                                   '(lambda (x:i64) (let ((y:i64 0)) (if (> x 0) (set! y x)) y)))
                 '() "fn-one-armed-if")
 (xtmtest-result (inferfn:residuals 'tf_prefptr
-                  '(lambda (p:double* n:i64) (pref-ptr p n)))
+                                   '(lambda (p:double* n:i64) (pref-ptr p n)))
                 '() "fn-pref-ptr")
 (bind-val inferfn_gv i64 7)
 (xtmtest-result (inferfn:residuals 'tf_gread '(lambda (x:i64) (+ x inferfn_gv)))
@@ -173,13 +173,13 @@
 (xtmtest-result (inferfn:residuals 'tf_gwrite '(lambda (x:i64) (set! inferfn_gv x) inferfn_gv))
                 '() "fn-global-write")
 (xtmtest-result (inferfn:residuals 'tf_vmath
-                  '(lambda (a:/4,float/* b:/4,float/*)
-                     (let ((v:/4,float/ (* (pref a 0) b))) v)))
+                                   '(lambda (a:/4,float/* b:/4,float/*)
+                                     (let ((v:/4,float/ (* (pref a 0) b))) v)))
                 '() "fn-vector-math-mixed-depth")
 (xtmtest-result (inferfn:residuals 'tf_vshuf
-                  '(lambda (a:/4,float/*)
-                     (let ((v:/4,float/ (vshuffle a null 0 0 1 1))) v)))
+                                   '(lambda (a:/4,float/*)
+                                     (let ((v:/4,float/ (vshuffle a null 0 0 1 1))) v)))
                 '() "fn-vector-shuffle")
 (xtmtest-result (inferfn:residuals 'tf_i8cmp
-                  '(lambda (s:i8* i:i64) (if (= (pref s i) 32) 1 0)))
+                                   '(lambda (s:i8* i:i64) (if (= (pref s i) 32) 1 0)))
                 '() "fn-i8-literal-compare")

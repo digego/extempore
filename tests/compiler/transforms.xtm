@@ -177,62 +177,62 @@
 ;; AST constructors and accessors
 
 (xtmtest-with-fixture ast-if-round-trip
-  (define node (ast:make-if 'test 'then 'els))
-  (is? (ast:if-test node) 'test "if-test")
-  (is? (ast:if-then node) 'then "if-then")
-  (is? (ast:if-else node) 'els "if-else"))
+                      (define node (ast:make-if 'test 'then 'els))
+                      (is? (ast:if-test node) 'test "if-test")
+                      (is? (ast:if-then node) 'then "if-then")
+                      (is? (ast:if-else node) 'els "if-else"))
 
 (xtmtest-with-fixture ast-let-round-trip
-  (define node (ast:make-let 'let '((x 1)) '(+ x 1)))
-  (is? (ast:let-tag node) 'let "let-tag")
-  (is? (ast:let-bindings node) '((x 1)) "let-bindings")
-  (is? (ast:let-body node) '(+ x 1) "let-body"))
+                      (define node (ast:make-let 'let '((x 1)) '(+ x 1)))
+                      (is? (ast:let-tag node) 'let "let-tag")
+                      (is? (ast:let-bindings node) '((x 1)) "let-bindings")
+                      (is? (ast:let-body node) '(+ x 1) "let-body"))
 
 (xtmtest-with-fixture ast-lambda-round-trip
-  (define node (ast:make-lambda 'lambda '(x y) '(+ x y)))
-  (is? (ast:lambda-tag node) 'lambda "lambda-tag")
-  (is? (ast:lambda-params node) '(x y) "lambda-params")
-  (is? (ast:lambda-body node) '(+ x y) "lambda-body"))
+                      (define node (ast:make-lambda 'lambda '(x y) '(+ x y)))
+                      (is? (ast:lambda-tag node) 'lambda "lambda-tag")
+                      (is? (ast:lambda-params node) '(x y) "lambda-params")
+                      (is? (ast:lambda-body node) '(+ x y) "lambda-body"))
 
 (xtmtest-with-fixture ast-predicates
-  (define (bool x) (if x #t #f))
-  (is? (bool (ast:if? '(if a b c))) #t "if-positive")
-  (is? (bool (ast:let? '(let ((x 1)) x))) #t "let-positive")
-  (is? (bool (ast:lambda? '(lambda (x) x))) #t "lambda-positive")
-  (is? (bool (ast:begin? '(begin 1 2))) #t "begin-positive")
-  (is? (bool (ast:set!? '(set! x 1))) #t "set!-positive")
-  (is? (bool (ast:var? 'x)) #t "var-positive")
-  (is? (bool (ast:lit? 42)) #t "lit-number")
-  (is? (bool (ast:lit? "hello")) #t "lit-string")
-  (is? (bool (ast:call? '(foo 1 2))) #t "call-positive")
-  (is? (bool (ast:if? '(+ 1 2))) #f "if-negative")
-  (is? (bool (ast:let? 42)) #f "let-negative")
-  (is? (bool (ast:call? '(if a b c))) #f "call-negative-if")
-  (is? (bool (ast:call? '(let ((x 1)) x))) #f "call-negative-let"))
+                      (define (bool x) (if x #t #f))
+                      (is? (bool (ast:if? '(if a b c))) #t "if-positive")
+                      (is? (bool (ast:let? '(let ((x 1)) x))) #t "let-positive")
+                      (is? (bool (ast:lambda? '(lambda (x) x))) #t "lambda-positive")
+                      (is? (bool (ast:begin? '(begin 1 2))) #t "begin-positive")
+                      (is? (bool (ast:set!? '(set! x 1))) #t "set!-positive")
+                      (is? (bool (ast:var? 'x)) #t "var-positive")
+                      (is? (bool (ast:lit? 42)) #t "lit-number")
+                      (is? (bool (ast:lit? "hello")) #t "lit-string")
+                      (is? (bool (ast:call? '(foo 1 2))) #t "call-positive")
+                      (is? (bool (ast:if? '(+ 1 2))) #f "if-negative")
+                      (is? (bool (ast:let? 42)) #f "let-negative")
+                      (is? (bool (ast:call? '(if a b c))) #f "call-negative-if")
+                      (is? (bool (ast:call? '(let ((x 1)) x))) #f "call-negative-let"))
 
 (xtmtest-with-fixture ast-begin-set
-  (define bnode (ast:make-begin '(1 2 3)))
-  (is? (ast:begin-exprs bnode) '(1 2 3) "begin-exprs")
-  (define snode (ast:make-set! 'x '(+ 1 2)))
-  (is? (ast:set!-var snode) 'x "set!-var")
-  (is? (ast:set!-expr snode) '(+ 1 2) "set!-expr"))
+                      (define bnode (ast:make-begin '(1 2 3)))
+                      (is? (ast:begin-exprs bnode) '(1 2 3) "begin-exprs")
+                      (define snode (ast:make-set! 'x '(+ 1 2)))
+                      (is? (ast:set!-var snode) 'x "set!-var")
+                      (is? (ast:set!-expr snode) '(+ 1 2) "set!-expr"))
 
 ;; lambda wrapping in first-transform (produces let-bound anon lambda)
 
 (xtmtest-with-fixture lambda-in-body
-  (define (bool x) (if x #t #f))
-  (define result (xtc:desugar:first-transform '(lambda (x) (+ x 1)) #t))
-  (is? (bool (ast:let? result)) #t "lambda-wraps-in-let")
-  (define binding-val (cadr (car (ast:let-bindings result))))
-  (is? (bool (ast:lambda? binding-val)) #t "binding-is-lambda"))
+                      (define (bool x) (if x #t #f))
+                      (define result (xtc:desugar:first-transform '(lambda (x) (+ x 1)) #t))
+                      (is? (bool (ast:let? result)) #t "lambda-wraps-in-let")
+                      (define binding-val (cadr (car (ast:let-bindings result))))
+                      (is? (bool (ast:lambda? binding-val)) #t "binding-is-lambda"))
 
 ;; let in first-transform preserves structure
 
 (xtmtest-with-fixture let-transform
-  (define (bool x) (if x #t #f))
-  (define result (xtc:desugar:first-transform '(let ((x 1)) (+ x 2)) #t))
-  (is? (bool (ast:let? result)) #t "let-preserved")
-  (is? (length (ast:let-bindings result)) 1 "let-one-binding"))
+                      (define (bool x) (if x #t #f))
+                      (define result (xtc:desugar:first-transform '(let ((x 1)) (+ x 2)) #t))
+                      (is? (bool (ast:let? result)) #t "let-preserved")
+                      (is? (length (ast:let-bindings result)) 1 "let-one-binding"))
 
 ;; cond -> if via first-transform
 
@@ -243,10 +243,10 @@
 ;; AST validation
 
 (xtmtest-with-fixture ast-validate
-  (is? (ast:validate '(if a b c)) #t "validate-if")
-  (is? (ast:validate '(let ((x 1)) x)) #t "validate-let")
-  (is? (ast:validate '(lambda (x) x)) #t "validate-lambda")
-  (is? (ast:validate '(begin 1 2 3)) #t "validate-begin")
-  (is? (ast:validate '(set! x 1)) #t "validate-set!")
-  (is? (ast:validate 42) #t "validate-literal")
-  (is? (ast:validate 'x) #t "validate-var"))
+                      (is? (ast:validate '(if a b c)) #t "validate-if")
+                      (is? (ast:validate '(let ((x 1)) x)) #t "validate-let")
+                      (is? (ast:validate '(lambda (x) x)) #t "validate-lambda")
+                      (is? (ast:validate '(begin 1 2 3)) #t "validate-begin")
+                      (is? (ast:validate '(set! x 1)) #t "validate-set!")
+                      (is? (ast:validate 42) #t "validate-literal")
+                      (is? (ast:validate 'x) #t "validate-var"))

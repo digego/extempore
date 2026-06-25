@@ -26,11 +26,11 @@
 ;; NOTE: use 'typ' not 'result' to avoid shadowing xtmtest internals
 
 (xtmtest-with-fixture pipeline-lambda
-  (define typ (xtc:bind:get-expression-type '(lambda (x:i64) (+ x 1))))
-  (is? (list? typ) #t "lambda-returns-list")
-  (is? (car typ) 213 "lambda-closure-tag")
-  (is? (cadr typ) 2 "lambda-return-type")
-  (is? (caddr typ) 2 "lambda-param-type"))
+                      (define typ (xtc:bind:get-expression-type '(lambda (x:i64) (+ x 1))))
+                      (is? (list? typ) #t "lambda-returns-list")
+                      (is? (car typ) 213 "lambda-closure-tag")
+                      (is? (cadr typ) 2 "lambda-return-type")
+                      (is? (caddr typ) 2 "lambda-param-type"))
 
 ;; desugaring composes with type checking
 
@@ -71,14 +71,14 @@
 ;; nested lambda
 
 (xtmtest-with-fixture pipeline-nested-lambda
-  (define typ (xtc:bind:get-expression-type '(lambda (x:i64) (lambda (y:i64) (+ x y)))))
-  (is? (list? typ) #t "nested-lambda-returns-list")
-  (is? (car typ) 213 "nested-lambda-outer-tag"))
+                      (define typ (xtc:bind:get-expression-type '(lambda (x:i64) (lambda (y:i64) (+ x y)))))
+                      (is? (list? typ) #t "nested-lambda-returns-list")
+                      (is? (car typ) 213 "nested-lambda-outer-tag"))
 
 ;; let with lambda application
 
 (xtmtest-with-fixture pipeline-let-lambda
-  (define typ (xtc:bind:get-expression-type
-               '(let ((f (lambda (x:i64) (+ x 1))))
-                  (f 10))))
-  (is? typ 2 "let-lambda-app"))
+                      (define typ (xtc:bind:get-expression-type
+                                    '(let ((f (lambda (x:i64) (+ x 1))))
+                                      (f 10))))
+                      (is? typ 2 "let-lambda-app"))

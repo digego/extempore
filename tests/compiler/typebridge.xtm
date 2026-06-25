@@ -18,19 +18,19 @@
 ;; identity.  The test returns the codes that fail to round-trip, so a failure
 ;; names exactly which encodings broke; an empty list means all passed.
 (xtmtest-result
- (let ((corpus (list 2 102 202 0 1 4 108 10
-                     '(14 2 0) '(114 2 0) '(214 2 0)
-                     '(15 4 2) '(115 4 2) '(16 4 1)
-                     '(113 2 2) '(213 2 2) '(313 2 2)
-                     '(14 2 (14 0 1)) '(14 2 (114 0 1))
-                     '(213 2 (114 0 1))
-                     '(15 3 (14 2 0)))))
-   (cl:remove-if
-    (lambda (ic)
-      (equal? ic (xtc:type:to-intcode (xtc:type:from-intcode ic (make-hashtable)))))
-    corpus))
- '()
- "intcode-roundtrip")
+  (let ((corpus (list 2 102 202 0 1 4 108 10
+                      '(14 2 0) '(114 2 0) '(214 2 0)
+                      '(15 4 2) '(115 4 2) '(16 4 1)
+                      '(113 2 2) '(213 2 2) '(313 2 2)
+                      '(14 2 (14 0 1)) '(14 2 (114 0 1))
+                      '(213 2 (114 0 1))
+                      '(15 3 (14 2 0)))))
+    (cl:remove-if
+      (lambda (ic)
+        (equal? ic (xtc:type:to-intcode (xtc:type:from-intcode ic (make-hashtable)))))
+      corpus))
+  '()
+  "intcode-roundtrip")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; explicit decode     ;;
@@ -83,7 +83,7 @@
                 "encode-named-pointer")
 
 (xtmtest-result (xtc:type:to-intcode
-                 (xtc:type:from-intcode "%foo**" (make-hashtable)))
+                  (xtc:type:from-intcode "%foo**" (make-hashtable)))
                 "%foo**"
                 "named-roundtrip")
 
@@ -122,16 +122,16 @@
 ;; concrete types and for types carrying bang variables alike --- the property
 ;; the canonical reification relies on.
 (xtmtest-result
- (let ((corpus (list "i64" "i64*" "double" "<i64,double>" "<i64,double>*"
-                     "[i64,i64]*" "|4,double|" "/4,float/"
-                     "!a*" "<!a*,i64>" "<!a*,!b>" "<!a,<!b,i64>>")))
-   (cl:remove-if
-    (lambda (s)
-      (let* ((tbl (make-hashtable)) (term (xtc:type:from-pretty s tbl)))
-        (string=? s (xtc:type:to-pretty term tbl))))
-    corpus))
- '()
- "pretty-roundtrip")
+  (let ((corpus (list "i64" "i64*" "double" "<i64,double>" "<i64,double>*"
+                      "[i64,i64]*" "|4,double|" "/4,float/"
+                      "!a*" "<!a*,i64>" "<!a*,!b>" "<!a,<!b,i64>>")))
+    (cl:remove-if
+      (lambda (s)
+        (let* ((tbl (make-hashtable)) (term (xtc:type:from-pretty s tbl)))
+          (string=? s (xtc:type:to-pretty term tbl))))
+      corpus))
+  '()
+  "pretty-roundtrip")
 
 ;; a tuple field !a* parses to a pointer-to-variable
 (xtmtest-result (let ((tbl (make-hashtable)))
@@ -215,9 +215,9 @@
 (xtmtest-result (let* ((intern (make-hashtable))
                        (pat (xtc:type:from-intcode "List{!a}*" intern))
                        (subst (xtc:type:unify
-                               pat
-                               (xtc:type:from-intcode "%List_poly_PGk2ND4*" intern)
-                               xtc:type:empty-subst)))
+                                pat
+                                (xtc:type:from-intcode "%List_poly_PGk2ND4*" intern)
+                                xtc:type:empty-subst)))
                   (xtc:type:to-intcode (xtc:type:apply-subst pat subst)))
                 "%List_poly_PGk2ND4*"
                 "napp-pattern-reifies")
