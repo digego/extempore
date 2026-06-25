@@ -10,12 +10,17 @@ file:
   everything else aligns arguments under the first operand.
 - **Helix** (and any tree-sitter editor) --- `queries/indents.scm` in
   [tree-sitter-extempore](https://github.com/extemporelang/tree-sitter-extempore),
-  built on the same scmindent model Helix's bundled Scheme query uses. The
-  `extras/tree-sitter-extempore` submodule vendors that grammar; bump it to a
-  revision that includes `indents.scm` to pick the query up in-tree.
+  built on the same scmindent model Helix's bundled Scheme query uses.
 - **batch / one-off reformat** ---
   [`scmindent`](https://github.com/ds26gte/scmindent) by Dorai Sitaram,
   configured with `lispwords.json` here.
+
+The `extras/tree-sitter-extempore` submodule is pinned here as a tooling
+dependency of this workflow: it supplies both the grammar Helix loads for the
+query above and the parser used as the non-destructiveness oracle below. (Editor
+integrations are otherwise not vendored --- they're linked from the
+editor-support guide; this grammar is the exception because the formatter itself
+consumes it.)
 
 The keyword set is identical across all three: `lispwords.json` mirrors the
 Emacs `put`-table one-for-one, and the `indents.scm` regex is the same set
