@@ -100,13 +100,13 @@
   (let ((label (if (null? extra) #f (car extra))))
     `(let ((env (current-environment))
            (name ,(if label label `(quote ,(if (pair? call) (car call) call)))))
-       (xtmtest:announce name)
-       (catch (xtmtest-record name 'runtime-error ',call #f #f)
-              (let* ((got (eval ',call env))
-                     (expected-val ,expected))
-                (if (xtmtest:equal? expected-val got)
-                    (xtmtest-record name 'pass ',call expected-val got)
-                    (xtmtest-record name 'fail ',call expected-val got)))))))
+      (xtmtest:announce name)
+      (catch (xtmtest-record name 'runtime-error ',call #f #f)
+             (let* ((got (eval ',call env))
+                    (expected-val ,expected))
+               (if (xtmtest:equal? expected-val got)
+                   (xtmtest-record name 'pass ',call expected-val got)
+                   (xtmtest-record name 'fail ',call expected-val got)))))))
 
 (define-macro (xtmtest-result call expected . extra)
   (xtmtest-result-body call expected extra))
@@ -117,10 +117,10 @@
   (let ((label (if (null? extra) #f (car extra))))
     `(let ((env (current-environment))
            (name ,(if label label `(quote ,(if (pair? call) (car call) call)))))
-       (xtmtest:announce name)
-       (catch (xtmtest-record name 'runtime-error ',call #f #f)
-              (let ((got (eval ',call env)))
-                (xtmtest-record name 'pass ',call 'any got))))))
+      (xtmtest:announce name)
+      (catch (xtmtest-record name 'runtime-error ',call #f #f)
+             (let ((got (eval ',call env)))
+               (xtmtest-record name 'pass ',call 'any got))))))
 
 (define-macro (xtmtest-runs call . extra)
   (xtmtest-runs-body call extra))
@@ -128,18 +128,18 @@
 ;; assert that FORM (a bind-func/bind-type) compiles
 (define-macro (xtmtest-compile form)
   `(let ((name ',(cadr form)))
-     (xtmtest:announce name)
-     (catch (xtmtest-record name 'compile-error 'compile-only #f #f)
-            (eval ',form (interaction-environment))
-            (xtmtest-record name 'compile-ok 'compile-only #t #t))))
+    (xtmtest:announce name)
+    (catch (xtmtest-record name 'compile-error 'compile-only #f #f)
+           (eval ',form (interaction-environment))
+           (xtmtest-record name 'compile-ok 'compile-only #t #t))))
 
 ;; assert that FORM does NOT compile (e.g. a deliberate type error)
 (define-macro (xtmtest-compile-fails form)
   `(let ((name ',(cadr form)))
-     (xtmtest:announce name)
-     (catch (xtmtest-record name 'pass 'compile-only 'compile-should-fail 'did-not-compile)
-            (eval ',form (interaction-environment))
-            (xtmtest-record name 'fail 'compile-only 'compile-should-fail 'compiled))))
+    (xtmtest:announce name)
+    (catch (xtmtest-record name 'pass 'compile-only 'compile-should-fail 'did-not-compile)
+           (eval ',form (interaction-environment))
+           (xtmtest-record name 'fail 'compile-only 'compile-should-fail 'compiled))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; fixtures            ;;
@@ -149,19 +149,19 @@
 ;; in scope that records under "SUITE.label" (or "SUITE.is?"). Fixtures nest.
 (define (xtmtest-with-fixture-body name fixture tests)
   `(let ((fixture-environment ((lambda () (current-environment)))))
-     (let ((suite-name ',name))
-       (xtmtest:announce suite-name)
-       (eval `(begin
-                (define-macro (is? call expected-result . args)
-                  (xtmtest-result-body
-                   call expected-result
-                   (list (if (not (null? args))
-                             (format "~a.~a" ',suite-name (car args))
-                             (format "~a.is?" ',suite-name))))))
-             fixture-environment)
-       (catch (xtmtest-record suite-name 'fixture-error ',fixture #f #f)
-              (eval ',fixture fixture-environment)
-              (eval '(begin ,@tests) fixture-environment)))))
+    (let ((suite-name ',name))
+      (xtmtest:announce suite-name)
+      (eval `(begin
+              (define-macro (is? call expected-result . args)
+                (xtmtest-result-body
+                  call expected-result
+                  (list (if (not (null? args))
+                            (format "~a.~a" ',suite-name (car args))
+                            (format "~a.is?" ',suite-name))))))
+            fixture-environment)
+      (catch (xtmtest-record suite-name 'fixture-error ',fixture #f #f)
+             (eval ',fixture fixture-environment)
+             (eval '(begin ,@tests) fixture-environment)))))
 
 (define-macro (xtmtest-with-fixture name fixture . tests)
   (xtmtest-with-fixture-body name fixture tests))
@@ -176,25 +176,25 @@
   (print-with-colors 'black 'blue #t (print " Test results "))
   (print "\n\n")
   (for-each
-   (lambda (outcome)
-     (let ((records (cl:remove-if-not (lambda (r) (eq? (cadr r) outcome))
-                                      (reverse *xtmtest-results*))))
-       (if (not (null? records))
-           (begin
-             (print-with-colors 'blue 'default #t (print outcome "\n\n"))
-             (for-each
-              (lambda (r)
-                (print "  name: ")
-                (print-with-colors (xtmtest:outcome-colour outcome) 'default #f
-                                   (print (car r)))
-                (print " call: ")
-                (print-with-colors 'blue 'default #f (print (caddr r)))
-                (if (not (xtmtest:pass? outcome))
-                    (print " expected: " (cadddr r) " got: " (list-ref r 4)))
-                (println))
-              records)
-             (println)))))
-   '(fail compile-error runtime-error fixture-error pass compile-ok)))
+    (lambda (outcome)
+      (let ((records (cl:remove-if-not (lambda (r) (eq? (cadr r) outcome))
+                                       (reverse *xtmtest-results*))))
+        (if (not (null? records))
+            (begin
+              (print-with-colors 'blue 'default #t (print outcome "\n\n"))
+              (for-each
+                (lambda (r)
+                  (print "  name: ")
+                  (print-with-colors (xtmtest:outcome-colour outcome) 'default #f
+                                     (print (car r)))
+                  (print " call: ")
+                  (print-with-colors 'blue 'default #f (print (caddr r)))
+                  (if (not (xtmtest:pass? outcome))
+                      (print " expected: " (cadddr r) " got: " (list-ref r 4)))
+                  (println))
+                records)
+              (println)))))
+    '(fail compile-error runtime-error fixture-error pass compile-ok)))
 
 (define (xtmtest:print-summary start)
   (print "\nCompleted ")
@@ -234,27 +234,27 @@
   (let ((failures (cl:remove-if (lambda (r) (xtmtest:pass? (cadr r)))
                                 *xtmtest-results*)))
     (sys:dump-string-to-file
-     path
-     (apply string-append
-            (append
-             (list "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                   (format "<testsuite name=\"xtmtest\" tests=\"~a\" failures=\"~a\">\n"
-                           (length *xtmtest-results*) (length failures)))
-             (map (lambda (r)
-                    (let ((name (xtmtest:xml-escape (car r)))
-                          (outcome (cadr r)))
-                      (if (xtmtest:pass? outcome)
-                          (format "  <testcase name=\"~a\" classname=\"xtmtest\"/>\n" name)
-                          (string-append
-                           (format "  <testcase name=\"~a\" classname=\"xtmtest\">\n" name)
-                           (format "    <failure type=\"~a\">call ~a expected ~a got ~a</failure>\n"
-                                   outcome
-                                   (xtmtest:xml-escape (caddr r))
-                                   (xtmtest:xml-escape (cadddr r))
-                                   (xtmtest:xml-escape (list-ref r 4)))
-                           "  </testcase>\n"))))
-                  (reverse *xtmtest-results*))
-             (list "</testsuite>\n"))))))
+      path
+      (apply string-append
+             (append
+               (list "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                     (format "<testsuite name=\"xtmtest\" tests=\"~a\" failures=\"~a\">\n"
+                             (length *xtmtest-results*) (length failures)))
+               (map (lambda (r)
+                      (let ((name (xtmtest:xml-escape (car r)))
+                            (outcome (cadr r)))
+                        (if (xtmtest:pass? outcome)
+                            (format "  <testcase name=\"~a\" classname=\"xtmtest\"/>\n" name)
+                            (string-append
+                              (format "  <testcase name=\"~a\" classname=\"xtmtest\">\n" name)
+                              (format "    <failure type=\"~a\">call ~a expected ~a got ~a</failure>\n"
+                                      outcome
+                                      (xtmtest:xml-escape (caddr r))
+                                      (xtmtest:xml-escape (cadddr r))
+                                      (xtmtest:xml-escape (list-ref r 4)))
+                              "  </testcase>\n"))))
+                    (reverse *xtmtest-results*))
+               (list "</testsuite>\n"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; runner              ;;

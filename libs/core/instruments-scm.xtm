@@ -140,14 +140,14 @@
   (let* ((note (append (string->sexpr (string-append "(" (symbol->string synthname) "_note)")) args))
          (fx (string->sexpr (string-append "(" (symbol->string synthname) "_fx)"))))
     `(begin
-       (eval (bind-val ,defname INSTRUMENT (make_instrument ,note ,fx))
-             (interaction-environment))
-       (eval (define ,defname (call-as-xtlang-leaky ,defname))
-             (interaction-environment))
-       (print-with-colors 'default 'default #f (print 'New 'instrument 'bound 'as ""))
-       (print-with-colors 'green 'default #t (print ',defname ""))
-       (print-with-colors 'default 'default #f (println 'in 'both 'scheme 'and 'xtlang))
-       #t)))
+      (eval (bind-val ,defname INSTRUMENT (make_instrument ,note ,fx))
+            (interaction-environment))
+      (eval (define ,defname (call-as-xtlang-leaky ,defname))
+            (interaction-environment))
+      (print-with-colors 'default 'default #f (print 'New 'instrument 'bound 'as ""))
+      (print-with-colors 'green 'default #t (print ',defname ""))
+      (print-with-colors 'default 'default #f (println 'in 'both 'scheme 'and 'xtlang))
+      #t)))
 
 (define play-note
   (lambda (time inst pitch vol dur . args)
@@ -168,20 +168,20 @@
           (if (list? pitch)
               (for-each (lambda (p)
                           (xtm_play_note (real->integer time)
-                          native
-                          (midi2frq (* 1.0 p))
-                          (/ (exp (/ vol 26.222)) 127.0)
-                          (real->integer duration)
-                          nargs
-                          dargs))
+                                         native
+                                         (midi2frq (* 1.0 p))
+                                         (/ (exp (/ vol 26.222)) 127.0)
+                                         (real->integer duration)
+                                         nargs
+                                         dargs))
                         pitch)
-            (xtm_play_note (real->integer time)
-                        native
-                        (midi2frq (* 1.0 pitch))
-                        (/ (exp (/ vol 26.222)) 127.0)
-                        (real->integer duration)
-                        nargs
-                        dargs))
+              (xtm_play_note (real->integer time)
+                             native
+                             (midi2frq (* 1.0 pitch))
+                             (/ (exp (/ vol 26.222)) 127.0)
+                             (real->integer duration)
+                             nargs
+                             dargs))
           (log-error 'No 'inst 'named (symbol->string inst))))))
 
 
@@ -202,21 +202,21 @@
   (let ((args (cons 'play __play-rest)))
     (if (symbol? (cadr args))
         `(play-note (*metro* beat) ,(cadr args) ,(caddr args) ,(cadddr args) (*metro* 'dur ,(car (cddddr args)))
-                    ,@(cdr (cddddr args)))
+          ,@(cdr (cddddr args)))
         `(play-note (*metro* (+ beat ,(cadr args))) ,(caddr args) ,(cadddr args) ,(car (cddddr args))
-                    (*metro* 'dur ,(car (cdr (cddddr args))))
-                    ,@(cddr (cddddr args))))))
+          (*metro* 'dur ,(car (cdr (cddddr args))))
+          ,@(cddr (cddddr args))))))
 
 
 (define-macro (playob o b . args)
   `(if (= ,o (+ 1 (modulo beat ,b)))
-       (play ,@args)
-       #f))
+    (play ,@args)
+    #f))
 
 (define-macro (playobs l b . args)
   `(if (member (+ 1 (modulo beat ,b)) ,l)
-       (play ,@args)
-       #f))
+    (play ,@args)
+    #f))
 
 
 (bind-macro
@@ -228,31 +228,31 @@ for use with native beat shceduler"
         (instargs '()))
     (if (symbol? (car args))
         (begin (set! ns (- (length args) 5))
-               (set! instargs (map (lambda (a)
-                                     (list 'convert (list '* '1.0:double a)))
-                                   (cdr (cddddr args))))
-               `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
-                  ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
-                  (xtm_play 0.0
-                            ,(car args)
-                            ,(cadr args)
-                            (convert ,(caddr args))
-                            (convert ,(cadddr args))
-                            (convert (* 1.0:double (* 1/1 ,(car (cddddr args)))))
-                            ,ns dat)))
+          (set! instargs (map (lambda (a)
+                                (list 'convert (list '* '1.0:double a)))
+                              (cdr (cddddr args))))
+          `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
+            ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
+            (xtm_play 0.0
+                      ,(car args)
+                      ,(cadr args)
+                      (convert ,(caddr args))
+                      (convert ,(cadddr args))
+                      (convert (* 1.0:double (* 1/1 ,(car (cddddr args)))))
+                      ,ns dat)))
         (begin (set! ns (- (length args) 6))
-               (set! instargs (map (lambda (a)
-                                     (list 'convert (list '* '1.0:double a)))
-                                   (cddr (cddddr args))))
-               `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
-                  ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
-                  (xtm_play ,(car args)
-                            ,(cadr args)
-                            ,(caddr args)
-                            (convert ,(cadddr args))
-                            (convert ,(car (cddddr args)))
-                            (convert (* 1.0:double (* 1/1 ,(cadr (cddddr args)))))
-                            ,ns dat))))))
+          (set! instargs (map (lambda (a)
+                                (list 'convert (list '* '1.0:double a)))
+                              (cddr (cddddr args))))
+          `(let ((dat:SAMPLE* ,(if (= ns 0) 'null `(alloc ,ns))))
+            ,(if (> ns 0) `(pfill! dat ,@instargs) 1)
+            (xtm_play ,(car args)
+                      ,(cadr args)
+                      ,(caddr args)
+                      (convert ,(cadddr args))
+                      (convert ,(car (cddddr args)))
+                      (convert (* 1.0:double (* 1/1 ,(cadr (cddddr args)))))
+                      ,ns dat))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -297,17 +297,17 @@ for use with native beat shceduler"
 (define-macro (onbeat? b of t . f)
   (if (null? f)
       `(if (= (modulo beat ,of) (- ,b 1))
-           ,t)
+        ,t)
       `(if (= (modulo beat ,of) (- ,b 1))
-           ,t ,(car f))))
+        ,t ,(car f))))
 
 
 (define-macro (choose prob a . args)
   (if (null? args)
       `(if (< (random) ,prob)
-           ,a)
+        ,a)
       `(if (< (random) ,prob)
-           ,a ,(car args))))
+        ,a ,(car args))))
 
 
 

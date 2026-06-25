@@ -63,20 +63,20 @@
     (if (null? obj)
         (printout "<NULL_MIDI_MSG>")
         (cond ((= (get_midi_evt_type obj) MIDI_NOTE_ON)
-              (printout "<NOTE-ON  pitch: " (get_midi_evt_a obj)
-                        " volume:" (get_midi_evt_b obj)
-                        " chan:" (get_midi_evt_channel obj)
-                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+               (printout "<NOTE-ON  pitch: " (get_midi_evt_a obj)
+                         " volume:" (get_midi_evt_b obj)
+                         " chan:" (get_midi_evt_channel obj)
+                         " timestamp:" (get_midi_evt_timestamp obj) ">"))
               ((= (get_midi_evt_type obj) MIDI_NOTE_OFF)
-              (printout "<NOTE-OFF  pitch:" (get_midi_evt_a obj)
-                        " volume:" (get_midi_evt_b obj)
-                        " chan:" (get_midi_evt_channel obj)
-                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+               (printout "<NOTE-OFF  pitch:" (get_midi_evt_a obj)
+                         " volume:" (get_midi_evt_b obj)
+                         " chan:" (get_midi_evt_channel obj)
+                         " timestamp:" (get_midi_evt_timestamp obj) ">"))
               ((= (get_midi_evt_type obj) MIDI_CONTROL_CHANGE)
-              (printout "<MIDI-CC byte1:" (get_midi_evt_a obj)
-                        " byte2:" (get_midi_evt_b obj)
-                        " chan:" (get_midi_evt_channel obj)
-                        " timestamp:" (get_midi_evt_timestamp obj) ">"))
+               (printout "<MIDI-CC byte1:" (get_midi_evt_a obj)
+                         " byte2:" (get_midi_evt_b obj)
+                         " chan:" (get_midi_evt_channel obj)
+                         " timestamp:" (get_midi_evt_timestamp obj) ">"))
               (else (printout "<UNKNOWN_MIDI_MSG>")))) ;; shouldn't get here
     void))
 
@@ -99,7 +99,7 @@
       (set! tail (enqueue_midi_event.tail:i64))
       (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
           (begin (println "Warning: MIDI overrun (head:" head "tail:" tail ") events dropped")
-                 (set! head tail)))
+            (set! head tail)))
       (if (< head tail)
           (let ((res (aref-ptr XTM_MIDI_EVENT_QUEUE (% head XTM_MIDI_EVENT_QUEUE_SIZE))))
             (set! head (+ head 1))
@@ -112,8 +112,8 @@
           (tail (enqueue_midi_event.tail:i64)))
       (if (< (+ head XTM_MIDI_EVENT_QUEUE_SIZE) tail)
           (begin (println "Warning: MIDI overrun - dropping old events")
-                 (dequeue_midi_event.head:i64 tail)
-                 0)
+            (dequeue_midi_event.head:i64 tail)
+            0)
           (- tail head)))))
 
 
@@ -124,42 +124,42 @@
   (lambda (port_name)
     (let* ((n:i32 (Pm_CountDevices))
            (loop:[i32,i32]*
-            (lambda (i:i32)
-              (cond
-               ((and (<= (i64toi32 0) i) (< i n))
-                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
-                       (name:i8* (tref info 2))
-                       (input:bool (= (i64toi32 1) (tref info 3)))
-                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
-                  (cond
-                   ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
-                   (else
-                    (loop (+ i (i64toi32 1)))))))
-               (else
-                (printf "No MIDI input port found with name %s\n" port_name)
-                (i64toi32 -1))))))
-        (loop (i64toi32 0)))))
+                  (lambda (i:i32)
+                    (cond
+                      ((and (<= (i64toi32 0) i) (< i n))
+                       (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                              (name:i8* (tref info 2))
+                              (input:bool (= (i64toi32 1) (tref info 3)))
+                              (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                         (cond
+                           ((and input (= (i64toi32 0) (strncmp name port_name c))) i)
+                           (else
+                             (loop (+ i (i64toi32 1)))))))
+                      (else
+                        (printf "No MIDI input port found with name %s\n" port_name)
+                        (i64toi32 -1))))))
+      (loop (i64toi32 0)))))
 
 
 (bind-func midi_output_port_id:[i32,i8*]*
   (lambda (port_name)
     (let* ((n:i32 (Pm_CountDevices))
            (loop:[i32,i32]*
-            (lambda (i:i32)
-              (cond
-               ((and (<= (i64toi32 0) i) (< i n))
-                (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
-                       (name:i8* (tref info 2))
-                       (output:bool (= (i64toi32 1) (tref info 4)))
-                       (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
-                  (cond
-                   ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
-                   (else
-                    (loop (+ i (i64toi32 1)))))))
-               (else
-                (printf "No MIDI output port found with name %s\n" port_name)
-                (i64toi32 -1))))))
-        (loop (i64toi32 0)))))
+                  (lambda (i:i32)
+                    (cond
+                      ((and (<= (i64toi32 0) i) (< i n))
+                       (let* ((info:PmDeviceInfo* (Pm_GetDeviceInfo i))
+                              (name:i8* (tref info 2))
+                              (output:bool (= (i64toi32 1) (tref info 4)))
+                              (a (strlen name)) (b (strlen port_name)) (c (if (< a b) a b)))
+                         (cond
+                           ((and output (= (i64toi32 0) (strncmp name port_name c))) i)
+                           (else
+                             (loop (+ i (i64toi32 1)))))))
+                      (else
+                        (printf "No MIDI output port found with name %s\n" port_name)
+                        (i64toi32 -1))))))
+      (loop (i64toi32 0)))))
 
 
 ; (bind-func print_midi_devices
@@ -242,12 +242,12 @@
                               (Pm_Message_Data2 msg)
                               (Pm_Message_Channel msg)))
                     (else
-                     (midi_msg timestamp
-                               (Pm_Message_Type msg)
-                               (Pm_Message_Data1 msg)
-                               (Pm_Message_Data2 msg)
-                               (Pm_Message_Channel msg)
-                               msg)))
+                      (midi_msg timestamp
+                                (Pm_Message_Type msg)
+                                (Pm_Message_Data1 msg)
+                                (Pm_Message_Data2 msg)
+                                (Pm_Message_Channel msg)
+                                msg)))
               void)
             void)
           void))))
@@ -293,17 +293,17 @@
   (lambda (beat dur)
     (dotimes (i (available_midi_events))
       (let* ((evt (dequeue_midi_event))
-            (type (get_midi_evt_type evt))
-            (a (get_midi_evt_a evt))
-            (b (get_midi_evt_b evt))
-            (chan (get_midi_evt_channel evt))
-            (timestamp (get_midi_evt_timestamp evt)))
+             (type (get_midi_evt_type evt))
+             (a (get_midi_evt_a evt))
+             (b (get_midi_evt_b evt))
+             (chan (get_midi_evt_channel evt))
+             (timestamp (get_midi_evt_timestamp evt)))
         (cond ((= type #x90)
-              (midi-note-on timestamp a b chan))
+               (midi-note-on timestamp a b chan))
               ((= type #x80)
-              (midi-note-off timestamp a b chan))
+               (midi-note-off timestamp a b chan))
               ((= type #xB0)
-              (midi-cc timestamp a b chan))
+               (midi-cc timestamp a b chan))
               (else #f))))
     (callback (*metro* (+ beat (* .5 dur))) 'scheme-midi-listener (+ beat dur) dur)))
 
@@ -314,7 +314,7 @@
 ;; startup
 (xtc:aot:do-or-emit
   (begin (pm_initialize)
-         (pm_print_devices)))
+    (pm_print_devices)))
 
 ; (xtc:aot:do-or-emit
 ;   ($ (midi_input_polling (+ (midi_clock_sched.time) 1.0))))

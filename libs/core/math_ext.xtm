@@ -40,9 +40,9 @@
 (define *xtmlib-math_ext-loaded* #t)
 
 (xtc:aot:suppress-aot-do
- (sys:load "libs/core/math.xtm"))
+  (sys:load "libs/core/math.xtm"))
 (xtc:aot:insert-forms
- (sys:load "libs/core/math.xtm" 'quiet))
+  (sys:load "libs/core/math.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmmath_ext")
 (xtc:aot:import-ll "xtmmath_ext")
@@ -167,8 +167,8 @@
   (lambda (m1 m2)
     (let ((mdat (alloc (* (tref m1 1) (tref m2 2)))))
       (mmmul (tref m1 0) (tref m1 1) (tref m1 2)
-            (tref m2 0) (tref m2 1) (tref m2 2)
-            mdat)
+             (tref m2 0) (tref m2 1) (tref m2 2)
+             mdat)
       (Matrix mdat (tref m1 1) (tref m2 2) (tref m1 3)))))
 
 ;; treat as row vector
@@ -176,8 +176,8 @@
   (lambda (v1 m2)
     (let ((mdat (alloc (* 1 (tref m2 2)))))
       (mmmul (tref v1 0) 1 (tref v1 1)
-            (tref m2 0) (tref m2 1) (tref m2 2)
-            mdat)
+             (tref m2 0) (tref m2 1) (tref m2 2)
+             mdat)
       (Matrix mdat 1 (tref m2 2) (tref m2 3)))))
 
 ;; treat as column vector
@@ -185,8 +185,8 @@
   (lambda (m1 v2)
     (let ((mdat (alloc (* (tref m1 1) 1))))
       (mmmul (tref m1 0) (tref m1 1) (tref m1 2)
-            (tref v2 0) (tref v2 1) 1
-            mdat)
+             (tref v2 0) (tref v2 1) 1
+             mdat)
       (Matrix mdat (tref m1 1) 1 (tref m1 3)))))
 
 (bind-func xtm_multiplication:[Matrix:<!a,i64,i64,i1>*,!b,Matrix:<!a,i64,i64,i1>*]*
@@ -216,11 +216,11 @@
         (int? (if (integer? (car args)) #t #f))
         (ary (gensym)))
     `(let ((,(string->symbol
-              (string-append (symbol->string ary)
-                             (if int? ":i64*" ":double*")))
-             (alloc ,l)))
-       (pfill! ,ary ,@args)
-       (Vector ,ary ,l))))
+               (string-append (symbol->string ary)
+                              (if int? ":i64*" ":double*")))
+            (alloc ,l)))
+      (pfill! ,ary ,@args)
+      (Vector ,ary ,l))))
 
 (bind-macro
   "convenience macro for Matrix creation"
@@ -236,11 +236,11 @@
       (if (<> (length (list-ref args i)) cols)
           (log-error "Bad Matrix - column length mismatch")))
     `(let ((,(string->symbol
-              (string-append (symbol->string ary)
-                             (if int? ":i64*" ":double*")))
-             (alloc ,(* rows cols))))
-       (pfill! ,ary ,@biglst)
-       (Matrix ,ary ,rows ,cols #f))))
+               (string-append (symbol->string ary)
+                              (if int? ":i64*" ":double*")))
+            (alloc ,(* rows cols))))
+      (pfill! ,ary ,@biglst)
+      (Matrix ,ary ,rows ,cols #f))))
 
 (define *xtmlib-math_ext-loaded* #t)
 

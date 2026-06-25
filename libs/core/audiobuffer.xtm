@@ -14,9 +14,9 @@
 (define *xtmlib-audiobuffer-loaded* #t)
 
 (xtc:aot:suppress-aot-do
- (sys:load "libs/base/base.xtm"))
+  (sys:load "libs/base/base.xtm"))
 (xtc:aot:insert-forms
- (sys:load "libs/base/base.xtm" 'quiet))
+  (sys:load "libs/base/base.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmaudiobuffer")
 (xtc:aot:import-ll "xtmaudiobuffer")
@@ -300,9 +300,9 @@
     (if (< frame 0) (set! frame (llabs frame)))
     (if (< frame (AudioBuffer_frames ab))
         (pref-ptr (AudioBuffer_data ab)
-          (+ (* frame (AudioBuffer_channels ab)) chan))
+                  (+ (* frame (AudioBuffer_channels ab)) chan))
         (pref-ptr (AudioBuffer_data ab)
-          (+ (* (% frame (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
+                  (+ (* (% frame (AudioBuffer_frames ab)) (AudioBuffer_channels ab)) chan)))))
 
 ;; no pulsewidth, faster but no segments or mixing
 (bind-func AudioBuffer_read_interp
@@ -317,10 +317,10 @@
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
           (pos:double phase)
           (lgth:i64 (if oneshot
-                    (- (- frames 1) loopstart)
-                    (clamp looplgth
-                           0
-                           (- frames loopstart))))
+                        (- (- frames 1) loopstart)
+                        (clamp looplgth
+                               0
+                               (- frames loopstart))))
           (lgthf:double (convert lgth))
           (dat (AudioBuffer_ptr buffer (clamp loopstart 0 (- frames looplgth)) chan))
           (y1 0.0)
@@ -339,9 +339,9 @@
             (set! x2 (pref dat x2pos))
             (if (= chan 0) ;; increment phase
                 (AudioBuffer_set_phase buffer
-                                      (if oneshot
-                                          (+ pos rate)
-                                          (% (+ pos rate) lgthf))))
+                                       (if oneshot
+                                           (+ pos rate)
+                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
@@ -363,10 +363,10 @@
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
           (pos:double phase)
           (lgth:i64 (if oneshot
-                      (- (- frames 1) loopstart)
-                      (clamp looplgth
-                            0
-                            (- frames loopstart))))
+                        (- (- frames 1) loopstart)
+                        (clamp looplgth
+                               0
+                               (- frames loopstart))))
           (lgthf:double (convert lgth))
           (offset (* (convert (floor (* pw (convert segments)))) looplgth))
           (mix (% (* pw (convert segments)) 1.0))
@@ -390,9 +390,9 @@
             (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
             (if (= chan 0) ;; increment phase
                 (AudioBuffer_set_phase buffer
-                                      (if oneshot
-                                          (+ pos rate)
-                                          (% (+ pos rate) lgthf))))
+                                       (if oneshot
+                                           (+ pos rate)
+                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
@@ -409,10 +409,10 @@
           (rate (/ (convert freq) (convert (midi2frq_local (convert (AudioBuffer_root_pitch buffer))))))
           (pos:double phase)
           (lgth:i64 (if oneshot
-                    (- (- frames 1) loopstart)
-                    (clamp looplgth
-                           0
-                           (- frames loopstart))))
+                        (- (- frames 1) loopstart)
+                        (clamp looplgth
+                               0
+                               (- frames loopstart))))
           (lgthf:double (convert lgth))
           (dat1 (AudioBuffer_ptr buffer (clamp loopstart 0 (- frames looplgth)) chan))
           (dat2 (AudioBuffer_ptr buffer2 (clamp loopstart 0 (- frames looplgth)) chan))
@@ -438,9 +438,9 @@
             (set! x2 (+ (pref dat1 x2pos) (* dx2 mix)))
             (if (= chan 0) ;; increment phase
                 (AudioBuffer_set_phase buffer
-                                      (if oneshot
-                                          (+ pos rate)
-                                          (% (+ pos rate) lgthf))))
+                                       (if oneshot
+                                           (+ pos rate)
+                                           (% (+ pos rate) lgthf))))
             ;; return interpolated result
             (hermite_interp_local (dtof (% pos 1.0)) y1 x0 x1 x2))))))
 
@@ -569,8 +569,8 @@
                (audiofile_24bitPCM_to_sample_be src dest nsamp))
            #t)
           (else
-           (println "audiofile error: the native xtlang wave/aiff file reader currently\nonly supports 16/24-bit PCM or 32-bit IEEE float audio\n\nFor more audio format options, use libs/external/sndfile.xtm")
-           #f))))
+            (println "audiofile error: the native xtlang wave/aiff file reader currently\nonly supports 16/24-bit PCM or 32-bit IEEE float audio\n\nFor more audio format options, use libs/external/sndfile.xtm")
+            #f))))
 
 ;;;;;;;;;
 ;; IFF ;;
@@ -600,8 +600,8 @@
             (pref-ptr fileptr
                       (+ IFF_CHUNK_HEADER_SIZE
                          (convert
-                          (iffchunk_size (cast fileptr IffChunkHeader*) le)
-                          i64)))))
+                           (iffchunk_size (cast fileptr IffChunkHeader*) le)
+                           i64)))))
     fileptr))
 
 ;; super naive - will run off the end of the buffer if it doesn't find
@@ -648,64 +648,64 @@
     (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "wavefile error: could not open file")
-                 (free filedata)
-                 #f)
+            (free filedata)
+            #f)
           (cond ((not (wave_validate filedata))
                  (println "wavefile error: there was a problem with the chunk IDs...\nis the file corrupt?")
                  (free filedata)
                  #f)
                 (else
-                 (let ((fmt (iffchunk_find_dumb filedata "fmt "))
-                       (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
-                       (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
-                       (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
-                       (samplerate (i32toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
-                       (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
-                       (data (iffchunk_find_dumb filedata "data"))
-                       (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
-                                   (* nchan (/ bitdepth 8))))
-                       ;; read data into memory
-                       (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
-                                                    dest
-                                                    (* nchan nframes)
-                                                    bitdepth
-                                                    type
-                                                    #t)))
-                   (free filedata)
-                   res)))))))
+                  (let ((fmt (iffchunk_find_dumb filedata "fmt "))
+                        (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
+                        (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
+                        (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
+                        (samplerate (i32toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
+                        (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
+                        (data (iffchunk_find_dumb filedata "data"))
+                        (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
+                                    (* nchan (/ bitdepth 8))))
+                        ;; read data into memory
+                        (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
+                                                     dest
+                                                     (* nchan nframes)
+                                                     bitdepth
+                                                     type
+                                                     #t)))
+                    (free filedata)
+                    res)))))))
 
 (bind-func AudioBuffer_from_wave
   (lambda (filepath)
     (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "wavefile error: could not open file")
-                 (free filedata)
-                 null)
+            (free filedata)
+            null)
           (cond ((not (wave_validate filedata))
                  (println "wavefile error: there was a problem with the chunk IDs...\nis the file corrupt?")
                  (free filedata)
                  null)
                 (else
-                 (let ((fmt (iffchunk_find_dumb filedata "fmt "))
-                       (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
-                       (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
-                       (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
-                       (samplerate (i32tod (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
-                       (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
-                       (data (iffchunk_find_dumb filedata "data"))
-                       (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
-                                   (* nchan (/ bitdepth 8))))
-                       (ab (AudioBuffer nframes nchan samplerate))
-                       (abres (AudioBuffer_set_filepath ab (Str filepath)))
-                       ;; read data into memory
-                       (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
-                                                    (AudioBuffer_data ab)
-                                                    (* nchan nframes)
-                                                    bitdepth
-                                                    type
-                                                    #t)))
-                   (free filedata)
-                   (if res ab null))))))))
+                  (let ((fmt (iffchunk_find_dumb filedata "fmt "))
+                        (chunksize (i32toi64 (iffchunk_size (cast fmt IffChunkHeader*) #t)))
+                        (type (i16toi64 (pref (cast (pref-ptr fmt IFF_CHUNK_HEADER_SIZE) i16*) 0)))
+                        (nchan (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 2)) i16*) 0)))
+                        (samplerate (i32tod (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 4)) i32*) 0)))
+                        (bitdepth (i16toi64 (pref (cast (pref-ptr fmt (+ IFF_CHUNK_HEADER_SIZE 14)) i16*) 0)))
+                        (data (iffchunk_find_dumb filedata "data"))
+                        (nframes (/ (i32toi64 (iffchunk_size (cast data IffChunkHeader*) #t))
+                                    (* nchan (/ bitdepth 8))))
+                        (ab (AudioBuffer nframes nchan samplerate))
+                        (abres (AudioBuffer_set_filepath ab (Str filepath)))
+                        ;; read data into memory
+                        (res (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
+                                                     (AudioBuffer_data ab)
+                                                     (* nchan nframes)
+                                                     bitdepth
+                                                     type
+                                                     #t)))
+                    (free filedata)
+                    (if res ab null))))))))
 
 ;;;;;;;;;;
 ;; AIFF ;;
@@ -724,7 +724,7 @@
     (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "aiff file error: could not open file")
-                 #f)
+            #f)
           (let ((common (iffchunk_find_dumb filedata "COMM"))
                 (sounddata (iffchunk_find_dumb filedata "SSND")))
             ;; pull the data out of the common chunk
@@ -745,7 +745,7 @@
     (let ((filedata (sys_slurp_file filepath)))
       (if (null? filedata)
           (begin (println "aiff file error: could not open file")
-                 null)
+            null)
           (let ((common (iffchunk_find_dumb filedata "COMM"))
                 (sounddata (iffchunk_find_dumb filedata "SSND")))
             ;; pull the data out of the common chunk
@@ -775,8 +775,8 @@
           ((rmatch "\\.aiff?$" filepath)
            (audiofile_aiff_read_samples filepath dest))
           (else
-           (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
-           #f))))
+            (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
+            #f))))
 
 (bind-func AudioBuffer
   (lambda (filepath)
@@ -785,8 +785,8 @@
           ((rmatch "\\.aiff?$" filepath)
            (AudioBuffer_from_aiff filepath))
           (else
-           (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
-           null))))
+            (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
+            null))))
 
 (bind-func AudioBuffer_malloc
   (lambda (frames chans samplerate)

@@ -71,7 +71,7 @@
 ;; shadertoy-compile, so you only need to write the @fragment function.
 
 (define shadertoy-preamble
-"struct Uniforms {
+  "struct Uniforms {
     iResolution: vec4f,
     iMouse: vec4f,
     iTime: f32,
@@ -99,7 +99,7 @@ fn vs_main(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4f {
 
 ;; Default shader: animated colour gradient (the classic Shadertoy hello world)
 (define shadertoy-default-fragment
-"@fragment
+  "@fragment
 fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
     let uv = frag_coord.xy / uniforms.iResolution.xy;
     let col = 0.5 + 0.5 * cos(uniforms.iTime + uv.xyx + vec3f(0.0, 2.0, 4.0));
@@ -142,14 +142,14 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
 ;; Uniform buffer and bind group (created once, reused across shader recompiles)
 (bind-val st_uniform_buf WGPUBuffer*
   (xtm_wgpu_create_buffer st_device ST_UNIFORM_SIZE
-                           (bor WGPUBufferUsage_Uniform WGPUBufferUsage_CopyDst)))
+                          (bor WGPUBufferUsage_Uniform WGPUBufferUsage_CopyDst)))
 
 (bind-val st_bind_group_layout WGPUBindGroupLayout*
   (xtm_wgpu_create_uniform_layout st_device))
 
 (bind-val st_bind_group WGPUBindGroup*
   (xtm_wgpu_create_uniform_bind_group st_device st_bind_group_layout
-                                       st_uniform_buf ST_UNIFORM_SIZE))
+                                      st_uniform_buf ST_UNIFORM_SIZE))
 
 ;; Uniform data and timing state
 (bind-val st_uniforms ShadertoyUniforms* (zalloc))
@@ -165,7 +165,7 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
 ;; Default WGSL as a bind-val string (preamble + default fragment baked together
 ;; so the shader module and pipeline can be initialised directly).
 (bind-val st_default_wgsl i8*
-"struct Uniforms {
+  "struct Uniforms {
     iResolution: vec4f,
     iMouse: vec4f,
     iTime: f32,
@@ -199,7 +199,7 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
 
 (bind-val st_pipeline WGPURenderPipeline*
   (xtm_wgpu_create_pipeline_with_layout st_device st_shader st_format
-                                         "vs_main" "fs_main" st_bind_group_layout))
+                                        "vs_main" "fs_main" st_bind_group_layout))
 
 ;; Low-level recompile: takes a complete WGSL source string (preamble + fragment).
 ;; Releases the old shader and pipeline, creates new ones.
@@ -274,8 +274,8 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
       (tset! st_uniforms 11 0.0)
       (set! st_frame_count (+ st_frame_count 1.0))
       (wgpuQueueWriteBuffer st_queue st_uniform_buf 0
-                             (cast st_uniforms i8*)
-                             ST_UNIFORM_SIZE)
+                            (cast st_uniforms i8*)
+                            ST_UNIFORM_SIZE)
       void)))
 
 ;; Draw one frame: begin pass, set pipeline + bind group, draw fullscreen
@@ -286,7 +286,7 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
           (pass:WGPURenderPassEncoder* null)
           (view:WGPUTextureView* null))
       (xtm_wgpu_begin_frame st_surface st_device 0.0 0.0 0.0 1.0
-                             (ref encoder) (ref pass) (ref view))
+                            (ref encoder) (ref pass) (ref view))
       (if (not (null? pass))
           (begin
             (wgpuRenderPassEncoderSetPipeline pass st_pipeline)

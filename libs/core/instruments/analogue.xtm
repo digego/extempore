@@ -31,11 +31,11 @@
         ;; positive frequencies
         (if (and (> inc 0.0) (>= mod 1.0))
             (begin (set! mod (- mod 1.0))
-                   (set! sqrmod (* sqrmod -1.0))))
+              (set! sqrmod (* sqrmod -1.0))))
         ;; negative frequencies
         (if (and (< inc 0.0) (<= mod 0.0))
             (begin (set! mod (+ mod 1.0))
-                   (set! sqrmod (* sqrmod -1.0))))
+              (set! sqrmod (* sqrmod -1.0))))
         ;; start with saw
         (set! sawout (- (* mod 2.0) 1.0)) ;; bipolar sawtooth
         (set! sawout (* sawout sawout)) ;; sqr'd sawtooth
@@ -113,22 +113,22 @@
         ;; update Q
         (if (or (<> oldQ Q) (<> oldfrq frq))
             (begin (if (< frq 0.0) (set! frq (fabs frq)))
-                   (if (< Q 0.0) (set! Q (fabs Q)))
-                   (set! oldQ Q)
-                   (set! oldfrq frq)
-                   (set! m_dK (* 4.0 Q))
-                   (set! oldfrq frq)
-                   (set! m_dAlpha (* t2 (tan (* STWOPI frq halfT))))
-                   (set! g (* halfT m_dAlpha))
-                   (set! G (/ g (+ 1.0 g)))
-                   (afill! op_m_dAlpha G G G G)
-                   (afill! op_m_dBeta
-                          (* G G (/ G (+ 1.0 g)))
-                          (* G (/ G (+ 1.0 g)))
-                          (/ G (+ 1.0 g))
-                          (/ 1.0 (+ 1.0 g)))
-                   (set! m_dGamma (* G G G G))
-                   (set! m_dAlpha_0 (/ 1.0 (+ 1.0 (* m_dK m_dGamma))))))
+              (if (< Q 0.0) (set! Q (fabs Q)))
+              (set! oldQ Q)
+              (set! oldfrq frq)
+              (set! m_dK (* 4.0 Q))
+              (set! oldfrq frq)
+              (set! m_dAlpha (* t2 (tan (* STWOPI frq halfT))))
+              (set! g (* halfT m_dAlpha))
+              (set! G (/ g (+ 1.0 g)))
+              (afill! op_m_dAlpha G G G G)
+              (afill! op_m_dBeta
+                      (* G G (/ G (+ 1.0 g)))
+                      (* G (/ G (+ 1.0 g)))
+                      (/ G (+ 1.0 g))
+                      (/ 1.0 (+ 1.0 g)))
+              (set! m_dGamma (* G G G G))
+              (set! m_dAlpha_0 (/ 1.0 (+ 1.0 (* m_dK m_dGamma))))))
         (set! dSigma (+ (aref op_fb_out 0) (aref op_fb_out 1) (aref op_fb_out 2) (aref op_fb_out 3)))
         (set! in (* in (+ 1.0 m_dK)))
         (set! dU (* (- in (* m_dK dSigma)) m_dAlpha_0))
@@ -289,12 +289,12 @@
                   (set! notetime (tref data 7)) ;; look for voice steeling
                   ;; this for voice steeling
                   (if (and (<> starttime notetime) (>= time notetime))
-                    (begin
+                      (begin
                         ;; (println "steeling voice:" (convert (frq2midi frequency) i64) "for" (note_frequency data))
                         (if (not legato)
                             (begin
-                                (set! amplitude (note_amplitude data)) ;; reset envelopes
-                                (retrigger_adsr adsr1) (retrigger_adsr adsr2) (retrigger_adsr adsr3) (retrigger_dadsr adsr4)))
+                              (set! amplitude (note_amplitude data)) ;; reset envelopes
+                              (retrigger_adsr adsr1) (retrigger_adsr adsr2) (retrigger_adsr adsr3) (retrigger_dadsr adsr4)))
                         ;; (note_starttime data (tref data 7))
                         (set! starttime (tref data 7)) ;(note_starttime data))
                         (set! target_frq (note_frequency data))
@@ -340,9 +340,9 @@
                                                                        (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
                                               ((= osc1_wave 3) (tri1 1.0 (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))))
                                               ((= osc1_wave 4) (AudioBuffer_read_interp_pw wt1
-                                                                  (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
-                                                                  0
-                                                                  (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
+                                                                                           (+ (* tune1 frq) (* adsr4_val (aref mods PARAM_OSC1_FRQ)))
+                                                                                           0
+                                                                                           (+ pw1 (* adsr4_val (aref mods PARAM_OSC1_PW)))))
                                               (else zero))))
                       (set! osc1_out 0.0))
                   (if (> osc2_amp 0.001)
@@ -353,9 +353,9 @@
                                                                        (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
                                               ((= osc2_wave 3) (tri2 1.0 (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))))
                                               ((= osc2_wave 4) (AudioBuffer_read_interp_pw wt2
-                                                                  (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
-                                                                  0
-                                                                  (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
+                                                                                           (+ (* tune2 frq) (* adsr4_val (aref mods PARAM_OSC2_FRQ)))
+                                                                                           0
+                                                                                           (+ pw2 (* adsr4_val (aref mods PARAM_OSC2_PW)))))
                                               (else zero))))
                       (set! osc2_out 0.0))
                   (if (> osc3_amp 0.001)
@@ -366,9 +366,9 @@
                                                                        (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
                                               ((= osc3_wave 3) (tri3 1.0 (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))))
                                               ((= osc3_wave 4) (AudioBuffer_read_interp_pw wt3
-                                                                  (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
-                                                                  0
-                                                                  (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
+                                                                                           (+ (* tune3 frq) (* adsr4_val (aref mods PARAM_OSC3_FRQ)))
+                                                                                           0
+                                                                                           (+ pw3 (* adsr4_val (aref mods PARAM_OSC3_PW)))))
                                               (else zero))))
                       (set! osc3_out 0.0))
                   (if (> osc4_amp 0.001)
@@ -379,9 +379,9 @@
                                                                        (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
                                               ((= osc4_wave 3) (tri4 1.0 (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))))
                                               ((= osc4_wave 4) (AudioBuffer_read_interp_pw wt4
-                                                                  (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
-                                                                  0
-                                                                  (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
+                                                                                           (+ (* tune4 frq) (* adsr4_val (aref mods PARAM_OSC4_FRQ)))
+                                                                                           0
+                                                                                           (+ pw4 (* adsr4_val (aref mods PARAM_OSC4_PW)))))
                                               (else zero))))
                       (set! osc4_out 0.0))
                   (if (> sub_amp 0.001)
@@ -393,13 +393,13 @@
                           (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (pink))))
                       (set! noise_out 0.0))
                   (set! main_out (* amp (filter
-                               (+ osc1_out
-                                  osc2_out
-                                  osc3_out
-                                  osc4_out
-                                  sub_out
-                                  noise_out)
-                        cof reso)))))
+                                          (+ osc1_out
+                                             osc2_out
+                                             osc3_out
+                                             osc4_out
+                                             sub_out
+                                             noise_out)
+                                          cof reso)))))
             main_out))))))
 
 
@@ -719,13 +719,13 @@
                           (set! noise_out (* 0.5 (+ noise_amp (* adsr4_val (aref mods PARAM_NOISE_AMP))) (pink))))
                       (set! noise_out 0.0))
                   (set! main_out (* amp (filter
-                               (+ (vref osc_out_v 0)
-                                  (vref osc_out_v 1)
-                                  (vref osc_out_v 2)
-                                  (vref osc_out_v 3)
-                                  sub_out
-                                  noise_out)
-                        cof reso)))))
+                                          (+ (vref osc_out_v 0)
+                                             (vref osc_out_v 1)
+                                             (vref osc_out_v 2)
+                                             (vref osc_out_v 3)
+                                             sub_out
+                                             noise_out)
+                                          cof reso)))))
             main_out))))))
 
 (bind-func analogueVec_fx
@@ -927,4 +927,4 @@
 (sys:load "libs/core/instruments/analogue_fileio-scm.xtm")
 ;; make sure we load them with AOT-compiled code as well
 (xtc:aot:insert-forms
- (sys:load "libs/core/instruments/analogue_fileio-scm.xtm"))
+  (sys:load "libs/core/instruments/analogue_fileio-scm.xtm"))

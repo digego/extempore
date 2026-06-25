@@ -20,7 +20,7 @@
 (define *xtmlib-portmidi-loaded* #t)
 
 (xtc:aot:suppress-aot-do
- (sys:load "libs/base/base.xtm"))
+  (sys:load "libs/base/base.xtm"))
 (xtc:aot:insert-forms (sys:load "libs/base/base.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmportmidi")
@@ -569,10 +569,10 @@
   (lambda (pmevent:PmEvent*)
     (let ((str:i8* (salloc 256)))
       (sprintf str "<PmEvent: type=%d chan=%d data1=%d data2=%d timestamp=%d>"
-              (Pm_Message_Type (tref pmevent 0))
-              (Pm_Message_Channel (tref pmevent 0))
-              (Pm_Message_Data1 (tref pmevent 0))
-              (Pm_Message_Data2 (tref pmevent 0))
+               (Pm_Message_Type (tref pmevent 0))
+               (Pm_Message_Channel (tref pmevent 0))
+               (Pm_Message_Data1 (tref pmevent 0))
+               (Pm_Message_Data2 (tref pmevent 0))
                (tref pmevent 1))
       (String str))))
 
@@ -841,8 +841,8 @@ output device(s)
 ;; OVERRIDE default midi out
 (bind-func set_midi_out
   (lambda (idx)
-     (set! midi_out (pm_create_output_stream idx))
-     midi_out))
+    (set! midi_out (pm_create_output_stream idx))
+    midi_out))
 
 (bind-func get_midi_out
   (lambda ()
@@ -854,8 +854,8 @@ output device(s)
 ;; OVERRIDE default midi in
 (bind-func set_midi_in
   (lambda (idx)
-     (set! midi_in (pm_create_input_stream idx))
-     midi_in))
+    (set! midi_in (pm_create_input_stream idx))
+    midi_in))
 
 (bind-func get_midi_in
   (lambda ()
@@ -872,85 +872,85 @@ output device(s)
 ;; scheme helper functions
 
 (xtc:aot:do-or-emit
- (define play-midi-note
-   (lambda (time device pitch velocity duration channel)
-     (callback time 'pm_send device *midi-note-on* channel pitch velocity)
-     (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
+  (define play-midi-note
+    (lambda (time device pitch velocity duration channel)
+      (callback time 'pm_send device *midi-note-on* channel pitch velocity)
+      (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
 
 (xtc:aot:do-or-emit
- (define send-midi-cc
-   (lambda (time device cc val channel)
-     (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))
+  (define send-midi-cc
+    (lambda (time device cc val channel)
+      (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))
 
 ;; homophonic playnote
 (xtc:aot:do-or-emit
- (define homo-play-midi-note
-   (let ((notes (make-vector 127 0)))
-     (lambda (time device pitch velocity duration channel)
-       (if (> time (vector-ref notes pitch))
-           (let ((dur (- duration (* 2 *au:block-size*))))
-             (vector-set! notes pitch (+ time dur))
-             (callback time 'pm_send device *midi-note-on* channel pitch velocity)
-             (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
+  (define homo-play-midi-note
+    (let ((notes (make-vector 127 0)))
+      (lambda (time device pitch velocity duration channel)
+        (if (> time (vector-ref notes pitch))
+            (let ((dur (- duration (* 2 *au:block-size*))))
+              (vector-set! notes pitch (+ time dur))
+              (callback time 'pm_send device *midi-note-on* channel pitch velocity)
+              (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
 
 ;; A midi-specific play macro
 (xtc:aot:do-or-emit
   (define *midioffset* 0))
 
 (xtc:aot:do-or-emit
- (define-macro (mplay . args)
-   (if (symbol? (car args))
-       `(if (list? ,(cadr args))
-            (map (lambda (p)
-                  (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
-                    (real->integer p)
-                    (real->integer ,(caddr args))
-                    (*metro* 'dur ,(car (cdddr args)))
-                    (real->integer , (car (cddddr args)))))
-              ,(cadr args))
-            (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
-                              (real->integer ,(cadr args))
-                              (real->integer ,(caddr args))
-                              (*metro* 'dur ,(car (cdddr args)))
-                              (real->integer , (car (cddddr args)))))
+  (define-macro (mplay . args)
+    (if (symbol? (car args))
+        `(if (list? ,(cadr args))
+          (map (lambda (p)
+                 (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
+                                 (real->integer p)
+                                 (real->integer ,(caddr args))
+                                 (*metro* 'dur ,(car (cdddr args)))
+                                 (real->integer , (car (cddddr args)))))
+               ,(cadr args))
+          (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
+                          (real->integer ,(cadr args))
+                          (real->integer ,(caddr args))
+                          (*metro* 'dur ,(car (cdddr args)))
+                          (real->integer , (car (cddddr args)))))
         `(if (list? ,(caddr args))
-             (map (lambda (p)
-              (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-                                (real->integer p)
-                                (real->integer ,(car (cdddr args)))
-                                (*metro* 'dur ,(cadr (cdddr args)))
-                                (real->integer , (cadr (cddddr args)))))
-                  ,(caddr args))
-              (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-                                (real->integer ,(caddr args))
-                                (real->integer ,(car (cdddr args)))
-                                (*metro* 'dur ,(cadr (cdddr args)))
-                                (real->integer , (cadr (cddddr args))))))))
+          (map (lambda (p)
+                 (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
+                                 (real->integer p)
+                                 (real->integer ,(car (cdddr args)))
+                                 (*metro* 'dur ,(cadr (cdddr args)))
+                                 (real->integer , (cadr (cddddr args)))))
+               ,(caddr args))
+          (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
+                          (real->integer ,(caddr args))
+                          (real->integer ,(car (cdddr args)))
+                          (*metro* 'dur ,(cadr (cdddr args)))
+                          (real->integer , (cadr (cddddr args))))))))
 
 (xtc:aot:do-or-emit
   (define-macro (mcc . args)
     (if (symbol? (car args))
         `(send-midi-cc (+ (*metro* beat) *midioffset*) ,(car args)
-                        (real->integer ,(cadr args))
-                        (real->integer ,(caddr args))
-                        (real->integer ,(car (cdddr args))))
+          (real->integer ,(cadr args))
+          (real->integer ,(caddr args))
+          (real->integer ,(car (cdddr args))))
         `(send-midi-cc (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-                        (real->integer ,(caddr args))
-                        (real->integer ,(car (cdddr args)))
-                        (real->integer ,(car (cddddr args)))))))
+          (real->integer ,(caddr args))
+          (real->integer ,(car (cdddr args)))
+          (real->integer ,(car (cddddr args)))))))
 
 
 (xtc:aot:do-or-emit
- (define-macro (mplayob o b . args)
-   `(if (= 0 (modulo (+ ,o beat) ,b))
-        (mplay ,@args)
-        #f)))
+  (define-macro (mplayob o b . args)
+    `(if (= 0 (modulo (+ ,o beat) ,b))
+      (mplay ,@args)
+      #f)))
 
 (xtc:aot:do-or-emit
- (define-macro (mplayobs l b . args)
-   `(if (member (modulo beat ,b) ,l)
-        (mplay ,@args)
-        #f)))
+  (define-macro (mplayobs l b . args)
+    `(if (member (modulo beat ,b) ,l)
+      (mplay ,@args)
+      #f)))
 
 ;; ;; uncomment if you want to use play instead of mplay
 ;; (xtc:aot:do-or-emit

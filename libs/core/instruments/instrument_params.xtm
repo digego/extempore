@@ -93,9 +93,9 @@
     (stop_running inst) ;; force a stop on all notes before changing poly count
     (if (and (> val 0) (< val (+ 1 MAXPOLYPHONY)))
         (begin (cset! (cast inst [void]*) poly val i64)
-               void)
+          void)
         (begin (println "Invalid argument, must be greater than 0 and less than MAXPOLYPHONY")
-               void))
+          void))
     void))
 
 (bind-func get_polyphony
@@ -930,9 +930,9 @@
 
 (bind-func static set_lfo_ad
   (lambda (inst:i8* lfo_num:i32 attack:float decay:float a_slope:float d_slope:float)
-    (let ((krl (if (< lfo_num 4) 
+    (let ((krl (if (< lfo_num 4)
                    (cref (cast inst [void]*) effect_kernel [void]*)
-                   (cref (cast inst [void]*) note_kernel [void]*)))                
+                   (cref (cast inst [void]*) note_kernel [void]*)))
           (mod_attack (cref krl mod_attack |4,float|*))
           (mod_decay (cref krl mod_decay |4,float|*))
           (mod_attack_slope (cref krl mod_attack_slope |4,float|*))
@@ -973,7 +973,7 @@
   (lambda (inst:i8* lfo_num:i32)
     (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
           (mod_attack_slope (cref fx mod_attack_slope |4,float|*)))
-        (aref mod_attack_slope lfo_num))))
+      (aref mod_attack_slope lfo_num))))
 
 (bind-func static get_lfo_ad_decay_slope
   (lambda (inst:i8* lfo_num:i32)
@@ -997,7 +997,7 @@
   (lambda (inst:i8* lfo_num:i32 slope:float)
     (let ((fx (cref (cast inst [void]*) effect_kernel [void]*))
           (mod_attack_slope (cref fx mod_attack_slope |4,float|*)))
-        (aset! mod_attack_slope lfo_num slope))))
+      (aset! mod_attack_slope lfo_num slope))))
 
 (bind-func static set_lfo_ad_decay_slope
   (lambda (inst:i8* lfo_num:i32 slope:float)
@@ -1110,7 +1110,7 @@
 (bind-func static get_lfo_type
   (lambda (inst:i8* lfo_num:i32)
     (let ((krl (if (< lfo_num 4)
-                   (cref (cast inst [void]*) effect_kernel [void]*) 
+                   (cref (cast inst [void]*) effect_kernel [void]*)
                    (cref (cast inst [void]*) note_kernel [void]*)))
           (lfo_types (cref krl lfo_types |4,i32|*)))
       (aref lfo_types (% lfo_num 4)))))
@@ -1277,7 +1277,7 @@
       (if (equal name 'Cerberus')
           (cerberus_set_mod_matrix inst src dst value)
           (analogue_set_mod_matrix inst src dst value)))))
-          
+
 (bind-func get_mod_matrix
   (lambda (inst:i8* src:enum dst:enum)
     (let ((name (cref (cast inst [void]*) name String*)))

@@ -58,20 +58,20 @@
                                         (else l)))
                                 tmpargs)))
                (cond
-                ((or (list? (car tmpargs)) (pair? (car tmpargs)))
-                 (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
-                ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
-                (else
-                 ;; this is a messy expression, but it just counts the number of
-                 ;; '| symbols *after* the current value, and adds them to the
-                 ;; duration
-                 (let ((note-dur (* one_beat
-                                   (+ 1 (length (take-while (lambda (x) (equal? x '|))
-                                                            (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
-                   (apply callback
-                          (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
-                          func (+ beat (- (car t) pos)) note-dur
-                          loopcnt targs))))))
+                 ((or (list? (car tmpargs)) (pair? (car tmpargs)))
+                  (apply rmap_helper one_beat offset func (+ beat (- (car t) pos)) one_beat loopcnt (+ looppos (- (car t) pos)) targs))
+                 ((member (car tmpargs) '(_ |)) #f) ;; skip these symbols
+                 (else
+                   ;; this is a messy expression, but it just counts the number of
+                   ;; '| symbols *after* the current value, and adds them to the
+                   ;; duration
+                   (let ((note-dur (* one_beat
+                                      (+ 1 (length (take-while (lambda (x) (equal? x '|))
+                                                               (cl:nthcdr (min (cdr t) (length (car args))) (car args))))))))
+                     (apply callback
+                            (- (*metro* (+ beat (- (car t) pos))) *RMAP_HELPER_CALLBACK_OFFSET*)
+                            func (+ beat (- (car t) pos)) note-dur
+                            loopcnt targs))))))
            newlst))))
 
 ;; rhythm map
@@ -103,7 +103,7 @@
          (f `(lambda ,(cons 'beat (cons 'dur (cons 'loop (map (lambda (x)
                                                                 (string->symbol (string-append "@" (number->string x))))
                                                               (range 1 (+ 1 (length lsts)))))))
-                     ,expr))
+              ,expr))
          (beats (eval beatsexpr))
          (offset (eval offsetexpr))
          (running? (closure? name)))
@@ -113,33 +113,33 @@
           (print-with-colors 'yellow 'default #f (print "changing "))
           (println name)))
     (begin (eval `(define ,name
-                    (lambda (beat totaldur loopcnt dur)
-                      (define beats ,beatsexpr)
-                      (define offset ,offsetexpr)
-                      (define LC loopcnt)
-                      (define LP totaldur)
-                      (define LL beats)
-                      (set! ,tagtime (now))
-                      (rmap beats offset ,f loopcnt totaldur ,@lsts)
-                      (if ,(if (equal? run 'stop) #t #f)
-                          (begin
-                            (print-with-colors 'blue 'default #t (print "pattern "))
-                            (print-with-colors 'red 'default #f (print "stopping "))
-                            (println ',name)
-                            (eval '(define ,name #f) (interaction-environment))
-                            #f)
-                          (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur)
-                                    (if (= (+ totaldur dur) beats) 0 (+ totaldur dur))
-                                    (if (= (+ totaldur dur) beats) (+ loopcnt 1) loopcnt)
-                                    ,(if (> beats 1) 1/2 (/ beats 2))))))
+                   (lambda (beat totaldur loopcnt dur)
+                     (define beats ,beatsexpr)
+                     (define offset ,offsetexpr)
+                     (define LC loopcnt)
+                     (define LP totaldur)
+                     (define LL beats)
+                     (set! ,tagtime (now))
+                     (rmap beats offset ,f loopcnt totaldur ,@lsts)
+                     (if ,(if (equal? run 'stop) #t #f)
+                         (begin
+                           (print-with-colors 'blue 'default #t (print "pattern "))
+                           (print-with-colors 'red 'default #f (print "stopping "))
+                           (println ',name)
+                           (eval '(define ,name #f) (interaction-environment))
+                           #f)
+                         (callback (*metro* (+ beat (* .5 dur))) ',name (+ beat dur)
+                                   (if (= (+ totaldur dur) beats) 0 (+ totaldur dur))
+                                   (if (= (+ totaldur dur) beats) (+ loopcnt 1) loopcnt)
+                                   ,(if (> beats 1) 1/2 (/ beats 2))))))
                  (interaction-environment))
-           (if (equal? run 'start)
-               (eval `(begin
-                        (print-with-colors 'blue 'default #t (print "pattern "))
-                        (print-with-colors 'green 'default #f (print "starting "))
-                        (println ',name)
-                        (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
-                     (interaction-environment))))))
+      (if (equal? run 'start)
+          (eval `(begin
+                  (print-with-colors 'blue 'default #t (print "pattern "))
+                  (print-with-colors 'green 'default #f (print "starting "))
+                  (println ',name)
+                  (,name (*metro* 'get-beat 4) 0 0 (if (> ,beats 1) 1/2 (/ ,beats 2))))
+                (interaction-environment))))))
 
 ;; start or modify looper
 (define-macro (:> tag . args)
@@ -156,7 +156,7 @@
   (let ((tagtime (string->symbol (string-append (symbol->string tag) "_tagtime"))))
     (if (defined? tag)
         (begin (callback (+ (now) *second*) eval `(define ,tag #f) (interaction-environment))
-               `(rmap-loop-runner ,tag ,tagtime stop ,@args)))))
+          `(rmap-loop-runner ,tag ,tagtime stop ,@args)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -218,7 +218,7 @@
 
 (define scale
   (lambda (octave num . args)
-    (let ((stepsize (get-scale-stepsize args)) 
+    (let ((stepsize (get-scale-stepsize args))
           (scale (get-scale-scale args)))
       (map (lambda (x)
              (pc:relative (+ 12 (car scale) (* 12 octave)) (* x stepsize) scale))
@@ -227,16 +227,16 @@
 (define qnt
   (lambda (pitch . args)
     (pc:quantize pitch (if (null? args) *scale*
-                       (map (lambda (pitch)
-                              (modulo pitch 12))
-                            (car args))))))
+                           (map (lambda (pitch)
+                                  (modulo pitch 12))
+                                (car args))))))
 
 (define rel
   (lambda (pitch i . args)
     (pc:relative pitch i (if (null? args) *scale*
-                         (map (lambda (pitch)
-                                (modulo pitch 12))
-                              (car args))))))
+                             (map (lambda (pitch)
+                                    (modulo pitch 12))
+                                  (car args))))))
 
 ;; always requires type, will default to *root* if second arg not provided
 (define chrd
@@ -298,12 +298,12 @@
       (cond ((<= k 0) (repeat n zero-val))
             ((>= k n) (repeat n one-val))
             (else
-             (let loop ((groups (euclid-distribute-zeros
-                                 (list (repeat k (list one-val))
-                                       (repeat (- n k) (list zero-val))))))
-               (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
-                   (flatten groups)
-                   (loop (euclid-distribute-zeros groups)))))))))
+              (let loop ((groups (euclid-distribute-zeros
+                                   (list (repeat k (list one-val))
+                                         (repeat (- n k) (list zero-val))))))
+                (if (or (= (length groups) 1) (member (cadr groups) (list zero-val)))
+                    (flatten groups)
+                    (loop (euclid-distribute-zeros groups)))))))))
 
 ;; number of (numof -> nof)
 (define-macro (nof num body)
@@ -331,9 +331,9 @@
     (let loop ((ret '())
                (remaining lst))
       (cond
-       ((null? remaining) (reverse ret))
-       ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
-       (else (reverse ret))))))
+        ((null? remaining) (reverse ret))
+        ((pred (car remaining)) (loop (cons (car remaining) ret) (cdr remaining)))
+        (else (reverse ret))))))
 
 ;; skip by m with a lst rotation of r
 ;; for example: (skip 2 -1 (scale 3 8))
