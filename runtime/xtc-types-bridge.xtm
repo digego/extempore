@@ -139,7 +139,7 @@
               t
               (let* ((v (xtc:type:fresh-var))
                      (subst (xtc:type:unify (xtc:type:wrap-ptr d v) term
-                                             xtc:type:empty-subst)))
+                                            xtc:type:empty-subst)))
                 (if subst
                     (xtc:type:to-intcode (xtc:type:apply-subst v subst))
                     'fail)))))))
@@ -218,9 +218,9 @@
 (define xtc:type:napp-from-args
   (lambda (name argstr depth intern)
     (xtc:type:wrap-ptr depth
-      (apply xtc:type:napp name
-             (map (lambda (a) (xtc:type:from-pretty a intern))
-                  (xtc:codegen:get-pretty-tuple-arg-strings argstr))))))
+                       (apply xtc:type:napp name
+                              (map (lambda (a) (xtc:type:from-pretty a intern))
+                                   (xtc:codegen:get-pretty-tuple-arg-strings argstr))))))
 
 (define xtc:type:generic-instance->napp
   (lambda (stripped depth intern)
@@ -243,9 +243,9 @@
         (napp napp)
         ((and (> (string-length stripped) 0) (char=? (string-ref stripped 0) #\%))
          (xtc:type:wrap-ptr depth
-           (xtc:type:named (substring stripped 1 (string-length stripped)))))
+                            (xtc:type:named (substring stripped 1 (string-length stripped)))))
         (else (xtc:diagnostics:print-compiler-error
-               (string-append "cannot decode type string " s)))))))
+                (string-append "cannot decode type string " s)))))))
 
 (define xtc:type:from-intcode-number
   (lambda (n)
@@ -258,8 +258,8 @@
               (if base
                   (xtc:type:wrap-ptr depth base)
                   (xtc:diagnostics:print-compiler-error
-                   (string-append "cannot decode int-code type "
-                                  (number->string n))))))))))
+                    (string-append "cannot decode int-code type "
+                                   (number->string n))))))))))
 
 (define xtc:type:from-intcode-compound
   (lambda (ic intern)
@@ -275,14 +275,14 @@
          (xtc:type:wrap-ptr (- rawdepth 1) (cons 'closure (map decode fields))))
         ((= tag *xtc:codegen:array*)
          (xtc:type:wrap-ptr rawdepth
-           (list 'array (car fields) (decode (cadr fields)))))
+                            (list 'array (car fields) (decode (cadr fields)))))
         ((= tag *xtc:codegen:vector*)
          (xtc:type:wrap-ptr rawdepth
-           (list 'vector (car fields) (decode (cadr fields)))))
+                            (list 'vector (car fields) (decode (cadr fields)))))
         (else
-         (xtc:diagnostics:print-compiler-error
-          (string-append "cannot decode compound int-code with tag "
-                         (number->string tag))))))))
+          (xtc:diagnostics:print-compiler-error
+            (string-append "cannot decode compound int-code with tag "
+                           (number->string tag))))))))
 
 ;; Decode a live int-code value into a canonical term.  `intern' is the
 ;; bang-variable table (see xtc:type:intern-var); pass a fresh (make-hashtable)
@@ -294,8 +294,8 @@
           ((string? ic) (xtc:type:from-intcode-string ic intern))
           ((pair? ic)   (xtc:type:from-intcode-compound ic intern))
           (else (xtc:diagnostics:print-compiler-error
-                 (string-append "cannot decode int-code type "
-                                (sexpr->string ic)))))))
+                  (string-append "cannot decode int-code type "
+                                 (sexpr->string ic)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; term -> int-code    ;;
@@ -318,17 +318,17 @@
          (if intern
              (let ((name (hashtable-ref intern (xtc:type:var-id base))))
                (string->symbol
-                (string-append (if name name "!gx_unresolved")
-                               (make-string depth #\*))))
+                 (string-append (if name name "!gx_unresolved")
+                                (make-string depth #\*))))
              (xtc:diagnostics:print-compiler-error
-              (string-append "unresolved type variable "
-                             (xtc:type:term->string base)))))
+               (string-append "unresolved type variable "
+                              (xtc:type:term->string base)))))
         ((symbol? base)
          (let ((code (xtc:type:base->code base)))
            (if code
                (+ code off)
                (xtc:diagnostics:print-compiler-error
-                (string-append "unknown base type " (symbol->string base))))))
+                 (string-append "unknown base type " (symbol->string base))))))
         ((xtc:type:named? base)
          (string-append "%" (xtc:type:named-name base) (make-string depth #\*)))
         ;; a nominal parametric type re-encodes to its concrete poly c-name ---
@@ -351,7 +351,7 @@
                                       (cname-encode (string-append "<" argstr ">")))))
            (if (not (xtc:cache:namedtype-exists? name1))
                (xtc:codegen:get-type-from-pretty-str
-                (string-append (xtc:type:napp-name base) "{" argstr "}")))
+                 (string-append (xtc:type:napp-name base) "{" argstr "}")))
            (string-append "%" name1 (make-string depth #\*))))
         ((xtc:type:tuple? base)
          (cons (+ *xtc:codegen:tuple* off) (map rec (cdr base))))
@@ -368,8 +368,8 @@
          (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
                (map rec (cdr base))))
         (else
-         (xtc:diagnostics:print-compiler-error
-          (string-append "cannot encode term " (xtc:type:term->string base))))))))
+          (xtc:diagnostics:print-compiler-error
+            (string-append "cannot encode term " (xtc:type:term->string base))))))))
 
 (define xtc:type:to-intcode
   (lambda (t) (xtc:type:to-intcode-open t #f)))
@@ -436,7 +436,7 @@
       ((xtc:type:closure? t)
        (string-append "[" (xtc:type:to-pretty-list (cdr t) intern) "]"))
       (else (xtc:diagnostics:print-compiler-error
-             (string-append "cannot render term " (xtc:type:term->string t)))))))
+              (string-append "cannot render term " (xtc:type:term->string t)))))))
 
 (define xtc:type:to-pretty-list
   (lambda (ts intern)
@@ -507,9 +507,9 @@
         ((xtc:type:napp? t)
          (and (null? (xtc:type:free-vars t))
               (let* ((argstr (string-join
-                              (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
-                                   (xtc:type:napp-args t))
-                              ","))
+                               (map (lambda (a) (xtc:type:to-pretty a (make-hashtable)))
+                                    (xtc:type:napp-args t))
+                               ","))
                      ;; prefer the REGISTERED instance's tuplecode: its fields
                      ;; are fully instantiated (a recursive field is the
                      ;; instance's own c-name).  The declaration-expansion
@@ -519,6 +519,6 @@
                                            (cname-encode (string-append "<" argstr ">"))))
                      (tc (or (xtc:cache:get-namedtype-type name1)
                              (xtc:desugar:get-generic-type-as-tuple
-                              (string-append (xtc:type:napp-name t) "{" argstr "}")))))
+                               (string-append (xtc:type:napp-name t) "{" argstr "}")))))
                 (and tc (xtc:type:field-from-tuplecode tc idx)))))
         (else #f)))))

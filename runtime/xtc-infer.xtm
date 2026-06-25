@@ -241,10 +241,10 @@
                (if (or (xtc:cache:genericfunc-exists? (string->symbol (car p)))
                        (xtc:cache:polyfunc-exists? (car p)))
                    (cons (xtc:codegen:get-type-from-pretty-str
-                          (if (xtc:cache:typealias-exists? (cadr p))
-                              (xtc:codegen:pretty-print-type
-                               (xtc:cache:get-typealias-type (cadr p)))
-                              (cadr p)))
+                           (if (xtc:cache:typealias-exists? (cadr p))
+                               (xtc:codegen:pretty-print-type
+                                 (xtc:cache:get-typealias-type (cadr p)))
+                               (cadr p)))
                          '())
                    (xtc:diagnostics:print-missing-identifier-error ast 'symbol))))
             ;; a poly reference, bare or ##-marked (a closure passed as an
@@ -257,7 +257,7 @@
              (let ((cands (xtc:infer:poly-candidates unmarked)))
                (if (not (= 1 (length (cl:remove-duplicates (map length cands)))))
                    (xtc:diagnostics:print-compiler-error
-                    "Try forcing a type? Ambiguous polymorphic function as a value" ast)
+                     "Try forcing a type? Ambiguous polymorphic function as a value" ast)
                    (let ((rk (xtc:infer:fresh-key))
                          (aks (map (lambda (_) (xtc:infer:fresh-key))
                                    (cdr (car cands)))))
@@ -266,9 +266,9 @@
                                  (xtc:solve:c-overload rk aks cands)))))))
             ((xtc:cache:genericfunc-exists? (string->symbol unmarked))
              (xtc:diagnostics:print-compiler-error
-              "Try forcing a type? Ambiguous generic function as value" ast))
+               "Try forcing a type? Ambiguous generic function as value" ast))
             (else
-             (xtc:diagnostics:print-missing-identifier-error ast 'symbol)))))))
+              (xtc:diagnostics:print-missing-identifier-error ast 'symbol)))))))
 
 ;; Collect constraints for one (already desugared) AST node, given the set of
 ;; lexically in-scope local variables.  Returns (cons result-key constraints).
@@ -373,7 +373,7 @@
       ((and (pair? ast) (symbol? (car ast))
             (xtc:cache:globalvar-exists? (symbol->string (car ast)))
             (xtc:codegen:closure? (xtc:codegen:strip-ptr-depth
-                                   (xtc:cache:get-globalvar-type (symbol->string (car ast))))))
+                                    (xtc:cache:get-globalvar-type (symbol->string (car ast))))))
        (xtc:infer:collect-closure-call ast bound))
       ;; otherwise a symbol in call position is a global function (its candidate
       ;; signatures) or a generic function whose return reifies from the argument
@@ -394,22 +394,22 @@
            (let ((cands (or (xtc:infer:generic-candidates (car ast) (length (cdr ast)))
                             (xtc:infer:global-candidates (car ast)))))
              (cond (cands
-                    (xtc:infer:collect-global-call ast cands bound))
+                     (xtc:infer:collect-global-call ast cands bound))
                    ;; the symbol names a generic whose only specialisations are
                    ;; a kind this path defers (constraint-guarded): a loud gap
                    ((xtc:cache:genericfunc-exists?
-                     (string->symbol (xtc:codegen:get-base-type (symbol->string (car ast)))))
+                      (string->symbol (xtc:codegen:get-base-type (symbol->string (car ast)))))
                     (xtc:diagnostics:print-compiler-error
-                     (string-append "xtc:infer: deferred generic kind: "
-                                    (sexpr->string ast))))
+                      (string-append "xtc:infer: deferred generic kind: "
+                                     (sexpr->string ast))))
                    ;; parity with the old checker: an unknown call-position
                    ;; symbol is an undefined function
                    (else
-                    (xtc:diagnostics:print-missing-identifier-error (car ast) 'symbol))))))
+                     (xtc:diagnostics:print-missing-identifier-error (car ast) 'symbol))))))
       (else
-       (xtc:diagnostics:print-compiler-error
-        (string-append "xtc:infer: unhandled form: "
-                       (sexpr->string ast)))))))
+        (xtc:diagnostics:print-compiler-error
+          (string-append "xtc:infer: unhandled form: "
+                         (sexpr->string ast)))))))
 
 ;; A binding (v e) constrains v to e's type; the let's type is its body's.  The
 ;; bound vars are in scope for the body and (let*-style, harmlessly wider than
@@ -575,13 +575,13 @@
                           (if (= depth 1)
                               (let* ((inner (substring s (+ i 2) k))
                                      (params (cl:remove-duplicates
-                                              (map xtc:infer:bang-canon
-                                                   (regex:match-all inner "![a-zA-Z0-9_]*")))))
+                                               (map xtc:infer:bang-canon
+                                                    (regex:match-all inner "![a-zA-Z0-9_]*")))))
                                 (xtc:infer:nominalise-annotations
-                                 (string-append
-                                  (substring s 0 (+ j 1))
-                                  name "{" (string-join params ",") "}"
-                                  (substring s (+ k 1) (string-length s)))))
+                                  (string-append
+                                    (substring s 0 (+ j 1))
+                                    name "{" (string-join params ",") "}"
+                                    (substring s (+ k 1) (string-length s)))))
                               (fwd (+ k 1) (- depth 1))))
                          (else (fwd (+ k 1) depth))))
                      (scan (+ i 1)))))))
@@ -620,9 +620,9 @@
                (let* ((inner (substring base (+ 1 (string-length name))
                                         (- (string-length base) 1)))
                       (args (cl:remove-if
-                             (lambda (a) (string=? (xtc:type:strip-trailing-stars a) name))
-                             (xtc:codegen:get-pretty-tuple-arg-strings
-                              (string-append "<" inner ">")))))
+                              (lambda (a) (string=? (xtc:type:strip-trailing-stars a) name))
+                              (xtc:codegen:get-pretty-tuple-arg-strings
+                                (string-append "<" inner ">")))))
                  (string-append name "{" (string-join args ",") "}"
                                 (make-string depth #\*)))
                c)))
@@ -661,14 +661,14 @@
            (entries (hashtable-ref *xtc:cache:genericfunc-cache* base)))
       (and entries
            (let ((sigs (cl:remove
-                        #f
-                        (map (lambda (e)
-                               (and (= (cadr e) arity)
-                                    (not (list-ref e 5))
-                                    (let ((sig (xtc:infer:pretty-sig->candidate
-                                                (symbol->string (caddr e)))))
-                                      (and (xtc:infer:sig-reifiable? sig) sig))))
-                             entries))))
+                         #f
+                         (map (lambda (e)
+                                (and (= (cadr e) arity)
+                                     (not (list-ref e 5))
+                                     (let ((sig (xtc:infer:pretty-sig->candidate
+                                                  (symbol->string (caddr e)))))
+                                       (and (xtc:infer:sig-reifiable? sig) sig))))
+                              entries))))
              (and (not (null? sigs)) sigs))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -699,14 +699,14 @@
            (entries (hashtable-ref *xtc:cache:genericfunc-cache* base)))
       (and entries
            (cl:remove
-            #f
-            (map (lambda (e)
-                   (and (= (cadr e) arity)
-                        (not (list-ref e 5))
-                        (cons (xtc:infer:pretty-sig->candidate
-                               (symbol->string (caddr e)))
-                              (caddr (cadddr e)))))
-                 entries))))))
+             #f
+             (map (lambda (e)
+                    (and (= (cadr e) arity)
+                         (not (list-ref e 5))
+                         (cons (xtc:infer:pretty-sig->candidate
+                                 (symbol->string (caddr e)))
+                               (caddr (cadddr e)))))
+                  entries))))))
 
 ;; The free-return fallback entry (sig . body) for `sym' at `arity', or #f ---
 ;; the one whose signature is not return-reifiable (see sig-reifiable?).
@@ -725,7 +725,7 @@
       (if (eq? subst 'conflict)
           #f
           (let ((term (xtc:type:apply-subst
-                       (xtc:type:from-intcode key intern) subst)))
+                        (xtc:type:from-intcode key intern) subst)))
             (if (pair? (xtc:type:free-vars term)) #f term))))))
 
 ;; Does candidate signature `sig' (ret p...) accept the concrete argument terms?
@@ -738,9 +738,9 @@
         (cond ((null? ps) (null? as))
               ((null? as) #f)
               (else
-               (let ((s2 (xtc:type:unify (xtc:type:from-intcode (car ps) fresh)
-                                         (car as) s)))
-                 (and s2 (loop (cdr ps) (cdr as) s2)))))))))
+                (let ((s2 (xtc:type:unify (xtc:type:from-intcode (car ps) fresh)
+                                          (car as) s)))
+                  (and s2 (loop (cdr ps) (cdr as) s2)))))))))
 
 (define xtc:infer:any-spec-matches?
   (lambda (specs argterms)
@@ -780,7 +780,7 @@
     (let ((recipe (xtc:infer:fallback-recipe body)))
       (and recipe
            (let ((field (xtc:type:project-field-term
-                         (list-ref argterms (car recipe)) (cdr recipe))))
+                          (list-ref argterms (car recipe)) (cdr recipe))))
              (and field
                   (null? (xtc:type:free-vars field))
                   (xtc:type:to-intcode field)))))))
@@ -817,36 +817,36 @@
                                         (xtc:infer:site-constraint sym rk (map car rcs))
                                         (list (xtc:solve:c-eq rk proj)))))))))
         (else
-         ;; no specialisation matches by arguments alone (an argument is not
-         ;; ground at collect time, or the eager projection could not fire):
-         ;; the call's CONTEXT directs the return --- the result key, tied by
-         ;; the surrounding binding or use, unifies with the signature's
-         ;; (napp-patterned) return and carries the type variables back into
-         ;; the parameter slots, the same way the old checker's expected type
-         ;; directed a free-return generic.  The fallback's field projection
-         ;; rides along as a DEFERRED project constraint: when the argument
-         ;; grounds during the solve, the result pins to its field --- without
-         ;; it the fallback's free return satisfies any candidate the
-         ;; surrounding overload greedily picks, and the residual variable
-         ;; silently drops the site from the read-back (the recursive-ADT
-         ;; print instance: (print## (tree_value## t)) chose [void,Tree*]).
-         (let* ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
-                (rk (xtc:infer:fresh-key))
-                (fb (xtc:infer:generic-fallback-entry sym arity))
-                (recipe (and fb (xtc:infer:fallback-recipe (cdr fb))))
-                (proj (if recipe
-                          (list (xtc:solve:c-project
-                                 rk (list-ref (map car rcs) (car recipe))
-                                 (cdr recipe)))
-                          '())))
-           (if (null? sigs)
-               (xtc:diagnostics:print-compiler-error
-                (string-append "xtc:infer: no unconstrained specialisation --- deferred: "
-                               (sexpr->string ast)))
-               (cons rk (append argcons
-                                (xtc:infer:site-constraint sym rk (map car rcs))
-                                (list (xtc:solve:c-overload rk (map car rcs) sigs))
-                                proj)))))))))
+          ;; no specialisation matches by arguments alone (an argument is not
+          ;; ground at collect time, or the eager projection could not fire):
+          ;; the call's CONTEXT directs the return --- the result key, tied by
+          ;; the surrounding binding or use, unifies with the signature's
+          ;; (napp-patterned) return and carries the type variables back into
+          ;; the parameter slots, the same way the old checker's expected type
+          ;; directed a free-return generic.  The fallback's field projection
+          ;; rides along as a DEFERRED project constraint: when the argument
+          ;; grounds during the solve, the result pins to its field --- without
+          ;; it the fallback's free return satisfies any candidate the
+          ;; surrounding overload greedily picks, and the residual variable
+          ;; silently drops the site from the read-back (the recursive-ADT
+          ;; print instance: (print## (tree_value## t)) chose [void,Tree*]).
+          (let* ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
+                 (rk (xtc:infer:fresh-key))
+                 (fb (xtc:infer:generic-fallback-entry sym arity))
+                 (recipe (and fb (xtc:infer:fallback-recipe (cdr fb))))
+                 (proj (if recipe
+                           (list (xtc:solve:c-project
+                                   rk (list-ref (map car rcs) (car recipe))
+                                   (cdr recipe)))
+                           '())))
+            (if (null? sigs)
+                (xtc:diagnostics:print-compiler-error
+                  (string-append "xtc:infer: no unconstrained specialisation --- deferred: "
+                                 (sexpr->string ast)))
+                (cons rk (append argcons
+                                 (xtc:infer:site-constraint sym rk (map car rcs))
+                                 (list (xtc:solve:c-overload rk (map car rcs) sigs))
+                                 proj)))))))))
 
 ;; A ##-marked call-site symbol (the dispatch marker desugaring stamps on a
 ;; poly / generic callee) is a variable in its own right: the old checker
@@ -1188,8 +1188,8 @@
                     (if (null? (car (cddddr ast)))
                         '()
                         (list (xtc:solve:c-eq
-                               (car rc-v)
-                               (xtc:codegen:get-type-from-str (car (cddddr ast)))))))))))
+                                (car rc-v)
+                                (xtc:codegen:get-type-from-str (car (cddddr ast)))))))))))
 
 ;; push_zone / pop_zone / push_new_zone / create_zone: each yields a memory-zone
 ;; pointer (%mzone*); a size argument, when present, is collected.
@@ -1302,32 +1302,32 @@
 (define xtc:infer:rewrite-op-sites!
   (lambda (subst intern)
     (cl:remove
-     #f
-     (map (lambda (site)
-            (let* ((ast (vector-ref site 0))
-                   (kind (vector-ref site 1))
-                   (rk (vector-ref site 2))
-                   (akeys (vector-ref site 3))
-                   (atypes (map (lambda (k) (xtc:solve:type-of k subst intern)) akeys))
-                   (rtype (if (eq? kind 'cmp)
-                              *xtc:codegen:i1*
-                              (xtc:solve:type-of rk subst intern)))
-                   (pname (if (eq? kind 'cmp)
-                              (xtc:infer:compare-poly-name (car ast))
-                              (xtc:infer:math-poly-name (car ast)))))
-              (and pname rtype
-                   (not (member #f atypes))
-                   (xtc:codegen:tuple? (car atypes))
-                   (begin
-                     (set! *xtc:infer:op-counter* (+ *xtc:infer:op-counter* 1))
-                     (let ((m (string->symbol
-                               (string-append pname "##"
-                                              (number->string
-                                               (+ 7000000 *xtc:infer:op-counter*))))))
-                       (set-car! ast m)
-                       (cons m (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
-                                     (cons rtype atypes))))))))
-          *xtc:infer:op-sites*))))
+      #f
+      (map (lambda (site)
+             (let* ((ast (vector-ref site 0))
+                    (kind (vector-ref site 1))
+                    (rk (vector-ref site 2))
+                    (akeys (vector-ref site 3))
+                    (atypes (map (lambda (k) (xtc:solve:type-of k subst intern)) akeys))
+                    (rtype (if (eq? kind 'cmp)
+                               *xtc:codegen:i1*
+                               (xtc:solve:type-of rk subst intern)))
+                    (pname (if (eq? kind 'cmp)
+                               (xtc:infer:compare-poly-name (car ast))
+                               (xtc:infer:math-poly-name (car ast)))))
+               (and pname rtype
+                    (not (member #f atypes))
+                    (xtc:codegen:tuple? (car atypes))
+                    (begin
+                      (set! *xtc:infer:op-counter* (+ *xtc:infer:op-counter* 1))
+                      (let ((m (string->symbol
+                                 (string-append pname "##"
+                                                (number->string
+                                                  (+ 7000000 *xtc:infer:op-counter*))))))
+                        (set-car! ast m)
+                        (cons m (cons (+ *xtc:codegen:closure* (* 2 *xtc:codegen:pointer*))
+                                      (cons rtype atypes))))))))
+           *xtc:infer:op-sites*))))
 
 ;; REENTRANT: encoding a fresh generic instance during the read-back triggers
 ;; the instance type's data-constructor compiles, each a full nested driver
@@ -1347,54 +1347,54 @@
              (subst (xtc:solve:run (append forced (cdr rc)) intern))
              (call-sites *xtc:infer:call-sites*)
              (result
-              (if (eq? subst 'conflict)
-                  (begin
-                    (xtc:solve:explain-conflict (append forced (cdr rc)) intern)
-                    #f)
-                  ;; Read back the declared variables (the var table's keys)
-                  ;; plus the ## call-site symbols this run constrained ---
-                  ;; nothing else.  A symbol the constraints referenced that
-                  ;; neither lists (a global variable, a cached closure) is NOT
-                  ;; a local: the alist marks locals, which codegen scope-checks
-                  ;; against its sym-name-stack, so an entry would shadow the
-                  ;; cache resolution those symbols get.  The user-overload op
-                  ;; sites rewrite first; their dispatch symbols' entries join
-                  ;; the alist.
-                  (let ((pattern-vars
-                         ;; vars whose FORCED annotation carried bang variables
-                         ;; (a constructor argument spelled with a recursive
-                         ;; type's bare expansion): a residual variable in
-                         ;; their type renders as its bang, like the old
-                         ;; checker's pattern-typed entries, instead of
-                         ;; dropping the entry
-                         (cl:remove #f
-                                    (map (lambda (ft)
-                                           (and (pair? (xtc:infer:bang-vars (cdr ft)))
-                                                (car ft)))
-                                         forced-types))))
-                    (append
-                     (xtc:infer:rewrite-op-sites! subst intern)
-                     (cl:remove #f
-                                (map (lambda (sym)
-                                       (let ((ty (or (xtc:solve:type-of sym subst intern)
-                                                     (and (memq sym pattern-vars)
-                                                          (xtc:solve:type-of-open sym subst intern)))))
-                                         ;; a call site whose type retains a residual
-                                         ;; variable cannot be read back; the entry is
-                                         ;; dropped and add-types-to-source errors at the
-                                         ;; site --- name the site and the open type here,
-                                         ;; because the downstream error's alist cannot
-                                         (if (and (not ty) (memq sym call-sites))
-                                             (xtc:diagnostics:print-compiler-warning
-                                              (string-append
-                                               "xtc:infer: unresolved call site dropped: "
-                                               (symbol->string sym) " : "
-                                               (sexpr->string
-                                                (xtc:type:apply-subst
-                                                 (xtc:type:from-intcode sym intern) subst)))))
-                                         (and ty (cons sym ty))))
-                                     (cl:remove-duplicates
-                                      (append (hashtable-keys vars) call-sites)))))))))
+               (if (eq? subst 'conflict)
+                   (begin
+                     (xtc:solve:explain-conflict (append forced (cdr rc)) intern)
+                     #f)
+                   ;; Read back the declared variables (the var table's keys)
+                   ;; plus the ## call-site symbols this run constrained ---
+                   ;; nothing else.  A symbol the constraints referenced that
+                   ;; neither lists (a global variable, a cached closure) is NOT
+                   ;; a local: the alist marks locals, which codegen scope-checks
+                   ;; against its sym-name-stack, so an entry would shadow the
+                   ;; cache resolution those symbols get.  The user-overload op
+                   ;; sites rewrite first; their dispatch symbols' entries join
+                   ;; the alist.
+                   (let ((pattern-vars
+                           ;; vars whose FORCED annotation carried bang variables
+                           ;; (a constructor argument spelled with a recursive
+                           ;; type's bare expansion): a residual variable in
+                           ;; their type renders as its bang, like the old
+                           ;; checker's pattern-typed entries, instead of
+                           ;; dropping the entry
+                           (cl:remove #f
+                                      (map (lambda (ft)
+                                             (and (pair? (xtc:infer:bang-vars (cdr ft)))
+                                                  (car ft)))
+                                           forced-types))))
+                     (append
+                       (xtc:infer:rewrite-op-sites! subst intern)
+                       (cl:remove #f
+                                  (map (lambda (sym)
+                                         (let ((ty (or (xtc:solve:type-of sym subst intern)
+                                                       (and (memq sym pattern-vars)
+                                                            (xtc:solve:type-of-open sym subst intern)))))
+                                           ;; a call site whose type retains a residual
+                                           ;; variable cannot be read back; the entry is
+                                           ;; dropped and add-types-to-source errors at the
+                                           ;; site --- name the site and the open type here,
+                                           ;; because the downstream error's alist cannot
+                                           (if (and (not ty) (memq sym call-sites))
+                                               (xtc:diagnostics:print-compiler-warning
+                                                 (string-append
+                                                   "xtc:infer: unresolved call site dropped: "
+                                                   (symbol->string sym) " : "
+                                                   (sexpr->string
+                                                     (xtc:type:apply-subst
+                                                       (xtc:type:from-intcode sym intern) subst)))))
+                                           (and ty (cons sym ty))))
+                                       (cl:remove-duplicates
+                                         (append (hashtable-keys vars) call-sites)))))))))
         (set! *xtc:infer:fresh-counter* saved-fresh)
         (set! *xtc:infer:op-sites* saved-ops)
         (set! *xtc:infer:call-sites* saved-calls)

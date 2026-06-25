@@ -81,9 +81,9 @@
       (let ((car1 (caar lists))
             (cdr1 (cdar lists)))
         (unzip1-with-cdr-iterative
-         (cdr lists)
-         (append cars (list car1))
-         (append cdrs (list cdr1))))))
+          (cdr lists)
+          (append cars (list car1))
+          (append cdrs (list cdr1))))))
 
 (define (last-pair x)
   (if (pair? (cdr x))
@@ -118,7 +118,7 @@
 ;;;; Handy for imperative programs
 (define-macro (define-with-return head . body)
   `(define ,head
-     (call/cc (lambda (return) ,@body))))
+    (call/cc (lambda (return) ,@body))))
 
 ;;;; Simple exception handling
 ;;
@@ -162,8 +162,8 @@
 (define *s7-catch* catch)
 (define-macro (catch error-value . body)
   `(*s7-catch* #t
-     (lambda () ,@body)
-     (lambda (type info) ,error-value)))
+    (lambda () ,@body)
+    (lambda (type info) ,error-value)))
 
 ;; *error-hook* is immutable in s7; use s7's error handling instead
 (define *livecoding-error-hook* (lambda (msg a) 1))
@@ -171,8 +171,8 @@
 ;;;;; Definition of MAKE-ENVIRONMENT
 (define-macro (make-environment . body)
   `(let ()
-     ,@body
-     (curlet)))
+    ,@body
+    (curlet)))
 
 (define-macro (eval-polymorphic x . envl)
   (display envl)
@@ -193,10 +193,10 @@
 
 (define (close-port p)
   (cond
-   ((input-output-port? p) (close-input-port (close-output-port p)))
-   ((input-port? p) (close-input-port p))
-   ((output-port? p) (close-output-port p))
-   (else (throw "Not a port" p))))
+    ((input-output-port? p) (close-input-port (close-output-port p)))
+    ((input-port? p) (close-input-port p))
+    ((output-port? p) (close-output-port p))
+    (else (throw "Not a port" p))))
 
 (define (call-with-input-file s p)
   (let ((inport (open-input-file s)))
@@ -262,7 +262,7 @@
     (set! *seed*
           (-   (* a (- *seed*
                        (* (quotient *seed* q) q)))
-               (* (quotient *seed* q) r)))
+             (* (quotient *seed* q) r)))
     (if (< *seed* 0) (set! *seed* (+ *seed* m)))
     *seed*))
 ;; SRFI-0

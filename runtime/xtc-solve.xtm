@@ -130,12 +130,12 @@
 (define xtc:solve:pretty-sig
   (lambda (intcodes intern subst)
     (string-append
-     "[" (xtc:type:to-pretty-list
-          (map (lambda (k) (xtc:type:apply-subst
-                            (xtc:type:from-intcode k intern) subst))
-               intcodes)
-          intern)
-     "]")))
+      "[" (xtc:type:to-pretty-list
+            (map (lambda (k) (xtc:type:apply-subst
+                               (xtc:type:from-intcode k intern) subst))
+                 intcodes)
+            intern)
+      "]")))
 
 ;; A conflict's WHY, for the error path only (the solve itself stays silent):
 ;; replay the equalities one at a time, reporting the first that fails as a
@@ -153,19 +153,19 @@
          (let* ((subst (xtc:solve:apply-defaults constraints intern subst))
                 (classes (xtc:solve:class-map constraints)))
            (for-each
-            (lambda (c)
-              (if (null? (xtc:solve:overload-viable c intern subst classes))
-                  (print
-                   (string-append
-                    "Type Error: no overload matches the argument types "
-                    (xtc:solve:pretty-sig (caddr c) intern subst)
-                    " --- candidates are "
-                    (string-join
-                     (map (lambda (sig) (xtc:solve:pretty-sig sig intern subst))
-                          (cadddr c))
-                     " ")
-                    "\n"))))
-            (cl:remove-if-not xtc:solve:overload? constraints))))
+             (lambda (c)
+               (if (null? (xtc:solve:overload-viable c intern subst classes))
+                   (print
+                     (string-append
+                       "Type Error: no overload matches the argument types "
+                       (xtc:solve:pretty-sig (caddr c) intern subst)
+                       " --- candidates are "
+                       (string-join
+                         (map (lambda (sig) (xtc:solve:pretty-sig sig intern subst))
+                              (cadddr c))
+                         " ")
+                       "\n"))))
+             (cl:remove-if-not xtc:solve:overload? constraints))))
         ((xtc:solve:eq? (car cs))
          (let* ((c (car cs))
                 (t1 (xtc:type:from-intcode (cadr c) intern))
@@ -174,12 +174,12 @@
            (if subst2
                (loop (cdr cs) subst2)
                (print
-                (string-append
-                 "Type Error: type mismatch --- "
-                 (xtc:type:to-pretty (xtc:type:apply-subst t1 subst) intern)
-                 " is not compatible with "
-                 (xtc:type:to-pretty (xtc:type:apply-subst t2 subst) intern)
-                 "\n")))))
+                 (string-append
+                   "Type Error: type mismatch --- "
+                   (xtc:type:to-pretty (xtc:type:apply-subst t1 subst) intern)
+                   " is not compatible with "
+                   (xtc:type:to-pretty (xtc:type:apply-subst t2 subst) intern)
+                   "\n")))))
         (else (loop (cdr cs) subst))))))
 
 (define xtc:solve:unify-equalities
@@ -209,9 +209,9 @@
                (if (xtc:type:var? resolved)
                    (let* ((default-code (apply min (caddr c)))
                           (subst2 (xtc:type:unify
-                                   resolved
-                                   (xtc:type:from-intcode default-code intern)
-                                   subst)))
+                                    resolved
+                                    (xtc:type:from-intcode default-code intern)
+                                    subst)))
                      (loop (cdr cs) (if subst2 subst2 subst)))
                    (loop (cdr cs) subst))))
             (else (loop (cdr cs) subst))))))
@@ -228,9 +228,9 @@
 (define xtc:solve:class-map
   (lambda (constraints)
     (cl:remove #f
-      (map (lambda (c)
-             (if (xtc:solve:default? c) (cons (cadr c) (caddr c)) #f))
-           constraints))))
+               (map (lambda (c)
+                      (if (xtc:solve:default? c) (cons (cadr c) (caddr c)) #f))
+                    constraints))))
 
 ;; The class of argument key `akey', looked up by canonical VARIABLE rather
 ;; than by syntactic key: a let-bound name unified with a literal (inv ~ -1.0)
@@ -242,7 +242,7 @@
       (let loop ((cs classes))
         (cond ((null? cs) #f)
               ((equal? rep (xtc:type:resolve
-                            (xtc:type:from-intcode (caar cs) intern) subst))
+                             (xtc:type:from-intcode (caar cs) intern) subst))
                (cdar cs))
               (else (loop (cdr cs))))))))
 
@@ -327,7 +327,7 @@
                   ((car bs)  ;; grounded vector(-ptr): bases must agree
                    (loop (cdr ts) (cdr bs) (xtc:type:unify (car bs) base s)))
                   (else      ;; still free (or must unify with the value vector)
-                   (loop (cdr ts) (cdr bs) (xtc:type:unify (car ts) base s)))))))))
+                        (loop (cdr ts) (cdr bs) (xtc:type:unify (car ts) base s)))))))))
 
 ;; The class alist with each key resolved to its canonical representative under
 ;; `subst': (rep . class) ...  This is a pure function of (classes, intern,
@@ -350,7 +350,7 @@
           (cadddr c)
           (let ((reps (map (lambda (cl)
                              (cons (xtc:type:resolve
-                                    (xtc:type:from-intcode (car cl) intern) subst)
+                                     (xtc:type:from-intcode (car cl) intern) subst)
                                    (cdr cl)))
                            classes)))
             (set! *xtc:solve:class-reps-cache* (list subst classes intern reps))
@@ -401,44 +401,44 @@
                                               (char=? (string-ref s 0) #\!))))
                                       (else #f)))))))
            (r (cl:remove
-               #f
-               (map (lambda (cand)
-                      (cond
-                        ((eq? cand 'vecmath)
-                         (xtc:solve:vecmath-viable rkey akeys intern subst))
-                        ((eq? cand 'ptrcmp)
-                         (xtc:solve:ptrcmp-viable rkey akeys intern subst))
-                        ((<> (length (cdr cand)) (length akeys))
-                         #f)
-                        ;; the result key is held to its class exactly like an
-                        ;; argument: an index expression's (si64 si32) bound must
-                        ;; reject the floating candidates or the search would
-                        ;; happily commit them
-                        ((not (admits? radmit (car cand)))
-                         #f)
-                        (else
-                         (let* ((fresh (make-hashtable))
-                                (s1 (xtc:type:unify rterm
-                                                    (xtc:type:from-intcode (car cand) fresh)
-                                                    subst)))
-                           (if (not s1)
-                               #f
-                               (let loop ((as aterms) (ads aadmits) (ps (cdr cand)) (s s1))
-                                 (if (null? as)
-                                     (cons cand s)
-                                     ;; the hoisted admissibility datum is computed
-                                     ;; under the entry substitution; a previous
-                                     ;; argument's unification in `s' cannot ground
-                                     ;; a classed literal to a non-numeric term, so
-                                     ;; the class bound still applies
-                                     (if (not (admits? (car ads) (car ps)))
-                                         #f
-                                         (let ((s2 (xtc:type:unify
-                                                    (car as)
-                                                    (xtc:type:from-intcode (car ps) fresh)
-                                                    s)))
-                                           (if s2 (loop (cdr as) (cdr ads) (cdr ps) s2) #f))))))))))
-                    cands))))
+                #f
+                (map (lambda (cand)
+                       (cond
+                         ((eq? cand 'vecmath)
+                          (xtc:solve:vecmath-viable rkey akeys intern subst))
+                         ((eq? cand 'ptrcmp)
+                          (xtc:solve:ptrcmp-viable rkey akeys intern subst))
+                         ((<> (length (cdr cand)) (length akeys))
+                          #f)
+                         ;; the result key is held to its class exactly like an
+                         ;; argument: an index expression's (si64 si32) bound must
+                         ;; reject the floating candidates or the search would
+                         ;; happily commit them
+                         ((not (admits? radmit (car cand)))
+                          #f)
+                         (else
+                           (let* ((fresh (make-hashtable))
+                                  (s1 (xtc:type:unify rterm
+                                                      (xtc:type:from-intcode (car cand) fresh)
+                                                      subst)))
+                             (if (not s1)
+                                 #f
+                                 (let loop ((as aterms) (ads aadmits) (ps (cdr cand)) (s s1))
+                                   (if (null? as)
+                                       (cons cand s)
+                                       ;; the hoisted admissibility datum is computed
+                                       ;; under the entry substitution; a previous
+                                       ;; argument's unification in `s' cannot ground
+                                       ;; a classed literal to a non-numeric term, so
+                                       ;; the class bound still applies
+                                       (if (not (admits? (car ads) (car ps)))
+                                           #f
+                                           (let ((s2 (xtc:type:unify
+                                                       (car as)
+                                                       (xtc:type:from-intcode (car ps) fresh)
+                                                       s)))
+                                             (if s2 (loop (cdr as) (cdr ads) (cdr ps) s2) #f))))))))))
+                     cands))))
       r)))
 
 ;; One pass over the pending overloads: re-filter each against the current
@@ -463,14 +463,14 @@
                   ((null? (cdr viable))
                    (loop (cdr ps) (cdr (car viable)) still #t))
                   (else
-                   (loop (cdr ps) subst
-                         (cons (xtc:solve:c-overload
-                                (cadr (car ps)) (caddr (car ps))
-                                (map car viable))
-                               still)
-                         ;; narrowing alone is not progress: only a commit
-                         ;; extends the substitution
-                         progress))))))))
+                    (loop (cdr ps) subst
+                          (cons (xtc:solve:c-overload
+                                  (cadr (car ps)) (caddr (car ps))
+                                  (map car viable))
+                                still)
+                          ;; narrowing alone is not progress: only a commit
+                          ;; extends the substitution
+                          progress))))))))
 
 ;; Resolve every pending overload by backtracking search: cascade whichever
 ;; overloads are uniquely viable, then split on the first still-ambiguous one,
@@ -499,45 +499,45 @@
           ((eq? pr 'conflict) 'conflict)
           ((caddr pr) (cascade (car pr) pending (cadr pr)))
           (else
-           (let ((step (xtc:solve:commit-pass pending intern subst classes)))
-             (cond
-               ((eq? step 'conflict) 'conflict)
-               ((caddr step) (cascade (car step) (cadr step) projects))
-               ((null? (cadr step)) (cons (car step) projects))
-               (else
-                ;; split on the MOST CONSTRAINED overload (fewest viable
-                ;; candidates): nearly-forced choices first, so the branching
-                ;; a large function's many independent chains would otherwise
-                ;; multiply collapses --- without this, a 500-line instrument
-                ;; constructor's search runs for minutes instead of millis.
-                ;; The pendings carry commit-pass's narrowed candidate lists,
-                ;; so these viability tests are over the few survivors only.
-                (let* ((pending (cadr step))
-                       (subst (car step))
-                       (viables (map (lambda (p)
-                                       (xtc:solve:overload-viable p intern subst classes))
-                                     pending))
-                       (idx (let imin ((i 0) (vs viables) (bi 0) (bn 1000000))
-                              (if (null? vs)
-                                  bi
-                                  (let ((n (length (car vs))))
-                                    (if (< n bn)
-                                        (imin (+ i 1) (cdr vs) i n)
-                                        (imin (+ i 1) (cdr vs) bi bn))))))
-                       (viable (list-ref viables idx))
-                       (rest (let split ((i 0) (ps pending) (acc '()))
-                               (cond ((null? ps) (reverse acc))
-                                     ((= i idx) (split (+ i 1) (cdr ps) acc))
-                                     (else (split (+ i 1) (cdr ps)
-                                                  (cons (car ps) acc)))))))
-                  (let try ((vs viable))
-                    (if (null? vs)
-                        'conflict
-                        (let ((r (xtc:solve:search rest projects intern
-                                                   (cdr (car vs)) classes)))
-                          (if (eq? r 'conflict)
-                              (try (cdr vs))
-                              r))))))))))))))
+            (let ((step (xtc:solve:commit-pass pending intern subst classes)))
+              (cond
+                ((eq? step 'conflict) 'conflict)
+                ((caddr step) (cascade (car step) (cadr step) projects))
+                ((null? (cadr step)) (cons (car step) projects))
+                (else
+                  ;; split on the MOST CONSTRAINED overload (fewest viable
+                  ;; candidates): nearly-forced choices first, so the branching
+                  ;; a large function's many independent chains would otherwise
+                  ;; multiply collapses --- without this, a 500-line instrument
+                  ;; constructor's search runs for minutes instead of millis.
+                  ;; The pendings carry commit-pass's narrowed candidate lists,
+                  ;; so these viability tests are over the few survivors only.
+                  (let* ((pending (cadr step))
+                         (subst (car step))
+                         (viables (map (lambda (p)
+                                         (xtc:solve:overload-viable p intern subst classes))
+                                       pending))
+                         (idx (let imin ((i 0) (vs viables) (bi 0) (bn 1000000))
+                                (if (null? vs)
+                                    bi
+                                    (let ((n (length (car vs))))
+                                      (if (< n bn)
+                                          (imin (+ i 1) (cdr vs) i n)
+                                          (imin (+ i 1) (cdr vs) bi bn))))))
+                         (viable (list-ref viables idx))
+                         (rest (let split ((i 0) (ps pending) (acc '()))
+                                 (cond ((null? ps) (reverse acc))
+                                       ((= i idx) (split (+ i 1) (cdr ps) acc))
+                                       (else (split (+ i 1) (cdr ps)
+                                                    (cons (car ps) acc)))))))
+                    (let try ((vs viable))
+                      (if (null? vs)
+                          'conflict
+                          (let ((r (xtc:solve:search rest projects intern
+                                                     (cdr (car vs)) classes)))
+                            (if (eq? r 'conflict)
+                                (try (cdr vs))
+                                r))))))))))))))
 
 ;; One pass over the pending DEFERRED constraints --- projections and
 ;; call-or-value reads --- discharging every one whose subject term has
@@ -577,36 +577,36 @@
           (let ((c (car ps)))
             (if (xtc:solve:callval? c)
                 (let ((head (xtc:type:apply-subst
-                             (xtc:type:from-intcode (caddr c) intern) subst)))
+                              (xtc:type:from-intcode (caddr c) intern) subst)))
                   (if (xtc:type:var? head)
                       (loop (cdr ps) subst (cons c still) progress)
                       (let* ((base (cdr (xtc:type:strip-ptr head)))
                              (decided
-                              (cond ((not (xtc:type:closure? base)) head)
-                                    ((null? (cddr base)) (cadr base))
-                                    (else #f))))
+                               (cond ((not (xtc:type:closure? base)) head)
+                                     ((null? (cddr base)) (cadr base))
+                                     (else #f))))
                         (if (not decided)
                             'conflict
                             (let ((s2 (xtc:type:unify
-                                       (xtc:type:from-intcode (cadr c) intern)
-                                       decided subst)))
+                                        (xtc:type:from-intcode (cadr c) intern)
+                                        decided subst)))
                               (if s2
                                   (loop (cdr ps) s2 still #t)
                                   'conflict))))))
                 (let* ((aggterm (xtc:type:apply-subst
-                                 (xtc:type:from-intcode (caddr c) intern) subst))
+                                  (xtc:type:from-intcode (caddr c) intern) subst))
                        (field (xtc:type:project-field-term aggterm (cadddr c))))
                   (cond
                     ((and field (null? (xtc:type:free-vars field)))
                      (let ((s2 (xtc:type:unify
-                                (xtc:type:from-intcode (cadr c) intern) field subst)))
+                                 (xtc:type:from-intcode (cadr c) intern) field subst)))
                        (if s2
                            (loop (cdr ps) s2 still #t)
                            'conflict)))
                     ((xtc:solve:tuple-index-oob? aggterm (cadddr c))
                      (xtc:diagnostics:print-index-oob-error 'tuple (cadddr c)))
                     (else
-                     (loop (cdr ps) subst (cons c still) progress))))))))))
+                      (loop (cdr ps) subst (cons c still) progress))))))))))
 
 ;; Discharge projections, overloads and defaults to a fixpoint.  Each round first
 ;; discharges every projection whose aggregate has resolved (which can concretise
@@ -630,26 +630,26 @@
             ((eq? pr 'conflict) 'conflict)
             ((caddr pr) (loop (car pr) pending (cadr pr)))
             (else
-             (let ((step (xtc:solve:commit-pass pending intern subst classes)))
-               (cond
-                 ((eq? step 'conflict) 'conflict)
-                 ((caddr step) (loop (car step) (cadr step) projects))
-                 ((pair? (cadr step))
-                  ;; a stall with overloads still pending: resolve them all by
-                  ;; search --- choices propagate through each other, so a
-                  ;; default cannot pin a literal at a width its uses contradict
-                  (let ((r (xtc:solve:search (cadr step) projects intern
-                                             (car step) classes)))
-                    (if (eq? r 'conflict)
-                        'conflict
-                        (loop (car r) '() (cdr r)))))
-                 (else
-                  ;; overloads done: numeric defaulting for whatever literals
-                  ;; no use ever pinned (it can wake a pending projection)
-                  (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
-                    (if (> (length subst2) (length subst))
-                        (loop subst2 pending projects)
-                        subst2))))))))))))
+              (let ((step (xtc:solve:commit-pass pending intern subst classes)))
+                (cond
+                  ((eq? step 'conflict) 'conflict)
+                  ((caddr step) (loop (car step) (cadr step) projects))
+                  ((pair? (cadr step))
+                   ;; a stall with overloads still pending: resolve them all by
+                   ;; search --- choices propagate through each other, so a
+                   ;; default cannot pin a literal at a width its uses contradict
+                   (let ((r (xtc:solve:search (cadr step) projects intern
+                                              (car step) classes)))
+                     (if (eq? r 'conflict)
+                         'conflict
+                         (loop (car r) '() (cdr r)))))
+                  (else
+                    ;; overloads done: numeric defaulting for whatever literals
+                    ;; no use ever pinned (it can wake a pending projection)
+                    (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
+                      (if (> (length subst2) (length subst))
+                          (loop subst2 pending projects)
+                          subst2))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; reading back        ;;
@@ -663,7 +663,7 @@
     (if (eq? subst 'conflict)
         #f
         (let ((term (xtc:type:apply-subst
-                     (xtc:type:from-intcode sym intern) subst)))
+                      (xtc:type:from-intcode sym intern) subst)))
           (if (pair? (xtc:type:free-vars term))
               #f
               (xtc:type:to-intcode-open term intern))))))
@@ -677,8 +677,8 @@
     (if (eq? subst 'conflict)
         #f
         (xtc:type:to-intcode-open
-         (xtc:type:apply-subst (xtc:type:from-intcode sym intern) subst)
-         intern))))
+          (xtc:type:apply-subst (xtc:type:from-intcode sym intern) subst)
+          intern))))
 
 ;; Did the solve fully determine `sym'?
 (define xtc:solve:resolved?

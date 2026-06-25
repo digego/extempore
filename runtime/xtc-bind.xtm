@@ -38,108 +38,108 @@
   (lambda (symname-string closure-type)
     (let* ((stub-type (xtc:codegen:get-closure-type-from-str closure-type))
            (scheme-stub-valid? #t)
-          (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
-          (ir (string-append "define dllexport ccc i8* "
-          " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
-          "{\nentry:\n"
-          (apply string-append
-                  (map (lambda (t n idx)
-                        (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
-                                        (cond ((and (not (number? t))
-                                                    (not (xtc:codegen:pointer? t)))
-                                              (set! scheme-stub-valid? #f)
-                                              "")
-                                              ((or (not (number? t))
-                                                  (not (or (xtc:codegen:number? t)
-                                                            (xtc:codegen:void? t))))
-                                              (if (and (number? t)
-                                                        (= t (+ *xtc:codegen:pointer* *xtc:codegen:si8*)))
-                                                  (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
-                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                  n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
-                                                  (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
-                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                  "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
-                                                                  n " = bitcast i8* %ttv_" (number->string idx) " to " (xtc:codegen:get-type-str t) "\n")))
-                                              ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc double @r64value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc float  @r32value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i64  @i64value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i32  @i32value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i16  @i16value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i8  @i8value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
-                                                                                (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                n " = call ccc i1  @i1value(i8* " n "_val)\n"))
-                                              ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
-                                                                                  (xtc:typecheck:scm_rt_check_string n symname-string)
-                                                                                  n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
-                                              (else (xtc:diagnostics:print-compiler-error "bad type in scheme stub")))))
-                      (cdr stub-type)
-                      (make-list-with-proc (length (cdr stub-type))
-                                            (lambda (i) (string-append "%arg_" (atom->string i))))
-                      (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
-          (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-              "call ccc " (xtc:codegen:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
+           (closure-type-- (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (xtc:codegen:get-type-from-str closure-type))))
+           (ir (string-append "define dllexport ccc i8* "
+                              " @" (string-append symname-string "_scheme(i8* %_sc, i8* %args) nounwind\n"
+                                                  "{\nentry:\n"
+                                                  (apply string-append
+                                                         (map (lambda (t n idx)
+                                                                (string-append n "_val = call ccc i8* @list_ref(i8* %_sc, i32 " (number->string idx) ",i8* %args)\n"
+                                                                               (cond ((and (not (number? t))
+                                                                                           (not (xtc:codegen:pointer? t)))
+                                                                                      (set! scheme-stub-valid? #f)
+                                                                                      "")
+                                                                                     ((or (not (number? t))
+                                                                                          (not (or (xtc:codegen:number? t)
+                                                                                                   (xtc:codegen:void? t))))
+                                                                                      (if (and (number? t)
+                                                                                               (= t (+ *xtc:codegen:pointer* *xtc:codegen:si8*)))
+                                                                                          (string-append n "_rt_check = call i32 @is_cptr_or_str(i8* " n "_val)\n"
+                                                                                                         (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                         n " = call ccc i8*  @cptr_value(i8* " n "_val)\n")
+                                                                                          (string-append n "_rt_check = call i32 @is_cptr(i8* " n "_val)\n"
+                                                                                                         (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                         "%ttv_" (number->string idx) " = call ccc i8* @cptr_value(i8* " n "_val)\n"
+                                                                                                         n " = bitcast i8* %ttv_" (number->string idx) " to " (xtc:codegen:get-type-str t) "\n")))
+                                                                                     ((= t *xtc:codegen:fp64*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc double @r64value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:fp32*) (string-append n "_rt_check = call i32 @is_real(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc float  @r32value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui64*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i64  @i64value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui32*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i32  @i32value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui16*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i16  @i16value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:si8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                             (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                             n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:ui8*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                             (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                             n " = call ccc i8  @i8value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:i1*) (string-append n "_rt_check = call i32 @is_integer(i8* " n "_val)\n"
+                                                                                                                            (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                            n " = call ccc i1  @i1value(i8* " n "_val)\n"))
+                                                                                     ((= t *xtc:codegen:char*) (string-append n "_rt_check = call i32 @is_string(i8* " n "_val)\n"
+                                                                                                                              (xtc:typecheck:scm_rt_check_string n symname-string)
+                                                                                                                              n " = call ccc i8*  @string_value(i8* " n "_val)\n"))
+                                                                                     (else (xtc:diagnostics:print-compiler-error "bad type in scheme stub")))))
+                                                              (cdr stub-type)
+                                                              (make-list-with-proc (length (cdr stub-type))
+                                                                                   (lambda (i) (string-append "%arg_" (atom->string i))))
+                                                              (make-list-with-proc (length (cdr stub-type)) (lambda (i) i))))
+                                                  (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
+                                                  "call ccc " (xtc:codegen:get-type-str (car stub-type)) " @" symname-string "(" ;; " %ff("
 
-          (string-join
-                  (map (lambda (t n)
-                        (string-append (xtc:codegen:get-type-str t) " " n))
-                      (cdr stub-type)
-                      (make-list-with-proc (length (cdr stub-type))
-                                            (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
-          ")\n"
+                                                  (string-join
+                                                    (map (lambda (t n)
+                                                           (string-append (xtc:codegen:get-type-str t) " " n))
+                                                         (cdr stub-type)
+                                                         (make-list-with-proc (length (cdr stub-type))
+                                                                              (lambda (i) (string-append "%arg_" (atom->string i))))) ", ")
+                                                  ")\n"
 
-          (let* ((t (car stub-type)))
-            (cond ((and (not (number? t))
-                        (not (xtc:codegen:pointer? t)))
-                    (set! scheme-stub-valid? #f)
-                    "")
-                  ((or (not (number? t))
-                        (not (or (xtc:codegen:number? t)
-                                (xtc:codegen:void? t))))
-                    (string-append "%tmpres = bitcast " (xtc:codegen:get-type-str t) " %result to i8*\n"
-                                  "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
-                  ((= t *xtc:codegen:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
-                  ((= t *xtc:codegen:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
-                  ((= t *xtc:codegen:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
-                  ((= t *xtc:codegen:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                  ((= t *xtc:codegen:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
-                  ((= t *xtc:codegen:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                  ((= t *xtc:codegen:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
-                  ((= t *xtc:codegen:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                  ((= t *xtc:codegen:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
-                  ((= t *xtc:codegen:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                  ((= t *xtc:codegen:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
-                  ((= t *xtc:codegen:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
-                  ((= t *xtc:codegen:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
-                  (else (xtc:diagnostics:print-compiler-error "return type error in scheme stub"))))
+                                                  (let* ((t (car stub-type)))
+                                                    (cond ((and (not (number? t))
+                                                                (not (xtc:codegen:pointer? t)))
+                                                           (set! scheme-stub-valid? #f)
+                                                           "")
+                                                          ((or (not (number? t))
+                                                               (not (or (xtc:codegen:number? t)
+                                                                        (xtc:codegen:void? t))))
+                                                           (string-append "%tmpres = bitcast " (xtc:codegen:get-type-str t) " %result to i8*\n"
+                                                                          "%res = call ccc i8* @mk_cptr(i8* %_sc, i8* %tmpres)\n"))
+                                                          ((= t *xtc:codegen:void*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 1)\n") ;; don't do anything for void
+                                                          ((= t *xtc:codegen:fp64*) "%res = call ccc i8* @mk_double(i8* %_sc, double %result)\n")
+                                                          ((= t *xtc:codegen:fp32*) "%res = call ccc i8* @mk_float(i8* %_sc, float %result)\n")
+                                                          ((= t *xtc:codegen:si64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                                                          ((= t *xtc:codegen:ui64*) "%res = call ccc i8* @mk_i64(i8* %_sc, i64 %result)\n")
+                                                          ((= t *xtc:codegen:si32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                                                          ((= t *xtc:codegen:ui32*) "%res = call ccc i8* @mk_i32(i8* %_sc, i32 %result)\n")
+                                                          ((= t *xtc:codegen:si16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                                                          ((= t *xtc:codegen:ui16*) "%res = call ccc i8* @mk_i16(i8* %_sc, i16 %result)\n")
+                                                          ((= t *xtc:codegen:si8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                                                          ((= t *xtc:codegen:ui8*) "%res = call ccc i8* @mk_i8(i8* %_sc, i8 %result)\n")
+                                                          ((= t *xtc:codegen:i1*) "%res = call ccc i8* @mk_i1(i8* %_sc, i1 %result)\n")
+                                                          ((= t *xtc:codegen:char*) "%res = call ccc i8* @mk_string(i8* %_sc, i8* %result\n")
+                                                          (else (xtc:diagnostics:print-compiler-error "return type error in scheme stub"))))
 
-          "ret i8* %res\n"
-          "}\n\n"))))
+                                                  "ret i8* %res\n"
+                                                  "}\n\n"))))
       (if scheme-stub-valid? ir #f))))
 
 
@@ -147,13 +147,13 @@
   `(let ((docstring (xtc:cache:get-closure-docstring ,name))
          (types (xtc:cache:get-closure-type ,name))
          (form (xtc:cache:get-closure-body ,name)))
-     (if docstring
-         (list (cdr docstring) (cdr types) (cdr form))
-         (if types
-             (list '() (cdr types) (cdr form))
-             (if form
-                 (list '() '() (cdr form))
-                 #f)))))
+    (if docstring
+        (list (cdr docstring) (cdr types) (cdr form))
+        (if types
+            (list '() (cdr types) (cdr form))
+            (if form
+                (list '() '() (cdr form))
+                #f)))))
 
 (define-macro (define-static symname . args)
   (let ((types (cdr (reverse args)))
@@ -165,26 +165,26 @@
           (set! types (cons (cons symname (string->symbol (cadr sres))) types))))
     ;; (print-full symname 'types: types 'e: expr 'args: args)
     `(let* ((newname (xtc:driver:run ',symname
-                                  '(let ((,symname ,expr)) ,symname)
-                                  0
-                                  #f
-                                  #t
-                                  ,@(if (null? types)
-                                        '()
-                                        (map (lambda (k) (list 'quote k)) types)))))
-        newname)))
+                                     '(let ((,symname ,expr)) ,symname)
+                                     0
+                                     #f
+                                     #t
+                                     ,@(if (null? types)
+                                           '()
+                                           (map (lambda (k) (list 'quote k)) types)))))
+      newname)))
 
 (define-macro (bind-static . args)
   (if (string? (cadr args))
       (if (not (equal? (caaddr args) 'lambda))
-        (xtc:diagnostics:print-compiler-error "static functions cannot be closures!"))
+          (xtc:diagnostics:print-compiler-error "static functions cannot be closures!"))
       (if (not (equal? (caadr args) 'lambda))
-        (xtc:diagnostics:print-compiler-error "static functions cannot be closures!")))
+          (xtc:diagnostics:print-compiler-error "static functions cannot be closures!")))
   ;; if aot and func already exists then bomb out
   (if (and (output-port? *xtc:aot:current-output-port*)
            (xtc:cache:closure-exists? (symbol->string (car args))))
       (begin ;; (xtc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
-             #t)
+        #t)
       ;; if doc-string exists!
       (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
             (zone-size (if (number? (cadr args)) (cadr args) *xtc:globals:default-zone-size*))
@@ -224,9 +224,9 @@
                    (expand-polys (map (lambda (k)
                                         (if (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
                                             (xtc:codegen:add-ptr-depth
-                                             (string-append (xtc:codegen:get-base-type k) ":"
-                                                            (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
-                                             (xtc:codegen:get-ptr-depth k))
+                                              (string-append (xtc:codegen:get-base-type k) ":"
+                                                             (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
+                                              (xtc:codegen:get-ptr-depth k))
                                             k))
                                       ags))
                    (newtype (string-append "[" (string-join expand-polys ",") "]*"))
@@ -252,7 +252,7 @@
   (let ((zone-size *xtc:globals:default-zone-size*))
     (if (number? (car args))
         (begin (set! zone-size (car args))
-               (set! args (cdr args))))
+          (set! args (cdr args))))
     (let ((types (cdr (reverse args)))
           (expr (car (reverse args)))
           (aot_sexpr '()))
@@ -263,22 +263,22 @@
       (let ((base-symname-str (symbol->string symname)))
         ;; (print-full symname 'types: types 'e: expr 'args: args)
         `(let* ((newname (xtc:driver:run ',symname
-                                      '(let ((,symname ,expr)) ,symname)
-                                      ,zone-size
-                                      ,poly
-                                      #f
-                                      ,@(if (null? types)
-                                            '()
-                                            (map (lambda (k) (list 'quote k)) types)))))
-           (xtc:bind:initialize-closure-with-new-zone newname *xtc:globals:default-zone-size*)
-           (xtc:bind:create-scheme-wrapper newname))))))
+                                         '(let ((,symname ,expr)) ,symname)
+                                         ,zone-size
+                                         ,poly
+                                         #f
+                                         ,@(if (null? types)
+                                               '()
+                                               (map (lambda (k) (list 'quote k)) types)))))
+          (xtc:bind:initialize-closure-with-new-zone newname *xtc:globals:default-zone-size*)
+          (xtc:bind:create-scheme-wrapper newname))))))
 
 (define-macro (bind-closure . args)
   ;; if aot and func already exists then bomb out
   (if (and (output-port? *xtc:aot:current-output-port*)
            (xtc:cache:closure-exists? (symbol->string (car args))))
       (begin ;; (xtc:aot:insert-sexpr `(println 'Warning: ',(car args) 'is 'overriden)) ;; insert warning into aot file
-             #t)
+        #t)
       ;; if doc-string exists!
       (let ((func-name (car (regex:type-split (symbol->string (car args)) ":")))
             (zone-size (if (number? (cadr args)) (cadr args) *xtc:globals:default-zone-size*))
@@ -292,7 +292,7 @@
             ;; size and/or docstring
             (closure-body (car (reverse args))))
         (if (member func-name *xtc:globals:reserved-keywords*)
-          (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
+            (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
         ;; strip docstring
         (set! args (cl:remove-if string? args))
         ;; strip poly
@@ -318,9 +318,9 @@
                    (expand-polys (map (lambda (k)
                                         (if (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
                                             (xtc:codegen:add-ptr-depth
-                                             (string-append (xtc:codegen:get-base-type k) ":"
-                                                            (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
-                                             (xtc:codegen:get-ptr-depth k))
+                                              (string-append (xtc:codegen:get-base-type k) ":"
+                                                             (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
+                                              (xtc:codegen:get-ptr-depth k))
                                             k))
                                       ags))
                    (newtype (string-append "[" (string-join expand-polys ",") "]*"))
@@ -365,10 +365,10 @@
 
 
 (xtc:cache:register-new-builtin
- "bind-func"
- ""
- "compile an xtlang closure"
- '(closure-name optional-zone-size optional-docstring closure-body))
+  "bind-func"
+  ""
+  "compile an xtlang closure"
+  '(closure-name optional-zone-size optional-docstring closure-body))
 
 ;; bind-func-ipc is for passing an already compiled (and setter'd)
 ;; native function across to a non-primary process
@@ -376,9 +376,9 @@
   (lambda (symname)
     (let ((zone-size *xtc:globals:default-zone-size*))
       (eval
-       `(define ,symname
+        `(define ,symname
           (xtc:bind:create-scheme-wrapper (symbol->string ',symname)))
-       (interaction-environment)))))
+        (interaction-environment)))))
 
 (define ipc:bind-func
   (lambda (procname symname)
@@ -390,7 +390,7 @@
                    (= (length polytypes) 1))
               (begin (ipc:call procname 'bind-func-ipc
                                (string->symbol (vector-ref (car polytypes) 0)))
-                     (ipc:define procname symname (eval symname)))
+                (ipc:define procname symname (eval symname)))
               (log-error "Not a monomorphic xtlang function:" symname))))))
 
 (define ipc:load
@@ -401,25 +401,25 @@
 
 (define-macro (bind-alias symbol type . docstring)
   `(begin (xtc:cache:register-new-typealias
-           ,(symbol->string symbol)
-           ',(xtc:codegen:get-type-from-pretty-str (symbol->string type))
-           ,(if (null? docstring) "" (car docstring)))
-          (xtc:diagnostics:print-binding-details-to-log
-           "SetAlias:"
-           ',symbol
-           ;;(print ',type)
-           (begin
-             (set! *xtc:codegen:get-type-callback-off* #t) ;; don't wait, do it immediately
-             (let ((r (xtc:codegen:pretty-print-type ,(symbol->string symbol))))
-               (set! *xtc:codegen:get-type-callback-off* #f)
-               r))
-           )))
+            ,(symbol->string symbol)
+            ',(xtc:codegen:get-type-from-pretty-str (symbol->string type))
+            ,(if (null? docstring) "" (car docstring)))
+    (xtc:diagnostics:print-binding-details-to-log
+      "SetAlias:"
+      ',symbol
+      ;;(print ',type)
+      (begin
+        (set! *xtc:codegen:get-type-callback-off* #t) ;; don't wait, do it immediately
+        (let ((r (xtc:codegen:pretty-print-type ,(symbol->string symbol))))
+          (set! *xtc:codegen:get-type-callback-off* #f)
+          r))
+      )))
 
 (xtc:cache:register-new-builtin
- "bind-alias"
- ""
- "bind an xtlang type alias"
- '(alias-name alias-target optional-docstring))
+  "bind-alias"
+  ""
+  "bind an xtlang type alias"
+  '(alias-name alias-target optional-docstring))
 
 (define xtc:bind:word-upcase
   (lambda (w)
@@ -453,12 +453,12 @@
           (let ((cands (xtc:cache:get-polyfunc-candidate-types polyname)))
             (if (and cands
                      (cl:find-if
-                      (lambda (ct)
-                        (and (list? ct)
-                             (> (length ct) subject-index)
-                             (string? (list-ref ct subject-index))
-                             (string=? (list-ref ct subject-index) field-type)))
-                      cands))
+                       (lambda (ct)
+                         (and (list? ct)
+                              (> (length ct) subject-index)
+                              (string? (list-ref ct subject-index))
+                              (string=? (list-ref ct subject-index) field-type)))
+                       cands))
                 #t #f))))))
 
 (define xtc:bind:compile-type-dataconstructors
@@ -494,18 +494,18 @@
                                             ;; than gathering bang symbols and
                                             ;; stripping their stars by hand.
                                             (string-join
-                                             (xtc:type:pretty-type-params type)
-                                             ",")
+                                              (xtc:type:pretty-type-params type)
+                                              ",")
                                             "}*"
 
                                             (map (lambda (x)
                                                    (string-append
-                                                    ","
-                                                    (if (regex:match? x (string-append namestr "([{<:*)|$"))
-                                                        (regex:replace x
-                                                                       (string-append namestr "([*]*)")
-                                                                       (string-append namestr ":" type "$1"))
-                                                        x)))
+                                                     ","
+                                                     (if (regex:match? x (string-append namestr "([{<:*)|$"))
+                                                         (regex:replace x
+                                                                        (string-append namestr "([*]*)")
+                                                                        (string-append namestr ":" type "$1"))
+                                                         x)))
                                                  a))
                                      (apply string-append (symbol->string name) "*"
                                             (map (lambda (x) (string-append "," x)) a)))
@@ -524,7 +524,7 @@
                                                         (string->symbol (string-append "hcopy:[" t "*," t "*]*")))))
                                         ;; (println 't: t 'name: name 'type: type)
                                         `(if (not (null? (tref x ,c)))
-                                             (tset! obj ,b (,fname (tref x ,c)))))
+                                          (tset! obj ,b (,fname (tref x ,c)))))
                                       ;; scalar, primitive pointer, or opaque pointer (e.g. mzone*): shallow copy
                                       `(tset! obj ,b (tref x ,c))))
                                 a arglst2 (range (length a)))))
@@ -540,7 +540,7 @@
                                                         'hfree
                                                         (string->symbol (string-append "hfree:[void," t "*]*")))))
                                         `(if (not (null? (tref x ,c)))
-                                             (,fname (tref x ,c))))
+                                          (,fname (tref x ,c))))
                                       ;; opaque pointer (e.g. mzone*): not owned, don't free
                                       ))
                                 a (range (length a)))))
@@ -557,55 +557,55 @@
                                                         'zcopy
                                                         (string->symbol (string-append "zcopy:[" t "*," t "*,mzone*,mzone*]*")))))
                                         `(if (not (null? (tref x ,c)))
-                                             (tset! obj ,b (,fname (tref x ,c) fromz toz))))
+                                          (tset! obj ,b (,fname (tref x ,c) fromz toz))))
                                       ;; opaque pointer (e.g. mzone*) falls through here: shared unless it
                                       ;; points into the from-zone (zone structs never do)
                                       (if (and (xtc:codegen:pointer? a)
                                                (= 1 (xtc:codegen:get-ptr-depth a)))
                                           `(if (llvm_ptr_in_zone fromz (cast (tref x ,c) i8*))
-                                               (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
-                                                 (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
-                                                         ,(xtc:codegen:get-type-size (xtc:codegen:strip-ptr-depth a)))
-                                                 (tset! obj ,b newptr))
-                                               (tset! obj ,b (tref x ,c)))
+                                            (let ((,(string->symbol (string-append "newptr:" aa)) (zalloc)))
+                                              (memcpy (cast newptr i8*) (cast (tref x ,c) i8*)
+                                                      ,(xtc:codegen:get-type-size (xtc:codegen:strip-ptr-depth a)))
+                                              (tset! obj ,b newptr))
+                                            (tset! obj ,b (tref x ,c)))
                                           `(begin
-                                             (tset! obj ,b (tref x ,c))))))
+                                            (tset! obj ,b (tref x ,c))))))
                                 a arglst2 (range (length a)))))
            (body (map (lambda (a b c) `(tset! obj ,b ,c)) a arglst2 arglst1)))
       ;;(println 'hcopy: hcopy_body)
       (sys:with-quiet-compiler
-       (if constructor?
-           (begin
-             (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
+        (if constructor?
+            (begin
+              (eval `(bind-func ,(string->symbol (string-append namestr ":" ctype)) #t
                       (lambda ,argslist
                         (let ((obj (zalloc)))
                           ,@body
                           obj)))
-                   (interaction-environment))))
-       ;; (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
-       (eval `(bind-func ,(string->symbol (string-append namestr "_z:" ctype)) #t
+                    (interaction-environment))))
+        ;; (eval `(bind-func ,(string->symbol (string-append namestr (if generic ":" "_z:") ctype)) #t
+        (eval `(bind-func ,(string->symbol (string-append namestr "_z:" ctype)) #t
                 (lambda ,argslist
                   (let ((obj (zalloc)))
                     ,@body
                     obj)))
-             (interaction-environment))
-       (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
+              (interaction-environment))
+        (eval `(bind-func ,(string->symbol (string-append namestr "_h:" ctype)) #t
                 (lambda ,argslist
                   (let ((obj (halloc)))
                     ,@body
                     obj)))
-             (interaction-environment))
-       (if (and generic printer?)
-           (begin
-             (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+              (interaction-environment))
+        (if (and generic printer?)
+            (begin
+              (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
                       (lambda (x)
                         (if (null? x)
                             (sprintout ,(string-append "<" namestr ":null"))
                             (sprintout ,(string-append "<" namestr ":")
                                        ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
                                        ">"))))
-                   (interaction-environment))
-             (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                    (interaction-environment))
+              (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
                       (lambda (x)
                         (if (null? x)
                             (printout ,(string-append "<" namestr ":null"))
@@ -613,12 +613,12 @@
                                       ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n))) (range (length a)))))
                                       ">"))
                         void))
-                   (interaction-environment))))
-       (if (not generic)
-           (begin
-             (if (and (not (regex:match? namestr "_poly_")) printer?)
-                 (begin
-                   (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
+                    (interaction-environment))))
+        (if (not generic)
+            (begin
+              (if (and (not (regex:match? namestr "_poly_")) printer?)
+                  (begin
+                    (eval `(bind-func ,(string->symbol (string-append "toString:[String*," namestr "*]*")) #t
                             (lambda (,(string->symbol (string-append "x:" namestr "*")))
                               (if (null? x)
                                   (sprintout ,(string-append "<" namestr ":null>"))
@@ -626,8 +626,8 @@
                                              ,@(cdr (apply append '() (map (lambda (n) (list "," (list 'tref 'x n)))
                                                                            (range (length a)))))
                                              ">"))))
-                         (interaction-environment))
-                   (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
+                          (interaction-environment))
+                    (eval `(bind-func ,(string->symbol (string-append "print:[void," namestr "*]*")) #t
                             (lambda (,(string->symbol (string-append "x:" namestr "*")))
                               (if (null? x)
                                   (printout ,(string-append "<" namestr ":null>"))
@@ -636,38 +636,38 @@
                                                                           (range (length a)))))
                                             ">"))
                               void))
-                         (interaction-environment))))
-             (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
+                          (interaction-environment))))
+              (eval `(bind-func ,(string->symbol (string-append namestr "_val"))
                       (lambda ,argslist
                         (let ((,(string->symbol (string-append "obj:" namestr "*")) (salloc)))
                           (tfill! obj ,@argslist)
                           (pref obj 0))))
-                   (interaction-environment))
-             (if copy?
-                 (begin
-                   (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
-                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                        (let ((obj (halloc)))
-                          ,@hcopy_body
-                          obj)))
-                   (interaction-environment))
-                  (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
-                      (lambda (,(string->symbol (string-append "x:" namestr "*")))
-                        ,@hfree_body
-                        (free x)
-                        void))
-                   (interaction-environment))
-                 (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
-                      (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
-                        (if (llvm_ptr_in_zone fromz (cast x i8*))
-                            (begin (push_zone toz)
-                              (let ((obj (zalloc)))
-                                 ,@zcopy_body
-                                 (pop_zone)
-                                 obj))
-                            x)))
-                   (interaction-environment))))
-             )))
+                    (interaction-environment))
+              (if copy?
+                  (begin
+                    (eval `(bind-func ,(string->symbol (string-append "hcopy:[" namestr "*," namestr "*]*"))
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              (let ((obj (halloc)))
+                                ,@hcopy_body
+                                obj)))
+                          (interaction-environment))
+                    (eval `(bind-func ,(string->symbol (string-append "hfree:[void," namestr "*]*"))
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")))
+                              ,@hfree_body
+                              (free x)
+                              void))
+                          (interaction-environment))
+                    (eval `(bind-func ,(string->symbol (string-append "zcopy:[" namestr "*," namestr "*,mzone*,mzone*]*"))
+                            (lambda (,(string->symbol (string-append "x:" namestr "*")) fromz toz)
+                              (if (llvm_ptr_in_zone fromz (cast x i8*))
+                                  (begin (push_zone toz)
+                                    (let ((obj (zalloc)))
+                                      ,@zcopy_body
+                                      (pop_zone)
+                                      obj))
+                                  x)))
+                          (interaction-environment))))
+              )))
       ;; (println 'dc-out: name)
       #t)))
 
@@ -679,23 +679,23 @@
   (let* ((symbol (car args))
          (type_1 (cadr args))
          (type (string->symbol
-                (string-append "<"
-                 (string-join
-                  (map (lambda (x)
-                         (if (xtc:cache:typealias-exists? x)
-                             (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-type x))
-                             x))
-                       (xtc:codegen:get-pretty-tuple-arg-strings (symbol->string type_1)))
-                  ",")
-                 ">")))
+                 (string-append "<"
+                                (string-join
+                                  (map (lambda (x)
+                                         (if (xtc:cache:typealias-exists? x)
+                                             (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-type x))
+                                             x))
+                                       (xtc:codegen:get-pretty-tuple-arg-strings (symbol->string type_1)))
+                                  ",")
+                                ">")))
          (docstring (if (string? (car (reverse args))) (car (reverse args)) ""))
          (extras (cl:remove #f (map (lambda (x) (if (pair? x) x #f)) args)))
          (printer? (if (assoc-strcmp 'printer? extras)
                        (cdr (assoc-strcmp 'printer? extras))
                        #t))
          (copy? (if (assoc-strcmp 'copy? extras)
-                       (cdr (assoc-strcmp 'copy? extras))
-                       #t))
+                    (cdr (assoc-strcmp 'copy? extras))
+                    #t))
          (constructor? (if (assoc-strcmp 'constructor? extras)
                            (cdr (assoc-strcmp 'constructor? extras))
                            #t)))
@@ -708,40 +708,40 @@
     (if (not (char=? (string-ref (symbol->string type) 0) #\<))
         (xtc:diagnostics:print-bad-type-error type "must be a tuple type"))
     `(begin
-       (set! *xtc:codegen:get-type-callback-off* #t)
-       (let* ((ags (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
-              ;; expand all non-explict generic types
-              ;; i.e. expand list* into list:<!a,list*>*
-              (expand-polys (map (lambda (k)
-                                   (if (and (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
-                                            (not (equal? (xtc:codegen:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                       (xtc:codegen:add-ptr-depth
+      (set! *xtc:codegen:get-type-callback-off* #t)
+      (let* ((ags (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
+             ;; expand all non-explict generic types
+             ;; i.e. expand list* into list:<!a,list*>*
+             (expand-polys (map (lambda (k)
+                                  (if (and (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
+                                           (not (equal? (xtc:codegen:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
+                                      (xtc:codegen:add-ptr-depth
                                         (string-append (xtc:codegen:get-base-type k) ":"
                                                        (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
                                         (xtc:codegen:get-ptr-depth k))
-                                       k))
-                                 ags))
-              (newtype (string-append "<" (string-join expand-polys ",") ">")))
-         ;; (println 'authors_type: ,(symbol->string type))
-         ;; (println 'transformed_type: newtype)
-         ;; and on with the show!
-         (if (xtc:desugar:bang-type? newtype) ;; then must be poly type
-             (begin
-               (xtc:cache:register-new-generictype ',symbol (string->symbol newtype))
-               (xtc:diagnostics:print-binding-details-to-log "GenrType:" ',symbol ',type))
-             (let ((typelist (cons *xtc:codegen:tuple* (xtc:codegen:get-type-from-pretty-tuple ,(symbol->string type)
-                                                                                       ,(symbol->string symbol)))))
-               (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                                   (xtc:codegen:get-type-str typelist)))
-                   (begin (xtc:cache:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
-                          (xtc:diagnostics:print-binding-details-to-log "DataType:" ',symbol ',type))
-                   (xtc:diagnostics:print-compiler-error "could not compile IR for type" ',type)))))
-       ;; the next line is to help specialize any element types that may not already be specialized!
-       (map (lambda (a) (xtc:codegen:get-type-from-pretty-str a (symbol->string ',(car args)))) (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
-       (set! *xtc:codegen:get-type-callback-off* #f)
-       ;; (sys:wait (now))
-       ;; now compile data constructor
-       (xtc:bind:compile-type-dataconstructors
+                                      k))
+                                ags))
+             (newtype (string-append "<" (string-join expand-polys ",") ">")))
+        ;; (println 'authors_type: ,(symbol->string type))
+        ;; (println 'transformed_type: newtype)
+        ;; and on with the show!
+        (if (xtc:desugar:bang-type? newtype) ;; then must be poly type
+            (begin
+              (xtc:cache:register-new-generictype ',symbol (string->symbol newtype))
+              (xtc:diagnostics:print-binding-details-to-log "GenrType:" ',symbol ',type))
+            (let ((typelist (cons *xtc:codegen:tuple* (xtc:codegen:get-type-from-pretty-tuple ,(symbol->string type)
+                                                                                              ,(symbol->string symbol)))))
+              (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
+                                                  (xtc:codegen:get-type-str typelist)))
+                  (begin (xtc:cache:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
+                    (xtc:diagnostics:print-binding-details-to-log "DataType:" ',symbol ',type))
+                  (xtc:diagnostics:print-compiler-error "could not compile IR for type" ',type)))))
+      ;; the next line is to help specialize any element types that may not already be specialized!
+      (map (lambda (a) (xtc:codegen:get-type-from-pretty-str a (symbol->string ',(car args)))) (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
+      (set! *xtc:codegen:get-type-callback-off* #f)
+      ;; (sys:wait (now))
+      ;; now compile data constructor
+      (xtc:bind:compile-type-dataconstructors
         ',symbol
         (if (xtc:cache:get-generictype-candidate-types ',symbol)
             (symbol->string (xtc:cache:get-generictype-candidate-types ',symbol))
@@ -752,15 +752,15 @@
         ,constructor?))))
 
 (xtc:cache:register-new-builtin
- "bind-type"
- ""
- "bind an xtlang named type"
- '(name type optional-docstring))
+  "bind-type"
+  ""
+  "bind an xtlang named type"
+  '(name type optional-docstring))
 
 (define-macro (xtc:diagnostics:pretty-print-vars . varlist)
   (map (lambda (var)
          `(begin (println '--- (quote ,var) '---)
-                 (println ,var)))
+           (println ,var)))
        varlist))
 
 (define xtc:bind:construct-generic-type-if-valid
@@ -804,124 +804,124 @@
     ;; will construct it if it doesn't yet exist
     (if (string? t) (xtc:codegen:get-type-from-pretty-str t))
     (cond (oldt
-           `(xtc:diagnostics:print-already-bound-error ',symbol ,(xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth oldt))))
+            `(xtc:diagnostics:print-already-bound-error ',symbol ,(xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth oldt))))
           ;; string literal
           (string-literal?
-           `(begin
+            `(begin
               (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
                                               " = dllexport global i8* zeroinitializer"))
               ;; we should really take the globalvar out of the cache
               ;; if the previous steps failed
               (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
               (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
-                                                         ,(symbol->string symbol)
-                                                         ,(symbol->string type)
-                                                         ,docstring)
+                                                        ,(symbol->string symbol)
+                                                        ,(symbol->string type)
+                                                        ,docstring)
               (xtc:aot:do-or-emit
-               (call-as-xtlang (set! ,symbol ,value) void))
+                (call-as-xtlang (set! ,symbol ,value) void))
               (xtc:diagnostics:print-binding-details-to-log "SetValue:"
-                                                          ,(symbol->string symbol)
-                                                          ,(xtc:codegen:pretty-print-type t))))
+                                                            ,(symbol->string symbol)
+                                                            ,(xtc:codegen:pretty-print-type t))))
           ;; non-pointer values
           ((and (or (xtc:codegen:number? t)
                     (xtc:codegen:boolean? t)
                     (not (xtc:codegen:pointer? t))))
            `(begin
-              (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                              " = dllexport global "
-                                              ,(xtc:codegen:get-type-str t) " "
-                                              ,(if (number? value)
-                                                   ;; can we serialise the value straight into the
-                                                   ;;  IR? (e.g. i32/i64/float/double)
-                                                   (if (equal? t *xtc:codegen:fp32*)
-                                                       (llvm:convert-float (atom->string value))
-                                                       (atom->string value))
-                                                   ;; otherwise use zeroinitializer and we'll just use a
-                                                   ;; set! inside a call-as-xtlang a bit further down
-                                                   "zeroinitializer")))
-              (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
-              (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
-                                                         ,(symbol->string symbol)
-                                                         ,(symbol->string type)
-                                                         ,docstring)
-              ;; set value for non int/float literals
-              ,(if (and value (not (number? value)))
-                   `(xtc:aot:do-or-emit
-                     (call-as-xtlang (set! ,symbol (convert ,value ,type)) void)))
-              ;; we should really take the globalvar out of the
-              ;; cache if any of the previous steps failed
-              (xtc:diagnostics:print-binding-details-to-log "SetValue:"
-                                                          ,(symbol->string symbol)
-                                                          ,(xtc:codegen:pretty-print-type t))))
+             (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                             " = dllexport global "
+                                             ,(xtc:codegen:get-type-str t) " "
+                                             ,(if (number? value)
+                                                  ;; can we serialise the value straight into the
+                                                  ;;  IR? (e.g. i32/i64/float/double)
+                                                  (if (equal? t *xtc:codegen:fp32*)
+                                                      (llvm:convert-float (atom->string value))
+                                                      (atom->string value))
+                                                  ;; otherwise use zeroinitializer and we'll just use a
+                                                  ;; set! inside a call-as-xtlang a bit further down
+                                                  "zeroinitializer")))
+             (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+             (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
+                                                       ,(symbol->string symbol)
+                                                       ,(symbol->string type)
+                                                       ,docstring)
+             ;; set value for non int/float literals
+             ,(if (and value (not (number? value)))
+                  `(xtc:aot:do-or-emit
+                    (call-as-xtlang (set! ,symbol (convert ,value ,type)) void)))
+             ;; we should really take the globalvar out of the
+             ;; cache if any of the previous steps failed
+             (xtc:diagnostics:print-binding-details-to-log "SetValue:"
+                                                           ,(symbol->string symbol)
+                                                           ,(xtc:codegen:pretty-print-type t))))
           ;; pointer
           ((xtc:codegen:pointer? t)
            (if (or (not value) (integer? value))
                `(begin
-                  (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                  " = dllexport global "
-                                                  ,(xtc:codegen:get-type-str t)
-                                                  " zeroinitializer"))
-                  (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
-                  (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
-                                                             ,(symbol->string symbol)
-                                                             ,(symbol->string type)
-                                                             ,docstring)
-                  (xtc:aot:do-or-emit
+                 (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                 " = dllexport global "
+                                                 ,(xtc:codegen:get-type-str t)
+                                                 " zeroinitializer"))
+                 (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                 (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
+                                                           ,(symbol->string symbol)
+                                                           ,(symbol->string type)
+                                                           ,docstring)
+                 (xtc:aot:do-or-emit
                    (call-as-xtlang (set! ,symbol (cast (malloc ,(* (or value 1)
                                                                    (if (xtc:codegen:number? t)
                                                                        (xtc:codegen:get-type-size t)
                                                                        (/ (sys:pointer-size) 8))))
                                                        ,type))
                                    void))
-                  ;; we should really take the globalvar out of the cache
-                  ;; if the previous steps failed
-                  (xtc:diagnostics:print-binding-details-to-log "SetValue:"
-                                                              ,(symbol->string symbol)
-                                                              ,(xtc:codegen:pretty-print-type t)))
+                 ;; we should really take the globalvar out of the cache
+                 ;; if the previous steps failed
+                 (xtc:diagnostics:print-binding-details-to-log "SetValue:"
+                                                               ,(symbol->string symbol)
+                                                               ,(xtc:codegen:pretty-print-type t)))
                (if (list? value)
                    `(begin
-                      (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
-                                                      " = dllexport global "
-                                                      ,(xtc:codegen:get-type-str t)
-                                                      "zeroinitializer"))
-                      (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
-                      (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
-                                                                 ,(symbol->string symbol)
-                                                                 ,(symbol->string type)
-                                                                 ,docstring)
-                      (xtc:aot:do-or-emit
+                     (llvm:compile-ir (string-append "@" ,(symbol->string symbol)
+                                                     " = dllexport global "
+                                                     ,(xtc:codegen:get-type-str t)
+                                                     "zeroinitializer"))
+                     (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+                     (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
+                                                               ,(symbol->string symbol)
+                                                               ,(symbol->string type)
+                                                               ,docstring)
+                     (xtc:aot:do-or-emit
                        (call-as-xtlang (set! ,symbol ,value) void))
-                      ;; we should really take the globalvar out of the cache
-                      ;; if the previous steps failed
-                      (xtc:diagnostics:print-binding-details-to-log "SetValue:"
-                                                                  ,(symbol->string symbol)
-                                                                  ,(xtc:codegen:pretty-print-type t)))
+                     ;; we should really take the globalvar out of the cache
+                     ;; if the previous steps failed
+                     (xtc:diagnostics:print-binding-details-to-log "SetValue:"
+                                                                   ,(symbol->string symbol)
+                                                                   ,(xtc:codegen:pretty-print-type t)))
                    `(xtc:diagnostics:print-compiler-error "when binding global pointers, third argument should be size of buffer to allocate or a valid xtlang sexpr"))))
           ;; tuple/array/vector
           ((or (xtc:codegen:tuple? t) (xtc:codegen:array? t) (xtc:codegen:vector? t))
            `(begin
-              (llvm:compile-ir
+             (llvm:compile-ir
                (string-append
-                "@" ,(symbol->string symbol)
-                " = dllexport global "
-                ,(xtc:codegen:get-type-str t) " zeroinitializer"))
-              (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
-              (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
-                                                         ,(symbol->string symbol)
-                                                         ,(symbol->string type)
-                                                         ,docstring)
-              ;; we should really take the globalvar out of the cache
-              ;; if the previous steps failed
-              (xtc:diagnostics:print-binding-details-to-log "SetValue:"
-                                                          ,(symbol->string symbol)
-                                                          ,(xtc:codegen:pretty-print-type t))))
+                 "@" ,(symbol->string symbol)
+                 " = dllexport global "
+                 ,(xtc:codegen:get-type-str t) " zeroinitializer"))
+             (xtc:cache:register-new-globalvar ,(symbol->string symbol) ',t ,docstring)
+             (xtc:aot:insert-globalvar-binding-details *xtc:aot:current-lib-name*
+                                                       ,(symbol->string symbol)
+                                                       ,(symbol->string type)
+                                                       ,docstring)
+             ;; we should really take the globalvar out of the cache
+             ;; if the previous steps failed
+             (xtc:diagnostics:print-binding-details-to-log "SetValue:"
+                                                           ,(symbol->string symbol)
+                                                           ,(xtc:codegen:pretty-print-type t))))
           (else (xtc:diagnostics:print-missing-identifier-error type 'type)))))
 
 (xtc:cache:register-new-builtin
- "bind-val"
- ""
- "bind a global variable"
- '(variable-name type optional-value optional-docstring))
+  "bind-val"
+  ""
+  "bind a global variable"
+  '(variable-name type optional-value optional-docstring))
 
 (define-macro (bind-ext-val symname type . docstring)
   `(let* ((type-str ,(if (xtc:cache:typealias-exists? (symbol->string type))
@@ -929,17 +929,17 @@
                          (symbol->string type)))
           (type-list (xtc:codegen:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
-      (llvm:compile-ir
-        (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-type-str type-list)))
-      (xtc:cache:register-new-globalvar ,(symbol->string symname) type-list ds)
-      (xtc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
-      (xtc:diagnostics:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+    (llvm:compile-ir
+      (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-type-str type-list)))
+    (xtc:cache:register-new-globalvar ,(symbol->string symname) type-list ds)
+    (xtc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+    (xtc:diagnostics:print-binding-details-to-log "bind-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
 
 (xtc:cache:register-new-builtin
- "bind-ext-val"
- ""
- "bind an external global variable"
- '(variable-name type optional-value optional-docstring))
+  "bind-ext-val"
+  ""
+  "bind an external global variable"
+  '(variable-name type optional-value optional-docstring))
 
 (define-macro (register-ext-val symname type . docstring)
   `(let* ((type-str ,(if (xtc:cache:typealias-exists? (symbol->string type))
@@ -947,11 +947,11 @@
                          (symbol->string type)))
           (type-list (xtc:codegen:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
-      ; (llvm:compile-ir
-      ;   (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-type-str type-list)))
-      (xtc:cache:register-new-globalvar ,(symbol->string symname) type-list ds)
-      (xtc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
-      (xtc:diagnostics:print-binding-details-to-log "register-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
+    ; (llvm:compile-ir
+    ;   (string-append "@" ,(symbol->string symname) " = external global " (xtc:codegen:get-type-str type-list)))
+    (xtc:cache:register-new-globalvar ,(symbol->string symname) type-list ds)
+    (xtc:aot:insert-ext-globalvar-binding-details ,(symbol->string symname) ,(symbol->string type) ds)
+    (xtc:diagnostics:print-binding-details-to-log "register-ext-val:" ,(symbol->string symname) ,(symbol->string type))))
 
 (define-macro (bind-poly poly_sym implementation_sym . docstring)
   (if (xtc:cache:genericfunc-exists? implementation_sym)
@@ -961,48 +961,48 @@
   (let ((type (xtc:cache:get-closure-or-nativefunc-type (symbol->string implementation_sym))))
     (if type
         `(begin
-           (xtc:cache:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
-           (xtc:bind:create-scheme-wrapper (symbol->string ',implementation_sym))
-           (if (not (regex:match? ,(symbol->string implementation_sym) "(_adhoc_|_poly_)"))
-               (xtc:diagnostics:print-polying-details-to-log "PolyFunc:"
-                                                           ,(symbol->string poly_sym)
-                                                           ,(symbol->string implementation_sym)
-                                                           ,(xtc:codegen:pretty-print-type type))))
+          (xtc:cache:register-new-polyfunc ,(symbol->string poly_sym) ,(symbol->string implementation_sym) ',type ,(if (null? docstring) "" (car docstring)))
+          (xtc:bind:create-scheme-wrapper (symbol->string ',implementation_sym))
+          (if (not (regex:match? ,(symbol->string implementation_sym) "(_adhoc_|_poly_)"))
+              (xtc:diagnostics:print-polying-details-to-log "PolyFunc:"
+                                                            ,(symbol->string poly_sym)
+                                                            ,(symbol->string implementation_sym)
+                                                            ,(xtc:codegen:pretty-print-type type))))
         `(xtc:diagnostics:print-missing-identifier-error ',implementation_sym 'closure))))
 
 (xtc:cache:register-new-builtin
- "bind-poly"
- ""
- "bind a polymorphic symbol"
- '(poly-name closure-name optional-docstring))
+  "bind-poly"
+  ""
+  "bind a polymorphic symbol"
+  '(poly-name closure-name optional-docstring))
 
 (define xtc:bind:search-for-dylib
   (lambda (path)
     (let loop ((candidate-paths
-                (append
-                 (list
-                  path
-                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
-                  (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))
-                 (unix-or-Windows (map
-                                   (lambda (x)
-                                     (sanitize-platform-path
-                                      (string-append x "/" path)))
-                                   (append (regex:split
-                                            (sys:command-output
-                                             "echo $LD_LIBRARY_PATH")
-                                            ":")
-                                           '("/usr/local/lib/"
-                                             "/usr/lib/"
-                                             "/opt/local/lib/"
-                                             ;; Linux
-                                             "/usr/lib/x86_64-linux-gnu"
-                                             "/usr/lib/aarch64-linux-gnu"
-                                             ;; macOS
-                                             "/opt/homebrew/lib/"
-                                             "/usr/local/Cellar/"
-                                             "/opt/homebrew/Cellar/")))
-                                  (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
+                 (append
+                   (list
+                     path
+                     (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/" path))
+                     (sanitize-platform-path (string-append (sys:share-dir) "/libs/platform-shlibs/" path)))
+                   (unix-or-Windows (map
+                                      (lambda (x)
+                                        (sanitize-platform-path
+                                          (string-append x "/" path)))
+                                      (append (regex:split
+                                                (sys:command-output
+                                                  "echo $LD_LIBRARY_PATH")
+                                                ":")
+                                              '("/usr/local/lib/"
+                                                "/usr/lib/"
+                                                "/opt/local/lib/"
+                                                ;; Linux
+                                                "/usr/lib/x86_64-linux-gnu"
+                                                "/usr/lib/aarch64-linux-gnu"
+                                                ;; macOS
+                                                "/opt/homebrew/lib/"
+                                                "/usr/local/Cellar/"
+                                                "/opt/homebrew/Cellar/")))
+                                    (list (sanitize-platform-path (string-append "C:/Windows/System32/" path)))))))
       (if (null? candidate-paths)
           #f
           (let ((dylib (sys:open-dylib (car candidate-paths) #f)))
@@ -1022,11 +1022,11 @@
 (define xtc:bind:bind-dylib
   (lambda (library lib-paths)
     (let ((dylib-pair
-           (let loop ((paths lib-paths))
-             (if (null? paths)
-                 #f
-                 (or (xtc:bind:search-for-dylib (car paths))
-                     (loop (cdr paths)))))))
+            (let loop ((paths lib-paths))
+              (if (null? paths)
+                  #f
+                  (or (xtc:bind:search-for-dylib (car paths))
+                      (loop (cdr paths)))))))
       (if dylib-pair
           (begin
             (eval (list 'define library (car dylib-pair))
@@ -1052,9 +1052,9 @@
     `(xtc:bind:bind-dylib ',library ',path)))
 
 (xtc:cache:register-new-builtin
- "bind-dylib"
- ""
- "load a dynamic library
+  "bind-dylib"
+  ""
+  "load a dynamic library
 
 e.g.
 
@@ -1062,25 +1062,25 @@ e.g.
 
 @param lib-symbol - symbol to refer to the library
 @param lib-paths - a string (or list of strings) of paths to search for the dylib"
- '(lib-symbol lib-paths))
+  '(lib-symbol lib-paths))
 
 ;; this here for wrapping llvm dynamic binds
 (define-macro (bind-lib library symname type . args)
   `(xtc:bind:bind-lib ',library ',symname ',type
-                     ;; calling convention
-                     ,(if (and (not (null? args)) (number? (car args)))
-                          (car args)
-                          0) ;; 0=ccc
-                     ;; docstring
-                     ,(if (and (not (null? args)) (string? (car (reverse args))))
-                          (car (reverse args))
-                          "")))
+    ;; calling convention
+    ,(if (and (not (null? args)) (number? (car args)))
+         (car args)
+         0) ;; 0=ccc
+    ;; docstring
+    ,(if (and (not (null? args)) (string? (car (reverse args))))
+         (car (reverse args))
+         "")))
 
 (xtc:cache:register-new-builtin
- "bind-lib"
- ""
- "bind a C function from a shared library"
- '(libname function-name type optional-docstring))
+  "bind-lib"
+  ""
+  "bind a C function from a shared library"
+  '(libname function-name type optional-docstring))
 
 ;; this was previously called __dynamic-bind
 (define xtc:bind:bind-lib
@@ -1094,27 +1094,27 @@ e.g.
             (xtc:diagnostics:print-compiler-error
               (string-append "the " (symbol->string library) " dynamic library appears to have not been loaded correctly"))
             (let* ((ctype (cdr (xtc:codegen:get-type-from-pretty-str (symbol->string type))))
-                  (ir-string (string-append "declare "
-                                            "cc " (atom->string calling-convention)
-                                            " "
-                                            (xtc:codegen:get-type-str (car ctype))
-                                            " @"
-                                            (symbol->string symname)
-                                            "("
-                                            (if (null? (cdr ctype))
-                                                ""
-                                                (apply string-append
+                   (ir-string (string-append "declare "
+                                             "cc " (atom->string calling-convention)
+                                             " "
+                                             (xtc:codegen:get-type-str (car ctype))
+                                             " @"
+                                             (symbol->string symname)
+                                             "("
+                                             (if (null? (cdr ctype))
+                                                 ""
+                                                 (apply string-append
                                                         (xtc:codegen:get-type-str (cadr ctype))
                                                         (map (lambda (v)
-                                                              (string-append "," (xtc:codegen:get-type-str v)))
-                                                            (cddr ctype))))
-                                            ") nounwind")))
+                                                               (string-append "," (xtc:codegen:get-type-str v)))
+                                                             (cddr ctype))))
+                                             ") nounwind")))
               (if (and (llvm:compile-ir ir-string)
-                      (llvm:bind-symbol (eval library) (symbol->string symname)))
+                       (llvm:bind-symbol (eval library) (symbol->string symname)))
                   (begin
                     (if (output-port? *xtc:aot:current-output-port*) ;; *xtc:aot:dll*)
                         (begin (write `(llvm:bind-symbol ,library ,(symbol->string symname)) *xtc:aot:current-output-port*)
-                              (newline *xtc:aot:current-output-port*)))
+                          (newline *xtc:aot:current-output-port*)))
                     (xtc:cache:register-new-nativefunc (symbol->string symname) (xtc:codegen:get-type-from-pretty-str (symbol->string type)) "" '())
                     (xtc:diagnostics:print-lib-binding-details-to-log library symname type)
                     (xtc:aot:insert-nativefunc-binding-details library symname type docstring))
@@ -1122,28 +1122,28 @@ e.g.
 
 (define-macro (unbind-func symname)
   `(begin
-     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var"))
-     (llvm:erase-function ,(symbol->string symname))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_setter"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_getter"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_callback"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_native"))
-     (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
-     (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var_zone"))
-     (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))
-         (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
+    (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var"))
+    (llvm:erase-function ,(symbol->string symname))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_setter"))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_getter"))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_callback"))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_native"))
+    (llvm:erase-function ,(string-append (symbol->string symname) "_maker"))
+    (llvm:remove-globalvar ,(string-append (symbol->string symname) "_var_zone"))
+    (if (llvm:get-function ,(string-append (symbol->string symname) "_scheme"))
+        (llvm:erase-function ,(string-append (symbol->string symname) "_scheme")))))
 
 (define-macro (bind-lib-type library name type docstring)
   (let* ((a (xtc:codegen:get-pretty-tuple-arg-strings (symbol->string type)))
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (if (llvm:compile-ir ,(string-append "%" namestr " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str typestr namestr))))
-           (xtc:cache:register-new-namedtype ,namestr
-                                           ',(xtc:codegen:get-type-from-pretty-str typestr namestr)
-                                           ,docstring)
-           (xtc:diagnostics:print-compiler-error "bind-lib-type failed" ,name)))))
+      (if (llvm:compile-ir ,(string-append "%" namestr " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str typestr namestr))))
+          (xtc:cache:register-new-namedtype ,namestr
+                                            ',(xtc:codegen:get-type-from-pretty-str typestr namestr)
+                                            ,docstring)
+          (xtc:diagnostics:print-compiler-error "bind-lib-type failed" ,name)))))
 
 (define-macro (register-lib-type library name type docstring)
   (if (xtc:aot:currently-compiling?)
@@ -1153,10 +1153,10 @@ e.g.
          (namestr (symbol->string name))
          (typestr (symbol->string type)))
     `(begin
-       (xtc:cache:register-new-namedtype ,namestr
-                                      ',(xtc:codegen:get-type-from-pretty-str typestr namestr)
-                                      ,docstring)
-       (set! *xtc:globals:suppress-ir-generation* #f))))
+      (xtc:cache:register-new-namedtype ,namestr
+                                        ',(xtc:codegen:get-type-from-pretty-str typestr namestr)
+                                        ,docstring)
+      (set! *xtc:globals:suppress-ir-generation* #f))))
 
 
 ;;; this here for binding to CLOSURE in dylib
@@ -1164,50 +1164,50 @@ e.g.
 ;; arg is for *optional* zone size arg
 (define-macro (bind-lib-func library symname type zone-size docstring body)
   `(begin
-     (bind-lib ,library ,symname ,type fastcc)
-     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void]*)
-     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
-     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
-     (if (xtc:bind:create-scm-wrapper? ,(symbol->string symname))
-         (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
-     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
-     (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
-               ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
-     (if (not (llvm:compile-ir
+    (bind-lib ,library ,symname ,type fastcc)
+    (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_setter")) [void]*)
+    (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_getter")) [i8*]*)
+    (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_callback")) [void,i8*]*)
+    (if (xtc:bind:create-scm-wrapper? ,(symbol->string symname))
+        (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_scheme")) [i8*,i8*,i8*]*))
+    (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_native")) ,type)
+    (bind-lib ,library ,(string->symbol (string-append (symbol->string symname) "_maker"))
+      ,(string->symbol (string-append "[" (symbol->string type) ",i8*]*")))
+    (if (not (llvm:compile-ir
                (string-append "@" ,(symbol->string symname) "_var = external global [1 x i8*]\n\n"
                               "@" ,(symbol->string symname) "_var_zone = external global [1 x i8*]\n\n")))
-         (xtc:diagnostics:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
-     (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
-     ;; bind scheme function
-     (if (xtc:bind:create-scm-wrapper? ,(symbol->string symname))
-         (eval (define ,symname
-                 (xtc:bind:create-scheme-wrapper (symbol->string ',symname)))
-               (interaction-environment))
-         (xtc:diagnostics:print-no-scheme-stub-notification (symbol->string ',symname)))
-     (xtc:cache:register-new-closure ,(symbol->string symname)
-                                   (xtc:codegen:get-type-from-pretty-str ,(symbol->string type))
-                                   ,zone-size
-                                   ,docstring
-                                   ,body)
-     (xtc:diagnostics:print-binding-details-to-log "LibBound:"
-                                                 ,(symbol->string symname)
-                                                 ,(symbol->string type))
-     (xtc:bind:initialize-closure-with-new-zone ,(symbol->string symname)
+        (xtc:diagnostics:print-compiler-error "failed to compile IR in bind-lib-func" ,symname))
+    (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var"))
+    (llvm:bind-symbol ,library ,(string-append (symbol->string symname) "_var_zone"))
+    ;; bind scheme function
+    (if (xtc:bind:create-scm-wrapper? ,(symbol->string symname))
+        (eval (define ,symname
+                (xtc:bind:create-scheme-wrapper (symbol->string ',symname)))
+              (interaction-environment))
+        (xtc:diagnostics:print-no-scheme-stub-notification (symbol->string ',symname)))
+    (xtc:cache:register-new-closure ,(symbol->string symname)
+                                    (xtc:codegen:get-type-from-pretty-str ,(symbol->string type))
+                                    ,zone-size
+                                    ,docstring
+                                    ,body)
+    (xtc:diagnostics:print-binding-details-to-log "LibBound:"
+                                                  ,(symbol->string symname)
+                                                  ,(symbol->string type))
+    (xtc:bind:initialize-closure-with-new-zone ,(symbol->string symname)
                                                ,zone-size)))
 
 (define-macro (register-lib-func library symname type zone-size docstring body)
   `(begin
-     ;; bind scheme function
-     (xtc:cache:register-new-closure ,(symbol->string symname)
-                                   (xtc:codegen:get-type-from-pretty-str ,(symbol->string type))
-                                   ,zone-size
-                                   ,docstring
-                                   ,body)
-     (xtc:diagnostics:print-binding-details-to-log "Lib Registered:"
-                                                 ,(symbol->string symname)
-                                                 ,(symbol->string type))
-     (xtc:bind:initialize-closure-with-new-zone ,(symbol->string symname) ,zone-size)))
+    ;; bind scheme function
+    (xtc:cache:register-new-closure ,(symbol->string symname)
+                                    (xtc:codegen:get-type-from-pretty-str ,(symbol->string type))
+                                    ,zone-size
+                                    ,docstring
+                                    ,body)
+    (xtc:diagnostics:print-binding-details-to-log "Lib Registered:"
+                                                  ,(symbol->string symname)
+                                                  ,(symbol->string type))
+    (xtc:bind:initialize-closure-with-new-zone ,(symbol->string symname) ,zone-size)))
 
 
 (define-macro (bind-lib-val library symname type . docstring)
@@ -1216,25 +1216,25 @@ e.g.
                          (symbol->string type)))
           (type-list (xtc:codegen:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
-     (if (and (llvm:compile-ir
+    (if (and (llvm:compile-ir
                (string-append "@" ,(symbol->string symname) " = external global "
                               (xtc:codegen:get-type-str type-list)))
-              (llvm:bind-symbol ,library ,(symbol->string symname)))
-         (begin
-           (xtc:cache:register-new-globalvar ,(symbol->string symname)
-                                           type-list
-                                           ds)
-           (xtc:aot:insert-globalvar-binding-details ,(symbol->string library)
-                                                      ,(symbol->string symname)
-                                                      ,(symbol->string type)
-                                                      ds)
-           (xtc:diagnostics:print-binding-details-to-log "LibBound:"
-                                                       ,(symbol->string symname)
-                                                       ,(symbol->string type)))
-         (xtc:diagnostics:print-compiler-error (string-append "could not bind-lib-val "
-                                                            ,(symbol->string symname)
-                                                            " from library "
-                                                            ,(symbol->string library))))))
+             (llvm:bind-symbol ,library ,(symbol->string symname)))
+        (begin
+          (xtc:cache:register-new-globalvar ,(symbol->string symname)
+                                            type-list
+                                            ds)
+          (xtc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                    ,(symbol->string symname)
+                                                    ,(symbol->string type)
+                                                    ds)
+          (xtc:diagnostics:print-binding-details-to-log "LibBound:"
+                                                        ,(symbol->string symname)
+                                                        ,(symbol->string type)))
+        (xtc:diagnostics:print-compiler-error (string-append "could not bind-lib-val "
+                                                             ,(symbol->string symname)
+                                                             " from library "
+                                                             ,(symbol->string library))))))
 
 (define-macro (register-lib-val library symname type . docstring)
   `(let* ((type-str ,(if (xtc:cache:typealias-exists? (symbol->string type))
@@ -1242,17 +1242,17 @@ e.g.
                          (symbol->string type)))
           (type-list (xtc:codegen:get-type-from-pretty-str type-str))
           (ds ,(if (null? docstring) "" (car docstring))))
-      (begin
-           (xtc:cache:register-new-globalvar ,(symbol->string symname)
-                                           type-list
-                                           ds)
-           (xtc:aot:insert-globalvar-binding-details ,(symbol->string library)
-                                                      ,(symbol->string symname)
-                                                      ,(symbol->string type)
-                                                      ds)
-           (xtc:diagnostics:print-binding-details-to-log "Lib Registered:"
-                                                       ,(symbol->string symname)
-                                                       ,(symbol->string type)))))
+    (begin
+      (xtc:cache:register-new-globalvar ,(symbol->string symname)
+                                        type-list
+                                        ds)
+      (xtc:aot:insert-globalvar-binding-details ,(symbol->string library)
+                                                ,(symbol->string symname)
+                                                ,(symbol->string type)
+                                                ds)
+      (xtc:diagnostics:print-binding-details-to-log "Lib Registered:"
+                                                    ,(symbol->string symname)
+                                                    ,(symbol->string type)))))
 
 ;; THIS IS A HELPER FUNCTION
 ;;
@@ -1283,27 +1283,27 @@ e.g.
 (define xtc:bind:create-scm-wrapper?
   (lambda (func-name)
     (cl:every
-     (lambda (type)
-       (or (xtc:codegen:void? type)
-           (xtc:codegen:floating-point? type)
-           (xtc:codegen:fixed-point? type)
-           (xtc:codegen:pointer? type)))
-     (map xtc:codegen:get-type-from-str
-          (xtc:cache:get-closure-or-nativefunc-arg-types func-name)))))
+      (lambda (type)
+        (or (xtc:codegen:void? type)
+            (xtc:codegen:floating-point? type)
+            (xtc:codegen:fixed-point? type)
+            (xtc:codegen:pointer? type)))
+      (map xtc:codegen:get-type-from-str
+           (xtc:cache:get-closure-or-nativefunc-arg-types func-name)))))
 
 (define xtc:bind:adhoc-scheme-wrapper
   (lambda (polyname funcname)
     `(define ,(string->symbol polyname)
-       (lambda args
-         (if (and (not (null? args))
-                  (symbol? (car args)))
-             (if (equal? (car args) 'xtlang)
-                 ',(string->symbol funcname)
-                 (if (null? (cdr args))
-                     (eval (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")")))
-                     (eval (append (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")"))
-                                   (list (cadr args))))))
-             (apply ,(string->symbol funcname) args))))))
+      (lambda args
+        (if (and (not (null? args))
+                 (symbol? (car args)))
+            (if (equal? (car args) 'xtlang)
+                ',(string->symbol funcname)
+                (if (null? (cdr args))
+                    (eval (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")")))
+                    (eval (append (string->sexpr (string-append "(" ,funcname "." (symbol->string (car args)) ")"))
+                                  (list (cadr args))))))
+            (apply ,(string->symbol funcname) args))))))
 
 
 (define xtc:bind:create-scheme-wrapper
@@ -1319,27 +1319,27 @@ e.g.
         (let ((scheme-func (llvm:get-function-pointer (string-append func-name "_scheme")))
               (p (regex:split func-name "_adhoc_")))
           (if (and
-               (or (not (defined? (string->symbol (car p))))
-                   (defined? (string->symbol (string-append (car p) "_xtlang_name"))))
-               (not (null? (cdr p)))) ;; if _adhoc_ is true
+                (or (not (defined? (string->symbol (car p))))
+                    (defined? (string->symbol (string-append (car p) "_xtlang_name"))))
+                (not (null? (cdr p)))) ;; if _adhoc_ is true
               (let ((polytypes (xtc:cache:get-polyfunc-candidate-list (car p))))
                 (if (and (list? polytypes)
                          (= (length polytypes) 1))
                     (begin
                       (eval `(define
-                               ,(string->symbol (string-append (car p) "_xtlang_name"))
-                               ,(vector-ref (car polytypes) 0))
+                              ,(string->symbol (string-append (car p) "_xtlang_name"))
+                              ,(vector-ref (car polytypes) 0))
                             (interaction-environment))
                       (eval (xtc:bind:adhoc-scheme-wrapper
-                             (car p)
-                             (vector-ref (car polytypes) 0))
+                              (car p)
+                              (vector-ref (car polytypes) 0))
                             (interaction-environment)))
                     (begin
                       (eval `(define ,(string->symbol (string-append (car p) "_xtlang_name")) #f)
                             (interaction-environment))
                       (eval `(define ,(string->symbol (car p))
-                               (lambda args
-                                 (println 'Ambiguous 'or 'unavailable 'xtlang 'wrapper: ,(car p))))
+                              (lambda args
+                                (println 'Ambiguous 'or 'unavailable 'xtlang 'wrapper: ,(car p))))
                             (interaction-environment))))))
           (if scheme-func
               (begin
@@ -1375,12 +1375,12 @@ e.g.
   (let* ((types (cdr (xtc:cache:get-closure-arg-types (symbol->string native-sym))))
          (args (map (lambda (t v) v)
                     types (make-list-with-proc
-                           (length types)
-                           (lambda (i)
-                             (string->symbol (string-append "arg_" (atom->string i))))))))
+                            (length types)
+                            (lambda (i)
+                              (string->symbol (string-append "arg_" (atom->string i))))))))
     `(bind-func ,local-sym
-       (lambda ,args
-         ,(cons native-sym args)))))
+      (lambda ,args
+        ,(cons native-sym args)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1406,32 +1406,32 @@ e.g.
         (let ((printspec *xtc:globals:print-code-specialization-compiles*))
           (set! *xtc:globals:print-code-specialization-compiles* #t)
           (for-each
-           (lambda (t)
-             (if (regex:match? t "_poly_")
-                 (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
-             (let ((etype (cname-encode t)))
-               (if (not (xtc:cache:closure-exists? (string-append sym "_poly_" etype)))
-                   (let* ((arity (xtc:codegen:get-arity-from-pretty-closure t))
-                          (code (caddr (cadr (xtc:cache:genericfunc-types (string->symbol sym) arity t))))
-                          (pfunc (string->symbol (string-append sym "_poly_" etype))))
-                     ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
-                     ;; pre-populate the closure cache for the new specialised func
-                     (if (not (xtc:cache:closure-exists? (symbol->string pfunc)))
-                         (xtc:cache:register-new-closure (symbol->string pfunc)
-                                                       '()
-                                                       *xtc:globals:default-zone-size*
-                                                       ""
-                                                       code))
-                     (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (xtc:driver:run pfunc code *xtc:globals:default-zone-size* #f #f (cons pfunc (string->symbol t)))
-                     (xtc:cache:register-new-polyfunc sym
-                                                    (symbol->string pfunc)
-                                                    (xtc:codegen:get-type-from-pretty-str t)
-                                                    "")
-                     (xtc:bind:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                               *xtc:globals:default-zone-size*)
-                     pfunc))))
-           types)
+            (lambda (t)
+              (if (regex:match? t "_poly_")
+                  (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
+              (let ((etype (cname-encode t)))
+                (if (not (xtc:cache:closure-exists? (string-append sym "_poly_" etype)))
+                    (let* ((arity (xtc:codegen:get-arity-from-pretty-closure t))
+                           (code (caddr (cadr (xtc:cache:genericfunc-types (string->symbol sym) arity t))))
+                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
+                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                      ;; pre-populate the closure cache for the new specialised func
+                      (if (not (xtc:cache:closure-exists? (symbol->string pfunc)))
+                          (xtc:cache:register-new-closure (symbol->string pfunc)
+                                                          '()
+                                                          *xtc:globals:default-zone-size*
+                                                          ""
+                                                          code))
+                      (set! code `(let ((,pfunc ,code)) ,pfunc))
+                      (xtc:driver:run pfunc code *xtc:globals:default-zone-size* #f #f (cons pfunc (string->symbol t)))
+                      (xtc:cache:register-new-polyfunc sym
+                                                       (symbol->string pfunc)
+                                                       (xtc:codegen:get-type-from-pretty-str t)
+                                                       "")
+                      (xtc:bind:initialize-closure-with-new-zone (symbol->string pfunc)
+                                                                 *xtc:globals:default-zone-size*)
+                      pfunc))))
+            types)
           (set! *xtc:globals:print-code-specialization-compiles* printspec)
           (hashtable-delete! *xtc:cache:genericfunc-cache* sym)
           #t))))
@@ -1459,14 +1459,14 @@ e.g.
         (let ((printspec *xtc:globals:print-code-specialization-compiles*))
           (set! *xtc:globals:print-code-specialization-compiles* #t)
           (for-each
-           (lambda (t)
-             (if (regex:match? t ":")
-                 (set! t (cadr (regex:type-split t ":"))))
-             (let ((newname (string-append sym "_poly_" (cname-encode t))))
-               (if (llvm:compile-ir (string-append "%" newname " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str t))))
-                   (xtc:bind:compile-type-dataconstructors (string->symbol newname) t #f #t #t #t)
-                   (xtc:diagnostics:print-compiler-error "failed to compile IR in xtc:bind:specialize-generictype" sym))))
-           types)
+            (lambda (t)
+              (if (regex:match? t ":")
+                  (set! t (cadr (regex:type-split t ":"))))
+              (let ((newname (string-append sym "_poly_" (cname-encode t))))
+                (if (llvm:compile-ir (string-append "%" newname " = type " (xtc:codegen:get-type-str (xtc:codegen:get-type-from-pretty-str t))))
+                    (xtc:bind:compile-type-dataconstructors (string->symbol newname) t #f #t #t #t)
+                    (xtc:diagnostics:print-compiler-error "failed to compile IR in xtc:bind:specialize-generictype" sym))))
+            types)
           (set! *xtc:globals:print-code-specialization-compiles* printspec)
           #t))))
 
@@ -1488,63 +1488,63 @@ e.g.
         (let ((printspec *xtc:globals:print-code-specialization-compiles*))
           (set! *xtc:globals:print-code-specialization-compiles* #t)
           (for-each
-           (lambda (t)
-             (if (regex:match? t "_poly_")
-                 (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
-             (let ((etype (cname-encode t)))
-               (if (not (xtc:cache:closure-exists? (string-append sym "_poly_" etype)))
-                   (let* ((arity (xtc:codegen:get-arity-from-pretty-closure t))
-                          (gftypes (xtc:cache:genericfunc-types (string->symbol sym) arity t))
-                          (res (if (not gftypes)
-                                   (xtc:diagnostics:print-compiler-error "Bad generic closure type:" (list sym t))))
-                          (code (caddr (cadr gftypes)))
-                          (pfunc (string->symbol (string-append sym "_poly_" etype))))
-                     ;; (println 'makesym etype 't: t)
-                     ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
-                     ;; pre-populate the closure cache for the new specialised func
-                     (if (not (xtc:cache:closure-exists? (symbol->string pfunc)))
-                         (xtc:cache:register-new-closure (symbol->string pfunc)
-                                                       '()
-                                                       *xtc:globals:default-zone-size*
-                                                       ""
-                                                       code))
-                     (set! code `(let ((,pfunc ,code)) ,pfunc))
-                     (xtc:driver:run pfunc code *xtc:globals:default-zone-size* #f #f (cons pfunc (string->symbol t)))
-                     (xtc:cache:register-new-polyfunc sym
-                                                    (symbol->string pfunc)
-                                                    (xtc:codegen:get-type-from-pretty-str t)
-                                                    "")
-                     (xtc:bind:initialize-closure-with-new-zone (symbol->string pfunc)
-                                                               *xtc:globals:default-zone-size*)
-                     pfunc))))
-           types)
+            (lambda (t)
+              (if (regex:match? t "_poly_")
+                  (set! t (cname-decode (cadr (regex:type-split t "_poly_")))))
+              (let ((etype (cname-encode t)))
+                (if (not (xtc:cache:closure-exists? (string-append sym "_poly_" etype)))
+                    (let* ((arity (xtc:codegen:get-arity-from-pretty-closure t))
+                           (gftypes (xtc:cache:genericfunc-types (string->symbol sym) arity t))
+                           (res (if (not gftypes)
+                                    (xtc:diagnostics:print-compiler-error "Bad generic closure type:" (list sym t))))
+                           (code (caddr (cadr gftypes)))
+                           (pfunc (string->symbol (string-append sym "_poly_" etype))))
+                      ;; (println 'makesym etype 't: t)
+                      ;; (println 'arity: arity 'code: code 'pfunc: pfunc)
+                      ;; pre-populate the closure cache for the new specialised func
+                      (if (not (xtc:cache:closure-exists? (symbol->string pfunc)))
+                          (xtc:cache:register-new-closure (symbol->string pfunc)
+                                                          '()
+                                                          *xtc:globals:default-zone-size*
+                                                          ""
+                                                          code))
+                      (set! code `(let ((,pfunc ,code)) ,pfunc))
+                      (xtc:driver:run pfunc code *xtc:globals:default-zone-size* #f #f (cons pfunc (string->symbol t)))
+                      (xtc:cache:register-new-polyfunc sym
+                                                       (symbol->string pfunc)
+                                                       (xtc:codegen:get-type-from-pretty-str t)
+                                                       "")
+                      (xtc:bind:initialize-closure-with-new-zone (symbol->string pfunc)
+                                                                 *xtc:globals:default-zone-size*)
+                      pfunc))))
+            types)
           (set! *xtc:globals:print-code-specialization-compiles* printspec)
           #t))))
 
 (define-macro (call-as-xtlang . expr)
   (if (not (xtc:aot:currently-compiling?))
       (sys:with-quiet-compiler
-       (begin
-         (set! *xtc:codegen:sym-name-stack* '())
-         (set! *xtc:codegen:ls_var* '())
-         (set! *xtc:globals:bound-lambdas* '())
-         (set! *xtc:desugar:generic-type-mappings* '())
-         (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
-           (eval `(bind-func xtlang_expression
+        (begin
+          (set! *xtc:codegen:sym-name-stack* '())
+          (set! *xtc:codegen:ls_var* '())
+          (set! *xtc:globals:bound-lambdas* '())
+          (set! *xtc:desugar:generic-type-mappings* '())
+          (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
+            (eval `(bind-func xtlang_expression
                     (lambda ()
                       ,(if (equal? type -1)
                            `(let ((s:i8* (halloc 2)))
-                              ,@expr
-                              s)
+                             ,@expr
+                             s)
                            `(letz ((res (begin ,@expr))
                                    (s:String* (toString res))
                                    (lgth (+ 1 (tref s 0)))
                                    (oldcs (tref s 1))
                                    (newcs:i8* (halloc lgth)))
-                              (strcpy newcs oldcs)
-                              newcs))))
-                 (interaction-environment))
-           (quote (string->atom (cptr->string (xtlang_expression)))))))))
+                             (strcpy newcs oldcs)
+                             newcs))))
+                  (interaction-environment))
+            (quote (string->atom (cptr->string (xtlang_expression)))))))))
 
 (define xtmX call-as-xtlang)
 (define $ call-as-xtlang)
@@ -1553,23 +1553,23 @@ e.g.
 (define-macro (call-as-xtlang-leaky . expr)
   (if (not (xtc:aot:currently-compiling?))
       (sys:with-quiet-compiler
-       (begin
-         (set! *xtc:codegen:sym-name-stack* '())
-         (set! *xtc:codegen:ls_var* '())
-         (set! *xtc:globals:bound-lambdas* '())
-         (set! *xtc:desugar:generic-type-mappings* '())
-         (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
-           (eval `(bind-func xtlang_expression
+        (begin
+          (set! *xtc:codegen:sym-name-stack* '())
+          (set! *xtc:codegen:ls_var* '())
+          (set! *xtc:globals:bound-lambdas* '())
+          (set! *xtc:desugar:generic-type-mappings* '())
+          (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
+            (eval `(bind-func xtlang_expression
                     (lambda ()
                       ,(if (not (xtc:codegen:pointer? type))
                            `(let ((s:i8* null))
-                              ;; (println "returning null for non-pointer type")
-                              ,@expr
-                              s)
+                             ;; (println "returning null for non-pointer type")
+                             ,@expr
+                             s)
                            `(let ((res:i8* (cast (begin ,@expr) i8*)))
-                              res))))
-                 (interaction-environment))
-           (quote (xtlang_expression)))))))
+                             res))))
+                  (interaction-environment))
+            (quote (xtlang_expression)))))))
 
 (define $$ call-as-xtlang-leaky)
 
@@ -1626,151 +1626,151 @@ e.g.
 (define xtmdoc-get-xtlang-genericfunc-args
   (lambda (fn-sym)
     (xtmdoc-get-args-from-form
-     (caddar (cdddar (reverse (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string fn-sym)) '())))))))
+      (caddar (cdddar (reverse (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string fn-sym)) '())))))))
 
 (define xtmdoc-builtin-handler
   (lambda (name-sym)
     (list
-     '(category . "builtin")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (xtc:cache:get-builtin-args (symbol->string name-sym)))
-     (cons 'type
-           (let ((type (xtc:cache:get-builtin-type-str (symbol->string name-sym))))
-             (if (string=? type "") '() type)))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-builtin-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "builtin")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (xtc:cache:get-builtin-args (symbol->string name-sym)))
+      (cons 'type
+            (let ((type (xtc:cache:get-builtin-type-str (symbol->string name-sym))))
+              (if (string=? type "") '() type)))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-builtin-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-genericfunc-handler
   (lambda (name-sym)
     ;; once we have a way to handle multipe aritys, we should update
     ;; this function
     (list
-     '(category . "generic closure")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
-     (cons 'type (xtc:desugar:simplify-genericfunc-pretty-type
-                  (symbol->string (caddar (reverse (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string name-sym)) '()))))))
-     (list 'docstring))))
+      '(category . "generic closure")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (xtmdoc-get-xtlang-genericfunc-args name-sym))
+      (cons 'type (xtc:desugar:simplify-genericfunc-pretty-type
+                    (symbol->string (caddar (reverse (or (hashtable-ref *xtc:cache:genericfunc-cache* (symbol->string name-sym)) '()))))))
+      (list 'docstring))))
 
 (define xtmdoc-generictype-handler
   (lambda (name-sym)
     (list
-     '(category . "generic type")
-     (cons 'name (symbol->string name-sym))
-     (list 'args)
-     (cons 'type (xtc:desugar:simplify-generictype-pretty-type
-                  (symbol->string (xtc:cache:get-generictype-candidate-types name-sym))))
-     (list 'docstring))))
+      '(category . "generic type")
+      (cons 'name (symbol->string name-sym))
+      (list 'args)
+      (cons 'type (xtc:desugar:simplify-generictype-pretty-type
+                    (symbol->string (xtc:cache:get-generictype-candidate-types name-sym))))
+      (list 'docstring))))
 
 (define xtmdoc-polyfunc-handler
   (lambda (name-sym)
     (list
-     '(category . "polymorphic closure")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args "")
-     (list 'type)
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-polyfunc-docstring (symbol->string name-sym)))
-                 (poly-options-docstring
-                  (string-join (map (lambda (pf)
-                                      (let* ((option-name (vector-ref pf 0)))
-                                        (string-append "@poly " option-name ":"
-                                                       (xtc:codegen:pretty-print-type (vector-ref pf 1)))))
-                                    (cl:remove-if
-                                     (lambda (pf) (regex:match? (vector-ref pf 0) "_poly_"))
-                                     (xtc:cache:get-polyfunc-candidate-list (symbol->string name-sym))))
-                               "\n")))
-             (string-append docstring "\n\n" poly-options-docstring))))))
+      '(category . "polymorphic closure")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args "")
+      (list 'type)
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-polyfunc-docstring (symbol->string name-sym)))
+                  (poly-options-docstring
+                    (string-join (map (lambda (pf)
+                                        (let* ((option-name (vector-ref pf 0)))
+                                          (string-append "@poly " option-name ":"
+                                                         (xtc:codegen:pretty-print-type (vector-ref pf 1)))))
+                                      (cl:remove-if
+                                        (lambda (pf) (regex:match? (vector-ref pf 0) "_poly_"))
+                                        (xtc:cache:get-polyfunc-candidate-list (symbol->string name-sym))))
+                                 "\n")))
+              (string-append docstring "\n\n" poly-options-docstring))))))
 
 (define xtmdoc-polytype-handler
   (lambda (name-sym)
     (list
-     '(category . "polymorphic type")
-     (cons 'name (symbol->string name-sym))
-     (list 'args)
-     (cons 'type (string-join (map (lambda (pf) (xtc:codegen:pretty-print-type pf))
-                                   (xtc:cache:get-polytype-candidate-types (symbol->string name-sym)))
-                              " "))
-     (list 'docstring))))
+      '(category . "polymorphic type")
+      (cons 'name (symbol->string name-sym))
+      (list 'args)
+      (cons 'type (string-join (map (lambda (pf) (xtc:codegen:pretty-print-type pf))
+                                    (xtc:cache:get-polytype-candidate-types (symbol->string name-sym)))
+                               " "))
+      (list 'docstring))))
 
 (define xtmdoc-closure-handler
   (lambda (name-sym)
     (list
-     '(category . "closure")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (xtmdoc-get-args-from-form (xtc:cache:get-closure-body (symbol->string name-sym))))
-     (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-closure-type (symbol->string name-sym))))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-closure-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "closure")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (xtmdoc-get-args-from-form (xtc:cache:get-closure-body (symbol->string name-sym))))
+      (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-closure-type (symbol->string name-sym))))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-closure-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-nativefunc-handler
   (lambda (name-sym)
     (list
-     '(category . "C function")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (xtc:cache:get-nativefunc-arg-names (symbol->string name-sym)))
-     (cons 'type
-           (let ((type (xtc:cache:get-nativefunc-type (symbol->string name-sym))))
-             (if (equal? type 'varargs)
-                 "varargs"
-                 (xtc:codegen:pretty-print-type type))))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-nativefunc-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "C function")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (xtc:cache:get-nativefunc-arg-names (symbol->string name-sym)))
+      (cons 'type
+            (let ((type (xtc:cache:get-nativefunc-type (symbol->string name-sym))))
+              (if (equal? type 'varargs)
+                  "varargs"
+                  (xtc:codegen:pretty-print-type type))))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-nativefunc-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-typealias-handler
   (lambda (name-sym)
     (list
-     '(category . "type alias")
-     (cons 'name (symbol->string name-sym))
-     (list 'args)
-     (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-ground-type (symbol->string name-sym))))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-typealias-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "type alias")
+      (cons 'name (symbol->string name-sym))
+      (list 'args)
+      (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-typealias-ground-type (symbol->string name-sym))))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-typealias-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-namedtype-handler
   (lambda (name-sym)
     (list
-     '(category . "named type")
-     (cons 'name (symbol->string name-sym))
-     (list 'args)
-     (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-namedtype-type (symbol->string name-sym))))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-namedtype-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "named type")
+      (cons 'name (symbol->string name-sym))
+      (list 'args)
+      (cons 'type (xtc:codegen:pretty-print-type (xtc:cache:get-namedtype-type (symbol->string name-sym))))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-namedtype-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-globalvar-handler
   (lambda (name-sym)
     (list
-     '(category . "global var")
-     (cons 'name (symbol->string name-sym))
-     (list 'args)
-     ;; rememeber that global vars need to be "depointerised" by one level
-     (cons 'type (xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string name-sym)))))
-     (cons 'docstring
-           (let ((docstring (xtc:cache:get-globalvar-docstring (symbol->string name-sym))))
-             (if (string=? docstring "") '() docstring))))))
+      '(category . "global var")
+      (cons 'name (symbol->string name-sym))
+      (list 'args)
+      ;; rememeber that global vars need to be "depointerised" by one level
+      (cons 'type (xtc:codegen:pretty-print-type (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string name-sym)))))
+      (cons 'docstring
+            (let ((docstring (xtc:cache:get-globalvar-docstring (symbol->string name-sym))))
+              (if (string=? docstring "") '() docstring))))))
 
 (define xtmdoc-scheme-function-handler
   (lambda (name-sym)
     (list
-     '(category . "scheme closure")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (xtmdoc-get-args-from-form (get-closure-code (eval name-sym))))
-     (list 'type)
-     (list 'docstring))))
+      '(category . "scheme closure")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (xtmdoc-get-args-from-form (get-closure-code (eval name-sym))))
+      (list 'type)
+      (list 'docstring))))
 
 (define xtmdoc-scheme-macro-handler
   (lambda (name-sym)
     (list
-     '(category . "scheme macro")
-     (cons 'name (symbol->string name-sym))
-     (cons 'args (cadadr (caddr (get-closure-code (eval name-sym)))))
-     (list 'type)
-     (list 'docstring))))
+      '(category . "scheme macro")
+      (cons 'name (symbol->string name-sym))
+      (cons 'args (cadadr (caddr (get-closure-code (eval name-sym)))))
+      (list 'type)
+      (list 'docstring))))
 
 (define xtmdoc-documentation-function
   (lambda (name)
@@ -1800,7 +1800,7 @@ e.g.
             ((and (defined? sym) (macro? (eval sym)))
              (cons 'xtmdoc-docstring (xtmdoc-scheme-macro-handler sym)))
             (else
-             '(xtmdoc-docstring-nodocstring))))))
+              '(xtmdoc-docstring-nodocstring))))))
 
 ;; sort the alists (as returned by the various handler functions) into
 ;; a reasonably meaningful order (least to most important)
@@ -1826,46 +1826,46 @@ e.g.
 (define xtmdoc-clean-nativefunc-alist
   (lambda (closure-alists nativefunc-alists)
     (cl:remove-if
-     (lambda (nativefunc-data)
-       (let ((nativefunc-name (cdr (assoc-strcmp 'name nativefunc-data))))
-         (cl:find-if (lambda (closure-data)
-                       ;; is it a closure?
-                       (string=? (cdr (assoc-strcmp 'name closure-data)) nativefunc-name))
-                     closure-alists)))
-     nativefunc-alists)))
+      (lambda (nativefunc-data)
+        (let ((nativefunc-name (cdr (assoc-strcmp 'name nativefunc-data))))
+          (cl:find-if (lambda (closure-data)
+                        ;; is it a closure?
+                        (string=? (cdr (assoc-strcmp 'name closure-data)) nativefunc-name))
+                      closure-alists)))
+      nativefunc-alists)))
 
 (define xtmdoc-all-doc-alists
   (lambda (include-nativefuncs?)
     (let* ((closure-alists
-            (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
-                 (hashtable->alist *xtc:cache:closure-cache*)))
+             (map (lambda (data) (xtmdoc-closure-handler (string->symbol (car data))))
+                  (hashtable->alist *xtc:cache:closure-cache*)))
            (all-doc-alists
-            (append
-             (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:builtin-cache*))
-             (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:typealias-cache*))
-             (map (lambda (data) (xtmdoc-generictype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:generictype-cache*))
-             (map (lambda (data) (xtmdoc-genericfunc-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:genericfunc-cache*))
+             (append
+               (map (lambda (data) (xtmdoc-builtin-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:builtin-cache*))
+               (map (lambda (data) (xtmdoc-typealias-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:typealias-cache*))
+               (map (lambda (data) (xtmdoc-generictype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:generictype-cache*))
+               (map (lambda (data) (xtmdoc-genericfunc-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:genericfunc-cache*))
 
-             (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:namedtype-cache*))
-             closure-alists
-             (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:polytype-cache*))
-             (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:polyfunc-cache*))
-             (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:globalvar-cache*))
-             ;; make sure the "_native" versions of each closure don't get in
-             ;; there (since the closure is already there)
-             (if include-nativefuncs?
-                 (xtmdoc-clean-nativefunc-alist
-                  closure-alists
-                  (map (lambda (x)
-                         (xtmdoc-nativefunc-handler (string->symbol (car x))))
-                       (hashtable->alist *xtc:cache:nativefunc-cache*)))
-                 '()))))
+               (map (lambda (data) (xtmdoc-namedtype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:namedtype-cache*))
+               closure-alists
+               (map (lambda (data) (xtmdoc-polytype-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:polytype-cache*))
+               (map (lambda (data) (xtmdoc-polyfunc-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:polyfunc-cache*))
+               (map (lambda (data) (xtmdoc-globalvar-handler (string->symbol (car data)))) (hashtable->alist *xtc:cache:globalvar-cache*))
+               ;; make sure the "_native" versions of each closure don't get in
+               ;; there (since the closure is already there)
+               (if include-nativefuncs?
+                   (xtmdoc-clean-nativefunc-alist
+                     closure-alists
+                     (map (lambda (x)
+                            (xtmdoc-nativefunc-handler (string->symbol (car x))))
+                          (hashtable->alist *xtc:cache:nativefunc-cache*)))
+                   '()))))
       ;; filter out the things which shouldn't make it to the exported docs
       (cl:remove-if
-       (lambda (doc-alist)
-         (regex:match? (cdr (assoc-strcmp 'name doc-alist))
-                       "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
-       all-doc-alists))))
+        (lambda (doc-alist)
+          (regex:match? (cdr (assoc-strcmp 'name doc-alist))
+                        "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
+        all-doc-alists))))
 
 ;; we handle the args field separately, since there are a few special
 ;; cases to handle
@@ -1878,62 +1878,62 @@ e.g.
           (type (cdr (assoc-strcmp 'type xtmdoc-alist))))
       ;; arg names and types
       (cond
-       ((member category '("closure" "generic closure"))
-        (display
-         (string-append
-          "["
-          (string-join (map (lambda (name type)
-                              (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
-                            (cons 'RETURN args)
-                            (xtc:codegen:get-pretty-closure-arg-strings type))
-                       ", ")
-          "]")
-         file-port))
-       ((string=? category "builtin")
-        (if (or (not (string? type))
-                (string=? type "")
-                (<> (length (cdr (xtc:codegen:get-pretty-closure-arg-strings type)))
-                    (length args)))
-            ;; allow builtins have malformed arg/type relationships
-            (display
-             (string-append
-              "["
-              (string-join (map (lambda (name)
-                                  (string-append "[\"" (symbol->string name) "\", null]"))
-                                args)
-                           ", ")
-              "]")
-             file-port)
-            (display
-             (string-append
-              "["
-              (string-join (map (lambda (name type)
-                                  (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
-                                (cons 'RETURN args)
-                                (xtc:codegen:get-pretty-closure-arg-strings type))
-                           ", ")
-              "]")
-             file-port)))
-       ((string=? category "C function")
-        (display
-         (string-append
-          "["
-          ;; at the moment, there's no way of telling the xtlang
-          ;; compiler about the names of the arguments to a C function
-          (string-join (map (lambda (type)
-                              (string-append "[null, \"" type "\"]"))
-                            (xtc:codegen:get-pretty-closure-arg-strings type))
-                       ", ")
-          "]")
-         file-port))
-       ;; these are the ones for which "args" doesn't make sense
-       ;; "named type"
-       ;; "generic type"
-       ;; "polymorphic closure"
-       ;; "global var"
-       ;; "polymorphic type"
-       ;; "type alias"
-       (else (write 'null file-port))))))
+        ((member category '("closure" "generic closure"))
+         (display
+           (string-append
+             "["
+             (string-join (map (lambda (name type)
+                                 (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                               (cons 'RETURN args)
+                               (xtc:codegen:get-pretty-closure-arg-strings type))
+                          ", ")
+             "]")
+           file-port))
+        ((string=? category "builtin")
+         (if (or (not (string? type))
+                 (string=? type "")
+                 (<> (length (cdr (xtc:codegen:get-pretty-closure-arg-strings type)))
+                     (length args)))
+             ;; allow builtins have malformed arg/type relationships
+             (display
+               (string-append
+                 "["
+                 (string-join (map (lambda (name)
+                                     (string-append "[\"" (symbol->string name) "\", null]"))
+                                   args)
+                              ", ")
+                 "]")
+               file-port)
+             (display
+               (string-append
+                 "["
+                 (string-join (map (lambda (name type)
+                                     (string-append "[\"" (symbol->string name) "\", \"" type "\"]"))
+                                   (cons 'RETURN args)
+                                   (xtc:codegen:get-pretty-closure-arg-strings type))
+                              ", ")
+                 "]")
+               file-port)))
+        ((string=? category "C function")
+         (display
+           (string-append
+             "["
+             ;; at the moment, there's no way of telling the xtlang
+             ;; compiler about the names of the arguments to a C function
+             (string-join (map (lambda (type)
+                                 (string-append "[null, \"" type "\"]"))
+                               (xtc:codegen:get-pretty-closure-arg-strings type))
+                          ", ")
+             "]")
+           file-port))
+        ;; these are the ones for which "args" doesn't make sense
+        ;; "named type"
+        ;; "generic type"
+        ;; "polymorphic closure"
+        ;; "global var"
+        ;; "polymorphic type"
+        ;; "type alias"
+        (else (write 'null file-port))))))
 
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
@@ -2028,8 +2028,8 @@ e.g.
                      `(xtc:bind:get-mono-name ,name ,t)
                      `(xtc:bind:get-mono-name ,name)))
             (n2 (llvm:get-closure-work-name n1)))
-       ;; (println 'n1 n1 'n2 n2)
-       (llvm:print-closure n2))))
+      ;; (println 'n1 n1 'n2 n2)
+      (llvm:print-closure n2))))
 
 (define-macro (llvm:asm name . args)
   (let* ((a1 (if (null? args) #f (car args)))
@@ -2039,9 +2039,9 @@ e.g.
     `(let ((n1 ,(if type
                     `(xtc:bind:get-mono-name ,name ,type)
                     `(xtc:bind:get-mono-name ,name))))
-       ,(if (not assm_print_type)
-            `(print (llvm:disassemble n1 0) "\n")
-            `(print (llvm:disassemble n1 ,assm_print_type) "\n")))))
+      ,(if (not assm_print_type)
+           `(print (llvm:disassemble n1 0) "\n")
+           `(print (llvm:disassemble n1 ,assm_print_type) "\n")))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
