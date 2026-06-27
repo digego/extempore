@@ -3,6 +3,19 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.10.1
+
+A one-fix patch release. The editor's documentation popup --- the `xtmdoc`
+machinery that answers a hover or doc lookup --- crashed whenever the cursor
+landed on a Scheme macro whose template was wrapped in a `let`, which covers
+`cosr`, `dotill` and most user-defined macros of that shape. The handler still
+pulled the macro's argument list out the way TinyScheme laid out a macro's
+source; under the s7 reader (in since 0.9.4) `procedure-source` returns
+`(macro <arglist> body...)`, so the old walk dived into the body and errored. It
+now reads the parameter list directly. Macros with a bare quasiquote body never
+hit the crash but were silently handed the wrong argument list; those are
+correct now too. Reported on the mailing list by Minoru.
+
 ## v0.10.0
 
 Two large strands of work land together: the xtlang compiler now drives every
