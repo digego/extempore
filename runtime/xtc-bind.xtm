@@ -1768,7 +1768,10 @@ e.g.
     (list
       '(category . "scheme macro")
       (cons 'name (symbol->string name-sym))
-      (cons 'args (cadadr (caddr (get-closure-code (eval name-sym)))))
+      ;; a macro's procedure-source is (macro <arglist> body...), so the
+      ;; parameter list is just the cadr (the old cadadr/caddr walk assumed
+      ;; TinyScheme's macro representation and errors under s7)
+      (cons 'args (cadr (get-closure-code (eval name-sym))))
       (list 'type)
       (list 'docstring))))
 
