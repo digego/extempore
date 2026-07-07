@@ -1,0 +1,158 @@
+;;; tests/core/error-reporting.xtm -- editor-eval error reporting
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Code sent from an editor is evaluated through sys:eval-string
+;; (runtime/init.xtm), which reads and evaluates each top-level form inside
+;; s7's native catch and reports any error with sys:report-error.
+;;
+;; This replaced a plain s7_load_c_string call, which did NOT unwind the s7
+;; stack after an uncaught error (the error long-jump skips OP_ERROR_QUIT). The
+;; leaked frames then showed up in every later error's stacktrace, so errors
+;; appeared to pile up across a session -- each new error redisplaying fragments
+;; of the earlier ones (reported on the mailing list by George, July 2026), and
+;; the stack slowly grew.
+;;
+;; These tests pin the fix: repeated errors don't grow the stack, an error in
+;; one form doesn't derail the surrounding session, ordinary top-level semantics
+;; (global defines, returned values) are preserved, and the report itself is the
+;; terse s7-style message with no trailing stacktrace.
+
+;;; Code:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; helpers
+
+;; capture what sys:eval-string writes to the error port for one eval
+(define (test-eval-capture str)
+  (let* ((sp (open-output-string))
+         (old (set-current-error-port sp)))
+    (sys:eval-string str)
+    (set-current-error-port old)
+    (get-output-string sp)))
+
+;; #t iff every non-blank line of s begins with a semicolon. The accumulating
+;; stacktrace is exactly the lines that DON'T -- so this is what tells a clean
+;; s7-style report apart from one with a stacktrace stapled on.
+(define (test-all-comment-lines? s)
+  (call-with-exit
+    (lambda (return)
+      (let ((at-line-start #t))
+        (do ((i 0 (+ i 1)))
+            ((= i (string-length s)) #t)
+          (let ((c (string-ref s i)))
+            (cond ((char=? c #\newline) (set! at-line-start #t))
+                  (at-line-start
+                   (set! at-line-start #f)
+                   (if (not (char=? c #\;)) (return #f))))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; stack hygiene -- the core of the fix
+
+;; many errors in a row must not grow the s7 stack (the leak that made errors
+;; accumulate). One warm-up settles any pre-existing frames, then the depth
+;; before and after a burst of errors must match exactly.
+(xtmtest-result
+  (begin
+    (sys:eval-string "(car 5)")
+    (let ((before (*s7* 'stack-top)))
+      (do ((i 0 (+ i 1))) ((= i 30)) (sys:eval-string "(car 5)"))
+      (= (*s7* 'stack-top) before)))
+  #t
+  "no-stack-leak-across-errors")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; error isolation and preserved semantics
+
+;; an error must not propagate out of sys:eval-string
+(xtmtest-result (begin (sys:eval-string "(car 5)") 'survived)
+                'survived
+                "error-does-not-propagate")
+
+;; the value of the last form is returned, like a REPL
+(xtmtest-result (sys:eval-string "(+ 3 4)") 7 "returns-last-value")
+
+;; a top-level define lands in the global environment, not a local scope
+(xtmtest-result (begin (sys:eval-string "(define erglobal 99)") erglobal)
+                99
+                "define-is-global")
+
+;; a bad form doesn't derail the forms after it in the same eval: the define
+;; still happens even though the preceding form errored
+(xtmtest-result (begin (sys:eval-string "(car 1) (define erpost 123)") erpost)
+                123
+                "continues-past-error")
+
+;; a scheme-level (error ...) is handled the same as a built-in type error
+(xtmtest-result (begin (sys:eval-string "(error 'boom \"deliberate\")") 'ok)
+                'ok
+                "handles-scheme-error")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; report shape -- terse s7-style message, no stacktrace
+
+;; the report names the offending call and its argument
+(xtmtest-result (let ((out (test-eval-capture "(car 5)")))
+                  (and (char-position #\c out)       ; non-#f => substring present
+                       (string-position "car argument" out)
+                       #t))
+                #t
+                "report-has-message")
+
+;; the offending form is echoed on its own ;-comment line
+(xtmtest-result (and (string-position "(car 5)" (test-eval-capture "(car 5)")) #t)
+                #t
+                "report-echoes-form")
+
+;; and there is NO trailing stacktrace: every non-blank line is a ;-comment.
+;; This is the regression that would fire if the raw s7 handler (with its
+;; history-walking stacktrace) came back.
+(xtmtest-result (test-all-comment-lines? (test-eval-capture "(car 5)"))
+                #t
+                "report-has-no-stacktrace")
+
+;; a successful eval writes nothing to the error port
+(xtmtest-result (string=? "" (test-eval-capture "(+ 1 2)"))
+                #t
+                "success-is-silent")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; scheduled callbacks -- sys:apply-top-level (scheme_call)
+
+;; The scheduler applies temporal-recursion / OSC callbacks through
+;; sys:apply-top-level, which has the same job as sys:eval-string: an erroring
+;; callback must not leak stack or accumulate a stacktrace. A callback that
+;; errors every firing is common (a bug in a beat loop), so this path leaked
+;; fast before the fix.
+
+;; the callback's return value is passed through on success
+(xtmtest-result (sys:apply-top-level + '(3 4)) 7 "apply-returns-value")
+
+;; an erroring callback is caught, not propagated
+(xtmtest-result (begin (sys:apply-top-level car '(5)) 'survived)
+                'survived
+                "apply-error-does-not-propagate")
+
+;; and repeated erroring callbacks don't grow the stack
+(xtmtest-result
+  (begin
+    (sys:apply-top-level car '(5))
+    (let ((before (*s7* 'stack-top)))
+      (do ((i 0 (+ i 1))) ((= i 30)) (sys:apply-top-level car '(5)))
+      (= (*s7* 'stack-top) before)))
+  #t
+  "apply-no-stack-leak")
+
+;; the callback error report is the same terse form, with no stacktrace
+(xtmtest-result
+  (let* ((sp (open-output-string))
+         (old (set-current-error-port sp)))
+    (sys:apply-top-level car '(5))
+    (set-current-error-port old)
+    (test-all-comment-lines? (get-output-string sp)))
+  #t
+  "apply-report-has-no-stacktrace")

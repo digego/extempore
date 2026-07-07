@@ -168,6 +168,67 @@
 ;; *error-hook* is immutable in s7; use s7's error handling instead
 (define *livecoding-error-hook* (lambda (msg a) 1))
 
+;; Code sent from an editor for evaluation goes through sys:eval-string. It
+;; reads and evaluates each form inside s7's native catch so an uncaught error
+;; unwinds the stack cleanly. (File loads stay on the C loader, which tracks
+;; per-line source locations --- see scheme_load_file in SchemeS7.cpp.)
+;;
+;; The alternative --- letting the C loader (s7_load_c_string) run each form
+;; without a catch --- leaves the s7 stack un-unwound after an error, because
+;; the error long-jump skips OP_ERROR_QUIT. Those leaked frames then show up in
+;; every subsequent error's stacktrace, so errors appear to pile up across a
+;; session (and the stack slowly grows). Catching per form avoids both.
+;;
+;; sys:report-error reproduces s7's own ";message / offending-form / location"
+;; report (minus the accumulating stacktrace). It uses the unshadowed built-ins
+;; #_format and #_object->string because init.xtm redefines format and catch.
+
+(define (sys:report-error tag info)
+  (*s7-catch* #t
+    (lambda ()
+      (let ((ep (current-error-port))
+            (ow (owlet)))
+        (let ((msg (if (and (pair? info) (string? (car info)))
+                       (apply #_format #f info)
+                       (#_format #f "~S ~S" tag info)))
+              (file (let-ref ow 'error-file)))
+          ;; Reproduce s7's own report: the message, the offending form
+          ;; (truncated the way s7 does), then the source location. A form read
+          ;; from a bare string port has no filename, so coerce #f to "" ---
+          ;; matching what s7's loader prints for editor evals.
+          (#_format ep "~%;~A~%;    ~A~%;    ~A, line ~A, position: ~A~%"
+            msg
+            (#_object->string (let-ref ow 'error-code) #f (*s7* 'print-length))
+            (if (string? file) file "")
+            (let-ref ow 'error-line)
+            (let-ref ow 'error-position)))))
+    ;; the reporter must never itself throw
+    (lambda (t i) (if #f #f))))
+
+(define (sys:eval-top-level form)
+  (*s7-catch* #t
+    (lambda () (eval form (rootlet)))
+    (lambda (tag info) (sys:report-error tag info) tag)))
+
+;; sys:apply-top-level is the same idea for a scheduled callback (temporal
+;; recursion, OSC handlers): scheme_call applies a closure whose error would
+;; otherwise leak stack frames exactly as an editor eval did. Catching here
+;; unwinds cleanly and reports the error without the accumulating stacktrace.
+(define (sys:apply-top-level func args)
+  (*s7-catch* #t
+    (lambda () (apply func args))
+    (lambda (tag info) (sys:report-error tag info) tag)))
+
+(define (sys:eval-string str)
+  (let ((port (open-input-string str)))
+    (let loop ((last (if #f #f)))
+      (let ((form (*s7-catch* #t
+                    (lambda () (read port))
+                    (lambda (tag info) (sys:report-error tag info) 'sys:read-error))))
+        (if (or (eof-object? form) (eq? form 'sys:read-error))
+            (begin (close-input-port port) last)
+            (loop (sys:eval-top-level form)))))))
+
 ;;;;; Definition of MAKE-ENVIRONMENT
 (define-macro (make-environment . body)
   `(let ()

@@ -240,6 +240,41 @@ void scheme_set_output_port_string(scheme* sc, char* start, char* past_the_end) 
     sc->outport = sc->output_port;
 }
 
+// Evaluate a string of top-level forms sent for interactive evaluation.
+//
+// Prefer the Scheme-side sys:eval-string (runtime/init.xtm), which reads and
+// evaluates each form inside a catch so an uncaught error unwinds the s7 stack
+// cleanly. s7_load_c_string does NOT: on an error long-jump it skips
+// OP_ERROR_QUIT, so the stack is left un-unwound and leaks frames. Those frames
+// then accumulate in every later error's stacktrace across an editor session.
+//
+// Fall back to s7_load_c_string during early boot, before init.xtm has defined
+// sys:eval-string.
+static s7_pointer eval_source(s7_scheme* s7, const char* str, s7_int len) {
+    s7_pointer eval_string = s7_name_to_value(s7, "sys:eval-string");
+    if (s7_is_procedure(eval_string)) {
+        return s7_call(s7, eval_string,
+                       s7_list(s7, 1, s7_make_string_with_length(s7, str, len)));
+    }
+    return s7_load_c_string(s7, str, len);
+}
+
+// Apply a scheduled callback (temporal recursion, OSC handlers, ...).
+//
+// Prefer the Scheme-side sys:apply-top-level (runtime/init.xtm), which applies
+// the closure inside a catch. A bare s7_call leaks the s7 stack after an
+// uncaught error for the same reason s7_load_c_string does (the error long-jump
+// skips OP_ERROR_QUIT) --- and a callback that errors every firing is a common
+// case, so the leak (and its accumulating stacktrace) grows fast. Fall back to
+// s7_call during early boot, before init.xtm has defined the wrapper.
+static s7_pointer apply_source(s7_scheme* s7, s7_pointer func, s7_pointer args) {
+    s7_pointer apply_fn = s7_name_to_value(s7, "sys:apply-top-level");
+    if (s7_is_procedure(apply_fn)) {
+        return s7_call(s7, apply_fn, s7_list(s7, 2, func, args));
+    }
+    return s7_call(s7, func, args);
+}
+
 static void eval_with_error_trap(scheme* sc, const char* str) {
     sc->retcode = 0;
 
@@ -248,9 +283,7 @@ static void eval_with_error_trap(scheme* sc, const char* str) {
     s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
-    // s7_load_c_string iterates all top-level forms; s7_eval_c_string reads
-    // only the first and silently discards the rest.
-    s7_pointer result = s7_load_c_string(sc->sc, str, strlen(str));
+    s7_pointer result = eval_source(sc->sc, str, strlen(str));
 
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
@@ -287,6 +320,11 @@ void scheme_load_file(scheme* sc, FILE* fin) {
     s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
+    // File loads stay on s7_load_c_string: it interleaves read and eval with
+    // the file as the current input port, so error reports carry the line
+    // number within the file, and a load aborts at the first error. (The
+    // stacktrace-accumulation bug that eval_source avoids is invisible here
+    // anyway --- sys:report-error, used for editor evals, prints no stacktrace.)
     s7_pointer result = s7_load_c_string(sc->sc, content.c_str(), content.size());
 
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
@@ -325,7 +363,7 @@ void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
     s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
-    s7_pointer result = s7_call(sc->sc, func, args);
+    s7_pointer result = apply_source(sc->sc, func, args);
 
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
