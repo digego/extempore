@@ -3,6 +3,28 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.10.2
+
+A one-bug patch release. Error messages piled up across a working session: each
+new error redisplayed fragments of the earlier ones, so a session with a few
+mistakes in it grew into a wall of text --- and the s7 stack quietly grew with
+it. The cause was that neither the interpreter's top-level loader
+(`s7_load_c_string`, which runs editor evals) nor `s7_call` (which runs a
+scheduled callback) unwinds the s7 stack after an uncaught error: the error
+long-jump skips the stack-reset step, so every erroring eval or callback left a
+handful of frames behind. s7 builds the stacktrace it appends to an error report
+by walking that stack, so each new error dragged along the leftovers from all
+the earlier ones. On the callback path --- a temporal-recursion loop with a bug
+in it, firing every beat --- it grew fastest of all.
+
+Both paths now go through a small Scheme wrapper (`sys:eval-string` for editor
+input, `sys:apply-top-level` for callbacks) that runs each form or callback
+inside s7's own catch. The catch unwinds the stack cleanly and reports the error
+itself --- the same terse s7-style "message, offending form, location" report,
+minus the accumulating stacktrace. Loading a file is unchanged: it keeps the C
+loader, so an error there still carries the line number within the file.
+Reported on the mailing list by George.
+
 ## v0.10.1
 
 A one-fix patch release. The editor's documentation popup --- the `xtmdoc`
