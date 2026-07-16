@@ -3,6 +3,23 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.10.3
+
+A one-bug patch release. On ARM64 machines (which for most users means Apple
+Silicon Macs), `real->integer` returned 0 for any negative input, and
+`real->rational` mangled negative values the same way. The C implementation cast
+the double through an _unsigned_ 64-bit integer, which is undefined behaviour
+for negative values: x86-64 happens to wrap around to the correct negative
+answer, but ARM's convert instruction saturates to zero. The cast has been in
+the codebase since 0.8.3 --- what changed is that Extempore gained native Apple
+Silicon builds in the 0.9 series, which took those users off the
+accidentally-correct x86 path. The most audible casualty was `pc:relative`,
+which truncates its step argument through `real->integer`: a negative step
+became 0 (i.e. "stay put"), so a melodic random walk could climb but never come
+back down. Both conversions now cast through a signed 64-bit integer, with
+regression tests pinning the negative cases. Reported on the mailing list by
+George and Minoru.
+
 ## v0.10.2
 
 A one-bug patch release. Error messages piled up across a working session: each
