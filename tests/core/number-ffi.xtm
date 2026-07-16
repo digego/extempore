@@ -1,0 +1,43 @@
+;;; tests/core/number-ffi.xtm -- numeric conversion FFI builtins
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for the scheme-level numeric conversion builtins in
+;; src/ffi/number.inc, pinning their behaviour for negative inputs.
+;;
+;; realToInteger and realToRational used to cast double -> uint64_t, which is
+;; UB for negative values: on x86-64 it happened to wrap back to the right
+;; negative integer, but on ARM64 the conversion saturates to 0. The visible
+;; symptom was (pc:relative pitch -1 pc) returning pitch unchanged on Apple
+;; Silicon, so random walks could only ever climb (reported on the mailing
+;; list by George and Minoru, July 2026).
+
+;;; Code:
+
+(sys:load "libs/core/pc_ivl.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; real->integer -- truncation toward zero, sign preserved
+
+(xtmtest-result (real->integer 4.7) 4 "real->integer-positive")
+(xtmtest-result (real->integer -4.7) -4 "real->integer-negative")
+(xtmtest-result (real->integer 0.0) 0 "real->integer-zero")
+(xtmtest-result (real->integer -1.0) -1 "real->integer-minus-one")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; real->rational -- sign preserved through the fixed-denominator conversion
+
+(xtmtest-result (real->rational 4.5) 9/2 "real->rational-positive")
+(xtmtest-result (real->rational -4.5) -9/2 "real->rational-negative")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pc:relative -- the downstream casualty: negative steps must move down
+
+(xtmtest-result (pc:relative 64 -1 '(0 2 4 5 7 9 11)) 62 "pc:relative-down-one")
+(xtmtest-result (pc:relative 64 -2 '(0 2 4 5 7 9 11)) 60 "pc:relative-down-two")
+(xtmtest-result (pc:relative 64 1 '(0 2 4 5 7 9 11)) 65 "pc:relative-up-one")
+(xtmtest-result (pc:relative 64 0 '(0 2 4 5 7 9 11)) 64 "pc:relative-zero")

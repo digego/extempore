@@ -10,15 +10,17 @@ static pointer randomInt(scheme* Scheme, pointer Args)
 
 static pointer realToInteger(scheme* Scheme, pointer Args)
 {
-    return mk_integer(Scheme, uint64_t(rvalue(pair_car(Args))));
+    // int64_t, not uint64_t: casting a negative double to an unsigned type is
+    // UB, and on ARM64 it saturates to 0 rather than wrapping
+    return mk_integer(Scheme, int64_t(rvalue(pair_car(Args))));
 }
 
 static pointer realToRational(scheme* Scheme, pointer Args)
 {
     double val = rvalue(pair_car(Args));
-    uint64_t vali = val;
+    int64_t vali = val;
     double remain = val - vali;
-    return mk_rational(Scheme, uint64_t(remain*10000000.0) + vali * 10000000ll, 10000000ll);
+    return mk_rational(Scheme, int64_t(remain*10000000.0) + vali * 10000000ll, 10000000ll);
 }
 
 static pointer rationalToReal(scheme* Scheme, pointer Args)
