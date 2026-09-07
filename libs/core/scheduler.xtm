@@ -1,4 +1,4 @@
-;; schedule.xtm -- rudimenary xtlang 'native' scheduling
+;;; scheduler.xtm -- rudimentary xtlang 'native' scheduling
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
@@ -6,8 +6,15 @@
 
 ;;; Commentary:
 
-;; This code is here as a jump off point.
-;; it is NOT tested, nor ready for prime time.
+;; A scheduler is an ordered list of events, each holding a time and the name
+;; of a native function to call with that time. scheduler_init turns a list
+;; into a closure which, called with a time, runs everything due by then;
+;; scheduler_evt (or the `sched` macro) adds to the list.
+
+;; Everything here is generic in the time type, so a scheduler can run off
+;; wall-clock seconds (clock_scheduler, a double) or musical beats
+;; (beat_scheduler, a Rational). See tests/core/scheduler.xtm for the API
+;; driven by hand, and examples/core/scheduler.xtm for the real thing.
 
 ;;; Code:
 
@@ -25,18 +32,30 @@
 (xtc:aot:import-ll "xtmscheduler")
 
 
-(bind-type SchedEvt <!a,i8*,SchedEvt*,SchedEvt*>)
+(bind-type SchedEvt <!a,i8*,SchedEvt*,SchedEvt*>
+  "a scheduled call: <time,native function name,previous,next>")
+
+;; the constructor bind-type generates for a generic type with a pointer field
+;; comes out with the wrong type arguments, so build the node by hand
+(bind-func SchedEvt_new:[SchedEvt{!a}*,!a,i8*,SchedEvt{!a}*,SchedEvt{!a}*]*
+  (lambda (time fname prev next)
+    (let ((evt:SchedEvt{!a}* (halloc)))
+      (tset! evt 0 time)
+      (tset! evt 1 fname)
+      (tset! evt 2 prev)
+      (tset! evt 3 next)
+      evt)))
 
 (bind-func scheduler_init:[[i64,!a]*,SchedEvt{!a}*,[void,!a]*]*
   (lambda (el f)
     (let ((mutex:i8* (mutex_create))
           (thread:i8* (thread_self))
           (cnt 0)
-          (evtlist:SchedEvt* el)
+          (evtlist:SchedEvt{!a}* el)
           (fp:[void,!a]* f)
-          (element:SchedEvt* null)
-          (next:SchedEvt* null)
-          (prev:SchedEvt* null))
+          (element:SchedEvt{!a}* null)
+          (next:SchedEvt{!a}* null)
+          (prev:SchedEvt{!a}* null))
       (lambda (time)
         (set! cnt 0)
         (mutex_lock mutex)
@@ -58,39 +77,40 @@
         (mutex_unlock mutex)
         cnt))))
 
-(bind-func scheduler_at:[SchedEvt*,SchedEvt*,!a]*
-  (let ((prev:SchedEvt* null))
-    (lambda (evtlist time)
-      (set! prev null)
-      (while (and (not (null? evtlist))
-                  (<= (tref evtlist 0) time))
-        (set! prev evtlist)
-        (set! evtlist (tref evtlist 3)))
+(bind-func scheduler_at:[SchedEvt{!a}*,SchedEvt{!a}*,!a]*
+  "the last event in EVTLIST at or before TIME, or null if there is none"
+  (lambda (evtlist time)
+    (let ((prev:SchedEvt{!a}* null)
+          (evt:SchedEvt{!a}* evtlist))
+      (while (and (not (null? evt))
+                  (<= (tref evt 0) time))
+        (set! prev evt)
+        (set! evt (tref evt 3)))
       prev)))
 
 (bind-func scheduler_evt:[void,[i64,!a]*,!a,i8*]*
-  (let ((evtlist:SchedEvt* null)
-        (next:SchedEvt* null)
-        (new:SchedEvt* null))
-    (lambda (scheduler time fname)
-      ;; (println "sched:" scheduler time fname data)
-      (if (= (thread_equal_self (scheduler.thread)) 0)
-          (mutex_lock (scheduler.mutex)))
-      (set! evtlist (scheduler_at (scheduler.evtlist) time))
-      (if (null? evtlist)
+  "add an event calling FNAME at TIME to SCHEDULER's list"
+  (lambda (scheduler time fname)
+    (let ((lock (= (thread_equal_self (scheduler.thread)) 0))
+          (prev:SchedEvt{!a}* null)
+          (next:SchedEvt{!a}* null)
+          (new:SchedEvt{!a}* null))
+      (if lock (mutex_lock (scheduler.mutex)))
+      (set! prev (scheduler_at (scheduler.evtlist) time))
+      (if (null? prev)
           (begin
             (set! next (scheduler.evtlist))
-            (set! new (SchedEvt_h time fname null next))
+            (set! new (SchedEvt_new time fname null next))
+            (if (not (null? next)) (tset! next 2 new))
             (scheduler.evtlist new)
             void)
           (begin
-            (set! next (tref evtlist 3)) ;; get next from previous
-            (set! new (SchedEvt_h time fname evtlist next))
-            (tset! evtlist 3 new) ;; make us next of previous
+            (set! next (tref prev 3)) ;; get next from previous
+            (set! new (SchedEvt_new time fname prev next))
+            (tset! prev 3 new) ;; make us next of previous
             (if (not (null? next)) (tset! next 2 new)) ;; set us to previous of next
             void))
-      (if (= (thread_equal_self (scheduler.thread)) 0)
-          (mutex_unlock (scheduler.mutex)))
+      (if lock (mutex_unlock (scheduler.mutex)))
       void)))
 
 (bind-alias SCHED [void]*)

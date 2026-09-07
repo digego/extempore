@@ -1,0 +1,175 @@
+;;; scheduler.xtm:tests -- tests for the native xtlang scheduler
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/scheduler.xtm. The schedulers the library ships
+;; (clock_scheduler, beat_scheduler) each spawn a thread that advances time
+;; from the wall clock, which is no use in a batch test, so these build a
+;; scheduler directly with scheduler_init and drive its clock by calling it
+;; with the time to run up to.
+
+;; An event's payload is the time it was scheduled for -- that's what the
+;; scheduler hands the callback -- so recording the payloads is also
+;; recording the firing order.
+
+;; The scheduler is generic in the payload type, so the whole thing is
+;; exercised twice: once over double (as clock_scheduler does) and once over
+;; Rational (as beat_scheduler does).
+
+;;; Code:
+
+(sys:load "libs/core/scheduler.xtm")
+
+(bind-val SCHEDTEST_LOG_SIZE i64 8)
+(bind-val schedtest_log double* 8)
+(bind-val schedtest_n i64 0)
+
+(bind-func schedtest_reset
+  (lambda ()
+    (set! schedtest_n 0)
+    void))
+
+(bind-func schedtest_record
+  "the scheduled callback: append the payload we were handed to the log"
+  (lambda (time:double)
+    (if (< schedtest_n SCHEDTEST_LOG_SIZE)
+        (begin
+          (pset! schedtest_log schedtest_n time)
+          (set! schedtest_n (+ schedtest_n 1))))
+    void))
+
+(bind-func schedtest_record_beat
+  (lambda (beat:Rational)
+    (schedtest_record (rtod beat))
+    void))
+
+(bind-func static schedtest_close
+  (lambda (got:double expected:double)
+    (< (fabs (- got expected)) 0.000001)))
+
+(bind-func schedtest_logged
+  "the log so far, as one boolean: N entries matching the first N of A B C"
+  (lambda (n:i64 a:double b:double c:double)
+    (let ((want:double* (salloc 3))
+          (ok (= schedtest_n n)))
+      (pset! want 0 a) (pset! want 1 b) (pset! want 2 c)
+      (doloop (i n)
+        (if (not (schedtest_close (pref schedtest_log i) (pref want i)))
+            (set! ok #f)))
+      ok)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a scheduler over double time  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the scheduler lives in the closure's environment, so it outlives the call
+;; that built it; calling the closure runs the list forward to TIME
+(bind-func schedtest_clock
+  (let ((evtlist:SchedEvt{double}* null)
+        (ft:[void,double]* null)
+        (scheduler (scheduler_init evtlist ft)))
+    (lambda (time:double)
+      (scheduler time))))
+
+;; three events, added out of order
+(bind-func schedtest_fill
+  (lambda ()
+    (schedtest_reset)
+    (sched schedtest_clock 3.0 schedtest_record:[void,double]*)
+    (sched schedtest_clock 1.0 schedtest_record:[void,double]*)
+    (sched schedtest_clock 2.5 schedtest_record:[void,double]*)
+    void))
+(xtmtest-runs (schedtest_fill))
+
+;; running up to 2.6 fires the two events due by then, earliest first,
+;; leaving the third where it is
+(bind-func test_scheduler_runs_in_time_order
+  (lambda ()
+    (and (= (schedtest_clock 2.6) 2)
+         (schedtest_logged 2 1.0 2.5 0.0))))
+(xtmtest-result (test_scheduler_runs_in_time_order) 1)
+
+;; and running on past the last event picks it up
+(bind-func test_scheduler_runs_remainder
+  (lambda ()
+    (and (= (schedtest_clock 5.0) 1)
+         (schedtest_logged 3 1.0 2.5 3.0))))
+(xtmtest-result (test_scheduler_runs_remainder) 1)
+
+;; an empty list fires nothing, however far the clock is wound on
+(bind-func test_scheduler_empty
+  (lambda ()
+    (and (= (schedtest_clock 100.0) 0)
+         (schedtest_logged 3 1.0 2.5 3.0))))
+(xtmtest-result (test_scheduler_empty) 1)
+
+;; an event due exactly now is due, and an event in the future isn't
+(bind-func test_scheduler_boundary
+  (lambda ()
+    (schedtest_reset)
+    (sched schedtest_clock 10.0 schedtest_record:[void,double]*)
+    (sched schedtest_clock 11.0 schedtest_record:[void,double]*)
+    (and (= (schedtest_clock 10.0) 1)
+         (schedtest_logged 1 10.0 0.0 0.0)
+         (= (schedtest_clock 11.0) 1)
+         (schedtest_logged 2 10.0 11.0 0.0))))
+(xtmtest-result (test_scheduler_boundary) 1)
+
+;; events added while the list already holds some end up in the right place,
+;; whether they belong at the head, the middle or the tail
+(bind-func test_scheduler_insert_positions
+  (lambda ()
+    (schedtest_reset)
+    (sched schedtest_clock 22.0 schedtest_record:[void,double]*) ;; middle
+    (sched schedtest_clock 23.0 schedtest_record:[void,double]*) ;; tail
+    (sched schedtest_clock 21.0 schedtest_record:[void,double]*) ;; head
+    (and (= (schedtest_clock 30.0) 3)
+         (schedtest_logged 3 21.0 22.0 23.0))))
+(xtmtest-result (test_scheduler_insert_positions) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the same scheduler over Rational ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func schedtest_beat
+  (let ((evtlist:SchedEvt{Rational}* null)
+        (ft:[void,Rational]* null)
+        (scheduler (scheduler_init evtlist ft)))
+    (lambda (beat:Rational)
+      (scheduler beat))))
+
+(bind-func test_scheduler_rational_payload
+  (lambda ()
+    (schedtest_reset)
+    (sched schedtest_beat (Rat 5 2) schedtest_record_beat:[void,Rational]*)
+    (sched schedtest_beat (Rat 1 2) schedtest_record_beat:[void,Rational]*)
+    (sched schedtest_beat (Rat 3 2) schedtest_record_beat:[void,Rational]*)
+    (and (= (schedtest_beat (Rat 2 1)) 2)
+         (schedtest_logged 2 0.5 1.5 0.0)
+         (= (schedtest_beat (Rat 3 1)) 1)
+         (schedtest_logged 3 0.5 1.5 2.5))))
+(xtmtest-result (test_scheduler_rational_payload) 1)
+
+;;;;;;;;;;;;;;;;;;;;;
+;; scheduler_at     ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; scheduler_at finds the last event at or before a time, and null when
+;; there's nothing that early
+(bind-func test_scheduler_at
+  (lambda ()
+    (let ((c:SchedEvt{double}* (SchedEvt_new 3.0 null null null))
+          (b:SchedEvt{double}* (SchedEvt_new 2.0 null null c))
+          (a:SchedEvt{double}* (SchedEvt_new 1.0 null null b)))
+      (tset! c 2 b)
+      (tset! b 2 a)
+      (and (null? (scheduler_at a 0.5))
+           (= (tref (scheduler_at a 1.0) 0) 1.0)
+           (= (tref (scheduler_at a 2.5) 0) 2.0)
+           (= (tref (scheduler_at a 99.0) 0) 3.0)
+           (null? (scheduler_at null 99.0))))))
+(xtmtest-result (test_scheduler_at) 1)
