@@ -1,3 +1,64 @@
+/*
+ * Copyright (c) 2011, Andrew Sorensen
+ *
+ * All rights reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * Neither the name of the authors nor other contributors may be used to endorse
+ * or promote products derived from this software without specific prior written
+ * permission.
+ *
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+#include "SchemeFFIRegistry.h"
+
+#include "BranchPrediction.h"
+// for string_hash
+#include "EXTLLVM.h"
+#include "SchemeProcess.h"
+// for extemp::CM
+#include "Task.h"
+#include "TaskScheduler.h"
+#include "UNIV.h"
+
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
+namespace extemp {
+
+namespace SchemeFFI {
+
 template <typename T>
 static T* getPtr(scheme* Scheme, pointer Args)
 {
@@ -336,35 +397,44 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-#define MISC_DEFS \
-        FFI_DEF("cptr:get-i64", dataGETi64, 2, 0, false), \
-        FFI_DEF("cptr:get-double", dataGETdouble, 2, 0, false), \
-        FFI_DEF("cptr:get-float", dataGETfloat, 2, 0, false), \
-        FFI_DEF("cptr:set-i64", dataSETi64, 3, 0, false), \
-        FFI_DEF("cptr:set-double", dataSETdouble, 3, 0, false), \
-        FFI_DEF("cptr:set-float", dataSETfloat, 3, 0, false), \
-        FFI_DEF("cptr->string", cptrToString, 1, 0, false), \
-        FFI_DEF("cptr:get-string", cptrToString, 1, 0, false), \
-        FFI_DEF("string->cptr", stringToCptr, 1, 0, false), \
-        FFI_DEF("string-strip", stringStrip, 1, 0, false), \
-        FFI_DEF("string-hash", stringHash, 1, 0, false), \
-        FFI_DEF("base64-encode", Base64Encode, 2, 0, false), \
-        FFI_DEF("base64-decode", Base64Decode, 1, 0, false), \
-        FFI_DEF("cname-encode", CNameEncode, 1, 0, false), \
-        FFI_DEF("cname-decode", CNameDecode, 1, 0, false), \
-        FFI_DEF("string-join", stringJoin, 2, 0, false), \
-        FFI_DEF("call-cpp-at-time", callCPPAtTime, 5, 0, false), \
-        FFI_DEF("now", getTime, 0, 0, false), \
-        FFI_DEF("sexpr->string", sexprToString, 1, 0, true), \
-        FFI_DEF("println", print, 0, 0, true), \
-        FFI_DEF("print", print_no_new_line, 0, 0, true), \
-        FFI_DEF("print-full", printFull, 0, 0, true), \
-        FFI_DEF("print-full-nq", printFullNoQuotes, 0, 0, true), \
-        FFI_DEF("print-error", printError, 0, 0, true), \
-        FFI_DEF("print-info", printInfo, 0, 0, true), \
-        FFI_DEF("print-warn", printWarn, 0, 0, true), \
-        FFI_DEF("get-closure-env", getClosureEnv, 1, 0, false), \
-        FFI_DEF("mk-ff", scmAddForeignFunc, 2, 0, false), \
-        FFI_DEF("xtc:codegen:getname", impcirGetName, 1, 0, false), \
-        FFI_DEF("xtc:codegen:gettype", impcirGetType, 1, 0, false), \
-        FFI_DEF("xtc:codegen:addtodict", impcirAdd, 3, 0, false)
+std::span<const FFIEntry> miscDefs()
+{
+    static const FFIEntry defs[] = {
+        FFI_DEF("cptr:get-i64", dataGETi64, 2, 0, false),
+        FFI_DEF("cptr:get-double", dataGETdouble, 2, 0, false),
+        FFI_DEF("cptr:get-float", dataGETfloat, 2, 0, false),
+        FFI_DEF("cptr:set-i64", dataSETi64, 3, 0, false),
+        FFI_DEF("cptr:set-double", dataSETdouble, 3, 0, false),
+        FFI_DEF("cptr:set-float", dataSETfloat, 3, 0, false),
+        FFI_DEF("cptr->string", cptrToString, 1, 0, false),
+        FFI_DEF("cptr:get-string", cptrToString, 1, 0, false),
+        FFI_DEF("string->cptr", stringToCptr, 1, 0, false),
+        FFI_DEF("string-strip", stringStrip, 1, 0, false),
+        FFI_DEF("string-hash", stringHash, 1, 0, false),
+        FFI_DEF("base64-encode", Base64Encode, 2, 0, false),
+        FFI_DEF("base64-decode", Base64Decode, 1, 0, false),
+        FFI_DEF("cname-encode", CNameEncode, 1, 0, false),
+        FFI_DEF("cname-decode", CNameDecode, 1, 0, false),
+        FFI_DEF("string-join", stringJoin, 2, 0, false),
+        FFI_DEF("call-cpp-at-time", callCPPAtTime, 5, 0, false),
+        FFI_DEF("now", getTime, 0, 0, false),
+        FFI_DEF("sexpr->string", sexprToString, 1, 0, true),
+        FFI_DEF("println", print, 0, 0, true),
+        FFI_DEF("print", print_no_new_line, 0, 0, true),
+        FFI_DEF("print-full", printFull, 0, 0, true),
+        FFI_DEF("print-full-nq", printFullNoQuotes, 0, 0, true),
+        FFI_DEF("print-error", printError, 0, 0, true),
+        FFI_DEF("print-info", printInfo, 0, 0, true),
+        FFI_DEF("print-warn", printWarn, 0, 0, true),
+        FFI_DEF("get-closure-env", getClosureEnv, 1, 0, false),
+        FFI_DEF("mk-ff", scmAddForeignFunc, 2, 0, false),
+        FFI_DEF("xtc:codegen:getname", impcirGetName, 1, 0, false),
+        FFI_DEF("xtc:codegen:gettype", impcirGetType, 1, 0, false),
+        FFI_DEF("xtc:codegen:addtodict", impcirAdd, 3, 0, false),
+    };
+    return defs;
+}
+
+}  // namespace SchemeFFI
+
+}  // namespace extemp

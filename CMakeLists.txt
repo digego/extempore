@@ -329,6 +329,16 @@ set(EXTEMPORE_SOURCES
     src/OSC.cpp
     src/SchemeS7.cpp
     src/SchemeFFI.cpp
+    src/ffi/clock.cpp
+    src/ffi/ipc.cpp
+    src/ffi/llvm.cpp
+    src/ffi/misc.cpp
+    src/ffi/number.cpp
+    src/ffi/regex.cpp
+    src/ffi/sys.cpp
+    src/ffi/sys_dsp.cpp
+    src/ffi/sys_zone.cpp
+    src/ffi/utility.cpp
     src/SchemeProcess.cpp
     src/SchemeREPL.cpp
     src/TaskScheduler.cpp

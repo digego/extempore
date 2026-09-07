@@ -1,3 +1,62 @@
+/*
+ * Copyright (c) 2011, Andrew Sorensen
+ *
+ * All rights reserved.
+ *
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * Neither the name of the authors nor other contributors may be used to endorse
+ * or promote products derived from this software without specific prior written
+ * permission.
+ *
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+#include "SchemeFFIRegistry.h"
+
+#include "SchemeProcess.h"
+#include "UNIV.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <system_error>
+
+// UNIV.h supplies <Windows.h> (behind WIN32_LEAN_AND_MEAN) for the DLL
+// helpers; the POSIX build needs dlfcn itself.
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+
+namespace extemp {
+
+namespace SchemeFFI {
+
 static pointer pointerSize(scheme* Scheme, pointer Args)
 {
     return mk_integer(Scheme, 8 * sizeof(uintptr_t));
@@ -267,23 +326,32 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, Scheme->m_process->getMaxDuration());
 }
 
-#define SYS_DEFS \
-        FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false), \
-        FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false), \
-        FFI_DEF("sys:platform", platform, 0, 0, false), \
-        FFI_DEF("sys:share-dir", getShareDir, 0, 0, false), \
-        FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false), \
-        FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false), \
-        FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false), \
-        FFI_DEF("sys:symbol-cptr", symbol_pointer, 2, 0, false), \
-        FFI_DEF("sys:make-cptr", makeCptr, 1, 0, false), \
-        FFI_DEF("sys:slurp-file", slurpFile, 1, 0, false), \
-        FFI_DEF("sys:dump-string-to-file", dumpStringToFile, 2, 0, false), \
-        FFI_DEF("sys:directory-list", dirlist, 1, 0, false), \
-        FFI_DEF("sys:expand-path", pathExpansion, 1, 0, false), \
-        FFI_DEF("sys:command", command, 1, 0, false), \
-        FFI_DEF("sys:command-output", commandOutput, 1, 0, false), \
-        FFI_DEF("sys:get-env", getEnv, 1, 0, false), \
-        FFI_DEF("sys:set-env", setEnv, 2, 0, false), \
-        FFI_DEF("sys:set-default-timeout", setDefaultTimeout, 1, 0, false), \
-        FFI_DEF("sys:get-default-timeout", getDefaultTimeout, 0, 0, false)
+std::span<const FFIEntry> sysDefs()
+{
+    static const FFIEntry defs[] = {
+        FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false),
+        FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false),
+        FFI_DEF("sys:platform", platform, 0, 0, false),
+        FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
+        FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
+        FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false),
+        FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false),
+        FFI_DEF("sys:symbol-cptr", symbol_pointer, 2, 0, false),
+        FFI_DEF("sys:make-cptr", makeCptr, 1, 0, false),
+        FFI_DEF("sys:slurp-file", slurpFile, 1, 0, false),
+        FFI_DEF("sys:dump-string-to-file", dumpStringToFile, 2, 0, false),
+        FFI_DEF("sys:directory-list", dirlist, 1, 0, false),
+        FFI_DEF("sys:expand-path", pathExpansion, 1, 0, false),
+        FFI_DEF("sys:command", command, 1, 0, false),
+        FFI_DEF("sys:command-output", commandOutput, 1, 0, false),
+        FFI_DEF("sys:get-env", getEnv, 1, 0, false),
+        FFI_DEF("sys:set-env", setEnv, 2, 0, false),
+        FFI_DEF("sys:set-default-timeout", setDefaultTimeout, 1, 0, false),
+        FFI_DEF("sys:get-default-timeout", getDefaultTimeout, 0, 0, false),
+    };
+    return defs;
+}
+
+}  // namespace SchemeFFI
+
+}  // namespace extemp
