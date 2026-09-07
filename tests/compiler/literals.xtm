@@ -1,0 +1,49 @@
+;;; tests/compiler/literals.xtm -- floating-point literals reach LLVM in a form it accepts
+
+;; LLVM's IR parser wants a decimal point in a decimal float literal
+;; (1.0e-9, not 1e-9), while s7's number->string drops it for magnitudes it
+;; prints in exponent form. Double literals therefore go through the same
+;; hex-float spelling floats already used, which is exact and always valid.
+
+(sys:load "libs/core/test.xtm")
+
+;; return position, both ends of the exponent range
+(bind-func literal_tiny (lambda () 1e-9))
+(xtmtest-result (literal_tiny) 1e-9 "double-literal-tiny")
+
+(bind-func literal_huge (lambda () 1e20))
+(xtmtest-result (literal_huge) 1e20 "double-literal-huge")
+
+(bind-func literal_negative_tiny (lambda () -1e-9))
+(xtmtest-result (literal_negative_tiny) -1e-9 "double-literal-negative-tiny")
+
+;; call-argument position, typed by the callee
+(bind-func literal_double_id (lambda (x:double) x))
+(bind-func literal_call_arg (lambda () (literal_double_id 1e-7)))
+(xtmtest-result (literal_call_arg) 1e-7 "double-literal-call-arg")
+
+;; comparison and arithmetic against a typed variable
+(bind-func literal_compare
+  (lambda (x:double)
+    (if (< x 1e-9) 1 0)))
+(xtmtest-result (literal_compare 0.0) 1 "double-literal-compare-below")
+(xtmtest-result (literal_compare 1.0) 0 "double-literal-compare-above")
+
+(bind-func literal_scale (lambda (x:double) (* x 1e-9)))
+(xtmtest-result (literal_scale 2.0) 2e-9 "double-literal-arithmetic")
+
+;; float literals in the same positions
+(bind-func literal_float_tiny (lambda () (let ((x:float 1e-5)) x)))
+(xtmtest-result (< (abs (- (literal_float_tiny) 1e-5)) 1e-10) #t "float-literal-tiny")
+
+(bind-func literal_float_compare
+  (lambda (x:float)
+    (if (< x 1e-9) 1 0)))
+(xtmtest-result (literal_float_compare 0.0) 1 "float-literal-compare")
+
+;; ordinary spellings still round-trip
+(bind-func literal_plain (lambda () 1.5))
+(xtmtest-result (literal_plain) 1.5 "double-literal-plain")
+
+(bind-func literal_zero (lambda () 0.0))
+(xtmtest-result (literal_zero) 0.0 "double-literal-zero")

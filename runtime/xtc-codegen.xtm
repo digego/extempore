@@ -3349,8 +3349,8 @@
         ;; do llvm double constant check
         (if (and (number? type)
                  (= *xtc:codegen:fp64* (xtc:codegen:get-type-from-str type)))
-            (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
-              (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
+            (begin (if (number? (cadr ast)) (set-car! aval (xtc:codegen:double-literal (cadr ast))))
+              (if (number? (caddr ast)) (set-car! bval (xtc:codegen:double-literal (caddr ast))))))
 
         ;; dereference any vector pointers
         (if (and (xtc:codegen:pointer? (cadr aval))
@@ -3421,8 +3421,8 @@
             (if (number? (caddr ast)) (set-car! bval (llvm:convert-float (car bval))))))
       ;; do llvm double constant check
       (if (= *xtc:codegen:fp64* (xtc:codegen:get-type-from-str type))
-          (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
-            (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
+          (begin (if (number? (cadr ast)) (set-car! aval (xtc:codegen:double-literal (cadr ast))))
+            (if (number? (caddr ast)) (set-car! bval (xtc:codegen:double-literal (caddr ast))))))
 
       ;; need this to transpose float values
       (if (xtc:codegen:fixed-point? (xtc:codegen:get-type-from-str type))
@@ -3553,8 +3553,8 @@
         ;; do llvm double constant check
         (if (and (number? type)
                  (= *xtc:codegen:fp64* (xtc:codegen:get-type-from-str type)))
-            (begin (if (number? (cadr ast)) (set-car! aval (number->string (* 1.0 (cadr ast)))))
-              (if (number? (caddr ast)) (set-car! bval (number->string (* 1.0 (caddr ast)))))))
+            (begin (if (number? (cadr ast)) (set-car! aval (xtc:codegen:double-literal (cadr ast))))
+              (if (number? (caddr ast)) (set-car! bval (xtc:codegen:double-literal (caddr ast))))))
         ;; dereference any vector pointers
         (if (and (xtc:codegen:pointer? (cadr aval))
                  (xtc:codegen:vector? (cadr aval)))
@@ -4084,6 +4084,13 @@
                            ")\n") os)
       (xtc:codegen:strip-space os))))
 
+;; A double literal in IR.  LLVM's parser wants a decimal point in a decimal
+;; spelling (1.0e-9, never the 1e-9 s7 prints for small magnitudes), so
+;; doubles take the exact hex form float literals already use.
+(define xtc:codegen:double-literal
+  (lambda (n)
+    (llvm:convert-double (number->string (* 1.0 n)))))
+
 (define xtc:codegen:compiler
   (let ((intrinsics '(sin cos ceil floor exp pow log log2 log10 sqrt fabs round trunc nearbyint fma exp2 powi)))
     (lambda (ast types . hint?)
@@ -4137,10 +4144,15 @@
                         (begin
                           (if (and (not (null? hint?))
                                    (xtc:codegen:number? (car hint?)))
-                              (if (= *xtc:codegen:fp32* (car hint?))
-                                  (xtc:codegen:ssa-temp (llvm:convert-float (number->string ast)) (xtc:codegen:get-type-str (car hint?)))
-                                  (xtc:codegen:ssa-temp (number->string ast) (xtc:codegen:get-type-str (car hint?))))
-                              (xtc:codegen:ssa-temp (number->string ast) (if (integer? ast) "i64" "double")))
+                              (cond ((= *xtc:codegen:fp32* (car hint?))
+                                     (xtc:codegen:ssa-temp (llvm:convert-float (number->string ast)) (xtc:codegen:get-type-str (car hint?))))
+                                    ((= *xtc:codegen:fp64* (car hint?))
+                                     (xtc:codegen:ssa-temp (xtc:codegen:double-literal ast) (xtc:codegen:get-type-str (car hint?))))
+                                    (else
+                                      (xtc:codegen:ssa-temp (number->string ast) (xtc:codegen:get-type-str (car hint?)))))
+                              (if (integer? ast)
+                                  (xtc:codegen:ssa-temp (number->string ast) "i64")
+                                  (xtc:codegen:ssa-temp (xtc:codegen:double-literal ast) "double")))
                           "")))
                    ((string? ast)
                     (xtc:codegen:make-const-string ast))
