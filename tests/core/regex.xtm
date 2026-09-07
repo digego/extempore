@@ -1,0 +1,82 @@
+;;; tests/core/regex.xtm -- the regex FFI builtins
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for the pcre-backed builtins in src/ffi/regex.inc: regex:match?,
+;; regex:matched, regex:match-all, regex:split and regex:replace.
+;;
+;; The awkward cases are pinned deliberately:
+;;
+;; - a zero-width match (e.g. "x*") leaves pcre's end offset where the search
+;;   started, so split and match-all step one character instead of looping on
+;;   the same position forever
+;; - a $N group reference in a replacement beyond what the pattern captured
+;;   substitutes nothing, rather than indexing past the end of pcre's ovector
+;; - a pattern pcre cannot compile reports no match (see compilePattern in
+;;   src/ffi/regex.inc for why that leniency is still needed)
+
+;;; Code:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex:match?
+
+(xtmtest-result (regex:match? "hello world" "wor") #t "match-substring")
+(xtmtest-result (regex:match? "hello world" "^hello") #t "match-anchored")
+(xtmtest-result (regex:match? "hello world" "^world") #f "match-anchored-miss")
+(xtmtest-result (regex:match? "" "^$") #t "match-empty-subject")
+;; unterminated character class: no match, no error
+(xtmtest-result (regex:match? "abc" "a([{<:*)|$") #f "match-uncompilable-pattern")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex:matched -- whole match first, then each capture
+
+(xtmtest-result (regex:matched "1.5+2.5i" "^([0-9.]+)\\+([0-9.]+)i$")
+                '("1.5+2.5i" "1.5" "2.5")
+                "matched-groups")
+(xtmtest-result (regex:matched "abc" "z+") '() "matched-no-match")
+;; an unparticipating group comes back as the empty string, not a hole
+(xtmtest-result (regex:matched "ac" "^a(b)?(c)$") '("ac" "" "c") "matched-optional-group")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex:match-all
+
+(xtmtest-result (regex:match-all "!a and !b" "![a-zA-Z0-9_]*")
+                '("!a" "!b")
+                "match-all-bang-types")
+(xtmtest-result (regex:match-all "abc" "z") '() "match-all-no-match")
+;; "x*" matches width zero at every position: one empty string per character,
+;; and (the point of the test) it terminates
+(xtmtest-result (regex:match-all "abc" "x*") '("" "" "") "match-all-zero-width")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex:split
+
+(xtmtest-result (regex:split "a.b.c" "\\.") '("a" "b" "c") "split-dots")
+(xtmtest-result (regex:split "a::b" "%|(::)") '("a" "b") "split-alternation")
+(xtmtest-result (regex:split "abc" "z") '("abc") "split-no-match")
+(xtmtest-result (regex:split "" "\\.") '() "split-empty-subject")
+;; a zero-width pattern splits into single characters and terminates
+(xtmtest-result (regex:split "abc" "x*") '("a" "b" "c") "split-zero-width")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; regex:replace -- first match only, $N for the Nth capture
+
+(xtmtest-result (regex:replace "hello world" "world" "there") "hello there"
+                "replace-literal")
+(xtmtest-result (regex:replace "{ i8*, i8*, i64}*" "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
+                " i64"
+                "replace-group")
+(xtmtest-result (regex:replace "ab" "(a)(b)" "$2$1") "ba" "replace-two-groups")
+(xtmtest-result (regex:replace "ab" "(a)b" "[$0]") "[ab]" "replace-whole-match")
+(xtmtest-result (regex:replace "abc" "z" "y") "abc" "replace-no-match")
+;; only the first match is replaced (regex:replace-all loops)
+(xtmtest-result (regex:replace "aXaXa" "X" "-") "a-aXa" "replace-first-only")
+;; $30 names a group the pattern doesn't have: substitutes nothing rather than
+;; reading past the end of the 60-int ovector
+(xtmtest-result (regex:replace "ab" "(a)b" "<$30>") "<>" "replace-group-out-of-range")
+;; a '$' that isn't a group reference is a literal
+(xtmtest-result (regex:replace "ab" "(a)b" "$x$1") "$xa" "replace-literal-dollar")
