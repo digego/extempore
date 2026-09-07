@@ -8,6 +8,7 @@
 ;;; Code:
 
 (sys:load "libs/core/instruments.xtm")
+(sys:load "libs/core/pattern-language.xtm")
 
 (make-instrument bass analogue)
 (make-instrument lead analogue)
@@ -94,18 +95,21 @@
 
 (*metro* 'set-tempo 125.0)
 
-(define R repeat)
+;; the bass and lead riffs are 32-beat patterns (8 bars); each sublist takes a
+;; beat, so (60 _ 60) is a triplet with a rest in the middle, and _ on its own
+;; is a one-beat rest.  nof repeats a bar-length sublist.
 
-(define test
-  (lambda (beat dur)
-    (playp 32 0 bass `(,@(R `((60 __ 60) (58 __ 60) (__ __ 55) (58 __ 55)) 4)
-                       ,@(R `((62 __ 62) (60 __ 62) (__ __ 57) (60 __ 57)) 2)
-                       ,@(R `((65 __ 65) (63 __ 60) (__ __ 65) (63 __ 60)) 2))
-           (cosr 80 20 2) 1/4)
-    (playp 32 0 lead 12 `(,@(R `(72 (__ __ 67) (63 __ 67) (__ __ 60) ,@(R __ 4)) 2)
-                          ,@(R `(70 (__ __ 69) (67 __ 69) (__ __ 62) ,@(R __ 4)) 1)
-                          ,(R `((69 __ 67) (65 __ 60) __ __) 2))
-           (cosr 80 20 2) (* 2.0 dur))
-    (callback (*metro* (+ beat (* .5 dur))) 'test (+ beat dur) dur)))
+(:> oxy-bass 32 0 (play bass @1 (cosr 80 20 2) dur)
+    `(,@(nof 4 '((60 _ 60) (58 _ 60) (_ _ 55) (58 _ 55)))
+      ,@(nof 2 '((62 _ 62) (60 _ 62) (_ _ 57) (60 _ 57)))
+      ,@(nof 2 '((65 _ 65) (63 _ 60) (_ _ 65) (63 _ 60)))))
 
-(test (*metro* 'get-beat 4) 1/4)
+;; the lead is written an octave below where it sounds
+(:> oxy-lead 32 0 (play lead (+ @1 12) (cosr 80 20 2) dur)
+    `(,@(nof 2 '(72 (_ _ 67) (63 _ 67) (_ _ 60) _ _ _ _))
+      70 (_ _ 69) (67 _ 69) (_ _ 62) _ _ _ _
+      ,@(nof 2 '((69 _ 67) (65 _ 60) _ _))))
+
+;; to stop a pattern, change its :> to :| and re-evaluate
+;; (:| oxy-bass 32 0 (play bass @1 (cosr 80 20 2) dur) '(60))
+;; (:| oxy-lead 32 0 (play lead (+ @1 12) (cosr 80 20 2) dur) '(60))
