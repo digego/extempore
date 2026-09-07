@@ -39,6 +39,11 @@
 #include "SchemeS7.h"
 #include "SchemeS7Private.h"
 
+// src/ffi/sys.inc uses std::filesystem for the directory and path helpers on
+// every platform, and the .inc files are included inside a namespace, so the
+// include has to happen here.
+#include <filesystem>
+
 namespace extemp {
 
 namespace SchemeFFI {

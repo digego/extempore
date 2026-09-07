@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <string>
+#include <utility>
 
 #include "BranchPrediction.h"
 #include "UNIV.h"
@@ -60,11 +62,22 @@ EXPORT pointer mk_float(scheme* sc, float num);
 
 EXPORT pointer mk_rational(scheme* sc, long long n, long long d);
 EXPORT pointer mk_symbol(scheme* sc, const char* name);
-EXPORT pointer gensym(scheme* sc);
 EXPORT pointer mk_string(scheme* sc, const char* str);
 EXPORT pointer mk_counted_string(scheme* sc, const char* str, int len);
 EXPORT pointer mk_character(scheme* sc, int c);
 EXPORT pointer mk_foreign_func(scheme* sc, foreign_func f);
+// As mk_foreign_func, but for a function bound at runtime under a known name
+// (mk-ff).  Re-registering the same name reuses its dispatch slot, so a long
+// session of bind-func redefinitions does not exhaust the table.
+EXPORT pointer mk_foreign_func_named(scheme* sc, foreign_func f, const char* name);
+// Record the name and arity of an FFI primitive and return f unchanged, so
+// the FFI_DEF entries in src/ffi/*.inc declare both in one place.  Registering
+// the same function twice is harmless.
+EXPORT foreign_func ffi_def(const char* name, foreign_func f, int required, int optional,
+                            bool rest);
+// Name of the FFI primitive running on this thread, for error messages raised
+// from a primitive body ("#<foreign>" outside one).
+EXPORT const char* ffi_current_name();
 EXPORT pointer mk_cptr(scheme* sc, void* p);
 void putstr(scheme* sc, const char* s);
 EXPORT int pointer_type(pointer p);
@@ -126,8 +139,6 @@ EXPORT int is_integer_extern(pointer p);
 void load_file(scheme* sc, FILE* fin);
 EXPORT void load_string(scheme* sc, const char* input);
 
-int list_length(scheme* sc, pointer a);
-
 enum scheme_types {
     T_STRING = 1,
     T_NUMBER = 2,
@@ -149,13 +160,13 @@ enum scheme_types {
 
 }  // extern "C"
 
+// Thrown from an FFI primitive body; the trampoline in SchemeS7.cpp turns it
+// into a Scheme error.  The message is owned so it can be built at the throw
+// site (e.g. by the argument accessors, which name the primitive).
 class ScmRuntimeError {
   public:
-    ScmRuntimeError(const char* _msg, pointer _p) {
-        msg = _msg;
-        p = _p;
-    }
-    const char* msg;
+    ScmRuntimeError(std::string _msg, pointer _p): msg(std::move(_msg)), p(_p) {}
+    std::string msg;
     pointer p;
 };
 

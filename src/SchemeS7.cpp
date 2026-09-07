@@ -26,22 +26,46 @@ static constexpr int MAX_FFI_FUNCS = 4096;
 // scheme call.  Atomics give us a happens-before between the store in
 // mk_foreign_func and the load here with no mutex on the hot path.
 static std::atomic<foreign_func> s_ffiTable[MAX_FFI_FUNCS];
+static std::atomic<const char*> s_ffiNames[MAX_FFI_FUNCS];
 static std::atomic<int> s_ffiCount{0};
+
+static thread_local const char* s_currentFFIName = nullptr;
+
+const char* ffi_current_name() {
+    return s_currentFFIName ? s_currentFFIName : "#<foreign>";
+}
+
+namespace {
+// Names the primitive for the duration of its body so the argument accessors
+// can say which one got a bad argument.  Saved and restored rather than just
+// set: a primitive can call back into Scheme, which can call another one.
+struct FFINameScope {
+    const char* prev;
+    explicit FFINameScope(const char* Name): prev(s_currentFFIName) { s_currentFFIName = Name; }
+    ~FFINameScope() { s_currentFFIName = prev; }
+};
+}  // namespace
 
 template <int N> static s7_pointer ffi_trampoline(s7_scheme* raw_sc, s7_pointer args) {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
+    s7_pointer errSym = nullptr;
+    s7_pointer errInfo = nullptr;
     try {
+        FFINameScope named(s_ffiNames[N].load(std::memory_order_acquire));
         return s_ffiTable[N].load(std::memory_order_acquire)(wrapper, args);
     } catch (const ScmRuntimeError& e) {
-        return s7_error(raw_sc, s7_make_symbol(raw_sc, "wrong-type-arg"),
-                        s7_list(raw_sc, 1, s7_make_string(raw_sc, e.msg)));
+        errSym = s7_make_symbol(raw_sc, "wrong-type-arg");
+        errInfo = s7_list(raw_sc, 1, s7_make_string(raw_sc, e.msg.c_str()));
     } catch (const std::exception& e) {
-        return s7_error(raw_sc, s7_make_symbol(raw_sc, "c-error"),
-                        s7_list(raw_sc, 1, s7_make_string(raw_sc, e.what())));
+        errSym = s7_make_symbol(raw_sc, "c-error");
+        errInfo = s7_list(raw_sc, 1, s7_make_string(raw_sc, e.what()));
     } catch (...) {
-        return s7_error(raw_sc, s7_make_symbol(raw_sc, "c-error"),
-                        s7_list(raw_sc, 1, s7_make_string(raw_sc, "unknown C++ exception in FFI")));
+        errSym = s7_make_symbol(raw_sc, "c-error");
+        errInfo = s7_list(raw_sc, 1, s7_make_string(raw_sc, "unknown C++ exception in FFI"));
     }
+    // s7_error long-jumps, so it has to run outside the handler: jumping out of
+    // a catch block skips __cxa_end_catch and leaks the in-flight exception.
+    return s7_error(raw_sc, errSym, errInfo);
 }
 
 using s7_function_ptr = s7_pointer (*)(s7_scheme*, s7_pointer);
@@ -57,7 +81,13 @@ static const auto s_trampolineTable =
 
 static s7_pointer lenient_string_ref(s7_scheme* sc, s7_pointer args) {
     s7_pointer s = s7_car(args);
+    if (!s7_is_string(s)) {
+        return s7_wrong_type_arg_error(sc, "string-ref", 1, s, "a string");
+    }
     s7_pointer idx_p = s7_cadr(args);
+    if (!s7_is_integer(idx_p)) {
+        return s7_wrong_type_arg_error(sc, "string-ref", 2, idx_p, "an integer");
+    }
     s7_int idx = s7_integer(idx_p);
     s7_int len = s7_string_length(s);
     if (idx < 0 || idx >= len) {
@@ -434,7 +464,6 @@ pointer assoc_strcmp(scheme* sc, pointer key, pointer alist, bool all) {
     const char* key_str = s7_is_string(key) ? s7_string(key) : s7_symbol_name(key);
 
     pointer result = sc->NIL;
-    pointer last = sc->NIL;
 
     for (pointer p = alist; s7_is_pair(p); p = s7_cdr(p)) {
         pointer entry = s7_car(p);
@@ -449,19 +478,21 @@ pointer assoc_strcmp(scheme* sc, pointer key, pointer alist, bool all) {
         else
             continue;
 
-        if (strcmp(key_str, ekey_str) == 0) {
-            if (!all)
-                return entry;
-            pointer node = s7_cons(sc->sc, entry, sc->NIL);
-            if (result == sc->NIL) {
-                result = node;
-            } else {
-                s7_set_cdr(last, node);
-            }
-            last = node;
-        }
+        if (strcmp(key_str, ekey_str) != 0)
+            continue;
+        if (!all)
+            return entry;
+        // s7_cons can trigger GC before it stores its arguments, and the GC
+        // cannot see C-frame locals: the list built so far has to be protected
+        // across each cons.  entry stays reachable through alist.
+        EnvInjector injector(sc, result);
+        result = s7_cons(sc->sc, entry, result);
     }
-    return (result == sc->NIL) ? sc->F : result;
+    if (result == sc->NIL) {
+        return sc->F;
+    }
+    EnvInjector injector(sc, result);
+    return s7_reverse(sc->sc, result);
 }
 
 pointer _cons(scheme* sc, pointer a, pointer b, int immutable) {
@@ -517,13 +548,6 @@ pointer mk_symbol(scheme* sc, const char* name) {
     return s7_make_symbol(sc->sc, name);
 }
 
-pointer gensym(scheme* sc) {
-    static int counter = 0;
-    char buf[64];
-    snprintf(buf, sizeof(buf), "gensym_%d", counter++);
-    return s7_make_symbol(sc->sc, buf);
-}
-
 pointer mk_string(scheme* sc, const char* str) {
     return s7_make_string(sc->sc, str);
 }
@@ -536,15 +560,106 @@ pointer mk_character(scheme* sc, int c) {
     return s7_make_character(sc->sc, static_cast<uint8_t>(c));
 }
 
-pointer mk_foreign_func(scheme* sc, foreign_func f) {
-    int slot = s_ffiCount.fetch_add(1, std::memory_order_relaxed);
-    if (slot >= MAX_FFI_FUNCS) {
-        printf("Too many FFI functions registered (slot %d, max %d)\n", slot, MAX_FFI_FUNCS);
-        fflush(stdout);
-        return sc->F;
+namespace {
+
+struct FFIDef {
+    const char* name;
+    int required;
+    int optional;
+    bool rest;
+};
+
+std::mutex& ffiDefMutex() {
+    static std::mutex m;
+    return m;
+}
+
+// Keyed on the address of the primitive: mk_foreign_func only ever sees the
+// function pointer, so this is how the arity declared by FFI_DEF reaches it.
+std::unordered_map<void*, FFIDef>& ffiDefTable() {
+    static std::unordered_map<void*, FFIDef> t;
+    return t;
+}
+
+// Dispatch slots, keyed by the primitive's name (or, for a function registered
+// without one, its address).  Re-registering a name reuses its slot, so a long
+// session of bind-func redefinitions --- each of which calls mk-ff --- does not
+// consume a fresh slot every time and eventually exhaust the table.
+std::mutex s_ffiSlotMutex;
+std::unordered_map<std::string, int> s_ffiSlots;
+
+}  // namespace
+
+foreign_func ffi_def(const char* name, foreign_func f, int required, int optional, bool rest) {
+    std::lock_guard<std::mutex> lock(ffiDefMutex());
+    ffiDefTable().emplace(reinterpret_cast<void*>(f), FFIDef{name, required, optional, rest});
+    return f;
+}
+
+static pointer makeFFIFunction(scheme* sc, foreign_func f, const std::string& key, int required,
+                               int optional, bool rest) {
+    const char* name = nullptr;
+    int slot = -1;
+    {
+        std::lock_guard<std::mutex> lock(s_ffiSlotMutex);
+        auto res = s_ffiSlots.emplace(key, 0);
+        if (!res.second) {
+            slot = res.first->second;
+        } else {
+            int next = s_ffiCount.load(std::memory_order_relaxed);
+            if (next >= MAX_FFI_FUNCS) {
+                s_ffiSlots.erase(res.first);
+            } else {
+                res.first->second = next;
+                s_ffiCount.store(next + 1, std::memory_order_relaxed);
+                slot = next;
+            }
+        }
+        if (slot >= 0) {
+            // s7 stores the name pointer rather than copying it, and
+            // unordered_map is node-based, so the key is a stable home for it
+            name = res.first->first.c_str();
+            s_ffiNames[slot].store(name, std::memory_order_release);
+            s_ffiTable[slot].store(f, std::memory_order_release);
+        }
     }
-    s_ffiTable[slot].store(f, std::memory_order_release);
-    return s7_make_function(sc->sc, "#<foreign>", s_trampolineTable[slot], 0, 0, true, nullptr);
+    if (slot < 0) {
+        return s7_error(sc->sc, s7_make_symbol(sc->sc, "out-of-range"),
+                        s7_list(sc->sc, 2,
+                                s7_make_string(sc->sc, "too many foreign functions "
+                                                       "registered, cannot bind ~S"),
+                                s7_make_string(sc->sc, key.c_str())));
+    }
+    return s7_make_function(sc->sc, name, s_trampolineTable[slot], required, optional, rest,
+                            nullptr);
+}
+
+pointer mk_foreign_func(scheme* sc, foreign_func f) {
+    FFIDef def{nullptr, 0, 0, true};
+    {
+        std::lock_guard<std::mutex> lock(ffiDefMutex());
+        auto it = ffiDefTable().find(reinterpret_cast<void*>(f));
+        if (it != ffiDefTable().end()) {
+            def = it->second;
+        }
+    }
+    if (def.name) {
+        return makeFFIFunction(sc, f, def.name, def.required, def.optional, def.rest);
+    }
+    // Not declared with FFI_DEF: no arity to enforce, and nothing but the
+    // address to key the slot on.
+    char key[40];
+    snprintf(key, sizeof(key), "#<foreign %p>", reinterpret_cast<void*>(f));
+    return makeFFIFunction(sc, f, key, 0, 0, true);
+}
+
+pointer mk_foreign_func_named(scheme* sc, foreign_func f, const char* name) {
+    if (!name || !*name) {
+        return mk_foreign_func(sc, f);
+    }
+    // The xtlang wrapper's arity isn't visible from here, so the binding stays
+    // variadic; the name is what makes its errors readable.
+    return makeFFIFunction(sc, f, name, 0, 0, true);
 }
 
 pointer mk_cptr(scheme* sc, void* p) {
