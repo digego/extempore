@@ -198,7 +198,7 @@
             ;; size and/or docstring
             (closure-body (car (reverse args))))
         (if (member func-name *xtc:globals:reserved-keywords*)
-            (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
+            (xtc:diagnostics:print-error (string-append func-name " is a reserved keyword")))
         ;; strip docstring
         (set! args (cl:remove-if string? args))
         ;; strip poly
@@ -292,7 +292,7 @@
             ;; size and/or docstring
             (closure-body (car (reverse args))))
         (if (member func-name *xtc:globals:reserved-keywords*)
-            (begin (println "ERROR: " func-name " is a reserved keyword") (error "")))
+            (xtc:diagnostics:print-error (string-append func-name " is a reserved keyword")))
         ;; strip docstring
         (set! args (cl:remove-if string? args))
         ;; strip poly
@@ -1003,14 +1003,9 @@
             (if dylib
                 (cons dylib (car candidate-paths))
                 (if (file-exists? (car candidate-paths))
-                    ;; if sys:open-dylib failed bu the file is there, something's gone wrong
-                    (begin
-                      (print-with-colors *xtc:globals:pretty-print-error-color* 'default #t
-                                         (print "Error"))
-                      (print ": could not open ")
-                      (print-with-colors *xtc:globals:pretty-print-type-color* 'default #t (car candidate-paths))
-                      (print " dynamic library\n")
-                      (error ""))
+                    ;; if sys:open-dylib failed but the file is there, something's gone wrong
+                    (xtc:diagnostics:print-error
+                      (string-append "could not open " (car candidate-paths) " dynamic library"))
                     (loop (cdr candidate-paths)))))))))
 
 (define xtc:bind:bind-dylib
@@ -1030,13 +1025,8 @@
             (xtc:aot:add-win-link-library (cdr dylib-pair))
             (xtc:diagnostics:print-dylib-loading-details-to-log (cdr dylib-pair))
             #t)
-          (begin
-            (print-with-colors *xtc:globals:pretty-print-error-color* 'default #t
-                               (print "Error"))
-            (print ": could not find ")
-            (print-with-colors *xtc:globals:pretty-print-type-color* 'default #t (print library))
-            (print " dynamic library\n")
-            (error ""))))))
+          (xtc:diagnostics:print-error
+            (string-append "could not find " (sexpr->string library) " dynamic library"))))))
 
 (define-macro (bind-dylib library lib-path . args)
   (let ((path (eval lib-path)))
