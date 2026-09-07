@@ -58,9 +58,20 @@ runs:
       with:
         arch: x64
 
+    # Configure downloads the LLVM, PCRE2 and googletest archives, and GitHub
+    # serves those with an occasional 504. A failed download leaves no stamp,
+    # so re-running configure retries it.
     - name: Configure
       shell: bash
-      run: cmake --preset ${{ inputs.preset }} ${{ inputs.extra-cmake-args }}
+      run: |
+        for attempt in 1 2 3; do
+          if cmake --preset ${{ inputs.preset }} ${{ inputs.extra-cmake-args }}; then
+            exit 0
+          fi
+          echo "configure attempt $attempt failed; retrying in 30s"
+          sleep 30
+        done
+        exit 1
 
     - name: Build LLVM
       if: steps.cache-llvm.outputs.cache-hit != 'true'
