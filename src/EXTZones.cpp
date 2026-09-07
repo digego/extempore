@@ -1,22 +1,17 @@
 #include <EXTZones.h>
-#include <BranchPrediction.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
-#include <mutex>
 
 #ifdef _WIN32
 #include <malloc.h>  // _aligned_malloc / _aligned_free
 #endif
 
-#define DEBUG_ZONE_ALLOC 0
-#define DEBUG_ZONE_STACK 0
-#define EXTENSIBLE_ZONES 1
-#define LEAKY_ZONES 1
+constexpr bool DEBUG_ZONE_ALLOC = false;
+constexpr bool DEBUG_ZONE_STACK = false;
 
 thread_local llvm_zone_stack* tls_llvm_zone_stack = nullptr;
-thread_local uint64_t tls_llvm_zone_stacksize = 0;
 
 namespace extemp {
 namespace EXTZones {
@@ -49,13 +44,13 @@ static void zone_aligned_free(void* ptr) {
 
 llvm_zone_t* llvm_zone_create(uint64_t size) {
     auto zone(reinterpret_cast<llvm_zone_t*>(malloc(sizeof(llvm_zone_t))));
-    if (unlikely(!zone)) {
+    if (!zone) [[unlikely]] {
         abort();  // in case a leak can be analyzed post-mortem
     }
     zone->memory = size ? zone_aligned_alloc(size_t(size)) : nullptr;
     zone->mark = 0;
     zone->offset = 0;
-    if (unlikely(!zone->memory)) {
+    if (!zone->memory) [[unlikely]] {
         size = 0;
     }
     zone->size = size;
@@ -65,9 +60,10 @@ llvm_zone_t* llvm_zone_create(uint64_t size) {
 }
 
 EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
-#if DEBUG_ZONE_ALLOC
-    printf("DestroyZone: %p:%p:%lld:%lld\n", Zone, Zone->memory, Zone->offset, Zone->size);
-#endif
+    if constexpr (DEBUG_ZONE_ALLOC) {
+        printf("DestroyZone: %p:%p:%" PRIu64 ":%" PRIu64 "\n", static_cast<void*>(Zone),
+               Zone->memory, Zone->offset, Zone->size);
+    }
     if (Zone->memories) {
         llvm_zone_destroy(Zone->memories);
     }
@@ -80,57 +76,75 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
     return Zone;
 }
 
-EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
-    static std::recursive_mutex alloc_mutex;
-    std::lock_guard<std::recursive_mutex> lock(alloc_mutex);
-#if DEBUG_ZONE_ALLOC
-    printf("MallocZone: %p:%p:%lld:%lld:%lld\n", zone, zone->memory, zone->offset, zone->size,
-           size);
-#endif
-    size += LLVM_ZONE_ALIGN;  // for storing size information
-    if (unlikely(zone->offset + size >= zone->size)) {
-#if EXTENSIBLE_ZONES  // if extensible_zones is true then extend zone size by zone->size
-        uint64_t old_zone_size = zone->size;
-        bool iszero(!zone->size);
-        if (size > zone->size) {
-            zone->size = size;
-        }
-        zone->size *= 2;  // keep doubling zone size for each new allocation // TODO: 1.5???
-        if (zone->size < 1024) {
-            zone->size = 1024;  // allocate a min size of 1024 bytes
-        }
-        llvm_zone_t* newzone = llvm_zone_create(zone->size);
-        void* tmp = newzone->memory;
-        if (iszero) {  // if initial zone is 0 - then replace don't extend
-            zone->memory = tmp;
-            free(newzone);
-        } else {
-            // printf("adding new memory %p:%lld to existing
-            // %p:%lld\n",newzone,newzone->size,zone,zone->size);
-            newzone->memories = zone->memories;
-            newzone->memory = zone->memory;
-            newzone->size = old_zone_size;
-            zone->memory = tmp;
-            zone->memories = newzone;
-        }
-        llvm_zone_reset(zone);
-#elif LEAKY_ZONES  // if LEAKY ZONE is TRUE then just print a warning and just leak the memory
-        printf("\nZone:%p size:%lld is full ... leaking %lld bytes\n", zone, zone->size, size);
-        printf("Leaving a leaky zone can be dangerous ... particularly for concurrency\n");
+// Every allocation is laid out as [size header: LLVM_ZONE_ALIGN bytes][payload],
+// rounded up as a whole to a multiple of LLVM_ZONE_ALIGN. The footprint is
+// computed once, up front, and both the capacity check and the memset use that
+// same number -- checking the unrounded size and then rounding up is how the
+// old allocator wrote past the end of a nearly-full zone.
+static uint64_t zone_footprint(uint64_t size) {
+    // Refuse sizes that would wrap when the header and padding are added.
+    if (size > UINT64_MAX - LLVM_ZONE_ALIGN - LLVM_ZONE_ALIGNPAD) [[unlikely]] {
+        fprintf(stderr, "\nZone allocation of %" PRIu64 " bytes is not representable ... exiting!\n",
+                size);
         fflush(nullptr);
-        return malloc((size_t)size);  // TODO: what about the stored size????
-#else
-        printf("\nZone:%p size:%lld is full ... exiting!\n", zone, zone->size, size);
-        fflush(nullptr);
-        exit(1);
-#endif
+        abort();
     }
-    size = (size + LLVM_ZONE_ALIGNPAD) & ~LLVM_ZONE_ALIGNPAD;
-    auto newptr = reinterpret_cast<void*>(reinterpret_cast<char*>(zone->memory) + zone->offset);
-    memset(newptr, 0, size);                                     // clear memory
-    newptr = reinterpret_cast<char*>(newptr) + LLVM_ZONE_ALIGN;  // skip past size
-    *(reinterpret_cast<uint64_t*>(newptr) - 1) = size;
-    zone->offset += size;
+    return (size + LLVM_ZONE_ALIGN + LLVM_ZONE_ALIGNPAD) & ~LLVM_ZONE_ALIGNPAD;
+}
+
+// Grow `zone` so that at least `footprint` bytes are free. The current memory
+// block is pushed onto the zone's `memories` chain (so pointers handed out from
+// it stay valid) and a fresh, larger block becomes the active one.
+static void zone_extend(llvm_zone_t* zone, uint64_t footprint) {
+    const bool iszero = !zone->size;
+    uint64_t new_size = zone->size > footprint ? zone->size : footprint;
+    if (new_size > UINT64_MAX / 2) [[unlikely]] {
+        fprintf(stderr, "\nZone:%p cannot grow to hold %" PRIu64 " bytes ... exiting!\n",
+                static_cast<void*>(zone), footprint);
+        fflush(nullptr);
+        abort();
+    }
+    new_size *= 2;  // keep doubling zone size for each new allocation
+    if (new_size < 1024) {
+        new_size = 1024;  // allocate a min size of 1024 bytes
+    }
+    llvm_zone_t* newzone = llvm_zone_create(new_size);
+    if (!newzone->memory) [[unlikely]] {
+        free(newzone);
+        fprintf(stderr, "\nZone:%p out of memory growing to %" PRIu64 " bytes ... exiting!\n",
+                static_cast<void*>(zone), new_size);
+        fflush(nullptr);
+        abort();
+    }
+    if (iszero) {  // an empty zone is replaced rather than chained
+        zone->memory = newzone->memory;
+        free(newzone);
+    } else {  // newzone takes over the old block; the fresh block becomes active
+        void* fresh = newzone->memory;
+        newzone->memories = zone->memories;
+        newzone->memory = zone->memory;
+        newzone->size = zone->size;
+        zone->memory = fresh;
+        zone->memories = newzone;
+    }
+    zone->size = new_size;
+    zone->offset = 0;
+}
+
+EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
+    if constexpr (DEBUG_ZONE_ALLOC) {
+        printf("MallocZone: %p:%p:%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n",
+               static_cast<void*>(zone), zone->memory, zone->offset, zone->size, size);
+    }
+    const uint64_t footprint = zone_footprint(size);
+    if (zone->offset + footprint >= zone->size) [[unlikely]] {
+        zone_extend(zone, footprint);
+    }
+    auto block = reinterpret_cast<char*>(zone->memory) + zone->offset;
+    memset(block, 0, size_t(footprint));
+    auto newptr = block + LLVM_ZONE_ALIGN;  // skip past size header
+    *(reinterpret_cast<uint64_t*>(newptr) - 1) = footprint;
+    zone->offset += footprint;
     return newptr;
 }
 
@@ -147,69 +161,56 @@ void llvm_push_zone_stack(llvm_zone_t* Zone) {
     stack->head = Zone;
     stack->tail = llvm_threads_get_zone_stack();
     llvm_threads_set_zone_stack(stack);
-    return;
 }
 
 llvm_zone_t* llvm_peek_zone_stack() {
-    llvm_zone_t* z = 0;
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
-    if (unlikely(!stack)) {  // for the moment create a "DEFAULT" zone if stack is nullptr
-#if DEBUG_ZONE_STACK
-        printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
-#endif
-        z = llvm_zone_create(1024 * 1024 * 1);  // default root zone is 1M
+    if (!stack) [[unlikely]] {  // for the moment create a "DEFAULT" zone if stack is nullptr
+        if constexpr (DEBUG_ZONE_STACK) {
+            printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
+        }
+        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1);  // default root zone is 1M
         llvm_push_zone_stack(z);
-        stack = llvm_threads_get_zone_stack();
-#if DEBUG_ZONE_STACK
-        printf("Creating new 1M default zone %p:%lld on ZStack:%p\n", z, z->size, stack);
-#endif
+        if constexpr (DEBUG_ZONE_STACK) {
+            printf("Creating new 1M default zone %p:%" PRIu64 " on ZStack:%p\n",
+                   static_cast<void*>(z), z->size,
+                   static_cast<void*>(llvm_threads_get_zone_stack()));
+        }
         return z;
     }
-    z = stack->head;
-#if DEBUG_ZONE_STACK
-    printf("%p: peeking at zone %p:%lld\n", stack, z, z->size);
-#endif
+    llvm_zone_t* z = stack->head;
+    if constexpr (DEBUG_ZONE_STACK) {
+        printf("%p: peeking at zone %p:%" PRIu64 "\n", static_cast<void*>(stack),
+               static_cast<void*>(z), z->size);
+    }
     return z;
 }
 
 EXPORT llvm_zone_t* llvm_pop_zone_stack() {
     auto stack(llvm_threads_get_zone_stack());
-    if (unlikely(!stack)) {
-#if DEBUG_ZONE_STACK
-        printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
-#endif
+    if (!stack) [[unlikely]] {
+        if constexpr (DEBUG_ZONE_STACK) {
+            printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
+        }
         return nullptr;
     }
     llvm_zone_t* head = stack->head;
     llvm_zone_stack* tail = stack->tail;
-#if DEBUG_ZONE_STACK
-    llvm_threads_dec_zone_stacksize();
-    if (!tail) {
-        printf("%p: popping zone %p:%lld from stack with no tail\n", stack, head, head->size);
-    } else {
-        printf("%p: popping new zone %p:%lld back to old zone %p:%lld\n", stack, head, head->size,
-               tail->head, tail->head->size);
+    if constexpr (DEBUG_ZONE_STACK) {
+        if (!tail) {
+            printf("%p: popping zone %p:%" PRIu64 " from stack with no tail\n",
+                   static_cast<void*>(stack), static_cast<void*>(head), head->size);
+        } else {
+            printf("%p: popping new zone %p:%" PRIu64 " back to old zone %p:%" PRIu64 "\n",
+                   static_cast<void*>(stack), static_cast<void*>(head), head->size,
+                   static_cast<void*>(tail->head), tail->head->size);
+        }
     }
-#endif
     free(stack);
     llvm_threads_set_zone_stack(tail);
     return head;
 }
 
-void llvm_threads_inc_zone_stacksize() {
-    ++tls_llvm_zone_stacksize;
-}
-
-void llvm_threads_dec_zone_stacksize() {
-    --tls_llvm_zone_stacksize;
-}
-
-uint64_t llvm_threads_get_zone_stacksize() {
-    return tls_llvm_zone_stacksize;
-}
-
-// merge note - the following were not exposed from EXTLLVM.h before, and still aren't in any
-// header.
 EXPORT void llvm_zone_print(llvm_zone_t* zone) {
     auto tmp(zone);
     auto total_size(zone->size);
@@ -219,9 +220,8 @@ EXPORT void llvm_zone_print(llvm_zone_t* zone) {
         total_size += tmp->size;
         segments++;
     }
-    printf("<MemZone(%p) size(%" PRId64 ") free(%" PRId64 ") segs(%" PRId64 ")>", zone, total_size,
-           (zone->size - zone->offset), segments);
-    return;
+    printf("<MemZone(%p) size(%" PRIu64 ") free(%" PRIu64 ") segs(%" PRId64 ")>",
+           static_cast<void*>(zone), total_size, (zone->size - zone->offset), segments);
 }
 
 EXPORT uint64_t llvm_zone_ptr_size(void* ptr)  // could be inline version in llvm (as well)
@@ -229,31 +229,24 @@ EXPORT uint64_t llvm_zone_ptr_size(void* ptr)  // could be inline version in llv
     return *(reinterpret_cast<uint64_t*>(ptr) - 1);
 }
 
+// Returns true on failure (generated code treats a non-zero result as an
+// error, see llvm_runtime_error in EXTLLVM.cpp).
 EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2) {
     uint64_t size1 = llvm_zone_ptr_size(ptr1);
     uint64_t size2 = llvm_zone_ptr_size(ptr2);
-
-    if (unlikely(size1 != size2)) {
-        // printf("Bad LLVM ptr copy - size mismatch setting %p:%lld ->
-        // %p:%lld\n",ptr1,size1,ptr2,size2);
-        return 1;
+    if (size1 != size2 || !size1) [[unlikely]] {
+        return true;
     }
-    if (unlikely(!size1)) {
-        // printf("Bad LLVM ptr copy - size mismatch setting %p:%lld ->
-        // %p:%lld\n",ptr1,size1,ptr2,size2);
-        return 1;
-    }
-    // printf("zone_copy_ptr: %p,%p,%lld,%lld\n",ptr2,ptr1,size1,size2);
-    std::memcpy(ptr2, ptr1, size1);
-    return 0;
+    std::memcpy(ptr2, ptr1, size_t(size1));
+    return false;
 }
 
 EXPORT bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr) {
-    while (unlikely(zone && (ptr < zone->memory ||
-                             ptr >= reinterpret_cast<char*>(zone->memory) + zone->size))) {
+    while (zone && (ptr < zone->memory ||
+                    ptr >= reinterpret_cast<char*>(zone->memory) + zone->size)) {
         zone = zone->memories;
     }
-    return zone;
+    return zone != nullptr;
 }
 
 EXPORT void* llvm_zone_malloc_from_current_zone(uint64_t size) {
@@ -276,10 +269,10 @@ EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size) {
     return llvm_zone_create(Size);
 }
 
-static thread_local llvm_zone_t* tls_llvm_callback_zone = 0;
+static thread_local llvm_zone_t* tls_llvm_callback_zone = nullptr;
 
 static inline llvm_zone_t* llvm_threads_get_callback_zone() {
-    if (unlikely(!tls_llvm_callback_zone)) {
+    if (!tls_llvm_callback_zone) [[unlikely]] {
         tls_llvm_callback_zone = llvm_zone_create(1024 * 1024);  // default callback zone 1M
     }
     return tls_llvm_callback_zone;

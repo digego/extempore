@@ -1,5 +1,13 @@
 #pragma once
 
+// Zone (region) allocator used by generated xtlang code.
+//
+// Zones are thread-confined: every thread has its own zone stack
+// (tls_llvm_zone_stack), and a zone is only ever pushed, popped, allocated
+// from, reset or destroyed by the thread that owns that stack. None of the
+// functions below take a lock. Sharing a single llvm_zone_t between threads
+// is a bug in the caller, not something this allocator defends against.
+
 #include <UNIV.h>
 
 #include <cinttypes>
@@ -11,7 +19,7 @@ struct zone_hooks_t {
 };
 
 // WARNING WARNING WARNING - HERE BE DRAGONS
-// THIS STRUCTURE IS REFERENCED FROM GENERATED CODE
+// THIS STRUCTURE IS REFERENCED FROM GENERATED CODE (runtime/bitcode.ll)
 // DO NOT ALTER IT!!!
 
 struct llvm_zone_t {
@@ -29,10 +37,10 @@ struct llvm_zone_stack {
 };
 
 extern thread_local llvm_zone_stack* tls_llvm_zone_stack;
-extern thread_local uint64_t tls_llvm_zone_stacksize;
 
-const unsigned LLVM_ZONE_ALIGN = 32;  // MUST BE POWER OF 2!
-const unsigned LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
+constexpr uint64_t LLVM_ZONE_ALIGN = 32;  // MUST BE POWER OF 2!
+constexpr uint64_t LLVM_ZONE_ALIGNPAD = LLVM_ZONE_ALIGN - 1;
+static_assert((LLVM_ZONE_ALIGN & LLVM_ZONE_ALIGNPAD) == 0, "LLVM_ZONE_ALIGN must be a power of 2");
 
 namespace extemp {
 namespace EXTZones {
@@ -55,8 +63,5 @@ EXPORT llvm_zone_t* llvm_peek_zone_stack_extern();
 EXPORT void llvm_push_zone_stack_extern(llvm_zone_t* Zone);
 EXPORT llvm_zone_t* llvm_zone_create_extern(uint64_t Size);
 EXPORT llvm_zone_t* llvm_zone_callback_setup();
-void llvm_threads_inc_zone_stacksize();
-void llvm_threads_dec_zone_stacksize();
-uint64_t llvm_threads_get_zone_stacksize();
 }  // namespace EXTZones
 }  // namespace extemp
