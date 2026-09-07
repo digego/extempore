@@ -420,7 +420,6 @@ if(UNIX)
 endif()
 
 if(WIN32)
-    target_include_directories(extempore SYSTEM PRIVATE src/networking-ts-impl/include)
     target_compile_definitions(extempore PRIVATE -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
     target_compile_options(extempore PRIVATE /bigobj ${EXTEMPORE_WARNING_FLAGS})
     target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
