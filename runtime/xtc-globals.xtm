@@ -91,6 +91,20 @@
       (set! *xtc:globals:message:level* msglvl)
       res)))
 
+;;;;;;;;;;;;;;;;;;
+;; emit buffers ;;
+;;;;;;;;;;;;;;;;;;
+
+;; IR is built by appending into an output string port: (emit "a" "b" buf)
+;; writes its string arguments to buf and returns it.  Every emitting site
+;; starts from one of these and reads the result back through
+;; xtc:emit:buffer->string (string-strip takes the port directly).
+(define xtc:emit:new-buffer
+  (lambda () (open-output-string)))
+
+(define xtc:emit:buffer->string
+  (lambda (buf) (get-output-string buf)))
+
 ;;;;;;;;;;;;;;;;
 ;; type enums ;;
 ;;;;;;;;;;;;;;;;

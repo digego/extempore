@@ -39,11 +39,11 @@
 
 ;; this is the "queue" where IR is cached as we go (NB: not actually a
 ;; queue)
-(define *xtc:codegen:queued-llvm-ir-string* (make-string 0))
+(define *xtc:codegen:queued-llvm-ir-string* (xtc:emit:new-buffer))
 
 (define xtc:codegen:reset-jit-compilation-queue
   (lambda ()
-    (set! *xtc:codegen:queued-llvm-ir-string* (make-string 0))))
+    (set! *xtc:codegen:queued-llvm-ir-string* (xtc:emit:new-buffer))))
 
 (define xtc:codegen:queue-ir-for-compilation
   (lambda (ir-string)
@@ -52,7 +52,7 @@
 
 (define xtc:codegen:flush-jit-compilation-queue
   (lambda ()
-    (let ((ir-str (emit-buffer->string *xtc:codegen:queued-llvm-ir-string*)))
+    (let ((ir-str (xtc:emit:buffer->string *xtc:codegen:queued-llvm-ir-string*)))
       (if *xtc:globals:print-raw-llvm*
           (print-full-nq ir-str))
       (if (not (string=? ir-str ""))
@@ -1183,7 +1183,7 @@
 
 (define xtc:codegen:make-function-str
   (lambda (t . with-env-added?)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (args (cdr t)))
       (if (car with-env-added?)
           (emit (string-append (xtc:codegen:get-type-str (car t))
@@ -1203,7 +1203,7 @@
 
 (define xtc:codegen:make-struct-str-env
   (lambda (t)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (args t))
       (emit "{"os)
       (dotimes (i (length args))
@@ -1215,7 +1215,7 @@
 
 (define xtc:codegen:make-arglist-str
   (lambda (args . with-symbol?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (dotimes (i (length args))
         (if (> i 0) (emit ", " os))
         (let ((arg (list-ref args i)))
@@ -1228,7 +1228,7 @@
 
 (define xtc:codegen:make-string
   (lambda (ast)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (cnt 0))
       (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
             (xtc:codegen:ssa-temp "zone" "%mzone*") " = bitcast i8* " (car (xtc:codegen:ssa-temp "tzone")) " to %mzone*\n"
@@ -1250,7 +1250,7 @@
 
 (define xtc:codegen:make-const-string
   (lambda (ast)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (lgthstr1 (regex:replace-all ast "\\\\[0-9][0-9]" "x"))
            (lgthstr2 (if (and *xtc:aot:current-output-port* (not *xtc:aot:dll*))
                          (regex:replace-all lgthstr1 "[\n]" "x") ;(if (string=? (sys:platform) "Windows") "xx" "x"))
@@ -1285,8 +1285,8 @@
 (define xtc:codegen:compile:make-closureenv
   (lambda (ast types)
     ;; (println 'make-closure-env 'ast: ast 'types: types)
-    (let* ((os2 (make-string 0))
-           (os1 (make-string 0))
+    (let* ((os2 (xtc:emit:new-buffer))
+           (os1 (xtc:emit:new-buffer))
            (name (list-ref ast 2))
            (allocate-mem? (list-ref ast 1))
            (rettype (list-ref ast 3))
@@ -1436,7 +1436,7 @@
 (define xtc:codegen:compile:make-closure
   (lambda (ast types)
     ;;(println 'ast: ast)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (name (list-ref ast 2))
            (allocate-mem? (list-ref ast 1))
            (rettype (list-ref ast 3))
@@ -1552,7 +1552,7 @@
 (define xtc:codegen:compile:make-static
   (lambda (ast types)
     ;;(println 'ast: ast)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (name (list-ref ast 2))
            (allocate-mem? (list-ref ast 1))
            (rettype (list-ref ast 3))
@@ -1647,7 +1647,7 @@
 (define xtc:codegen:compile:make-env
   (lambda (ast types)
     ;; (println 'ast: ast 'types types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (result '())
            (env-zone-tmp '())
            (res
@@ -1781,7 +1781,7 @@
   (lambda (name)
     (if (not (xtc:cache:closure-exists? name))
         (xtc:diagnostics:print-missing-identifier-error name 'closure)
-        (let* ((os (make-string 0))
+        (let* ((os (xtc:emit:new-buffer))
                (type (cons (+ *xtc:codegen:pointer* *xtc:codegen:pointer* *xtc:codegen:closure*)
                            (map (lambda (x) (xtc:codegen:get-type-from-str x))
                                 (xtc:cache:get-closure-arg-types name)))))
@@ -1796,7 +1796,7 @@
     ;; arg 1 must be a closure
     ;; arg 2 must be a string
     ;; arg 3 MAY be a type string or NULL
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (num (number->string (llvm:count++)))
            (closure-str (if (and (symbol? (cadr ast))
                                  (xtc:cache:closure-exists? (symbol->string (cadr ast))))
@@ -1886,7 +1886,7 @@
     ;; arg 2 must be a string
     ;; arg 3 must be a value
     ;; arg 4 MAY be a type string or NULL
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (num (number->string (llvm:count++)))
            (closure-str (if (and (symbol? (cadr ast))
                                  (xtc:cache:closure-exists? (symbol->string (cadr ast))))
@@ -1972,7 +1972,7 @@
 
 (define xtc:codegen:compiler:closure-refcheck
   (lambda (ast types . hint?)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (num (number->string (llvm:count++)))
            ;; (name-str (xtc:codegen:compiler (caddr ast) types))
            ;; (name (xtc:codegen:ssa-temp))
@@ -2008,7 +2008,7 @@
 ;; returns a ptr's value
 (define xtc:codegen:compiler:pdref
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (val-str (xtc:codegen:compiler (cadr ast) types))
            (val (xtc:codegen:ssa-temp))
            (type (- (xtc:codegen:get-type-from-str (cadr val)) *xtc:codegen:pointer*)))
@@ -2022,7 +2022,7 @@
 ;; returns a ptr to ptr
 (define xtc:codegen:compiler:pref
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (val-str (xtc:codegen:compiler (cadr ast) types))
            (val (xtc:codegen:ssa-temp)))
       (emit val-str os)
@@ -2093,7 +2093,7 @@
 
 (define xtc:codegen:compile:eval-var
   (lambda (var t)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let ((typestr (xtc:codegen:get-type-str t)))
         (emit (xtc:codegen:ssa-temp "val" typestr)
               " = load " typestr ", " typestr
@@ -2103,7 +2103,7 @@
 
 (define xtc:codegen:compile:eval-gvar
   (lambda (var)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (type (xtc:cache:get-globalvar-type (symbol->string var)))
            (type2 (xtc:codegen:strip-ptr-depth type))
            (typestr (xtc:codegen:get-type-str type2)))
@@ -2123,7 +2123,7 @@
 
 (define xtc:codegen:compile:push_new_zone
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (size-str (xtc:codegen:compiler (cadr ast) types))
            (size (xtc:codegen:ssa-temp)))
       ;;(println 'size: size)
@@ -2144,7 +2144,7 @@
 
 (define xtc:codegen:compile:push_zone
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (zone-str (xtc:codegen:compiler (cadr ast) types))
            (zone (xtc:codegen:ssa-temp)))
       (emit zone-str os)
@@ -2156,7 +2156,7 @@
 
 (define xtc:codegen:compile:create_zone
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (size-str (xtc:codegen:compiler (cadr ast) types))
            (size (xtc:codegen:ssa-temp)))
       ;;(println 'size: size)
@@ -2169,7 +2169,7 @@
 
 (define xtc:codegen:compile:pop_zone
   (lambda (ast types)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (emit (xtc:codegen:ssa-temp "oldzone" "%mzone*") " = call %mzone* @llvm_pop_zone_stack()\n" os)
       (emit (xtc:codegen:ssa-temp "newzone" "%mzone") " = call %mzone* @llvm_peek_zone_stack()\n" os)
       (emit (xtc:codegen:ssa-temp "zone_ptr" "i8*") " = bitcast %mzone* " (car (xtc:codegen:ssa-temp "newzone")) " to i8*\n" os)
@@ -2193,7 +2193,7 @@
                                      (xtc:diagnostics:print-bad-type-error (car ast) "bad type for closure")))))
            ;;(recursive-call (if (eq? (car ast) (car *xtc:codegen:sym-name-stack*)) #t #f))
            (recursive-call (if (member (car ast) *xtc:codegen:sym-name-stack*) #t #f))
-           (os (make-string 0))
+           (os (xtc:emit:new-buffer))
            (ftype (xtc:codegen:make-function-str functiontype #t))
            (clstype (string-append "{i8*, i8*, " ftype "*}*"))
            (vars (map (lambda (arg hint)
@@ -2248,7 +2248,7 @@
 
 (define xtc:codegen:compiler:loop
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (loop-num (llvm:count++))
            (loop-label (string-append "loop" (number->string loop-num) ":"))
            (closeloop-label (string-append "closeloop" (number->string loop-num) ":"))
@@ -2347,7 +2347,7 @@
 
 (define xtc:codegen:compiler:while-loop
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (loop-num-string (number->string (llvm:count++)))
            (loop (string-append "%loop" loop-num-string))
            (after (string-append "%after" loop-num-string)))
@@ -2379,7 +2379,7 @@
 
 (define xtc:codegen:compiler:set!
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (global? (xtc:cache:globalvar-exists? (symbol->string (cadr ast)))) ;; are we are setting a global variable?
            (gtype (if global? (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string (cadr ast)))) #f))
            (t (if global? gtype
@@ -2408,7 +2408,7 @@
 (define xtc:codegen:compiler:make-array
   (lambda (ast types hint?)
     ;; (println 'make-array-literal: hint?)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (tt #f))
       (let* ((elts (map (lambda (x t)
                           (let ((res (cons (xtc:codegen:compiler x types (if tt tt t))
@@ -2442,7 +2442,7 @@
 
 (define xtc:codegen:compiler:array-ref
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2476,7 +2476,7 @@
 
 (define xtc:codegen:compiler:array-ref-ptr
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2504,7 +2504,7 @@
 
 (define xtc:codegen:compiler:array-set
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2549,7 +2549,7 @@
 
 (define xtc:codegen:compiler:pointer-ref
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2578,7 +2578,7 @@
 
 (define xtc:codegen:compiler:pointer-ref-ptr
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2604,7 +2604,7 @@
 
 (define xtc:codegen:compiler:pointer-set
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2650,7 +2650,7 @@
 (define xtc:codegen:compiler:make-vector
   (lambda (ast types hint?)
     ;; (println 'make-vector-literal: hint?)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (tt #f))
       (let* ((elts (map (lambda (x t)
                           (let ((res (cons (xtc:codegen:compiler x types (if tt tt t))
@@ -2685,7 +2685,7 @@
 
 (define xtc:codegen:compiler:vector-ref
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types *xtc:codegen:si32*))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2717,7 +2717,7 @@
 
 (define xtc:codegen:compiler:vector-set
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types *xtc:codegen:si32*)) ;; i32
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -2764,7 +2764,7 @@
 ;;
 (define xtc:codegen:compiler:vector-shuffle
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types *xtc:codegen:si32*)) ;; i32
            (a-str (xtc:codegen:compiler (cadr ast) types))
            (aval (xtc:codegen:ssa-temp))
@@ -2844,7 +2844,7 @@
 
 (define xtc:codegen:compiler:zone-alloc-without-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let*      ;((t (xtc:codegen:convert-from-pretty-types (cadr ast))))
           ((t (xtc:codegen:strip-ptr-depth (car hint?))))
         (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
@@ -2862,7 +2862,7 @@
 
 (define xtc:codegen:compiler:zone-alloc-with-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ((idx-str (xtc:codegen:compiler (cadr ast) types))
              (idx (xtc:codegen:ssa-temp))
              (t (xtc:codegen:get-type-from-str (cadr idx)))
@@ -2911,7 +2911,7 @@
 
 (define xtc:codegen:compiler:heap-alloc-without-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ;;((t (xtc:codegen:convert-from-pretty-types (cadr ast))))
           ((t (xtc:codegen:strip-ptr-depth (car hint?))))
         (emit  (xtc:codegen:ssa-temp "dat" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size t)) ")\n" os)
@@ -2924,7 +2924,7 @@
 
 (define xtc:codegen:compiler:heap-alloc-with-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ((idx-str (xtc:codegen:compiler (cadr ast) types))
              (idx (xtc:codegen:ssa-temp))
              (t (xtc:codegen:get-type-from-str (cadr idx)))
@@ -2975,7 +2975,7 @@
 
 (define xtc:codegen:compiler:stack-alloc-with-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ((idx-str (xtc:codegen:compiler (cadr ast) types))
              (idx (xtc:codegen:ssa-temp))
              (t (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (car hint?)))))
@@ -2985,7 +2985,7 @@
 
 (define xtc:codegen:compiler:stack-alloc-without-size
   (lambda (ast types hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ;((t (xtc:codegen:get-type-str (xtc:codegen:convert-from-pretty-types (cadr ast)))))
           ((t (xtc:codegen:get-type-str (xtc:codegen:strip-ptr-depth (car hint?)))))
         (emit (string-append (xtc:codegen:ssa-temp "dat" (string-append t "*")) " = alloca " t ", align 16\n") os)
@@ -3008,7 +3008,7 @@
 (define xtc:codegen:compiler:make-tuple
   (lambda (ast types hint?)
     ;; (println 'make-tuple-ir hint?)
-    (let* ((os (make-string 0)))
+    (let* ((os (xtc:emit:new-buffer)))
       (let* ((elts (map (lambda (x t)
                           (cons (xtc:codegen:compiler x types t)
                                 (xtc:codegen:ssa-temp)))
@@ -3043,7 +3043,7 @@
     ;; arg 1 for tuples must be a symbol
     ;; arg 2 for typles must be a number
     ;; this should make it easy for us!
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -3106,7 +3106,7 @@
     ;; arg 1 for tuples must be a symbol
     ;; arg 2 for typles must be a number
     ;; this should make it easy for us!
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (index-str (xtc:codegen:compiler (caddr ast) types))
            (idx (xtc:codegen:ssa-temp))
            (var-str (xtc:codegen:compiler (cadr ast) types))
@@ -3165,7 +3165,7 @@
     ;; arg 1 for tuples must be a symbol
     ;; arg 2 for tuples must be a number
     ;; this should make it easy for us!
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (var-str (xtc:codegen:compiler (cadr ast) types))
            (var (xtc:codegen:ssa-temp))
            ;;(tuple-type (xtc:codegen:get-type-from-str (cadr var)))
@@ -3218,7 +3218,7 @@
     (let* ((hinttype? (cadr (cdr (assoc-strcmp (cadr ast) types))))
            (str (xtc:codegen:compiler (caddr ast) types hinttype?)) ;(if (null? hint?) hinttype? (car hint?))))
            (val (xtc:codegen:ssa-temp))
-           (os (make-string 0)))
+           (os (xtc:emit:new-buffer)))
       (emit str os)
       ;; A void-returning function discards its body's tail value: the body IR is
       ;; already emitted (for its side effects), so emit `ret void' rather than
@@ -3321,7 +3321,7 @@
              (t (xtc:codegen:get-type-from-str (cadr aval)))
              (b (xtc:codegen:compiler (caddr ast) types t))
              (bval (xtc:codegen:ssa-temp))
-             (os (make-string 0))
+             (os (xtc:emit:new-buffer))
              (type (cadr aval)))
         ;; sanity checks
         (if (not (or (and (xtc:codegen:number? (cadr aval))
@@ -3408,7 +3408,7 @@
                   (xtc:codegen:compiler (caddr ast) types)
                   (xtc:codegen:compiler (caddr ast) types type-hint)))
            (bval (xtc:codegen:ssa-temp))
-           (os (make-string 0))
+           (os (xtc:emit:new-buffer))
            (type (if (null? type-hint)
                      (cadr aval)
                      (xtc:codegen:get-type-str type-hint))))
@@ -3456,7 +3456,7 @@
                        (xtc:codegen:compiler (cadddr ast) types (if (null? hint?) #f (car hint?)))
                        ""))
              (cval (if (< args 3) #f (xtc:codegen:ssa-temp)))
-             (os (make-string 0)))
+             (os (xtc:emit:new-buffer)))
         ;; (println 'intrinsice ast aval bval cval)
         ;; sanity checks
         (if (not (or (xtc:codegen:number? (cadr aval))
@@ -3524,7 +3524,7 @@
                                           (xtc:codegen:get-type-from-str (cadr (xtc:codegen:ssa-temp))))
                     (xtc:codegen:compiler (caddr ast) types type-hint)))
              (bval (xtc:codegen:ssa-temp))
-             (os (make-string 0))
+             (os (xtc:emit:new-buffer))
              (type (if (null? type-hint)
                        (cadr aval)
                        (xtc:codegen:get-type-str type-hint))))
@@ -3608,7 +3608,7 @@
 (define xtc:codegen:compiler:bitwise
   (lambda (v ast types . hint?)
     (let* ((bitops '("and" "or" "xor" "shl" "lshr"))
-           (os (make-string 0))
+           (os (xtc:emit:new-buffer))
            (a (xtc:codegen:compiler (cadr ast) types))
            (aval (xtc:codegen:ssa-temp))
            (b (xtc:codegen:compiler (caddr ast) types))
@@ -3630,7 +3630,7 @@
     (if (and (null? (car hint?))
              (null? (cddr ast)))
         (xtc:diagnostics:print-could-not-resolve-type-error ast "try forcing the cast"))
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (a (xtc:codegen:compiler (cadr ast) types))
            (at (xtc:codegen:ssa-temp))
            (type-str (if (null? (cddr ast))
@@ -3647,7 +3647,7 @@
     (if (and (null? (car hint?))
              (null? (cddr ast)))
         (xtc:diagnostics:print-could-not-resolve-type-error ast "try forcing the conversion"))
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (a (xtc:codegen:compiler (cadr ast) types))
            (at (xtc:codegen:ssa-temp))
            (type-str (if (null? (cddr ast))
@@ -3750,7 +3750,7 @@
 
 (define xtc:codegen:compiler:null
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (a (xtc:codegen:compiler (cadr ast) types))
            (at (xtc:codegen:ssa-temp)))
       (emit a os)
@@ -3761,7 +3761,7 @@
 ;; if that finishes with ret clauses (i.e. doesn't return a value)
 (define xtc:codegen:compiler:ifret
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (elset (if (null? (cdddr ast)) #f #t))
            (num (number->string (llvm:count++))))
       ;(println 'ifretast: ast)
@@ -3794,7 +3794,7 @@
 (define xtc:codegen:compiler:if
   (lambda (ast types . hint?)
     ;; (println 'ast: ast)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (elset (if (or (null? (cdddr ast))
                           (null? (cadddr ast)))
                       #f #t))
@@ -3862,7 +3862,7 @@
 ;;
 (define xtc:codegen:compiler:callback
   (lambda (ast types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (timestr (xtc:codegen:compiler (cadr ast) types))
            (time (xtc:codegen:ssa-temp))
            (fname (symbol->string (caddr ast)))
@@ -3975,7 +3975,7 @@
 (define xtc:codegen:compiler:native-call
   (lambda (ast types)
     ;; (println 'ast: ast 'types: types)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (fname (symbol->string (car ast)))
            (ftypes (or (xtc:cache:get-closure-arg-types fname)
                        (xtc:cache:get-nativefunc-arg-types fname)))
@@ -4042,7 +4042,7 @@
 
 (define xtc:codegen:compiler:fptrcall
   (lambda (ast types . hint?)
-    (let* ((os (make-string 0))
+    (let* ((os (xtc:emit:new-buffer))
            (fptrstr (xtc:codegen:compiler (cadr ast) types))
            (fptr (xtc:codegen:ssa-temp))
            (ftypes (xtc:codegen:get-type-from-str (cadr fptr)))

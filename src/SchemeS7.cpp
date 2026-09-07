@@ -142,20 +142,6 @@ scheme* scheme_init_new() {
     s7_define_function(sc->sc, "string-ref", lenient_string_ref, 2, 0, false,
                        "(string-ref str i) returns str[i], #\\nul if out of bounds");
 
-    // make-string: (make-string 0) returns an output-string-port (mutable emit buffer)
-    // TinyScheme's emit mutated its last string arg in-place; s7 strings are immutable.
-    // Using output string ports as mutable accumulators preserves the emit pattern.
-    s7_eval_c_string(sc->sc, "(let ((old-make-string make-string))"
-                             "  (set! make-string"
-                             "    (lambda args"
-                             "      (if (and (pair? args) (null? (cdr args)) (eqv? (car args) 0))"
-                             "          (open-output-string)"
-                             "          (apply old-make-string args)))))");
-
-    // Helper to extract string from emit buffer (output string port) or pass through
-    s7_eval_c_string(sc->sc, "(define (emit-buffer->string x)"
-                             "  (if (output-port? x) (get-output-string x) x))");
-
     // string->atom and atom->string
     s7_eval_c_string(sc->sc, "(define (string->atom s) (with-input-from-string s read))");
     s7_eval_c_string(sc->sc, "(define (atom->string x) (object->string x))");

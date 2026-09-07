@@ -39,3 +39,12 @@
 (xtmtest-result (begin (put 'sym 'k1 'v1) (put 'sym 'k2 'v2) (list (get 'sym 'k1) (get 'sym 'k2)))
                 '(v1 v2)
                 "distinct-keys-per-symbol")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; make-string -- s7's own, with no special case for a zero length
+
+;; the compiler's IR buffers are made by xtc:emit:new-buffer, so a zero-length
+;; make-string is the plain empty string R7RS says it is
+(xtmtest-result (string? (make-string 0)) #t "make-string-zero-is-string")
+(xtmtest-result (string=? "" (make-string 0)) #t "make-string-zero-is-empty")
+(xtmtest-result (string-length (make-string 0)) 0 "make-string-zero-length")
+(xtmtest-result (string-append "a" (make-string 0) "b") "ab" "make-string-zero-appends")
