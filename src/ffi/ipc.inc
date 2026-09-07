@@ -63,7 +63,7 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value)
     } else if (is_string(Value) || is_number(Value) || is_symbol(Value)) {
         UNIV::printSchemeCell(Scheme, Stream, Value, true);
     } else {
-        PRINT_ERROR("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
+        ffiPrintError("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
         return false;
     }
     return true;

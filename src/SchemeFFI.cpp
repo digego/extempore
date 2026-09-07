@@ -124,11 +124,6 @@
 #include <AppKit/AppKit.h>
 #endif
 
-#define PRINT_ERROR(format, ...)                                                                   \
-    ascii_error();                                                                                 \
-    printf(format, ##__VA_ARGS__);                                                                 \
-    ascii_normal()
-
 #include <queue>
 // #include <unistd.h>
 #include <EXTLLVM.h>
