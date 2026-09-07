@@ -231,9 +231,48 @@
                 "%List_poly_PGk2ND4*"
                 "napp-pattern-reifies")
 
-;; a %name that is not a named type is an error in get-type-size, not a spin
-(xtmtest-result (*s7-catch* #t
-                            (lambda () (xtc:codegen:get-type-size "%NoSuchNamedTypeXYZ"))
-                            (lambda args 'caught))
-                'caught
-                "unresolved-named-type-is-an-error")
+;; The parser's value is memoised by string (xtc:codegen:get-type-from-pretty-str);
+;; its one effect --- instantiating a generic instance that is not yet a named
+;; type --- happens where the parser meets the instance, and clears the memo.
+
+(xtmtest-result (let ((fresh (begin (xtc:cache:invalidate-type-parse-memo!)
+                                    (xtc:codegen:get-type-from-pretty-str "<i64,double>*"))))
+                  (list (if (hashtable-ref *xtc:cache:type-parse-memo* "<i64,double>*") 'memoised 'not-memoised)
+                        (equal? fresh (xtc:codegen:get-type-from-pretty-str "<i64,double>*"))))
+                '(memoised #t)
+                "parse-memoised-and-stable")
+
+;; two instances inside one tuple, one of them twice: each is registered once
+(xtmtest-result (let* ((before (hashtable-count *xtc:cache:namedtype-cache*))
+                       (t (xtc:codegen:get-type-from-pretty-str "<List{i1}*,List{i1}*,List{i16}*>"))
+                       (added (- (hashtable-count *xtc:cache:namedtype-cache*) before)))
+                  (list added
+                        (xtc:cache:namedtype-exists? (cadr t))
+                        (xtc:cache:namedtype-exists? (cadddr t))))
+                '(2 #t #t)
+                "nested-instances-instantiated-once-each")
+
+;; An instance first met inside another instance's parse must be registered
+;; right there: generating the outer _poly_ cname pretty-prints the inner
+;; instance, and pretty-print-type re-parses an unknown %name until it
+;; resolves.  With the registration deferred to the end of the outer parse
+;; that was an endless loop, seen as an intermittent hang in
+;; tests/core/generics.xtm (whether the inner instance had been met earlier
+;; depended on the run).
+(bind-type TBInner <!a,!a>)
+(bind-type TBOuter <i64,TBInner{!a}*>)
+(xtmtest-result (let ((outer (xtc:codegen:get-type-from-pretty-str "TBOuter:<i64,TBInner:<i16,i16>*>*")))
+                  (list (xtc:codegen:pretty-print-type outer)
+                        (xtc:cache:namedtype-exists? outer)
+                        (xtc:cache:namedtype-exists? (xtc:codegen:get-type-from-pretty-str "TBInner:<i16,i16>*"))))
+                '("TBOuter{i16}*" #t #t)
+                "inner-instance-registered-during-outer-parse")
+
+;; registering a type clears the memo (a bare name can parse differently once
+;; it names a type or an alias)
+(xtmtest-result (begin
+                  (xtc:codegen:get-type-from-pretty-str "<i32,i32>")
+                  (bind-alias ProbeAliasXYZ i64)
+                  (if (hashtable-ref *xtc:cache:type-parse-memo* "<i32,i32>") 'stale 'cleared))
+                'cleared
+                "registrar-clears-memo")

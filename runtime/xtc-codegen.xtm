@@ -333,11 +333,37 @@
                 (list (car p2) (cname-decode (cadr p2)))
                 #f))))))
 
+;; Parsing a pretty type string is pure except in one branch: a generic
+;; instance %Name_poly_ENC that is not yet a named type has its LLVM struct
+;; compiled, the named type registered and its data constructors scheduled
+;; at the point the parser meets it.  The effect has to happen right there,
+;; not after the parse: the parser's own helpers take an instance string it
+;; has just handed back and look the named type up (the _poly_ cname
+;; generation through xtc:desugar:minimized-gen-type, pretty-print-type,
+;; get-type-size), and pretty-print-type re-parses an unknown %name until it
+;; resolves.  Deferring the registration past the enclosing parse makes that
+;; an endless loop whenever an instance is first met inside another type's
+;; parse --- which instance is met first depends on the run, so it shows up
+;; as an intermittent hang.
+;;
+;; The effect is idempotent (the branch is skipped once the type exists),
+;; and every named-type, alias and generic registration clears
+;; *xtc:cache:type-parse-memo* (xtc-caches.xtm), so the parse *value* of an
+;; argless call --- the public hot path --- is memoised by string: an entry
+;; is only written after the registrations its parse performed, and a later
+;; registration clears it.  Parses with args (a recursive-type context) are
+;; not memoised, since the same string parses differently under different
+;; args; nor are parses under *xtc:globals:suppress-ir-generation*, which
+;; skip the registration the memo relies on.
+
 (define xtc:codegen:get-type-from-pretty-str
   (lambda (string-type . args)
-    (let ((res (apply xtc:codegen:get-type-from-pretty-str-rec string-type args)))
-      ;; (println 'pretty-string-type string-type 'to res)
-      res)))
+    (if (or (not (null? args)) *xtc:globals:suppress-ir-generation*)
+        (apply xtc:codegen:get-type-from-pretty-str-rec string-type args)
+        (or (hashtable-ref *xtc:cache:type-parse-memo* string-type)
+            (let ((res (xtc:codegen:get-type-from-pretty-str-rec string-type)))
+              (hashtable-set! *xtc:cache:type-parse-memo* string-type res)
+              res)))))
 
 ;; now with pretty print support
 (define xtc:codegen:get-type-from-pretty-str-rec
