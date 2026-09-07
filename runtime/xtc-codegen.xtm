@@ -710,16 +710,14 @@
              (if (char=? (string-ref base 0) #\%)
                  string-type
                  (string-append "%" string-type)))
-            (else (let loop ((i -1))
-                    (if (string=? base (xtc:codegen:get-type-str i string-type))
-                        (+ i offset)
-                        (if (< i *xtc:codegen:lowest-base-type*)
-                            (loop (+ i 1))
-                            ;; if everything else fails try type aliases
-                            (let ((res (xtc:cache:get-typealias-type base)))
-                              (if res
-                                  (xtc:codegen:add-ptr-depth res ptr-depth)
-                                  (xtc:diagnostics:print-could-not-resolve-type-error string-type)))))))))))
+            (else (let ((code (hashtable-ref *xtc:codegen:base-type-codes* base)))
+                    (if code
+                        (+ code offset)
+                        ;; if everything else fails try type aliases
+                        (let ((res (xtc:cache:get-typealias-type base)))
+                          (if res
+                              (xtc:codegen:add-ptr-depth res ptr-depth)
+                              (xtc:diagnostics:print-could-not-resolve-type-error string-type))))))))))
 
 
 (define xtc:codegen:convert-from-pretty-types
@@ -795,8 +793,10 @@
            (offset (* ptr-depth *xtc:codegen:pointer*))
            ;;(expand-closures? (if (null? args) #f (car args)))
            (base (xtc:codegen:get-base-type string-type)))
-      (if (= 92 (char->integer (string-ref base 0)))
-          (string-set! base 0 (integer->char 48)))
+      ;; a recursive LLVM type ref "\N" reads as the number N (copied, not
+      ;; mutated in place: the caller may still hold the string)
+      (if (char=? (string-ref base 0) #\\)
+          (set! base (string-append "0" (substring base 1 (string-length base)))))
       (cond ((string=? base "void") *xtc:codegen:void*)
             ((string=? base "notype") *xtc:codegen:notype*)
             ;; this here just for recursive named types from LLVM IR
@@ -831,12 +831,10 @@
             ((assoc-strcmp (string->symbol string-type) *xtc:desugar:generic-type-mappings*)
              (xtc:codegen:get-type-from-str (cdr (assoc-strcmp (string->symbol string-type) *xtc:desugar:generic-type-mappings*))))
             ;; ((regex:match? string-type "##") string-type)
-            (else (let loop ((i -1))
-                    (if (string=? base (xtc:codegen:get-type-str i string-type))
-                        (+ i offset)
-                        (if (< i *xtc:codegen:lowest-base-type*)
-                            (loop (+ i 1))
-                            (xtc:diagnostics:print-bad-type-error string-type)))))))))
+            (else (let ((code (hashtable-ref *xtc:codegen:base-type-codes* base)))
+                    (if code
+                        (+ code offset)
+                        (xtc:diagnostics:print-bad-type-error string-type))))))))
 
 
 ;; A scalar int-code (double, float, iN, including pointer depth) renders to an
@@ -901,6 +899,22 @@
                                                (xtc:diagnostics:print-bad-type-error (if (null? args) type (car args))))
                                            (make-string ptr-depth #\*)))))))))))
 
+
+;; The base LLVM type strings ("double", "i64", ...) mapped back to their
+;; codegen int-codes, for the string->code fallback in get-type-from-str and
+;; get-type-from-pretty-str. Built once from get-type-str so it can't drift
+;; from the rendering; the first code to render a string wins, which keeps
+;; the signed integer codes ahead of the unsigned ones.
+(define *xtc:codegen:base-type-codes*
+  (let ((table (make-hashtable 32)))
+    (let loop ((i -1))
+      (if (< i *xtc:codegen:lowest-base-type*)
+          (let ((str (xtc:codegen:get-type-str i "")))
+            (if (and (not (char=? (string-ref str 0) #\%)) ;; a named-type render
+                     (not (hashtable-ref table str)))
+                (hashtable-set! table str i))
+            (loop (+ i 1)))))
+    table))
 
 (define xtc:codegen:convert-types
   (lambda (t)
