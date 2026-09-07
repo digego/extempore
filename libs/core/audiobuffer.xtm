@@ -54,6 +54,11 @@
 
 (bind-type AudioBuffer <String*,i64,i64,i64,SAMPLE*,double,i64,i64,i64,double> (printer? . #f))
 
+(bind-func static AudioBuffer_sample_bytes
+  "sizeof(SAMPLE) -- the offset of element 1 of a null SAMPLE*"
+  (lambda ()
+    (convert (pref-ptr (cast null SAMPLE*) 1) i64)))
+
 (bind-func AudioBuffer
   (lambda (frames chans)
     (let ((dat:SAMPLE* (alloc (* frames chans))))
@@ -165,13 +170,13 @@
 (bind-func AudioBuffer_data_b64
   (lambda (ab:AudioBuffer*)
     (let ((b64size:i64 0)
-          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4)))
+          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) (AudioBuffer_sample_bytes))))
       (String (base64_encode (cast (tref ab 4) i8*) datsize (ref b64size))))))
 
 (bind-func AudioBuffer_data_b64_cstring
   (lambda (ab:AudioBuffer*)
     (let ((b64size:i64 0)
-          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4)))
+          (datsize:i64 (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) (AudioBuffer_sample_bytes))))
       (base64_encode (cast (tref ab 4) i8*) datsize (ref b64size)))))
 
 (bind-func static AudioBuffer_set_data
@@ -182,7 +187,7 @@
   (lambda (ab:AudioBuffer* b64:String*)
     (let ((size:i64 0)
           (out:i8* (base64_decode (cstring b64) (length b64) (ref size))))
-      (if (<= size (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) 4))
+      (if (<= size (* (AudioBuffer_frames ab) (AudioBuffer_channels ab) (AudioBuffer_sample_bytes)))
           (begin (memcpy (cast (AudioBuffer_data ab)) out size) void)
           (begin (println "error: AudioBuffer must be at least " size " bytes." ) void)))))
 
@@ -993,7 +998,7 @@ fewer than the chunk header claims when the file is truncated."
     (let ((size (* (AudioBuffer_frames in) (AudioBuffer_channels in)))
           (dat:SAMPLE* (alloc size))
           (olddat:SAMPLE* (AudioBuffer_data in)))
-      (memcpy (cast dat) (cast olddat) (* size 4))
+      (memcpy (cast dat) (cast olddat) (* size (AudioBuffer_sample_bytes)))
       (AudioBuffer_z
         (AudioBuffer_filepath in)
         (AudioBuffer_playhead in)
