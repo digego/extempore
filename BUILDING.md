@@ -73,6 +73,17 @@ Passes, MCDisassembler, IRPrinter).
 CI caches `build/_deps/` across runs --- see
 `.github/workflows/build-and-test.yml`.
 
+## PCRE2
+
+The `regex:*` builtins are backed by PCRE2 (currently 10.48, pinned in
+`CMakeLists.txt`), fetched and built in-tree via `FetchContent` alongside LLVM
+--- no system PCRE required. Only the static 8-bit library is built and it's
+linked into the binary, so there's nothing extra to ship.
+
+The xtlang compiler's type-string grammars use recursive subpatterns and named
+groups, so a PCRE-compatible engine is a hard requirement rather than a
+convenience.
+
 ## Targets
 
 The default target builds Extempore, all the dependencies, and AOT-compiles the

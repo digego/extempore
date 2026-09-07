@@ -173,23 +173,6 @@ if(NOT WIN32)
     set_property(TARGET s7_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 
-########
-# PCRE #
-########
-
-add_library(pcre STATIC
-    src/pcre/config.h
-    src/pcre/pcre.h
-    src/pcre/ucp.h
-    src/pcre/pcre_chartables.c
-    src/pcre/pcre_compile.c
-    src/pcre/pcre_exec.c
-    src/pcre/pcre_globals.c
-    src/pcre/pcre_internal.h
-    src/pcre/pcre_newline.c
-    src/pcre/pcre_tables.c)
-target_compile_definitions(pcre PRIVATE -DHAVE_CONFIG_H)
-
 ############
 # linenoise #
 ############
@@ -358,7 +341,6 @@ add_dependencies(extempore s7_lib portaudio_static)
 
 target_include_directories(extempore PRIVATE
     include
-    src/pcre
     ${CMAKE_BINARY_DIR}/generated)
 
 target_include_directories(extempore SYSTEM PRIVATE
@@ -367,7 +349,7 @@ target_include_directories(extempore SYSTEM PRIVATE
     ${LLVM_INCLUDE_DIRS})
 
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
-target_link_libraries(extempore PRIVATE s7_lib pcre pcre2-8 portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE s7_lib pcre2-8 portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
 
 # Compile definitions
 if(EXT_SHARE_DIR)
@@ -439,7 +421,7 @@ endif()
 
 if(WIN32)
     target_include_directories(extempore SYSTEM PRIVATE src/networking-ts-impl/include)
-    target_compile_definitions(extempore PRIVATE -DPCRE_STATIC -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
+    target_compile_definitions(extempore PRIVATE -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
     target_compile_options(extempore PRIVATE /bigobj ${EXTEMPORE_WARNING_FLAGS})
     target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
     set_target_properties(extempore PROPERTIES
@@ -462,7 +444,6 @@ elseif(APPLE)
         COMMAND xattr -cr "$<TARGET_FILE_DIR:extempore>")
 else()
     # Linux
-    set_property(TARGET pcre PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
     target_link_libraries(extempore PRIVATE dl asound)
     target_link_options(extempore PRIVATE -rdynamic)
@@ -476,7 +457,7 @@ endif()
 # Filters to extempore source files only, not vendored third-party code.
 set(TIDY_SOURCES "")
 foreach(_src ${EXTEMPORE_SOURCES})
-    if(NOT _src MATCHES "(s7\\.c|pcre|networking-ts-impl|ffi/|shims/|linenoise)")
+    if(NOT _src MATCHES "(s7\\.c|networking-ts-impl|ffi/|shims/|linenoise)")
         list(APPEND TIDY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
     endif()
 endforeach()
