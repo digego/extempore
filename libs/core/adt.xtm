@@ -531,12 +531,6 @@
 ;; never work for the (push 42 (list)) case, so it's best to not use
 ;; it for the moment
 
-;; (bind-func push:[void,!a,List:<!a,List*>*]*
-;;   "add element to head of list (modifies list in-place)"
-;;   (lambda (element lst)
-;;     (set! lst (cons element lst))
-;;     void))
-
 (bind-func pop:[!a,List{!a}*]*
   "pop first element from list (modifies list in-place)"
   (lambda (lst)
@@ -663,66 +657,6 @@
           (BTree_walk_postorder fn (BTree_left tree))
           (BTree_walk_postorder fn (BTree_right tree))
           (fn (tref tree 0))))))
-
-;; ;; imperative version
-;; (bind-func BTree_walk_preorder:[void,BTree:<!v,BTree*,BTree*>*,[void,!v]*]
-;;   (lambda (tree fn)
-;;     (let ((to_visit (list)))
-;;       (while (not (or (null? to_visit)
-;;                       (null? tree)))
-;;         (if (not (null? tree))
-;;             (begin
-;;               ;; call the render callback
-;;               (fn (tref tree 0))
-;;               ;; set the other children to walk later
-;;               (if (not (null? (cdr (tref tree 5))))
-;;                   (set! to_visit
-;;                         (append (cdr (tref tree 5))
-;;                                 to_visit)))
-;;               ;; keep walking deeper
-;;               (set! tree (car (tref tree 5))))
-;;             (begin
-;;               ;; go back up and walk a different branch
-;;               (set! tree (car to_visit))
-;;               (set! to_visit (cdr to_visit))))))))
-
-
-;; a generic tree
-
-;; (bind-type Tree <!nt,List:<Tree*,List*>*>)
-
-;; (bind-func Tree_walk_preorder:[void,Tree:<!nt,List:<Tree*,List*>*>,[void,!nt]*]
-;;   (lambda (tree fn)
-;;     (let ((to_visit (list)))
-;;       (while (not (or (null? to_visit)
-;;                       (null? tree)))
-;;         (if (not (null? tree))
-;;             (begin
-;;               ;; call the render callback
-;;               (fn (tref tree 0))
-;;               ;; set the other children to walk later
-;;               (if (not (null? (cdr (tref tree 5))))
-;;                   (set! to_visit
-;;                         (append (cdr (tref tree 5))
-;;                                 to_visit)))
-;;               ;; keep walking deeper
-;;               (set! tree (car (tref tree 5))))
-;;             (begin
-;;               ;; go back up and walk a different branch
-;;               (set! tree (car to_visit))
-;;               (set! to_visit (cdr to_visit))))))))
-
-;; (bind-func Tree_find:[]
-;;   (lambda (tree visit)
-;;     ))
-
-;; (bind-func Tree_map:[]
-;;   (lambda (tree visit)
-;;     ))
-
-;; (bind-func Tree_reduce:[]
-;;   (lambda (tree visit)
-;;     ))
 
 
 
