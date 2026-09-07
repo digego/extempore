@@ -325,76 +325,13 @@
                 (list (car p2) (cname-decode (cadr p2)))
                 #f))))))
 
-;; Parsing a pretty type string is pure except in one branch: a generic
-;; instance %Name_poly_ENC that is not yet a named type has its LLVM struct
-;; compiled, the named type registered and its data constructors scheduled.
-;; The parser (get-type-from-pretty-str-rec) records that work as a request
-;; on *xtc:codegen:type-instantiations* instead of doing it, and
-;; get-type-from-pretty-str performs the requests, in parse order, once the
-;; parse is done.  A nested public call (the tuple, closure, array and
-;; vector helpers recurse through get-type-from-pretty-str) finds the
-;; accumulator active and hands its requests up, so an outer parse's memo
-;; entry carries every request the parse produced and a memo hit replays
-;; them all.  Replay is idempotent: a request for a type that exists by then
-;; is skipped, exactly as the parser skips the branch when it finds the type.
-;;
-;; With the effects out of the parser, argless parses --- the public hot
-;; path --- are memoised in *xtc:cache:type-parse-memo* (xtc-caches.xtm),
-;; which the type registrars clear.  Parses with args (a recursive-type
-;; context) are not memoised: the same string parses differently under
-;; different args.
-
-(define *xtc:codegen:type-instantiations* #f)
-
-;; the parser's one deferred effect: instantiate %name as the LLVM struct
-;; TYPE; gname is the generic it instantiates (for the error message only)
-(define xtc:codegen:request-type-instantiation!
-  (lambda (name gname type)
-    (set! *xtc:codegen:type-instantiations*
-          (cons (list name gname type) *xtc:codegen:type-instantiations*))))
-
-(define xtc:codegen:instantiate-type!
-  (lambda (req)
-    (let ((name (car req))
-          (gname (cadr req))
-          (type (caddr req)))
-      (if (not (xtc:cache:namedtype-exists? (string-append "%" name)))
-          (begin
-            (if (not *xtc:globals:suppress-ir-generation*)
-                (if (llvm:compile-ir (string-append "%" name " = type " type))
-                    (xtc:cache:register-new-namedtype name (xtc:codegen:get-type-from-str type) "")
-                    (xtc:diagnostics:print-compiler-error "could not compile new type" (cons gname type))))
-            (if *xtc:codegen:get-type-callback-off*
-                (xtc:bind:compile-type-dataconstructors (string->symbol name) type #f #t #t #t)
-                (callback (now) 'xtc:bind:compile-type-dataconstructors (string->symbol name) type #f #t #t #t)))))))
-
-;; pure: (value . requests), memoised for argless calls
-(define xtc:codegen:parse-pretty-type
-  (lambda (string-type args)
-    (or (and (null? args) (hashtable-ref *xtc:cache:type-parse-memo* string-type))
-        (let ((saved *xtc:codegen:type-instantiations*)
-              (parsed #f))
-          (dynamic-wind
-            (lambda () (set! *xtc:codegen:type-instantiations* '()))
-            (lambda ()
-              (let ((value (apply xtc:codegen:get-type-from-pretty-str-rec string-type args)))
-                (set! parsed (cons value (reverse *xtc:codegen:type-instantiations*)))))
-            (lambda () (set! *xtc:codegen:type-instantiations* saved)))
-          (if (null? args)
-              (hashtable-set! *xtc:cache:type-parse-memo* string-type parsed))
-          parsed))))
-
 (define xtc:codegen:get-type-from-pretty-str
   (lambda (string-type . args)
-    (let ((parsed (xtc:codegen:parse-pretty-type string-type args)))
-      (if *xtc:codegen:type-instantiations*
-          ;; nested in an outer parse: it performs the requests when it is done
-          (set! *xtc:codegen:type-instantiations*
-                (append (reverse (cdr parsed)) *xtc:codegen:type-instantiations*))
-          (for-each xtc:codegen:instantiate-type! (cdr parsed)))
-      (car parsed))))
+    (let ((res (apply xtc:codegen:get-type-from-pretty-str-rec string-type args)))
+      ;; (println 'pretty-string-type string-type 'to res)
+      res)))
 
-;; the parser: pure but for the request it records (see above)
+;; now with pretty print support
 (define xtc:codegen:get-type-from-pretty-str-rec
   (lambda (string-type . args)
     ;; (println 'ir:get-type-from-pretty-str-rec 'stype: string-type 'args: args)
@@ -614,7 +551,13 @@
                ;; (println 'name1 name1 't1 t1 't2 t2 't3 t3 't4 t4 'type type)
                ;; (println 'make-new-type: (string-append "%" name1 " = type " type))
                ;; (llvm:compile-ir (string-append "%" name1 " = type " type))
-               (xtc:codegen:request-type-instantiation! name1 name type)
+               (if (not *xtc:globals:suppress-ir-generation*)
+                   (if (llvm:compile-ir (string-append "%" name1 " = type " type))
+                       (xtc:cache:register-new-namedtype name1 (xtc:codegen:get-type-from-str type) "")
+                       (xtc:diagnostics:print-compiler-error "could not compile new type" (cons name type))))
+               (if *xtc:codegen:get-type-callback-off*
+                   (xtc:bind:compile-type-dataconstructors (string->symbol name1) type #f #t #t #t)
+                   (callback (now) 'xtc:bind:compile-type-dataconstructors (string->symbol name1) type #f #t #t #t))
                string-type))
             ;; (error ""))))
             ;; #315: keep the pointer depth on a *bare* type variable (!a* stays
