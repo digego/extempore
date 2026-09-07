@@ -96,3 +96,46 @@
 (xtmtest-result (xtc:bind:get-expression-type '(let ((x:i64 1)) (begin x)))
                 2
                 "begin-expr")
+
+;; the phases around the constraint engine, on ASTs shaped as first-transform
+;; leaves them (a single begin-wrapped body per let and lambda)
+
+(xtmtest-result (xtc:typecheck:mark-returns '(let ((f (lambda (x) (begin (if (> x 1) (begin x) (begin 2)))))) (begin f)) 'f #f #f #f)
+                '(let ((f (lambda (x) (begin (ifret (> x 1) (begin (ret-> f x)) (begin (ret-> f 2))))))) (begin (ret-> f f)))
+                "mark-returns-if-else")
+
+(xtmtest-result (xtc:typecheck:mark-returns '(let ((y (begin 1))) (begin (if a (begin b)))) 'g #t #t #f)
+                '(let ((y (begin 1))) (begin (ifret a (begin (ret-> g b)))))
+                "mark-returns-if-without-else")
+
+(xtmtest-result (xtc:typecheck:mark-returns '(begin (if a b ())) 'k #t #t #f)
+                '(begin (ifret a (ret-> k b) (ret-> k ())))
+                "mark-returns-keeps-nil-else")
+
+(xtmtest-result (xtc:typecheck:mark-returns '(lambdaz (x) (begin (set! x 1) (begin (f x) 2))) 'h #f #f #f)
+                '(lambdaz (x) (begin (set! x 1) (begin (f x) (ret-> h 2))))
+                "mark-returns-last-form-only")
+
+(xtmtest-result (xtc:typecheck:closure:convert '(let ((f (lambdaz (x) (begin (let ((y 1)) (begin (+ x y))))))) (begin f)) '(f))
+                '(__make-env 3 ((f (__make-closure-z 0 () (x) (begin (__make-env 0 ((y 1)) (begin (+ x y))))))) (begin f))
+                "closure-convert-nested-let")
+
+(xtmtest-result (xtc:typecheck:closure:convert '(let ((g (lambdah (a b) (begin (lambdas () (begin a)))))) (begin g)) '(g))
+                '(__make-env 2 ((g (__make-closure-h 2 () (a b) (begin (__make-closure-s 0 (b a) () (begin a)))))) (begin g))
+                "closure-convert-alloc-tags-and-env")
+
+(xtmtest-result (xtc:typecheck:find-all-vars '(__make-env 0 ((f (__make-closure-z 0 (f) (x) (__make-env 0 ((y 1)) (begin (+ x y)))))) (begin f)) '())
+                '(y f x)
+                "find-all-vars")
+
+(xtmtest-result (xtc:typecheck:coercion-run '(begin (+ a 1) (* 2 b) (< a b) (- b a)) '((a . 0) (b . 2)))
+                '(begin (+ a 1.0) (* 2 b) (< a (i64tod b)) (- (i64tod b) a))
+                "coercion-run")
+
+(xtmtest-result (xtc:typecheck:get-closure-arg-symbols 'f '(let ((f (lambda (a b) (begin 1)))) (begin f)))
+                '(a b)
+                "closure-arg-symbols")
+
+(xtmtest-result (xtc:typecheck:get-closure-arg-symbols 'f '(let ((f 1)) (begin f)))
+                '()
+                "closure-arg-symbols-none")

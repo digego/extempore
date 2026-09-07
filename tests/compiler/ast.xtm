@@ -1,0 +1,107 @@
+;;; tests/compiler/ast.xtm -- unit tests for the AST accessor layer (xtc-ast.xtm)
+;;;
+;;; The layer names the fields of every node shape the pipeline produces:
+;;; the core forms first-transform leaves behind, then ret-> (mark-returns),
+;;; __make-closure*/__make-env* (closure conversion, re-shaped with types by
+;;; add-types-to-source) and clrun-> (closure application).  These tests pin
+;;; the shape each constructor writes and each accessor reads, and that the
+;;; predicates are safe on atoms and the empty list (the walkers call them
+;;; ahead of their pair? guard).
+
+(sys:load "libs/core/test.xtm")
+
+(xtmtest-with-fixture ast-predicates
+                      (define (bool x) (if x #t #f))
+                      (is? (bool (ast:let? '(let ((x 1)) x))) #t "let")
+                      (is? (bool (ast:let? '(letrec ((x 1)) x))) #t "letrec")
+                      (is? (bool (ast:let? '())) #f "let-on-nil")
+                      (is? (bool (ast:let? 'x)) #f "let-on-symbol")
+                      (is? (bool (ast:lambda? '(lambdaz (x) x))) #t "lambdaz")
+                      (is? (bool (ast:lambda? '())) #f "lambda-on-nil")
+                      (is? (bool (ast:if? '(ifret a b))) #t "ifret")
+                      (is? (bool (ast:if? 42)) #f "if-on-literal")
+                      (is? (bool (ast:begin? '(begin 1))) #t "begin")
+                      (is? (bool (ast:set!? '(set! x 1))) #t "set!")
+                      (is? (bool (ast:ret? '(ret-> f x))) #t "ret")
+                      (is? (bool (ast:ret? '())) #f "ret-on-nil")
+                      (is? (bool (ast:closure? '(__make-closure-z 0 () (x) x))) #t "closure-z")
+                      (is? (bool (ast:closure? '(__make-closure-h 0 () (x) x))) #t "closure-h")
+                      (is? (bool (ast:closure? '())) #f "closure-on-nil")
+                      (is? (bool (ast:env? '(__make-env 0 () x))) #t "env")
+                      (is? (bool (ast:env? '(__make-env-zone 0 () x))) #t "env-zone")
+                      (is? (bool (ast:env? '())) #f "env-on-nil")
+                      (is? (bool (ast:clrun? '(clrun-> f 1))) #t "clrun")
+                      (is? (bool (ast:clrun? '(f 1))) #f "clrun-on-call")
+                      (is? (bool (ast:call? '(f 1))) #t "call")
+                      (is? (bool (ast:call? '(if a b))) #f "call-on-if"))
+
+;; an if node is 3 or 4 long: a desugared cond drops a missing else
+
+(xtmtest-with-fixture ast-if
+                      (define node '(if a b c))
+                      (is? (ast:if-test node) 'a "test")
+                      (is? (ast:if-then node) 'b "then")
+                      (is? (ast:if-else node) 'c "else")
+                      (is? (ast:if-else '(if a b)) '() "missing-else-reads-nil")
+                      (is? (ast:if-has-else? '(if a b)) #f "has-else-missing")
+                      (is? (ast:if-has-else? '(if a b ())) #t "has-else-nil")
+                      (is? (ast:make-if 'a 'b 'c) '(if a b c) "make-if")
+                      (is? (ast:make-tagged-if 'ifret 'a 'b) '(ifret a b) "tagged-if-no-else")
+                      (is? (ast:make-tagged-if 'if 'a 'b 'c) '(if a b c) "tagged-if-else"))
+
+(xtmtest-with-fixture ast-let-lambda
+                      (define l (ast:make-let 'let (list (ast:make-binding 'x 1)) '(begin x)))
+                      (is? l '(let ((x 1)) (begin x)) "make-let")
+                      (is? (ast:let-tag l) 'let "let-tag")
+                      (is? (ast:binding-var (car (ast:let-bindings l))) 'x "binding-var")
+                      (is? (ast:binding-expr (car (ast:let-bindings l))) 1 "binding-expr")
+                      (is? (ast:let-body l) '(begin x) "let-body")
+                      (define f (ast:make-lambda 'lambdaz '(a b) '(begin a)))
+                      (is? f '(lambdaz (a b) (begin a)) "make-lambda")
+                      (is? (ast:lambda-tag f) 'lambdaz "lambda-tag")
+                      (is? (ast:lambda-params f) '(a b) "lambda-params")
+                      (is? (ast:lambda-body f) '(begin a) "lambda-body"))
+
+(xtmtest-with-fixture ast-call-begin-set-ret
+                      (define call '(f 1 2))
+                      (is? (ast:call-head call) 'f "head")
+                      (is? (ast:call-args call) '(1 2) "args")
+                      (is? (ast:call-arg call 1) 2 "arg-n")
+                      (is? (ast:begin-exprs (ast:make-begin '(1 2))) '(1 2) "begin-exprs")
+                      (is? (ast:set!-var (ast:make-set! 'x 1)) 'x "set-var")
+                      (is? (ast:set!-expr (ast:make-set! 'x 1)) 1 "set-expr")
+                      (is? (ast:make-ret 'f 'x) '(ret-> f x) "make-ret")
+                      (is? (ast:ret-name '(ret-> f x)) 'f "ret-name")
+                      (is? (ast:ret-expr '(ret-> f x)) 'x "ret-expr"))
+
+;; closure conversion nodes, before and after add-types-to-source
+
+(xtmtest-with-fixture ast-closure
+                      (define c (ast:make-closure '__make-closure-z 0 '(e) '(x) '(begin x)))
+                      (is? c '(__make-closure-z 0 (e) (x) (begin x)) "make-closure")
+                      (is? (ast:closure-tag c) '__make-closure-z "tag")
+                      (is? (ast:closure-alloc c) 0 "alloc")
+                      (is? (ast:closure-env c) '(e) "env")
+                      (is? (ast:closure-params c) '(x) "params")
+                      (is? (ast:closure-body c) '(begin x) "body")
+                      (define t (ast:make-typed-closure '__make-closure-z 0 "f__1" 2 '((e . 2)) '((x . 2)) '(begin x)))
+                      (is? t '(__make-closure-z 0 "f__1" 2 ((e . 2)) ((x . 2)) (begin x)) "make-typed-closure")
+                      (is? (ast:closure-tag t) '__make-closure-z "typed-tag")
+                      (is? (ast:closure-alloc t) 0 "typed-alloc")
+                      (is? (ast:typed-closure-name t) "f__1" "name")
+                      (is? (ast:typed-closure-rettype t) 2 "rettype")
+                      (is? (ast:typed-closure-envtypes t) '((e . 2)) "envtypes")
+                      (is? (ast:typed-closure-argtypes t) '((x . 2)) "argtypes")
+                      (is? (ast:typed-closure-body t) '(begin x) "typed-body"))
+
+(xtmtest-with-fixture ast-env-clrun
+                      (define e (ast:make-env '__make-env 0 '((y 1)) '(begin y)))
+                      (is? e '(__make-env 0 ((y 1)) (begin y)) "make-env")
+                      (is? (ast:env-tag e) '__make-env "tag")
+                      (is? (ast:env-alloc e) 0 "alloc")
+                      (is? (ast:env-bindings e) '((y 1)) "bindings")
+                      (is? (ast:env-body e) '(begin y) "body")
+                      (define r (ast:make-clrun 'f '(1 2)))
+                      (is? r '(clrun-> f 1 2) "make-clrun")
+                      (is? (ast:clrun-callee r) 'f "callee")
+                      (is? (ast:clrun-args r) '(1 2) "args"))

@@ -2,9 +2,13 @@
 ;; Thin AST accessor layer for the xtlang compiler.
 ;;
 ;; Provides predicates, accessors, and constructors for the 7 core
-;; node types (let, lambda, if, begin, set!, call, var, lit).
-;; The underlying representation is unchanged (tagged lists), so
-;; intermediate passes and IR generation work unmodified.
+;; node types (let, lambda, if, begin, set!, call, var, lit) as they
+;; leave first-transform, and for the nodes the later phases introduce:
+;; ret-> (mark-returns), __make-closure*/__make-env* (closure
+;; conversion, then re-shaped with types by add-types-to-source) and
+;; clrun-> (closure application).  The underlying representation is
+;; unchanged (tagged lists); the layer exists so every pass reads a
+;; node's fields by name rather than by position.
 ;;
 ;; Loaded between xtc-transforms.xtm and xtc-typecheck.xtm.
 ;;
@@ -13,23 +17,23 @@
 
 (define ast:let?
   (lambda (ast)
-    (and (list? ast) (member (car ast) *xtc:globals:letslist*))))
+    (and (pair? ast) (member (car ast) *xtc:globals:letslist*))))
 
 (define ast:lambda?
   (lambda (ast)
-    (and (list? ast) (member (car ast) *xtc:globals:lambdaslist*))))
+    (and (pair? ast) (member (car ast) *xtc:globals:lambdaslist*))))
 
 (define ast:if?
   (lambda (ast)
-    (and (list? ast) (member (car ast) '(if ifret)))))
+    (and (pair? ast) (member (car ast) '(if ifret)))))
 
 (define ast:begin?
   (lambda (ast)
-    (and (list? ast) (eq? (car ast) 'begin))))
+    (and (pair? ast) (eq? (car ast) 'begin))))
 
 (define ast:set!?
   (lambda (ast)
-    (and (list? ast) (eq? (car ast) 'set!))))
+    (and (pair? ast) (eq? (car ast) 'set!))))
 
 (define ast:var?
   (lambda (ast)
@@ -86,6 +90,11 @@
   (lambda (ast)
     (if (null? (cdddr ast)) '() (cadddr ast))))
 
+;; a desugared cond drops a missing else branch entirely, so an if node
+;; is 3 or 4 long; ast:if-else cannot tell "no else" from "else is ()"
+(define ast:if-has-else?
+  (lambda (ast) (not (null? (cdddr ast)))))
+
 ;; --- begin accessors ---
 ;; (begin e1 e2 ...) => (begin . exprs)
 
@@ -100,6 +109,118 @@
 
 (define ast:set!-expr
   (lambda (ast) (caddr ast)))
+
+;; --- binding accessors ---
+;; a let (or __make-env) binding: (var expr); after add-types-to-source an
+;; env binding's var slot holds the (var . type) entry instead
+
+(define ast:binding-var
+  (lambda (b) (car b)))
+
+(define ast:binding-expr
+  (lambda (b) (cadr b)))
+
+;; --- call accessors ---
+;; (f a b ...) => head and args
+
+(define ast:call-head
+  (lambda (ast) (car ast)))
+
+(define ast:call-args
+  (lambda (ast) (cdr ast)))
+
+(define ast:call-arg
+  (lambda (ast n) (list-ref (cdr ast) n)))
+
+;; --- ret-> accessors ---
+;; (ret-> name expr): the return marker mark-returns inserts
+
+(define ast:ret?
+  (lambda (ast)
+    (and (pair? ast) (eq? (car ast) 'ret->))))
+
+(define ast:ret-name
+  (lambda (ast) (cadr ast)))
+
+(define ast:ret-expr
+  (lambda (ast) (caddr ast)))
+
+;; --- closure accessors ---
+;; closure conversion turns a lambda into
+;;   (__make-closure-z alloc env params body)
+;; and add-types-to-source re-shapes that into
+;;   (__make-closure-z alloc name rettype envtypes argtypes body)
+;; where envtypes and argtypes are (var . type) entries
+
+(define *xtc:ast:closure-tags* '(__make-closure __make-closure-s __make-closure-h __make-closure-z))
+
+(define ast:closure?
+  (lambda (ast)
+    (and (pair? ast) (member (car ast) *xtc:ast:closure-tags*))))
+
+(define ast:closure-tag
+  (lambda (ast) (car ast)))
+
+(define ast:closure-alloc
+  (lambda (ast) (cadr ast)))
+
+(define ast:closure-env
+  (lambda (ast) (caddr ast)))
+
+(define ast:closure-params
+  (lambda (ast) (cadddr ast)))
+
+(define ast:closure-body
+  (lambda (ast) (list-ref ast 4)))
+
+(define ast:typed-closure-name
+  (lambda (ast) (list-ref ast 2)))
+
+(define ast:typed-closure-rettype
+  (lambda (ast) (list-ref ast 3)))
+
+(define ast:typed-closure-envtypes
+  (lambda (ast) (list-ref ast 4)))
+
+(define ast:typed-closure-argtypes
+  (lambda (ast) (list-ref ast 5)))
+
+(define ast:typed-closure-body
+  (lambda (ast) (list-ref ast 6)))
+
+;; --- env accessors ---
+;; closure conversion turns a let into (__make-env alloc bindings body)
+
+(define *xtc:ast:env-tags* '(__make-env __make-env-zone))
+
+(define ast:env?
+  (lambda (ast)
+    (and (pair? ast) (member (car ast) *xtc:ast:env-tags*))))
+
+(define ast:env-tag
+  (lambda (ast) (car ast)))
+
+(define ast:env-alloc
+  (lambda (ast) (cadr ast)))
+
+(define ast:env-bindings
+  (lambda (ast) (caddr ast)))
+
+(define ast:env-body
+  (lambda (ast) (cadddr ast)))
+
+;; --- clrun-> accessors ---
+;; (clrun-> callee arg ...): apply a closure
+
+(define ast:clrun?
+  (lambda (ast)
+    (and (pair? ast) (eq? (car ast) 'clrun->))))
+
+(define ast:clrun-callee
+  (lambda (ast) (cadr ast)))
+
+(define ast:clrun-args
+  (lambda (ast) (cddr ast)))
 
 ;; --- constructors ---
 
@@ -122,6 +243,35 @@
 (define ast:make-lambda
   (lambda (tag params body)
     (cons tag (cons params (list body)))))
+
+;; an if or ifret node; a missing else is omitted, not nulled
+(define ast:make-tagged-if
+  (lambda (tag test then . else)
+    (cons tag (cons test (cons then else)))))
+
+(define ast:make-binding
+  (lambda (var expr)
+    (list var expr)))
+
+(define ast:make-ret
+  (lambda (name expr)
+    (list 'ret-> name expr)))
+
+(define ast:make-closure
+  (lambda (tag alloc env params body)
+    (list tag alloc env params body)))
+
+(define ast:make-typed-closure
+  (lambda (tag alloc name rettype envtypes argtypes body)
+    (list tag alloc name rettype envtypes argtypes body)))
+
+(define ast:make-env
+  (lambda (tag alloc bindings body)
+    (list tag alloc bindings body)))
+
+(define ast:make-clrun
+  (lambda (callee args)
+    (cons 'clrun-> (cons callee args))))
 
 ;; --- validation ---
 
