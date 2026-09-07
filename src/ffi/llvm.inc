@@ -590,23 +590,15 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args)
     return mk_string(Scheme, extemp::EXTLLVM::llvm_disassemble(fptr, syntax));
 }
 
-// NOTE: duplicates the registerSymbol path in EXTLLVM.cpp; leaving the two in
-// place until the JIT symbol-registration rework lands.
-static void registerJITSymbol(const char* name, void* addr) {
-    if (!EXTLLVM::JIT) return;
-    auto& ES = EXTLLVM::JIT->getExecutionSession();
-    auto& JD = EXTLLVM::JIT->getMainJITDylib();
-
-    llvm::orc::SymbolMap Symbols;
-    Symbols[ES.intern(name)] = {
-        llvm::orc::ExecutorAddr::fromPtr(addr),
-        llvm::JITSymbolFlags::Exported
-    };
-
-    auto err = JD.define(llvm::orc::absoluteSymbols(std::move(Symbols)));
-    if (err) {
-        llvm::consumeError(std::move(err));
+// Map a symbol name to a process address for future compiles, replacing any
+// earlier mapping. Reports failure to the console and returns false.
+static bool defineJITSymbol(const char* name, void* addr) {
+    if (auto err = EXTLLVM::defineAbsoluteSymbol(name, addr)) {
+        std::cerr << "Error: could not bind symbol " << name << ": " << llvm::toString(std::move(err))
+                  << std::endl;
+        return false;
     }
+    return true;
 }
 
 static pointer bind_symbol(scheme* Scheme, pointer Args)
@@ -619,8 +611,7 @@ static pointer bind_symbol(scheme* Scheme, pointer Args)
 #else
     auto ptr(dlsym(library, sym));
 #endif
-    if (likely(ptr)) {
-        registerJITSymbol(sym, ptr);
+    if (ptr && defineJITSymbol(sym, ptr)) [[likely]] {
         return Scheme->T;
     }
     return Scheme->F;
@@ -631,14 +622,9 @@ static pointer update_mapping(scheme* Scheme, pointer Args)
     auto sym(argString(Scheme, Args, 1));
     auto ptr(argCptr(Scheme, Args, 2));
 
-    // Extempore doesn't track arbitrary symbol addresses under ORC.
-    // Return 0 for "old".
-    uint64_t oldaddr = 0;
-
-    // Register new mapping
-    registerJITSymbol(sym, ptr);
-
-    return mk_cptr(Scheme, reinterpret_cast<void*>(oldaddr));
+    // The previous address is not tracked under ORC; "old" is always 0.
+    defineJITSymbol(sym, ptr);
+    return mk_cptr(Scheme, nullptr);
 }
 
 // Written from whichever scheme process thread is compiling, so both ends take

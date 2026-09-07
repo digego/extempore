@@ -114,6 +114,8 @@ llvm::orc::ThreadSafeContext& getThreadSafeContext();
 // absolute symbol registered with defineAbsoluteSymbol. False if not found.
 bool removeSymbol(const std::string& name);
 void removeFromGlobalMap(const std::string& name);
+// Define, or redefine, a symbol resolving to a fixed process address.
+llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr);
 
 // What a module contributes to the JIT: strong definitions it exports, external
 // symbols it uses, and whether any export is a global variable.

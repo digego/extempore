@@ -437,7 +437,8 @@ static std::unique_ptr<llvm::Module> cloneTemplateModule(llvm::LLVMContext& ctx)
     if (modOrErr) {
         return std::move(modOrErr.get());
     }
-    llvm::consumeError(modOrErr.takeError());
+    std::cerr << "Failed to read the cached bitcode.ll template: "
+              << llvm::toString(modOrErr.takeError()) << std::endl;
     return nullptr;
 }
 

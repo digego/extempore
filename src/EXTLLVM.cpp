@@ -1184,21 +1184,97 @@ EXPORT int64_t thread_sleep(int64_t Secs, int64_t Nanosecs) {
     return 0;
 }
 
-// Register a symbol with the JIT
-static void registerSymbol(const char* name, void* addr) {
-    if (!JIT)
-        return;
-    auto& ES = JIT->getExecutionSession();
-    auto& JD = JIT->getMainJITDylib();
+// Runtime entry points generated code calls by name. They are defined in the
+// main JITDylib as absolute symbols once the JIT exists; anything else
+// resolves through the DynamicLibrarySearchGenerator.
+static const std::pair<const char*, void*> kRuntimeSymbols[] = {
+    {"llvm_zone_destroy", (void*)&extemp::EXTZones::llvm_zone_destroy},
+    {"llvm_zone_malloc", (void*)&extemp::EXTZones::llvm_zone_malloc},
+    {"llvm_zone_malloc_from_current_zone", (void*)&extemp::EXTZones::llvm_zone_malloc_from_current_zone},
+    {"llvm_zone_print", (void*)&extemp::EXTZones::llvm_zone_print},
+    {"llvm_zone_ptr_size", (void*)&extemp::EXTZones::llvm_zone_ptr_size},
+    {"llvm_zone_copy_ptr", (void*)&extemp::EXTZones::llvm_zone_copy_ptr},
+    {"llvm_ptr_in_zone", (void*)&extemp::EXTZones::llvm_ptr_in_zone},
+    {"llvm_ptr_in_current_zone", (void*)&extemp::EXTZones::llvm_ptr_in_current_zone},
+    {"llvm_pop_zone_stack", (void*)&extemp::EXTZones::llvm_pop_zone_stack},
+    {"llvm_zone_callback_setup", (void*)&extemp::EXTZones::llvm_zone_callback_setup},
+    {"llvm_peek_zone_stack_extern", (void*)&extemp::EXTZones::llvm_peek_zone_stack_extern},
+    {"llvm_push_zone_stack_extern", (void*)&extemp::EXTZones::llvm_push_zone_stack_extern},
+    {"llvm_zone_create_extern", (void*)&extemp::EXTZones::llvm_zone_create_extern},
+    {"llvm_destroy_zone_after_delay", (void*)&llvm_destroy_zone_after_delay},
+    {"get_address_offset", (void*)&extemp::ClosureAddressTable::get_address_offset},
+    {"add_address_table", (void*)&extemp::ClosureAddressTable::add_address_table},
+    {"get_address_table", (void*)&extemp::ClosureAddressTable::get_address_table},
+    {"check_address_exists", (void*)&extemp::ClosureAddressTable::check_address_exists},
+    {"check_address_type", (void*)&extemp::ClosureAddressTable::check_address_type},
+    {"string_hash", (void*)&string_hash},
+    {"swap64i", (void*)&swap64i},
+    {"swap64f", (void*)&swap64f},
+    {"swap32i", (void*)&swap32i},
+    {"swap32f", (void*)&swap32f},
+    {"unswap64i", (void*)&unswap64i},
+    {"unswap64f", (void*)&unswap64f},
+    {"unswap32i", (void*)&unswap32i},
+    {"unswap32f", (void*)&unswap32f},
+    {"rsplit", (void*)&rsplit},
+    {"rmatch", (void*)&rmatch},
+    {"rreplace", (void*)&rreplace},
+    {"r64value", (void*)&r64value},
+    {"mk_double", (void*)&mk_double},
+    {"r32value", (void*)&r32value},
+    {"mk_float", (void*)&mk_float},
+    {"mk_i64", (void*)&mk_i64},
+    {"mk_i32", (void*)&mk_i32},
+    {"mk_i16", (void*)&mk_i16},
+    {"mk_i8", (void*)&mk_i8},
+    {"mk_i1", (void*)&mk_i1},
+    {"string_value", (void*)&string_value},
+    {"mk_string", (void*)&mk_string},
+    {"cptr_value", (void*)&cptr_value},
+    {"mk_cptr", (void*)&mk_cptr},
+    {"sys_sharedir", (void*)&sys_sharedir},
+    {"sys_slurp_file", (void*)&sys_slurp_file},
+    {"fp80_to_double_portable", (void*)&fp80_to_double_portable},
+};
 
-    llvm::orc::SymbolMap Symbols;
-    Symbols[ES.intern(name)] = {llvm::orc::ExecutorAddr::fromPtr(addr),
-                                llvm::JITSymbolFlags::Exported};
-
-    auto err = JD.define(llvm::orc::absoluteSymbols(std::move(Symbols)));
-    if (err) {
-        llvm::consumeError(std::move(err));
+// Define, or redefine, a symbol that resolves to a fixed process address
+// (bind-lib and llvm:update-mapping). A symbol an earlier module defined is
+// erased first, so rebinding replaces the mapping rather than silently
+// keeping the old one.
+llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr) {
+    if (!JIT) {
+        return llvm::make_error<llvm::StringError>("JIT not initialized",
+                                                   llvm::inconvertibleErrorCode());
     }
+    std::lock_guard<std::mutex> lock(sModulesMutex);
+    std::string name(Name);
+    if (sSymbolOwner.count(name)) {
+        sPendingErase.push_back(name);
+        flushPendingErasures();
+    }
+    auto& JD = JIT->getMainJITDylib();
+    auto sym = JIT->mangleAndIntern(name);
+    auto define = [&]() {
+        llvm::orc::SymbolMap symbols;
+        symbols[sym] = {llvm::orc::ExecutorAddr::fromPtr(Addr), llvm::JITSymbolFlags::Exported};
+        return JD.define(llvm::orc::absoluteSymbols(std::move(symbols)));
+    };
+    auto err = define();
+    if (!err) {
+        return llvm::Error::success();
+    }
+    bool duplicate = false;
+    std::string message;
+    llvm::handleAllErrors(
+        std::move(err), [&](const llvm::orc::DuplicateDefinition&) { duplicate = true; },
+        [&](const llvm::ErrorInfoBase& e) { message = e.message(); });
+    if (!duplicate) {
+        return llvm::make_error<llvm::StringError>(message, llvm::inconvertibleErrorCode());
+    }
+    if (auto rerr = JD.remove({sym})) {  // an earlier absolute definition
+        return rerr;
+    }
+    return define();
 }
 
 void initLLVM() {
@@ -1325,62 +1401,17 @@ void initLLVM() {
     std::cout << " ORC JIT" << std::endl;
     ascii_normal();
 
-    // Register built-in symbols with the JIT.
-
-    // Zone memory management functions
-    registerSymbol("llvm_zone_destroy", (void*)&extemp::EXTZones::llvm_zone_destroy);
-    registerSymbol("llvm_zone_malloc", (void*)&extemp::EXTZones::llvm_zone_malloc);
-    registerSymbol("llvm_zone_malloc_from_current_zone",
-                   (void*)&extemp::EXTZones::llvm_zone_malloc_from_current_zone);
-    registerSymbol("llvm_zone_print", (void*)&extemp::EXTZones::llvm_zone_print);
-    registerSymbol("llvm_zone_ptr_size", (void*)&extemp::EXTZones::llvm_zone_ptr_size);
-    registerSymbol("llvm_zone_copy_ptr", (void*)&extemp::EXTZones::llvm_zone_copy_ptr);
-    registerSymbol("llvm_ptr_in_zone", (void*)&extemp::EXTZones::llvm_ptr_in_zone);
-    registerSymbol("llvm_ptr_in_current_zone", (void*)&extemp::EXTZones::llvm_ptr_in_current_zone);
-    registerSymbol("llvm_pop_zone_stack", (void*)&extemp::EXTZones::llvm_pop_zone_stack);
-    registerSymbol("llvm_zone_callback_setup", (void*)&extemp::EXTZones::llvm_zone_callback_setup);
-    registerSymbol("llvm_peek_zone_stack_extern",
-                   (void*)&extemp::EXTZones::llvm_peek_zone_stack_extern);
-    registerSymbol("llvm_push_zone_stack_extern",
-                   (void*)&extemp::EXTZones::llvm_push_zone_stack_extern);
-    registerSymbol("llvm_zone_create_extern", (void*)&extemp::EXTZones::llvm_zone_create_extern);
-    registerSymbol("llvm_destroy_zone_after_delay", (void*)&llvm_destroy_zone_after_delay);
-
-    // Closure address table functions
-    registerSymbol("get_address_offset", (void*)&extemp::ClosureAddressTable::get_address_offset);
-    registerSymbol("add_address_table", (void*)&extemp::ClosureAddressTable::add_address_table);
-    registerSymbol("get_address_table", (void*)&extemp::ClosureAddressTable::get_address_table);
-    registerSymbol("check_address_exists",
-                   (void*)&extemp::ClosureAddressTable::check_address_exists);
-    registerSymbol("check_address_type", (void*)&extemp::ClosureAddressTable::check_address_type);
-    registerSymbol("string_hash", (void*)&string_hash);
-    registerSymbol("swap64i", (void*)&swap64i);
-    registerSymbol("swap64f", (void*)&swap64f);
-    registerSymbol("swap32i", (void*)&swap32i);
-    registerSymbol("swap32f", (void*)&swap32f);
-    registerSymbol("unswap64i", (void*)&unswap64i);
-    registerSymbol("unswap64f", (void*)&unswap64f);
-    registerSymbol("unswap32i", (void*)&unswap32i);
-    registerSymbol("unswap32f", (void*)&unswap32f);
-    registerSymbol("rsplit", (void*)&rsplit);
-    registerSymbol("rmatch", (void*)&rmatch);
-    registerSymbol("rreplace", (void*)&rreplace);
-    registerSymbol("r64value", (void*)&r64value);
-    registerSymbol("mk_double", (void*)&mk_double);
-    registerSymbol("r32value", (void*)&r32value);
-    registerSymbol("mk_float", (void*)&mk_float);
-    registerSymbol("mk_i64", (void*)&mk_i64);
-    registerSymbol("mk_i32", (void*)&mk_i32);
-    registerSymbol("mk_i16", (void*)&mk_i16);
-    registerSymbol("mk_i8", (void*)&mk_i8);
-    registerSymbol("mk_i1", (void*)&mk_i1);
-    registerSymbol("string_value", (void*)&string_value);
-    registerSymbol("mk_string", (void*)&mk_string);
-    registerSymbol("cptr_value", (void*)&cptr_value);
-    registerSymbol("mk_cptr", (void*)&mk_cptr);
-    registerSymbol("sys_sharedir", (void*)&sys_sharedir);
-    registerSymbol("sys_slurp_file", (void*)&sys_slurp_file);
-    registerSymbol("fp80_to_double_portable", (void*)&fp80_to_double_portable);
+    // Register the runtime entry points with the JIT.
+    llvm::orc::SymbolMap runtimeSymbols;
+    for (const auto& [name, addr] : kRuntimeSymbols) {
+        runtimeSymbols[JIT->mangleAndIntern(name)] = {llvm::orc::ExecutorAddr::fromPtr(addr),
+                                                      llvm::JITSymbolFlags::Exported};
+    }
+    if (auto err = MainJD.define(llvm::orc::absoluteSymbols(std::move(runtimeSymbols)))) {
+        std::cerr << "ERROR: Failed to register runtime symbols with the JIT: "
+                  << llvm::toString(std::move(err)) << std::endl;
+        exit(1);
+    }
 
     return;
 }
