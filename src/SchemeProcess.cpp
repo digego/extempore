@@ -196,7 +196,11 @@ bool SchemeProcess::start(bool subsume) {
 
 void SchemeProcess::stop() {
     std::cout << "Stop Scheme Interface" << std::endl;
-    m_running = false;
+    {
+        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+        m_running = false;
+    }
+    m_guardCond.notify_all();  // wake the task thread so it can exit its loop
     scheme_deinit(m_scheme);
     // TODO: what about sm_current?/name lookup
 }
@@ -271,12 +275,14 @@ void* SchemeProcess::taskImpl() {
                                         SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
     }
-    while (likely(m_running)) {
-        if (unlikely(taskQueueEmpty())) {
-            std::this_thread::sleep_for(std::chrono::microseconds(1000));  // 1 ms
-            continue;
+    while (m_running) [[likely]] {
+        {
+            // Sleep until a producer pushes a task (or stop() is called); the
+            // predicate is checked under m_guardMutex so no notify is missed.
+            std::unique_lock<std::recursive_mutex> lock(m_guardMutex);
+            m_guardCond.wait(lock, [this] { return !m_taskQueue.empty() || !m_running; });
         }
-        while (likely(!taskQueueEmpty() && m_running)) {
+        while (!taskQueueEmpty() && m_running) [[likely]] {
             SchemeTask task = [&]() {
                 std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                 SchemeTask t = m_taskQueue.front();
