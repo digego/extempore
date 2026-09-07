@@ -424,7 +424,14 @@ int OPTIMIZATION_LEVEL = 2;  // Default to O2
 // e.g. "foo_adhoc_W2k4K_native" -> "foo_adhoc_9_W2k4K_native"
 // The xtlang get_native_fptr macro generates names without the counter,
 // but the compiled functions include an adhoc counter in their names.
+//
+// Written on the compile thread and read by llvm_get_function_ptr, which
+// generated code calls from the scheduler/audio callback path, so reads take
+// a shared lock. Resolving the alias at compile time would remove the lookup
+// from that path altogether, but needs the runtime (xtc-codegen.xtm) to emit
+// the full name.
 static std::unordered_map<std::string, std::string> sAdhocAliases;
+static std::shared_mutex sAdhocAliasesMutex;
 
 static std::string stripAdhocCounter(std::string_view name) {
     auto pos = name.find("_adhoc_");
@@ -444,8 +451,16 @@ static std::string stripAdhocCounter(std::string_view name) {
 void registerAdhocAlias(std::string_view fullName) {
     auto alias = stripAdhocCounter(fullName);
     if (!alias.empty()) {
+        std::unique_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
         sAdhocAliases[alias] = std::string(fullName);
     }
+}
+
+// Full name registered for a counter-less adhoc alias, or empty.
+static std::string lookupAdhocAlias(std::string_view name) {
+    std::shared_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
+    auto it = sAdhocAliases.find(std::string(name));
+    return it == sAdhocAliases.end() ? std::string() : it->second;
 }
 
 // Get function address - main lookup function
@@ -458,9 +473,9 @@ uint64_t getFunctionAddress(std::string_view name) {
     if (!sym) {
         llvm::consumeError(sym.takeError());
         // Fall back to counter-less adhoc alias lookup
-        auto it = sAdhocAliases.find(std::string(name));
-        if (it != sAdhocAliases.end()) {
-            auto sym2 = JIT->lookup(it->second);
+        auto full = lookupAdhocAlias(name);
+        if (!full.empty()) {
+            auto sym2 = JIT->lookup(full);
             if (sym2)
                 return sym2->getValue();
             llvm::consumeError(sym2.takeError());
