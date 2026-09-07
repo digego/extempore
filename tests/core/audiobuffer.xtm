@@ -319,6 +319,80 @@ supposed to skip over."
     (null? (AudioBuffer_from_wave "xtmtest-audiobuffer-does-not-exist.wav"))))
 (xtmtest-result (test_missing_file) 1)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading into a caller-supplied buffer  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the *_read_samples readers take a destination and its capacity, so a file
+;; holding more samples than the destination has room for must be truncated
+;; rather than written past the end. The check is a guard region beyond the
+;; capacity which has to come back untouched.
+
+(bind-val ABTEST_GUARD SAMPLE -99.0)
+
+(bind-func static abtest_fill_guarded
+  (lambda (dest:SAMPLE* n:i64)
+    (doloop (i n) (pset! dest i ABTEST_GUARD))))
+
+(bind-func static abtest_check_guarded
+  "the first CAP samples match the file, the GUARD samples after them don't"
+  (lambda (dest:SAMPLE* cap:i64 guard:i64)
+    (let ((ok #t))
+      (doloop (i cap)
+        (if (not (abtest_close (convert (pref dest i) double)
+                               (abtest_expected (/ i 2) (% i 2))))
+            (set! ok #f)))
+      (doloop (i guard)
+        (if (not (abtest_close (convert (pref dest (+ cap i)) double)
+                               (convert ABTEST_GUARD double)))
+            (set! ok #f)))
+      ok)))
+
+;; 8 stereo frames is 16 samples; the destination holds 6
+(bind-func test_wave_read_samples_capacity
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-cap.wav")
+          (cap 6)
+          (guard 4)
+          (dest:SAMPLE* (salloc 10)))
+      (abtest_fill_guarded dest 10)
+      (if (not (abtest_make_wav path 1 2 44100 8 #f 0))
+          #f
+          (let ((res (and (audiofile_wave_read_samples path dest cap)
+                          (abtest_check_guarded dest cap guard))))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_read_samples_capacity) 1)
+
+(bind-func test_aiff_read_samples_capacity
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-cap.aiff")
+          (cap 6)
+          (guard 4)
+          (dest:SAMPLE* (salloc 10)))
+      (abtest_fill_guarded dest 10)
+      (if (not (abtest_make_aiff path 2 44100 8 0))
+          #f
+          (let ((res (and (audiofile_aiff_read_samples path dest cap)
+                          (abtest_check_guarded dest cap guard))))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_aiff_read_samples_capacity) 1)
+
+;; a destination with room to spare gets the whole file and nothing more
+(bind-func test_read_samples_spare_capacity
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-spare.wav")
+          (dest:SAMPLE* (salloc 12)))
+      (abtest_fill_guarded dest 12)
+      (if (not (abtest_make_wav path 1 2 44100 4 #f 0))
+          #f
+          (let ((res (and (audiofile_read_samples path dest 12)
+                          (abtest_check_guarded dest 8 4))))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_read_samples_spare_capacity) 1)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; guards against an empty buffer ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

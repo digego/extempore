@@ -584,6 +584,17 @@
             (println "audiofile error: the native xtlang wave/aiff file reader currently\nonly supports 16/24-bit PCM or 32-bit IEEE float audio\n\nFor more audio format options, use libs/external/sndfile.xtm")
             #f))))
 
+(bind-func static audiofile_clamp_samples
+  "clamp the sample count a file claims to what the destination can hold"
+  (lambda (nsamp:i64 destsamples:i64)
+    (cond ((< destsamples 0) 0)
+          ((> nsamp destsamples)
+           (println "audiofile warning: the file holds " nsamp
+                    " samples but the destination holds only " destsamples
+                    " -- the rest will not be read")
+           destsamples)
+          (else nsamp))))
+
 ;; sys_slurp_file doesn't report how many bytes it read, and the IFF
 ;; readers below need that to bound their chunk scans, so read the file
 ;; here instead
@@ -731,7 +742,8 @@ fewer than the chunk header claims when the file is truncated."
     (if (< framebytes 1) 0 (/ datalen framebytes))))
 
 (bind-func audiofile_wave_read_samples
-  (lambda (filepath dest:SAMPLE*)
+  "read FILEPATH into DEST, writing at most DESTSAMPLES samples"
+  (lambda (filepath dest:SAMPLE* destsamples:i64)
     (let ((lenptr:i64* (salloc 1))
           (fmtlen:i64* (salloc 1))
           (datalen:i64* (salloc 1))
@@ -767,7 +779,7 @@ fewer than the chunk header claims when the file is truncated."
                                      #f)
                                    (audiofile_copy_samples (pref-ptr data IFF_CHUNK_HEADER_SIZE)
                                                            dest
-                                                           (* nchan nframes)
+                                                           (audiofile_clamp_samples (* nchan nframes) destsamples)
                                                            bitdepth
                                                            type
                                                            #t))))
@@ -846,7 +858,8 @@ fewer than the chunk header claims when the file is truncated."
         (let ((avail (/ (- ssndlen AIFF_SSND_PREAMBLE_SIZE) framebytes)))
           (if (> declared avail) avail declared)))))
 (bind-func audiofile_aiff_read_samples
-  (lambda (filepath dest:SAMPLE*)
+  "read FILEPATH into DEST, writing at most DESTSAMPLES samples"
+  (lambda (filepath dest:SAMPLE* destsamples:i64)
     (let ((lenptr:i64* (salloc 1))
           (commlen:i64* (salloc 1))
           (ssndlen:i64* (salloc 1))
@@ -884,7 +897,7 @@ fewer than the chunk header claims when the file is truncated."
                                      #f)
                                    (audiofile_copy_samples (pref-ptr sounddata (+ IFF_CHUNK_HEADER_SIZE AIFF_SSND_PREAMBLE_SIZE))
                                                            dest
-                                                           (* nchan nframes)
+                                                           (audiofile_clamp_samples (* nchan nframes) destsamples)
                                                            bitdepth
                                                            WAVE_FORMAT_PCM ;; AIFF is always PCM
                                                            #f))))           ;; AIFF is *not* little-endian
@@ -946,11 +959,12 @@ fewer than the chunk header claims when the file is truncated."
 ;; works for both aiff and wave files
 
 (bind-func audiofile_read_samples
-  (lambda (filepath dest:SAMPLE*)
+  "read FILEPATH into DEST, writing at most DESTSAMPLES samples"
+  (lambda (filepath dest:SAMPLE* destsamples:i64)
     (cond ((rmatch "\\.wave?$" filepath)
-           (audiofile_wave_read_samples filepath dest))
+           (audiofile_wave_read_samples filepath dest destsamples))
           ((rmatch "\\.aiff?$" filepath)
-           (audiofile_aiff_read_samples filepath dest))
+           (audiofile_aiff_read_samples filepath dest destsamples))
           (else
             (println "native xtlang audiofile reader only works for uncompressed aiff and wave files")
             #f))))
