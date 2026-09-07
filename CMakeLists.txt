@@ -465,7 +465,26 @@ endif()
 # install #
 ###########
 
-install(TARGETS extempore RUNTIME DESTINATION bin)
+# `cmake --install build --prefix <dir>` reproduces the layout of the binary
+# release archives (see .github/workflows/release-binary.yml): the executable at
+# the top of the prefix with runtime/, libs/ (AOT cache and platform shlibs
+# included) and examples/ beside it. That is what a binary configured with
+# -DEXT_SHARE_DIR=. (the `release` preset) expects to find relative to its
+# working directory; a binary built with the default share dir --- which is the
+# source tree, so uninstalled builds are unaffected --- can be pointed at an
+# installed tree with `extempore --sharedir <dir>`.
+install(TARGETS extempore RUNTIME DESTINATION .)
+install(DIRECTORY
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    ${CMAKE_CURRENT_SOURCE_DIR}/examples
+    DESTINATION .)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION . OPTIONAL)
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/BUILDING.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.md
+    DESTINATION .)
 
 ########################################
 # external shared library dependencies #
