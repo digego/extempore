@@ -174,7 +174,7 @@ CSimpleOptA::SOption g_rgOptions[] = {
     {OPT_REALTIME, "--realtime", SO_NONE},
     {OPT_ARCH, "--arch", SO_REQ_SEP},
     {OPT_CPU, "--cpu", SO_REQ_SEP},
-    {OPT_ATTR, "--attr", SO_MULTI},
+    {OPT_ATTR, "--attr", SO_REQ_SEP},
     {OPT_LEVEL, "--opt-level", SO_REQ_SEP},
     {OPT_AUDIO_OUTFILE, "--audio-outfile", SO_REQ_SEP},
     {OPT_DURATION, "--duration", SO_REQ_SEP},
