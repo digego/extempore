@@ -1,0 +1,68 @@
+;;; tests/core/ffi-arity.xtm -- arity and argument checks on the FFI primitives
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Every primitive in src/ffi/*.inc is registered with s7 under its real name
+;; and its true argument count (see FFI_DEF in include/SchemeS7Private.h), and
+;; the bodies read their arguments through the checked accessors there.
+;;
+;; Before that, each was an anonymous rest-arg function: (cptr:get-i64)
+;; dereferenced the car of the empty list, and (llvm:run) reinterpret-cast
+;; whatever it found as an llvm::Function*. Both segfaulted. These tests pin
+;; the errors so a primitive that loses its arity is caught here rather than in
+;; a crash report.
+
+;;; Code:
+
+;; #t if the thunk raises, #f if it returns
+(define (ffi-raises? thunk)
+  (*s7-catch* #t (lambda () (thunk) #f) (lambda args #t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; too few arguments
+
+(xtmtest-result (ffi-raises? (lambda () (cptr:get-i64))) #t "arity-cptr-get-i64")
+(xtmtest-result (ffi-raises? (lambda () (cptr:set-i64 0))) #t "arity-cptr-set-i64")
+(xtmtest-result (ffi-raises? (lambda () (llvm:run))) #t "arity-llvm-run")
+(xtmtest-result (ffi-raises? (lambda () (regex:match? "abc"))) #t "arity-regex-match")
+(xtmtest-result (ffi-raises? (lambda () (string-join))) #t "arity-string-join")
+
+;; ... and too many, for the primitives that take a fixed count
+(xtmtest-result (ffi-raises? (lambda () (sys:platform 1))) #t "arity-sys-platform-extra")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; wrong argument types
+
+(xtmtest-result (ffi-raises? (lambda () (cptr:get-i64 1 2))) #t "type-cptr-get-i64")
+(xtmtest-result (ffi-raises? (lambda () (string-hash 42))) #t "type-string-hash")
+(xtmtest-result (ffi-raises? (lambda () (regex:match? "abc" 42))) #t "type-regex-match")
+(xtmtest-result (ffi-raises? (lambda () (random-int "not-a-number"))) #t "type-random-int")
+
+;; the error names the primitive, not "#<foreign>"
+(xtmtest-result (*s7-catch* #t
+                            (lambda () (cptr:get-i64 1 2))
+                            (lambda (type info)
+                              (if (regex:match? (car info) "cptr:get-i64") 'named 'anonymous)))
+                'named
+                "error-message-names-the-primitive")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; string-ref keeps its TinyScheme leniency for an out-of-range index, but is
+;; no longer willing to index a non-string
+
+(xtmtest-result (string-ref "abc" 1) #\b "string-ref-in-range")
+(xtmtest-result (string-ref "abc" 99) (integer->char 0) "string-ref-out-of-range")
+(xtmtest-result (ffi-raises? (lambda () (string-ref 5 0))) #t "string-ref-non-string")
+(xtmtest-result (ffi-raises? (lambda () (string-ref "abc" "x"))) #t "string-ref-non-integer")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the variadic and optional-argument primitives still accept what they should
+
+(xtmtest-result (ffi-raises? (lambda () (sys:platform))) #f "arity-sys-platform")
+(xtmtest-result (ffi-raises? (lambda () (println))) #f "arity-println-none")
+(xtmtest-result (ffi-raises? (lambda () (println "a" "b" "c"))) #f "arity-println-many")
+(xtmtest-result (ffi-raises? (lambda () (llvm:optimization-level))) #f "arity-opt-level-none")
