@@ -1,0 +1,81 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (Release, Ninja, tests on)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "ci",
+      "inherits": "default",
+      "displayName": "CI build & test"
+    },
+    {
+      "name": "release",
+      "inherits": "default",
+      "displayName": "Release artefact (assets, no tests, relocatable share dir)",
+      "cacheVariables": {
+        "BUILD_TESTS": "OFF",
+        "ASSETS": "ON",
+        "EXT_SHARE_DIR": "."
+      }
+    },
+    {
+      "name": "sanitize-asan",
+      "inherits": "default",
+      "displayName": "AddressSanitizer",
+      "cacheVariables": {
+        "EXTEMPORE_SANITIZE": "asan"
+      }
+    },
+    {
+      "name": "sanitize-ubsan",
+      "inherits": "default",
+      "displayName": "UndefinedBehaviorSanitizer",
+      "cacheVariables": {
+        "EXTEMPORE_SANITIZE": "ubsan"
+      }
+    },
+    {
+      "name": "sanitize-tsan",
+      "inherits": "default",
+      "displayName": "ThreadSanitizer",
+      "cacheVariables": {
+        "EXTEMPORE_SANITIZE": "tsan"
+      }
+    },
+    {
+      "name": "sanitize-asan-ubsan",
+      "inherits": "default",
+      "displayName": "Address + UndefinedBehaviorSanitizer",
+      "cacheVariables": {
+        "EXTEMPORE_SANITIZE": "asan+ubsan"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ]
+}
