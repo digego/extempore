@@ -76,7 +76,11 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Linker/Linker.h"
 
-#include "pcre.h"
+// pcre2 is width-agnostic: the code unit width has to be picked before the
+// header, and the 8-bit library is the one src/ffi/regex.inc uses.
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
+
 #include "SchemeFFI.h"
 #include "AudioDevice.h"
 #include "UNIV.h"
