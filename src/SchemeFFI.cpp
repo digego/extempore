@@ -450,11 +450,33 @@ static llvm::Module* jitCompile(const std::string& irString) {
     Module* modulePtr = nullptr;
 
     EXTLLVM::getThreadSafeContext().withContextDo([&](LLVMContext* ctx) {
-        // Step 1: Initialize template module (first time only).
+        // Step 1: Initialize template module (first time only), and add one
+        // copy of it to the JIT for good. Every module compiled below carries
+        // its own linkonce_odr clone of the bitcode.ll helpers, and ORC keeps
+        // whichever definition it saw first; this permanent copy makes sure
+        // that is never a module that can later be removed.
         static bool templateInitialized = false;
         if (!templateInitialized) {
             if (!initializeTemplateModule(*ctx)) {
                 std::cerr << "Failed to initialize template module" << std::endl;
+                return;
+            }
+            auto runtimeModule = cloneTemplateModule(*ctx);
+            if (!runtimeModule) {
+                std::cerr << "Failed to clone template module" << std::endl;
+                return;
+            }
+            runtimeModule->setModuleIdentifier("xtm_runtime");
+            if (!extemp::UNIV::ARCH.empty()) {
+                runtimeModule->setTargetTriple(Triple(extemp::UNIV::ARCH));
+            }
+            if (EXTLLVM::JIT) {
+                runtimeModule->setDataLayout(EXTLLVM::JIT->getDataLayout());
+            }
+            if (auto err = EXTLLVM::addPermanentModule(orc::ThreadSafeModule(
+                    std::move(runtimeModule), EXTLLVM::getThreadSafeContext()))) {
+                std::cerr << "Failed to add the runtime module to the JIT: "
+                          << toString(std::move(err)) << std::endl;
                 return;
             }
             templateInitialized = true;
@@ -647,36 +669,25 @@ static llvm::Module* jitCompile(const std::string& irString) {
             }
         }
 
-        modulePtr = baseModule.get();
-
-        // Step 9: Extract symbol names (only non-declarations defined in this module).
-        std::vector<std::string> symbolNames;
-        for (const auto& func : baseModule->getFunctionList()) {
-            if (!func.isDeclaration()) {
-                symbolNames.push_back(func.getName().str());
-            }
-        }
-        for (const auto& glob : baseModule->globals()) {
-            if (!glob.isDeclaration()) {
-                symbolNames.push_back(glob.getName().str());
-            }
-        }
-        // Step 10: Clone for metadata tracking.
+        // Step 9: Work out what the module exports and imports, clone it for
+        // the metadata view, and hand both to the JIT under one tracker.
+        auto symbols = EXTLLVM::collectModuleSymbols(*baseModule);
+        auto exportedNames = symbols.exports;
         auto metadataModule = CloneModule(*baseModule);
+        llvm::Module* metadata = metadataModule.get();
 
-        // Step 11: Add to ORC JIT.
         auto TSM = orc::ThreadSafeModule(std::move(baseModule), EXTLLVM::getThreadSafeContext());
-        auto err = EXTLLVM::addTrackedModule(std::move(TSM), symbolNames);
+        auto err = EXTLLVM::addTrackedModule(std::move(TSM), std::move(symbols),
+                                             std::move(metadataModule));
 
         if (err) {
             std::cerr << "Failed to add module " << modname
                       << " to JIT: " << toString(std::move(err)) << std::endl;
             modulePtr = nullptr;
         } else {
-            modulePtr = metadataModule.get();
-            EXTLLVM::addModule(metadataModule.get());
+            modulePtr = metadata;
 
-            for (const auto& name : symbolNames) {
+            for (const auto& name : exportedNames) {
                 EXTLLVM::registerAdhocAlias(name);
             }
 
@@ -687,7 +698,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 std::lock_guard<std::mutex> lock(sTemplateMutex);
 
                 // First, add any identified struct types from the module.
-                for (auto* structType : metadataModule->getIdentifiedStructTypes()) {
+                for (auto* structType : metadata->getIdentifiedStructTypes()) {
                     if (structType->hasName() && !structType->isOpaque()) {
                         std::string name = structType->getName().str();
                         if (sTypeDefs.count(name)) {
@@ -719,7 +730,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 }
 
                 // Now add function declarations for newly defined functions.
-                for (const auto& func : metadataModule->functions()) {
+                for (const auto& func : metadata->functions()) {
                     if (func.isDeclaration())
                         continue;
 
@@ -764,7 +775,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     sFuncDecls.emplace(name, ss.str());
                 }
 
-                for (const auto& glob : metadataModule->globals()) {
+                for (const auto& glob : metadata->globals()) {
                     std::string name = glob.getName().str();
                     if (sTemplateGlobalNames.count(name)) {
                         continue;
@@ -813,7 +824,6 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 }
             }
 
-            metadataModule.release();
         }
     });
 

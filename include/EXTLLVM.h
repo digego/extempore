@@ -45,6 +45,7 @@
 #include <string_view>
 #include <memory>
 
+#include "llvm/ExecutionEngine/Orc/Core.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/Support/Error.h"
 
@@ -101,7 +102,6 @@ namespace EXTLLVM {
 
 uint64_t getFunctionAddress(std::string_view name);
 void registerAdhocAlias(std::string_view fullName);
-void addModule(llvm::Module* m);
 
 // ORC JIT
 extern std::unique_ptr<llvm::orc::LLJIT> JIT;
@@ -109,11 +109,32 @@ extern std::unique_ptr<llvm::orc::LLJIT> JIT;
 extern std::unique_ptr<llvm::orc::ThreadSafeContext> TSC;
 
 llvm::orc::ThreadSafeContext& getThreadSafeContext();
+
+// Erase a symbol defined by an earlier module (lazily, see EXTLLVM.cpp) or an
+// absolute symbol registered with defineAbsoluteSymbol. False if not found.
 bool removeSymbol(const std::string& name);
 void removeFromGlobalMap(const std::string& name);
 
-llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM,
-                             const std::vector<std::string>& symbolNames);
+// What a module contributes to the JIT: strong definitions it exports, external
+// symbols it uses, and whether any export is a global variable.
+struct ModuleSymbols {
+    std::vector<std::string> exports;
+    std::vector<std::string> imports;
+    bool definesGlobals = false;
+};
+ModuleSymbols collectModuleSymbols(const llvm::Module& M);
+
+// Add a module the JIT keeps for the life of the process (the bitcode.ll
+// runtime helpers).
+llvm::Error addPermanentModule(llvm::orc::ThreadSafeModule TSM);
+// Add a compiled module under its own resource tracker. Metadata is the clone
+// exposed through getModules()/getGlobalValue(); it is released with the code.
+llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symbols,
+                             std::unique_ptr<llvm::Module> Metadata);
+// Add a module for a single use (the llvm:run call stubs); pass the tracker
+// back to removeTransientModule once the call has returned.
+llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::ThreadSafeModule TSM);
+void removeTransientModule(llvm::orc::ResourceTrackerSP RT);
 
 extern int64_t LLVM_COUNT;
 extern bool OPTIMIZE_COMPILES;

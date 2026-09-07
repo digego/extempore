@@ -372,55 +372,62 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
         return Scheme->F;
     }
 
-    // JIT the stub
+    // JIT the stub; it is removed again once the call has returned.
     auto TSM = llvm::orc::ThreadSafeModule(std::move(module), extemp::EXTLLVM::getThreadSafeContext());
-    if (auto err = extemp::EXTLLVM::addTrackedModule(std::move(TSM), {stubName})) {
-        std::cerr << "Failed to JIT call stub: " << llvm::toString(std::move(err)) << std::endl;
+    auto stubTracker = extemp::EXTLLVM::addTransientModule(std::move(TSM));
+    if (!stubTracker) {
+        std::cerr << "Failed to JIT call stub: " << llvm::toString(stubTracker.takeError()) << std::endl;
         return Scheme->F;
     }
 
+    pointer result = Scheme->F;
     auto stubAddr = EXTLLVM::getFunctionAddress(stubName);
     if (!stubAddr) {
         printf("Failed to resolve call stub\n");
-        return Scheme->F;
-    }
+    } else {
+        // Call the stub and marshal the result back to Scheme.
+        auto retTy = funcType->getReturnType();
+        switch (retTy->getTypeID()) {
+        case llvm::Type::FloatTyID: {
+            using StubFn = float(*)();
+            float res = reinterpret_cast<StubFn>(stubAddr)();
+            result = mk_real(Scheme, res);
+            break;
+        }
+        case llvm::Type::DoubleTyID: {
+            using StubFn = double(*)();
+            double res = reinterpret_cast<StubFn>(stubAddr)();
+            result = mk_real(Scheme, res);
+            break;
+        }
+        case llvm::Type::IntegerTyID: {
+            auto intTy = llvm::cast<llvm::IntegerType>(retTy);
+            unsigned width = intTy->getBitWidth();
+            uint64_t mask = (width >= 64) ? ~uint64_t(0) : ((uint64_t(1) << width) - 1);
 
-    // Call the stub and marshal the result back to Scheme.
-    auto retTy = funcType->getReturnType();
-    switch (retTy->getTypeID()) {
-    case llvm::Type::FloatTyID: {
-        using StubFn = float(*)();
-        float res = reinterpret_cast<StubFn>(stubAddr)();
-        return mk_real(Scheme, res);
+            using StubFn = uint64_t(*)();
+            uint64_t res = reinterpret_cast<StubFn>(stubAddr)() & mask;
+            result = mk_integer(Scheme, res);
+            break;
+        }
+        case llvm::Type::PointerTyID: {
+            using StubFn = void*(*)();
+            void* res = reinterpret_cast<StubFn>(stubAddr)();
+            result = mk_cptr(Scheme, res);
+            break;
+        }
+        case llvm::Type::VoidTyID: {
+            using StubFn = void(*)();
+            reinterpret_cast<StubFn>(stubAddr)();
+            result = Scheme->T;
+            break;
+        }
+        default:
+            printf("Unsupported return type for compiled call\n");
+        }
     }
-    case llvm::Type::DoubleTyID: {
-        using StubFn = double(*)();
-        double res = reinterpret_cast<StubFn>(stubAddr)();
-        return mk_real(Scheme, res);
-    }
-    case llvm::Type::IntegerTyID: {
-        auto intTy = llvm::cast<llvm::IntegerType>(retTy);
-        unsigned width = intTy->getBitWidth();
-        uint64_t mask = (width >= 64) ? ~uint64_t(0) : ((uint64_t(1) << width) - 1);
-
-        using StubFn = uint64_t(*)();
-        uint64_t res = reinterpret_cast<StubFn>(stubAddr)() & mask;
-        return mk_integer(Scheme, res);
-    }
-    case llvm::Type::PointerTyID: {
-        using StubFn = void*(*)();
-        void* res = reinterpret_cast<StubFn>(stubAddr)();
-        return mk_cptr(Scheme, res);
-    }
-    case llvm::Type::VoidTyID: {
-        using StubFn = void(*)();
-        reinterpret_cast<StubFn>(stubAddr)();
-        return Scheme->T;
-    }
-    default:
-        printf("Unsupported return type for compiled call\n");
-        return Scheme->F;
-    }
+    extemp::EXTLLVM::removeTransientModule(std::move(*stubTracker));
+    return result;
 }
 
 static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)

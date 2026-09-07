@@ -40,8 +40,12 @@
 // must be included before anything which pulls in <Windows.h>
 #include "llvm/AsmParser/Parser.h"
 #include "llvm/Config/llvm-config.h"  // for LLVM_VERSION_STRING
+#include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constants.h"
@@ -59,6 +63,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/Memory.h"
 #include "llvm/TargetParser/Host.h"
 
 #include "llvm/MC/MCAsmInfo.h"
@@ -77,7 +82,9 @@
 #include <random>
 #include <fstream>
 #include <mutex>
+#include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <set>
 #include <cmath>
 #include <cstdlib>
@@ -485,41 +492,488 @@ uint64_t getFunctionAddress(std::string_view name) {
     return sym->getValue();
 }
 
-// Remove a single symbol from the JIT - called from Scheme via llvm:erase-function
-bool removeSymbol(const std::string& name) {
-    if (!JIT)
-        return false;
+// ---------------------------------------------------------------------------
+// Module ownership
+//
+// Every module compiled by jitCompile is added under its own ResourceTracker
+// so its machine code can be released once nothing needs it. What can go, and
+// when, follows from how the xtlang driver (runtime/xtc-driver.xtm) redefines
+// a closure: the first definition of `foo` produces a stub module holding
+// @foo_var and the getter/native/scheme entry points, and every later
+// redefinition produces a body module (functions only, e.g. @foo__12) plus a
+// maker/setter module that references it. Scheme erases foo_maker and
+// foo_setter before recompiling; it never erases a body by name.
+//
+//  * A module that defines a global variable is never removed as a unit --
+//    other code may hold its addresses (foo_var, the AOT library modules, the
+//    string-constant modules). Erasing one of its symbols unlinks just that
+//    symbol and pins the module, which is what happened for every module
+//    before trackers existed.
+//  * A functions-only module is removed once all of its exported symbols have
+//    been erased (the maker/setter module).
+//  * A functions-only module that was referenced only by modules that have
+//    since been removed (the body, once its maker goes) is an orphan. It is
+//    released when a new module defines one of the symbols its referrer
+//    exported -- i.e. once the redefinition that orphaned it has produced a
+//    replacement maker. A redefinition that fails to compile therefore leaves
+//    the old body in place, as before.
+//  * Erasures are applied lazily, just before the next module is added. ORC
+//    does not allow JITDylib::remove on a symbol followed by removing the
+//    tracker that owns it, so a module is either removed whole or has its
+//    erased symbols unlinked one by one; batching the erasures lets us tell
+//    which.
+//
+// Removing a tracker unlinks its symbols at once, but the audio thread may be
+// executing the old code at that moment (Scheme erases foo_maker before the
+// new closure is installed), so the memory itself is only returned after
+// kCodeGracePeriod. Closure objects that still point into a superseded
+// definition after that period are dangling; that is the hazard
+// llvm_destroy_zone_after_delay already accepts for zones.
+// ---------------------------------------------------------------------------
 
-    auto& ES = JIT->getExecutionSession();
-    auto& JD = JIT->getMainJITDylib();
+namespace {
 
-    // Try to remove both mangled and unmangled versions
-    for (const auto& tryName : {name, "_" + name}) {
-        llvm::orc::SymbolNameSet toRemove;
-        toRemove.insert(ES.intern(tryName));
-        if (auto err = JD.remove(toRemove)) {
-            llvm::consumeError(std::move(err));
+constexpr auto kCodeGracePeriod = std::chrono::seconds(10);
+
+// Common face of the two memory-manager flavours below.
+struct GraceReaper {
+    virtual ~GraceReaper() = default;
+    // Return memory retired more than kCodeGracePeriod ago (or all of it).
+    virtual void reap(bool All) = 0;
+};
+
+// JITLink flavour (ELF and MachO): wraps the in-process manager and parks
+// deallocations in a graveyard instead of returning them straight away.
+class GraceJITLinkMemoryManager final : public llvm::jitlink::JITLinkMemoryManager,
+                                        public GraceReaper {
+    using clock = std::chrono::steady_clock;
+    using Entry = std::pair<clock::time_point, std::vector<FinalizedAlloc>>;
+    std::unique_ptr<llvm::jitlink::JITLinkMemoryManager> m_inner;
+    std::mutex m_mutex;
+    std::vector<Entry> m_graveyard;
+
+  public:
+    explicit GraceJITLinkMemoryManager(std::unique_ptr<llvm::jitlink::JITLinkMemoryManager> Inner)
+        : m_inner(std::move(Inner)) {}
+    ~GraceJITLinkMemoryManager() override {
+        reap(true);
+    }
+    void allocate(const llvm::jitlink::JITLinkDylib* JD, llvm::jitlink::LinkGraph& G,
+                  OnAllocatedFunction OnAllocated) override {
+        m_inner->allocate(JD, G, std::move(OnAllocated));
+    }
+    void deallocate(std::vector<FinalizedAlloc> Allocs,
+                    OnDeallocatedFunction OnDeallocated) override {
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_graveyard.emplace_back(clock::now(), std::move(Allocs));
         }
+        OnDeallocated(llvm::Error::success());
+    }
+    void reap(bool All) override {
+        std::vector<std::vector<FinalizedAlloc>> expired;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            const auto now = clock::now();
+            std::vector<Entry> kept;
+            for (auto& entry : m_graveyard) {
+                if (!All && now - entry.first < kCodeGracePeriod) {
+                    kept.push_back(std::move(entry));
+                } else {
+                    expired.push_back(std::move(entry.second));
+                }
+            }
+            m_graveyard = std::move(kept);
+        }
+        for (auto& allocs : expired) {
+            m_inner->deallocate(std::move(allocs), [](llvm::Error Err) {
+                if (Err) {
+                    std::cerr << "LLVM: error releasing JIT memory: "
+                              << llvm::toString(std::move(Err)) << std::endl;
+                }
+            });
+        }
+    }
+};
+
+// RuntimeDyld flavour (COFF): the mapper SectionMemoryManager allocates
+// through, deferring only the release.
+class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
+                                public GraceReaper {
+    using clock = std::chrono::steady_clock;
+    using Entry = std::pair<clock::time_point, llvm::sys::MemoryBlock>;
+    std::mutex m_mutex;
+    std::vector<Entry> m_graveyard;
+
+  public:
+    ~GraceMemoryMapper() override {
+        reap(true);
+    }
+    llvm::sys::MemoryBlock allocateMappedMemory(llvm::SectionMemoryManager::AllocationPurpose,
+                                                size_t NumBytes,
+                                                const llvm::sys::MemoryBlock* const NearBlock,
+                                                unsigned Flags, std::error_code& EC) override {
+        return llvm::sys::Memory::allocateMappedMemory(NumBytes, NearBlock, Flags, EC);
+    }
+    std::error_code protectMappedMemory(const llvm::sys::MemoryBlock& Block,
+                                        unsigned Flags) override {
+        return llvm::sys::Memory::protectMappedMemory(Block, Flags);
+    }
+    std::error_code releaseMappedMemory(llvm::sys::MemoryBlock& M) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_graveyard.emplace_back(clock::now(), M);
+        return std::error_code();
+    }
+    void reap(bool All) override {
+        std::vector<llvm::sys::MemoryBlock> expired;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            const auto now = clock::now();
+            std::vector<Entry> kept;
+            for (auto& entry : m_graveyard) {
+                if (!All && now - entry.first < kCodeGracePeriod) {
+                    kept.push_back(entry);
+                } else {
+                    expired.push_back(entry.second);
+                }
+            }
+            m_graveyard = std::move(kept);
+        }
+        for (auto& block : expired) {
+            if (auto ec = llvm::sys::Memory::releaseMappedMemory(block)) {
+                std::cerr << "LLVM: error releasing JIT memory: " << ec.message() << std::endl;
+            }
+        }
+    }
+};
+
+struct TrackedModule {
+    llvm::orc::ResourceTrackerSP tracker;
+    std::vector<std::string> exports;        // strong symbols this module defines
+    std::vector<std::string> imports;        // external symbols it references
+    std::unique_ptr<llvm::Module> metadata;  // clone exposed via getModules()
+    bool reclaimable = false;                // defines no global variables
+    bool pinned = false;                     // a symbol was unlinked on its own
+    bool everReferenced = false;             // a later module imported an export
+    std::unordered_set<std::string> erased;    // exports Scheme has erased ...
+    std::unordered_set<std::string> unlinked;  // ... and which are already unlinked
+    // Non-empty for an orphan: exports of the module whose removal orphaned
+    // it. Redefining any of them releases the orphan.
+    std::unordered_set<std::string> orphanedBy;
+};
+
+std::mutex sModulesMutex;  // guards everything below
+std::vector<std::unique_ptr<TrackedModule>> sModules;
+std::unordered_map<std::string, TrackedModule*> sSymbolOwner;
+std::unordered_map<std::string, int> sImportRefs;  // live modules importing a symbol
+std::vector<std::string> sPendingErase;
+GraceReaper* sGraceReaper = nullptr;
+// Name -> global in a metadata clone, for getGlobalValue()/getFunction().
+std::unordered_map<std::string, const llvm::GlobalValue*> sGlobalMap;
+
+void indexMetadataModule(llvm::Module* Module) {
+    for (const auto& function : Module->functions()) {
+        sGlobalMap[function.getName().str()] = &function;
+    }
+    for (const auto& global : Module->globals()) {
+        sGlobalMap[global.getName().str()] = &global;
+    }
+    Ms.push_back(Module);
+}
+
+void unlinkSymbol(const std::string& Name) {
+    llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(Name)};
+    if (auto err = JIT->getMainJITDylib().remove(names)) {
+        llvm::handleAllErrors(
+            std::move(err), [](const llvm::orc::SymbolsNotFound&) {},  // already gone
+            [&](const llvm::ErrorInfoBase& e) {
+                std::cerr << "LLVM: could not remove symbol " << Name << ": " << e.message()
+                          << std::endl;
+            });
+    }
+}
+
+bool unreferenced(const TrackedModule& M) {
+    return std::none_of(M.exports.begin(), M.exports.end(),
+                        [](const std::string& n) { return sImportRefs.count(n) != 0; });
+}
+
+// Unlink a module's symbols and retire its code and metadata. Modules that only
+// this one referenced become orphans.
+void removeModule(TrackedModule* M) {
+    if (auto err = M->tracker->remove()) {
+        std::cerr << "LLVM: could not remove module: " << llvm::toString(std::move(err))
+                  << std::endl;
+    }
+    for (const auto& name : M->imports) {
+        auto it = sImportRefs.find(name);
+        if (it == sImportRefs.end() || --it->second > 0) {
+            continue;
+        }
+        sImportRefs.erase(it);
+        auto owner = sSymbolOwner.find(name);
+        if (owner == sSymbolOwner.end()) {
+            continue;
+        }
+        auto* B = owner->second;
+        if (B->reclaimable && !B->pinned && B->everReferenced && unreferenced(*B)) {
+            B->orphanedBy.insert(M->exports.begin(), M->exports.end());
+        }
+    }
+    for (const auto& name : M->exports) {
+        auto it = sSymbolOwner.find(name);
+        if (it != sSymbolOwner.end() && it->second == M) {
+            sSymbolOwner.erase(it);
+        }
+    }
+    if (M->metadata) {
+        for (auto it = sGlobalMap.begin(); it != sGlobalMap.end();) {
+            if (it->second->getParent() == M->metadata.get()) {
+                it = sGlobalMap.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        std::erase(Ms, M->metadata.get());
+    }
+    std::erase_if(sModules, [M](const std::unique_ptr<TrackedModule>& p) { return p.get() == M; });
+}
+
+void flushPendingErasures() {
+    std::vector<TrackedModule*> touched;
+    for (const auto& name : sPendingErase) {
+        auto it = sSymbolOwner.find(name);
+        if (it == sSymbolOwner.end()) {
+            continue;
+        }
+        auto* M = it->second;
+        M->erased.insert(name);
+        if (std::find(touched.begin(), touched.end(), M) == touched.end()) {
+            touched.push_back(M);
+        }
+        sSymbolOwner.erase(it);
+    }
+    sPendingErase.clear();
+    for (auto* M : touched) {
+        if (M->reclaimable && !M->pinned && M->erased.size() == M->exports.size()) {
+            removeModule(M);
+            continue;
+        }
+        for (const auto& name : M->erased) {
+            if (M->unlinked.insert(name).second) {
+                unlinkSymbol(name);
+            }
+        }
+        M->pinned = true;
+    }
+}
+
+// Release orphans whose referrer has just been replaced by a module defining
+// one of the same symbols.
+void releaseOrphans(const std::vector<std::string>& NewExports) {
+    for (bool changed = true; changed;) {
+        changed = false;
+        for (auto& p : sModules) {
+            auto* M = p.get();
+            if (M->orphanedBy.empty()) {
+                continue;
+            }
+            bool replaced = std::any_of(NewExports.begin(), NewExports.end(),
+                                        [&](const std::string& n) { return M->orphanedBy.count(n); });
+            if (replaced) {
+                removeModule(M);  // invalidates the iteration
+                changed = true;
+                break;
+            }
+        }
+    }
+}
+
+}  // namespace
+
+ModuleSymbols collectModuleSymbols(const llvm::Module& M) {
+    ModuleSymbols syms;
+    auto consider = [&](const llvm::GlobalValue& GV, bool IsVariable) {
+        if (GV.hasLocalLinkage()) {
+            return;  // not a JIT symbol
+        }
+        if (GV.isDeclaration()) {
+            if (!GV.use_empty()) {
+                syms.imports.push_back(GV.getName().str());
+            }
+            return;
+        }
+        if (GV.hasLinkOnceLinkage() || GV.hasWeakLinkage()) {
+            return;  // a bitcode.ll clone; the permanent runtime module owns the real one
+        }
+        syms.exports.push_back(GV.getName().str());
+        if (IsVariable) {
+            syms.definesGlobals = true;
+        }
+    };
+    for (const auto& F : M.functions()) {
+        if (!F.isIntrinsic()) {
+            consider(F, false);
+        }
+    }
+    for (const auto& G : M.globals()) {
+        consider(G, true);
+    }
+    for (const auto& A : M.aliases()) {
+        consider(A, true);
+    }
+    return syms;
+}
+
+llvm::Error addPermanentModule(llvm::orc::ThreadSafeModule TSM) {
+    if (!JIT) {
+        return llvm::make_error<llvm::StringError>("JIT not initialized",
+                                                   llvm::inconvertibleErrorCode());
+    }
+    return JIT->addIRModule(std::move(TSM));
+}
+
+llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symbols,
+                             std::unique_ptr<llvm::Module> Metadata) {
+    if (!JIT) {
+        return llvm::make_error<llvm::StringError>("JIT not initialized",
+                                                   llvm::inconvertibleErrorCode());
+    }
+    std::lock_guard<std::mutex> lock(sModulesMutex);
+    if (sGraceReaper) {
+        sGraceReaper->reap(false);
+    }
+    flushPendingErasures();
+    auto RT = JIT->getMainJITDylib().createResourceTracker();
+    if (auto err = JIT->addIRModule(RT, std::move(TSM))) {
+        llvm::consumeError(RT->remove());
+        return err;
+    }
+    auto M = std::make_unique<TrackedModule>();
+    M->tracker = std::move(RT);
+    M->exports = std::move(Symbols.exports);
+    M->imports = std::move(Symbols.imports);
+    M->metadata = std::move(Metadata);
+    M->reclaimable = !Symbols.definesGlobals;
+    for (const auto& name : M->exports) {
+        sSymbolOwner[name] = M.get();
+    }
+    for (const auto& name : M->imports) {
+        ++sImportRefs[name];
+        auto owner = sSymbolOwner.find(name);
+        if (owner != sSymbolOwner.end()) {
+            owner->second->everReferenced = true;
+        }
+    }
+    if (M->metadata) {
+        indexMetadataModule(M->metadata.get());
+    }
+    const auto& newExports = M->exports;
+    sModules.push_back(std::move(M));
+    releaseOrphans(newExports);
+    return llvm::Error::success();
+}
+
+llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::ThreadSafeModule TSM) {
+    if (!JIT) {
+        return llvm::make_error<llvm::StringError>("JIT not initialized",
+                                                   llvm::inconvertibleErrorCode());
+    }
+    std::lock_guard<std::mutex> lock(sModulesMutex);
+    if (sGraceReaper) {
+        sGraceReaper->reap(false);
+    }
+    auto RT = JIT->getMainJITDylib().createResourceTracker();
+    if (auto err = JIT->addIRModule(RT, std::move(TSM))) {
+        llvm::consumeError(RT->remove());
+        return std::move(err);
+    }
+    return RT;
+}
+
+void removeTransientModule(llvm::orc::ResourceTrackerSP RT) {
+    if (auto err = RT->remove()) {
+        std::cerr << "LLVM: could not remove module: " << llvm::toString(std::move(err))
+                  << std::endl;
+    }
+}
+
+// Erase a symbol, called from Scheme via llvm:erase-function and friends.
+// Symbols owned by a tracked module are queued and take effect when the next
+// module is added (see the notes above); anything else -- an absolute symbol
+// from bind-lib -- is unlinked now. Returns false if the symbol does not exist.
+bool removeSymbol(const std::string& name) {
+    if (!JIT) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(sModulesMutex);
+    if (sSymbolOwner.count(name)) {
+        sPendingErase.push_back(name);
+        return true;
+    }
+    llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(name)};
+    if (auto err = JIT->getMainJITDylib().remove(names)) {
+        bool removed = false;
+        llvm::handleAllErrors(
+            std::move(err), [](const llvm::orc::SymbolsNotFound&) {},
+            [&](const llvm::ErrorInfoBase& e) {
+                std::cerr << "LLVM: could not remove symbol " << name << ": " << e.message()
+                          << std::endl;
+            });
+        return removed;
     }
     return true;
 }
 
-// Add a module to the JIT
-// Symbol removal for redefinition is handled by Scheme calling llvm:erase-function
-// BEFORE sending the IR to be compiled. This ensures symbols are only removed
-// when we actually intend to redefine them.
-llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM,
-                             const std::vector<std::string>& symbolNames) {
-    if (!JIT)
-        return llvm::make_error<llvm::StringError>("JIT not initialized",
-                                                   llvm::inconvertibleErrorCode());
-
-    if (auto err = JIT->addIRModule(std::move(TSM))) {
-        return err;
-    }
-
-    return llvm::Error::success();
+void removeFromGlobalMap(const std::string& name) {
+    sGlobalMap.erase(name);
 }
+
+const llvm::GlobalValue* getGlobalValue(const char* Name) {
+    auto iter(sGlobalMap.find(Name));
+    if (iter != sGlobalMap.end()) [[likely]] {
+        return iter->second;
+    }
+    return nullptr;
+}
+
+const llvm::GlobalVariable* getGlobalVariable(const char* Name) {
+    auto val(getGlobalValue(Name));
+    if (val) [[likely]] {
+        return llvm::dyn_cast<llvm::GlobalVariable>(val);
+    }
+    return nullptr;
+}
+
+const llvm::Function* getFunction(const char* Name) {
+    auto val(getGlobalValue(Name));
+    if (val) [[likely]] {
+        return llvm::dyn_cast<llvm::Function>(val);
+    }
+    return nullptr;
+}
+
+// Release the JIT (and the metadata clones that live in its context) before
+// static destruction can get the order wrong.
+static void cleanupLLVM() {
+    {
+        std::lock_guard<std::mutex> lock(sModulesMutex);
+        sGlobalMap.clear();
+        Ms.clear();
+        sSymbolOwner.clear();
+        sImportRefs.clear();
+        sPendingErase.clear();
+        sModules.clear();
+    }
+    sGraceReaper = nullptr;
+    JIT.reset();
+}
+
+static struct EXTLLVMCleanupRegistrar {
+    EXTLLVMCleanupRegistrar() {
+        std::atexit(cleanupLLVM);
+    }
+} sCleanupRegistrar;
 
 EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax) {
     size_t code_size = 1024 * 100;
@@ -788,11 +1242,48 @@ void initLLVM() {
     }
 
     // Set up target machine builder with actual CPU features.
-    JITBuilder.setJITTargetMachineBuilder(
-        llvm::orc::JITTargetMachineBuilder(llvm::Triple(triple))
-            .setCPU(cpu)
-            .addFeatures(featureVec)
-            .setCodeGenOptLevel(llvm::CodeGenOptLevel::Aggressive));
+    llvm::orc::JITTargetMachineBuilder JTMB{llvm::Triple(triple)};
+    JTMB.setCPU(cpu).addFeatures(featureVec).setCodeGenOptLevel(
+        llvm::CodeGenOptLevel::Aggressive);
+
+    // Mirror LLJITBuilder's own linker choice (JITLink except on COFF, with the
+    // code and relocation models it sets for JITLink), but supply memory
+    // managers whose releases wait out kCodeGracePeriod -- see the module
+    // ownership notes above.
+    const bool isCOFF = llvm::Triple(triple).isOSBinFormatCOFF();
+    const bool useJITLink = !isCOFF;
+    if (useJITLink) {
+        JTMB.setCodeModel(llvm::CodeModel::Small);
+        JTMB.setRelocationModel(llvm::Reloc::PIC_);
+    }
+    JITBuilder.setJITTargetMachineBuilder(std::move(JTMB));
+    JITBuilder.setObjectLinkingLayerCreator(
+        [useJITLink, isCOFF](llvm::orc::ExecutionSession& ES)
+            -> llvm::Expected<std::unique_ptr<llvm::orc::ObjectLayer>> {
+            if (useJITLink) {
+                auto inner = llvm::jitlink::InProcessMemoryManager::Create();
+                if (!inner) {
+                    return inner.takeError();
+                }
+                auto memMgr = std::make_unique<GraceJITLinkMemoryManager>(std::move(*inner));
+                sGraceReaper = memMgr.get();
+                return std::unique_ptr<llvm::orc::ObjectLayer>(
+                    std::make_unique<llvm::orc::ObjectLinkingLayer>(ES, std::move(memMgr)));
+            }
+            // Leaked on purpose: it must outlive every SectionMemoryManager,
+            // which the JIT destroys during static destruction.
+            static auto* mapper = new GraceMemoryMapper;
+            sGraceReaper = mapper;
+            auto layer = std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(
+                ES, [](const llvm::MemoryBuffer&) {
+                    return std::make_unique<llvm::SectionMemoryManager>(mapper);
+                });
+            if (isCOFF) {
+                layer->setOverrideObjectFlagsWithResponsibilityFlags(true);
+                layer->setAutoClaimResponsibilityForObjectSymbols(true);
+            }
+            return std::unique_ptr<llvm::orc::ObjectLayer>(std::move(layer));
+        });
 
     // Create the JIT.
     auto JITResult = JITBuilder.create();
@@ -895,76 +1386,4 @@ void initLLVM() {
 }
 
 }  // namespace EXTLLVM
-}  // namespace extemp
-
-static std::unordered_map<std::string, const llvm::GlobalValue*> sGlobalMap;
-
-// Cleanup handler to avoid segfaults during static destruction
-static void cleanupLLVM() {
-    sGlobalMap.clear();
-    extemp::EXTLLVM::Ms.clear();
-    // Reset the JIT to release resources.
-    if (extemp::EXTLLVM::JIT) {
-        extemp::EXTLLVM::JIT.reset();
-    }
-}
-
-static struct EXTLLVMCleanupRegistrar {
-    EXTLLVMCleanupRegistrar() {
-        std::atexit(cleanupLLVM);
-    }
-} sCleanupRegistrar;
-
-namespace extemp {
-
-void EXTLLVM::addModule(llvm::Module* Module) {
-    for (const auto& function : Module->getFunctionList()) {
-        std::string str;
-        llvm::raw_string_ostream stream(str);
-        function.printAsOperand(stream, false);
-        std::string funcName = stream.str().substr(1);
-        auto result(sGlobalMap.insert(std::make_pair(funcName, &function)));
-        if (!result.second) {
-            result.first->second = &function;
-        }
-    }
-    for (const auto& global : Module->globals()) {
-        std::string str;
-        llvm::raw_string_ostream stream(str);
-        global.printAsOperand(stream, false);
-        auto result(sGlobalMap.insert(std::make_pair(stream.str().substr(1), &global)));
-        if (!result.second) {
-            result.first->second = &global;
-        }
-    }
-    Ms.push_back(Module);
-}
-
-void EXTLLVM::removeFromGlobalMap(const std::string& name) {
-    sGlobalMap.erase(name);
-}
-
-const llvm::GlobalValue* EXTLLVM::getGlobalValue(const char* Name) {
-    auto iter(sGlobalMap.find(Name));
-    if (likely(iter != sGlobalMap.end())) {
-        return iter->second;
-    }
-    return nullptr;
-}
-
-const llvm::GlobalVariable* EXTLLVM::getGlobalVariable(const char* Name) {
-    auto val(getGlobalValue(Name));
-    if (likely(val)) {
-        return llvm::dyn_cast<llvm::GlobalVariable>(val);
-    }
-    return nullptr;
-}
-
-const llvm::Function* EXTLLVM::getFunction(const char* Name) {
-    auto val(getGlobalValue(Name));
-    if (likely(val)) {
-        return llvm::dyn_cast<llvm::Function>(val);
-    }
-    return nullptr;
-}
 }  // namespace extemp
