@@ -36,20 +36,11 @@
 #pragma once
 
 #include "UNIV.h"
+
+#include "ext/NetCompat.h"
 #include <mutex>
 #include <string>
 #include <unordered_map>
-
-#ifdef _WIN32
-#include <experimental/buffer>
-#include <experimental/executor>
-#include <experimental/internet>
-#include <experimental/io_context>
-#include <experimental/net>
-#include <experimental/netfwd>
-#include <experimental/socket>
-#include <experimental/timer>
-#endif
 
 namespace extemp {
 
@@ -64,12 +55,7 @@ class SchemeREPL {
   private:
     std::string m_title;
     SchemeProcess* m_process;
-#ifdef _WIN32
-    std::experimental::net::ip::tcp::socket* m_serverSocket;
-    std::experimental::net::io_context* m_serverIoService;
-#else
-    int m_serverSocket;
-#endif
+    SOCKET m_serverSocket;
     char m_buf[BUFLENGTH];
     bool m_connected;
     bool m_active;

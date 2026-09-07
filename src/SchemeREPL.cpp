@@ -35,30 +35,14 @@
 
 #include "SchemeREPL.h"
 #include "UNIV.h"
+#include "ext/NetCompat.h"
 #include "ext/NetUtil.h"
 
-#include <cstdio>
-
-#ifdef _WIN32
-// nothing
-#else
-#include <sys/types.h>   /* standard system types       */
-#include <netinet/in.h>  /* Internet address structures */
-#include <netinet/tcp.h> /* for define of TCP_NODELAY  Nagles Algorithm*/
-#include <sys/socket.h>  /* socket interface functions  */
-#include <netdb.h>       /* host to IP resolution       */
-#endif
-
 #include <chrono>
-#include <thread>
-
-#ifndef _WIN32
-#include <unistd.h>
-#endif
-#include <iostream>
-#include <sstream>
+#include <cstdio>
 #include <cstring>
-#include <cerrno>
+#include <iostream>
+#include <thread>
 
 namespace extemp {
 
@@ -66,13 +50,8 @@ std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 std::mutex SchemeREPL::sm_replsMutex;
 
 SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
-    : m_title(Title), m_process(Process),
-#ifdef _WIN32
-      m_serverSocket(nullptr),
-#else
-      m_serverSocket(-1),
-#endif
-      m_connected(false), m_active(true) {
+    : m_title(Title), m_process(Process), m_serverSocket(INVALID_SOCKET), m_connected(false),
+      m_active(true) {
     ascii_info();
     printf("INFO:");
     ascii_default();
@@ -100,15 +79,9 @@ SchemeREPL* SchemeREPL::I(const std::string& name) {
 }
 
 void SchemeREPL::writeString(std::string&& String) {
-#ifdef _WIN32
-    if (!m_serverSocket) {
+    if (m_serverSocket == INVALID_SOCKET) {
         return;
     }
-#else
-    if (m_serverSocket == -1) {
-        return;
-    }
-#endif
     std::lock_guard<std::recursive_mutex> lock(m_writeLock);
     String.push_back('\r');
     String.push_back('\n');
@@ -116,11 +89,7 @@ void SchemeREPL::writeString(std::string&& String) {
     const char* b = String.c_str();
     while (true) {
         int lth = (length > 1024) ? 1024 : length;
-#ifdef _WIN32
-        int chars_written = m_serverSocket->write_some(std::experimental::net::buffer(b, lth));
-#else
-        int chars_written = write(m_serverSocket, b, lth);
-#endif
+        long chars_written = net::send(m_serverSocket, b, size_t(lth));
         if (chars_written != lth) {
             printf("There was an error sending this expression to the interpreter. Check for "
                    "non-ascii characters in your code.\n");
@@ -137,7 +106,6 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     if (m_connected) {
         return false;
     }
-    int rc;
     // this whole "trying to connect" print-out is just confusing to newcomers
     // I'd delete it, but SB likes to leave these comments in :)
 
@@ -148,23 +116,9 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 
     /* Address resolution stage */
 
-#ifdef _WIN32
-    std::experimental::net::io_context context;
-    std::experimental::net::ip::tcp::resolver resolver(context);
-    std::stringstream ss;
-    ss << port;
-    std::experimental::net::ip::tcp::resolver::results_type res =
-        resolver.resolve(std::experimental::net::ip::tcp::v4(), hostname, ss.str());
-    auto iter = res.begin();
-    auto end = res.end();
-    std::experimental::net::ip::tcp::endpoint ep = *iter;
-    // std::cout << "resolved: " << ep << std::endl << std::flush;
-    if (iter == end) {
-#else
-    struct sockaddr_in sa;
+    net::ensureInitialised();
     uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
     if (!resolved) {
-#endif
         ascii_error();
         printf("Could not resolve host name\n");
         ascii_default();
@@ -173,52 +127,37 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     // wait for main server to start up first time out of the gates.
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-#ifdef _WIN32
-    m_serverIoService = new std::experimental::net::io_context;
-    try {
-        m_serverSocket = new std::experimental::net::ip::tcp::socket(*m_serverIoService);
-        m_serverSocket->open(std::experimental::net::ip::tcp::v4());
-        m_serverSocket->connect(ep);
-    } catch (std::exception& e) {
-        ascii_error();
-        std::cout << "Connection Error:" << e.what() << std::endl;
-        ascii_default();
-        return false;
-    }
-    rc = m_serverSocket->read_some(std::experimental::net::buffer(m_buf, sizeof(m_buf)));
-#else
+    struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
+    sa.sin_port = htons(uint16_t(port));
     sa.sin_addr.s_addr = resolved;
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (m_serverSocket < 0) {
+    if (m_serverSocket == INVALID_SOCKET) {
         ascii_error();
         printf("Socket Connection Failed\n");
         ascii_default();
         return false;
     }
     int flag = 1;
-    int result = setsockopt(m_serverSocket, /* socket affected */
-                            IPPROTO_TCP,    /* set option at TCP level */
-                            TCP_NODELAY,    /* name of option */
-                            (char*)&flag,   /* the cast is historical cruft */
-                            sizeof(int));   /* length of option value */
+    int result = setsockopt(m_serverSocket,     /* socket affected */
+                            IPPROTO_TCP,        /* set option at TCP level */
+                            TCP_NODELAY,        /* name of option */
+                            (const char*)&flag, /* the cast is historical cruft */
+                            int(sizeof(int)));  /* length of option value */
     if (result < 0) {
         printf("error turning off TCP Nagle ALGO\n");
     }
-    rc = connect(m_serverSocket, (struct sockaddr*)&sa, sizeof(sa));
-    if (rc) {
+    if (connect(m_serverSocket, (struct sockaddr*)&sa, int(sizeof(sa)))) {
         ascii_error();
-        printf("Connection error:%d\n", errno);
+        printf("Connection error:%d\n", net::lastError());
         ascii_default();
         return false;
     }
 
     // should now be connected
-    rc = read(m_serverSocket, m_buf, sizeof(m_buf));
-#endif
+    long rc = net::recv(m_serverSocket, m_buf, sizeof(m_buf));
     if (!rc) {
         this->closeREPL();
         ascii_warning();
@@ -239,21 +178,11 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
 
 void SchemeREPL::closeREPL() {
     m_active = false;
-#ifdef _WIN32
-    if (m_serverSocket) {
-        m_serverSocket->close();
-        delete m_serverSocket;
-        m_serverSocket = nullptr;
-    }
-    delete m_serverIoService;
-    m_serverIoService = nullptr;
-#else
-    if (m_serverSocket != -1) {
+    if (m_serverSocket != INVALID_SOCKET) {
         shutdown(m_serverSocket, SHUT_RDWR);
-        close(m_serverSocket);
-        m_serverSocket = -1;
+        closesocket(m_serverSocket);
+        m_serverSocket = INVALID_SOCKET;
     }
-#endif
     m_connected = false;
 }
 
