@@ -4,6 +4,7 @@ add_executable(extempore_cpp_unit
     osc_test.cpp
     zones_test.cpp
     scheduler_test.cpp
+    ir_preamble_test.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTThread.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTZones.cpp)
 

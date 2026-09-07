@@ -746,9 +746,6 @@ ModuleSymbols collectModuleSymbols(const llvm::Module& M) {
             }
             return;
         }
-        if (GV.hasLinkOnceLinkage() || GV.hasWeakLinkage()) {
-            return;  // a bitcode.ll clone; the permanent runtime module owns the real one
-        }
         syms.exports.push_back(GV.getName().str());
         if (IsVariable) {
             syms.definesGlobals = true;
@@ -766,14 +763,6 @@ ModuleSymbols collectModuleSymbols(const llvm::Module& M) {
         consider(A, true);
     }
     return syms;
-}
-
-llvm::Error addPermanentModule(llvm::orc::ThreadSafeModule TSM) {
-    if (!JIT) {
-        return llvm::make_error<llvm::StringError>("JIT not initialized",
-                                                   llvm::inconvertibleErrorCode());
-    }
-    return JIT->addIRModule(std::move(TSM));
 }
 
 llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symbols,

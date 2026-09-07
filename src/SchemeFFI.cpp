@@ -46,7 +46,6 @@
 #include "llvm/AsmParser/Parser.h"
 #include "llvm-c/Core.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/Bitcode/BitcodeReader.h"
 
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
@@ -132,6 +131,7 @@
 #include <queue>
 // #include <unistd.h>
 #include <EXTLLVM.h>
+#include <IRPreamble.h>
 namespace extemp {
 namespace SchemeFFI {
 static llvm::Module* jitCompile(const std::string& String);
@@ -181,32 +181,15 @@ static std::string formatLLVMType(llvm::Type* Type) {
 static std::unordered_set<std::string> sExternalLibFunctionNames;
 static std::mutex sExternalLibFunctionNamesMutex;
 
-// Cached template module (parsed bitcode.ll) and its binary form for fast cloning.
-static std::string sTemplateBitcode;
-// IR declarations keyed by bare name (without % or @ prefix), prepended to every user IR.
-// std::map (ordered) rather than unordered_map so the generated preamble is
-// byte-deterministic across runs, keeping the AOT cache reproducible.
-static std::map<std::string, std::string> sTypeDefs;
-static std::map<std::string, std::string> sFuncDecls;
-static std::map<std::string, std::string> sGlobalDecls;
-// Global/function names defined in the template module (bitcode.ll).
-// Declarations for these must not be added to the maps above, since they
-// already exist in every cloned template module and would cause redefinitions.
-static std::unordered_set<std::string> sTemplateGlobalNames;
-static std::mutex sTemplateMutex;
-// The three maps above concatenated, rebuilt only after one of them changes;
-// see buildPreamble. Caller must hold sTemplateMutex.
-static std::string sPreambleCache;
-static bool sPreambleDirty = true;
+// The IR preamble (see IRPreamble.h): what each compile may need to reference
+// from earlier compiles and from runtime/bitcode.ll. A compile is prepended
+// with just the entries its IR transitively references, so parsing cost
+// scales with the IR being compiled rather than with everything compiled
+// before it.
+static IRPreamble::Entries sPreamble;
+static std::mutex sPreambleMutex;
+static bool sRuntimeHelpersLoaded = false;
 
-// Insert a declaration into one of the preamble maps (first definition wins),
-// noting that the cached preamble is stale. Caller must hold sTemplateMutex.
-template <typename Map>
-static void addPreambleDecl(Map& map, std::string name, std::string decl) {
-    if (map.emplace(std::move(name), std::move(decl)).second) {
-        sPreambleDirty = true;
-    }
-}
 void initSchemeFFI(scheme* sc) {
     static struct {
         const char* name;
@@ -244,195 +227,6 @@ static void registerExternalLibFunction(const std::string& name) {
     sExternalLibFunctionNames.insert(name);
 }
 
-// Extract names of types, functions, and globals that are declared or defined
-// in the given IR string.  This is used to avoid emitting duplicate preamble
-// entries when the user IR (e.g. an AOT-compiled .ll file) already contains them.
-// We scan line-by-line, which is O(n) in the IR size and done at most once per
-// jitCompile call.
-struct IRNames {
-    std::unordered_set<std::string> types;
-    std::unordered_set<std::string> funcs;
-    std::unordered_set<std::string> globals;
-};
-
-static IRNames extractIRNames(const std::string& irString) {
-    IRNames names;
-    size_t pos = 0;
-    while (pos < irString.size()) {
-        size_t lineEnd = irString.find('\n', pos);
-        if (lineEnd == std::string::npos)
-            lineEnd = irString.size();
-        size_t lineLen = lineEnd - pos;
-
-        // Use a string_view bounded to this line to avoid O(n^2) scans.
-        std::string_view line(irString.data() + pos, lineLen);
-
-        // "%Name = type " at start of line
-        if (line.size() > 0 && line[0] == '%') {
-            auto eq = line.find(" = type ");
-            if (eq != std::string_view::npos) {
-                names.types.emplace(line.substr(1, eq - 1));
-            }
-        }
-        // "declare ... @name(" or "define ... @name("
-        else if ((line.size() >= 7 && line.compare(0, 7, "declare") == 0) ||
-                 (line.size() >= 6 && line.compare(0, 6, "define") == 0)) {
-            auto atPos = line.find('@');
-            if (atPos != std::string_view::npos) {
-                auto nameEnd = line.find('(', atPos);
-                if (nameEnd != std::string_view::npos) {
-                    names.funcs.emplace(line.substr(atPos + 1, nameEnd - atPos - 1));
-                }
-            }
-        }
-        // "@name = ..." at start of line (global definition)
-        else if (line.size() > 0 && line[0] == '@') {
-            auto eq = line.find(" = ");
-            if (eq != std::string_view::npos) {
-                names.globals.emplace(line.substr(1, eq - 1));
-            }
-        }
-
-        pos = lineEnd + 1;
-    }
-    return names;
-}
-
-// Build the preamble string from the three maps (types, then functions, then globals).
-// Declarations the IR itself defines are left out to avoid "invalid
-// redefinition" errors (an AOT-compiled .ll file carries its own bind-lib
-// declarations; a redefinition defines a function an earlier compile declared).
-// When nothing clashes -- the common case -- the cached concatenation is
-// returned as is, so the maps are only walked when they have changed.
-// NOTE: caller must hold sTemplateMutex.
-static std::string buildPreamble(const std::string& irString = "") {
-    IRNames existing;
-    if (!irString.empty()) {
-        existing = extractIRNames(irString);
-    }
-    auto clashes = [](const auto& names, const auto& map) {
-        return std::any_of(names.begin(), names.end(),
-                           [&](const std::string& n) { return map.count(n) != 0; });
-    };
-    if (!clashes(existing.types, sTypeDefs) && !clashes(existing.funcs, sFuncDecls) &&
-        !clashes(existing.globals, sGlobalDecls)) {
-        if (sPreambleDirty) {
-            sPreambleCache.clear();
-            sPreambleCache.reserve(sTypeDefs.size() * 80 + sFuncDecls.size() * 120 +
-                                   sGlobalDecls.size() * 60);
-            for (const auto& [name, val] : sTypeDefs) {
-                sPreambleCache += val;
-            }
-            for (const auto& [name, val] : sFuncDecls) {
-                sPreambleCache += val;
-            }
-            for (const auto& [name, val] : sGlobalDecls) {
-                sPreambleCache += val;
-            }
-            sPreambleDirty = false;
-        }
-        return sPreambleCache;
-    }
-
-    std::string preamble;
-    preamble.reserve(sTypeDefs.size() * 80 + sFuncDecls.size() * 120 + sGlobalDecls.size() * 60);
-
-    for (const auto& [name, val] : sTypeDefs) {
-        if (existing.types.count(name))
-            continue;
-        preamble += val;
-    }
-
-    for (const auto& [name, val] : sFuncDecls) {
-        if (existing.funcs.count(name))
-            continue;
-        preamble += val;
-    }
-
-    for (const auto& [name, val] : sGlobalDecls) {
-        if (existing.globals.count(name))
-            continue;
-        preamble += val;
-    }
-
-    return preamble;
-}
-
-// Extract external global declarations from IR string and add to sGlobalDecls.
-// This handles globals that are declared but not defined (e.g., @SAMPLE_RATE = external global
-// i32). These get dropped by LLVM if they're not used in the same module. NOTE: lockless version -
-// caller must hold sTemplateMutex.
-static void extractExternalGlobalsLockless(const std::string& irString) {
-    std::istringstream stream(irString);
-    std::string line;
-    while (std::getline(stream, line)) {
-        // Strip trailing CR
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        // Look for pattern: @name = external global type
-        if (line.size() > 1 && line[0] == '@') {
-            size_t extPos = line.find(" = external global ");
-            if (extPos != std::string::npos) {
-                std::string bareName = line.substr(1, extPos - 1);
-                if (sTemplateGlobalNames.count(bareName)) {
-                    continue;
-                }
-                addPreambleDecl(sGlobalDecls, bareName, line + "\n");
-            }
-        }
-    }
-}
-
-// Extract type definitions from a line (handles CRLF safely).
-// Returns the type definition line if it matches "%name = type ...", empty otherwise.
-static std::string extractTypeDef(const std::string& line) {
-    size_t start = 0;
-    size_t end = line.size();
-    // Skip leading whitespace
-    while (start < end && (line[start] == ' ' || line[start] == '\t')) {
-        start++;
-    }
-    // Skip trailing whitespace and CR
-    while (end > start && (line[end - 1] == ' ' || line[end - 1] == '\t' || line[end - 1] == '\r' ||
-                           line[end - 1] == '\n')) {
-        end--;
-    }
-    if (start >= end)
-        return "";
-
-    std::string trimmed = line.substr(start, end - start);
-    // Check for type definition pattern: %name = type ...
-    if (trimmed.size() > 1 && trimmed[0] == '%') {
-        size_t eqPos = trimmed.find(" = type ");
-        if (eqPos != std::string::npos) {
-            return trimmed + "\n";
-        }
-    }
-    return "";
-}
-
-// Record every "%name = type ..." line of an IR string in sTypeDefs. LLVM's
-// module may not preserve forward declarations or opaque types, so they are
-// captured from the source text. Caller must hold sTemplateMutex.
-static void captureTypeDefsLockless(const std::string& irString) {
-    std::istringstream stream(irString);
-    std::string line;
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        std::string typeDef = extractTypeDef(line);
-        if (typeDef.empty()) {
-            continue;
-        }
-        size_t eqPos = typeDef.find(" = type ");
-        if (eqPos != std::string::npos) {
-            addPreambleDecl(sTypeDefs, typeDef.substr(1, eqPos - 1), typeDef);
-        }
-    }
-}
-
 // The "declare ..." line that lets a later module reference `func`.
 static std::string functionDeclaration(const llvm::Function& func) {
     std::string declStr;
@@ -466,58 +260,30 @@ static std::string functionDeclaration(const llvm::Function& func) {
     return ss.str();
 }
 
-// Initialize template module from bitcode.ll (called once, thread-safe).
-static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
-    std::lock_guard<std::mutex> lock(sTemplateMutex);
-    if (!sTemplateBitcode.empty()) {
+// Load runtime/bitcode.ll into the preamble maps, once. The file is parsed
+// with LLVM first so a mistake in it is reported here rather than by whichever
+// later compile happens to reference the broken helper. Caller must hold
+// sPreambleMutex.
+static bool loadRuntimeHelpersLockless(llvm::LLVMContext& ctx) {
+    if (sRuntimeHelpersLoaded) {
         return true;
     }
-
-    std::string inlineString;
     std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
     std::stringstream ss;
     ss << inStream.rdbuf();
-    inlineString = ss.str();
+    const std::string text = ss.str();
 
-    // Type definitions are needed so user IR can reference runtime types.
-    captureTypeDefsLockless(inlineString);
-
-    // Parse template module to create the binary bitcode for fast cloning.
     llvm::SMDiagnostic diag;
-    auto templateModule = llvm::parseAssemblyString(inlineString, diag, ctx);
-    if (!templateModule) {
+    if (!llvm::parseAssemblyString(text, diag, ctx)) {
         std::cerr << "Failed to parse bitcode.ll: " << diag.getMessage().str() << std::endl;
         return false;
     }
 
-    for (const auto& global : templateModule->globals()) {
-        sTemplateGlobalNames.insert(global.getName().str());
-    }
-    for (const auto& func : templateModule->functions()) {
-        sTemplateGlobalNames.insert(func.getName().str());
-    }
-
-    llvm::raw_string_ostream bitstream(sTemplateBitcode);
-    llvm::WriteBitcodeToFile(*templateModule, bitstream);
-
+    IRPreamble::captureTypeDefs(sPreamble, text);
+    IRPreamble::captureExternalGlobals(sPreamble, text);
+    IRPreamble::captureDeclaresAndDefines(sPreamble, text);
+    sRuntimeHelpersLoaded = true;
     return true;
-}
-
-// Clone the template module for a new compilation.
-static std::unique_ptr<llvm::Module> cloneTemplateModule(llvm::LLVMContext& ctx) {
-    std::lock_guard<std::mutex> lock(sTemplateMutex);
-    if (sTemplateBitcode.empty()) {
-        return nullptr;
-    }
-
-    auto modOrErr =
-        llvm::parseBitcodeFile(llvm::MemoryBufferRef(sTemplateBitcode, "<template>"), ctx);
-    if (modOrErr) {
-        return std::move(modOrErr.get());
-    }
-    std::cerr << "Failed to read the cached bitcode.ll template: "
-              << llvm::toString(modOrErr.takeError()) << std::endl;
-    return nullptr;
 }
 
 static llvm::Module* jitCompile(const std::string& irString) {
@@ -529,72 +295,26 @@ static llvm::Module* jitCompile(const std::string& irString) {
     Module* modulePtr = nullptr;
 
     EXTLLVM::getThreadSafeContext().withContextDo([&](LLVMContext* ctx) {
-        // Step 1: Initialize template module (first time only), and add one
-        // copy of it to the JIT for good. Every module compiled below carries
-        // its own linkonce_odr clone of the bitcode.ll helpers, and ORC keeps
-        // whichever definition it saw first; this permanent copy makes sure
-        // that is never a module that can later be removed.
-        static bool templateInitialized = false;
-        if (!templateInitialized) {
-            if (!initializeTemplateModule(*ctx)) {
-                std::cerr << "Failed to initialize template module" << std::endl;
-                return;
-            }
-            auto runtimeModule = cloneTemplateModule(*ctx);
-            if (!runtimeModule) {
-                std::cerr << "Failed to clone template module" << std::endl;
-                return;
-            }
-            runtimeModule->setModuleIdentifier("xtm_runtime");
-            if (!extemp::UNIV::ARCH.empty()) {
-                runtimeModule->setTargetTriple(Triple(extemp::UNIV::ARCH));
-            }
-            if (EXTLLVM::JIT) {
-                runtimeModule->setDataLayout(EXTLLVM::JIT->getDataLayout());
-            }
-            if (auto err = EXTLLVM::addPermanentModule(orc::ThreadSafeModule(
-                    std::move(runtimeModule), EXTLLVM::getThreadSafeContext()))) {
-                std::cerr << "Failed to add the runtime module to the JIT: "
-                          << toString(std::move(err)) << std::endl;
-                return;
-            }
-            templateInitialized = true;
-        }
-
-        // Step 2: Clone the template module for each compilation.
-        // The template module contains bitcode.ll runtime helpers.
-        // Use LinkOnceODR linkage so duplicate definitions are resolved by the linker.
-        auto baseModule = cloneTemplateModule(*ctx);
-        if (!baseModule) {
-            std::cerr << "Failed to clone template module" << std::endl;
-            return;
-        }
-
-        // Set linkage to LinkOnceODR so the linker can deduplicate across modules.
-        for (auto& func : baseModule->functions()) {
-            if (!func.isDeclaration() && !func.isIntrinsic()) {
-                func.setLinkage(GlobalValue::LinkOnceODRLinkage);
-            }
-        }
-        for (auto& global : baseModule->globals()) {
-            if (global.hasInitializer()) {
-                global.setLinkage(GlobalValue::LinkOnceODRLinkage);
-            }
-        }
-        baseModule->setModuleIdentifier(modname);
-
-        // Set target triple and data layout.
+        auto mod = std::make_unique<Module>(modname, *ctx);
         if (!extemp::UNIV::ARCH.empty()) {
-            baseModule->setTargetTriple(Triple(extemp::UNIV::ARCH));
+            mod->setTargetTriple(Triple(extemp::UNIV::ARCH));
         }
         if (EXTLLVM::JIT) {
-            baseModule->setDataLayout(EXTLLVM::JIT->getDataLayout());
+            mod->setDataLayout(EXTLLVM::JIT->getDataLayout());
         }
 
-        // Step 3: Parse user IR with type definitions prepended.
-        std::string fullIR = buildPreamble(irString) + irString;
+        // Parse the IR with the preamble it needs prepended.
+        std::string fullIR;
+        {
+            std::lock_guard<std::mutex> lock(sPreambleMutex);
+            if (!loadRuntimeHelpersLockless(*ctx)) {
+                return;
+            }
+            fullIR = IRPreamble::select(sPreamble, irString);
+        }
+        fullIR += irString;
         SMDiagnostic diag;
-        if (parseAssemblyInto(MemoryBufferRef(fullIR, "<user>"), baseModule.get(), nullptr, diag)) {
+        if (parseAssemblyInto(MemoryBufferRef(fullIR, "<user>"), mod.get(), nullptr, diag)) {
             std::string errstr;
             raw_string_ostream ss(errstr);
             diag.print("LLVM IR", ss);
@@ -606,28 +326,26 @@ static llvm::Module* jitCompile(const std::string& irString) {
         if (EXTLLVM::VERIFY_COMPILES) {
             std::string verifyErrors;
             raw_string_ostream verifyStream(verifyErrors);
-            if (verifyModule(*baseModule, &verifyStream)) {
+            if (verifyModule(*mod, &verifyStream)) {
                 std::cerr << "Invalid LLVM IR for " << modname << ":\n"
                           << verifyErrors << std::endl;
                 return;
             }
         }
 
-        // Step 4: Capture new declarations into sFuncDecls so subsequent
+        // Capture new declarations into the preamble so subsequent
         // compilations can reference them. This handles both individual bind-lib
         // declarations (small IR) and AOT-cached .ll files (large IR).
         // We capture before optimization because LLVM may drop unused declarations.
         bool isBindLibDeclaration = (irString.find("declare") == 0 && irString.size() < 500);
         {
-            std::lock_guard<std::mutex> lock(sTemplateMutex);
-            for (const auto& func : baseModule->functions()) {
+            std::lock_guard<std::mutex> lock(sPreambleMutex);
+            for (const auto& func : mod->functions()) {
                 if (!func.isDeclaration() || func.isIntrinsic())
                     continue;
 
                 std::string name = func.getName().str();
-                if (sTemplateGlobalNames.count(name))
-                    continue;
-                if (sFuncDecls.count(name))
+                if (sPreamble.funcDecls.count(name))
                     continue;
 
                 // For bind-lib declarations, register as external library function
@@ -636,13 +354,13 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     registerExternalLibFunction(name);
                 }
 
-                addPreambleDecl(sFuncDecls, name, functionDeclaration(func));
+                IRPreamble::add(sPreamble.funcDecls, name, functionDeclaration(func));
             }
         }
 
-        // Step 5: Add function/global declarations for previously compiled symbols.
+        // Add function/global declarations for previously compiled symbols.
         // This allows the current module to reference symbols from earlier compiles.
-        for (auto& func : baseModule->functions()) {
+        for (auto& func : mod->functions()) {
             if (!func.isDeclaration())
                 continue;
             if (func.isIntrinsic())
@@ -657,7 +375,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
 
             if (auto srcFunc = dyn_cast<Function>(gv)) {
                 auto funcType = srcFunc->getFunctionType();
-                auto callee = baseModule->getOrInsertFunction(name, funcType);
+                auto callee = mod->getOrInsertFunction(name, funcType);
                 if (auto* newFunc = dyn_cast<Function>(callee.getCallee())) {
                     if (newFunc->isDeclaration()) {
                         if (isExternalLibFunction(name)) {
@@ -670,7 +388,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
             }
         }
 
-        for (const auto& global : baseModule->globals()) {
+        for (const auto& global : mod->globals()) {
             if (!global.isDeclaration())
                 continue;
 
@@ -681,11 +399,11 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 continue;
 
             if (auto srcGlobal = dyn_cast<GlobalVariable>(gv)) {
-                baseModule->getOrInsertGlobal(name, srcGlobal->getValueType());
+                mod->getOrInsertGlobal(name, srcGlobal->getValueType());
             }
         }
 
-        // Step 7: Optimize.
+        // Optimise.
         if (EXTLLVM::OPTIMIZE_COMPILES) {
             LoopAnalysisManager LAM;
             FunctionAnalysisManager FAM;
@@ -716,17 +434,17 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 break;
             }
             ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(optLevel);
-            MPM.run(*baseModule, MAM);
+            MPM.run(*mod, MAM);
         }
 
-        // Step 9: Work out what the module exports and imports, clone it for
+        // Work out what the module exports and imports, clone it for
         // the metadata view, and hand both to the JIT under one tracker.
-        auto symbols = EXTLLVM::collectModuleSymbols(*baseModule);
+        auto symbols = EXTLLVM::collectModuleSymbols(*mod);
         auto exportedNames = symbols.exports;
-        auto metadataModule = CloneModule(*baseModule);
+        auto metadataModule = CloneModule(*mod);
         llvm::Module* metadata = metadataModule.get();
 
-        auto TSM = orc::ThreadSafeModule(std::move(baseModule), EXTLLVM::getThreadSafeContext());
+        auto TSM = orc::ThreadSafeModule(std::move(mod), EXTLLVM::getThreadSafeContext());
         auto err = EXTLLVM::addTrackedModule(std::move(TSM), std::move(symbols),
                                              std::move(metadataModule));
 
@@ -741,17 +459,20 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 EXTLLVM::registerAdhocAlias(name);
             }
 
-            // Add declarations for newly defined symbols to the IR preamble maps.
+            // Add declarations for newly defined symbols to the IR preamble.
             // This allows subsequent compilations to reference these symbols.
             // We also need to add any new type definitions from the module.
+            // Local (private/internal) symbols are skipped: no other module can
+            // reference them, and the bitcode.ll helpers among them already
+            // have their definitions in the preamble.
             {
-                std::lock_guard<std::mutex> lock(sTemplateMutex);
+                std::lock_guard<std::mutex> lock(sPreambleMutex);
 
                 // First, add any identified struct types from the module.
                 for (auto* structType : metadata->getIdentifiedStructTypes()) {
                     if (structType->hasName() && !structType->isOpaque()) {
                         std::string name = structType->getName().str();
-                        if (sTypeDefs.count(name)) {
+                        if (sPreamble.types.count(name)) {
                             continue;
                         }
 
@@ -775,29 +496,29 @@ static llvm::Module* jitCompile(const std::string& irString) {
                             ts << " }";
                         }
                         ts << "\n";
-                        addPreambleDecl(sTypeDefs, name, ts.str());
+                        IRPreamble::add(sPreamble.types, name, ts.str());
                     }
                 }
 
                 // Now add function declarations for newly defined functions.
                 for (const auto& func : metadata->functions()) {
-                    if (func.isDeclaration())
+                    if (func.isDeclaration() || func.hasLocalLinkage())
                         continue;
 
                     std::string name = func.getName().str();
-                    if (sFuncDecls.count(name)) {
+                    if (sPreamble.funcDecls.count(name)) {
                         continue;
                     }
 
-                    addPreambleDecl(sFuncDecls, name, functionDeclaration(func));
+                    IRPreamble::add(sPreamble.funcDecls, name, functionDeclaration(func));
                 }
 
                 for (const auto& glob : metadata->globals()) {
-                    std::string name = glob.getName().str();
-                    if (sTemplateGlobalNames.count(name)) {
+                    if (glob.hasLocalLinkage()) {
                         continue;
                     }
-                    if (sGlobalDecls.count(name)) {
+                    std::string name = glob.getName().str();
+                    if (sPreamble.globals.count(name)) {
                         continue;
                     }
 
@@ -813,17 +534,15 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     glob.getValueType()->print(ss, false, true);
                     ss << "\n";
 
-                    addPreambleDecl(sGlobalDecls, name, ss.str());
+                    IRPreamble::add(sPreamble.globals, name, ss.str());
                 }
 
                 // Also extract external global declarations from the original IR string.
                 // LLVM drops unused external declarations during parsing, so we need to
                 // capture them from the source IR to make them available to subsequent modules.
-                extractExternalGlobalsLockless(irString);
-
-                captureTypeDefsLockless(irString);
+                IRPreamble::captureExternalGlobals(sPreamble, irString);
+                IRPreamble::captureTypeDefs(sPreamble, irString);
             }
-
         }
     });
 

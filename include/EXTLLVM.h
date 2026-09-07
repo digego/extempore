@@ -125,9 +125,6 @@ struct ModuleSymbols {
 };
 ModuleSymbols collectModuleSymbols(const llvm::Module& M);
 
-// Add a module the JIT keeps for the life of the process (the bitcode.ll
-// runtime helpers).
-llvm::Error addPermanentModule(llvm::orc::ThreadSafeModule TSM);
 // Add a compiled module under its own resource tracker. Metadata is the clone
 // exposed through getModules()/getGlobalValue(); it is released with the code.
 llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symbols,
