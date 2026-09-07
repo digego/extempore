@@ -190,6 +190,19 @@ static std::map<std::string, std::string> sGlobalDecls;
 // already exist in every cloned template module and would cause redefinitions.
 static std::unordered_set<std::string> sTemplateGlobalNames;
 static std::mutex sTemplateMutex;
+// The three maps above concatenated, rebuilt only after one of them changes;
+// see buildPreamble. Caller must hold sTemplateMutex.
+static std::string sPreambleCache;
+static bool sPreambleDirty = true;
+
+// Insert a declaration into one of the preamble maps (first definition wins),
+// noting that the cached preamble is stale. Caller must hold sTemplateMutex.
+template <typename Map>
+static void addPreambleDecl(Map& map, std::string name, std::string decl) {
+    if (map.emplace(std::move(name), std::move(decl)).second) {
+        sPreambleDirty = true;
+    }
+}
 void initSchemeFFI(scheme* sc) {
     static struct {
         const char* name;
@@ -282,18 +295,43 @@ static IRNames extractIRNames(const std::string& irString) {
 }
 
 // Build the preamble string from the three maps (types, then functions, then globals).
-// When irString is provided, skip any declarations already present in it to avoid
-// "invalid redefinition" errors (e.g. when loading AOT-compiled .ll files that
-// contain their own declarations for bind-lib functions).
+// Declarations the IR itself defines are left out to avoid "invalid
+// redefinition" errors (an AOT-compiled .ll file carries its own bind-lib
+// declarations; a redefinition defines a function an earlier compile declared).
+// When nothing clashes -- the common case -- the cached concatenation is
+// returned as is, so the maps are only walked when they have changed.
 // NOTE: caller must hold sTemplateMutex.
 static std::string buildPreamble(const std::string& irString = "") {
-    std::string preamble;
-    preamble.reserve(sTypeDefs.size() * 80 + sFuncDecls.size() * 120 + sGlobalDecls.size() * 60);
-
     IRNames existing;
     if (!irString.empty()) {
         existing = extractIRNames(irString);
     }
+    auto clashes = [](const auto& names, const auto& map) {
+        return std::any_of(names.begin(), names.end(),
+                           [&](const std::string& n) { return map.count(n) != 0; });
+    };
+    if (!clashes(existing.types, sTypeDefs) && !clashes(existing.funcs, sFuncDecls) &&
+        !clashes(existing.globals, sGlobalDecls)) {
+        if (sPreambleDirty) {
+            sPreambleCache.clear();
+            sPreambleCache.reserve(sTypeDefs.size() * 80 + sFuncDecls.size() * 120 +
+                                   sGlobalDecls.size() * 60);
+            for (const auto& [name, val] : sTypeDefs) {
+                sPreambleCache += val;
+            }
+            for (const auto& [name, val] : sFuncDecls) {
+                sPreambleCache += val;
+            }
+            for (const auto& [name, val] : sGlobalDecls) {
+                sPreambleCache += val;
+            }
+            sPreambleDirty = false;
+        }
+        return sPreambleCache;
+    }
+
+    std::string preamble;
+    preamble.reserve(sTypeDefs.size() * 80 + sFuncDecls.size() * 120 + sGlobalDecls.size() * 60);
 
     for (const auto& [name, val] : sTypeDefs) {
         if (existing.types.count(name))
@@ -336,7 +374,7 @@ static void extractExternalGlobalsLockless(const std::string& irString) {
                 if (sTemplateGlobalNames.count(bareName)) {
                     continue;
                 }
-                sGlobalDecls.emplace(bareName, line + "\n");
+                addPreambleDecl(sGlobalDecls, bareName, line + "\n");
             }
         }
     }
@@ -386,7 +424,7 @@ static void captureTypeDefsLockless(const std::string& irString) {
         }
         size_t eqPos = typeDef.find(" = type ");
         if (eqPos != std::string::npos) {
-            sTypeDefs.emplace(typeDef.substr(1, eqPos - 1), typeDef);
+            addPreambleDecl(sTypeDefs, typeDef.substr(1, eqPos - 1), typeDef);
         }
     }
 }
@@ -594,7 +632,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     registerExternalLibFunction(name);
                 }
 
-                sFuncDecls.emplace(name, functionDeclaration(func));
+                addPreambleDecl(sFuncDecls, name, functionDeclaration(func));
             }
         }
 
@@ -733,7 +771,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                             ts << " }";
                         }
                         ts << "\n";
-                        sTypeDefs.emplace(name, ts.str());
+                        addPreambleDecl(sTypeDefs, name, ts.str());
                     }
                 }
 
@@ -747,7 +785,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                         continue;
                     }
 
-                    sFuncDecls.emplace(name, functionDeclaration(func));
+                    addPreambleDecl(sFuncDecls, name, functionDeclaration(func));
                 }
 
                 for (const auto& glob : metadata->globals()) {
@@ -771,7 +809,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     glob.getValueType()->print(ss, false, true);
                     ss << "\n";
 
-                    sGlobalDecls.emplace(name, ss.str());
+                    addPreambleDecl(sGlobalDecls, name, ss.str());
                 }
 
                 // Also extract external global declarations from the original IR string.
