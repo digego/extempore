@@ -83,7 +83,6 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <ctime>
-#include <shared_mutex>
 
 #include <EXTLLVM.h>
 #include <ext/NetUtil.h>
@@ -130,13 +129,6 @@
 #endif
 
 #include "SchemeProcess.h"
-
-// llvm_scheme foreign function -> string name.  std::map keeps iterators /
-// stored strings stable across inserts, so a reader that copied out .c_str()
-// under a shared lock can safely use it after releasing the lock (we never
-// erase entries).
-std::map<foreign_func, std::string> LLVM_SCHEME_FF_MAP;
-static std::shared_mutex LLVM_SCHEME_FF_MAP_MUTEX;
 
 EXPORT void* malloc16(size_t Size) {
     if (!Size) {
@@ -210,20 +202,6 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
         // Denormalized or pseudo-denormalized - rare for audio sample rates.
         return sign ? -0.0 : 0.0;
     }
-}
-
-const char* llvm_scheme_ff_get_name(foreign_func ff) {
-    std::shared_lock<std::shared_mutex> lock(LLVM_SCHEME_FF_MAP_MUTEX);
-    auto it = LLVM_SCHEME_FF_MAP.find(ff);
-    if (it == LLVM_SCHEME_FF_MAP.end()) {
-        return "";
-    }
-    return it->second.c_str();
-}
-
-void llvm_scheme_ff_set_name(foreign_func ff, const char* name) {
-    std::unique_lock<std::shared_mutex> lock(LLVM_SCHEME_FF_MAP_MUTEX);
-    LLVM_SCHEME_FF_MAP[ff] = std::string(name);
 }
 
 // LLVM RUNTIME ERROR
@@ -419,158 +397,6 @@ EXPORT float xtc_rand1_f(float Limit) {
 
 EXPORT float xtc_rand2_f(float Start, float Limit) {
     return xtc_randf() * (Limit - Start) + Start;
-}
-
-///////////////////////////////////
-
-bool llvm_check_valid_dot_symbol(scheme* sc, char* symbol) {
-    char c[1024];
-    auto pos(strchr(symbol, '.'));
-    if (!pos) {
-        // printf("Eval error: not valid dot syntax\n");
-        return false;
-    }
-    size_t prefix_len = pos - symbol;
-    // Need room for the prefix, the "_xtlang_name" suffix appended below, and a NUL.
-    if (prefix_len + sizeof("_xtlang_name") > sizeof(c)) {
-        return false;
-    }
-    strncpy(c, symbol, prefix_len);
-    c[prefix_len] = '\0';
-    pointer x = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
-    if (x == sc->NIL) {
-        return false;
-    }
-    strcat(c, "_xtlang_name");
-    pointer y = find_slot_in_env(sc, sc->envir, mk_symbol(sc, c), 1);
-    return y != sc->NIL;
-}
-
-static char* get_address_type(uint64_t id,
-                              extemp::ClosureAddressTable::closure_address_table* table) {
-    while (table) {
-        if (table->id == id) {
-            return table->type;
-        }
-        table = table->next;
-    }
-    // printf("Unable to locate id in closure environment c\n");
-    return nullptr;
-}
-
-pointer llvm_scheme_env_set(scheme* _sc, char* sym) {
-    using namespace llvm;
-    // rsplit() assumes 2048-byte output buffers (see UNIV.cpp); give it that
-    // much so a long symbol can't overflow the stack. c holds fname plus the
-    // "_xtlang_name" suffix and a NUL.
-    char fname[2048];
-    char tmp[2048];
-    char vname[2048];
-    char tname[2048];
-
-    char c[2048 + 16];
-    c[0] = '\0';
-    const char* d = "_xtlang_name";
-
-    if (!(rsplit((char*)"\\.", sym, (char*)fname, (char*)tmp))) {
-        printf("Error attempting to set environment variable in closure bad split %s\n", sym);
-        return _sc->F;
-    }
-    if (!rsplit((char*)":", tmp, (char*)vname, (char*)tname)) {
-        tname[0] = '\0';
-        strcpy(vname, tmp);
-    }
-    strcat(c, fname);
-    strcat(c, d);
-    pointer xtlang_f_name = find_slot_in_env(_sc, _sc->envir, mk_symbol(_sc, c), 1);
-    char* xtlang_name = string_value(pair_cdr(xtlang_f_name));
-    // printf("in llvm scheme env set %s.%s:%s  xtlang:%s\n",fname,vname,tname,xtlang_name);
-    uint64_t id = string_hash(vname);
-    // Module* M = extemp::EXTLLVM::M;
-    std::string funcname(xtlang_name);
-    std::string getter("_getter");
-    void* (*p)() = (void* (*)())extemp::EXTLLVM::getFunctionAddress(funcname + getter);
-    if (!p) {
-        printf("Error attempting to set environment variable in closure %s.%s\n", fname, vname);
-        return _sc->F;
-    }
-
-    size_t*** closur = (size_t***)p();
-    size_t** closure = *closur;
-    // uint32_t** closure = (uint32_t**) cptr_value(pair_car(args));
-    extemp::ClosureAddressTable::closure_address_table* addy_table =
-        (extemp::ClosureAddressTable::closure_address_table*)*(closure + 0);
-    // check address exists
-    if (!check_address_exists(id, addy_table)) {
-        ascii_error();
-        printf("RunTime Error:");
-        ascii_normal();
-        printf(" slot");
-        ascii_warning();
-        printf(" %s.%s ", fname, vname);
-        ascii_normal();
-        printf("does not exist!\n");
-        ascii_default();
-        return _sc->F;
-    }
-    char* eptr = (char*)*(closure + 1);
-    char* type = get_address_type(id, addy_table);
-    uint32_t offset = extemp::ClosureAddressTable::get_address_offset(id, addy_table);
-
-    // printf("type: %s  offset: %d\n",type, offset);
-
-    pointer value = 0;
-    if (_sc->args == _sc->NIL) {
-        // value = 0;
-        value = _sc->NIL;
-    } else {
-        value = pair_car(_sc->args);
-    }
-
-    if (strcmp(type, "i32") == 0) {
-        int32_t** ptr = (int32_t**)(eptr + offset);
-        if (value == _sc->NIL) {
-            return mk_integer(_sc, **ptr);
-        } else {
-            **ptr = (int32_t)ivalue(value);
-            return _sc->T;
-        }
-    } else if (strcmp(type, "i64") == 0) {
-        uint64_t** ptr = (uint64_t**)(eptr + offset);
-        if (value == _sc->NIL) {
-            return mk_integer(_sc, **ptr);
-        } else {
-            **ptr = ivalue(value);
-            return _sc->T;
-        }
-    } else if (strcmp(type, "float") == 0) {
-        float** ptr = (float**)(eptr + offset);
-        if (value == _sc->NIL) {
-            return mk_real(_sc, **ptr);
-        } else {
-            **ptr = rvalue(value);
-            return _sc->T;
-        }
-    } else if (strcmp(type, "double") == 0) {
-        double** ptr = (double**)(eptr + offset);
-        if (value == _sc->NIL) {
-            return mk_real(_sc, **ptr);
-        } else {
-            **ptr = rvalue(value);
-            return _sc->T;
-        }
-    } else {  // else pointer type
-        char*** ptr = (char***)(eptr + offset);
-        if (value == _sc->NIL) {
-            return mk_cptr(_sc, (void*)**ptr);
-        } else {
-            **ptr = (char*)cptr_value(value);
-            // printf("Unsuported type for closure environment set\n");
-            return _sc->T;
-        }
-    }
-    // shouldn't get to here
-    return _sc->F;
 }
 
 namespace extemp {
