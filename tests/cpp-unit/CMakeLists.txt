@@ -15,6 +15,10 @@ target_include_directories(extempore_cpp_unit PRIVATE
 
 target_compile_features(extempore_cpp_unit PRIVATE cxx_std_20)
 
+# Same warning set as the extempore target (defined in the top-level
+# CMakeLists.txt), so test code is held to the same standard as what it tests.
+target_compile_options(extempore_cpp_unit PRIVATE ${EXTEMPORE_WARNING_FLAGS})
+
 if(UNIX AND NOT APPLE)
     target_link_libraries(extempore_cpp_unit PRIVATE pthread)
 endif()

@@ -343,6 +343,26 @@ else()
     target_compile_definitions(extempore PRIVATE -DEXT_SHARE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# Warning flags, shared with the C++ unit tests (tests/cpp-unit).
+if(MSVC)
+    set(EXTEMPORE_WARNING_FLAGS /W3 /wd4244 /wd4267 /wd4018 /wd4996 /we4715)
+else()
+    set(EXTEMPORE_WARNING_FLAGS
+        -Wall
+        -Wextra
+        -Woverloaded-virtual
+        -Wshadow
+        -Wno-unused-result
+        -Wno-unused-parameter
+        # src/ffi/llvm.inc defines printLLVMModule for use from a debugger.
+        -Wno-unused-function
+        -Wno-missing-field-initializers
+        -Wno-sign-compare
+        -Wno-deprecated-declarations
+        -Werror=return-type
+        -Werror=uninitialized)
+endif()
+
 # Platform-specific configuration
 if(UNIX)
     target_compile_definitions(extempore PRIVATE
@@ -354,19 +374,7 @@ if(UNIX)
         -fvisibility-inlines-hidden
         -fno-rtti
         -fno-common
-        -Wall
-        -Wextra
-        -Woverloaded-virtual
-        -Wshadow
-        -Wno-unused-result
-        -Wno-unused-parameter
-        -Wno-unused-variable
-        -Wno-unused-function
-        -Wno-missing-field-initializers
-        -Wno-sign-compare
-        -Wno-deprecated-declarations
-        -Werror=return-type
-        -Werror=uninitialized)
+        ${EXTEMPORE_WARNING_FLAGS})
 
     if(EXTEMPORE_SANITIZE)
         set(SAN_FLAGS "")
@@ -399,7 +407,7 @@ endif()
 if(WIN32)
     target_include_directories(extempore SYSTEM PRIVATE src/networking-ts-impl/include)
     target_compile_definitions(extempore PRIVATE -DPCRE_STATIC -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
-    target_compile_options(extempore PRIVATE /bigobj /W3 /wd4244 /wd4267 /wd4018 /wd4996 /we4715)
+    target_compile_options(extempore PRIVATE /bigobj ${EXTEMPORE_WARNING_FLAGS})
     target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
     set_target_properties(extempore PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
