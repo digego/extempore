@@ -41,36 +41,21 @@
 #include "UNIV.h"
 
 #include <atomic>
-#include <condition_variable>
 #include <mutex>
+#include <semaphore>
 
 namespace extemp {
-
-// Paired mutex + condvar used by the scheduler and its clients.
-struct Monitor {
-    std::recursive_mutex mutex;
-    std::condition_variable_any cond;
-    void lock() {
-        mutex.lock();
-    }
-    void unlock() {
-        mutex.unlock();
-    }
-    void wait() {
-        std::unique_lock<std::recursive_mutex> lk(mutex);
-        cond.wait(lk);
-    }
-    void signal() {
-        cond.notify_one();
-    }
-};
 
 class TaskScheduler {
   private:
     std::atomic<unsigned> m_numFrames;
     PriorityQueue<TaskI> m_queue;
     EXTThread m_queueThread;
-    Monitor m_guard;
+    // One permit per audio buffer: the audio callback releases, the scheduler
+    // thread acquires. A binary semaphore saturates at one, so a tick that
+    // arrives while the scheduler is still inside timeSlice() is not lost, it
+    // just coalesces with the next.
+    std::binary_semaphore m_tick{0};
     std::recursive_mutex m_queueMutex;
 
     static TaskScheduler sm_instance;
@@ -85,6 +70,7 @@ class TaskScheduler {
 
   public:
     TaskScheduler();
+    ~TaskScheduler();
 
     void start() {
         m_queueThread.start();
@@ -92,8 +78,10 @@ class TaskScheduler {
     void setFrames(unsigned Frames) {
         m_numFrames = Frames;
     }
-    Monitor& getGuard() {
-        return m_guard;
+    // Called from the audio callback once per buffer. No lock is taken on this
+    // side, so it is safe to call from the real-time thread.
+    void tick() {
+        m_tick.release();
     }
 
     void add(TaskI* Task) {

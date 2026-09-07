@@ -247,7 +247,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
     AudioDevice::REALTIME = getRealTime();
     UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
     sched->setFrames(FramesPerBuffer);
-    sched->getGuard().signal();
+    sched->tick();
     // One acquire load per block. Every field below comes from that snapshot,
     // so a dsp:set! landing mid-callback is either wholly visible or not at
     // all -- there is no ordering contract between the setters to get wrong.

@@ -46,6 +46,14 @@ TaskScheduler TaskScheduler::sm_instance;
 TaskScheduler::TaskScheduler()
     : m_numFrames(0), m_queueThread(TaskScheduler::queueThread, this, "scheduler") {}
 
+// Only reached on the exit(1) paths -- (quit) goes through _Exit and skips
+// static destructors. Ask the scheduler thread to stop and wake it so the
+// EXTThread member's joining destructor returns promptly.
+TaskScheduler::~TaskScheduler() {
+    m_queueThread.kill();
+    m_tick.release();
+}
+
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
 static double LAST_REALTIME_STAMP = 0.0;
 
@@ -98,20 +106,19 @@ void TaskScheduler::timeSlice() {
         if (delay_ns > 0) {
             std::this_thread::sleep_for(std::chrono::nanoseconds(delay_ns));
         }
-    } while (true);
+    } while (!m_queueThread.stopRequested());
 }
 
 void* TaskScheduler::queueThreadImpl() {
     if (likely(UNIV::TIME_DIVISION == 1)) {
-        while (true) {
+        // One pass per audio buffer, paced by the callback's tick().
+        while (!m_queueThread.stopRequested()) {
             timeSlice();
-            m_guard.lock();
-            m_guard.wait();
-            m_guard.unlock();
+            m_tick.acquire();
         }
         return this;
     }
-    timeSlice();  // will never return
+    timeSlice();  // self-paced; only returns once a stop is requested
     return nullptr;
 }
 
