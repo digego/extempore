@@ -514,9 +514,9 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
             ss << "( -- " << lgth << " elements -- )";
         } else {
             ss << "(";
-            for (int i = 0; i < lgth; i++) {
-                printSchemeCell(_sc, ss, list_ref(_sc, i, val), full, stringquotes);
-                if (i < lgth - 1)
+            for (pointer p = val; is_pair(p); p = pair_cdr(p)) {
+                printSchemeCell(_sc, ss, pair_car(p), full, stringquotes);
+                if (is_pair(pair_cdr(p)))
                     ss << " ";
             }
             ss << ")";

@@ -587,7 +587,7 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args)
                               string_value(name), Args);
     }
     auto fptr(reinterpret_cast<unsigned char*>(cptr_value(fp)));
-    return mk_string(Scheme, extemp::EXTLLVM::llvm_disassemble(fptr, syntax));
+    return mk_string(Scheme, extemp::EXTLLVM::llvm_disassemble(fptr, syntax).c_str());
 }
 
 // Map a symbol name to a process address for future compiles, replacing any

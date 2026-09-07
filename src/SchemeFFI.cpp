@@ -370,6 +370,60 @@ static std::string extractTypeDef(const std::string& line) {
     return "";
 }
 
+// Record every "%name = type ..." line of an IR string in sTypeDefs. LLVM's
+// module may not preserve forward declarations or opaque types, so they are
+// captured from the source text. Caller must hold sTemplateMutex.
+static void captureTypeDefsLockless(const std::string& irString) {
+    std::istringstream stream(irString);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        std::string typeDef = extractTypeDef(line);
+        if (typeDef.empty()) {
+            continue;
+        }
+        size_t eqPos = typeDef.find(" = type ");
+        if (eqPos != std::string::npos) {
+            sTypeDefs.emplace(typeDef.substr(1, eqPos - 1), typeDef);
+        }
+    }
+}
+
+// The "declare ..." line that lets a later module reference `func`.
+static std::string functionDeclaration(const llvm::Function& func) {
+    std::string declStr;
+    llvm::raw_string_ostream ss(declStr);
+    ss << "declare ";
+    if (func.getCallingConv() == llvm::CallingConv::Fast) {
+        ss << "fastcc ";
+    } else if (func.getCallingConv() == llvm::CallingConv::C) {
+        ss << "ccc ";
+    }
+    auto* funcType = func.getFunctionType();
+    funcType->getReturnType()->print(ss, false, true);
+    ss << " @" << func.getName() << "(";
+    bool first = true;
+    for (unsigned i = 0; i < funcType->getNumParams(); ++i) {
+        if (!first)
+            ss << ", ";
+        first = false;
+        funcType->getParamType(i)->print(ss, false, true);
+    }
+    if (funcType->isVarArg()) {
+        if (!first)
+            ss << ", ";
+        ss << "...";
+    }
+    ss << ")";
+    if (func.hasFnAttribute(llvm::Attribute::NoUnwind)) {
+        ss << " nounwind";
+    }
+    ss << "\n";
+    return ss.str();
+}
+
 // Initialize template module from bitcode.ll (called once, thread-safe).
 static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
     std::lock_guard<std::mutex> lock(sTemplateMutex);
@@ -383,26 +437,8 @@ static bool initializeTemplateModule(llvm::LLVMContext& ctx) {
     ss << inStream.rdbuf();
     inlineString = ss.str();
 
-    // Extract type definitions and declarations (line by line to handle CRLF safely).
-    // Declarations are needed so user IR can reference runtime symbols during parsing.
-    std::istringstream lineStream(inlineString);
-    std::string line;
-    while (std::getline(lineStream, line)) {
-        // Strip trailing CR if present (Windows CRLF).
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-
-        std::string typeDef = extractTypeDef(line);
-        if (!typeDef.empty()) {
-            size_t eqPos = typeDef.find(" = type ");
-            if (eqPos != std::string::npos) {
-                std::string bareName = typeDef.substr(1, eqPos - 1);
-                sTypeDefs.emplace(bareName, typeDef);
-            }
-            continue;
-        }
-    }
+    // Type definitions are needed so user IR can reference runtime types.
+    captureTypeDefsLockless(inlineString);
 
     // Parse template module to create the binary bitcode for fast cloning.
     llvm::SMDiagnostic diag;
@@ -523,6 +559,17 @@ static llvm::Module* jitCompile(const std::string& irString) {
             printf("%s\n", ss.str().c_str());
             return;
         }
+        // Verify now, so malformed IR is a diagnostic rather than something the
+        // optimiser trips over.
+        if (EXTLLVM::VERIFY_COMPILES) {
+            std::string verifyErrors;
+            raw_string_ostream verifyStream(verifyErrors);
+            if (verifyModule(*baseModule, &verifyStream)) {
+                std::cerr << "Invalid LLVM IR for " << modname << ":\n"
+                          << verifyErrors << std::endl;
+                return;
+            }
+        }
 
         // Step 4: Capture new declarations into sFuncDecls so subsequent
         // compilations can reference them. This handles both individual bind-lib
@@ -547,35 +594,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     registerExternalLibFunction(name);
                 }
 
-                std::string declStr;
-                raw_string_ostream ss(declStr);
-                ss << "declare ";
-                if (func.getCallingConv() == CallingConv::Fast) {
-                    ss << "fastcc ";
-                } else if (func.getCallingConv() == CallingConv::C) {
-                    ss << "ccc ";
-                }
-                auto* funcType = func.getFunctionType();
-                funcType->getReturnType()->print(ss, false, true);
-                ss << " @" << name << "(";
-                bool first = true;
-                for (unsigned i = 0; i < funcType->getNumParams(); ++i) {
-                    if (!first)
-                        ss << ", ";
-                    first = false;
-                    funcType->getParamType(i)->print(ss, false, true);
-                }
-                if (funcType->isVarArg()) {
-                    if (!first)
-                        ss << ", ";
-                    ss << "...";
-                }
-                ss << ")";
-                if (func.hasFnAttribute(Attribute::NoUnwind)) {
-                    ss << " nounwind";
-                }
-                ss << "\n";
-                sFuncDecls.emplace(name, ss.str());
+                sFuncDecls.emplace(name, functionDeclaration(func));
             }
         }
 
@@ -658,18 +677,6 @@ static llvm::Module* jitCompile(const std::string& irString) {
             MPM.run(*baseModule, MAM);
         }
 
-        // Step 8: Verify.
-        if (EXTLLVM::VERIFY_COMPILES) {
-            std::string verifyErrors;
-            raw_string_ostream verifyStream(verifyErrors);
-            bool invalid = verifyModule(*baseModule, &verifyStream);
-            if (invalid) {
-                std::cerr << "Invalid LLVM IR for " << modname << ":\n"
-                          << verifyErrors << std::endl;
-                return;
-            }
-        }
-
         // Step 9: Work out what the module exports and imports, clone it for
         // the metadata view, and hand both to the JIT under one tracker.
         auto symbols = EXTLLVM::collectModuleSymbols(*baseModule);
@@ -740,40 +747,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                         continue;
                     }
 
-                    std::string declStr;
-                    raw_string_ostream ss(declStr);
-
-                    ss << "declare ";
-                    if (func.getCallingConv() == CallingConv::Fast) {
-                        ss << "fastcc ";
-                    } else if (func.getCallingConv() == CallingConv::C) {
-                        ss << "ccc ";
-                    }
-
-                    auto* funcType = func.getFunctionType();
-                    funcType->getReturnType()->print(ss, false, true);
-                    ss << " @" << name << "(";
-
-                    bool first = true;
-                    for (unsigned i = 0; i < funcType->getNumParams(); ++i) {
-                        if (!first)
-                            ss << ", ";
-                        first = false;
-                        funcType->getParamType(i)->print(ss, false, true);
-                    }
-                    if (funcType->isVarArg()) {
-                        if (!first)
-                            ss << ", ";
-                        ss << "...";
-                    }
-                    ss << ")";
-
-                    if (func.hasFnAttribute(Attribute::NoUnwind)) {
-                        ss << " nounwind";
-                    }
-                    ss << "\n";
-
-                    sFuncDecls.emplace(name, ss.str());
+                    sFuncDecls.emplace(name, functionDeclaration(func));
                 }
 
                 for (const auto& glob : metadata->globals()) {
@@ -805,24 +779,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                 // capture them from the source IR to make them available to subsequent modules.
                 extractExternalGlobalsLockless(irString);
 
-                // Extract type definitions from the user IR string.
-                // LLVM's module may not preserve forward declarations or opaque types,
-                // so we need to capture them from the source IR as well.
-                std::istringstream irStream(irString);
-                std::string irLine;
-                while (std::getline(irStream, irLine)) {
-                    if (!irLine.empty() && irLine.back() == '\r') {
-                        irLine.pop_back();
-                    }
-                    std::string typeDef = extractTypeDef(irLine);
-                    if (!typeDef.empty()) {
-                        size_t eqPos = typeDef.find(" = type ");
-                        if (eqPos != std::string::npos) {
-                            std::string bareName = typeDef.substr(1, eqPos - 1);
-                            sTypeDefs.emplace(bareName, typeDef);
-                        }
-                    }
-                }
+                captureTypeDefsLockless(irString);
             }
 
         }

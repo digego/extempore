@@ -1,70 +1,71 @@
 #include <EXTClosureAddressTable.h>
 #include <EXTLLVM.h>
 
-#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <string_view>
 
+// The closure address table is an intrusive singly linked list whose layout
+// generated code depends on (runtime/bitcode.ll declares %clsvar and
+// add_address_table); do not turn it into a map.
 namespace extemp {
 namespace ClosureAddressTable {
 EXPORT closure_address_table* get_address_table(const char* name, closure_address_table* table) {
-    while (table) {
-        if (strcmp(table->name, name) == 0)
+    for (; table; table = table->next) {
+        if (std::string_view(table->name) == name) {
             return table;
-        table = table->next;
+        }
     }
-    // printf("Unable to locate %s in closure environment a\n", name);
-    return 0;
+    return nullptr;
 }
 
 EXPORT uint32_t get_address_offset(uint64_t id, closure_address_table* table) {
-    while (table) {
-        // printf("%p name: %s\ntablename: %s\n\n", name, name, table->name);
+    for (; table; table = table->next) {
         if (table->id == id) {
-            // printf("in %s returning offset %d from %s\n", table->name, table->offset, name);
             return table->offset;
         }
-        table = table->next;
     }
-    // printf("Unable to locate %" PRIu64 " in closure environment b\n", id);
     return 0;
 }
 
 EXPORT bool check_address_exists(uint64_t id, closure_address_table* table) {
-    while (table) {
+    for (; table; table = table->next) {
         if (table->id == id) {
             return true;
         }
-        table = table->next;
     }
     return false;
 }
 
 EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const char* type) {
-    while (table) {
-        if (table->id == id) {
-            if ((strcmp(table->type, type) != 0) &&
-                (strcmp("{i8*, i8*, void (i8*, i8*)*}**", type) != 0)) {
-                printf("Runtime Type Error: bad type %s for %s. Should be %s\n", type, table->name,
-                       table->type);
-                return 0;
-            } else {
-                return 1;
-            }
+    for (; table; table = table->next) {
+        if (table->id != id) {
+            continue;
         }
-        table = table->next;
+        if (std::string_view(table->type) != type &&
+            std::string_view("{i8*, i8*, void (i8*, i8*)*}**") != type) {
+            printf("Runtime Type Error: bad type %s for %s. Should be %s\n", type, table->name,
+                   table->type);
+            return false;
+        }
+        return true;
     }
-    // printf("Unable to locate id in closure environment type: %s d\n",type);
-    return 0;
+    return false;
 }
 
+// alloctype 1 is the codegen's __make-closure-h path: a heap closure that
+// lives for the rest of the run, so its table entries are malloc'd and never
+// freed, deliberately. Everything else is allocated in the closure's zone and
+// goes with it.
 EXPORT closure_address_table* add_address_table(llvm_zone_t* zone, char* name, uint32_t offset,
                                                 char* type, int alloctype,
                                                 struct closure_address_table* table) {
-    struct closure_address_table* t = NULL;
+    closure_address_table* t = nullptr;
     if (alloctype == 1) {
-        t = reinterpret_cast<closure_address_table*>(malloc(sizeof(struct closure_address_table)));
+        t = static_cast<closure_address_table*>(malloc(sizeof(closure_address_table)));
     } else {
-        t = (struct closure_address_table*)extemp::EXTZones::llvm_zone_malloc(
-            zone, sizeof(struct closure_address_table));
+        t = static_cast<closure_address_table*>(
+            extemp::EXTZones::llvm_zone_malloc(zone, sizeof(closure_address_table)));
     }
     t->id = string_hash(name);
     t->name = name;

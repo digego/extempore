@@ -240,6 +240,9 @@ EXPORT void* llvm_get_function_ptr(char* fname) {
     return reinterpret_cast<void*>(extemp::EXTLLVM::getFunctionAddress(fname));
 }
 
+// Returns a per-thread buffer that the next extitoa call on the same thread
+// overwrites: xtlang callers must copy or consume the result before calling
+// again (two extitoa results in one expression alias each other).
 EXPORT char* extitoa(int64_t val) {
     static thread_local char buf[32];
     snprintf(buf, sizeof(buf), "%" PRId64, val);
@@ -290,27 +293,23 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
     socket.send_to(std::experimental::net::buffer(message, length), sa);
 #else
     fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-
-    //////// Dr Offig addition ////////
-    int broadcastEnable = 1;
-    int ret = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
-    if (ret) {
-        printf("Error: Could not open set socket to broadcast mode\n");
+    if (fd < 0) {
+        printf("Error: could not open UDP socket: %s\n", strerror(errno));
+        return;
     }
-    //////////////////////////////////////
-
-    int err = sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa));
-    close(fd);
-#endif
-    if (err < 0) {
-        if (err == EMSGSIZE) {
+    int broadcastEnable = 1;
+    if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable))) {
+        printf("Error: could not set socket to broadcast mode: %s\n", strerror(errno));
+    }
+    if (sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+        if (errno == EMSGSIZE) {
             printf("Error: OSC message too large: UDP 8k message MAX\n");
         } else {
-            printf("Error: Problem sending OSC message %d\n", err);
+            printf("Error: problem sending OSC message: %s\n", strerror(errno));
         }
     }
-
-    return;
+    close(fd);
+#endif
 }
 
 /////////////////////////////////////////////////
@@ -974,8 +973,11 @@ static struct EXTLLVMCleanupRegistrar {
     }
 } sCleanupRegistrar;
 
-EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax) {
-    size_t code_size = 1024 * 100;
+// Disassemble the function at Code. The JIT does not expose symbol sizes,
+// so decoding stops at the first return instruction (a function with several
+// exits is shown up to its first one) or after kDisassembleLimit bytes.
+std::string llvm_disassemble(const unsigned char* Code, int syntax) {
+    constexpr size_t kDisassembleLimit = 64 * 1024;
     std::string Error;
 
     // Get target triple from host
@@ -985,66 +987,63 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax) {
     // Look up target
     const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(Triple, Error);
     if (!TheTarget) {
-        std::string errMsg = "Disassembler error: " + Error;
-        return strdup(errMsg.c_str());
+        return "Disassembler error: " + Error;
     }
 
     std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Triple));
     if (!MRI)
-        return strdup("Failed to create MCRegisterInfo");
+        return "Failed to create MCRegisterInfo";
 
     llvm::MCTargetOptions MCOptions;
     std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(
         TheTarget->createMCAsmInfo(*MRI, Triple, MCOptions));
     if (!AsmInfo)
-        return strdup("Failed to create MCAsmInfo");
+        return "Failed to create MCAsmInfo";
 
     std::unique_ptr<const llvm::MCSubtargetInfo> STI(
         TheTarget->createMCSubtargetInfo(Triple, "", ""));
     if (!STI)
-        return strdup("Failed to create MCSubtargetInfo");
+        return "Failed to create MCSubtargetInfo";
 
     std::unique_ptr<const llvm::MCInstrInfo> MII(TheTarget->createMCInstrInfo());
     if (!MII)
-        return strdup("Failed to create MCInstrInfo");
+        return "Failed to create MCInstrInfo";
 
     llvm::MCContext Ctx(Triple, AsmInfo.get(), MRI.get(), STI.get());
     std::unique_ptr<llvm::MCDisassembler> DisAsm(TheTarget->createMCDisassembler(*STI, Ctx));
     if (!DisAsm)
-        return strdup("Failed to create MCDisassembler");
+        return "Failed to create MCDisassembler";
 
     std::unique_ptr<llvm::MCInstPrinter> IP(
         TheTarget->createMCInstPrinter(Triple, syntax, *AsmInfo, *MII, *MRI));
     if (!IP)
-        return strdup("Failed to create MCInstPrinter");
+        return "Failed to create MCInstPrinter";
 
     IP->setPrintImmHex(true);
 
     std::string out_str;
     llvm::raw_string_ostream OS(out_str);
-    llvm::ArrayRef<uint8_t> mem(Code, code_size);
-    uint64_t size;
-    uint64_t index;
+    llvm::ArrayRef<uint8_t> mem(Code, kDisassembleLimit);
     OS << "\n";
-    for (index = 0; index < code_size; index += size) {
+    for (uint64_t index = 0; index < kDisassembleLimit;) {
         llvm::MCInst Inst;
-        if (DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls())) {
-            auto instSize(*reinterpret_cast<const size_t*>(Code + index));
-            if (instSize == 0) {
-                break;
-            }
-            OS.indent(4);
-            OS.write("0x", 2);
-            OS.write_hex(size_t(Code) + index);
-            OS.write(": ", 2);
-            OS.write_hex(instSize);
-            IP->printInst(&Inst, 0, "", *STI, OS);
-            OS << "\n";
-        } else if (!size) {
-            size = 1;
+        uint64_t size = 0;
+        if (!DisAsm->getInstruction(Inst, size, mem.slice(index), index, llvm::nulls())) {
+            index += size ? size : 1;  // skip an undecodable byte
+            continue;
         }
+        OS.indent(4);
+        OS.write("0x", 2);
+        OS.write_hex(size_t(Code) + index);
+        OS.write(": ", 2);
+        IP->printInst(&Inst, 0, "", *STI, OS);
+        OS << "\n";
+        if (MII->get(Inst.getOpcode()).isReturn()) {
+            break;
+        }
+        index += size;
     }
-    return strdup(OS.str().c_str());
+    return OS.str();
 }
 
 static extemp::CM DestroyMallocZoneWithDelayCM([](extemp::TaskI* Task) {
