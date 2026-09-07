@@ -28,8 +28,18 @@
 (xtmtest-result (regex:match? "hello world" "^hello") #t "match-anchored")
 (xtmtest-result (regex:match? "hello world" "^world") #f "match-anchored-miss")
 (xtmtest-result (regex:match? "" "^$") #t "match-empty-subject")
-;; unterminated character class: no match, no error
-(xtmtest-result (regex:match? "abc" "a([{<:*)|$") #f "match-uncompilable-pattern")
+;; unterminated character class: an error carrying pcre2's message, not a
+;; silent non-match
+(xtmtest-result (*s7-catch* #t
+                            (lambda () (regex:match? "abc" "a([{<:*)|$"))
+                            (lambda (type info)
+                              (and (string? (car info))
+                                   (regex:match? (car info) "invalid regex"))))
+                #t "match-uncompilable-pattern")
+(xtmtest-result (*s7-catch* #t
+                            (lambda () (regex:replace "abc" "(" "x"))
+                            (lambda (type info) 'invalid))
+                'invalid "replace-uncompilable-pattern")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; regex:matched -- whole match first, then each capture

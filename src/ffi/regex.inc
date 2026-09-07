@@ -19,35 +19,32 @@ using MatchDataPtr = std::unique_ptr<pcre2_match_data, MatchDataDeleter>;
 // rejected as a group the pattern doesn't have.
 static constexpr uint32_t REGEX_MAX_GROUP = 100000;
 
-// A pattern pcre2 rejects gives a null PcrePtr, and the bodies below then report
-// no match.
-//
-// That leniency is a compatibility shim, not a design choice: xtc-bind.xtm's
-// generic bind-type path builds "<name>([{<:*)|$" --- an unterminated character
-// class --- and depends on the non-match, so raising here fails every generic
-// type definition. Once that pattern is fixed this should throw a
-// ScmRuntimeError carrying pcre2's message, so a typo in a compiler regex is
-// loud instead of quietly matching nothing.
-static PcrePtr compilePattern(const char* Pattern)
+// A pattern pcre2 rejects is a Scheme error carrying pcre2's message and the
+// offset it stopped at, so a typo in a compiler regex is loud instead of
+// quietly matching nothing.
+static PcrePtr compilePattern(const char* Pattern, pointer Args)
 {
     int errorcode = 0;
     PCRE2_SIZE erroroffset = 0;
     pcre2_code* re = pcre2_compile(reinterpret_cast<PCRE2_SPTR>(Pattern), PCRE2_ZERO_TERMINATED, 0,
             &errorcode, &erroroffset, nullptr);
-    return PcrePtr(re, [](pcre2_code* Code) {
-        if (Code) {
-            pcre2_code_free(Code);
-        }
-    });
+    if (!re) {
+        PCRE2_UCHAR message[256];
+        pcre2_get_error_message(errorcode, message, sizeof(message));
+        throw ScmRuntimeError(std::string(ffi_current_name()) + ": invalid regex \"" + Pattern
+                        + "\" at offset " + std::to_string(erroroffset) + ": "
+                        + reinterpret_cast<const char*>(message),
+                Args);
+    }
+    return PcrePtr(re, [](pcre2_code* Code) { pcre2_code_free(Code); });
 }
 
 // These sit on the compiler's hot path --- every type string goes through
 // several --- and pcre2_compile is not cheap, so compiled patterns are cached.
 // Plain bounded map rather than an LRU: the working set is the handful of
 // patterns in runtime/*.xtm, and dropping the lot on overflow costs one
-// recompile each. Patterns that fail to compile are cached as well, so a bad
-// one isn't handed to pcre2_compile on every call.
-static PcrePtr cachedPattern(const char* Pattern)
+// recompile each.
+static PcrePtr cachedPattern(const char* Pattern, pointer Args)
 {
     static constexpr size_t MAX_CACHED_PATTERNS = 512;
     static std::mutex sPatternCacheMutex;
@@ -61,7 +58,7 @@ static PcrePtr cachedPattern(const char* Pattern)
             return it->second;
         }
     }
-    PcrePtr re = compilePattern(Pattern);  // compiled outside the lock
+    PcrePtr re = compilePattern(Pattern, Args);  // compiled outside the lock
     std::lock_guard<std::mutex> lock(sPatternCacheMutex);
     if (sPatternCache.size() >= MAX_CACHED_PATTERNS) {
         sPatternCache.clear();
@@ -72,7 +69,7 @@ static PcrePtr cachedPattern(const char* Pattern)
 
 static MatchDataPtr matchDataFor(const PcrePtr& Re)
 {
-    return MatchDataPtr(Re ? pcre2_match_data_create_from_pattern(Re.get(), nullptr) : nullptr);
+    return MatchDataPtr(pcre2_match_data_create_from_pattern(Re.get(), nullptr));
 }
 
 // Sizing the match data from the pattern means the ovector always has room for
@@ -80,9 +77,6 @@ static MatchDataPtr matchDataFor(const PcrePtr& Re)
 // never 0.
 static int regexExec(const PcrePtr& Re, const MatchDataPtr& MatchData, std::string_view Data)
 {
-    if (!Re || !MatchData) {  // the pattern didn't compile; see compilePattern
-        return -1;
-    }
     return pcre2_match(Re.get(), reinterpret_cast<PCRE2_SPTR>(Data.data()), Data.size(), 0, 0,
             MatchData.get(), nullptr);
 }
@@ -90,7 +84,7 @@ static int regexExec(const PcrePtr& Re, const MatchDataPtr& MatchData, std::stri
 static pointer regex_match(scheme* Scheme, pointer Args)
 {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2)));
+    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     return (regexExec(re, matchData, data) > 0) ? Scheme->T : Scheme->F;
 }
@@ -98,7 +92,7 @@ static pointer regex_match(scheme* Scheme, pointer Args)
 static pointer regex_matched(scheme* Scheme, pointer Args)
 {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2)));
+    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     int rc = regexExec(re, matchData, data);
     pointer list = Scheme->NIL;
@@ -126,7 +120,7 @@ static pointer regex_matched(scheme* Scheme, pointer Args)
 static pointer regex_match_all(scheme* Scheme, pointer Args)
 {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2)));
+    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     pointer list = Scheme->NIL;
     while (!data.empty()) {
@@ -153,7 +147,7 @@ static pointer regex_match_all(scheme* Scheme, pointer Args)
 static pointer regex_split(scheme* Scheme, pointer Args)
 {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2)));
+    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     pointer list = Scheme->NIL;
     while (true) {
@@ -198,7 +192,7 @@ static pointer regex_split(scheme* Scheme, pointer Args)
 static pointer regex_replace(scheme* Scheme, pointer Args)
 {
     std::string_view data(argString(Scheme, Args, 1));
-    auto re(cachedPattern(argString(Scheme, Args, 2)));
+    auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     const char* replace = argString(Scheme, Args, 3);
     auto matchData(matchDataFor(re));
     int rc = regexExec(re, matchData, data);
