@@ -1283,12 +1283,12 @@
     ;; (println 'make-closure-env 'ast: ast 'types: types)
     (let* ((os2 (xtc:emit:new-buffer))
            (os1 (xtc:emit:new-buffer))
-           (name (list-ref ast 2))
-           (allocate-mem? (list-ref ast 1))
-           (rettype (list-ref ast 3))
-           (env (list-ref ast 4))
-           (args (list-ref ast 5))
-           (code (list-ref ast 6)))
+           (name (ast:typed-closure-name ast))
+           (allocate-mem? (ast:closure-alloc ast))
+           (rettype (ast:typed-closure-rettype ast))
+           (env (ast:typed-closure-envtypes ast))
+           (args (ast:typed-closure-argtypes ast))
+           (code (ast:typed-closure-body ast)))
       (define func-type-str (xtc:codegen:make-function-str (list* rettype (map (lambda (x) (cdr x)) args)) #t))
 
       (define closure-struct-str
@@ -1301,10 +1301,10 @@
       (emit "call void @llvm_zone_mark(%mzone* " (car (xtc:codegen:ssa-temp "zone")) ")\n" os2)
       ;; malloc closure structure
       (emit "; malloc closure structure\n" os2)
-      (cond ((eq? (car ast) '__make-closure-h)
+      (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = call i8* @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str)) ")\n" os2))
-            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
              (emit (xtc:codegen:ssa-temp "clsptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size closure-struct-str))
                    ", align 16\n" os2))
@@ -1319,10 +1319,10 @@
       ;; malloc evironment structure
       (emit "\n; malloc environment structure\n" os2)
       (define estruct (xtc:codegen:make-struct-str-env env))
-      (cond ((eq? (car ast) '__make-closure-h)
+      (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call i8* @malloc("
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2))
-            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
              (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = alloca i8, "
                    *xtc:codegen:size_t_str* " " (number->string (xtc:codegen:get-type-size estruct))
                    ", align 16\n" os2))
@@ -1356,8 +1356,8 @@
                 (cadr name) " " (car name) ", "
                 "i32 " (number->string ptridx) ", "
                 (cadr type) " " (car type) ", "
-                (cond ((eq? (car ast) '__make-closure-h) "i32 1, ")
-                      ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*)) "i32 2, ")
+                (cond ((eq? (ast:closure-tag ast) '__make-closure-h) "i32 1, ")
+                      ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*)) "i32 2, ")
                       (else "i32 3, "))
                 "%clsvar* " (car table) ")\n"
                 os2)
@@ -1411,10 +1411,10 @@
 
       (xtc:codegen:ssa-temp "closure" (car (xtc:codegen:ssa-temp "closure")) (cadr (xtc:codegen:ssa-temp "closure")))
       ;; add an additional pointer wrapper for closure
-      (cond ((eq? (car ast) '__make-closure-h)
+      (cond ((eq? (ast:closure-tag ast) '__make-closure-h)
              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = call i8* @malloc(" *xtc:codegen:size_t_str* " "
                    *xtc:codegen:pointer_size_bytes_str* ")\n" os2))
-            ((and (eq? (car ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
+            ((and (eq? (ast:closure-tag ast) '__make-closure-s) (not *WINDOWS_ALLOC_BUG*))
              (emit (xtc:codegen:ssa-temp "wrapper_ptr" "i8*") " = alloca i8, "
                    " i32 " *xtc:codegen:pointer_size_bytes_str*
                    ", align 16\n" os2))
@@ -1433,13 +1433,13 @@
   (lambda (ast types)
     ;;(println 'ast: ast)
     (let* ((os (xtc:emit:new-buffer))
-           (name (list-ref ast 2))
-           (allocate-mem? (list-ref ast 1))
-           (rettype (list-ref ast 3))
+           (name (ast:typed-closure-name ast))
+           (allocate-mem? (ast:closure-alloc ast))
+           (rettype (ast:typed-closure-rettype ast))
            (result '())
-           (env (list-ref ast 4))
-           (args (list-ref ast 5))
-           (code (list-ref ast 6)))
+           (env (ast:typed-closure-envtypes ast))
+           (args (ast:typed-closure-argtypes ast))
+           (code (ast:typed-closure-body ast)))
       ;;(println 'making-closure--------------------------------------> )
       ;;(println 'name: name)
       ;;(println 'allocate: allocate-mem?)
@@ -1549,15 +1549,15 @@
   (lambda (ast types)
     ;;(println 'ast: ast)
     (let* ((os (xtc:emit:new-buffer))
-           (name (list-ref ast 2))
-           (allocate-mem? (list-ref ast 1))
-           (rettype (list-ref ast 3))
+           (name (ast:typed-closure-name ast))
+           (allocate-mem? (ast:closure-alloc ast))
+           (rettype (ast:typed-closure-rettype ast))
            (result '())
            (fulltype (cdr (assq (string->symbol name) types)))
-           (env (list-ref ast 4))
-           (args (list-ref ast 5))
+           (env (ast:typed-closure-envtypes ast))
+           (args (ast:typed-closure-argtypes ast))
            (mynewtype (string-append (xtc:codegen:get-type-str rettype) " (" (string-join (map (lambda (x) (xtc:codegen:get-type-str (cdr x))) args) ", ") ")*"))
-           (code (list-ref ast 6)))
+           (code (ast:typed-closure-body ast)))
       ; (println 'making-static--------------------------------------> )
       ; (println 'name: name)
       ; (println 'allocate: allocate-mem?)
@@ -1648,29 +1648,29 @@
            (env-zone-tmp '())
            (res
              (map (lambda (p)
-                    (set! *xtc:codegen:sym-name-stack* (cons (caar p) *xtc:codegen:sym-name-stack*))
+                    (set! *xtc:codegen:sym-name-stack* (cons (car (ast:binding-var p)) *xtc:codegen:sym-name-stack*))
                     ;;(println '__envin: *xtc:codegen:sym-name-stack*)
-                    ;; (println 'p2: (cadr p))
-                    (let* ((symstr (symbol->string (caar p)))
-                           (symtype (cdr (assq (caar p) types)))
-                           (value (xtc:codegen:compiler (cadr p) types symtype))
+                    ;; (println 'p2: (ast:binding-expr p))
+                    (let* ((symstr (symbol->string (car (ast:binding-var p))))
+                           (symtype (cdr (assq (car (ast:binding-var p)) types)))
+                           (value (xtc:codegen:compiler (ast:binding-expr p) types symtype))
                            (typestr (cadr (xtc:codegen:ssa-temp)))
                            (e (xtc:codegen:ssa-temp)))
                       ;; (println 'symstr: symstr 'symtype: symtype)
                       ;; (println 'typestr: typestr)
-                      (if (and (number? (cadr p)) ;; if numeric constant force to type of symbol
-                               (xtc:codegen:number? (cdr (assq (caar p) types)))
+                      (if (and (number? (ast:binding-expr p)) ;; if numeric constant force to type of symbol
+                               (xtc:codegen:number? (cdr (assq (car (ast:binding-var p)) types)))
                                (xtc:codegen:number? (xtc:codegen:get-type-from-str typestr)))
-                          (set! typestr (xtc:codegen:get-type-str (cdr (assq (caar p) types)))))
+                          (set! typestr (xtc:codegen:get-type-str (cdr (assq (car (ast:binding-var p)) types)))))
                       ;; type check
-                      ;; (println 'tt1: (xtc:codegen:get-type-from-str typestr) 'tt2: (cdr (assq (caar p) types)))
+                      ;; (println 'tt1: (xtc:codegen:get-type-from-str typestr) 'tt2: (cdr (assq (car (ast:binding-var p)) types)))
                       (if (not (equal? (xtc:codegen:get-type-from-str typestr) ;; check to see if the two types are equal?
-                                       (cdr (assq (caar p) types))))
+                                       (cdr (assq (car (ast:binding-var p)) types))))
                           (xtc:diagnostics:print-type-mismatch-error
                             (xtc:codegen:pretty-print-type typestr)
-                            (xtc:codegen:pretty-print-type (cdr (assq (caar p) types)))
-                            (caar p)))
-                      ;(println 'value: value 'typestr: typestr) ;'cadrp (cadr p))
+                            (xtc:codegen:pretty-print-type (cdr (assq (car (ast:binding-var p)) types)))
+                            (car (ast:binding-var p))))
+                      ;(println 'value: value 'typestr: typestr) ;'cadrp (ast:binding-expr p))
                       ;(emit (xtc:codegen:ssa-temp "zone" "%mzone*") " = call %mzone* @llvm_peek_zone_stack()\n" os)
                       ;(emit "call ccc void @llvm_print_i32(i32 111)\n" os)
                       (emit (xtc:codegen:ssa-temp "tzone" "i8*") " = load i8*, i8** %_zonei8Ptr\n"
@@ -1679,7 +1679,7 @@
                       (emit  "\n; let assign value to symbol " symstr "\n" os)
                       ;; (emit "call ccc void @llvm_print_i32(i32 222)\n" os)
 
-                      (if (or (= (cadr ast) 3)
+                      (if (or (= (ast:env-alloc ast) 3)
                               *WINDOWS_ALLOC_BUG*)
                           (begin
                             ;(emit "call ccc void @llvm_print_i32(i32 2222)\n" os)
@@ -1703,7 +1703,7 @@
                       ;;    (emit (car value) os)
                       ;;    (emit value os))
                       (list symstr typestr value e)))
-                  (caddr ast))))
+                  (ast:env-bindings ast))))
       ;(emit "call ccc void @llvm_print_i32(i32 444)\n" os)
       ;; (println '____________A> ast)
       (map (lambda (p r)
@@ -1720,12 +1720,12 @@
                ; (emit "call ccc void @llvm_print_i32(i32 555)\n" os)
 
                (emit (string-append "%" symstr " = select i1 true, " typestr " "
-                                    (if (and (number? (cadr p))
+                                    (if (and (number? (ast:binding-expr p))
                                              (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
                                         (llvm:convert-float (car e)) ;(xtc:codegen:ssa-temp)))
                                         (car e)) ;(xtc:codegen:ssa-temp)))
                                     ", " typestr " "
-                                    (if (and (number? (cadr p))
+                                    (if (and (number? (ast:binding-expr p))
                                              (= *xtc:codegen:fp32* (xtc:codegen:get-type-from-str typestr)))
                                         (llvm:convert-float (car e)) ; (xtc:codegen:ssa-temp)))
                                         (car e)) ;(xtc:codegen:ssa-temp)))
@@ -1742,12 +1742,12 @@
                ;; references keep working.
                (if (pair? value)
                    (emit (cdr value) os))))
-           (caddr ast) res)
+           (ast:env-bindings ast) res)
       ; (emit "call ccc void @llvm_print_i32(i32 999)\n" os)
       ;; (println '____________B> ast)
       ;; compile body
       (set! *xtc:codegen:ls_var* (cons (list) *xtc:codegen:ls_var*))
-      (define envbody-str (xtc:codegen:compiler (cdddr ast) types))
+      (define envbody-str (xtc:codegen:compiler (ast:env-body ast) types))
       (define result (xtc:codegen:ssa-temp))
       ;(println '*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
       (if (not (null? (car *xtc:codegen:ls_var*)))
@@ -1765,11 +1765,10 @@
                        (begin (emit (car v) " = alloca " (cdr v) "\n" os))))
                  (car *xtc:codegen:ls_var*))))
       (set! *xtc:codegen:ls_var* (cdr *xtc:codegen:ls_var*))
-      (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length (caddr ast))))
+      (set! *xtc:codegen:sym-name-stack* (list-tail *xtc:codegen:sym-name-stack* (length (ast:env-bindings ast))))
       ;; (println '_envout: ast) ;;*xtc:codegen:sym-name-stack*)
       (emit envbody-str os)
       (xtc:codegen:ssa-temp "result" (car result) (cadr result))
-      ;;(emit (xtc:codegen:compiler (cdddr ast) types) os)
       (xtc:codegen:strip-space os))))
 
 
@@ -2180,24 +2179,24 @@
     ;; (if ftype-provided? (println 'ftype: (car args)))
     (let* ((functiontype (if ftype-provided?
                              (cdr (xtc:codegen:get-type-from-str (cadar (car args))))
-                             (if (and (assq (car ast) types)
-                                      (xtc:codegen:closure? (cdr (assq (car ast) types)))
-                                      (= 2 (xtc:codegen:get-ptr-depth (cdr (assq (car ast) types)))))
-                                 (cddr (assq (car ast) types))
-                                 (if (xtc:codegen:closure? (cdr (assq (car ast) types)))
-                                     (xtc:diagnostics:print-bad-type-error (car ast) "remember that closures must be pointers")
-                                     (xtc:diagnostics:print-bad-type-error (car ast) "bad type for closure")))))
-           ;;(recursive-call (if (eq? (car ast) (car *xtc:codegen:sym-name-stack*)) #t #f))
-           (recursive-call (if (member (car ast) *xtc:codegen:sym-name-stack*) #t #f))
+                             (if (and (assq (ast:call-head ast) types)
+                                      (xtc:codegen:closure? (cdr (assq (ast:call-head ast) types)))
+                                      (= 2 (xtc:codegen:get-ptr-depth (cdr (assq (ast:call-head ast) types)))))
+                                 (cddr (assq (ast:call-head ast) types))
+                                 (if (xtc:codegen:closure? (cdr (assq (ast:call-head ast) types)))
+                                     (xtc:diagnostics:print-bad-type-error (ast:call-head ast) "remember that closures must be pointers")
+                                     (xtc:diagnostics:print-bad-type-error (ast:call-head ast) "bad type for closure")))))
+           ;;(recursive-call (if (eq? (ast:call-head ast) (car *xtc:codegen:sym-name-stack*)) #t #f))
+           (recursive-call (if (member (ast:call-head ast) *xtc:codegen:sym-name-stack*) #t #f))
            (os (xtc:emit:new-buffer))
            (ftype (xtc:codegen:make-function-str functiontype #t))
            (clstype (string-append "{i8*, i8*, " ftype "*}*"))
            (vars (map (lambda (arg hint)
                         (emit (xtc:codegen:compiler arg types hint) os)
                         (xtc:codegen:ssa-temp))
-                      (cdr ast)
+                      (ast:call-args ast)
                       (cdr functiontype))))
-      ;; (println 'recursive-call! recursive-call (car *xtc:codegen:sym-name-stack*) (car ast))
+      ;; (println 'recursive-call! recursive-call (car *xtc:codegen:sym-name-stack*) (ast:call-head ast))
       (emit "\n; apply closure \n" os)
       (define v '())
       (if ftype-provided?
@@ -2206,7 +2205,7 @@
             (set! v (car (xtc:codegen:ssa-temp "val"))))
           (begin (emit (xtc:codegen:ssa-temp "vval" (string-append clstype "*"))
                        " = load " clstype "*, " clstype "** %"
-                       (symbol->string (car ast)) "Ptr\n" os)
+                       (symbol->string (ast:call-head ast)) "Ptr\n" os)
             (emit (xtc:codegen:ssa-temp "val" clstype)
                   " = load " clstype "," clstype "* " (car (xtc:codegen:ssa-temp 1)) "\n" os)
             (set! v (car (xtc:codegen:ssa-temp "val")))))
@@ -2376,26 +2375,26 @@
 (define xtc:codegen:compiler:set!
   (lambda (ast types)
     (let* ((os (xtc:emit:new-buffer))
-           (global? (xtc:cache:globalvar-exists? (symbol->string (cadr ast)))) ;; are we are setting a global variable?
-           (gtype (if global? (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string (cadr ast)))) #f))
+           (global? (xtc:cache:globalvar-exists? (symbol->string (ast:set!-var ast)))) ;; are we are setting a global variable?
+           (gtype (if global? (xtc:codegen:strip-ptr-depth (xtc:cache:get-globalvar-type (symbol->string (ast:set!-var ast)))) #f))
            (t (if global? gtype
-                  (if (assq (cadr ast) types)
-                      (cdr (assq (cadr ast) types))
+                  (if (assq (ast:set!-var ast) types)
+                      (cdr (assq (ast:set!-var ast) types))
                       #f)))
            (s2 (if t
-                   (xtc:codegen:compiler (caddr ast) types t)
-                   (xtc:codegen:compiler (caddr ast) types)))
+                   (xtc:codegen:compiler (ast:set!-expr ast) types t)
+                   (xtc:codegen:compiler (ast:set!-expr ast) types)))
            (vv (xtc:codegen:ssa-temp))
            (type (xtc:codegen:get-type-from-str (cadr vv))))
       (emit "; do set!\n" os)
       (emit s2 os)
-      (if global? ;; (xtc:cache:globalvar-exists? (symbol->string (cadr ast))) ;; are we are setting a global variable?
+      (if global? ;; (xtc:cache:globalvar-exists? (symbol->string (ast:set!-var ast))) ;; are we are setting a global variable?
           (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* @"
-                               (symbol->string (cadr ast)) "\n") os)
-          (if (member (cadr ast) *xtc:codegen:sym-name-stack*)
+                               (symbol->string (ast:set!-var ast)) "\n") os)
+          (if (member (ast:set!-var ast) *xtc:codegen:sym-name-stack*)
               (emit (string-append "store " (cadr vv) " " (car vv) ", " (cadr vv) "* %"
-                                   (symbol->string (cadr ast)) "Ptr\n") os)
-              (xtc:diagnostics:print-missing-identifier-error (cadr ast) 'variable)))
+                                   (symbol->string (ast:set!-var ast)) "Ptr\n") os)
+              (xtc:diagnostics:print-missing-identifier-error (ast:set!-var ast) 'variable)))
       ;; ir:gname should be vv
       (xtc:codegen:strip-space os))))
 
@@ -3209,10 +3208,10 @@
     ;; (println 'ast: ast)
     ;; (println 'types: types)
     ;; (println 'hint?: hint?)
-    ;; (println 'ping: (assq (caddr ast) types))
-    ;; (println 'return-> (cadr (assq (cadr ast) types)))
-    (let* ((hinttype? (cadr (cdr (assq (cadr ast) types))))
-           (str (xtc:codegen:compiler (caddr ast) types hinttype?)) ;(if (null? hint?) hinttype? (car hint?))))
+    ;; (println 'ping: (assq (ast:ret-expr ast) types))
+    ;; (println 'return-> (cadr (assq (ast:ret-name ast) types)))
+    (let* ((hinttype? (cadr (cdr (assq (ast:ret-name ast) types))))
+           (str (xtc:codegen:compiler (ast:ret-expr ast) types hinttype?)) ;(if (null? hint?) hinttype? (car hint?))))
            (val (xtc:codegen:ssa-temp))
            (os (xtc:emit:new-buffer)))
       (emit str os)
@@ -3223,16 +3222,16 @@
       ;; void, or the declared return type is --- but only for a genuine body
       ;; return: the closure _maker reuses this compiler to return the closure
       ;; pointer, where hinttype? is the closure's (void) return type yet the
-      ;; value is the pointer.  That case has (cadr ast) = (caddr ast), the same
+      ;; value is the pointer.  That case has (ast:ret-name ast) = (ast:ret-expr ast), the same
       ;; outer-let marker the bitcast guard below uses.
       (if (or (xtc:codegen:void? (cadr (xtc:codegen:ssa-temp)))
               (and (xtc:codegen:void? hinttype?)
-                   (not (equal? (cadr ast) (caddr ast)))))
+                   (not (equal? (ast:ret-name ast) (ast:ret-expr ast)))))
           (emit "ret void\n" os)
-          (let ((type (cadr (cdr (assq (cadr ast) types)))))
+          (let ((type (cadr (cdr (assq (ast:ret-name ast) types)))))
             ;(println 'type: type)
             (if (and (not (equal? (xtc:codegen:get-type-from-str (cadr (xtc:codegen:ssa-temp))) type))
-                     (not (equal? (cadr ast) (caddr ast)))) ;; this line is a weird catch for outer let??
+                     (not (equal? (ast:ret-name ast) (ast:ret-expr ast)))) ;; this line is a weird catch for outer let??
                 (emit (xtc:codegen:ssa-temp "retval" (xtc:codegen:get-type-str type)) " = bitcast " (cadr val) " " (car val) " to " (xtc:codegen:get-type-str type) "\n" os))
             (emit "ret " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp)) "\n" os)))
       ;;(println 'os2: os)
@@ -3758,24 +3757,24 @@
 (define xtc:codegen:compiler:ifret
   (lambda (ast types)
     (let* ((os (xtc:emit:new-buffer))
-           (elset (if (null? (cdddr ast)) #f #t))
+           (elset (ast:if-has-else? ast))
            (num (number->string (llvm:count++))))
       ;(println 'ifretast: ast)
       ;; first do compare expression
-      (emit (xtc:codegen:compiler (cadr ast) types) os)
+      (emit (xtc:codegen:compiler (ast:if-test ast) types) os)
       ;; then break on compare
       (emit (string-append "br i1 " (car (xtc:codegen:ssa-temp)) ", label %then" num ", "
                            (if elset "label %else" "label %then")
                            num "\n") os)
       ;; do then
       (emit  "\nthen" num ":\n" os)
-      (emit (xtc:codegen:compiler (caddr ast) types) os)
+      (emit (xtc:codegen:compiler (ast:if-then ast) types) os)
 
       (define a (xtc:codegen:ssa-temp))
       ;; do else if requried
       (if elset
           (begin (emit  "\nelse" num ":\n" os)
-            (emit (xtc:codegen:compiler (cadddr ast) types) os)))
+            (emit (xtc:codegen:compiler (ast:if-else ast) types) os)))
       ;; finally consolidate return type of if statement
       (define b (if elset (xtc:codegen:ssa-temp) #f))
 
@@ -3791,20 +3790,18 @@
   (lambda (ast types . hint?)
     ;; (println 'ast: ast)
     (let* ((os (xtc:emit:new-buffer))
-           (elset (if (or (null? (cdddr ast))
-                          (null? (cadddr ast)))
-                      #f #t))
+           (elset (not (null? (ast:if-else ast)))) ;; a missing else reads as ()
            (num (number->string (llvm:count++))))
       ;; first do compare expression
-      (emit (xtc:codegen:compiler (cadr ast) types) os)
+      (emit (xtc:codegen:compiler (ast:if-test ast) types) os)
       ;; then break on compare
       (emit (string-append "br i1 " (car (xtc:codegen:ssa-temp)) ", label %then" num ", "
                            "label %else" num "\n") os)
       ;; do then
       (emit  "\nthen" num ":\n" os)
       (if (not (null? hint?))
-          (emit (xtc:codegen:compiler (caddr ast) types (car hint?)) os)
-          (emit (xtc:codegen:compiler (caddr ast) types) os))
+          (emit (xtc:codegen:compiler (ast:if-then ast) types (car hint?)) os)
+          (emit (xtc:codegen:compiler (ast:if-then ast) types) os))
       (if (not (xtc:codegen:void? (cadr (xtc:codegen:ssa-temp))))
           (emit (string-append "store " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp))
                                ", " (cadr (xtc:codegen:ssa-temp)) "* %ifptr" num "\n") os))
@@ -3814,8 +3811,8 @@
       (if elset
           (begin (emit  "\nelse" num ":\n" os)
             (if (not (null? hint?))
-                (emit (xtc:codegen:compiler (cadddr ast) types (car hint?)) os)
-                (emit (xtc:codegen:compiler (cadddr ast) types) os))
+                (emit (xtc:codegen:compiler (ast:if-else ast) types (car hint?)) os)
+                (emit (xtc:codegen:compiler (ast:if-else ast) types) os))
             (if (not (xtc:codegen:void? (cadr (xtc:codegen:ssa-temp))))
                 (emit (string-append "store " (cadr (xtc:codegen:ssa-temp)) " " (car (xtc:codegen:ssa-temp))
                                      ", " (cadr (xtc:codegen:ssa-temp)) "* %ifptr" num "\n") os))
@@ -4158,7 +4155,7 @@
                     (xtc:codegen:make-const-string ast))
                    (else (xtc:diagnostics:print-compiler-error "bad or unsupported atom type" ast))))
             ((list? ast)
-             (cond ((member (car ast) '(__make-env __make-env-zone))
+             (cond ((ast:env? ast)
                     (xtc:codegen:compile:make-env ast types))
                    ;; ((equal? (car ast) 'memzone) (xtc:codegen:compile:zone ast types))
                    ((equal? (car ast) 'push_new_zone) (xtc:codegen:compile:push_new_zone ast types))
@@ -4175,39 +4172,36 @@
                       (if *xtc:globals:print* (println '------------------------------compiling---------------------------->))
                       (if *xtc:globals:print* (print-full-nq fstr))
                       (if *xtc:globals:compile*
-                          (begin (llvm:remove-function (caddr ast))
+                          (begin (llvm:remove-function (ast:typed-closure-name ast))
                             (if (not (llvm:compile-ir fstr))
                                 (if *xtc:globals:verbose*
                                     (xtc:diagnostics:print-compiler-error "compiler failed on " fstr)
                                     (xtc:diagnostics:print-compiler-error "compiler failed")))))
                       fstr))
-                   ((member (car ast) '(__make-closure __make-closure-z __make-closure-h __make-closure-s))
-                    (let* (;(str-pair (xtc:codegen:compile:make-closure ast types))
-                           ;(fstr (car str-pair))
-                           ;(lstr (cdr str-pair)))
-                           (fstr (xtc:codegen:compile:make-closure ast types))
+                   ((ast:closure? ast)
+                    (let* ((fstr (xtc:codegen:compile:make-closure ast types))
                            (lstr (xtc:codegen:compile:make-closureenv ast types)))
                       ;; compile function
                       (if *xtc:globals:print* (println '------------------------------compiling---------------------------->))
                       (if *xtc:globals:print* (print-full-nq fstr))
                       (if *xtc:globals:compile*
-                          (begin (llvm:remove-function (caddr ast))
+                          (begin (llvm:remove-function (ast:typed-closure-name ast))
                             (if (not (llvm:compile-ir fstr))
                                 (if *xtc:globals:verbose*
                                     (xtc:diagnostics:print-compiler-error "compiler failed on " fstr)
                                     (xtc:diagnostics:print-compiler-error "compiler failed")))))
                       lstr))
-                   ((member (car ast) '(clrun->)) ;; apply function
-                    (if (xtc:cache:closure-exists? (symbol->string (cadr ast)))
-                        (string-append (xtc:codegen:compiler (cadr ast) types)
-                                       (xtc:codegen:compile:apply-closure (cdr ast) types #t
-                                                                          (cons (xtc:codegen:ssa-temp) (cddr ast))))
-                        (if (xtc:cache:globalvar-exists? (symbol->string (cadr ast))) ;; else is gloval var (i.e. bind-val)
-                            (string-append (xtc:codegen:compiler (cadr ast) types)
-                                           (xtc:codegen:compile:apply-closure (cdr ast) types #t
-                                                                              (cons (xtc:codegen:ssa-temp) (cddr ast))))
-                            (xtc:codegen:compile:apply-closure (cdr ast) types #f)))) ;; else closure is in local env
-                   ((equal? (car ast) 'set!)
+                   ((ast:clrun? ast) ;; apply function
+                    (let* ((callee (ast:clrun-callee ast))
+                           (args (ast:clrun-args ast))
+                           (call (cons callee args)))
+                      (if (or (xtc:cache:closure-exists? (symbol->string callee))
+                              (xtc:cache:globalvar-exists? (symbol->string callee))) ;; a global closure or bind-val
+                          (string-append (xtc:codegen:compiler callee types)
+                                         (xtc:codegen:compile:apply-closure call types #t
+                                                                            (cons (xtc:codegen:ssa-temp) args)))
+                          (xtc:codegen:compile:apply-closure call types #f)))) ;; else closure is in local env
+                   ((ast:set!? ast)
                     (xtc:codegen:compiler:set! ast types))
                    ((equal? (car ast) 'pref)
                     (xtc:codegen:compiler:pref ast types))
@@ -4321,17 +4315,16 @@
                     (if (member (car ast) '(printf fprintf sprintf sscanf fscanf))
                         (xtc:codegen:compiler:llvm_varargs ast types)
                         (xtc:codegen:compiler:native-call ast types)))
-                   ((equal? (car ast) 'ret->) ;; return from function
+                   ((ast:ret? ast) ;; return from function
                     (xtc:codegen:compiler:ret ast types hint?))
                    ((equal? (car ast) 'fptrcall)
                     (xtc:codegen:compiler:fptrcall ast types hint?))
                    ((equal? (car ast) 'if)
                     (xtc:codegen:compiler:if ast types))
-                   ((equal? (car ast) 'begin)
-                    (let ((ll (map (lambda (expr) (xtc:codegen:compiler expr types)) (cdr ast))))
+                   ((ast:begin? ast)
+                    (let ((ll (map (lambda (expr) (xtc:codegen:compiler expr types)) (ast:begin-exprs ast))))
                       (apply string-append ll)))
-                   ((and (list? (car ast))
-                         (equal? (caar ast) 'begin))
+                   ((ast:begin? (car ast))
                     (string-append (xtc:codegen:compiler (car ast) types)
                                    (xtc:codegen:compiler (cdr ast) types)))
                    ((list? (car ast))
