@@ -59,9 +59,10 @@
 ;; set envelope for sampler2
 (set_amp_env sampler 100.0 0.0 1.0 100.0)
 
-(dspsum.wet 2.0)
-(dspsum.dry 0.0)
-(dsp1.vol 2.0)
+;; closure slots are read and set from Scheme through $
+($ (dspsum.wet:SAMPLE 2.0))
+($ (dspsum.dry:SAMPLE 0.0))
+($ (dsp1.vol:SAMPLE 2.0))
 
 ;; make some noise
 (define test
@@ -91,7 +92,7 @@
 (define print-load
   (lambda (beat dur)
     (ascii-print-color 0 2 8)
-    (console_print (sys:audio-load) (dspsum.left) (dspsum.right))
+    (console_print (sys:audio-load) ($ (dspsum.left:SAMPLE)) ($ (dspsum.right:SAMPLE)))
     (callback (*metro* (+ beat (* .5 dur))) 'print-load (+ beat dur) dur)))
 
 (print-load (*metro* 'get-beat 4) 1)

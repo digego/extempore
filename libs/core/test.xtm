@@ -19,6 +19,7 @@
 ;;   compile-error  the definition (bind-func/bind-type) failed to compile
 ;;   compile-ok     a compile-only test compiled successfully
 ;;   fixture-error  a fixture's setup threw
+;;   load-error     a top-level form in the test file itself threw
 ;;
 ;; A run "fails" (non-zero exit) if any result is not a pass or compile-ok.
 
@@ -64,7 +65,7 @@
     ((pass compile-ok) 'green)
     ((fail) 'magenta)
     ((runtime-error) 'yellow)
-    (else 'red))) ;; compile-error, fixture-error
+    (else 'red))) ;; compile-error, fixture-error, load-error
 
 ;; numbers compare with = (so 4 and 4.0 agree); everything else with equal?
 (define (xtmtest:equal? expected got)
@@ -275,7 +276,13 @@
     (if (string? test-files)
         (set! test-files (list test-files)))
     (let ((start (now)))
-      (for-each (lambda (tf) (sys:load tf)) test-files)
+      ;; sys:load returns #f if any top-level form threw (the error has
+      ;; already been printed); record that as a failure so a broken test
+      ;; file can't pass by accident
+      (for-each (lambda (tf)
+                  (if (not (sys:load tf))
+                      (xtmtest-record tf 'load-error tf "load without error" "error while loading")))
+                test-files)
       (if print? (xtmtest-print-results))
       (if junit (xtmtest:write-junit junit))
       (xtmtest:print-summary start))

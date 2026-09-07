@@ -179,31 +179,42 @@
 ;; every subsequent error's stacktrace, so errors appear to pile up across a
 ;; session (and the stack slowly grows). Catching per form avoids both.
 ;;
-;; sys:report-error reproduces s7's own ";message / offending-form / location"
-;; report (minus the accumulating stacktrace). It uses the unshadowed built-ins
-;; #_format and #_object->string because init.xtm redefines format and catch.
+;; sys:error-report-string reproduces s7's own ";message / offending-form /
+;; location" report (minus the accumulating stacktrace). It uses the unshadowed
+;; built-ins #_format and #_object->string because scheme.xtm redefines format
+;; and init.xtm redefines catch. The optional LOCATION replaces s7's own, which
+;; for a form read from a string port (sys:load) is no file and line 0.
+;;
+;; sys:report-error writes that report to the error port, which the C++ eval
+;; trap (eval_with_error_trap in SchemeS7.cpp) captures and relays as the
+;; editor's reply once the whole eval returns.
 
-(define (sys:report-error tag info)
+(define (sys:error-report-string tag info . location)
   (*s7-catch* #t
     (lambda ()
-      (let ((ep (current-error-port))
-            (ow (owlet)))
-        (let ((msg (if (and (pair? info) (string? (car info)))
-                       (apply #_format #f info)
-                       (#_format #f "~S ~S" tag info)))
-              (file (let-ref ow 'error-file)))
-          ;; Reproduce s7's own report: the message, the offending form
-          ;; (truncated the way s7 does), then the source location. A form read
-          ;; from a bare string port has no filename, so coerce #f to "" ---
-          ;; matching what s7's loader prints for editor evals.
-          (#_format ep "~%;~A~%;    ~A~%;    ~A, line ~A, position: ~A~%"
-            msg
-            (#_object->string (let-ref ow 'error-code) #f (*s7* 'print-length))
-            (if (string? file) file "")
-            (let-ref ow 'error-line)
-            (let-ref ow 'error-position)))))
+      (let* ((ow (owlet))
+             (msg (if (and (pair? info) (string? (car info)))
+                      (apply #_format #f info)
+                      (#_format #f "~S ~S" tag info)))
+             (file (let-ref ow 'error-file)))
+        ;; the message, the offending form (truncated the way s7 does), then
+        ;; the source location. A form read from a bare string port has no
+        ;; filename, so coerce #f to "" --- matching what s7's loader prints
+        ;; for editor evals.
+        (#_format #f "~%;~A~%;    ~A~%;    ~A~%"
+          msg
+          (#_object->string (let-ref ow 'error-code) #f (*s7* 'print-length))
+          (if (pair? location)
+              (car location)
+              (#_format #f "~A, line ~A, position: ~A"
+                (if (string? file) file "")
+                (let-ref ow 'error-line)
+                (let-ref ow 'error-position))))))
     ;; the reporter must never itself throw
-    (lambda (t i) (if #f #f))))
+    (lambda (t i) (#_format #f "~%;~S ~S~%" tag info))))
+
+(define (sys:report-error tag info)
+  (#_display (sys:error-report-string tag info) (current-error-port)))
 
 (define (sys:eval-top-level form)
   (*s7-catch* #t

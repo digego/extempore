@@ -1744,8 +1744,7 @@
 (define sys:load
   (lambda (path . quiet?)
     (let ((file-string (or (sys:slurp-file path)
-                           (sys:slurp-file (string-append (sys:share-dir) "/" path))))
-          (cnt 0))
+                           (sys:slurp-file (string-append (sys:share-dir) "/" path)))))
       (if (not file-string)
           (if (or (null? quiet?) (not (car quiet?)))
               (begin (print-with-colors 'red 'default #t (print "File Error"))
@@ -1759,19 +1758,44 @@
                          (set! *sys:load-escape-stack* (cons k *sys:load-escape-stack*))
                          ""))))
             (if (string=? msg "")
-                (begin
-                  (let loop ((sexpr (read input)))
-                    (if (not (eof-object? sexpr))
-                        (begin
-                          (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
-                          (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
-                          (*s7-catch* #t
-                                      (lambda () (eval (car *global-sysload-evals*) (interaction-environment)))
-                                      (lambda (type info) #f))
-                          (loop (read input)))))
-                  (close-input-port input)
-                  (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*))
-                  #t)
+                ;; Each top-level form is evaluated inside its own catch: an
+                ;; error is reported (with the file's path, which the string
+                ;; port doesn't carry) and loading carries on with the next
+                ;; form, but the load as a whole then returns #f. The report
+                ;; goes to stdout rather than the error port so it appears
+                ;; in sequence with the file's own output, and at all in a
+                ;; batch run that quits before the enclosing eval returns.
+                ;; Under AOT compilation a failed form must instead abort
+                ;; the compile, so no cache is ever written from a partial
+                ;; load.
+                (let loop ((sexpr (read input))
+                           (ok #t))
+                  (if (eof-object? sexpr)
+                      (begin
+                        (close-input-port input)
+                        (set! *sys:load-escape-stack* (cdr *sys:load-escape-stack*))
+                        ok)
+                      (let ((line (+ 1 (port-line-number input)))) ;; where the form ends, as s7 reports it
+                        (set! *global-sysload-evals* (cons sexpr *global-sysload-evals*))
+                        (set! *global-sysload-evals* (list-head *global-sysload-evals* 10))
+                        (let ((form-ok
+                                (*s7-catch* #t
+                                  (lambda ()
+                                    (eval (car *global-sysload-evals*) (interaction-environment))
+                                    #t)
+                                  (lambda (tag info)
+                                    (#_display (sys:error-report-string
+                                                 tag info
+                                                 (string-append path ", line " (number->string line)))
+                                               (current-output-port))
+                                    (if (and (defined? 'xtc:aot:currently-compiling?)
+                                             (xtc:aot:currently-compiling?))
+                                        (begin
+                                          (print-with-colors 'red 'default #t (print "AOT compilation failed"))
+                                          (print " while loading " path "\n")
+                                          (xtc:aot:abort-compilation)))
+                                    #f))))
+                          (loop (read input) (and form-ok ok))))))
                 (let ((words (regex:split msg " ")))
                   (if (or (null? quiet?) (not (car quiet?)))
                       (begin (print-with-colors 'yellow 'default #t (print "sys:load notification "))
@@ -1783,9 +1807,8 @@
 ;; load, then wait 10s and quit
 (define sys:load-then-quit
   (lambda (filename delay-in-sec)
-    (begin
-      (sys:load filename)
-      (callback (+ (now) (* *second* delay-in-sec)) quit 0))))
+    (let ((ok (sys:load filename)))
+      (callback (+ (now) (* *second* delay-in-sec)) quit (if ok 0 1)))))
 
 (define range
   (lambda args

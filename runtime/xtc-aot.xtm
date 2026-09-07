@@ -3,6 +3,9 @@
 ;;;;;;;;;;;;;;;;;;;;;
 
 (define *xtc:aot:current-output-port* #f)
+;; path of the cache file *xtc:aot:current-output-port* writes to, so an
+;; aborted compile can remove it
+(define *xtc:aot:current-output-path* #f)
 (define *xtc:aot:current-lib-name* "xtmdylib")
 (define *xtc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *xtc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
@@ -26,6 +29,19 @@
     (or (output-port? *xtc:aot:current-output-port*)
         ;; this will be #t in a suppress-aot-do form
         *xtc:aot:current-output-port*)))
+
+;; Abort an AOT compile with a non-zero exit. The cache file was opened
+;; before the library started loading, so remove the partial one --- a
+;; later sys:load of the library would otherwise preload it.
+(define xtc:aot:abort-compilation
+  (lambda ()
+    (if (output-port? *xtc:aot:current-output-port*)
+        (close-port *xtc:aot:current-output-port*))
+    (set! *xtc:aot:current-output-port* #f)
+    (if (and (string? *xtc:aot:current-output-path*)
+             (file-exists? *xtc:aot:current-output-path*))
+        (sys:command (string-append (unix-or-Windows "rm " "DEL ") *xtc:aot:current-output-path*)))
+    (quit 2)))
 
 ;; helpers for putting the correct info into the aot-header file
 
@@ -568,6 +584,7 @@
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") ll-path)))
                   ;; open output file, ready for writing
                   (set! *xtc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *xtc:aot:current-output-path* aot-compilation-file-path)
                   (set! *xtc:aot:func-defs-in-mod* '())
                   (if (xtc:aot:currently-compiling?)
                       (begin
@@ -630,6 +647,7 @@
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))
                   ;; open output file, ready for writing
                   (set! *xtc:aot:current-output-port* (open-output-file aot-compilation-file-path))
+                  (set! *xtc:aot:current-output-path* aot-compilation-file-path)
                   (set! *xtc:aot:func-defs-in-mod* '())
                   (if (xtc:aot:currently-compiling?)
                       (begin
