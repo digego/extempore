@@ -36,6 +36,7 @@
 #include "TaskScheduler.h"
 #include "AudioDevice.h"
 #include <cmath>
+#include <iostream>
 #include <thread>
 #include <chrono>
 
@@ -58,9 +59,10 @@ static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
 static double LAST_REALTIME_STAMP = 0.0;
 
 void TaskScheduler::timeSlice() {
-    uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
-    long nanosecs = long(double(frames) / UNIV::SAMPLE_RATE * D_BILLION);
-    if (unlikely(UNIV::AUDIO_NONE)) {  // i.e. if no audio device
+    using dseconds = std::chrono::duration<double>;
+    const uint32_t frames = m_numFrames / UNIV::TIME_DIVISION;
+    const dseconds slice(double(frames) / UNIV::SAMPLE_RATE);
+    if (UNIV::AUDIO_NONE) [[unlikely]] {  // i.e. if no audio device
         AudioDevice::CLOCKBASE = getRealTime();
         UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     }
@@ -72,7 +74,7 @@ void TaskScheduler::timeSlice() {
             m_queue.pop();
             m_queueMutex.unlock();
             try {
-                if (likely(!task->getTag())) {
+                if (!task->getTag()) [[likely]] {
                     task->execute();
                 }
             } catch (std::exception& e) {
@@ -83,34 +85,36 @@ void TaskScheduler::timeSlice() {
             task = m_queue.peek();
         }
         m_queueMutex.unlock();
-        if (likely(UNIV::TIME_DIVISION == 1)) {
+        if (UNIV::TIME_DIVISION == 1) [[likely]] {
             return;
         }
-        if (unlikely(UNIV::AUDIO_NONE)) {
+        if (UNIV::AUDIO_NONE) [[unlikely]] {
             AudioDevice::REALTIME = getRealTime();
             UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
         } else if (!UNIV::DEVICE_TIME) {
             AUDIO_DEVICE_START_OFFSET = UNIV::TIME;
         }
         UNIV::TIME += frames;
-        double realtimeStamp = getRealTime();
-        double timediff =
-            realtimeStamp - (LAST_REALTIME_STAMP + double(frames) / UNIV::SAMPLE_RATE);
-        LAST_REALTIME_STAMP = realtimeStamp;
-        long delay_ns = nanosecs - long(timediff / 2 * BILLION);
-        if (likely(!UNIV::AUDIO_NONE)) {
-            delay_ns +=
-                long((double(UNIV::TIME) - (UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
-                     UNIV::SAMPLE_RATE / 2 * BILLION);
+        // Sleep for one slice, pulling in half of any drift against the wall
+        // clock (and, with a device, against the audio clock).
+        const dseconds now(getRealTime());
+        const dseconds drift = now - (dseconds(LAST_REALTIME_STAMP) + slice);
+        LAST_REALTIME_STAMP = now.count();
+        dseconds delay = slice - drift / 2;
+        if (!UNIV::AUDIO_NONE) [[likely]] {
+            delay += dseconds(
+                (double(UNIV::TIME) - double(UNIV::DEVICE_TIME + AUDIO_DEVICE_START_OFFSET)) /
+                UNIV::SAMPLE_RATE / 2);
         }
-        if (delay_ns > 0) {
-            std::this_thread::sleep_for(std::chrono::nanoseconds(delay_ns));
+        if (delay > dseconds::zero()) {
+            std::this_thread::sleep_for(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(delay));
         }
     } while (!m_queueThread.stopRequested());
 }
 
 void* TaskScheduler::queueThreadImpl() {
-    if (likely(UNIV::TIME_DIVISION == 1)) {
+    if (UNIV::TIME_DIVISION == 1) [[likely]] {
         // One pass per audio buffer, paced by the callback's tick().
         while (!m_queueThread.stopRequested()) {
             timeSlice();

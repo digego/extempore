@@ -101,7 +101,6 @@
 #include <SchemeS7.h>
 #include <SchemeS7Private.h>
 #include <OSC.h>
-#include <BranchPrediction.h>
 
 #ifdef _WIN32
 #include <malloc.h>
@@ -1048,7 +1047,7 @@ EXPORT const char* llvm_disassemble(const unsigned char* Code, int syntax) {
     return strdup(OS.str().c_str());
 }
 
-static extemp::CMG DestroyMallocZoneWithDelayCM([](extemp::TaskI* Task) -> void {
+static extemp::CM DestroyMallocZoneWithDelayCM([](extemp::TaskI* Task) {
     extemp::EXTZones::llvm_zone_destroy(static_cast<extemp::Task<llvm_zone_t*>*>(Task)->getArg());
 });
 
@@ -1057,7 +1056,7 @@ EXPORT void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay) {
         extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(), &DestroyMallocZoneWithDelayCM, Zone));
 }
 
-static extemp::CMG FreeWithDelayCM([](extemp::TaskI* Task) -> void {
+static extemp::CM FreeWithDelayCM([](extemp::TaskI* Task) {
     free(static_cast<extemp::Task<char*>*>(Task)->getArg());
 });
 
@@ -1278,7 +1277,7 @@ llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr) {
 }
 
 void initLLVM() {
-    if (unlikely(JIT)) {
+    if (JIT) [[unlikely]] {
         return;
     }
 

@@ -41,7 +41,6 @@
 #include <queue>
 
 #include "Task.h"
-#include "BranchPrediction.h"
 
 namespace extemp {
 
@@ -68,7 +67,7 @@ template <typename T> class PriorityQueue {
         }
     }
     T* pop() {
-        if (unlikely(m_queue.empty())) {
+        if (m_queue.empty()) [[unlikely]] {
             return nullptr;
         }
         auto element(m_queue.top().second);
@@ -76,7 +75,7 @@ template <typename T> class PriorityQueue {
         return element;
     }
     T* peek() {
-        if (unlikely(m_queue.empty())) {
+        if (m_queue.empty()) [[unlikely]] {
             return nullptr;
         }
         return m_queue.top().second;

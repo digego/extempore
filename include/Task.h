@@ -36,10 +36,32 @@
 #ifndef IMP_TASK_H
 #define IMP_TASK_H
 
-#include "CM.h"
 #include <cstdint>
+#include <functional>
+#include <utility>
 
 namespace extemp {
+
+class TaskI;
+
+// What a scheduled task runs when it fires. Held by pointer -- Scheme sees it
+// as a cptr (*callback*, *io:osc:send-msg*) and TaskScheduler::addTask takes
+// one -- so instances are heap objects that outlive the tasks using them.
+class CM {
+  private:
+    std::function<void(TaskI*)> m_function;
+
+  public:
+    explicit CM(std::function<void(TaskI*)> Function) : m_function(std::move(Function)) {}
+
+    void execute(TaskI* Task) {
+        m_function(Task);
+    }
+};
+
+// A CM calling `instance->func(task)`.
+#define mk_cb(instance, class, func)                                                               \
+    (new extemp::CM([instance](extemp::TaskI* task) { (instance)->func(task); }))
 
 class TaskI {
   private:
@@ -47,21 +69,15 @@ class TaskI {
     uint64_t m_duration;
     CM* m_classMember;
     int m_tag;
-    bool m_isCallback;
-    bool m_active;
-    bool m_isAumidi;
 
   protected:
-    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool Callback = false)
-        : m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag),
-          m_isCallback(Callback), m_active(true), m_isAumidi(false) {}
+    // Callback is accepted for the callers that pass it and otherwise unused.
+    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool /*Callback*/ = false)
+        : m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag) {}
 
   public:
     virtual ~TaskI() = default;
 
-    void setStartTime(uint64_t StartTime) {
-        m_startTime = StartTime;
-    }
     uint64_t getStartTime() const {
         return m_startTime;
     }
@@ -70,12 +86,6 @@ class TaskI {
     }
     int getTag() const {
         return m_tag;
-    }
-    bool isActive() const {
-        return m_active;
-    }
-    bool isCallback() const {
-        return m_isCallback;
     }
     void execute() {
         m_classMember->execute(this);

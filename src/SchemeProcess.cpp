@@ -311,7 +311,7 @@ void* SchemeProcess::taskImpl() {
                     uint64_t now(UNIV::TIME);
                     scheme_load_string(m_scheme, evalString->c_str(), now,
                                        now + task.getMaxDuration());
-                    if (unlikely(m_scheme->retcode)) {  // scheme error
+                    if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
                     }
                 }
@@ -329,7 +329,7 @@ void* SchemeProcess::taskImpl() {
                     uint64_t now(UNIV::TIME);
                     scheme_load_string(m_scheme, (const char*)evalString->c_str(), now,
                                        now + task.getMaxDuration());
-                    if (unlikely(m_scheme->retcode)) {  // scheme error
+                    if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         if (write_reply) {
                             std::string err(m_schemeOutportString);
                             if (!err.empty()) {
@@ -372,7 +372,7 @@ void* SchemeProcess::taskImpl() {
                     is_foreign(func)) {
                     uint64_t now(UNIV::TIME);
                     scheme_call(m_scheme, func, args, now, now + task.getMaxDuration());
-                    if (unlikely(m_scheme->retcode)) {  // scheme error
+                    if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
                     }
                 } else {
@@ -569,7 +569,7 @@ void* SchemeProcess::serverImpl() {
 
 SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env)
     : m_scheme(Scheme), m_values(Values), m_env(Env) {
-    if (unlikely(!Env)) {
+    if (!Env) [[unlikely]] {
         std::cout << "BANG CRASH SHEBANG" << std::endl;
         fflush(stdout);
         abort();
@@ -579,7 +579,7 @@ SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env)
 }
 
 SchemeObj::~SchemeObj() {
-    if (likely(m_env)) {
+    if (m_env) [[likely]] {
         s7_gc_unprotect_at(m_scheme->sc, m_gcLoc);
         m_scheme->m_process->createSchemeTask(m_env, "destroy SchemeObj",
                                               SchemeTask::Type::DESTROY_ENV);

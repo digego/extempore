@@ -38,7 +38,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <BranchPrediction.h>
 
 #include <string>
 #include <vector>
@@ -53,10 +52,6 @@
 #else
 #define EXPORT extern "C"
 #endif
-
-#define BILLION 1000000000L
-#define D_BILLION 1000000000.0
-#define D_MILLION 1000000.0
 
 struct scheme;
 struct s7_cell;
@@ -159,20 +154,18 @@ extern void printSchemeCell(scheme* sc, std::stringstream& ss, pointer cell, boo
 // it), while Linux's clock_gettime(CLOCK_REALTIME) and the macOS CoreFoundation
 // clock both returned exactly the Unix wall time system_clock already provides.
 extern "C" inline double getRealTime() {
-    return double(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count()) /
-           D_BILLION;
+    return std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
 }
 
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
-    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor)) {
+    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor) [[unlikely]] {
         return;
     }
 #ifdef _WIN32
     extern int WINDOWS_COLORS[];
     extern int WINDOWS_BGCOLORS[];
-    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Cmd)) {
+    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Cmd) [[unlikely]] {
         Foreground = (Foreground > 7) ? 7 : Foreground;
         Background = (Background > 7) ? 0 : Background;
         HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -189,11 +182,11 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
     // then default to black background and white text
     Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
     Background = (Background > 9 || Background == 8) ? 9 : Background;
-    if (unlikely(extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Basic)) {
-        if (unlikely(Background == 9)) {
+    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Basic) [[unlikely]] {
+        if (Background == 9) [[unlikely]] {
             Background = 0;
         }
-        if (unlikely(Foreground == 9)) {
+        if (Foreground == 9) [[unlikely]] {
             Foreground = 7;
         }
     }

@@ -32,7 +32,7 @@ static pointer connectToProcess(scheme* Scheme, pointer Args)
 static SchemeREPL* findREPL(const std::string& Name)
 {
     auto repl(SchemeREPL::I(Name));
-    if (unlikely(!repl)) {
+    if (!repl) [[unlikely]] {
       std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
       return nullptr;
    }
