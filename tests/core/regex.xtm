@@ -75,8 +75,36 @@
 (xtmtest-result (regex:replace "abc" "z" "y") "abc" "replace-no-match")
 ;; only the first match is replaced (regex:replace-all loops)
 (xtmtest-result (regex:replace "aXaXa" "X" "-") "a-aXa" "replace-first-only")
+;; $1..$9 each name their own capture
+(xtmtest-result (regex:replace "abcdefghi" "(a)(b)(c)(d)(e)(f)(g)(h)(i)"
+                               "$9$8$7$6$5$4$3$2$1")
+                "ihgfedcba"
+                "replace-nine-groups")
+;; a run of digits after '$' is one group number: $11 is the eleventh capture,
+;; not the first followed by a literal "1"
+(xtmtest-result (regex:replace "abcdefghijk" "(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)" "$11$10")
+                "kj"
+                "replace-two-digit-group")
 ;; $30 names a group the pattern doesn't have: substitutes nothing rather than
-;; reading past the end of the 60-int ovector
+;; reading past the end of the ovector
 (xtmtest-result (regex:replace "ab" "(a)b" "<$30>") "<>" "replace-group-out-of-range")
+;; a group the pattern has but this match didn't fill also substitutes nothing
+(xtmtest-result (regex:replace "ac" "^a(b)?(c)$" "[$1|$2]") "[|c]" "replace-unset-group")
 ;; a '$' that isn't a group reference is a literal
 (xtmtest-result (regex:replace "ab" "(a)b" "$x$1") "$xa" "replace-literal-dollar")
+(xtmtest-result (regex:replace "ab" "(a)b" "$1$") "a$" "replace-trailing-dollar")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pcre features the xtlang compiler leans on, so a change of regex engine has
+;; to keep them: runtime/xtc-codegen.xtm walks nested type strings with named
+;; groups and \g<name> recursion, and runtime/xtc-transforms.xtm quotes type
+;; names with \Q..\E
+
+(xtmtest-result (regex:match? "[i8,[i8,i8]]" "^\\[(?<a>[^][]|\\[\\g<a>*\\])*\\]$")
+                #t
+                "feature-recursive-subpattern")
+(xtmtest-result (regex:match? "[i8,[i8,i8]" "^\\[(?<a>[^][]|\\[\\g<a>*\\])*\\]$")
+                #f
+                "feature-recursive-subpattern-unbalanced")
+(xtmtest-result (regex:match? "a.c" "^\\Qa.c\\E$") #t "feature-quoted-literal")
+(xtmtest-result (regex:match? "abc" "^\\Qa.c\\E$") #f "feature-quoted-literal-miss")
