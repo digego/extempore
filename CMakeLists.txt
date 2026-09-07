@@ -32,6 +32,14 @@ configure_file(
 option(ASSETS "download multimedia assets (approx 250MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
 set(EXTEMPORE_SANITIZE "" CACHE STRING "Build with sanitizer: asan, ubsan, tsan, asan+ubsan")
+set_property(CACHE EXTEMPORE_SANITIZE PROPERTY STRINGS "" "asan" "ubsan" "tsan" "asan+ubsan")
+# The flags below are selected by substring match, so a typo (e.g. "addr")
+# would quietly produce an uninstrumented build. Reject it instead.
+if(EXTEMPORE_SANITIZE AND NOT EXTEMPORE_SANITIZE MATCHES "^(asan|ubsan|tsan|asan\\+ubsan)$")
+    message(FATAL_ERROR
+        "EXTEMPORE_SANITIZE must be one of: asan, ubsan, tsan, asan+ubsan "
+        "(got '${EXTEMPORE_SANITIZE}')")
+endif()
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native, stb_image)" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
