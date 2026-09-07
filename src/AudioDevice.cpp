@@ -36,6 +36,7 @@
 #include <time.h>
 #include <iostream>
 #include <cstring>
+#include <cerrno>
 #include <cinttypes>
 #include <regex>
 
@@ -72,8 +73,6 @@
 #include <cstdio>
 #include <atomic>
 #include <vector>
-
-// this is an aribrary maximum
 
 // this functionality is duplicated in EXTThread::setPriority(), but
 // kep here to not mess with the MT audio stuff
@@ -132,13 +131,10 @@ static inline float audio_sanity(float x) {
 namespace extemp {
 
 AudioDevice AudioDevice::SINGLETON;
-// AudioDevice* AudioDevice::SINGLETON = nullptr;
 
 std::atomic<double> AudioDevice::REALTIME = 0.0;
 std::atomic<double> AudioDevice::CLOCKBASE = 0.0;
 double AudioDevice::CLOCKOFFSET = 0.0;
-bool first_callback = true;
-uint64_t start_time = 0;
 
 //-----------------------------------
 //  PORT AUDIO
@@ -172,47 +168,56 @@ void* audioCallbackMT(void* Args) {
 #elif _WIN32
     SetThreadPriority(GetCurrentThread(), 15);  // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
-    // printf("Starting RT Audio Process\n");
     unsigned idx = uintptr_t(Args);
-    auto cache_wrapper(AudioDevice::I()->getDSPWrapper());
+    auto device(AudioDevice::I());
+    // The wrapper, latency mode and buffers are fixed for the life of the
+    // worker: initMTAudio() publishes them before starting us and refuses to
+    // change them afterwards.
+    auto cache_wrapper(device->getDspState()->wrapper);
     auto zone(extemp::EXTZones::llvm_peek_zone_stack());
-    SAMPLE* outbuf = AudioDevice::I()->getDSPMTOutBuffer();
-    SAMPLE* outbufs[2];
-    outbufs[0] = outbuf + UNIV::CHANNELS * UNIV::NUM_FRAMES * idx * 2;
-    outbufs[1] = outbufs[0] + UNIV::CHANNELS * UNIV::NUM_FRAMES;
-    SAMPLE* inbuf = AudioDevice::I()->getDSPMTInBuffer();
+    std::span<SAMPLE> slice(device->getMTOutSlice(idx));
+    const size_t blockSamples = size_t(UNIV::CHANNELS) * UNIV::NUM_FRAMES;
+    SAMPLE* outbufs[2] = {slice.data(), slice.data() + blockSamples};
+    std::span<SAMPLE> inbuf(device->getMTInBuffer());
     // per-worker scratch buffer for one frame of input, sized once before the
     // realtime loop so the loop stays allocation-free
     std::vector<SAMPLE> indata(UNIV::IN_CHANNELS);
-    bool zerolatency = AudioDevice::I()->getZeroLatency();
+    bool zerolatency = device->getDspState()->zeroLatency;
     bool toggle = false;
     printf("Starting RT Audio MT worker %u\n", idx);
     while (true) {
         sMtWorkAvailable.acquire();
-        outbuf = outbufs[toggle];
+        SAMPLE* outbuf = outbufs[toggle];
         if (unlikely(!zerolatency)) {
             toggle = !toggle;
         }
-        auto cache_closure(AudioDevice::I()->getDSPMTClosure(idx)());
+        auto getter(device->getDspState()->mtClosures[idx]);
+        if (unlikely(!getter)) {
+            // no closure installed for this worker yet: emit silence
+            std::fill_n(outbuf, blockSamples, 0.0f);
+            sMtWorkComplete.release(1);
+            continue;
+        }
+        auto cache_closure(getter());
         auto closure = *reinterpret_cast<closure_fn_type*>(cache_closure);
         uint64_t LTIME = UNIV::DEVICE_TIME;
         for (uint32_t i = 0; i < UNIV::NUM_FRAMES; i++) {
             uint32_t iout = i * UNIV::CHANNELS;
             uint32_t iin = i * UNIV::IN_CHANNELS;
             for (unsigned k = 0; k < UNIV::IN_CHANNELS; k++) {
-                indata[k] = (SAMPLE)inbuf[iin + k];
+                indata[k] = inbuf[iin + k];
             }
             if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     outbuf[iout + k] =
-                        audio_sanity(cache_wrapper(zone, (void*)closure, (SAMPLE)inbuf[iin + k],
+                        audio_sanity(cache_wrapper(zone, (void*)closure, inbuf[iin + k],
                                                    (i + LTIME), k, &(indata[0])));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else if (UNIV::IN_CHANNELS == 1) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     outbuf[iout + k] = audio_sanity(cache_wrapper(
-                        zone, (void*)closure, (SAMPLE)inbuf[iin], (i + LTIME), k, &(indata[0])));
+                        zone, (void*)closure, inbuf[iin], (i + LTIME), k, &(indata[0])));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else {
@@ -243,15 +248,17 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
     UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
     sched->setFrames(FramesPerBuffer);
     sched->getGuard().signal();
-    auto dsp_closure(AudioDevice::I()->getDSPClosure());
-    if (unlikely(!dsp_closure)) {
+    // One acquire load per block. Every field below comes from that snapshot,
+    // so a dsp:set! landing mid-callback is either wholly visible or not at
+    // all -- there is no ordering contract between the setters to get wrong.
+    const DspState* state = getDspState();
+    if (unlikely(!state->closure)) {
         memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
         return;
     }
-    auto cache_closure(dsp_closure());
-    if (likely(AudioDevice::I()->getDSPWrapper() &&
-               !AudioDevice::I()->getDSPSUMWrapper())) {  // sample by sample
-        auto cache_wrapper(AudioDevice::I()->getDSPWrapper());
+    auto cache_closure(state->closure());
+    if (likely(state->wrapper && !state->sumWrapper)) {  // sample by sample
+        auto cache_wrapper(state->wrapper);
         auto closure = *((SAMPLE(**)(SAMPLE, uint64_t, uint64_t, SAMPLE*))cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
         auto dat(OutputBuffer);
@@ -285,8 +292,6 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
                 ++in;
             }
         } else {  // for when in channels & out channels don't match
-            // SAMPLE* indata = alloc(UNIV::IN_CHANNELS); // auto
-            // indata(in);
             auto indata(in);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
@@ -299,34 +304,39 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         }
         return;
     }
-    if (AudioDevice::I()->getDSPSUMWrapper() &&
-        AudioDevice::I()->getMTReady()) {  // multi-threaded sample-by-sample
-        const unsigned numthreads = unsigned(AudioDevice::I()->getNumThreads());
-        const bool zerolatency = AudioDevice::I()->getZeroLatency();
-        SAMPLE in[32];
-        SAMPLE* inb = AudioDevice::I()->getDSPMTInBuffer();
-        const float* input = InputBuffer;
-        for (unsigned i = 0; i < UNIV::IN_CHANNELS * UNIV::NUM_FRAMES; i++)
-            inb[i] = (SAMPLE)input[i];
+    if (state->sumWrapper && state->mtReady) {  // multi-threaded sample-by-sample
+        // The worker slices are sized from UNIV::NUM_FRAMES, so a host buffer
+        // of a different size would read past them.
+        if (unlikely(FramesPerBuffer != UNIV::NUM_FRAMES)) {
+            memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
+            return;
+        }
+        const unsigned numthreads = state->numThreads;
+        const bool zerolatency = state->zeroLatency;
+        SAMPLE in[AudioDevice::MAX_RT_AUDIO_THREADS];
+        std::span<SAMPLE> inb(getMTInBuffer());
+        if (InputBuffer) {
+            for (size_t i = 0; i < inb.size(); i++) {
+                inb[i] = SAMPLE(InputBuffer[i]);
+            }
+        }
         if (zerolatency) {
             sMtWorkAvailable.release(numthreads);
             for (unsigned i = 0; i < numthreads; ++i) {
                 sMtWorkComplete.acquire();
             }
         }
-        dsp_f_ptr_sum cache_wrapper = AudioDevice::I()->getDSPSUMWrapper();
+        dsp_f_ptr_sum cache_wrapper = state->sumWrapper;
         auto closure = *((SAMPLE(**)(SAMPLE*, uint64_t, uint64_t, SAMPLE*))cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
-        bool toggle = AudioDevice::I()->getToggle();
+        bool toggle = getToggle();
+        // if we are NOT running zerolatency and toggle is FALSE then the
+        // workers wrote into the second half of their slice
+        const size_t half =
+            (!zerolatency && !toggle) ? size_t(UNIV::NUM_FRAMES) * UNIV::CHANNELS : 0;
         SAMPLE* indats[AudioDevice::MAX_RT_AUDIO_THREADS];
-        indats[0] = AudioDevice::I()->getDSPMTOutBuffer();
-        // if we are NOT running zerolatency
-        // and toggle is FALSE then use alternate buffers
-        if (!zerolatency && !toggle) {
-            indats[0] = indats[0] + UNIV::NUM_FRAMES * UNIV::CHANNELS;
-        }
-        for (unsigned jj = 1; jj < numthreads; jj++) {
-            indats[jj] = indats[0] + (UNIV::NUM_FRAMES * UNIV::CHANNELS * jj * 2);
+        for (unsigned jj = 0; jj < numthreads; jj++) {
+            indats[jj] = getMTOutSlice(jj).data() + half;
         }
         for (uint64_t i = 0; i < UNIV::NUM_FRAMES; i++) {
             uint32_t iout = i * UNIV::CHANNELS;
@@ -348,8 +358,8 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             }
         }
     } else {
-        // no wrapper registered — emit silence
-        memset(OutputBuffer, 0, (UNIV::CHANNELS * UNIV::NUM_FRAMES * sizeof(float)));
+        // no wrapper registered -- emit silence
+        memset(OutputBuffer, 0, UNIV::CHANNELS * FramesPerBuffer * sizeof(float));
     }
 }
 
@@ -416,7 +426,19 @@ void FileAudioDriver::finalizeWav() {
     const uint32_t bitsPerSample = 32;
     const uint32_t blockAlign = channels * (bitsPerSample / 8);
     const uint32_t byteRate = sampleRate * blockAlign;
-    const uint32_t dataBytes = static_cast<uint32_t>(m_framesWritten * blockAlign);
+    // A canonical WAV header cannot describe more than 4 GB of samples. A
+    // render that long is out of scope (RF64 would be the answer), so cap the
+    // advertised size and say so rather than writing a header that wraps.
+    const uint64_t dataBytes64 = m_framesWritten * blockAlign;
+    uint32_t dataBytes = static_cast<uint32_t>(dataBytes64);
+    if (dataBytes64 > 0xFFFFFFF0ull - 36) {
+        dataBytes = 0xFFFFFFF0u - 36;
+        ascii_warning();
+        printf("Warning: render exceeds the 4 GB WAV limit; the header describes the first "
+               "%u bytes only\n",
+               dataBytes);
+        ascii_normal();
+    }
     const uint32_t riffSize = 36 + dataBytes;
 
     unsigned char hdr[44];
@@ -440,8 +462,13 @@ void FileAudioDriver::finalizeWav() {
     std::memcpy(hdr + 40, &dataBytes, 4);
 
     std::fflush(m_file);
-    std::fseek(m_file, 0, SEEK_SET);
-    std::fwrite(hdr, 1, sizeof(hdr), m_file);
+    if (std::fseek(m_file, 0, SEEK_SET) != 0 ||
+        std::fwrite(hdr, 1, sizeof(hdr), m_file) != sizeof(hdr)) {
+        ascii_error();
+        printf("Error: could not finalise the WAV header for %s (%s)\n", m_path.c_str(),
+               std::strerror(errno));
+        ascii_normal();
+    }
     std::fflush(m_file);
     std::fclose(m_file);
     m_file = nullptr;
@@ -488,7 +515,7 @@ void FileAudioDriver::run() {
             break;
         }
 
-        const bool haveDSP = (AudioDevice::I()->getDSPClosure() != nullptr);
+        const bool haveDSP = (AudioDevice::I()->getDspState()->closure != nullptr);
         std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
         AudioDevice::I()->processFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
                                         frames, TaskScheduler::I());
@@ -502,7 +529,14 @@ void FileAudioDriver::run() {
             }
         }
         const size_t samples = m_outBuf.size();
-        std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file);
+        if (std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file) != samples) {
+            ascii_error();
+            printf("Error: could not write to --audio-outfile (%s); stopping the render\n",
+                   std::strerror(errno));
+            ascii_normal();
+            fflush(stdout);
+            break;
+        }
         m_framesWritten += frames;
         // Sleep briefly so the task scheduler thread actually gets CPU between
         // our per-buffer signal() calls. The scheduler uses a plain condvar
@@ -553,11 +587,14 @@ static int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned l
                          const PaStreamCallbackTimeInfo* /*TimeInfo*/,
                          PaStreamCallbackFlags StatusFlags, void* UserData) {
     if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
+        // Nothing may block or allocate on the audio thread, printf included:
+        // count the xruns and let the Scheme side read them back with
+        // (sys:audio-xruns).
         if (StatusFlags & paOutputUnderflow) {
-            printf("Audio underflow: are you pushing extempore too hard?\n");
+            AudioDevice::I()->countUnderflow();
         }
         if (StatusFlags & paOutputOverflow) {
-            printf("Audio output overflow\n");
+            AudioDevice::I()->countOverflow();
         }
     }
     AudioDevice::I()->processFrames(reinterpret_cast<const float*>(InputBuffer),
@@ -567,8 +604,8 @@ static int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned l
 }
 
 AudioDevice::AudioDevice()
-    : m_started(false), buffer(0), m_dsp_closure(nullptr), dsp_wrapper(0), dsp_wrapper_sum(0),
-      outbuf(nullptr), inbuf(nullptr), m_numThreads(50) /* NOT 0! */, m_zeroLatency(true) {}
+    : m_started(false), stream(nullptr), m_dspState(new DspState()), m_toggle(1), m_underflows(0),
+      m_overflows(0) {}
 
 AudioDevice::~AudioDevice() {
     // The RT audio threads run `while(true)` loops and are intentionally
@@ -597,19 +634,35 @@ AudioDevice::~AudioDevice() {
     }
 }
 
-#undef max
-
+// --device / --indevice take a regex, but the user types it on a command
+// line: a pattern std::regex won't accept must not take the process down, so
+// fall back to a plain substring match.
 static int findDevice(const std::string& Name) {
-    std::regex rgx(Name);
-    std::cmatch m;
+    std::regex pattern;
+    bool usePattern = true;
+    try {
+        pattern = std::regex(Name);
+    } catch (const std::regex_error& e) {
+        ascii_warning();
+        printf("Warning: '%s' is not a valid regex (%s); matching it as plain text\n",
+               Name.c_str(), e.what());
+        ascii_normal();
+        usePattern = false;
+    }
     int numDevices(Pa_GetDeviceCount());
     for (int i = 0; i < numDevices; ++i) {
-        if (std::regex_search(Pa_GetDeviceInfo(i)->name, m, rgx)) {
+        const char* deviceName = Pa_GetDeviceInfo(i)->name;
+        if (usePattern) {
+            std::cmatch match;
+            if (std::regex_search(deviceName, match, pattern)) {
+                return i;
+            }
+        } else if (std::string(deviceName).find(Name) != std::string::npos) {
             return i;
         }
     }
     ascii_error();
-    printf("\n*** Can't find device matching regex: %s\n", Name.c_str());
+    printf("\n*** Can't find device matching: %s\n", Name.c_str());
     ascii_normal();
     fflush(stdout);
     std::_Exit(1);
@@ -638,8 +691,13 @@ void AudioDevice::start() {
         ascii_normal();
         return;
     }
-    Pa_Initialize();
-    PaError err;
+    PaError err = Pa_Initialize();
+    if (err != paNoError) {
+        ascii_error();
+        std::cout << "Could not initialise PortAudio: " << Pa_GetErrorText(err) << std::endl;
+        ascii_normal();
+        std::_Exit(1);
+    }
     int numDevices = Pa_GetDeviceCount();
     if (!UNIV::AUDIO_DEVICE_NAME.empty()) {
         UNIV::AUDIO_DEVICE = findDevice(UNIV::AUDIO_DEVICE_NAME);
@@ -650,21 +708,21 @@ void AudioDevice::start() {
     if (numDevices < 0) {
         printf("No audio devices found!\n");
         printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
-        exit(1);
+        std::_Exit(1);
     }
     if (int(UNIV::AUDIO_DEVICE) < -1 || int(UNIV::AUDIO_DEVICE) >= numDevices) {
         ascii_error();
         printf("Output device not valid! %d\n", int(UNIV::AUDIO_DEVICE));
         ascii_normal();
         printf("\n");
-        exit(1);
+        std::_Exit(1);
     }
     if (int(UNIV::AUDIO_IN_DEVICE) < -1 || int(UNIV::AUDIO_IN_DEVICE) >= numDevices) {
         ascii_error();
         printf("Input device not valid! %d\n", (int)UNIV::AUDIO_IN_DEVICE);
         ascii_normal();
         printf("\n");
-        exit(1);
+        std::_Exit(1);
     }
     if (UNIV::IN_CHANNELS != UNIV::CHANNELS && UNIV::IN_CHANNELS != 1 && UNIV::IN_CHANNELS > 0) {
         ascii_warning();
@@ -706,7 +764,7 @@ void AudioDevice::start() {
         std::cout << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
         std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
-        exit(1);
+        std::_Exit(1);
     }
 
     err = Pa_StartStream(stream);
@@ -716,7 +774,7 @@ void AudioDevice::start() {
         std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
         std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
         ascii_normal();
-        exit(1);
+        std::_Exit(1);
     }
 
     m_started = true;
@@ -773,46 +831,78 @@ void AudioDevice::stop() {
     m_started = false;
 }
 
-void AudioDevice::initMTAudio(int Num, bool ZeroLatency) {
-    if (unsigned(Num) > MAX_RT_AUDIO_THREADS) {
-        printf("HARD CEILING of %d RT AUDIO THREADS .. aborting!\n", MAX_RT_AUDIO_THREADS);
-        exit(1);
+bool AudioDevice::initMTAudio(int Num, bool ZeroLatency, std::string& Reason) {
+    if (Num < 1 || unsigned(Num) > MAX_RT_AUDIO_THREADS) {
+        Reason = "requested " + std::to_string(Num) + " realtime audio threads; the limit is " +
+                 std::to_string(MAX_RT_AUDIO_THREADS);
+        return false;
     }
     const unsigned n = unsigned(Num);
-    // Take the MT path offline while we (re)build its state, so a concurrent
-    // free-running processFrames() can't dispatch against half-initialised
-    // buffers/threads. Republished true once everything below is in place.
-    setMTReady(false);
-    m_numThreads.store(n, std::memory_order_release);
-    m_zeroLatency = ZeroLatency;
-    m_toggle = true;
-    inbuf = (SAMPLE*)malloc(UNIV::IN_CHANNELS * UNIV::NUM_FRAMES * sizeof(SAMPLE));
-    // outbuf * 2 for double buffering
-    outbuf = (SAMPLE*)malloc(UNIV::CHANNELS * UNIV::NUM_FRAMES * sizeof(SAMPLE) * n * 2);
-    memset(outbuf, 0, UNIV::CHANNELS * UNIV::NUM_FRAMES * sizeof(SAMPLE) * n * 2);
+    const DspState* state = getDspState();
+    if (state->numThreads != 0) {
+        // Already up. Restarting would replace EXTThreads whose std::threads
+        // are still joinable and free the buffers the live workers are reading
+        // from, so the shape is fixed for the session; the per-worker closures
+        // set just before this call are picked up on the next block.
+        if (state->numThreads != n || state->zeroLatency != ZeroLatency) {
+            Reason = "multi-threaded audio is already running with " +
+                     std::to_string(state->numThreads) + " threads (zero-latency " +
+                     (state->zeroLatency ? "on" : "off") +
+                     "); restart Extempore to change that";
+            return false;
+        }
+        return true;
+    }
+
+    publishDspState([&](DspState& next) {
+        next.mtReady = false;
+        next.numThreads = n;
+        next.zeroLatency = ZeroLatency;
+    });
+    m_toggle.store(1, std::memory_order_relaxed);
+    m_inbuf.assign(size_t(UNIV::IN_CHANNELS) * UNIV::NUM_FRAMES, 0.0f);
+    // two blocks per worker, for double buffering
+    m_outbuf.assign(size_t(UNIV::CHANNELS) * UNIV::NUM_FRAMES * n * 2, 0.0f);
     for (unsigned i = 0; i < n; ++i) {
         m_threads[i] =
             std::make_unique<EXTThread>(audioCallbackMT, reinterpret_cast<void*>(uintptr_t(i)),
                                         std::string("MT_AUD_") + char('A' + i));
         m_threads[i]->start();
     }
-    // Release: buffers, thread count and workers are all up — publish them as a
-    // unit to processFrames(), which gates the MT branch on getMTReady().
-    setMTReady(true);
+    // Buffers, thread count and workers are all up -- publish them as a unit
+    // to processFrames(), which gates the MT branch on mtReady.
+    publishDspState([](DspState& next) { next.mtReady = true; });
+    return true;
+}
+
+std::span<SAMPLE> AudioDevice::getMTOutSlice(unsigned Index) {
+    const size_t block = size_t(UNIV::CHANNELS) * UNIV::NUM_FRAMES * 2;
+    const size_t offset = block * Index;
+    if (offset + block > m_outbuf.size()) {
+        return std::span<SAMPLE>();
+    }
+    return std::span<SAMPLE>(m_outbuf.data() + offset, block);
 }
 
 double AudioDevice::getCPULoad() {
-    return Pa_GetStreamCpuLoad(AudioDevice::I()->getPaStream());
+    // No stream in --noaudio or offline-render mode.
+    PaStream* stream = AudioDevice::I()->getPaStream();
+    return stream ? Pa_GetStreamCpuLoad(stream) : 0.0;
 }
 
 void AudioDevice::printDevices() {
-    Pa_Initialize();
+    PaError err = Pa_Initialize();
+    if (err != paNoError) {
+        ascii_error();
+        printf("Error: could not initialise PortAudio: %s\n", Pa_GetErrorText(err));
+        ascii_normal();
+        std::_Exit(1);
+    }
 
     int numDevices = Pa_GetDeviceCount();
     if (numDevices <= 0) {
         printf("Error: no audio devices found! Exiting...\n");
-        // printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
-        exit(1);
+        std::_Exit(1);
     }
     ascii_normal();
     printf("\n-----Available Audio Devices-----------------------------\n");
