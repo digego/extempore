@@ -12,8 +12,20 @@
 ;; exactly. That's what the golden arrays below are: a run captured from a
 ;; known-good build, to catch a refactor that changes what comes out.
 
-;; The first grains read a cache that hasn't been written yet, so the
-;; assertions start well past the beginning.
+;; The sampling starts at the very first output sample, so the goldens also
+;; pin down that a fresh granulator starts from silence rather than from
+;; whatever its cache happened to hold.
+
+;; To regenerate the goldens, load this file interactively (or from a script)
+;; and print what the drivers produce, e.g.
+;;
+;;   (bind-func dsptest_dump
+;;     (lambda ()
+;;       (let ((o:double* (salloc 8)))
+;;         (dsptest_granulator_linear o 8)
+;;         (doloop (i 8) (printf "%.9f\n" (pref o i))))))
+;;
+;; then paste the printed values into the afill! below.
 
 ;;; Code:
 
@@ -28,14 +40,13 @@
   (lambda (i:i64)
     (convert (sin (* 0.01 (convert i double))) SAMPLE)))
 
-(bind-val DSPTEST_GRAIN_SKIP i64 1000)
 (bind-val DSPTEST_GRAIN_STRIDE i64 137)
 
 (bind-func dsptest_granulator_linear
   (lambda (out:double* nout:i64)
     (let ((grains (granulator_c 1))
           (v:SAMPLE 0.0)
-          (n (+ DSPTEST_GRAIN_SKIP (* nout DSPTEST_GRAIN_STRIDE))))
+          (n (* nout DSPTEST_GRAIN_STRIDE)))
       (grains.iot 100)
       (grains.dlo 500.0) (grains.dhi 500.0)
       (grains.rlo 1.5) (grains.rhi 1.5)
@@ -44,16 +55,15 @@
       (grains.wet 1.0:f)
       (doloop (i n)
         (set! v (grains 0 i (dsptest_input i)))
-        (if (and (>= i DSPTEST_GRAIN_SKIP)
-                 (= (% (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) 0))
-            (pset! out (/ (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) (convert v double))))
+        (if (= (% i DSPTEST_GRAIN_STRIDE) 0)
+            (pset! out (/ i DSPTEST_GRAIN_STRIDE) (convert v double))))
       void)))
 
 (bind-func dsptest_granulator_hermite
   (lambda (out:double* nout:i64)
     (let ((grains (granulator_hermite_c 1))
           (v:SAMPLE 0.0)
-          (n (+ DSPTEST_GRAIN_SKIP (* nout DSPTEST_GRAIN_STRIDE))))
+          (n (* nout DSPTEST_GRAIN_STRIDE)))
       (grains.iot 100)
       (grains.dlo 500.0) (grains.dhi 500.0)
       (grains.rlo 1.5) (grains.rhi 1.5)
@@ -62,9 +72,8 @@
       (grains.wet 1.0:f)
       (doloop (i n)
         (set! v (grains 0 i (dsptest_input i)))
-        (if (and (>= i DSPTEST_GRAIN_SKIP)
-                 (= (% (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) 0))
-            (pset! out (/ (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) (convert v double))))
+        (if (= (% i DSPTEST_GRAIN_STRIDE) 0)
+            (pset! out (/ i DSPTEST_GRAIN_STRIDE) (convert v double))))
       void)))
 
 (bind-func test_granulator_linear
@@ -73,8 +82,8 @@
           (expected:|8,double|* (salloc))
           (ok #t))
       (afill! expected
-              0.275067329 0.334935963 -0.143669501 -0.388719708
-              -0.011201041 0.388250321 0.165665284 -0.322427362)
+              0.000000000 0.000000000 0.022799831 0.360773891
+              0.226936772 -0.273223609 -0.333393157 0.140527621)
       (dsptest_granulator_linear out 8)
       (doloop (i 8)
         (if (not (dsptest_close (pref out i) (aref expected i)))
@@ -88,8 +97,8 @@
           (expected:|8,double|* (salloc))
           (ok #t))
       (afill! expected
-              0.275067329 0.333861321 -0.143669501 -0.388396710
-              -0.011201041 0.388728440 0.165665284 -0.323618233)
+              0.000000000 0.000000000 0.022799831 0.361559808
+              0.226936772 -0.274681479 -0.333393157 0.142405525)
       (dsptest_granulator_hermite out 8)
       (doloop (i 8)
         (if (not (dsptest_close (pref out i) (aref expected i)))
@@ -110,6 +119,42 @@
             (set! ok #f)))
       ok)))
 (xtmtest-result (test_granulator_dry) 1)
+
+;; a grain created in the first GRANULATOR_GRAIN_LEAD samples reads from the
+;; far end of the cache, which the writer hasn't reached yet. That far end has
+;; to be silence, so a granulator fed nothing but zeros emits nothing but
+;; zeros.
+(bind-func test_granulator_silence_in_silence_out
+  (lambda ()
+    (let ((grains (granulator_c 1))
+          (nonzero 0)
+          (v:SAMPLE 0.0))
+      (grains.iot 100)
+      (grains.dlo 500.0) (grains.dhi 500.0)
+      (grains.rlo 1.5) (grains.rhi 1.5)
+      (grains.alo 0.5:f) (grains.ahi 0.5:f)
+      (grains.wet 1.0:f)
+      (doloop (i 1000)
+        (set! v (grains 0 i 0.0))
+        (if (<> v 0.0) (set! nonzero (+ nonzero 1))))
+      nonzero)))
+(xtmtest-result (test_granulator_silence_in_silence_out) 0)
+
+(bind-func test_granulator_hermite_silence_in_silence_out
+  (lambda ()
+    (let ((grains (granulator_hermite_c 1))
+          (nonzero 0)
+          (v:SAMPLE 0.0))
+      (grains.iot 100)
+      (grains.dlo 500.0) (grains.dhi 500.0)
+      (grains.rlo 1.5) (grains.rhi 1.5)
+      (grains.alo 0.5:f) (grains.ahi 0.5:f)
+      (grains.wet 1.0:f)
+      (doloop (i 1000)
+        (set! v (grains 0 i 0.0))
+        (if (<> v 0.0) (set! nonzero (+ nonzero 1))))
+      nonzero)))
+(xtmtest-result (test_granulator_hermite_silence_in_silence_out) 0)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hermite_interp     ;;

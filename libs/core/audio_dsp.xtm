@@ -2096,6 +2096,10 @@ but v1 and v2 can be computed in parallel"
           (panning:|200,float|* (alloc))
           (active:|200,i1|* (alloc)))
       (dotimes (i GRANULATOR_MAX_GRAINS) (aset! active i 0))
+      ;; a grain created in the first GRANULATOR_GRAIN_LEAD samples reads
+      ;; from the far end of the cache, which the writer hasn't reached yet,
+      ;; so that end has to start out silent
+      (dotimes (i cachesize) (pset! audio_cache i 0.0))
       (lambda (chan time:i64 in)
         (set! iotn (+ iotn 1))
         (pset! audio_cache (% cnt cachesize) in)
@@ -2181,6 +2185,10 @@ but v1 and v2 can be computed in parallel"
           (panning:|200,float|* (alloc))
           (active:|200,i1|* (alloc)))
       (dotimes (i GRANULATOR_MAX_GRAINS) (aset! active i 0))
+      ;; a grain created in the first GRANULATOR_GRAIN_LEAD samples reads
+      ;; from the far end of the cache, which the writer hasn't reached yet,
+      ;; so that end has to start out silent
+      (dotimes (i cachesize) (pset! audio_cache i 0.0))
       (lambda (chan time:i64 in)
         (set! iotn (+ iotn 1))
         (pset! audio_cache (% cnt cachesize) in)
