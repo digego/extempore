@@ -1,0 +1,56 @@
+;;; topclock.xtm:tests -- tests for the distributed OSC clock
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/topclock.xtm. topclock is a network protocol, so what can
+;; be checked in a single process without touching the network is: that the file
+;; loads inert when autostart is off, that the message handlers do what they say
+;; to the module's own state, and that the epoch helpers agree with each other.
+
+;;; Code:
+
+;; load the definitions without binding the UDP port or starting the sync loop
+(define *topclock-autostart* #f)
+(sys:load "libs/core/topclock.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; loading is side-effect free ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; nothing is on the wire and no callback loop is scheduled
+(xtmtest-result *topclock-running* #f "topclock-load-is-inert")
+
+;; but the explicit entry points are there to be called
+(xtmtest-result (procedure? topclock-start) #t "topclock-start-defined")
+(xtmtest-result (procedure? topclock-stop) #t "topclock-stop-defined")
+(xtmtest-result (procedure? topclock-receive) #t "topclock-receive-defined")
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; message handling ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; a master response records where the master is, so later syncs go to it
+(xtmtest-result (begin (set! *topclock-master-ip* "127.0.0.1")
+                       (topclock-receive 0 "/clock/master/r" "192.168.1.7" 5555)
+                       *topclock-master-ip*)
+                "192.168.1.7"
+                "topclock-master-response-sets-ip")
+
+;; an election reply means someone else outranks us, so we concede
+(xtmtest-result (begin (set! *topclock-election-winner* #t)
+                       (topclock-receive 0 "/clock/election/r" "192.168.1.7" 5555)
+                       *topclock-election-winner*)
+                #f
+                "topclock-election-reply-concedes")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; epoch conversions   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the NTP epoch is 2208988800 seconds before the Unix one
+(xtmtest-result (1970->1900 0.0) 2208988800.0 "topclock-unix-epoch-in-ntp")
+(xtmtest-result (1900->1970 (1970->1900 1234567.5)) 1234567.5 "topclock-epoch-roundtrip")

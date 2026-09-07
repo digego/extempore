@@ -35,6 +35,8 @@
 (define *topclock-lastmsg* (+ 1. (clock:clock)))
 ;; did we win!
 (define *topclock-election-winner* #f)
+;; is the sync loop running (i.e. has topclock-start been called)?
+(define *topclock-running* #f)
 (define *topclock-broadcast* (cons "255.255.255.255" *topclock-port*))
 (define *topclock-print-stream* #f)
 
@@ -101,8 +103,8 @@
                  (io:osc:send (now) (cons srcip srcport) "/clock/master/r")))
             ((string=? address "/clock/master/r")
              ;; if we get a message it must be from master
-             ;; so we can set the *mastersip* to whatever the srcip is
-             (set! *mastersip* srcip)) ;; master port must be *topclock-port*
+             ;; so the master ip is whatever the srcip is
+             (set! *topclock-master-ip* srcip)) ;; master port must be *topclock-port*
             ((string=? address "/clock/election/q")
              ;; someone has asked for an election!
              ;; if we have a higher election-val OR we are allready the master
@@ -244,13 +246,6 @@
                    (io:osc:send (now) (cons *topclock-master-ip* *topclock-port*) "/clock/bpm/q"))))
             (else (println 'bad 'osc 'message: address))))))
 
-;; start topclock osc receiver (both client and server)
-(io:osc:start-server *topclock-port* "topclock-receive")
-;; send doubles for OSC real nums:
-(io:osc:set-real-64bit? #t)
-;; have OSC emit both source IP and PORT
-(io:osc:netaddress? #t)
-
 ;; sends OSC message /clock/bpm/set to current master
 ;; of type <double,double>
 ;; 'time' is double (UTC epoch 1900)
@@ -340,12 +335,45 @@
     (if (and (not *topclock-master*)
              (> (- (clock:clock) *topclock-lastmsg*) 3.0))
         (topclock-election))
-    (callback (+ (now) 10000) 'topclock-sync (+ cnt 1))))
+    (if *topclock-running*
+        (callback (+ (now) 10000) 'topclock-sync (+ cnt 1)))))
 
-(print-with-colors 'magenta 'default #f
-                   (print "Starting TOPClock\n"))
+;;;; starting and stopping ;;;;;;;
 
-;; start clock sync
-;; all clients (including master)
-;; will run this loop
-(topclock-sync 0)
+;; everything above this point is inert: the UDP port isn't bound and no
+;; callback loop is running until topclock-start is called.
+
+(define topclock-start
+  (lambda ()
+    (if *topclock-running*
+        #f
+        (begin
+          (set! *topclock-running* #t)
+          ;; give ourselves a second of breathing room before the first
+          ;; election, measured from the start rather than from load
+          (set! *topclock-lastmsg* (+ 1. (clock:clock)))
+          ;; osc receiver (for both client and server)
+          (io:osc:start-server *topclock-port* "topclock-receive")
+          ;; send doubles for OSC real nums
+          (io:osc:set-real-64bit? #t)
+          ;; have OSC emit both source IP and PORT
+          (io:osc:netaddress? #t)
+          (print-with-colors 'magenta 'default #f
+                             (print "Starting TOPClock\n"))
+          ;; all clients (including the master) run this loop
+          (topclock-sync 0)
+          #t))))
+
+;; stop the sync loop (the OSC server keeps its port; call
+;; io:osc:start-server again on a different port to move it)
+(define topclock-stop
+  (lambda ()
+    (set! *topclock-running* #f)
+    (set! *topclock-master* #f)))
+
+;; loading this file joins the topclock network. Define *topclock-autostart* as
+;; #f beforehand to get the definitions without binding the UDP port --- the or
+;; short-circuits, so the symbol is only read when it exists.
+(if (or (not (defined? '*topclock-autostart*))
+        *topclock-autostart*)
+    (topclock-start))
