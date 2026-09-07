@@ -1082,7 +1082,6 @@
                  (xtc:cache:genericfunc-apply-macros (cdr ast))))
           (else ast))))
 
-(define *xtc:cache:genericfunc-num-list* '())
 
 (define xtc:cache:register-new-genericfunc
   (lambda (code)
@@ -1105,8 +1104,6 @@
           (xtc:diagnostics:print-compiler-error "generic functions must supply type"))
       (let* ((res (xtc:desugar:split-namedfunc (cadr code))) ;;(regex:type-split (symbol->string (cadr code)) ":"))
              (name (string->symbol (car res)))
-             (numl (assoc-strcmp (car res) *xtc:cache:genericfunc-num-list*))
-             ;; (num (if numl (cdr numl) *xtc:cache:generic-count*))
              (num *xtc:cache:generic-count*)
              ;; (ftype (string->symbol (cadr res))))
              (type (cadr res))
@@ -1165,8 +1162,6 @@
                                                  (xtc:codegen:get-pretty-closure-arg-strings (symbol->string newtype))
                                                  (xtc:codegen:get-pretty-closure-arg-strings (symbol->string (caddr x)))))))
                                 entries)))
-          (if (= num *xtc:cache:generic-count*)
-              (set! *xtc:cache:genericfunc-num-list* (cons (cons name-str *xtc:cache:generic-count*) *xtc:cache:genericfunc-num-list*)))
           (if (not (null? v))
               (set-cdr! (car v) (list arity newtype newcode newtypematch type-constraint))
               (hashtable-set! *xtc:cache:genericfunc-cache* name-str
@@ -1400,8 +1395,6 @@
               ;;                      (println k))
               ;;                    weights))
               ;; (println 'best: w ': (length weights) '-> (assoc w weights))
-              (if (> (length (or (assoc-strcmp-all w weights) '())) 1)
-                  (xtc:diagnostics:print-compiler-error (string-append "ambiguous generic overload " (symbol->string name) " -> " (symbol->string type))))
               (cdddr (assoc w weights))))))))
 
 (define xtc:cache:genericfunc-pretty-print

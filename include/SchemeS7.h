@@ -40,7 +40,6 @@ void new_slot_in_env(scheme* sc, pointer variable, pointer value);
 pointer reverse(scheme* sc, pointer a);
 pointer reverse_in_place(scheme* sc, pointer term, pointer list);
 pointer append(scheme* sc, pointer a, pointer b);
-pointer assoc_strcmp(scheme* sc, pointer key, pointer alist, bool all = false);
 
 EXPORT char* string_value(pointer p);
 EXPORT pointer list_ref(scheme* sc, int pos, pointer a);

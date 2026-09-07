@@ -444,42 +444,6 @@ pointer append(scheme* sc, pointer a, pointer b) {
     return s7_append(sc->sc, a, b);
 }
 
-pointer assoc_strcmp(scheme* sc, pointer key, pointer alist, bool all) {
-    if (!s7_is_string(key) && !s7_is_symbol(key))
-        return sc->F;
-    const char* key_str = s7_is_string(key) ? s7_string(key) : s7_symbol_name(key);
-
-    pointer result = sc->NIL;
-
-    for (pointer p = alist; s7_is_pair(p); p = s7_cdr(p)) {
-        pointer entry = s7_car(p);
-        if (!s7_is_pair(entry))
-            continue;
-        pointer ekey = s7_car(entry);
-        const char* ekey_str = nullptr;
-        if (s7_is_symbol(ekey))
-            ekey_str = s7_symbol_name(ekey);
-        else if (s7_is_string(ekey))
-            ekey_str = s7_string(ekey);
-        else
-            continue;
-
-        if (strcmp(key_str, ekey_str) != 0)
-            continue;
-        if (!all)
-            return entry;
-        // s7_cons can trigger GC before it stores its arguments, and the GC
-        // cannot see C-frame locals: the list built so far has to be protected
-        // across each cons.  entry stays reachable through alist.
-        EnvInjector injector(sc, result);
-        result = s7_cons(sc->sc, entry, result);
-    }
-    if (result == sc->NIL) {
-        return sc->F;
-    }
-    EnvInjector injector(sc, result);
-    return s7_reverse(sc->sc, result);
-}
 
 pointer _cons(scheme* sc, pointer a, pointer b, int immutable) {
     pointer p = s7_cons(sc->sc, a, b);

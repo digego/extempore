@@ -706,14 +706,14 @@
                                 ">")))
          (docstring (if (string? (car (reverse args))) (car (reverse args)) ""))
          (extras (cl:remove #f (map (lambda (x) (if (pair? x) x #f)) args)))
-         (printer? (if (assoc-strcmp 'printer? extras)
-                       (cdr (assoc-strcmp 'printer? extras))
+         (printer? (if (assq 'printer? extras)
+                       (cdr (assq 'printer? extras))
                        #t))
-         (copy? (if (assoc-strcmp 'copy? extras)
-                    (cdr (assoc-strcmp 'copy? extras))
+         (copy? (if (assq 'copy? extras)
+                    (cdr (assq 'copy? extras))
                     #t))
-         (constructor? (if (assoc-strcmp 'constructor? extras)
-                           (cdr (assoc-strcmp 'constructor? extras))
+         (constructor? (if (assq 'constructor? extras)
+                           (cdr (assq 'constructor? extras))
                            #t)))
     (if (not (char=? (string-ref (symbol->string type_1) (- (string-length (symbol->string type_1)) 1)) #\>))
         (xtc:diagnostics:print-bad-type-error type_1 "is a malformed tuple type"))
@@ -1462,7 +1462,6 @@ e.g.
           (set! *xtc:codegen:sym-name-stack* '())
           (set! *xtc:codegen:ls_var* '())
           (set! *xtc:globals:bound-lambdas* '())
-          (set! *xtc:desugar:generic-type-mappings* '())
           (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
             (eval `(bind-func xtlang_expression
                     (lambda ()
@@ -1491,7 +1490,6 @@ e.g.
           (set! *xtc:codegen:sym-name-stack* '())
           (set! *xtc:codegen:ls_var* '())
           (set! *xtc:globals:bound-lambdas* '())
-          (set! *xtc:desugar:generic-type-mappings* '())
           (let ((type (xtc:bind:get-expression-type (car (reverse expr)))))
             (eval `(bind-func xtlang_expression
                     (lambda ()
@@ -1753,21 +1751,21 @@ e.g.
                         "generic type"
                         "type alias"
                         "builtin")))
-      (let ((lpos (cl:position (cdr (assoc-strcmp 'category left)) categories))
-            (rpos (cl:position (cdr (assoc-strcmp 'category right)) categories)))
+      (let ((lpos (cl:position (cdr (assq 'category left)) categories))
+            (rpos (cl:position (cdr (assq 'category right)) categories)))
         (if (<> lpos rpos)
             (< lpos rpos)
-            (string<? (cdr (assoc-strcmp 'name left))
-                      (cdr (assoc-strcmp 'name right))))))))
+            (string<? (cdr (assq 'name left))
+                      (cdr (assq 'name right))))))))
 
 (define xtmdoc-clean-nativefunc-alist
   (lambda (closure-alists nativefunc-alists)
     (cl:remove-if
       (lambda (nativefunc-data)
-        (let ((nativefunc-name (cdr (assoc-strcmp 'name nativefunc-data))))
+        (let ((nativefunc-name (cdr (assq 'name nativefunc-data))))
           (cl:find-if (lambda (closure-data)
                         ;; is it a closure?
-                        (string=? (cdr (assoc-strcmp 'name closure-data)) nativefunc-name))
+                        (string=? (cdr (assq 'name closure-data)) nativefunc-name))
                       closure-alists)))
       nativefunc-alists)))
 
@@ -1800,7 +1798,7 @@ e.g.
       ;; filter out the things which shouldn't make it to the exported docs
       (cl:remove-if
         (lambda (doc-alist)
-          (regex:match? (cdr (assoc-strcmp 'name doc-alist))
+          (regex:match? (cdr (assq 'name doc-alist))
                         "(_setter$|_scheme$|_native$|_maker$|_getter$|_callback$|_poly_)"))
         all-doc-alists))))
 
@@ -1808,11 +1806,11 @@ e.g.
 ;; cases to handle
 (define xtmdoc-write-alist-args-as-json
   (lambda (xtmdoc-alist file-port)
-    ;; (println (cdr (assoc-strcmp 'name xtmdoc-alist)))
+    ;; (println (cdr (assq 'name xtmdoc-alist)))
     (display ",\n  \"args\": " file-port)
-    (let ((category (cdr (assoc-strcmp 'category xtmdoc-alist)))
-          (args (cdr (assoc-strcmp 'args xtmdoc-alist)))
-          (type (cdr (assoc-strcmp 'type xtmdoc-alist))))
+    (let ((category (cdr (assq 'category xtmdoc-alist)))
+          (args (cdr (assq 'args xtmdoc-alist)))
+          (type (cdr (assq 'type xtmdoc-alist))))
       ;; arg names and types
       (cond
         ((member category '("closure" "generic closure"))
@@ -1875,15 +1873,15 @@ e.g.
 (define xtmdoc-write-alist-as-json
   (lambda (xtmdoc-alist file-port)
     (display "{\n  \"category\": " file-port)
-    (write (cdr (assoc-strcmp 'category xtmdoc-alist)) file-port)
+    (write (cdr (assq 'category xtmdoc-alist)) file-port)
     (display ",\n  \"name\": " file-port)
-    (write (cdr (assoc-strcmp 'name xtmdoc-alist)) file-port)
+    (write (cdr (assq 'name xtmdoc-alist)) file-port)
     (xtmdoc-write-alist-args-as-json xtmdoc-alist file-port)
     (display ",\n  \"type\": " file-port)
-    (let ((type (cdr (assoc-strcmp 'type xtmdoc-alist))))
+    (let ((type (cdr (assq 'type xtmdoc-alist))))
       (write (if (null? type) 'null type) file-port))
     (display ",\n  \"docstring\": " file-port)
-    (let ((docstring (cdr (assoc-strcmp 'docstring xtmdoc-alist))))
+    (let ((docstring (cdr (assq 'docstring xtmdoc-alist))))
       (write (if (null? docstring) 'null docstring) file-port))
     (display "\n}" file-port)))
 
