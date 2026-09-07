@@ -1,0 +1,26 @@
+;;; tests/compiler/static.xtm -- bind-func static rejects a closure body
+
+;; A static function's body must be a bare lambda: a let wrapping one would
+;; need a closure environment. The check has to see past a docstring and a
+;; zone size to the body, or a static with a zone size fell into a raw s7
+;; caadr error instead of the diagnostic.
+
+(sys:load "libs/core/test.xtm")
+
+(xtmtest-compile-fails (bind-func static static_let (let ((k 1)) (lambda (x:i64) (+ x k)))))
+(xtmtest-compile-fails (bind-func static static_let_doc "doc" (let ((k 1)) (lambda (x:i64) (+ x k)))))
+(xtmtest-compile-fails (bind-func static static_let_zone 1024 (let ((k 1)) (lambda (x:i64) (+ x k)))))
+(xtmtest-compile-fails (bind-func static static_let_both 1024 "doc" (let ((k 1)) (lambda (x:i64) (+ x k)))))
+
+;; a rejected static leaves nothing behind
+(xtmtest-result (xtc:cache:closure-exists? "static_let") #f "rejected-static-not-registered")
+
+;; the same shapes with a plain lambda body compile and run
+(xtmtest-compile (bind-func static static_ok (lambda (x:i64) (+ x 1))))
+(xtmtest-result (static_ok 1) 2 "static-plain")
+(xtmtest-compile (bind-func static static_ok_doc "doc" (lambda (x:i64) (+ x 2))))
+(xtmtest-result (static_ok_doc 1) 3 "static-docstring")
+(xtmtest-compile (bind-func static static_ok_zone 1024 (lambda (x:i64) (+ x 3))))
+(xtmtest-result (static_ok_zone 1) 4 "static-zone-size")
+(xtmtest-compile (bind-func static static_ok_both 1024 "doc" (lambda (x:i64) (+ x 4))))
+(xtmtest-result (static_ok_both 1) 5 "static-zone-size-and-docstring")

@@ -186,11 +186,12 @@
                          ": an xtlang function name may only contain letters, digits and - $ . _")))))
 
 (define-macro (bind-static . args)
-  (if (string? (cadr args))
-      (if (not (equal? (caaddr args) 'lambda))
-          (xtc:diagnostics:print-compiler-error "static functions cannot be closures!"))
-      (if (not (equal? (caadr args) 'lambda))
-          (xtc:diagnostics:print-compiler-error "static functions cannot be closures!")))
+  ;; the body is always in last position, whatever zone size or docstring
+  ;; precedes it, and a static function has no environment to close over
+  (let ((body (car (reverse args))))
+    (if (not (and (pair? body) (equal? (car body) 'lambda)))
+        (xtc:diagnostics:print-compiler-error
+          "static functions cannot be closures: the body must be a lambda" body)))
   ;; if aot and func already exists then bomb out
   (if (and (output-port? *xtc:aot:current-output-port*)
            (xtc:cache:closure-exists? (symbol->string (car args))))
@@ -211,9 +212,10 @@
         (xtc:bind:check-closure-name func-name)
         (if (member func-name *xtc:globals:reserved-keywords*)
             (xtc:diagnostics:print-error (string-append func-name " is a reserved keyword")))
-        ;; strip docstring
+        ;; strip docstring, zone size and poly flag: define-static takes the
+        ;; name, any type annotations and the body
         (set! args (cl:remove-if string? args))
-        ;; strip poly
+        (set! args (cl:remove-if number? args))
         (set! args (cl:remove-if boolean? args))
         (if (xtc:cache:polyfunc-exists? (car args))
             (xtc:diagnostics:print-already-bound-error (car args) " static function"))
