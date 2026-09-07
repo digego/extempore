@@ -33,7 +33,7 @@
  *
  */
 
-#include <iostream>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 
@@ -50,18 +50,36 @@
 #include <pthread.h>
 #endif
 
-// #define _EXTTHREAD_DEBUG_
-
 namespace extemp {
 
 thread_local EXTThread* EXTThread::sm_current = nullptr;
 
 EXTThread::~EXTThread() {
-#ifdef _EXTTHREAD_DEBUG_
-    if (m_initialised && !m_detached && !m_joined) {
-        printf("Resource leak destroying EXTThread: creator has not joined nor detached thread.\n");
+    m_stopSource.request_stop();
+    if (m_thread.joinable()) {
+        m_thread.join();
+    }
+}
+
+// Body of the thread: names it, publishes it as the active thread, then runs
+// the user entry point. Runs on m_thread, or on the caller when subsumed.
+void* EXTThread::run() {
+#ifdef _WIN32
+    m_nativeHandle = GetCurrentThread();
+#else
+    m_nativeHandle = pthread_self();
+#endif
+#ifdef __APPLE__  // apple requires pthread_setname_np in current thread
+    if (!m_name.empty()) {
+        pthread_setname_np(m_name.c_str());
+    }
+#elif __linux__
+    if (!m_name.empty()) {
+        pthread_setname_np(pthread_self(), m_name.c_str());
     }
 #endif
+    sm_current = this;
+    return m_function(m_arg);
 }
 
 int EXTThread::start(function_type EntryPoint, void* Arg) {
@@ -71,85 +89,49 @@ int EXTThread::start(function_type EntryPoint, void* Arg) {
     if (Arg) {
         m_arg = Arg;
     }
-    int result = 0;
-    if (!m_initialised && !m_subsume) {
-        std::function<void*()> fn = [this]() -> void* { return Trampoline(this); };
-        m_thread = std::thread(fn);
-#ifdef __linux__
-        if (!m_name.empty()) {
-            pthread_setname_np(m_thread.native_handle(), m_name.c_str());
-        }
-#endif
-        m_initialised = true;
+    if (m_started) {
+        return EINVAL;
     }
-    if (m_subsume && !m_initialised) {
-        m_initialised = true;
-#ifdef __linux__
-        if (!m_name.empty()) {
-            pthread_setname_np(pthread_self(), m_name.c_str());
-        }
-#endif
-        // Trampoline here never returns!
-        Trampoline(this);
+    m_started = true;
+    if (m_subsume) {
+        run();  // never returns for the process threads that subsume main
+        return 0;
     }
-#ifdef _EXTTHREAD_DEBUG_
-    if (result) {
-        printf("Error creating thread: %d\n", result);
-    }
-#endif
-    return result;
+    m_thread = std::jthread([this] { run(); });
+    return 0;
 }
 
 int EXTThread::kill() {
-    // Cooperative cancellation: request the thread stop and let it unwind
-    // cleanly at its next stopRequested() check. (Previously pthread_cancel,
-    // which is undefined behaviour with C++ RAII/locks and was a silent no-op
-    // on Windows anyway.)
-    m_stopRequested.store(true, std::memory_order_relaxed);
+    m_stopSource.request_stop();
     return 0;
 }
 
 int EXTThread::detach() {
-    int result = 22;  // EINVAL;
-    if (m_initialised) {
-        m_thread.detach();
-        result = 0;
-        m_detached = !result;
+    if (!m_thread.joinable()) {
+        return EINVAL;
     }
-#ifdef _EXTTHREAD_DEBUG_
-    if (result) {
-        printf("Error detaching thread: %d\n", result);
-    }
-#endif
-    return result;
+    m_thread.detach();
+    return 0;
 }
 
 int EXTThread::join() {
-    int result = 22;  // EINVAL;
-    if (m_initialised) {
-        m_thread.join();
-        result = 0;
-        m_joined = !result;
+    if (!m_thread.joinable()) {
+        return EINVAL;
     }
-#ifdef _EXTTHREAD_DEBUG_
-    if (result) {
-        printf("Error joining thread: %d\n", result);
-    }
-#endif
-    return result;
+    m_thread.join();
+    return 0;
 }
 
 int EXTThread::setPriority(int Priority, bool Realtime) {
-    auto thread = m_thread.native_handle();
 #ifdef __linux__
     sched_param param;
     int policy;
-    pthread_getschedparam(thread, &policy, &param);
+    pthread_getschedparam(m_nativeHandle, &policy, &param);
     param.sched_priority = Priority;
     if (Realtime) {  // for realtime threads, use SCHED_RR policy
         policy = SCHED_RR;
     }
-    int result = pthread_setschedparam(thread, policy, &param);
+    int result = pthread_setschedparam(m_nativeHandle, policy, &param);
     if (result) {
         printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
@@ -163,8 +145,9 @@ int EXTThread::setPriority(int Priority, bool Realtime) {
     ttcpolicy.computation = uint32_t(UNIV::SAMPLE_RATE / 143);  // HZ/3300;
     ttcpolicy.constraint = uint32_t(UNIV::SAMPLE_RATE / 143);   // HZ/2200;
     ttcpolicy.preemptible = 1;                                  // 1
-    result = thread_policy_set(pthread_mach_thread_np(thread), THREAD_TIME_CONSTRAINT_POLICY,
-                               (thread_policy_t)&ttcpolicy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+    result =
+        thread_policy_set(pthread_mach_thread_np(m_nativeHandle), THREAD_TIME_CONSTRAINT_POLICY,
+                          (thread_policy_t)&ttcpolicy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
     if (result != KERN_SUCCESS) {
         printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;
@@ -180,10 +163,9 @@ int EXTThread::getPriority() {
 #ifdef __linux__
     int policy;
     sched_param param;
-    pthread_getschedparam(m_thread.native_handle(), &policy, &param);
+    pthread_getschedparam(m_nativeHandle, &policy, &param);
     return param.sched_priority;
 #endif
-    // fprintf(stderr, "Error: thread priority only available Linux\n");
     return 0;
 }
 
