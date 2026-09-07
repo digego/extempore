@@ -967,23 +967,32 @@
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
 
-;; remap xtc:codegen:poly-print-all
+;; print "HEADING NAME" then one "  name:type" line per candidate --- the
+;; shared body of the polyfunc, genericfunc and polytype pretty-printers.
+;; ENTRIES is a list of (name . pretty-type) pairs.
+(define xtc:cache:pretty-print-candidates
+  (lambda (heading name entries)
+    (print heading)
+    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
+    (println)
+    (for-each (lambda (entry)
+                (print "  ")
+                (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print (car entry)))
+                (print ":")
+                (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (cdr entry)))
+                (println))
+              entries)))
+
 (define xtc:cache:polyfunc-pretty-print
   (lambda (polyfunc-name)
     (let ((candidates (xtc:cache:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
-           (begin
-             (print "Polymorphic options for ")
-             (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print polyfunc-name))
-             (println)
-             (for-each (lambda (func-vector)
-                         ;; perhaps this should (regex:split (vector-ref func-vector 0) "_poly_") to clean the generic ones up a bit?
-                         (print "  ")
-                         (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print (vector-ref func-vector 0)))
-                         (print ":")
-                         (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
-                         (println))
-                       candidates))))))
+           (xtc:cache:pretty-print-candidates
+             "Polymorphic options for " polyfunc-name
+             (map (lambda (func-vector)
+                    (cons (vector-ref func-vector 0)
+                          (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
+                  candidates))))))
 
 ;; takes a polyname and a type, and returns the (first)
 ;; poly'd over function with that type
@@ -1404,18 +1413,9 @@
             (print "No generic specialisations found for ")
             (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
             (println))
-          (begin
-            (print "Generic specialisations for ")
-            (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
-            (println)
-            (for-each (lambda (gf-list)
-                        ;; perhaps this should (regex:split (vector-ref gf-list 0) "_poly_") to clean the generic ones up a bit?
-                        (print "  ")
-                        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print (car gf-list)))
-                        (print ":")
-                        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (caddr gf-list)))
-                        (println))
-                      candidates))))
+          (xtc:cache:pretty-print-candidates
+            "Generic specialisations for " name
+            (map (lambda (gf-list) (cons (car gf-list) (caddr gf-list))) candidates))))
     #t))
 
 ;;;;;;;;;;;;;;;;;;;;
@@ -1475,23 +1475,16 @@
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
 
-;; remap xtc:codegen:poly-print-all
 (define xtc:cache:polytype-pretty-print
   (lambda (polytype-name)
     (let ((candidates (xtc:cache:get-polytype-candidate-list polytype-name)))
       (and candidates
-           (begin
-             (print "Polymorphic types for ")
-             (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print polytype-name))
-             (println)
-             (for-each (lambda (func-vector)
-                         ;; perhaps this should (regex:split (vector-ref func-vector 0) "_poly_") to clean the generic ones up a bit?
-                         (print "  ")
-                         (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print (vector-ref func-vector 0)))
-                         (print ": ")
-                         (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
-                         (println))
-                       candidates))))))
+           (xtc:cache:pretty-print-candidates
+             "Polymorphic types for " polytype-name
+             (map (lambda (func-vector)
+                    (cons (vector-ref func-vector 0)
+                          (xtc:codegen:pretty-print-type (vector-ref func-vector 1))))
+                  candidates))))))
 
 ;;;;;;;;;;;;;;;;
 ;; generic types

@@ -124,6 +124,41 @@
           (set! newast (xtc:typecheck:add-types-to-source symname t5 (cl:tree-copy types) (list))))
       (list types newast symname symname-string))))
 
+;; The IR for a thunk that loads the closure from its global slot and calls
+;; it with the thunk's own arguments. SUFFIX and CC distinguish the fastcc
+;; stub, called from other xtlang code, from the ccc _native entry point,
+;; called from C.
+(define xtc:driver:emit-thunk-ir
+  (lambda (symname-string suffix cc stub-type closure-type closure-type--)
+    (let* ((rettype (xtc:codegen:get-type-str (car stub-type)))
+           (argtypes (cdr stub-type))
+           (argnames (make-list-with-proc (length argtypes)
+                                          (lambda (i) (string-append "%arg_" (atom->string i)))))
+           (ftype (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")))
+      (string-append "define dllexport " cc " " rettype " @" symname-string suffix "("
+                     (string-join (map (lambda (t n) (string-append (xtc:codegen:get-type-str t) " " n))
+                                       argtypes argnames)
+                                  ",")
+                     ") alwaysinline nounwind \n"
+                     "{\nentry:\n"
+                     "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
+                     "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
+                     "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
+                     "%ptrvar = load i8*, i8** %ptr\n"
+                     "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
+                     "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
+                     "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
+                     "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
+                     "%ff = load " ftype ", " ftype "* %fPtr\n"
+                     "%ee = load i8*, i8** %ePtr\n"
+                     (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
+                     "call fastcc " rettype " %ff(i8* %_zonei8, i8* %ee"
+                     (apply string-append (map (lambda (t n) (string-append ", " (xtc:codegen:get-type-str t) " " n))
+                                               argtypes argnames))
+                     ")\nret " rettype
+                     (if (xtc:codegen:void? (car stub-type)) "\n" " %result\n")
+                     "}\n\n"))))
+
 (define xtc:driver:run
   (lambda (symname code zone-size poly static . args)
     (xtc:driver:clear-pipeline-state)
@@ -471,78 +506,10 @@
 
                                                                     "ret i8* %res\n"
                                                                     "}\n\n")))
-                 (stub-ir (string-append "define dllexport fastcc " (xtc:codegen:get-type-str (car stub-type))
-                                         " @" (string-append symname-string "("
-                                                             (apply string-append (map (lambda (t n c)
-                                                                                         (string-append c (xtc:codegen:get-type-str t) " "
-                                                                                                        n))
-                                                                                       (cdr stub-type)
-                                                                                       (make-list-with-proc (length (cdr stub-type))
-                                                                                                            (lambda (i) (string-append "%arg_" (atom->string i))))
-                                                                                       (cons "" (make-list (length (cdr stub-type)) ","))))
-                                                             ") alwaysinline nounwind \n"
-                                                             "{\nentry:\n"
-                                                             "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                             "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
-                                                             "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                             "%ptrvar = load i8*, i8** %ptr\n"
-                                                             "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                             "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                             "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                             "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
-                                                             "%ff = load "
-                                                             (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
-                                                             (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
-                                                             "* %fPtr\n"
-                                                             "%ee = load i8*, i8** %ePtr\n"
-                                                             (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                             "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
-                                                             (apply string-append (map (lambda (t n)
-                                                                                         (string-append ", "
-                                                                                                        (xtc:codegen:get-type-str t)
-                                                                                                        " " n))
-                                                                                       (cdr stub-type)
-                                                                                       (make-list-with-proc (length (cdr stub-type))
-                                                                                                            (lambda (i) (string-append "%arg_" (atom->string i))))))
-                                                             ")\nret " (xtc:codegen:get-type-str (car stub-type))
-                                                             (if (xtc:codegen:void? (car stub-type)) "\n" " %result\n")
-                                                             "}\n\n")))
-                 (native-ir (string-append "define dllexport ccc " (xtc:codegen:get-type-str (car stub-type))
-                                           " @" (string-append symname-string "_native("
-                                                               (apply string-append (map (lambda (t n c)
-                                                                                           (string-append c (xtc:codegen:get-type-str t) " "
-                                                                                                          n))
-                                                                                         (cdr stub-type)
-                                                                                         (make-list-with-proc (length (cdr stub-type))
-                                                                                                              (lambda (i) (string-append "%arg_" (atom->string i))))
-                                                                                         (cons "" (make-list (length (cdr stub-type)) ","))))
-                                                               ") alwaysinline nounwind \n"
-                                                               "{\nentry:\n"
-                                                               "%_zone = call ccc %mzone* @llvm_peek_zone_stack()\n"
-                                                               "%_zonei8 = bitcast %mzone* %_zone to i8*\n"
-                                                               "%ptr = getelementptr [1 x i8*], [1 x i8*]* @" symname-string "_var, i32 0, i32 0\n"
-                                                               "%ptrvar = load i8*, i8** %ptr\n"
-                                                               "%closure_tmp = bitcast i8* %ptrvar to " closure-type "\n"
-                                                               "%closure = load " closure-type-- ", " closure-type " %closure_tmp \n"
-                                                               "%fPtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 2\n"
-                                                               "%ePtr = getelementptr " (xtc:codegen:strip-ptr-depth closure-type--) ", " closure-type-- " %closure, i32 0, i32 1\n"
-                                                               "%ff = load "
-                                                               (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1") ", "
-                                                               (regex:replace closure-type-- "\\{ ?i8\\*, ?i8\\*,(.*)\\}\\*" "$1")
-                                                               "* %fPtr\n"
-                                                               "%ee = load i8*, i8** %ePtr\n"
-                                                               (if (xtc:codegen:void? (car stub-type)) "" "%result = ")
-                                                               "call fastcc " (xtc:codegen:get-type-str (car stub-type)) " %ff(i8* %_zonei8, i8* %ee"
-                                                               (apply string-append (map (lambda (t n)
-                                                                                           (string-append ", "
-                                                                                                          (xtc:codegen:get-type-str t)
-                                                                                                          " " n))
-                                                                                         (cdr stub-type)
-                                                                                         (make-list-with-proc (length (cdr stub-type))
-                                                                                                              (lambda (i) (string-append "%arg_" (atom->string i))))))
-                                                               ")\nret " (xtc:codegen:get-type-str (car stub-type))
-                                                               (if (xtc:codegen:void? (car stub-type)) "\n" " %result\n")
-                                                               "}\n\n"))))
+                 (stub-ir (xtc:driver:emit-thunk-ir symname-string "" "fastcc"
+                                                    stub-type closure-type closure-type--))
+                 (native-ir (xtc:driver:emit-thunk-ir symname-string "_native" "ccc"
+                                                      stub-type closure-type closure-type--)))
             (if *xtc:globals:print*
                 (println '------------------------------compiling 'maker----------------------------------->))
             (if *xtc:globals:print* (print-full-nq maker-ir))

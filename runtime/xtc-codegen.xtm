@@ -60,9 +60,14 @@
                  (res (llvm:jit-compile-ir-string ir-to-compile)))
             (xtc:codegen:reset-jit-compilation-queue)
             (if (not res)
-                (begin
+                ;; the queue can hold a whole library's IR, so show the head
+                (let* ((lines (regex:split ir-to-compile "\n"))
+                       (limit 40)
+                       (shown (if (> (length lines) limit) (list-head lines limit) lines)))
                   (print "FLUSH FAILED. IR was:\n")
-                  (print-full-nq ir-to-compile)))
+                  (print-full-nq (string-join shown "\n"))
+                  (if (> (length lines) limit)
+                      (print (string-append "\n... " (number->string (- (length lines) limit)) " more lines\n")))))
             res)
           #t))))
 
