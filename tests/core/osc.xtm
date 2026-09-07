@@ -1,0 +1,65 @@
+;;; osc.xtm -- tests for the OSC server
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Real UDP round trips through an OSC server on localhost. The receive path
+;; turns a packet into Scheme source text that the interpreter then evaluates,
+;; so these tests care about two things: that arguments survive the trip
+;; unmangled, and that a packet crafted to close the string literal and open a
+;; form of its own does not run.
+
+;;; Code:
+
+(io:osc:start-server 17755 "osc-test-receive")
+
+(define *osc-test-received* '())
+(define *osc-test-injected* #f)
+
+(define (osc-test-receive timestamp address . args)
+  (set! *osc-test-received* (cons address args)))
+
+(define *osc-test-addy* (cons "127.0.0.1" 17755))
+
+;; half a second is ample for a loopback datagram plus the queued eval; sleeping
+;; (rather than spinning) hands the interpreter back so the queued form runs
+(define (osc-test-settle)
+  (sys:sleep (* 0.5 *second*)))
+
+;; a string argument carrying the characters that matter to the Scheme reader
+
+(io:osc:send (now) *osc-test-addy* "/xtm/test"
+             "quote:\" backslash:\\ paren:) end" 42 6.5)
+(osc-test-settle)
+
+(xtmtest-result *osc-test-received*
+                (list "/xtm/test" "quote:\" backslash:\\ paren:) end" 42 6.5)
+                "osc-round-trip")
+
+;; an argument that closes the literal with a backslash-escaped backslash and
+;; then opens a form: it must arrive as data, byte for byte
+
+(set! *osc-test-received* '())
+(io:osc:send (now) *osc-test-addy* "/xtm/inject"
+             "\\\") (set! *osc-test-injected* #t) (\"")
+(osc-test-settle)
+
+(xtmtest-result *osc-test-received*
+                (list "/xtm/inject" "\\\") (set! *osc-test-injected* #t) (\"")
+                "osc-injection-arg-is-data")
+
+;; the same payload in the address, which is not a valid OSC address: the
+;; message is dropped rather than dispatched
+
+(set! *osc-test-received* '())
+(io:osc:send (now) *osc-test-addy*
+             "/x\") (set! *osc-test-injected* #t) (\"" 1)
+(osc-test-settle)
+
+(xtmtest-result *osc-test-received* '() "osc-hostile-address-dropped")
+
+;; nothing above should have evaluated anything the packets carried
+
+(xtmtest-result *osc-test-injected* #f "osc-no-injection")

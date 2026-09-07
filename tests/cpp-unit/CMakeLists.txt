@@ -1,6 +1,7 @@
 add_executable(extempore_cpp_unit
     univ_test.cpp
-    netutil_test.cpp)
+    netutil_test.cpp
+    osc_test.cpp)
 
 target_link_libraries(extempore_cpp_unit PRIVATE
     gtest_main)

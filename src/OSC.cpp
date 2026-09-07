@@ -36,8 +36,9 @@
 #include "OSC.h"
 #include "SchemeProcess.h"
 #include "ext/NetUtil.h"
+#include "ext/OscText.h"
 #include <string>
-#include <iomanip>
+#include <string_view>
 #include <sstream>
 #include <cmath>
 #include <algorithm>
@@ -171,55 +172,69 @@ static double osc_ntp_to_seconds(uint64_t timetag) {
     return static_cast<double>(seconds) + static_cast<double>(fractional) / 4294967296.0;
 }
 
-// Backslash-escape double quotes so a string can be embedded in the Scheme
-// expression handed to the interpreter.
-static void osc_escape_quotes(std::string& str) {
-    for (unsigned i = 0; i < str.length(); i++) {
-        if (str.at(i) == '"') {
-            if (i == 0 || str.at(i - 1) != '\\') {
-                str.insert(i, "\\");
-                i++;
-            }
-        }
-    }
-}
-
-// Build the Scheme call string for one parsed message and queue it. Argument
-// reads go through oscpp's bounds-checked stream, so a truncated argument throws
-// and the message is dropped by the caller.
+// Build the Scheme call string for one parsed message and queue it.
+//
+// Everything appended here becomes source text that the interpreter will
+// evaluate, so no packet-derived byte may reach it unescaped: the address is
+// checked against the OSC charset (and dropped if it fails), strings go out as
+// escaped Scheme string literals, and numbers are formatted from their binary
+// values. Argument reads go through oscpp's bounds-checked stream, so a
+// truncated argument throws and the message is dropped by the caller.
 static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, double t,
                                     const char* address, OSCPP::Server::ArgStream argv,
                                     bool include_netaddr, const std::string& netaddy, int netport) {
-    std::stringstream ss;
-    ss << "(" << fname << " " << std::fixed << std::showpoint << std::setprecision(23) << t << " \""
-       << address << "\"";
-    if (include_netaddr)
-        ss << " \"" << netaddy << "\" " << netport;
+    if (!osc_text::address_is_valid(address)) {
+        return;
+    }
+    std::string form("(");
+    form += fname;
+    form += " ";
+    form += osc_text::scheme_real_literal(t);
+    form += " ";
+    form += osc_text::scheme_string_literal(address);
+    if (include_netaddr) {
+        form += " ";
+        form += osc_text::scheme_string_literal(netaddy);
+        form += " ";
+        form += std::to_string(netport);
+    }
     auto streams = argv.state();
     auto tags = std::get<0>(streams);
     auto args = std::get<1>(streams);
+    int depth = 0;  // nesting of OSC array type tags, emitted as Scheme lists
     while (!tags.atEnd()) {
         switch (tags.getChar()) {
-            case 'i': ss << " " << args.getInt32(); break;
-            case 'f': ss << " " << args.getFloat32(); break;
-            case 'd': ss << " " << args.getFloat64(); break;
-            case 'h': ss << " " << static_cast<int64_t>(args.getUInt64()); break;
-            case 't': ss << " " << osc_ntp_to_seconds(args.getUInt64()); break;
-            case 's': {
-                std::string s(args.getString());
-                osc_escape_quotes(s);
-                ss << " \"" << s << "\"";
+            case 'i': form += " " + std::to_string(args.getInt32()); break;
+            case 'f': form += " " + osc_text::scheme_real_literal(args.getFloat32()); break;
+            case 'd': form += " " + osc_text::scheme_real_literal(args.getFloat64()); break;
+            case 'h': form += " " + std::to_string(static_cast<int64_t>(args.getUInt64())); break;
+            case 't':
+                form += " " + osc_text::scheme_real_literal(osc_ntp_to_seconds(args.getUInt64()));
                 break;
-            }
-            case '[': ss << " (list "; break;
-            case ']': ss << ")"; break;
+            case 's':
+                form += " " + osc_text::scheme_string_literal(std::string_view(args.getString()));
+                break;
+            case '[':
+                form += " (list ";
+                ++depth;
+                break;
+            case ']':
+                if (--depth < 0) {
+                    return;  // unbalanced array tags: drop the message
+                }
+                form += ")";
+                break;
             default: return;  // unsupported type tag: drop the message
         }
     }
-    ss << ")";
-    if (proc != nullptr)
-        proc->createSchemeTask(new std::string(ss.str()), "OSC TASK",
+    if (depth != 0) {
+        return;  // unterminated array: drop rather than emit a broken form
+    }
+    form += ")";
+    if (proc != nullptr) {
+        proc->createSchemeTask(new std::string(std::move(form)), "OSC TASK",
                                SchemeTask::Type::LOCAL_PROCESS_STRING);
+    }
 }
 
 // Dispatch one parsed message to the native callback or the Scheme interpreter.
