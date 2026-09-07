@@ -45,16 +45,23 @@
 #include <cerrno>
 
 #include <sys/types.h>
-#include <sys/stat.h>
 
 #include <chrono>
 #include <thread>
+#include <vector>
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
+// Winsock's struct pollfd carries a SOCKET fd; WSAPoll is the poll(2) analogue.
+static int poll_sockets(std::vector<pollfd>& Fds) {
+    return WSAPoll(Fds.data(), ULONG(Fds.size()), -1);
+}
+static bool poll_interrupted() {
+    return false;
+}
 #else
 #include <sys/socket.h>
-#include <sys/select.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h> /* host to IP resolution       */
@@ -62,17 +69,17 @@
 static int closesocket(int Socket) {
     return close(Socket);
 }
+static int poll_sockets(std::vector<pollfd>& Fds) {
+    return poll(Fds.data(), nfds_t(Fds.size()), -1);
+}
+static bool poll_interrupted() {
+    return errno == EINTR;
+}
 #endif
 #include <cstdlib>
 #include "UNIV.h"
 
-#define EXT_INITEXPR_BUFLEN 1024
 static const char TERMINATION_CHAR = 23;
-
-// FD_COPY IS BSD ONLY
-#ifndef FD_COPY
-#define FD_COPY(f, t) static_cast<void>(*(t) = *(f))
-#endif
 
 namespace extemp {
 namespace EXTZones {
@@ -400,106 +407,113 @@ void* SchemeProcess::serverImpl() {
     while (!m_libsLoaded) {
         std::this_thread::sleep_for(std::chrono::microseconds(1000));
     }
-    fd_set readFds;
-    std::vector<SOCKET> clientSockets;
-    std::map<SOCKET, std::string> inStrings;
-    FD_ZERO(&readFds);                 // zero out open sockets
-    FD_SET(m_serverSocket, &readFds);  // add server socket to open sockets list
-    int numFds = int(m_serverSocket) + 1;
+    struct Client {
+        SOCKET fd;
+        std::string buffer;  // bytes received but not yet terminated by CRLF
+    };
+    std::vector<Client> clients;
+    std::vector<pollfd> fds;
+    constexpr size_t BUFLEN = 1024;
+    constexpr size_t MAX_PENDING = 10 * 1024 * 1024;
+    char buf[BUFLEN];
     while (m_running) {
-        fd_set curReadFds;
-        FD_COPY(&readFds, &curReadFds);
-        int res(select(numFds, &curReadFds, nullptr, nullptr, nullptr));
-        if (unlikely(res < 0)) {  // assumes only one failure
-            auto iter(clientSockets.begin());
-            for (; iter != clientSockets.end(); ++iter) {
-                struct stat buf;
-                if (fstat(int(*iter), &buf) < 0) {
-                    FD_CLR(*iter, &readFds);
-                    clientSockets.erase(iter);
-                    break;
-                }
+        // Level-triggered poll over the listening socket plus every client:
+        // fds[0] is the server, fds[i + 1] is clients[i].
+        fds.clear();
+        fds.push_back({m_serverSocket, POLLIN, 0});
+        for (const auto& client : clients) {
+            fds.push_back({client.fd, POLLIN, 0});
+        }
+        int res = poll_sockets(fds);
+        if (res < 0) [[unlikely]] {
+            if (poll_interrupted()) {
+                continue;
             }
             ascii_error();
             printf("%s SERVER ERROR: %s\n", m_name.c_str(), strerror(errno));
             ascii_normal();
+            // don't spin on a persistent failure
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-        if (unlikely(
-                FD_ISSET(m_serverSocket,
-                         &curReadFds))) {  // check if we have any new accepts on our server socket
+        if (fds[0].revents & POLLIN) [[unlikely]] {  // new connection on the server socket
             sockaddr_in client_address;
             socklen_t clientAddressSize(sizeof(client_address));
             auto sock(accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
                              &clientAddressSize));
-            if (unlikely(sock < 0)) {
+            if (sock == INVALID_SOCKET) [[unlikely]] {
                 std::cout << "Bad Accept in Server Socket Handling" << std::endl;
-                continue;  // continue on error
-            }
-            numFds = int(sock) + 1;
-            FD_SET(sock, &readFds);  // add new socket to the FD_SET
-            ascii_info();
-            printf("INFO:");
-            ascii_default();
-            std::cout << " server: accepted new connection to " << m_name << " process"
-                      << std::endl;
-            clientSockets.push_back(sock);
-            inStrings[sock].clear();
-            std::string outString;
-            if (m_banner) {
-                outString += sm_banner;
-                uint64_t time(UNIV::TIME);
-                auto hours(time / UNIV::HOUR());
-                time -= hours * UNIV::HOUR();
-                auto minutes(time / UNIV::MINUTE());
-                time -= minutes * UNIV::MINUTE();
-                auto seconds(time / UNIV::SECOND());
-                char prompt[64];
-                snprintf(prompt, sizeof(prompt),
-                         "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours % 100),
-                         unsigned(minutes % 60), unsigned(seconds % 60));
-                outString += prompt;
             } else {
-                outString += "Welcome to extempore!";
+                ascii_info();
+                printf("INFO:");
+                ascii_default();
+                std::cout << " server: accepted new connection to " << m_name << " process"
+                          << std::endl;
+                clients.push_back({sock, std::string()});
+                std::string outString;
+                if (m_banner) {
+                    outString += sm_banner;
+                    uint64_t time(UNIV::TIME);
+                    auto hours(time / UNIV::HOUR());
+                    time -= hours * UNIV::HOUR();
+                    auto minutes(time / UNIV::MINUTE());
+                    time -= minutes * UNIV::MINUTE();
+                    auto seconds(time / UNIV::SECOND());
+                    char prompt[64];
+                    snprintf(prompt, sizeof(prompt),
+                             "[extempore %.2u:%.2u:%.2u]: ", unsigned(hours % 100),
+                             unsigned(minutes % 60), unsigned(seconds % 60));
+                    outString += prompt;
+                } else {
+                    outString += "Welcome to extempore!";
+                }
+                send(sock, outString.c_str(), int(outString.length() + 1), 0);
             }
-            send(sock, outString.c_str(), int(outString.length() + 1), 0);
-            continue;
         }
-        for (unsigned index = 0; index < clientSockets.size(); ++index) {
-            auto sock(clientSockets[index]);
-            const int BUFLEN = 1024;
-            char buf[BUFLEN + 1];
-            if (FD_ISSET(sock, &curReadFds)) {  // see if any client sockets have data for us
-                std::string evalStr;
-                for (int j = 0; true; j++) {  // read from stream in BUFLEN blocks
-                    res = recv(sock, buf, BUFLEN, 0);
-                    if (unlikely(!res)) {  // close the socket
-                        FD_CLR(sock, &readFds);
-                        inStrings.erase(sock);
-                        ascii_info();
-                        printf("INFO:");
-                        ascii_default();
-                        std::cout << " server: client disconnected" << std::endl;
-                        clientSockets.erase(clientSockets.begin() + index);
-                        closesocket(sock);
-                        --index;
-                        break;
-                    } else if (unlikely(res < 0)) {
+        // Only the clients that were polled this round (a client accepted
+        // above has no pollfd yet and is picked up next time around).
+        for (size_t i = 0; i + 1 < fds.size(); ++i) {
+            const auto revents = fds[i + 1].revents;
+            if (!revents) {
+                continue;
+            }
+            auto& client = clients[i];
+            bool disconnected = (revents & POLLNVAL) != 0;
+            if (!disconnected) {
+                auto n = recv(client.fd, buf, BUFLEN, 0);
+                if (n == 0) {
+                    disconnected = true;
+                } else if (n < 0) {
+#ifdef _WIN32
+                    disconnected = true;
+#else
+                    if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
                         ascii_error();
                         printf("ERROR:");
                         ascii_default();
                         std::cout << " in socket read from extempore process " << strerror(errno)
                                   << std::endl;
-                        break;
+                        disconnected = true;
                     }
-                    auto& string(inStrings[sock]);
-                    buf[res] = '\0';
-                    string += buf;
-                    if (buf[res - 2] == 0x0d && buf[res - 1] == 0x0a) {
-                        evalStr.swap(string);
-                        break;
+#endif
+                } else {
+                    client.buffer.append(buf, size_t(n));
+                    // Each expression is terminated by CRLF. Hand every complete
+                    // expression in the accumulated buffer to the task thread and
+                    // keep whatever trails the last terminator.
+                    std::string::size_type pos = 0;
+                    for (auto end = client.buffer.find("\r\n", pos); end != std::string::npos;
+                         pos = end + 2, end = client.buffer.find("\r\n", pos)) {
+                        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+                        char c[24];
+                        snprintf(c, sizeof(c), "%lld", static_cast<long long>(client.fd));
+                        auto* s = new std::string(client.buffer.substr(pos, end - pos + 1));
+                        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c,
+                                                    SchemeTask::Type::REPL));
+                        m_guardCond.notify_one();
                     }
-                    if (unlikely(j > 1024 * 10)) {
+                    client.buffer.erase(0, pos);
+                    if (client.buffer.size() > MAX_PENDING) [[unlikely]] {
                         ascii_error();
                         printf("ERROR:");
                         ascii_default();
@@ -507,33 +521,23 @@ void* SchemeProcess::serverImpl() {
                             << " eval string too large (no terminator received before 10MB limit)"
                             << std::endl;
                         ascii_normal();
-                        string.clear();
-                        break;
-                    }
-                }
-                if (likely(evalStr != "#break#")) {
-                    std::string::size_type pos = 0;
-                    std::string::size_type end = evalStr.find_first_of('\x0d', pos);
-                    for (; end != std::string::npos;
-                         pos = end + 2, end = evalStr.find_first_of('\x0d', pos)) {
-                        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
-                        char c[16];
-                        snprintf(c, sizeof(c), "%i", int(sock));
-                        std::string* s = new std::string(evalStr.substr(pos, end - pos + 1));
-                        // std::cout << extemp::UNIV::TIME << "> SCHEME TASK WITH SUBEXPR:" << *s <<
-                        // std::endl;
-                        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c,
-                                                    SchemeTask::Type::REPL));
-                        m_guardCond.notify_one();
+                        client.buffer.clear();
                     }
                 }
             }
+            if (disconnected) {
+                ascii_info();
+                printf("INFO:");
+                ascii_default();
+                std::cout << " server: client disconnected" << std::endl;
+                closesocket(client.fd);
+                client.fd = INVALID_SOCKET;
+            }
         }
+        std::erase_if(clients, [](const Client& c) { return c.fd == INVALID_SOCKET; });
     }
-    for (auto sock : clientSockets) {
-        std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
-        closesocket(sock);
-        std::cout << "DONE-CLOSING_CLIENT" << std::endl;
+    for (const auto& client : clients) {
+        closesocket(client.fd);
     }
     if (closesocket(m_serverSocket)) {
         std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;

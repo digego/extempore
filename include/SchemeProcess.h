@@ -53,6 +53,7 @@
 #include <winsock2.h>
 #else
 typedef int SOCKET;
+constexpr SOCKET INVALID_SOCKET = -1;
 #endif
 
 struct llvm_zone_t;
