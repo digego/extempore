@@ -595,6 +595,18 @@
 ;; the 1-parameter Tree) dropped so the pattern's arity matches the instances';
 ;; a BARE registered generic name (a recursive type's self-reference, Blob's
 ;; Shape*) rides as the named term, compatible with any instance of the name.
+;; Does a compound component spell a nominal type somewhere inside --- a
+;; braced instance, or a registered generic's bare name (the [Stream*]* field
+;; of Stream <!a,[Stream*]*>)?  Such a component is decoded per sub-component
+;; so the name stays nominal; parsed whole, the surface parser would expand the
+;; bare name structurally into a tuple that no instance unifies with.
+(define xtc:infer:nominal-inside?
+  (lambda (s)
+    (or (string-contains? s "{")
+        (and (cl:find-if xtc:cache:generictype-exists?
+                         (regex:match-all s "[A-Za-z_][A-Za-z0-9_-]*"))
+             #t))))
+
 (define xtc:infer:component->candidate
   (lambda (c0)
     (let* ((c (xtc:infer:nominalise-annotations c0))
@@ -603,13 +615,13 @@
       (cond
         ((and (> (string-length base) 0)
               (char=? (string-ref base 0) #\[)
-              (string-contains? base "{"))
+              (xtc:infer:nominal-inside? base))
          (cons (+ *xtc:codegen:closure* (* (+ depth 1) *xtc:codegen:pointer*))
                (map xtc:infer:component->candidate
                     (xtc:codegen:get-pretty-closure-arg-strings base))))
         ((and (> (string-length base) 0)
               (char=? (string-ref base 0) #\<)
-              (string-contains? base "{"))
+              (xtc:infer:nominal-inside? base))
          (cons (+ *xtc:codegen:tuple* (* depth *xtc:codegen:pointer*))
                (map xtc:infer:component->candidate
                     (xtc:codegen:get-pretty-tuple-arg-strings base))))

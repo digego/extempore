@@ -184,6 +184,15 @@
 (xtmtest-result (xtc:type:pretty-type-params "<!a*,!b>")   '("!a" "!b") "params-two")
 (xtmtest-result (xtc:type:pretty-type-params "<!a,!a*>")   '("!a")      "params-shared")
 
+;; a recursive template's self-reference and its non-variable fields are not
+;; parameters, however the surface parser expands them
+(xtmtest-result (xtc:type:pretty-type-params "<!a,i8*,SchedEvt*,SchedEvt*>")
+                '("!a") "params-recursive-fields")
+(xtmtest-result (xtc:type:pretty-type-params "<!a,[Stream*]*>")
+                '("!a") "params-recursive-closure")
+(xtmtest-result (xtc:type:pretty-type-params "<i64,Circle{!a}*,Rect{!b}*>")
+                '("!a" "!b") "params-nested-instances")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; nominal generics    ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;

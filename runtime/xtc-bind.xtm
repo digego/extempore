@@ -457,6 +457,30 @@
                        cands))
                 #t #f))))))
 
+;; Spell every bare self-reference Name* inside a generic template's field
+;; string as the annotated same-instance form Name:<template>* --- the surface
+;; the candidate decoder nominalises to Name{params}*, so a recursive field
+;; (SchedEvt's prev/next, Stream's [Stream*]* thunk) is typed as the instance
+;; under construction rather than as a wildcard over every instance.  A
+;; left-to-right scan on identifier boundaries: StreamPair* is not a
+;; self-reference of Stream, and the spliced template, which itself contains
+;; Name*, is never rescanned.
+(define xtc:bind:spell-self-refs
+  (lambda (name template x)
+    (let ((n (string-length x))
+          (k (string-length name))
+          (ident? (lambda (c)
+                    (or (char-alphabetic? c) (char-numeric? c)
+                        (char=? c #\_) (char=? c #\-)))))
+      (let loop ((i 0) (acc ""))
+        (cond ((>= i n) acc)
+              ((and (< (+ i k) n)
+                    (string=? (substring x i (+ i k)) name)
+                    (or (= i 0) (not (ident? (string-ref x (- i 1)))))
+                    (char=? (string-ref x (+ i k)) #\*))
+               (loop (+ i k) (string-append acc name ":" template)))
+              (else (loop (+ i 1) (string-append acc (string (string-ref x i))))))))))
+
 (define xtc:bind:compile-type-dataconstructors
   (lambda (name type generic printer? copy? constructor?)
     (if (or (not (string? type)) ;; if not already a pretty type
@@ -497,11 +521,7 @@
                                             (map (lambda (x)
                                                    (string-append
                                                      ","
-                                                     (if (regex:match? x (string-append namestr "([{<:*)|$"))
-                                                         (regex:replace x
-                                                                        (string-append namestr "([*]*)")
-                                                                        (string-append namestr ":" type "$1"))
-                                                         x)))
+                                                     (xtc:bind:spell-self-refs namestr type x)))
                                                  a))
                                      (apply string-append (symbol->string name) "*"
                                             (map (lambda (x) (string-append "," x)) a)))
