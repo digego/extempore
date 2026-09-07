@@ -268,7 +268,7 @@ endif()
 # PCRE2 #
 #########
 
-# The regex FFI builtins (src/ffi/regex.inc) need a PCRE engine: the xtlang
+# The regex FFI builtins (src/ffi/regex.cpp) need a PCRE engine: the xtlang
 # compiler's type-string grammars use recursive subpatterns and named groups,
 # which std::regex has no answer for.
 #
@@ -379,7 +379,6 @@ else()
         -Wshadow
         -Wno-unused-result
         -Wno-unused-parameter
-        # src/ffi/llvm.inc defines printLLVMModule for use from a debugger.
         -Wno-unused-function
         -Wno-missing-field-initializers
         -Wno-sign-compare
