@@ -31,8 +31,19 @@
 (bind-val xt_pcg_rng_global_state PCG_RNG_State*
   (PCG_RNG_State #x853c49e6748fea9b #xda3e39cb94b95bdb))
 
+;; The reference implementation works in uint64_t/uint32_t throughout, while
+;; xtlang's integers are signed. The bit patterns still line up, because
+;; xtlang's >> is a logical (zero-filling) shift and +, * and the bitwise
+;; operators are width-preserving two's-complement ops --- so state, xorshifted
+;; and the returned draw all carry exactly the reference's bits, just read as
+;; signed. Only %, / and the comparisons differ between signed and unsigned, and
+;; those are confined to pcg32_boundedrand_r below.
+
 (bind-func xt_pcg32_random_r:[i32,PCG_RNG_State*]*
-  "Generate a uniformaly distributed 32-bit random number
+  "Generate a uniformly distributed 32-bit random number
+
+The bits are those of the reference pcg32_random_r, read as a signed i32, so
+roughly half the draws are negative.
 
 @param state - the current rng state
 @return - 32 bit random number"
@@ -41,6 +52,8 @@
       (tset! state 0 (+ (* oldstate 6364136223846793005)
                         (tref state 1)))
       (let ((xorshifted (convert (>> (^ (>> oldstate 18) oldstate) 27) i32))
+            ;; a logical shift, so rot lands in [0,31] and both shifts below
+            ;; stay in range
             (rot (convert (>> oldstate 59) i32)))
         (bor (>> xorshifted rot)
              (<< xorshifted (& (* -1 rot) 31)))))))
@@ -78,15 +91,27 @@ takes the state variable.
 (bind-func pcg32_boundedrand_r:[i32,PCG_RNG_State*,i32]*
   "Generate a uniformly distributed number, r, where 0 <= r < bound
 
+BOUND is read as an unsigned 32-bit value, as in the reference implementation.
+The work is done in i64 with both the bound and each draw zero-extended: xtlang's
+% and < are signed, but on i64 values held in [0,2^32) the signed answer is the
+unsigned one.
+
 @param state - the current state of the rng
+@param bound - the exclusive upper bound
 @return - a bounded i32 number
 "
   (lambda (state bound)
-    (let* ((threshold (% (- #x10000000 bound) bound))
-           (r (- threshold 1)))
-      (while (< r threshold)
-        (set! r (xt_pcg32_random_r state)))
-      (% r bound))))
+    (let ((b (& (convert bound i64) #xffffffff)))
+      (if (= b 0)
+          0:i32
+          ;; 2^32 % b --- the reference's (-bound % bound). Draws below this are
+          ;; rejected, since 2^32 isn't a whole number of bounds and the low
+          ;; residues would otherwise come up once too often.
+          (let ((threshold (% (- #x100000000 b) b))
+                (r (& (convert (xt_pcg32_random_r state) i64) #xffffffff)))
+            (while (< r threshold)
+              (set! r (& (convert (xt_pcg32_random_r state) i64) #xffffffff)))
+            (convert (% r b) i32))))))
 
 (bind-func pcg32_boundedrand:[i32,i32]*
   (lambda (bound)
