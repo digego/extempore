@@ -66,6 +66,13 @@ that were repeated across six files. CI derives the LLVM version from
 throttles only the AOT step through a Ninja job pool, runs tests in parallel,
 and cancels superseded runs. Every xtlang test has a timeout.
 
+One compiler landmine is closed along the way: an unresolved generic type name
+reaching code generation used to spin forever between two lookup functions, so
+a compile could hang instead of failing. It now raises a compile error. That
+loop was reachable through an attempt to memoise the type-string parser, which
+turned out to depend on registration happening inline; the parse result is
+memoised, the registration stays where it was.
+
 Library changes with visible behaviour: `pcg32_boundedrand` now matches
 reference PCG32 (it previously rejected about half its draws and used the wrong
 threshold, so seeded streams differ); `sys:directory-list` returns bare names
