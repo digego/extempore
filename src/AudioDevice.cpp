@@ -49,6 +49,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
+#include <array>
 #include <semaphore>
 #include <thread>
 
@@ -142,15 +143,19 @@ double AudioDevice::CLOCKOFFSET = 0.0;
 
 namespace {
 
-// Counting semaphores synchronise the multi-threaded audio dispatcher with its
-// worker threads without spinning on atomics. (This replaced a hand-rolled
-// mutex+condvar stand-in, and before that a sSignalCount/sThreadDoneCount pair
-// that had a TOCTOU race on the thread count.) Both start empty: the dispatcher
-// release()s work for the workers to acquire(), and the workers release()
-// completion for the dispatcher to acquire().
+// Semaphores synchronise the multi-threaded audio dispatcher with its worker
+// threads without spinning on atomics. Each worker has its own work semaphore
+// so that one block hands exactly one wake to every worker: with a single
+// counting semaphore a fast worker could take two permits in one block and
+// leave another worker's slice stale, which showed up as a missing voice.
+// Completion is counted on one semaphore, since every worker releases it
+// exactly once per block.
 
-// dispatcher -> workers
-std::counting_semaphore<> sMtWorkAvailable{0};
+// dispatcher -> worker i
+struct MtWorkerSignal {
+    std::binary_semaphore work{0};
+};
+std::array<MtWorkerSignal, AudioDevice::MAX_RT_AUDIO_THREADS> sMtWorkers;
 // workers -> dispatcher
 std::counting_semaphore<> sMtWorkComplete{0};
 
@@ -186,7 +191,7 @@ void* audioCallbackMT(void* Args) {
     bool toggle = false;
     printf("Starting RT Audio MT worker %u\n", idx);
     while (true) {
-        sMtWorkAvailable.acquire();
+        sMtWorkers[idx].work.acquire();
         SAMPLE* outbuf = outbufs[toggle];
         if (unlikely(!zerolatency)) {
             toggle = !toggle;
@@ -321,7 +326,9 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             }
         }
         if (zerolatency) {
-            sMtWorkAvailable.release(numthreads);
+            for (unsigned i = 0; i < numthreads; ++i) {
+                sMtWorkers[i].work.release();
+            }
             for (unsigned i = 0; i < numthreads; ++i) {
                 sMtWorkComplete.acquire();
             }
@@ -352,7 +359,9 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             }
         }
         if (!zerolatency) {
-            sMtWorkAvailable.release(numthreads);
+            for (unsigned i = 0; i < numthreads; ++i) {
+                sMtWorkers[i].work.release();
+            }
             for (unsigned i = 0; i < numthreads; ++i) {
                 sMtWorkComplete.acquire();
             }
