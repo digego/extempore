@@ -277,3 +277,30 @@
 (xtmtest-result (xtc:type:free-vars (xtc:type:tuple 'i64 'f64))
                 '()
                 "free-vars-none")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; bare-name refinement ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a variable holding a bare generic name (the wildcard Stream*) is refined
+;; to the instance it later unifies with, and so is every variable sharing
+;; its binding chain --- the read-back must never hand codegen the bare name
+(xtmtest-result (let* ((v (xtc:type:var 20))
+                       (w (xtc:type:var 21))
+                       (s1 (xtc:type:unify v (xtc:type:ptr (xtc:type:named "S"))
+                                           xtc:type:empty-subst))
+                       (s2 (xtc:type:unify w v s1))
+                       (s3 (xtc:type:unify w (xtc:type:ptr (xtc:type:napp "S" 'i64)) s2)))
+                  (list (xtc:type:apply-subst v s3) (xtc:type:apply-subst w s3)))
+                (list (xtc:type:ptr (xtc:type:napp "S" 'i64))
+                      (xtc:type:ptr (xtc:type:napp "S" 'i64)))
+                "refine-named-through-chain")
+
+;; the instance side is never weakened to the bare name
+(xtmtest-result (let* ((v (xtc:type:var 22))
+                       (s1 (xtc:type:unify v (xtc:type:ptr (xtc:type:napp "S" 'i64))
+                                           xtc:type:empty-subst))
+                       (s2 (xtc:type:unify v (xtc:type:ptr (xtc:type:named "S")) s1)))
+                  (xtc:type:apply-subst v s2))
+                (xtc:type:ptr (xtc:type:napp "S" 'i64))
+                "refine-named-keeps-instance")

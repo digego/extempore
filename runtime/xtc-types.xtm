@@ -194,33 +194,89 @@
 ;; same-shaped constructors recurse on their arguments, everything else fails.
 (define xtc:type:unify
   (lambda (s t subst)
-    (let ((s (xtc:type:resolve s subst))
-          (t (xtc:type:resolve t subst)))
+    (let ((rs (xtc:type:resolve s subst))
+          (rt (xtc:type:resolve t subst)))
       (cond
-        ((and (xtc:type:var? s) (xtc:type:var? t)
-              (= (xtc:type:var-id s) (xtc:type:var-id t)))
+        ((and (xtc:type:var? rs) (xtc:type:var? rt)
+              (= (xtc:type:var-id rs) (xtc:type:var-id rt)))
          subst)
-        ((xtc:type:var? s) (xtc:type:bind (xtc:type:var-id s) t subst))
-        ((xtc:type:var? t) (xtc:type:bind (xtc:type:var-id t) s subst))
-        ;; a BARE generic name (Blob's [Shape*]*) is compatible with any
-        ;; instance of the same name (Shape{double}): under the old structural
-        ;; model the bare form expanded with a free type variable that bound
-        ;; and vanished, so the two were literally one type --- name equality
-        ;; is the nominal rendering of that
-        ((and (xtc:type:named? s) (xtc:type:napp? t)
-              (string=? (xtc:type:named-name s) (xtc:type:napp-name t)))
-         subst)
-        ((and (xtc:type:napp? s) (xtc:type:named? t)
-              (string=? (xtc:type:napp-name s) (xtc:type:named-name t)))
-         subst)
-        ((and (pair? s) (pair? t))
-         (if (and (eq? (car s) (car t))
-                  (= (length s) (length t)))
-             (xtc:type:unify-args (cdr s) (cdr t) subst)
-             #f))
-        ((and (atom? s) (atom? t))
-         (if (equal? s t) subst #f))
-        (else #f)))))
+        ;; a variable binds to the other side's VARIABLE when it has one (not
+        ;; to that variable's resolution), so binding chains stay connected
+        ;; and a later refinement of the chain's end (refine-named below)
+        ;; reaches every variable that shares the term
+        ((xtc:type:var? rs)
+         (xtc:type:bind (xtc:type:var-id rs) (if (xtc:type:var? t) t rt) subst))
+        ((xtc:type:var? rt)
+         (xtc:type:bind (xtc:type:var-id rt) (if (xtc:type:var? s) s rs) subst))
+        (else
+          (let ((subst2 (xtc:type:unify-ground rs rt subst)))
+            (and subst2
+                 (xtc:type:refine-named t rt rs
+                   (xtc:type:refine-named s rs rt subst2)))))))))
+
+;; The non-variable cases of unify: both terms already resolved.
+(define xtc:type:unify-ground
+  (lambda (s t subst)
+    (cond
+      ;; a BARE generic name (Blob's [Shape*]*) is compatible with any
+      ;; instance of the same name (Shape{double}): under the old structural
+      ;; model the bare form expanded with a free type variable that bound
+      ;; and vanished, so the two were literally one type --- name equality
+      ;; is the nominal rendering of that
+      ((and (xtc:type:named? s) (xtc:type:napp? t)
+            (string=? (xtc:type:named-name s) (xtc:type:napp-name t)))
+       subst)
+      ((and (xtc:type:napp? s) (xtc:type:named? t)
+            (string=? (xtc:type:napp-name s) (xtc:type:named-name t)))
+       subst)
+      ((and (pair? s) (pair? t))
+       (if (and (eq? (car s) (car t))
+                (= (length s) (length t)))
+           (xtc:type:unify-args (cdr s) (cdr t) subst)
+           #f))
+      ((and (atom? s) (atom? t))
+       (if (equal? s t) subst #f))
+      (else #f))))
+
+;; The bare-name compatibility above is a wildcard, and a wildcard bound into a
+;; variable is a dead end: once the variable holds (ptr (named "Stream")),
+;; meeting Stream{float} later confirms but never refines it, and the read-back
+;; hands codegen a %Stream* no instance exists for (an ad-hoc function whose
+;; inner lambda first unifies with a constructor's [Stream*]* slot, then with
+;; the recursive call's Stream{float}*).  So when `s' is a variable whose
+;; resolution `rs' spells strictly more bare names than the term `rt' it just
+;; unified with, the end of s's binding chain is rebound to rt --- every
+;; variable in the chain then sees the instance.  Sound because the two terms
+;; unified: rt agrees with rs everywhere except where it carries the instance
+;; rs left open.
+(define xtc:type:refine-named
+  (lambda (s rs rt subst)
+    (if (and (xtc:type:var? s)
+             (< (xtc:type:named-count rt subst) (xtc:type:named-count rs subst)))
+        (let ((v (xtc:type:chain-end s subst)))
+          (or (xtc:type:bind (xtc:type:var-id v) rt subst) subst))
+        subst)))
+
+;; The last variable on s's binding chain: the one bound to a term (or unbound).
+(define xtc:type:chain-end
+  (lambda (v subst)
+    (let ((b (xtc:type:subst-ref (xtc:type:var-id v) subst)))
+      (if (and b (xtc:type:var? b))
+          (xtc:type:chain-end b subst)
+          v))))
+
+;; How many bare named nodes a term contains, resolved through subst.
+(define xtc:type:named-count
+  (lambda (t subst)
+    (let ((t (xtc:type:resolve t subst)))
+      (cond ((xtc:type:named? t) 1)
+            ((xtc:type:var? t) 0)
+            ((pair? t)
+             (let loop ((xs (cdr t)) (n 0))
+               (if (null? xs)
+                   n
+                   (loop (cdr xs) (+ n (xtc:type:named-count (car xs) subst))))))
+            (else 0)))))
 
 ;; Unify two equal-length argument lists left to right, threading the
 ;; substitution.  Size literals and named-type names ride through as atoms.
