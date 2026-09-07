@@ -90,6 +90,17 @@
     (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
       (if builtin-data (vector-ref builtin-data 2) #f))))
 
+;; Memo for xtc:codegen:parse-pretty-type (xtc-codegen.xtm).  A parse of a
+;; pretty type string depends only on the string and on the named-type,
+;; type-alias and generic-type caches, so it is cached by string and each
+;; of those three registrars clears it.  It lives here rather than with the
+;; parser because the registrars run before xtc-codegen.xtm is loaded.
+(define *xtc:cache:type-parse-memo* (make-hashtable 1024))
+
+(define xtc:cache:invalidate-type-parse-memo!
+  (lambda ()
+    (set! *xtc:cache:type-parse-memo* (make-hashtable 1024))))
+
 ;;;;;;;;;;;;;;
 ;; named types
 ;; -----------
@@ -128,6 +139,7 @@
             (xtc:diagnostics:print-compiler-error "couldn't register new named type")
             (begin
               (hashtable-set! *xtc:cache:namedtype-cache* namedtype-name (vector type docstring))
+              (xtc:cache:invalidate-type-parse-memo!)
               (xtc:aot:insert-namedtype-binding-details namedtype-name type docstring))))))
 
 (define xtc:cache:get-namedtype-docstring
@@ -201,6 +213,7 @@
             (xtc:diagnostics:print-compiler-error "couldn't register new type alias")
             (begin
               (hashtable-set! *xtc:cache:typealias-cache* typealias-name (vector type docstring))
+              (xtc:cache:invalidate-type-parse-memo!)
               (xtc:aot:insert-typealias-binding-details typealias-name type docstring))))))
 
 (define xtc:cache:get-typealias-docstring
@@ -1519,6 +1532,7 @@
              (key (if (symbol? name) (symbol->string name) name)))
         ;; (println 'gtype-name: name 'type: type 'newtype: newtype)
         (hashtable-set! *xtc:cache:generictype-cache* key newtype)
+        (xtc:cache:invalidate-type-parse-memo!)
         #t))))
 
 (define xtc:cache:get-generictype-candidate-types
