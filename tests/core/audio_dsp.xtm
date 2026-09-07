@@ -1,0 +1,125 @@
+;;; audio_dsp.xtm:tests -- tests for the DSP closure library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/audio_dsp.xtm. The granulators are stochastic by
+;; design, but setting each lo/hi pair to the same value makes them
+;; deterministic, so their output over a known input can be pinned down
+;; exactly. That's what the golden arrays below are: a run captured from a
+;; known-good build, to catch a refactor that changes what comes out.
+
+;; The first grains read a cache that hasn't been written yet, so the
+;; assertions start well past the beginning.
+
+;;; Code:
+
+(sys:load "libs/core/audio_dsp.xtm")
+
+(bind-func static dsptest_close
+  (lambda (got:double expected:double)
+    (< (fabs (- got expected)) 1e-5)))
+
+(bind-func static dsptest_input
+  "a deterministic input signal to granulate"
+  (lambda (i:i64)
+    (convert (sin (* 0.01 (convert i double))) SAMPLE)))
+
+(bind-val DSPTEST_GRAIN_SKIP i64 1000)
+(bind-val DSPTEST_GRAIN_STRIDE i64 137)
+
+(bind-func dsptest_granulator_linear
+  (lambda (out:double* nout:i64)
+    (let ((grains (granulator_c 1))
+          (v:SAMPLE 0.0)
+          (n (+ DSPTEST_GRAIN_SKIP (* nout DSPTEST_GRAIN_STRIDE))))
+      (grains.iot 100)
+      (grains.dlo 500.0) (grains.dhi 500.0)
+      (grains.rlo 1.5) (grains.rhi 1.5)
+      (grains.plo 0.5:f) (grains.phi 0.5:f)
+      (grains.alo 0.5:f) (grains.ahi 0.5:f)
+      (grains.wet 1.0:f)
+      (doloop (i n)
+        (set! v (grains 0 i (dsptest_input i)))
+        (if (and (>= i DSPTEST_GRAIN_SKIP)
+                 (= (% (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) 0))
+            (pset! out (/ (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) (convert v double))))
+      void)))
+
+(bind-func dsptest_granulator_hermite
+  (lambda (out:double* nout:i64)
+    (let ((grains (granulator_hermite_c 1))
+          (v:SAMPLE 0.0)
+          (n (+ DSPTEST_GRAIN_SKIP (* nout DSPTEST_GRAIN_STRIDE))))
+      (grains.iot 100)
+      (grains.dlo 500.0) (grains.dhi 500.0)
+      (grains.rlo 1.5) (grains.rhi 1.5)
+      (grains.plo 0.5:f) (grains.phi 0.5:f)
+      (grains.alo 0.5:f) (grains.ahi 0.5:f)
+      (grains.wet 1.0:f)
+      (doloop (i n)
+        (set! v (grains 0 i (dsptest_input i)))
+        (if (and (>= i DSPTEST_GRAIN_SKIP)
+                 (= (% (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) 0))
+            (pset! out (/ (- i DSPTEST_GRAIN_SKIP) DSPTEST_GRAIN_STRIDE) (convert v double))))
+      void)))
+
+(bind-func test_granulator_linear
+  (lambda ()
+    (let ((out:double* (salloc 8))
+          (expected:|8,double|* (salloc))
+          (ok #t))
+      (afill! expected
+              0.275067329 0.334935963 -0.143669501 -0.388719708
+              -0.011201041 0.388250321 0.165665284 -0.322427362)
+      (dsptest_granulator_linear out 8)
+      (doloop (i 8)
+        (if (not (dsptest_close (pref out i) (aref expected i)))
+            (set! ok #f)))
+      ok)))
+(xtmtest-result (test_granulator_linear) 1)
+
+(bind-func test_granulator_hermite
+  (lambda ()
+    (let ((out:double* (salloc 8))
+          (expected:|8,double|* (salloc))
+          (ok #t))
+      (afill! expected
+              0.275067329 0.333861321 -0.143669501 -0.388396710
+              -0.011201041 0.388728440 0.165665284 -0.323618233)
+      (dsptest_granulator_hermite out 8)
+      (doloop (i 8)
+        (if (not (dsptest_close (pref out i) (aref expected i)))
+            (set! ok #f)))
+      ok)))
+(xtmtest-result (test_granulator_hermite) 1)
+
+;; a fully dry granulator has to pass its input through untouched
+(bind-func test_granulator_dry
+  (lambda ()
+    (let ((grains (granulator_c 1))
+          (ok #t)
+          (v:SAMPLE 0.0))
+      (grains.wet 0.0:f)
+      (doloop (i 2000)
+        (set! v (grains 0 i (dsptest_input i)))
+        (if (not (dsptest_close (convert v double) (convert (dsptest_input i) double)))
+            (set! ok #f)))
+      ok)))
+(xtmtest-result (test_granulator_dry) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; hermite_interp     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; hermite interpolation reproduces a straight line exactly, so on evenly
+;; spaced taps the result is just the linear one
+(bind-func test_hermite_interp_linear
+  (lambda ()
+    (and (dsptest_close (convert (hermite_interp 0.5:f 1.0 2.0 3.0 4.0) double) 2.5)
+         (dsptest_close (convert (hermite_interp 0.0:f 1.0 2.0 3.0 4.0) double) 2.0)
+         (dsptest_close (convert (hermite_interp 0.25:f 1.0 2.0 3.0 4.0) double) 2.25))))
+(xtmtest-result (test_hermite_interp_linear) 1)
