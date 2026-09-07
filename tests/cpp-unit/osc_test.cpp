@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "ext/OscText.h"
+#include "ext/OscWire.h"
 
+#include <cstring>
 #include <limits>
 #include <string>
 #include <vector>
@@ -199,4 +201,61 @@ TEST(SchemeRealLiteral, ShortestRoundTrip) {
     EXPECT_EQ(scheme_real_literal(6.6), "6.6");
     EXPECT_EQ(std::strtod(scheme_real_literal(0.1).c_str(), nullptr), 0.1);
     EXPECT_EQ(std::strtof(scheme_real_literal(6.6f).c_str(), nullptr), 6.6f);
+}
+
+// ---------------------------------------------------------------------------
+// wire encoding
+// ---------------------------------------------------------------------------
+
+TEST(OscWriter, MessageBytesMatchWireFormat) {
+    extemp::osc::Writer args;
+    args.string("hi");
+    args.int32(500);
+    args.float32(6.5f);
+
+    extemp::osc::Writer msg;
+    msg.string("/test");
+    msg.string(",sif");
+    msg.append(args);
+
+    const std::vector<unsigned char> expected = {
+        '/',  't',  'e',  's',  't',  0,    0,    0,     // address, padded to 8
+        ',',  's',  'i',  'f',  0,    0,    0,    0,     // type tags, padded to 8
+        'h',  'i',  0,    0,                             // "hi", padded to 4
+        0x00, 0x00, 0x01, 0xf4,                          // 500, big-endian
+        0x40, 0xd0, 0x00, 0x00,                          // 6.5f, big-endian
+    };
+    ASSERT_EQ(msg.size(), expected.size());
+    EXPECT_EQ(std::memcmp(msg.data(), expected.data(), expected.size()), 0);
+}
+
+TEST(OscWriter, StringPaddingAlwaysLeavesATerminator) {
+    struct {
+        const char* text;
+        size_t size;
+    } cases[] = {{"", 4}, {"a", 4}, {"ab", 4}, {"abc", 4}, {"abcd", 8}, {"abcde", 8}};
+    for (const auto& c : cases) {
+        extemp::osc::Writer w;
+        w.string(c.text);
+        EXPECT_EQ(w.size(), c.size) << "for \"" << c.text << "\"";
+        EXPECT_EQ(w.data()[w.size() - 1], '\0');
+    }
+}
+
+TEST(OscWriter, GrowsPastTheOldFixedBuffers) {
+    // A 4 KB string argument overflowed the 1 KB scratch/2 KB message buffers
+    // the send path used to write into.
+    const std::string big(4096, 'x');
+    extemp::osc::Writer msg;
+    msg.string("/big");
+    msg.string(",s");
+    msg.string(big);
+    EXPECT_EQ(msg.size(), 8u + 4u + 4100u);
+    EXPECT_EQ(std::memcmp(msg.data() + 12, big.data(), big.size()), 0);
+}
+
+TEST(OscWriter, ByteswapIsItsOwnInverse) {
+    EXPECT_EQ(extemp::osc::byteswap(extemp::osc::byteswap(uint32_t(0x12345678))), 0x12345678u);
+    EXPECT_EQ(extemp::osc::byteswap(extemp::osc::byteswap(uint64_t(0x0123456789abcdefULL))),
+              0x0123456789abcdefULL);
 }
