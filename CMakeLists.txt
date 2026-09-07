@@ -150,6 +150,8 @@ set(DEP_WGPU_SHA256_MACOS_AARCH64 "15367c26fdbe6892db35007d39f3883593384e777360b
 set(DEP_WGPU_SHA256_WINDOWS_X86_64 "f14ca334b4d253881bde2605bd147f332178d705f56fbd74f81458797c77fce1")
 set(DEP_GOOGLETEST_VERSION "1.15.2")
 set(DEP_GOOGLETEST_SHA256 "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926")
+set(DEP_PCRE2_VERSION "10.48")
+set(DEP_PCRE2_SHA256 "ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42befd46888")
 
 ######
 # s7 #
@@ -279,6 +281,37 @@ if(BUILD_TESTS)
     FetchContent_MakeAvailable(googletest)
 endif()
 
+#########
+# PCRE2 #
+#########
+
+# The regex FFI builtins (src/ffi/regex.inc) need a PCRE engine: the xtlang
+# compiler's type-string grammars use recursive subpatterns and named groups,
+# which std::regex has no answer for.
+#
+# Built as a static library and linked in, so nothing has to be shipped
+# alongside the binary. pcre2-8-static carries PCRE2_STATIC as a PUBLIC compile
+# definition, which is what keeps MSVC from decorating the API with
+# __declspec(dllimport).
+FetchContent_Declare(pcre2
+    URL https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${DEP_PCRE2_VERSION}/pcre2-${DEP_PCRE2_VERSION}.tar.gz
+    URL_HASH SHA256=${DEP_PCRE2_SHA256}
+    SYSTEM
+    EXCLUDE_FROM_ALL)
+
+set(PCRE2_BUILD_PCRE2GREP OFF CACHE BOOL "" FORCE)
+set(PCRE2_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(PCRE2_SHOW_REPORT OFF CACHE BOOL "" FORCE)
+set(PCRE2_STATIC_PIC ON CACHE BOOL "" FORCE)
+
+# BUILD_SHARED_LIBS picks which of the two builds `pcre2-8` aliases, so pin it
+# for pcre2 alone rather than for the whole project.
+block()
+    set(BUILD_SHARED_LIBS OFF)
+    set(BUILD_STATIC_LIBS ON)
+    FetchContent_MakeAvailable(pcre2)
+endblock()
+
 set(EXTEMPORE_LLVM_COMPONENTS
     OrcJIT
     ${LLVM_TARGET_ARCH}
@@ -334,7 +367,7 @@ target_include_directories(extempore SYSTEM PRIVATE
     ${LLVM_INCLUDE_DIRS})
 
 target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
-target_link_libraries(extempore PRIVATE s7_lib pcre portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE s7_lib pcre pcre2-8 portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
 
 # Compile definitions
 if(EXT_SHARE_DIR)
