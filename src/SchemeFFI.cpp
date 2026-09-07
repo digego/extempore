@@ -166,7 +166,6 @@ static std::string formatLLVMType(llvm::Type* Type) {
 
 #include "ffi/utility.inc"
 #include "ffi/ipc.inc"
-#include "ffi/assoc.inc"
 #include "ffi/number.inc"
 #include "ffi/sys.inc"
 #include "ffi/sys_dsp.inc"
@@ -206,7 +205,7 @@ void initSchemeFFI(scheme* sc) {
     static struct {
         const char* name;
         foreign_func func;
-    } funcTable[] = {UTILITY_DEFS,  IPC_DEFS,  ASSOC_DEFS, NUMBER_DEFS, SYS_DEFS,  SYS_DSP_DEFS,
+    } funcTable[] = {UTILITY_DEFS,  IPC_DEFS,  NUMBER_DEFS, SYS_DEFS,  SYS_DSP_DEFS,
                      SYS_ZONE_DEFS, MISC_DEFS, REGEX_DEFS, LLVM_DEFS,   CLOCK_DEFS};
     for (auto& elem : funcTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_foreign_func(sc, elem.func));
