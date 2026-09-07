@@ -1,0 +1,162 @@
+;;; pc_ivl.xtm:tests -- tests for the pitch-class and interval library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/pc_ivl.xtm. Everything in that file is Scheme-level, so
+;; these are plain calls with pinned return values.
+
+;; Several of the helpers are deliberately non-deterministic (pc:random,
+;; pc:make-chord, pc:move-chord). They're exercised here only over ranges
+;; narrow enough that there's exactly one answer, or for their documented
+;; #f-on-impossible behaviour.
+
+;;; Code:
+
+(sys:load "libs/core/pc_ivl.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; pitch classes and members  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (pc:pc 61) 1 "pc:pc")
+(xtmtest-result (pc:pc 72) 0 "pc:pc-octave")
+;; modulo, not remainder, so negative pitches wrap upwards
+(xtmtest-result (pc:pc -1) 11 "pc:pc-negative")
+
+(xtmtest-result (pc:? 60 '(0 4 7)) #t "pc:?-member")
+(xtmtest-result (pc:? 61 '(0 4 7)) #f "pc:?-non-member")
+(xtmtest-result (pc:? 72 '(0 4 7)) #t "pc:?-octave-member")
+
+;;;;;;;;;;;;;;;;;;;
+;; quantisation  ;;
+;;;;;;;;;;;;;;;;;;;
+
+;; a pitch already in the pc comes back unchanged
+(xtmtest-result (pc:quantize 60 '(0 2 4 5 7 9 11)) 60 "pc:quantize-identity")
+;; where the distance is a tie, quantize goes up and quantize-low goes down
+(xtmtest-result (pc:quantize 61 '(0 2 4 5 7 9 11)) 62 "pc:quantize-ties-high")
+(xtmtest-result (pc:quantize-low 61 '(0 2 4 5 7 9 11)) 60 "pc:quantize-low-ties-low")
+;; a non-integer pitch is rounded before quantising
+(xtmtest-result (pc:quantize 60.4 '(0 2 4 5 7 9 11)) 60 "pc:quantize-rounds")
+;; an empty pc has nothing to quantise to
+(xtmtest-result (pc:quantize 60 '()) #f "pc:quantize-empty")
+
+(xtmtest-result (pc:quantize-list '(60 61 62 63) '(0 2 4 5 7 9 11))
+                '(60 62 62 64)
+                "pc:quantize-list")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; relative pitch motion ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the two examples from the docstring
+(xtmtest-result (pc:relative 64 -2 '(0 2 4 5 7 9 11)) 60 "pc:relative-down")
+(xtmtest-result (pc:relative 69 3 '(0 2 4 5 7 9 11)) 74 "pc:relative-up")
+;; a zero offset is the identity, whether or not the pitch is in the pc
+(xtmtest-result (pc:relative 61 0 '(0 2 4 5 7 9 11)) 61 "pc:relative-zero")
+
+(xtmtest-result (pc:degree 67 '(0 2 4 5 7 9 11)) 5 "pc:degree")
+(xtmtest-result (pc:degree 61 '(0 2 4 5 7 9 11)) #f "pc:degree-not-in-pc")
+
+;;;;;;;;;;;;
+;; scales ;;
+;;;;;;;;;;;;
+
+(xtmtest-result (pc:scale 0 'ionian) '(0 2 4 5 7 9 11) "pc:scale-ionian")
+;; scales wrap at the octave, so A aeolian starts at 9 and comes back round
+(xtmtest-result (pc:scale 9 'aeolian) '(9 11 0 2 4 5 7) "pc:scale-aeolian")
+;; the type may be given as a string
+(xtmtest-result (pc:scale 0 "ionian") '(0 2 4 5 7 9 11) "pc:scale-string-type")
+
+;; scale-from-pc is the inverse, and hands back the pc itself if it can't
+;; name the scale
+(xtmtest-result (pc:scale-from-pc '(0 2 4 5 7 9 11)) 'ionian "pc:scale-from-pc")
+(xtmtest-result (pc:scale-from-pc '(0 1 2)) '(0 1 2) "pc:scale-from-pc-unknown")
+
+(xtmtest-result (pc:from-intervals '(0) '(2 2 1 2 2 2))
+                '(0 2 4 5 7 9 11)
+                "pc:from-intervals")
+
+;;;;;;;;;;;;
+;; chords ;;
+;;;;;;;;;;;;
+
+(xtmtest-result (pc:chord 0 '^7) '(0 4 7 11) "pc:chord-major-seventh")
+;; a chord above a root high enough to wrap keeps its pitch classes in order
+(xtmtest-result (pc:chord 2 '-7) '(2 5 9 0) "pc:chord-minor-seventh")
+(xtmtest-result (pc:chord 0 'not-a-chord) #f "pc:chord-unknown-type")
+
+(xtmtest-result (pc:diatonic 0 '^ 'i) '(0 4 7) "pc:diatonic-tonic")
+(xtmtest-result (pc:diatonic 0 '^ 'v) '(7 11 2) "pc:diatonic-dominant")
+;; a numeric degree is mapped onto its roman numeral first
+(xtmtest-result (pc:diatonic 0 '^ 7) '(7 11 2) "pc:diatonic-numeric-degree")
+
+(xtmtest-result (pc:chord-options 0 '^ (pc:scale 0 'ionian))
+                '((0 4 7) (0 4 7 11) (0 5 7) (0 4 7 11 2) (0 4 7 11 6))
+                "pc:chord-options")
+
+(xtmtest-result (pc:chord->scale 0 'i) '(0 2 4 5 7 9 11) "pc:chord->scale-tonic")
+(xtmtest-result (pc:chord->scale 0 'v7) '(7 9 11 0 2 4 5) "pc:chord->scale-dominant")
+
+(xtmtest-result (pc:scale-from-chord 0 '(0 4 7))
+                '(0 2 4 5 7 9 11)
+                "pc:scale-from-chord")
+
+;; over a range with exactly one candidate per slot, make-chord is determinate
+(xtmtest-result (pc:make-chord 60 72 3 '(0 4 7)) '(60 64 67) "pc:make-chord")
+(xtmtest-result (pc:make-chord-fixed 60 3 '(0 4 7)) '(60 64 67) "pc:make-chord-fixed")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; distances and nearness ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; distance is measured around the octave, so it never exceeds 6
+(xtmtest-result (pc:distance 61 '(0 4 7)) 1 "pc:distance")
+(xtmtest-result (pc:distance 66 '(0)) 6 "pc:distance-tritone")
+(xtmtest-result (pc:distance 60 '(0 4 7)) 0 "pc:distance-in-pc")
+
+(xtmtest-result (pc:distance-of-chord '(60 61 62) '(0 4 7)) 3 "pc:distance-of-chord")
+(xtmtest-result (pc:closest-pc 61 '(0 4 7)) 0 "pc:closest-pc")
+(xtmtest-result (pc:closest-pitch '(0 4 7) '(61 65 68)) 61 "pc:closest-pitch")
+(xtmtest-result (pc:find-closest '(60 61 62) '(0 4 7)) 60 "pc:find-closest")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; interval (key-blind) operations ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (ivl:retrograde '(1 2 3)) '(3 2 1) "ivl:retrograde")
+;; the first element is the pivot unless one is given, so it stays put
+(xtmtest-result (ivl:invert '(60 64 67)) '(60 56 53) "ivl:invert")
+(xtmtest-result (ivl:invert '(60 64 67) 62) '(60 60 57) "ivl:invert-pivot")
+(xtmtest-result (ivl:transpose 3 '(60 64 67)) '(63 67 70) "ivl:transpose")
+(xtmtest-result (ivl:expand/contract '(60 62 64) 2) '(60 64 68) "ivl:expand")
+(xtmtest-result (ivl:expand/contract '(60 62 64) 1) '(60 62 64) "ivl:expand-identity")
+(xtmtest-result (ivl:melody-by-ivl 60 '(2 2 1)) '(60 62 64 65) "ivl:melody-by-ivl")
+
+;; the pc: variants are the same thing quantised back into the pitch class
+(xtmtest-result (pc:transpose 2 '(60 64 67) (pc:scale 0 'ionian))
+                '(62 67 69)
+                "pc:transpose")
+(xtmtest-result (pc:invert '(60 64 67) (pc:scale 0 'ionian))
+                '(60 57 53)
+                "pc:invert")
+(xtmtest-result (pc:expand/contract '(60 62 64) 2 (pc:scale 0 'ionian))
+                '(60 64 69)
+                "pc:expand/contract")
+(xtmtest-result (pc:melody-by-step 60 '(1 1 1) (pc:scale 0 'ionian))
+                '(60 62 64 65)
+                "pc:melody-by-step")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the non-deterministic ones ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; an empty pc, or a range with no member of the pc in it, has no answer
+(xtmtest-result (pc:random 60 72 '()) #f "pc:random-empty-pc")
+(xtmtest-result (pc:random 60 61 '(1)) #f "pc:random-no-candidate")
+;; a range containing exactly one member of the pc has only one answer
+(xtmtest-result (pc:random 60 64 '(2)) 62 "pc:random-single-candidate")
