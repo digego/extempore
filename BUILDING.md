@@ -9,8 +9,25 @@ in more depth, here's some more information.
 - a C++20 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
 - Git
 - CMake >= 3.28
-- Ninja (recommended on Linux/macOS)
+- Ninja (every preset uses it, on all three platforms)
 - Python >= 3.8 (for LLVM)
+
+## Presets
+
+`CMakePresets.json` carries the configurations CI uses, so you can build the
+same thing locally:
+
+    cmake --preset default          # Ninja, Release, tests on --- builds into build/
+    cmake --build build
+
+| Preset                                                                    | What it configures                                              |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `default`, `ci`                                                           | Ninja, `Release`, `BUILD_TESTS=ON`                              |
+| `release`                                                                 | as above plus `ASSETS=ON`, `BUILD_TESTS=OFF`, `EXT_SHARE_DIR=.` |
+| `sanitize-asan`, `sanitize-ubsan`, `sanitize-tsan`, `sanitize-asan-ubsan` | as `default` plus the matching `EXTEMPORE_SANITIZE` value       |
+
+Presets are a starting point, not a straitjacket --- add `-D` options to the
+`cmake --preset` line as usual.
 
 ## Build options
 
@@ -29,6 +46,18 @@ users will care about:
   (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
   ALSA.
+- `EXTEMPORE_CCACHE` (default `ON`) --- route compilation through `ccache` when
+  it's installed. The sub-builds (LLVM, portaudio, sndfile, ...) inherit it, so
+  a second build directory costs minutes rather than half an hour.
+- `EXTEMPORE_SANITIZE` (default empty) --- build Extempore's own objects with a
+  sanitizer: `asan`, `ubsan`, `tsan` or `asan+ubsan`. Anything else is a
+  configure error. Unix only.
+- `EXT_SHARE_DIR` (default: the source tree) --- where the binary looks for
+  `runtime/`, `libs/` and `examples/`, baked in at compile time. The release
+  builds set `.`, i.e. the working directory. `--sharedir` overrides it at
+  runtime.
+- `EXTEMPORE_VERSION` (default: `git describe`) --- the version the binary
+  reports. CI passes the tag explicitly because its checkout is shallow.
 
 ## LLVM
 
@@ -55,6 +84,16 @@ standard library (for faster startup). Other targets worth knowing about:
   sndfile, fft, etc). This is the default AOT target.
 - `clean_aot` --- remove all AOT-compiled files.
 - `assets` --- download and unpack the assets tarball.
+
+## Installing
+
+`cmake --install build --prefix <dir>` lays out a self-contained tree in
+`<dir>`: the `extempore` binary with `runtime/`, `libs/` (AOT cache and platform
+shared libraries included), `examples/` and, if they were downloaded, `assets/`
+beside it. That's the layout of the binary release archives, so a build
+configured with the `release` preset (which sets `EXT_SHARE_DIR=.`) runs from
+the install directory as-is. A binary built with the default share dir needs
+`--sharedir <dir>` to use an installed tree.
 
 ## Running Extempore
 
@@ -109,7 +148,9 @@ Extempore is built & tested on Windows Server 2022 with Visual Studio 2022. If
 you don't already have VS installed, download the free
 [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/).
 
-The CMake generator for VS2022 is `-G "Visual Studio 17 2022" -A x64`.
+CI builds Windows with Ninja from a Visual Studio developer prompt, which is
+what the presets assume. To use the VS generator instead, skip the presets and
+configure with `-G "Visual Studio 17 2022" -A x64`.
 
 #### Missing `VCRUNTIME140_1.dll`
 

@@ -80,13 +80,12 @@ Extempore's CMake build process downloads and builds all the dependencies you
 need (including LLVM). So, if you've got a C++ compiler, git, CMake >= 3.28 and
 Ninja, here are some one-liner build commands.
 
-On **Linux/macOS**:
+On **Linux/macOS** (and on **Windows** from a Visual Studio developer prompt):
 
-    git clone https://github.com/digego/extempore && cmake -S extempore -B extempore/build -G Ninja -DASSETS=ON && cmake --build extempore/build -j$(nproc)
+    git clone https://github.com/digego/extempore && cd extempore && cmake --preset default -DASSETS=ON && cmake --build build
 
-On **Windows** (adjust the generator for your VS version):
-
-    git clone https://github.com/digego/extempore && cmake -S extempore -B extempore/build -G "Visual Studio 17 2022" -A x64 -DASSETS=ON && cmake --build extempore/build --config Release
+`--preset default` is a Ninja + Release build with the tests enabled; see
+`CMakePresets.json` (and [BUILDING.md](./BUILDING.md)) for the others.
 
 _Note on build time_: the first build takes ~10-30 minutes because LLVM is
 compiled from source. Subsequent builds reuse the cached LLVM artifacts under
@@ -99,8 +98,10 @@ rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
 
 _Note on running_: the `extempore` binary locates its runtime files (`runtime/`,
-`libs/`, `examples/`) relative to the source tree at build time. Run it from the
-build directory (`./extempore`) rather than installing it to a system location.
+`libs/`, `examples/`) relative to the source tree at build time, so run it in
+place (`build/extempore`). If you'd rather have a self-contained tree somewhere
+else, `cmake --install build --prefix <dir>` copies the binary and its runtime
+files into `<dir>` --- see [BUILDING.md](./BUILDING.md).
 
 ### Hear your first sine wave
 

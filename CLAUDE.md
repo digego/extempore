@@ -6,13 +6,18 @@ xtlang---a statically-typed lisp that compiles to LLVM IR at runtime.
 ## Build
 
 ```bash
-mkdir build && cd build
-cmake .. -G Ninja
-cmake --build . -j$(nproc)
+cmake --preset default
+cmake --build build
 ```
 
-Use the Ninja generator (as CI does); it keeps all cores busy far better than
-Make on the LLVM build and makes incremental rebuilds near-instant.
+`CMakePresets.json` holds the configurations CI uses: `default`/`ci` (Ninja,
+Release, tests on), `release` (assets, no tests, `EXT_SHARE_DIR=.`) and
+`sanitize-asan`/`sanitize-ubsan`/`sanitize-tsan`/`sanitize-asan-ubsan`. All of
+them build into `build/`.
+
+Ninja is not optional in the presets: it keeps all cores busy far better than
+Make on the LLVM build and makes incremental rebuilds near-instant. The AOT
+steps run in a Ninja job pool capped at 2, so build at full parallelism.
 
 Key options: `-DASSETS=ON` (download multimedia assets), `-DBUILD_TESTS=ON`
 (default).
@@ -42,8 +47,8 @@ caches `build/_deps/` to speed up CI builds.
 ## Test
 
 ```bash
-ctest --label-regex libs-core -j4      # core library tests
-ctest --label-regex libs-external -j4  # external library tests
+ctest --test-dir build -L libs-core -j4      # core library tests
+ctest --test-dir build -L libs-external -j4  # external library tests
 ```
 
 Tests are `.xtm` files in `tests/`. They run in `--batch` mode (which implies
@@ -86,11 +91,12 @@ NOTE: this project uses GitHub Actions (in particular the
 ## Common tasks
 
 ```bash
-cmake --build . --target aot        # AOT compile stdlib (faster startup)
-cmake --build . --target clean_aot  # rebuild AOT cache
-cmake --build . --target xtmdoc     # generate docs
-./extempore --noaudio               # run without audio
-./extempore --repl                  # interactive REPL (Linux/macOS only)
+cmake --build build --target aot_core            # AOT compile the core stdlib
+cmake --build build --target aot_external_audio  # ... and the audio libs (default)
+cmake --build build --target clean_aot           # delete libs/aot-cache
+cmake --build build --target xtmdoc              # generate docs
+build/extempore --noaudio                        # run without audio
+build/extempore --repl                           # interactive REPL (Linux/macOS only)
 ```
 
 ## Evaluating extempore code
