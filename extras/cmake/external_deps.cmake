@@ -18,17 +18,22 @@ if(WIN32)
 endif()
 
 function(extempore_add_external name)
-    cmake_parse_arguments(ARG "" "URL;URL_MD5;FOLDER" "CMAKE_ARGS" ${ARGN})
+    cmake_parse_arguments(ARG "" "URL;URL_SHA256;FOLDER" "CMAKE_ARGS" ${ARGN})
+    if(NOT ARG_URL_SHA256)
+        message(FATAL_ERROR "extempore_add_external(${name}): URL_SHA256 is required")
+    endif()
     ExternalProject_Add(${name}
         PREFIX ${name}
         URL ${ARG_URL}
-        URL_MD5 ${ARG_URL_MD5}
+        URL_HASH SHA256=${ARG_URL_SHA256}
+        LIST_SEPARATOR |
         CMAKE_ARGS
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
             -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
             -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
             -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+            ${EXT_DEPS_TOOLCHAIN_ARGS}
             ${ARG_CMAKE_ARGS})
     set_target_properties(${name} PROPERTIES FOLDER ${ARG_FOLDER})
 endfunction()
@@ -36,12 +41,12 @@ endfunction()
 if(EXTERNAL_SHLIBS_AUDIO)
     extempore_add_external(portmidi
         URL https://github.com/PortMidi/portmidi/archive/${DEP_PORTMIDI_VERSION}.zip
-        URL_MD5 ${DEP_PORTMIDI_MD5}
+        URL_SHA256 ${DEP_PORTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
     extempore_add_external(rtmidi
         URL https://github.com/thestk/rtmidi/archive/${DEP_RTMIDI_VERSION}.zip
-        URL_MD5 ${DEP_RTMIDI_MD5}
+        URL_SHA256 ${DEP_RTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS
         CMAKE_ARGS -DRTMIDI_BUILD_TESTING=OFF
             $<$<BOOL:${WIN32}>:-DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}>
@@ -49,10 +54,12 @@ if(EXTERNAL_SHLIBS_AUDIO)
 
     extempore_add_external(kiss_fft
         URL https://github.com/extemporelang/kiss_fft/archive/${DEP_KISS_FFT_VERSION}.zip
+        URL_SHA256 ${DEP_KISS_FFT_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
     extempore_add_external(sndfile
         URL https://github.com/erikd/libsndfile/archive/${DEP_SNDFILE_COMMIT}.zip
+        URL_SHA256 ${DEP_SNDFILE_SHA256}
         FOLDER EXTERNAL_SHLIBS
         CMAKE_ARGS
             -DBUILD_SHARED_LIBS=ON
@@ -100,10 +107,12 @@ endif()
 if(EXTERNAL_SHLIBS_GRAPHICS)
     extempore_add_external(stb_image
         URL https://github.com/extemporelang/stb/archive/${DEP_STB_COMMIT}.zip
+        URL_SHA256 ${DEP_STB_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
     extempore_add_external(glfw3
         URL https://github.com/glfw/glfw/releases/download/${DEP_GLFW_VERSION}/glfw-${DEP_GLFW_VERSION}.zip
+        URL_SHA256 ${DEP_GLFW_SHA256}
         FOLDER EXTERNAL_SHLIBS
         CMAKE_ARGS
             -DBUILD_SHARED_LIBS=ON
@@ -115,18 +124,23 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     if(APPLE)
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
             set(_wgpu_platform "macos-aarch64")
+            set(_wgpu_sha256 ${DEP_WGPU_SHA256_MACOS_AARCH64})
         else()
             set(_wgpu_platform "macos-x86_64")
+            set(_wgpu_sha256 ${DEP_WGPU_SHA256_MACOS_X86_64})
         endif()
         set(_wgpu_lib_name "libwgpu_native.dylib")
     elseif(WIN32)
         set(_wgpu_platform "windows-x86_64-msvc")
+        set(_wgpu_sha256 ${DEP_WGPU_SHA256_WINDOWS_X86_64})
         set(_wgpu_lib_name "wgpu_native.dll")
     else()
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
             set(_wgpu_platform "linux-aarch64")
+            set(_wgpu_sha256 ${DEP_WGPU_SHA256_LINUX_AARCH64})
         else()
             set(_wgpu_platform "linux-x86_64")
+            set(_wgpu_sha256 ${DEP_WGPU_SHA256_LINUX_X86_64})
         endif()
         set(_wgpu_lib_name "libwgpu_native.so")
     endif()
@@ -137,6 +151,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     ExternalProject_Add(wgpu_native_download
         PREFIX wgpu-native
         URL ${_wgpu_url}
+        URL_HASH SHA256=${_wgpu_sha256}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include ${_wgpu_dir}/include

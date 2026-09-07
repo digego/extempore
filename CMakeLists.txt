@@ -82,25 +82,66 @@ if(EXTEMPORE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
     endif()
 endif()
 
+#####################################
+# external sub-build toolchain args #
+#####################################
+
+# Every dependency is built by a nested CMake project (ExternalProject or
+# FetchContent), which re-detects its own toolchain from scratch. Forward the
+# settings that have to match --- compiler, ccache launcher, macOS deployment
+# settings --- but only the ones actually set, since an empty -D would override
+# the sub-build's own detection with nothing. Values are joined with `|` and
+# every consumer passes LIST_SEPARATOR, so a multi-value setting such as
+# CMAKE_OSX_ARCHITECTURES survives the trip.
+set(EXT_DEPS_TOOLCHAIN_ARGS "")
+foreach(_var
+        CMAKE_C_COMPILER
+        CMAKE_CXX_COMPILER
+        CMAKE_C_COMPILER_LAUNCHER
+        CMAKE_CXX_COMPILER_LAUNCHER
+        CMAKE_OSX_DEPLOYMENT_TARGET
+        CMAKE_OSX_ARCHITECTURES)
+    if(${_var})
+        string(REPLACE ";" "|" _value "${${_var}}")
+        list(APPEND EXT_DEPS_TOOLCHAIN_ARGS "-D${_var}=${_value}")
+    endif()
+endforeach()
+
 #############################
 # dependency version pinning #
 #############################
 
+# Every archive is pinned by SHA256 so a re-tagged or tampered-with download is
+# rejected rather than built. Hashes come from the upstream release assets /
+# GitHub source archives at the pinned version.
 set(DEP_LLVM_VERSION "22.1.6")
+set(DEP_LLVM_SHA256 "6e0b376a1f6d9873e7dfb09ae6e04b9c7024400f01733fa4c29be69d5c138bc2")
 # PortAudio tags releases rarely (v19.7.0 is from 2021), so pin master by commit
 # SHA for its modern CMake (3.10 -- which lets us drop the policy-version floor
 # the old 2.8 CMake needed) and five years of platform fixes. Still built static.
 set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
 set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
-set(DEP_PORTMIDI_MD5 "212d4fa92fbb40c8bbaee054af138bf8")
+set(DEP_PORTMIDI_SHA256 "e4ee3152ae42362f30b5e59fc5729b8b7e2a98023e1752f641d849543602f31e")
 set(DEP_RTMIDI_VERSION "6.0.0")
-set(DEP_RTMIDI_MD5 "4fd20d9f3227023d4b369f21d29667ef")
+set(DEP_RTMIDI_SHA256 "55f1e7636160204a8b04dc7aacf959b7c66df0011124e7ddfa6d9c06c8b3363e")
 set(DEP_KISS_FFT_VERSION "1.3.0")
+set(DEP_KISS_FFT_SHA256 "fd6d82f4aa4a22d2fc3d192a66b919abf43b9c001b78585dc5c3290218981fcd")
 set(DEP_SNDFILE_COMMIT "ae64caf9b5946d365971c550875000342e763de6")
+set(DEP_SNDFILE_SHA256 "d9335f7c7113b5030ab5e6c1d77a5efb2cfcae6c5ddaae5010dd0cb9b3107f02")
 set(DEP_STB_COMMIT "152a250a702bf28951bb0220d63bc0c99830c498")
+set(DEP_STB_SHA256 "6772c4240031ba162ed317d8e13fce5a4e18987937e6f28364819c0a262a0d22")
 set(DEP_GLFW_VERSION "3.4")
+set(DEP_GLFW_SHA256 "b5ec004b2712fd08e8861dc271428f048775200a2df719ccf575143ba749a3e9")
 set(DEP_WGPU_VERSION "27.0.4.0")
+# wgpu-native ships prebuilt binaries, so the hash is per platform archive.
+set(DEP_WGPU_SHA256_LINUX_X86_64 "271481ef76fbf3ea09631a6079e9493636ecf813cd9c92306c44a1a452991ba1")
+set(DEP_WGPU_SHA256_LINUX_AARCH64 "a2f22248200997b69373273b10d50a58164f6ed840877289f3e46bff317b134e")
+set(DEP_WGPU_SHA256_MACOS_X86_64 "660fe9be59b555ec1d7c839e5cf8b6c71762938af61ab444a7a58dd87970dba2")
+set(DEP_WGPU_SHA256_MACOS_AARCH64 "15367c26fdbe6892db35007d39f3883593384e777360b70e6bd704cb5dedde53")
+set(DEP_WGPU_SHA256_WINDOWS_X86_64 "f14ca334b4d253881bde2605bd147f332178d705f56fbd74f81458797c77fce1")
+set(DEP_GOOGLETEST_VERSION "1.15.2")
+set(DEP_GOOGLETEST_SHA256 "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926")
 
 ######
 # s7 #
@@ -158,11 +199,13 @@ ExternalProject_Add(portaudio_static
     PREFIX portaudio
     URL https://github.com/PortAudio/portaudio/archive/${DEP_PORTAUDIO_VERSION}.zip
     URL_HASH SHA256=${DEP_PORTAUDIO_SHA256}
+    LIST_SEPARATOR |
     CMAKE_ARGS
         -DPA_BUILD_SHARED_LIBS=OFF
         -DPA_USE_JACK=${JACK}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio)
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio
+        ${EXT_DEPS_TOOLCHAIN_ARGS})
 
 ########
 # LLVM #
@@ -211,6 +254,7 @@ set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(LLVM
     URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
+    URL_HASH SHA256=${DEP_LLVM_SHA256}
     SOURCE_SUBDIR llvm
     EXCLUDE_FROM_ALL)
 
@@ -220,7 +264,8 @@ FetchContent_MakeAvailable(LLVM)
 if(BUILD_TESTS)
     FetchContent_Declare(
         googletest
-        URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz)
+        URL https://github.com/google/googletest/archive/refs/tags/v${DEP_GOOGLETEST_VERSION}.tar.gz
+        URL_HASH SHA256=${DEP_GOOGLETEST_SHA256})
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
