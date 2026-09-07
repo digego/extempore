@@ -166,11 +166,6 @@ scheme* scheme_init_new() {
     s7_eval_c_string(sc->sc, "(define set-input-port set-current-input-port)");
     s7_eval_c_string(sc->sc, "(define set-output-port set-current-output-port)");
 
-    // foldr (TinyScheme's foldr is actually foldl - left fold)
-    s7_eval_c_string(sc->sc, "(define (foldr f x lst)"
-                             "  (if (null? lst) x"
-                             "      (foldr f (f x (car lst)) (cdr lst))))");
-
     // list* (like cons* - creates list with last arg as tail)
     s7_eval_c_string(sc->sc, "(define (list* . args)"
                              "  (if (null? (cdr args)) (car args)"
