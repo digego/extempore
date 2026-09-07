@@ -54,10 +54,10 @@ static pointer getAudioXruns(scheme* Scheme, pointer Args)
 }
 
 #define SYS_DSP_DEFS \
-        { "sys:set-dsp-closure", &setDSPClosure }, \
-        { "sys:set-dspmt-closure", &setDSPMTClosure }, \
-        { "sys:set-dsp-wrapper", &setDSPWrapper }, \
-        { "sys:set-dspmt-wrapper", &setDSPMTWrapper }, \
-        { "sys:init-mt-audio", &initMTAudio }, \
-        { "sys:audio-load", &getAudioLoad }, \
-        { "sys:audio-xruns", &getAudioXruns }
+        FFI_DEF("sys:set-dsp-closure", setDSPClosure, 1, 0, false), \
+        FFI_DEF("sys:set-dspmt-closure", setDSPMTClosure, 2, 0, false), \
+        FFI_DEF("sys:set-dsp-wrapper", setDSPWrapper, 1, 0, false), \
+        FFI_DEF("sys:set-dspmt-wrapper", setDSPMTWrapper, 2, 0, false), \
+        FFI_DEF("sys:init-mt-audio", initMTAudio, 2, 0, false), \
+        FFI_DEF("sys:audio-load", getAudioLoad, 0, 0, false), \
+        FFI_DEF("sys:audio-xruns", getAudioXruns, 0, 0, false)

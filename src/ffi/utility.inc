@@ -1,6 +1,7 @@
 static pointer asciiColor(scheme* Scheme, pointer Args)
 {
-    ascii_text_color(bool(ivalue(pair_car(Args))), ivalue(pair_cadr(Args)), ivalue(pair_caddr(Args)));
+    ascii_text_color(bool(argInt(Scheme, Args, 1)), int(argInt(Scheme, Args, 2)),
+            int(argInt(Scheme, Args, 3)));
     return Scheme->T;
 }
 
@@ -41,7 +42,7 @@ static pointer emit(scheme* Scheme, pointer Args)
 
 static pointer exit_extempore(scheme* Scheme, pointer Args)
 {
-    int rc(ivalue(pair_car(Args)));
+    int rc = (Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0;
     // std::_Exit bypasses destructors AND discards stdio buffers. Flush any
     // pending output (e.g. printf from xtlang tests) and finalize the offline
     // WAV before terminating.
@@ -51,6 +52,6 @@ static pointer exit_extempore(scheme* Scheme, pointer Args)
 }
 
 #define UTILITY_DEFS \
-        { "ascii-print-color", &asciiColor }, \
-        { "emit", &emit }, \
-        { "quit", &exit_extempore }
+        FFI_DEF("ascii-print-color", asciiColor, 3, 0, false), \
+        FFI_DEF("emit", emit, 1, 0, true), \
+        FFI_DEF("quit", exit_extempore, 0, 1, false)

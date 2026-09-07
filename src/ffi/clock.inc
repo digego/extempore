@@ -1,26 +1,26 @@
-pointer setClockOffset(scheme* Scheme, pointer Args)
+static pointer setClockOffset(scheme* Scheme, pointer Args)
 {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args));
+    UNIV::CLOCK_OFFSET = argReal(Scheme, Args, 1);
     return pair_car(Args);
 }
 
-pointer getClockOffset(scheme* Scheme, pointer Args)
+static pointer getClockOffset(scheme* Scheme, pointer Args)
 {
     return mk_real(Scheme, UNIV::CLOCK_OFFSET);
 }
 
-pointer adjustClockOffset(scheme* Scheme, pointer Args)
+static pointer adjustClockOffset(scheme* Scheme, pointer Args)
 {
-    UNIV::CLOCK_OFFSET = rvalue(pair_car(Args)) + UNIV::CLOCK_OFFSET;
+    UNIV::CLOCK_OFFSET = argReal(Scheme, Args, 1) + UNIV::CLOCK_OFFSET;
     return mk_real(Scheme, UNIV::CLOCK_OFFSET);
 }
 
-pointer getClockTime(scheme* Scheme, pointer Args)
+static pointer getClockTime(scheme* Scheme, pointer Args)
 {
     return mk_real(Scheme, getRealTime() + UNIV::CLOCK_OFFSET);
 }
 
-pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
+static pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
 {
     pointer p1 = mk_integer(Scheme, UNIV::TIME);
     EnvInjector inject1(Scheme, p1);
@@ -30,8 +30,8 @@ pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
 }
 
 #define CLOCK_DEFS \
-        { "clock:set-offset", &setClockOffset }, \
-        { "clock:get-offset", &getClockOffset }, \
-        { "clock:adjust-offset", &adjustClockOffset }, \
-        { "clock:clock", &getClockTime }, \
-        { "clock:ad:clock", &lastSampleBlockClock }
+        FFI_DEF("clock:set-offset", setClockOffset, 1, 0, false), \
+        FFI_DEF("clock:get-offset", getClockOffset, 0, 0, false), \
+        FFI_DEF("clock:adjust-offset", adjustClockOffset, 1, 0, false), \
+        FFI_DEF("clock:clock", getClockTime, 0, 0, false), \
+        FFI_DEF("clock:ad:clock", lastSampleBlockClock, 0, 0, false)

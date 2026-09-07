@@ -1,8 +1,8 @@
 // ipc stuff
 static pointer newSchemeProcess(scheme* Scheme, pointer Args)
 {
-    std::string proc_name(string_value(pair_car(Args)));
-    int port = ivalue(pair_cadr(Args));
+    std::string proc_name(argString(Scheme, Args, 1));
+    int port = int(argInt(Scheme, Args, 2));
     SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
     sp->start();
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
@@ -17,9 +17,9 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
 
 static pointer connectToProcess(scheme* Scheme, pointer Args)
 {
-    std::string host_name(string_value(pair_car(Args)));
-    std::string proc_name(string_value(pair_cadr(Args)));
-    int port = ivalue(pair_caddr(Args));
+    std::string host_name(argString(Scheme, Args, 1));
+    std::string proc_name(argString(Scheme, Args, 2));
+    int port = int(argInt(Scheme, Args, 3));
     SchemeREPL* repl = new SchemeREPL(proc_name, nullptr);
     if (repl->connectToProcessAtHostname(host_name, port)) {
         return Scheme->T;
@@ -70,7 +70,7 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value)
 
 static pointer ipcCall(scheme* Scheme, pointer Args)
 {
-    auto repl(findREPL(string_value(pair_car(Args))));
+    auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
       return Scheme->F;
     }
@@ -88,7 +88,7 @@ static pointer ipcCall(scheme* Scheme, pointer Args)
 
 static pointer ipcDefine(scheme* Scheme, pointer Args)
 {
-    auto repl(findREPL(string_value(pair_car(Args))));
+    auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
         return Scheme->F;
     }
@@ -103,27 +103,27 @@ static pointer ipcDefine(scheme* Scheme, pointer Args)
 
 static pointer ipcEval(scheme* Scheme, pointer Args)
 {
-    auto repl(findREPL(string_value(pair_car(Args))));
+    auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
         return Scheme->F;
     }
-    repl->writeString(string_value(pair_cadr(Args)));
+    repl->writeString(argString(Scheme, Args, 2));
     return Scheme->T;
 }
 
 static pointer ipcSetPriority(scheme* Scheme, pointer Args)
 {
-    auto repl(findREPL(string_value(pair_car(Args))));
+    auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl || !repl->getProcess()) {
         return Scheme->F;
     }
-    repl->getProcess()->setPriority(ivalue(pair_cadr(Args)));
+    repl->getProcess()->setPriority(argInt(Scheme, Args, 2));
     return Scheme->T;
 }
 
 static pointer ipcGetPriority(scheme* Scheme, pointer Args)
 {
-    auto repl(findREPL(string_value(pair_car(Args))));
+    auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl || !repl->getProcess()) {
         return Scheme->F;
     }
@@ -136,11 +136,11 @@ static pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args)
 }
 
 #define IPC_DEFS \
-        { "ipc:new", &newSchemeProcess }, \
-        { "ipc:connect", &connectToProcess }, \
-        { "ipc:call-async", &ipcCall }, \
-        { "ipc:define", &ipcDefine }, \
-        { "ipc:eval-string", &ipcEval }, \
-        { "ipc:set-priority", &ipcSetPriority }, \
-        { "ipc:get-priority", &ipcGetPriority }, \
-        { "ipc:get-process-name", &getNameOfCurrentProcess }
+        FFI_DEF("ipc:new", newSchemeProcess, 2, 0, false), \
+        FFI_DEF("ipc:connect", connectToProcess, 3, 0, false), \
+        FFI_DEF("ipc:call-async", ipcCall, 2, 0, true), \
+        FFI_DEF("ipc:define", ipcDefine, 3, 0, false), \
+        FFI_DEF("ipc:eval-string", ipcEval, 2, 0, false), \
+        FFI_DEF("ipc:set-priority", ipcSetPriority, 2, 0, false), \
+        FFI_DEF("ipc:get-priority", ipcGetPriority, 1, 0, false), \
+        FFI_DEF("ipc:get-process-name", getNameOfCurrentProcess, 0, 0, false)

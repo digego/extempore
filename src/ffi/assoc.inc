@@ -9,5 +9,5 @@ static pointer assocstrcmpall(scheme* Scheme, pointer Args)
 }
 
 #define ASSOC_DEFS \
-        { "assoc-strcmp", &assocstrcmp }, \
-        { "assoc-strcmp-all", &assocstrcmpall }
+        FFI_DEF("assoc-strcmp", assocstrcmp, 2, 0, false), \
+        FFI_DEF("assoc-strcmp-all", assocstrcmpall, 2, 0, false)
