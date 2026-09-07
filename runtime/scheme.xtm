@@ -90,12 +90,6 @@
           (else (cons (car lst) (remove-all obj (cdr lst)))))))
 
 
-(define (tree-copy tree)
-  (let loop ((tree tree))
-    (if (pair? tree)
-        (cons (loop (car tree)) (loop (cdr tree)))
-        tree)))
-
 (define (tree-member mem tree)
   (if (member #t
               (flatten
@@ -301,23 +295,6 @@
                   (log-info "clock times: " lst))
                 (begin (log-info 'clock 'successfully 'adjusted 'by (/ (apply + l2) (length l2)) 'seconds)
                   (clock:adjust-offset (/ (apply + l2) (length l2))))))))))
-
-
-(define -clock:metro-from-host-
-  (lambda ()
-    (let ((mark (*metro* 'get-mark)))
-      (list (*metro* 'get-tempo)
-            (car mark)
-            (samples->clock (cdr mark))))))
-
-
-(define clock:update-metro
-  (lambda (server-process local-process)
-    (let ((res (ipc:call server-process local-process '-clock:metro-from-host-)))
-      (set! *metro* (make-metro (car res)
-                                (cons (cadr res)
-                                      (clock->samples (caddr res))))))))
-
 
 
 (define clock:update-metro
@@ -953,26 +930,6 @@
                                 s)))))
           (flatten-1 (f1 set))))))
 
-
-
-;; return all combinations of set
-;; or subsets (size) of set
-(define combinations
-  (lambda (s size)
-    (if (< (length s) size)
-        '()
-        (letrec ((f1 (lambda (h t)
-                       (if (= (length h) size)
-                           (reverse h)
-                           (let loop ((e (car t))
-                                      (l (cdr t)))
-                             (if (null? l)
-                                 (if (< (length h) (- size 1)) '()
-                                     (reverse (list* e h)))
-                                 (list (f1 (list* e h) l)
-                                       (loop (car l) (cdr l)))))))))
-          (cl:remove '() (flatten-1 (append (f1 (list (car s)) (cdr s))
-                                            (combinations (cdr s) size))))))))
 
 
 ;; return all combinations of set
