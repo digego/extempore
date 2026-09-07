@@ -1,0 +1,404 @@
+;;; audiobuffer.xtm:tests -- tests for the audiobuffer library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/audiobuffer.xtm, covering the native WAVE and AIFF
+;; readers (including malformed and truncated files), the guards against
+;; zero-frame buffers, and the interpolating readers.
+
+;; The test files are built byte-by-byte below rather than checked in, so
+;; there's nothing to keep in sync and no binary in the repo. They're written
+;; into the working directory under a distinctive prefix and removed again.
+
+;;; Code:
+
+(sys:load "libs/core/audiobuffer.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; building little test files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static abtest_poke_le
+  "write V as an NBYTES-wide little-endian integer at OFFSET"
+  (lambda (buf:i8* offset:i64 nbytes:i64 v:i64)
+    (doloop (i nbytes)
+      (pset! buf (+ offset i) (convert (& (>> v (* i 8)) 255) i8)))))
+
+(bind-func static abtest_poke_be
+  "write V as an NBYTES-wide big-endian integer at OFFSET"
+  (lambda (buf:i8* offset:i64 nbytes:i64 v:i64)
+    (doloop (i nbytes)
+      (pset! buf (+ offset i) (convert (& (>> v (* 8 (- nbytes 1 i))) 255) i8)))))
+
+(bind-func static abtest_poke_id
+  "write a four-character chunk ID at OFFSET"
+  (lambda (buf:i8* offset:i64 id:i8*)
+    (doloop (i 4)
+      (pset! buf (+ offset i) (pref id i)))))
+
+;; every platform Extempore runs on is little-endian, so the host's own byte
+;; order is what a WAVE file wants
+(bind-func abtest_poke_f32_le
+  (let ((tmp:float* (zalloc 1)))
+    (lambda (buf:i8* offset:i64 v:double)
+      (pset! tmp 0 (dtof v))
+      (doloop (i 4)
+        (pset! buf (+ offset i) (pref (cast tmp i8*) i))))))
+
+(bind-func static abtest_poke_fp80_be
+  "write a positive integer as an 80-bit IEEE extended big-endian value"
+  (lambda (buf:i8* offset:i64 v:i64)
+    (let ((e 62))
+      (while (and (> e 0) (= (& (>> v e) 1) 0))
+        (set! e (- e 1)))
+      (abtest_poke_be buf offset 2 (+ 16383 e))
+      (abtest_poke_be buf (+ offset 2) 8 (<< v (- 63 e))))))
+
+;; the sample at frame I of channel C, as a 16-bit PCM value; reading it back
+;; through an AudioBuffer divides by 1 << 16
+(bind-func static abtest_pcm16
+  (lambda (i:i64 c:i64)
+    (- (* i 100) (* c 7))))
+
+(bind-func static abtest_expected
+  (lambda (i:i64 c:i64)
+    (/ (convert (abtest_pcm16 i c) double) 65536.0)))
+
+(bind-func static abtest_write_file
+  (lambda (path:i8* buf:i8* len:i64)
+    (let ((fp (fopen path "wb")))
+      (if (null? fp)
+          #f
+          (let ((wrote (fwrite buf 1:i64 len fp)))
+            (fclose fp)
+            (= wrote len))))))
+
+(bind-func abtest_build_wav
+  "build a minimal WAVE file in a malloc'd buffer, returning its length in LENPTR
+
+FMT is 1 for 16-bit PCM or 3 for 32-bit IEEE float. When EXTRA is true an
+unknown LIST chunk is inserted between fmt and data, which a reader is
+supposed to skip over."
+  (lambda (fmt:i64 nchan:i64 samplerate:i64 nframes:i64 extra:i1 lenptr:i64*)
+    (let ((bitdepth (if (= fmt 3) 32 16))
+          (samplebytes (/ bitdepth 8))
+          (databytes (* nframes nchan samplebytes))
+          (extrabytes (if extra 12 0))
+          (len (+ 36 extrabytes 8 databytes))
+          (buf:i8* (malloc len))
+          (pos 0))
+      (abtest_poke_id buf 0 "RIFF")
+      (abtest_poke_le buf 4 4 (- len 8))
+      (abtest_poke_id buf 8 "WAVE")
+      (abtest_poke_id buf 12 "fmt ")
+      (abtest_poke_le buf 16 4 16)
+      (abtest_poke_le buf 20 2 fmt)
+      (abtest_poke_le buf 22 2 nchan)
+      (abtest_poke_le buf 24 4 samplerate)
+      (abtest_poke_le buf 28 4 (* samplerate nchan samplebytes))
+      (abtest_poke_le buf 32 2 (* nchan samplebytes))
+      (abtest_poke_le buf 34 2 bitdepth)
+      (set! pos 36)
+      (if extra
+          (begin
+            (abtest_poke_id buf pos "LIST")
+            (abtest_poke_le buf (+ pos 4) 4 4)
+            (abtest_poke_id buf (+ pos 8) "INFO")
+            (set! pos (+ pos 12))))
+      (abtest_poke_id buf pos "data")
+      (abtest_poke_le buf (+ pos 4) 4 databytes)
+      (set! pos (+ pos 8))
+      (doloop (i nframes)
+        (doloop (c nchan)
+          (let ((idx (+ (* i nchan) c)))
+            (if (= fmt 3)
+                (abtest_poke_f32_le buf (+ pos (* idx 4)) (abtest_expected i c))
+                (abtest_poke_le buf (+ pos (* idx 2)) 2 (abtest_pcm16 i c))))))
+      (pset! lenptr 0 len)
+      buf)))
+
+(bind-func abtest_build_aiff
+  "build a minimal 16-bit AIFF file in a malloc'd buffer"
+  (lambda (nchan:i64 samplerate:i64 nframes:i64 lenptr:i64*)
+    (let ((databytes (* nframes nchan 2))
+          (len (+ 12 26 8 8 databytes))
+          (buf:i8* (malloc len))
+          (pos 0))
+      (abtest_poke_id buf 0 "FORM")
+      (abtest_poke_be buf 4 4 (- len 8))
+      (abtest_poke_id buf 8 "AIFF")
+      (abtest_poke_id buf 12 "COMM")
+      (abtest_poke_be buf 16 4 18)
+      (abtest_poke_be buf 20 2 nchan)
+      (abtest_poke_be buf 22 4 nframes)
+      (abtest_poke_be buf 26 2 16)
+      (abtest_poke_fp80_be buf 28 samplerate)
+      (abtest_poke_id buf 38 "SSND")
+      (abtest_poke_be buf 42 4 (+ 8 databytes))
+      (abtest_poke_be buf 46 4 0) ;; offset
+      (abtest_poke_be buf 50 4 0) ;; blockSize
+      (set! pos 54)
+      (doloop (i nframes)
+        (doloop (c nchan)
+          (abtest_poke_be buf (+ pos (* (+ (* i nchan) c) 2)) 2 (abtest_pcm16 i c))))
+      (pset! lenptr 0 len)
+      buf)))
+
+;; TRUNCATE, if positive, is the number of bytes to lop off the end
+(bind-func abtest_make_wav
+  (lambda (path:i8* fmt:i64 nchan:i64 samplerate:i64 nframes:i64 extra:i1 truncate:i64)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (abtest_build_wav fmt nchan samplerate nframes extra lenptr))
+          (len (- (pref lenptr 0) truncate))
+          (res (abtest_write_file path buf (if (< len 0) 0 len))))
+      (free buf)
+      res)))
+
+(bind-func abtest_make_aiff
+  (lambda (path:i8* nchan:i64 samplerate:i64 nframes:i64 truncate:i64)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (abtest_build_aiff nchan samplerate nframes lenptr))
+          (len (- (pref lenptr 0) truncate))
+          (res (abtest_write_file path buf (if (< len 0) 0 len))))
+      (free buf)
+      res)))
+
+(bind-func abtest_remove
+  (lambda (path:i8*)
+    (remove path)
+    void))
+
+(bind-func static abtest_close
+  (lambda (got:double expected:double)
+    (< (fabs (- got expected)) 1e-5)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading a valid WAVE ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; frames, channels, samplerate and a couple of sample values, packed into one
+;; boolean so a single assertion covers the whole round trip
+(bind-func static abtest_check_buffer
+  (lambda (ab:AudioBuffer* nframes:i64 nchan:i64 samplerate:double)
+    (and (not (null? ab))
+         (= (AudioBuffer_frames ab) nframes)
+         (= (AudioBuffer_channels ab) nchan)
+         (= (AudioBuffer_samplerate ab) samplerate)
+         (abtest_close (convert (AudioBuffer_read ab 0 0)) (abtest_expected 0 0))
+         (abtest_close (convert (AudioBuffer_read ab 3 1)) (abtest_expected 3 1))
+         (abtest_close (convert (AudioBuffer_read ab 7 0)) (abtest_expected 7 0)))))
+
+(bind-func test_wave_16bit
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-16.wav"))
+      (if (not (abtest_make_wav path 1 2 44100 8 #f 0))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (abtest_check_buffer ab 8 2 44100.0)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_16bit) 1)
+
+(bind-func test_wave_float
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-f32.wav"))
+      (if (not (abtest_make_wav path 3 2 48000 8 #f 0))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (abtest_check_buffer ab 8 2 48000.0)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_float) 1)
+
+;; an unknown chunk between fmt and data must be stepped over, not stumbled on
+(bind-func test_wave_unknown_chunk
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-extra.wav"))
+      (if (not (abtest_make_wav path 1 2 44100 8 #t 0))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (abtest_check_buffer ab 8 2 44100.0)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_unknown_chunk) 1)
+
+;; a data chunk with no frames in it is legal, if useless
+(bind-func test_wave_zero_frames
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-empty.wav"))
+      (if (not (abtest_make_wav path 1 2 44100 0 #f 0))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (and (not (null? ab))
+                          (= (AudioBuffer_frames ab) 0)
+                          (= (AudioBuffer_channels ab) 2))))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_zero_frames) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading a valid AIFF ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func test_aiff
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer.aiff"))
+      (if (not (abtest_make_aiff path 2 44100 8 0))
+          #f
+          (let ((ab (AudioBuffer_from_aiff path))
+                (res (abtest_check_buffer ab 8 2 44100.0)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_aiff) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; malformed and truncated files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; chopping the data chunk short must give back the frames that are there
+;; rather than reading off the end of the buffer
+(bind-func test_wave_truncated_data
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-shortdata.wav"))
+      ;; 8 stereo 16-bit frames is 32 bytes of data; drop 12 of them
+      (if (not (abtest_make_wav path 1 2 44100 8 #f 12))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (and (not (null? ab))
+                          (= (AudioBuffer_frames ab) 5)
+                          (abtest_close (convert (AudioBuffer_read ab 4 1))
+                                         (abtest_expected 4 1)))))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_truncated_data) 1)
+
+;; a file cut off before the data chunk header has no data chunk at all
+(bind-func test_wave_truncated_header
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-shorthdr.wav"))
+      (if (not (abtest_make_wav path 1 2 44100 8 #f 36))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (null? ab)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_truncated_header) 1)
+
+(bind-func test_aiff_truncated
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-short.aiff"))
+      ;; drop everything from halfway through the COMM chunk onwards
+      (if (not (abtest_make_aiff path 2 44100 8 40))
+          #f
+          (let ((ab (AudioBuffer_from_aiff path))
+                (res (null? ab)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_aiff_truncated) 1)
+
+;; a file which isn't a WAVE at all
+(bind-func test_wave_not_riff
+  (lambda ()
+    (let ((path "xtmtest-audiobuffer-junk.wav")
+          (junk:i8* (salloc 64)))
+      (doloop (i 64) (pset! junk i (convert (+ 65 (% i 26)) i8)))
+      (if (not (abtest_write_file path junk 64))
+          #f
+          (let ((ab (AudioBuffer_from_wave path))
+                (res (null? ab)))
+            (abtest_remove path)
+            res)))))
+(xtmtest-result (test_wave_not_riff) 1)
+
+(bind-func test_missing_file
+  (lambda ()
+    (null? (AudioBuffer_from_wave "xtmtest-audiobuffer-does-not-exist.wav"))))
+(xtmtest-result (test_missing_file) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; guards against an empty buffer ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a zero-frame buffer used to take the modulo of zero, which traps
+(bind-func test_empty_buffer_reads
+  (lambda ()
+    (let ((ab (AudioBuffer 0 2)))
+      (and (abtest_close (convert (AudioBuffer_peek_looped ab 0) double) 0.0)
+           (abtest_close (convert (AudioBuffer_read_looped ab 0) double) 0.0)
+           (abtest_close (convert (AudioBuffer_read_looped ab 3 0) double) 0.0)
+           (null? (AudioBuffer_ptr ab 0 0))
+           (null? (AudioBuffer_ptr ab 5 1))
+           (abtest_close (convert (AudioBuffer_read_interp ab 440.0:f 0) double) 0.0)))))
+(xtmtest-result (test_empty_buffer_reads) 1)
+
+;; and reading past the end of a non-empty one gives silence, not a stray read
+(bind-func test_out_of_range_reads
+  (lambda ()
+    (let ((ab (AudioBuffer 4 1)))
+      (doloop (i 4) (pset! (AudioBuffer_data ab) i (convert (+ i 1) SAMPLE)))
+      (and (abtest_close (convert (AudioBuffer_read_looped ab 4 0) double) 0.0)
+           (abtest_close (convert (AudioBuffer_read_looped ab -1 0) double) 0.0)
+           (abtest_close (convert (AudioBuffer_read_looped ab 2 0) double) 3.0)))))
+(xtmtest-result (test_out_of_range_reads) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the interpolating readers  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; hermite interpolation reproduces a cubic exactly, so on a linear ramp the
+;; expected value at a fractional position is just the linear one -- no golden
+;; numbers needed
+
+(bind-func static abtest_root_frq
+  (lambda (pitch:double)
+    (* 440.0 (pow 2.0 (/ (- pitch 69.0) 12.0)))))
+
+(bind-func static abtest_ramp_buffer
+  "a mono buffer whose sample I is I/16, played back at its root pitch"
+  (lambda (offset:double)
+    (let ((ab (AudioBuffer 16 1)))
+      (doloop (i 16)
+        (pset! (AudioBuffer_data ab) i (convert (+ offset (/ (convert i double) 16.0)) SAMPLE)))
+      (AudioBuffer_set_root_pitch ab 60)
+      ab)))
+
+(bind-func test_read_interp_ramp
+  (lambda ()
+    (let ((ab (abtest_ramp_buffer 0.0)))
+      (AudioBuffer_set_phase ab 2.5)
+      (let ((got (convert (AudioBuffer_read_interp ab (convert (abtest_root_frq 60.0) SAMPLE) 0) double)))
+        ;; halfway between samples 2 and 3 of the ramp
+        (and (abtest_close got (/ 2.5 16.0))
+             ;; and the phase has advanced by one frame
+             (abtest_close (AudioBuffer_phase ab) 3.5))))))
+(xtmtest-result (test_read_interp_ramp) 1)
+
+(bind-func test_read_interp_mix_ramp
+  (lambda ()
+    (let ((ab1 (abtest_ramp_buffer 0.0))
+          (ab2 (abtest_ramp_buffer 0.25)))
+      (AudioBuffer_set_phase ab1 2.5)
+      (AudioBuffer_set_phase ab2 2.5)
+      (let ((got (convert (AudioBuffer_read_interp_mix
+                            ab1 ab2 (convert (abtest_root_frq 60.0) SAMPLE) 0 0.5)
+                          double)))
+        ;; half of the 0.25 offset between the two ramps
+        (abtest_close got (+ (/ 2.5 16.0) 0.125))))))
+(xtmtest-result (test_read_interp_mix_ramp) 1)
+
+(bind-func test_read_interp_pw_ramp
+  (lambda ()
+    (let ((ab (abtest_ramp_buffer 0.0)))
+      (AudioBuffer_set_loop_start ab 0)
+      (AudioBuffer_set_loop_frames ab 8)
+      (AudioBuffer_set_phase ab 2.5)
+      ;; a pulsewidth of zero selects the first segment outright
+      (let ((got (convert (AudioBuffer_read_interp_pw
+                            ab (convert (abtest_root_frq 60.0) SAMPLE) 0 0.0)
+                          double)))
+        (abtest_close got (/ 2.5 16.0))))))
+(xtmtest-result (test_read_interp_pw_ramp) 1)
