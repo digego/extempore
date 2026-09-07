@@ -249,8 +249,8 @@ static void osc_handle_message(OSC* osc, SchemeProcess* proc, double t,
         nativeOSC(const_cast<char*>(msg.address()), const_cast<char*>(typetags.c_str()),
                   const_cast<char*>(args.pos()), static_cast<int>(args.consumable()));
     } else {
-        osc_emit_scheme_message(proc, osc->fname.c_str(), t, msg.address(), msg.args(), include_netaddr,
-                                netaddy, netport);
+        osc_emit_scheme_message(proc, osc->fname.c_str(), t, msg.address(), msg.args(),
+                                include_netaddr, netaddy, netport);
     }
 }
 
