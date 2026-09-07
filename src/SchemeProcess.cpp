@@ -47,40 +47,21 @@
 #include <sys/types.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <thread>
 #include <vector>
+
+#include "UNIV.h"
 
 // How long the server thread blocks in poll() before re-checking m_running.
 static constexpr int SERVER_POLL_TIMEOUT_MS = 250;
 
-#ifdef _WIN32
-#include <ws2tcpip.h>
-// Winsock's struct pollfd carries a SOCKET fd; WSAPoll is the poll(2) analogue.
 static int poll_sockets(std::vector<pollfd>& Fds) {
-    return WSAPoll(Fds.data(), ULONG(Fds.size()), SERVER_POLL_TIMEOUT_MS);
+    return extemp::net::poll(Fds, SERVER_POLL_TIMEOUT_MS);
 }
 static bool poll_interrupted() {
-    return false;
+    return extemp::net::interrupted(extemp::net::lastError());
 }
-#else
-#include <sys/socket.h>
-#include <poll.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h> /* host to IP resolution       */
-#include <unistd.h>
-static int closesocket(int Socket) {
-    return close(Socket);
-}
-static int poll_sockets(std::vector<pollfd>& Fds) {
-    return poll(Fds.data(), nfds_t(Fds.size()), SERVER_POLL_TIMEOUT_MS);
-}
-static bool poll_interrupted() {
-    return errno == EINTR;
-}
-#endif
-#include <cstdlib>
-#include "UNIV.h"
 
 static const char TERMINATION_CHAR = 23;
 
