@@ -387,7 +387,8 @@
           (offset (* (convert (floor (* pw (convert segments)))) looplgth))
           (mix (% (* pw (convert segments)) 1.0))
           (dat1 (AudioBuffer_ptr buffer offset chan))
-          (dat2 (AudioBuffer_ptr buffer (% (+ offset looplgth) frames) chan))
+          ;; frames is zero for an empty buffer, and % would trap on it
+          (dat2 (AudioBuffer_ptr buffer (if (< frames 1) 0 (% (+ offset looplgth) frames)) chan))
           (dy1 0.0) (dx0 0.0) (dx1 0.0) (dx2 0.0)
           (y1 0.0) (x0 0.0) (x1 0.0) (x2 0.0)
           (y1pos:i64 (* channels (convert (floor (% (- pos rate) lgthf)))))
