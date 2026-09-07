@@ -3,6 +3,79 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## Unreleased
+
+A large robustness and modernisation pass over the whole tree, driven by a
+full-codebase review. Nothing here changes the language, but a lot changes
+underneath it.
+
+Errors no longer disappear. `sys:load` used to swallow every error in a loaded
+file: the form failed silently and loading carried on, which meant a broken
+library could be AOT-compiled "successfully" and the example-based tests could
+only ever catch a crash. It now prints the s7-style report for each failing form
+and returns `#f`, an AOT compile of a broken file aborts without writing a
+cache, and `sys:load-then-quit` exits non-zero. That change surfaced five
+examples that had quietly stopped working (two used pattern-language functions
+removed long ago, three hit real bugs in generic type inference for recursive
+types and free-return generics); all five are fixed and now run as ordinary
+tests, and the type solver explains a conflict instead of falling back to
+"couldn't resolve type". A failed `bind-type` no longer leaves compiler flags
+flipped for the rest of the session, invalid regular expressions raise instead
+of silently matching nothing, and the compiler rejects closure names LLVM cannot
+spell rather than producing invalid IR.
+
+Memory safety in the C++ runtime. Every Scheme FFI primitive is now registered
+with its real name and arity, so a call with the wrong number or type of
+arguments is a Scheme error rather than a segfault. The zone allocator checked
+capacity before rounding and could write past the arena; it rounds first now.
+OSC messages were turned into Scheme source text with an unescaped address, so
+any host that could reach a running OSC server could evaluate arbitrary code;
+addresses are validated and strings are escaped by construction. The OSC send
+path, the multi-threaded DSP closure table, the IFF chunk scanner in
+`audiobuffer.xtm`, and half a dozen fixed C string buffers all had unbounded
+writes, and all are bounded. Redefining a function under the ORC JIT now
+releases the old machine code (it leaked every time before), and the compile
+path emits only the runtime helpers a module actually references instead of
+cloning and re-optimising all of `bitcode.ll` per compile, which roughly halves
+the latency of a `bind-func` redefinition.
+
+Threading and audio. The scheduler is paced by a semaphore instead of a
+condition variable with a lost-wakeup bug, the task thread waits on its queue
+instead of polling every millisecond, and the audio callback no longer takes a
+lock or calls `printf` (under and overflow counts are exposed as
+`(sys:audio-xruns)`). A second multi-threaded `dsp:set!` used to terminate the
+process; it is now a no-op for the same shape and a clear error for a different
+one. Each MT worker has its own wake semaphore, fixing a race where a fast
+worker could take two blocks and leave another worker's voice stale. The TCP
+server uses `poll()` and per-client buffers, and `--attr foo` no longer aborts.
+
+Less vendored code. The 2019 Networking TS snapshot (69,000 lines, Windows-only,
+every use duplicated a POSIX branch) and PCRE 8.38 (2015, end of life) are gone;
+sockets go through one small shim on every platform and regular expressions use
+PCRE2 10.48, fetched and built statically at configure time. `SimpleOpt.h` is
+replaced by a table-driven parser that also generates `--help`. The Scheme FFI
+is ten real translation units instead of `.inc` files textually included into
+one file, so an edit to a non-LLVM primitive rebuilds in about a second.
+
+Build and CI. The AOT cache now depends on the compiler sources and the binary,
+so editing either rebuilds it. Every fetched dependency is pinned by SHA-256,
+external projects inherit the compiler and ccache launcher, `cmake --install`
+produces a runnable tree, and `CMakePresets.json` replaces the configure lines
+that were repeated across six files. CI derives the LLVM version from
+`CMakeLists.txt` (so a bump cannot silently make the cache key stale forever),
+throttles only the AOT step through a Ninja job pool, runs tests in parallel,
+and cancels superseded runs. Every xtlang test has a timeout.
+
+Library changes with visible behaviour: `pcg32_boundedrand` now matches
+reference PCG32 (it previously rejected about half its draws and used the wrong
+threshold, so seeded streams differ); `sys:directory-list` returns bare names
+on every platform; `sys:expand-path` canonicalises on Windows too;
+`io:osc:set-integer-64bit?` and `io:osc:send-from-server-socket?` are removed;
+`topclock` no longer starts its network loop at load when
+`*topclock-autostart*` is `#f`. Around 300 lines of commented-out library code,
+119 dead compiler definitions, and the orphaned `libs/base/prelude.xtm` and
+`libs/base/adt.xtm` are deleted.
+
 ## v0.10.3
 
 A one-bug patch release. On ARM64 machines (which for most users means Apple

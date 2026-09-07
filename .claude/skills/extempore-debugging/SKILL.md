@@ -190,7 +190,7 @@ all run — wrap them in `(begin ...)`:
 
 ### `(quit rc)` and stdio flushing
 
-`exit_extempore` in `src/ffi/utility.inc` calls `std::_Exit(rc)`, which bypasses
+`exit_extempore` in `src/ffi/utility.cpp` calls `std::_Exit(rc)`, which bypasses
 destructors **and discards stdio buffers**. It explicitly `fflush(stdout)`
 before `_Exit` so xtlang `printf` output isn't lost. If you add another pre-exit
 cleanup step there, keep it short — `_Exit` runs right after.
@@ -467,7 +467,7 @@ ffmpeg -i /tmp/output.wav -af "volumedetect" -f null /dev/null 2>&1 \
 | ---------------------- | --------------------------------------------------- |
 | `src/SchemeFFI.cpp`    | `jitCompile()` - main JIT entry point               |
 | `src/EXTLLVM.cpp`      | `addModule()`, `getGlobalValue()` - symbol tracking |
-| `src/ffi/llvm.inc`     | Scheme FFI bindings for LLVM functions              |
+| `src/ffi/llvm.cpp`     | Scheme FFI bindings for LLVM functions              |
 | `runtime/llvmir.xtm`   | `llvm:compile-ir`, compilation queue                |
 | `runtime/llvmti.xtm`   | Type inference, AOT compilation                     |
 | `runtime/bitcode.ll`   | Base type definitions (`%mzone`, `%clsvar`)         |
