@@ -5,9 +5,6 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*" # Push events to matching vX.X.X*, e.g. v0.9.8-beta
 
-env:
-  LLVM_VERSION: "22.1.6"
-
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -35,49 +32,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Restore LLVM cache
-        id: cache-llvm
-        uses: actions/cache/restore@v5
+      # The `release` preset sets EXT_SHARE_DIR=. so the released binary
+      # locates runtime/, libs/, etc. relative to CWD instead of the (long-gone)
+      # CI worker's source path.
+      - uses: ./.github/actions/setup-build
         with:
-          path: |
-            build/_deps
-            build/.ninja_log
-            build/.ninja_deps
-          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
+          preset: release
+          cache-key-os: ${{ matrix.os }}
+          extra-cmake-args: -DEXTEMPORE_VERSION=${{ github.ref_name }}
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
-
-      - name: Set up MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: TheMrMilchmann/setup-msvc-dev@v4
-        with:
-          arch: x64
-
-      - name: Configure
-        # EXT_SHARE_DIR=. so the released binary locates runtime/, libs/, etc.
-        # relative to CWD instead of the (long-gone) CI worker's source path.
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DASSETS=ON -DEXT_SHARE_DIR=. -DEXTEMPORE_VERSION=${{ github.ref_name }}
-
-      - name: Build LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: cmake --build build --target llvm-libs
-
-      - name: Save LLVM cache
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            build/_deps
-            build/.ninja_log
-            build/.ninja_deps
-          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
-
+      # Parallelism is Ninja's default; the AOT compile is throttled by the
+      # `aot` job pool declared in CMakeLists.txt.
       - name: Build
-        run: cmake --build build --parallel 2
+        run: cmake --build build
 
       - name: Package (Unix)
         if: runner.os != 'Windows'

@@ -5,8 +5,12 @@ on:
     branches: [master, aarch64]
   pull_request:
 
-env:
-  LLVM_VERSION: "22.1.6"
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -18,88 +22,60 @@ jobs:
         include:
           - os: ubuntu-24.04
             name: Linux x86_64
-            build_jobs: 4
           - os: ubuntu-24.04-arm
             name: Linux aarch64
-            build_jobs: 4
           - os: macos-15
             name: macOS aarch64
-            build_jobs: 2
           - os: windows-2022
             name: Windows x86_64
-            build_jobs: 4
 
     name: ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Restore LLVM cache
-        id: cache-llvm
-        uses: actions/cache/restore@v5
+      - uses: ./.github/actions/setup-build
         with:
-          path: |
-            build/_deps
-            build/.ninja_log
-            build/.ninja_deps
-          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
+          preset: ci
+          cache-key-os: ${{ matrix.os }}
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
-
-      - name: Set up MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: TheMrMilchmann/setup-msvc-dev@v4
-        with:
-          arch: x64
-
-      - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
-
-      - name: Build LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: cmake --build build --target llvm-libs
-
-      - name: Save LLVM cache
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            build/_deps
-            build/.ninja_log
-            build/.ninja_deps
-          key: ${{ matrix.os }}-llvm-${{ env.LLVM_VERSION }}-v7
-
+      # No restore-keys: a partial hit would be an AOT cache built from
+      # different sources, and the touch below would then hide the staleness
+      # from Ninja. Only an exact hit is safe to reuse.
       - name: Restore AOT cache
         id: cache-aot
         uses: actions/cache/restore@v5
         with:
           path: libs/aot-cache
-          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**') }}
-          restore-keys: |
-            ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-
+          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
 
+      - name: Build extempore
+        run: cmake --build build --target extempore
+
+      # Checkout stamps the AOT inputs (and the build stamps the binary) newer
+      # than the restored outputs, so without this Ninja re-runs the whole AOT
+      # compile and the cache buys nothing. Safe only on an exact key hit.
+      - name: Refresh AOT cache timestamps
+        if: steps.cache-aot.outputs.cache-hit == 'true'
+        shell: bash
+        run: find libs/aot-cache -type f -exec touch {} +
+
+      # Parallelism is Ninja's default; the AOT compile is throttled by the
+      # `aot` job pool declared in CMakeLists.txt, which keeps the memory-hungry
+      # extempore+LLVM-JIT processes to two at a time on every runner.
       - name: Build
-        # Parallelism is per-platform (matrix.build_jobs). The Linux/Windows
-        # runners are 4 vCPU / 16 GB, but the macOS arm runner is smaller
-        # (3 vCPU / 7 GB) and the AOT step spawns extempore+LLVM-JIT processes
-        # that are memory-hungry, so it stays at 2 to avoid OOM. (LLVM itself
-        # builds at Ninja's default full parallelism in the step above.)
-        run: cmake --build build --parallel ${{ matrix.build_jobs }}
+        run: cmake --build build
 
       - name: Save AOT cache
         if: steps.cache-aot.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: libs/aot-cache
-          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**') }}
+          key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
 
       - name: Test
         timeout-minutes: 30
         # NOTE: the 'docs' label (docs/verify-examples.py) is intentionally not
         # run in CI --- it's a local-only tool (run it on Linux with
         # `ctest --test-dir build -L docs`). See docs/verify-examples.py header.
-        run: ctest --test-dir build --build-config Release --label-regex "libs-core|libs-external|compiler-unit|cpp-unit|examples-core|examples-audio|audio-offline" --output-on-failure
+        run: ctest --test-dir build --build-config Release --parallel 4 --label-regex "libs-core|libs-external|compiler-unit|cpp-unit|examples-core|examples-audio|audio-offline" --output-on-failure

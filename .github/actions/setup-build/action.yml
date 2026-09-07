@@ -1,0 +1,79 @@
+name: Set up Extempore build
+description: >-
+  Resolve the pinned LLVM version, restore (or build and save) the LLVM cache,
+  install the platform build dependencies and configure the CMake build.
+
+inputs:
+  preset:
+    description: CMake configure preset to use (see CMakePresets.json).
+    required: true
+  cache-key-os:
+    description: >-
+      Runner label used in the LLVM cache key. It has to distinguish
+      architectures (ubuntu-24.04 vs ubuntu-24.04-arm), so pass matrix.os
+      rather than runner.os.
+    required: true
+  extra-cmake-args:
+    description: Extra arguments appended to the configure command.
+    required: false
+    default: ""
+  save-llvm-cache:
+    description: Save the LLVM build under the cache key when the restore missed.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # The pinned version lives in CMakeLists.txt; deriving it here keeps the
+    # cache key from going stale (and silently useless) after a version bump.
+    - name: Resolve pinned LLVM version
+      shell: bash
+      run: |
+        echo "LLVM_VERSION=$(sed -n 's/^set(DEP_LLVM_VERSION "\(.*\)")/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
+
+    # The source tarball is ~140 MB and is only read by the download step, which
+    # the restored stamps skip --- so keep it out of the cache.
+    - name: Restore LLVM cache
+      id: cache-llvm
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          build/_deps
+          !build/_deps/**/llvm-project-*.src.tar.xz
+          build/.ninja_log
+          build/.ninja_deps
+        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8
+
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev xorg-dev libglu1-mesa-dev
+
+    - name: Set up MSVC (Windows)
+      if: runner.os == 'Windows'
+      uses: TheMrMilchmann/setup-msvc-dev@v4
+      with:
+        arch: x64
+
+    - name: Configure
+      shell: bash
+      run: cmake --preset ${{ inputs.preset }} ${{ inputs.extra-cmake-args }}
+
+    - name: Build LLVM
+      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      shell: bash
+      run: cmake --build build --target llvm-libs
+
+    - name: Save LLVM cache
+      if: inputs.save-llvm-cache == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          build/_deps
+          !build/_deps/**/llvm-project-*.src.tar.xz
+          build/.ninja_log
+          build/.ninja_deps
+        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8
