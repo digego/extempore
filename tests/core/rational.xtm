@@ -1,0 +1,91 @@
+;;; rational.xtm:tests -- tests for the rational number library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Deeper tests for libs/core/rational.xtm. The basic overload/equality
+;; smoke tests already live in tests/core/math.xtm (which also loads this
+;; library), so this file goes further: sign normalisation, reduction of
+;; negative and zero rationals, the comparison operators, mixed
+;; Rational/i64 arithmetic, and conversion to double/i64.
+
+;;; Code:
+
+(sys:load "libs/core/rational.xtm")
+
+;; Rational_greatest_common_divisor already abs()es its arguments -- check
+;; that holds for negative input too (math.xtm only exercises positives).
+(bind-func test_gcd_negative_args
+  (lambda ()
+    (= (Rational_greatest_common_divisor -4 12) 4)))
+(xtmtest-result (test_gcd_negative_args) 1)
+
+;; Rat always normalises so the denominator is positive.
+(bind-func test_rat_normalises_sign
+  (lambda ()
+    (let ((a (Rat 3 -4))
+          (b (Rat -3 -4)))
+      (and (= (tref a 0) -3) (= (tref a 1) 4)
+           (= (tref b 0) 3) (= (tref b 1) 4)))))
+(xtmtest-result (test_rat_normalises_sign) 1)
+
+;; reduction should keep the sign on the numerator
+(bind-func test_reduce_negative
+  (lambda ()
+    (let ((r (Rational_reduce (Rat -2 12))))
+      (and (= (tref r 0) -1) (= (tref r 1) 6)))))
+(xtmtest-result (test_reduce_negative) 1)
+
+;; a zero numerator reduces to 0/1, not a division-by-zero
+(bind-func test_reduce_zero_numerator
+  (lambda ()
+    (let ((r (Rational_reduce (Rat 0 5))))
+      (and (= (tref r 0) 0) (= (tref r 1) 1)))))
+(xtmtest-result (test_reduce_zero_numerator) 1)
+
+(bind-func test_equal_after_reduction
+  (lambda ()
+    (xtm_equal (Rat 2 4) (Rat 1 2))))
+(xtmtest-result (test_equal_after_reduction) 1)
+
+(bind-func test_notequal_distinguishes
+  (lambda ()
+    (xtm_notequal (Rat 1 3) (Rat 1 2))))
+(xtmtest-result (test_notequal_distinguishes) 1)
+
+(bind-func test_lessthan_rational
+  (lambda ()
+    (xtm_lessthan (Rat 1 2) (Rat 2 3))))
+(xtmtest-result (test_lessthan_rational) 1)
+
+(bind-func test_greaterthan_rational
+  (lambda ()
+    (xtm_greaterthan (Rat 1 2) (Rat 2 3))))
+(xtmtest-result (test_greaterthan_rational) 0)
+
+;; mixed Rational/i64 comparison
+(bind-func test_lessthan_mixed
+  (lambda ()
+    (xtm_lessthan (Rat 3 2) 2)))
+(xtmtest-result (test_lessthan_mixed) 1)
+
+;; mixed Rational/i64 modulo: 5 mod 2 = 1
+(bind-func test_modulo_mixed
+  (lambda ()
+    (xtm_equal (xtm_modulo (Rat 5 1) 2) 1)))
+(xtmtest-result (test_modulo_mixed) 1)
+
+;; conversion to double
+(bind-func test_rtod
+  (lambda ()
+    (= (rtod (Rat 3 4)) 0.75)))
+(xtmtest-result (test_rtod) 1)
+
+;; conversion to i64 (exact division, no rounding ambiguity)
+(bind-func test_rtoi64
+  (lambda ()
+    (= (rtoi64 (Rat 9 3)) 3)))
+(xtmtest-result (test_rtoi64) 1)

@@ -1,0 +1,66 @@
+;;; xthread.xtm:tests -- tests for native xtlang threads
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/xthread.xtm. These all follow the same shape: start
+;; one or more threads that compute a value, join them (via async's future,
+;; or sync's implicit join-all), and check the result. Nothing here depends
+;; on wall-clock timing, so it stays fast and deterministic under --batch.
+
+;;; Code:
+
+(sys:load "libs/core/xthread.xtm")
+
+;; a thread comparing its own handle to thread_self should always agree
+(bind-func test_thread_self_equal
+  (lambda ()
+    (thread_equal_self (thread_self))))
+(xtmtest-result (test_thread_self_equal) 1)
+
+;; async with no arguments: returns a future that joins on call
+(bind-func test_async_compute
+  (lambda ()
+    (let ((fut (async (lambda () (+ 21 21)))))
+      (fut))))
+(xtmtest-result (test_async_compute) 42)
+
+;; async with one argument
+(bind-func test_async_with_arg
+  (lambda ()
+    (let ((fut (async (lambda (x:i64) (* x x)) 7)))
+      (fut))))
+(xtmtest-result (test_async_with_arg) 49)
+
+;; after joining a future, async_done should report it finished
+(bind-func test_async_done_after_join
+  (lambda ()
+    (let ((fut (async (lambda () 5))))
+      (let ((r (fut)))
+        (and (= r 5) (async_done fut))))))
+(xtmtest-result (test_async_done_after_join) 1)
+
+;; two independent futures, each joined and combined
+(bind-func test_two_futures
+  (lambda ()
+    (let ((f1 (async (lambda () 10)))
+          (f2 (async (lambda (x:i64) (* x 3)) 4)))
+      (+ (f1) (f2)))))
+(xtmtest-result (test_two_futures) 22)
+
+;; spawn/sync: fan out four threads, each writing its own slot, then join
+;; all of them before reading the results back
+(bind-func test_spawn_sync
+  (lambda ()
+    (letz ((results:i64* (zalloc 4))
+           (i 0))
+      (sync
+        (dotimes (i 4)
+          (spawn (let ((idx i))
+                   (lambda ()
+                     (pset! results idx (* idx idx)))))))
+      (+ (pref results 0) (pref results 1) (pref results 2) (pref results 3)))))
+(xtmtest-result (test_spawn_sync) 14)
