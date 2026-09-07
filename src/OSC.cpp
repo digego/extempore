@@ -660,25 +660,21 @@ void OSC::sendOSC(TaskI* task) {
     // port the user started the server on. A TCP-OSC server has no UDP socket,
     // so fall back to a throwaway one.
     UdpSocket fallback;
-    UdpSocket* socket = &osc->getSocket();
-    if (!socket->isOpen()) {
+    UdpSocket* sendSocket = &osc->getSocket();
+    if (!sendSocket->isOpen()) {
         if (!fallback.open()) {
             printf("OSC Error: could not open a socket to send from\n");
             delete t->getArg();
             return;
         }
-        socket = &fallback;
+        sendSocket = &fallback;
     }
 
     // sendto reports the byte count, never an errno -- the reason for a
     // failure is in errno / WSAGetLastError.
-    if (socket->sendTo(message.data(), message.size(), destination) < 0) {
+    if (sendSocket->sendTo(message.data(), message.size(), destination) < 0) {
         const int error = UdpSocket::lastError();
-#ifndef _WIN32
-        if (error == EMSGSIZE) {
-#else
-        if (error == WSAEMSGSIZE) {
-#endif
+        if (UdpSocket::messageTooBig(error)) {
             printf("Error: OSC message of %zu bytes is too large for one UDP datagram\n",
                    message.size());
         } else {

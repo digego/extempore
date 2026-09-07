@@ -139,6 +139,16 @@ class UdpSocket {
 #endif
     }
 
+    // True when a send failed because the datagram was larger than the path
+    // would carry.
+    static bool messageTooBig(int Code) {
+#ifdef _WIN32
+        return Code == WSAEMSGSIZE;
+#else
+        return Code == EMSGSIZE;
+#endif
+    }
+
     // True when a failed recvFrom/sendTo simply had nothing to do.
     static bool wouldBlock(int Code) {
 #ifdef _WIN32
