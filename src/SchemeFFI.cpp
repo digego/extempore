@@ -81,6 +81,7 @@
 #include <pcre2.h>
 
 #include "SchemeFFI.h"
+#include "SchemeFFIRegistry.h"
 #include "AudioDevice.h"
 #include "UNIV.h"
 #include "TaskScheduler.h"
@@ -175,6 +176,60 @@ static std::string formatLLVMType(llvm::Type* Type) {
 #include "ffi/llvm.inc"
 #include "ffi/clock.inc"
 
+// The accessors declared in SchemeFFIRegistry.h.  Each table is a
+// function-local static, so it is built --- and its arities registered with
+// the s7 adapter --- on the first call rather than during static
+// initialisation.
+std::span<const FFIEntry> clockDefs() {
+    static const FFIEntry defs[] = {CLOCK_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> ipcDefs() {
+    static const FFIEntry defs[] = {IPC_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> llvmDefs() {
+    static const FFIEntry defs[] = {LLVM_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> miscDefs() {
+    static const FFIEntry defs[] = {MISC_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> numberDefs() {
+    static const FFIEntry defs[] = {NUMBER_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> regexDefs() {
+    static const FFIEntry defs[] = {REGEX_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> sysDefs() {
+    static const FFIEntry defs[] = {SYS_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> sysDspDefs() {
+    static const FFIEntry defs[] = {SYS_DSP_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> sysZoneDefs() {
+    static const FFIEntry defs[] = {SYS_ZONE_DEFS};
+    return defs;
+}
+
+std::span<const FFIEntry> utilityDefs() {
+    static const FFIEntry defs[] = {UTILITY_DEFS};
+    return defs;
+}
+
 // Track external library function names for calling convention (CallingConv::C).
 // These are functions declared via bind-lib.
 static std::unordered_set<std::string> sExternalLibFunctionNames;
@@ -202,13 +257,15 @@ void initSchemeFFI(scheme* sc) {
     for (auto& elem : integerTable) {
         scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_integer(sc, elem.value));
     }
-    static struct {
-        const char* name;
-        foreign_func func;
-    } funcTable[] = {UTILITY_DEFS,  IPC_DEFS,  NUMBER_DEFS, SYS_DEFS,  SYS_DSP_DEFS,
-                     SYS_ZONE_DEFS, MISC_DEFS, REGEX_DEFS, LLVM_DEFS,   CLOCK_DEFS};
-    for (auto& elem : funcTable) {
-        scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name), mk_foreign_func(sc, elem.func));
+    const std::span<const FFIEntry> groups[] = {
+        utilityDefs(), ipcDefs(),  numberDefs(), sysDefs(),  sysDspDefs(),
+        sysZoneDefs(), miscDefs(), regexDefs(),  llvmDefs(), clockDefs(),
+    };
+    for (const auto& group : groups) {
+        for (const auto& elem : group) {
+            scheme_define(sc, sc->global_env, mk_symbol(sc, elem.name),
+                          mk_foreign_func(sc, elem.func));
+        }
     }
 }
 
