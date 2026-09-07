@@ -1,0 +1,28 @@
+;;; tests/compiler/names.xtm -- closure names are checked before they reach LLVM
+
+;; An xtlang closure name becomes an unquoted LLVM identifier, which allows
+;; only letters, digits, '-', '$', '.' and '_'. Anything else (a Scheme-style
+;; trailing '?' or '!', a '>' in an arrow name) used to surface as an IR parse
+;; error at the definition line; it is a compile error naming the character.
+
+(sys:load "libs/core/test.xtm")
+
+(xtmtest-compile-fails (bind-func name_close? (lambda (x:double) (< x 0.5))))
+(xtmtest-compile-fails (bind-func name_set! (lambda (x:i64) x)))
+(xtmtest-compile-fails (bind-func name->arrow (lambda (x:i64) x)))
+(xtmtest-compile-fails (bind-func static name_static? (lambda (x:i64) x)))
+
+;; a type annotation is split off before the check, so the name after the
+;; colon is not what's being checked
+(xtmtest-compile-fails (bind-func name_typed?:[i64,i64]* (lambda (x) x)))
+
+;; rejected up front, so nothing is half-registered under the bad name (the
+;; late IR failure left a closure-cache entry behind)
+(xtmtest-result (cl:remove-if-not (lambda (n) (regex:match? n "^name_close"))
+                                  (map car (hashtable->alist *xtc:cache:closure-cache*)))
+                '()
+                "rejected-name-not-registered")
+
+;; the characters LLVM does accept still compile
+(xtmtest-compile (bind-func name-with-dashes_and_digits1 (lambda (x:i64) x)))
+(xtmtest-result (name-with-dashes_and_digits1 3) 3 "legal-name-runs")

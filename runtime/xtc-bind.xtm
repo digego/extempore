@@ -174,6 +174,17 @@
                                            (map (lambda (k) (list 'quote k)) types)))))
       newname)))
 
+;; A closure name is emitted as an unquoted LLVM identifier, which admits only
+;; letters, digits and - $ . _ ; anything else (a Scheme-style trailing ? or
+;; !, the > of an arrow name) would only surface as an IR parse error after
+;; the closure had been half-registered.
+(define xtc:bind:check-closure-name
+  (lambda (name)
+    (if (not (regex:match? name "^[-a-zA-Z$._][-a-zA-Z$._0-9]*$"))
+        (xtc:diagnostics:print-compiler-error
+          (string-append "invalid closure name " name
+                         ": an xtlang function name may only contain letters, digits and - $ . _")))))
+
 (define-macro (bind-static . args)
   (if (string? (cadr args))
       (if (not (equal? (caaddr args) 'lambda))
@@ -197,6 +208,7 @@
             ;; closure body is always in last position, preceeded by zone
             ;; size and/or docstring
             (closure-body (car (reverse args))))
+        (xtc:bind:check-closure-name func-name)
         (if (member func-name *xtc:globals:reserved-keywords*)
             (xtc:diagnostics:print-error (string-append func-name " is a reserved keyword")))
         ;; strip docstring
@@ -291,6 +303,7 @@
             ;; closure body is always in last position, preceeded by zone
             ;; size and/or docstring
             (closure-body (car (reverse args))))
+        (xtc:bind:check-closure-name func-name)
         (if (member func-name *xtc:globals:reserved-keywords*)
             (xtc:diagnostics:print-error (string-append func-name " is a reserved keyword")))
         ;; strip docstring
