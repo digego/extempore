@@ -287,7 +287,15 @@
                     (if (char=? (string-ref t 0) #\%)
                         (substring t 1 (string-length t))
                         t))
-                (xtc:codegen:pretty-print-type (xtc:codegen:get-type-from-pretty-str t)))
+                ;; an unknown %name is re-parsed, which registers a generic
+                ;; instance and hands the string back; a string that comes
+                ;; back unchanged and still unregistered would loop here
+                ;; forever, so it is an error instead
+                (let ((parsed (xtc:codegen:get-type-from-pretty-str t)))
+                  (if (and (equal? parsed t)
+                           (not (xtc:cache:namedtype-exists? (xtc:codegen:get-base-type t))))
+                      (xtc:diagnostics:print-compiler-error "pretty-print-type: unresolved named type" t)
+                      (xtc:codegen:pretty-print-type parsed))))
             (if (or (null? t) (not (xtc:codegen:type? t))) '()
                 (cond ((atom? t) (xtc:codegen:get-type-str t))
                       ((xtc:codegen:tuple? t)
@@ -967,7 +975,13 @@
             (if (xtc:codegen:pointer? type)
                 (/ (sys:pointer-size) 8) ;; in bytes not bits
                 (xtc:codegen:get-type-size (xtc:cache:get-namedtype-type type)))
-            (xtc:codegen:get-type-size (xtc:codegen:get-type-from-str type)))
+            ;; get-type-from-str hands a %name that is not a registered
+            ;; named type straight back, so recursing on it would spin
+            ;; forever: it is an error instead
+            (let ((t (xtc:codegen:get-type-from-str type)))
+              (if (equal? t type)
+                  (xtc:diagnostics:print-compiler-error "get-type-size: unresolved named type" type)
+                  (xtc:codegen:get-type-size t))))
         (let ((t (xtc:codegen:str-list-check type)))
           (if (xtc:codegen:pointer? t) (/ (sys:pointer-size) 8) ;; in bytes not bits
               (cond ((member t (list *xtc:codegen:fp64* *xtc:codegen:si64* *xtc:codegen:ui64*)) 8) ; 8 byte stuff

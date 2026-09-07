@@ -230,3 +230,10 @@
                   (xtc:type:to-intcode (xtc:type:apply-subst pat subst)))
                 "%List_poly_PGk2ND4*"
                 "napp-pattern-reifies")
+
+;; a %name that is not a named type is an error in get-type-size, not a spin
+(xtmtest-result (*s7-catch* #t
+                            (lambda () (xtc:codegen:get-type-size "%NoSuchNamedTypeXYZ"))
+                            (lambda args 'caught))
+                'caught
+                "unresolved-named-type-is-an-error")
