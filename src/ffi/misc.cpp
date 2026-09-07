@@ -37,7 +37,7 @@
 
 #include "BranchPrediction.h"
 // for string_hash
-#include "EXTLLVM.h"
+#include "EXTRuntime.h"
 #include "SchemeProcess.h"
 // for extemp::CM
 #include "Task.h"

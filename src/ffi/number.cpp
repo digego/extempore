@@ -36,7 +36,7 @@
 #include "SchemeFFIRegistry.h"
 
 // for xtc_randd and xtc_rand1_i64
-#include "EXTLLVM.h"
+#include "EXTRuntime.h"
 
 #include <cstdint>
 

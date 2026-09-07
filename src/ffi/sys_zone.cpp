@@ -37,7 +37,7 @@
 
 #include "EXTZones.h"
 // for llvm_destroy_zone_after_delay
-#include "EXTLLVM.h"
+#include "EXTRuntime.h"
 #include "SchemeProcess.h"
 
 namespace extemp {
