@@ -639,19 +639,14 @@
 ;; Reentrant wrapper: an instance compile can be triggered MID-PIPELINE --- a
 ;; generic instance type registered during inference read-back, an instance
 ;; injected during add-types-to-source --- and recursively enters the driver,
-;; whose entry CLEARS the pipeline globals.  Save and restore them around
-;; every run so the outer pipeline resumes undisturbed.  (On a throw the
-;; restore is skipped, but the outer compile is aborting anyway.)
+;; whose entry CLEARS the pipeline globals.  let-temporarily restores them
+;; around every run (on normal exit and on a throw) so the outer pipeline
+;; resumes undisturbed.
 (define xtc:driver:run
   (let ((run-fresh xtc:driver:run))
     (lambda args
-      (let ((saved-stack *xtc:codegen:sym-name-stack*)
-            (saved-ls *xtc:codegen:ls_var*)
-            (saved-bl *xtc:globals:bound-lambdas*)
-            (saved-gtm *xtc:desugar:generic-type-mappings*))
-        (let ((r (apply run-fresh args)))
-          (set! *xtc:codegen:sym-name-stack* saved-stack)
-          (set! *xtc:codegen:ls_var* saved-ls)
-          (set! *xtc:globals:bound-lambdas* saved-bl)
-          (set! *xtc:desugar:generic-type-mappings* saved-gtm)
-          r)))))
+      (let-temporarily ((*xtc:codegen:sym-name-stack* *xtc:codegen:sym-name-stack*)
+                        (*xtc:codegen:ls_var* *xtc:codegen:ls_var*)
+                        (*xtc:globals:bound-lambdas* *xtc:globals:bound-lambdas*)
+                        (*xtc:desugar:generic-type-mappings* *xtc:desugar:generic-type-mappings*))
+        (apply run-fresh args)))))

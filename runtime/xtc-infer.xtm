@@ -1332,15 +1332,13 @@
 ;; REENTRANT: encoding a fresh generic instance during the read-back triggers
 ;; the instance type's data-constructor compiles, each a full nested driver
 ;; run through this very function --- so the per-run state (the op/call site
-;; lists, the fresh-key counter) is saved and restored around the body.
+;; lists, the fresh-key counter) is rebound with let-temporarily, which
+;; restores the outer run's values on exit or on a throw.
 (define xtc:infer:check-function
   (lambda (vars forced-types ast)
-    (let ((saved-fresh *xtc:infer:fresh-counter*)
-          (saved-ops *xtc:infer:op-sites*)
-          (saved-calls *xtc:infer:call-sites*))
-      (xtc:infer:reset-fresh!)
-      (set! *xtc:infer:op-sites* '())
-      (set! *xtc:infer:call-sites* '())
+    (let-temporarily ((*xtc:infer:fresh-counter* 0)
+                      (*xtc:infer:op-sites* '())
+                      (*xtc:infer:call-sites* '()))
       (let* ((rc (xtc:infer:collect ast '()))
              (forced (map (lambda (ft) (xtc:solve:c-eq (car ft) (cdr ft))) forced-types))
              (intern (make-hashtable))
@@ -1395,8 +1393,5 @@
                                            (and ty (cons sym ty))))
                                        (cl:remove-duplicates
                                          (append (hashtable-keys vars) call-sites)))))))))
-        (set! *xtc:infer:fresh-counter* saved-fresh)
-        (set! *xtc:infer:op-sites* saved-ops)
-        (set! *xtc:infer:call-sites* saved-calls)
         result))))
 

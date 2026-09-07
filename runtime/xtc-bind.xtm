@@ -407,13 +407,9 @@
     (xtc:diagnostics:print-binding-details-to-log
       "SetAlias:"
       ',symbol
-      ;;(print ',type)
-      (begin
-        (set! *xtc:codegen:get-type-callback-off* #t) ;; don't wait, do it immediately
-        (let ((r (xtc:codegen:pretty-print-type ,(symbol->string symbol))))
-          (set! *xtc:codegen:get-type-callback-off* #f)
-          r))
-      )))
+      ;; don't wait, do it immediately
+      (let-temporarily ((*xtc:codegen:get-type-callback-off* #t))
+        (xtc:codegen:pretty-print-type ,(symbol->string symbol))))))
 
 (xtc:cache:register-new-builtin
   "bind-alias"
@@ -708,38 +704,36 @@
     (if (not (char=? (string-ref (symbol->string type) 0) #\<))
         (xtc:diagnostics:print-bad-type-error type "must be a tuple type"))
     `(begin
-      (set! *xtc:codegen:get-type-callback-off* #t)
-      (let* ((ags (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
-             ;; expand all non-explict generic types
-             ;; i.e. expand list* into list:<!a,list*>*
-             (expand-polys (map (lambda (k)
-                                  (if (and (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
-                                           (not (equal? (xtc:codegen:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
-                                      (xtc:codegen:add-ptr-depth
-                                        (string-append (xtc:codegen:get-base-type k) ":"
-                                                       (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
-                                        (xtc:codegen:get-ptr-depth k))
-                                      k))
-                                ags))
-             (newtype (string-append "<" (string-join expand-polys ",") ">")))
-        ;; (println 'authors_type: ,(symbol->string type))
-        ;; (println 'transformed_type: newtype)
-        ;; and on with the show!
-        (if (xtc:desugar:bang-type? newtype) ;; then must be poly type
-            (begin
-              (xtc:cache:register-new-generictype ',symbol (string->symbol newtype))
-              (xtc:diagnostics:print-binding-details-to-log "GenrType:" ',symbol ',type))
-            (let ((typelist (cons *xtc:codegen:tuple* (xtc:codegen:get-type-from-pretty-tuple ,(symbol->string type)
-                                                                                              ,(symbol->string symbol)))))
-              (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
-                                                  (xtc:codegen:get-type-str typelist)))
-                  (begin (xtc:cache:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
-                    (xtc:diagnostics:print-binding-details-to-log "DataType:" ',symbol ',type))
-                  (xtc:diagnostics:print-compiler-error "could not compile IR for type" ',type)))))
-      ;; the next line is to help specialize any element types that may not already be specialized!
-      (map (lambda (a) (xtc:codegen:get-type-from-pretty-str a (symbol->string ',(car args)))) (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
-      (set! *xtc:codegen:get-type-callback-off* #f)
-      ;; (sys:wait (now))
+      (let-temporarily ((*xtc:codegen:get-type-callback-off* #t))
+        (let* ((ags (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type)))
+               ;; expand all non-explict generic types
+               ;; i.e. expand list* into list:<!a,list*>*
+               (expand-polys (map (lambda (k)
+                                    (if (and (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))
+                                             (not (equal? (xtc:codegen:get-base-type k) ,(symbol->string symbol)))) ;; for recursive case!
+                                        (xtc:codegen:add-ptr-depth
+                                          (string-append (xtc:codegen:get-base-type k) ":"
+                                                         (symbol->string (xtc:cache:get-generictype-candidate-types (xtc:codegen:get-base-type k))))
+                                          (xtc:codegen:get-ptr-depth k))
+                                        k))
+                                  ags))
+               (newtype (string-append "<" (string-join expand-polys ",") ">")))
+          ;; (println 'authors_type: ,(symbol->string type))
+          ;; (println 'transformed_type: newtype)
+          ;; and on with the show!
+          (if (xtc:desugar:bang-type? newtype) ;; then must be poly type
+              (begin
+                (xtc:cache:register-new-generictype ',symbol (string->symbol newtype))
+                (xtc:diagnostics:print-binding-details-to-log "GenrType:" ',symbol ',type))
+              (let ((typelist (cons *xtc:codegen:tuple* (xtc:codegen:get-type-from-pretty-tuple ,(symbol->string type)
+                                                                                                ,(symbol->string symbol)))))
+                (if (llvm:compile-ir (string-append "%" ,(symbol->string symbol) " = type "
+                                                    (xtc:codegen:get-type-str typelist)))
+                    (begin (xtc:cache:register-new-namedtype ,(symbol->string symbol) typelist ,docstring)
+                      (xtc:diagnostics:print-binding-details-to-log "DataType:" ',symbol ',type))
+                    (xtc:diagnostics:print-compiler-error "could not compile IR for type" ',type)))))
+        ;; the next line is to help specialize any element types that may not already be specialized!
+        (map (lambda (a) (xtc:codegen:get-type-from-pretty-str a (symbol->string ',(car args)))) (xtc:codegen:get-pretty-tuple-arg-strings ,(symbol->string type))))
       ;; now compile data constructor
       (xtc:bind:compile-type-dataconstructors
         ',symbol
