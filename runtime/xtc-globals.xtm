@@ -41,10 +41,6 @@
 ;; flags for printing debug info ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define *xtc:globals:print-sub-checks* #f)
-(define *xtc:globals:print-main-check* #f)
-(define *xtc:globals:print-unifications* #f)
-
 (define *xtc:globals:print-full-generic-types* #f)
 (define *xtc:globals:print-code-specialization-compiles* #f)
 
@@ -66,8 +62,6 @@
 (define *xtc:globals:process* (ipc:get-process-name))
 
 (define *xtc:globals:bound-lambdas* '())
-
-(define *xtc:globals:zone* (sys:default-mzone))
 
 (define *xtc:globals:default-zone-size* 0) ;(* 8 1024))
 
@@ -96,9 +90,6 @@
     (let ((res (catch #f ,@form)))
       (set! *xtc:globals:message:level* msglvl)
       res)))
-
-(define *xtc:globals:alphabetlist* '(a b c d e f g h i j k l m n o p q r s t u v w x y z))
-(define *xtc:globals:alphabetidxlist* '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25))
 
 ;;;;;;;;;;;;;;;;
 ;; type enums ;;
@@ -185,15 +176,6 @@
 ;;   message  --- the main error description
 ;;   details  --- alist of optional context ((name . val) (type . val) (ast . val))
 
-(define xtc:diagnostics:make-error
-  (lambda (category label message . detail-pairs)
-    (list 'compiler-error category label message detail-pairs)))
-
-(define xtc:diagnostics:error-category (lambda (err) (cadr err)))
-(define xtc:diagnostics:error-label (lambda (err) (caddr err)))
-(define xtc:diagnostics:error-message (lambda (err) (cadddr err)))
-(define xtc:diagnostics:error-details (lambda (err) (car (cddddr err))))
-
 (define xtc:diagnostics:print-error-header
   (lambda (label)
     (print-with-colors *xtc:globals:pretty-print-error-color*
@@ -204,23 +186,6 @@
     (if (xtc:aot:currently-compiling?)
         (xtc:aot:abort-compilation)
         (throw ""))))
-
-(define xtc:diagnostics:print-constraint-error
-  (lambda (name type constraint . args)
-    (xtc:diagnostics:print-error-header "Constraint Error")
-    (print " ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #f (print name))
-    (print " failed constraint ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print constraint))
-    (print "\nwith type: ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type))
-    (if (not (null? args))
-        (begin
-          (print "\nast: ")
-          (define ast (cons (string->symbol name) (cdar args)))
-          (print (sexpr->string ast))))
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
 
 (define xtc:diagnostics:print-double-colon-error
   (lambda (var)
@@ -291,13 +256,6 @@
     (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print after "\n"))
     (xtc:diagnostics:throw-or-quit)))
 
-(define xtc:diagnostics:print-no-valid-forms-for-generic-error
-  (lambda (name)
-    (xtc:diagnostics:print-error-header "Generics Error")
-    (print " cannot find any valid forms for generic function ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print name "\n"))
-    (xtc:diagnostics:throw-or-quit)))
-
 (define xtc:diagnostics:print-shadow-var-error
   (lambda (name)
     (xtc:diagnostics:print-error-header "Compiler Error")
@@ -343,24 +301,6 @@
     (print " ")
     (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-name))
     (print " requires a zone size as its first argument\n")
-    (xtc:diagnostics:throw-or-quit)))
-
-(define xtc:diagnostics:print-needs-zone-delay-error
-  (lambda (expr-name)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-name))
-    (print " requires an ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print "i64"))
-    (print " delay as its second argument\n")
-    (xtc:diagnostics:throw-or-quit)))
-
-(define xtc:diagnostics:print-variable-not-marked-as-free-error
-  (lambda (vs)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " variable " )
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print vs))
-    (print " not marked as free - check the variable name in the polytype\n")
     (xtc:diagnostics:throw-or-quit)))
 
 (define *xtc:globals:top-level-generic-error* #f)
@@ -461,79 +401,6 @@
                    name (cdr ast))))
           (else #f))))
 
-(define xtc:diagnostics:print-could-not-resolve-types
-  (lambda (types ast . name)
-    (if (and (not (null? types))
-             (list? types)
-             (= (length types) 1)
-             (list? (car types)))
-        (set! types (car types)))
-    (if (and (not (null? types))
-             (symbol? (car types)))
-        (set! types (list types)))
-    ;; (println 'types: types)
-    ;; (println 'ast: ast)
-    (print-with-colors 'black 'red #t (print "Could not resolve types!"))
-    (if (not (null? name))
-        (begin
-          (print-with-colors 'red 'black #t (print "::"))
-          (print-with-colors 'black 'red #t (print (car name)))))
-    (print-with-colors 'default 'default #t (print "\n"))
-    (for-each (lambda (t)
-                ;; (println 't t (xtc:codegen:type? (cdr t)))
-                (if (or (atom? t)
-                        (and (not (null? (cdr t)))
-                             (not (atom? (cdr t)))
-                             (member (cadr t) '(213)))
-                        (and (not (null? (cdr t)))
-                             (xtc:codegen:type? (cdr t))))
-                    'done
-                    (let* ((ts (if (atom? (cdr t))
-                                   (if (xtc:codegen:type? (cdr t))
-                                       (list (cdr t))
-                                       '())
-                                   (map (lambda (x)
-                                          (if (xtc:codegen:type? x) x
-                                              #f))
-                                        (cdr t))))
-                           (tsr (cl:remove #f ts))
-                           (expr1 (if (null? ast) '()
-                                      (flatten (xtc:diagnostics:print-could-not-resolve-types_find-expr (car t) ast))))
-                           (expr2 (cl:remove #f expr1))
-                           (expr1a (if (null? expr2) '() (vector-ref (car expr2) 0)))
-                           (all-expr (cl:every (lambda (x) (symbol? x)) expr1a))
-                           (expr (if all-expr (car expr1a) expr1a)))
-                      ;; (println tsr ': expr)
-                      ;; (println 'tsr tsr (car t))
-                      (if (null? tsr)
-                          (begin
-                            (if (and (symbol? (car t))
-                                     (let ((s (symbol->string (car t))))
-                                       (or (string-contains? s "_anon_lambda")
-                                           (char=? (string-ref s 0) #\!))))
-                                'done
-                                (begin
-                                  (print-with-colors 'red 'black #t (print "unresolved: "))
-                                  (if (null? expr)
-                                      (print-with-colors 'red 'black #t (print (car t)))
-                                      (print-with-colors 'red 'black #t (print expr)))
-                                  (print-with-colors 'default 'default #t (print "\n")))))
-                          (begin (print-with-colors 'red 'black #t (print "ambiguous: "))
-                            (if (null? expr)
-                                (print-with-colors 'red 'black #t (print (car t)))
-                                (print-with-colors 'red 'black #t (print expr)))
-                            (print-with-colors 'default 'default #t (print "\n"))
-                            (for-each (lambda (x n)
-                                        (print (string-append "(" (number->string n) ") "))
-                                        (print-with-colors 'default 'black #t (print (xtc:codegen:pretty-print-type x) "\n")))
-                                      tsr
-                                      (range 0 (length tsr))))))))
-              types)
-    (print-with-colors 'red 'default #t (print '------------------------))
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f types)
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
-
 (define xtc:diagnostics:print-could-not-resolve-type-error
   (lambda (types . message)
     (xtc:diagnostics:print-error-header "Type Error")
@@ -614,12 +481,6 @@
                              (print (car ast)))))
     (println)
     (xtc:diagnostics:throw-or-quit)))
-
-(define xtc:diagnostics:print-compiler-failed-error
-  (lambda ()
-    (xtc:diagnostics:print-error-header "Compiler Failed.")
-    (xtc:diagnostics:throw-or-quit)))
-
 
 (define xtc:diagnostics:print-binding-details-to-log
   (lambda (lead-string symname type)

@@ -9,7 +9,7 @@
 (define *xtc:aot:current-lib-name* "xtmdylib")
 (define *xtc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
 (define *xtc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
-(define *xtc:aot:unix-link-libraries* '("-lextempore -lm"))
+
 (define *xtc:aot:unix-link-libraries-exe* '("-lextempore -lm"))
 
 (define *xtc:aot:func-defs-in-mod* '())
@@ -236,20 +236,10 @@
         (begin (write sexpr *xtc:aot:current-output-port*)
           (newline *xtc:aot:current-output-port*)))))
 
-(define-macro (xtc:aot:do-and-emit . forms)
-  `(begin
-    ,@forms
-    (xtc:aot:insert-forms ,@forms)))
-
 (define-macro (xtc:aot:do-or-emit . forms)
   (if (not (output-port? *xtc:aot:current-output-port*))
       `(begin ,@forms)
       `(xtc:aot:insert-forms ,@forms)))
-
-(define-macro (xtc:aot:do-at-runtime . forms)
-  `(xtc:aot:do-or-emit
-    (if (not (output-port? *xtc:aot:current-output-port*))
-        (begin ,@forms))))
 
 (define-macro (xtc:aot:suppress-aot-do . forms)
   `(if ,*xtc:aot:current-output-port*

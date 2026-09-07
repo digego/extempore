@@ -75,11 +75,6 @@
           (if *xtc:globals:print-raw-llvm* (print-full-nq ir-string))
           (llvm:jit-compile-ir-string ir-string)))))
 
-(define llvm:compile-ir-and-print
-  (lambda (ir-string)
-    (print-full-nq ir-string)
-    (llvm:compile-ir ir-string)))
-
 ;; to compile the special init.ll file (which needs to be done on most
 ;; startups)
 (define sys:compile-ll
@@ -104,43 +99,6 @@
 (define sys:compile-init-ll
   (lambda ()
     (sys:compile-ll "init.ll")))
-
-;; to compile the special init.ll file (which needs to be done on most
-;; startups)
-(define sys:compile-ll-from-str
-  (lambda (str)
-    (let ((print? #f))
-      (if (string=? (ipc:get-process-name) *xtc:globals:process*)
-          (let ((init-ll-string str))
-            (if (and init-ll-string (llvm:compile-ir init-ll-string))
-                (if print?
-                    (begin
-                      (print "\nCompiling ")
-                      (print-with-colors 'blue 'default #t (print name))
-                      (print "... ")
-                      (print-with-colors 'green 'default #t (print "done"))
-                      (print "\n\n"))
-                    #t)
-                (begin
-                  (print-with-colors 'red 'default #t (print "\n\nError compiling " name " IR\n\n"))
-                  (print "This is pretty bad.  Exiting...\n")
-                  (quit 1))))))))
-
-(define sys:compile-init-ll-from-str
-  (lambda (str)
-    (sys:compile-ll-from-str str)))
-
-;; GCHANGE
-;; removes %b when returning base types (i.e. !head%b returns !head)
-(define xtc:codegen:get-base-type-g
-  (lambda (str)
-    (let* ((r1 (car (regex:split str "##")))
-           (r2 (xtc:codegen:get-ptr-depth r1))
-           (stars (if (= r2 0) "" (apply string-append (make-list r2 "\\*"))))
-           (r3 (string-append "^([^%]*)%*[a-z]*" stars "$")))
-      ;; (println str r2 "$1")
-      (regex:replace r1 r3 "$1"))))
-
 
 ;; GCHANGE
 ;; does not remove %b when returning base types (i.e. !head%b returns !head%b
@@ -342,7 +300,7 @@
 
 
 (define xtc:codegen:pptype xtc:codegen:pretty-print-type)
-(define xtc:codegen:get-type-expand-poly #f)
+
 (define *xtc:codegen:get-type-callback-off* #f)
 
 ;; helpful for generics and adhoc polys
@@ -1024,25 +982,6 @@
                      )
                     (else (xtc:diagnostics:print-bad-type-error type "bad type in get-size"))))))))
 
-;; handy for checking that the type size calculations are getting done
-;; correctly.  typename-list should be a list of typenames (as strings)
-(define xtc:codegen:check-type-size-calculations
-  (lambda (typename-list)
-    (for-each (lambda (type)
-                (if (<> (xtc:codegen:get-type-size type)
-                        (llvm:get-named-struct-size type))
-                    (println
-                      'type: type
-                      'xtc: (xtc:codegen:get-type-size type)
-                      'llvm: (llvm:get-named-struct-size type))))
-              typename-list)
-    #t))
-
-(define xtc:codegen:objectsize-intrinsic
-  (lambda (object-name rettype)
-    (format "@llvm.objectsize.~a(i8* ~a, i1 true)" object-name rettype)))
-
-
 (define xtc:codegen:strip-ptr-depth
   (lambda (type . ptr-depth)
     (if (null? ptr-depth)
@@ -1127,12 +1066,6 @@
     ;; (println 'equal? a b)
     (equal? a b)))
 
-(define xtc:codegen:other?
-  (lambda (type)
-    (let ((t (xtc:codegen:str-list-check type)))
-      (if (string? t) #f
-          (if (= t *xtc:codegen:other*) #t #f)))))
-
 (define xtc:codegen:pointer?
   (lambda (type)
     (let ((t (xtc:codegen:str-list-check type)))
@@ -1185,14 +1118,6 @@
           (if (string? t) #f
               (if (= (modulo t *xtc:codegen:pointer*) *xtc:codegen:closure*)
                   #t #f))))))
-
-(define xtc:codegen:complex-type?
-  (lambda (type)
-    (cond ((xtc:codegen:closure? type) #t)
-          ((xtc:codegen:tuple? type) #t)
-          ((xtc:codegen:array? type) #t)
-          ((xtc:codegen:vector? type) #t)
-          (else #f))))
 
 (define xtc:codegen:signed?
   (lambda (type)
@@ -1270,19 +1195,6 @@
         (emit (xtc:codegen:get-type-str (list-ref args i)) os))
       (emit ")" os)
       (xtc:codegen:strip-space os))))
-
-
-(define xtc:codegen:make-struct-str
-  (lambda (t)
-    (let* ((os (make-string 0))
-           (args t))
-      (emit "{"os)
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (emit (xtc:codegen:get-type-str (cdr (list-ref args i))) os))
-      (emit "}" os)
-      (xtc:codegen:strip-space os))))
-
 
 (define xtc:codegen:make-struct-str-env
   (lambda (t)

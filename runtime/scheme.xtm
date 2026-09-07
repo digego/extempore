@@ -112,16 +112,6 @@
               (loop (append new (list (car lstb))) (cdr lstb))))
         lst)))
 
-(define get-named-arg
-  (lambda (name args . default-value)
-    (let ((value (member name args)))
-      (if value
-          (cadr value)
-          (if (null? default-value)
-              '()
-              (car default-value))))))
-
-
 (define replace-all
   (lambda (lst alst)
     (if (pair? lst)
@@ -140,17 +130,6 @@
                                   (#t (cons v lstb)))))
                 (loop (cdr lsta) lstb2))))
         lst)))
-
-(define replace-first
-  (lambda (obj-a obj-b  lst)
-    (if (member obj-a lst)
-        (let loop ((new '())
-                   (lstb lst))
-          (if (equal? (car lstb) obj-a)
-              (append new (list obj-b) (cdr lstb))
-              (loop (append new (list (car lstb))) (cdr lstb))))
-        lst)))
-
 
 (define-macro (dotimes init . body)
   `(if (<= ,(cadr init) 0)
@@ -663,18 +642,6 @@
 
 ;; synchronous IPC
 
-
-(define *ipc:remote-process-name-map* '())
-
-(define ipc:set-local-remote-mapping
-  (lambda (local-name remote-name)
-    (let ((res (assoc *xtc:globals:remote-process-name-map* local-name)))
-      (if res
-          (set-cdr! res remote-name)
-          (set! *xtc:globals:remote-process-name-map*
-                (cons (cons local-name remote-name)
-                      *xtc:globals:remote-process-name-map*))))))
-
 (define ipc:proc-name-with-mapping
   (lambda ()
     (let ((pair (assoc *xtc:globals:remote-process-name-map* (ipc:get-process-name))))
@@ -823,17 +790,6 @@
            lst)
           (else (set-cdr! (cl:nthcdr (- k 1) lst)
                           (cons obj (cl:nthcdr k lst)))
-                lst))))
-
-; change list item at index
-(define change-at-index
-  (lambda (k lst obj)
-    (cond ((or (null? lst)
-               (< k 0))
-           lst)
-          ((>= k (length lst))
-           lst)
-          (else (set-car! (cl:nthcdr k lst) obj)
                 lst))))
 
 (define (foldr func end lst)
@@ -987,8 +943,6 @@
           ((> value max) max)
           (else value))))
 
-(define limit-range range-limit)
-
 ;; string formatting macro, taken from SRFI-28 (see
 ;; http://srfi.schemers.org/srfi-28/srfi-28.html)
 
@@ -1117,12 +1071,6 @@
           (res ,expr))
     (- (clock:clock) t)))
 
-(define sys:livecoding-error-hook?
-  (lambda (on?)
-    (if on?
-        (set! *error-hook* '())
-        (set! *error-hook* throw))))
-
 ;; this for buffered version
 (define _dsp:set!
   (lambda (zerolatency? name . args)
@@ -1181,12 +1129,6 @@
     `(_dsp:set! ,zerolatency ,@lst)))
 
 ;; filename wrangling
-
-(define sys:file-path-components
-  (lambda (file-path)
-    (let ((base (regex:matched file-path "(.*)/(.*)\\.(.*)")))
-      (and (not (null? base))
-           (cdr base)))))
 
 ;;;;;;;;;;;;;;;;;
 ;; comlist.xtm ;;
@@ -1337,39 +1279,7 @@
 (define (cl:notany pred . ls) (not (apply cl:some pred ls)))
 ;@
 (define (cl:notevery pred . ls) (not (apply cl:every pred ls)))
-;@
-(define (cl:list-of?? predicate . bound)
-  (define (errout) (apply slib:error 'list-of?? predicate bound))
-  (case (length bound)
-    ((0)
-     (lambda (obj)
-       (and (list? obj)
-            (cl:every predicate obj))))
-    ((1)
-     (set! bound (car bound))
-     (cond ((negative? bound)
-            (set! bound (- bound))
-            (lambda (obj)
-              (and (list? obj)
-                   (<= bound (length obj))
-                   (cl:every predicate obj))))
-           (else
-             (lambda (obj)
-               (and (list? obj)
-                    (<= (length obj) bound)
-                    (cl:every predicate obj))))))
-    ((2)
-     (let ((low (car bound))
-           (high (cadr bound)))
-       (cond ((or (negative? low) (negative? high)) (errout))
-             ((< high low)
-              (set! high (car bound))
-              (set! low (cadr bound))))
-       (lambda (obj)
-         (and (list? obj)
-              (<= low (length obj) high)
-              (cl:every predicate obj)))))
-    (else (errout))))
+
 ;@
 (define (cl:find-if pred? lst)
   (cond ((null? lst) #f)
@@ -1678,23 +1588,6 @@
 (define filename-strip-extension
   (lambda (path)
     (car (regex:split path "[.]"))))
-
-;; this is incredibly slow! use sys:slurp-file instead
-(define file->string
-  (lambda (path)
-    (let ((in (open-input-file path))
-          (out (make-string 0)))
-      (if in
-          (let loop ((char (read-char in)))
-            (if (not (eof-object? char))
-                (begin (emit (string char) out)
-                  (loop (read-char in)))
-                (begin (close-port in)
-                  out)))
-          (begin (print-with-colors 'red 'default #t
-                                    (print "Error opening file: "))
-            (print path "\n")
-            #f)))))
 
 ;; sys:load and friends
 

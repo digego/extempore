@@ -232,48 +232,6 @@
                       (if (xtc:solve:default? c) (cons (cadr c) (caddr c)) #f))
                     constraints))))
 
-;; The class of argument key `akey', looked up by canonical VARIABLE rather
-;; than by syntactic key: a let-bound name unified with a literal (inv ~ -1.0)
-;; is the same variable as the literal's fresh key, so it carries the
-;; literal's class even though the default constraint is keyed differently.
-(define xtc:solve:arg-class
-  (lambda (akey subst intern classes)
-    (let ((rep (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
-      (let loop ((cs classes))
-        (cond ((null? cs) #f)
-              ((equal? rep (xtc:type:resolve
-                             (xtc:type:from-intcode (caar cs) intern) subst))
-               (cdar cs))
-              (else (loop (cdr cs))))))))
-
-;; May argument key `akey' take parameter type `pcode' in a candidate?  A still-
-;; free literal may only take a type from its own class (an integer literal an
-;; integer width, etc.), so a candidate whose parameter falls outside that class
-;; is rejected --- the bound the old candidate-list carried, here read off the
-;; literal's default.  A non-numeric parameter --- a named type ("%Complexf"), a
-;; tuple, a compound --- is likewise rejected for a classed variable (a numeric
-;; literal is never one of those; admitting it would hold every literal-argument
-;; overload ambiguous whenever some library registers such an operator overload,
-;; blocking resolution until defaulting fires at the wrong width).  A generic's
-;; !bang parameter stays admissible: it unifies freely and the candidate's other
-;; positions decide.  An argument already fixed to a concrete type carries no
-;; restriction (the equality that fixed it already had the final say), and an
-;; argument with no class ranges freely.
-(define xtc:solve:arg-admits?
-  (lambda (akey pcode subst intern classes)
-    (let ((resolved (xtc:type:resolve (xtc:type:from-intcode akey intern) subst)))
-      (if (xtc:type:var? resolved)
-          (let ((class (xtc:solve:arg-class akey subst intern classes)))
-            (if (not class)
-                #t
-                (cond ((number? pcode) (and (member pcode class) #t))
-                      ((symbol? pcode)
-                       (let ((s (symbol->string pcode)))
-                         (and (> (string-length s) 0)
-                              (char=? (string-ref s 0) #\!))))
-                      (else #f))))
-          #t))))
-
 ;; The vector-math rule: the old math-check lets a binary operator combine a
 ;; SIMD vector with a vector of the same base type at either pointer depth
 ;; ("we are allowed to multiply a Vector by a Vector*"), the result being the
@@ -680,7 +638,3 @@
           (xtc:type:apply-subst (xtc:type:from-intcode sym intern) subst)
           intern))))
 
-;; Did the solve fully determine `sym'?
-(define xtc:solve:resolved?
-  (lambda (sym subst intern)
-    (and (xtc:solve:type-of sym subst intern) #t)))

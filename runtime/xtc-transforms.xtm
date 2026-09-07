@@ -1,25 +1,3 @@
-(define icr:new-zone
-  (lambda args
-    (if (null? args)
-        (sys:create-mzone *xtc:globals:default-zone-size*)
-        (sys:create-mzone (car args)))))
-
-(define icr:destroy-zone
-  (lambda (zone)
-    (if (equal? *xtc:globals:zone* zone)
-        (set! *xtc:globals:zone* (sys:default-mzone)))
-    (if (equal? zone (sys:default-mzone))
-        (log-info "You are not allowed to destroy the default zone")
-        (sys:destrop-mzone zone))))
-
-(define icr:set-zone
-  (lambda (zone)
-    (set! *xtc:globals:zone* zone)))
-
-(define icr:set-zone-default
-  (lambda ()
-    (set! *xtc:globals:zone* (sys:default-mzone))))
-
 (define regex:type-split string-split-on)
 
 (define xtc:desugar:split-namedfunc
@@ -1257,18 +1235,7 @@ Continue executing `body' forms until `test-expression' returns #f"
                 mint)
       ;; (println 'new_cname_for: 't: t 'is (string-append "<" (string-join mint ",") ">"))
       (cname-encode (string-append "<" (string-join mint ",") ">")))))
-(define xtc:desugar:intersection*
-  (lambda args
-    (let loop ((a args)
-               (res '()))
-      (if (null? a)
-          res
-          (loop (cdr a)
-                (if (null? res)
-                    (car a)
-                    (if (null? (car a))
-                        res
-                        (cl:intersection (car a) res))))))))
+
 (define xtc:desugar:type-normalize
   (lambda (t)
     (cond ((atom? t) t)

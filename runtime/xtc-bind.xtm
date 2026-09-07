@@ -751,29 +751,6 @@
   "bind an xtlang named type"
   '(name type optional-docstring))
 
-(define-macro (xtc:diagnostics:pretty-print-vars . varlist)
-  (map (lambda (var)
-         `(begin (println '--- (quote ,var) '---)
-           (println ,var)))
-       varlist))
-
-(define xtc:bind:construct-generic-type-if-valid
-  (lambda (t)
-    ;; named type might need to be constructed!
-    (if (and (string? t)
-             (char=? (string-ref t 0) #\%)
-             (regex:match? t "_poly_"))
-        (if (xtc:cache:namedtype-exists? t)
-            #t ;; if 't' exists don't do anything else
-            (let* ((p (regex:split t "_poly_"))
-                   (n (substring (car p) 1 (string-length (car p)))))
-              (if (not (xtc:cache:get-generictype-candidate-types n))
-                  #f  ;; if not a generic type then bad :(
-                  (begin
-                    #t))))
-        #t)))
-
-
 ;; bind-val takes an optional argument, the meaning of which depends
 ;; on the type of the val, and also an optional docstring
 (define-macro (bind-val symbol type . args)
@@ -1238,18 +1215,6 @@ e.g.
                                                     ,(symbol->string symname)
                                                     ,(symbol->string type)))))
 
-;; THIS IS A HELPER FUNCTION
-;;
-;; returns a (bind-lib-xtm) form for the named function
-;; by using the xtm-closure-doc to get the type
-;; function must already have been compiled into module
-(define-macro (bind-lib-xtm-get-string name)
-  (let ((res (eval `(xtm-closure-doc ,name))))
-    (if (string? res)
-        `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol res)))
-        `(sexpr->string '(bind-lib-xtm mathlib ,name ,(string->symbol (cdr res)))))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define xtc:bind:initialize-closure-with-new-zone
@@ -1341,32 +1306,6 @@ e.g.
           (if f (llvm:run f)
               '())))))
 
-(define llvm:get-closure-setter
-  (lambda (name)
-    (if (xtc:aot:currently-compiling?)
-        (xtc:diagnostics:print-not-during-aot-error)
-        (llvm:get-function-pointer (string-append name "_setter")))))
-
-;; a helper for returning a scheme closure native closure (if one exists!)
-(define llvm:get-native-function
-  (lambda (name)
-    (if (xtc:aot:currently-compiling?)
-        (xtc:diagnostics:print-not-during-aot-error)
-        (llvm:get-function-pointer (string-append name "_native")))))
-
-;; Wrap a native, bound C function, allowing it to be called from scheme
-(define-macro (bind-wrapper local-sym native-sym)
-  (let* ((types (cdr (xtc:cache:get-closure-arg-types (symbol->string native-sym))))
-         (args (map (lambda (t v) v)
-                    types (make-list-with-proc
-                            (length types)
-                            (lambda (i)
-                              (string->symbol (string-append "arg_" (atom->string i))))))))
-    `(bind-func ,local-sym
-      (lambda ,args
-        ,(cons native-sym args)))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; very dodgy
@@ -1453,15 +1392,6 @@ e.g.
             types)
           (set! *xtc:globals:print-code-specialization-compiles* printspec)
           #t))))
-
-(define-macro (specialize-generictype sym . args)
-  (apply xtc:bind:specialize-generictype
-         (symbol->string sym)
-         (map (lambda (x)
-                (if (regex:match? (symbol->string x) "^\\$")
-                    (set! x (string->symbol (string-append (symbol->string sym) ":" (symbol->string x)))))
-                (symbol->string (xtc:desugar:expand-generic-type x))) args)))
-
 
 ;; force specializations on a generic funtion
 (define xtc:bind:specialize-genericfunc
@@ -2120,6 +2050,3 @@ e.g.
 
 ;; to catch the dreaded heisenbug...
 
-(define s-p-a-c-e-s___
-  (lambda ()
-    (string-append "  ")))

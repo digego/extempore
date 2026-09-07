@@ -54,28 +54,6 @@
             ("callback" . #("[i1,i64,sym,args...]*" "set callback for closure at time with args" (time closure args...)))
             ;; special scheme macros
             ("call-as-xtlang" . #("[String*,!v]*" "the body of this (scheme) macro will be executed as xtlang" (body)))))
-;;
-;; language builtins - the cache is just used for documentation at
-;; this stage, the actual builtins are handled in the compiler (mostly
-;; in first-transform). In the future, however, we could integrate
-;; that stuff into the builtin-cache
-;;
-;; (name . #(type-str docstring args))
-;;
-;; The other differences between this and the closure-list are that
-;; the type is stored as a string rather than a list (so that we can
-;; handle weird/overloaded/varargs things nicely for documentation
-;; purposes) and also that "body" is replaced by "args"
-;;
-(define xtc:cache:print-builtin-cache
-  (lambda ()
-    (print '*xtc:cache:builtin-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:builtin-cache*)))
-
-(define xtc:cache:reset-builtin-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:builtin-cache*)))
 
 ;; this is never called in regular compilation! the builtin cache is
 ;; populated by hand (see above) and is mostly here for documentation
@@ -102,37 +80,15 @@
     (let ((res (xtc:cache:get-builtin-type-str builtin-name)))
       (if (and res (not (null? res))) #t #f))))
 
-(define xtc:cache:set-builtin-type-str
-  (lambda (builtin-name type-str)
-    (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
-      (if builtin-data
-          (if (not (null? (vector-ref builtin-data 0)))
-              (begin (print "Warning: attempting to re-type already typed builtin")
-                (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print builtin-name))
-                (print " to ")
-                (print-with-colors *xtc:globals:pretty-print-type-color* 'default #t (print (xtc:codegen:pretty-print-type-str type-str) "\n")))
-              (vector-set! builtin-data 0 type-str))
-          (xtc:diagnostics:print-compiler-error "tried to set type of unknown builtin" builtin-name)))))
-
 (define xtc:cache:get-builtin-docstring
   (lambda (builtin-name)
     (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
       (if builtin-data (vector-ref builtin-data 1) #f))))
 
-(define xtc:cache:set-builtin-docstring
-  (lambda (builtin-name docstring)
-    (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
-      (if builtin-data (vector-set! builtin-data 1 docstring) #f))))
-
 (define xtc:cache:get-builtin-args
   (lambda (builtin-name)
     (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
       (if builtin-data (vector-ref builtin-data 2) #f))))
-
-(define xtc:cache:set-builtin-args
-  (lambda (builtin-name args)
-    (let ((builtin-data (hashtable-ref *xtc:cache:builtin-cache* builtin-name)))
-      (if builtin-data (vector-set! builtin-data 2 args) #f))))
 
 ;;;;;;;;;;;;;;
 ;; named types
@@ -145,16 +101,6 @@
 ;; each element of the list is of the form
 ;;
 ;; (name . #(type docstring))
-
-(define xtc:cache:print-namedtype-cache
-  (lambda ()
-    (print '*xtc:cache:namedtype-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:namedtype-cache*)))
-
-(define xtc:cache:reset-namedtype-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:namedtype-cache*)))
 
 ;; type is immutable, doesn't need a setter
 (define xtc:cache:get-namedtype-type
@@ -189,11 +135,6 @@
     (let ((namedtype-data (hashtable-ref *xtc:cache:namedtype-cache* (xtc:codegen:clean-named-type namedtype-name))))
       (if namedtype-data (vector-ref namedtype-data 1) #f))))
 
-(define xtc:cache:set-namedtype-docstring
-  (lambda (namedtype-name docstring)
-    (let ((namedtype-data (hashtable-ref *xtc:cache:namedtype-cache* (xtc:codegen:clean-named-type namedtype-name))))
-      (if namedtype-data (vector-set! namedtype-data 1 docstring) #f))))
-
 ;;;;;;;;;;;;;;;
 ;; type aliases
 ;; ------------
@@ -201,16 +142,6 @@
 (define *xtc:cache:typealias-cache* (make-hashtable 256))
 ;;
 ;; each entry maps name -> #(type-alias docstring)
-
-(define xtc:cache:print-typealias-cache
-  (lambda ()
-    (print '*xtc:cache:typealias-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:typealias-cache*)))
-
-(define xtc:cache:reset-typealias-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:typealias-cache*)))
 
 (define xtc:cache:get-typealias-type
   (lambda (typealias-name)
@@ -277,11 +208,6 @@
     (let ((typealias-data (hashtable-ref *xtc:cache:typealias-cache* (xtc:codegen:clean-named-type typealias-name))))
       (if typealias-data (vector-ref typealias-data 1) #f))))
 
-(define xtc:cache:set-typealias-docstring
-  (lambda (typealias-name docstring)
-    (let ((typealias-data (hashtable-ref *xtc:cache:typealias-cache* (xtc:codegen:clean-named-type typealias-name))))
-      (if typealias-data (vector-set! typealias-data 1 docstring) #f))))
-
 ;;;;;;;;;;;;;;;;
 ;; xtlang macros
 ;; -------------
@@ -293,16 +219,6 @@
 ;; create an xtlang macro through bind-macro. behind the scenes, these
 ;; are currently implemented as scheme macros (although with an
 ;; "xtmacro_" prefix) but this could change in future
-
-(define xtc:cache:print-xtmacro-cache
-  (lambda ()
-    (print '*xtc:cache:xtmacro-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:xtmacro-cache*)))
-
-(define xtc:cache:reset-xtmacro-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:xtmacro-cache*)))
 
 (define xtc:cache:xtmacro-exists?
   (lambda (xtmacro-name)
@@ -317,16 +233,6 @@
     (if (and (or (string? macro-name) (begin (println 'bad 'macro-name: macro-name) #f))
              (or (string? docstring) (begin (println 'bad 'docstring: docstring) #f)))
         (hashtable-set! *xtc:cache:xtmacro-cache* macro-name (vector docstring)))))
-
-(define xtc:cache:get-xtmacro-docstring
-  (lambda (xtmacro-name)
-    (let ((xtmacro-data (hashtable-ref *xtc:cache:xtmacro-cache* xtmacro-name)))
-      (if xtmacro-data (vector-ref xtmacro-data 0) #f))))
-
-(define xtc:cache:set-xtmacro-docstring
-  (lambda (xtmacro-name docstring)
-    (let ((xtmacro-data (hashtable-ref *xtc:cache:xtmacro-cache* xtmacro-name)))
-      (if xtmacro-data (vector-set! xtmacro-data 0 docstring) #f))))
 
 ;; docstrings are compulsory for xtlang macros
 (define-macro (bind-macro . forms)
@@ -368,17 +274,6 @@
 ;;
 ;; each entry maps name -> #(type docstring zone-size body)
 
-(define xtc:cache:print-closure-cache
-  (lambda ()
-    (print '*xtc:cache:closure-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:closure-cache*)))
-
-(define xtc:cache:reset-closure-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:closure-cache*)
-    (set! *xtc:cache:closure-cache-order* '())))
-
 (define xtc:cache:register-new-closure
   (lambda (closure-name type zone-size docstring body)
     ;; (println 'closure-name: closure-name 'type: type 'docstring: docstring 'zone-size: zone-size 'body: body 'exists? (xtc:cache:closure-exists? closure-name))
@@ -410,13 +305,6 @@
       (if (or (not type) (null? type))
           #f
           (map xtc:codegen:get-type-str (cdr type))))))
-
-;; this will return true during compilation (i.e. after the call to
-;; `bind-func' but before the type of the closure is finalised)
-(define xtc:cache:closure-is-being-compiled?
-  (lambda (closure-name)
-    (let ((res (xtc:cache:get-closure-type closure-name)))
-      (if res #t #f))))
 
 (define xtc:cache:closure-exists?
   (lambda (closure-name)
@@ -465,11 +353,6 @@
   (lambda (closure-name)
     (let ((closure-data (hashtable-ref *xtc:cache:closure-cache* closure-name)))
       (if closure-data (vector-ref closure-data 2) #f))))
-
-(define xtc:cache:set-closure-zone-size
-  (lambda (closure-name body)
-    (let ((closure-data (hashtable-ref *xtc:cache:closure-cache* closure-name)))
-      (if closure-data (vector-set! closure-data 2 body) #f))))
 
 (define xtc:cache:get-closure-body
   (lambda (closure-name)
@@ -954,16 +837,6 @@
             ("unswap64i" . #((213 2 2) "" ()))
             ))
 
-(define xtc:cache:print-nativefunc-cache
-  (lambda ()
-    (print '*xtc:cache:nativefunc-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:nativefunc-cache*)))
-
-(define xtc:cache:reset-nativefunc-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:nativefunc-cache*)))
-
 (define xtc:cache:register-new-nativefunc
   (lambda (nativefunc-name type docstring arg-list)
     ;; check arg types
@@ -990,30 +863,15 @@
   (lambda (nativefunc-name)
     (if (xtc:cache:get-nativefunc-type nativefunc-name) #t #f)))
 
-(define xtc:cache:set-nativefunc-type
-  (lambda (nativefunc-name type)
-    (let ((nfunc-data (hashtable-ref *xtc:cache:nativefunc-cache* nativefunc-name)))
-      (if nfunc-data (vector-set! nfunc-data 0 type) #f))))
-
 (define xtc:cache:get-nativefunc-docstring
   (lambda (nativefunc-name)
     (let ((nfunc-data (hashtable-ref *xtc:cache:nativefunc-cache* nativefunc-name)))
       (if nfunc-data (vector-ref nfunc-data 1) #f))))
 
-(define xtc:cache:set-nativefunc-docstring
-  (lambda (nativefunc-name docstring)
-    (let ((nfunc-data (hashtable-ref *xtc:cache:nativefunc-cache* nativefunc-name)))
-      (if nfunc-data (vector-set! nfunc-data 1 docstring) #f))))
-
 (define xtc:cache:get-nativefunc-arg-names
   (lambda (nativefunc-name)
     (let ((nativefunc-data (hashtable-ref *xtc:cache:nativefunc-cache* nativefunc-name)))
       (if nativefunc-data (vector-ref nativefunc-data 2) #f))))
-
-(define xtc:cache:set-nativefunc-arg-names
-  (lambda (nativefunc-name arg-list)
-    (let ((nativefunc-data (hashtable-ref *xtc:cache:nativefunc-cache* nativefunc-name)))
-      (if nativefunc-data (vector-set! nativefunc-data 2 arg-list) #f))))
 
 ;; helpers for dealing with either closures or nativefuncs
 
@@ -1036,11 +894,6 @@
           (xtc:cache:get-nativefunc-arg-types closure-or-nativefunc-name)
           res))))
 
-(define xtc:cache:get-closure-or-nativefunc-docstring
-  (lambda (closure-or-nativefunc-name)
-    (or (xtc:cache:get-closure-docstring closure-or-nativefunc-name)
-        (xtc:cache:get-nativefunc-docstring closure-or-nativefunc-name))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;; polymorphic functions
 ;; ---------------------
@@ -1050,16 +903,6 @@
 ;; (polyfunc-name . #((list #(func1 func1type) #(func2 func2type)) docstring))
 ;;
 (define *xtc:cache:polyfunc-cache* (make-hashtable 256))
-
-(define xtc:cache:print-polyfunc-cache
-  (lambda ()
-    (print '*xtc:cache:polyfunc-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:polyfunc-cache*)))
-
-(define xtc:cache:reset-polyfunc-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:polyfunc-cache*)))
 
 (define xtc:cache:polyfunc-exists?
   (lambda (polyfunc-name)
@@ -1123,11 +966,6 @@
     (let ((candidates (xtc:cache:get-polyfunc-candidate-list polyfunc-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
-
-(define xtc:cache:get-polyfunc-candidate-pretty-types
-  (lambda (polyfunc-name)
-    (let ((types (xtc:cache:get-polyfunc-candidate-types polyfunc-name)))
-      (and types (map xtc:codegen:pretty-print-type types)))))
 
 ;; remap xtc:codegen:poly-print-all
 (define xtc:cache:polyfunc-pretty-print
@@ -1206,18 +1044,6 @@
 (define *xtc:cache:genericfunc-cache* (make-hashtable 64))
 
 (define *xtc:cache:genericfunc-needs-update* '())
-
-(define xtc:cache:print-genericfunc-cache
-  (lambda ()
-    (println '----------------------)
-    (hashtable-for-each (lambda (entry)
-                          (for-each (lambda (x) (println ':> x))
-                                    (cdr entry)))
-                        *xtc:cache:genericfunc-cache*)))
-
-(define xtc:cache:reset-genericfunc-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:genericfunc-cache*)))
 
 (define xtc:cache:genericfunc-src-changed
   (lambda (name arity)
@@ -1603,16 +1429,6 @@
 ;;
 (define *xtc:cache:polytype-cache* (make-hashtable 256))
 
-(define xtc:cache:print-polytype-cache
-  (lambda ()
-    (print '*xtc:cache:polytype-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:polytype-cache*)))
-
-(define xtc:cache:reset-polytype-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:polytype-cache*)))
-
 (define xtc:cache:polytype-exists?
   (lambda (polytype-name)
     (if (hashtable-ref *xtc:cache:polytype-cache* polytype-name) #t #f)))
@@ -1651,12 +1467,6 @@
           (if (not (xtc:cache:namedtype-exists? type-name))
               (xtc:cache:register-new-namedtype type-name type docstring))))))
 
-(define xtc:cache:get-polytype-candidate-names
-  (lambda (polytype-name)
-    (let ((candidates (xtc:cache:get-polytype-candidate-list polytype-name)))
-      (and candidates
-           (map (lambda (func-vector) (vector-ref func-vector 0)) candidates)))))
-
 ;; remap xtc:codegen:polytype-types - should return list types for all
 ;; options
 (define xtc:cache:get-polytype-candidate-types
@@ -1664,11 +1474,6 @@
     (let ((candidates (xtc:cache:get-polytype-candidate-list polytype-name)))
       (and candidates
            (map (lambda (func-vector) (vector-ref func-vector 1)) candidates)))))
-
-(define xtc:cache:get-polytype-candidate-pretty-types
-  (lambda (polytype-name)
-    (let ((types (xtc:cache:get-polytype-candidate-types polytype-name)))
-      (and types (map xtc:codegen:pretty-print-type types)))))
 
 ;; remap xtc:codegen:poly-print-all
 (define xtc:cache:polytype-pretty-print
@@ -1688,36 +1493,6 @@
                          (println))
                        candidates))))))
 
-;; takes a polyname and a type, and returns the name of the first
-;; (first) namedtype with that type
-;; remap xtc:codegen:check-polytype
-(define xtc:cache:get-polytype-candidate
-  (lambda (polytype-name func-type)
-    (let loop ((candidates (xtc:cache:get-polytype-candidate-list polytype-name)))
-      (if (or (not candidates) (null? candidates))
-          #f
-          (if (equal? (vector-ref (car candidates) 1) func-type)
-              (string->symbol (vector-ref (car candidates) 0))
-              (loop (cdr candidates)))))))
-
-(define xtc:cache:polytype-match?
-  (lambda (t1 t2)
-    (if (<> (length t1)
-            (length t2))
-        #f
-        (if (member #f (map (lambda (t1 t2)
-                              (if (atom? t1)
-                                  (set! t1 (list t1)))
-                              (if (atom? t2)
-                                  (set! t2 (list t2)))
-                              (if (null? (xtc:desugar:intersection* t1 t2))
-                                  #f
-                                  #t))
-                            t1
-                            t2))
-            #f
-            #t))))
-
 ;;;;;;;;;;;;;;;;
 ;; generic types
 ;; -------------
@@ -1727,18 +1502,6 @@
 ;; renamed)
 ;;
 (define *xtc:cache:generictype-cache* (make-hashtable 64))
-
-(define *xtc:cache:generictype-needs-update* '())
-
-(define xtc:cache:print-generictype-cache
-  (lambda ()
-    (print '*xtc:cache:generictype-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:generictype-cache*)))
-
-(define xtc:cache:reset-generictype-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:generictype-cache*)))
 
 (define xtc:cache:generictype-exists?
   (lambda (name)
@@ -1800,16 +1563,6 @@
 ;;
 (define *xtc:cache:globalvar-cache* (make-hashtable 256))
 
-(define xtc:cache:print-globalvar-cache
-  (lambda ()
-    (print '*xtc:cache:globalvar-cache*:)
-    (hashtable-for-each (lambda (entry) (println " " (car entry) ": " (cdr entry)))
-                        *xtc:cache:globalvar-cache*)))
-
-(define xtc:cache:reset-globalvar-cache
-  (lambda ()
-    (hashtable-clear! *xtc:cache:globalvar-cache*)))
-
 ;; type is immutable, doesn't need a setter
 (define xtc:cache:get-globalvar-type
   (lambda (globalvar-name)
@@ -1846,9 +1599,4 @@
   (lambda (globalvar-name)
     (let ((globalvar-data (hashtable-ref *xtc:cache:globalvar-cache* globalvar-name)))
       (if globalvar-data (vector-ref globalvar-data 1) #f))))
-
-(define xtc:cache:set-globalvar-docstring
-  (lambda (globalvar-name docstring)
-    (let ((globalvar-data (hashtable-ref *xtc:cache:globalvar-cache* globalvar-name)))
-      (if globalvar-data (vector-set! globalvar-data 1 docstring) #f))))
 

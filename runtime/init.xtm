@@ -54,30 +54,6 @@
 (define (succ x) (+ x 1))
 (define (pred x) (- x 1))
 
-;; String/atom conversion (TinyScheme-specific, shimmed in SchemeS7.cpp)
-(define (string->anyatom str pred)
-  (let* ((a (string->atom str)))
-    (if (pred a) a
-        (error "string->xxx: not a xxx" a))))
-
-(define (anyatom->string n pred)
-  (if (pred n)
-      (atom->string n)
-      (error "xxx->string: not a xxx" n)))
-
-(define (unzip1-with-cdr . lists)
-  (unzip1-with-cdr-iterative lists '() '()))
-
-(define (unzip1-with-cdr-iterative lists cars cdrs)
-  (if (null? lists)
-      (cons cars cdrs)
-      (let ((car1 (caar lists))
-            (cdr1 (cdar lists)))
-        (unzip1-with-cdr-iterative
-          (cdr lists)
-          (append cars (list car1))
-          (append cdrs (list cdr1))))))
-
 (define (last-pair x)
   (if (pair? (cdr x))
       (last-pair (cdr x))
@@ -87,20 +63,9 @@
 
 (define (tail stream) (force (cdr stream)))
 
-(define (vector-equal? x y)
-  (and (vector? x) (vector? y) (= (vector-length x) (vector-length y))
-       (let ((n (vector-length x)))
-         (let loop ((i 0))
-           (if (= i n)
-               #t
-               (and (equal? (vector-ref x i) (vector-ref y i))
-                    (loop (succ i))))))))
-
 ;;;; atom?
 (define (atom? x)
   (not (pair? x)))
-
-(define (acons x y z) (cons (cons x y) z))
 
 ;;;; Utility to ease macro creation
 ;; s7's macroexpand is a special form (doesn't evaluate its argument).
@@ -109,9 +74,6 @@
   (eval (list 'macroexpand form)))
 
 ;;;; Handy for imperative programs
-(define-macro (define-with-return head . body)
-  `(define ,head
-    (call/cc (lambda (return) ,@body))))
 
 ;;;; Simple exception handling
 ;;
@@ -121,32 +83,10 @@
 ;;              (if-something goes-wrong)
 ;;              (with-these calls))
 ;;
-;;    "Catch" establishes a scope spanning multiple call-frames
-;;    until another "catch" is encountered.
-;;
-;;    Exceptions are thrown with:
-;;
-;;         (throw "message")
-;;
-;;    If used outside a (catch ...), reverts to (error "message)
-
-(define *handlers* (list))
-
-(define (push-handler proc)
-  (set! *handlers* (cons proc *handlers*)))
-
-(define (pop-handler)
-  (let ((h (car *handlers*)))
-    (set! *handlers* (cdr *handlers*))
-    h))
-
-(define (more-handlers?)
-  (pair? *handlers*))
+;;    and thrown with (throw "message"), which is (error "message").
 
 (define (throw . x)
-  (if (more-handlers?)
-      (apply (pop-handler))
-      (apply error x)))
+  (apply error x))
 
 ;; Override s7's catch with TinyScheme-compatible version
 ;; s7's catch is (catch tag thunk handler)
@@ -157,9 +97,6 @@
   `(*s7-catch* #t
     (lambda () ,@body)
     (lambda (type info) ,error-value)))
-
-;; *error-hook* is immutable in s7; use s7's error handling instead
-(define *livecoding-error-hook* (lambda (msg a) 1))
 
 ;; Code sent from an editor for evaluation goes through sys:eval-string. It
 ;; reads and evaluates each form inside s7's native catch so an uncaught error
@@ -234,18 +171,6 @@
             (loop (sys:eval-top-level form)))))))
 
 ;;;;; Definition of MAKE-ENVIRONMENT
-(define-macro (make-environment . body)
-  `(let ()
-    ,@body
-    (curlet)))
-
-(define-macro (eval-polymorphic x . envl)
-  (display envl)
-  (let* ((env (if (null? envl) (curlet) (eval (car envl))))
-         (xval (eval x env)))
-    (if (procedure? xval)
-        xval
-        xval)))
 
 ;; Redefine this if you install another package infrastructure
 ;; Also redefine 'package'
@@ -301,35 +226,6 @@
             (set-current-output-port prev-outport)
             res)))))
 
-(define (with-input-output-from-to-files si so p)
-  (let ((inport (open-input-file si))
-        (outport (open-input-file so)))
-    (if (not (and inport outport))
-        (begin
-          (close-input-port inport)
-          (close-output-port outport)
-          #f)
-        (let ((prev-inport (current-input-port))
-              (prev-outport (current-output-port)))
-          (set-current-input-port inport)
-          (set-current-output-port outport)
-          (let ((res (p)))
-            (close-input-port inport)
-            (close-output-port outport)
-            (set-current-input-port prev-inport)
-            (set-current-output-port prev-outport)
-            res)))))
-
-;; Random number generator (maximum cycle)
-(define *seed* 1)
-(define (random-next)
-  (let* ((a 16807) (m 2147483647) (q (quotient m a)) (r (modulo m a)))
-    (set! *seed*
-          (-   (* a (- *seed*
-                       (* (quotient *seed* q) q)))
-             (* (quotient *seed* q) r)))
-    (if (< *seed* 0) (set! *seed* (+ *seed* m)))
-    *seed*))
 ;; SRFI-0
 ;; COND-EXPAND
 ;; Implemented as a macro
@@ -390,10 +286,3 @@
              (list)
              lst))))
 
-(define remq
-  (lambda (val lst)
-    (remove val lst eq?)))
-
-(define remv
-  (lambda (val lst)
-    (remove val lst eqv?)))
