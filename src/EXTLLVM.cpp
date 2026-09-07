@@ -93,6 +93,7 @@
 
 #include <EXTLLVM.h>
 #include <ext/NetUtil.h>
+#include <ext/UdpSocket.h>
 #include <EXTClosureAddressTable.h>
 #include <EXTThread.h>
 #include <UNIV.h>
@@ -108,31 +109,8 @@
 #include <sys/types.h>
 #endif
 
-#ifdef _WIN32
-#include <experimental/buffer>
-#include <experimental/executor>
-#include <experimental/internet>
-#include <experimental/io_context>
-#include <experimental/net>
-#include <experimental/netfwd>
-#include <experimental/socket>
-#include <experimental/timer>
-#else
-#include <sys/errno.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> /* host to IP resolution       */
-#include <sys/fcntl.h>
-#include <arpa/inet.h>
-#endif
-
 #include <chrono>
 #include <thread>
-
-#ifndef _WIN32
-#include <unistd.h>
-#endif
 
 #include "SchemeProcess.h"
 
@@ -250,66 +228,33 @@ EXPORT char* extitoa(int64_t val) {
 }
 
 EXPORT void llvm_send_udp(char* host, int port, void* message, int message_length) {
-    int length = message_length;
-
-#ifdef _WIN32  // TODO: This should use WinSock on Windows
-    std::experimental::net::io_context context;
-    // std::experimental::net::ip::udp::resolver::iterator end;
-    std::experimental::net::ip::udp::resolver resolver(context);
-    std::stringstream ss;
-    ss << port;
-    std::experimental::net::ip::udp::resolver::results_type res =
-        resolver.resolve(std::experimental::net::ip::udp::v4(), host, ss.str());
-    auto iter = res.begin();
-    auto end = res.end();
-    std::experimental::net::ip::udp::endpoint sa = *iter;
-
-#else
-    struct sockaddr_in sa;
-
     uint32_t resolved = extemp::net_util::resolve_ipv4(host);
     if (!resolved) {
         printf("OSC Error: Could not resolve host name\n");
         return;
     }
 
+    struct sockaddr_in sa;
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(port);
+    sa.sin_port = htons(uint16_t(port));
     sa.sin_addr.s_addr = resolved;
-#endif
 
-#ifdef _WIN32
-    std::experimental::net::ip::udp::socket* fd = 0;
-#else
-    int fd = 0;
-#endif
-
-#ifdef _WIN32
-    int err = 0;
-    std::experimental::net::io_context service;
-    std::experimental::net::ip::udp::socket socket(service);
-    socket.open(std::experimental::net::ip::udp::v4());
-    socket.send_to(std::experimental::net::buffer(message, length), sa);
-#else
-    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (fd < 0) {
-        printf("Error: could not open UDP socket: %s\n", strerror(errno));
+    extemp::UdpSocket sock;
+    if (!sock.open()) {
+        printf("Error: could not open UDP socket: %s\n",
+               extemp::UdpSocket::errorText(extemp::UdpSocket::lastError()).c_str());
         return;
     }
-    int broadcastEnable = 1;
-    if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable))) {
-        printf("Error: could not set socket to broadcast mode: %s\n", strerror(errno));
-    }
-    if (sendto(fd, message, length, 0, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
-        if (errno == EMSGSIZE) {
+    if (sock.sendTo(message, size_t(message_length), sa) < 0) {
+        const int err = extemp::UdpSocket::lastError();
+        if (extemp::UdpSocket::messageTooBig(err)) {
             printf("Error: OSC message too large: UDP 8k message MAX\n");
         } else {
-            printf("Error: problem sending OSC message: %s\n", strerror(errno));
+            printf("Error: problem sending OSC message: %s\n",
+                   extemp::UdpSocket::errorText(err).c_str());
         }
     }
-    close(fd);
-#endif
 }
 
 /////////////////////////////////////////////////
