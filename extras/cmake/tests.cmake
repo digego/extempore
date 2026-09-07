@@ -228,23 +228,6 @@ extempore_add_example_as_test(examples/external/portmidi.xtm 10 examples-audio)
 extempore_add_example_as_test(examples/external/sampler.xtm 10 examples-audio)
 extempore_add_example_as_test(examples/external/sing_a_song.xtm 10 examples-audio)
 
-# Examples that no longer load cleanly. sys:load now reports errors and
-# sys:load-then-quit exits non-zero on them, which exposed these. Registered as
-# EXPECTED failures (the tests/failing.xtm convention) so ctest stays green
-# while they are broken and flips the moment one is fixed.
-#   expr_problem, audio_streams, scheduler: type inference reports a conflict
-#     inside a generic instance (a self-recursive generic over a recursive
-#     type; closure-slot access on a generic closure argument)
-#   synth, covers: use playp and R, removed in c285f1e5 and 99875ff3; need
-#     porting to the current pattern language
-set_tests_properties(
-    examples/core/expr_problem.xtm
-    examples/core/audio_streams.xtm
-    examples/core/scheduler.xtm
-    examples/core/synth.xtm
-    examples/core/covers.xtm
-    PROPERTIES WILL_FAIL TRUE)
-
 # WebGPU graphics examples
 if(EXTERNAL_SHLIBS_GRAPHICS)
     extempore_add_example_as_test(examples/external/webgpu-triangle.xtm 10 examples-graphics)

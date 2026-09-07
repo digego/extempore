@@ -69,6 +69,7 @@ Each assertion records one of these outcomes:
 - `compile-error` --- the definition failed to compile
 - `compile-ok` --- a compile-only test compiled
 - `fixture-error` --- a fixture's setup threw
+- `load-error` --- a top-level form in the test file itself threw
 
 A run fails (non-zero exit) if any outcome is not a `pass` or `compile-ok`.
 
