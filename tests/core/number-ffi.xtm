@@ -29,10 +29,22 @@
 (xtmtest-result (real->integer -1.0) -1 "real->integer-minus-one")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; real->rational -- sign preserved through the fixed-denominator conversion
+;; real->rational -- best rational approximation with a bounded denominator,
+;; sign preserved
 
 (xtmtest-result (real->rational 4.5) 9/2 "real->rational-positive")
 (xtmtest-result (real->rational -4.5) -9/2 "real->rational-negative")
+(xtmtest-result (real->rational 0.0) 0 "real->rational-zero")
+(xtmtest-result (real->rational 0.25) 1/4 "real->rational-quarter")
+(xtmtest-result (real->rational -0.125) -1/8 "real->rational-negative-eighth")
+(xtmtest-result (real->rational (/ 1.0 3.0)) 1/3 "real->rational-third")
+
+;; multiplying through by a fixed 1e7 denominator overflowed int64 above about
+;; 9.2e11, so these used to come back as garbage
+(xtmtest-result (real->rational 1e12) 1000000000000 "real->rational-large")
+(xtmtest-result (real->rational -1e12) -1000000000000 "real->rational-large-negative")
+(xtmtest-result (real->rational 1e15) 1000000000000000 "real->rational-very-large")
+(xtmtest-result (real->rational 123456789012.5) 246913578025/2 "real->rational-large-fraction")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; pc:relative -- the downstream casualty: negative steps must move down
