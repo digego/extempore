@@ -1,0 +1,43 @@
+;;; tests/compiler/callback.xtm -- callback targets are resolved to their native symbol at compile time
+
+;; A polymorphic closure is compiled under a name with an adhoc counter
+;; (name_adhoc_<n>_<cname>), but a reference that the type checker could not
+;; match to a registered candidate is spelled without the counter
+;; (name_adhoc_<cname>). The callback path used to hand that spelling to
+;; llvm_get_function_ptr and lean on a counter-less alias map inside the JIT
+;; at callback time; the codegen now resolves it through the driver's
+;; adhoc-name map, so the string in the IR is the symbol the JIT defines.
+
+(sys:load "libs/core/test.xtm")
+
+(bind-func cbres_target (lambda (x:i64) (println 'cbres_target x) void))
+
+(define cbres:full-name
+  (car (cl:remove-if-not (lambda (n) (regex:match? n "^cbres_target_adhoc_[0-9]+_"))
+                         (map car (hashtable->alist *xtc:cache:closure-cache*)))))
+
+;; the counter-less spelling maps onto the compiled name
+(xtmtest-result (xtc:driver:resolve-adhoc-name
+                  (string-append "cbres_target_adhoc_" (cname-encode "[void,i64]")))
+                cbres:full-name
+                "resolve-counterless-adhoc-name")
+
+;; a name that already carries its counter is left alone
+(xtmtest-result (xtc:driver:resolve-adhoc-name cbres:full-name)
+                cbres:full-name
+                "resolve-full-name-unchanged")
+
+;; a name with no adhoc part, or a specialisation that was never compiled,
+;; comes back as it went in
+(xtmtest-result (xtc:driver:resolve-adhoc-name "cbres_target") "cbres_target" "resolve-plain-name")
+(xtmtest-result (xtc:driver:resolve-adhoc-name "cbres_nothing_adhoc_QUJD")
+                "cbres_nothing_adhoc_QUJD"
+                "resolve-unknown-specialisation")
+
+;; the emitted callback string is the compiled symbol, so the JIT finds the
+;; _callback entry point directly
+(bind-func cbres_caller (lambda () (callback (now) cbres_target 1) void))
+(xtmtest-result (if (llvm:get-function (string-append cbres:full-name "_callback")) #t #f)
+                #t
+                "callback-entry-point-exists")
+(xtmtest-runs (cbres_caller))

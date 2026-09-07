@@ -13,6 +13,21 @@
 (define *xtc:driver:adhoc-cnt* 0)
 (define *xtc:driver:adhoc-name-map* (make-hashtable 256))
 
+;; The native symbol a counter-less adhoc spelling was compiled under.  The
+;; type checker spells a reference it cannot match to a registered candidate
+;; as name_adhoc_<cname>, while the closure is defined as
+;; name_adhoc_<n>_<cname>; the map above bridges the two.  A name that already
+;; carries its counter, has no adhoc part, or names a specialisation that was
+;; never compiled comes back unchanged.
+(define xtc:driver:resolve-adhoc-name
+  (lambda (name)
+    (let ((p (string-split-on name "_adhoc_")))
+      (if (or (null? (cdr p))
+              (regex:match? (cadr p) "^[0-9]+_"))
+          name
+          (or (hashtable-ref *xtc:driver:adhoc-name-map* (string-append (car p) "_" (cadr p)))
+              name)))))
+
 (define xtc:driver:clear-pipeline-state
   (lambda ()
     (set! *xtc:codegen:sym-name-stack* '())

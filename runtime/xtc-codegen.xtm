@@ -3861,7 +3861,9 @@
     (let* ((os (xtc:emit:new-buffer))
            (timestr (xtc:codegen:compiler (cadr ast) types))
            (time (xtc:codegen:ssa-temp))
-           (fname (symbol->string (caddr ast)))
+           ;; the compiled symbol, so the _callback lookup at callback time is a
+           ;; plain JIT lookup with no alias to consult
+           (fname (xtc:driver:resolve-adhoc-name (symbol->string (caddr ast))))
            (ftypes (if (assq (caddr ast) types)
                        (map (lambda (a) (xtc:codegen:get-type-str a)) (cddr (assq (caddr ast) types)))
                        (xtc:cache:get-closure-arg-types fname)))
