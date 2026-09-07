@@ -60,7 +60,13 @@
                       (is? f '(lambdaz (a b) (begin a)) "make-lambda")
                       (is? (ast:lambda-tag f) 'lambdaz "lambda-tag")
                       (is? (ast:lambda-params f) '(a b) "lambda-params")
-                      (is? (ast:lambda-body f) '(begin a) "lambda-body"))
+                      (is? (ast:lambda-body f) '(begin a) "lambda-body")
+                      ;; source shape: many body forms until first-transform wraps them
+                      (is? (ast:let-body-forms '(let ((x 1)) (f x) x)) '((f x) x) "let-body-forms")
+                      (is? (ast:lambda-body-forms '(lambda (x) (f x) x)) '((f x) x) "lambda-body-forms")
+                      (is? (ast:let-body-forms (xtc:desugar:first-transform '(let ((x 1)) (f x) x) #t))
+                           '((begin (f x) x))
+                           "first-transform-wraps-body"))
 
 (xtmtest-with-fixture ast-call-begin-set-ret
                       (define call '(f 1 2))
