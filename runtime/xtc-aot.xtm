@@ -184,13 +184,13 @@
           (write
             (list 'bind-dylib library `(list ,@lib-path))
             *xtc:aot:current-output-port*)
+          ;; bind-dylib throws when the library can't be found, so `library'
+          ;; may be unbound (not #f) by the time this guard runs
           (write
-            `(if (not ',library)
-              (begin
-                (print-with-colors '*xtc:globals:pretty-print-error-color* 'default #t (print "Error"))
-                (print ": could not load the " ',library
-                       " dynamic library - perhaps you can install it through your package manager?\n")
-                (error "")))
+            `(if (not (and (defined? ',library) ,library))
+              (xtc:diagnostics:print-error
+                ,(string-append "could not load the " (symbol->string library)
+                                " dynamic library - perhaps you can install it through your package manager?")))
             *xtc:aot:current-output-port*)
           (newline *xtc:aot:current-output-port*)
           (if (and (not (null? args)) (string? (car args)))
@@ -397,11 +397,8 @@
                          *xtc:aot:current-output-port*)
                 (write
                   `(if (not ,(string->symbol libname))
-                    (begin
-                      (print-with-colors '*xtc:globals:pretty-print-error-color* 'default #t (print "Error"))
-                      (print ": could not load the AOT-compilied " ,libname
-                             " dynamic library\n")
-                      (error "")))
+                    (xtc:diagnostics:print-error
+                      ,(string-append "could not load the AOT-compiled " libname " dynamic library")))
                   *xtc:aot:current-output-port*)
                 (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
                                         "(xtc:codegen:flush-jit-compilation-queue)\n")
