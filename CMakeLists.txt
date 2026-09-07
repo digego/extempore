@@ -469,28 +469,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/external_deps.cmake)
 # AOT compilation #
 ###################
 
-set(AOT_CORE_LIBS
-    "libs/base/base.xtm"
-    "libs/core/xthread.xtm"
-    "libs/core/rational.xtm"
-    "libs/core/math.xtm"
-    "libs/core/scheduler.xtm"
-    "libs/core/audiobuffer.xtm"
-    "libs/core/audio_dsp.xtm"
-    "libs/core/instruments.xtm")
-
-set(AOT_EXTERNAL_AUDIO_LIBS
-    "libs/external/fft.xtm"
-    "libs/external/sndfile.xtm"
-    "libs/external/audio_dsp_ext.xtm"
-    "libs/external/instruments_ext.xtm"
-    "libs/external/portmidi.xtm")
-
-set(AOT_EXTERNAL_GRAPHICS_LIBS
-    "libs/external/stb_image.xtm"
-    "libs/external/glfw3.xtm"
-    "libs/external/webgpu.xtm")
-
 # AOT compilation with proper per-library dependencies
 if(APPLE)
     find_program(TIMEOUT_CMD gtimeout)
@@ -501,6 +479,20 @@ elseif(NOT WIN32)
     find_program(TIMEOUT_CMD timeout)
 endif()
 set(AOT_TIMEOUT_SECONDS 300)
+
+# Each AOT step spawns an extempore process with LLVM's JIT behind it, which is
+# far more memory-hungry than a C++ compile. Cap the concurrent ones with a
+# Ninja job pool rather than throttling the whole build: the C++ compiles still
+# run at full parallelism. (Ignored by other generators, which don't have pools.)
+set_property(GLOBAL PROPERTY JOB_POOLS aot=2)
+
+# The xtlang compiler is live-loaded from runtime/ at startup, so an AOT output
+# is stale whenever the compiler sources or the binary that runs them change.
+# Both have to be real inputs of the custom command (not just order-only target
+# dependencies) or Ninja will happily keep a cache built by an older compiler.
+file(GLOB AOT_RUNTIME_DEPS CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.xtm
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.ll)
 
 macro(aotcompile_lib libfile group)
     get_filename_component(_basename ${libfile} NAME_WE)
@@ -523,8 +515,9 @@ macro(aotcompile_lib libfile group)
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
         COMMAND ${_extempore_cmd} --nobase
             --batch "(xtc:aot:compile-xtm-file \"${libfile}\")"
-        DEPENDS ${libfile} ${_dep_files}
+        DEPENDS ${libfile} ${_dep_files} $<TARGET_FILE:extempore> ${AOT_RUNTIME_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        JOB_POOL aot
         VERBATIM)
 
     add_custom_target(${_targetname} DEPENDS ${_ll_file} ${_xtm_file} extempore)
@@ -576,7 +569,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
 endif()
 
 add_custom_target(clean_aot
-    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache
     COMMENT "Removing AOT-compiled libs")
 
 #########
