@@ -75,10 +75,16 @@ class SchemeREPL {
     bool m_active;
     std::recursive_mutex m_writeLock;
 
+    // Registry of live REPLs by title; guarded by sm_replsMutex because REPLs
+    // are created and looked up from different Scheme process threads.
     static repls_type sm_repls;
+    static std::mutex sm_replsMutex;
 
   public:
     SchemeREPL(const std::string& Title, SchemeProcess* Process);
+    ~SchemeREPL();  // closes the socket and deregisters the title
+    SchemeREPL(const SchemeREPL&) = delete;
+    SchemeREPL& operator=(const SchemeREPL&) = delete;
 
     const std::string& getTitle() {
         return m_title;
@@ -90,13 +96,7 @@ class SchemeREPL {
         return m_process;
     }
 
-    static SchemeREPL* I(const std::string& name) {
-        auto iter(sm_repls.find(name));
-        if (unlikely(iter == sm_repls.end())) {
-            return nullptr;
-        }
-        return iter->second;
-    }
+    static SchemeREPL* I(const std::string& name);
 };
 
 }  // namespace extemp

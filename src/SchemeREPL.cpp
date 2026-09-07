@@ -63,6 +63,7 @@
 namespace extemp {
 
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
+std::mutex SchemeREPL::sm_replsMutex;
 
 SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
     : m_title(Title), m_process(Process),
@@ -76,7 +77,26 @@ SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
     printf("INFO:");
     ascii_default();
     std::cout << " starting " << m_title << " process..." << std::endl;
+    std::lock_guard<std::mutex> lock(sm_replsMutex);
     sm_repls[m_title] = this;
+}
+
+SchemeREPL::~SchemeREPL() {
+    closeREPL();
+    std::lock_guard<std::mutex> lock(sm_replsMutex);
+    auto iter(sm_repls.find(m_title));
+    if (iter != sm_repls.end() && iter->second == this) {
+        sm_repls.erase(iter);
+    }
+}
+
+SchemeREPL* SchemeREPL::I(const std::string& name) {
+    std::lock_guard<std::mutex> lock(sm_replsMutex);
+    auto iter(sm_repls.find(name));
+    if (iter == sm_repls.end()) {
+        return nullptr;
+    }
+    return iter->second;
 }
 
 void SchemeREPL::writeString(std::string&& String) {

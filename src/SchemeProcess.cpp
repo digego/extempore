@@ -50,11 +50,14 @@
 #include <thread>
 #include <vector>
 
+// How long the server thread blocks in poll() before re-checking m_running.
+static constexpr int SERVER_POLL_TIMEOUT_MS = 250;
+
 #ifdef _WIN32
 #include <ws2tcpip.h>
 // Winsock's struct pollfd carries a SOCKET fd; WSAPoll is the poll(2) analogue.
 static int poll_sockets(std::vector<pollfd>& Fds) {
-    return WSAPoll(Fds.data(), ULONG(Fds.size()), -1);
+    return WSAPoll(Fds.data(), ULONG(Fds.size()), SERVER_POLL_TIMEOUT_MS);
 }
 static bool poll_interrupted() {
     return false;
@@ -70,7 +73,7 @@ static int closesocket(int Socket) {
     return close(Socket);
 }
 static int poll_sockets(std::vector<pollfd>& Fds) {
-    return poll(Fds.data(), nfds_t(Fds.size()), -1);
+    return poll(Fds.data(), nfds_t(Fds.size()), SERVER_POLL_TIMEOUT_MS);
 }
 static bool poll_interrupted() {
     return errno == EINTR;
@@ -114,7 +117,7 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
       m_initExpr(InitExpr), m_libsLoaded(false), m_running(true),
       m_threadTask(&taskTrampoline, this, "SP_task"),
       m_threadServer(&serverTrampoline, this, "SP_server") {
-    if (m_loadPath[m_loadPath.length() - 1] != '/') {
+    if (m_loadPath.empty() || m_loadPath.back() != '/') {
         m_loadPath.push_back('/');
     }
     m_scheme = scheme_init_new();
@@ -136,12 +139,15 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     }
     scheme_load_file(m_scheme, initscm);
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (m_serverSocket < 0) {
+    if (m_serverSocket == INVALID_SOCKET) {
+        // Returning here would leave the callbacks and FFI uninitialised, so a
+        // process that cannot get a socket is not worth keeping.
         ascii_error();
         printf("ERROR:");
         ascii_normal();
-        std::cout << " could not open Extempore socket" << std::endl;
-        return;
+        std::cout << " could not open a TCP socket for the " << m_name
+                  << " process, exiting." << std::endl;
+        exit(1);
     }
     int flag = 1;
     setsockopt(m_serverSocket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag),
@@ -195,14 +201,24 @@ bool SchemeProcess::start(bool subsume) {
 }
 
 void SchemeProcess::stop() {
-    std::cout << "Stop Scheme Interface" << std::endl;
     {
         std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
         m_running = false;
     }
     m_guardCond.notify_all();  // wake the task thread so it can exit its loop
+    // the server thread notices m_running on its next poll() timeout
+}
+
+SchemeProcess::~SchemeProcess() {
+    stop();
+    m_threadTask.join();
+    m_threadServer.join();
+    if (m_serverSocket != INVALID_SOCKET) {  // the server thread never ran
+        closesocket(m_serverSocket);
+    }
     scheme_deinit(m_scheme);
-    // TODO: what about sm_current?/name lookup
+    extemp::EXTZones::llvm_zone_destroy(m_defaultZone);
+    delete m_extemporeCallback;
 }
 
 void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type) {
@@ -235,8 +251,6 @@ void* SchemeProcess::taskImpl() {
     sm_current = this;
     OSC::schemeInit(this);
     std::this_thread::sleep_for(std::chrono::seconds(1));  // give time for NSApp etc. to init
-    while (!m_running) {
-    }
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-globals.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-caches.xtm", UNIV::SHARE_DIR);
@@ -260,11 +274,7 @@ void* SchemeProcess::taskImpl() {
             m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
                                         new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"),
                                         "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
-        } /* else {
-            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
-                    new std::string("(sys:compile-init-ll)"), "file_init",
-                        SchemeTask::Type::LOCAL_PROCESS_STRING));
-        } */
+        }
         if (!m_initExpr.empty()) {
             ascii_text_color(0, 5, 10);
             printf("\nEvaluating expression: ");
@@ -410,7 +420,7 @@ void* SchemeProcess::taskImpl() {
 }
 
 void* SchemeProcess::serverImpl() {
-    while (!m_libsLoaded) {
+    while (!m_libsLoaded && m_running) {
         std::this_thread::sleep_for(std::chrono::microseconds(1000));
     }
     struct Client {
@@ -431,6 +441,9 @@ void* SchemeProcess::serverImpl() {
             fds.push_back({client.fd, POLLIN, 0});
         }
         int res = poll_sockets(fds);
+        if (res == 0) {  // timeout: loop around and re-check m_running
+            continue;
+        }
         if (res < 0) [[unlikely]] {
             if (poll_interrupted()) {
                 continue;
@@ -549,6 +562,7 @@ void* SchemeProcess::serverImpl() {
         std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
         perror(nullptr);
     }
+    m_serverSocket = INVALID_SOCKET;
     std::cout << "Exiting server thread" << std::endl;
     return this;
 }

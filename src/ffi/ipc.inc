@@ -9,9 +9,10 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
     if (repl->connectToProcessAtHostname("localhost", port)) {
         return pair_car(Args); //return Scheme->T;
     }
-    sp->stop();
-    delete sp;
+    // The REPL deregisters itself from the name table; the process
+    // destructor stops and joins its task and server threads.
     delete repl;
+    delete sp;
     return Scheme->F;
 }
 

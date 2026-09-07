@@ -113,7 +113,7 @@ class SchemeProcess {
   private:
     std::string m_loadPath;
     std::string m_name;
-    int16_t m_serverPort;
+    uint16_t m_serverPort;
     bool m_banner;
     std::string m_initExpr;
     // Set once by the task thread after the runtime libs finish loading.
@@ -172,6 +172,12 @@ class SchemeProcess {
   public:
     SchemeProcess(const std::string& LoadPath, const std::string& Name, int ServerPort = 7010,
                   bool Banner = false, const std::string& InitExpr = std::string());
+    // Stops and joins the task and server threads, then tears down the
+    // interpreter. The primary/utility processes live for the whole run; this
+    // is for processes created (and possibly abandoned) by ipc:new.
+    ~SchemeProcess();
+    SchemeProcess(const SchemeProcess&) = delete;
+    SchemeProcess& operator=(const SchemeProcess&) = delete;
 
     uint64_t getMaxDuration() const {
         return m_maxDuration;
@@ -216,7 +222,7 @@ class SchemeProcess {
                       mk_cptr(m_scheme, Cptr));
     }
     void createSchemeTask(void* Arg, const std::string& label, SchemeTask::Type TaskType);
-    void stop();
+    void stop();  // asks both threads to exit; they are joined by the destructor
     bool start(bool subsume = false);
 
     static SchemeProcess* I() {
