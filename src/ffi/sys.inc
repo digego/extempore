@@ -28,7 +28,7 @@ static pointer getShareDir(scheme* Scheme, pointer Args)
 
 static pointer cmdarg(scheme* Scheme, pointer Args)
 {
-    auto iter(UNIV::CMDPARAMS.find(string_value(pair_car(Args))));
+    auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
     if (iter == UNIV::CMDPARAMS.end()) {
         return Scheme->F;
     }
@@ -37,15 +37,16 @@ static pointer cmdarg(scheme* Scheme, pointer Args)
 
 static pointer openDynamicLib(scheme* Scheme, pointer Args)
 {
+    const char* libname = argString(Scheme, Args, 1);
 #ifdef _WIN32
     // set up the DLL load path
     SetDllDirectory(""); // Plug "binary planting" security hole.
     if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str())) {
         std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
     }
-    void* lib_handle = LoadLibraryA(string_value(pair_car(Args)));
+    void* lib_handle = LoadLibraryA(libname);
 #else
-    void* lib_handle = dlopen(string_value(pair_car(Args)), RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
+    void* lib_handle = dlopen(libname, RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
 #endif
     if (!lib_handle) {
         // if an optional second argument is non-nil, print the error
@@ -65,17 +66,17 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
 static pointer closeDynamicLib(scheme* Scheme, pointer Args)
 {
 #ifdef _WIN32
-    FreeLibrary((HMODULE)cptr_value(pair_car(Args))) ;
+    FreeLibrary((HMODULE)argCptr(Scheme, Args, 1));
 #else
-    dlclose(cptr_value(pair_car(Args)));
+    dlclose(argCptr(Scheme, Args, 1));
 #endif
     return Scheme->T;
 }
 
 static pointer symbol_pointer(scheme* Scheme, pointer Args)
 {
-    void* library = cptr_value(pair_car(Args));
-    char* symname = string_value(pair_cadr(Args));
+    void* library = argCptr(Scheme, Args, 1);
+    char* symname = argString(Scheme, Args, 2);
 #ifdef _WIN32
     void* ptr = (void*) GetProcAddress(HMODULE(library), symname);
 #else
@@ -89,139 +90,149 @@ static pointer symbol_pointer(scheme* Scheme, pointer Args)
 
 static pointer makeCptr(scheme* Scheme, pointer Args)
 {
-     auto num_bytes(ivalue(pair_car(Args)));
-     void* ptr = calloc(1, num_bytes);
+     auto num_bytes(argInt(Scheme, Args, 1));
+     if (num_bytes <= 0) {
+         return Scheme->F;
+     }
+     void* ptr = calloc(1, size_t(num_bytes));
+     if (!ptr) {
+         return Scheme->F;
+     }
      return mk_cptr(Scheme, ptr);
 }
 
 static pointer slurpFile(scheme* Scheme, pointer Args)
 {
-    std::string filename(string_value(pair_car(Args)));
-    std::string sharedir_filename(UNIV::SHARE_DIR + "/" + filename);
+    std::string filename(argString(Scheme, Args, 1));
 
     // check raw path first, then prepend SHARE_DIR
-    std::FILE *fp = std::fopen(filename.c_str(), "rb");
-    if (!fp) {
-      fp = std::fopen(sharedir_filename.c_str(), "rb");
+    std::ifstream in(filename, std::ios::binary);
+    if (!in) {
+        in.clear();
+        in.open(UNIV::SHARE_DIR + "/" + filename, std::ios::binary);
     }
-    if (fp) {
-        std::string contents;
-        std::fseek(fp, 0, SEEK_END);
-        contents.resize(std::ftell(fp));
-        std::rewind(fp);
-        std::fread(&contents[0], 1, contents.size(), fp);
-        std::fclose(fp);
-        return mk_string(Scheme, contents.c_str());
+    if (!in) {
+        return Scheme->F;
     }
-    return Scheme->F;
+    in.seekg(0, std::ios::end);
+    std::streamoff length = in.tellg();
+    if (length < 0) {
+        return Scheme->F;
+    }
+    std::string contents(static_cast<size_t>(length), '\0');
+    in.seekg(0, std::ios::beg);
+    in.read(&contents[0], length);
+    if (in.bad()) {
+        return Scheme->F;
+    }
+    contents.resize(static_cast<size_t>(in.gcount()));
+    return mk_counted_string(Scheme, contents.data(), int(contents.size()));
 }
 
 static pointer dumpStringToFile(scheme* Scheme, pointer Args)
 {
-    std::string filename(string_value(pair_car(Args)));
-    std::string dumpstr(string_value(pair_cadr(Args)));
-
-    std::FILE *fp = std::fopen(filename.c_str(), "wb");
-    if (fp) {
-        std::fwrite(dumpstr.data(), 1, dumpstr.length(), fp);
-        std::fclose(fp);
-        return Scheme->T;
+    std::string filename(argString(Scheme, Args, 1));
+    pointer str = argAt(Scheme, Args, 2);
+    if (!is_string(str)) {
+        ffiWrongType(str, 2, "a string");
     }
-    return Scheme->F;
-}
 
+    std::ofstream out(filename, std::ios::binary);
+    if (!out) {
+        return Scheme->F;
+    }
+    out.write(s7_string(str), s7_string_length(str));
+    out.close();
+    return out ? Scheme->T : Scheme->F;
+}
 
 static pointer dirlist(scheme* Scheme, pointer Args)
 {
-#ifdef _WIN32
-    char* path = string_value(pair_car(Args));
-    std::filesystem::path bpath(path);
-    if (!std::filesystem::exists(bpath)) {
-        return Scheme->NIL;
-    }
-    if (!std::filesystem::is_directory(bpath)) {
-        return Scheme->NIL;
-    }
-    std::filesystem::directory_iterator end_it;
+    // Bare filenames, and no "." or ".." (directory_iterator skips those):
+    // callers such as libs/external/instruments_ext-scm.xtm match the entries
+    // against a filename pattern, not a path.
+    std::error_code ec;
+    std::filesystem::path dir(argString(Scheme, Args, 1));
     pointer list = Scheme->NIL;
-    for (std::filesystem::directory_iterator it(bpath); it != end_it; ++it) {
+    for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
         EnvInjector injector(Scheme, list);
-        pointer s = mk_string(Scheme, it->path().string().c_str());
+        pointer s = mk_string(Scheme, it->path().filename().string().c_str());
         EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
     }
-#else
-    DIR* dp;
-    dp = opendir(string_value(pair_car(Args)));
-    pointer list = Scheme->NIL;
-    if (dp) {
-        struct dirent* ep;
-        while ((ep = readdir(dp))) {
-            EnvInjector injector(Scheme, list);
-            pointer s = mk_string(Scheme, ep->d_name);
-            EnvInjector injector2(Scheme, s);
-            list = cons(Scheme, s, list);
-        }
-        closedir(dp);
-    } else {
-        perror ("Couldn't open the directory");
+    if (ec) {
+        return Scheme->NIL;
     }
-#endif
-    return reverse(Scheme,list);
+    return reverse(Scheme, list);
 }
 
 static pointer pathExpansion(scheme* Scheme, pointer Args)
 {
+    std::string path(argString(Scheme, Args, 1));
+    if (!path.empty() && path[0] == '~') {
+        const char* home = std::getenv("HOME");
 #ifdef _WIN32
-    char* exp_path = string_value(pair_car(Args));
-#else
-    char exp_path[8192];
-    char* path = string_value(pair_car(Args));
-    if (path[0] == '~') {
-        char* h = getenv("HOME");
-        strcpy(exp_path, h);
-        strcat(exp_path, &path[1]);
-    } else{
-        realpath(path, exp_path);
-    }
+        if (!home) {
+            home = std::getenv("USERPROFILE");
+        }
 #endif
-    return mk_string(Scheme, exp_path);
+        // no home to expand against: leave the path as the caller wrote it
+        if (home) {
+            path = std::string(home) + path.substr(1);
+        }
+    }
+    std::error_code ec;
+    std::filesystem::path expanded(std::filesystem::weakly_canonical(path, ec));
+    if (ec) {
+        return mk_string(Scheme, path.c_str());
+    }
+    return mk_string(Scheme, expanded.string().c_str());
 }
 
 static pointer command(scheme* Scheme, pointer Args)
 {
     // NOTE: doesn't work for Windows yet
-    return mk_integer(Scheme, system(string_value(pair_car(Args))));
+    return mk_integer(Scheme, system(argString(Scheme, Args, 1)));
 }
 
 static pointer commandOutput(scheme* Scheme, pointer Args)
 {
-    char outbuf[8192];
+    const char* cmd = argString(Scheme, Args, 1);
 #ifdef _WIN32
-    FILE* stream = _popen(string_value(pair_car(Args)), "r");
+    FILE* stream = _popen(cmd, "r");
 #else
-    FILE* stream = popen(string_value(pair_car(Args)), "r");
+    FILE* stream = popen(cmd, "r");
 #endif
-    if (stream && fgets(outbuf, 8192, stream))
-    {
-#ifdef _WIN32
-        _pclose(stream);
-#else
-        pclose(stream);
-#endif
-        // get rid of the final newline
-        size_t len = strnlen(outbuf, 8192);
-        if (len < 8192) {
-           outbuf[len - 1] = '\0';
-        }
-        return mk_string(Scheme, outbuf); // todo: THIS GO BOOM IF 8192
+    if (!stream) {
+        return Scheme->F;
     }
-    return Scheme->F;
+    std::string out;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), stream)) > 0) {
+        out.append(buf, n);
+    }
+#ifdef _WIN32
+    _pclose(stream);
+#else
+    pclose(stream);
+#endif
+    // #f means the command wrote nothing at all --- a command whose output is
+    // just a newline still yields "" (callers such as the LD_LIBRARY_PATH
+    // lookup in runtime/xtc-bind.xtm split the result, and can't split #f)
+    if (out.empty()) {
+        return Scheme->F;
+    }
+    // get rid of the trailing newline
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) {
+        out.pop_back();
+    }
+    return mk_counted_string(Scheme, out.data(), int(out.size()));
 }
 
 static pointer getEnv(scheme* Scheme, pointer Args)
 {
-  const char* var = string_value(pair_car(Args));
+  const char* var = argString(Scheme, Args, 1);
   const char* val = std::getenv(var);
 
   if (val != NULL){
@@ -233,8 +244,8 @@ static pointer getEnv(scheme* Scheme, pointer Args)
 
 static pointer setEnv(scheme* Scheme, pointer Args)
 {
-    char* var = string_value(pair_car(Args));
-    char* val = string_value(pair_cadr(Args));
+    char* var = argString(Scheme, Args, 1);
+    char* val = argString(Scheme, Args, 2);
 
     int res;
 #ifdef _WIN32
@@ -247,7 +258,7 @@ static pointer setEnv(scheme* Scheme, pointer Args)
 
 static pointer setDefaultTimeout(scheme* Scheme, pointer Args)
 {
-    Scheme->m_process->setMaxDuration(ivalue(pair_car(Args)));
+    Scheme->m_process->setMaxDuration(argInt(Scheme, Args, 1));
     return Scheme->T;
 }
 
@@ -257,22 +268,22 @@ static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
 }
 
 #define SYS_DEFS \
-        { "sys:pointer-size", &pointerSize }, \
-        { "sys:mcjit-enabled", &mcjitEnabled }, \
-        { "sys:platform", &platform }, \
-        { "sys:share-dir", &getShareDir }, \
-        { "sys:cmdarg", &cmdarg }, \
-        { "sys:open-dylib", &openDynamicLib }, \
-        { "sys:close-dylib", &closeDynamicLib }, \
-        { "sys:symbol-cptr", &symbol_pointer }, \
-        { "sys:make-cptr", &makeCptr }, \
-        { "sys:slurp-file", &slurpFile }, \
-        { "sys:dump-string-to-file", &dumpStringToFile }, \
-        { "sys:directory-list", &dirlist }, \
-        { "sys:expand-path", &pathExpansion }, \
-        { "sys:command", &command }, \
-        { "sys:command-output", &commandOutput }, \
-        { "sys:get-env", &getEnv }, \
-        { "sys:set-env", &setEnv },						   \
-        { "sys:set-default-timeout", &setDefaultTimeout }, \
-        { "sys:get-default-timeout", &getDefaultTimeout }
+        FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false), \
+        FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false), \
+        FFI_DEF("sys:platform", platform, 0, 0, false), \
+        FFI_DEF("sys:share-dir", getShareDir, 0, 0, false), \
+        FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false), \
+        FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false), \
+        FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false), \
+        FFI_DEF("sys:symbol-cptr", symbol_pointer, 2, 0, false), \
+        FFI_DEF("sys:make-cptr", makeCptr, 1, 0, false), \
+        FFI_DEF("sys:slurp-file", slurpFile, 1, 0, false), \
+        FFI_DEF("sys:dump-string-to-file", dumpStringToFile, 2, 0, false), \
+        FFI_DEF("sys:directory-list", dirlist, 1, 0, false), \
+        FFI_DEF("sys:expand-path", pathExpansion, 1, 0, false), \
+        FFI_DEF("sys:command", command, 1, 0, false), \
+        FFI_DEF("sys:command-output", commandOutput, 1, 0, false), \
+        FFI_DEF("sys:get-env", getEnv, 1, 0, false), \
+        FFI_DEF("sys:set-env", setEnv, 2, 0, false), \
+        FFI_DEF("sys:set-default-timeout", setDefaultTimeout, 1, 0, false), \
+        FFI_DEF("sys:get-default-timeout", getDefaultTimeout, 0, 0, false)
