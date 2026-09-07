@@ -36,7 +36,7 @@
 #ifndef EXT_THREAD
 #define EXT_THREAD
 
-#include <stop_token>
+#include <atomic>
 #include <thread>
 #include <string>
 
@@ -61,8 +61,8 @@ class EXTThread {
     void* m_arg;
     std::string m_name;
     bool m_subsume = false;  // run the body on the calling thread instead
-    std::stop_source m_stopSource;
-    std::jthread m_thread;
+    std::atomic<bool> m_stopRequested{false};
+    std::thread m_thread;
     // The body's native handle, whether it runs on m_thread or on the thread
     // that subsumed it; setPriority/getPriority need a handle in both cases.
     std::thread::native_handle_type m_nativeHandle{};
@@ -84,7 +84,7 @@ class EXTThread {
     int start(function_type EntryPoint = nullptr, void* Arg = nullptr);
     int kill();  // cooperative: requests stop; the body must poll stopRequested()
     bool stopRequested() const {
-        return m_stopSource.stop_requested();
+        return m_stopRequested.load(std::memory_order_acquire);
     }
     int detach();
     int join();

@@ -55,7 +55,7 @@ namespace extemp {
 thread_local EXTThread* EXTThread::sm_current = nullptr;
 
 EXTThread::~EXTThread() {
-    m_stopSource.request_stop();
+    m_stopRequested.store(true, std::memory_order_release);
     if (m_thread.joinable()) {
         m_thread.join();
     }
@@ -97,12 +97,12 @@ int EXTThread::start(function_type EntryPoint, void* Arg) {
         run();  // never returns for the process threads that subsume main
         return 0;
     }
-    m_thread = std::jthread([this] { run(); });
+    m_thread = std::thread([this] { run(); });
     return 0;
 }
 
 int EXTThread::kill() {
-    m_stopSource.request_stop();
+    m_stopRequested.store(true, std::memory_order_release);
     return 0;
 }
 
