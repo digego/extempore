@@ -720,12 +720,22 @@
                                (caddr (cadddr e)))))
                   entries))))))
 
-;; The free-return fallback entry (sig . body) for `sym' at `arity', or #f ---
-;; the one whose signature is not return-reifiable (see sig-reifiable?).
+;; The free-return fallback entry (sig . body) for `sym' at `arity' --- one
+;; whose signature is not return-reifiable (see sig-reifiable?) --- or #f.
+;; Given concrete argument terms, the fallback that ACCEPTS them: the
+;; expression problem registers one eval fallback per node type, and only
+;; the Add one describes an Add.  Without arguments, the first registered.
 (define xtc:infer:generic-fallback-entry
-  (lambda (sym arity)
-    (let ((es (xtc:infer:generic-entries sym arity)))
-      (and es (cl:find-if (lambda (e) (not (xtc:infer:sig-reifiable? (car e)))) es)))))
+  (lambda (sym arity . argterms)
+    (let* ((es (xtc:infer:generic-entries sym arity))
+           (fbs (if es
+                    (cl:remove-if (lambda (e) (xtc:infer:sig-reifiable? (car e))) es)
+                    '())))
+      (and (pair? fbs)
+           (if (null? argterms)
+               (car fbs)
+               (cl:find-if (lambda (e) (xtc:infer:spec-matches? (car e) (car argterms)))
+                           fbs))))))
 
 ;; Solve a sub-expression's constraints in isolation and return its resolved
 ;; canonical TERM, or #f if it does not fully determine (a conflict, or a residual
@@ -797,12 +807,98 @@
                   (null? (xtc:type:free-vars field))
                   (xtc:type:to-intcode field)))))))
 
+;; Reify a free-return generic call whose arguments have grounded: the fallback
+;; that accepts them is projected when its body is a field accessor, and
+;; otherwise EXERCISED --- its body inferred with the parameters pinned to the
+;; argument types, the return read off the result.  This is the old checker's
+;; "exercise the generic code", for the bodies a projection recipe cannot
+;; describe (eval:[!a,Add*]* summing two recursive evals).  The return's
+;; int-code, or #f when nothing can be learned.  Called eagerly at collect
+;; time when the arguments are already ground, and from the solver (through
+;; *xtc:solve:exercise-hook*) when they ground during the solve.
+(define xtc:infer:exercise-generic
+  (lambda (sym arity argterms)
+    (let ((fb (xtc:infer:generic-fallback-entry sym arity argterms)))
+      (and fb
+           (or (xtc:infer:project-fallback (cdr fb) argterms)
+               (xtc:infer:exercise-body sym (cdr fb) argterms))))))
+
+;; The exercises in progress, keyed "sym:argtypes".  Re-entry on the same key
+;; is a self-recursive generic (sum over a Node{i64} summing its Node{i64}
+;; tail), whose return the enclosing exercise --- or the instance compile
+;; itself, through its other uses --- determines; the nested call learns
+;; nothing and says so with #f.
+(define *xtc:infer:exercise-stack* '())
+;; Memoised by the same key for the duration of one top-level check-function
+;; (the search revisits a call on every backtrack); a fresh table per compile,
+;; so a redefined fallback is exercised afresh.
+(define *xtc:infer:exercise-cache* (make-hashtable 16))
+;; Set while a body is exercised: a conflict inside is a negative result, not
+;; a diagnostic, so check-function's reporting is held back.
+(define *xtc:infer:exercising* #f)
+(define *xtc:infer:exercise-counter* 0)
+
+;; Infer the fallback's lambda with its parameters annotated as the argument
+;; types --- the driver's phases up to the type check, as inferfn's harness
+;; runs them --- and read the return off the lambda's closure type.  The
+;; pipeline state a nested run would clobber is rebound around it, and any
+;; error inside (a body the exercise cannot type) is the answer #f.
+(define xtc:infer:exercise-body
+  (lambda (sym body argterms)
+    (let* ((pretty (map (lambda (t) (xtc:type:to-pretty t (make-hashtable))) argterms))
+           (key (string-append (symbol->string sym) ":" (string-join pretty ","))))
+      (cond
+        ((hashtable-ref *xtc:infer:exercise-cache* key))
+        ((member key *xtc:infer:exercise-stack*) #f)
+        (else
+          (set! *xtc:infer:exercise-counter* (+ 1 *xtc:infer:exercise-counter*))
+          (let* ((symname (string->symbol
+                            (string-append "xtc_exercise_"
+                                           (number->string *xtc:infer:exercise-counter*))))
+                 (code (cons 'lambda
+                             (cons (map (lambda (p t)
+                                          (string->symbol
+                                            (string-append
+                                              (symbol->string (xtc:infer:param-name p))
+                                              ":" t)))
+                                        (cadr body) pretty)
+                                   (cddr body))))
+                 (ret (let-temporarily
+                        ((*xtc:infer:exercise-stack* (cons key *xtc:infer:exercise-stack*))
+                         (*xtc:infer:exercising* #t)
+                         (*xtc:solve:conflict-why* #f)
+                         (*xtc:desugar:generic-type-mappings* *xtc:desugar:generic-type-mappings*)
+                         (*xtc:globals:bound-lambdas* *xtc:globals:bound-lambdas*)
+                         (*xtc:codegen:sym-name-stack* *xtc:codegen:sym-name-stack*)
+                         (*xtc:codegen:ls_var* *xtc:codegen:ls_var*))
+                        (catch #f
+                          (let* ((syn (xtc:driver:syntactic-phase symname code))
+                                 (t1 (car syn))
+                                 (ann (xtc:driver:annotation-phase t1 symname))
+                                 (vars (cadr ann))
+                                 (forced (apply xtc:typecheck:handle-forced-types t1 (cadr syn)))
+                                 (t4 (xtc:typecheck:coercion-run (car ann) forced)))
+                            (if (not (hashtable-ref vars symname))
+                                (hashtable-set! vars symname (xtc:typecheck:make-uf-cell '())))
+                            (let* ((alist (xtc:infer:check-function vars forced t4))
+                                   ;; the lambda reads back under the name the
+                                   ;; syntactic phase let-bound it to (the outer
+                                   ;; let's first binding), as the closure
+                                   ;; int-code (head ret param...)
+                                   (bound (and (pair? t1) (eq? (car t1) 'let)
+                                               (pair? (cadr t1)) (caar (cadr t1))))
+                                   (entry (and alist bound (assoc bound alist))))
+                              (and entry (pair? (cdr entry)) (pair? (cddr entry))
+                                   (caddr entry))))))))
+            (if ret (hashtable-set! *xtc:infer:exercise-cache* key ret))
+            ret))))))
+
 ;; (g arg ...) with g a genericfunc carrying a free-return fallback.  We collect
 ;; the arguments, resolve them to concrete types, and either route to the lazy
 ;; reifiable overload (a specialisation matches, or an argument is non-ground) ---
 ;; the fallback never shadows a matching specialisation --- or, when only the
-;; fallback applies, reify it by projecting its body's field against the
-;; arguments and pin the call's result to that concrete type.
+;; fallback applies, reify it against the arguments (projecting or exercising
+;; its body) and pin the call's result to that concrete type.
 (define xtc:infer:collect-generic-call
   (lambda (ast bound)
     (let* ((sym (car ast))
@@ -821,35 +917,31 @@
                             (xtc:infer:site-constraint sym rk (map car rcs))
                             (list (xtc:solve:c-overload rk (map car rcs) specs))))))
         ((and (not (member #f argterms))
-              (let* ((fb (xtc:infer:generic-fallback-entry sym arity))
-                     (proj (and fb (xtc:infer:project-fallback (cdr fb) argterms))))
-                (and proj
+              (let ((ic (xtc:infer:exercise-generic sym arity argterms)))
+                (and ic
                      (let ((rk (xtc:infer:fresh-key)))
                        (cons rk (append argcons
                                         (xtc:infer:site-constraint sym rk (map car rcs))
-                                        (list (xtc:solve:c-eq rk proj)))))))))
+                                        (list (xtc:solve:c-eq rk ic)))))))))
         (else
           ;; no specialisation matches by arguments alone (an argument is not
-          ;; ground at collect time, or the eager projection could not fire):
+          ;; ground at collect time, or the eager reification could not fire):
           ;; the call's CONTEXT directs the return --- the result key, tied by
           ;; the surrounding binding or use, unifies with the signature's
           ;; (napp-patterned) return and carries the type variables back into
           ;; the parameter slots, the same way the old checker's expected type
-          ;; directed a free-return generic.  The fallback's field projection
-          ;; rides along as a DEFERRED project constraint: when the argument
-          ;; grounds during the solve, the result pins to its field --- without
-          ;; it the fallback's free return satisfies any candidate the
-          ;; surrounding overload greedily picks, and the residual variable
-          ;; silently drops the site from the read-back (the recursive-ADT
-          ;; print instance: (print## (tree_value## t)) chose [void,Tree*]).
+          ;; directed a free-return generic.  The fallback rides along as a
+          ;; DEFERRED exercise constraint: when the arguments ground during the
+          ;; solve, the result pins to what the accepting fallback's body
+          ;; projects or returns --- without it the fallback's free return
+          ;; satisfies any candidate the surrounding overload greedily picks,
+          ;; and the residual variable silently drops the site from the
+          ;; read-back (the recursive-ADT print instance: (print##
+          ;; (tree_value## t)) chose [void,Tree*]).
           (let* ((sigs (map car (or (xtc:infer:generic-entries sym arity) '())))
                  (rk (xtc:infer:fresh-key))
-                 (fb (xtc:infer:generic-fallback-entry sym arity))
-                 (recipe (and fb (xtc:infer:fallback-recipe (cdr fb))))
-                 (proj (if recipe
-                           (list (xtc:solve:c-project
-                                   rk (list-ref (map car rcs) (car recipe))
-                                   (cdr recipe)))
+                 (proj (if (xtc:infer:generic-fallback-entry sym arity)
+                           (list (xtc:solve:c-exercise rk sym arity (map car rcs)))
                            '())))
             (if (null? sigs)
                 (xtc:diagnostics:print-compiler-error
@@ -1350,7 +1442,11 @@
   (lambda (vars forced-types ast)
     (let-temporarily ((*xtc:infer:fresh-counter* 0)
                       (*xtc:infer:op-sites* '())
-                      (*xtc:infer:call-sites* '()))
+                      (*xtc:infer:call-sites* '())
+                      ;; a nested exercise shares the top-level run's memo
+                      (*xtc:infer:exercise-cache* (if *xtc:infer:exercising*
+                                                      *xtc:infer:exercise-cache*
+                                                      (make-hashtable 16))))
       (let* ((rc (xtc:infer:collect ast '()))
              (forced (map (lambda (ft) (xtc:solve:c-eq (car ft) (cdr ft))) forced-types))
              (intern (make-hashtable))
@@ -1359,7 +1455,8 @@
              (result
                (if (eq? subst 'conflict)
                    (begin
-                     (xtc:solve:explain-conflict (append forced (cdr rc)) intern)
+                     (if (not *xtc:infer:exercising*)
+                         (xtc:solve:explain-conflict (append forced (cdr rc)) intern))
                      #f)
                    ;; Read back the declared variables (the var table's keys)
                    ;; plus the ## call-site symbols this run constrained ---
@@ -1394,7 +1491,8 @@
                                            ;; dropped and add-types-to-source errors at the
                                            ;; site --- name the site and the open type here,
                                            ;; because the downstream error's alist cannot
-                                           (if (and (not ty) (memq sym call-sites))
+                                           (if (and (not ty) (memq sym call-sites)
+                                                    (not *xtc:infer:exercising*))
                                                (xtc:diagnostics:print-compiler-warning
                                                  (string-append
                                                    "xtc:infer: unresolved call site dropped: "
@@ -1406,4 +1504,7 @@
                                        (cl:remove-duplicates
                                          (append (hashtable-keys vars) call-sites)))))))))
         result))))
+
+;; the solver's deferred exercise constraint reifies through this module
+(set! *xtc:solve:exercise-hook* xtc:infer:exercise-generic)
 

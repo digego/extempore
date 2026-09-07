@@ -1,0 +1,118 @@
+;;; tests/compiler/generics.xtm -- generic types and functions through the
+;;; whole pipeline, in the shapes the core examples exercise: a recursive
+;;; generic type with a closure field and ad-hoc functions over it
+;;; (audio_streams), a generic linked list read through closure slots
+;;; (scheduler), and a free-return generic whose return only its body
+;;; determines (expr_problem).
+
+(sys:load "libs/core/test.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a recursive generic with a closure field (a lazy stream)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The constructor returns GStream{!a}* --- one parameter; the [GStream*]*
+;; field is not one --- and the recursive field is typed as the instance
+;; under construction, so a call site's closure argument (or null) unifies
+;; with it as GStream{float}* rather than as a wildcard over every instance.
+(bind-type GStream <!a,[GStream*]*>)
+
+(bind-func gstream_fixed:[GStream{!a}*,!a]*
+  (lambda (x) (GStream x (lambda () (gstream_fixed x)))))
+
+;; ad-hoc (unannotated) functions over the recursive generic: through a
+;; declared generic, self-recursive, and with null in the recursive slot
+(xtmtest-compile
+  (bind-func gstream_via_fixed
+    (lambda (x:float) (GStream x (lambda () (gstream_fixed x))))))
+
+(xtmtest-compile
+  (bind-func gstream_lift
+    (lambda (x:float) (GStream x (lambda () (gstream_lift x))))))
+
+(xtmtest-compile
+  (bind-func gstream_end
+    (lambda (x:float) (GStream x null))))
+
+(bind-func gstream_second
+  (lambda (x:float)
+    (let ((s (gstream_lift x)))
+      (tref ((tref s 1)) 0))))
+
+(xtmtest-result (gstream_second 2.0) 2.0 "adhoc-recursive-stream")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a generic linked list read through a closure's slots
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; GEvt_h returns GEvt{!a}* (i8* and the two self-references are fields, not
+;; parameters), so a node built inside a generic instance unifies with the
+;; GEvt{Rational}* field of the list it links into.
+(bind-type GEvt <!a,i8*,GEvt*,GEvt*>)
+
+(bind-func gevt_scheduler:[[i64,!a]*,GEvt{!a}*]*
+  (lambda (el)
+    (let ((evtlist:GEvt* el)
+          (thread:i8* null))
+      (lambda (time) 1))))
+
+(bind-func gevt_push:[void,[i64,!a]*,!a,i8*]*
+  (let ((evtlist:GEvt* null)
+        (new:GEvt* null))
+    (lambda (scheduler time fname)
+      (set! evtlist (scheduler.evtlist))
+      (set! new (GEvt_h time fname null evtlist))
+      (if (not (null? evtlist)) (tset! evtlist 2 new))
+      (scheduler.evtlist new)
+      void)))
+
+(bind-val gevt_sched [i64,double]* (gevt_scheduler (GEvt_h 1.0 null null null)))
+
+(bind-func gevt_count
+  (lambda ()
+    (gevt_push gevt_sched 2.0 null)
+    (gevt_push gevt_sched 3.0 null)
+    (let ((n 0)
+          (e:GEvt{double}* (gevt_sched.evtlist)))
+      (while (not (null? e))
+        (set! n (+ n 1))
+        (set! e (tref e 3)))
+      n)))
+
+(xtmtest-result (gevt_count) 3 "generic-closure-slot-list")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a free-return generic reified from its body
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; xeval:[!a,XAdd*]* says nothing about !a in its parameters: the return is
+;; what its body --- two recursive xevals summed --- comes to for the
+;; argument's node types.  The XLit fallback is a field accessor (projected),
+;; the XAdd one is exercised.
+(bind-type XLit <!a>)
+(bind-type XAdd <!a,!b>)
+
+(bind-func xeval:[!a,XLit*]*
+  (lambda (x) (tref x 0)))
+
+(bind-func xeval:[!a,XAdd*]*
+  (lambda (x) (+ (xeval (tref x 0)) (xeval (tref x 1)))))
+
+(bind-func xeval_lit
+  (lambda ()
+    (let ((e (XLit 4)))
+      (xeval e))))
+
+(bind-func xeval_tree
+  (lambda ()
+    (let ((e (XAdd (XLit 1) (XAdd (XLit 2) (XLit 3)))))
+      (xeval e))))
+
+(bind-func xeval_float
+  (lambda ()
+    (let ((e (XAdd (XLit 1.5) (XLit 2.0))))
+      (xeval e))))
+
+(xtmtest-result (xeval_lit) 4 "free-return-projected")
+(xtmtest-result (xeval_tree) 6 "free-return-exercised")
+(xtmtest-result (xeval_float) 3.5 "free-return-exercised-double")
