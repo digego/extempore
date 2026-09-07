@@ -464,6 +464,8 @@ endif()
 
 # Requires CMAKE_EXPORT_COMPILE_COMMANDS=ON (Ninja sets this automatically).
 # Filters to extempore source files only, not vendored third-party code.
+# src/ffi/ is still held out: the primitive bodies came across from the .inc
+# files unchanged and carry ~130 findings, mostly misc-const-correctness.
 set(TIDY_SOURCES "")
 foreach(_src ${EXTEMPORE_SOURCES})
     if(NOT _src MATCHES "(s7\\.c|networking-ts-impl|ffi/|shims/|linenoise)")
