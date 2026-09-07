@@ -17,6 +17,16 @@ set(EXTEMPORE_TEST_PORT_COUNTER 17099 CACHE INTERNAL "")
 set(EXTEMPORE_TEST_RESULTS_DIR ${CMAKE_CURRENT_BINARY_DIR}/test-results)
 file(MAKE_DIRECTORY ${EXTEMPORE_TEST_RESULTS_DIR})
 
+# CTest has no default timeout, so a wedged extempore process would hang the
+# run until the CI job's own limit. 120s is an order of magnitude more than the
+# slowest .xtm test needs; instrumented builds run 5-15x slower and get a
+# budget to match.
+if(EXTEMPORE_SANITIZE)
+    set(EXTEMPORE_TEST_TIMEOUT 900)
+else()
+    set(EXTEMPORE_TEST_TIMEOUT 120)
+endif()
+
 function(extempore_get_next_port OUT_VAR)
     set(${OUT_VAR} ${EXTEMPORE_TEST_PORT_COUNTER} PARENT_SCOPE)
     math(EXPR _new_port "${EXTEMPORE_TEST_PORT_COUNTER} - 2")
@@ -31,6 +41,7 @@ macro(extempore_add_test testfile label)
             --batch "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
         LABELS ${label})
 endmacro()
 
@@ -42,6 +53,7 @@ macro(extempore_add_ipc_test testfile label)
             --eval "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
         LABELS ${label})
 endmacro()
 
@@ -127,7 +139,7 @@ add_test(NAME tests/failing.xtm
 set_tests_properties(tests/failing.xtm PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS libs-core
-    TIMEOUT 120
+    TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
     WILL_FAIL TRUE)
 
 # AOT compilation round-trip test (two-phase): AOT-compile a fixture library,
