@@ -119,11 +119,16 @@
   (lambda (c) (or (xtc:solve:project? c) (xtc:solve:callval? c) (xtc:solve:exercise? c))))
 
 ;; WHY the last solve conflicted, for the error path: the deferred and
-;; overload passes leave a thunk here that prints the failing constraint in
-;; the terms of the substitution it failed under, and explain-conflict runs
-;; it when no single equality accounts for the conflict.  A thunk, not a
+;; overload passes leave a procedure here that prints the failing constraint in
+;; the terms of the substitution it failed under, and explain-conflict runs it
+;; when no single equality accounts for the conflict.  A procedure, not a
 ;; string: the search backtracks through many conflicts, so the rendering is
 ;; paid only when a diagnostic is actually printed.
+;;
+;; It takes `ground', which extends a substitution with the numeric defaults,
+;; and must render every type through it --- the substitution of the moment
+;; leaves a literal argument as an unresolved variable, so a wrong-argument-
+;; type error would read [!infer_1] where the reader wants [double].
 (define *xtc:solve:conflict-why* #f)
 
 (define xtc:solve:conflict!
@@ -186,7 +191,8 @@
       (cond
         ((null? cs)
          (if *xtc:solve:conflict-why*
-             (*xtc:solve:conflict-why*)
+             (*xtc:solve:conflict-why*
+               (lambda (s) (xtc:solve:apply-defaults constraints intern s)))
              ;; apply numeric defaults first so a literal argument renders as
              ;; its concrete type (double/i64) rather than an unresolved
              ;; variable
@@ -467,7 +473,8 @@
             (cond ((null? viable)
                    (let ((c (car ps)))
                      (xtc:solve:conflict!
-                       (lambda () (xtc:solve:print-no-overload c intern subst)))))
+                       (lambda (ground)
+                         (xtc:solve:print-no-overload c intern (ground subst))))))
                   ((null? (cdr viable))
                    (loop (cdr ps) (cdr (car viable)) still #t))
                   (else
@@ -593,13 +600,13 @@
                        (if s2
                            (loop (cdr ps) s2 still #t)
                            (xtc:solve:conflict!
-                             (lambda ()
+                             (lambda (ground)
                                (print
                                  (string-append
                                    "Type Error: " what " is "
                                    (xtc:type:to-pretty decided intern)
                                    ", but its use requires "
-                                   (xtc:solve:pretty-key (cadr c) intern subst)
+                                   (xtc:solve:pretty-key (cadr c) intern (ground subst))
                                    "\n")))))))))
             (cond
               ((xtc:solve:callval? c)
@@ -614,11 +621,11 @@
                                     (else #f))))
                        (if (not decided)
                            (xtc:solve:conflict!
-                             (lambda ()
+                             (lambda (ground)
                                (print
                                  (string-append
                                    "Type Error: a closure of type "
-                                   (xtc:type:to-pretty head intern)
+                                   (xtc:solve:pretty-key (caddr c) intern (ground subst))
                                    " is called with no arguments\n"))))
                            (decide decided
                                    (string-append "the call of "
@@ -744,9 +751,9 @@
                                ;; then the last branch's own reason
                                (let ((why *xtc:solve:conflict-why*))
                                  (xtc:solve:conflict!
-                                   (lambda ()
+                                   (lambda (ground)
                                      (print "Type Error: no choice of overload candidates satisfies every use; the last attempt failed because\n")
-                                     (if why (why)))))
+                                     (if why (why ground)))))
                                (loop (car r) '() (cdr r)))))))
                   (else
                     ;; overloads done: numeric defaulting for whatever literals
