@@ -184,7 +184,7 @@ thumb is that when you call a print function (e.g. `println`)
   of your VSCode window like so (notice the little white `#t` on the blue
   background---I've added an orange arrow to point it out).
 
-![Extempore return value as shown in VSCode](/images/vscode-hello-world-echo-area.png)
+![Extempore return value as shown in VSCode](../../../assets/images/vscode-hello-world-echo-area.png)
 
 :::
 

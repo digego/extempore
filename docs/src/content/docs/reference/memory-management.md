@@ -558,7 +558,7 @@ in the `num_cats` 'place' in memory and use whatever value is stored there. The
 computer's memory is laid out like a row of little boxes, and each box has an
 address (the location of the box) and also a value (what's _in_ the box).
 
-![image](/images/pointer-tut-1.png)
+![image](../../../assets/images/pointer-tut-1.png)
 
 In this image the computer's memory is represented by the blue boxes. Each box
 has an address (the number below the box), an in this picture you can see that
@@ -589,13 +589,13 @@ the memory location that `num_cats` refers to. In `print_num_cats2` the value of
 `num_cats` starts out as `4`, so the first `printf` call prints "You have 4
 cats…". The memory at this point might look like this:
 
-![image](/images/pointer-tut-2a.png)
+![image](../../../assets/images/pointer-tut-2a.png)
 
 But then a new value (`13`) is set into `num_cats` with the call to `set!`, so
 the second call to `printf` prints "and now you have 13 cats!". After the call
 to `set!`, this is what the memory looks like:
 
-![image](/images/pointer-tut-2b.png)
+![image](../../../assets/images/pointer-tut-2b.png)
 
 Notice how this time the memory address for `num_cats` is different to what it
 was the previous time (28 rather than 26). This is because the `let` rebinds all
@@ -671,7 +671,7 @@ After the call to `zalloc`, the memory therefore will look like this (the value
 is now shown in a different coloured box, to indicate it's an `i64*` pointer
 type and not an `i64` value type)
 
-![image](/images/pointer-tut-3.png)
+![image](../../../assets/images/pointer-tut-3.png)
 
 This is cool, we can see that the value in memory location 27 is actually the
 address 29, and the value of 29 is `0` because we haven't initialised it yet.
@@ -698,7 +698,7 @@ things are working properly again. After the `pset!` call, the memory will look
 like this (the only difference from last time is that the value 5 is stored in
 address 29, just as it should be).
 
-![image](/images/pointer-tut-4.png)
+![image](../../../assets/images/pointer-tut-4.png)
 
 Notice also that in `print_num_cats4` we don't pass `num_cats_ptr` directly to
 `printf`, we do it through a call to `pref`. Whereas `pset!` is for writing
@@ -766,7 +766,7 @@ then allocates enough memory to fit 3 `double` values. The pointer that gets
 returned is still only a pointer to the first of these memory slots. And this is
 where the second 'offset' argument to `pref` and `pset!` come in.
 
-![image](/images/pointer-tut-5.png)
+![image](../../../assets/images/pointer-tut-5.png)
 
 See how the repeated calls to `pset!` and `pref` above have different offset
 values? Well, that's because the offset argument allows you to get and set
@@ -813,7 +813,7 @@ and just fills it with ascending numbers:
 
 After the `dotimes` the memory will look like this:
 
-![image](/images/pointer-tut-6.png)
+![image](../../../assets/images/pointer-tut-6.png)
 
 There's one more useful function for working with pointers: `pref-ptr`. Where
 `(pref num_ptr 3)` returns the _value_ of the 4th element of the chunk of memory
@@ -877,12 +877,12 @@ Let's have a look at what the memory will look like during the execution of
 chunk of memory, but the tuples in this memory are uninitialised (indicated by
 u).
 
-![image](/images/pointer-tut-7.png)
+![image](../../../assets/images/pointer-tut-7.png)
 
 After using `pref` and `tset!` in step 2, the values get set into the tuples.
 Step 3 simply reads these values back out---it doesn't change the memory.
 
-![image](/images/pointer-tut-8.png)
+![image](../../../assets/images/pointer-tut-8.png)
 
 There are a couple of other things worth discussing about this example.
 
@@ -923,7 +923,7 @@ So, reconsidering our very first example, where we stored an `i64` value of `4`
 to represent how many cats we had, a more accurate diagram of the actual memory
 layout in this situation is:
 
-![image](/images/pointer-tut-9.png)
+![image](../../../assets/images/pointer-tut-9.png)
 
 See how each `i64` value takes up 8 bytes? Also, each byte has a memory
 addresses, so the start of each `i64` in memory is actually 8 bytes along from
@@ -931,7 +931,7 @@ the previous one.
 
 Now, consider the layout of an aggregate type like a tuple:
 
-![image](/images/pointer-tut-10.png)
+![image](../../../assets/images/pointer-tut-10.png)
 
 Each tuple contains (and therefore takes up the space of) an `i64` and a
 `double`. So the actual memory address offset between the beginning of

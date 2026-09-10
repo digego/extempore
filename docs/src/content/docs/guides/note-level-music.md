@@ -660,7 +660,7 @@ is a diminished chord. When we add the circle of 5ths into the mix, we end up
 with a chord progression chart that in it's simplest form looks something like
 this (I've taken a few liberties based on a few hundred years of usage).
 
-![image](/images/playing-an-instrument-part-i/markov-matrix.png)
+![image](../../../assets/images/playing-an-instrument-part-i/markov-matrix.png)
 
 So reading this diagram from left to right we can move from `iii` to `vi`. Then
 from `vi` to either `IV` or `ii`. From `IV` we can then move to either `viio`,

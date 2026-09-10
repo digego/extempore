@@ -483,7 +483,7 @@ delay, a reverb, or some more outlandish audio processing. But we don't want to
 apply the fx processing to each note individually, but rather to the total audio
 output of the instrument. And that's where the **fx closure** comes in.
 
-![image](/images/simple-instrument/fx.png)
+![image](../../../assets/images/simple-instrument/fx.png)
 
 The most important argument to the fx closure is the `in` argument, which
 represents the (dry) input signal that you want to process. It _is_ necessary to
@@ -528,7 +528,7 @@ Finally, to complete the instrument, we use a special `make-instrument` macro
 (make-instrument saw_synth saw_synth)
 ```
 
-![image](/images/simple-instrument/whole-instrument.png)
+![image](../../../assets/images/simple-instrument/whole-instrument.png)
 
 As long as your kernel (`saw_synth_note`) and fx (`saw_synth_fx`) closures have
 the right signature, then evaluating the above line should print for you

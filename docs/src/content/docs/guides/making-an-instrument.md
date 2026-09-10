@@ -69,7 +69,7 @@ timbre than just a sine tone.
 The key tone-shaping controls in a Hammond organ are its drawbars, which look
 like this:
 
-![image](/images/making-an-instrument/drawbars.png)
+![image](../../../assets/images/making-an-instrument/drawbars.png)
 
 Each drawbar controls the relative amplitude of a given tonewheel. The
 tonewheels are denoted by their 'pipe length', which is a carry-over from pipe
@@ -202,7 +202,7 @@ for `osc_c` (which is in `libs/core/audio_dsp.xtm`)
 
 In an xtlang type diagram, `osc_c` looks like this
 
-![image](/images/making-an-instrument/osc_c.png)
+![image](../../../assets/images/making-an-instrument/osc_c.png)
 
 `osc_c` is a higher-order closure, because it returns a closure, as indicated by
 the _two_ `lambda` forms: the outer one (with one `phase` argument) defines the
@@ -307,7 +307,7 @@ look like this
 
 and in an xtlang type diagram
 
-![image](/images/making-an-instrument/full-organ-inst.png)
+![image](../../../assets/images/making-an-instrument/full-organ-inst.png)
 
 `make-instrument` is actually a (Scheme) macro, and it takes the two kernel
 closures (`organ_note_c` and `organ_fx`) and compiles a new xtlang closure, and
@@ -345,7 +345,7 @@ should be and which notes it should be playing?
 
 The playing of a note happens through a function called `xtm_play_note`.
 
-![image](/images/making-an-instrument/play-note.png)
+![image](../../../assets/images/making-an-instrument/play-note.png)
 
 which takes four arguments:
 
@@ -380,7 +380,7 @@ three active note closures in `notes`.
 That's all a bit hard to wrap your head when it's described with words. So,
 here's the same explanation in (pretty) pictures:
 
-![image](/images/making-an-instrument/note-lifecycle.png)
+![image](../../../assets/images/making-an-instrument/note-lifecycle.png)
 
 Don't be overwhelmed if you don't understand the whole thing---you don't need to
 if you just want to play the instrument like a regular soft synth. In fact, you
@@ -504,7 +504,7 @@ highlights the difference:
 
 :::note[This diagram is outdated]
 
-![image](/images/making-an-instrument/organ-drone-vs-note.png)
+![image](../../../assets/images/making-an-instrument/organ-drone-vs-note.png)
 
 As I described in the previous section, this provides the flexibility required
 to manage note scheduling (via `xtm_play_note`) and polyphony.

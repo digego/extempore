@@ -28,6 +28,12 @@ export default defineConfig({
   markdown: {
     processor: satteri({ mdastPlugins: [headingIds] }),
   },
+  image: {
+    // The screenshots are up to 2800px wide but render in a ~800px content
+    // column; a constrained layout emits a srcset so narrow viewports don't
+    // pay for the full-width source.
+    layout: "constrained",
+  },
   site: "https://extemporelang.github.io",
   base: "/",
   // type-inference was folded into the types reference page; keep the old URL working.

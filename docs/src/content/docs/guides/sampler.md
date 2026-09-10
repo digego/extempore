@@ -15,7 +15,7 @@ Since samplers are so useful, Extempore provides a built-in sampler in
 You can think of a sampler as a series of 'slots', each of which contains a
 sound file.
 
-![image](/images/sampler/piano-full.png)
+![image](../../../assets/images/sampler/piano-full.png)
 
 Each slot has a unique index, and playing the sampler generally involves
 specifying the index of the sample to play, the loudness/velocity and the
@@ -42,7 +42,7 @@ argument of `60`.
 
 The Extempore sampler doesn't _have_ to be full---there can be empty slots.
 
-![image](/images/sampler/piano-gaps.png)
+![image](../../../assets/images/sampler/piano-gaps.png)
 
 In this situation, when the sampler is told to play a pitch value corresponding
 to an empty slot, looks for the closest 'filled' slot, grabs that audio data,

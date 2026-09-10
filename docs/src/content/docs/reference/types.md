@@ -38,7 +38,7 @@ cases.
 
 ### Integers {#integers}
 
-![image](/images/int-examples.png)
+![image](../../../assets/images/int-examples.png)
 
 Extempore supports signed integers of various different sizes:
 
@@ -58,7 +58,7 @@ A couple of gotchas:
 
 ### Floats {#floats}
 
-![image](/images/float-examples.png)
+![image](../../../assets/images/float-examples.png)
 
 There are two sizes of floating point number:
 
@@ -70,7 +70,7 @@ the type signatures suggest otherwise (as is the case with `i64` int literals).
 
 ### Pointer types {#pointer-types}
 
-![image](/images/pointer-examples.png)
+![image](../../../assets/images/pointer-examples.png)
 
 xtlang supports
 [pointers](<http://en.wikipedia.org/wiki/Pointer_(computer_programming)>) to any
@@ -253,7 +253,7 @@ on the Extempore to-do list at the moment and will be added in a future release.
 
 Examples:
 
-![image](/images/tuple-examples.png)
+![image](../../../assets/images/tuple-examples.png)
 
 - `<double,i32>*` is a pointer to a 2-tuple: the first element is a `double` and
   the second element is an `i32`
@@ -309,7 +309,7 @@ _faster_.
 
 Examples:
 
-![image](/images/vector-examples.png)
+![image](../../../assets/images/vector-examples.png)
 
 - `/4,float/*`: a pointer to a vector of four floats
 - `/256,i32/*`: a pointer to a vector of 256 ints
@@ -328,7 +328,7 @@ type of the array elements, and is closed off with the pipe (`|`) character.
 
 Examples:
 
-![image](/images/array-examples.png)
+![image](../../../assets/images/array-examples.png)
 
 - `|4,double|*`: a pointer to an array of 4 `double`
 - `|10000000,i32|*`: a pointer to an array of one million `i32`
@@ -366,7 +366,7 @@ representing the type signature of the function.
 
 Examples:
 
-![image](/images/closure-examples.png)
+![image](../../../assets/images/closure-examples.png)
 
 - `[i64]*`: a pointer to a closure which takes no arguments and returns a single
   `i64`
