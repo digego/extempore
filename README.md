@@ -43,9 +43,10 @@ reproducible example where you can.
 ### The easy way
 
 Download the latest
-[binary release](https://github.com/digego/extempore/releases) for your
-platform, unzip it and run `extempore` (`extempore.exe` on Windows) from inside
-the `extempore` folder.
+[binary release](https://github.com/digego/extempore/releases) for your platform
+and unzip it. The folder is self-contained --- keep it together, but put it
+wherever you like --- and `extempore` (`extempore.exe` on Windows) runs from any
+working directory.
 
 Then,
 [set up your text editor of choice](https://extemporelang.github.io/guides/editor-support/)
@@ -97,11 +98,12 @@ many of the examples, but adds a ~250MB download to the build process. If you'd
 rather not do that, and are happy with some of the examples not working, then
 set `-DASSETS=OFF` instead.
 
-_Note on running_: the `extempore` binary locates its runtime files (`runtime/`,
-`libs/`, `examples/`) relative to the source tree at build time, so run it in
-place (`build/extempore`). If you'd rather have a self-contained tree somewhere
-else, `cmake --install build --prefix <dir>` copies the binary and its runtime
-files into `<dir>` --- see [BUILDING.md](./BUILDING.md).
+_Note on running_: an in-tree build keeps its runtime files (`runtime/`,
+`libs/`, `examples/`) in the source tree, so run it in place
+(`build/extempore`). If you'd rather have a self-contained tree somewhere else,
+`cmake --install build --prefix <dir>` copies the binary and its runtime files
+into `<dir>`; that tree can be moved anywhere and run from any working directory
+--- see [BUILDING.md](./BUILDING.md).
 
 ### Hear your first sine wave
 

@@ -37,18 +37,23 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
+#include <filesystem>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <sstream>
 #include <iosfwd>
 #include <iomanip>
 #include "SchemeFFI.h"
 #include "SchemeS7Private.h"
 #include "ext/FileUtil.h"
+#include "ext/ShareDir.h"
 
 #ifdef __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #include <AppKit/AppKit.h>
+#include <mach-o/dyld.h>
 #else
 #include <time.h>
 #endif
@@ -391,9 +396,60 @@ EXPORT int register_for_window_events() {
 #endif
 }
 
+namespace {
+
+// The absolute path of the running executable, or an empty path if the platform
+// call fails.  Symlinks are resolved, so a link on $PATH (a mise shim, a
+// /usr/local/bin symlink) still names the real install.
+std::filesystem::path executable_path() {
+    std::filesystem::path raw;
+#ifdef _WIN32
+    std::wstring buf(MAX_PATH, L'\0');
+    for (;;) {
+        DWORD len = GetModuleFileNameW(nullptr, buf.data(), static_cast<DWORD>(buf.size()));
+        if (len == 0) {
+            return {};
+        }
+        if (len < buf.size()) {
+            buf.resize(len);
+            raw = std::filesystem::path(buf);
+            break;
+        }
+        buf.resize(buf.size() * 2);
+    }
+#elif defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);  // sets size, always "fails"
+    std::string buf(size, '\0');
+    if (_NSGetExecutablePath(buf.data(), &size) != 0) {
+        return {};
+    }
+    buf.resize(std::strlen(buf.c_str()));
+    raw = std::filesystem::path(buf);
+#else
+    {
+        std::error_code ec;
+        raw = std::filesystem::read_symlink("/proc/self/exe", ec);
+        if (ec) {
+            return {};
+        }
+    }
+#endif
+    std::error_code ec;
+    auto resolved = std::filesystem::canonical(raw, ec);
+    return ec ? raw : resolved;
+}
+
+}  // namespace
+
 namespace extemp {
 
 namespace UNIV {
+
+std::string resolve_share_dir(std::string_view explicit_dir) {
+    auto exe = executable_path();
+    return share_dir::pick(explicit_dir, exe.empty() ? exe : exe.parent_path(), EXT_SHARE_DIR);
+}
 
 std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
 uint32_t NUM_FRAMES = 1024;

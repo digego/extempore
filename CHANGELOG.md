@@ -9,6 +9,13 @@ A large robustness and modernisation pass over the whole tree, driven by a
 full-codebase review. Nothing here changes the language, but a lot changes
 underneath it.
 
+One item is worth singling out. A running Extempore turned each incoming OSC
+message into Scheme source text with its address interpolated unescaped, so any
+host that could reach the OSC server could evaluate arbitrary code in the
+session. Addresses are now validated and strings escaped by construction. If
+you have ever run Extempore where untrusted hosts can reach it, that is the
+reason to upgrade.
+
 Errors no longer disappear. `sys:load` used to swallow every error in a loaded
 file: the form failed silently and loading carried on, which meant a broken
 library could be AOT-compiled "successfully" and the example-based tests could
@@ -28,10 +35,7 @@ Memory safety in the C++ runtime. Every Scheme FFI primitive is now registered
 with its real name and arity, so a call with the wrong number or type of
 arguments is a Scheme error rather than a segfault. The zone allocator checked
 capacity before rounding and could write past the arena; it rounds first now.
-OSC messages were turned into Scheme source text with an unescaped address, so
-any host that could reach a running OSC server could evaluate arbitrary code;
-addresses are validated and strings are escaped by construction. The OSC send
-path, the multi-threaded DSP closure table, the IFF chunk scanner in
+The OSC send path, the multi-threaded DSP closure table, the IFF chunk scanner in
 `audiobuffer.xtm`, and half a dozen fixed C string buffers all had unbounded
 writes, and all are bounded. Redefining a function under the ORC JIT now
 releases the old machine code (it leaked every time before), and the compile
@@ -65,6 +69,14 @@ that were repeated across six files. CI derives the LLVM version from
 `CMakeLists.txt` (so a bump cannot silently make the cache key stale forever),
 throttles only the AOT step through a Ninja job pool, runs tests in parallel,
 and cancels superseded runs. Every xtlang test has a timeout.
+
+Extempore finds its own runtime files. The binary now looks for `runtime/`,
+`libs/` and `examples/` in the directory it lives in --- resolving symlinks
+first --- before falling back to the path baked in at build time. An unzipped
+binary release or a `cmake --install` tree can therefore be moved anywhere, run
+from any working directory, and linked onto your `PATH`. `--sharedir` still
+overrides it, and an in-tree build (whose binary sits in `build/` with no
+`runtime/` beside it) still uses the source tree it was built from.
 
 One compiler landmine is closed along the way: an unresolved generic type name
 reaching code generation used to spin forever between two lookup functions, so

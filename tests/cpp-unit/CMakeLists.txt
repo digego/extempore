@@ -1,5 +1,6 @@
 add_executable(extempore_cpp_unit
     univ_test.cpp
+    sharedir_test.cpp
     netutil_test.cpp
     osc_test.cpp
     zones_test.cpp

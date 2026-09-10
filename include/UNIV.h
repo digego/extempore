@@ -40,6 +40,7 @@
 #include <cstdint>
 
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 
@@ -77,7 +78,11 @@ namespace extemp {
 
 namespace UNIV {
 
+// Where the runtime files (runtime/, libs/, examples/) live.  Resolved once at
+// startup by resolve_share_dir(); pass the value of --sharedir, or an empty
+// view when it was not given.
 extern std::string SHARE_DIR;
+std::string resolve_share_dir(std::string_view explicit_dir);
 EXPORT uint32_t CHANNELS;
 EXPORT uint32_t IN_CHANNELS;
 EXPORT uint32_t SAMPLE_RATE;

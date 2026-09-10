@@ -52,10 +52,10 @@ users will care about:
 - `EXTEMPORE_SANITIZE` (default empty) --- build Extempore's own objects with a
   sanitizer: `asan`, `ubsan`, `tsan` or `asan+ubsan`. Anything else is a
   configure error. Unix only.
-- `EXT_SHARE_DIR` (default: the source tree) --- where the binary looks for
-  `runtime/`, `libs/` and `examples/`, baked in at compile time. The release
-  builds set `.`, i.e. the working directory. `--sharedir` overrides it at
-  runtime.
+- `EXT_SHARE_DIR` (default: the source tree) --- the fallback location for
+  `runtime/`, `libs/` and `examples/`, baked in at compile time. It is only
+  consulted when the directory holding the binary has no `runtime/` beside it
+  (see [Running Extempore](#running-extempore)); the release builds set `.`.
 - `EXTEMPORE_VERSION` (default: `git describe`) --- the version the binary
   reports. CI passes the tag explicitly because its checkout is shallow.
 
@@ -101,25 +101,27 @@ standard library (for faster startup). Other targets worth knowing about:
 `cmake --install build --prefix <dir>` lays out a self-contained tree in
 `<dir>`: the `extempore` binary with `runtime/`, `libs/` (AOT cache and platform
 shared libraries included), `examples/` and, if they were downloaded, `assets/`
-beside it. That's the layout of the binary release archives, so a build
-configured with the `release` preset (which sets `EXT_SHARE_DIR=.`) runs from
-the install directory as-is. A binary built with the default share dir needs
-`--sharedir <dir>` to use an installed tree.
+beside it. That's the layout of the binary release archives, and an installed
+tree runs from any working directory --- and can be moved anywhere --- because
+the binary finds those directories beside itself.
 
 ## Running Extempore
 
-The `extempore` binary locates its share directory (`runtime/`, `libs/`,
-`examples/`) relative to the source tree at build time. Run it from the build
-directory:
+The `extempore` binary looks for its share directory (`runtime/`, `libs/`,
+`examples/`) beside itself, resolving symlinks first, so an unzipped release or
+an installed tree works from any working directory and keeps working if you move
+it or put a link to it on your `PATH`. An in-tree build --- where the binary
+sits in `build/` with no `runtime/` next to it --- falls back to the source tree
+it was built from, so run it from the build directory:
 
     ./extempore                 # audio + Scheme interpreter, listens on port 7099
     ./extempore --noaudio       # same, without audio
     ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
     ./extempore --batch "(begin (println 'hello) (quit 0))"
 
-If you've moved the `extempore` binary away from the source tree (for example,
-out of a downloaded release archive), point it at the share directory
-explicitly:
+To use a share directory that isn't beside the binary --- an in-tree build run
+against an installed tree, say, or a binary you copied out of a release archive
+on its own --- name it explicitly:
 
     ./extempore --sharedir /path/to/extempore
 

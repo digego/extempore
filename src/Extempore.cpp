@@ -284,6 +284,7 @@ struct Settings {
     std::string initexpr;
     int primary_port = 7099;
     bool repl_mode = false;
+    std::string sharedir;  // --sharedir, empty when not given
 };
 
 enum class ParseResult { Continue, Exit };
@@ -303,7 +304,7 @@ ParseResult apply_option(const OptionSpec& spec, std::string_view value, Setting
         break;
     case Opt::ShareDir:
     case Opt::Runtime:
-        UNIV::SHARE_DIR = std::string(value);
+        settings.sharedir = std::string(value);
         break;
     case Opt::SampleRate:
         if (!parse_integer(spec.name, value, UNIV::SAMPLE_RATE)) {
@@ -542,6 +543,7 @@ EXPORT int extempore_init(int argc, char** argv) {
                    status) == ParseResult::Exit) {
         return status;
     }
+    extemp::UNIV::SHARE_DIR = extemp::UNIV::resolve_share_dir(settings.sharedir);
     const int primary_port = settings.primary_port;
     const int utility_port = primary_port - 1;
     // --batch implies --noaudio only when --audio-outfile was not specified.
