@@ -12,15 +12,18 @@ jobs:
   deploy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+      # node_modules/.astro holds the image service's transform cache; without
+      # it CI re-encodes every optimised image from scratch on each run.
+      - uses: actions/cache@v6
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
-      - run: npm ci
+          path: docs/node_modules/.astro
+          key: astro-${{ github.sha }}
+          restore-keys: astro-
+      - run: pnpm install --frozen-lockfile
         working-directory: docs
-      - run: npm run build
+      - run: pnpm run build
         working-directory: docs
       - uses: peaceiris/actions-gh-pages@v4
         with:
