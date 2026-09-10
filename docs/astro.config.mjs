@@ -1,31 +1,29 @@
 import { defineConfig } from 'astro/config'
+import { satteri } from '@astrojs/markdown-satteri'
 import starlight from '@astrojs/starlight'
+import { defineMdastPlugin } from 'satteri'
 
 // Honour `## Heading {#custom-id}` syntax (supported by the old VitePress site,
 // not by Astro out of the box): strip the marker and set the heading's id.
-function remarkHeadingIds() {
-  const walk = (node) => {
-    if (node.type === 'heading' && node.children?.length) {
-      const last = node.children[node.children.length - 1]
-      if (last.type === 'text') {
-        const m = last.value.match(/\s*\{#([\w-]+)\}\s*$/)
-        if (m) {
-          last.value = last.value.slice(0, last.value.length - m[0].length)
-          node.data = node.data || {}
-          node.data.hProperties = { ...(node.data.hProperties || {}), id: m[1] }
-          node.data.id = m[1]
-        }
-      }
-    }
-    if (node.children) node.children.forEach(walk)
-  }
-  return (tree) => walk(tree)
-}
+const headingIds = defineMdastPlugin({
+  name: 'heading-ids',
+  heading(node, ctx) {
+    const last = node.children[node.children.length - 1]
+    if (last?.type !== 'text') return
+    const m = last.value.match(/\s*\{#([\w-]+)\}\s*$/)
+    if (!m) return
+    ctx.setProperty(last, 'value', last.value.slice(0, last.value.length - m[0].length))
+    ctx.setProperty(node, 'data', {
+      ...node.data,
+      hProperties: { ...node.data?.hProperties, id: m[1] },
+    })
+  },
+})
 
 // https://astro.build/config
 export default defineConfig({
   markdown: {
-    remarkPlugins: [remarkHeadingIds],
+    processor: satteri({ mdastPlugins: [headingIds] }),
   },
   site: 'https://extemporelang.github.io',
   base: '/',
