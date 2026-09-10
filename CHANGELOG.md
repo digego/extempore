@@ -3,7 +3,7 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
-## Unreleased
+## v0.11.0
 
 A large robustness and modernisation pass over the whole tree, driven by a
 full-codebase review. Nothing here changes the language, but a lot changes

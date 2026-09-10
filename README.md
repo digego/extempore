@@ -9,32 +9,43 @@ interpreter with _xtlang_---a statically-typed lisp that compiles to LLVM IR at
 runtime---so you can reshape a running program while it keeps making sound. Runs
 on Linux (x86_64 and aarch64), macOS (Apple Silicon) and Windows (x86_64).
 
-## What's new in v0.10.0
+## What's new in v0.11.0
 
-v0.10.0 is a consolidation release---nothing changes about what Extempore does,
-but a lot got faster, safer and tidier under the hood:
+v0.11.0 is a robustness release driven by a full-codebase review---nothing
+changes about the language, but a lot changes underneath it.
+[CHANGELOG.md](./CHANGELOG.md) has the detail; the headlines:
 
-- **Unified type inference** --- the xtlang compiler now drives every
-  compilation through a single constraint-based inference engine. Overload
-  resolution is near-linear (no more compile-time blow-ups on heavily-overloaded
-  call sites) and conflicting constraints report a clearer diagnostic.
-- **C++20 runtime** --- a broad modernisation that retires hand-rolled stand-ins
-  in favour of the standard library and fixes a clutch of latent cross-platform
-  bugs. Building now needs a C++20 compiler (GCC 13+, a recent Clang, or MSVC
-  from Visual Studio 2022).
-- **Hardened OSC** --- the memory-unsafe hand-rolled OSC receive parser is
-  replaced with the bounds-checked `oscpp` reader, so a malformed or hostile
-  packet is dropped rather than crashing the process.
-- **`--version`** --- the git tag is now the single source of truth for the
-  version, and a running Extempore can report its own.
-- **LLVM 22.1.6** --- verified green on all four CI platforms.
+- **A security fix worth upgrading for** --- a running Extempore turned each
+  incoming OSC message into Scheme source text with its address interpolated
+  unescaped, so any host that could reach the OSC server could evaluate
+  arbitrary code in the session.
+- **Errors stop disappearing** --- `sys:load` used to swallow every error in a
+  file it loaded, so a broken library could AOT-compile "successfully". It now
+  reports each failing form and returns `#f`, which surfaced (and fixed) five
+  examples that had quietly stopped working.
+- **Memory safety through the C++ runtime** --- every Scheme FFI primitive is
+  registered with its real name and arity, so a wrong call is a Scheme error
+  rather than a segfault, and the zone allocator, OSC send path, IFF chunk
+  scanner and a dozen fixed buffers no longer write past their ends.
+- **Relocatable installs** --- the binary looks for `runtime/`, `libs/` and
+  `examples/` beside itself, so an unzipped release runs from any working
+  directory and can be moved wherever you like.
+- **Less vendored code** --- the 2019 Networking TS snapshot and PCRE 8.38 are
+  gone; sockets go through one small shim on every platform and regular
+  expressions use PCRE2 10.48.
+- **Behaviour worth knowing about before you upgrade** --- `pcg32_boundedrand`
+  now matches reference PCG32, so seeded streams differ;
+  `io:osc:set-integer-64bit?` and `io:osc:send-from-server-socket?` are removed;
+  and `topclock` no longer starts its network loop at load when
+  `*topclock-autostart*` is `#f`.
 
-Extempore's current stack came together in v0.9.0: LLVM 22 with the ORC JIT (in
-place of the legacy MCJIT), s7 Scheme (in place of TinyScheme), first-class
-Linux aarch64, and an interactive `--repl` (Linux and macOS only). Graphics is
-now a lean set of WebGPU bindings (via `wgpu-native`, enabled with
-`-DEXTERNAL_SHLIBS_GRAPHICS=ON`); the old OpenGL stack has been retired. If you
-hit any breakage, please
+Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 22.1.6
+with the ORC JIT (in place of the legacy MCJIT), s7 Scheme (in place of
+TinyScheme), a single constraint-based type inference engine in the xtlang
+compiler, a C++20 runtime, first-class Linux aarch64, and an interactive
+`--repl` (Linux and macOS only). Graphics is now a lean set of WebGPU bindings
+(via `wgpu-native`, enabled with `-DEXTERNAL_SHLIBS_GRAPHICS=ON`); the old
+OpenGL stack has been retired. If you hit any breakage, please
 [file an issue](https://github.com/digego/extempore/issues) with a minimal
 reproducible example where you can.
 
