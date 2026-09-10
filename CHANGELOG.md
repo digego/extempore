@@ -12,9 +12,9 @@ underneath it.
 One item is worth singling out. A running Extempore turned each incoming OSC
 message into Scheme source text with its address interpolated unescaped, so any
 host that could reach the OSC server could evaluate arbitrary code in the
-session. Addresses are now validated and strings escaped by construction. If
-you have ever run Extempore where untrusted hosts can reach it, that is the
-reason to upgrade.
+session. Addresses are now validated and strings escaped by construction. If you
+have ever run Extempore where untrusted hosts can reach it, that is the reason
+to upgrade.
 
 Errors no longer disappear. `sys:load` used to swallow every error in a loaded
 file: the form failed silently and loading carried on, which meant a broken
@@ -35,8 +35,8 @@ Memory safety in the C++ runtime. Every Scheme FFI primitive is now registered
 with its real name and arity, so a call with the wrong number or type of
 arguments is a Scheme error rather than a segfault. The zone allocator checked
 capacity before rounding and could write past the arena; it rounds first now.
-The OSC send path, the multi-threaded DSP closure table, the IFF chunk scanner in
-`audiobuffer.xtm`, and half a dozen fixed C string buffers all had unbounded
+The OSC send path, the multi-threaded DSP closure table, the IFF chunk scanner
+in `audiobuffer.xtm`, and half a dozen fixed C string buffers all had unbounded
 writes, and all are bounded. Redefining a function under the ORC JIT now
 releases the old machine code (it leaked every time before), and the compile
 path emits only the runtime helpers a module actually references instead of
@@ -79,21 +79,21 @@ overrides it, and an in-tree build (whose binary sits in `build/` with no
 `runtime/` beside it) still uses the source tree it was built from.
 
 One compiler landmine is closed along the way: an unresolved generic type name
-reaching code generation used to spin forever between two lookup functions, so
-a compile could hang instead of failing. It now raises a compile error. That
-loop was reachable through an attempt to memoise the type-string parser, which
-turned out to depend on registration happening inline; the parse result is
-memoised, the registration stays where it was.
+reaching code generation used to spin forever between two lookup functions, so a
+compile could hang instead of failing. It now raises a compile error. That loop
+was reachable through an attempt to memoise the type-string parser, which turned
+out to depend on registration happening inline; the parse result is memoised,
+the registration stays where it was.
 
 Library changes with visible behaviour: `pcg32_boundedrand` now matches
 reference PCG32 (it previously rejected about half its draws and used the wrong
-threshold, so seeded streams differ); `sys:directory-list` returns bare names
-on every platform; `sys:expand-path` canonicalises on Windows too;
+threshold, so seeded streams differ); `sys:directory-list` returns bare names on
+every platform; `sys:expand-path` canonicalises on Windows too;
 `io:osc:set-integer-64bit?` and `io:osc:send-from-server-socket?` are removed;
-`topclock` no longer starts its network loop at load when
-`*topclock-autostart*` is `#f`. Around 300 lines of commented-out library code,
-119 dead compiler definitions, and the orphaned `libs/base/prelude.xtm` and
-`libs/base/adt.xtm` are deleted.
+`topclock` no longer starts its network loop at load when `*topclock-autostart*`
+is `#f`. Around 300 lines of commented-out library code, 119 dead compiler
+definitions, and the orphaned `libs/base/prelude.xtm` and `libs/base/adt.xtm`
+are deleted.
 
 ## v0.10.3
 
