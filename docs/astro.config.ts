@@ -13,9 +13,12 @@ const headingIds = defineMdastPlugin({
     const m = last.value.match(/\s*\{#([\w-]+)\}\s*$/);
     if (!m) return;
     ctx.setProperty(last, "value", last.value.slice(0, last.value.length - m[0].length));
+    // `data` is an open bag on the wire; the declared HeadingData type doesn't
+    // include the hProperties the mdast -> hast conversion reads.
+    const data = node.data as { hProperties?: Record<string, unknown> } | undefined;
     ctx.setProperty(node, "data", {
-      ...node.data,
-      hProperties: { ...node.data?.hProperties, id: m[1] },
+      ...data,
+      hProperties: { ...data?.hProperties, id: m[1] },
     });
   },
 });
