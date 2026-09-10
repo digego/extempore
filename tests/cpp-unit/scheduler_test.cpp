@@ -12,9 +12,10 @@
 
 // EXTThread::setPriority reads UNIV::SAMPLE_RATE on macOS; the rest of UNIV.cpp
 // drags in the Scheme interpreter, so provide the one global here instead.
+// UNIV.h (via EXTThread.h) already declares it, so this is only the definition.
 namespace extemp {
 namespace UNIV {
-EXPORT uint32_t SAMPLE_RATE = 44100;
+uint32_t SAMPLE_RATE = 44100;
 }
 }  // namespace UNIV
 

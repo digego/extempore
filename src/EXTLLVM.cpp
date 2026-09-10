@@ -818,7 +818,7 @@ llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::Threa
     auto RT = JIT->getMainJITDylib().createResourceTracker();
     if (auto err = JIT->addIRModule(RT, std::move(TSM))) {
         llvm::consumeError(RT->remove());
-        return std::move(err);
+        return err;
     }
     return RT;
 }
