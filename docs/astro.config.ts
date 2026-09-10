@@ -36,6 +36,8 @@ export default defineConfig({
   },
   integrations: [
     starlight({
+      // /404 is owned by src/pages/404.astro --- see the note there.
+      disable404Route: true,
       title: "Extempore",
       description: "Livecoding environment for music and audio",
       social: [
