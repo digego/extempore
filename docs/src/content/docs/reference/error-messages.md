@@ -325,12 +325,17 @@ corruption or a segfault at runtime.
 **Error**
 
 ```
-;read-error ("missing close paren:   (lambda (a:i64)\n    (+ a 1))\n(quit 0)\n")
+;missing close paren:
+  (lambda (a:i64)
+    (+ a 1))
+(quit 0)
+;    sys:eval-string
 ```
 
 **What it means.** The reader hit end-of-input before all parentheses were
 balanced. This is a Scheme-level read error, not an xtlang type error--- you'll
-see it whenever the forms you send don't parse as complete s-expressions.
+see it whenever the forms you send don't parse as complete s-expressions. The
+report shows the unbalanced text and the frame that read it.
 
 **Fix.** Close the paren. In an interactive session your editor's paren-matching
 will usually catch this; in `--batch` or file loads it's easier to miss.
