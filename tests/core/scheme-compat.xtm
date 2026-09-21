@@ -6,10 +6,10 @@
 
 ;;; Commentary:
 
-;; runtime/init.xtm re-provides builtins that the old TinyScheme-derived
-;; interpreter offered but s7 does not. These tests pin the shims that aren't
-;; exercised elsewhere, so a regression (or an s7 upgrade that shadows them)
-;; fails loudly here.
+;; src/SchemeS7.cpp and runtime/init.xtm re-provide the builtins and the
+;; behaviour that the old TinyScheme-derived interpreter offered but s7 does
+;; not. These tests pin the shims that aren't exercised elsewhere, so a
+;; regression (or an s7 upgrade that shadows them) fails loudly here.
 ;;
 ;; put/get are TinyScheme's symbol property lists (its USE_PLIST builtins, a
 ;; MacLisp/Common-Lisp-heritage extension -- not part of any RnRS). They went
@@ -48,3 +48,33 @@
 (xtmtest-result (string=? "" (make-string 0)) #t "make-string-zero-is-empty")
 (xtmtest-result (string-length (make-string 0)) 0 "make-string-zero-length")
 (xtmtest-result (string-append "a" (make-string 0) "b") "ab" "make-string-zero-appends")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; print-length -- write must round-trip, not elide
+
+;; s7 drops list and vector elements past (*s7* 'print-length) and writes a
+;; literal "..." in their place; TinyScheme never truncated. Extempore
+;; serialises with `write` (instrument presets, the AOT cache), so s7's default
+;; of 40 silently corrupted anything longer: a saved preset read back as a list
+;; whose tail was the symbol ... (reported on the mailing list by George,
+;; September 2026). SchemeS7.cpp raises the limit at startup.
+
+(xtmtest-result (> (*s7* 'print-length) 1000) #t "print-length-raised")
+
+(xtmtest-result (let ((port (open-output-string)))
+                  (write (range 0 200) port)
+                  (equal? (with-input-from-string (get-output-string port) read)
+                          (range 0 200)))
+                #t
+                "write-long-list-round-trips")
+
+;; the shape an instrument preset is saved in: an alist well past the old limit
+(xtmtest-result (let* ((alist (map (lambda (i)
+                                     (cons (string->symbol (string-append "k" (number->string i)))
+                                           (* i 1.0)))
+                                   (range 0 100)))
+                       (port (open-output-string)))
+                  (write alist port)
+                  (equal? (with-input-from-string (get-output-string port) read) alist))
+                #t
+                "write-long-alist-round-trips")

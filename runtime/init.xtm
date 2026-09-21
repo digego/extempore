@@ -127,13 +127,15 @@
                       (apply #_format #f info)
                       (#_format #f "~S ~S" tag info)))
              (file (let-ref ow 'error-file)))
-        ;; the message, the offending form (truncated the way s7 does), then
-        ;; the source location. A form read from a bare string port has no
+        ;; the message, the offending form (truncated to keep one-line error
+        ;; reports readable --- (*s7* 'print-length) is deliberately raised at
+        ;; startup so `write` round-trips, so it can't serve as the limit here),
+        ;; then the source location. A form read from a bare string port has no
         ;; filename, so coerce #f to "" --- matching what s7's loader prints
         ;; for editor evals.
         (#_format #f "~%;~A~%;    ~A~%;    ~A~%"
           msg
-          (#_object->string (let-ref ow 'error-code) #f (*s7* 'print-length))
+          (#_object->string (let-ref ow 'error-code) #f 40)
           (if (pair? location)
               (car location)
               (#_format #f "~A, line ~A, position: ~A"

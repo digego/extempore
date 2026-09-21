@@ -209,6 +209,15 @@ scheme* scheme_init_new() {
                              "        (lambda () (apply s7-open-input-file path mode))"
                              "        (lambda (type info) #f)))))");
 
+    // print-length: s7's writer elides list/vector elements past
+    // (*s7* 'print-length) --- 40 by default --- replacing the tail with a
+    // literal "...". TinyScheme never truncated, and extempore uses `write`
+    // to serialise data it later reads back (instrument presets, the AOT
+    // cache), where an elided tail is silent corruption. Raise the limit to
+    // s7's own no-truncation value; console truncation of error forms is
+    // handled explicitly in runtime/init.xtm.
+    s7_eval_c_string(sc->sc, "(set! (*s7* 'print-length) 1048576)");
+
     // file-exists?: not built into s7, was defined in TinyScheme
     s7_eval_c_string(sc->sc, "(define (file-exists? path)"
                              "  (let ((port (open-input-file path)))"
