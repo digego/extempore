@@ -3,6 +3,57 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.11.1
+
+A patch release for instrument presets, which have not survived a save-and-load
+round trip since the move to s7. Both synths failed the same way, for a reason
+that belongs to the interpreter.
+
+s7 elides list and vector elements past `(*s7* 'print-length)`, which defaults
+to 40, writing a literal `...` in their place. TinyScheme, the interpreter
+Extempore used before 0.9, never truncated anything. `analogue-save-preset`
+serialises its whole parameter alist with `write`, so every preset saved since
+the move to s7 was cut off after the fortieth entry. Loading one read the file
+back as a list whose last element was the symbol `...`, then died in `(car x)`.
+Nothing went wrong at save time: the file looked fine until you tried to load
+it. The limit is now raised at interpreter startup, alongside the other
+TinyScheme compatibility shims. The same truncation had been corrupting the AOT
+cache, where stored source for anything longer than forty forms was written with
+its tail elided. `analogue_reset` and `cerberus_reset` were both stored that
+way.
+
+The cerberus synth had three problems of its own, none of them visible until the
+truncation was fixed. `PARAM_LFO7` and `PARAM_LFO8` were copies of `PARAM_LFO5`
+and `PARAM_LFO6`. The last two note-kernel LFOs were therefore unreachable, and
+the synth's reset set the first two twice. The Scheme mirror of those enums
+stopped at `PARAM_LFO4`, so saving a cerberus preset failed outright on an
+unbound `PARAM_LFO5`. Cerberus also has eight modulation sources where analogue
+has four, but its preset code sized the matrix for four. Saving overran the
+vector; loading restored half the matrix.
+
+Presets with a wavetable on any oscillator but the first failed to load too.
+Only `osc1` built its entry as a pair. The others used `list`, so the loader
+evaluated `(set_osc2_wt inst ((AudioBuffer_cstring ...)))` --- calling the
+constructor, then applying the AudioBuffer it returned.
+
+`PARAM_WT` meant two different things. It indexes the LFO waveform table, where
+4 is the AD envelope and 5 is the wavetable slot. Oscillators dispatch on their
+own scale, where 4 is the wavetable and 5 falls through to silence. The two
+Scheme copies of the parameter table disagreed about which reading to use, and
+the copy in `examples/sharedsystem/audiosetup.xtm` overrode the library's. Under
+the sharedsystem, then, preset saving compared an oscillator's stored 4 against
+5 and left wavetables out of the file entirely. Selecting a wavetable over MIDI
+set the oscillator to a silent 5. Oscillators now have their own `PARAM_OSC_WT`,
+leaving `PARAM_WT` and `PARAM_AD` to the LFO table.
+
+`libs/core/instruments-scm.xtm` is now the only Scheme copy of that table. It
+had been carrying a dead two-oscillator block above the current one. It was also
+missing the flanger destinations, which is why `audiosetup.xtm` defined its own.
+If you set an oscillator's waveform from Scheme, note that `PARAM_WT` is now 5,
+matching xtlang, and `PARAM_OSC_WT` is the one you want.
+
+Reported on the mailing list by George.
+
 ## v0.11.0
 
 A large robustness and modernisation pass over the whole tree, driven by a
