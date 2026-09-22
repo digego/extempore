@@ -80,6 +80,7 @@ endmacro()
 # duration is the length of audio to render (seconds). Two-phase: implemented
 # as a cmake -P script so it works cross-platform.
 macro(extempore_add_audio_offline_test testname renderfile duration assert_expr label)
+    extempore_get_next_port(_port)
     set(_wav "${CMAKE_CURRENT_BINARY_DIR}/audio_offline_${testname}.wav")
     add_test(NAME audio-offline/${testname}
         COMMAND ${CMAKE_COMMAND}
@@ -91,6 +92,7 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
             -DASSERT_EXPR=${assert_expr}
             -DRENDER_TIMEOUT=60
             -DVERIFY_TIMEOUT=60
+            -DPORT=${_port}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_audio_offline_test.cmake)
     set_tests_properties(audio-offline/${testname} PROPERTIES
         TIMEOUT 180
@@ -200,6 +202,22 @@ extempore_add_audio_offline_test(hello-mt
 extempore_add_audio_offline_test(hello-sweep
     examples/core/hello-sweep.xtm 2.0
     "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44100 8000)"
+    audio-offline)
+
+# Notes reaching an instrument through the pattern language. play-note asked
+# sys:make-cptr for a zero-byte buffer when a note carried no extra arguments,
+# got #f, and the xtlang wrapper refused the call without raising --- so
+# patterns ran in silence through two releases with the whole suite green.
+# Nothing here asserts the content: the analogue synth randomises oscillator
+# phase and slop, so no two renders match. The peak does not vary, sitting near
+# 0.95 when notes sound and at exactly 0.0 when they do not.
+#
+# 20s of audio for a pattern whose first note lands 1-2s in. The margin is for
+# the render starting at (dsp:set!) while the rest of the file is still
+# compiling, which is wall-clock work and slower on a loaded machine.
+extempore_add_audio_offline_test(pattern-notes
+    examples/core/synth.xtm 20.0
+    "(audiotest_assert_not_silent \"@WAV@\" 0.05)"
     audio-offline)
 
 # Core examples

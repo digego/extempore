@@ -135,6 +135,22 @@
 ;; Per-channel sine check. Verifies the WAV has exactly two channels and each
 ;; channel contains a dominant sine at the expected frequency. Useful for
 ;; catching L/R swaps or single-channel-only DSPs.
+(bind-func audiotest_assert_not_silent
+  (lambda (path:i8* floor:double)
+    (let ((ab (AudioBuffer_from_wave path)))
+      (if (null? ab)
+          (begin (printf "FAIL: could not read %s\n" path) 1)
+          (let ((sr (AudioBuffer_samplerate ab))
+                (nfr (AudioBuffer_frames ab))
+                (pk (convert (audiotest_peak ab -1) double))
+                (rms (audiotest_rms ab -1))
+                (ok #t))
+            (printf "audiotest: %s  sr=%.0f frames=%lld peak=%.4f rms=%.4f  floor=%.4f\n"
+                    path sr nfr pk rms floor)
+            (if (< nfr (dtoi64 (* sr 0.1))) (begin (println "FAIL: too short") (set! ok #f)))
+            (if (< pk floor) (begin (println "FAIL: peak below floor (silence?)") (set! ok #f)))
+            (if ok (begin (println "PASS") 0) 1))))))
+
 (bind-func audiotest_assert_stereo_sine
   (lambda (path:i8* freq_l:double freq_r:double)
     (let ((ab (AudioBuffer_from_wave path)))

@@ -12,8 +12,13 @@
 #                     "(audiotest_assert_sine \"@WAV@\" 440.0)"
 #   RENDER_TIMEOUT  seconds of wall-clock time allowed for the render phase
 #   VERIFY_TIMEOUT  seconds of wall-clock time allowed for the verify phase
+#   PORT            TCP port for the render phase. Both phases start a full
+#                   extempore, which binds its server port, so without this
+#                   every offline test would sit on the default 7099 and
+#                   collide under `ctest --parallel`. The verify phase gets
+#                   PORT-1, which the caller leaves free for it.
 
-foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION ASSERT_EXPR RENDER_TIMEOUT VERIFY_TIMEOUT)
+foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION ASSERT_EXPR RENDER_TIMEOUT VERIFY_TIMEOUT PORT)
     if(NOT DEFINED ${var})
         message(FATAL_ERROR "run_audio_offline_test.cmake: required variable ${var} not set")
     endif()
@@ -24,7 +29,7 @@ string(REPLACE "@WAV@" "${WAV_PATH}" ASSERT_EXPR_EXPANDED "${ASSERT_EXPR}")
 # Phase 1: render
 file(REMOVE "${WAV_PATH}")
 execute_process(
-    COMMAND "${EXTEMPORE}" --term nocolor
+    COMMAND "${EXTEMPORE}" --term nocolor --port=${PORT}
         --batch "(sys:load \"${RENDER_XTM}\")"
         --audio-outfile "${WAV_PATH}"
         --duration ${DURATION}
@@ -41,8 +46,9 @@ if(NOT EXISTS "${WAV_PATH}")
 endif()
 
 # Phase 2: verify
+math(EXPR _verify_port "${PORT} - 1")
 execute_process(
-    COMMAND "${EXTEMPORE}" --term nocolor
+    COMMAND "${EXTEMPORE}" --term nocolor --port=${_verify_port}
         --batch "(begin (sys:load \"libs/core/audiotest.xtm\") (quit ${ASSERT_EXPR_EXPANDED}))"
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE verify_rc
