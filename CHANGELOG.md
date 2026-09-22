@@ -3,6 +3,36 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## v0.11.2
+
+A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to
+unusable without anyone noticing. `play-note` has not played a note since
+v0.11.0 unless you gave it extra arguments, which almost nobody does and the
+pattern language never does.
+
+`play-note` passes its extra arguments to xtlang through a buffer it allocates
+as `(sys:make-cptr (* 8 nargs))`. With no extra arguments that asks for zero
+bytes, and the bounds check added to `sys:make-cptr` in v0.11.0 answers `#f` to
+that. The generated xtlang wrapper takes a c-pointer in that position and will
+not accept `#f`, so it refused the call, printed `check the arg arity and types`
+and returned 0. It does not raise, so no error reached the scheduler or the
+editor. A pattern would start and keep running, in silence.
+
+The allocation was pointless in that case to begin with, since `nargs` is 0 and
+the buffer is never read. It was also a leak, because the Scheme FFI has no way
+to free what `sys:make-cptr` returns, so every note played since 0.9 dropped one
+of these on the floor. `play-note` now reuses a single buffer for the
+no-argument case and allocates only when there is something to put in one.
+
+`tests/core/instruments.xtm` is new, and plays a note. No test did that before,
+which is why a release went out with this in it.
+
+Also restores `LFO_OPT_NULL`, `LFO_OPT_FRQ_TO_FRQ`, `LFO_OPT_FRQ_TO_AMP` and
+`LFO_OPT_NOTEDUR` to the Scheme parameter table. They were bound only in the
+copy that v0.11.1 deleted from `examples/sharedsystem/audiosetup.xtm`.
+
+Reported on the mailing list by George.
+
 ## v0.11.1
 
 A patch release for instrument presets, which have not survived a save-and-load
