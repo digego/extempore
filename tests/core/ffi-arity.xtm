@@ -66,3 +66,18 @@
 (xtmtest-result (ffi-raises? (lambda () (println))) #f "arity-println-none")
 (xtmtest-result (ffi-raises? (lambda () (println "a" "b" "c"))) #f "arity-println-many")
 (xtmtest-result (ffi-raises? (lambda () (llvm:optimization-level))) #f "arity-opt-level-none")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; sys:make-cptr wants a real size
+
+;; It answers #f for a size it won't allocate, which is easy to pass on to
+;; something that wanted a c-pointer. play-note used to size its dargs buffer
+;; as (* 8 nargs) unconditionally, so a note with no extra args asked for zero
+;; bytes, got #f, and the xtlang wrapper refused the call --- every plain
+;; play-note, and so the whole pattern language, printed an arity error instead
+;; of sounding (reported on the mailing list by George, September 2026). It now
+;; reuses one session-wide buffer instead of asking for nothing.
+
+(xtmtest-result (sys:make-cptr 0) #f "make-cptr-zero-is-false")
+(xtmtest-result (sys:make-cptr -1) #f "make-cptr-negative-is-false")
+(xtmtest-result (cptr? (sys:make-cptr 8)) #t "make-cptr-positive-is-a-cptr")

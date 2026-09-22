@@ -1,0 +1,38 @@
+;;; tests/core/instruments.xtm -- playing notes through an instrument
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; play-note builds a dargs buffer for the extra arguments a note carries and
+;; hands it to xtm_play_note. It used to size that buffer as (* 8 nargs)
+;; unconditionally, so a note with no extra args --- which is almost every note,
+;; and every note the pattern language plays --- asked sys:make-cptr for zero
+;; bytes and got #f. The generated xtlang wrapper takes a c-pointer there, so it
+;; refused the call, printed "check the arg arity and types" and returned 0
+;; rather than raising. Nothing sounded, and no error reached the scheduler.
+;;
+;; This broke in v0.11.0 with the bounds check on sys:make-cptr, and was
+;; reported on the mailing list by George, September 2026. The test plays a note
+;; and checks a NoteData* comes back, so a wrapper that starts rejecting these
+;; arguments fails here instead of going quiet.
+
+;;; Code:
+
+(sys:load "libs/core/instruments.xtm" 'quiet)
+(sys:load "libs/core/instruments/analogue.xtm" 'quiet)
+
+(make-instrument test_syn analogue)
+
+;; a plain note, no extra args: the case that regressed
+(xtmtest-result (cptr? (play-note (now) test_syn 60 80 1000)) #t "play-note-no-extra-args")
+
+;; and with extra args, which allocates a real buffer
+(xtmtest-result (cptr? (play-note (now) test_syn 60 80 1000 0.5)) #t "play-note-with-extra-args")
+
+;; a chord goes through the list branch, which plays each pitch in turn
+(xtmtest-result (begin (play-note (now) test_syn '(60 64 67) 80 1000) #t)
+                #t
+                "play-note-chord")

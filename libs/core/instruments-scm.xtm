@@ -158,11 +158,19 @@
       (print-with-colors 'default 'default #f (println 'in 'both 'scheme 'and 'xtlang))
       #t)))
 
+;; A note still has to hand the xtlang wrapper a real c-pointer when it carries
+;; no extra args, and with nargs at 0 nothing ever reads it. Hand over one
+;; buffer for the session rather than allocating per note: sys:make-cptr
+;; callocs, and the FFI has no way to free what it hands back.
+(define *xtm-empty-dargs* (sys:make-cptr 8))
+
 (define play-note
   (lambda (time inst pitch vol dur . args)
     (let* ((nargs (length args))
            (duration dur)
-           (dargs (sys:make-cptr (* (if (audio_64bit) 8 4) nargs))) ;; doubles
+           (dargs (if (= nargs 0)
+                      *xtm-empty-dargs*
+                      (sys:make-cptr (* (if (audio_64bit) 8 4) nargs)))) ;; doubles
            (native (if (closure? inst)
                        (llvm:get-native-closure (symbol->string (apply inst (list 'xtlang))))
                        (if (symbol? inst)
