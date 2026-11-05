@@ -32,7 +32,7 @@ jobs:
     name: ${{ matrix.name }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-build
         with:
@@ -44,7 +44,7 @@ jobs:
       # from Ninja. Only an exact hit is safe to reuse.
       - name: Restore AOT cache
         id: cache-aot
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: libs/aot-cache
           key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Save AOT cache
         if: steps.cache-aot.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: libs/aot-cache
           key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
