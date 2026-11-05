@@ -99,6 +99,19 @@ build/extempore --noaudio                        # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)
 ```
 
+## Docs site
+
+The docs are an Astro/Starlight site in `docs/` (run commands there, with
+`mise exec --`):
+
+```bash
+pnpm dev            # dev server
+pnpm build
+pnpm typecheck
+pnpm format         # oxfmt; CI-style check: pnpm format:check
+python3 verify-examples.py   # local only: runs doc xtlang snippets against build/extempore
+```
+
 ## Evaluating extempore code
 
 For users, extempore is designed to be run interactively (start it, then connect
