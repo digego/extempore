@@ -1041,7 +1041,7 @@ svf_c::[[|6,float|*,float,float,float,|6,float|*]*]*
 
 ### Returns
 
-- **[SAMPLE,SAMPLE,SAMPLE,|6,float|*]\*** : The filter closure.
+- **[SAMPLE,SAMPLE,SAMPLE,|6,float|\*]\*** : The filter closure.
 
 #### Closure Parameters
 
