@@ -104,7 +104,7 @@ The main source tree is C++ (runtime) and xtlang (standard library and
 examples). See
 [`BUILDING.md`](https://github.com/digego/extempore/blob/master/BUILDING.md) for
 how to build from source, and
-[`CLAUDE.md`](https://github.com/digego/extempore/blob/master/CLAUDE.md) for a
+[`AGENTS.md`](https://github.com/digego/extempore/blob/master/AGENTS.md) for a
 one-page map of the codebase.
 
 Issues and PRs live at [digego/extempore](https://github.com/digego/extempore).
