@@ -15,9 +15,8 @@ Release, tests on), `release` (assets, no tests, `EXT_SHARE_DIR=.`) and
 `sanitize-asan`/`sanitize-ubsan`/`sanitize-tsan`/`sanitize-asan-ubsan`. All of
 them build into `build/`.
 
-Ninja is not optional in the presets: it keeps all cores busy far better than
-Make on the LLVM build and makes incremental rebuilds near-instant. The AOT
-steps run in a Ninja job pool capped at 2, so build at full parallelism.
+The presets use Ninja. The AOT steps run in a Ninja job pool capped at 2, so
+build at full parallelism.
 
 Key options: `-DASSETS=ON` (download multimedia assets), `-DBUILD_TESTS=ON`
 (default).
@@ -51,7 +50,8 @@ ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-external -j4  # external library tests
 ```
 
-Tests are `.xtm` files in `tests/`. They run in `--batch` mode (which implies
+Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
+(`xtmtest-run-tests`, `is?` macro). They run in `--batch` mode (which implies
 `--noaudio`), except for `system.xtm` which uses `--eval` for IPC testing.
 
 In addition, building the `aot_external_audio` target (the default) is a pretty
@@ -61,34 +61,9 @@ NOTE: this project uses GitHub Actions (in particular the
 `.github/workflows/build-and-test.yml` workflow) to build and test on Linux
 (x64), macOS (arm64), and Windows (x64).
 
-## Structure
-
-| Directory         | Purpose                                               |
-| ----------------- | ----------------------------------------------------- |
-| `src/`            | C++ runtime (Scheme interpreter, LLVM JIT, audio/OSC) |
-| `include/`        | C++ headers                                           |
-| `runtime/`        | Bootstrap files (scheme.xtm, LLVM IR bitcode)         |
-| `libs/core/`      | Core xtlang standard library                          |
-| `libs/external/`  | Bindings to external libs (WebGPU, audio codecs, FFT) |
-| `libs/aot-cache/` | AOT-compiled bytecode (auto-generated, don't edit)    |
-| `tests/`          | Test files (.xtm)                                     |
-| `examples/`       | Example programs                                      |
-
-## Languages
-
-- **C++20**: runtime in `src/` (SchemeS7.cpp, EXTLLVM.cpp, AudioDevice.cpp)
-- **Scheme**: user-facing interpreted language
-- **xtlang**: compiled DSL, files use `.xtm` extension, compiles to LLVM IR
-
-## Key files
-
-- `src/Extempore.cpp` --- main entry point
-- `src/SchemeS7.cpp` --- s7 Scheme interpreter adapter
-- `src/EXTLLVM.cpp` --- LLVM JIT compilation
-- `runtime/scheme.xtm` --- Scheme runtime bootstrap
-- `libs/core/test.xtm` --- test harness (`xtmtest-run-tests`, `is?` macro)
-
 ## Common tasks
+
+`libs/aot-cache/` is generated AOT output: don't edit it.
 
 ```bash
 cmake --build build --target aot_core            # AOT compile the core stdlib
@@ -102,15 +77,8 @@ build/extempore --repl                           # interactive REPL (Linux/macOS
 ## Docs site
 
 The docs are an Astro/Starlight site in `docs/` (run commands there, with
-`mise exec --`):
-
-```bash
-pnpm dev            # dev server
-pnpm build
-pnpm typecheck
-pnpm format         # oxfmt; CI-style check: pnpm format:check
-python3 verify-examples.py   # local only: runs doc xtlang snippets against build/extempore
-```
+`mise exec --`). `python3 verify-examples.py` runs the doc xtlang snippets
+against `build/extempore` (local only).
 
 ## Evaluating extempore code
 
@@ -127,6 +95,7 @@ Note: `--batch` implies `--noaudio`, so there's no need to specify both.
 
 If the final `quit` isn't present, then extempore won't exit. And if the eval'ed
 code throws an error, extempore won't exit either (it will print the scheme
-stacktrace and then await further instructions). For this reason, for scripted
+stacktrace and then await further instructions); `sys:load-then-quit` can't
+rescue a compilation error either. For this reason, for scripted
 debugging it's often helpful to use `timeout` (combined with `--batch`) with a
 short value (e.g. 10s) to ensure that whatever happens the script will exit.
