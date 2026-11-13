@@ -86,7 +86,10 @@ runs:
       shell: bash
       run: |
         cmake --build build --target llvm-libs 2>&1 | tee llvm-build.log
-        if grep -qE 'Building (C|CXX) object _deps.llvm-build' llvm-build.log; then
+        # Every run recompiles the two files that include VCSRevision.h, which
+        # a fresh configure regenerates; only a real rebuild is worth a save.
+        compiled=$(grep -cE 'Building (C|CXX) object _deps.llvm-build' llvm-build.log || true)
+        if [ "$compiled" -gt 20 ]; then
           echo "rebuilt=true" >> "$GITHUB_OUTPUT"
         fi
         rm llvm-build.log
