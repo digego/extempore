@@ -8,14 +8,6 @@ description:
 
 # Extempore debugging skill
 
-## Architecture overview
-
-Extempore has three main layers:
-
-1. **C++ runtime** (`src/`): Scheme interpreter, LLVM JIT, audio/OSC
-2. **Scheme runtime** (`runtime/`): scheme.xtm, llvmir.xtm, llvmti.xtm
-3. **xtlang libraries** (`libs/`): user-facing compiled DSL code
-
 ## Compilation paths
 
 ### Normal (interactive) compilation
@@ -60,9 +52,9 @@ impc:compiler:flush-jit-compilation-queue
 
 - `--nobase`: Skip loading base library (useful for debugging JIT in isolation)
 - `--noaudio`: Disable audio (required for headless/CI testing)
-- `--batch "expr"`: Batch mode (no server, single process); exits only if the
-  expression calls `(quit ...)`. Implies `--noaudio` **unless `--audio-outfile`
-  is also given** — in that case the offline file driver handles audio output.
+- `--batch "expr"`: Batch mode (no server, single process); `AGENTS.md` covers
+  exiting and `timeout`. Implies `--noaudio` **unless `--audio-outfile` is also
+  given** — in that case the offline file driver handles audio output.
 - `--eval "expr"`: Evaluate expression at startup but keep full server running
   (utility + primary processes, TCP server on port 7099).
 - `--audio-outfile <path>`: render DSP output to a float32 WAV file via an
@@ -144,28 +136,13 @@ Check that:
 2. `EXTLLVM::addModule()` was called with the metadata clone
 3. Symbol name matches exactly (including mangling like `_adhoc_`, `_poly_`)
 
-### --batch mode hangs after errors
-
-When a compilation error occurs in `--batch` mode, the process does not
-automatically exit --- it hangs waiting for further input. Use `timeout` when
-running batch tests. The `sys:load-then-quit` helper is designed to exit after a
-timeout, but compilation errors can prevent it from reaching the quit call.
-
 ### Bug doesn't reproduce in --batch mode
 
-`--batch` runs a single process with no TCP server or utility process. `--eval`
-and interactive TCP eval run two processes (utility + primary) that share C++
-statics like `sTypeDefinitions` and `sGlobalMap`. This means compiler bugs can
-appear in one mode but not the other.
-
-When a user reports a bug from interactive use:
-
-1. First try `--batch` --- if it reproduces, great, it's the simplest to debug
-2. If not, try `--eval` with the same expression
-3. If not, start extempore normally and send the expression via TCP with
-   `printf '(expr)\r\n' | nc -w 10 localhost 7099`
-4. If the bug is specifically about redefinition or accumulated state, send
-   multiple expressions sequentially via TCP to simulate an interactive session
+Compiler bugs can appear in one mode but not the other (see "--batch vs --eval
+differences" above). For a bug reported from interactive use, try `--batch`, then
+`--eval` with the same expression, then a normal start with the expression sent
+via TCP (`printf '(expr)\r\n' | nc -w 10 localhost 7099`). For redefinition or
+accumulated-state bugs, send several expressions sequentially over TCP.
 
 ## Scheme ↔ xtlang interop gotchas
 
@@ -209,13 +186,6 @@ errors. Fixes: add explicit `void` branches, or wrap in `begin`:
 ;; RIGHT
 (if (> v peak) (begin (set! peak v) void) void)
 ```
-
-### Mis-reading shell exit codes behind `|`
-
-`cmd | tail` puts `tail` as the last pipeline member, so `$?` is tail's exit
-code, not `cmd`'s. To check the actual program's exit status, either avoid the
-pipe (`cmd > file 2>&1; echo $?`) or use `PIPESTATUS[0]` in bash/zsh. This bit
-me while verifying `(quit 1)` propagation.
 
 ## Debugging commands
 
@@ -284,12 +254,10 @@ tail /tmp/xtm_output.log
 
 Key runtime functions to instrument:
 
-| Function                        | File              | Purpose                           |
-| ------------------------------- | ----------------- | --------------------------------- |
-| `impc:ti:callback-check`        | `llvmti.xtm:7583` | callback arity/type checking      |
-| `impc:ti:first-transform`       | `llvmti.xtm`      | AST transformation (macro expand) |
-| `impc:ir:compiler:callback`     | `llvmir.xtm:4029` | callback IR generation            |
-| `impc:ti:get-closure-arg-types` | `llvmti.xtm`      | closure type lookup               |
+- `impc:ti:callback-check` (`llvmti.xtm`): callback arity/type checking
+- `impc:ti:first-transform` (`llvmti.xtm`): AST transformation (macro expand)
+- `impc:ir:compiler:callback` (`llvmir.xtm`): callback IR generation
+- `impc:ti:get-closure-arg-types` (`llvmti.xtm`): closure type lookup
 
 ## Testing in isolation
 
@@ -315,16 +283,9 @@ visible output. Options:
 
 ## Building and testing
 
+The build and the core test labels are in `AGENTS.md`.
+
 ```bash
-# configure (fetches LLVM ~30s, full configure ~30s)
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DEXTERNAL_SHLIBS_GRAPHICS=OFF
-
-# build (LLVM is the bulk of the build time)
-cmake --build build --target extempore -- -j$(nproc)
-
-# run core tests (no audio needed, ~150s total)
-cd build && ctest -L libs-core --output-on-failure
-
 # run audio example tests (need audio libs built, each test has 300s timeout)
 cd build && ctest -L examples-audio --output-on-failure
 
@@ -345,17 +306,7 @@ Register via
 
 Examples are registered as tests via the `extempore_add_example_as_test` macro
 in `extras/cmake/tests.cmake`. They run with `--batch` (which implies
-`--noaudio`) using `sys:load-then-quit`:
-
-```cmake
-extempore_add_example_as_test(examples/core/audio_101.xtm 10 examples-audio)
-```
-
-This translates to:
-
-```bash
-extempore --batch "(sys:load-then-quit \"examples/core/audio_101.xtm\" 10)"
-```
+`--noaudio`) using `sys:load-then-quit`.
 
 Note: because `--batch` implies `--noaudio`, example tests verify that the code
 **compiles** but do not exercise the audio callback path. An example can pass as
@@ -410,17 +361,3 @@ platforms CTest supports.
 
 To verify the _realtime_ path rather than the offline one, capture a real audio
 output with PipeWire's `pw-record`: see `references/pipewire-capture.md`.
-
-
-## Key files
-
-| File                   | Purpose                                             |
-| ---------------------- | --------------------------------------------------- |
-| `src/SchemeFFI.cpp`    | `jitCompile()` - main JIT entry point               |
-| `src/EXTLLVM.cpp`      | `addModule()`, `getGlobalValue()` - symbol tracking |
-| `src/ffi/llvm.cpp`     | Scheme FFI bindings for LLVM functions              |
-| `runtime/llvmir.xtm`   | `llvm:compile-ir`, compilation queue                |
-| `runtime/llvmti.xtm`   | Type inference, AOT compilation                     |
-| `runtime/bitcode.ll`   | Base type definitions (`%mzone`, `%clsvar`)         |
-| `libs/aot-cache/*.ll`  | Pre-compiled LLVM IR                                |
-| `libs/aot-cache/*.xtm` | Scheme stubs that load `.ll` files                  |
