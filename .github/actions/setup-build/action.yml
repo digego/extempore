@@ -18,7 +18,7 @@ inputs:
     required: false
     default: ""
   save-llvm-cache:
-    description: Save the LLVM build under the cache key when the restore missed.
+    description: Save the LLVM build to the cache when this run had to compile any of it.
     required: false
     default: "true"
 
@@ -35,8 +35,10 @@ runs:
     # The source tarball is ~140 MB and configure downloads it again anyway, so
     # keep it out of the cache. The cached objects stay valid because the
     # sources are extracted with the archive's timestamps (CMakeLists.txt).
+    #
+    # The key is a prefix: saves append the run id (below), and the restore
+    # takes the newest match.
     - name: Restore LLVM cache
-      id: cache-llvm
       uses: actions/cache/restore@v6
       with:
         path: |
@@ -44,7 +46,8 @@ runs:
           !build/_deps/**/llvm-project-*.src.tar.xz
           build/.ninja_log
           build/.ninja_deps
-        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8
+        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8
 
     - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
@@ -74,13 +77,22 @@ runs:
         done
         exit 1
 
+    # Always run: with a current cache this is a no-op. A restored cache can go
+    # stale (a compiler-flag change, a runner image update), and Ninja then
+    # recompiles LLVM here; `rebuilt` records that so the fresh build is saved
+    # and the next run restores it, instead of every run paying for the rebuild.
     - name: Build LLVM
-      if: steps.cache-llvm.outputs.cache-hit != 'true'
+      id: build-llvm
       shell: bash
-      run: cmake --build build --target llvm-libs
+      run: |
+        cmake --build build --target llvm-libs 2>&1 | tee llvm-build.log
+        if grep -qE 'Building (C|CXX) object _deps.llvm-build' llvm-build.log; then
+          echo "rebuilt=true" >> "$GITHUB_OUTPUT"
+        fi
+        rm llvm-build.log
 
     - name: Save LLVM cache
-      if: inputs.save-llvm-cache == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.save-llvm-cache == 'true' && steps.build-llvm.outputs.rebuilt == 'true'
       uses: actions/cache/save@v6
       with:
         path: |
@@ -88,4 +100,4 @@ runs:
           !build/_deps/**/llvm-project-*.src.tar.xz
           build/.ninja_log
           build/.ninja_deps
-        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8
+        key: ${{ inputs.cache-key-os }}-llvm-${{ env.LLVM_VERSION }}-v8-${{ github.run_id }}-${{ github.run_attempt }}
