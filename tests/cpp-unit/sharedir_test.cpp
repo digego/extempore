@@ -15,8 +15,12 @@ class TempTree {
 public:
     explicit TempTree(bool with_runtime) {
         static std::atomic<unsigned> counter{0};
+        // ctest runs each test in its own process, in parallel, so the counter
+        // alone does not make the name unique: the test name does.
+        const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
         m_path = std::filesystem::temp_directory_path() /
-                 ("extempore_sharedir_test_" + std::to_string(counter.fetch_add(1)));
+                 (std::string("extempore_sharedir_test_") + info->test_suite_name() +
+                  "_" + info->name() + "_" + std::to_string(counter.fetch_add(1)));
         std::filesystem::create_directories(m_path);
         if (with_runtime) {
             std::filesystem::create_directories(m_path / "runtime");
