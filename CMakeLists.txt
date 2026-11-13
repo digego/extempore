@@ -245,10 +245,15 @@ set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
 
+# DOWNLOAD_EXTRACT_TIMESTAMP keeps the archive's mtimes on the extracted
+# sources. CI restores a cached LLVM build into a fresh checkout, where
+# configure extracts the sources again; stamped with the extraction time they
+# would be newer than every cached object and Ninja would rebuild all of LLVM.
 FetchContent_Declare(LLVM
     URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
     URL_HASH SHA256=${DEP_LLVM_SHA256}
     SOURCE_SUBDIR llvm
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     EXCLUDE_FROM_ALL)
 
 FetchContent_MakeAvailable(LLVM)

@@ -32,8 +32,9 @@ runs:
       run: |
         echo "LLVM_VERSION=$(sed -n 's/^set(DEP_LLVM_VERSION "\(.*\)")/\1/p' CMakeLists.txt)" >> "$GITHUB_ENV"
 
-    # The source tarball is ~140 MB and is only read by the download step, which
-    # the restored stamps skip --- so keep it out of the cache.
+    # The source tarball is ~140 MB and configure downloads it again anyway, so
+    # keep it out of the cache. The cached objects stay valid because the
+    # sources are extracted with the archive's timestamps (CMakeLists.txt).
     - name: Restore LLVM cache
       id: cache-llvm
       uses: actions/cache/restore@v6
