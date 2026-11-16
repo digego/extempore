@@ -28,9 +28,11 @@ if ! timeout 600 build/extempore --term nocolor --port "$port" \
     grep -n -i -B2 -A6 "error" "$log" | head -60
     exit 1
 fi
-if grep -q -i "error" "$log"; then
-    echo "the render finished, but the log has errors --- see $log"
-    grep -n -i -B2 -A6 "error" "$log" | head -60
+# xtlang compile errors say "Error"; Scheme errors are lines which start with a
+# semicolon
+if grep -q -i -E "error|^;" "$log"; then
+    echo "PROBLEM: the render finished, but the log has errors --- see $log"
+    grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
 fi
 ffmpeg -loglevel error -y -i "$wav" -codec:a libmp3lame -q:a 4 "${wav%.wav}.mp3"
 "$root/extras/studio/analyse.py" "$wav" --png "${wav%.wav}.png"

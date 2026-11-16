@@ -1,0 +1,645 @@
+;;; resonator.xtm -- struck and plucked physical models, ported from Mutable Instruments Rings
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Mallets, bells, bars and plucked strings. Each note fires a short exciter
+;; (a mallet strike or a burst of noise) into a resonator, and the resonator
+;; rings until its energy has gone. There's no sustain: a note sounds for as
+;; long as the resonator rings, however long the key is held.
+;;
+;; The resonators are ported from Mutable Instruments Rings, by Emilie Gillet.
+;; `model` picks one of two:
+;;
+;; - model 0, *modal*: a bank of up to 20 bandpass filters, one for each
+;;   partial (mode) of a struck object. The partials sit at whole-number
+;;   multiples of the note, stretched apart by `structure`: around 0.27 they
+;;   are harmonic (a tuned bar, a vibraphone), and further up they spread out
+;;   like the partials of a stiff plate or a bell. `damping` sets how long the
+;;   fundamental rings, and `brightness` how much faster the high partials
+;;   die than the low ones. `position` is where the object is struck: striking
+;;   a third of the way along leaves out every partial with a node there, which
+;;   is how a marimba gets its hollow sound.
+;;
+;; - model 1, *string*: a Karplus-Strong string. A delay line one period long
+;;   feeds back through a lowpass filter which takes away a little of the high
+;;   end on every trip, so the string mellows as it rings. `structure` adds
+;;   dispersion (stiffness): above about 0.3 an allpass filter in the loop
+;;   stretches the upper partials sharp, like a piano wire, and right at the top
+;;   the delay wobbles with noise. Below about 0.2 it instead models a curved
+;;   bridge, which the string slaps against as it vibrates: the buzz of a sitar
+;;   or a tanpura. `position` is where the string is plucked and where it's
+;;   heard from.
+;;
+;; Rings has an audio input, but an instrument here has nothing to listen to,
+;; so the exciter is built in, as Rings' own is when nothing is patched into
+;; it. `noise` mixes two kinds of strike, which then pass through a lowpass
+;; filter. At 0.0 it's clean: a single click for the modal model, and for the
+;; string a pluck (one period of a triangle, the shape of a string pulled
+;; aside at the pluck position). At 1.0 it's a short burst of noise, which for
+;; the string is combed at the pluck position, as Rings' plucker does. The
+;; filter's cutoff is the hardness of the mallet or plectrum: `hardness` sets
+;; it, and a louder note raises it, as a harder strike does.
+;;
+;; The stereo image comes from Rings too. The modal model sends its odd
+;; partials (the 1st, 3rd, 5th...) to one side and its even partials to the
+;; other; the string sends the sound at its bridge to one side and the sound
+;; at its pickup position to the other. Successive notes swap sides.
+;;
+;; Tuning. A trip round the string loop passes through a delay line and up to
+;; three filters, and each filter delays the fundamental a little too, so the
+;; delay line is shortened by the exact phase delay of each filter at the
+;; note's frequency (Rings approximates this; here it's computed). The modal
+;; filters' frequencies are set with an exact tan(), not an approximation, so
+;; they stay in tune right up to the top of the range.
+;;
+;; Filter coefficients are worked out every 32 frames, and only when something
+;; has changed. A decaying filter falls into denormal numbers, which are very
+;; slow on most CPUs, so modes which have died away are set to exactly zero,
+;; and the string loop has a tiny constant added to it.
+;;
+;; This file is a port of rings/dsp/resonator.cc, rings/dsp/string.cc,
+;; rings/dsp/plucker.h and rings/dsp/part.cc, and of the state-variable filter,
+;; delay line and lookup tables in stmlib, from
+;; https://github.com/pichenettes/eurorack. Their licence:
+;;
+;;   Copyright 2014-2015 Emilie Gillet.
+;;
+;;   Permission is hereby granted, free of charge, to any person obtaining a
+;;   copy of this software and associated documentation files (the
+;;   "Software"), to deal in the Software without restriction, including
+;;   without limitation the rights to use, copy, modify, merge, publish,
+;;   distribute, sublicense, and/or sell copies of the Software, and to permit
+;;   persons to whom the Software is furnished to do so, subject to the
+;;   following conditions:
+;;
+;;   The above copyright notice and this permission notice shall be included
+;;   in all copies or substantial portions of the Software.
+;;
+;;   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;;   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+;;   NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+;;   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+;;   USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-resonator)
+(define *xtmlib-studio-resonator-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument resonator
+  "struck and plucked physical models (bars, bells, strings), ported from Mutable Instruments Rings"
+  (params
+    (model 0.0 "the resonator: 0 is modal (bars, bells, plates), 1 is a string")
+    (structure 0.27 "0.0 to 1.0. Modal: how far the partials are stretched apart (0.27 is harmonic). String: below 0.24 a buzzing bridge, above 0.26 stiffness")
+    (brightness 0.5 "0.0 to 1.0: how long the high partials ring, relative to the low ones")
+    (damping 0.3 "0.0 to 1.0: how quickly the sound dies away, from about 25 s (0.0) to a dead thud (1.0)")
+    (position 0.33 "0.0 to 1.0: where it's struck or plucked; 0.5 is the middle")
+    (hardness 0.5 "0.0 to 1.0: how hard the mallet or plectrum is (velocity adds to it)")
+    (noise 0.0 "0.0 to 1.0: the exciter, from a clean strike (0.0) to a burst of noise (1.0), which plucks a string")
+    (choke 0.0 "0.0 to 1.0: how hard a released note is damped: 0.0 lets it ring on, 1.0 stops it in about 0.1 s")
+    (width 0.5 "stereo width, 0.0 to 1.0: how far apart the two halves of the sound are spread")
+    (level 1.0 "output level"))
+  (presets
+    (marimba (damping 0.5) (brightness 0.2) (hardness 0.35))
+    (vibes (damping 0.15) (brightness 0.5) (hardness 0.45) (choke 0.4))
+    (bell (structure 0.72) (damping 0.1) (brightness 0.75) (position 0.12) (hardness 0.7))
+    (kalimba (structure 0.55) (damping 0.45) (brightness 0.3) (position 0.08) (hardness 0.6))
+    (glass (structure 0.92) (damping 0.2) (brightness 0.85) (position 0.4) (hardness 0.9))
+    (pan (structure 0.4) (damping 0.4) (brightness 0.55) (position 0.22) (hardness 0.4) (noise 0.1))
+    (harp (model 1.0) (damping 0.25) (brightness 0.45) (position 0.3) (hardness 0.35) (noise 0.3) (choke 0.1))
+    (koto (model 1.0) (structure 0.35) (damping 0.45) (brightness 0.75) (position 0.1) (hardness 0.75) (noise 0.5))
+    (sitar (model 1.0) (structure 0.08) (damping 0.25) (brightness 0.7) (position 0.15) (hardness 0.6) (noise 0.4))
+    (dulcimer (model 1.0) (structure 0.5) (damping 0.3) (brightness 0.6) (position 0.12) (hardness 0.6) (noise 0.2))))
+
+;; the most partials the modal model can have per voice
+(bind-val RESONATOR_MODES i64 20)
+;; the string's delay line, in frames: room for 16 Hz at 48 kHz
+(bind-val RESONATOR_STRING_FRAMES i64 4096)
+;; each mode of the modal bank is six numbers: three filter coefficients, two
+;; filter states and the mode's amplitude
+(bind-val RESONATOR_MODE_SIZE i64 6)
+;; output levels for each model, so that a full-velocity note peaks around -12 dB
+(bind-val RESONATOR_MODAL_LEVEL SAMPLE 0.28)
+(bind-val RESONATOR_STRING_LEVEL SAMPLE 0.5)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the state-variable filter (from stmlib) ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A two-pole filter with lowpass and bandpass outputs (Zavalishin's
+;; topology-preserving form). Its coefficients and state live in five numbers:
+;; g, r + g, h, then the two states.
+
+(bind-func static resonator_svf_set
+  "tune the filter f to `freq` (a fraction of the sample rate) with resonance q"
+  (lambda (f:SAMPLE* freq:SAMPLE q:SAMPLE)
+    (let ((g (tan (* SPI freq)))
+          (r (/ 1.0 q)))
+      (pset! f 0 g)
+      (pset! f 1 (+ r g))
+      (pset! f 2 (/ 1.0 (+ 1.0 (* r g) (* g g))))
+      void)))
+
+(bind-func static resonator_svf_bp
+  "run the filter f for one frame and return its bandpass output"
+  (lambda (f:SAMPLE* x:SAMPLE)
+    (let ((g (pref f 0))
+          (s1 (pref f 3))
+          (s2 (pref f 4))
+          (hp (* (- x (* (pref f 1) s1) s2) (pref f 2)))
+          (bp (+ (* g hp) s1)))
+      (pset! f 3 (+ bp (* g hp)))
+      (pset! f 4 (+ s2 (* 2.0 g bp)))
+      bp)))
+
+(bind-func static resonator_svf_lp
+  "run the filter f for one frame and return its lowpass output"
+  (lambda (f:SAMPLE* x:SAMPLE)
+    (let ((g (pref f 0))
+          (s1 (pref f 3))
+          (s2 (pref f 4))
+          (hp (* (- x (* (pref f 1) s1) s2) (pref f 2)))
+          (bp (+ (* g hp) s1))
+          (lp (+ (* g bp) s2)))
+      (pset! f 3 (+ bp (* g hp)))
+      (pset! f 4 (+ lp (* g bp)))
+      lp)))
+
+(bind-func static resonator_dc_block
+  "a one-pole highpass which takes out DC; its state is two numbers at s"
+  (lambda (s:SAMPLE* x:SAMPLE pole:SAMPLE)
+    (let ((y (+ (* pole (pref s 1)) (- x (pref s 0)))))
+      (pset! s 0 x)
+      (pset! s 1 y)
+      y)))
+
+(bind-func static resonator_svf_clear
+  (lambda (f:SAMPLE*)
+    (pset! f 3 0.0)
+    (pset! f 4 0.0)
+    void))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; the modal model ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static resonator_stiffness
+  "how much each partial of the modal model is stretched beyond the last, from
+`structure` (Rings' lut_stiffness). Below 0.25 the partials are squeezed
+together, from 0.25 to 0.3 they're harmonic, and above that they spread out,
+slowly at first and then fast."
+  (lambda (structure:SAMPLE)
+    (let ((g:SAMPLE (if (< structure 0.0) 0.0 (if (> structure 1.0) 1.0 structure)))
+          (h:SAMPLE (* 10.0 (- g 0.9))))
+      (cond ((< g 0.25) (* -0.25 (- 0.25 g)))
+            ((< g 0.3) 0.0)
+            ((< g 0.9) (- (* 0.01 (pow 10.0 (* 2.005 (/ (- g 0.3) 0.6)))) 0.01))
+            (else (- 1.5 (* 0.5 (cos (* SPI h h)))))))))
+
+(bind-func static resonator_modal_tune
+  "tune the modes of the modal bank (Rings' Resonator::ComputeFilters).
+
+f is the note's frequency as a fraction of the sample rate; damping is Rings'
+(1.0 rings longest). Returns how many modes are worth running: those below
+Nyquist, rounded up to an even number so that they go in odd/even pairs."
+  (lambda (modes:SAMPLE* nmax:i64 f:SAMPLE structure:SAMPLE brightness:SAMPLE damping:SAMPLE position:SAMPLE)
+    (let ((stiffness (resonator_stiffness structure))
+          (harmonic:SAMPLE f)
+          (stretch:SAMPLE 1.0)
+          ;; the fundamental's q, in units which make its decay time q/pi
+          ;; frames whatever the pitch: from 500 to 5,000,000
+          (q:SAMPLE (* 500.0 (pow 10.0 (* 4.0 damping))))
+          ;; each partial's q is the last one's times q_loss, so a lower
+          ;; brightness makes the upper partials die sooner. Very low
+          ;; structures get less brightness, which would otherwise clip.
+          (soften:SAMPLE (pow (- 1.0 structure) 8.0))
+          (b:SAMPLE (* brightness (- 1.0 (* 0.2 soften))))
+          (q_loss:SAMPLE (+ 0.15 (* 0.85 b (- 2.0 b))))
+          ;; ... and q_loss creeps towards 1.0, so that the highest partials
+          ;; don't die too fast
+          (q_loss_rate:SAMPLE (* 0.1 structure (- 2.0 structure)))
+          (pf:SAMPLE 0.0)
+          (m:SAMPLE* null)
+          (n:i64 0)
+          (i:i64 0))
+      (dotimes (i nmax)
+        (set! pf (* harmonic stretch))
+        (if (>= pf 0.49)
+            (begin (set! pf 0.49) void)
+            (begin (set! n (+ i 1)) void))
+        (set! m (pref-ptr modes (* i RESONATOR_MODE_SIZE)))
+        (resonator_svf_set m pf (+ 1.0 (* pf q)))
+        ;; Striking at `position` excites each mode in proportion to its
+        ;; shape there: a raised cosine across the modes. A bandpass filter
+        ;; rings at about 2 tan(pi f) for a unit click, so dividing by that
+        ;; leaves each mode as loud as the exciter is at its frequency. (Rings
+        ;; leaves this out, and its upper partials are louder: brighter, but
+        ;; with a sharp spike at the strike.)
+        (pset! m 5 (/ (* 0.25 (+ 1.0 (cos (* STWOPI position (convert i SAMPLE)))))
+                      (pref m 0)))
+        (set! stretch (+ stretch stiffness))
+        ;; squeezed partials mustn't fold back below zero; stretched ones
+        ;; stretch a little less each time, which leaves room for a few more
+        (set! stiffness (* stiffness (if (< stiffness 0.0) 0.93 0.98)))
+        (set! q_loss (+ q_loss (* q_loss_rate (- 1.0 q_loss))))
+        (set! harmonic (+ harmonic f))
+        (set! q (* q q_loss)))
+      (+ n (% n 2)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the string model's delay lines (from stmlib) ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static resonator_read_hermite
+  "the sample written `delay` frames ago (delay >= 2), with four-point Hermite
+interpolation, which is smoother than linear at high frequencies"
+  (lambda (d:DelayLine* delay:SAMPLE)
+    (let ((n:i64 (convert delay))
+          (f (- delay (convert n SAMPLE)))
+          (xm1 (dl_read d (- n 1)))
+          (x0 (dl_read d n))
+          (x1 (dl_read d (+ n 1)))
+          (x2 (dl_read d (+ n 2)))
+          (c (* 0.5 (- x1 xm1)))
+          (v (- x0 x1))
+          (w (+ c v))
+          (a (+ w v (* 0.5 (- x2 x0))))
+          (b_neg (+ w a)))
+      (+ x0 (* f (+ c (* f (- (* a f) b_neg))))))))
+
+(bind-func static resonator_allpass
+  "a Schroeder allpass: delay x by m frames through the delay line d, with
+coefficient c. It passes every frequency at the same level but delays them by
+different amounts, which is what stretches a stiff string's partials."
+  (lambda (d:DelayLine* x:SAMPLE m:i64 c:SAMPLE)
+    (let ((delayed (dl_read d m))
+          (w (+ x (* c delayed))))
+      (dl_write d w)
+      (- delayed (* c w)))))
+
+;; For tuning the string: the phase delay (in frames) of each filter in its
+;; loop at frequency f (a fraction of the sample rate).
+
+(bind-func static resonator_lowpass_delay
+  "the phase delay of a two-pole lowpass with q = 0.5 and coefficient g = tan(pi fc)"
+  (lambda (f:SAMPLE g:SAMPLE)
+    (/ (* 2.0 (atan (/ (tan (* SPI f)) g)))
+       (* STWOPI f))))
+
+(bind-func static resonator_allpass_delay
+  "the phase delay of resonator_allpass with delay m and coefficient c"
+  (lambda (f:SAMPLE m:i64 c:SAMPLE)
+    (let ((w (* STWOPI f))
+          (theta (* w (convert m SAMPLE))))
+      (/ (- theta (* 2.0 (atan2 (* -1.0 c (sin theta)) (- 1.0 (* c (cos theta))))))
+         w))))
+
+;;;;;;;;;;;;;;;
+;; the voice ;;
+;;;;;;;;;;;;;;;
+
+(bind-func resonator_voice_c
+  (lambda (p:SAMPLE* side:SAMPLE)
+    (let (;; the modal bank
+          (modes:SAMPLE* (zalloc (* RESONATOR_MODES RESONATOR_MODE_SIZE)))
+          (nmodes:i64 0)
+          ;; the string: its loop, the allpass's delay line, and the loop's
+          ;; two filters (a three-tap FIR and a two-pole lowpass)
+          (string (dl_make RESONATOR_STRING_FRAMES))
+          (stiff (dl_make 2048))
+          (loop_lp:SAMPLE* (zalloc 5))
+          (fir1:SAMPLE 0.0) (fir2:SAMPLE 0.0)
+          (fir_h0:SAMPLE 0.5) (fir_h1:SAMPLE 0.25) (loop_gain:SAMPLE 0.99)
+          (period:SAMPLE 100.0)
+          (main_delay:SAMPLE 100.0)
+          (ap_delay:i64 0)
+          (ap_gain:SAMPLE 0.0)
+          (pickup:SAMPLE 50.0)
+          (noise_amount:SAMPLE 0.0) (noise_filter:SAMPLE 0.0) (disp_noise:SAMPLE 0.0)
+          (bridge_curving:SAMPLE 0.0) (curved_bridge:SAMPLE 0.0)
+          (ac_blocking:SAMPLE 0.0) (ac_x:SAMPLE 0.0) (ac_y:SAMPLE 0.0)
+          (ac_pole:SAMPLE (- 1.0 (/ 20.0 SRf)))
+          (out_dc:SAMPLE* (zalloc 4))
+          ;; the exciter: a click and a noise burst, combed (for the string)
+          ;; and lowpassed
+          (exc_lp:SAMPLE* (zalloc 5))
+          (exc_comb (dl_make 4096))
+          (comb_delay:SAMPLE 10.0) (comb_gain:SAMPLE 0.0)
+          (exc_dc_x:SAMPLE 0.0) (exc_dc_y:SAMPLE 0.0)
+          (dc_pole:SAMPLE (- 1.0 (/ 10.0 SRf)))
+          (click:SAMPLE 0.0) (burst:SAMPLE 0.0)
+          (burst_left:i64 0) (exc_left:i64 0)
+          (first:i1 #f)
+          (pluck_n:i64 0) (pluck_len:i64 0) (apex:SAMPLE 0.0)
+          (seed:i64 12345)
+          ;; the note
+          (is_string:i1 #f)
+          (flip:SAMPLE side)
+          (pending:i1 #f)
+          (fade:i64 0)
+          (f:SAMPLE 0.01)
+          (choke_coeff:SAMPLE 1.0)
+          (rel:SAMPLE 1.0)
+          (peak:SAMPLE 0.0)
+          (level:SAMPLE 0.0)
+          ;; parameters, as last seen, so coefficients are recomputed only
+          ;; when they change
+          (last_structure:SAMPLE -1.0) (last_brightness:SAMPLE -1.0)
+          (last_damping:SAMPLE -1.0) (last_position:SAMPLE -1.0)
+          (structure:SAMPLE 0.0) (brightness:SAMPLE 0.0) (damping:SAMPLE 0.0) (position:SAMPLE 0.0)
+          (vel:SAMPLE 0.0) (octaves:SAMPLE 0.0) (fc:SAMPLE 0.0)
+          (x:SAMPLE 0.0) (s:SAMPLE 0.0) (a:SAMPLE 0.0) (b:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (t:SAMPLE 0.0) (w:SAMPLE 0.0) (gain:SAMPLE 0.0) (delay:SAMPLE 0.0)
+          (i:i64 0) (k:i64 0))
+      (lambda (v:Voice* out:SAMPLE*)
+        ;; A new note. If the voice was stolen while still ringing, fade the old
+        ;; sound out over 2 ms before clearing it, rather than clicking.
+        (if (voice_start? v)
+            (begin
+              (set! pending #t)
+              (set! fade (if (> level 0.0001) 96 0))))
+        (if (and pending (<= fade 0))
+            (begin
+              (set! pending #f)
+              (set! flip (- 1.0 flip))
+              (set! is_string (> (resonator_model p) 0.5))
+              (set! f (/ (voice_freq v) SRf))
+              (set! f (if (> f 0.45) 0.45 f))
+              (set! period (/ 1.0 f))
+              (set! position (resonator_position p))
+              (dotimes (i (* RESONATOR_MODES RESONATOR_MODE_SIZE))
+                (pset! modes i 0.0))
+              (dotimes (i RESONATOR_STRING_FRAMES)
+                (pset! (tref string 0) i 0.0))
+              (dotimes (i 2048)
+                (pset! (tref stiff 0) i 0.0))
+              (dotimes (i 4096)
+                (pset! (tref exc_comb 0) i 0.0))
+              (resonator_svf_clear loop_lp)
+              (resonator_svf_clear exc_lp)
+              (set! fir1 0.0) (set! fir2 0.0) (set! curved_bridge 0.0) (set! disp_noise 0.0)
+              (set! ac_x 0.0) (set! ac_y 0.0) (set! exc_dc_x 0.0) (set! exc_dc_y 0.0)
+              (dotimes (i 4) (pset! out_dc i 0.0))
+              (set! rel 1.0)
+              (set! peak 0.0)
+              (set! level 1.0)
+              (set! last_structure -1.0)
+              ;; The exciter. Its lowpass cutoff (the mallet's hardness) is
+              ;; set in octaves above the note, from hardness and velocity, so
+              ;; that the timbre stays the same across the keyboard.
+              (set! vel (voice_vel v))
+              (set! octaves (+ -2.0 (* 5.0 (resonator_hardness p)) (* 2.0 vel)))
+              ;; (Rings filters its plucker three octaves higher)
+              (set! fc (* f (pow 2.0 (if is_string (+ octaves 3.0) octaves))))
+              (set! fc (if (> fc 0.45) 0.45 (if (< fc (/ 20.0 SRf)) (/ 20.0 SRf) fc)))
+              (resonator_svf_set exc_lp fc 1.0)
+              (set! gain (* vel (sqrt vel)))
+              ;; a harder strike excites more partials, and they all start
+              ;; together: keep the peak it makes in proportion
+              (set! gain (/ gain (sqrt (+ 1.0 (* 0.25 (pow 2.0 octaves))))))
+              (set! click (* gain (- 1.0 (resonator_noise p))))
+              ;; A string isn't given a click: a click would circulate as a
+              ;; narrow, buzzy pulse. It's plucked instead: one period of a
+              ;; triangle with its peak at the pluck position, which is the
+              ;; shape a plucked string has the moment it's let go.
+              (set! pluck_len (if is_string (convert period i64) 0))
+              (set! pluck_n 0)
+              (set! apex (* period (if (< position 0.05) 0.05 (if (> position 0.95) 0.95 position))))
+              (set! burst (* gain (resonator_noise p)))
+              ;; Rings' plucker: a burst a fraction of a period long, combed so
+              ;; that the partials with a node at the pluck point are quieter
+              (set! comb_delay (* period (+ 0.05 (* 0.9 position))))
+              (set! burst_left (convert (+ comb_delay 1.0) i64))
+              (set! comb_gain (if is_string (* 0.8 (- 1.0 position)) 0.0))
+              ;; scale the burst so that it's about as loud as the click
+              (set! burst (* burst (if is_string
+                                       (* 2.5 (sqrt (/ period (convert burst_left SAMPLE))))
+                                       (/ 1.0 (sqrt (convert burst_left SAMPLE))))))
+              ;; the exciter runs until the comb's echoes have died away and
+              ;; its lowpass has settled (eight time constants)
+              (set! t (/ 8.0 (* STWOPI fc)))
+              (set! exc_left (+ (if (> pluck_len burst_left) pluck_len burst_left) 4 (convert t i64)))
+              (if is_string
+                  (set! exc_left (+ exc_left (convert (* comb_delay (/ -9.2 (log (if (< comb_gain 0.01) 0.01 comb_gain)))) i64))))
+              (set! first #t)
+              void))
+        (if (> fade 0)
+            (set! fade (- fade 1)))
+        ;; Control rate: every 32 frames, look at the parameters
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! structure (resonator_structure p))
+              (set! brightness (resonator_brightness p))
+              ;; Rings' damping runs the other way: 1.0 rings longest. Its top
+              ;; end (infinite decay) is left out, so that every note ends.
+              (set! damping (* 0.75 (- 1.0 (resonator_damping p))))
+              (set! position (resonator_position p))
+              (if (or (<> structure last_structure) (<> brightness last_brightness)
+                      (<> damping last_damping) (<> position last_position))
+                  (begin
+                    (set! last_structure structure)
+                    (set! last_brightness brightness)
+                    (set! last_damping damping)
+                    (set! last_position position)
+                    (if (not is_string)
+                        (begin
+                          (set! nmodes (resonator_modal_tune modes RESONATOR_MODES f structure
+                                                             (* brightness brightness) damping position))
+                          void)
+                        ;; The string's loop (Rings' String::ProcessInternal).
+                        (let ((lf_damping:SAMPLE (* damping (- 2.0 damping)))
+                              ;; the time to fall by 60 dB, in frames
+                              (rt60:SAMPLE (* SRf 0.07 (pow 2.0 (* 8.0 lf_damping))))
+                              (cutoff:SAMPLE (+ 24.0 (* damping damping 48.0) (* brightness brightness 24.0)))
+                              (lp_f:SAMPLE 0.0)
+                              (dispersion:SAMPLE (if (< structure 0.24)
+                                                     (* 4.166 (- structure 0.24))
+                                                     (if (> structure 0.26) (* 1.35135 (- structure 0.26)) 0.0)))
+                              (stretch_point:SAMPLE 0.0))
+                          ;; lose 60 dB over rt60 frames: this much per trip
+                          (set! loop_gain (pow 2.0 (* -10.0 (/ period rt60))))
+                          ;; the FIR's taps: brightness 1.0 is a plain delay of
+                          ;; one frame, 0.0 is a gentle lowpass
+                          (set! fir_h0 (* 0.5 (+ 1.0 (* brightness brightness))))
+                          (set! fir_h1 (* 0.25 (- 1.0 (* brightness brightness))))
+                          ;; the lowpass, between 2 and 7 octaves above the note
+                          (set! cutoff (if (> cutoff 84.0) 84.0 cutoff))
+                          (set! lp_f (* f (pow 2.0 (/ cutoff 12.0))))
+                          (set! lp_f (if (> lp_f 0.499) 0.499 lp_f))
+                          (resonator_svf_set loop_lp lp_f 0.5)
+                          (set! noise_filter (pow 2.0 (* 4.0 (- brightness 1.0))))
+                          ;; dispersion: a stretched string above 0, a curved
+                          ;; bridge below
+                          (set! stretch_point (if (<= dispersion 0.0) 0.0 (* 0.475 dispersion (- 2.0 dispersion))))
+                          (set! noise_amount (if (> dispersion 0.75) (* 0.4 (- dispersion 0.75) (- dispersion 0.75)) 0.0))
+                          (set! ac_blocking (if (< dispersion 0.0) (* -1.0 dispersion) 0.0))
+                          (set! bridge_curving (* 0.01 ac_blocking ac_blocking))
+                          (set! ap_gain (/ (* -0.618 dispersion) (+ 0.15 (fabs dispersion))))
+                          (set! ap_delay (convert (* period stretch_point) i64))
+                          ;; Tuning: the loop must take exactly one period. The
+                          ;; FIR delays by one frame, and the lowpass and the
+                          ;; allpass by their phase delays at the note; the
+                          ;; delay line makes up the rest.
+                          (set! main_delay (- period 1.0 (resonator_lowpass_delay f (pref loop_lp 0))))
+                          (if (and (>= ap_delay 4)
+                                   (>= (- main_delay (resonator_allpass_delay f ap_delay ap_gain)) 4.0))
+                              (begin (set! main_delay (- main_delay (resonator_allpass_delay f ap_delay ap_gain))) void)
+                              (begin (set! ap_delay 0) void))
+                          ;; the second output listens at the pick-up position
+                          (set! pickup (* period (- 0.5 (* 0.98 (fabs (- position 0.5))))))
+                          (set! pickup (if (< pickup 1.0) 1.0 pickup))
+                          void))))
+              ;; set modes which have died away to exactly zero, before
+              ;; they become denormal
+              (if (not is_string)
+                  (dotimes (k nmodes)
+                    (if (< (+ (fabs (pref modes (+ (* k RESONATOR_MODE_SIZE) 3)))
+                              (fabs (pref modes (+ (* k RESONATOR_MODE_SIZE) 4))))
+                           1.0e-12)
+                        (begin
+                          (pset! modes (+ (* k RESONATOR_MODE_SIZE) 3) 0.0)
+                          (pset! modes (+ (* k RESONATOR_MODE_SIZE) 4) 0.0)))))
+              ;; a released note dies away faster as choke goes up
+              (set! t (resonator_choke p))
+              (set! choke_coeff (if (< t 0.001) 1.0 (exp (/ -1.0 (* SRf (/ 0.015 (* t t)))))))
+              ;; the note is over once the exciter has finished and the
+              ;; resonator has fallen to about -75 dB
+              (set! level peak)
+              (set! peak 0.0)
+              (if (and (not pending) (<= exc_left 0) (or (< level 0.0002) (not (< level 100.0))))
+                  (voice_done v))))
+        ;; The exciter: the click on its first frame, then the noise burst,
+        ;; combed (for the string) and lowpassed
+        (set! x 0.0)
+        (if (and (not pending) (> exc_left 0))
+            (begin
+              (if (and first (not is_string))
+                  (set! x click))
+              (set! first #f)
+              (if (> burst_left 0)
+                  (begin
+                    (set! seed (% (+ (* seed 1103515245) 12345) 2147483648))
+                    (set! x (+ x (* burst (- (/ (convert seed SAMPLE) 1073741824.0) 1.0))))
+                    (set! burst_left (- burst_left 1))
+                    void))
+              (if is_string
+                  (begin
+                    (set! x (+ x (* comb_gain (dl_readf exc_comb comb_delay))))
+                    (dl_write exc_comb x)
+                    (if (< pluck_n pluck_len)
+                        (begin
+                          (set! t (convert pluck_n SAMPLE))
+                          (set! x (+ x (* click (if (< t apex) (/ t apex) (/ (- period t) (- period apex))))))
+                          (set! pluck_n (+ pluck_n 1))
+                          void))
+                    void))
+              (set! x (resonator_svf_lp exc_lp x))
+              ;; a noise burst has some DC in it, which would sit in the
+              ;; string's loop: block it
+              (set! y (+ (* dc_pole exc_dc_y) (- x exc_dc_x)))
+              (set! exc_dc_x x)
+              (set! exc_dc_y y)
+              (if is_string (set! x y))
+              (set! exc_left (- exc_left 1))
+              (if (<= exc_left 0)
+                  (begin
+                    (resonator_svf_clear exc_lp)
+                    (set! exc_dc_x 0.0)
+                    (set! exc_dc_y 0.0)
+                    void))
+              void))
+        (if (not is_string)
+            (begin
+              ;; The modal bank: every mode hears the exciter, and the odd and
+              ;; even modes are summed separately
+              (set! a 0.0)
+              (set! b 0.0)
+              (set! k 0)
+              (while (< k nmodes)
+                (set! a (+ a (* (pref modes (+ (* k RESONATOR_MODE_SIZE) 5))
+                                (resonator_svf_bp (pref-ptr modes (* k RESONATOR_MODE_SIZE)) x))))
+                (set! k (+ k 1))
+                (set! b (+ b (* (pref modes (+ (* k RESONATOR_MODE_SIZE) 5))
+                                (resonator_svf_bp (pref-ptr modes (* k RESONATOR_MODE_SIZE)) x))))
+                (set! k (+ k 1)))
+              (set! a (* RESONATOR_MODAL_LEVEL a))
+              (set! b (* RESONATOR_MODAL_LEVEL b))
+              void)
+            (begin
+              ;; The string. Noise in the delay time (high dispersion) and
+              ;; the bridge's slap (low dispersion) both bend the loop's length.
+              (set! delay main_delay)
+              (if (> noise_amount 0.0)
+                  (begin
+                    (set! seed (% (+ (* seed 1103515245) 12345) 2147483648))
+                    (set! t (/ (- (/ (convert seed SAMPLE) 1073741824.0) 1.0) (+ 0.2 noise_filter)))
+                    (set! disp_noise (+ disp_noise (* noise_filter (- t disp_noise))))
+                    (set! delay (+ delay (* period disp_noise noise_amount)))
+                    void))
+              (set! delay (- delay (* period curved_bridge bridge_curving)))
+              (set! delay (if (< delay 2.0) 2.0 delay))
+              (set! s (resonator_read_hermite string delay))
+              (if (> ap_delay 0)
+                  (set! s (resonator_allpass stiff s ap_delay ap_gain)))
+              ;; the curved bridge: a DC blocker takes out the offset the slap
+              ;; puts in, and the slap itself is how far the string has
+              ;; swung past the bridge's edge, more one way than the other
+              (if (> ac_blocking 0.0)
+                  (begin
+                    (set! y (+ (* ac_pole ac_y) (- s ac_x)))
+                    (set! ac_x s)
+                    (set! ac_y y)
+                    (set! s (+ s (* ac_blocking (- y s))))
+                    (set! t (- (fabs s) 0.025))
+                    (set! curved_bridge (* (+ (fabs t) t) (if (> s 0.0) 1.0 -1.5)))
+                    void))
+              ;; the exciter goes into the loop, then the loop's filters: the
+              ;; FIR (which also sets the decay) and the lowpass
+              (set! s (+ s (* 0.7 x)))
+              (set! y (* loop_gain (+ (* fir_h0 fir1) (* fir_h1 (+ s fir2)))))
+              (set! fir2 fir1)
+              (set! fir1 s)
+              (set! s (resonator_svf_lp loop_lp y))
+              ;; the tiny constant keeps the loop out of denormals
+              (dl_write string (+ s 1.0e-18))
+              ;; the loop holds on to any DC the exciter leaves it with:
+              ;; block it at the outputs (in the loop it would detune the note)
+              (set! a (resonator_dc_block out_dc s dc_pole))
+              (set! b (resonator_dc_block (pref-ptr out_dc 2) (dl_readf string pickup) dc_pole))
+              (set! a (* RESONATOR_STRING_LEVEL a))
+              (set! b (* RESONATOR_STRING_LEVEL b))
+              void))
+        ;; how loud the voice is, for knowing when it has finished
+        (set! t (+ (fabs a) (fabs b)))
+        (if (> t peak) (set! peak t))
+        ;; release, the fade of a stolen voice, and the stereo image
+        (if (< (voice_gate v) 0.5)
+            (set! rel (* rel choke_coeff)))
+        (set! gain (* rel (resonator_level p) (if pending (/ (convert fade SAMPLE) 96.0) 1.0)))
+        (set! w (resonator_width p))
+        ;; a gentle limiter, as Rings has, for the rare burst of noise which
+        ;; sets a string ringing much harder than usual
+        (set! a (* gain (soft_clip a 0.5)))
+        (set! b (* gain (soft_clip b 0.5)))
+        (set! t (* 0.5 (+ 1.0 w)))
+        (set! y (* 0.5 (- 1.0 w)))
+        (if (> flip 0.5)
+            (frame_add_stereo out (+ (* t a) (* y b)) (+ (* y a) (* t b)))
+            (frame_add_stereo out (+ (* y a) (* t b)) (+ (* t a) (* y b))))
+        void))))
+
+(bind-func resonator_make
+  (lambda ()
+    (let ((inst (inst_make "resonator" 5 (resonator_nparams)))
+          (i:i64 0))
+      (resonator_defaults (inst_params inst))
+      (dotimes (i 5)
+        (inst_set_voice inst i (resonator_voice_c (inst_params inst) (convert (% i 2) SAMPLE))))
+      inst)))
