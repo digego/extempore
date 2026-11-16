@@ -1,11 +1,11 @@
-;;; wavetable.xtm -- a wavetable synth with unison, for modern electronic sounds
+;;; wavetable.xtm -- a six-voice wavetable synth with unison, for modern electronic sounds
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
 
 ;;; Commentary:
 
-;; An eight-voice stereo wavetable synth: the instrument behind most current
+;; A six-voice stereo wavetable synth: the instrument behind most current
 ;; electronic music's reese and wobble basses, supersaw leads, slowly moving
 ;; pads, vocal and sync leads, plucks and bell-like keys.
 ;;
@@ -54,10 +54,10 @@
 ;; each copy. Every frame is scaled to the same loudness (an RMS of 0.5), with
 ;; the same factor for all ten of its copies, so a note is as loud at the top
 ;; of the keyboard as at the bottom. The tables take 11 MB, shared by every
-;; wavetable track, and take about a second to build.
+;; wavetable track, and take about a tenth of a second to build.
 ;;
 ;; Unison. Each oscillator can be played as up to seven copies of itself
-;; (`unison`), detuned by up to a semitone either side (`detune`, whose
+;; (`unison`; oscillator B stops at three), detuned by up to a semitone either side (`detune`, whose
 ;; effect grows with its square: 0.3 is 9 cents at the edges, 0.5 is 25,
 ;; 1.0 is 100). The inner copies sit closer to the centre pitch than the
 ;; outer ones, as in a supersaw. The copies beat against each other, which
@@ -78,7 +78,7 @@
 ;;     restarts at the start of every cycle of the note, as a hard-synced
 ;;     oscillator does. Sweeping the amount gives the tearing sync-lead sound.
 ;;     The restart is a jump in the waveform, and jumps alias: this mode is
-;;     not band-limited, and its high notes have some fold-back.
+;;     not band-limited, and notes above about C6 have audible fold-back.
 ;;   2 formant: the same, but each cycle is faded in and out by half a sine,
 ;;     so there's no jump. A sine table then becomes a peak in the spectrum
 ;;     near harmonic 1 to 16: a vocal, formant-like tone at a steady pitch.
@@ -86,8 +86,12 @@
 ;;     synths) so that each cycle starts slowly and rushes through its middle.
 ;;     A sine gains harmonics as the amount rises.
 ;;   4 fm: oscillator B's centre copy modulates oscillator A's phase. This is
-;;     two-operator FM on top of the wavetables, and like sync it isn't
-;;     band-limited.
+;;     two-operator FM on top of the wavetables.
+;;
+;; The warps push partials upwards, so they also choose a smaller mip level
+;; (as if the note were higher), and on high notes the sync ratio and the fm
+;; depth are capped, so that the synced cycle and most of the fm sidebands
+;; stay below half the sample rate.
 ;;
 ;; The filter is a state-variable filter in its trapezoidal (zero-delay
 ;; feedback) form, after Andrew Simper (Cytomic, "Linear trapezoidal
@@ -106,6 +110,13 @@
 ;; each side adds its own tap and takes away half of the other's. That
 ;; widens the sound while the bass stays in the middle.
 ;;
+;; Cost. Six voices of two oscillators with up to seven and three copies is
+;; up to sixty table reads a frame, which is most of the work. The copy in
+;; the centre of each oscillator is read with four-point interpolation and
+;; the others with two-point (linear) interpolation; the mod envelope and the
+;; LFO are worked out every 16 frames and glided between, and so are the
+;; filter's coefficients and the mip levels.
+;;
 ;; This is an independent implementation, written from a functional
 ;; specification of a wavetable synth; its wavetables are generated from
 ;; formulas.
@@ -118,7 +129,7 @@
 (sys:load "libs/studio/api.xtm")
 
 (def-instrument wavetable
-  "an eight-voice wavetable synth with unison, warp modes and a chorus"
+  "a six-voice wavetable synth with unison, warp modes and a chorus"
   (params
     (a-table 0.0 "oscillator A's wavetable: 0 basic, 1 pulse, 2 sync, 3 vowel, 4 resonant, 5 fm, 6 bright, 7 octave")
     (a-pos 0.6667 "oscillator A's position in its table, 0.0 to 1.0 (on basic: 0 sine, 0.33 triangle, 0.67 saw, 1 square)")
@@ -153,48 +164,48 @@
     (env-cutoff 0.0 "how far the mod envelope moves the cutoff, in semitones (-72 to 72)")
     (env-warp 0.0 "how far the mod envelope moves oscillator A's warp amount, -1.0 to 1.0")
     (chorus 0.0 "chorus amount, 0.0 to 1.0")
-    (level 0.8 "output level, 0.0 to 1.0"))
+    (level 0.4 "output level, 0.0 to 1.0"))
   (presets
     (reese (b-table 1.0) (b-pos 0.3) (b-level 0.5) (detune 0.32) (width 0.3) (sub 0.6)
            (filter 1.0) (cutoff 600.0) (res 0.2) (drive 9.0) (key-track 0.5)
            (attack 0.003) (decay 0.1) (sustain 1.0) (release 0.12)
-           (lfo-rate 0.15) (lfo-cutoff 6.0))
+           (lfo-rate 0.15) (lfo-cutoff 6.0) (level 0.19))
     (supersaw (b-pos 0.6667) (b-pitch 12.0) (b-level 0.35) (unison 7.0) (detune 0.55) (width 1.0)
               (cutoff 9000.0) (res 0.1) (key-track 0.3)
-              (attack 0.005) (decay 0.5) (sustain 0.9) (release 0.35) (chorus 0.35))
+              (attack 0.005) (decay 0.5) (sustain 0.9) (release 0.35) (chorus 0.35) (level 0.25))
     (pluck (a-table 6.0) (a-pos 0.15) (b-pitch 12.0) (b-level 0.25) (detune 0.12) (width 0.6)
            (cutoff 2500.0) (key-track 1.0)
            (attack 0.001) (decay 0.6) (sustain 0.0) (release 0.3)
-           (mod-attack 0.001) (mod-decay 0.35) (env-pos 0.75) (env-cutoff 36.0) (chorus 0.25))
+           (mod-attack 0.001) (mod-decay 0.35) (env-pos 0.75) (env-cutoff 36.0) (chorus 0.25) (level 0.42))
     (pad (a-table 3.0) (a-pos 0.2) (a-level 0.7) (b-table 4.0) (b-pos 0.5) (b-pitch 7.0) (b-level 0.4)
          (unison 5.0) (detune 0.35) (width 1.0) (cutoff 3000.0) (res 0.15)
          (attack 1.5) (decay 2.0) (sustain 0.8) (release 3.0)
          (mod-attack 4.0) (mod-decay 6.0) (mod-sustain 0.6)
-         (lfo-rate 0.08) (lfo-pos 0.35) (env-pos 0.3) (chorus 0.5))
+         (lfo-rate 0.08) (lfo-pos 0.35) (env-pos 0.3) (chorus 0.5) (level 0.4))
     (bells (a-table 5.0) (a-pos 0.1) (b-pitch 23.6) (b-level 0.12) (unison 1.0)
            (cutoff 12000.0) (key-track 0.5)
            (attack 0.001) (decay 2.5) (sustain 0.0) (release 0.8)
-           (mod-attack 0.001) (mod-decay 1.2) (env-pos 0.45) (chorus 0.3))
+           (mod-attack 0.001) (mod-decay 1.2) (env-pos 0.45) (chorus 0.3) (level 0.5))
     (sync (warp-mode 1.0) (warp 0.35) (b-pos 0.6667) (b-level 0.3) (unison 2.0) (detune 0.15) (width 0.5)
           (cutoff 7000.0) (res 0.2) (drive 6.0)
           (attack 0.003) (decay 0.3) (sustain 0.85) (release 0.25)
-          (mod-attack 0.001) (mod-decay 0.4) (mod-sustain 0.3) (env-warp 0.4) (chorus 0.2))
+          (mod-attack 0.001) (mod-decay 0.4) (mod-sustain 0.3) (env-warp 0.4) (chorus 0.2) (level 0.2))
     (formant (a-pos 0.0) (warp-mode 2.0) (warp 0.55) (a-level 0.9) (detune 0.1) (width 0.6)
              (cutoff 6000.0) (attack 0.02) (decay 0.5) (sustain 0.9) (release 0.3)
              (mod-attack 0.6) (mod-decay 1.5) (mod-sustain 0.5) (env-warp 0.2)
-             (lfo-shape 1.0) (lfo-rate 0.3) (lfo-cutoff 3.0) (chorus 0.3))
+             (lfo-shape 1.0) (lfo-rate 0.3) (lfo-cutoff 3.0) (chorus 0.3) (level 0.4))
     (wobble (a-table 4.0) (a-pos 0.2) (b-pos 1.0) (b-pitch -12.0) (b-level 0.3) (unison 1.0) (sub 0.7)
             (filter 1.0) (cutoff 400.0) (res 0.45) (drive 12.0)
             (attack 0.002) (decay 0.1) (sustain 1.0) (release 0.1)
-            (lfo-rate 2.333) (lfo-pos 0.35) (lfo-cutoff 30.0))
+            (lfo-rate 2.333) (lfo-pos 0.35) (lfo-cutoff 30.0) (level 0.2))
     (growl (a-table 7.0) (a-pos 0.3) (unison 2.0) (detune 0.2) (width 0.2) (sub 0.5)
            (filter 4.0) (cutoff 700.0) (res 0.6) (drive 12.0)
            (attack 0.002) (decay 0.1) (sustain 1.0) (release 0.1)
-           (lfo-shape 2.0) (lfo-rate 4.667) (lfo-pos 0.4) (lfo-cutoff 24.0))
+           (lfo-shape 2.0) (lfo-rate 4.667) (lfo-pos 0.4) (lfo-cutoff 24.0) (level 0.3))
     (strings (a-table 1.0) (a-pos 0.3) (a-level 0.7) (b-table 1.0) (b-pos 0.5) (b-pitch -12.0) (b-level 0.4)
              (unison 4.0) (detune 0.25) (width 1.0) (cutoff 4500.0) (res 0.1) (key-track 0.5)
              (attack 0.25) (decay 1.0) (sustain 0.9) (release 0.8)
-             (lfo-shape 1.0) (lfo-rate 0.4) (lfo-pos 0.25) (chorus 0.6))))
+             (lfo-shape 1.0) (lfo-rate 0.4) (lfo-pos 0.25) (chorus 0.6) (level 0.65))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; small helpers, inlined as macros ;;
@@ -243,9 +254,9 @@
          (sin_a:SAMPLE (pref wavetable_sine_table sin_i)))
      (+ sin_a (* sin_f (- (pref wavetable_sine_table (+ sin_i 1)) sin_a)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; the fast Fourier transform ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The largest transform the table builder needs: one cycle of a waveform
 ;; sampled at 16384 points.
@@ -327,9 +338,9 @@ the first step shuffles them. Then passes of butterflies combine transforms of
         (set! len (* len 2)))
       void)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; the wavetable recipes ;;
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func static wavetable_vowel_formant:[double,i64,i64]*
   "formant k (0, 1 or 2) of vowel number v (0 a, 1 e, 2 i, 3 o, 4 u), in Hz:
@@ -434,9 +445,9 @@ described by its waveform (tables 1, 2 and 5)"
               (sin (+ (* 6.283185307179586 theta)
                       (* 8.0 x (sin (* 6.283185307179586 theta))))))))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; building the tables ;;
-;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Each table has 64 frames, and each frame ten mip levels laid end to end:
 ;; level j keeps harmonics 1 to 512/2^j, in 2048, 1024, 512, then 256 samples
@@ -610,9 +621,9 @@ beating of the copies"
      (set! rl_y1 (+ rl_y1 (* ,alpha (- (pref ,f1 rl_i1) rl_y1))))
      (+ rl_y0 (* rl_mu (- rl_y1 rl_y0)))))
 
-;;;;;;;;;;;;;
+;;;;;;;;;;;;
 ;; unison ;;
-;;;;;;;;;;;;;
+;;;;;;;;;;;;
 
 (bind-func wavetable_unison_layout
   "work out the pitch ratio and left and right gains of each of n unison copies.
@@ -758,9 +769,9 @@ right and of even-numbered pairs to the left."
            (else void))
      (convert (tref env_p 9) SAMPLE)))
 
-;;;;;;;;;;;;;
+;;;;;;;;;;;;
 ;; filter ;;
-;;;;;;;;;;;;;
+;;;;;;;;;;;;
 
 (bind-macro
   "one step of the trapezoidal state-variable filter (Simper). s1 and s2 are its
@@ -814,14 +825,16 @@ scaled by k, and lp the lowpass output"
           (off_a:i64 0) (off_b:i64 0) (mask_a:i64 255) (mask_b:i64 255)
           (len_a:double 256.0) (len_b:double 256.0)
           (mode:i64 0) (b_on:i1 #f)
-          (freq_a:double 0.0) (freq_b:double 0.0) (rsync:double 1.0)
+          (freq_a:double 0.0) (freq_b:double 0.0) (rsync:double 1.0) (warp_cap:double 16.0) (top:double 0.0)
           ;; the sub oscillator and the LFO
           (ph_sub:SAMPLE 0.0) (inc_sub:SAMPLE 0.0)
           (lfo_shape:i64 0) (lfo_ph:SAMPLE 0.0) (lfo_inc:SAMPLE 0.0)
           (lfo_held:SAMPLE 0.0) (lfo_state:SAMPLE 0.0) (lfo:SAMPLE 0.0)
-          (square_coeff:SAMPLE (smoothing_coeff 0.001))
-          (random_coeff:SAMPLE (smoothing_coeff 0.002))
-          (aenv:SAMPLE 0.0) (menv:SAMPLE 0.0)
+          (lfo_step:SAMPLE 0.0)
+          ;; (per 16-frame step)
+          (square_coeff:SAMPLE (smoothing_coeff (/ 0.001 16.0)))
+          (random_coeff:SAMPLE (smoothing_coeff (/ 0.002 16.0)))
+          (aenv:SAMPLE 0.0) (menv:SAMPLE 0.0) (menv_step:SAMPLE 0.0)
           ;; the filter: type, coefficients for up to three stages, and the
           ;; state of each stage for the left and right channels
           (ftype:i64 0)
@@ -839,6 +852,7 @@ scaled by k, and lp the lowpass output"
           (j:i64 0) (x:SAMPLE 0.0) (a:SAMPLE 0.0))
       (lambda (v:Voice* out:SAMPLE*)
         (let ((start:i1 (voice_start? v))
+              ;; the control rate: every 16 frames
               (tick:i1 (= (& (voice_age v) 15) 0)))
           ;;;; control rate, part one: the parameters
           (if tick
@@ -913,45 +927,89 @@ scaled by k, and lp the lowpass output"
                 (set! lfo_held (- (* 2.0 (convert (random) SAMPLE)) 1.0))
                 (set! lfo_state lfo_held)
                 (if (= lfo_shape 3) (set! lfo_state 1.0))
-                (set! l1a 0.0) (set! l1b 0.0) (set! l2a 0.0) (set! l2b 0.0) (set! l3a 0.0) (set! l3b 0.0)
-                (set! r1a 0.0) (set! r1b 0.0) (set! r2a 0.0) (set! r2b 0.0) (set! r3a 0.0) (set! r3b 0.0)
-                (set! dc_xl 0.0) (set! dc_yl 0.0) (set! dc_xr 0.0) (set! dc_yr 0.0)
+                ;; a silent voice starts with empty filters; a stolen one
+                ;; which is still sounding keeps them, so it doesn't click
+                (if (<= aenv 0.0)
+                    (begin
+                      (set! l1a 0.0) (set! l1b 0.0) (set! l2a 0.0) (set! l2b 0.0) (set! l3a 0.0) (set! l3b 0.0)
+                      (set! r1a 0.0) (set! r1b 0.0) (set! r2a 0.0) (set! r2b 0.0) (set! r3a 0.0) (set! r3b 0.0)
+                      (set! dc_xl 0.0) (set! dc_yl 0.0) (set! dc_xr 0.0) (set! dc_yr 0.0)
+                      void))
                 void))
-          ;;;; envelopes and LFO
+          ;;;; envelopes and LFO. The amp envelope runs every frame. The mod
+          ;;;; envelope and the LFO only move the timbre, so on each tick they
+          ;;;; work out where they'll be 16 frames on, and glide there in a
+          ;;;; straight line.
           (set! aenv (wavetable_env amp_env start tick (voice_gate v) attack decay sustain release))
-          (set! menv (wavetable_env mod_env start tick (voice_gate v) mod_attack mod_decay mod_sustain release))
-          (set! lfo_ph (+ lfo_ph lfo_inc))
-          (if (>= lfo_ph 1.0)
+          (if start
+              (cond ((or (= lfo_shape 2) (= lfo_shape 3)) (set! lfo 1.0) void)
+                    ((= lfo_shape 4) (set! lfo lfo_held) void)
+                    (else (set! lfo 0.0) void)))
+          (if tick
               (begin
-                (set! lfo_ph (- lfo_ph 1.0))
-                (set! lfo_held (- (* 2.0 (convert (random) SAMPLE)) 1.0))
+                (set! x (wavetable_env mod_env start tick (voice_gate v)
+                                       (* 0.0625 mod_attack) (* 0.0625 mod_decay) mod_sustain (* 0.0625 release)))
+                (set! menv_step (* 0.0625 (- x menv)))
+                (set! lfo_ph (+ lfo_ph (* 16.0 lfo_inc)))
+                (if (>= lfo_ph 1.0)
+                    (begin
+                      (set! lfo_ph (- lfo_ph 1.0))
+                      (set! lfo_held (- (* 2.0 (convert (random) SAMPLE)) 1.0))
+                      void))
+                (cond ((= lfo_shape 0) (set! x (wavetable_sin lfo_ph)) void)
+                      ((= lfo_shape 1)
+                       ;; a triangle which starts at 0.0 and rises, like the sine
+                       (set! x (+ lfo_ph 0.75))
+                       (if (>= x 1.0) (set! x (- x 1.0)))
+                       (set! x (- (* 4.0 (fabs (- x 0.5))) 1.0))
+                       void)
+                      ((= lfo_shape 2) (set! x (- 1.0 (* 2.0 lfo_ph))) void)
+                      ((= lfo_shape 3)
+                       ;; a square, its edges rounded off (1 ms) so they don't click
+                       (set! lfo_state (+ lfo_state (* square_coeff (- (if (< lfo_ph 0.5) 1.0 -1.0) lfo_state))))
+                       (set! x lfo_state)
+                       void)
+                      (else
+                        ;; a new random level each cycle, glided to in 2 ms
+                        (set! lfo_state (+ lfo_state (* random_coeff (- lfo_held lfo_state))))
+                        (set! x lfo_state)
+                        void))
+                (set! lfo_step (* 0.0625 (- x lfo)))
                 void))
-          (cond ((= lfo_shape 0) (set! lfo (wavetable_sin lfo_ph)) void)
-                ((= lfo_shape 1)
-                 ;; a triangle which starts at 0.0 and rises, like the sine
-                 (set! x (+ lfo_ph 0.75))
-                 (if (>= x 1.0) (set! x (- x 1.0)))
-                 (set! lfo (- (* 4.0 (fabs (- x 0.5))) 1.0))
-                 void)
-                ((= lfo_shape 2) (set! lfo (- 1.0 (* 2.0 lfo_ph))) void)
-                ((= lfo_shape 3)
-                 ;; a square, its edges rounded off (1 ms) so they don't click
-                 (set! lfo_state (+ lfo_state (* square_coeff (- (if (< lfo_ph 0.5) 1.0 -1.0) lfo_state))))
-                 (set! lfo lfo_state)
-                 void)
-                (else
-                  ;; a new random level each cycle, glided to in 2 ms
-                  (set! lfo_state (+ lfo_state (* random_coeff (- lfo_held lfo_state))))
-                  (set! lfo lfo_state)
-                  void))
+          (set! menv (+ menv menv_step))
+          (set! lfo (+ lfo lfo_step))
           ;;;; control rate, part two: what the envelopes and LFO move
           (if tick
               (begin
                 ;; the mip level for each oscillator, chosen for its fastest
                 ;; unison copy (and, for oscillator A, its sync ratio)
                 (set! a (wavetable_clamp (+ warp (* env_warp menv)) 0.0 1.0))
-                (set! rsync (if (or (= mode 1) (= mode 2)) (pow 2.0 (convert (* 4.0 a) double)) 1.0))
-                (set! j (wavetable_mip (* freq_a (pref ratio (- n 1)) rsync)))
+                ;; The warps push partials up, and on high notes past half
+                ;; the sample rate, where they fold back. So bend (which
+                ;; reads up to 1.95 times as fast) and fm pick a smaller mip
+                ;; level, as sync does; the sync ratio is capped to keep the
+                ;; synced cycle below half the sample rate; and the fm depth
+                ;; is capped to keep most of its sidebands below it.
+                (set! top (* freq_a (pref ratio (- n 1))))
+                (set! rsync 1.0)
+                (cond ((= mode 0) void)
+                      ((< mode 3)
+                       (set! warp_cap (/ 0.45 top))
+                       (if (< warp_cap 1.0) (set! warp_cap 1.0))
+                       (set! rsync (pow 2.0 (convert (* 4.0 a) double)))
+                       (if (> rsync warp_cap) (set! rsync warp_cap))
+                       void)
+                      ((= mode 3) (set! rsync (+ 1.0 (* 0.95 (convert a double)))) void)
+                      (else
+                        ;; fm spreads each harmonic h over about h (1 + 2 pi
+                        ;; depth) times the note
+                        (set! warp_cap (/ (- (/ 0.5 top) 1.0) 6.283185307179586))
+                        (if (< warp_cap 0.0) (set! warp_cap 0.0))
+                        (set! rsync (* 2.0 (convert (* a a) double)))
+                        (if (> rsync warp_cap) (set! rsync warp_cap))
+                        (set! rsync (+ 1.0 (* 6.283185307179586 rsync)))
+                        void))
+                (set! j (wavetable_mip (* top rsync)))
                 (set! off_a (+ (* (wavetable_int (wavetable_a_table p) 0 7) WAVETABLE_TABLE_SIZE) (wavetable_level_offset j)))
                 (set! mask_a (- (wavetable_level_length j) 1))
                 (set! len_a (convert (wavetable_level_length j) double))
@@ -1049,9 +1107,15 @@ scaled by k, and lp the lowpass output"
             (if (> warp_mode 0)
                 (begin
                   (set! a (wavetable_clamp (+ warp (* env_warp menv)) 0.0 1.0))
-                  (cond ((< warp_mode 3) (set! r (exp (* 2.772588722239781 (convert a double))))) ;; 2^(4a)
-                        ((= warp_mode 3) (set! bend (/ (* 0.95 (convert a double)) 6.283185307179586)))
-                        (else (set! index (* 2.0 (convert (* a a) double)))))
+                  (cond ((< warp_mode 3)
+                         (set! r (exp (* 2.772588722239781 (convert a double)))) ;; 2^(4a)
+                         (if (> r warp_cap) (set! r warp_cap))
+                         void)
+                        ((= warp_mode 3) (set! bend (/ (* 0.95 (convert a double)) 6.283185307179586)) void)
+                        (else
+                          (set! index (* 2.0 (convert (* a a) double)))
+                          (if (> index warp_cap) (set! index warp_cap))
+                          void))
                   void))
             (dotimes (jj count)
               (set! ph (+ (pref pa jj) (pref da jj)))
@@ -1071,7 +1135,8 @@ scaled by k, and lp the lowpass output"
             ;;;; mix, block DC, drive
             (set! ph_sub (+ ph_sub inc_sub))
             (if (>= ph_sub 1.0) (set! ph_sub (- ph_sub 1.0)))
-            (set! s (* sub 0.70710678 (wavetable_sin ph_sub)))
+            (set! s 0.0)
+            (if (> sub 0.0) (set! s (* sub 0.70710678 (wavetable_sin ph_sub))))
             (set! xl (* 0.5 (+ (* a_level al) (* b_level bl) s)))
             (set! xr (* 0.5 (+ (* a_level ar) (* b_level br) s)))
             (set! dc_yl (+ (- xl dc_xl) (* dc_coeff dc_yl) 1.0e-18))
@@ -1107,7 +1172,9 @@ scaled by k, and lp the lowpass output"
             (set! yl (wavetable_knee yl))
             (set! yr (wavetable_knee yr))
             ;;;; amplifier, and out
-            (set! x (* aenv vel_gain level))
+            ;; (the 2.0 leaves room in `level` for the quieter tables: a
+            ;; narrow pulse or a sharp resonance has little RMS for its peak)
+            (set! x (* 2.0 aenv vel_gain level))
             (frame_add_stereo out (* x yl) (* x yr)))
           (if (and (< (voice_gate v) 0.5) (<= aenv 0.0))
               (voice_done v))
