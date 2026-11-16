@@ -103,88 +103,37 @@
 ;; building blocks ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func static kit808_decay
-  "the per-frame multiplier which makes an envelope fall by 60 dB in `seconds`"
-  (lambda (seconds:SAMPLE)
-    (exp (/ -6.9077553 (* (if (< seconds 0.002) 0.002 seconds) SRf)))))
+;; The filters, white noise, sine table, band-limited pulse and decay
+;; multipliers are dsp.xtm's. What follows is what is particular to this kit.
 
-(bind-func static kit808_clamp
-  (lambda (x:SAMPLE lo:SAMPLE hi:SAMPLE)
-    (if (< x lo) lo (if (> x hi) hi x))))
+(bind-macro
+  "one frame of a square wave from the oscillator whose phase is number i of
+the array ph, at freq Hz: -1.0 to 1.0, band-limited by blep_pulse. The
+oscillators run freely from note to note, as the 808's do, so no two hits start
+from quite the same place."
+  (kit808_square ph i freq)
+  `(let ((sq_inc:SAMPLE (/ ,freq SRf)))
+     (let ((sq_phase:SAMPLE (+ (pref ,ph ,i) sq_inc)))
+       (if (>= sq_phase 1.0) (set! sq_phase (- sq_phase 1.0)))
+       (pset! ,ph ,i sq_phase)
+       (blep_pulse sq_phase sq_inc 0.5))))
 
-(bind-func static kit808_out
-  "add the mono sample y to the stereo frame out, at pan position pan"
-  (lambda (out:SAMPLE* y:SAMPLE pan:SAMPLE)
-    (frame_add_mono out y pan)
-    void))
-
-(bind-func kit808_noise_c
-  "white noise from -1.0 to 1.0 (a linear congruential generator)"
-  (lambda (seed:i64)
-    (let ((state seed))
-      (lambda ()
-        (set! state (% (+ (* state 1103515245) 12345) 2147483648))
-        (- (* (convert state SAMPLE) 0.00000000093132257) 1.0)))))
-
-(bind-func kit808_svf_c
-  "a two-pole state-variable filter, in the trapezoidal form described by
-Andrew Simper. It stays stable and in tune right up to the top of the audio
-band, which matters for the hi-hats.
-
-@param x - input
-@param freq - cutoff or centre frequency in Hz
-@param q - resonance (0.5 is gentle, 5.0 is a narrow peak)
-@param mode - 0 lowpass, 1 bandpass (unity gain at the centre), 2 highpass"
+(bind-func kit808_metal_make
+  "the six phases of the metal bank, each starting somewhere different"
   (lambda ()
-    (let ((ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
-          (g:SAMPLE 0.0) (k:SAMPLE 1.0)
-          (a1:SAMPLE 0.0) (a2:SAMPLE 0.0) (a3:SAMPLE 0.0)
-          (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0)
-          (old_freq:SAMPLE -1.0) (old_q:SAMPLE -1.0))
-      (lambda (x:SAMPLE freq:SAMPLE q:SAMPLE mode:i64)
-        (if (or (<> freq old_freq) (<> q old_q))
-            (begin
-              (set! old_freq freq)
-              (set! old_q q)
-              (set! g (tan (* SPI (/ (kit808_clamp freq 20.0 (* 0.45 SRf)) SRf))))
-              (set! k (/ 1.0 (kit808_clamp q 0.3 30.0)))
-              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-              (set! a2 (* g a1))
-              (set! a3 (* g a2))))
-        (set! v3 (- x ic2))
-        (set! v1 (+ (* a1 ic1) (* a2 v3)))
-        (set! v2 (+ ic2 (* a2 ic1) (* a3 v3)))
-        ;; the tiny constant keeps the state out of denormal numbers
-        (set! ic1 (+ (- (* 2.0 v1) ic1) 1.0e-18))
-        (set! ic2 (- (* 2.0 v2) ic2))
-        (cond ((= mode 0) v2)
-              ((= mode 1) (* k v1))
-              (else (- x (* k v1) v2)))))))
+    (let ((ph:SAMPLE* (zalloc 6)))
+      (pset! ph 0 0.0) (pset! ph 1 0.31) (pset! ph 2 0.57)
+      (pset! ph 3 0.13) (pset! ph 4 0.79) (pset! ph 5 0.44)
+      ph)))
 
-(bind-func kit808_square_c
-  "a square wave, -1.0 to 1.0, with its edges rounded off by poly_blep so that
-it doesn't alias. It runs freely from note to note, as the 808's oscillators
-do, so no two hits start from quite the same place."
-  (lambda (start_phase:SAMPLE)
-    (let ((phase start_phase) (inc:SAMPLE 0.0) (x:SAMPLE 0.0))
-      (lambda (freq:SAMPLE)
-        (set! inc (/ freq SRf))
-        (set! phase (+ phase inc))
-        (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! x (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
-        (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
-           (poly_blep x inc 1.0 #t))))))
-
-(bind-func kit808_metal_c
+(bind-func static kit808_metal
   "the 808's metallic source: six square waves at unrelated frequencies,
 summed. Their harmonics land everywhere, so the sum is a dense, clangorous
-spectrum rather than a chord."
-  (lambda ()
-    (let ((o1 (kit808_square_c 0.0)) (o2 (kit808_square_c 0.31))
-          (o3 (kit808_square_c 0.57)) (o4 (kit808_square_c 0.13))
-          (o5 (kit808_square_c 0.79)) (o6 (kit808_square_c 0.44)))
-      (lambda ()
-        (* 0.1667 (+ (o1 205.3) (o2 304.4) (o3 369.6) (o4 522.7) (o5 540.0) (o6 800.0)))))))
+spectrum rather than a chord. ph is from kit808_metal_make."
+  (lambda (ph:SAMPLE*)
+    (* 0.1667 (+ (kit808_square ph 0 205.3) (kit808_square ph 1 304.4)
+                 (kit808_square ph 2 369.6) (kit808_square ph 3 522.7)
+                 (kit808_square ph 4 540.0) (kit808_square ph 5 800.0)))))
 
 ;;;;;;;;;;
 ;; kick ;;
@@ -207,7 +156,7 @@ spectrum rather than a chord."
           (amp:SAMPLE 0.0)
           (amp_coeff:SAMPLE 0.999)
           (sweep:SAMPLE 0.0)
-          (sweep_coeff (kit808_decay 0.15))
+          (sweep_coeff (decay_mult 0.15))
           (click:SAMPLE 0.0)
           (click_coeff:SAMPLE 0.5)
           (pulse_frames:i64 (convert (/ SRf 1600.0) i64))
@@ -216,7 +165,7 @@ spectrum rather than a chord."
           (y:SAMPLE 0.0)
           (last:SAMPLE 0.0)
           (carry:SAMPLE 0.0)
-          (carry_coeff (kit808_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -227,20 +176,19 @@ spectrum rather than a chord."
               (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! amp_coeff (kit808_decay (kit808_bd_decay p)))
+              (set! amp_coeff (decay_mult (clampf (kit808_bd_decay p) 0.002 100.0)))
               ;; the tone control opens the click's lowpass from 600 Hz to 8 kHz
-              (set! click_coeff (- 1.0 (exp (/ (* -6.2831853 (+ 600.0 (* 7400.0 (kit808_bd_tone p) vel)))
-                                               SRf))))
+              (set! click_coeff (onepole_coeff (+ 600.0 (* 7400.0 (kit808_bd_tone p) vel))))
               (set! pre (+ 1.0 (* 5.0 (kit808_bd_drive p))))))
         ;; the resonator
         (set! phase (+ phase (/ (* (kit808_bd_tune p) (+ 1.0 (* 0.5 sweep))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! y (* amp (sin (* STWOPI phase))))
+        (set! y (* amp (sine_at phase)))
         (set! amp (* amp amp_coeff))
         (set! sweep (* sweep sweep_coeff))
         ;; the click: a 0.6 ms pulse through a one-pole lowpass. Its level goes
         ;; up with velocity as well as tone, so harder hits are clickier.
-        (set! click (+ click (* click_coeff (- (if (< (voice_age v) pulse_frames) 1.0 0.0) click))))
+        (onepole_lp click click_coeff (if (< (voice_age v) pulse_frames) 1.0 0.0))
         (set! y (+ y (* (+ 0.1 (* 0.9 (kit808_bd_tone p))) vel click)))
         ;; drive: saturate, then scale back so that the peak stays put. The
         ;; flattened wave carries more energy, so turn it down a little too.
@@ -248,7 +196,7 @@ spectrum rather than a chord."
         (set! y (* 0.42 (- 1.0 (* 0.35 (kit808_bd_drive p))) (kit808_bd_level p) vel y))
         (set! carry (* carry carry_coeff))
         (set! last (+ y carry))
-        (kit808_out out last 0.5)
+        (frame_add_mono out last 0.5)
         (if (and (< amp 0.0005) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
@@ -265,20 +213,21 @@ spectrum rather than a chord."
 
 (bind-func kit808_sd_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit808_noise_c 4711))
-          (hp (kit808_svf_c))
-          (lp (kit808_svf_c))
+    (let ((seed:i64 4711)
+          (hp (svf_make 1))
+          (lp (svf_make 1))
           (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0)
           (env1:SAMPLE 0.0) (env2:SAMPLE 0.0) (env_noise:SAMPLE 0.0)
-          (coeff1 (kit808_decay 0.2))
-          (coeff2 (kit808_decay 0.13))
-          (coeff_noise (kit808_decay 0.28))
+          (coeff1 (decay_mult 0.2))
+          (coeff2 (decay_mult 0.13))
+          (coeff_noise (decay_mult 0.28))
           (sweep:SAMPLE 0.0)
-          (sweep_coeff (kit808_decay 0.03))
-          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
+          (sweep_coeff (decay_mult 0.03))
+          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0) (last_bright:SAMPLE -1.0)
           (f:SAMPLE 0.0) (body:SAMPLE 0.0) (snares:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (kit808_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
+      (svf_set hp 1800.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -288,16 +237,20 @@ spectrum rather than a chord."
               (set! sweep 1.0)
               (set! vel (voice_vel v))))
         (set! bright (* (kit808_sd_tone p) (+ 0.5 (* 0.5 vel))))
+        (if (<> bright last_bright)
+            (begin
+              (set! last_bright bright)
+              (svf_set lp (+ 4000.0 (* 9000.0 bright)) 0.7)))
         ;; the drum
         (set! f (* (kit808_sd_tune p) (+ 1.0 (* 0.12 sweep))))
         (set! phase1 (+ phase1 (/ f SRf)))
         (if (>= phase1 1.0) (set! phase1 (- phase1 1.0)))
         (set! phase2 (+ phase2 (/ (* 1.78 f) SRf)))
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
-        (set! body (+ (* env1 (sin (* STWOPI phase1)))
-                      (* env2 (+ 0.35 (* 0.65 bright)) (sin (* STWOPI phase2)))))
+        (set! body (+ (* env1 (sine_at phase1))
+                      (* env2 (+ 0.35 (* 0.65 bright)) (sine_at phase2))))
         ;; the snares
-        (set! snares (lp (hp (noise) 1800.0 0.7 2) (+ 4000.0 (* 9000.0 bright)) 0.7 0))
+        (set! snares (svf_lp lp (svf_hp hp (noise_white seed))))
         (set! snares (* env_noise (+ 0.3 (* 1.2 (kit808_sd_snappy p) (+ 0.6 (* 0.4 vel)))) snares))
         (set! env1 (* env1 coeff1))
         (set! env2 (* env2 coeff2))
@@ -305,7 +258,7 @@ spectrum rather than a chord."
         (set! sweep (* sweep sweep_coeff))
         (set! carry (* carry carry_coeff))
         (set! last (+ (* 0.22 (kit808_sd_level p) vel (+ (* 0.75 body) snares)) carry))
-        (kit808_out out last 0.5)
+        (frame_add_mono out last 0.5)
         (if (and (< env_noise 0.001) (< env1 0.001) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
@@ -320,33 +273,38 @@ spectrum rather than a chord."
 
 (bind-func kit808_cp_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit808_noise_c 90210))
-          (bp (kit808_svf_c))
-          (hp (kit808_svf_c))
+    (let ((seed:i64 90210)
+          (bp (svf_make 1))
+          (hp (svf_make 1))
           (env:SAMPLE 0.0)
-          (burst_coeff (kit808_decay 0.02))
+          (burst_coeff (decay_mult 0.02))
           (tail_coeff:SAMPLE 0.999)
           (spacing:i64 (convert (/ SRf 90.0) i64))
           (age:i64 0)
           (tail:i1 #f)
           (vel:SAMPLE 0.0)
           (y:SAMPLE 0.0))
+      (svf_set hp 400.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (set! age (voice_age v))
         (if (voice_start? v)
-            (begin (set! env 1.0) (set! tail #f) (set! vel (voice_vel v))))
+            (begin
+              (set! env 1.0)
+              (set! tail #f)
+              (set! vel (voice_vel v))
+              (svf_set bp (+ 900.0 (* 350.0 vel)) 1.6)))
         (if (or (= age spacing) (= age (* 2 spacing)))
             (set! env 1.0))
         (if (= age (* 3 spacing))
             (begin (set! env 0.8) (set! tail #t)))
         (if (= (% age 32) 0)
-            (set! tail_coeff (kit808_decay (kit808_cp_decay p))))
+            (set! tail_coeff (decay_mult (clampf (kit808_cp_decay p) 0.002 100.0))))
         ;; the highpass comes after the envelope, to take out the thump of
         ;; each burst's sudden start
-        (set! y (* env (bp (noise) (+ 900.0 (* 350.0 vel)) 1.6 1)))
-        (set! y (hp y 400.0 0.7 2))
+        (set! y (* env (svf_bp bp (noise_white seed))))
+        (set! y (svf_hp hp y))
         (set! env (* env (if tail tail_coeff burst_coeff)))
-        (kit808_out out (* 0.88 (kit808_cp_level p) vel y) 0.52)
+        (frame_add_mono out (* 0.88 (kit808_cp_level p) vel y) 0.52)
         (if (and tail (< env 0.001))
             (voice_done v))
         void))))
@@ -362,29 +320,31 @@ spectrum rather than a chord."
 
 (bind-func kit808_hh_c
   (lambda (p:SAMPLE*)
-    (let ((metal (kit808_metal_c))
-          (bp (kit808_svf_c))
-          (hp (kit808_svf_c))
+    (let ((metal (kit808_metal_make))
+          (bp (svf_make 1))
+          (hp (svf_make 1))
           (env:SAMPLE 0.0)
           (coeff:SAMPLE 0.99)
           (open:i1 #f)
           (vel:SAMPLE 0.0)
           (level:SAMPLE 0.0)
           (y:SAMPLE 0.0))
+      (svf_set hp 6500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
               (set! env 1.0)
               (set! open (> (voice_pitch v) 44.0))
-              (set! vel (voice_vel v))))
+              (set! vel (voice_vel v))
+              (svf_set bp (+ 7000.0 (* 2000.0 vel)) 1.2)))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! coeff (kit808_decay (if open (kit808_oh_decay p) (kit808_hh_decay p))))
+              (set! coeff (decay_mult (clampf (if open (kit808_oh_decay p) (kit808_hh_decay p)) 0.002 100.0)))
               (set! level (if open (kit808_oh_level p) (kit808_hh_level p)))))
-        (set! y (bp (metal) (+ 7000.0 (* 2000.0 vel)) 1.2 1))
-        (set! y (hp (* env y) 6500.0 0.7 2))
+        (set! y (svf_bp bp (kit808_metal metal)))
+        (set! y (svf_hp hp (* env y)))
         (set! env (* env coeff))
-        (kit808_out out (* 1.45 level vel y) 0.62)
+        (frame_add_mono out (* 1.45 level vel y) 0.62)
         (if (< env 0.001)
             (voice_done v))
         void))))
@@ -399,28 +359,31 @@ spectrum rather than a chord."
 
 (bind-func kit808_cr_c
   (lambda (p:SAMPLE*)
-    (let ((metal (kit808_metal_c))
-          (bp_low (kit808_svf_c))
-          (bp_high (kit808_svf_c))
-          (hp (kit808_svf_c))
+    (let ((metal (kit808_metal_make))
+          (bp_low (svf_make 1))
+          (bp_high (svf_make 1))
+          (hp (svf_make 1))
           (env_low:SAMPLE 0.0) (env_high:SAMPLE 0.0)
           (coeff_low:SAMPLE 0.99) (coeff_high:SAMPLE 0.99)
           (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
           (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set bp_low 3400.0 2.0)
+      (svf_set bp_high 8000.0 0.8)
+      (svf_set hp 6000.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! env_low 1.0) (set! env_high 1.0) (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! coeff_low (kit808_decay (* 0.3 (kit808_cr_decay p))))
-              (set! coeff_high (kit808_decay (kit808_cr_decay p)))
+              (set! coeff_low (decay_mult (clampf (* 0.3 (kit808_cr_decay p)) 0.002 100.0)))
+              (set! coeff_high (decay_mult (clampf (kit808_cr_decay p) 0.002 100.0)))
               (set! bright (* (kit808_cr_tone p) (+ 0.6 (* 0.4 vel))))))
-        (set! x (metal))
-        (set! y (+ (* env_low (- 1.0 (* 0.6 bright)) (bp_low x 3400.0 2.0 1))
-                   (* env_high (+ 0.5 bright) (hp (bp_high x 8000.0 0.8 1) 6000.0 0.7 2))))
+        (set! x (kit808_metal metal))
+        (set! y (+ (* env_low (- 1.0 (* 0.6 bright)) (svf_bp bp_low x))
+                   (* env_high (+ 0.5 bright) (svf_hp hp (svf_bp bp_high x)))))
         (set! env_low (* env_low coeff_low))
         (set! env_high (* env_high coeff_high))
-        (kit808_out out (* 0.95 (kit808_cr_level p) vel y) 0.38)
+        (frame_add_mono out (* 0.95 (kit808_cr_level p) vel y) 0.38)
         (if (< env_high 0.001)
             (voice_done v))
         void))))
@@ -456,19 +419,20 @@ spectrum rather than a chord."
 
 (bind-func kit808_tom_c
   (lambda (p:SAMPLE* which:i64 pan:SAMPLE)
-    (let ((noise (kit808_noise_c (+ 17 which)))
-          (lp (kit808_svf_c))
+    (let ((seed:i64 (+ 17 which))
+          (lp (svf_make 1))
           (conga (> which 2))
           (depth:SAMPLE (if (> which 2) 0.06 0.18))
           (phase:SAMPLE 0.0)
           (amp:SAMPLE 0.0) (amp_coeff:SAMPLE 0.999)
           (sweep:SAMPLE 0.0)
-          (sweep_coeff (kit808_decay (if (> which 2) 0.04 0.2)))
+          (sweep_coeff (decay_mult (if (> which 2) 0.04 0.2)))
           (env_noise:SAMPLE 0.0)
-          (noise_coeff (kit808_decay 0.12))
+          (noise_coeff (decay_mult 0.12))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (kit808_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
+      (svf_set lp 1200.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -477,17 +441,17 @@ spectrum rather than a chord."
               (set! env_noise (if conga 0.0 1.0))
               (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
-            (set! amp_coeff (kit808_decay (if conga (kit808_conga_decay p) (kit808_tom_decay p)))))
+            (set! amp_coeff (decay_mult (clampf (if conga (kit808_conga_decay p) (kit808_tom_decay p)) 0.002 100.0))))
         (set! phase (+ phase (/ (* (kit808_tom_tune p which) (+ 1.0 (* depth sweep))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! y (+ (* amp (sin (* STWOPI phase)))
-                   (* env_noise 0.25 vel (lp (noise) 1200.0 0.7 0))))
+        (set! y (+ (* amp (sine_at phase))
+                   (* env_noise 0.25 vel (svf_lp lp (noise_white seed)))))
         (set! amp (* amp amp_coeff))
         (set! sweep (* sweep sweep_coeff))
         (set! env_noise (* env_noise noise_coeff))
         (set! carry (* carry carry_coeff))
         (set! last (+ (* 0.3 (kit808_tom_level p which) vel y) carry))
-        (kit808_out out last pan)
+        (frame_add_mono out last pan)
         (if (and (< amp 0.001) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
@@ -501,10 +465,11 @@ spectrum rather than a chord."
 
 (bind-func kit808_rs_c
   (lambda (p:SAMPLE*)
-    (let ((hp (kit808_svf_c))
+    (let ((hp (svf_make 1))
           (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0)
-          (env:SAMPLE 0.0) (coeff (kit808_decay 0.035))
+          (env:SAMPLE 0.0) (coeff (decay_mult 0.035))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set hp 350.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! phase1 0.0) (set! phase2 0.0) (set! env 1.0) (set! vel (voice_vel v))))
@@ -512,10 +477,10 @@ spectrum rather than a chord."
         (if (>= phase1 1.0) (set! phase1 (- phase1 1.0)))
         (set! phase2 (+ phase2 (/ 1700.0 SRf)))
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
-        (set! y (* env (+ (* 0.6 (sin (* STWOPI phase1))) (sin (* STWOPI phase2)))))
-        (set! y (hp (tanh (* 2.0 y)) 350.0 0.7 2))
+        (set! y (* env (+ (* 0.6 (sine_at phase1)) (sine_at phase2))))
+        (set! y (svf_hp hp (tanh (* 2.0 y))))
         (set! env (* env coeff))
-        (kit808_out out (* 0.21 (kit808_rs_level p) vel y) 0.45)
+        (frame_add_mono out (* 0.21 (kit808_rs_level p) vel y) 0.45)
         (if (< env 0.001) (voice_done v))
         void))))
 
@@ -524,14 +489,14 @@ spectrum rather than a chord."
 (bind-func kit808_cl_c
   (lambda (p:SAMPLE*)
     (let ((phase:SAMPLE 0.0)
-          (env:SAMPLE 0.0) (coeff (kit808_decay 0.09))
+          (env:SAMPLE 0.0) (coeff (decay_mult 0.09))
           (vel:SAMPLE 0.0))
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! phase 0.0) (set! env 1.0) (set! vel (voice_vel v))))
         (set! phase (+ phase (/ 2500.0 SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (kit808_out out (* 0.23 (kit808_cl_level p) vel env (sin (* STWOPI phase))) 0.36)
+        (frame_add_mono out (* 0.23 (kit808_cl_level p) vel env (sine_at phase)) 0.36)
         (set! env (* env coeff))
         (if (< env 0.001) (voice_done v))
         void))))
@@ -540,16 +505,17 @@ spectrum rather than a chord."
 
 (bind-func kit808_ma_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit808_noise_c 31337))
-          (hp (kit808_svf_c))
+    (let ((seed:i64 31337)
+          (hp (svf_make 1))
           (rise:SAMPLE 0.0) (rise_coeff (smoothing_coeff 0.004))
-          (env:SAMPLE 0.0) (coeff (kit808_decay 0.08))
+          (env:SAMPLE 0.0) (coeff (decay_mult 0.08))
           (vel:SAMPLE 0.0))
+      (svf_set hp 5500.0 0.8)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! rise 0.0) (set! env 1.0) (set! vel (voice_vel v))))
-        (set! rise (+ rise (* rise_coeff (- 1.0 rise))))
-        (kit808_out out (* 0.28 (kit808_ma_level p) vel rise env (hp (noise) 5500.0 0.8 2)) 0.66)
+        (onepole_lp rise rise_coeff 1.0)
+        (frame_add_mono out (* 0.28 (kit808_ma_level p) vel rise env (svf_hp hp (noise_white seed))) 0.66)
         (set! env (* env coeff))
         (if (< env 0.001) (voice_done v))
         void))))
@@ -560,21 +526,24 @@ spectrum rather than a chord."
 
 (bind-func kit808_cb_c
   (lambda (p:SAMPLE*)
-    (let ((o1 (kit808_square_c 0.0))
-          (o2 (kit808_square_c 0.25))
-          (bp (kit808_svf_c))
-          (lp (kit808_svf_c))
-          (strike:SAMPLE 0.0) (strike_coeff (kit808_decay 0.05))
-          (ring:SAMPLE 0.0) (ring_coeff (kit808_decay 0.45))
+    (let ((ph:SAMPLE* (zalloc 2))
+          (bp (svf_make 1))
+          (lp (svf_make 1))
+          (strike:SAMPLE 0.0) (strike_coeff (decay_mult 0.05))
+          (ring:SAMPLE 0.0) (ring_coeff (decay_mult 0.45))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (pset! ph 0 0.0)
+      (pset! ph 1 0.25)
+      (svf_set bp 1000.0 1.2)
+      (svf_set lp 4000.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! strike 1.0) (set! ring 1.0) (set! vel (voice_vel v))))
-        (set! y (lp (bp (+ (o1 540.0) (o2 800.0)) 1000.0 1.2 1) 4000.0 0.7 0))
+        (set! y (svf_lp lp (svf_bp bp (+ (kit808_square ph 0 540.0) (kit808_square ph 1 800.0)))))
         (set! y (* (+ (* 0.65 strike) (* 0.35 ring)) y))
         (set! strike (* strike strike_coeff))
         (set! ring (* ring ring_coeff))
-        (kit808_out out (* 0.14 (kit808_cb_level p) vel y) 0.58)
+        (frame_add_mono out (* 0.14 (kit808_cb_level p) vel y) 0.58)
         (if (< ring 0.001) (voice_done v))
         void))))
 

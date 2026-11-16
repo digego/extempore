@@ -101,20 +101,8 @@
 ;; building blocks ;;
 ;;;;;;;;;;;;;;;;;;;;;
 
-(bind-func static kit909_decay
-  "the per-frame multiplier which makes an envelope fall by 60 dB in `seconds`"
-  (lambda (seconds:SAMPLE)
-    (exp (/ -6.9077553 (* (if (< seconds 0.002) 0.002 seconds) SRf)))))
-
-(bind-func static kit909_clamp
-  (lambda (x:SAMPLE lo:SAMPLE hi:SAMPLE)
-    (if (< x lo) lo (if (> x hi) hi x))))
-
-(bind-func static kit909_out
-  "add the mono sample y to the stereo frame out, at pan position pan"
-  (lambda (out:SAMPLE* y:SAMPLE pan:SAMPLE)
-    (frame_add_mono out y pan)
-    void))
+;; The filters, white noise, sine table, band-limited pulse and decay
+;; multipliers are dsp.xtm's. What follows is what is particular to this kit.
 
 (bind-func static kit909_shape
   "soft saturation: tanh, scaled so that an input of 1.0 still gives 1.0.
@@ -122,74 +110,34 @@
   (lambda (x:SAMPLE drive:SAMPLE)
     (/ (tanh (* drive x)) (tanh drive))))
 
-(bind-func kit909_noise_c
-  "white noise from -1.0 to 1.0 (a linear congruential generator)"
-  (lambda (seed:i64)
-    (let ((state seed))
-      (lambda ()
-        (set! state (% (+ (* state 1103515245) 12345) 2147483648))
-        (- (* (convert state SAMPLE) 0.00000000093132257) 1.0)))))
+(bind-macro
+  "one frame of a square wave from the oscillator whose phase is number i of
+the array ph, at freq Hz: -1.0 to 1.0, band-limited by blep_pulse. The
+oscillators run freely from note to note, so no two hits start from quite the
+same place."
+  (kit909_square ph i freq)
+  `(let ((sq_inc:SAMPLE (/ ,freq SRf)))
+     (let ((sq_phase:SAMPLE (+ (pref ,ph ,i) sq_inc)))
+       (if (>= sq_phase 1.0) (set! sq_phase (- sq_phase 1.0)))
+       (pset! ,ph ,i sq_phase)
+       (blep_pulse sq_phase sq_inc 0.5))))
 
-(bind-func kit909_svf_c
-  "a two-pole state-variable filter, in the trapezoidal form described by
-Andrew Simper. It stays stable and in tune right up to the top of the audio
-band, which matters for the cymbals.
-
-@param x - input
-@param freq - cutoff or centre frequency in Hz
-@param q - resonance (0.5 is gentle, 5.0 is a narrow peak)
-@param mode - 0 lowpass, 1 bandpass (unity gain at the centre), 2 highpass"
+(bind-func kit909_metal_make
+  "the six phases of a metal bank, each starting somewhere different"
   (lambda ()
-    (let ((ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
-          (g:SAMPLE 0.0) (k:SAMPLE 1.0)
-          (a1:SAMPLE 0.0) (a2:SAMPLE 0.0) (a3:SAMPLE 0.0)
-          (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0)
-          (old_freq:SAMPLE -1.0) (old_q:SAMPLE -1.0))
-      (lambda (x:SAMPLE freq:SAMPLE q:SAMPLE mode:i64)
-        (if (or (<> freq old_freq) (<> q old_q))
-            (begin
-              (set! old_freq freq)
-              (set! old_q q)
-              (set! g (tan (* SPI (/ (kit909_clamp freq 20.0 (* 0.45 SRf)) SRf))))
-              (set! k (/ 1.0 (kit909_clamp q 0.3 30.0)))
-              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
-              (set! a2 (* g a1))
-              (set! a3 (* g a2))))
-        (set! v3 (- x ic2))
-        (set! v1 (+ (* a1 ic1) (* a2 v3)))
-        (set! v2 (+ ic2 (* a2 ic1) (* a3 v3)))
-        ;; the tiny constant keeps the state out of denormal numbers
-        (set! ic1 (+ (- (* 2.0 v1) ic1) 1.0e-18))
-        (set! ic2 (- (* 2.0 v2) ic2))
-        (cond ((= mode 0) v2)
-              ((= mode 1) (* k v1))
-              (else (- x (* k v1) v2)))))))
+    (let ((ph:SAMPLE* (zalloc 6)))
+      (pset! ph 0 0.0) (pset! ph 1 0.31) (pset! ph 2 0.57)
+      (pset! ph 3 0.13) (pset! ph 4 0.79) (pset! ph 5 0.44)
+      ph)))
 
-(bind-func kit909_square_c
-  "a square wave, -1.0 to 1.0, with its edges rounded off by poly_blep so that
-it doesn't alias. It runs freely from note to note, so no two hits start from
-quite the same place."
-  (lambda (start_phase:SAMPLE)
-    (let ((phase start_phase) (inc:SAMPLE 0.0) (x:SAMPLE 0.0))
-      (lambda (freq:SAMPLE)
-        (set! inc (/ freq SRf))
-        (set! phase (+ phase inc))
-        (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! x (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
-        (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
-           (poly_blep x inc 1.0 #t))))))
-
-(bind-func kit909_metal_c
+(bind-func static kit909_metal
   "six square waves at unrelated frequencies, summed: a dense, clangorous
 spectrum. `scale` moves all six together, so that two banks made with
-different scales share no partials."
-  (lambda (scale:SAMPLE)
-    (let ((o1 (kit909_square_c 0.0)) (o2 (kit909_square_c 0.31))
-          (o3 (kit909_square_c 0.57)) (o4 (kit909_square_c 0.13))
-          (o5 (kit909_square_c 0.79)) (o6 (kit909_square_c 0.44)))
-      (lambda ()
-        (* 0.1667 (+ (o1 (* scale 263.0)) (o2 (* scale 401.5)) (o3 (* scale 433.7))
-                     (o4 (* scale 562.9)) (o5 (* scale 683.3)) (o6 (* scale 891.6))))))))
+different scales share no partials. ph is from kit909_metal_make."
+  (lambda (ph:SAMPLE* scale:SAMPLE)
+    (* 0.1667 (+ (kit909_square ph 0 (* scale 263.0)) (kit909_square ph 1 (* scale 401.5))
+                 (kit909_square ph 2 (* scale 433.7)) (kit909_square ph 3 (* scale 562.9))
+                 (kit909_square ph 4 (* scale 683.3)) (kit909_square ph 5 (* scale 891.6))))))
 
 ;;;;;;;;;;
 ;; kick ;;
@@ -211,20 +159,21 @@ different scales share no partials."
 
 (bind-func kit909_bd_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit909_noise_c 909))
-          (click_bp (kit909_svf_c))
+    (let ((seed:i64 909)
+          (click_bp (svf_make 1))
           (phase:SAMPLE 0.0)
           (amp:SAMPLE 0.0) (amp_coeff:SAMPLE 0.999)
-          (fast:SAMPLE 0.0) (fast_coeff (kit909_decay 0.03))
-          (slow:SAMPLE 0.0) (slow_coeff (kit909_decay 0.25))
+          (fast:SAMPLE 0.0) (fast_coeff (decay_mult 0.03))
+          (slow:SAMPLE 0.0) (slow_coeff (decay_mult 0.25))
           (depth:SAMPLE 0.0)
-          (pulse:SAMPLE 0.0) (pulse_coeff (- 1.0 (exp (/ (* -6.2831853 5000.0) SRf))))
+          (pulse:SAMPLE 0.0) (pulse_coeff (onepole_coeff 5000.0))
           (pulse_frames:i64 (convert (/ SRf 2000.0) i64))
-          (burst:SAMPLE 0.0) (burst_coeff (kit909_decay 0.015))
+          (burst:SAMPLE 0.0) (burst_coeff (decay_mult 0.015))
           (vel:SAMPLE 0.0) (pre:SAMPLE 1.0)
           (y:SAMPLE 0.0) (click:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (kit909_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
+      (svf_set click_bp 3000.0 0.8)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -234,20 +183,20 @@ different scales share no partials."
               (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! amp_coeff (kit909_decay (kit909_bd_decay p)))
+              (set! amp_coeff (decay_mult (clampf (kit909_bd_decay p) 0.002 100.0)))
               (set! depth (* (kit909_bd_sweep p) (+ 0.7 (* 0.3 vel))))
               (set! pre (+ 1.6 (* 6.0 (kit909_bd_drive p))))))
         ;; the oscillator
         (set! phase (+ phase (/ (* (kit909_bd_tune p) (+ 1.0 (* depth (+ (* 5.0 fast) (* 1.5 slow))))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! y (* amp (sin (* STWOPI phase))))
+        (set! y (* amp (sine_at phase)))
         (set! amp (* amp amp_coeff))
         (set! fast (* fast fast_coeff))
         (set! slow (* slow slow_coeff))
         ;; the click: a 0.5 ms pulse through a lowpass, and a burst of noise
         ;; around 3 kHz
-        (set! pulse (+ pulse (* pulse_coeff (- (if (< (voice_age v) pulse_frames) 1.0 0.0) pulse))))
-        (set! click (+ (* 0.6 pulse) (* 0.8 burst (click_bp (noise) 3000.0 0.8 1))))
+        (onepole_lp pulse pulse_coeff (if (< (voice_age v) pulse_frames) 1.0 0.0))
+        (set! click (+ (* 0.6 pulse) (* 0.8 burst (svf_bp click_bp (noise_white seed)))))
         (set! burst (* burst burst_coeff))
         (set! y (+ y (* (kit909_bd_attack p) vel click)))
         ;; drive flattens the wave, which carries more energy at the same
@@ -256,7 +205,7 @@ different scales share no partials."
         (set! y (* 0.47 (- 1.0 (* 0.35 (kit909_bd_drive p))) (kit909_bd_level p) vel y))
         (set! carry (* carry carry_coeff))
         (set! last (+ y carry))
-        (kit909_out out last 0.5)
+        (frame_add_mono out last 0.5)
         (if (and (< amp 0.0005) (< burst 0.001) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
@@ -272,19 +221,20 @@ different scales share no partials."
 
 (bind-func kit909_sd_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit909_noise_c 4242))
-          (hp (kit909_svf_c))
-          (lp (kit909_svf_c))
+    (let ((seed:i64 4242)
+          (hp (svf_make 1))
+          (lp (svf_make 1))
           (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0)
           (env1:SAMPLE 0.0) (env2:SAMPLE 0.0) (env_noise:SAMPLE 0.0)
-          (coeff1 (kit909_decay 0.17))
-          (coeff2 (kit909_decay 0.11))
-          (coeff_noise (kit909_decay 0.32))
-          (sweep:SAMPLE 0.0) (sweep_coeff (kit909_decay 0.04))
-          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
+          (coeff1 (decay_mult 0.17))
+          (coeff2 (decay_mult 0.11))
+          (coeff_noise (decay_mult 0.32))
+          (sweep:SAMPLE 0.0) (sweep_coeff (decay_mult 0.04))
+          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0) (last_bright:SAMPLE -1.0)
           (f:SAMPLE 0.0) (body:SAMPLE 0.0) (snares:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (kit909_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
+      (svf_set hp 700.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -294,17 +244,21 @@ different scales share no partials."
               (set! sweep 1.0)
               (set! vel (voice_vel v))))
         (set! bright (* (kit909_sd_tone p) (+ 0.5 (* 0.5 vel))))
+        (if (<> bright last_bright)
+            (begin
+              (set! last_bright bright)
+              (svf_set lp (+ 3500.0 (* 11000.0 bright)) 0.7)))
         ;; the drum
         (set! f (* (kit909_sd_tune p) (+ 1.0 (* 0.2 sweep))))
         (set! phase1 (+ phase1 (/ f SRf)))
         (if (>= phase1 1.0) (set! phase1 (- phase1 1.0)))
         (set! phase2 (+ phase2 (/ (* 1.7 f) SRf)))
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
-        (set! body (kit909_shape (+ (* env1 (sin (* STWOPI phase1)))
-                                    (* 0.6 env2 (sin (* STWOPI phase2))))
+        (set! body (kit909_shape (+ (* env1 (sine_at phase1))
+                                    (* 0.6 env2 (sine_at phase2)))
                                  1.5))
         ;; the snares
-        (set! snares (lp (hp (noise) 700.0 0.7 2) (+ 3500.0 (* 11000.0 bright)) 0.7 0))
+        (set! snares (svf_lp lp (svf_hp hp (noise_white seed))))
         (set! snares (* env_noise (+ 0.25 (* 1.3 (kit909_sd_snappy p) (+ 0.6 (* 0.4 vel)))) snares))
         (set! env1 (* env1 coeff1))
         (set! env2 (* env2 coeff2))
@@ -312,7 +266,7 @@ different scales share no partials."
         (set! sweep (* sweep sweep_coeff))
         (set! carry (* carry carry_coeff))
         (set! last (+ (* 0.18 (kit909_sd_level p) vel (+ (* 0.8 body) snares)) carry))
-        (kit909_out out last 0.5)
+        (frame_add_mono out last 0.5)
         (if (and (< env_noise 0.001) (< env1 0.001) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
@@ -327,33 +281,38 @@ different scales share no partials."
 
 (bind-func kit909_cp_c
   (lambda (p:SAMPLE*)
-    (let ((noise (kit909_noise_c 1234567))
-          (bp (kit909_svf_c))
-          (hp (kit909_svf_c))
+    (let ((seed:i64 1234567)
+          (bp (svf_make 1))
+          (hp (svf_make 1))
           (env:SAMPLE 0.0)
-          (burst_coeff (kit909_decay 0.018))
+          (burst_coeff (decay_mult 0.018))
           (tail_coeff:SAMPLE 0.999)
           (spacing:i64 (convert (/ SRf 110.0) i64))
           (age:i64 0)
           (tail:i1 #f)
           (vel:SAMPLE 0.0)
           (y:SAMPLE 0.0))
+      (svf_set hp 600.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (set! age (voice_age v))
         (if (voice_start? v)
-            (begin (set! env 1.0) (set! tail #f) (set! vel (voice_vel v))))
+            (begin
+              (set! env 1.0)
+              (set! tail #f)
+              (set! vel (voice_vel v))
+              (svf_set bp (+ 1000.0 (* 400.0 vel)) 1.4)))
         (if (or (= age spacing) (= age (* 2 spacing)) (= age (* 3 spacing)))
             (set! env 1.0))
         (if (= age (* 4 spacing))
             (begin (set! env 0.85) (set! tail #t)))
         (if (= (% age 32) 0)
-            (set! tail_coeff (kit909_decay (kit909_cp_decay p))))
+            (set! tail_coeff (decay_mult (clampf (kit909_cp_decay p) 0.002 100.0))))
         ;; the highpass comes after the envelope, to take out the thump of
         ;; each burst's sudden start
-        (set! y (* env (bp (noise) (+ 1000.0 (* 400.0 vel)) 1.4 1)))
-        (set! y (hp y 600.0 0.7 2))
+        (set! y (* env (svf_bp bp (noise_white seed))))
+        (set! y (svf_hp hp y))
         (set! env (* env (if tail tail_coeff burst_coeff)))
-        (kit909_out out (* 0.74 (kit909_cp_level p) vel y) 0.52)
+        (frame_add_mono out (* 0.74 (kit909_cp_level p) vel y) 0.52)
         (if (and tail (< env 0.001))
             (voice_done v))
         void))))
@@ -367,10 +326,11 @@ different scales share no partials."
 
 (bind-func kit909_rs_c
   (lambda (p:SAMPLE*)
-    (let ((hp (kit909_svf_c))
+    (let ((hp (svf_make 1))
           (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0) (phase3:SAMPLE 0.0)
-          (env:SAMPLE 0.0) (coeff (kit909_decay 0.04))
+          (env:SAMPLE 0.0) (coeff (decay_mult 0.04))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set hp 500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -382,12 +342,12 @@ different scales share no partials."
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
         (set! phase3 (+ phase3 (/ 1900.0 SRf)))
         (if (>= phase3 1.0) (set! phase3 (- phase3 1.0)))
-        (set! y (* env (+ (* 0.5 (sin (* STWOPI phase1)))
-                          (sin (* STWOPI phase2))
-                          (* 0.6 (sin (* STWOPI phase3))))))
-        (set! y (hp (tanh (* 2.5 y)) 500.0 0.7 2))
+        (set! y (* env (+ (* 0.5 (sine_at phase1))
+                          (sine_at phase2)
+                          (* 0.6 (sine_at phase3)))))
+        (set! y (svf_hp hp (tanh (* 2.5 y))))
         (set! env (* env coeff))
-        (kit909_out out (* 0.21 (kit909_rs_level p) vel y) 0.45)
+        (frame_add_mono out (* 0.21 (kit909_rs_level p) vel y) 0.45)
         (if (< env 0.001) (voice_done v))
         void))))
 
@@ -402,30 +362,32 @@ different scales share no partials."
 
 (bind-func kit909_hh_c
   (lambda (p:SAMPLE*)
-    (let ((metal (kit909_metal_c 1.0))
-          (noise (kit909_noise_c 777))
-          (bp (kit909_svf_c))
-          (hp (kit909_svf_c))
+    (let ((metal (kit909_metal_make))
+          (seed:i64 777)
+          (bp (svf_make 1))
+          (hp (svf_make 1))
           (env:SAMPLE 0.0)
           (coeff:SAMPLE 0.99)
           (open:i1 #f)
           (vel:SAMPLE 0.0)
           (level:SAMPLE 0.0)
           (y:SAMPLE 0.0))
+      (svf_set hp 7500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
               (set! env 1.0)
               (set! open (> (voice_pitch v) 44.0))
-              (set! vel (voice_vel v))))
+              (set! vel (voice_vel v))
+              (svf_set bp (+ 9000.0 (* 2000.0 vel)) 0.9)))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! coeff (kit909_decay (if open (kit909_oh_decay p) (kit909_hh_decay p))))
+              (set! coeff (decay_mult (clampf (if open (kit909_oh_decay p) (kit909_hh_decay p)) 0.002 100.0)))
               (set! level (if open (kit909_oh_level p) (kit909_hh_level p)))))
-        (set! y (bp (+ (metal) (* 0.6 (noise))) (+ 9000.0 (* 2000.0 vel)) 0.9 1))
-        (set! y (hp (* env y) 7500.0 0.7 2))
+        (set! y (svf_bp bp (+ (kit909_metal metal 1.0) (* 0.6 (noise_white seed)))))
+        (set! y (svf_hp hp (* env y)))
         (set! env (* env coeff))
-        (kit909_out out (* 0.28 level vel y) 0.62)
+        (frame_add_mono out (* 0.28 level vel y) 0.62)
         (if (< env 0.001)
             (voice_done v))
         void))))
@@ -442,33 +404,36 @@ different scales share no partials."
 
 (bind-func kit909_cr_c
   (lambda (p:SAMPLE*)
-    (let ((metal_a (kit909_metal_c 1.0))
-          (metal_b (kit909_metal_c 1.37))
-          (noise (kit909_noise_c 5150))
-          (bp_mid (kit909_svf_c))
-          (hp_high (kit909_svf_c))
-          (hp_low (kit909_svf_c))
+    (let ((metal_a (kit909_metal_make))
+          (metal_b (kit909_metal_make))
+          (seed:i64 5150)
+          (bp_mid (svf_make 1))
+          (hp_high (svf_make 1))
+          (hp_low (svf_make 1))
           (rise:SAMPLE 0.0) (rise_coeff (smoothing_coeff 0.002))
           (env_mid:SAMPLE 0.0) (env_high:SAMPLE 0.0)
           (coeff_mid:SAMPLE 0.99) (coeff_high:SAMPLE 0.99)
           (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
           (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set bp_mid 5000.0 1.0)
+      (svf_set hp_high 8000.0 0.7)
+      (svf_set hp_low 2500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! env_mid 1.0) (set! env_high 1.0) (set! rise 0.0) (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! coeff_mid (kit909_decay (* 0.45 (kit909_cr_decay p))))
-              (set! coeff_high (kit909_decay (kit909_cr_decay p)))
+              (set! coeff_mid (decay_mult (clampf (* 0.45 (kit909_cr_decay p)) 0.002 100.0)))
+              (set! coeff_high (decay_mult (clampf (kit909_cr_decay p) 0.002 100.0)))
               (set! bright (* (kit909_cr_tone p) (+ 0.6 (* 0.4 vel))))))
-        (set! x (+ (* 4.0 (metal_a) (metal_b)) (* 0.4 (noise))))
-        (set! y (+ (* env_mid (- 1.0 (* 0.5 bright)) (bp_mid x 5000.0 1.0 1))
-                   (* env_high (+ 0.4 bright) (hp_high x 8000.0 0.7 2))))
-        (set! y (* rise (hp_low y 2500.0 0.7 2)))
-        (set! rise (+ rise (* rise_coeff (- 1.0 rise))))
+        (set! x (+ (* 4.0 (kit909_metal metal_a 1.0) (kit909_metal metal_b 1.37)) (* 0.4 (noise_white seed))))
+        (set! y (+ (* env_mid (- 1.0 (* 0.5 bright)) (svf_bp bp_mid x))
+                   (* env_high (+ 0.4 bright) (svf_hp hp_high x))))
+        (set! y (* rise (svf_hp hp_low y)))
+        (onepole_lp rise rise_coeff 1.0)
         (set! env_mid (* env_mid coeff_mid))
         (set! env_high (* env_high coeff_high))
-        (kit909_out out (* 0.29 (kit909_cr_level p) vel y) 0.38)
+        (frame_add_mono out (* 0.29 (kit909_cr_level p) vel y) 0.38)
         (if (< env_high 0.001)
             (voice_done v))
         void))))
@@ -480,28 +445,31 @@ different scales share no partials."
 
 (bind-func kit909_rd_c
   (lambda (p:SAMPLE*)
-    (let ((metal_a (kit909_metal_c 1.19))
-          (metal_b (kit909_metal_c 1.61))
-          (ping1 (kit909_svf_c))
-          (ping2 (kit909_svf_c))
-          (wash (kit909_svf_c))
+    (let ((metal_a (kit909_metal_make))
+          (metal_b (kit909_metal_make))
+          (ping1 (svf_make 1))
+          (ping2 (svf_make 1))
+          (wash (svf_make 1))
           (env_ping:SAMPLE 0.0) (env_wash:SAMPLE 0.0)
           (coeff_ping:SAMPLE 0.99) (coeff_wash:SAMPLE 0.99)
           (vel:SAMPLE 0.0)
           (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set ping1 3200.0 8.0)
+      (svf_set ping2 5300.0 8.0)
+      (svf_set wash 7000.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin (set! env_ping 1.0) (set! env_wash 1.0) (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (begin
-              (set! coeff_ping (kit909_decay (* 0.35 (kit909_rd_decay p))))
-              (set! coeff_wash (kit909_decay (kit909_rd_decay p)))))
-        (set! x (* 4.0 (metal_a) (metal_b)))
-        (set! y (+ (* env_ping (+ (ping1 x 3200.0 8.0 1) (* 0.8 (ping2 x 5300.0 8.0 1))))
-                   (* env_wash (+ 0.25 (* 0.2 vel)) (wash x 7000.0 0.7 2))))
+              (set! coeff_ping (decay_mult (clampf (* 0.35 (kit909_rd_decay p)) 0.002 100.0)))
+              (set! coeff_wash (decay_mult (clampf (kit909_rd_decay p) 0.002 100.0)))))
+        (set! x (* 4.0 (kit909_metal metal_a 1.19) (kit909_metal metal_b 1.61)))
+        (set! y (+ (* env_ping (+ (svf_bp ping1 x) (* 0.8 (svf_bp ping2 x))))
+                   (* env_wash (+ 0.25 (* 0.2 vel)) (svf_hp wash x))))
         (set! env_ping (* env_ping coeff_ping))
         (set! env_wash (* env_wash coeff_wash))
-        (kit909_out out (* 0.25 (kit909_rd_level p) vel y) 0.64)
+        (frame_add_mono out (* 0.25 (kit909_rd_level p) vel y) 0.64)
         (if (< env_wash 0.001)
             (voice_done v))
         void))))
@@ -528,15 +496,16 @@ different scales share no partials."
 
 (bind-func kit909_tom_c
   (lambda (p:SAMPLE* which:i64 pan:SAMPLE)
-    (let ((noise (kit909_noise_c (+ 99 which)))
-          (lp (kit909_svf_c))
+    (let ((seed:i64 (+ 99 which))
+          (lp (svf_make 1))
           (phase:SAMPLE 0.0)
           (amp:SAMPLE 0.0) (amp_coeff:SAMPLE 0.999)
-          (sweep:SAMPLE 0.0) (sweep_coeff (kit909_decay 0.3))
-          (env_noise:SAMPLE 0.0) (noise_coeff (kit909_decay 0.08))
+          (sweep:SAMPLE 0.0) (sweep_coeff (decay_mult 0.3))
+          (env_noise:SAMPLE 0.0) (noise_coeff (decay_mult 0.08))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (kit909_decay 0.02)))
+          (carry_coeff (decay_mult 0.02)))
+      (svf_set lp 2500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
@@ -544,17 +513,17 @@ different scales share no partials."
               (set! phase 0.0) (set! amp 1.0) (set! sweep 1.0) (set! env_noise 1.0)
               (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
-            (set! amp_coeff (kit909_decay (kit909_tom_decay p))))
+            (set! amp_coeff (decay_mult (clampf (kit909_tom_decay p) 0.002 100.0))))
         (set! phase (+ phase (/ (* (kit909_tom_tune p which) (+ 1.0 (* 0.5 sweep))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! y (+ (* amp (kit909_shape (sin (* STWOPI phase)) 1.5))
-                   (* env_noise 0.3 vel (lp (noise) 2500.0 0.7 0))))
+        (set! y (+ (* amp (kit909_shape (sine_at phase) 1.5))
+                   (* env_noise 0.3 vel (svf_lp lp (noise_white seed)))))
         (set! amp (* amp amp_coeff))
         (set! sweep (* sweep sweep_coeff))
         (set! env_noise (* env_noise noise_coeff))
         (set! carry (* carry carry_coeff))
         (set! last (+ (* 0.27 (kit909_tom_level p which) vel y) carry))
-        (kit909_out out last pan)
+        (frame_add_mono out last pan)
         (if (and (< amp 0.001) (< (fabs carry) 0.0001))
             (begin (set! last 0.0) (voice_done v)))
         void))))
