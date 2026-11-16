@@ -211,6 +211,19 @@ extempore_add_audio_offline_test(hello-sweep
     "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44100 8000)"
     audio-offline)
 
+# The studio's synthesised instruments each have a demo score which plays
+# through their presets. Rendering the start of one compiles the instrument and
+# pushes notes through the whole signal path; the check is only that sound
+# came out. (The sampled instruments need the optional assets, so they aren't
+# rendered here.)
+set(_studio_demos acid)
+foreach(_demo ${_studio_demos})
+    extempore_add_audio_offline_test(studio-${_demo}
+        examples/studio/demos/${_demo}.xtm 3.0
+        "(audiotest_assert_not_silent \"@WAV@\" 0.05)"
+        audio-offline)
+endforeach()
+
 # Notes reaching an instrument through the pattern language. play-note asked
 # sys:make-cptr for a zero-byte buffer when a note carried no extra arguments,
 # got #f, and the xtlang wrapper refused the call without raising --- so
