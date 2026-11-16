@@ -705,7 +705,11 @@
           ((number? x) (pure x))
           ((eq? x '~) silence)
           ((symbol? x) (pure x))
-          ((vector? x) (apply stack (map (lambda (e) (studio:sequence (list e))) (vector->list x))))
+          ;; a vector's elements are read as a sequence's would be, then stacked
+          ((vector? x)
+           (apply stack
+                  (map cdr (studio:steps (car (studio:group-brackets
+                                                (studio:tokenise (vector->list x))))))))
           ((and (pair? x) (eq? (car x) '*alt*))
            (apply slowcat (map cdr (studio:steps (cdr x)))))
           ((and (pair? x) (eq? (car x) 'euclid) (>= (length x) 4))
