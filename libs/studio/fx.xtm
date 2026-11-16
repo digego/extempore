@@ -52,6 +52,8 @@ The returned closure processes the stereo frame in place, reading its settings
 from the parameter array p (see the STRIP_ constants)."
   (lambda ()
     (let ((smooth (smoothing_coeff 0.005))
+          (sat_l (os_make))
+          (sat_r (os_make))
           (gain_l 0.7071) (gain_r 0.7071)
           ;; lowpass and highpass are state variable filters, one per channel
           (lp_g 0.0) (lp_a1 0.0) (lp_a2 0.0)
@@ -105,13 +107,13 @@ from the parameter array p (see the STRIP_ constants)."
               (set! lp_r1 (- (* 2.0 v1) lp_r1))
               (set! lp_r2 (- (* 2.0 v2) lp_r2))
               (set! r v2)))
-        (if (> (pref p STRIP_SHAPE) 0.001)
-            (begin
-              ;; push the signal into a tanh curve, then turn it back down so
-              ;; more drive means more dirt rather than more level
-              (set! pre (+ 1.0 (* 9.0 (pref p STRIP_SHAPE))))
-              (set! l (/ (tanh (* pre l)) (tanh pre)))
-              (set! r (/ (tanh (* pre r)) (tanh pre)))))
+        ;; push the signal into a tanh curve, turned back down afterwards so
+        ;; that more shape means more dirt rather than more level. The curve
+        ;; is applied at four times the sample rate (see oversat4 in dsp.xtm),
+        ;; because the harmonics it adds would otherwise fold back as aliases.
+        (set! pre (if (> (pref p STRIP_SHAPE) 0.001) (+ 1.0 (* 9.0 (pref p STRIP_SHAPE))) 0.0))
+        (set! l (oversat4 sat_l l pre))
+        (set! r (oversat4 sat_r r pre))
         ;; equal-power pan, smoothed so that changes don't click
         (set! target (if (> (pref p STRIP_MUTE) 0.5) 0.0 (* 1.41421356 (pref p STRIP_GAIN))))
         (set! pre (* 1.5707963 (clamp (pref p STRIP_PAN) 0.0 1.0)))
