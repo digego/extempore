@@ -129,3 +129,15 @@
 ;; a vector of alternations: a chord which changes each cycle
 (xtmtest-result (values-of '#(<a b> <c d>) 0 2) '(a c b d) "chord-of-alternations")
 (xtmtest-result (values-of '(#(a*2 b) c)) '(a b a c) "modifiers-inside-a-chord")
+
+;; strum delays each note of a chord a little more than the one below it
+(xtmtest-result (cl:sort (map (lambda (v) (list (cdr (assoc 'note v)) (cdr (assoc 'nudge v))))
+                              (values-of (strum 1/100 (note '#(c3 e3 g3)))))
+                         (lambda (a b) (< (car a) (car b))))
+                '((48 0) (52 1/100) (55 1/50))
+                "strum")
+(xtmtest-result (cl:sort (map (lambda (v) (list (cdr (assoc 'note v)) (cdr (assoc 'nudge v))))
+                              (values-of (strum -1/100 (note '#(c3 e3 g3)))))
+                         (lambda (a b) (< (car a) (car b))))
+                '((48 1/50) (52 1/100) (55 0))
+                "strum-downwards")

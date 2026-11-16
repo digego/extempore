@@ -971,6 +971,42 @@
                                           acc)))))))
                     starts))))))
 
+;; Spread the notes of each chord out in time, as a strummed guitar does:
+;; each note starts `seconds` after the one below it. A negative time strums
+;; downwards in pitch, from the top note.
+(define-transform (strum seconds)
+  (studio:make-pattern
+    (lambda (from end)
+      (let ((haps (query pat from end)))
+        (map (lambda (h)
+               (let ((v (studio:hap-value h)))
+                 (if (and (studio:hap-whole-begin h) (list? v) (assoc 'note v))
+                     ;; how many notes of the same chord are lower (or, strumming
+                     ;; down, higher) than this one?
+                     (let* ((pitch (cdr (assoc 'note v)))
+                            (before (length
+                                      (cl:remove-if-not
+                                        (lambda (other)
+                                          (let ((ov (studio:hap-value other)))
+                                            (and (studio:hap-whole-begin other)
+                                                 (= (studio:hap-whole-begin other) (studio:hap-whole-begin h))
+                                                 (list? ov)
+                                                 (assoc 'note ov)
+                                                 (number? (cdr (assoc 'note ov)))
+                                                 (number? pitch)
+                                                 (if (> seconds 0)
+                                                     (< (cdr (assoc 'note ov)) pitch)
+                                                     (> (cdr (assoc 'note ov)) pitch)))))
+                                        haps))))
+                       (studio:hap-with-value
+                         h
+                         (studio:merge-values
+                           v
+                           (list (cons 'nudge (+ (studio:control-value v 'nudge 0)
+                                                 (* before (abs seconds))))))))
+                     h)))
+             haps)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; playing events on the studio ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
