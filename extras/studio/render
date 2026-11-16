@@ -22,10 +22,26 @@ port=${4:-7099}
 log="${wav%.wav}.log"
 
 cd "$root"
-if ! timeout 600 build/extempore --term nocolor --port "$port" \
-    --audio-outfile "$wav" --duration "$seconds" --run "$file" >"$log" 2>&1; then
-    echo "render failed or timed out --- see $log"
-    grep -n -i -B2 -A6 "error" "$log" | head -60
+build/extempore --term nocolor --port "$port" \
+    --audio-outfile "$wav" --duration "$seconds" --run "$file" >"$log" 2>&1 &
+pid=$!
+# The render's clock starts when the score starts the audio (score-end). If
+# the score fails before then, extempore would wait for ever: give up if the
+# audio hasn't started after three minutes, or finished after ten.
+waited=0
+while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    waited=$((waited + 1))
+    if { [ "$waited" -ge 180 ] && ! grep -q "^zerolatency" "$log"; } || [ "$waited" -ge 600 ]; then
+        kill "$pid" 2>/dev/null
+        echo "PROBLEM: the render never started (or never finished) --- see $log"
+        grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
+        exit 1
+    fi
+done
+if ! wait "$pid"; then
+    echo "PROBLEM: the render failed --- see $log"
+    grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
     exit 1
 fi
 # xtlang compile errors say "Error"; Scheme errors are lines which start with a

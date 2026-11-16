@@ -189,6 +189,9 @@ The compiler is strict in ways that are easy to trip over.
   can't hold exactly (`0.004`, say), multiplied by a `SAMPLE` inside a
   `convert`, fails with this error. Divide by a value which is exact instead:
   `(convert (/ SRf 250.0) i64)`, not `(convert (* 0.004 SRf) i64)`.
+- **A parameter's accessor is a macro, and a function of the same name loses.**
+  An instrument `chip` with a parameter `ring` gets the macro `(chip_ring p)`,
+  so don't also call a function `chip_ring`.
 - **Declare loop variables.** `(dotimes (i n) ...)` needs `(i:i64 0)` in an
   enclosing `let`.
 - **Convert explicitly.** `(convert x i64)` and `(convert n SAMPLE)`.
