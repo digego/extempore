@@ -982,11 +982,20 @@
 
 ;; Where does a sound name play? A track's name plays that track. Otherwise
 ;; it's a sound which some track's instrument knows by name (a kit's bd, say),
-;; and the most recently added such track plays it. Returns (track-index .
-;; pitch-or-#f), or #f.
+;; and the most recently added such track plays it. With two kits loaded,
+;; drums2:bd asks for the bd of the track called drums2. Returns (track-index
+;; . pitch-or-#f), or #f.
 (define studio:resolve-sound
   (lambda (name)
-    (let ((i (studio:track-index name)))
+    (let ((i (studio:track-index name))
+          (parts (if (symbol? name) (regex:split (symbol->string name) ":") '())))
+      (if (= (length parts) 2)
+          ;; drums2:bd is the sound bd on the track drums2
+          (let* ((i (studio:track-index (string->symbol (car parts))))
+                 (slot (and i (vector-ref *studio:tracks* i)))
+                 (s (and slot (assoc (string->symbol (cadr parts))
+                                     (studio:instrument-sounds (cadr slot))))))
+            (if s (cons i (cadr s)) #f))
       (if i
           (cons i #f)
           (let loop ((i (- *studio:num-tracks* 1)))
@@ -996,7 +1005,7 @@
                        (s (and slot (assoc name (studio:instrument-sounds (cadr slot))))))
                   (if s
                       (cons i (cadr s))
-                      (loop (- i 1))))))))))
+                      (loop (- i 1)))))))))))
 
 (define *studio:special-controls* '(sound note vel legato dur nudge))
 
