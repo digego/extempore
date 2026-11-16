@@ -104,6 +104,7 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "guides" },
             { label: "Editor support", slug: "guides/editor-support" },
+            { label: "The studio", slug: "guides/studio" },
             { label: "Pattern language", slug: "guides/pattern-language" },
             { label: "Analogue synth", slug: "guides/analogue-synth" },
             { label: "Audio signal processing", slug: "guides/audio-signal-processing" },
