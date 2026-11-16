@@ -48,6 +48,8 @@ caches `build/_deps/` to speed up CI builds.
 ```bash
 ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-external -j4  # external library tests
+ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
+ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
@@ -73,6 +75,14 @@ cmake --build build --target xtmdoc              # generate docs
 build/extempore --noaudio                        # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)
 ```
+
+## The studio
+
+`libs/studio` is the instrument, mixer and pattern-language library. Read
+`libs/studio/README.md` before writing or changing an instrument: it has the
+instrument interface and the xtlang traps. `extras/studio/render` renders an
+`.xtm` score to a WAV offline and prints an analysis of it, which is how to
+check a sound without listening to it.
 
 ## Docs site
 
