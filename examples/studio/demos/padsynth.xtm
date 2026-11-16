@@ -1,0 +1,72 @@
+;;; padsynth.xtm -- a tour of the PADsynth pad's presets
+
+;; Evaluate the whole file to hear each preset in turn, or render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/padsynth.xtm /tmp/padsynth.wav 66
+;;
+;; The first padsynth track builds the instrument's tables, which takes about
+;; a second.
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'pad 'padsynth)
+(score-ctl 0 'pad 'reverb 0.25)
+
+;; play each chord (a list of pitches) for `len` seconds, one after another,
+;; starting at `start`
+(define padsynth-demo-chords
+  (lambda (start len velocity chords)
+    (let loop ((t start) (chords chords))
+      (if (pair? chords)
+          (begin
+            (for-each (lambda (pitch) (score-note t 'pad pitch velocity (* 0.95 len)))
+                      (car chords))
+            (loop (+ t len) (cdr chords)))))))
+
+;; strings: a slow progression in close voicing
+(score-preset 0.0 'pad 'strings)
+(padsynth-demo-chords 0.0 2.5 0.8 '((48 55 64 71) (45 52 60 67) (41 48 57 64)))
+
+;; ensemble: brighter, quicker chords higher up
+(score-preset 7.5 'pad 'ensemble)
+(padsynth-demo-chords 7.5 1.2 0.85 '((53 60 65 69) (55 62 67 71) (52 59 64 67) (53 60 65 69) (50 57 62 65)))
+
+;; cathedral: a choir on "ah" in D minor, low and wide
+(score-preset 14.0 'pad 'cathedral)
+(padsynth-demo-chords 14.0 3.5 0.8 '((38 50 57 62 65) (34 50 58 62 65)))
+
+;; oo: the softer vowel, a little higher
+(score-preset 21.5 'pad 'oo)
+(padsynth-demo-chords 21.5 3.0 0.75 '((55 62 67 71) (52 60 64 67)))
+
+;; vowels: one long chord, drifting between "ah" and "oo"
+(score-preset 28.0 'pad 'vowels)
+(padsynth-demo-chords 28.0 7.0 0.8 '((45 52 57 60 64)))
+
+;; air: a breathy cluster
+(score-preset 35.5 'pad 'air)
+(padsynth-demo-chords 35.5 6.0 0.8 '((60 62 67 74)))
+
+;; glass: an arpeggio of struck bells over a held fifth
+(score-preset 42.0 'pad 'glass)
+(padsynth-demo-chords 42.0 5.5 0.6 '((48 55)))
+(let loop ((t 42.0) (notes '(72 76 79 83 86 83 79 76 74 79 81 84)))
+  (if (pair? notes)
+      (begin
+        (score-note t 'pad (car notes) 0.75 0.4)
+        (loop (+ t 0.45) (cdr notes)))))
+
+;; frozen: a bell drone which darkens as it swells
+(score-preset 48.0 'pad 'frozen)
+(padsynth-demo-chords 48.0 7.0 0.8 '((43 50 62 69)))
+
+;; organ: steady pipes, a cadence
+(score-preset 56.0 'pad 'organ)
+(padsynth-demo-chords 56.0 1.4 0.8 '((48 55 64 67) (53 57 60 65) (55 59 62 67) (48 52 55 60)))
+
+;; sub: a slow bass line under nothing at all
+(score-preset 62.0 'pad 'sub)
+(padsynth-demo-chords 62.0 1.5 0.85 '((36) (33) (29) (31)))
+
+(score-end)

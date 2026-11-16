@@ -1,0 +1,1184 @@
+;;; padsynth.xtm -- lush pads, string ensembles and choirs from PADsynth tables
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A pad instrument built on the PADsynth method, which is Paul Nasca's. This
+;; is an independent implementation, written from a description of the method
+;; and not from any existing program's source.
+;;
+;; The usual way to make a sustained tone is to add up sine waves, one per
+;; harmonic, each at an exact frequency. Real ensembles aren't like that. Ten
+;; violinists playing the same A are each a few cents out, and each wavers a
+;; little, so what reaches the ear at "the second harmonic" isn't one line in
+;; the spectrum but a narrow hump of energy a few hertz wide. PADsynth builds
+;; that hump directly. For every harmonic it writes a bell-shaped (Gaussian)
+;; band of magnitudes into one very long spectrum, gives every bin of the
+;; spectrum its own random phase, and runs a single inverse FFT. Out comes a
+;; sample several seconds long which already sounds like many players.
+;;
+;; Why it works: a band B Hz wide made of many bins with random phases is a
+;; sinusoid whose amplitude and phase wander at random, at rates up to about B
+;; Hz. That's what the sum of several slightly detuned, slowly drifting copies
+;; of a partial sounds like too: it beats, swells and fades, never quite
+;; repeating. So a band of a few hertz is an ensemble's "chorus" for that
+;; harmonic, without any oscillators or delay lines.
+;;
+;; Why the band should widen with the harmonic: if each player is out by a
+;; few cents, that's the same few cents at every harmonic, and a cent is a
+;; fixed fraction of the frequency. So the band's width in hertz grows in
+;; proportion to the harmonic's number. Here a band's width is
+;;
+;;   W = (2^(cents/1200) - 1) * f0 * r^p
+;;
+;; for a partial at r times the fundamental f0. With p = 1 every partial is
+;; equally wide in cents, like a real section. A little above 1 lets the top
+;; partials smear further (the shimmer of a big string section); p = 0 makes
+;; them all equally wide in hertz, so the upper partials of the organ stay
+;; steady and only its lowest pipes move.
+;;
+;; Every band carries the same power whatever its width: a wide band is
+;; lower at its peak than a narrow one. Overlapping bands add in power, which
+;; is right for things with independent random phases.
+;;
+;; The spectrum is also shaped by a fixed curve in absolute hertz, the same
+;; for every note, which is how a choir gets its vowel. A voice's vocal tract
+;; has resonances (formants) at fixed frequencies --- for "ah" around 700 and
+;; 1100 Hz, for "oo" around 320 and 800 Hz --- whatever note is sung. So the
+;; tables here are built with the formants applied to each partial at its own
+;; frequency in hertz: a low note has many partials under each formant and a
+;; high one few, and the vowel stays the same up and down the keyboard. The
+;; formants move a little from a low-voice set to a high-voice set between C3
+;; and C5, so low notes sound like tenors and basses and high ones like altos
+;; and sopranos. The string timbres use the same idea with broad body
+;; resonances in place of vowels.
+;;
+;; How the tables are made and played. An inverse FFT's output is circular:
+;; its last sample runs straight on into its first, so a table loops with no
+;; seam and needs no crossfade. Each table is 2^17 = 131 072 samples (about
+;; three seconds) and stored as 16-bit integers with one gain per table, so
+;; the whole bank fits in about 29 MB. There are eight timbres (below), each
+;; built at fourteen key zones half an octave apart, from C1 to F#7: 112
+;; tables. Each zone's base frequency is moved slightly (by up to 25 cents)
+;; so that it falls exactly on a bin of the spectrum which is a multiple of
+;; four; then every harmonic, and the sub-octave and fifth used by the organ,
+;; land exactly on an even bin, and the tables are perfectly in tune. A zone
+;; holds nothing above about 14 kHz, so it can be read up to half an octave
+;; sharp without aliasing.
+;;
+;; A note reads the two zones either side of its pitch, at the speed which
+;; puts it in tune, and crossfades between them with equal-power weights (the
+;; two tables are unrelated noise, so their powers add). It reads the selected
+;; timbre and the next one in the bank too, and `morph` crossfades between
+;; them. The left and right channels read the same table half a loop apart,
+;; which gives two uncorrelated signals for any band wider than about a
+;; hertz: a wide stereo image for free. A narrow partial on an even bin is in
+;; phase half a loop later, so the narrow low partials (the fundamental of
+;; the dark sub, the organ's pipes) stay in the centre and never cancel in
+;; mono. Reading starts at a random point for each note, so repeated notes
+;; never sound the same.
+;;
+;; The tables are built when the first padsynth track is made, with an
+;; inverse FFT written out below, and are shared by every padsynth track.
+;; Building them takes about a third of a second; they live outside the
+;; track's memory zone, and stay for the rest of the session.
+;;
+;; After the tables, each voice has a 12 dB/octave lowpass filter with its
+;; own envelope, an amplitude envelope, a delayed vibrato, and two slow random
+;; drifts: one in pitch, one in `morph`, so a held chord breathes between
+;; neighbouring timbres.
+;;
+;; The timbres, in the order `morph` moves through them:
+;;
+;;   0 strings    a focused ensemble core with a wide, shimmering halo
+;;   1 ensemble   a brighter string-machine ensemble with a lift at 3 kHz
+;;   2 ah         a choir singing "ah"
+;;   3 oo         a choir singing "oo"
+;;   4 air        a hollow, blurred tone almost dissolved in breath
+;;   5 glass      a stretched, nearly sinusoidal tone plus the inharmonic
+;;                partials of a vibrating bar: a glass bell
+;;   6 organ      drawbar pipes with very narrow bands
+;;   7 sub        a soft, triangle-like tone with a sub-octave
+
+;;; Code:
+
+(sys:load-preload-check 'studio-padsynth)
+(define *xtmlib-studio-padsynth-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument padsynth
+  "PADsynth pads: string ensembles, choirs, glass and organ from long, looping spectral tables"
+  (params
+    (timbre 0.0 "which table set, 0 to 7: strings, ensemble, ah, oo, air, glass, organ, sub (taken at note-on)")
+    (morph 0.0 "crossfade towards the next timbre, 0.0 to 1.0")
+    (level 1.0 "output level, linear (1.0 is the reference level)")
+    (attack 0.8 "seconds to swell to full level")
+    (decay 2.0 "seconds to fall 60 dB towards the sustain level")
+    (sustain 1.0 "level held after the decay, 0.0 to 1.0")
+    (release 2.5 "seconds to fade by 60 dB after the note ends")
+    (cutoff 6000.0 "lowpass filter cutoff in Hz, at middle C")
+    (resonance 0.1 "filter resonance, 0.0 (none) to 1.0 (a mild peak)")
+    (keytrack 0.5 "how far the cutoff follows the note, 0.0 (fixed) to 1.0 (fully)")
+    (fenv-amount 0.0 "how far the filter envelope moves the cutoff, in octaves (-4 to 6)")
+    (fenv-attack 1.5 "seconds for the filter envelope to rise")
+    (vib-rate 4.5 "vibrato rate in Hz")
+    (vib-depth 0.0 "vibrato depth in cents (0 to 50); it fades in over the attack")
+    (drift 0.3 "slow random wander of pitch (up to 7 cents) and morph, 0.0 to 1.0")
+    (width 1.0 "stereo width, 0.0 (mono) to 1.0")
+    (vel-sens 0.5 "how much velocity changes the level, 0.0 (none) to 1.0 (24 dB)"))
+  (presets
+    (strings (morph 0.2) (level 1.2) (attack 0.6) (decay 3.0) (sustain 0.9) (release 2.0)
+             (cutoff 3500.0) (keytrack 0.6) (fenv-amount 1.0) (fenv-attack 1.2) (vib-rate 5.0)
+             (vib-depth 6.0) (width 0.9))
+    (ensemble (timbre 1.0) (attack 0.25) (release 1.5) (cutoff 9000.0) (resonance 0.15)
+              (keytrack 0.4) (fenv-attack 0.5) (vib-rate 5.5) (vib-depth 12.0) (drift 0.2)
+              (vel-sens 0.4))
+    (cathedral (timbre 2.0) (morph 0.35) (level 0.9) (attack 1.5) (decay 4.0) (release 4.0)
+               (cutoff 5000.0) (resonance 0.05) (fenv-amount 0.5) (fenv-attack 2.0) (vib-rate 4.8)
+               (vib-depth 8.0) (drift 0.4) (vel-sens 0.3))
+    (oo (timbre 3.0) (morph 0.1) (level 0.9) (attack 1.2) (decay 3.0) (release 3.0) (cutoff 3000.0)
+        (fenv-attack 1.0) (vib-depth 5.0) (width 0.8) (vel-sens 0.3))
+    (vowels (timbre 2.0) (morph 0.5) (level 0.85) (attack 2.0) (decay 4.0) (release 5.0)
+            (fenv-attack 1.0) (drift 0.8) (vel-sens 0.2))
+    (air (timbre 4.0) (morph 0.3) (level 0.9) (attack 2.5) (decay 5.0) (release 6.0)
+         (cutoff 2500.0) (resonance 0.2) (keytrack 0.3) (fenv-amount 2.0) (fenv-attack 4.0)
+         (vib-rate 0.3) (vib-depth 3.0) (drift 0.5) (vel-sens 0.2))
+    (glass (timbre 5.0) (attack 0.05) (decay 4.0) (sustain 0.6) (release 5.0) (cutoff 12000.0)
+           (keytrack 0.3) (fenv-amount -1.0) (fenv-attack 3.0) (drift 0.2) (vel-sens 0.6))
+    (frozen (timbre 5.0) (morph 0.6) (level 0.85) (attack 4.0) (decay 8.0) (release 10.0)
+            (cutoff 8000.0) (resonance 0.05) (keytrack 0.2) (fenv-amount -1.5) (fenv-attack 8.0)
+            (drift 0.5) (vel-sens 0.2))
+    (organ (timbre 6.0) (level 0.9) (attack 0.15) (decay 1.0) (release 0.8) (cutoff 8000.0)
+           (resonance 0.0) (keytrack 0.3) (fenv-attack 0.5) (vib-rate 6.0) (vib-depth 4.0)
+           (drift 0.1) (width 0.6) (vel-sens 0.3))
+    (sub (timbre 7.0) (level 0.8) (attack 1.0) (decay 3.0) (release 3.0) (cutoff 1200.0)
+         (resonance 0.2) (keytrack 1.0) (fenv-amount 0.5) (drift 0.15) (width 0.5) (vel-sens 0.4))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; the table geometry ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Each table is N samples long, stored with three guard samples (N-1 before
+;; the start, 0 and 1 after the end) so a cubic read never has to wrap.
+(bind-val PADSYNTH_N i64 131072)
+(bind-val PADSYNTH_BITS i64 17)
+(bind-val PADSYNTH_LEN i64 131075)
+(bind-val PADSYNTH_ZONES i64 14)
+(bind-val PADSYNTH_TIMBRES i64 8)
+;; a layer of a timbre's recipe is 48 numbers: see padsynth_layer_clear
+(bind-val PADSYNTH_LAYER i64 48)
+
+;; the bank, shared by every padsynth track and built once (padsynth_build)
+(bind-val padsynth_tables i16*)  ;; 112 tables, timbre-major: table (timbre * 14 + zone)
+(bind-val padsynth_gains SAMPLE*) ;; each table's gain, which brings its RMS to 1.0
+(bind-val padsynth_bases SAMPLE*) ;; each zone's base frequency in Hz
+(bind-val padsynth_trims SAMPLE*) ;; each timbre's loudness trim (linear)
+(bind-val padsynth_built i64 0)
+(bind-val padsynth_seed i64 0)    ;; a running count, which seeds each voice's randomness
+
+(bind-func static padsynth_rand
+  "a uniform random number in [0, 1).
+
+The generator is SplitMix64 (Steele, Lea and Flood): a counter which steps by
+a large odd constant, scrambled by two multiply-xorshift rounds. It's fast,
+needs one 64-bit word of state, and a given seed always gives the same
+sequence, so the bank comes out the same every time it's built."
+  (lambda (state:i64*)
+    (let ((z:i64 (+ (pref state 0) -7046029254386353131)))
+      (pset! state 0 z)
+      (set! z (* (bitwise-eor z (bitwise-shift-right z 30)) -4658895280553007687))
+      (set! z (* (bitwise-eor z (bitwise-shift-right z 27)) -7723592293110705685))
+      (set! z (bitwise-eor z (bitwise-shift-right z 31)))
+      ;; the top 53 bits, as a double in [0, 1)
+      (/ (convert (bitwise-shift-right z 11) double) 9007199254740992.0))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the inverse FFT, radix 2, in place ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func padsynth_twiddles
+  "the twiddle factors for an inverse FFT of size n: tw[2k] + i tw[2k+1] =
+e^(2 pi i k / n) for k = 0 to n/2 - 1, worked out in double precision"
+  (lambda (tw:float* n:i64)
+    (let ((k:i64 0)
+          (a:double 0.0))
+      (dotimes (k (/ n 2))
+        (set! a (/ (* 2.0 3.141592653589793 (convert k double)) (convert n double)))
+        (pset! tw (* 2 k) (convert (cos a) float))
+        (pset! tw (+ (* 2 k) 1) (convert (sin a) float)))
+      void)))
+
+(bind-func padsynth_ifft
+  "an inverse FFT of the n = 2^bits complex numbers in z (real and imaginary
+parts interleaved), in place: z_t = sum over j of Z_j e^(+2 pi i j t / n),
+with no 1/n scaling.
+
+This is the textbook iterative decimation-in-time algorithm. A transform of
+size n is two transforms of size n/2, one of the even-numbered inputs and one
+of the odd, joined by a 'butterfly' for each output pair:
+
+  out[k]       = even[k] + w^k odd[k]
+  out[k + n/2] = even[k] - w^k odd[k],    w = e^(2 pi i / n)
+
+Doing that recursively all the way down to transforms of size 1 needs the
+inputs in bit-reversed order (input 1 = 00..01 goes to slot 10..00, and so on).
+So: shuffle the input into that order, then make log2(n) passes, each joining
+pairs of transforms of size L/2 into transforms of size L."
+  (lambda (z:float* tw:float* n:i64 bits:i64)
+    (let ((i:i64 0) (r:i64 0) (x:i64 0) (b:i64 0)
+          (tmp:float 0.0)
+          (len:i64 2) (half:i64 0) (step:i64 0) (start:i64 0) (k:i64 0)
+          (lo:i64 0) (hi:i64 0) (w:i64 0)
+          (wr:float 0.0) (wi:float 0.0)
+          (vr:float 0.0) (vi:float 0.0)
+          (ur:float 0.0) (ui:float 0.0))
+      ;; the bit-reversal shuffle: swap each pair once
+      (dotimes (i n)
+        (set! r 0)
+        (set! x i)
+        (dotimes (b bits)
+          (set! r (bitwise-or (bitwise-shift-left r 1) (bitwise-and x 1)))
+          (set! x (bitwise-shift-right x 1)))
+        (if (> r i)
+            (begin
+              (set! tmp (pref z (* 2 i)))
+              (pset! z (* 2 i) (pref z (* 2 r)))
+              (pset! z (* 2 r) tmp)
+              (set! tmp (pref z (+ (* 2 i) 1)))
+              (pset! z (+ (* 2 i) 1) (pref z (+ (* 2 r) 1)))
+              (pset! z (+ (* 2 r) 1) tmp)
+              void)))
+      ;; the passes: join transforms of size len/2 into transforms of size len.
+      ;; The twiddle for output k of a size-len transform is e^(2 pi i k / len),
+      ;; which is entry k * (n / len) of the size-n table.
+      (while (<= len n)
+        (set! half (/ len 2))
+        (set! step (/ n len))
+        (set! start 0)
+        (while (< start n)
+          (dotimes (k half)
+            (set! w (* 2 k step))
+            (set! wr (pref tw w))
+            (set! wi (pref tw (+ w 1)))
+            (set! lo (* 2 (+ start k)))
+            (set! hi (+ lo len)) ;; (start + k + half), times two for re/im
+            (set! vr (- (* wr (pref z hi)) (* wi (pref z (+ hi 1)))))
+            (set! vi (+ (* wr (pref z (+ hi 1))) (* wi (pref z hi))))
+            (set! ur (pref z lo))
+            (set! ui (pref z (+ lo 1)))
+            (pset! z lo (+ ur vr))
+            (pset! z (+ lo 1) (+ ui vi))
+            (pset! z hi (- ur vr))
+            (pset! z (+ hi 1) (- ui vi)))
+          (set! start (+ start len)))
+        (set! len (* len 2)))
+      void)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; recipes: what goes into each timbre     ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A timbre is up to three layers, each its own set of partials (or a band of
+;; noise) with its own band widths, mixed at a set level. A layer is 48
+;; numbers:
+;;
+;;   0 kind: 0 a harmonic series, 1 a list of (ratio, weight) pairs, 2 noise
+;;   1 how many partials (series) or pairs (list)
+;;   2 series stretch s: partial n sits at n^(1 + s)
+;;   3 series slope a: partial n has weight n^-a ...
+;;   4 ... times this for the even-numbered partials
+;;   5 tilt corner in Hz (0 for none), 6 tilt order: a smooth lowpass
+;;   7 band width in cents at middle C, 8 width exponent p (above),
+;;   9 keyboard exponent: zone z's width is (7) * (base_z / 261.63)^-(9)
+;;   10 level in dB, relative to the first layer's total power
+;;   11, 12 noise: the pass band in Hz
+;;   13 envelope floor (linear), 14 how many resonances, 15-26 up to four
+;;      resonances as (centre Hz, half bandwidth Hz, peak gain linear)
+;;   27-46 up to ten (ratio, weight) pairs
+
+(bind-func static padsynth_layer_clear
+  (lambda (l:double*)
+    (let ((i:i64 0))
+      (dotimes (i PADSYNTH_LAYER) (pset! l i 0.0))
+      (pset! l 4 1.0)  ;; even partials at full weight
+      (pset! l 13 1.0) ;; a flat envelope
+      void)))
+
+(bind-func static padsynth_series
+  "a harmonic series of up to n partials (every one below the zone's limit
+when n is 256), with weights n^-slope, even partials times even"
+  (lambda (l:double* n:i64 stretch:double slope:double even:double)
+    (pset! l 0 0.0)
+    (pset! l 1 (convert n double))
+    (pset! l 2 stretch)
+    (pset! l 3 slope)
+    (pset! l 4 even)
+    void))
+
+(bind-func static padsynth_pair
+  "add a partial at ratio r with weight w to a list layer"
+  (lambda (l:double* r:double w:double)
+    (let ((i (convert (pref l 1) i64)))
+      (pset! l 0 1.0)
+      (pset! l (+ 27 (* 2 i)) r)
+      (pset! l (+ 28 (* 2 i)) w)
+      (pset! l 1 (convert (+ i 1) double))
+      void)))
+
+(bind-func static padsynth_noise
+  "make the layer a band of noise from lo to hi Hz, shaped by its envelope"
+  (lambda (l:double* lo:double hi:double)
+    (pset! l 0 2.0)
+    (pset! l 11 lo)
+    (pset! l 12 hi)
+    void))
+
+(bind-func static padsynth_band
+  "the layer's band width (cents at middle C), width exponent, keyboard
+exponent, and level (dB)"
+  (lambda (l:double* cents:double p:double kappa:double db:double)
+    (pset! l 7 cents)
+    (pset! l 8 p)
+    (pset! l 9 kappa)
+    (pset! l 10 db)
+    void))
+
+(bind-func static padsynth_tilt
+  (lambda (l:double* corner:double order:double)
+    (pset! l 5 corner)
+    (pset! l 6 order)
+    void))
+
+(bind-func static padsynth_floor
+  (lambda (l:double* db:double)
+    (pset! l 13 (pow 10.0 (/ db 20.0)))
+    void))
+
+(bind-func static padsynth_res
+  "add a resonance to the layer's envelope: centre Hz, -3 dB bandwidth Hz,
+peak gain dB"
+  (lambda (l:double* centre:double bw:double db:double)
+    (let ((i (convert (pref l 14) i64)))
+      (pset! l (+ 15 (* 3 i)) centre)
+      (pset! l (+ 16 (* 3 i)) (* 0.5 bw))
+      (pset! l (+ 17 (* 3 i)) (pow 10.0 (/ db 20.0)))
+      (pset! l 14 (convert (+ i 1) double))
+      void)))
+
+(bind-func static padsynth_layer_copy
+  (lambda (to:double* from:double*)
+    (let ((i:i64 0))
+      (dotimes (i PADSYNTH_LAYER) (pset! to i (pref from i)))
+      void)))
+
+(bind-func static padsynth_vowel_res
+  "a formant between its low-voice and high-voice settings: w = 0 is the low
+voice, 1 the high. Frequencies move geometrically, gains linearly in dB."
+  (lambda (l:double* w:double f0:double b0:double g0:double f1:double b1:double g1:double)
+    (padsynth_res l (* (pow f0 (- 1.0 w)) (pow f1 w))
+                  (* (pow b0 (- 1.0 w)) (pow b1 w))
+                  (+ g0 (* w (- g1 g0))))))
+
+(bind-func static padsynth_vowel
+  "the formants of a vowel (0 'ah', 1 'oo') for a zone based at bk Hz.
+
+Rounded textbook formant averages, with the bandwidths widened about one and
+a half times for an ensemble. Zones at C3 and below get the low-voice set,
+zones at C5 and above the high-voice set, and the zones between are
+interpolated."
+  (lambda (l:double* vowel:i64 bk:double)
+    (let ((w:double (* 0.5 (/ (log (/ bk 130.8)) (log 2.0)))))
+      (if (< w 0.0) (set! w 0.0))
+      (if (> w 1.0) (set! w 1.0))
+      (if (= vowel 0)
+          (begin
+            (padsynth_floor l -45.0)
+            (padsynth_vowel_res l w 700.0 130.0 0.0 850.0 150.0 0.0)
+            (padsynth_vowel_res l w 1100.0 150.0 -5.0 1250.0 170.0 -6.0)
+            (padsynth_vowel_res l w 2450.0 220.0 -18.0 2850.0 250.0 -22.0)
+            (padsynth_vowel_res l w 3300.0 300.0 -28.0 3900.0 350.0 -32.0))
+          (begin
+            (padsynth_floor l -50.0)
+            (padsynth_vowel_res l w 320.0 100.0 0.0 380.0 120.0 0.0)
+            (padsynth_vowel_res l w 800.0 130.0 -12.0 950.0 150.0 -14.0)
+            (padsynth_vowel_res l w 2300.0 200.0 -30.0 2650.0 250.0 -32.0)
+            (padsynth_vowel_res l w 3000.0 300.0 -36.0 3500.0 350.0 -40.0)))
+      void)))
+
+(bind-func padsynth_recipe
+  "write timbre tau's layers, for a zone based at bk Hz, into l (three
+layers' worth). Returns how many layers there are."
+  (lambda (tau:i64 bk:double l:double*)
+    (let ((l0 (pref-ptr l 0))
+          (l1 (pref-ptr l PADSYNTH_LAYER))
+          (l2 (pref-ptr l (* 2 PADSYNTH_LAYER)))
+          (n:i64 2))
+      (padsynth_layer_clear l0)
+      (padsynth_layer_clear l1)
+      (padsynth_layer_clear l2)
+      (cond
+        ((= tau 0)
+         ;; strings: a saw-like series under four broad body resonances and a
+         ;; soft top, as a focused core (22 cents) plus a wide halo (70 cents,
+         ;; widening towards the top) 9 dB down
+         (padsynth_series l0 256 0.0 1.0 1.0)
+         (padsynth_floor l0 -18.0)
+         (padsynth_res l0 280.0 160.0 0.0)
+         (padsynth_res l0 520.0 300.0 -2.0)
+         (padsynth_res l0 1150.0 700.0 -8.0)
+         (padsynth_res l0 2700.0 1600.0 -7.0)
+         (padsynth_tilt l0 4500.0 2.0)
+         (padsynth_band l0 22.0 1.0 0.25 0.0)
+         (padsynth_layer_copy l1 l0)
+         (padsynth_band l1 70.0 1.2 0.25 -9.0))
+        ((= tau 1)
+         ;; ensemble: brighter, with a broad presence lift at 3 kHz
+         (padsynth_series l0 256 0.0 1.0 1.0)
+         (padsynth_floor l0 -6.0)
+         (padsynth_res l0 3000.0 3000.0 0.0)
+         (padsynth_tilt l0 11000.0 1.0)
+         (padsynth_band l0 12.0 1.0 0.2 0.0)
+         (padsynth_layer_copy l1 l0)
+         (padsynth_band l1 45.0 1.15 0.2 -4.0))
+        ((= tau 2)
+         ;; choir "ah": a bright source through the vowel's formants, in wide
+         ;; (50 cent) bands, with a little breath noise through the same vowel
+         (padsynth_series l0 256 0.0 1.2 1.0)
+         (padsynth_vowel l0 0 bk)
+         (padsynth_tilt l0 5000.0 1.0)
+         (padsynth_band l0 50.0 1.0 0.3 0.0)
+         (padsynth_layer_copy l1 l0)
+         (padsynth_noise l1 150.0 12000.0)
+         (padsynth_band l1 0.0 0.0 0.0 -22.0))
+        ((= tau 3)
+         ;; choir "oo": a darker source and a darker vowel
+         (padsynth_series l0 256 0.0 1.6 1.0)
+         (padsynth_vowel l0 1 bk)
+         (padsynth_tilt l0 3000.0 1.0)
+         (padsynth_band l0 45.0 1.0 0.3 0.0)
+         (padsynth_layer_copy l1 l0)
+         (padsynth_noise l1 150.0 8000.0)
+         (padsynth_band l1 0.0 0.0 0.0 -26.0))
+        ((= tau 4)
+         ;; air: weak even partials (a hollow tone) in very wide bands, and
+         ;; shaped noise only 4 dB below it
+         (padsynth_series l0 256 0.0 1.0 0.6)
+         (padsynth_floor l0 -18.0)
+         (padsynth_res l0 900.0 700.0 0.0)
+         (padsynth_res l0 2500.0 1500.0 -6.0)
+         (padsynth_tilt l0 6000.0 1.0)
+         (padsynth_band l0 90.0 1.0 0.3 0.0)
+         (padsynth_noise l1 100.0 14000.0)
+         (padsynth_floor l1 -20.0)
+         (padsynth_res l1 1200.0 1500.0 0.0)
+         (padsynth_res l1 4500.0 4000.0 -4.0)
+         (padsynth_band l1 0.0 0.0 0.0 -4.0))
+        ((= tau 5)
+         ;; glass: six slightly stretched harmonics falling steeply (the
+         ;; pitch), the first overtones of a free bar at 2.756, 5.404, 8.933
+         ;; and 13.345 times the fundamental in very narrow bands (the glassy
+         ;; ring), and a wide copy of the bar partials for slow sparkle
+         (set! n 3)
+         (padsynth_series l0 6 0.015 2.5 1.0)
+         (padsynth_band l0 6.0 0.5 0.0 0.0)
+         (padsynth_pair l1 2.756 0.70)
+         (padsynth_pair l1 5.404 0.50)
+         (padsynth_pair l1 8.933 0.35)
+         (padsynth_pair l1 13.345 0.22)
+         (padsynth_band l1 4.0 0.5 0.0 -2.0)
+         (padsynth_layer_copy l2 l1)
+         (padsynth_band l2 40.0 1.0 0.0 -14.0))
+        ((= tau 6)
+         ;; organ: drawbars 68 4040 023 (16', 8', 5 1/3', 4', 2', 1') at 3 dB
+         ;; a step, in bands only 4 cents wide and equally wide in Hz
+         ;; (exponent 0), so the pitch stays steady, plus a faint chorus copy
+         (padsynth_pair l0 0.5 0.501)
+         (padsynth_pair l0 1.0 1.0)
+         (padsynth_pair l0 1.5 0.251)
+         (padsynth_pair l0 2.0 0.501)
+         (padsynth_pair l0 4.0 0.251)
+         (padsynth_pair l0 6.0 0.126)
+         (padsynth_pair l0 8.0 0.178)
+         (padsynth_band l0 4.0 0.0 0.0 0.0)
+         (padsynth_layer_copy l1 l0)
+         (padsynth_band l1 18.0 0.8 0.0 -10.0))
+        (else
+         ;; sub: a soft triangle-like tone (steep slope, weak even partials,
+         ;; a lowpass at 900 Hz) whose upper partials widen fast (p = 1.4),
+         ;; and a pure sub-octave 6 dB down
+         (padsynth_series l0 256 0.0 2.0 0.3)
+         (padsynth_tilt l0 900.0 2.0)
+         (padsynth_band l0 8.0 1.4 0.0 0.0)
+         (padsynth_pair l1 0.5 1.0)
+         (padsynth_band l1 3.0 1.0 0.0 -6.0)))
+      n)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; from a recipe to a spectrum ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static padsynth_shape
+  "a layer's spectral envelope times its tilt, at f Hz"
+  (lambda (l:double* f:double)
+    (let ((e:double (pref l 13))
+          (n (convert (pref l 14) i64))
+          (i:i64 0)
+          (x:double 0.0)
+          (y:double 0.0)
+          (t:double 1.0)
+          (order (convert (pref l 6) i64)))
+      ;; a parallel bank of resonances, each 1 / sqrt(1 + x^2): a peak of
+      ;; its gain at its centre, 3 dB down at x = 1 (half its bandwidth away)
+      (dotimes (i n)
+        (set! x (/ (- f (pref l (+ 15 (* 3 i)))) (pref l (+ 16 (* 3 i)))))
+        (set! e (+ e (/ (pref l (+ 17 (* 3 i))) (sqrt (+ 1.0 (* x x)))))))
+      ;; the tilt: 1 / sqrt(1 + (f / corner)^(2 order)), a smooth lowpass
+      (if (> (pref l 5) 0.0)
+          (begin
+            (set! y (/ f (pref l 5)))
+            (set! y (* y y))
+            (dotimes (i order) (set! t (* t y)))
+            (set! e (/ e (sqrt (+ 1.0 t))))))
+      e)))
+
+(bind-func static padsynth_ratio
+  (lambda (l:double* i:i64)
+    (if (= (pref l 0) 0.0)
+        (pow (convert (+ i 1) double) (+ 1.0 (pref l 2)))
+        (pref l (+ 27 (* 2 i))))))
+
+(bind-func static padsynth_weight
+  (lambda (l:double* i:i64)
+    (if (= (pref l 0) 0.0)
+        (* (pow (convert (+ i 1) double) (- 0.0 (pref l 3)))
+           (if (= (% i 2) 1) (pref l 4) 1.0))
+        (pref l (+ 28 (* 2 i))))))
+
+(bind-func padsynth_layer_power
+  "a layer's total power in the zone based at bk Hz, before it's scaled: the
+sum of its partials' squared amplitudes, or of its noise's squared envelope
+over the bins it fills. Partials outside 20 Hz to flim, or more than 80 dB
+below the layer's loudest, are left out (here and when the layer is added)."
+  (lambda (l:double* bk:double flim:double jmax:i64 sr:double)
+    (let ((n (convert (pref l 1) i64))
+          (i:i64 0) (j:i64 0)
+          (f:double 0.0) (a:double 0.0)
+          (amax:double 0.0) (total:double 0.0)
+          (nn (convert PADSYNTH_N double)))
+      (if (= (pref l 0) 2.0)
+          (let ((lo:i64 (convert (ceil (/ (* (pref l 11) nn) sr)) i64))
+                (hi:i64 (convert (floor (/ (* (pref l 12) nn) sr)) i64)))
+            (if (< lo 1) (set! lo 1))
+            (if (> hi jmax) (set! hi jmax))
+            (set! j lo)
+            (while (<= j hi)
+              (set! a (padsynth_shape l (/ (* (convert j double) sr) nn)))
+              (set! total (+ total (* a a)))
+              (set! j (+ j 1)))
+            total)
+          (begin
+            (dotimes (i n)
+              (set! f (* bk (padsynth_ratio l i)))
+              (if (and (>= f 20.0) (<= f flim))
+                  (begin
+                    (set! a (* (padsynth_weight l i) (padsynth_shape l f)))
+                    (if (> a amax) (set! amax a))
+                    void)))
+            (dotimes (i n)
+              (set! f (* bk (padsynth_ratio l i)))
+              (if (and (>= f 20.0) (<= f flim))
+                  (begin
+                    (set! a (* (padsynth_weight l i) (padsynth_shape l f)))
+                    (if (>= a (* 0.0001 amax)) (set! total (+ total (* a a))))
+                    void)))
+            total)))))
+
+(bind-func padsynth_layer_add
+  "add a layer's power spectrum, times scale, into slot `slot` (0 for the real
+parts, 1 for the imaginary) of bins 1 to jmax of the work buffer z.
+
+bk is the zone's base frequency in Hz and beta the bin it sits on. Each
+partial becomes a Gaussian band, exp(-((j - c) / h)^2) in magnitude, so
+exp(-2 ((j - c) / h)^2) in power, centred on the even bin c nearest to it,
+with h half its 1/e width in bins. The band's power is divided by its sum,
+so every partial carries the same power however wide it is."
+  (lambda (z:float* slot:i64 l:double* bk:double beta:double flim:double jmax:i64 sr:double scale:double)
+    (let ((n (convert (pref l 1) i64))
+          (nn (convert PADSYNTH_N double))
+          (i:i64 0) (j:i64 0) (d:i64 0) (c:i64 0) (reach:i64 0)
+          (r:double 0.0) (f:double 0.0) (a:double 0.0) (amax:double 0.0)
+          (cents:double 0.0) (width:double 0.0) (h:double 0.0)
+          (power:double 0.0) (sum:double 0.0)
+          (g:double 0.0) (ratio:double 0.0) (q:double 0.0))
+      (if (= (pref l 0) 2.0)
+          ;; noise: every bin in the pass band, at the envelope's level. The
+          ;; random phases (added later) make it noise.
+          (let ((lo:i64 (convert (ceil (/ (* (pref l 11) nn) sr)) i64))
+                (hi:i64 (convert (floor (/ (* (pref l 12) nn) sr)) i64)))
+            (if (< lo 1) (set! lo 1))
+            (if (> hi jmax) (set! hi jmax))
+            (set! j lo)
+            (while (<= j hi)
+              (set! a (padsynth_shape l (/ (* (convert j double) sr) nn)))
+              (pset! z (+ (* 2 j) slot)
+                     (+ (pref z (+ (* 2 j) slot)) (convert (* scale a a) float)))
+              (set! j (+ j 1)))
+            void)
+          (begin
+            (dotimes (i n)
+              (set! f (* bk (padsynth_ratio l i)))
+              (if (and (>= f 20.0) (<= f flim))
+                  (begin
+                    (set! a (* (padsynth_weight l i) (padsynth_shape l f)))
+                    (if (> a amax) (set! amax a))
+                    void)))
+            ;; this zone's width in cents: narrower up the keyboard when the
+            ;; keyboard exponent is above 0
+            (set! cents (* (pref l 7) (pow (/ bk 261.63) (- 0.0 (pref l 9)))))
+            (dotimes (i n)
+              (set! r (padsynth_ratio l i))
+              (set! f (* bk r))
+              (set! a (* (padsynth_weight l i) (padsynth_shape l f)))
+              (if (and (>= f 20.0) (<= f flim) (>= a (* 0.0001 amax)))
+                  (begin
+                    (set! width (* (- (pow 2.0 (/ cents 1200.0)) 1.0) bk (pow r (pref l 8))))
+                    (set! h (/ (* width nn) (* 2.0 sr)))
+                    (set! c (* 2 (convert (floor (+ (* 0.5 r beta) 0.5)) i64)))
+                    (set! power (* scale a a))
+                    (if (< h 0.25)
+                        ;; narrower than a bin: all of it in the centre bin
+                        (begin
+                          (if (and (>= c 1) (<= c jmax))
+                              (pset! z (+ (* 2 c) slot)
+                                     (+ (pref z (+ (* 2 c) slot)) (convert power float))))
+                          void)
+                        (begin
+                          ;; Walk out from the centre. exp(-2 d^2 / h^2) for
+                          ;; d = 1, 2, 3 ... is each step's value times a
+                          ;; ratio, and the ratio itself shrinks by a fixed
+                          ;; factor each step, so the band needs only two
+                          ;; exps rather than one per bin.
+                          (set! reach (convert (ceil (* 3.0 h)) i64))
+                          (set! q (exp (/ -4.0 (* h h))))
+                          (if (>= h 1.5)
+                              ;; the sum of the samples of a wide Gaussian is
+                              ;; its integral
+                              (begin (set! sum (* h 1.2533141373155003)) void)
+                              (begin
+                                (set! sum 1.0)
+                                (set! g 1.0)
+                                (set! ratio (exp (/ -2.0 (* h h))))
+                                (dotimes (d reach)
+                                  (set! g (* g ratio))
+                                  (set! ratio (* ratio q))
+                                  (set! sum (+ sum (* 2.0 g))))
+                                void))
+                          (set! power (/ power sum))
+                          (if (and (>= c 1) (<= c jmax))
+                              (pset! z (+ (* 2 c) slot)
+                                     (+ (pref z (+ (* 2 c) slot)) (convert power float))))
+                          (set! g 1.0)
+                          (set! ratio (exp (/ -2.0 (* h h))))
+                          (set! d 1)
+                          (while (<= d reach)
+                            (set! g (* g ratio))
+                            (set! ratio (* ratio q))
+                            (set! j (+ c d))
+                            (if (<= j jmax)
+                                (pset! z (+ (* 2 j) slot)
+                                       (+ (pref z (+ (* 2 j) slot)) (convert (* power g) float))))
+                            (set! j (- c d))
+                            (if (and (>= j 1) (<= j jmax))
+                                (pset! z (+ (* 2 j) slot)
+                                       (+ (pref z (+ (* 2 j) slot)) (convert (* power g) float))))
+                            (set! d (+ d 1)))
+                          void)))
+                  void))
+            void)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; from a spectrum to the tables ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func padsynth_zone_limit
+  "the highest frequency a zone may hold. A note reads a zone at up to half an
+octave above its base (the top zone a whole octave), and the result must stay
+below 0.45 times the sample rate."
+  (lambda (zone:i64 sr:double)
+    (if (= zone (- PADSYNTH_ZONES 1))
+        (/ (* 0.45 sr) 2.0)
+        (/ (* 0.45 sr) 1.4142135623730951))))
+
+(bind-func padsynth_store
+  "quantise the real (part 0) or imaginary (part 1) parts of z into table
+`table`, with its guard samples, and set its gain so that gain * sample has an
+RMS of 1"
+  (lambda (z:float* part:i64 table:i64)
+    (let ((n PADSYNTH_N)
+          (t:i64 0)
+          (x:double 0.0)
+          (sumsq:double 0.0)
+          (peak:double 0.0)
+          (rms:double 0.0)
+          (s:double 0.0)
+          (dst:i16* (pref-ptr padsynth_tables (* table PADSYNTH_LEN))))
+      (dotimes (t n)
+        (set! x (convert (pref z (+ (* 2 t) part)) double))
+        (set! sumsq (+ sumsq (* x x)))
+        (if (> (fabs x) peak) (set! peak (fabs x))))
+      (set! rms (sqrt (/ sumsq (convert n double))))
+      (set! s (/ 32767.0 peak))
+      ;; sample t goes in slot t + 1; slot 0 holds sample N - 1
+      (dotimes (t n)
+        (set! x (convert (pref z (+ (* 2 t) part)) double))
+        (pset! dst (+ t 1) (convert (floor (+ (* x s) 0.5)) i16)))
+      (pset! dst 0 (pref dst n))
+      (pset! dst (+ n 1) (pref dst 1))
+      (pset! dst (+ n 2) (pref dst 2))
+      (pset! padsynth_gains table (convert (/ peak (* 32767.0 rms)) SAMPLE))
+      void)))
+
+(bind-func padsynth_build_pair
+  "build two tables (zones 2m and 2m + 1 of timbre tau) with one inverse FFT.
+
+The inverse transform of a spectrum with conjugate symmetry (X_(N-j) =
+conj(X_j)) is real. Two such spectra X and Y can share one complex
+transform: put Z = X + iY, and the real part of the result is X's table and
+the imaginary part Y's. So the power spectra are built in the real and
+imaginary slots of bins 0 to N/2, then each bin gets its magnitude and a
+random phase and the upper half is filled in as the conjugates."
+  (lambda (tau:i64 m:i64 z:float* tw:float* l:double* sr:double)
+    (let ((n PADSYNTH_N)
+          (half (/ PADSYNTH_N 2))
+          (nn (convert PADSYNTH_N double))
+          (slot:i64 0) (zone:i64 0) (layer:i64 0) (layers:i64 0) (j:i64 0)
+          (bk:double 0.0) (beta:double 0.0) (flim:double 0.0) (jmax:i64 0)
+          (p1:double 0.0) (pl:double 0.0)
+          (rng:i64* (salloc 2))
+          (mx:double 0.0) (my:double 0.0) (ax:double 0.0) (ay:double 0.0)
+          (xr:double 0.0) (xi:double 0.0) (yr:double 0.0) (yi:double 0.0))
+      (dotimes (j (* 2 n)) (pset! z j 0.0))
+      (dotimes (slot 2)
+        (set! zone (+ (* 2 m) slot))
+        (set! bk (convert (pref padsynth_bases zone) double))
+        (set! beta (/ (* bk nn) sr))
+        (set! flim (padsynth_zone_limit zone sr))
+        (set! jmax (convert (floor (/ (* flim nn) sr)) i64))
+        (set! layers (padsynth_recipe tau bk l))
+        ;; the first layer sets the reference; each other layer is scaled so
+        ;; its total power is its level in dB relative to the first's
+        (set! p1 (padsynth_layer_power l bk flim jmax sr))
+        (dotimes (layer layers)
+          (set! pl (padsynth_layer_power (pref-ptr l (* layer PADSYNTH_LAYER)) bk flim jmax sr))
+          (if (> pl 0.0)
+              (padsynth_layer_add z slot (pref-ptr l (* layer PADSYNTH_LAYER)) bk beta flim jmax sr
+                                  (if (= layer 0)
+                                      1.0
+                                      (* (pow 10.0 (/ (pref l (+ (* layer PADSYNTH_LAYER) 10)) 10.0))
+                                         (/ p1 pl)))))))
+      ;; magnitudes and random phases, a fixed seed per table
+      (pset! rng 0 (+ 1 (* 1000 tau) (* 2 m)))
+      (pset! rng 1 (+ 2 (* 1000 tau) (* 2 m)))
+      (set! j 1)
+      (while (< j half)
+        (set! mx (sqrt (convert (pref z (* 2 j)) double)))
+        (set! my (sqrt (convert (pref z (+ (* 2 j) 1)) double)))
+        (set! ax (* 6.283185307179586 (padsynth_rand (pref-ptr rng 0))))
+        (set! ay (* 6.283185307179586 (padsynth_rand (pref-ptr rng 1))))
+        (set! xr (* mx (cos ax)))
+        (set! xi (* mx (sin ax)))
+        (set! yr (* my (cos ay)))
+        (set! yi (* my (sin ay)))
+        ;; Z_j = X_j + i Y_j, and Z_(N-j) = conj(X_j) + i conj(Y_j)
+        (pset! z (* 2 j) (convert (- xr yi) float))
+        (pset! z (+ (* 2 j) 1) (convert (+ xi yr) float))
+        (pset! z (* 2 (- n j)) (convert (+ xr yi) float))
+        (pset! z (+ (* 2 (- n j)) 1) (convert (- yr xi) float))
+        (set! j (+ j 1)))
+      ;; no DC, and nothing at the Nyquist bin
+      (pset! z 0 0.0)
+      (pset! z 1 0.0)
+      (pset! z n 0.0)
+      (pset! z (+ n 1) 0.0)
+      (padsynth_ifft z tw n PADSYNTH_BITS)
+      (padsynth_store z 0 (+ (* tau PADSYNTH_ZONES) (* 2 m)))
+      (padsynth_store z 1 (+ (* tau PADSYNTH_ZONES) (* 2 m) 1))
+      void)))
+
+(bind-func padsynth_build
+  "build the bank: eight timbres at fourteen zones, 112 tables. This runs once,
+when the first padsynth track is made; every later track shares the tables."
+  (lambda ()
+    (if (= padsynth_built 0)
+        (let ((t0 (clock_clock))
+              (sr (convert SRf double))
+              (nn (convert PADSYNTH_N double))
+              (ntables (* PADSYNTH_TIMBRES PADSYNTH_ZONES))
+              (z:float* (halloc (* 2 PADSYNTH_N)))
+              (tw:float* (halloc PADSYNTH_N))
+              (l:double* (halloc (* 3 PADSYNTH_LAYER)))
+              (k:i64 0) (tau:i64 0) (m:i64 0)
+              (nominal:double 0.0)
+              (beta:double 0.0))
+          (set! padsynth_tables (halloc (* ntables PADSYNTH_LEN)))
+          (set! padsynth_gains (halloc ntables))
+          (set! padsynth_bases (halloc PADSYNTH_ZONES))
+          (set! padsynth_trims (halloc PADSYNTH_TIMBRES))
+          ;; zone k is nominally MIDI note 24 + 6k (C1, F#1, C2 ... F#7),
+          ;; moved to the nearest bin which is a multiple of four
+          (dotimes (k PADSYNTH_ZONES)
+            (set! nominal (* 440.0 (pow 2.0 (/ (convert (- (+ 24 (* 6 k)) 69) double) 12.0))))
+            (set! beta (* 4.0 (floor (+ (/ (* nominal nn) (* 4.0 sr)) 0.5))))
+            (pset! padsynth_bases k (convert (/ (* beta sr) nn) SAMPLE)))
+          ;; loudness trims in dB. Every table has an RMS of 1, but equal RMS
+          ;; isn't equal loudness: these bring each timbre at middle C to
+          ;; within half a loudness unit (EBU R128) of the others.
+          (pset! padsynth_trims 0 (convert (pow 10.0 (/ 0.0 20.0)) SAMPLE))
+          (pset! padsynth_trims 1 (convert (pow 10.0 (/ -0.5 20.0)) SAMPLE))
+          (pset! padsynth_trims 2 (convert (pow 10.0 (/ 0.0 20.0)) SAMPLE))
+          (pset! padsynth_trims 3 (convert (pow 10.0 (/ 0.5 20.0)) SAMPLE))
+          (pset! padsynth_trims 4 (convert (pow 10.0 (/ -1.0 20.0)) SAMPLE))
+          (pset! padsynth_trims 5 (convert (pow 10.0 (/ -0.5 20.0)) SAMPLE))
+          (pset! padsynth_trims 6 (convert (pow 10.0 (/ 0.0 20.0)) SAMPLE))
+          (pset! padsynth_trims 7 (convert (pow 10.0 (/ 0.5 20.0)) SAMPLE))
+          (padsynth_twiddles tw PADSYNTH_N)
+          (dotimes (tau PADSYNTH_TIMBRES)
+            (dotimes (m (/ PADSYNTH_ZONES 2))
+              (padsynth_build_pair tau m z tw l sr)))
+          (free z)
+          (free tw)
+          (free l)
+          (set! padsynth_built 1)
+          (printf "padsynth: built %lld tables (%lld bytes) in %.2f seconds\n"
+                  ntables (* ntables PADSYNTH_LEN 2) (- (clock_clock) t0))
+          void))
+    void))
+
+;;;;;;;;;;;;;;;
+;; the voice ;;
+;;;;;;;;;;;;;;;
+
+(bind-func static padsynth_read
+  "table t at position pos (0 <= pos < N), by 4-point cubic (Catmull-Rom)
+interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
+  (lambda (t:i16* pos:double)
+    (let ((i:i64 (convert pos i64))
+          (mu:SAMPLE (convert (- pos (convert i double)) SAMPLE))
+          (ym1:SAMPLE (convert (pref t i) SAMPLE))
+          (y0:SAMPLE (convert (pref t (+ i 1)) SAMPLE))
+          (y1:SAMPLE (convert (pref t (+ i 2)) SAMPLE))
+          (y2:SAMPLE (convert (pref t (+ i 3)) SAMPLE))
+          (c1 (* 0.5 (- y1 ym1)))
+          (c2 (- (+ ym1 (* 2.0 y1)) (+ (* 2.5 y0) (* 0.5 y2))))
+          (c3 (+ (* 0.5 (- y2 ym1)) (* 1.5 (- y0 y1)))))
+      (+ y0 (* mu (+ c1 (* mu (+ c2 (* mu c3)))))))))
+
+(bind-func static padsynth_clamp
+  (lambda (x:SAMPLE lo:SAMPLE hi:SAMPLE)
+    (if (< x lo) lo (if (> x hi) hi x))))
+
+(bind-func static padsynth_wrap
+  "x, brought back into [0, n) (for 0 <= x < 2n)"
+  (lambda (x:double n:double)
+    (if (>= x n) (- x n) x)))
+
+(bind-func padsynth_voice_c
+  (lambda (p:SAMPLE* index:i64)
+    (let ((rng:i64* (zalloc 1))
+          (nn:double (convert PADSYNTH_N double))
+          (halfn:double (* 0.5 (convert PADSYNTH_N double)))
+          ;; the note
+          (note:SAMPLE 60.0)
+          (tau:i64 0) (tau2:i64 1) (new_tau:i64 0)
+          (vel_gain:SAMPLE 1.0)
+          ;; the two zone slots: which zone each holds (-1 for none), and its
+          ;; left and right read positions and increment
+          (za:i64 -1) (zb:i64 -1)
+          (pal:double 0.0) (par:double 0.0) (pbl:double 0.0) (pbr:double 0.0)
+          (inca:double 1.0) (incb:double 1.0)
+          ;; where each slot's two timbres' tables start, and their weights
+          (oa1:i64 0) (oa2:i64 0) (ob1:i64 0) (ob2:i64 0)
+          (ca1:SAMPLE 0.0) (ca2:SAMPLE 0.0) (cb1:SAMPLE 0.0) (cb2:SAMPLE 0.0)
+          ;; envelopes: the attack ramp, the amplitude, the filter envelope
+          (stage:i64 2) (rho:SAMPLE 0.0) (ea:SAMPLE 0.0) (ef:SAMPLE 0.0)
+          (astep:SAMPLE 0.0) (dcoef:SAMPLE 0.0) (rcoef:SAMPLE 0.0)
+          (fstep:SAMPLE 0.0) (frcoef:SAMPLE 0.0) (sus:SAMPLE 1.0)
+          ;; the filter, one per channel
+          (s1l:SAMPLE 0.0) (s2l:SAMPLE 0.0) (s1r:SAMPLE 0.0) (s2r:SAMPLE 0.0)
+          (fg:SAMPLE 0.0) (fk:SAMPLE 2.0) (fh:SAMPLE 1.0)
+          ;; vibrato, drift and morph
+          (vib_ph:SAMPLE 0.0) (vib_t:SAMPLE 0.0)
+          (d1a:SAMPLE 0.0) (d1b:SAMPLE 0.0) (d1ph:SAMPLE 0.0)
+          (d2a:SAMPLE 0.0) (d2b:SAMPLE 0.0) (d2ph:SAMPLE 0.0)
+          (morph_s:SAMPLE 0.0)
+          (morph_coef:SAMPLE (- 1.0 (exp (/ -16.0 (* 0.03 SRf)))))
+          (level_s:SAMPLE 1.0) (level_t:SAMPLE 1.0) (width_s:SAMPLE 1.0)
+          (width_coef:SAMPLE (- 1.0 (exp (/ -16.0 (* 0.02 SRf)))))
+          (wide:SAMPLE 1.0) (narrow:SAMPLE 0.0)
+          (glide (smoothing_coeff 0.02))
+          ;; a retriggered voice still sounding fades out over 5 ms first
+          (fade:i64 0) (fade_len:i64 (convert (/ SRf 200.0) i64)) (pending:i64 0)
+          (tick:i64 0)
+          (zone_j:i64 0) (k:i64 0)
+          (f:SAMPLE 0.0) (t:SAMPLE 0.0) (w0:SAMPLE 0.0) (w1:SAMPLE 0.0)
+          (wa:SAMPLE 0.0) (wb:SAMPLE 0.0) (m1:SAMPLE 0.0) (m2:SAMPLE 0.0)
+          (mu:SAMPLE 0.0) (x:SAMPLE 0.0) (d1:SAMPLE 0.0) (d2:SAMPLE 0.0)
+          (cents:SAMPLE 0.0) (fc:SAMPLE 0.0) (q:SAMPLE 0.0))
+      (pset! rng 0 (+ 7919 (* 104729 index) (* 1299709 padsynth_seed)))
+      (set! padsynth_seed (+ padsynth_seed 1))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (= padsynth_built 0)
+            (begin (voice_done v) void)
+            (begin
+              ;; a new note: if this voice is still sounding a different
+              ;; note (it has been stolen), fade that out first; if it's the
+              ;; same note, swell again from where the envelope is
+              (if (voice_start? v)
+                  (begin
+                    (set! x (padsynth_timbre p))
+                    (set! new_tau (convert (floor (+ (padsynth_clamp x 0.0 7.0) 0.5)) i64))
+                    (if (> ea 0.0001)
+                        (if (or (<> (voice_pitch v) note) (<> new_tau tau))
+                            (begin (if (= fade 0) (set! fade fade_len)) void)
+                            (begin
+                              (set! rho (sqrt ea))
+                              (set! stage 0)
+                              (set! x (padsynth_clamp (padsynth_vel_sens p) 0.0 1.0))
+                              (set! vel_gain (pow 10.0 (* -1.2 x (- 1.0 (voice_vel v)))))
+                              void))
+                        (begin (set! pending 1) void))))
+              (if (> fade 0)
+                  (begin
+                    (set! fade (- fade 1))
+                    (if (= fade 0) (set! pending 1))
+                    void))
+              (if (= pending 1)
+                  (begin
+                    ;; start afresh
+                    (set! pending 0)
+                    (set! note (voice_pitch v))
+                    (set! tau new_tau)
+                    (set! tau2 (% (+ tau 1) PADSYNTH_TIMBRES))
+                    (set! x (padsynth_clamp (padsynth_vel_sens p) 0.0 1.0))
+                    (set! vel_gain (pow 10.0 (* -1.2 x (- 1.0 (voice_vel v)))))
+                    (set! rho 0.0) (set! ea 0.0) (set! ef 0.0) (set! stage 0)
+                    (set! s1l 0.0) (set! s2l 0.0) (set! s1r 0.0) (set! s2r 0.0)
+                    (set! vib_ph (* STWOPI (convert (padsynth_rand rng) SAMPLE)))
+                    (set! vib_t 0.0)
+                    (set! d1a (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0))
+                    (set! d1b (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0))
+                    (set! d2a (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0))
+                    (set! d2b (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0))
+                    (set! d1ph 0.0) (set! d2ph 0.0)
+                    (set! za -1) (set! zb -1)
+                    (set! x (padsynth_morph p))
+                    (set! morph_s (padsynth_clamp x 0.0 1.0))
+                    (set! level_s (padsynth_clamp (padsynth_level p) 0.0 4.0))
+                    (set! width_s (padsynth_clamp (padsynth_width p) 0.0 1.0))
+                    (set! tick 0)
+                    void))
+              ;;;; the control rate: every 16 frames
+              (if (= (bitwise-and tick 15) 0)
+                  (begin
+                    ;; vibrato, fading in over the attack (at least half a second)
+                    (set! x (padsynth_clamp (padsynth_attack p) 0.005 20.0))
+                    (set! t (/ vib_t (* SRf (padsynth_clamp x 0.5 20.0))))
+                    (if (> t 1.0) (set! t 1.0))
+                    (set! cents (* (padsynth_clamp (padsynth_vib_depth p) 0.0 50.0) t (sin vib_ph)))
+                    (set! x (padsynth_clamp (padsynth_vib_rate p) 0.1 8.0))
+                    (set! vib_ph (+ vib_ph (/ (* STWOPI 16.0 x) SRf)))
+                    (if (> vib_ph STWOPI) (set! vib_ph (- vib_ph STWOPI)))
+                    (set! vib_t (+ vib_t 16.0))
+                    ;; two drifts, each gliding (along a half cosine) between
+                    ;; random values 1.7 and 2.3 seconds apart
+                    (set! d1ph (+ d1ph (/ 16.0 (* 1.7 SRf))))
+                    (if (>= d1ph 1.0)
+                        (begin (set! d1ph (- d1ph 1.0)) (set! d1a d1b)
+                               (set! d1b (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0)) void))
+                    (set! d2ph (+ d2ph (/ 16.0 (* 2.3 SRf))))
+                    (if (>= d2ph 1.0)
+                        (begin (set! d2ph (- d2ph 1.0)) (set! d2a d2b)
+                               (set! d2b (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0)) void))
+                    (set! d1 (+ d1a (* (- d1b d1a) 0.5 (- 1.0 (cos (* SPI d1ph))))))
+                    (set! d2 (+ d2a (* (- d2b d2a) 0.5 (- 1.0 (cos (* SPI d2ph))))))
+                    (set! x (padsynth_clamp (padsynth_drift p) 0.0 1.0))
+                    (set! cents (+ cents (* 7.0 x d1)))
+                    (set! mu (* 0.15 x d2))
+                    ;; the pitch
+                    (set! f (* 440.0 (pow 2.0 (+ (/ (- note 69.0) 12.0) (/ cents 1200.0)))))
+                    (set! x (* 0.5 (pref padsynth_bases 0)))
+                    (if (< f x) (set! f x))
+                    (set! x (* 2.0 (pref padsynth_bases 13)))
+                    (if (> f x) (set! f x))
+                    ;; the two zones either side of it, and their weights
+                    (set! zone_j 0)
+                    (dotimes (k 13)
+                      (if (<= (pref padsynth_bases k) f) (set! zone_j k)))
+                    (set! t (/ (log (/ f (pref padsynth_bases zone_j)))
+                               (log (/ (pref padsynth_bases (+ zone_j 1)) (pref padsynth_bases zone_j)))))
+                    (if (< t 0.0) (set! t 0.0))
+                    (if (> t 1.0) (set! t 1.0))
+                    (set! w0 (cos (* 0.5 SPI t)))
+                    (set! w1 (sin (* 0.5 SPI t)))
+                    ;; A slot keeps its zone (and its read positions) for as
+                    ;; long as the zone is needed. A zone which isn't in
+                    ;; either slot takes over the slot whose zone has dropped
+                    ;; out; with a smoothly moving pitch that happens just as
+                    ;; the dropped zone's weight reaches 0, so it's silent.
+                    (if (and (<> za zone_j) (<> zb zone_j))
+                        (if (<> za (+ zone_j 1))
+                            (begin (set! za zone_j) (set! pal (* nn (padsynth_rand rng))) (set! par (padsynth_wrap (+ pal halfn) nn)) void)
+                            (begin (set! zb zone_j) (set! pbl (* nn (padsynth_rand rng))) (set! pbr (padsynth_wrap (+ pbl halfn) nn)) void)))
+                    (if (and (<> za (+ zone_j 1)) (<> zb (+ zone_j 1)))
+                        (if (<> za zone_j)
+                            (begin (set! za (+ zone_j 1)) (set! pal (* nn (padsynth_rand rng))) (set! par (padsynth_wrap (+ pal halfn) nn)) void)
+                            (begin (set! zb (+ zone_j 1)) (set! pbl (* nn (padsynth_rand rng))) (set! pbr (padsynth_wrap (+ pbl halfn) nn)) void)))
+                    (set! wa (if (= za zone_j) w0 w1))
+                    (set! wb (if (= zb zone_j) w0 w1))
+                    (set! inca (convert (/ f (pref padsynth_bases za)) double))
+                    (set! incb (convert (/ f (pref padsynth_bases zb)) double))
+                    ;; morph: smoothed, plus the slow drift
+                    (set! x (padsynth_morph p))
+                    (set! morph_s (+ morph_s (* morph_coef (- (padsynth_clamp x 0.0 1.0) morph_s))))
+                    (set! mu (+ mu morph_s))
+                    (if (< mu 0.0) (set! mu 0.0))
+                    (if (> mu 1.0) (set! mu 1.0))
+                    (set! m1 (cos (* 0.5 SPI mu)))
+                    (set! m2 (sin (* 0.5 SPI mu)))
+                    ;; each read's weight: zone weight, timbre weight, trim
+                    ;; and the table's own gain
+                    (set! oa1 (+ (* tau PADSYNTH_ZONES) za))
+                    (set! oa2 (+ (* tau2 PADSYNTH_ZONES) za))
+                    (set! ob1 (+ (* tau PADSYNTH_ZONES) zb))
+                    (set! ob2 (+ (* tau2 PADSYNTH_ZONES) zb))
+                    (set! ca1 (* wa m1 (pref padsynth_trims tau) (pref padsynth_gains oa1)))
+                    (if (< (* wa m1) 0.0001) (set! ca1 0.0))
+                    (set! ca2 (* wa m2 (pref padsynth_trims tau2) (pref padsynth_gains oa2)))
+                    (if (< (* wa m2) 0.0001) (set! ca2 0.0))
+                    (set! cb1 (* wb m1 (pref padsynth_trims tau) (pref padsynth_gains ob1)))
+                    (if (< (* wb m1) 0.0001) (set! cb1 0.0))
+                    (set! cb2 (* wb m2 (pref padsynth_trims tau2) (pref padsynth_gains ob2)))
+                    (if (< (* wb m2) 0.0001) (set! cb2 0.0))
+                    (set! oa1 (* oa1 PADSYNTH_LEN))
+                    (set! oa2 (* oa2 PADSYNTH_LEN))
+                    (set! ob1 (* ob1 PADSYNTH_LEN))
+                    (set! ob2 (* ob2 PADSYNTH_LEN))
+                    ;; the filter: cutoff follows the key and the envelope
+                    (set! x (padsynth_clamp (padsynth_keytrack p) 0.0 1.0))
+                    (set! fc (* (padsynth_clamp (padsynth_cutoff p) 40.0 20000.0) (pow (/ f 261.63) x)))
+                    (set! x (padsynth_clamp (padsynth_fenv_amount p) -4.0 6.0))
+                    (set! fc (* fc (pow 2.0 (* x ef))))
+                    (set! x (* 0.45 SRf))
+                    (if (> fc x) (set! fc x))
+                    (if (< fc 20.0) (set! fc 20.0))
+                    (set! fg (tan (* SPI (/ fc SRf))))
+                    (set! q (+ 0.5 (* 1.5 (padsynth_clamp (padsynth_resonance p) 0.0 1.0))))
+                    (set! fk (/ 1.0 q))
+                    (set! fh (/ 1.0 (+ 1.0 (* fg (+ fg fk)))))
+                    ;; envelope rates. A factor of 0.001 (-60 dB) over T
+                    ;; seconds is exp(ln(0.001) / (T SR)) a frame.
+                    (set! astep (/ 1.0 (* (padsynth_clamp (padsynth_attack p) 0.005 20.0) SRf)))
+                    (set! dcoef (exp (/ -6.9077553 (* (padsynth_clamp (padsynth_decay p) 0.01 20.0) SRf))))
+                    (set! x (padsynth_clamp (padsynth_release p) 0.02 30.0))
+                    (set! rcoef (exp (/ -6.9077553 (* x SRf))))
+                    (set! frcoef (exp (/ -4.6051702 (* x SRf))))
+                    (set! fstep (/ 1.0 (* (padsynth_clamp (padsynth_fenv_attack p) 0.005 20.0) SRf)))
+                    (set! sus (padsynth_clamp (padsynth_sustain p) 0.0 1.0))
+                    ;; level, and the stereo width: each channel is a mix of
+                    ;; the two reads, scaled to keep its power for any width
+                    (set! level_t (padsynth_clamp (padsynth_level p) 0.0 4.0))
+                    (set! x (padsynth_clamp (padsynth_width p) 0.0 1.0))
+                    (set! width_s (+ width_s (* width_coef (- x width_s))))
+                    (set! x (sqrt (/ 2.0 (+ 1.0 (* width_s width_s)))))
+                    (set! wide (* x 0.5 (+ 1.0 width_s)))
+                    (set! narrow (* x 0.5 (- 1.0 width_s)))
+                    void))
+              (set! tick (+ tick 1))
+              ;;;; every frame: envelopes
+              (if (> (voice_gate v) 0.5)
+                  (begin
+                    (if (= stage 0)
+                        (begin
+                          (set! rho (+ rho astep))
+                          (if (>= rho 1.0) (begin (set! rho 1.0) (set! stage 1) void))
+                          (set! ea (* rho rho))
+                          void)
+                        (begin (set! ea (+ sus (* (- ea sus) dcoef))) void))
+                    (set! ef (+ ef fstep))
+                    (if (> ef 1.0) (set! ef 1.0))
+                    void)
+                  (begin
+                    (set! stage 2)
+                    (set! ea (* ea rcoef))
+                    (set! ef (* ef frcoef))
+                    void))
+              ;;;; the table reads: up to two zones times two timbres, each
+              ;;;; read for the left and the right channel half a loop apart.
+              ;;;; (Per-frame temporaries live in this let, where the compiler
+              ;;;; can keep them in registers.)
+              (let ((ul:SAMPLE 0.0) (ur:SAMPLE 0.0) (yl:SAMPLE 0.0) (yr:SAMPLE 0.0)
+                    (hp:SAMPLE 0.0) (bp:SAMPLE 0.0) (gain:SAMPLE 0.0)
+                    (tabs padsynth_tables))
+                (if (<> ca1 0.0)
+                    (begin
+                      (set! ul (* ca1 (padsynth_read (pref-ptr tabs oa1) pal)))
+                      (set! ur (* ca1 (padsynth_read (pref-ptr tabs oa1) par)))
+                      void))
+                (if (<> ca2 0.0)
+                    (begin
+                      (set! ul (+ ul (* ca2 (padsynth_read (pref-ptr tabs oa2) pal))))
+                      (set! ur (+ ur (* ca2 (padsynth_read (pref-ptr tabs oa2) par))))
+                      void))
+                (if (<> cb1 0.0)
+                    (begin
+                      (set! ul (+ ul (* cb1 (padsynth_read (pref-ptr tabs ob1) pbl))))
+                      (set! ur (+ ur (* cb1 (padsynth_read (pref-ptr tabs ob1) pbr))))
+                      void))
+                (if (<> cb2 0.0)
+                    (begin
+                      (set! ul (+ ul (* cb2 (padsynth_read (pref-ptr tabs ob2) pbl))))
+                      (set! ur (+ ur (* cb2 (padsynth_read (pref-ptr tabs ob2) pbr))))
+                      void))
+                (set! pal (padsynth_wrap (+ pal inca) nn))
+                (set! par (padsynth_wrap (+ par inca) nn))
+                (set! pbl (padsynth_wrap (+ pbl incb) nn))
+                (set! pbr (padsynth_wrap (+ pbr incb) nn))
+                ;; stereo width (the mix is worked out at the control rate)
+                (set! yl (+ (* wide ul) (* narrow ur)))
+                (set! yr (+ (* narrow ul) (* wide ur)))
+                ;; the filter: a state-variable lowpass in its trapezoidal
+                ;; (topology-preserving) form, stable however fast it moves
+                (set! hp (* fh (- (+ yl 1.0e-18) (* (+ fg fk) s1l) s2l)))
+                (set! bp (+ (* fg hp) s1l))
+                (set! s1l (+ (* fg hp) bp))
+                (set! yl (+ (* fg bp) s2l))
+                (set! s2l (+ (* fg bp) yl))
+                (set! hp (* fh (- (+ yr 1.0e-18) (* (+ fg fk) s1r) s2r)))
+                (set! bp (+ (* fg hp) s1r))
+                (set! s1r (+ (* fg hp) bp))
+                (set! yr (+ (* fg bp) s2r))
+                (set! s2r (+ (* fg bp) yr))
+                ;; output
+                (set! level_s (+ level_s (* glide (- level_t level_s))))
+                (set! gain (* 0.07 level_s vel_gain ea))
+                (if (> fade 0)
+                    (set! gain (* gain (/ (convert fade SAMPLE) (convert fade_len SAMPLE)))))
+                (frame_add_stereo out (* gain yl) (* gain yr)))
+              ;; the note is over once it has been released and faded away
+              (if (and (< (voice_gate v) 0.5) (< ea 0.0001) (= fade 0) (= pending 0))
+                  (voice_done v))
+              void))
+        void))))
+
+(bind-func padsynth_make
+  (lambda ()
+    (padsynth_build)
+    (let ((inst (inst_make "padsynth" 12 (padsynth_nparams)))
+          (i:i64 0))
+      (padsynth_defaults (inst_params inst))
+      (dotimes (i 12)
+        (inst_set_voice inst i (padsynth_voice_c (inst_params inst) i)))
+      inst)))
