@@ -268,6 +268,11 @@ to `out`.
 (bind-func compressor_c
   "a stereo compressor: turns the loud parts down so that everything can come up.
 
+It follows the level of the signal, works out how far that is over the
+threshold, and turns the signal down by a share of the excess. Around the
+threshold the ratio comes in gradually (a soft knee, 8 dB wide), so there is no
+sudden change in the sound as the level crosses it.
+
 The returned closure processes the stereo frame in place and returns the gain
 reduction it applied, in dB.
 
@@ -279,6 +284,7 @@ reduction it applied, in dB.
   (lambda ()
     (let ((env:SAMPLE 0.0)
           (level:SAMPLE 0.0) (over:SAMPLE 0.0) (reduction:SAMPLE 0.0)
+          (slope:SAMPLE 0.0) (knee:SAMPLE 8.0)
           (gain:SAMPLE 1.0) (target:SAMPLE 1.0)
           (attack_coeff:SAMPLE 0.0) (release_coeff:SAMPLE 0.0)
           (old_attack:SAMPLE -1.0) (old_release:SAMPLE -1.0)
@@ -299,7 +305,15 @@ reduction it applied, in dB.
         (if (= (% count 8) 0)
             (begin
               (set! over (- (* 8.6858896 (log (+ env 0.000001))) threshold))
-              (set! reduction (if (> over 0.0) (* over (- (/ 1.0 (max ratio 1.0)) 1.0)) 0.0))
+              (set! slope (- (/ 1.0 (max ratio 1.0)) 1.0))
+              ;; below the knee: nothing. Above it: the full ratio. Inside
+              ;; it: a parabola which joins the two smoothly.
+              (set! reduction
+                    (if (< over (* -0.5 knee))
+                        0.0
+                        (if (> over (* 0.5 knee))
+                            (* slope over)
+                            (/ (* slope (+ over (* 0.5 knee)) (+ over (* 0.5 knee))) (* 2.0 knee)))))
               (set! target (exp (* 0.11512925 (+ reduction makeup))))))
         (set! gain (+ gain (* smooth (- target gain))))
         (pset! frame 0 (* gain (pref frame 0)))
@@ -314,51 +328,84 @@ reduction it applied, in dB.
   "a lookahead limiter: keeps peaks under a ceiling without audible distortion.
 
 It delays the signal by a few milliseconds, which lets it see each peak coming
-and turn the level down smoothly before the peak arrives, then let it back up
-afterwards. The returned closure processes the stereo frame in place.
+and turn the level down smoothly before the peak arrives. For every frame it
+works out the gain which that frame needs to fit under the ceiling. The gain it
+applies is the lowest of those over the lookahead (so it is already low enough
+when the peak comes out of the delay), let back up gradually (the release), and
+then averaged over the lookahead (so it moves smoothly and never jumps). The
+average of values which are all low enough for a frame is low enough for it,
+so the output never passes the ceiling.
+
+The returned closure processes the stereo frame in place.
 
 @param ceiling - the highest level let through (1.0 is full scale)
 @param release - how quickly the level comes back up, in milliseconds"
   (lambda ()
-    (let (;; four milliseconds
-          (lookahead:i64 (convert (/ SRf 250.0)))
+    (let (;; three milliseconds
+          (lookahead:i64 (convert (/ SRf 333.0)))
           (line_l (dl_make (+ lookahead 4)))
           (line_r (dl_make (+ lookahead 4)))
-          ;; the gain we need to reach, held until the peak which asked for
-          ;; it has passed through the delay
-          (held:SAMPLE 1.0)
-          (hold_count:i64 0)
-          (gain:SAMPLE 1.0)
-          (attack (smoothing_coeff 0.001))
+          ;; the gain each of the last `lookahead` + 1 frames needs
+          (wanted:SAMPLE* (zalloc (+ lookahead 4)))
+          ;; the held-and-released gain for the last `lookahead` frames,
+          ;; and their running sum, for the average
+          (held:SAMPLE* (zalloc (+ lookahead 4)))
+          (sum:double 0.0)
+          (pos:i64 0)
+          (lowest:SAMPLE 1.0)
+          (lowest_age:i64 0)
+          (released:SAMPLE 1.0)
           (release_coeff:SAMPLE 0.0)
           (old_release:SAMPLE -1.0)
           (peak:SAMPLE 0.0)
-          (wanted:SAMPLE 1.0))
+          (need:SAMPLE 1.0)
+          (gain:SAMPLE 1.0)
+          (i:i64 0))
+      (dotimes (i (+ lookahead 4))
+        (pset! wanted i 1.0)
+        (pset! held i 1.0))
+      (set! sum (convert lookahead double))
       (lambda (frame:SAMPLE* ceiling:SAMPLE release:SAMPLE)
         (if (<> release old_release)
             (begin
               (set! old_release release)
               (set! release_coeff (smoothing_coeff (* 0.001 release)))))
         (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
-        (set! wanted (if (> peak ceiling) (/ ceiling peak) 1.0))
-        ;; a peak which needs at least the gain we're holding, or less gain
-        ;; than we've reached so far, starts the hold again: otherwise the
-        ;; gain would start to recover while that peak was still on its way
-        (if (or (< wanted held) (< wanted gain))
+        (set! need (if (> peak ceiling) (/ ceiling peak) 1.0))
+        ;; the lowest gain needed over the last lookahead + 1 frames. Keep
+        ;; track of it and how old it is; only when it drops out of the
+        ;; window do we have to look through the window for the next lowest.
+        (pset! wanted (% pos (+ lookahead 1)) need)
+        (if (<= need lowest)
+            (begin (set! lowest need) (set! lowest_age 0) void)
             (begin
-              (if (< wanted held) (set! held wanted))
-              (set! hold_count lookahead)
-              void)
-            (if (> hold_count 0)
-                (begin (set! hold_count (- hold_count 1)) void)
-                (begin (set! held (+ held (* release_coeff (- 1.0 held)))) void)))
-        ;; glide down quickly, so the gain is there by the time the peak is
-        (set! gain (+ gain (* attack (- held gain))))
-        (if (< held gain) (set! gain (+ gain (* 3.0 attack (- held gain)))))
+              (set! lowest_age (+ lowest_age 1))
+              (if (> lowest_age lookahead)
+                  (begin
+                    (set! lowest 1.0)
+                    (dotimes (i (+ lookahead 1))
+                      (if (<= (pref wanted (% (- pos i) (+ lookahead 1))) lowest)
+                          (begin
+                            (set! lowest (pref wanted (% (- pos i) (+ lookahead 1))))
+                            (set! lowest_age i))))))
+              void))
+        ;; let the gain back up gradually, but never above what's needed
+        (set! released (+ released (* release_coeff (- 1.0 released))))
+        (if (< lowest released) (set! released lowest))
+        ;; average it over the lookahead
+        (set! sum (+ sum (convert (- released (pref held (% pos lookahead))) double)))
+        (pset! held (% pos lookahead) released)
+        (set! gain (/ (convert sum SAMPLE) (convert lookahead SAMPLE)))
+        (set! pos (+ pos 1))
+        ;; every so often, add the average up afresh so that rounding
+        ;; errors in the running sum can't build up
+        (if (= (% pos 65536) 0)
+            (begin
+              (set! sum 0.0)
+              (dotimes (i lookahead)
+                (set! sum (+ sum (convert (pref held i) double))))))
         (dl_write line_l (pref frame 0))
         (dl_write line_r (pref frame 1))
-        ;; whatever gets past is caught by a clamp just above the ceiling
-        (set! peak (* 1.06 ceiling))
-        (pset! frame 0 (clamp (* gain (dl_read line_l lookahead)) (* -1.0 peak) peak))
-        (pset! frame 1 (clamp (* gain (dl_read line_r lookahead)) (* -1.0 peak) peak))
+        (pset! frame 0 (* gain (dl_read line_l (+ lookahead 1))))
+        (pset! frame 1 (* gain (dl_read line_r (+ lookahead 1))))
         void))))

@@ -113,6 +113,30 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
 }
 #endif
 
+// Tell the CPU to treat denormal floats as zero on the calling thread. A
+// filter or delay line decaying towards silence passes through denormal
+// numbers, which are tens of times slower to compute with and would show up
+// as CPU spikes when the music stops. The setting is per-thread, and cheap
+// enough to make at the top of every audio callback, which also covers audio
+// APIs that call us from more than one thread.
+#if defined(__SSE__) || defined(_M_X64) || defined(_M_IX86)
+#include <xmmintrin.h>
+#include <pmmintrin.h>
+static inline void flush_denormals_to_zero() {
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+}
+#elif defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
+static inline void flush_denormals_to_zero() {
+    uint64_t fpcr;
+    __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr |= (uint64_t(1) << 24);  // FZ: flush-to-zero
+    __asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+}
+#else
+static inline void flush_denormals_to_zero() {}
+#endif
+
 // Reject non-finite samples and clamp the rest to a safe range. The finite
 // check runs first so NaN/inf never reach std::clamp; on x86 and ARM, compilers
 // lower the clamp to min/max instructions, so no hand-written intrinsics needed.
@@ -162,6 +186,7 @@ std::counting_semaphore<> sMtWorkComplete{0};
 }  // anonymous namespace
 
 void* audioCallbackMT(void* Args) {
+    flush_denormals_to_zero();
 #ifdef __APPLE__
     Float64 clockFrequency = AudioGetHostClockFrequency();
     // set_thread_realtime(pthread_mach_thread_np(pthread_self()),
@@ -240,6 +265,7 @@ void* audioCallbackMT(void* Args) {
 
 void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
                                 uint64_t FramesPerBuffer, void* UserData) {
+    flush_denormals_to_zero();
     auto sched(reinterpret_cast<TaskScheduler*>(UserData));
     UNIV::DEVICE_TIME += FramesPerBuffer;
     if (likely(UNIV::TIME_DIVISION == 1)) {
