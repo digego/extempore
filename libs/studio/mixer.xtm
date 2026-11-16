@@ -126,6 +126,18 @@
         (tset! (pref-ptr studio_tracks track) 0 inst))
     void))
 
+(bind-func studio_reset_strip
+  "put a track's mixer strip back to its defaults"
+  (lambda (track:i64)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
+        (strip_defaults (tref (pref-ptr studio_tracks track) 1)))
+    void))
+
+(bind-func studio_clock_offset
+  "how far the studio's clock is behind (now), in frames"
+  (lambda ()
+    studio_time_offset))
+
 (bind-func studio_clear_track
   "take the instrument off a track"
   (lambda (track:i64)
@@ -316,7 +328,11 @@
                   (frame_add_stereo mix
                                     (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 0))
                                     (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 1)))
-                  ;; the master bus
+                  ;; the master bus. One infinite or not-a-number sample
+                  ;; from a misbehaving instrument would stick in the
+                  ;; compressor and the effects for good, so stop it here.
+                  (if (not (< (fabs (pref mix 0)) 1000.0)) (pset! mix 0 0.0))
+                  (if (not (< (fabs (pref mix 1)) 1000.0)) (pset! mix 1 0.0))
                   (set! studio_gain_reduction
                         (compressor mix
                                     (pref master MASTER_COMP_THRESHOLD)

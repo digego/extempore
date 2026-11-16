@@ -154,6 +154,7 @@ other side (ping-pong)"
         (set! lp_l (+ (* (- 1.0 damp) l) (* damp lp_l)))
         (set! lp_r (+ (* (- 1.0 damp) r) (* damp lp_r)))
         (set! fb (clamp feedback 0.0 0.95))
+        (set! cross (clamp cross 0.0 1.0))
         (dl_write line_l (+ (pref in 0) (* cross (pref in 1)) 1.0e-18
                             (* fb (+ (* (- 1.0 cross) lp_l) (* cross lp_r)))))
         (dl_write line_r (+ (* (- 1.0 cross) (pref in 1)) 1.0e-18
@@ -340,9 +341,12 @@ afterwards. The returned closure processes the stereo frame in place.
               (set! release_coeff (smoothing_coeff (* 0.001 release)))))
         (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
         (set! wanted (if (> peak ceiling) (/ ceiling peak) 1.0))
-        (if (< wanted held)
+        ;; a peak which needs at least the gain we're holding, or less gain
+        ;; than we've reached so far, starts the hold again: otherwise the
+        ;; gain would start to recover while that peak was still on its way
+        (if (or (< wanted held) (< wanted gain))
             (begin
-              (set! held wanted)
+              (if (< wanted held) (set! held wanted))
               (set! hold_count lookahead)
               void)
             (if (> hold_count 0)

@@ -198,6 +198,8 @@
       (if i
           (begin
             (studio_clear_track i)
+            ;; the next track to use this slot starts with a clean mixer strip
+            (studio_reset_strip i)
             (vector-set! *studio:tracks* i #f)))
       name)))
 
@@ -221,7 +223,8 @@
 
 (define studio:send
   (lambda (time kind track i x y)
-    (studio_send_event (real->integer time) kind track i (* 1.0 x) (* 1.0 y))))
+    ;; (times may arrive as exact fractions of a frame)
+    (studio_send_event (real->integer (* 1.0 time)) kind track i (* 1.0 x) (* 1.0 y))))
 
 ;; where a parameter lives: (event-kind index), or #f if the track has no
 ;; parameter with that name
@@ -377,11 +380,15 @@
 ;; first.
 ;;
 ;;   (:> A 4 0 (play-on 'bass @1 80 dur) '(36 36 39 48))
+;;
+;; The two pattern languages don't share a session well. That file (and the
+;; libraries it loads) defines rev, sub, scale, chord, choose and d1 to d8 for
+;; its own purposes, so whichever is loaded second takes those names.
 (define-macro (play-on . args)
   (let* ((offset? (> (length args) 4))
          (offset (if offset? (car args) 0))
          (rest (if offset? (cdr args) args)))
-    `(studio:note-at (*metro* (+ beat ,offset))
+    `(studio:note-at (- (*metro* (+ beat ,offset)) (studio_clock_offset))
                      ,(car rest)
                      ,(cadr rest)
                      (/ ,(caddr rest) 127.0)
@@ -481,6 +488,9 @@
   (lambda ()
     (studio:start)
     (studio_release)
+    (if (> (studio_dropped_event_count) 0)
+        (studio:error (studio_dropped_event_count)
+                      "events were dropped: the score has more events than the queue holds"))
     (for-each (lambda (seconds)
                 (callback (+ (now) (* seconds *studio:samplerate*)) 'studio:score-report seconds))
               *studio:score-level-times*)

@@ -95,3 +95,19 @@
 (xtmtest-result (reload 'bass) 'bass "reload-makes-a-new-instance")
 (note-on 'bass 36 0.8 0.1)
 (xtmtest-result (> (run_studio 0.2) 0.05) #t "which-plays")
+
+;; a track which takes over a slot doesn't inherit the last one's mixer strip
+(track 'old 'acid)
+(ctl 'old 'mute 1.0 'lpf 300)
+(run_studio 0.05)
+(untrack 'old)
+(track 'new 'acid)
+(xtmtest-result (studio:param-value 'new 'mute) 0.0 "a-reused-slot-is-unmuted")
+(xtmtest-result (studio:param-value 'new 'lpf) 20000.0 "a-reused-slot-has-a-clean-strip")
+
+;; hush forgets what was queued, and the studio carries on afterwards
+(note-on 'bass 36 0.8 0.1)
+(hush)
+(xtmtest-result (< (run_studio 0.3) 0.01) #t "hush-forgets-queued-notes")
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "notes-play-again-after-hush")

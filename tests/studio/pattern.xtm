@@ -141,3 +141,46 @@
                          (lambda (a b) (< (car a) (car b))))
                 '((48 1/50) (52 1/100) (55 0))
                 "strum-downwards")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; queried a little at a time, as live ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The live clock asks for a pattern in many small spans. Every event must be
+;; played exactly once however the spans fall.
+(define onsets-in-windows
+  (lambda (pat cycles width)
+    (let loop ((from 0) (acc '()))
+      (if (>= from cycles)
+          (cl:sort acc <)
+          (loop (+ from width)
+                (append acc
+                        (map studio:hap-whole-begin
+                             (cl:remove-if-not studio:hap-onset?
+                                               (query pat from (min cycles (+ from width)))))))))))
+
+(define same-in-windows?
+  (lambda (pat)
+    (equal? (onsets-in-windows pat 4 4) (onsets-in-windows pat 4 441/88200))))
+
+(xtmtest-result (same-in-windows? '(a b c)) #t "windows-thirds")
+(xtmtest-result (same-in-windows? '(a b c d e)) #t "windows-fifths")
+(xtmtest-result (same-in-windows? (late 1/3 '(a b c))) #t "windows-late")
+(xtmtest-result (same-in-windows? (swing 1/3 4 'a*8)) #t "windows-swing")
+(xtmtest-result (same-in-windows? (euclid 3 7 'x)) #t "windows-euclid")
+(xtmtest-result (same-in-windows? (ply 4 '(a/4 b))) #t "windows-ply-across-cycles")
+(xtmtest-result (same-in-windows? (ply 2 (late 3/4 'a))) #t "windows-ply-late")
+(xtmtest-result (same-in-windows? (arp 8 (slow 2 (note (chord 'minor7 '(c3 f3)))))) #t "windows-arp-slow")
+(xtmtest-result (length (onsets-in-windows (arp 8 (slow 2 (note (chord 'minor7 'c3)))) 2 1)) 8
+                "arp-carries-on-into-the-next-cycle")
+(xtmtest-result (same-in-windows? (rev (slow 2 '(a b c)))) #t "windows-rev-slow")
+(xtmtest-result (same-in-windows? (linger 1/3 '(a b c d e f))) #t "windows-linger")
+
+;; the clock's own arithmetic is exact
+(cps 0.55)
+(xtmtest-result (exact? (studio:cycle-at 123457)) #t "the-clock-is-exact")
+(xtmtest-result (studio:cycle-at (studio:time-at 7/3)) 7/3 "cycle-to-time-and-back")
+(cps 1/2)
+
+;; a rotation can be given without a pattern
+(xtmtest-result (events ((euclid 3 8 2) 'x)) '((1/8 1/4 x) (1/2 5/8 x) (3/4 7/8 x)) "euclid-rotation-curried")

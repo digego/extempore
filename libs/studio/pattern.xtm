@@ -329,24 +329,22 @@
              (map (lambda (h)
                     (if (not (studio:hap-whole-begin h))
                         (list h)
+                        ;; A long event may arrive as several fragments, over
+                        ;; several queries. Each repeat is played by the
+                        ;; fragment which contains its start.
                         (let* ((wb (studio:hap-whole-begin h))
                                (step (/ (- (studio:hap-whole-end h) wb) n)))
                           (let loop ((i 0) (acc '()))
                             (if (>= i n)
                                 (reverse acc)
                                 (let* ((b (+ wb (* i step)))
-                                       (e (+ b step))
-                                       (pb (max b from))
-                                       (pe (min e end)))
+                                       (e (+ b step)))
                                   (loop (+ i 1)
-                                        (if (< pb pe)
-                                            (cons (studio:hap b e pb pe (studio:hap-value h)) acc)
+                                        (if (and (>= b (studio:hap-part-begin h))
+                                                 (< b (studio:hap-part-end h)))
+                                            (cons (studio:hap b e b (min e end) (studio:hap-value h)) acc)
                                             acc))))))))
-                  ;; ask for a little more than the span, so that an event
-                  ;; which started before it still contributes its repeats
-                  (cl:remove-if-not
-                    (lambda (h) (or (not (studio:hap-whole-begin h)) (studio:hap-onset? h)))
-                    (query pat (floor from) end)))))))
+                  (query pat from end))))))
 
 ;; `count` copies of the pattern, each `time` later and `feedback` times as loud
 (define-transform (echo count time feedback)
@@ -459,14 +457,17 @@
 ;; fourth number rotates the rhythm: (euclid 3 8 2 pat).
 (define euclid
   (lambda (hits steps . more)
-    (let* ((rotation (if (and (pair? more) (number? (car more)) (pair? (cdr more))) (car more) 0))
-           (rest (if (and (pair? more) (number? (car more)) (pair? (cdr more))) (cdr more) more)))
-      (if (null? rest)
-          (lambda (pat) (euclid hits steps rotation pat))
-          (let ((pat (->pattern (car rest))))
-            (apply fastcat
-                   (map (lambda (hit) (if hit pat silence))
-                        (studio:rotate (studio:bjorklund hits steps) rotation))))))))
+    (cond ((null? more)
+           (lambda (pat) (euclid hits steps 0 pat)))
+          ;; a third number with nothing after it is the rotation
+          ((and (number? (car more)) (null? (cdr more)))
+           (lambda (pat) (euclid hits steps (car more) pat)))
+          (else
+            (let ((rotation (if (pair? (cdr more)) (car more) 0))
+                  (pat (->pattern (if (pair? (cdr more)) (cadr more) (car more)))))
+              (apply fastcat
+                     (map (lambda (hit) (if hit pat silence))
+                          (studio:rotate (studio:bjorklund hits steps) rotation))))))))
 
 ;; keep the timing of the true events in `bools`, with values from pat
 (define-transform (struct bools)
@@ -942,13 +943,15 @@
 (define-transform (arp n)
   (studio:make-pattern
     (lambda (from end)
-      (let* ((haps (cl:remove-if-not studio:hap-onset? (query pat (floor from) (ceiling end))))
+      (let* ((haps (cl:remove-if-not studio:hap-whole-begin (query pat from end)))
              (starts (let loop ((hs haps) (acc '()))
                        (cond ((null? hs) (reverse acc))
                              ((member (studio:hap-whole-begin (car hs)) acc) (loop (cdr hs) acc))
                              (else (loop (cdr hs) (cons (studio:hap-whole-begin (car hs)) acc)))))))
         (apply append
                (map (lambda (start)
+                      ;; the chord: every note which started at this moment
+                      ;; (they may have started before this query's span)
                       (let* ((group (list->vector
                                       (cl:remove-if-not
                                         (lambda (h) (= (studio:hap-whole-begin h) start))
@@ -960,12 +963,10 @@
                           (if (>= i n)
                               (reverse acc)
                               (let* ((b (+ start (* i step)))
-                                     (e (+ b step))
-                                     (pb (max b from))
-                                     (pe (min e end)))
+                                     (e (+ b step)))
                                 (loop (+ i 1)
-                                      (if (and (< pb pe) (= pb b))
-                                          (cons (studio:hap b e pb pe
+                                      (if (and (>= b from) (< b end))
+                                          (cons (studio:hap b e b (min e end)
                                                             (studio:hap-value (vector-ref group (modulo i size))))
                                                 acc)
                                           acc)))))))
@@ -1107,10 +1108,21 @@
 ;; the clock ;;
 ;;;;;;;;;;;;;;;
 
-(define *studio:cps* 0.5)           ;; cycles per second
-(define *studio:clock-cycle* 0.0)   ;; the cycle at ...
+;; The clock works in exact numbers (whole frames, and cycles as fractions).
+;; A pattern's events start at exact fractions of a cycle, and a note is
+;; played by the query whose span contains its start: with floating-point
+;; spans, an event which starts right on a boundary could be seen by neither
+;; of the queries either side of it, or by both.
+(define studio:exact
+  (lambda (x)
+    (if (exact? x) x (inexact->exact x))))
+
+(define *studio:frames-per-second* (studio:exact (round *studio:samplerate*)))
+
+(define *studio:cps* 1/2)           ;; cycles per second
+(define *studio:clock-cycle* 0)     ;; the cycle at ...
 (define *studio:clock-time* 0)      ;; ... this time, in frames
-(define *studio:scheduled-to* 0.0)  ;; everything before this cycle has been played
+(define *studio:scheduled-to* 0)    ;; everything before this cycle has been played
 (define *studio:clock-running* #f)
 (define *studio:lookahead* 0.25)    ;; seconds ahead of the clock that events are queued
 (define *studio:tick* 0.05)         ;; seconds between looks
@@ -1120,11 +1132,13 @@
 
 (define studio:cycle-at
   (lambda (time)
-    (+ *studio:clock-cycle* (* *studio:cps* (/ (- time *studio:clock-time*) *studio:samplerate*)))))
+    (+ *studio:clock-cycle*
+       (* *studio:cps* (/ (- (studio:exact time) *studio:clock-time*) *studio:frames-per-second*)))))
 
 (define studio:time-at
   (lambda (cycle)
-    (+ *studio:clock-time* (* *studio:samplerate* (/ (- cycle *studio:clock-cycle*) *studio:cps*)))))
+    (+ *studio:clock-time*
+       (* *studio:frames-per-second* (/ (- (studio:exact cycle) *studio:clock-cycle*) *studio:cps*)))))
 
 ;; set (or with no argument, get) the tempo in cycles per second
 (define cps
@@ -1136,20 +1150,21 @@
               (let ((time (studio:time-at *studio:scheduled-to*)))
                 (set! *studio:clock-cycle* *studio:scheduled-to*)
                 (set! *studio:clock-time* time)))
-          (set! *studio:cps* (* 1.0 (car args)))))
+          (set! *studio:cps* (studio:exact (car args)))))
     *studio:cps*))
 
 ;; the tempo in beats per minute, at four beats to the cycle
 (define bpm
   (lambda args
-    (if (pair? args) (cps (/ (car args) 240.0)))
-    (* 240.0 *studio:cps*)))
+    (if (pair? args) (cps (/ (studio:exact (car args)) 240)))
+    (* 240 *studio:cps*)))
 
 (define studio:tick
   (lambda ()
     (if *studio:clock-running*
         (let* ((now (studio_now))
-               (end (studio:cycle-at (+ now (* *studio:lookahead* *studio:samplerate*))))
+               (end (studio:cycle-at
+                      (+ now (studio:exact (round (* *studio:lookahead* *studio:samplerate*))))))
                ;; if Scheme was busy and the clock got ahead of us, skip what was missed
                (from (max *studio:scheduled-to* (studio:cycle-at now))))
           (if (> end from)
@@ -1172,9 +1187,10 @@
           (set! *studio:clock-running* #t)
           ;; cycle 0 starts a moment from now, so that its first events have
           ;; time to be queued
-          (set! *studio:clock-time* (+ (studio_now) (* 0.1 *studio:samplerate*)))
-          (set! *studio:clock-cycle* 0.0)
-          (set! *studio:scheduled-to* 0.0)
+          (set! *studio:clock-time*
+                (+ (studio_now) (studio:exact (round (* 0.1 *studio:samplerate*)))))
+          (set! *studio:clock-cycle* 0)
+          (set! *studio:scheduled-to* 0)
           (studio:tick)))
     #t))
 
@@ -1224,7 +1240,7 @@
   (lambda pats
     (let* ((pat (apply with pats))
            (start (studio_now))
-           (frames-per-cycle (/ *studio:samplerate* *studio:cps*)))
+           (frames-per-cycle (/ *studio:frames-per-second* *studio:cps*)))
       (studio:play-span pat 0 1 (lambda (cycle) (+ start (* cycle frames-per-cycle))))
       #t)))
 
@@ -1237,8 +1253,8 @@
 (define score-pattern
   (lambda (from to . pats)
     (let ((pat (apply with pats))
-          (frames-per-cycle (/ *studio:samplerate* *studio:cps*)))
-      (studio:play-span pat from to
+          (frames-per-cycle (/ *studio:frames-per-second* *studio:cps*)))
+      (studio:play-span pat (studio:exact from) (studio:exact to)
                         (lambda (cycle) (+ *studio:score-start* (* cycle frames-per-cycle))))
       #t)))
 

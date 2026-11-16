@@ -388,12 +388,25 @@ were sent in, so a parameter change sent just before a note applies to it."
           (studio_event_copy (pref-ptr studio_heap i) last))
       void)))
 
+;; the inbox position up to which everything should be forgotten, or -1
+(bind-val studio_clear_request i64 -1)
+
 (bind-func static studio_drain_inbox
   "move newly arrived events into the heap (audio thread only).
 
 An event is taken one frame after it was first seen, which gives the writing
 thread time to finish storing it."
   (lambda ()
+    ;; a request to forget everything (see studio_clear_events) is carried out
+    ;; here, on the audio thread, which is the only one to touch the heap
+    (if (>= studio_clear_request 0)
+        (begin
+          (set! studio_heap_size 0)
+          (if (> studio_clear_request studio_inbox_read)
+              (set! studio_inbox_read studio_clear_request))
+          (if (> studio_clear_request studio_inbox_seen)
+              (set! studio_inbox_seen studio_clear_request))
+          (set! studio_clear_request -1)))
     (let ((seen studio_inbox_seen))
       (set! studio_inbox_seen studio_inbox_write)
       (while (< studio_inbox_read seen)
@@ -402,9 +415,8 @@ thread time to finish storing it."
       void)))
 
 (bind-func studio_clear_events
-  "forget every queued event"
+  "forget every event queued so far. The audio thread does the forgetting, the
+next time it looks at the queue."
   (lambda ()
-    (set! studio_inbox_read studio_inbox_write)
-    (set! studio_inbox_seen studio_inbox_write)
-    (set! studio_heap_size 0)
+    (set! studio_clear_request studio_inbox_write)
     void))
