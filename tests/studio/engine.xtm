@@ -1,0 +1,192 @@
+;;; tests/studio/engine.xtm -- tests for the studio's voices, instruments and event queue
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Code:
+
+(sys:load "libs/studio/mixer.xtm" 'quiet)
+
+;;;;;;;;;;;;;;;;;;;;;
+;; the event queue ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; send events out of order, then check that they come back in time order,
+;; with events at the same time in the order they were sent. Returns the
+;; events' `i` fields as the digits of a number.
+(bind-func test_event_order
+  (lambda ()
+    (let ((evt:StudioEvent* (alloc))
+          (digits:i64 0))
+      (studio_clear_events)
+      (studio_send_event 300 EVT_NOTE_ON 0 1 0.0 0.0)
+      (studio_send_event 100 EVT_NOTE_ON 0 2 0.0 0.0)
+      (studio_send_event 200 EVT_NOTE_ON 0 3 0.0 0.0)
+      (studio_send_event 200 EVT_NOTE_ON 0 4 0.0 0.0)
+      (studio_send_event 50 EVT_NOTE_ON 0 5 0.0 0.0)
+      (studio_send_event 200 EVT_NOTE_ON 0 6 0.0 0.0)
+      ;; an event is taken on the drain after the one which first sees it
+      (studio_drain_inbox)
+      (studio_drain_inbox)
+      (while (> studio_heap_size 0)
+        (studio_heap_pop evt)
+        (set! digits (+ (* digits 10) (tref evt 4))))
+      digits)))
+
+(xtmtest-result (test_event_order) 523461 "events-come-back-in-time-order")
+
+(bind-func test_event_queue_survives_a_flood
+  (lambda ()
+    (let ((evt:StudioEvent* (alloc))
+          (i:i64 0)
+          (last:i64 -1)
+          (sorted:i1 #t)
+          (count:i64 0))
+      (studio_clear_events)
+      (dotimes (i 5000)
+        (studio_send_event (% (* i 7919) 1000) EVT_NOTE_ON 0 i 0.0 0.0))
+      (studio_drain_inbox)
+      (studio_drain_inbox)
+      (while (> studio_heap_size 0)
+        (studio_heap_pop evt)
+        (if (< (tref evt 0) last) (set! sorted #f))
+        (set! last (tref evt 0))
+        (set! count (+ count 1)))
+      (if sorted count -1))))
+
+(xtmtest-result (test_event_queue_survives_a_flood) 5000 "five-thousand-events-sorted")
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; voice allocation ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; a voice which sounds for as long as its note is held
+(bind-func test_voice_c
+  (lambda ()
+    (lambda (v:Voice* out:SAMPLE*)
+      (frame_add out (* 0.1 (voice_vel v)))
+      (if (< (voice_gate v) 0.5) (voice_done v))
+      void)))
+
+(bind-func test_inst
+  (lambda (nvoices:i64)
+    (let ((inst (inst_make "test" nvoices 2))
+          (i:i64 0))
+      (dotimes (i nvoices)
+        (inst_set_voice inst i (test_voice_c)))
+      inst)))
+
+(bind-func test_tick
+  "run the instrument for n frames"
+  (lambda (inst:Inst* n:i64)
+    (let ((frame:SAMPLE* (alloc 2))
+          (i:i64 0))
+      (dotimes (i n)
+        (inst_tick inst frame))
+      (pref frame 0))))
+
+(bind-func test_poly_uses_free_voices
+  (lambda ()
+    (let ((inst (test_inst 4)))
+      (inst_note_on inst 60.0 0.8 0)
+      (inst_note_on inst 64.0 0.8 0)
+      (inst_note_on inst 67.0 0.8 0)
+      (inst_active_voices inst))))
+
+(xtmtest-result (test_poly_uses_free_voices) 3 "poly-uses-free-voices")
+
+(bind-func test_poly_steals_the_oldest
+  (lambda ()
+    (let ((inst (test_inst 2)))
+      (inst_note_on inst 60.0 0.8 0)
+      (test_tick inst 10)
+      (inst_note_on inst 64.0 0.8 0)
+      (test_tick inst 10)
+      ;; both voices are busy, so this takes the one playing 60
+      (inst_note_on inst 67.0 0.8 0)
+      (+ (* 100 (convert (voice_pitch (pref-ptr (tref inst 2) 0)) i64))
+         (convert (voice_pitch (pref-ptr (tref inst 2) 1)) i64)))))
+
+(xtmtest-result (test_poly_steals_the_oldest) 6764 "poly-steals-the-oldest")
+
+(bind-func test_gate_time_runs_out
+  (lambda ()
+    (let ((inst (test_inst 2)))
+      (inst_note_on inst 60.0 0.8 100)
+      (test_tick inst 50)
+      (let ((during (inst_active_voices inst)))
+        (test_tick inst 100)
+        (+ (* 10 during) (inst_active_voices inst))))))
+
+(xtmtest-result (test_gate_time_runs_out) 10 "a-note-ends-when-its-gate-time-runs-out")
+
+(bind-func test_note_off_releases
+  (lambda ()
+    (let ((inst (test_inst 4)))
+      (inst_note_on inst 60.0 0.8 0)
+      (inst_note_on inst 64.0 0.8 0)
+      (test_tick inst 10)
+      (inst_note_off inst 60.0)
+      (test_tick inst 10)
+      (inst_active_voices inst))))
+
+(xtmtest-result (test_note_off_releases) 1 "note-off-releases-the-right-voice")
+
+(bind-func test_mono_legato
+  (lambda ()
+    (let ((inst (test_inst 1))
+          (v:Voice* null)
+          (first:i64 0))
+      (inst_set_mode inst INST_MONO)
+      (inst_note_on inst 60.0 0.8 0)
+      (set! v (pref-ptr (tref inst 2) 0))
+      (set! first (if (voice_legato v) 1 0))
+      (test_tick inst 10)
+      ;; the first note is still held, so this one is legato and keeps its age
+      (inst_note_on inst 64.0 0.8 0)
+      (+ (* 100 first)
+         (* 10 (if (voice_legato v) 1 0))
+         (if (> (voice_age v) 0) 1 0)))))
+
+(xtmtest-result (test_mono_legato) 11 "mono-notes-which-overlap-are-legato")
+
+(bind-func test_keyed
+  (lambda ()
+    (let ((inst (test_inst 3)))
+      (inst_set_mode inst INST_KEYED)
+      (inst_map_key inst 36 0)
+      (inst_map_key inst 42 2)
+      (inst_map_key inst 46 2)
+      (inst_note_on inst 36.0 0.8 0)
+      (inst_note_on inst 42.0 0.8 0)
+      (inst_note_on inst 46.0 0.8 0) ;; the same voice as 42
+      (inst_note_on inst 50.0 0.8 0) ;; not mapped
+      (inst_active_voices inst))))
+
+(xtmtest-result (test_keyed) 2 "keyed-pitches-have-their-own-voices")
+
+(bind-func test_params_are_bounded
+  (lambda ()
+    (let ((inst (test_inst 1)))
+      (inst_set_param inst 1 0.5)
+      (inst_set_param inst 7 99.0)
+      (inst_set_param inst -1 99.0)
+      (+ (inst_get_param inst 1) (inst_get_param inst 7)))))
+
+(xtmtest-result (test_params_are_bounded) 0.5 "parameters-outside-the-table-are-ignored")
+
+;;;;;;;;;;;;;;;;;
+;; delay lines ;;
+;;;;;;;;;;;;;;;;;
+
+(bind-func test_delay_line
+  (lambda ()
+    (let ((line (dl_make 8))
+          (i:i64 0))
+      (dotimes (i 20)
+        (dl_write line (convert i SAMPLE)))
+      ;; the last write was 19, so three frames ago was 17, and halfway
+      ;; between two and three frames ago is 17.5
+      (+ (* 100.0 (dl_read line 3)) (dl_readf line 2.5)))))
+
+(xtmtest-result (test_delay_line) 1717.5 "delay-line-reads")
