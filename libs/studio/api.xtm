@@ -144,7 +144,12 @@
     (let ((make (eval (string->symbol (string-append (symbol->string instrument) "_make")))))
       ;; the instance lives in a memory zone of its own
       (sys:push-memzone (sys:create-mzone *studio:instrument-zone-size*))
-      (let ((inst (make)))
+      (let ((inst (make))
+            (setup (string->symbol (string-append (symbol->string instrument) "-setup"))))
+        ;; an instrument which needs Scheme's help to get ready (loading its
+        ;; samples, say) defines a function called <name>-setup
+        (if (defined? setup)
+            ((eval setup) inst))
         (sys:pop-memzone)
         inst))))
 
