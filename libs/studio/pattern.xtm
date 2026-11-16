@@ -280,6 +280,15 @@
 ;; transforming patterns ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Where one of these takes a function to apply to a pattern, it will also
+;; take a pattern, which is merged in as `with` would: (off 1/8 (vel 0.3)) is
+;; an echo at a velocity of 0.3.
+(define studio:transform
+  (lambda (f pat)
+    (if (pattern? f)
+        (studio:merge pat f)
+        (->pattern (f pat)))))
+
 (define-transform (rev)
   (studio:cycle-pattern
     (lambda (b e cycle)
@@ -294,7 +303,7 @@
 
 ;; use (f pat) in the cycles where (test cycle) is true
 (define-transform (when-cycle test f)
-  (let ((transformed (->pattern (f pat))))
+  (let ((transformed (studio:transform f pat)))
     (studio:cycle-pattern
       (lambda (b e cycle)
         (query (if (test cycle) transformed pat) b e)))))
@@ -307,10 +316,10 @@
   (when-cycle (lambda (cycle) (= offset (modulo cycle n))) f pat))
 
 (define-transform (superimpose f)
-  (stack pat (f pat)))
+  (stack pat (studio:transform f pat)))
 
 (define-transform (off amount f)
-  (stack pat (f (late amount pat))))
+  (stack pat (studio:transform f (late amount pat))))
 
 ;; repeat each event n times in its own span
 (define-transform (ply n)
@@ -364,7 +373,7 @@
 
 ;; apply f only to the part of each cycle from start to end (0 to 1)
 (define-transform (within start end f)
-  (let ((transformed (->pattern (f pat)))
+  (let ((transformed (studio:transform f pat))
         (in? (lambda (h)
                (let* ((t (or (studio:hap-whole-begin h) (studio:hap-part-begin h)))
                       (pos (- t (floor t))))
@@ -376,7 +385,7 @@
 
 ;; apply f as if the pattern were n times slower: (inside 2 rev) reverses each half
 (define-transform (inside n f)
-  (fast n (f (slow n pat))))
+  (fast n (studio:transform f (slow n pat))))
 
 ;; delay every second step of n per cycle by `amount` of a step
 (define-transform (swing amount n)
@@ -537,8 +546,10 @@
                        probability))))
     (stack (studio:make-pattern
              (lambda (from end) (cl:remove-if chosen? (query pat from end))))
-           (f (studio:make-pattern
-                (lambda (from end) (cl:remove-if-not chosen? (query pat from end))))))))
+           (studio:transform
+             f
+             (studio:make-pattern
+               (lambda (from end) (cl:remove-if-not chosen? (query pat from end))))))))
 
 (define-transform (sometimes f) (sometimes-by 0.5 f pat))
 (define-transform (often f) (sometimes-by 0.75 f pat))
@@ -1189,7 +1200,7 @@
       (for-each
         (lambda (h)
           (if (studio:hap-onset? h)
-              (println (studio:hap-whole-begin h) '-> (studio:hap-whole-end h) (studio:hap-value h))))
+              (studio:say (studio:hap-whole-begin h) "->" (studio:hap-whole-end h) (studio:hap-value h))))
         (cl:sort (query pat from end)
               (lambda (a b) (< (studio:hap-part-begin a) (studio:hap-part-begin b)))))
       #t)))

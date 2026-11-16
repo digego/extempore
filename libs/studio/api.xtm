@@ -60,9 +60,7 @@
     (if (not (studio:instrument-info name))
         (sys:load (studio:instrument-file name)))
     (if (not (studio:instrument-info name))
-        (begin (print-with-colors 'red 'default #t (print "studio: "))
-               (println "there is no instrument called" name)
-               #f)
+        (studio:error "there is no instrument called" name)
         name)))
 
 ;;;;;;;;;;;;
@@ -133,10 +131,21 @@
           (cadr (vector-ref *studio:tracks* i))
           #f))))
 
+;; print the arguments separated by spaces, without quotes around strings
+(define studio:say
+  (lambda args
+    (let loop ((args args))
+      (if (pair? args)
+          (begin
+            (display (car args))
+            (if (pair? (cdr args)) (display " "))
+            (loop (cdr args)))))
+    (newline)))
+
 (define studio:error
   (lambda args
-    (print-with-colors 'red 'default #t (print "studio: "))
-    (apply println args)
+    (print-with-colors 'red 'default #t (display "studio: "))
+    (apply studio:say args)
     #f))
 
 (define studio:make-instance
@@ -171,6 +180,17 @@
                   name)))
         #f)))
 
+;; make a track's instrument afresh. Use this after changing an instrument's
+;; code, so that the track picks up the new version.
+(define reload
+  (lambda (name)
+    (let ((i (studio:track-index name)))
+      (if (not i)
+          (studio:error "there is no track called" name)
+          (begin
+            (studio_set_instrument i (studio:make-instance (studio:track-instrument name)))
+            name)))))
+
 (define untrack
   (lambda (name)
     (let ((i (studio:track-index name)))
@@ -184,7 +204,7 @@
   (lambda ()
     (dotimes (i *studio:num-tracks*)
       (if (vector-ref *studio:tracks* i)
-          (println i (car (vector-ref *studio:tracks* i)) '-- (cadr (vector-ref *studio:tracks* i)))))
+          (studio:say i (car (vector-ref *studio:tracks* i)) "--" (cadr (vector-ref *studio:tracks* i)))))
     #t))
 
 ;;;;;;;;;;;;;;;;
@@ -272,10 +292,12 @@
 (define studio:print-params
   (lambda (track-name params)
     (for-each (lambda (p)
-                (print-with-colors 'green 'default #t (print "  " (car p)))
-                (print " " (studio:param-value track-name (car p)))
-                (print-with-colors 'black 'default #t (print "  " (cadddr p)))
-                (println))
+                (print-with-colors 'green 'default #t (begin (display "  ") (display (car p))))
+                ;; parameters are 32-bit floats: round away the noise in the last digits
+                (studio:say ""
+                            (/ (round (* 10000.0 (studio:param-value track-name (car p)))) 10000.0)
+                            ""
+                            (cadddr p)))
               params)))
 
 (define params
@@ -286,9 +308,9 @@
           (if (not instrument)
               (studio:error "there is no track called" track-name)
               (begin
-                (println track-name '-- instrument)
+                (studio:say track-name "--" instrument)
                 (studio:print-params track-name (studio:instrument-params instrument))
-                (println "mixer")
+                (studio:say "mixer")
                 (studio:print-params track-name *studio:strip-params*)))))
     #t))
 
@@ -306,17 +328,26 @@
           (map car (studio:instrument-sounds instrument))
           '()))))
 
+(define studio:instrument-names
+  (lambda ()
+    (cl:sort (map (lambda (f) (string->symbol (car (regex:split f "[.]"))))
+                  (cl:remove-if-not
+                    (lambda (f) (regex:match? f "[.]xtm$"))
+                    (sys:directory-list (string-append (sys:share-dir) "/libs/studio/instruments"))))
+             (lambda (a b) (string<? (symbol->string a) (symbol->string b))))))
+
+;; list the instruments in libs/studio/instruments. This reads each file's
+;; description without compiling it, so it's quick.
 (define instruments
   (lambda ()
-    (let ((names (map (lambda (f) (string->symbol (car (regex:split (filename-from-path f) "[.]"))))
-                      (sys:directory-list (string-append (sys:share-dir) "/libs/studio/instruments")))))
-      (for-each (lambda (name)
-                  (if (studio:load-instrument name)
-                      (begin
-                        (print-with-colors 'green 'default #t (print name))
-                        (println " --" (studio:instrument-doc name)))))
-                (cl:sort names (lambda (a b) (string<? (symbol->string a) (symbol->string b)))))
-      #t)))
+    (for-each
+      (lambda (name)
+        (let* ((text (or (sys:slurp-file (string-append (sys:share-dir) "/" (studio:instrument-file name))) ""))
+               (found (regex:matched text "\\(def-instrument\\s+\\S+\\s+\"([^\"]*)\"")))
+          (print-with-colors 'green 'default #t (display name))
+          (studio:say " --" (if (and (pair? found) (pair? (cdr found))) (cadr found) ""))))
+      (studio:instrument-names))
+    #t))
 
 ;;;;;;;;;;;
 ;; notes ;;
@@ -346,6 +377,8 @@
 (define studio:start
   (lambda ()
     (dsp:set! studio_dsp)
+    (print-with-colors 'green 'default #t (display "studio: "))
+    (studio:say "ready. (instruments) lists what you can put on a track.")
     #t))
 
 ;;;;;;;;;;;;
