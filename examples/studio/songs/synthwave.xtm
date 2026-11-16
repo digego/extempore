@@ -1,0 +1,60 @@
+;;; synthwave.xtm -- arpeggios, a pulsing bass and a big snare
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Four chords at 100 bpm, the way the eighties heard the future: an FM bass
+;; playing eighth notes, polysynth brass and a plucked arpeggio, string
+;; machine behind, and a lead from the macro oscillator.
+;;
+;;   extras/studio/render examples/studio/songs/synthwave.xtm /tmp/synthwave.wav 52
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 100)
+
+(track 'drums 'kit909 'classic)
+(track 'bass 'fm 'bass)
+(track 'brass 'polysynth 'brass)
+(track 'arp 'polysynth 'pluck)
+(track 'pad 'strings 'classic)
+(track 'lead 'macro 'sync)
+
+(ctl 'drums 'gain 1.6 'reverb 0.18 'hh-level 0.9)
+(ctl 'bass 'gain 0.85)
+(ctl 'brass 'gain 0.6 'reverb 0.3 'pan 0.4)
+(ctl 'arp 'gain 0.7 'reverb 0.3 'delay 0.35 'pan 0.62)
+(ctl 'pad 'gain 0.45 'reverb 0.4 'hpf 200)
+(ctl 'lead 'gain 0.9 'reverb 0.35 'delay 0.4)
+(master 'reverb-size 0.85 'delay-time (/ 3/16 (cps)) 'delay-feedback 0.45)
+
+;; A minor, F, C and G: each <...> is one voice of the chord
+(define synthwave-chords '#(<a3 a3 g3 g3> <c4 c4 c4 b3> <e4 f4 e4 d4>))
+(define synthwave-roots '(<a1 f1 c2 g1>))
+
+(define synthwave-beat
+  (stack (with (sound 'bd*4) (vel 0.9))
+         (with (sound '(~ sd ~ sd)) (vel 0.9))
+         (with (sound 'hh*8) (vel '(0.5 0.3)))))
+
+(score-pattern 0 20 (note synthwave-chords) (sound 'pad) (vel 0.5) (legato 1.0))
+;; eighth notes on the root, the first of each pair a little harder
+(score-pattern 0 20 (note synthwave-roots) (ply 8) (sound 'bass) (vel '((0.8 0.6)*4)) (legato 0.6))
+(score-pattern 2 20 (note synthwave-chords) (arp 16) (add (note 12)) (sound 'arp)
+               (vel (between 0.35 0.65 (slow 4 sine))) (legato 0.8))
+(score-pattern 4 20 synthwave-beat)
+(score-pattern 3 4 (sound '(lt lt mt mt ht ht #(sd cr) ~)) (vel 0.8))
+(score-pattern 8 20 (note synthwave-chords) (struct '(t ~ ~ t ~ ~ t ~)) (sound 'brass) (vel 0.7) (legato 1.5))
+(score-pattern 12 20
+               (note '(<(e5 _ _ d5) (c5 _ _ _) (g5 _ _ e5) (d5 _ _ _)> <(c5 a4) (~ c5) (e5 c5) (~ b4)>))
+               (sound 'lead) (vel 0.7) (legato 0.95))
+(score-pattern 20 21 (note '#(a2 a3 c4 e4 a4)) (sound 'brass) (vel 0.8) (legato 2))
+(score-pattern 20 21 (note 'a1) (sound 'bass) (vel 0.8))
+(score-pattern 20 21 (sound '#(bd cr)))
+
+(score-end)

@@ -1,0 +1,58 @@
+;;; ambient.xtm -- slow chords, glass and a long reverb
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; No drums and no hurry: a string pad which changes chord every eight
+;; seconds, struck glass and bells scattered over the top, and a swarm of
+;; detuned oscillators underneath.
+;;
+;;   extras/studio/render examples/studio/songs/ambient.xtm /tmp/ambient.wav 75
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(cps 0.25)
+
+(track 'pad 'strings 'pad)
+(track 'glass 'resonator 'glass)
+(track 'bell 'resonator 'bell)
+(track 'drone 'macro 'swarm)
+(track 'keys 'epiano 'suitcase)
+
+(ctl 'pad 'gain 0.5 'reverb 0.6 'hpf 150)
+(ctl 'glass 'gain 1.8 'reverb 0.7 'delay 0.5 'pan 0.7)
+(ctl 'bell 'gain 1.4 'reverb 0.8 'delay 0.3 'pan 0.3)
+(ctl 'drone 'gain 0.6 'reverb 0.5 'lpf 1200)
+(ctl 'keys 'gain 2.8 'reverb 0.6 'delay 0.4)
+(master 'reverb-size 0.97 'reverb-damping 0.25 'reverb-predelay 0.04
+        'delay-time 1.0 'delay-feedback 0.65 'delay-tone 0.6 'delay-reverb 0.5)
+
+;; F major 9, A minor 7, D minor 9 and B flat major 7, two cycles each
+(define ambient-chords
+  (slow 2 '#(<f2 a2 d2 bb1> <c3 e3 a2 f2> <a3 g3 f3 a3> <e4 c4 c4 d4> <g4 e4 e4 a4>)))
+
+(score-pattern 0 16 (note ambient-chords) (sound 'pad) (vel 0.55) (legato 1.0))
+(score-pattern 0 16 (note (slow 2 '(<f1 a1 d1 bb0>))) (sound 'drone) (vel 0.6) (legato 1.0)
+               (param 'timbre (between 0.2 0.6 (slow 8 sine))))
+
+;; glass: random notes from a pentatonic scale, most of them left out
+(score-pattern 2 16
+               (note (scale 'c5 'pentatonic (segment 8 (irand 10))))
+               (sound 'glass)
+               (degrade-by 0.6)
+               (vel (between 0.25 0.7 rand))
+               (pan (between 0.2 0.8 rand)))
+
+;; a low bell, now and then
+(score-pattern 4 16 (note '(<c3 ~ a2 ~> ~ ~ <~ g3 ~ e3>)) (sound 'bell) (vel 0.5))
+
+;; the electric piano answers with slow arpeggios of the chord
+(score-pattern 8 16 (note ambient-chords) (arp 4) (add (note 12)) (sound 'keys)
+               (every 2 rev) (vel (between 0.3 0.55 perlin)) (legato 2))
+
+(score-end)

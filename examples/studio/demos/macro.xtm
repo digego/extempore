@@ -1,0 +1,87 @@
+;;; macro.xtm -- a tour of the macro-oscillator's presets
+
+;; Evaluate the whole file to hear each preset in turn, or render it to a
+;; file:
+;;
+;;   extras/studio/render examples/studio/demos/macro.xtm /tmp/macro.wav 66
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'macro 'macro)
+(score-ctl 0 'macro 'reverb 0.2)
+(score-ctl 0 'macro 'delay 0.08)
+
+;; play each (pitch ...) in a list `step` seconds apart
+(define macro-demo-line
+  (lambda (start step pitches velocity seconds)
+    (let loop ((t start) (ps pitches))
+      (if (pair? ps)
+          (begin
+            (if (> (car ps) 0)
+                (score-note t 'macro (car ps) velocity seconds))
+            (loop (+ t step) (cdr ps)))))))
+
+;; play every pitch in each chord together, one chord every `step` seconds
+(define macro-demo-chords
+  (lambda (start step chords velocity seconds)
+    (let loop ((t start) (cs chords))
+      (if (pair? cs)
+          (begin
+            (for-each (lambda (p) (score-note t 'macro p velocity seconds)) (car cs))
+            (loop (+ t step) (cdr cs)))))))
+
+;; poly: slow chords on the detuned saw and square
+(score-preset 0.0 'macro 'poly)
+(macro-demo-chords 0.0 1.5 '((48 55 60 64) (45 52 57 60) (41 48 53 57) (43 50 55 59)) 0.8 1.4)
+
+;; pluck: a sixteenth-note arpeggio through the low-pass gate
+(score-preset 6.0 'macro 'pluck)
+(macro-demo-line 6.0 0.125 '(48 55 60 64 67 64 60 55 45 52 57 60 64 60 57 52
+                             41 48 53 57 60 57 53 48 43 50 55 59 62 59 55 50)
+                 0.85 0.1)
+
+;; sync: a lead line, the sync sweeping down as each note decays
+(score-preset 10.0 'macro 'sync)
+(macro-demo-line 10.0 0.25 '(60 0 63 65 67 0 70 67 65 63 0 60 58 60 0 0) 0.9 0.22)
+(score-note 14.0 'macro 60 0.9 1.0)
+
+;; folded: a wavefolded bass
+(score-preset 16.0 'macro 'folded)
+(macro-demo-line 16.0 0.25 '(36 36 48 36 39 36 43 46 36 36 48 36 34 34 46 41) 0.9 0.2)
+(score-note 20.0 'macro 36 1.0 1.2)
+
+;; epiano: FM electric piano chords, soft and then hard
+(score-preset 22.0 'macro 'epiano)
+(macro-demo-chords 22.0 1.0 '((52 59 62 67) (53 57 60 64) (50 57 60 65) (52 55 59 64)) 0.5 0.9)
+(macro-demo-chords 26.0 0.5 '((52 59 62 67) (57 64 67 71)) 0.95 0.45)
+(score-note 27.0 'macro 76 0.7 0.8)
+
+;; bell: inharmonic FM, left to ring
+(score-preset 28.0 'macro 'bell)
+(macro-demo-line 28.0 0.6 '(84 79 76 72 79 0 77 72) 0.8 0.5)
+
+;; vowel: a slow tune while the formant moves
+(score-preset 34.0 'macro 'vowel)
+(macro-demo-line 34.0 0.8 '(55 57 59 62 60 59 57) 0.8 0.75)
+(score-ctl 34.0 'macro 'timbre 0.3)
+(score-ctl 35.6 'macro 'timbre 0.45)
+(score-ctl 37.2 'macro 'timbre 0.55)
+(score-ctl 38.8 'macro 'timbre 0.35)
+
+;; organ: the drawbar harmonics, with the spectrum opening up
+(score-preset 40.0 'macro 'organ)
+(macro-demo-chords 40.0 1.0 '((48 55 60 64) (50 57 60 65) (52 55 59 64) (48 55 60 67)) 0.8 0.95)
+(score-ctl 42.0 'macro 'timbre 0.5)
+(macro-demo-line 44.0 0.25 '(72 74 76 79 76 74 72 0) 0.8 0.22)
+
+;; glass: rippled additive spectra in a broken chord
+(score-preset 46.0 'macro 'glass)
+(macro-demo-line 46.0 0.3 '(60 67 71 74 76 74 71 67 64 71 74 79) 0.75 0.4)
+
+;; swarm: a long pad of drifting saws
+(score-preset 52.0 'macro 'swarm)
+(macro-demo-chords 52.0 3.5 '((45 52 57 64) (41 48 57 64)) 0.8 3.2)
+(score-note 59.0 'macro 45 0.8 2.5)
+
+(score-end)
