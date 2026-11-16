@@ -1,0 +1,119 @@
+;;; tests/studio/pattern.xtm -- tests for the studio's pattern language
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Each test asks a pattern for the events which start in a span of cycles
+;; (the first cycle unless it says otherwise) and compares them, as a list of
+;; (start end value), with what the notation promises.
+
+;;; Code:
+
+(sys:load "libs/studio/pattern.xtm" 'quiet)
+
+(define events
+  (lambda (pat . span)
+    (let ((from (if (pair? span) (car span) 0))
+          (to (if (pair? span) (cadr span) 1)))
+      (map (lambda (h)
+             (list (studio:hap-whole-begin h) (studio:hap-whole-end h) (studio:hap-value h)))
+           (cl:sort (cl:remove-if-not studio:hap-onset? (query pat from to))
+                    (lambda (a b) (< (studio:hap-part-begin a) (studio:hap-part-begin b))))))))
+
+;; just the values, in order
+(define values-of
+  (lambda (pat . span)
+    (map caddr (apply events pat span))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the notation for sequences ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (events '(a b c)) '((0 1/3 a) (1/3 2/3 b) (2/3 1 c)) "sequence")
+(xtmtest-result (events '(a (b c) d)) '((0 1/3 a) (1/3 1/2 b) (1/2 2/3 c) (2/3 1 d)) "sublist")
+(xtmtest-result (events '(a ~ c)) '((0 1/3 a) (2/3 1 c)) "rest")
+(xtmtest-result (events '(a _ c)) '((0 2/3 a) (2/3 1 c)) "tie")
+(xtmtest-result (events '(a*2 b)) '((0 1/4 a) (1/4 1/2 a) (1/2 1 b)) "repeat-in-step")
+(xtmtest-result (events '(a/2 b) 0 2) '((0 1 a) (1/2 1 b) (3/2 2 b)) "stretch-over-cycles")
+(xtmtest-result (events '(a!3 b)) '((0 1/4 a) (1/4 1/2 a) (1/2 3/4 a) (3/4 1 b)) "replicate")
+(xtmtest-result (events '(a ! b)) '((0 1/3 a) (1/3 2/3 a) (2/3 1 b)) "replicate-once")
+(xtmtest-result (events '(a@3 b)) '((0 3/4 a) (3/4 1 b)) "weight")
+(xtmtest-result (events '(<a b c> d) 0 3)
+                '((0 1/2 a) (1/2 1 d) (1 3/2 b) (3/2 2 d) (2 5/2 c) (5/2 3 d))
+                "alternate")
+(xtmtest-result (values-of '(<a (b c)>*2 d) 0 2) '(a b c d a b c d) "alternate-with-modifier")
+(xtmtest-result (events '(#(a b) d)) '((0 1/2 a) (0 1/2 b) (1/2 1 d)) "chord")
+(xtmtest-result (events '((euclid 3 8 x))) '((0 1/8 x) (3/8 1/2 x) (3/4 7/8 x)) "euclid-in-sequence")
+(xtmtest-result (events '((a b)*2 c)) '((0 1/8 a) (1/8 1/4 b) (1/4 3/8 a) (3/8 1/2 b) (1/2 1 c))
+                "modifier-on-sublist")
+(xtmtest-result (values-of '(60 1/2 -3)) '(60 1/2 -3) "numbers")
+(xtmtest-result (values-of `(a ,(fast 3 'x) b)) '(a x x x b) "unquoted-pattern")
+(xtmtest-result (values-of 'a*4) '(a a a a) "single-symbol")
+(xtmtest-result (events '()) '() "empty")
+
+;;;;;;;;;;;;;;;;
+;; transforms ;;
+;;;;;;;;;;;;;;;;
+
+(xtmtest-result (events (fast 2 '(a b))) '((0 1/4 a) (1/4 1/2 b) (1/2 3/4 a) (3/4 1 b)) "fast")
+(xtmtest-result (events (slow 2 '(a b)) 0 2) '((0 1 a) (1 2 b)) "slow")
+(xtmtest-result (values-of (rev '(a b c))) '(c b a) "rev")
+(xtmtest-result (values-of (every 2 rev '(a b c)) 0 2) '(c b a a b c) "every")
+(xtmtest-result (values-of (every 2 (fast 2) '(a b)) 0 2) '(a b a b a b) "every-with-partial-application")
+(xtmtest-result (events (late 1/4 '(a b))) '((1/4 3/4 a) (3/4 5/4 b)) "late")
+(xtmtest-result (events (early 1/4 '(a b))) '((1/4 3/4 b) (3/4 5/4 a)) "early")
+(xtmtest-result (events (ply 2 '(a b))) '((0 1/4 a) (1/4 1/2 a) (1/2 3/4 b) (3/4 1 b)) "ply")
+(xtmtest-result (values-of (palindrome '(a b c)) 0 2) '(a b c c b a) "palindrome")
+(xtmtest-result (values-of (iter 4 '(a b c d)) 1 2) '(b c d a) "iter")
+(xtmtest-result (values-of (linger 1/4 '(a b c d e f g h))) '(a b a b a b a b) "linger")
+(xtmtest-result (values-of (within 0 1/2 (fast 2) '(a b c d))) '(a b c d c d) "within")
+(xtmtest-result (values-of (chunk 4 (fast 2) '(a b c d)) 1 2) '(a c d c d) "chunk")
+(xtmtest-result (events (swing 1/3 2 'a*4)) '((0 1/4 a) (1/3 7/12 a) (1/2 3/4 a) (5/6 13/12 a)) "swing")
+(xtmtest-result (events (euclid 5 8 'x))
+                '((0 1/8 x) (1/4 3/8 x) (3/8 1/2 x) (5/8 3/4 x) (3/4 7/8 x))
+                "euclid")
+(xtmtest-result (events (euclid 3 8 2 'x)) '((1/8 1/4 x) (1/2 5/8 x) (3/4 7/8 x)) "euclid-rotated")
+(xtmtest-result (events (struct '(t ~ t t) 'x)) '((0 1/4 x) (1/2 3/4 x) (3/4 1 x)) "struct")
+(xtmtest-result (values-of (mask '(t f) '(a b c d))) '(a b) "mask")
+(xtmtest-result (values-of (stack '(a b) '(c))) '(a c b) "stack")
+(xtmtest-result (values-of (slowcat '(a b) 'c) 0 2) '(a b c) "slowcat")
+(xtmtest-result (events (timecat '(3 . a) '(1 . b))) '((0 3/4 a) (3/4 1 b)) "timecat")
+;; chance is repeatable: the same pattern drops the same events every time
+(define degraded (degrade-by 0.5 'a*64))
+(xtmtest-result (equal? (events degraded) (events degraded)) #t "degrade-is-repeatable")
+(xtmtest-result (< 16 (length (events degraded)) 48) #t "degrade-drops-about-half")
+(xtmtest-result (events (segment 2 saw)) '((0 1/2 0.0) (1/2 1 0.5)) "segment-a-signal")
+
+;;;;;;;;;;;;;;
+;; controls ;;
+;;;;;;;;;;;;;;
+
+(xtmtest-result (values-of (note '(c4 eb3 f#2 bb1 cs5 c 62)))
+                '(((note . 60)) ((note . 51)) ((note . 42)) ((note . 34)) ((note . 73)) ((note . 60))
+                  ((note . 62)))
+                "note-names")
+(xtmtest-result (values-of (with (sound '(bd sd)) (pan '(0 1/2 1))))
+                '(((sound . bd) (pan . 0)) ((sound . sd) (pan . 1/2)))
+                "with-takes-structure-from-the-first")
+(xtmtest-result (length (events (with (sound '(bd sd)) (fast 2)))) 4 "with-applies-functions")
+(xtmtest-result (values-of (add (note 12) (note '(c3 e3)))) '(((note . 60)) ((note . 64))) "add")
+(xtmtest-result (values-of (note (scale 'c3 'minor '(0 2 4 7 8))))
+                '(((note . 48)) ((note . 51)) ((note . 55)) ((note . 60)) ((note . 62)))
+                "scale")
+(xtmtest-result (values-of (scale 'major '(0 -1))) '(0 -1) "scale-below-the-root")
+(xtmtest-result (cl:sort (map cdar (values-of (note (chord 'minor7 'c3)))) <) '(48 51 55 58) "chord")
+(xtmtest-result (map cdar (values-of (arp 4 (note (chord 'minor 'c3))))) '(48 51 55 48) "arp")
+(xtmtest-result (events (off 1/4 (add (note 7)) (note 'c3)))
+                '((0 1 ((note . 48))) (1/4 5/4 ((note . 55))))
+                "off")
+(xtmtest-result (values-of (with (sound 'bd*2) (param 'cutoff (between 200 1000 square))))
+                '(((sound . bd) (cutoff . 200.0)) ((sound . bd) (cutoff . 1000.0)))
+                "signal-as-a-parameter")
+
+;;;;;;;;;;;;;;;;;;;;
+;; finding sounds ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (studio:resolve-sound 'nothing) #f "unknown-sound")

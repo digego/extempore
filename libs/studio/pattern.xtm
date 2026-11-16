@@ -1,0 +1,1195 @@
+;;; pattern.xtm -- a pattern language for the studio
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A pattern language in the manner of TidalCycles, written in Scheme.
+;;
+;;   (d1 (sound '(bd*2 <sd cp> hh*4)))
+;;   (d2 (note '(c2 c2 <eb2 g2> c3))
+;;       (sound 'bass)
+;;       (every 4 (fast 2)))
+;;   (hush)
+;;
+;; Time is measured in cycles. A pattern is a function from a span of time to
+;; the events which happen in it, so patterns can be squeezed, shifted,
+;; reversed and layered without limit, and nothing is worked out until the
+;; clock asks for it.
+;;
+;; The notation for a sequence is a quoted list:
+;;
+;;   '(a b c)        three steps in one cycle
+;;   '(a (b c) d)    a sublist squeezes its steps into one step
+;;   '(a ~ c)        ~ is a rest
+;;   '(a _ c)        _ makes the step before it longer
+;;   '(a*2 b)        play a twice in its step
+;;   '(a/2 b)        stretch a over two cycles
+;;   '(a!3 b)        three steps of a (and ! alone repeats the last step)
+;;   '(a@3 b)        a lasts as long as three steps
+;;   '(a? b)         play a half the time (a?0.2 one time in five)
+;;   '(<a b c> d)    one of a, b, c each cycle, in turn
+;;   '(#(a b c) d)   a vector plays its elements at once (a chord)
+;;   '((euclid 3 8 a) b)   a Euclidean rhythm: 3 hits spread over 8 steps
+;;
+;; and the modifiers work on a sublist too: '((a b)*2 <c d>!2).
+;;
+;; Inside a quasiquoted list, an unquoted pattern is a step: `(a ,(fast 3 x)).
+
+;;; Code:
+
+(sys:load-preload-check 'studio-pattern)
+(define *xtmlib-studio-pattern-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; events and patterns ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; An event (a "hap", in Tidal's word) is a value with two time spans. The
+;; *whole* is when the event really starts and ends. The *part* is the
+;; fragment of it which falls inside the span that was asked about. A note is
+;; played only by the fragment which contains its start.
+(define studio:hap (lambda (whole-begin whole-end part-begin part-end value)
+                     (vector whole-begin whole-end part-begin part-end value)))
+(define studio:hap-whole-begin (lambda (h) (vector-ref h 0)))
+(define studio:hap-whole-end (lambda (h) (vector-ref h 1)))
+(define studio:hap-part-begin (lambda (h) (vector-ref h 2)))
+(define studio:hap-part-end (lambda (h) (vector-ref h 3)))
+(define studio:hap-value (lambda (h) (vector-ref h 4)))
+
+(define studio:hap-onset?
+  (lambda (h)
+    (and (vector-ref h 0) (= (vector-ref h 0) (vector-ref h 2)))))
+
+(define studio:hap-with-value
+  (lambda (h value)
+    (vector (vector-ref h 0) (vector-ref h 1) (vector-ref h 2) (vector-ref h 3) value)))
+
+;; apply f to each of a hap's times
+(define studio:hap-with-time
+  (lambda (h f)
+    (vector (and (vector-ref h 0) (f (vector-ref h 0)))
+            (and (vector-ref h 1) (f (vector-ref h 1)))
+            (f (vector-ref h 2))
+            (f (vector-ref h 3))
+            (vector-ref h 4))))
+
+;; a pattern is a tagged query function: (query from end) -> list of haps
+(define studio:make-pattern (lambda (query) (cons '*pattern* query)))
+
+(define pattern?
+  (lambda (x)
+    (and (pair? x) (eq? (car x) '*pattern*) (procedure? (cdr x)))))
+
+(define query
+  (lambda (pat from end)
+    ((cdr (->pattern pat)) from end)))
+
+;; the pieces of the span from from to end which fall in each cycle, as a
+;; list of (begin end cycle)
+(define studio:cycle-spans
+  (lambda (from end)
+    (let loop ((b from) (acc '()))
+      (if (>= b end)
+          (reverse acc)
+          (let* ((cycle (floor b))
+                 (next (min end (+ cycle 1))))
+            (loop next (cons (list b next cycle) acc)))))))
+
+;; build a pattern from a function of one cycle's piece of the query
+(define studio:cycle-pattern
+  (lambda (f)
+    (studio:make-pattern
+      (lambda (from end)
+        (apply append
+               (map (lambda (span) (f (car span) (cadr span) (caddr span)))
+                    (studio:cycle-spans from end)))))))
+
+(define silence (studio:make-pattern (lambda (from end) '())))
+
+(define pure
+  (lambda (value)
+    (studio:cycle-pattern
+      (lambda (b e cycle)
+        (list (studio:hap cycle (+ cycle 1) b e value))))))
+
+;; the value a pattern has at one instant, or #f
+(define studio:sample-at
+  (lambda (pat time)
+    (let loop ((haps (query pat time (+ time 1/1048576))))
+      (cond ((null? haps) #f)
+            ((or (not (studio:hap-whole-begin (car haps)))
+                 (and (<= (studio:hap-whole-begin (car haps)) time)
+                      (< time (studio:hap-whole-end (car haps)))))
+             (car haps))
+            (else (loop (cdr haps)))))))
+
+(define fmap
+  (lambda (f pat)
+    (let ((p (->pattern pat)))
+      (studio:make-pattern
+        (lambda (from end)
+          (map (lambda (h) (studio:hap-with-value h (f (studio:hap-value h))))
+               (query p from end)))))))
+
+;; A function which transforms a pattern can be called without the pattern,
+;; and then returns a function waiting for it: (fast 2) is "play it twice as
+;; fast". That's what lets (every 4 (fast 2)) read the way it does.
+(define-macro (define-transform name-and-args . body)
+  (let ((name (car name-and-args))
+        (args (cdr name-and-args)))
+    `(define ,name
+      (lambda (,@args . maybe-pattern)
+        (if (null? maybe-pattern)
+            (lambda (pat) (,name ,@args pat))
+            (let ((pat (->pattern (car maybe-pattern))))
+              ,@body))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; combining patterns  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define stack
+  (lambda pats
+    (let ((ps (map ->pattern pats)))
+      (studio:make-pattern
+        (lambda (from end)
+          (apply append (map (lambda (p) (query p from end)) ps)))))))
+
+;; one pattern per cycle, in turn
+(define slowcat
+  (lambda pats
+    (let* ((ps (list->vector (map ->pattern pats)))
+           (n (vector-length ps)))
+      (if (= n 0)
+          silence
+          (studio:cycle-pattern
+            (lambda (b e cycle)
+              ;; each pattern sees its own cycles count up one at a time
+              (let* ((p (vector-ref ps (modulo cycle n)))
+                     (offset (- cycle (floor (/ cycle n)))))
+                (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t offset))))
+                     (query p (- b offset) (- e offset))))))))))
+
+(define-transform (fast factor)
+  (if (<= factor 0)
+      silence
+      (studio:make-pattern
+        (lambda (from end)
+          (map (lambda (h) (studio:hap-with-time h (lambda (t) (/ t factor))))
+               (query pat (* from factor) (* end factor)))))))
+
+(define-transform (slow factor)
+  (if (<= factor 0) silence (fast (/ 1 factor) pat)))
+
+;; all of the patterns in one cycle, one after the other
+(define fastcat
+  (lambda pats
+    (if (null? pats)
+        silence
+        (fast (length pats) (apply slowcat pats)))))
+
+(define cat slowcat)
+(define seq fastcat)
+
+(define-transform (late amount)
+  (studio:make-pattern
+    (lambda (from end)
+      (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t amount))))
+           (query pat (- from amount) (- end amount))))))
+
+(define-transform (early amount)
+  (late (- amount) pat))
+
+;; squeeze each cycle of a pattern into the part of the cycle from start to end
+(define studio:compress
+  (lambda (start end pat)
+    (let ((width (- end start)))
+      (if (<= width 0)
+          silence
+          (studio:cycle-pattern
+            (lambda (b e cycle)
+              (let* ((lo (+ cycle start))
+                     (hi (+ cycle end))
+                     (qb (max b lo))
+                     (qe (min e hi)))
+                (if (>= qb qe)
+                    '()
+                    (map (lambda (h)
+                           (studio:hap-with-time h (lambda (t) (+ lo (* (- t cycle) width)))))
+                         (query pat
+                                (+ cycle (/ (- qb lo) width))
+                                (+ cycle (/ (- qe lo) width))))))))))))
+
+;; like fastcat, but each pattern has a weight which says how much of the
+;; cycle it gets: (timecat '(3 . a) '(1 . b))
+(define timecat
+  (lambda weighted
+    (let ((total (apply + (map car weighted))))
+      (if (<= total 0)
+          silence
+          (let loop ((ws weighted) (start 0) (acc '()))
+            (if (null? ws)
+                (apply stack acc)
+                (let ((end (+ start (/ (car (car ws)) total))))
+                  (loop (cdr ws)
+                        end
+                        (cons (studio:compress start end (->pattern (cdr (car ws)))) acc)))))))))
+
+;; Take the structure (the timing) from the first pattern and values from the
+;; rest. Each of the others is either a pattern, whose value at the start of
+;; each event is merged into the event, or a function, which transforms the
+;; pattern so far. This is what d1 and friends do with their arguments.
+(define with
+  (lambda (pat . others)
+    (let loop ((p (->pattern pat)) (others others))
+      (cond ((null? others) p)
+            ((and (procedure? (car others)) (not (pattern? (car others))))
+             (loop (->pattern ((car others) p)) (cdr others)))
+            (else
+              (loop (studio:merge p (->pattern (car others))) (cdr others)))))))
+
+(define studio:merge-values
+  (lambda (a b)
+    (cond ((and (list? a) (list? b))
+           (append (cl:remove-if (lambda (pair) (assoc (car pair) b)) a) b))
+          (else b))))
+
+(define studio:merge
+  (lambda (structure values)
+    (studio:make-pattern
+      (lambda (from end)
+        (let loop ((haps (query structure from end)) (acc '()))
+          (if (null? haps)
+              (reverse acc)
+              (let* ((h (car haps))
+                     (other (studio:sample-at values (or (studio:hap-whole-begin h)
+                                                         (studio:hap-part-begin h)))))
+                (loop (cdr haps)
+                      (if other
+                          (cons (studio:hap-with-value
+                                  h
+                                  (studio:merge-values (studio:hap-value h) (studio:hap-value other)))
+                                acc)
+                          acc)))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; transforming patterns ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-transform (rev)
+  (studio:cycle-pattern
+    (lambda (b e cycle)
+      (let ((mirror (lambda (t) (- (+ cycle cycle 1) t))))
+        (map (lambda (h)
+               (studio:hap (and (studio:hap-whole-end h) (mirror (studio:hap-whole-end h)))
+                           (and (studio:hap-whole-begin h) (mirror (studio:hap-whole-begin h)))
+                           (mirror (studio:hap-part-end h))
+                           (mirror (studio:hap-part-begin h))
+                           (studio:hap-value h)))
+             (query pat (mirror e) (mirror b)))))))
+
+;; use (f pat) in the cycles where (test cycle) is true
+(define-transform (when-cycle test f)
+  (let ((transformed (->pattern (f pat))))
+    (studio:cycle-pattern
+      (lambda (b e cycle)
+        (query (if (test cycle) transformed pat) b e)))))
+
+(define-transform (every n f)
+  (when-cycle (lambda (cycle) (= 0 (modulo cycle n))) f pat))
+
+;; like every, but from the cycle numbered `offset` in each group of n
+(define-transform (every-from n offset f)
+  (when-cycle (lambda (cycle) (= offset (modulo cycle n))) f pat))
+
+(define-transform (superimpose f)
+  (stack pat (f pat)))
+
+(define-transform (off amount f)
+  (stack pat (f (late amount pat))))
+
+;; repeat each event n times in its own span
+(define-transform (ply n)
+  (studio:make-pattern
+    (lambda (from end)
+      (apply append
+             (map (lambda (h)
+                    (if (not (studio:hap-whole-begin h))
+                        (list h)
+                        (let* ((wb (studio:hap-whole-begin h))
+                               (step (/ (- (studio:hap-whole-end h) wb) n)))
+                          (let loop ((i 0) (acc '()))
+                            (if (>= i n)
+                                (reverse acc)
+                                (let* ((b (+ wb (* i step)))
+                                       (e (+ b step))
+                                       (pb (max b from))
+                                       (pe (min e end)))
+                                  (loop (+ i 1)
+                                        (if (< pb pe)
+                                            (cons (studio:hap b e pb pe (studio:hap-value h)) acc)
+                                            acc))))))))
+                  ;; ask for a little more than the span, so that an event
+                  ;; which started before it still contributes its repeats
+                  (cl:remove-if-not
+                    (lambda (h) (or (not (studio:hap-whole-begin h)) (studio:hap-onset? h)))
+                    (query pat (floor from) end)))))))
+
+;; `count` copies of the pattern, each `time` later and `feedback` times as loud
+(define-transform (echo count time feedback)
+  (apply stack
+         (let loop ((i 0) (acc '()))
+           (if (>= i count)
+               (reverse acc)
+               (loop (+ i 1)
+                     (cons (if (= i 0)
+                               pat
+                               (studio:scale-control 'vel (expt feedback i) (late (* i time) pat)))
+                           acc))))))
+
+(define-transform (palindrome)
+  (slowcat pat (rev pat)))
+
+;; start one step later each cycle, for a pattern of n steps
+(define-transform (iter n)
+  (apply slowcat
+         (let loop ((i 0) (acc '()))
+           (if (>= i n)
+               (reverse acc)
+               (loop (+ i 1) (cons (early (/ i n) pat) acc))))))
+
+;; apply f only to the part of each cycle from start to end (0 to 1)
+(define-transform (within start end f)
+  (let ((transformed (->pattern (f pat)))
+        (in? (lambda (h)
+               (let* ((t (or (studio:hap-whole-begin h) (studio:hap-part-begin h)))
+                      (pos (- t (floor t))))
+                 (and (>= pos start) (< pos end))))))
+    (studio:make-pattern
+      (lambda (b e)
+        (append (cl:remove-if in? (query pat b e))
+                (cl:remove-if-not in? (query transformed b e)))))))
+
+;; apply f as if the pattern were n times slower: (inside 2 rev) reverses each half
+(define-transform (inside n f)
+  (fast n (f (slow n pat))))
+
+;; delay every second step of n per cycle by `amount` of a step
+(define-transform (swing amount n)
+  (inside n (within 1/2 1 (late (* 1/2 amount))) pat))
+
+;; repeat the first `fraction` of each cycle
+(define-transform (linger fraction)
+  (if (<= fraction 0)
+      pat
+      (studio:cycle-pattern
+        (lambda (b e cycle)
+          (apply append
+                 (map (lambda (span)
+                        (let* ((rep (floor (/ (- (car span) cycle) fraction)))
+                               (shift (* rep fraction)))
+                          (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t shift))))
+                               (cl:remove-if-not
+                                 (lambda (h) (< (- (or (studio:hap-whole-begin h)
+                                                       (studio:hap-part-begin h))
+                                                   cycle)
+                                                fraction))
+                                 (query pat (- (car span) shift) (- (cadr span) shift))))))
+                      ;; cut the cycle into pieces of length `fraction`
+                      (let loop ((t b) (acc '()))
+                        (if (>= t e)
+                            (reverse acc)
+                            (let ((next (min e (+ cycle (* fraction (+ 1 (floor (/ (- t cycle) fraction))))))))
+                              (loop next (cons (list t next) acc)))))))))))
+
+;; split each cycle into n parts and apply f to one part per cycle, in turn
+(define-transform (chunk n f)
+  (apply slowcat
+         (let loop ((i 0) (acc '()))
+           (if (>= i n)
+               (reverse acc)
+               (loop (+ i 1) (cons (within (/ i n) (/ (+ i 1) n) f pat) acc))))))
+
+;; sample a continuous pattern n times per cycle
+(define-transform (segment n)
+  (studio:merge (fast n (pure #t)) pat))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; rhythm and chance   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Bjorklund's algorithm: spread `hits` as evenly as possible over `steps`
+(define studio:bjorklund
+  (lambda (hits steps)
+    (cond ((<= steps 0) '())
+          ((<= hits 0) (make-list steps #f))
+          ((>= hits steps) (make-list steps #t))
+          (else
+            (let loop ((a (make-list hits '(#t)))
+                       (b (make-list (- steps hits) '(#f))))
+              (if (<= (length b) 1)
+                  (apply append (append a b))
+                  (let* ((n (min (length a) (length b)))
+                         (paired (map append (list-head a n) (list-head b n)))
+                         (rest-a (list-tail a n))
+                         (rest-b (list-tail b n)))
+                    (loop paired (if (null? rest-a) rest-b rest-a)))))))))
+
+(define studio:rotate
+  (lambda (lst n)
+    (if (null? lst)
+        lst
+        (let ((k (modulo n (length lst))))
+          (append (list-tail lst k) (list-head lst k))))))
+
+;; (euclid 3 8 pat) plays pat on 3 of 8 steps, spread evenly. An optional
+;; fourth number rotates the rhythm: (euclid 3 8 2 pat).
+(define euclid
+  (lambda (hits steps . more)
+    (let* ((rotation (if (and (pair? more) (number? (car more)) (pair? (cdr more))) (car more) 0))
+           (rest (if (and (pair? more) (number? (car more)) (pair? (cdr more))) (cdr more) more)))
+      (if (null? rest)
+          (lambda (pat) (euclid hits steps rotation pat))
+          (let ((pat (->pattern (car rest))))
+            (apply fastcat
+                   (map (lambda (hit) (if hit pat silence))
+                        (studio:rotate (studio:bjorklund hits steps) rotation))))))))
+
+;; keep the timing of the true events in `bools`, with values from pat
+(define-transform (struct bools)
+  (let ((b (->pattern bools)))
+    (studio:merge-right (studio:filter-values (lambda (v) (and v (not (eq? v 'f)) (not (eqv? v 0)))) b)
+                        pat)))
+
+;; silence pat wherever `bools` is false
+(define-transform (mask bools)
+  (let ((b (->pattern bools)))
+    (studio:make-pattern
+      (lambda (from end)
+        (cl:remove-if-not
+          (lambda (h)
+            (let ((m (studio:sample-at b (or (studio:hap-whole-begin h) (studio:hap-part-begin h)))))
+              (and m
+                   (studio:hap-value m)
+                   (not (eq? (studio:hap-value m) 'f))
+                   (not (eqv? (studio:hap-value m) 0)))))
+          (query pat from end))))))
+
+(define studio:filter-values
+  (lambda (keep? pat)
+    (studio:make-pattern
+      (lambda (from end)
+        (cl:remove-if-not (lambda (h) (keep? (studio:hap-value h))) (query pat from end))))))
+
+;; structure from the first pattern, values (only) from the second
+(define studio:merge-right
+  (lambda (structure values)
+    (studio:make-pattern
+      (lambda (from end)
+        (let loop ((haps (query structure from end)) (acc '()))
+          (if (null? haps)
+              (reverse acc)
+              (let* ((h (car haps))
+                     (other (studio:sample-at values (or (studio:hap-whole-begin h)
+                                                         (studio:hap-part-begin h)))))
+                (loop (cdr haps)
+                      (if other
+                          (cons (studio:hap-with-value h (studio:hap-value other)) acc)
+                          acc)))))))))
+
+;; a repeatable random number from 0 to 1 for a moment in time: the same
+;; pattern makes the same choices every time it is played
+(define studio:random-at
+  (lambda (time seed)
+    (let ((x (* 43758.5453 (sin (+ (* 12.9898 time) (* 78.233 seed) 0.5)))))
+      (- x (floor x)))))
+
+(define *studio:random-seed* 0)
+
+(define studio:next-seed
+  (lambda ()
+    (set! *studio:random-seed* (+ *studio:random-seed* 1))
+    *studio:random-seed*))
+
+;; drop events at random, each with the given probability
+(define-transform (degrade-by probability)
+  (let ((seed (studio:next-seed)))
+    (studio:make-pattern
+      (lambda (from end)
+        (cl:remove-if
+          (lambda (h)
+            (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+               probability))
+          (query pat from end))))))
+
+(define-transform (degrade)
+  (degrade-by 0.5 pat))
+
+;; apply f to events at random, each with the given probability
+(define-transform (sometimes-by probability f)
+  (let* ((seed (studio:next-seed))
+         (chosen? (lambda (h)
+                    (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+                       probability))))
+    (stack (studio:make-pattern
+             (lambda (from end) (cl:remove-if chosen? (query pat from end))))
+           (f (studio:make-pattern
+                (lambda (from end) (cl:remove-if-not chosen? (query pat from end))))))))
+
+(define-transform (sometimes f) (sometimes-by 0.5 f pat))
+(define-transform (often f) (sometimes-by 0.75 f pat))
+(define-transform (rarely f) (sometimes-by 0.25 f pat))
+
+;; apply f to whole cycles at random
+(define-transform (some-cycles-by probability f)
+  (let ((seed (studio:next-seed)))
+    (when-cycle (lambda (cycle) (< (studio:random-at cycle seed) probability)) f pat)))
+
+;;;;;;;;;;;;;
+;; signals ;;
+;;;;;;;;;;;;;
+
+;; A signal is a pattern with a value at every moment rather than a sequence
+;; of events. Used as a parameter it is sampled at the start of each note:
+;; (pan sine). Each of these runs from 0 to 1 once per cycle.
+(define studio:signal
+  (lambda (f)
+    (studio:make-pattern
+      (lambda (from end)
+        (list (studio:hap #f #f from end (f (* 1.0 from))))))))
+
+(define sine (studio:signal (lambda (t) (+ 0.5 (* 0.5 (sin (* 6.283185307179586 t)))))))
+(define cosine (studio:signal (lambda (t) (+ 0.5 (* 0.5 (cos (* 6.283185307179586 t)))))))
+(define saw (studio:signal (lambda (t) (- t (floor t)))))
+(define tri (studio:signal (lambda (t) (let ((x (- t (floor t)))) (if (< x 0.5) (* 2 x) (- 2 (* 2 x)))))))
+(define square (studio:signal (lambda (t) (if (< (- t (floor t)) 0.5) 0.0 1.0))))
+(define rand (studio:signal (lambda (t) (studio:random-at t 0))))
+
+;; smooth random movement: a new random value each cycle, with a glide between
+(define perlin
+  (studio:signal
+    (lambda (t)
+      (let* ((c (floor t))
+             (x (- t c))
+             (smooth (* x x (- 3 (* 2 x))))
+             (a (studio:random-at c 7))
+             (b (studio:random-at (+ c 1) 7)))
+        (+ a (* smooth (- b a)))))))
+
+;; a random whole number from 0 up to (but not including) n
+(define irand
+  (lambda (n)
+    (fmap (lambda (x) (floor (* x n))) rand)))
+
+;; a random choice from a list, as a signal: (segment 4 (choose '(c3 e3 g3)))
+(define choose
+  (lambda (choices)
+    (let ((v (list->vector choices)))
+      (fmap (lambda (x) (vector-ref v (min (- (vector-length v) 1) (floor (* x (vector-length v))))))
+            rand))))
+
+;; stretch a 0-to-1 pattern to run between lo and hi: (between 200 2000 sine)
+(define-transform (between lo hi)
+  (fmap (lambda (x) (if (number? x) (+ lo (* x (- hi lo))) x)) pat))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the notation for sequences ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define studio:modifier-char?
+  (lambda (c)
+    (or (char=? c #\*) (char=? c #\/) (char=? c #\!) (char=? c #\@) (char=? c #\?))))
+
+;; split a symbol like <a or b>*2 into the tokens < a and b > *2
+(define studio:split-brackets
+  (lambda (sym)
+    (let* ((str (symbol->string sym))
+           (n (string-length str)))
+      (let loop ((i 0) (start 0) (acc '()))
+        (let ((flush (lambda ()
+                       (if (> i start)
+                           (cons (studio:read-atom (substring str start i)) acc)
+                           acc))))
+          (cond ((>= i n) (reverse (flush)))
+                ((char=? (string-ref str i) #\<) (loop (+ i 1) (+ i 1) (cons '< (flush))))
+                ((char=? (string-ref str i) #\>) (loop (+ i 1) (+ i 1) (cons '> (flush))))
+                (else (loop (+ i 1) start acc))))))))
+
+(define studio:read-atom
+  (lambda (str)
+    (or (string->number str) (string->symbol str))))
+
+(define studio:tokenise
+  (lambda (lst)
+    (apply append
+           (map (lambda (x)
+                  (if (and (symbol? x) (not (eq? x '<>)))
+                      (studio:split-brackets x)
+                      (list x)))
+                lst))))
+
+;; gather the tokens between each < and its > into (*alt* ...)
+(define studio:group-brackets
+  (lambda (tokens)
+    ;; returns (grouped . remaining-tokens)
+    (let loop ((tokens tokens) (acc '()))
+      (cond ((null? tokens) (cons (reverse acc) '()))
+            ((eq? (car tokens) '>) (cons (reverse acc) (cdr tokens)))
+            ((eq? (car tokens) '<)
+             (let ((inner (studio:group-brackets (cdr tokens))))
+               (loop (cdr inner) (cons (cons '*alt* (car inner)) acc))))
+            (else (loop (cdr tokens) (cons (car tokens) acc)))))))
+
+;; the modifiers at the end of a symbol's name: "bd*2?" -> ("bd" (#\* . 2) (#\? . #f))
+(define studio:split-modifiers
+  (lambda (str)
+    (let* ((n (string-length str))
+           (base-end (let loop ((i 1))
+                       (cond ((>= i n) n)
+                             ((studio:modifier-char? (string-ref str i)) i)
+                             (else (loop (+ i 1)))))))
+      (if (and (> n 0) (studio:modifier-char? (string-ref str 0)))
+          (set! base-end 0))
+      (cons (substring str 0 base-end)
+            (let loop ((i base-end) (acc '()))
+              (if (>= i n)
+                  (reverse acc)
+                  (let* ((op (string-ref str i))
+                         (arg-end (let scan ((j (+ i 1)))
+                                    (if (or (>= j n) (studio:modifier-char? (string-ref str j)))
+                                        j
+                                        (scan (+ j 1)))))
+                         (arg (if (> arg-end (+ i 1))
+                                  (string->number (substring str (+ i 1) arg-end))
+                                  #f)))
+                    (loop arg-end (cons (cons op arg) acc)))))))))
+
+;; a step is (weight . pattern). Apply one modifier to the last of `steps`
+;; (which is in reverse order) and return the new list.
+(define studio:apply-modifier
+  (lambda (steps modifier)
+    (if (null? steps)
+        steps
+        (let* ((step (car steps))
+               (op (car modifier))
+               (arg (cdr modifier)))
+          (cond ((char=? op #\*) (cons (cons (car step) (fast (or arg 2) (cdr step))) (cdr steps)))
+                ((char=? op #\/) (cons (cons (car step) (slow (or arg 2) (cdr step))) (cdr steps)))
+                ((char=? op #\@) (cons (cons (or arg 2) (cdr step)) (cdr steps)))
+                ((char=? op #\?) (cons (cons (car step) (degrade-by (or arg 0.5) (cdr step))) (cdr steps)))
+                ((char=? op #\!)
+                 (let loop ((i 1) (steps steps))
+                   (if (>= i (or arg 2))
+                       steps
+                       (loop (+ i 1) (cons step steps)))))
+                (else steps))))))
+
+(define studio:element->pattern
+  (lambda (x)
+    (cond ((pattern? x) x)
+          ((number? x) (pure x))
+          ((eq? x '~) silence)
+          ((symbol? x) (pure x))
+          ((vector? x) (apply stack (map (lambda (e) (studio:sequence (list e))) (vector->list x))))
+          ((and (pair? x) (eq? (car x) '*alt*))
+           (apply slowcat (map cdr (studio:steps (cdr x)))))
+          ((and (pair? x) (eq? (car x) 'euclid) (>= (length x) 4))
+           (if (and (number? (cadddr x)) (pair? (cddddr x)))
+               (euclid (cadr x) (caddr x) (cadddr x) (studio:sequence (cddddr x)))
+               (euclid (cadr x) (caddr x) (studio:sequence (cdddr x)))))
+          ((list? x) (studio:sequence x))
+          (else (pure x)))))
+
+;; the steps of a sequence, as a list of (weight . pattern)
+(define studio:steps
+  (lambda (grouped)
+    (let loop ((tokens grouped) (steps '()))
+      (if (null? tokens)
+          (reverse steps)
+          (let ((x (car tokens)))
+            (cond ((eq? x '_)
+                   (loop (cdr tokens)
+                         (if (null? steps)
+                             steps
+                             (cons (cons (+ 1 (car (car steps))) (cdr (car steps))) (cdr steps)))))
+                  ((and (symbol? x) (not (eq? x '~)) (not (pattern? x)))
+                   (let* ((parts (studio:split-modifiers (symbol->string x)))
+                          (base (car parts))
+                          (with-base (if (string=? base "")
+                                         steps
+                                         (cons (cons 1 (studio:element->pattern (studio:read-atom base)))
+                                               steps))))
+                     (loop (cdr tokens)
+                           (let apply-all ((mods (cdr parts)) (steps with-base))
+                             (if (null? mods)
+                                 steps
+                                 (apply-all (cdr mods) (studio:apply-modifier steps (car mods))))))))
+                  (else
+                    (loop (cdr tokens) (cons (cons 1 (studio:element->pattern x)) steps)))))))))
+
+(define studio:sequence
+  (lambda (lst)
+    (let ((steps (studio:steps (car (studio:group-brackets (studio:tokenise lst))))))
+      (cond ((null? steps) silence)
+            ((null? (cdr steps)) (cdr (car steps)))
+            (else (apply timecat steps))))))
+
+;; turn the notation for a sequence into a pattern
+(define mini
+  (lambda (x)
+    (cond ((pattern? x) x)
+          ((list? x) (studio:sequence x))
+          (else (studio:sequence (list x))))))
+
+(define ->pattern mini)
+
+;;;;;;;;;;;;;;
+;; controls ;;
+;;;;;;;;;;;;;;
+
+;; A control pattern's values are association lists such as
+;; ((sound . bd) (pan . 0.3)). Each of the functions below makes one from a
+;; pattern of plain values: (sound '(bd sd)), (pan sine), (vel 0.9).
+
+(define studio:control
+  (lambda (name convert)
+    (lambda (x)
+      (fmap (lambda (v) (list (cons name (convert v)))) (->pattern x)))))
+
+(define studio:identity (lambda (x) x))
+
+;; c4 is middle C (MIDI note 60). Sharps are # or s, flats are b or f: c#3 cs3
+;; eb3 ef3. A name without an octave is in octave 4.
+(define studio:note-number
+  (lambda (x)
+    (if (not (symbol? x))
+        x
+        (let* ((str (symbol->string x))
+               (n (string-length str))
+               (base (assv (string-ref str 0)
+                           '((#\c . 0) (#\d . 2) (#\e . 4) (#\f . 5) (#\g . 7) (#\a . 9) (#\b . 11)))))
+          (if (not base)
+              x
+              (let loop ((i 1) (semitones (cdr base)))
+                (cond ((>= i n) (+ 60 semitones))
+                      ((or (char=? (string-ref str i) #\#) (char=? (string-ref str i) #\s))
+                       (loop (+ i 1) (+ semitones 1)))
+                      ((or (char=? (string-ref str i) #\b) (char=? (string-ref str i) #\f))
+                       (loop (+ i 1) (- semitones 1)))
+                      (else
+                        (let ((octave (string->number (substring str i n))))
+                          (if octave
+                              (+ semitones (* 12 (+ octave 1)))
+                              x))))))))))
+
+(define sound (studio:control 'sound studio:identity))
+(define note (studio:control 'note studio:note-number))
+(define n note)
+;; how hard the note is played, 0.0 to 1.0
+(define vel (studio:control 'vel studio:identity))
+;; the note's length as a fraction of its step: more than 1 overlaps the next
+(define legato (studio:control 'legato studio:identity))
+;; the note's length in seconds, whatever the tempo
+(define dur (studio:control 'dur studio:identity))
+;; move the note later by this many seconds
+(define nudge (studio:control 'nudge studio:identity))
+
+;; any parameter of the track's instrument or mixer strip: (param 'cutoff 800)
+(define param
+  (lambda (name x)
+    ((studio:control name studio:identity) x)))
+
+;; the mixer strip's parameters
+(define gain (studio:control 'gain studio:identity))
+(define pan (studio:control 'pan studio:identity))
+(define reverb (studio:control 'reverb studio:identity))
+(define delay (studio:control 'delay studio:identity))
+(define lpf (studio:control 'lpf studio:identity))
+(define hpf (studio:control 'hpf studio:identity))
+(define lpq (studio:control 'lpq studio:identity))
+(define shape (studio:control 'shape studio:identity))
+
+;; combine the numbers in two patterns, keeping the structure of the second:
+;; (add (note 12) pat) is pat an octave up
+(define studio:combine
+  (lambda (op)
+    (lambda (amount . maybe-pattern)
+      (if (null? maybe-pattern)
+          (lambda (pat) ((studio:combine op) amount pat))
+          (let ((amounts (->pattern amount))
+                (pat (->pattern (car maybe-pattern))))
+            (studio:make-pattern
+              (lambda (from end)
+                (map (lambda (h)
+                       (let ((other (studio:sample-at amounts (or (studio:hap-whole-begin h)
+                                                                  (studio:hap-part-begin h)))))
+                         (if other
+                             (studio:hap-with-value
+                               h (studio:combine-values op (studio:hap-value h) (studio:hap-value other)))
+                             h)))
+                     (query pat from end)))))))))
+
+(define studio:combine-values
+  (lambda (op a b)
+    (cond ((and (number? a) (number? b)) (op a b))
+          ((and (list? a) (list? b))
+           (map (lambda (pair)
+                  (let ((other (assoc (car pair) b)))
+                    (if (and other (number? (cdr pair)) (number? (cdr other)))
+                        (cons (car pair) (op (cdr pair) (cdr other)))
+                        pair)))
+                a))
+          ((and (list? a) (number? b))
+           (map (lambda (pair)
+                  (if (and (eq? (car pair) 'note) (number? (cdr pair)))
+                      (cons 'note (op (cdr pair) b))
+                      pair))
+                a))
+          (else a))))
+
+(define add (studio:combine +))
+(define sub (studio:combine -))
+(define mul (studio:combine *))
+
+(define studio:scale-control
+  (lambda (name factor pat)
+    (fmap (lambda (v)
+            (if (list? v)
+                (let ((existing (assoc name v)))
+                  (cons (cons name (* factor (if existing (cdr existing) 0.75)))
+                        (cl:remove-if (lambda (pair) (eq? (car pair) name)) v)))
+                v))
+          pat)))
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; scales and chords ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+(define *studio:scales*
+  '((major 0 2 4 5 7 9 11) (ionian 0 2 4 5 7 9 11)
+    (minor 0 2 3 5 7 8 10) (aeolian 0 2 3 5 7 8 10)
+    (dorian 0 2 3 5 7 9 10) (phrygian 0 1 3 5 7 8 10)
+    (lydian 0 2 4 6 7 9 11) (mixolydian 0 2 4 5 7 9 10) (locrian 0 1 3 5 6 8 10)
+    (harmonic-minor 0 2 3 5 7 8 11) (melodic-minor 0 2 3 5 7 9 11)
+    (pentatonic 0 2 4 7 9) (minor-pentatonic 0 3 5 7 10)
+    (blues 0 3 5 6 7 10) (whole-tone 0 2 4 6 8 10) (chromatic 0 1 2 3 4 5 6 7 8 9 10 11)
+    (hirajoshi 0 2 3 7 8) (in-sen 0 1 5 7 10)))
+
+(define *studio:chords*
+  '((major 0 4 7) (minor 0 3 7) (dim 0 3 6) (aug 0 4 8) (sus2 0 2 7) (sus4 0 5 7)
+    (major7 0 4 7 11) (minor7 0 3 7 10) (dom7 0 4 7 10) (dim7 0 3 6 9) (m7b5 0 3 6 10)
+    (major9 0 4 7 11 14) (minor9 0 3 7 10 14) (dom9 0 4 7 10 14)
+    (six 0 4 7 9) (minor6 0 3 7 9) (five 0 7)))
+
+;; turn scale degrees into notes: (scale 'c3 'minor '(0 2 4 7)) or, counting
+;; semitones from 0, (scale 'minor '(0 2 4 7)). Degree 0 is the root, and
+;; degrees past the top of the scale carry on into the next octave.
+(define scale
+  (lambda (first . more)
+    (let* ((rooted? (and (pair? more) (assoc (car more) *studio:scales*)))
+           (root (if rooted? (studio:note-number first) 0))
+           (name (if rooted? (car more) first))
+           (rest (if rooted? (cdr more) more))
+           (steps (assoc name *studio:scales*)))
+      (cond ((not steps) (studio:error "there is no scale called" name) silence)
+            ((null? rest) (lambda (pat) (if rooted? (scale first name pat) (scale name pat))))
+            (else
+              (let* ((degrees (list->vector (cdr steps)))
+                     (size (vector-length degrees)))
+                (fmap (lambda (d)
+                        (if (number? d)
+                            (let ((whole (floor d)))
+                              (+ root
+                                 (* 12 (floor (/ whole size)))
+                                 (vector-ref degrees (modulo whole size))))
+                            d))
+                      (car rest))))))))
+
+;; turn each root note into a chord: (chord 'minor7 '(c3 f3))
+(define chord
+  (lambda (name . maybe-pattern)
+    (let ((intervals (assoc name *studio:chords*)))
+      (cond ((not intervals) (studio:error "there is no chord called" name) silence)
+            ((null? maybe-pattern) (lambda (pat) (chord name pat)))
+            (else
+              (let ((roots (fmap studio:note-number (car maybe-pattern))))
+                (apply stack
+                       (map (lambda (interval)
+                              (fmap (lambda (root) (if (number? root) (+ root interval) root)) roots))
+                            (cdr intervals)))))))))
+
+;; play the notes which sound together one after another, n to each chord
+;; (going back to the bottom when they run out)
+(define-transform (arp n)
+  (studio:make-pattern
+    (lambda (from end)
+      (let* ((haps (cl:remove-if-not studio:hap-onset? (query pat (floor from) (ceiling end))))
+             (starts (let loop ((hs haps) (acc '()))
+                       (cond ((null? hs) (reverse acc))
+                             ((member (studio:hap-whole-begin (car hs)) acc) (loop (cdr hs) acc))
+                             (else (loop (cdr hs) (cons (studio:hap-whole-begin (car hs)) acc)))))))
+        (apply append
+               (map (lambda (start)
+                      (let* ((group (list->vector
+                                      (cl:remove-if-not
+                                        (lambda (h) (= (studio:hap-whole-begin h) start))
+                                        haps)))
+                             (size (vector-length group))
+                             (whole-end (studio:hap-whole-end (vector-ref group 0)))
+                             (step (/ (- whole-end start) n)))
+                        (let loop ((i 0) (acc '()))
+                          (if (>= i n)
+                              (reverse acc)
+                              (let* ((b (+ start (* i step)))
+                                     (e (+ b step))
+                                     (pb (max b from))
+                                     (pe (min e end)))
+                                (loop (+ i 1)
+                                      (if (and (< pb pe) (= pb b))
+                                          (cons (studio:hap b e pb pe
+                                                            (studio:hap-value (vector-ref group (modulo i size))))
+                                                acc)
+                                          acc)))))))
+                    starts))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; playing events on the studio ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define *studio:warned* '())
+
+(define studio:warn-once
+  (lambda (key . message)
+    (if (not (member key *studio:warned*))
+        (begin
+          (set! *studio:warned* (cons key *studio:warned*))
+          (apply studio:error message)))))
+
+;; Where does a sound name play? A track's name plays that track. Otherwise
+;; it's a sound which some track's instrument knows by name (a kit's bd, say),
+;; and the most recently added such track plays it. Returns (track-index .
+;; pitch-or-#f), or #f.
+(define studio:resolve-sound
+  (lambda (name)
+    (let ((i (studio:track-index name)))
+      (if i
+          (cons i #f)
+          (let loop ((i (- *studio:num-tracks* 1)))
+            (if (< i 0)
+                #f
+                (let* ((slot (vector-ref *studio:tracks* i))
+                       (s (and slot (assoc name (studio:instrument-sounds (cadr slot))))))
+                  (if s
+                      (cons i (cadr s))
+                      (loop (- i 1))))))))))
+
+(define *studio:special-controls* '(sound note vel legato dur nudge))
+
+(define studio:control-value
+  (lambda (value name default)
+    (let ((pair (assoc name value)))
+      (if (and pair (number? (cdr pair))) (cdr pair) default))))
+
+;; play one event: `time` in frames, `seconds` the length of its step
+(define studio:play-value
+  (lambda (value time seconds)
+    (if (list? value)
+        (let* ((sound-name (let ((pair (assoc 'sound value))) (and pair (cdr pair))))
+               (where (and sound-name (studio:resolve-sound sound-name))))
+          (cond ((not sound-name)
+                 (studio:warn-once 'no-sound "a pattern has no (sound ...), so there is nothing to play it"))
+                ((not where)
+                 (studio:warn-once sound-name "there is no track or sound called" sound-name))
+                (else
+                  (let* ((i (car where))
+                         (track-name (car (vector-ref *studio:tracks* i)))
+                         (when (+ time (* *studio:samplerate* (studio:control-value value 'nudge 0))))
+                         (pitch (or (cdr where) (studio:control-value value 'note 60)))
+                         (length (or (studio:control-value value 'dur #f)
+                                     (* seconds (studio:control-value value 'legato 0.9)))))
+                    ;; anything which isn't about the note itself is a
+                    ;; parameter of the track, set just before the note
+                    (for-each
+                      (lambda (pair)
+                        (if (and (not (memq (car pair) *studio:special-controls*))
+                                 (number? (cdr pair)))
+                            (let ((p (studio:find-param track-name (car pair))))
+                              (if p
+                                  (studio:send when (car p) i (cadr p) (cdr pair) 0.0)
+                                  (studio:warn-once (list track-name (car pair))
+                                                    track-name "has no parameter called" (car pair))))))
+                      value)
+                    (if (number? pitch)
+                        (studio:send when studio:event-note-on i
+                                     (max 1 (real->integer (* length *studio:samplerate*)))
+                                     pitch
+                                     (studio:control-value value 'vel 0.75))))))))))
+
+;; play the events of a pattern which start between two cycles, given a
+;; function which turns a cycle into a time in frames
+(define studio:play-span
+  (lambda (pat from end cycle->time)
+    (for-each
+      (lambda (h)
+        (if (studio:hap-onset? h)
+            (let ((start (cycle->time (studio:hap-whole-begin h)))
+                  (finish (cycle->time (studio:hap-whole-end h))))
+              (studio:play-value (studio:hap-value h)
+                                 start
+                                 (/ (- finish start) *studio:samplerate*)))))
+      (query pat from end))))
+
+;;;;;;;;;;;;;;;
+;; the clock ;;
+;;;;;;;;;;;;;;;
+
+(define *studio:cps* 0.5)           ;; cycles per second
+(define *studio:clock-cycle* 0.0)   ;; the cycle at ...
+(define *studio:clock-time* 0)      ;; ... this time, in frames
+(define *studio:scheduled-to* 0.0)  ;; everything before this cycle has been played
+(define *studio:clock-running* #f)
+(define *studio:lookahead* 0.25)    ;; seconds ahead of the clock that events are queued
+(define *studio:tick* 0.05)         ;; seconds between looks
+
+;; name -> pattern, for everything which is playing
+(define *studio:patterns* '())
+
+(define studio:cycle-at
+  (lambda (time)
+    (+ *studio:clock-cycle* (* *studio:cps* (/ (- time *studio:clock-time*) *studio:samplerate*)))))
+
+(define studio:time-at
+  (lambda (cycle)
+    (+ *studio:clock-time* (* *studio:samplerate* (/ (- cycle *studio:clock-cycle*) *studio:cps*)))))
+
+;; set (or with no argument, get) the tempo in cycles per second
+(define cps
+  (lambda args
+    (if (and (pair? args) (number? (car args)) (> (car args) 0))
+        (begin
+          ;; the new tempo takes over from the last cycle which was queued
+          (if *studio:clock-running*
+              (let ((time (studio:time-at *studio:scheduled-to*)))
+                (set! *studio:clock-cycle* *studio:scheduled-to*)
+                (set! *studio:clock-time* time)))
+          (set! *studio:cps* (* 1.0 (car args)))))
+    *studio:cps*))
+
+;; the tempo in beats per minute, at four beats to the cycle
+(define bpm
+  (lambda args
+    (if (pair? args) (cps (/ (car args) 240.0)))
+    (* 240.0 *studio:cps*)))
+
+(define studio:tick
+  (lambda ()
+    (if *studio:clock-running*
+        (let* ((now (studio_now))
+               (end (studio:cycle-at (+ now (* *studio:lookahead* *studio:samplerate*))))
+               ;; if Scheme was busy and the clock got ahead of us, skip what was missed
+               (from (max *studio:scheduled-to* (studio:cycle-at now))))
+          (if (> end from)
+              (begin
+                (for-each
+                  (lambda (entry)
+                    (*s7-catch* #t
+                                (lambda () (studio:play-span (cdr entry) from end studio:time-at))
+                                (lambda args
+                                  (studio:warn-once (list 'broken (car entry))
+                                                    "the pattern" (car entry) "failed:" args))))
+                  *studio:patterns*)
+                (set! *studio:scheduled-to* end)))
+          (callback (+ (now) (* *studio:tick* *studio:samplerate*)) 'studio:tick)))))
+
+(define studio:start-clock
+  (lambda ()
+    (if (not *studio:clock-running*)
+        (begin
+          (set! *studio:clock-running* #t)
+          (set! *studio:clock-time* (studio_now))
+          (set! *studio:clock-cycle* 0.0)
+          (set! *studio:scheduled-to* 0.0)
+          (studio:tick)))
+    #t))
+
+(define studio:stop-clock
+  (lambda ()
+    (set! *studio:clock-running* #f)
+    #t))
+
+;; play a pattern under a name, replacing whatever had that name. The
+;; arguments are combined as `with` does.
+(define play-pattern
+  (lambda (name . pats)
+    (let ((pat (if (null? pats) silence (apply with pats))))
+      ;; try it before letting it loose
+      (query pat 0 1)
+      (set! *studio:warned* '())
+      (set! *studio:patterns*
+            (cons (cons name pat)
+                  (cl:remove-if (lambda (entry) (eq? (car entry) name)) *studio:patterns*)))
+      (studio:start-clock)
+      name)))
+
+(define stop-pattern
+  (lambda (name)
+    (set! *studio:patterns*
+          (cl:remove-if (lambda (entry) (eq? (car entry) name)) *studio:patterns*))
+    name))
+
+(define d1 (lambda pats (apply play-pattern 'd1 pats)))
+(define d2 (lambda pats (apply play-pattern 'd2 pats)))
+(define d3 (lambda pats (apply play-pattern 'd3 pats)))
+(define d4 (lambda pats (apply play-pattern 'd4 pats)))
+(define d5 (lambda pats (apply play-pattern 'd5 pats)))
+(define d6 (lambda pats (apply play-pattern 'd6 pats)))
+(define d7 (lambda pats (apply play-pattern 'd7 pats)))
+(define d8 (lambda pats (apply play-pattern 'd8 pats)))
+
+;; stop every pattern, and release every note
+(define hush
+  (lambda ()
+    (set! *studio:patterns* '())
+    (studio:all-off)
+    #t))
+
+;; play one cycle of a pattern, once, starting now
+(define once
+  (lambda pats
+    (let* ((pat (apply with pats))
+           (start (studio_now))
+           (frames-per-cycle (/ *studio:samplerate* *studio:cps*)))
+      (studio:play-span pat 0 1 (lambda (cycle) (+ start (* cycle frames-per-cycle))))
+      #t)))
+
+;; In a score (see api.xtm), play a pattern from one cycle to another:
+;;
+;;   (score-begin)
+;;   (track 'drums 'kit808)
+;;   (score-pattern 0 8 (sound '(bd*2 sd)))
+;;   (score-end)
+(define score-pattern
+  (lambda (from to . pats)
+    (let ((pat (apply with pats))
+          (frames-per-cycle (/ *studio:samplerate* *studio:cps*)))
+      (studio:play-span pat from to
+                        (lambda (cycle) (+ *studio:score-start* (* cycle frames-per-cycle))))
+      #t)))
+
+;; the events of a pattern's first cycle (or the cycles from from to end), for
+;; seeing what a pattern does
+(define show
+  (lambda (pat . span)
+    (let ((from (if (pair? span) (car span) 0))
+          (end (if (and (pair? span) (pair? (cdr span))) (cadr span) 1)))
+      (for-each
+        (lambda (h)
+          (if (studio:hap-onset? h)
+              (println (studio:hap-whole-begin h) '-> (studio:hap-whole-end h) (studio:hap-value h))))
+        (cl:sort (query pat from end)
+              (lambda (a b) (< (studio:hap-part-begin a) (studio:hap-part-begin b)))))
+      #t)))

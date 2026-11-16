@@ -99,8 +99,9 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
         LABELS ${label})
 endmacro()
 
-# Core and compiler xtlang tests are auto-discovered: every tests/core/*.xtm
-# and tests/compiler/*.xtm runs as a batch test, labelled by its directory. The
+# Core, studio and compiler xtlang tests are auto-discovered: every
+# tests/core/*.xtm, tests/studio/*.xtm and tests/compiler/*.xtm runs as a batch
+# test, labelled by its directory. The
 # few that need a bespoke harness (or aren't standalone) are excluded here and
 # registered explicitly below. CONFIGURE_DEPENDS re-globs when a test file is
 # added or removed, so new tests are picked up without editing this file.
@@ -109,6 +110,9 @@ file(GLOB _core_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
      ${CMAKE_CURRENT_SOURCE_DIR}/tests/core/*.xtm)
 file(GLOB _compiler_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
      ${CMAKE_CURRENT_SOURCE_DIR}/tests/compiler/*.xtm)
+
+file(GLOB _studio_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+     ${CMAKE_CURRENT_SOURCE_DIR}/tests/studio/*.xtm)
 
 # excluded from batch auto-registration (handled specially below, or fixtures)
 set(_xtm_special_tests
@@ -120,6 +124,9 @@ foreach(_t ${_core_tests})
     if(NOT _t IN_LIST _xtm_special_tests)
         extempore_add_test(${_t} libs-core)
     endif()
+endforeach()
+foreach(_t ${_studio_tests})
+    extempore_add_test(${_t} libs-studio)
 endforeach()
 foreach(_t ${_compiler_tests})
     if(NOT _t IN_LIST _xtm_special_tests)
