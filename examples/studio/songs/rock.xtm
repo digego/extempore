@@ -1,0 +1,72 @@
+;;; rock.xtm -- power chords, palm mutes and a guitar solo
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Three tracks of the guitar model through its amplifier: a palm-muted
+;; rhythm part, crunchy power chords, and a lead. E minor, 140 bpm, with a
+;; hard 909 standing in for the drummer and an organ filling out the chorus.
+;;
+;;   extras/studio/render examples/studio/songs/rock.xtm /tmp/rock.wav 46
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 140)
+
+(track 'drums 'kit909 'hard)
+(track 'bass 'polysynth 'bass)
+(track 'chug 'guitar 'chug)
+(track 'chords 'guitar 'crunch)
+(track 'lead 'guitar 'lead)
+(track 'organ 'organ 'rock)
+
+(ctl 'drums 'gain 1.5 'reverb 0.1 'hh-level 0.9)
+(ctl 'bass 'gain 1.25 'lpf 1200)
+(ctl 'chug 'gain 1.4 'pan 0.25 'reverb 0.08)
+(ctl 'chords 'gain 1.6 'pan 0.75 'reverb 0.1)
+(ctl 'lead 'gain 0.9 'reverb 0.3 'delay 0.3)
+(ctl 'organ 'gain 0.4 'reverb 0.2)
+(master 'reverb-size 0.55 'delay-time (/ 3/16 (cps)) 'delay-feedback 0.35)
+
+;; E, C, G and D power chords: root, fifth and octave
+(define rock-chords '#(<e2 c3 g2 d3> <b2 g3 d3 a3> <e3 c4 g3 d4>))
+(define rock-roots '(<e1 c2 g1 d2>))
+
+(define rock-beat
+  (stack (with (sound '(bd ~ ~ bd bd ~ ~ ~)) (vel 0.95))
+         (with (sound '(~ sd ~ sd)) (vel 0.95))
+         (with (sound 'hh*8) (vel '(0.8 0.55)))))
+
+;; the intro: palm-muted eighth notes on the root, on their own
+(score-pattern 0 16 (note rock-roots) (add (note 12)) (ply 8) (sound 'chug)
+               (vel '((0.9 0.6 0.7 0.6)*2)) (legato 0.8))
+(score-pattern 1 2 (sound '(~ ~ ~ ~ sd sd lt (lt mt))) (vel (between 0.6 1.0 saw)))
+
+;; the band comes in
+(score-pattern 2 16 rock-beat (every-from 4 3 (within 1/2 1 (ply 2))))
+(score-pattern 2 16 (sound '(<cr ~ ~ ~>)) (vel 0.8))
+(score-pattern 2 16 (note rock-roots) (ply 8) (sound 'bass) (vel '((0.8 0.6)*4)) (legato 0.7))
+;; chords on the push: strummed low to high, a few milliseconds a string
+(score-pattern 2 16 (note rock-chords) (struct '(t ~ ~ t ~ ~ t ~)) (sound 'chords)
+               (strum 0.006) (vel 0.9) (legato 1.6))
+
+;; the solo: E minor pentatonic over the same four chords
+(score-pattern 8 16
+               (note (scale 'e4 'minor-pentatonic
+                            '(<(4 _ 3 4 5 _ 4 3) (4 _ _ 3 2 _ 3 _) (5 6 7 _ 6 5 4 _) (5 _ 4 3 2 _ _ _)
+                               (7 _ 8 7 6 _ 5 4) (7 _ _ 5 4 5 _ _) (9 8 7 5 4 5 7 8) (7 _ _ _ _ _ _ _)>)))
+               (sound 'lead) (vel 0.85) (legato 1.05))
+(score-pattern 8 16 (note rock-chords) (sound 'organ) (vel 0.6) (legato 1.0))
+
+;; the last chord
+(score-pattern 16 17 (note '#(e2 b2 e3)) (sound 'chords) (strum 0.01) (vel 1.0) (legato 3))
+(score-pattern 16 17 (note 'e1) (sound 'bass) (vel 0.9) (legato 2))
+(score-pattern 16 17 (sound '#(bd cr)) (vel 1.0))
+(score-pattern 16 17 (note 'e4) (sound 'lead) (vel 0.8) (legato 3))
+
+(score-end)

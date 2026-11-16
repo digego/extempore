@@ -1,0 +1,584 @@
+;;; guitar.xtm -- a plucked-string guitar, acoustic or electric, with an amplifier
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A guitar built from a physical model of a plucked string, which can be
+;; heard through a wooden body (an acoustic guitar) or through a magnetic
+;; pickup and a valve amplifier (an electric one, clean or distorted).
+;;
+;; The string. A wave travels along a string, reflects off the bridge and
+;; the fret, and comes back to where it started once per period of the note.
+;; Karplus and Strong's insight was that a delay line one period long, fed
+;; back into itself through a gentle lowpass filter, behaves just like this:
+;; whatever is put into it repeats at the note's pitch, and the filter takes
+;; a little more of the high frequencies away on each trip, so the note
+;; starts bright and mellows as it dies. Jaffe and Smith extended the
+;; idea, and the voice uses most of their extensions:
+;;
+;; - The loop filter is a one-pole lowpass whose coefficient is worked out
+;;   for each note, so that the fundamental fades by 60 dB in `sustain`
+;;   seconds and a harmonic at a fixed frequency (set by `bright`) fades
+;;   twice as fast, whatever the note. High notes come round the loop more
+;;   often, so without this they would die far too quickly.
+;; - A delay line can only be a whole number of samples long, which would
+;;   leave high notes badly out of tune. A first-order allpass filter in
+;;   the loop adds the missing fraction of a sample. The loop filter also
+;;   delays the signal a little (more as it gets darker), and the allpass
+;;   makes up for that too, so the string stays in tune at every setting.
+;; - The pluck is not a burst of noise, as in the original algorithm, but
+;;   the shape a real pick gives: plucking a string at a point a fraction
+;;   b of its length from the bridge leaves its n-th harmonic with an
+;;   amplitude proportional to sin(pi n b) / n. Harmonics with a node at
+;;   the picking point are missing: picked halfway along, the even
+;;   harmonics vanish and the note sounds hollow. That spectrum is one
+;;   period of a pulse wave, b of the period wide, which is what the voice
+;;   feeds into the loop. A softer pick (or a thumb) rounds off the pulse,
+;;   which takes the top off the spectrum, and so does a softer touch.
+;; - Palm muting and lifting a finger off a note both press something soft
+;;   against the string. Both are modelled by making the loop filter lose
+;;   more energy, and more of it at high frequencies.
+;; - Vibrato on a guitar comes from rocking the fretting finger, which
+;;   stretches the string and so can only raise the pitch. Here it shortens
+;;   the loop a little and lets it back, five or six times a second.
+;;
+;; The electric guitar. A magnetic pickup senses the string's motion at one
+;; point. The wave passing the pickup and its reflection off the bridge
+;; arrive at slightly different times, so the pickup hears the difference
+;; of two copies of the string's signal: another comb filter, with notches
+;; at the harmonics which have a node at the pickup. A pickup near the
+;; bridge loses some fundamental and sounds thin and cutting; one near the
+;; neck sounds round. The pickup's coil and the guitar cable together make
+;; a resonant lowpass filter: high and sharp for a single-coil pickup
+;; (around 5 kHz), lower and broader for a humbucker (around 2.5 kHz).
+;;
+;; The acoustic guitar. The strings are too thin to move much air; the
+;; sound comes from the top plate and the air in the body, which the
+;; bridge drives. The body's response has a few strong low resonances (the
+;; air in the body bouncing in and out of the soundhole around 100 Hz, the
+;; top plate around 200 Hz, the back a little above) and broader ones
+;; higher up. Here the body is a bank of resonant bandpass filters driven
+;; by the bridge, added to the sound the top plate radiates directly. That
+;; follows the plate's acceleration, so it rises by 6 dB an octave, which
+;; is why an acoustic guitar has more sparkle than the same strings heard
+;; through a pickup.
+;;
+;; The amplifier is the instrument's effect, so it hears all the voices
+;; together. A preamp gain pushes the signal into two valve-style
+;; saturation stages. Their curve is asymmetric, as a valve's is, which adds
+;; even harmonics. The stages run at four times the sample rate (with
+;; lowpass filters before and after), because heavy distortion makes
+;; harmonics far above the audible range which would otherwise fold back
+;; down as harsh, unrelated tones. Because the strings are summed before
+;; the distortion, the notes of a chord intermodulate as they do in a real
+;; amp: a power chord (root, fifth and octave) makes difference tones which
+;; reinforce the root, which is why it sounds heavy, while a full major
+;; chord turns to mud. After the tone controls comes the speaker cabinet,
+;; whose steep rolloff above about 5 kHz is what turns raw distortion's
+;; fizz into a guitar sound. Acoustic presets turn the amplifier off with
+;; `amp`.
+;;
+;; This is an original implementation, built from the published literature
+;; on plucked-string synthesis and guitar amplifiers.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-guitar)
+(define *xtmlib-studio-guitar-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument guitar
+  "a plucked-string guitar: acoustic, clean electric or distorted, with an amplifier"
+  (params
+    (pluck-pos 0.18 "where the string is picked, as a fraction of its length from the bridge, 0.05 to 0.5: nearer the bridge is thinner and brighter")
+    (pick 0.6 "pick hardness, 0.0 (the flesh of a thumb) to 1.0 (a hard plectrum): harder is brighter")
+    (sustain 5.0 "seconds for a held A2 to fade by 60 dB (higher notes fade faster)")
+    (bright 0.5 "string brightness, 0.0 to 1.0: how long the upper harmonics ring")
+    (palm 0.0 "palm muting, 0.0 to 1.0: shortens and darkens every note")
+    (release 0.1 "seconds for a released note to fade by 60 dB, as the fretting finger lifts")
+    (vibrato 0.0 "depth of the vibrato which starts a quarter of a second into a note, 0.0 to 1.0 (up to half a semitone)")
+    (vib-rate 5.5 "vibrato rate in Hz")
+    (pickup 0.3 "pickup position, 0.0 at the bridge (thin, cutting) to 1.0 at the neck (round, warm)")
+    (coil 1.0 "pickup type, 0.0 a single coil (bright, glassy) to 1.0 a humbucker (warm, thick)")
+    (body 0.0 "0.0 is an electric guitar heard through its pickup, 1.0 an acoustic heard through its body")
+    (drive 0.2 "amplifier preamp gain, 0.0 (clean) to 1.0 (high-gain distortion)")
+    (tone 0.5 "amplifier tone, 0.0 dark to 1.0 bright")
+    (mids 0.5 "amplifier midrange at 750 Hz, 0.0 scooped (-12 dB) to 1.0 pushed (+12 dB)")
+    (amp 1.0 "how much of the sound goes through the amplifier and speaker, 0.0 to 1.0")
+    (level 1.0 "output level"))
+  (presets
+    (clean)
+    (steel (body 1.0) (amp 0.0) (pluck-pos 0.25) (pick 0.7) (bright 0.7) (sustain 7.0) (level 0.75))
+    (nylon (body 1.0) (amp 0.0) (pluck-pos 0.2) (pick 0.3) (bright 0.35) (sustain 4.0) (level 1.8))
+    (funk (coil 0.0) (pickup 0.2) (pick 0.85) (bright 0.7) (tone 0.75) (drive 0.15) (release 0.04)
+          (level 0.5))
+    (jazz (pickup 1.0) (pick 0.25) (bright 0.3) (tone 0.3) (drive 0.1) (level 1.3))
+    (crunch (pickup 0.0) (drive 0.55) (mids 0.6) (pick 0.7) (level 0.75))
+    (lead (pickup 0.0) (drive 0.85) (mids 0.65) (sustain 10.0) (vibrato 0.6) (level 0.75))
+    (chug (pickup 0.0) (drive 0.9) (palm 0.8) (mids 0.3) (pick 0.9) (level 1.4))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; filters for the body and the amp ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A state-variable filter, solved with the trapezoidal rule so that it
+;; behaves well at low frequencies and high Q in single precision. One
+;; filter state is eight numbers: three coefficients, three output mixing
+;; weights and two integrator states. The mix of the lowpass, bandpass and
+;; input decides whether it is a lowpass, highpass, bandpass or peaking EQ.
+(bind-val GUITAR_LOWPASS i64 0)
+(bind-val GUITAR_HIGHPASS i64 1)
+(bind-val GUITAR_BANDPASS i64 2) ;; unity gain at the centre frequency
+(bind-val GUITAR_PEAK i64 3)     ;; boost or cut of `db` around the centre
+
+(bind-func guitar_svf_make
+  (lambda ()
+    (let ((s:SAMPLE* (zalloc 8))
+          (i:i64 0))
+      (dotimes (i 8) (pset! s i 0.0))
+      s)))
+
+(bind-func guitar_svf_set
+  "set a filter's response: kind, frequency (Hz), Q, gain (dB, peaking only) at sample rate `rate`"
+  (lambda (s:SAMPLE* kind:i64 freq:SAMPLE q:SAMPLE db:SAMPLE rate:SAMPLE)
+    (let ((f:SAMPLE (if (> freq (* 0.45 rate)) (* 0.45 rate) freq))
+          (big_a:SAMPLE (pow 10.0 (/ db 40.0)))
+          (g:SAMPLE (tan (* SPI (/ f rate))))
+          (k:SAMPLE (if (= kind GUITAR_PEAK) (/ 1.0 (* q big_a)) (/ 1.0 q)))
+          (a1:SAMPLE (/ 1.0 (+ 1.0 (* g (+ g k))))))
+      (pset! s 0 a1)
+      (pset! s 1 (* g a1))
+      (pset! s 2 (* g g a1))
+      (cond ((= kind GUITAR_LOWPASS)
+             (pset! s 3 0.0) (pset! s 4 0.0) (pset! s 5 1.0) void)
+            ((= kind GUITAR_HIGHPASS)
+             (pset! s 3 1.0) (pset! s 4 (* -1.0 k)) (pset! s 5 -1.0) void)
+            ((= kind GUITAR_BANDPASS)
+             (pset! s 3 0.0) (pset! s 4 k) (pset! s 5 0.0) void)
+            (else
+              (pset! s 3 1.0) (pset! s 4 (* k (- (* big_a big_a) 1.0))) (pset! s 5 0.0) void))
+      void)))
+
+(bind-func static guitar_svf
+  "run one frame of a filter made by guitar_svf_make"
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((ic1 (pref s 6))
+          (ic2 (pref s 7))
+          (v3 (- x ic2))
+          (v1 (+ (* (pref s 0) ic1) (* (pref s 1) v3)))
+          (v2 (+ ic2 (* (pref s 1) ic1) (* (pref s 2) v3))))
+      (pset! s 6 (- (* 2.0 v1) ic1))
+      (pset! s 7 (- (* 2.0 v2) ic2))
+      (+ (* (pref s 3) x) (* (pref s 4) v1) (* (pref s 5) v2)))))
+
+;; The valve stages' saturation: x for small x, levelling off smoothly to
+;; exactly +-1 at |x| = 3. It is a rational stand-in for tanh, far cheaper,
+;; and its slope reaches zero where it meets the flat part, so it has no
+;; corner to make harsh high harmonics.
+(bind-func static guitar_sat
+  (lambda (x:SAMPLE)
+    (if (> x 3.0) 1.0
+        (if (< x -3.0) -1.0
+            (/ (* x (+ 27.0 (* x x))) (+ 27.0 (* 9.0 x x)))))))
+
+;;;;;;;;;;;;;;;;
+;; the string ;;
+;;;;;;;;;;;;;;;;
+
+;; Room for one period of the lowest note (about 20 Hz at 48 kHz).
+(bind-val GUITAR_STRING_LEN i64 4096)
+
+(bind-func static guitar_tap
+  "the sample written n frames ago into a string whose next write is at w"
+  (lambda (buf:SAMPLE* w:i64 n:i64)
+    (let ((i (- w n)))
+      (pref buf (if (< i 0) (+ i GUITAR_STRING_LEN) i)))))
+
+(bind-func guitar_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((buf:SAMPLE* (zalloc GUITAR_STRING_LEN))
+          (w:i64 0)
+          (i:i64 0)
+          ;; the note: its frequency, that as an angle per sample, and the
+          ;; loop length in samples (a whole number `di` of them in the delay
+          ;; line, the rest in the filters)
+          (f0:SAMPLE 110.0) (w0:SAMPLE 0.01) (len:SAMPLE 400.0) (di:i64 398)
+          ;; the loop filter (lowpass coefficient, state, and gain) and the
+          ;; allpass which makes up the fraction of a sample
+          (lp_a:SAMPLE 0.0) (lp:SAMPLE 0.0) (loop_g:SAMPLE 0.0)
+          (ap:SAMPLE 0.0) (ap_x:SAMPLE 0.0) (ap_y:SAMPLE 0.0) (frac:SAMPLE 1.0)
+          ;; the pluck: frames since it started, the pulse's period and width,
+          ;; when to stop feeding it in, and the two lowpasses which round it off
+          (k:i64 0) (np:i64 1) (dp:i64 1) (exc_end:i64 0) (noise_end:i64 0)
+          (mean:SAMPLE 0.0) (raw:SAMPLE 0.0) (e1:SAMPLE 0.0) (e2:SAMPLE 0.0)
+          (exc_c:SAMPLE 0.5) (exc_amp:SAMPLE 0.0) (noise_amp:SAMPLE 0.0) (fc:SAMPLE 1000.0)
+          ;; damping: how far the note has been released (0.0 held, 1.0 let
+          ;; go), the decay time and brightness corner, and their working
+          (released:SAMPLE 0.0) (rel_coeff:SAMPLE (- 1.0 (exp (/ -4000.0 SRf))))
+          (t60:SAMPLE 1.0) (t60_held:SAMPLE 1.0) (t60_rel:SAMPLE 1.0)
+          (fd:SAMPLE 1000.0) (fd_held:SAMPLE 1000.0) (fd_rel:SAMPLE 1000.0)
+          (palm:SAMPLE 0.0) (r0:SAMPLE 1.0) (q:SAMPLE 0.0) (tau:SAMPLE 0.0)
+          ;; vibrato: its phase and depth, and the loop length and angle it gives
+          (vib_phase:SAMPLE 0.0) (vib:SAMPLE 0.0) (len_v:SAMPLE 400.0) (w0_v:SAMPLE 0.01)
+          ;; the pickup: how far back along the delay line it reads, and its gain
+          (pp:SAMPLE 10.0) (pp_i:i64 10) (pp_f:SAMPLE 0.0) (pu_gain:SAMPLE 1.0)
+          (beta:SAMPLE 0.1) (body:SAMPLE 0.0)
+          (x:SAMPLE 0.0) (y:SAMPLE 0.0) (pu:SAMPLE 0.0) (tmp:SAMPLE 0.0) (rnd:SAMPLE 0.0)
+          (env:SAMPLE 0.0) (env_k:SAMPLE (exp (/ -20.0 SRf))))
+      (dotimes (i GUITAR_STRING_LEN) (pset! buf i 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! tmp (voice_freq v))
+              (set! f0 (clamp tmp 20.0 (* 0.2 SRf)))
+              (set! w0 (/ (* STWOPI f0) SRf))
+              (set! len (/ SRf f0))
+              (set! released 0.0)
+              (set! vib_phase 0.0)
+              ;; The pluck: one period of a pulse wave, its width the picking
+              ;; position's fraction of the period, less its average so that
+              ;; it carries no DC into the loop.
+              (set! np (convert (+ len 0.5) i64))
+              (set! tmp (* (clamp (guitar_pluck_pos p) 0.05 0.5) len))
+              (set! dp (convert (+ tmp 0.5) i64))
+              (if (< dp 1) (set! dp 1))
+              (set! mean (/ (convert dp SAMPLE) (convert np SAMPLE)))
+              ;; Two lowpasses round off the pulse. Their corner rises with
+              ;; the pick's hardness and with velocity: from about 600 Hz for
+              ;; a soft thumb to 10 kHz for a hard pick, an octave and a half
+              ;; lower for the softest notes.
+              (set! fc (* 600.0 (pow 2.0 (+ (* 4.0 (clamp (guitar_pick p) 0.0 1.0))
+                                            (* 1.5 (- (voice_vel v) 1.0))))))
+              (if (> fc (* 0.4 SRf)) (set! fc (* 0.4 SRf)))
+              (set! exc_c (- 1.0 (exp (/ (* -1.0 STWOPI fc) SRf))))
+              ;; Softer, rounder picks take the top off high notes more than
+              ;; low ones. Make up part of the fundamental's loss so that the
+              ;; top strings aren't lost.
+              (set! tmp (sqrt (+ 1.0 (* (/ f0 fc) (/ f0 fc)))))
+              (set! exc_amp (* (pow (voice_vel v) 1.3) (if (> tmp 3.0) 3.0 tmp)))
+              ;; a short scrape of noise as the pick leaves the string
+              (set! noise_amp (* 0.15 (clamp (guitar_pick p) 0.0 1.0)))
+              (set! noise_end (convert (/ SRf 670.0) i64))
+              (set! exc_end (+ np 256))
+              (set! k 0)
+              (set! e1 0.0) (set! e2 0.0)))
+        ;; Work out the loop filter every 32 frames.
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              ;; held: the fundamental fades in `sustain` seconds at A2, faster
+              ;; for higher notes; palm muting brings that down to 0.2 seconds
+              (set! palm (clamp (guitar_palm p) 0.0 1.0))
+              (set! tmp (clamp (guitar_sustain p) 0.05 60.0))
+              (set! t60_held (* tmp (sqrt (/ 110.0 f0))))
+              (if (> t60_held 0.2)
+                  (set! t60_held (exp (+ (log t60_held) (* palm (- (log 0.2) (log t60_held)))))))
+              ;; the frequency whose harmonics fade twice as fast as the
+              ;; fundamental, from 600 Hz to 14 kHz, and down to 300 Hz muted
+              (set! fd_held (* 600.0 (pow 2.0 (* 4.5 (clamp (guitar_bright p) 0.0 1.0)))))
+              (set! fd_held (exp (+ (log fd_held) (* palm (- (log 300.0) (log fd_held))))))
+              ;; released: a finger damps the string, the highs first
+              (set! tmp (clamp (guitar_release p) 0.01 10.0))
+              (set! t60_rel (if (< tmp t60_held) tmp t60_held))
+              (set! fd_rel (if (< fd_held 900.0) fd_held 900.0))
+              (set! tmp (if (< (voice_gate v) 0.5) 1.0 0.0))
+              (set! released (+ released (* rel_coeff (- tmp released))))
+              (set! t60 (exp (+ (log t60_held) (* released (- (log t60_rel) (log t60_held))))))
+              (set! fd (exp (+ (log fd_held) (* released (- (log fd_rel) (log fd_held))))))
+              (if (> fd (* 0.45 SRf)) (set! fd (* 0.45 SRf)))
+              ;; The one-pole loop filter H = (1 - a) / (1 - a z^-1). Each
+              ;; trip round the loop it takes 0.5 ln(1 + q 2(1 - cos w)) nepers
+              ;; from a partial at angle w, where q = a / (1 - a)^2. Choose q
+              ;; so that at fd that loss matches the fundamental's own decay
+              ;; rate r0, then solve for a.
+              (set! r0 (/ 6.9078 t60))
+              (set! q (/ (- (exp (/ (* 2.0 r0) f0)) 1.0)
+                         (* 2.0 (- 1.0 (cos (/ (* STWOPI fd) SRf))))))
+              (set! lp_a (if (< q 0.000001) q
+                             (/ (- (+ (* 2.0 q) 1.0) (sqrt (+ (* 4.0 q) 1.0))) (* 2.0 q))))
+              (if (> lp_a 0.95) (set! lp_a 0.95))
+              ;; the loop gain makes up the rest of the fundamental's decay
+              ;; (it must stay below 1.0, or DC would grow)
+              (set! tmp (/ (- 1.0 lp_a)
+                           (sqrt (+ 1.0 (* -2.0 lp_a (cos w0)) (* lp_a lp_a)))))
+              (set! loop_g (/ (exp (/ (* -1.0 r0) f0)) tmp))
+              (if (> loop_g 0.99995) (set! loop_g 0.99995))
+              ;; Vibrato: a quarter of a second into the note the player
+              ;; starts rocking the fretting finger, which stretches the
+              ;; string and can only raise its pitch. It fades in over half a
+              ;; second. A higher pitch is a shorter loop.
+              (set! vib_phase (+ vib_phase (/ (* STWOPI 32.0 (guitar_vib_rate p)) SRf)))
+              (if (> vib_phase STWOPI) (set! vib_phase (- vib_phase STWOPI)))
+              (set! tmp (* 2.0 (- (/ (convert (voice_age v) SAMPLE) SRf) 0.25)))
+              (set! vib (* (clamp (guitar_vibrato p) 0.0 1.0) (clamp tmp 0.0 1.0)))
+              (set! tmp (pow 2.0 (/ (* 0.25 vib (- 1.0 (cos vib_phase))) 12.0)))
+              (set! len_v (/ len tmp))
+              (set! w0_v (* w0 tmp))
+              ;; Tuning: the lowpass delays the fundamental by tau samples, the
+              ;; delay line by di, and the allpass makes up the rest. The
+              ;; allpass coefficient gives exactly that delay at the note's
+              ;; frequency, not just at low frequencies. When the loop
+              ;; filter or the vibrato change the delay the allpass has to
+              ;; make up by more than it comfortably can, the delay line
+              ;; moves by a whole sample.
+              (set! tau (/ (atan2 (* lp_a (sin w0_v)) (- 1.0 (* lp_a (cos w0_v)))) w0_v))
+              (if (voice_start? v)
+                  (set! di (convert (floor (- len tau 1.3)) i64)))
+              (set! frac (- len_v (convert di SAMPLE) tau))
+              (if (< frac 0.6) (begin (set! di (- di 1)) (set! frac (+ frac 1.0))))
+              (if (> frac 2.6) (begin (set! di (+ di 1)) (set! frac (- frac 1.0))))
+              (if (< di 1) (set! di 1))
+              (if (> di (- GUITAR_STRING_LEN 4)) (set! di (- GUITAR_STRING_LEN 4)))
+              (set! frac (- len_v (convert di SAMPLE) tau))
+              (set! frac (clamp frac 0.2 4.0))
+              (set! ap (/ (sin (* 0.5 w0_v (- 1.0 frac))) (sin (* 0.5 w0_v (+ 1.0 frac)))))
+              ;; The pickup sits `beta` of the way from the bridge (more
+              ;; precisely, from 6% to 26%). The difference of two taps has a
+              ;; gain of 2 sin(pi n beta) at the n-th harmonic: scale it so the
+              ;; second harmonic comes out at about its own level.
+              (set! beta (+ 0.06 (* 0.2 (clamp (guitar_pickup p) 0.0 1.0))))
+              (set! pp (* beta len))
+              (set! pp_i (convert (floor pp) i64))
+              (set! pp_f (- pp (convert pp_i SAMPLE)))
+              (set! pu_gain (/ 0.5 (sin (* STWOPI beta))))
+              (set! body (clamp (guitar_body p) 0.0 1.0))))
+        ;; the pluck, fed into the loop
+        (if (< k exc_end)
+            (begin
+              (set! raw (if (< k np) (- (if (< k dp) 1.0 0.0) mean) 0.0))
+              (if (< k noise_end)
+                  (begin
+                    (set! rnd (random))
+                    (set! raw (+ raw (* noise_amp (- (* 2.0 rnd) 1.0))))))
+              (set! e1 (+ e1 (* exc_c (- raw e1))))
+              (set! e2 (+ e2 (* exc_c (- e1 e2))))
+              (set! k (+ k 1))
+              void)
+            (begin (set! e2 0.0) void))
+        ;; one trip round the loop: delay line, loop filter, allpass
+        (set! x (guitar_tap buf w di))
+        (set! lp (+ x (* lp_a (- lp x))))
+        (set! x (* loop_g lp))
+        (set! y (- (+ (* ap x) ap_x) (* ap ap_y)))
+        (set! ap_x x)
+        (set! ap_y y)
+        ;; (the tiny constant keeps the loop out of denormal numbers)
+        (set! y (+ y (* exc_amp e2) 1.0e-18))
+        (pset! buf w y)
+        (set! w (+ w 1))
+        (if (= w GUITAR_STRING_LEN) (set! w 0))
+        ;; the pickup hears the string now, less the string pp samples ago
+        (set! pu (- y (+ (* (- 1.0 pp_f) (guitar_tap buf w (+ pp_i 1)))
+                         (* pp_f (guitar_tap buf w (+ pp_i 2))))))
+        (set! x (* 0.24 (+ (* (- 1.0 body) pu_gain pu) (* body y))))
+        (frame_add_stereo out x x)
+        ;; the note is over once it has been released and has died away
+        (set! tmp (fabs y))
+        (set! env (if (> tmp env) tmp (* env env_k)))
+        (if (and (< (voice_gate v) 0.5) (>= k exc_end) (< env 0.000002))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; body, pickup, amplifier and speaker (the effect) ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the acoustic body's resonances: frequency (Hz), Q and gain of each
+(bind-val GUITAR_BODY_MODES i64 7)
+
+(bind-func guitar_body_mode
+  "frequency, Q or gain (field 0, 1 or 2) of body resonance i"
+  (lambda (i:i64 field:i64)
+    (let ((table:SAMPLE* (salloc 21)))
+      (pfill! table
+              100.0 12.0 0.7    ;; the air in the body, through the soundhole
+              195.0 15.0 0.65   ;; the top plate's first mode
+              245.0 12.0 0.4    ;; the back plate
+              390.0 6.0 0.35
+              580.0 5.0 0.3
+              1050.0 3.0 0.3
+              2400.0 2.0 0.35)
+      (pref table (+ (* 3 i) field)))))
+
+(bind-func guitar_fx_c
+  (lambda (p:SAMPLE*)
+    (let ((smooth (smoothing_coeff 0.01))
+          (os_rate:SAMPLE (* 4.0 SRf))
+          (i:i64 0) (j:i64 0)
+          (x:SAMPLE 0.0) (u:SAMPLE 0.0) (tmp:SAMPLE 0.0)
+          ;; source: the pickup's resonance and the body's
+          (pickup_lp (guitar_svf_make))
+          (coil:SAMPLE -1.0)
+          (modes:SAMPLE* (zalloc (* 8 GUITAR_BODY_MODES)))
+          (mode_gain:SAMPLE* (zalloc GUITAR_BODY_MODES))
+          (body:SAMPLE 0.0) (body_x:SAMPLE 0.0) (spread:SAMPLE 0.0) (src:SAMPLE 0.0)
+          (last_x:SAMPLE 0.0) (radiate:SAMPLE 0.0)
+          (radiate_gain:SAMPLE (/ SRf (* STWOPI 1000.0)))
+          (radiate_c:SAMPLE (- 1.0 (exp (/ (* -1.0 STWOPI 5000.0) SRf))))
+          ;; the preamp: a highpass, then two saturating stages at four times
+          ;; the sample rate, with a coupling highpass between them
+          (drive:SAMPLE -1.0) (g1:SAMPLE 1.0) (g2:SAMPLE 1.0) (makeup:SAMPLE 1.0)
+          (g1_t:SAMPLE 1.0) (g2_t:SAMPLE 1.0) (makeup_t:SAMPLE 1.0)
+          (pre_lp:SAMPLE 0.0) (pre_c:SAMPLE 0.01)
+          (couple_lp:SAMPLE 0.0)
+          (couple_c:SAMPLE (- 1.0 (exp (/ (* -1.0 STWOPI 150.0) (* 4.0 SRf)))))
+          (up1 (guitar_svf_make))
+          (down1 (guitar_svf_make)) (down2 (guitar_svf_make))
+          (bias1:SAMPLE 0.25) (bias2:SAMPLE -0.15)
+          (rest1:SAMPLE (guitar_sat 0.25)) (rest2:SAMPLE (guitar_sat -0.15))
+          (quiet:i64 0)
+          ;; tone controls
+          (tone:SAMPLE -1.0) (tilt_lp:SAMPLE 0.0)
+          (tilt_c:SAMPLE (- 1.0 (exp (/ (* -1.0 STWOPI 700.0) SRf))))
+          (lo_t:SAMPLE 1.0) (hi_t:SAMPLE 1.0) (lo:SAMPLE 1.0) (hi:SAMPLE 1.0)
+          (mids:SAMPLE -1.0) (mid_eq (guitar_svf_make))
+          ;; the speaker cabinet
+          (cab_hp (guitar_svf_make)) (cab_thump (guitar_svf_make)) (cab_presence (guitar_svf_make))
+          (cab_lp1 (guitar_svf_make)) (cab_lp2 (guitar_svf_make)) (cab_lp3 (guitar_svf_make))
+          (amix:SAMPLE 1.0) (level:SAMPLE 1.0) (y:SAMPLE 0.0))
+      (dotimes (i (* 8 GUITAR_BODY_MODES)) (pset! modes i 0.0))
+      (dotimes (i GUITAR_BODY_MODES)
+        (pset! mode_gain i (guitar_body_mode i 2))
+        (guitar_svf_set (pref-ptr modes (* 8 i)) GUITAR_BANDPASS
+                        (guitar_body_mode i 0) (guitar_body_mode i 1) 0.0 SRf))
+      ;; Lowpasses at 11 kHz, at the oversampled rate. On the way down, two
+      ;; sections (a 24 dB/octave Butterworth) remove everything above the
+      ;; audio band before it can fold back. On the way up one section is
+      ;; enough to fill in between the samples, since the pickup's own
+      ;; lowpass has already taken the top off the signal.
+      (guitar_svf_set up1 GUITAR_LOWPASS 11000.0 0.7071 0.0 os_rate)
+      (guitar_svf_set down1 GUITAR_LOWPASS 11000.0 0.5412 0.0 os_rate)
+      (guitar_svf_set down2 GUITAR_LOWPASS 11000.0 1.3066 0.0 os_rate)
+      ;; A 12-inch speaker in an open-backed cabinet: little below 75 Hz, a
+      ;; bump at the cone's resonance, a presence peak, and a steep fall above
+      ;; about 4.5 kHz, 36 dB/octave (the second section is a little
+      ;; resonant, like the cone's own breakup there).
+      (guitar_svf_set cab_hp GUITAR_HIGHPASS 75.0 0.8 0.0 SRf)
+      (guitar_svf_set cab_thump GUITAR_PEAK 110.0 1.2 3.0 SRf)
+      (guitar_svf_set cab_presence GUITAR_PEAK 2600.0 1.0 4.0 SRf)
+      (guitar_svf_set cab_lp1 GUITAR_LOWPASS 4500.0 0.54 0.0 SRf)
+      (guitar_svf_set cab_lp2 GUITAR_LOWPASS 4500.0 1.6 0.0 SRf)
+      (guitar_svf_set cab_lp3 GUITAR_LOWPASS 6500.0 0.7 0.0 SRf)
+      (lambda (frame:SAMPLE*)
+        (set! x (+ (pref frame 0) 1.0e-18))
+        ;;;; the source: electric pickup or acoustic body ;;;;
+        (if (<> (guitar_coil p) coil)
+            (begin
+              ;; single coil: 5 kHz, Q 2.5. humbucker: 2.5 kHz, Q 1.2
+              (set! coil (guitar_coil p))
+              (set! tmp (clamp coil 0.0 1.0))
+              (guitar_svf_set pickup_lp GUITAR_LOWPASS (* 5000.0 (pow 0.5 tmp))
+                              (- 2.5 (* 1.3 tmp)) 0.0 SRf)))
+        (set! tmp (clamp (guitar_body p) 0.0 1.0))
+        (set! body (+ body (* smooth (- tmp body))))
+        (set! tmp (clamp (guitar_amp p) 0.0 1.0))
+        (set! amix (+ amix (* smooth (- tmp amix))))
+        ;; (each preset uses either the body or the pickup and amplifier, so
+        ;; whichever is switched off is skipped)
+        (set! body_x 0.0)
+        (set! spread 0.0)
+        (if (> body 0.0001)
+            (begin
+              ;; The top plate radiates sound pressure in proportion to its
+              ;; acceleration, the rate of change of the bridge signal: a
+              ;; rise of 6 dB/octave (unity gain at 1 kHz), softened above
+              ;; 5 kHz. The resonances, driven by the bridge itself, supply
+              ;; the low end.
+              (set! radiate (+ radiate (* radiate_c (- (* radiate_gain (- x last_x)) radiate))))
+              (set! body_x (* 0.7 radiate))
+              (dotimes (j GUITAR_BODY_MODES)
+                (set! u (* (pref mode_gain j) (guitar_svf (pref-ptr modes (* 8 j)) x)))
+                (set! body_x (+ body_x u))
+                ;; alternate modes lean left and right, as a pair of
+                ;; microphones would hear them
+                (set! spread (+ spread (if (= (% j 2) 0) u (* -1.0 u)))))
+              (set! spread (* 0.25 body (- 1.0 amix) spread))))
+        (set! last_x x)
+        (set! src (* body body_x))
+        (if (< body 0.9999)
+            (set! src (+ src (* (- 1.0 body) (guitar_svf pickup_lp x)))))
+        ;;;; the amplifier ;;;;
+        ;; Its settings are followed even while it rests (below), so that
+        ;; it wakes with them in place.
+        (if (<> (guitar_drive p) drive)
+            (begin
+              ;; Up to 48 dB of gain, three fifths of it in the first stage.
+              ;; makeup brings a typical note's peak (0.3) back to where it
+              ;; was, and lower as the drive rises, since a distorted note
+              ;; sounds louder for the same peak.
+              (set! drive (guitar_drive p))
+              (set! tmp (clamp drive 0.0 1.0))
+              (set! u (pow 10.0 (* 2.4 tmp)))
+              (set! g1_t (pow u 0.6))
+              (set! g2_t (pow u 0.4))
+              (set! u (- (guitar_sat (+ (* g1_t 0.3) bias1)) rest1))
+              (set! u (- (guitar_sat (+ (* g2_t u) bias2)) rest2))
+              (set! makeup_t (/ 0.3 (* u (+ 1.0 (* 2.0 tmp)))))
+              ;; the more gain, the more bass is trimmed before it, to keep
+              ;; the distortion tight: 40 Hz clean, 240 Hz flat out
+              (set! pre_c (- 1.0 (exp (/ (* -1.0 STWOPI 40.0 (pow 2.0 (* 2.6 tmp))) SRf))))))
+        (set! g1 (+ g1 (* smooth (- g1_t g1))))
+        (set! g2 (+ g2 (* smooth (- g2_t g2))))
+        (set! makeup (+ makeup (* smooth (- makeup_t makeup))))
+        ;; tone: tilt the spectrum about 700 Hz by up to 6 dB each way, and
+        ;; boost or cut the mids
+        (if (<> (guitar_tone p) tone)
+            (begin
+              (set! tone (guitar_tone p))
+              (set! tmp (- (clamp tone 0.0 1.0) 0.5))
+              (set! lo_t (pow 10.0 (* -0.6 tmp)))
+              (set! hi_t (pow 10.0 (* 0.6 tmp)))))
+        (set! lo (+ lo (* smooth (- lo_t lo))))
+        (set! hi (+ hi (* smooth (- hi_t hi))))
+        (if (<> (guitar_mids p) mids)
+            (begin
+              (set! mids (guitar_mids p))
+              (guitar_svf_set mid_eq GUITAR_PEAK 750.0 0.7
+                              (* 24.0 (- (clamp mids 0.0 1.0) 0.5)) SRf)))
+        ;; It is the most expensive part of the instrument, so it rests once
+        ;; its input and output have both been silent for a tenth of a second
+        ;; (every filter in it has settled by then).
+        (set! quiet (if (> (fabs src) 0.0000001) 0 (+ quiet 1)))
+        (set! x 0.0)
+        (if (and (> amix 0.0001) (< quiet (convert (/ SRf 10.0) i64)))
+            (begin
+              (set! pre_lp (+ pre_lp (* pre_c (- src pre_lp))))
+              (set! x (- src pre_lp))
+              ;; Four times oversampled: the input sample followed by three
+              ;; zeros, smoothed by the lowpass, through both stages, and
+              ;; lowpassed again. Only the last of the four results is kept.
+              (dotimes (j 4)
+                (set! u (guitar_svf up1 (if (= j 0) (* 4.0 x) 0.0)))
+                (set! u (- (guitar_sat (+ (* g1 u) bias1)) rest1))
+                (set! couple_lp (+ couple_lp (* couple_c (- u couple_lp))))
+                (set! u (- u couple_lp))
+                (set! u (- (guitar_sat (+ (* g2 u) bias2)) rest2))
+                (set! u (guitar_svf down2 (guitar_svf down1 u))))
+              (set! x (* makeup u))
+              ;; tone controls
+              (set! tilt_lp (+ tilt_lp (* tilt_c (- x tilt_lp))))
+              (set! x (+ (* lo tilt_lp) (* hi (- x tilt_lp))))
+              (set! x (guitar_svf mid_eq x))
+              ;; the speaker cabinet
+              (set! x (guitar_svf cab_presence (guitar_svf cab_thump (guitar_svf cab_hp x))))
+              (set! x (guitar_svf cab_lp3 (guitar_svf cab_lp2 (guitar_svf cab_lp1 x))))
+              (if (> (fabs x) 0.0000001) (set! quiet 0))
+              void))
+        ;;;; out: the amplifier mixed with the direct sound ;;;;
+        (set! level (+ level (* smooth (- (guitar_level p) level))))
+        (set! y (+ (* amix x) (* (- 1.0 amix) src)))
+        (pset! frame 0 (* level (+ y spread)))
+        (pset! frame 1 (* level (- y spread)))
+        void))))
+
+(bind-func guitar_make
+  (lambda ()
+    (let ((inst (inst_make "guitar" 12 (guitar_nparams)))
+          (i:i64 0))
+      (guitar_defaults (inst_params inst))
+      (dotimes (i 12)
+        (inst_set_voice inst i (guitar_voice_c (inst_params inst))))
+      (inst_set_fx inst (guitar_fx_c (inst_params inst)))
+      inst)))

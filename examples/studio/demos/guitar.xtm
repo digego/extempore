@@ -1,0 +1,196 @@
+;;; guitar.xtm -- a tour of the guitar's presets
+
+;; Evaluate the whole file to hear each preset in turn, or render it to a
+;; file:
+;;
+;;   extras/studio/render examples/studio/demos/guitar.xtm /tmp/guitar.wav 58
+;;
+;; Each preset plays the kind of part it suits: strummed chords on the two
+;; acoustics, arpeggios on the clean electric, funk sixteenths, jazz
+;; comping, a rock riff, a lead line and a palm-muted metal riff.
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'gtr 'guitar)
+(score-ctl 0 'gtr 'reverb 0.12)
+
+;; A strum: the pick crosses the strings one after another, low to high on a
+;; downstroke and high to low on an upstroke, a little softer as it goes.
+;; `gap` is the time between strings, in seconds.
+(define guitar-demo-strum
+  (lambda (t pitches vel dur gap up)
+    (let loop ((i 0) (ps (if up (reverse pitches) pitches)))
+      (if (pair? ps)
+          (begin
+            (score-note (+ t (* i gap)) 'gtr (car ps) (* vel (- 1.0 (* 0.03 i))) dur)
+            (loop (+ i 1) (cdr ps)))))))
+
+;; play a list of (time pitch duration velocity), times and durations in beats
+(define guitar-demo-line
+  (lambda (start beat line)
+    (for-each (lambda (n)
+                (score-note (+ start (* beat (car n))) 'gtr (cadr n) (cadddr n) (* beat (caddr n))))
+              line)))
+
+;; chord shapes, as MIDI notes from the lowest string up
+(define guitar-demo-g '(43 47 50 55 59 67))
+(define guitar-demo-c '(48 52 55 60 64))
+(define guitar-demo-d '(50 57 62 66))
+(define guitar-demo-am7 '(45 52 55 60 64))
+(define guitar-demo-dm9 '(50 53 57 60 64))
+(define guitar-demo-e7 '(40 47 50 56 59 64))
+(define guitar-demo-fmaj7 '(41 48 53 57 64))
+(define guitar-demo-cmaj7 '(48 52 55 59 64))
+
+;; steel: a folk strumming pattern (down, down-up, up-down-up) at 110 bpm.
+;; Upstrokes catch only the top four strings.
+(define guitar-demo-steel
+  (lambda (start)
+    (let ((e 0.27))
+      (for-each
+        (lambda (bar chord)
+          (for-each (lambda (stroke)
+                      (let ((t (+ start (* bar 8 e) (* (car stroke) e)))
+                            (up (cadr stroke))
+                            (dur (* e (caddr stroke))))
+                        (if up
+                            (guitar-demo-strum t (list-tail chord (- (length chord) 4)) 0.55 dur 0.012 #t)
+                            (guitar-demo-strum t chord 0.85 dur 0.018 #f))))
+                    '((0 #f 2) (2 #f 1) (3 #t 2) (5 #t 1) (6 #f 1) (7 #t 1))))
+        '(0 1)
+        (list guitar-demo-g guitar-demo-c))
+      (guitar-demo-strum (+ start (* 16 e)) guitar-demo-d 0.85 (* 2 e) 0.02 #f)
+      (guitar-demo-strum (+ start (* 18 e)) guitar-demo-g 0.9 1.8 0.022 #f))))
+
+;; nylon: slow, soft strums with the thumb, which spread the strings out
+(define guitar-demo-nylon
+  (lambda (start)
+    (let ((b 0.75))
+      (for-each (lambda (n)
+                  (guitar-demo-strum (+ start (* b (car n))) (cadr n) (caddr n) (* b (cadddr n)) 0.03 #f))
+                (list (list 0 guitar-demo-am7 0.7 1.4) (list 1.5 guitar-demo-am7 0.5 0.6)
+                      (list 2 guitar-demo-dm9 0.7 1.4) (list 3.5 guitar-demo-dm9 0.5 0.6)
+                      (list 4 guitar-demo-cmaj7 0.7 1.4) (list 5.5 guitar-demo-cmaj7 0.5 0.6)
+                      (list 6 guitar-demo-e7 0.75 2.5))))))
+
+;; clean: picked arpeggios, each string left to ring
+(define guitar-demo-clean
+  (lambda (start)
+    (let ((e 0.23))
+      (for-each
+        (lambda (bar chord)
+          (let ((c (list->vector chord)))
+            (for-each (lambda (step idx)
+                        (score-note (+ start (* bar 6 e) (* step e)) 'gtr (vector-ref c idx)
+                                    (if (= step 0) 0.85 0.65) (* e (- 6 step))))
+                      '(0 1 2 3 4 5) '(0 2 3 4 3 2))))
+        '(0 1 2 3)
+        (list guitar-demo-cmaj7 guitar-demo-am7 guitar-demo-fmaj7 guitar-demo-g)))))
+
+;; funk: sixteenths on an E9, with muted scratches (x) between the stabs (X).
+;; The pick goes down on the beat and up off it.
+(define guitar-demo-funk
+  (lambda (start)
+    (let ((s 0.14)
+          (e9 '(56 62 66 71))
+          (a13 '(55 61 66)))
+      (let loop ((step 0))
+        (if (< step 40)
+            (let* ((hit (string-ref "XxXX.xXx.XxxX.xX" (modulo step 16)))
+                   (chord (if (and (>= step 24) (< step 32)) a13 e9))
+                   (t (+ start (* step s)))
+                   (up (odd? step)))
+              (cond ((char=? hit #\X) (guitar-demo-strum t chord 0.85 0.09 0.006 up))
+                    ((char=? hit #\x) (guitar-demo-strum t chord 0.6 0.015 0.006 up)))
+              (loop (+ step 1)))))
+      (guitar-demo-strum (+ start (* 40 s)) e9 0.9 0.6 0.008 #f))))
+
+;; jazz: comping on a ii-V-I, then a short line to the tonic
+(define guitar-demo-jazz
+  (lambda (start)
+    (let ((b 0.45)
+          (dm7 '(50 60 65 69))
+          (g13 '(43 53 59 64))
+          (cmaj9 '(48 59 62 64 67)))
+      (for-each (lambda (n)
+                  (guitar-demo-strum (+ start (* b (car n))) (cadr n) (caddr n) (* b (cadddr n)) 0.02 #f))
+                (list (list 0 dm7 0.7 1.2) (list 1.5 dm7 0.55 2.2)
+                      (list 4 g13 0.7 1.2) (list 5.5 g13 0.55 2.2)))
+      (guitar-demo-line (+ start (* 8 b)) b
+                        '((0 64 0.5 0.7) (0.5 65 0.5 0.6) (1 67 0.5 0.7) (1.5 69 0.5 0.6)
+                          (2 71 0.5 0.7) (2.5 74 0.5 0.65) (3 72 1.0 0.75)))
+      (guitar-demo-strum (+ start (* 12 b)) cmaj9 0.65 (* 3 b) 0.03 #f))))
+
+;; crunch: a rock riff on A, with power chords and an open D shape
+(define guitar-demo-crunch
+  (lambda (start)
+    (let ((e 0.24)
+          (a5 '(45 52 57))
+          (g5 '(43 50 55))
+          (d-a '(45 50 57 62 66)))
+      (for-each
+        (lambda (bar first)
+          (for-each (lambda (n)
+                      (guitar-demo-strum (+ start (* bar 8 e) (* (car n) e))
+                                         (cond ((eq? (cadr n) 'first) first)
+                                               ((eq? (cadr n) 'd) d-a)
+                                               (else a5))
+                                         (caddr n) (* e (cadddr n)) 0.01 #f))
+                    '((0 first 0.95 0.9) (1 first 0.6 0.9) (2 first 0.9 0.9)
+                      (3 d 0.9 0.9) (4 d 0.7 0.9) (5 a 0.95 1.9) (7 a 0.6 0.9))))
+        '(0 1 2)
+        (list a5 g5 a5))
+      (guitar-demo-strum (+ start (* 24 e)) a5 1.0 1.0 0.01 #f))))
+
+;; lead: a pentatonic line in E minor. Each note is held until the next, and
+;; the long ones bloom into vibrato.
+(define guitar-demo-lead
+  (lambda (start)
+    (guitar-demo-line start 0.3
+                      '((0 71 1.05 0.9) (1 74 1.05 0.85) (2 76 4.05 1.0) (6 74 1.05 0.8)
+                        (7 71 1.05 0.85) (8 69 1.05 0.8) (9 67 1.05 0.85) (10 69 2.05 0.9)
+                        (12 64 9.0 1.0)))))
+
+;; chug: palm-muted eighths on the low E, with unmuted power chords on top
+(define guitar-demo-chug
+  (lambda (start)
+    (let ((e 0.21)
+          (e5 '(40 47 52)))
+      (for-each
+        (lambda (bar)
+          (for-each (lambda (n)
+                      (let ((t (+ start (* bar 8 e) (* (car n) e))))
+                        (if (eq? (cadr n) 'mute)
+                            (score-note t 'gtr 40 (caddr n) (* 0.8 e))
+                            (begin
+                              ;; lift the palm for the accents, then put it back
+                              (score-ctl (- t 0.005) 'gtr 'palm 0.0)
+                              (guitar-demo-strum t (cadr n) 0.95 (* 0.9 e) 0.008 #f)
+                              (score-ctl (+ t (* 0.95 e)) 'gtr 'palm 0.8)))))
+                    (if (< bar 3)
+                        '((0 mute 1.0) (1 mute 0.7) (2 mute 0.9) (3 mute 0.7)
+                          (4 mute 1.0) (5 mute 0.7) (6 (43 50 55) 0) (7 (41 48 53) 0))
+                        '((0 mute 1.0) (1 mute 0.7) (2 mute 0.9) (3 mute 0.7)
+                          (4 mute 1.0) (5 mute 0.8) (6 mute 1.0) (7 mute 0.8)))))
+        '(0 1 2 3))
+      (score-ctl (+ start (* 32 e) -0.005) 'gtr 'palm 0.0)
+      (guitar-demo-strum (+ start (* 32 e)) e5 1.0 1.5 0.01 #f))))
+
+;; each preset gets seven seconds
+(let loop ((start 0.1)
+           (tour (list (cons 'steel guitar-demo-steel)
+                       (cons 'nylon guitar-demo-nylon)
+                       (cons 'clean guitar-demo-clean)
+                       (cons 'funk guitar-demo-funk)
+                       (cons 'jazz guitar-demo-jazz)
+                       (cons 'crunch guitar-demo-crunch)
+                       (cons 'lead guitar-demo-lead)
+                       (cons 'chug guitar-demo-chug))))
+  (if (pair? tour)
+      (begin
+        (score-preset (- start 0.05) 'gtr (car (car tour)))
+        ((cdr (car tour)) start)
+        (loop (+ start 7.0) (cdr tour)))))
+
+(score-end)
