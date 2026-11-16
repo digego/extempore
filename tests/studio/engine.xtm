@@ -190,3 +190,16 @@
       (+ (* 100.0 (dl_read line 3)) (dl_readf line 2.5)))))
 
 (xtmtest-result (test_delay_line) 1717.5 "delay-line-reads")
+
+;; every voice of a big instrument sounding at once (an array of voices which
+;; was allocated too small used to overrun into the voice functions)
+(bind-func test_all_voices_at_once
+  (lambda ()
+    (let ((inst (test_inst 32))
+          (i:i64 0))
+      (dotimes (i 40)
+        (inst_note_on inst (convert (+ 40 i) SAMPLE) 0.8 0))
+      (test_tick inst 100)
+      (inst_active_voices inst))))
+
+(xtmtest-result (test_all_voices_at_once) 32 "thirty-two-voices-at-once")

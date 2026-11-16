@@ -1,0 +1,405 @@
+;;; strings.xtm -- a string machine: lush ensemble strings and pads
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A polyphonic string machine in the style of the ARP/Eminent Solina String
+;; Ensemble and the Roland RS series.
+;;
+;; The voices are deliberately plain. A string machine is a divide-down
+;; organ: every key plays sawtooth waves at three octaves (16', 8' and 4',
+;; which we call cello, viola and violin), locked in phase and perfectly in
+;; tune, with a slow attack and a long release. On its own that sounds like a
+;; cheap organ. Two things turn it into strings:
+;;
+;; 1. Fixed tone shaping: a gentle body resonance, a presence peak and a
+;;    lowpass, applied to the sum of the voices so the raw saws don't buzz.
+;;
+;; 2. The ensemble, which is the instrument. The originals used bucket-brigade
+;;    (BBD) delay chips: three short delay lines, each with its delay time
+;;    swept by the sum of a slow LFO (about 0.6 Hz) and a faster one (about 6
+;;    Hz). The three lines get the same LFOs a third of a cycle (120 degrees)
+;;    apart. Each line on its own is a slight vibrato. Mixed, the three copies
+;;    beat against each other and every partial shimmers, like a section of
+;;    players who are never quite together. Because the three sweeps are
+;;    120 degrees apart they cancel in the sum, so the average pitch never
+;;    moves and a single note doesn't wobble. For stereo, each channel here
+;;    has its own set of three lines, the right's a quarter cycle behind the
+;;    left's.
+;;
+;; A fourth register, brass, is a pulse wave through a lowpass which opens as
+;; the note swells, for the synth-brass ensemble sound. After the ensemble
+;; there's an optional phaser: the string-machine-through-a-phaser sound of
+;; the 1970s.
+;;
+;; This is an original implementation, built from published descriptions of
+;; how string machines and their ensemble circuits work.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-strings)
+(define *xtmlib-studio-strings-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument strings
+  "a string machine with a three-line ensemble chorus, in the style of the Solina"
+  (params
+    (cello 0.4 "level of the 16' register (an octave below the key), 0.0 to 1.0")
+    (viola 0.8 "level of the 8' register (at the key's pitch), 0.0 to 1.0")
+    (violin 0.6 "level of the 4' register (an octave above the key), 0.0 to 1.0")
+    (brass 0.0 "level of the brass register (a narrow pulse at 8' through a swelling filter), 0.0 to 1.0")
+    (attack 0.25 "seconds to swell to full level")
+    (release 1.6 "seconds to fade to silence (-60 dB) after the note ends")
+    (bright 0.5 "tone, 0.0 (dark, 1.2 kHz lowpass) to 1.0 (open, 12 kHz)")
+    (velocity 0.2 "how much velocity changes the level, 0.0 (none, like the originals) to 1.0")
+    (ensemble 1.0 "ensemble mix, 0.0 (dry) to 1.0 (all ensemble)")
+    (depth 0.4 "how far the ensemble sweeps its delays, 0.0 to 1.0")
+    (phaser 0.0 "phaser mix, 0.0 (off) to 1.0 (deepest notches)")
+    (phaser-rate 0.25 "phaser sweep rate in Hz")
+    (phaser-depth 0.7 "how widely the phaser sweeps, 0.0 to 1.0")
+    (phaser-feedback 0.5 "phaser resonance, 0.0 to 1.0")
+    (level 0.6 "output level"))
+  (presets
+    (classic)
+    (cellos (cello 1.0) (viola 0.25) (violin 0.0) (bright 0.4) (attack 0.15) (release 0.8)
+            (level 0.9))
+    (violins (cello 0.0) (viola 0.35) (violin 1.0) (bright 0.62) (attack 0.35) (level 0.65))
+    (phased (cello 0.4) (viola 0.8) (violin 0.7) (bright 0.6) (phaser 1.0) (phaser-rate 0.18)
+            (phaser-depth 0.8) (phaser-feedback 0.6))
+    (pad (cello 0.6) (viola 0.7) (violin 0.3) (bright 0.3) (attack 1.4) (release 3.5)
+         (depth 0.6) (level 0.7))
+    (brassy (cello 0.2) (viola 0.4) (violin 0.3) (brass 1.0) (bright 0.85) (attack 0.08)
+            (release 0.5) (velocity 0.5) (depth 0.45) (level 0.55))
+    (chamber (cello 0.4) (viola 1.0) (violin 0.3) (bright 0.45) (attack 0.12) (release 0.9)
+             (depth 0.35) (ensemble 0.8))
+    (jet (cello 0.3) (viola 0.6) (violin 0.9) (brass 0.3) (bright 0.75) (attack 0.6)
+         (release 2.5) (phaser 1.0) (phaser-rate 0.12) (phaser-depth 1.0) (phaser-feedback 0.9))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; oscillator and filters ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static strings_saw
+  "a sawtooth (-1 to 1) at phase ph (0 to 1), which advances by inc each frame.
+poly_blep rounds off the reset so that it doesn't alias."
+  (lambda (ph:SAMPLE inc:SAMPLE)
+    (- (- (* 2.0 ph) 1.0) (poly_blep ph inc 1.0 #t))))
+
+(bind-func strings_lowpass_c
+  "a two-pole (12 dB/octave) state variable lowpass with a fixed q.
+
+@param x - input
+@param cutoff - cutoff in Hz (the coefficients are only recalculated when it changes)"
+  (lambda (q:SAMPLE)
+    (let ((k:SAMPLE (/ 1.0 q))
+          (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
+          (g:SAMPLE 0.0) (a1:SAMPLE 0.0) (a2:SAMPLE 0.0) (a3:SAMPLE 0.0)
+          (fc:SAMPLE 0.0) (old_cutoff:SAMPLE -1.0)
+          (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0))
+      (lambda (x:SAMPLE cutoff:SAMPLE)
+        (if (<> cutoff old_cutoff)
+            (begin
+              (set! old_cutoff cutoff)
+              (set! fc (clamp cutoff 20.0 (* 0.45 SRf)))
+              (set! g (tan (* SPI (/ fc SRf))))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))
+              (set! a3 (* g a2))))
+        (set! v3 (- x ic2))
+        (set! v1 (+ (* a1 ic1) (* a2 v3)))
+        (set! v2 (+ ic2 (* a2 ic1) (* a3 v3)))
+        (set! ic1 (- (* 2.0 v1) ic1))
+        (set! ic2 (- (* 2.0 v2) ic2))
+        v2))))
+
+(bind-func strings_peak_c
+  "a fixed peaking EQ band (the biquad from Robert Bristow-Johnson's Audio EQ
+Cookbook): gain_db of boost or cut around freq Hz, with bandwidth set by q."
+  (lambda (freq:SAMPLE gain_db:SAMPLE q:SAMPLE)
+    (let ((amp (pow 10.0 (/ gain_db 40.0)))
+          (w0 (* STWOPI (/ freq SRf)))
+          (alpha (/ (sin w0) (* 2.0 q)))
+          (a0 (+ 1.0 (/ alpha amp)))
+          (b0 (/ (+ 1.0 (* alpha amp)) a0))
+          (b1 (/ (* -2.0 (cos w0)) a0))
+          (b2 (/ (- 1.0 (* alpha amp)) a0))
+          (a1 b1)
+          (a2 (/ (- 1.0 (/ alpha amp)) a0))
+          (s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (x:SAMPLE)
+        (set! y (+ (* b0 x) s1))
+        (set! s1 (- (+ (* b1 x) s2) (* a1 y)))
+        (set! s2 (- (* b2 x) (* a2 y)))
+        y))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the ensemble and the phaser ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static strings_tap
+  "the delay line's output n frames back (n >= 2), for fractional n.
+
+The read point sweeps continuously, so it's interpolated with a cubic
+(Catmull-Rom) curve through the four nearest frames. Straight-line
+interpolation would dull the top end by an amount which moves with the sweep."
+  (lambda (d:DelayLine* n:SAMPLE)
+    (let ((whole:i64 (convert n))
+          (f (- n (convert whole SAMPLE)))
+          (ym1 (dl_read d (- whole 1)))
+          (y0 (dl_read d whole))
+          (y1 (dl_read d (+ whole 1)))
+          (y2 (dl_read d (+ whole 2)))
+          (c1 (* 0.5 (- y1 ym1)))
+          (c2 (- (+ ym1 (* 2.0 y1)) (+ (* 2.5 y0) (* 0.5 y2))))
+          (c3 (+ (* 0.5 (- y2 ym1)) (* 1.5 (- y0 y1)))))
+      (+ y0 (* f (+ c1 (* f (+ c2 (* f c3)))))))))
+
+(bind-func strings_phaser_c
+  "one channel of a four-stage phaser.
+
+Four first-order allpass filters in a row shift the phase of each frequency by
+a different amount. Mixed with the dry signal, the frequencies which come out
+of the chain inverted cancel, cutting two notches into the spectrum; sweeping
+the allpasses' corner frequency sweeps the notches. Feeding the chain's output
+back to its input sharpens the peaks between the notches.
+
+@param x - input
+@param a - the allpass coefficient, (t - 1) / (t + 1) for t = tan(pi fc / SR)
+@param feedback - 0.0 to below 1.0
+@return the allpass chain's output (mix it with x)"
+  (lambda ()
+    (let ((state:SAMPLE* (zalloc 8)) ;; 0-3 each stage's last input, 4-7 its last output
+          (last:SAMPLE 0.0)
+          (y:SAMPLE 0.0)
+          (stage_in:SAMPLE 0.0)
+          (i:i64 0))
+      (dotimes (i 8) (pset! state i 0.0))
+      (lambda (x:SAMPLE a:SAMPLE feedback:SAMPLE)
+        ;; the tiny constant keeps the feedback loop out of denormals in silence
+        (set! y (+ x (* feedback last) 1.0e-18))
+        (dotimes (i 4)
+          (set! stage_in y)
+          (set! y (+ (* a (- stage_in (pref state (+ i 4)))) (pref state i)))
+          (pset! state i stage_in)
+          (pset! state (+ i 4) y))
+        (set! last y)
+        y))))
+
+(bind-func strings_fx_c
+  "the effect on the summed voices: tone shaping, the ensemble, then the phaser"
+  (lambda (p:SAMPLE*)
+    (let ((x:SAMPLE 0.0) (l:SAMPLE 0.0) (r:SAMPLE 0.0)
+          (frames:i64 0)
+          ;; tone shaping. The voices are raw saws, so take out any DC, add a
+          ;; broad body resonance and a presence peak (roughly where a
+          ;; violin's are), then lowpass at the brightness setting.
+          (dc_in:SAMPLE 0.0) (dc_out:SAMPLE 0.0)
+          (dc_r:SAMPLE (- 1.0 (/ (* STWOPI 30.0) SRf)))
+          (body (strings_peak_c 420.0 3.5 0.8))
+          (presence (strings_peak_c 2600.0 4.5 1.2))
+          (tone (strings_lowpass_c 0.8))
+          (cutoff:SAMPLE 4000.0)
+          ;; the ensemble: one delay line read at swept points. The sweeps are
+          ;; centred on 7 ms; at full depth the slow LFO moves each tap by up
+          ;; to 2 ms and the fast one by up to 0.4 ms, which is a vibrato of
+          ;; about 13 cents from the slow one and 27 from the fast one on each
+          ;; tap alone. The slow sweep sets how far apart the copies drift
+          ;; and the fast one how quickly they shimmer; much more slow sweep
+          ;; and the low partials start to swim.
+          (line (dl_make (convert (/ SRf 50.0) i64)))
+          (centre:SAMPLE (* 0.007 SRf))
+          (slow_depth:SAMPLE (* 0.002 SRf))
+          (fast_depth:SAMPLE (* 0.0004 SRf))
+          (slow_inc:SAMPLE (/ 0.6 SRf))
+          (fast_inc:SAMPLE (/ 6.3 SRf))
+          (slow_ph:SAMPLE 0.0) (fast_ph:SAMPLE 0.0)
+          (ss:SAMPLE 0.0) (sc:SAMPLE 0.0) (fs:SAMPLE 0.0) (fc:SAMPLE 0.0)
+          (s0:SAMPLE 0.0) (s1:SAMPLE 0.0)
+          (e0:SAMPLE 0.0) (e1:SAMPLE 0.0)
+          (wet_l:SAMPLE 0.0) (wet_r:SAMPLE 0.0)
+          ;; the mix settings glide so that changing them doesn't click
+          (glide (smoothing_coeff 0.02))
+          (depth:SAMPLE 0.4) (ens_mix:SAMPLE 1.0) (ph_mix:SAMPLE 0.0)
+          ;; the phaser: one LFO, a quarter cycle apart on the two channels
+          (phaser_l (strings_phaser_c))
+          (phaser_r (strings_phaser_c))
+          (ph_ph:SAMPLE 0.0)
+          (sweep:SAMPLE 0.0) (tan_w:SAMPLE 0.0) (a_l:SAMPLE 0.0) (a_r:SAMPLE 0.0)
+          (fb:SAMPLE 0.0) (target:SAMPLE 0.0))
+      (lambda (frame:SAMPLE*)
+        ;; the voices are mono, added to the centre at -3 dB per channel
+        (set! x (* 0.70710678 (+ (pref frame 0) (pref frame 1))))
+        (if (= (% frames 32) 0)
+            (set! cutoff (* 1200.0 (pow 2.0 (* 3.32 (clamp (strings_bright p) 0.0 1.0))))))
+        (set! frames (+ frames 1))
+        ;; tone shaping
+        (set! dc_out (+ (- x dc_in) (* dc_r dc_out) 1.0e-18))
+        (set! dc_in x)
+        (set! x (tone (presence (body dc_out)) cutoff))
+        ;; the ensemble LFOs. Every phase we need (a third of a cycle apart,
+        ;; and a quarter cycle on for the right channel) comes from sin(t) and
+        ;; cos(t), so each LFO costs one sin and one cos per frame.
+        (set! slow_ph (+ slow_ph slow_inc))
+        (if (>= slow_ph 1.0) (set! slow_ph (- slow_ph 1.0)))
+        (set! fast_ph (+ fast_ph fast_inc))
+        (if (>= fast_ph 1.0) (set! fast_ph (- fast_ph 1.0)))
+        (set! ss (sin (* STWOPI slow_ph)))
+        (set! sc (cos (* STWOPI slow_ph)))
+        (set! fs (sin (* STWOPI fast_ph)))
+        (set! fc (cos (* STWOPI fast_ph)))
+        (set! target (clamp (strings_depth p) 0.0 1.0))
+        (set! depth (+ depth (* glide (- target depth))))
+        (set! s0 (* depth slow_depth))
+        (set! s1 (* depth fast_depth))
+        ;; Each channel gets a whole set of three lines, so that each side on
+        ;; its own keeps its pitch. (Panning one set of three left, centre and
+        ;; right would leave each side with a net vibrato.) The right
+        ;; channel's set runs a quarter cycle behind the left's, which makes
+        ;; the two sides different without putting them out of phase.
+        ;;
+        ;; e0 and e1 are how far the first two lines stray from the centre
+        ;; delay; the third strays by -(e0 + e1), since the three cancel.
+        (dl_write line x)
+        (set! e0 (+ (* s0 ss) (* s1 fs)))
+        (set! e1 (+ (* s0 (+ (* -0.5 ss) (* 0.8660254 sc)))
+                    (* s1 (+ (* -0.5 fs) (* 0.8660254 fc)))))
+        (set! wet_l (+ (strings_tap line (+ centre e0))
+                       (strings_tap line (+ centre e1))
+                       (strings_tap line (- centre (+ e0 e1)))))
+        (set! e0 (+ (* s0 sc) (* s1 fc)))
+        (set! e1 (+ (* s0 (- (* -0.5 sc) (* 0.8660254 ss)))
+                    (* s1 (- (* -0.5 fc) (* 0.8660254 fs)))))
+        (set! wet_r (+ (strings_tap line (+ centre e0))
+                       (strings_tap line (+ centre e1))
+                       (strings_tap line (- centre (+ e0 e1)))))
+        ;; at low frequencies the three taps are nearly in phase and add up
+        ;; (to three times the input), higher up their phases are scattered
+        ;; and they add up to about 1.7 times: this scaling is a compromise
+        (set! wet_l (* 0.33 wet_l))
+        (set! wet_r (* 0.33 wet_r))
+        (set! target (clamp (strings_ensemble p) 0.0 1.0))
+        (set! ens_mix (+ ens_mix (* glide (- target ens_mix))))
+        (set! x (* 0.70710678 (- 1.0 ens_mix) x))
+        (set! l (+ x (* ens_mix wet_l)))
+        (set! r (+ x (* ens_mix wet_r)))
+        ;; the phaser sweeps its notches exponentially, around 800 Hz: at
+        ;; full depth from 140 Hz to 4.5 kHz
+        (set! target (clamp (strings_phaser p) 0.0 1.0))
+        (set! ph_mix (+ ph_mix (* glide (- target ph_mix))))
+        (if (> ph_mix 0.0001)
+            (begin
+              ;; the sweep is slow, so the coefficients are worked out every
+              ;; 8 frames
+              (if (= (% frames 8) 0)
+                  (begin
+                    (set! ph_ph (+ ph_ph (/ (* 8.0 (clamp (strings_phaser_rate p) 0.01 10.0)) SRf)))
+                    (if (>= ph_ph 1.0) (set! ph_ph (- ph_ph 1.0)))
+                    (set! sweep (* 2.5 (clamp (strings_phaser_depth p) 0.0 1.0)))
+                    (set! tan_w (tan (* SPI (/ (* 800.0 (pow 2.0 (* sweep (sin (* STWOPI ph_ph))))) SRf))))
+                    (set! a_l (/ (- tan_w 1.0) (+ tan_w 1.0)))
+                    (set! tan_w (tan (* SPI (/ (* 800.0 (pow 2.0 (* sweep (cos (* STWOPI ph_ph))))) SRf))))
+                    (set! a_r (/ (- tan_w 1.0) (+ tan_w 1.0)))
+                    ;; at most 0.7, so the peaks between the notches stay
+                    ;; under 10 dB
+                    (set! fb (* 0.7 (clamp (strings_phaser_feedback p) 0.0 1.0)))))
+              (set! l (+ l (* 0.5 ph_mix (- (phaser_l l a_l fb) l))))
+              (set! r (+ r (* 0.5 ph_mix (- (phaser_r r a_r fb) r))))))
+        (pset! frame 0 l)
+        (pset! frame 1 r)
+        void))))
+
+;;;;;;;;;;;;;;;
+;; the voice ;;
+;;;;;;;;;;;;;;;
+
+(bind-func strings_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((brass_filter (strings_lowpass_c 1.6))
+          ;; the 16' phase. Like a divide-down oscillator it runs freely and
+          ;; is never reset, so a stolen voice changes pitch without a click.
+          (phase:SAMPLE 0.0)
+          (inc:SAMPLE 0.0)
+          (ph8:SAMPLE 0.0) (ph4:SAMPLE 0.0) (ph_pulse:SAMPLE 0.0)
+          (saw8:SAMPLE 0.0)
+          (env:SAMPLE 0.0)
+          (attacking:i1 #t)
+          (touch:SAMPLE 1.0)
+          (x:SAMPLE 0.0)
+          ;; these depend on parameters, and are worked out every 16 frames
+          (attack_coeff:SAMPLE 0.0)
+          (release_coeff:SAMPLE 0.0)
+          (brass_cutoff:SAMPLE 1000.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! attacking #t)
+              ;; the originals had no velocity at all: by default it's subtle
+              (set! touch (- 1.0 (* (clamp (strings_velocity p) 0.0 1.0) (- 1.0 (voice_vel v)))))))
+        (if (= (% (voice_age v) 16) 0)
+            (begin
+              ;; the attack rises towards 1.3 and stops at 1.0, which makes the
+              ;; RC curve of an analogue envelope nearly straight; ln(1.3/0.3)
+              ;; = 1.466 time constants gets it there. The release falls by 60
+              ;; dB (6.9 time constants) in the time given.
+              (set! attack_coeff (smoothing_coeff (/ (strings_attack p) 1.466)))
+              (set! release_coeff (smoothing_coeff (/ (strings_release p) 6.9)))
+              ;; the brass filter opens four and a half octaves as the note
+              ;; swells, which is what makes a pulse wave sound blown
+              (set! brass_cutoff (* 250.0 (pow 2.0 (+ (* 4.5 env)
+                                                       (* 2.0 (- (strings_bright p) 0.5))))))))
+        ;; envelope
+        (if (> (voice_gate v) 0.5)
+            (if attacking
+                (begin
+                  (set! env (+ env (* attack_coeff (- 1.3 env))))
+                  (if (>= env 1.0)
+                      (begin (set! env 1.0) (set! attacking #f)))
+                  void))
+            (begin (set! env (- env (* release_coeff env))) void))
+        ;; oscillators: one phase for the 16' register, doubled for 8' and
+        ;; doubled again for 4', so the octaves stay locked together as on a
+        ;; divide-down machine
+        (set! inc (* 0.5 (/ (voice_freq v) SRf)))
+        (set! phase (+ phase inc))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (set! ph8 (* 2.0 phase))
+        (if (>= ph8 1.0) (set! ph8 (- ph8 1.0)))
+        (set! ph4 (* 4.0 phase))
+        (set! ph4 (- ph4 (floor ph4)))
+        ;; the 8' saw is always needed (the brass is made from it too); the
+        ;; other registers are skipped when they're turned off
+        (set! saw8 (strings_saw ph8 (* 2.0 inc)))
+        (set! x (* (strings_viola p) saw8))
+        (if (> (strings_cello p) 0.0)
+            (set! x (+ x (* (strings_cello p) (strings_saw phase inc)))))
+        (if (> (strings_violin p) 0.0)
+            (set! x (+ x (* (strings_violin p) (strings_saw ph4 (* 4.0 inc))))))
+        ;; brass: a narrow (20%) pulse, which is weak in its fundamental and
+        ;; strong in the next few harmonics, like a horn. It's the difference
+        ;; of two saws a fifth of a cycle apart, which keeps it band-limited
+        ;; and centred on zero. Its filter has a little resonance for bite.
+        (if (> (strings_brass p) 0.0)
+            (begin
+              (set! ph_pulse (+ ph8 0.2))
+              (if (>= ph_pulse 1.0) (set! ph_pulse (- ph_pulse 1.0)))
+              (set! x (+ x (* (strings_brass p)
+                              (brass_filter (* 0.7 (- saw8 (strings_saw ph_pulse (* 2.0 inc))))
+                                            brass_cutoff))))))
+        (frame_add out (* 0.16 (strings_level p) touch env x))
+        ;; the note is over once it has been released and has faded away
+        (if (and (< (voice_gate v) 0.5) (< env 0.001))
+            (voice_done v))
+        void))))
+
+(bind-func strings_make
+  (lambda ()
+    (let ((inst (inst_make "strings" 16 (strings_nparams)))
+          (i:i64 0))
+      (strings_defaults (inst_params inst))
+      (dotimes (i 16)
+        (inst_set_voice inst i (strings_voice_c (inst_params inst))))
+      (inst_set_fx inst (strings_fx_c (inst_params inst)))
+      inst)))

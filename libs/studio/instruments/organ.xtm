@@ -1,0 +1,533 @@
+;;; organ.xtm -- a tonewheel organ with drawbars, percussion and a rotary speaker
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; An organ in the style of a Hammond B-3 played through a Leslie 122 rotary
+;; speaker. This is an original implementation, built from published
+;; descriptions of how the instrument and the speaker behave.
+;;
+;; The tone generator. The Hammond makes its sound with 91 tonewheels: steel
+;; discs, spun by one synchronous motor, whose bumpy edges induce a nearly
+;; sinusoidal voltage in a pickup. Each key has nine contacts, one for each
+;; drawbar, and each contact picks up one wheel. The drawbars set how much of
+;; each is heard, in steps of about 3 dB from 8 (loudest) down to 1, with 0
+;; silent. Their footages, as on a pipe organ, and the wheel each one picks
+;; up, counted in semitones from the key:
+;;
+;;   drawbar1  16'      sub-octave        -12
+;;   drawbar2  5 1/3'   fifth above        +7
+;;   drawbar3  8'       fundamental         0
+;;   drawbar4  4'       octave            +12
+;;   drawbar5  2 2/3'   twelfth           +19
+;;   drawbar6  2'       fifteenth         +24
+;;   drawbar7  1 3/5'   seventeenth       +28
+;;   drawbar8  1 1/3'   nineteenth        +31
+;;   drawbar9  1'       twenty-second     +36
+;;
+;; The "harmonics" come from wheels tuned in equal temperament, so the 2 2/3'
+;; is two cents flat of a true third harmonic and the 1 3/5' fourteen cents
+;; sharp of a true fifth. That slight impurity is part of the sound.
+;;
+;; The wheels run from C at 32.7 Hz to F# at 5.92 kHz. A contact which would
+;; need a wheel above the top one takes the wheel an octave (or two) lower
+;; instead, so the highest keys lose their top harmonics rather than reaching
+;; for frequencies the organ can't make. This *foldback* also keeps every
+;; partial well below the Nyquist frequency. At the bottom, a contact below
+;; the lowest wheel folds up an octave.
+;;
+;; Each partial is a sine oscillator of the cheapest kind: a point rotated
+;; a fixed angle around a circle every frame (the "magic circle" or coupled
+;; form), which costs two multiplies and two adds. Because all the wheels turn
+;; all the time, two keys which use the same wheel get the same signal, in
+;; phase. The voices reproduce this: each partial's starting phase is worked
+;; out from a clock the whole instrument shares and a fixed angle for each
+;; wheel, so the 4' of one key and the 8' of the key an octave up add
+;; together just as they do on the organ. A little level tolerance per wheel
+;; (about a decibel either way) and a faint crosstalk (*leakage*, which lets
+;; every drawbar through at about -45 dB even when it's pushed in) make it
+;; less clinically clean.
+;;
+;; Key click. A key's nine contacts don't close at the same instant, and each
+;; switches its wheel on abruptly, wherever it is in its cycle. That's the
+;; Hammond's key click, which players came to love. Here each partial switches
+;; on at its own random moment in the first few milliseconds, and a short burst
+;; of bright noise adds the snap of the contacts. Both scale with `click`; at
+;; zero the note fades in and out over a few milliseconds and doesn't click.
+;; Velocity has no effect, as on the real instrument.
+;;
+;; Harmonic percussion adds a decaying second or third harmonic to the start
+;; of a note. On the B-3 it is *single-triggered*: one envelope serves the
+;; whole manual, and it fires only when a key goes down while no other key is
+;; held. A chord struck together all gets the ping; notes played legato under
+;; a held note don't. The instrument here works the same way: the voices count
+;; the keys which are held and which have just been struck, and the effect,
+;; which runs once per frame after the voices, fires the shared envelope. As
+;; on the B-3, the 1' drawbar is silent while percussion is on.
+;;
+;; The signal path after the voices, in the order of the real instrument:
+;;
+;; - the scanner chorus-vibrato. The B-3 delays the signal through a chain of
+;;   filters and sweeps a rotating capacitor across its taps about seven times
+;;   a second, which shifts the pitch up and down. In its "C" (chorus)
+;;   settings it mixes this with the dry signal, so the two beat against each
+;;   other. Here it's a modulated delay line, mixed half and half with the dry
+;;   signal: `vibrato` at 1.0 is roughly the C3 setting.
+;;
+;; - the Leslie's valve amplifier, which overdrives when it's pushed. A tanh
+;;   with a small offset clips softly and a little asymmetrically, which adds
+;;   the even harmonics of a valve stage.
+;;
+;; - the rotary speaker. A crossover at 800 Hz splits the sound between a
+;;   treble horn and a bass drum, which spin at their own speeds. A spinning
+;;   source moves towards and away from the listener, so it's heard through a
+;;   delay which grows and shrinks (Doppler shift); it points towards and away
+;;   from the listener, so it gets louder and quieter and, for the horn,
+;;   brighter and duller; and some of its sound reaches the listener the long
+;;   way round, off the inside of the cabinet. Two virtual microphones, placed
+;;   some way apart around the cabinet, make the stereo image. The `speed`
+;;   parameter is the horn's speed in Hz: 0.8 is "chorale", 6.7 "tremolo", and
+;;   0 brakes the rotors to a stop. The drum turns a little slower than the
+;;   horn. The rotors are heavy, so they take time to change speed: the light
+;;   horn gets there in about a second, the drum in about five. Switching
+;;   speed in the middle of a phrase, and hearing the rotors wind up or down,
+;;   is the sound of the instrument.
+;;
+;; Simplifications: there's one manual and no pedals (for a lower manual, put
+;; a second organ on another track, as the demo does); the wheels are tuned in
+;; exact equal temperament rather than by the B-3's gear ratios (within a
+;; cent or so of each other); the scanner's filter chain is a plain delay; and
+;; the lowest wheels, which on the organ are less pure than the rest, are
+;; sines like the others.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-organ)
+(define *xtmlib-studio-organ-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument organ
+  "a tonewheel organ with drawbars and percussion, through a rotary speaker"
+  (params
+    (drawbar1 8.0 "16' sub-octave, 0 to 8")
+    (drawbar2 8.0 "5 1/3' fifth, 0 to 8")
+    (drawbar3 8.0 "8' fundamental, 0 to 8")
+    (drawbar4 0.0 "4' octave, 0 to 8")
+    (drawbar5 0.0 "2 2/3' twelfth, 0 to 8")
+    (drawbar6 0.0 "2' fifteenth, 0 to 8")
+    (drawbar7 0.0 "1 3/5' seventeenth, 0 to 8")
+    (drawbar8 0.0 "1 1/3' nineteenth, 0 to 8")
+    (drawbar9 0.0 "1' twenty-second, 0 to 8 (silent while percussion is on)")
+    (perc 0.8 "harmonic percussion level, 0.0 (off) to 1.0")
+    (perc-harmonic 3.0 "which harmonic the percussion sounds: 2.0 (4') or 3.0 (2 2/3')")
+    (perc-decay 0.6 "seconds for the percussion to die away: about 0.6 is fast, 2.5 slow")
+    (click 0.5 "key click, 0.0 to 1.0")
+    (leakage 0.4 "tonewheel crosstalk, 0.0 to 1.0")
+    (vibrato 0.0 "scanner chorus-vibrato depth, 0.0 (off) to 1.0 (C3)")
+    (drive 0.15 "overdrive in the speaker's amplifier, 0.0 to 1.0")
+    (speed 0.8 "rotor speed in Hz: 0.0 brake, 0.8 chorale, 6.7 tremolo")
+    (spread 0.7 "stereo width of the rotary speaker, 0.0 to 1.0")
+    (level 0.8 "output level"))
+  (presets
+    (jazz)
+    (gospel (drawbar4 8.0) (drawbar5 8.0) (drawbar6 8.0) (drawbar7 8.0) (drawbar8 8.0)
+            (drawbar9 8.0) (perc 0.0) (vibrato 1.0) (drive 0.35) (click 0.6) (speed 6.7))
+    (rock (drawbar4 6.0) (perc 0.0) (drive 0.8) (click 0.7) (speed 6.7))
+    (ballad (drawbar2 3.0) (perc 0.0) (vibrato 1.0) (drive 0.0) (click 0.15))
+    (reggae (drawbar1 0.0) (drawbar2 0.0) (drawbar4 6.0) (perc 0.6) (perc-harmonic 2.0)
+            (perc-decay 0.35) (click 0.8) (drive 0.25) (speed 0.0))
+    (bright (drawbar2 0.0) (drawbar4 8.0) (drawbar7 8.0) (drawbar8 6.0) (perc 1.0)
+            (perc-decay 0.4) (click 0.8) (drive 0.2) (speed 6.7))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; what the voices and effect share ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The effect runs once per frame, after the voices, so it keeps the clock,
+;; runs the percussion envelope, and works out what every voice needs from
+;; the parameters (once, rather than sixteen times).
+;;
+;; 0 clock     frames since the instrument was made (the tonewheels' phase)
+;; 1 held      keys held this frame (counted by the voices)
+;; 2 struck    keys which started this frame (counted by the voices)
+;; 3 perc      the percussion envelope, 0.0 to 1.0
+;; 4 rising    1.0 while the percussion envelope is rising
+;; 5 table     one cycle of a sine, ORGAN_TABLE_SIZE points plus a guard point
+;; 6 gains     the gain of each of the nine partials, from the drawbars
+;; 7 norm      the overall gain for this registration
+;; 8 perc_gain the percussion level (0.0 when it's off)
+;; 9 perc_idx  which partial the percussion sounds: 3 (4') or 4 (2 2/3')
+(bind-type OrganShared <i64,i64,i64,SAMPLE,SAMPLE,SAMPLE*,SAMPLE*,SAMPLE,SAMPLE,i64> (printer? . #f))
+
+(bind-val ORGAN_TABLE_SIZE i64 2048)
+(bind-val ORGAN_VOICES i64 16)
+
+(bind-macro
+  "sin(2 pi phase) from the table, for 0.0 <= phase < 1.0 (linear interpolation).
+2048.0 is ORGAN_TABLE_SIZE."
+  (organ_sin table phase)
+  `(let ((organ_pos:SAMPLE (* ,phase 2048.0))
+         (organ_idx:i64 (convert organ_pos i64))
+         (organ_a:SAMPLE (pref ,table organ_idx)))
+    (+ organ_a (* (- organ_pos (convert organ_idx SAMPLE))
+                  (- (pref ,table (+ organ_idx 1)) organ_a)))))
+
+(bind-macro
+  "cos(2 pi phase) from the table, for any phase"
+  (organ_cos table phase)
+  `(let ((organ_ph:SAMPLE (+ ,phase 0.25)))
+    (organ_sin ,table (- organ_ph (floor organ_ph)))))
+
+(bind-func static organ_drawbar_gain
+  "the amplitude for a drawbar setting: 1.0 at 8, 3 dB less for each step down,
+and fading to nothing between 1 and 0"
+  (lambda (setting:SAMPLE)
+    (let ((d:SAMPLE (clamp setting 0.0 8.0)))
+      (if (< d 1.0)
+          (* d 0.0891)
+          (pow 10.0 (* -0.15 (- 8.0 d)))))))
+
+(bind-func static organ_hash
+  "a repeatable pseudo-random number in [0, 1) for each integer n"
+  (lambda (n:i64 salt:SAMPLE)
+    (let ((x:SAMPLE (* (convert n SAMPLE) salt)))
+      (- x (floor x)))))
+
+;;;;;;;;;;;
+;; voice ;;
+;;;;;;;;;;;
+
+(bind-func organ_voice_c
+  (lambda (p:SAMPLE* bus:OrganShared*)
+    (let ((offset:SAMPLE* (zalloc 9))   ; semitones from the key
+          ;; each partial's oscillator: a point (x, y) and its rotation k
+          (xs:SAMPLE* (zalloc 9))
+          (ys:SAMPLE* (zalloc 9))
+          (ks:SAMPLE* (zalloc 9))
+          (wheel_gain:SAMPLE* (zalloc 9))
+          (target:SAMPLE* (zalloc 9))   ; gain from the drawbars
+          (gain:SAMPLE* (zalloc 9))     ; ramps towards target, 32 frames at a time
+          (step:SAMPLE* (zalloc 9))
+          (contact:i64* (zalloc 9))     ; the frame each contact closes
+          (last_contact:i64 0)
+          (env:SAMPLE 0.0)
+          (norm:SAMPLE 0.0)
+          (norm_step:SAMPLE 0.0)
+          (click_env:SAMPLE 0.0)
+          (click_decay:SAMPLE (exp (/ -1.0 (* 0.0015 SRf))))
+          (last_noise:SAMPLE 0.0)
+          (attack_step:SAMPLE 0.01)
+          (release_step:SAMPLE 0.01)
+          (was_held:i1 #f)
+          ;; the share of the way to its target a gain moves in 32 frames,
+          ;; so that drawbar moves settle in about 10 ms
+          (ramp:SAMPLE (- 1.0 (exp (/ -32.0 (* 0.004 SRf))))))
+      (pset! offset 0 -12.0) (pset! offset 1 7.0) (pset! offset 2 0.0)
+      (pset! offset 3 12.0) (pset! offset 4 19.0) (pset! offset 5 24.0)
+      (pset! offset 6 28.0) (pset! offset 7 31.0) (pset! offset 8 36.0)
+      (lambda (v:Voice* out:SAMPLE*)
+        ;; scratch variables live here rather than in the closure, so that
+        ;; they can stay in registers
+        (let ((age (voice_age v))
+              (gains (tref bus 6))
+              (clock:double 0.0)
+              (wheel:SAMPLE 0.0)
+              (w:double 0.0)
+              (angle:double 0.0)
+              (c:i64 0)
+              (g:SAMPLE 0.0)
+              (x:SAMPLE 0.0)
+              (y:SAMPLE 0.0)
+              (k:SAMPLE 0.0)
+              (sum:SAMPLE 0.0)
+              (i:i64 0))
+          (if (voice_start? v)
+              (begin
+                (set! clock (convert (tref bus 0) double))
+                (set! last_contact 0)
+                (dotimes (i 9)
+                  ;; which wheel this contact picks up, folded into the
+                  ;; generator's range (C at 32.7 Hz to F# at 5.92 kHz)
+                  (set! wheel (+ (voice_pitch v) (pref offset i)))
+                  (while (> wheel 114.0) (set! wheel (- wheel 12.0)))
+                  (while (< wheel 24.0) (set! wheel (+ wheel 12.0)))
+                  (set! w (/ (* 6.283185307179586 (convert (midi2frq wheel) double))
+                             (convert SRf double)))
+                  (pset! ks i (convert (* 2.0 (sin (* 0.5 w))) SAMPLE))
+                  ;; every wheel is always turning: where it is now depends
+                  ;; on the shared clock and the wheel's own starting angle.
+                  ;; The oscillator's output is x = cos(angle), and y =
+                  ;; sin(angle + w/2) is the partner which keeps it on its
+                  ;; circle.
+                  (set! c (convert (floor (+ wheel 0.5)) i64))
+                  (set! angle (+ (* w clock) (* 6.283185307179586 (convert (organ_hash c 0.618034) double))))
+                  (set! angle (- angle (* 6.283185307179586 (floor (/ angle 6.283185307179586)))))
+                  (pset! xs i (convert (cos angle) SAMPLE))
+                  (pset! ys i (convert (sin (+ angle (* 0.5 w))) SAMPLE))
+                  ;; each wheel's output is a decibel or so off nominal
+                  (pset! wheel_gain i (pow 10.0 (* 0.06 (- (organ_hash c 0.754878) 0.5))))
+                  ;; the contacts close at scattered moments, over up to 4
+                  ;; ms, and the partial is silent until then. A stolen voice
+                  ;; which is still sounding switches straight over instead.
+                  (set! g (convert (random) SAMPLE))
+                  (pset! contact i (if (> env 0.01) 0 (convert (* g (organ_click p) 0.004 SRf) i64)))
+                  (if (> (pref contact i) last_contact) (set! last_contact (pref contact i)))
+                  (pset! gain i 0.0)
+                  (pset! step i 0.0))
+                (set! norm (tref bus 7))
+                (set! click_env (organ_click p))
+                (tset! bus 2 (+ (tref bus 2) 1))))
+          ;; every 32 frames, set each partial's gain ramping towards its
+          ;; drawbar for the next 32 frames
+          (if (= (% age 32) 0)
+              (begin
+                (dotimes (i 9)
+                  (pset! target i (* (pref wheel_gain i) (pref gains i)))
+                  (if (> age (pref contact i))
+                      (pset! step i (* ramp 0.03125 (- (pref target i) (pref gain i))))))
+                (set! norm_step (* ramp 0.03125 (- (tref bus 7) norm)))
+                (set! g (organ_click p))
+                (set! attack_step (/ 1.0 (* (- 0.005 (* 0.003 g)) SRf)))
+                (set! release_step (/ 1.0 (* (- 0.008 (* 0.005 g)) SRf)))))
+          ;; a contact closing switches its partial on at once
+          (if (<= age last_contact)
+              (dotimes (i 9)
+                (if (= age (pref contact i))
+                    (begin (pset! gain i (pref target i)) (pset! step i 0.0)))))
+          ;; the nine partials: rotate each point, and sum the x's
+          (dotimes (i 9)
+            (set! k (pref ks i))
+            (set! x (- (pref xs i) (* k (pref ys i))))
+            (set! y (+ (pref ys i) (* k x)))
+            (pset! xs i x)
+            (pset! ys i y)
+            (set! g (+ (pref gain i) (pref step i)))
+            (pset! gain i g)
+            (set! sum (+ sum (* g x))))
+          ;; percussion: the shared envelope on the second or third harmonic
+          (set! c (tref bus 9))
+          (set! sum (+ sum (* (tref bus 8) (tref bus 3) (pref wheel_gain c) (pref xs c))))
+          (set! norm (+ norm norm_step))
+          ;; the envelope: a ramp of a few milliseconds each way
+          (if (> (voice_gate v) 0.5)
+              (begin
+                (tset! bus 1 (+ (tref bus 1) 1))
+                (set! was_held #t)
+                (set! env (+ env attack_step))
+                (if (> env 1.0) (set! env 1.0)))
+              (begin
+                (if was_held
+                    (begin
+                      ;; the contacts open: a smaller click
+                      (set! was_held #f)
+                      (set! click_env (+ click_env (* 0.5 (organ_click p))))))
+                (set! env (- env release_step))
+                (if (< env 0.0) (set! env 0.0))))
+          (set! x (* norm env sum))
+          ;; the snap of the contacts: differentiated white noise
+          (if (> click_env 0.0001)
+              (begin
+                (set! y (- (* 2.0 (convert (random) SAMPLE)) 1.0))
+                (set! x (+ x (* 0.05 click_env (- y last_noise))))
+                (set! last_noise y)
+                (set! click_env (* click_env click_decay)))
+              (set! click_env 0.0))
+          (frame_add out x)
+          (if (and (< (voice_gate v) 0.5) (<= env 0.0) (= click_env 0.0))
+              (voice_done v))
+          void)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; percussion, scanner, overdrive and rotary speaker ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func organ_fx_c
+  (lambda (p:SAMPLE* bus:OrganShared*)
+    (let ((table (tref bus 5))
+          ;; percussion
+          (perc_decay:SAMPLE 0.999)
+          (perc_rise:SAMPLE (/ 1.0 (* 0.001 SRf)))
+          ;; scanner
+          (scanner (dl_make 64))
+          (scan_phase:SAMPLE 0.0)
+          (scan_inc:SAMPLE (/ 6.9 SRf))
+          (scan_depth:SAMPLE 0.0)
+          (scan_mix:SAMPLE 0.0)
+          ;; overdrive
+          (pre:SAMPLE 1.0)
+          (bias:SAMPLE 0.0)
+          (post:SAMPLE 1.0)
+          (dc_in:SAMPLE 0.0)
+          (dc_out:SAMPLE 0.0)
+          ;; crossover: a state-variable filter at 800 Hz, Q 0.707
+          (xg:SAMPLE (tan (* SPI (/ 800.0 SRf))))
+          (xk:SAMPLE 1.4142)
+          (xa1:SAMPLE 0.0) (xa2:SAMPLE 0.0) (xa3:SAMPLE 0.0)
+          (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
+          ;; the rotors: angle in turns, speed in Hz
+          (horn (dl_make 256))
+          (drum (dl_make 256))
+          (horn_angle:SAMPLE 0.0)
+          (drum_angle:SAMPLE 0.37)
+          (horn_speed:SAMPLE -1.0)
+          (drum_speed:SAMPLE 0.0)
+          (horn_up (smoothing_coeff 0.35))
+          (horn_down (smoothing_coeff 0.6))
+          (drum_up (smoothing_coeff 1.6))
+          (drum_down (smoothing_coeff 2.2))
+          ;; the horn's mouth travels on a 12 cm radius, the drum's scoop on
+          ;; 7 cm; these are the Doppler delay swings, in frames
+          (horn_r:SAMPLE (* (/ 0.12 343.0) SRf))
+          (drum_r:SAMPLE (* (/ 0.07 343.0) SRf))
+          (bounce:SAMPLE (* 0.0009 SRf))
+          (mic_angle:SAMPLE 0.35)
+          ;; the horn is duller when it points away: a one-pole lowpass per mic
+          (bright:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 13000.0) SRf))))
+          (dull:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 2500.0) SRf))))
+          (horn_lp_l:SAMPLE 0.0)
+          (horn_lp_r:SAMPLE 0.0))
+      (set! xa1 (/ 1.0 (+ 1.0 (* xg (+ xg xk)))))
+      (set! xa2 (* xg xa1))
+      (set! xa3 (* xg xa2))
+      (lambda (frame:SAMPLE*)
+        (let ((gains (tref bus 6))
+              (total:SAMPLE 0.0)
+              (perc:SAMPLE 0.0)
+              (target:SAMPLE 0.0)
+              (v1:SAMPLE 0.0)
+              (v2:SAMPLE 0.0)
+              (c:SAMPLE 0.0)
+              (a:SAMPLE 0.0)
+              (x:SAMPLE 0.0)
+              (y:SAMPLE 0.0)
+              (high:SAMPLE 0.0)
+              (horn_l:SAMPLE 0.0)
+              (horn_r:SAMPLE 0.0)
+              (drum_l:SAMPLE 0.0)
+              (drum_r:SAMPLE 0.0)
+              (i:i64 0))
+          ;; the parameters, every 32 frames
+          (if (= (% (tref bus 0) 32) 0)
+              (begin
+                ;; the drawbars are the first nine parameters. Leakage lets
+                ;; a little of every wheel through, pushed in or not.
+                (set! x (* 0.006 (organ_leakage p)))
+                (dotimes (i 9)
+                  (set! y (organ_drawbar_gain (pref p i)))
+                  (set! total (+ total y))
+                  (pset! gains i (+ x y)))
+                ;; more drawbars are louder, but not nine times louder: one
+                ;; drawbar at 8, or the three of 888000000, peak near 0.25
+                (tset! bus 7 (/ 0.27 (pow (if (< total 1.0) 1.0 total) 0.7)))
+                ;; percussion borrows the 1' contact, so that drawbar goes quiet
+                (tset! bus 8 (clamp (organ_perc p) 0.0 1.0))
+                (if (> (tref bus 8) 0.0) (pset! gains 8 x))
+                (tset! bus 9 (if (< (organ_perc_harmonic p) 2.5) 3 4))
+                (set! perc_decay (exp (/ -6.9 (* (clamp (organ_perc_decay p) 0.05 20.0) SRf))))
+                (set! scan_depth (* (clamp (organ_vibrato p) 0.0 1.0) 0.0003 SRf))
+                (set! scan_mix (* 0.5 (clamp (* 20.0 (organ_vibrato p)) 0.0 1.0)))
+                (set! x (clamp (organ_drive p) 0.0 1.0))
+                (set! pre (+ 1.0 (* 24.0 x x)))
+                (set! bias (* 0.15 x))
+                ;; scale so that a signal swinging 0.25 either way comes out
+                ;; about as loud as it went in, however hard it's driven
+                (set! post (/ 0.5 (- (tanh (+ (* pre 0.25) bias)) (tanh (- bias (* pre 0.25))))))
+                (set! mic_angle (* 0.5 (clamp (organ_spread p) 0.0 1.0)))
+                ;; the rotors start at the speed set
+                (if (< horn_speed 0.0)
+                    (begin (set! horn_speed (organ_speed p))
+                           (set! drum_speed (* 0.86 (organ_speed p)))))))
+          (tset! bus 0 (+ (tref bus 0) 1))
+          ;; percussion: fire the envelope when keys go down and none were
+          ;; already held (single triggering)
+          (if (and (> (tref bus 2) 0) (= (tref bus 1) (tref bus 2)))
+              (tset! bus 4 1.0))
+          (tset! bus 1 0)
+          (tset! bus 2 0)
+          (set! perc (tref bus 3))
+          (if (> (tref bus 4) 0.5)
+              (begin
+                (set! perc (+ perc perc_rise))
+                (if (>= perc 1.0) (begin (set! perc 1.0) (tset! bus 4 0.0))))
+              (begin
+                (set! perc (* perc perc_decay))
+                (if (< perc 0.00001) (set! perc 0.0))))
+          (tset! bus 3 perc)
+          ;; the voices are mono, in the centre
+          (set! x (* 0.70710678 (+ (pref frame 0) (pref frame 1))))
+          ;; scanner chorus-vibrato: a delay swept about 7 times a second,
+          ;; half and half with the dry signal
+          (set! scan_phase (+ scan_phase scan_inc))
+          (if (>= scan_phase 1.0) (set! scan_phase (- scan_phase 1.0)))
+          (dl_write scanner x)
+          (set! y (dl_readf scanner (+ 1.0 (* scan_depth (+ 1.0 (organ_sin table scan_phase))))))
+          (set! x (+ x (* scan_mix (- y x))))
+          ;; overdrive, then a DC blocker for what the asymmetry adds
+          (set! y (* post (- (tanh (+ (* pre x) bias)) (tanh bias))))
+          (set! dc_out (+ (- y dc_in) (* 0.9985 dc_out) 1.0e-18))
+          (set! dc_in y)
+          (set! x dc_out)
+          ;; crossover: below 800 Hz to the drum, above to the horn
+          (set! y (- x ic2))
+          (set! v1 (+ (* xa1 ic1) (* xa2 y)))
+          (set! v2 (+ ic2 (* xa2 ic1) (* xa3 y)))
+          (set! ic1 (+ (- (* 2.0 v1) ic1) 1.0e-18))
+          (set! ic2 (+ (- (* 2.0 v2) ic2) 1.0e-18))
+          (dl_write horn (- x (* xk v1) v2))
+          (dl_write drum v2)
+          ;; the rotors wind up and down towards the speed set
+          (set! target (clamp (organ_speed p) 0.0 12.0))
+          (set! horn_speed (+ horn_speed (* (if (> target horn_speed) horn_up horn_down)
+                                            (- target horn_speed))))
+          (set! target (* 0.86 target))
+          (set! drum_speed (+ drum_speed (* (if (> target drum_speed) drum_up drum_down)
+                                            (- target drum_speed))))
+          (set! horn_angle (+ horn_angle (/ horn_speed SRf)))
+          (if (>= horn_angle 1.0) (set! horn_angle (- horn_angle 1.0)))
+          (set! drum_angle (+ drum_angle (/ drum_speed SRf)))
+          (if (>= drum_angle 1.0) (set! drum_angle (- drum_angle 1.0)))
+          ;; horn, left mic. c is 1.0 when the horn points at the mic: then
+          ;; it's nearest (shortest delay), loudest and brightest. The
+          ;; reflection off the far side of the cabinet is strongest when it
+          ;; points away.
+          (set! c (organ_cos table horn_angle))
+          (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
+                     (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
+          (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
+          (set! horn_lp_l (+ horn_lp_l (* a (- y horn_lp_l)) 1.0e-18))
+          ;; horn, right mic
+          (set! c (organ_cos table (- horn_angle mic_angle)))
+          (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
+                     (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
+          (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
+          (set! horn_lp_r (+ horn_lp_r (* a (- y horn_lp_r)) 1.0e-18))
+          ;; drum: less Doppler and a gentler throb than the horn
+          (set! c (organ_cos table drum_angle))
+          (set! drum_l (* (- 1.0 (* 0.18 (- 1.0 c))) (dl_readf drum (+ 2.0 (* drum_r (- 1.0 c))))))
+          (set! c (organ_cos table (- drum_angle mic_angle)))
+          (set! drum_r (* (- 1.0 (* 0.18 (- 1.0 c))) (dl_readf drum (+ 2.0 (* drum_r (- 1.0 c))))))
+          (set! x (organ_level p))
+          (pset! frame 0 (* x (+ horn_lp_l drum_l)))
+          (pset! frame 1 (* x (+ horn_lp_r drum_r)))
+          void)))))
+
+(bind-func organ_make
+  (lambda ()
+    (let ((inst (inst_make "organ" ORGAN_VOICES (organ_nparams)))
+          (table:SAMPLE* (zalloc (+ ORGAN_TABLE_SIZE 1)))
+          (gains:SAMPLE* (zalloc 9))
+          (bus:OrganShared* (zalloc))
+          (i:i64 0))
+      (organ_defaults (inst_params inst))
+      (dotimes (i (+ ORGAN_TABLE_SIZE 1))
+        (pset! table i (sin (* STWOPI (/ (convert i SAMPLE) (convert ORGAN_TABLE_SIZE SAMPLE))))))
+      (dotimes (i 9)
+        (pset! gains i 0.0))
+      (tfill! bus 0 0 0 0.0 0.0 table gains 0.0 0.0 4)
+      (dotimes (i ORGAN_VOICES)
+        (inst_set_voice inst i (organ_voice_c (inst_params inst) bus)))
+      (inst_set_fx inst (organ_fx_c (inst_params inst) bus))
+      inst)))
