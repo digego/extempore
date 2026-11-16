@@ -128,12 +128,11 @@
           (diff_gain:SAMPLE 1.0) (gain:SAMPLE 1.0) (gain_target:SAMPLE 1.0)
           (key_drive:SAMPLE 1.0) (vel_amp:SAMPLE 1.0)
           (freq:SAMPLE 261.6) (bell_freq:SAMPLE 1800.0) (key:SAMPLE 0.0)
-          ;; noise through a bandpass for the hammer and damper, as a
-          ;; state-variable filter (g, k) with state (ic1, ic2)
+          ;; noise through a bandpass (k = nk) for the hammer and damper
           (noise:SAMPLE 0.0) (noise_mult:SAMPLE 0.0)
-          (ng:SAMPLE 0.1) (nk:SAMPLE 1.4) (na1:SAMPLE 0.0) (na2:SAMPLE 0.0) (na3:SAMPLE 0.0)
-          (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0) (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0)
-          (rnd:SAMPLE 0.0)
+          (nk:SAMPLE 1.4)
+          (nsvf (svf_make 1))
+          (seed:i64 (convert (* 4294967295.0 (random)) i64))
           (y:SAMPLE 0.0)
           (smooth (smoothing_coeff 0.005)))
       (lambda (v:Voice* out:SAMPLE*)
@@ -183,11 +182,7 @@
               ;; the hammer's thump: a short burst of noise around the second harmonic
               (set! noise (* 0.2 (epiano_thump p) (voice_vel v) (voice_vel v)))
               (set! noise_mult (exp (/ -6.9 (* 0.012 SRf))))
-              (set! tmp (* 2.0 freq))
-              (set! ng (tan (* SPI (/ (clamp tmp 200.0 2000.0) SRf))))
-              (set! na1 (/ 1.0 (+ 1.0 (* ng (+ ng nk)))))
-              (set! na2 (* ng na1))
-              (set! na3 (* ng na2))))
+              (svf_set nsvf (clampf (* 2.0 freq) 200.0 2000.0) (/ 1.0 nk))))
         ;; parameters, every 32 frames
         (if (= (% (voice_age v) 32) 0)
             (begin
@@ -223,11 +218,7 @@
               (set! bell_mult (* bell_mult tmp))
               (set! noise (+ noise (* 0.05 (epiano_thump p) (sqrt amp))))
               (set! noise_mult (exp (/ -6.9 (* 0.03 SRf))))
-              (set! tmp (* 0.5 freq))
-              (set! ng (tan (* SPI (/ (clamp tmp 80.0 400.0) SRf))))
-              (set! na1 (/ 1.0 (+ 1.0 (* ng (+ ng nk)))))
-              (set! na2 (* ng na1))
-              (set! na3 (* ng na2))))
+              (svf_set nsvf (clampf (* 0.5 freq) 80.0 400.0) (/ 1.0 nk))))
         ;; the tine's motion. Every 32 frames the phasors are pulled back to
         ;; unit length, so rounding errors don't build up.
         (set! tmp (- (* c rc) (* s rs)))
@@ -273,16 +264,10 @@
         ;; hammer and damper noise
         (if (> noise 0.00001)
             (begin
-              (set! rnd (random))
-              (set! v3 (- (* noise (- (* 2.0 rnd) 1.0)) ic2))
-              (set! v1 (+ (* na1 ic1) (* na2 v3)))
-              (set! v2 (+ ic2 (* na2 ic1) (* na3 v3)))
-              (set! ic1 (- (* 2.0 v1) ic1))
-              (set! ic2 (- (* 2.0 v2) ic2))
+              (set! y (+ y (/ (svf_bp nsvf (* noise (noise_white seed))) nk)))
               (set! noise (* noise noise_mult))
-              (set! y (+ y v1))
               void)
-            (begin (set! ic1 0.0) (set! ic2 0.0) void))
+            (begin (svf_clear nsvf) void))
         (set! y (* (epiano_level p) y))
         (frame_add_stereo out y y)
         ;; the note is over once the tine has stopped moving
@@ -305,15 +290,13 @@
           (smooth (smoothing_coeff 0.01))
           ;; tone controls: shelving filters made from one-pole lowpasses
           (bass_lp:SAMPLE 0.0) (treble_lp:SAMPLE 0.0)
-          (bass_coeff:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 250.0) SRf))))
-          (treble_coeff:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 2500.0) SRf))))
+          (bass_coeff:SAMPLE (onepole_coeff 250.0))
+          (treble_coeff:SAMPLE (onepole_coeff 2500.0))
           (bass_db:SAMPLE -100.0) (treble_db:SAMPLE -100.0)
           (bass_target:SAMPLE 1.0) (treble_target:SAMPLE 1.0)
           (bass_gain:SAMPLE 1.0) (treble_gain:SAMPLE 1.0)
           ;; the reed piano's nasal resonance, a bandpass around 1.2 kHz
-          (fg:SAMPLE (tan (* SPI (/ 1200.0 SRf)))) (fk:SAMPLE 0.7)
-          (fa1:SAMPLE 0.0) (fa2:SAMPLE 0.0)
-          (f1:SAMPLE 0.0) (f2:SAMPLE 0.0) (v1:SAMPLE 0.0) (v2:SAMPLE 0.0)
+          (reed_svf (svf_make 1)) (fk:SAMPLE 0.7)
           (reed:SAMPLE 0.0)
           ;; saturation
           (drive:SAMPLE -1.0) (pre_target:SAMPLE 1.0) (makeup_target:SAMPLE 1.0)
@@ -326,8 +309,7 @@
           (tr_phase:SAMPLE 0.0) (lfo:SAMPLE 0.0) (angle:SAMPLE 0.0)
           (tr_depth:SAMPLE 0.0) (tr_stereo:SAMPLE 1.0)
           (mono:SAMPLE 0.0) (gl:SAMPLE 0.0) (gr:SAMPLE 0.0))
-      (set! fa1 (/ 1.0 (+ 1.0 (* fg (+ fg fk)))))
-      (set! fa2 (* fg fa1))
+      (svf_set reed_svf 1200.0 (/ 1.0 fk))
       (lambda (frame:SAMPLE*)
         ;; (the tiny offset keeps the filters out of denormal numbers in silence)
         (set! x (+ (pref frame 0) 1.0e-18))
@@ -342,20 +324,13 @@
               (set! treble_target (pow 10.0 (/ (clamp treble_db -12.0 12.0) 20.0)))))
         (set! bass_gain (+ bass_gain (* smooth (- bass_target bass_gain))))
         (set! treble_gain (+ treble_gain (* smooth (- treble_target treble_gain))))
-        (set! bass_lp (+ bass_lp (* bass_coeff (- x bass_lp))))
-        (set! x (+ x (* (- bass_gain 1.0) bass_lp)))
-        (set! treble_lp (+ treble_lp (* treble_coeff (- x treble_lp))))
-        (set! x (+ x (* (- treble_gain 1.0) (- x treble_lp))))
+        (set! x (+ x (* (- bass_gain 1.0) (onepole_lp bass_lp bass_coeff x))))
+        (set! x (+ x (* (- treble_gain 1.0) (onepole_hp treble_lp treble_coeff x))))
         ;; the reed piano's resonance, up to +5 dB
         (set! tmp (clamp (epiano_reed p) 0.0 1.0))
         (set! reed (+ reed (* smooth (- tmp reed))))
         (if (> reed 0.0001)
-            (begin
-              (set! v1 (+ (* fa1 f1) (* fa2 (- x f2))))
-              (set! v2 (+ f2 (* fg v1)))
-              (set! f1 (- (* 2.0 v1) f1))
-              (set! f2 (- (* 2.0 v2) f2))
-              (set! x (+ x (* 0.8 reed fk v1)))))
+            (set! x (+ x (* 0.8 reed (svf_bp reed_svf x)))))
         ;; saturation: a tanh, scaled so that a single loud note (about 0.3)
         ;; keeps its level and quieter ones are pushed up into the curve
         (if (<> (epiano_drive p) drive)

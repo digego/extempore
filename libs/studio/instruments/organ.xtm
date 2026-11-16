@@ -79,6 +79,8 @@
 ;; - the Leslie's valve amplifier, which overdrives when it's pushed. A tanh
 ;;   with a small offset clips softly and a little asymmetrically, which adds
 ;;   the even harmonics of a valve stage.
+;;   The curve is applied at twice the sample rate (with the oversampler in
+;;   dsp.xtm), so that its harmonics don't fold back down as aliasing.
 ;;
 ;; - the rotary speaker. A crossover at 800 Hz splits the sound between a
 ;;   treble horn and a bass drum, which spin at their own speeds. A spinning
@@ -155,31 +157,13 @@
 ;; 2 struck    keys which started this frame (counted by the voices)
 ;; 3 perc      the percussion envelope, 0.0 to 1.0
 ;; 4 rising    1.0 while the percussion envelope is rising
-;; 5 table     one cycle of a sine, ORGAN_TABLE_SIZE points plus a guard point
-;; 6 gains     the gain of each of the nine partials, from the drawbars
-;; 7 norm      the overall gain for this registration
-;; 8 perc_gain the percussion level (0.0 when it's off)
-;; 9 perc_idx  which partial the percussion sounds: 3 (4') or 4 (2 2/3')
-(bind-type OrganShared <i64,i64,i64,SAMPLE,SAMPLE,SAMPLE*,SAMPLE*,SAMPLE,SAMPLE,i64> (printer? . #f))
+;; 5 gains     the gain of each of the nine partials, from the drawbars
+;; 6 norm      the overall gain for this registration
+;; 7 perc_gain the percussion level (0.0 when it's off)
+;; 8 perc_idx  which partial the percussion sounds: 3 (4') or 4 (2 2/3')
+(bind-type OrganShared <i64,i64,i64,SAMPLE,SAMPLE,SAMPLE*,SAMPLE,SAMPLE,i64> (printer? . #f))
 
-(bind-val ORGAN_TABLE_SIZE i64 2048)
 (bind-val ORGAN_VOICES i64 16)
-
-(bind-macro
-  "sin(2 pi phase) from the table, for 0.0 <= phase < 1.0 (linear interpolation).
-2048.0 is ORGAN_TABLE_SIZE."
-  (organ_sin table phase)
-  `(let ((organ_pos:SAMPLE (* ,phase 2048.0))
-         (organ_idx:i64 (convert organ_pos i64))
-         (organ_a:SAMPLE (pref ,table organ_idx)))
-    (+ organ_a (* (- organ_pos (convert organ_idx SAMPLE))
-                  (- (pref ,table (+ organ_idx 1)) organ_a)))))
-
-(bind-macro
-  "cos(2 pi phase) from the table, for any phase"
-  (organ_cos table phase)
-  `(let ((organ_ph:SAMPLE (+ ,phase 0.25)))
-    (organ_sin ,table (- organ_ph (floor organ_ph)))))
 
 (bind-func static organ_drawbar_gain
   "the amplitude for a drawbar setting: 1.0 at 8, 3 dB less for each step down,
@@ -219,6 +203,7 @@ and fading to nothing between 1 and 0"
           (click_env:SAMPLE 0.0)
           (click_decay:SAMPLE (exp (/ -1.0 (* 0.0015 SRf))))
           (last_noise:SAMPLE 0.0)
+          (seed:i64 (convert (* 4294967295.0 (random)) i64))
           (attack_step:SAMPLE 0.01)
           (release_step:SAMPLE 0.01)
           (was_held:i1 #f)
@@ -232,7 +217,7 @@ and fading to nothing between 1 and 0"
         ;; scratch variables live here rather than in the closure, so that
         ;; they can stay in registers
         (let ((age (voice_age v))
-              (gains (tref bus 6))
+              (gains (tref bus 5))
               (clock:double 0.0)
               (wheel:SAMPLE 0.0)
               (w:double 0.0)
@@ -277,7 +262,7 @@ and fading to nothing between 1 and 0"
                   (if (> (pref contact i) last_contact) (set! last_contact (pref contact i)))
                   (pset! gain i 0.0)
                   (pset! step i 0.0))
-                (set! norm (tref bus 7))
+                (set! norm (tref bus 6))
                 (set! click_env (organ_click p))
                 (tset! bus 2 (+ (tref bus 2) 1))))
           ;; every 32 frames, set each partial's gain ramping towards its
@@ -288,7 +273,7 @@ and fading to nothing between 1 and 0"
                   (pset! target i (* (pref wheel_gain i) (pref gains i)))
                   (if (> age (pref contact i))
                       (pset! step i (* ramp 0.03125 (- (pref target i) (pref gain i))))))
-                (set! norm_step (* ramp 0.03125 (- (tref bus 7) norm)))
+                (set! norm_step (* ramp 0.03125 (- (tref bus 6) norm)))
                 (set! g (organ_click p))
                 (set! attack_step (/ 1.0 (* (- 0.005 (* 0.003 g)) SRf)))
                 (set! release_step (/ 1.0 (* (- 0.008 (* 0.005 g)) SRf)))))
@@ -308,8 +293,8 @@ and fading to nothing between 1 and 0"
             (pset! gain i g)
             (set! sum (+ sum (* g x))))
           ;; percussion: the shared envelope on the second or third harmonic
-          (set! c (tref bus 9))
-          (set! sum (+ sum (* (tref bus 8) (tref bus 3) (pref wheel_gain c) (pref xs c))))
+          (set! c (tref bus 8))
+          (set! sum (+ sum (* (tref bus 7) (tref bus 3) (pref wheel_gain c) (pref xs c))))
           (set! norm (+ norm norm_step))
           ;; the envelope: a ramp of a few milliseconds each way
           (if (> (voice_gate v) 0.5)
@@ -330,7 +315,7 @@ and fading to nothing between 1 and 0"
           ;; the snap of the contacts: differentiated white noise
           (if (> click_env 0.0001)
               (begin
-                (set! y (- (* 2.0 (convert (random) SAMPLE)) 1.0))
+                (set! y (noise_white seed))
                 (set! x (+ x (* 0.05 click_env (- y last_noise))))
                 (set! last_noise y)
                 (set! click_env (* click_env click_decay)))
@@ -346,8 +331,7 @@ and fading to nothing between 1 and 0"
 
 (bind-func organ_fx_c
   (lambda (p:SAMPLE* bus:OrganShared*)
-    (let ((table (tref bus 5))
-          ;; percussion
+    (let (;; percussion
           (perc_decay:SAMPLE 0.999)
           (perc_rise:SAMPLE (/ 1.0 (* 0.001 SRf)))
           ;; scanner
@@ -356,16 +340,18 @@ and fading to nothing between 1 and 0"
           (scan_inc:SAMPLE (/ 6.9 SRf))
           (scan_depth:SAMPLE 0.0)
           (scan_mix:SAMPLE 0.0)
-          ;; overdrive
+          ;; overdrive, at twice the sample rate, and its DC blocker
+          (os (os_make))
           (pre:SAMPLE 1.0)
           (bias:SAMPLE 0.0)
+          (bias_t:SAMPLE 0.0)
           (post:SAMPLE 1.0)
           (dc_in:SAMPLE 0.0)
           (dc_out:SAMPLE 0.0)
+          (dc_pole:SAMPLE 0.9985)
           ;; crossover: a state-variable filter at 800 Hz, Q 0.707
-          (xg:SAMPLE (tan (* SPI (/ 800.0 SRf))))
+          (xover (svf_make 1))
           (xk:SAMPLE 1.4142)
-          (xa1:SAMPLE 0.0) (xa2:SAMPLE 0.0) (xa3:SAMPLE 0.0)
           (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
           ;; the rotors: angle in turns, speed in Hz
           (horn (dl_make 256))
@@ -385,15 +371,13 @@ and fading to nothing between 1 and 0"
           (bounce:SAMPLE (* 0.0009 SRf))
           (mic_angle:SAMPLE 0.35)
           ;; the horn is duller when it points away: a one-pole lowpass per mic
-          (bright:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 13000.0) SRf))))
-          (dull:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 2500.0) SRf))))
+          (bright:SAMPLE (onepole_coeff 13000.0))
+          (dull:SAMPLE (onepole_coeff 2500.0))
           (horn_lp_l:SAMPLE 0.0)
           (horn_lp_r:SAMPLE 0.0))
-      (set! xa1 (/ 1.0 (+ 1.0 (* xg (+ xg xk)))))
-      (set! xa2 (* xg xa1))
-      (set! xa3 (* xg xa2))
+      (svf_set_g xover (svf_g 800.0 SRf) xk)
       (lambda (frame:SAMPLE*)
-        (let ((gains (tref bus 6))
+        (let ((gains (tref bus 5))
               (total:SAMPLE 0.0)
               (perc:SAMPLE 0.0)
               (target:SAMPLE 0.0)
@@ -421,11 +405,11 @@ and fading to nothing between 1 and 0"
                   (pset! gains i (+ x y)))
                 ;; more drawbars are louder, but not nine times louder: one
                 ;; drawbar at 8, or the three of 888000000, peak near 0.25
-                (tset! bus 7 (/ 0.27 (pow (if (< total 1.0) 1.0 total) 0.7)))
+                (tset! bus 6 (/ 0.27 (pow (if (< total 1.0) 1.0 total) 0.7)))
                 ;; percussion borrows the 1' contact, so that drawbar goes quiet
-                (tset! bus 8 (clamp (organ_perc p) 0.0 1.0))
-                (if (> (tref bus 8) 0.0) (pset! gains 8 x))
-                (tset! bus 9 (if (< (organ_perc_harmonic p) 2.5) 3 4))
+                (tset! bus 7 (clamp (organ_perc p) 0.0 1.0))
+                (if (> (tref bus 7) 0.0) (pset! gains 8 x))
+                (tset! bus 8 (if (< (organ_perc_harmonic p) 2.5) 3 4))
                 (set! perc_decay (exp (/ -6.9 (* (clamp (organ_perc_decay p) 0.05 20.0) SRf))))
                 (set! scan_depth (* (clamp (organ_vibrato p) 0.0 1.0) 0.0003 SRf))
                 (set! scan_mix (* 0.5 (clamp (* 20.0 (organ_vibrato p)) 0.0 1.0)))
@@ -434,7 +418,8 @@ and fading to nothing between 1 and 0"
                 (set! bias (* 0.15 x))
                 ;; scale so that a signal swinging 0.25 either way comes out
                 ;; about as loud as it went in, however hard it's driven
-                (set! post (/ 0.5 (- (tanh (+ (* pre 0.25) bias)) (tanh (- bias (* pre 0.25))))))
+                (set! bias_t (tanh_fast bias))
+                (set! post (/ 0.5 (- (tanh_fast (+ (* pre 0.25) bias)) (tanh_fast (- bias (* pre 0.25))))))
                 (set! mic_angle (* 0.5 (clamp (organ_spread p) 0.0 1.0)))
                 ;; the rotors start at the speed set
                 (if (< horn_speed 0.0)
@@ -463,19 +448,18 @@ and fading to nothing between 1 and 0"
           (set! scan_phase (+ scan_phase scan_inc))
           (if (>= scan_phase 1.0) (set! scan_phase (- scan_phase 1.0)))
           (dl_write scanner x)
-          (set! y (dl_readf scanner (+ 1.0 (* scan_depth (+ 1.0 (organ_sin table scan_phase))))))
+          (set! y (dl_readf scanner (+ 1.0 (* scan_depth (+ 1.0 (sine_at scan_phase))))))
           (set! x (+ x (* scan_mix (- y x))))
-          ;; overdrive, then a DC blocker for what the asymmetry adds
-          (set! y (* post (- (tanh (+ (* pre x) bias)) (tanh bias))))
-          (set! dc_out (+ (- y dc_in) (* 0.9985 dc_out) 1.0e-18))
-          (set! dc_in y)
-          (set! x dc_out)
+          ;; overdrive, then a DC blocker for what the asymmetry adds. The
+          ;; curve is applied at twice the sample rate, so that its harmonics
+          ;; don't fold back down as aliasing.
+          (os_up2 os x)
+          (pset! os 0 (* post (- (tanh_fast (+ (* pre (pref os 0)) bias)) bias_t)))
+          (pset! os 1 (* post (- (tanh_fast (+ (* pre (pref os 1)) bias)) bias_t)))
+          (set! y (os_down2 os))
+          (set! x (dc_block dc_in dc_out dc_pole y))
           ;; crossover: below 800 Hz to the drum, above to the horn
-          (set! y (- x ic2))
-          (set! v1 (+ (* xa1 ic1) (* xa2 y)))
-          (set! v2 (+ ic2 (* xa2 ic1) (* xa3 y)))
-          (set! ic1 (+ (- (* 2.0 v1) ic1) 1.0e-18))
-          (set! ic2 (+ (- (* 2.0 v2) ic2) 1.0e-18))
+          (svf_tick x ic1 ic2 (pref xover 0) (pref xover 1) (pref xover 2) v1 v2)
           (dl_write horn (- x (* xk v1) v2))
           (dl_write drum v2)
           ;; the rotors wind up and down towards the speed set
@@ -493,21 +477,21 @@ and fading to nothing between 1 and 0"
           ;; it's nearest (shortest delay), loudest and brightest. The
           ;; reflection off the far side of the cabinet is strongest when it
           ;; points away.
-          (set! c (organ_cos table horn_angle))
+          (set! c (sine_wrap (+ horn_angle 0.25)))
           (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
                      (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
           (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
-          (set! horn_lp_l (+ horn_lp_l (* a (- y horn_lp_l)) 1.0e-18))
+          (onepole_lp horn_lp_l a y)
           ;; horn, right mic
-          (set! c (organ_cos table (- horn_angle mic_angle)))
+          (set! c (sine_wrap (+ (- horn_angle mic_angle) 0.25)))
           (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
                      (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
           (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
-          (set! horn_lp_r (+ horn_lp_r (* a (- y horn_lp_r)) 1.0e-18))
+          (onepole_lp horn_lp_r a y)
           ;; drum: less Doppler and a gentler throb than the horn
-          (set! c (organ_cos table drum_angle))
+          (set! c (sine_wrap (+ drum_angle 0.25)))
           (set! drum_l (* (- 1.0 (* 0.18 (- 1.0 c))) (dl_readf drum (+ 2.0 (* drum_r (- 1.0 c))))))
-          (set! c (organ_cos table (- drum_angle mic_angle)))
+          (set! c (sine_wrap (+ (- drum_angle mic_angle) 0.25)))
           (set! drum_r (* (- 1.0 (* 0.18 (- 1.0 c))) (dl_readf drum (+ 2.0 (* drum_r (- 1.0 c))))))
           (set! x (organ_level p))
           (pset! frame 0 (* x (+ horn_lp_l drum_l)))
@@ -517,16 +501,13 @@ and fading to nothing between 1 and 0"
 (bind-func organ_make
   (lambda ()
     (let ((inst (inst_make "organ" ORGAN_VOICES (organ_nparams)))
-          (table:SAMPLE* (zalloc (+ ORGAN_TABLE_SIZE 1)))
           (gains:SAMPLE* (zalloc 9))
           (bus:OrganShared* (zalloc))
           (i:i64 0))
       (organ_defaults (inst_params inst))
-      (dotimes (i (+ ORGAN_TABLE_SIZE 1))
-        (pset! table i (sin (* STWOPI (/ (convert i SAMPLE) (convert ORGAN_TABLE_SIZE SAMPLE))))))
       (dotimes (i 9)
         (pset! gains i 0.0))
-      (tfill! bus 0 0 0 0.0 0.0 table gains 0.0 0.0 4)
+      (tfill! bus 0 0 0 0.0 0.0 gains 0.0 0.0 4)
       (dotimes (i ORGAN_VOICES)
         (inst_set_voice inst i (organ_voice_c (inst_params inst) bus)))
       (inst_set_fx inst (organ_fx_c (inst_params inst) bus))
