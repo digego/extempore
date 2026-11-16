@@ -1,0 +1,40 @@
+;;; acid.xtm -- a tour of the acid bass synth's presets
+
+;; Evaluate the whole file to hear each preset play the same bassline, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/acid.xtm /tmp/acid.wav 22
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'bass 'acid)
+(score-ctl 0 'bass 'delay 0.15)
+(score-ctl 0 'bass 'reverb 0.1)
+
+;; sixteen steps of (pitch velocity seconds). Velocities above 0.8 are accents,
+;; and the long notes run into the next step, so the pitch slides.
+(define acid-demo-line
+  '((36 0.6 0.09) (36 0.6 0.09) (48 0.95 0.09) (36 0.6 0.09)
+    (39 0.6 0.16) (43 0.6 0.09) (36 0.95 0.09) (48 0.6 0.09)
+    (36 0.6 0.09) (34 0.6 0.16) (36 0.95 0.09) (36 0.6 0.09)
+    (46 0.6 0.16) (48 0.95 0.09) (43 0.6 0.09) (39 0.6 0.09)))
+
+(define acid-demo-bar
+  (lambda (start)
+    (let loop ((step 0) (line acid-demo-line))
+      (if (pair? line)
+          (begin
+            (score-note (+ start (* step 0.125)) 'bass (car (car line)) (cadr (car line)) (caddr (car line)))
+            (loop (+ step 1) (cdr line)))))))
+
+;; two bars of each preset
+(let loop ((start 0.0) (names (presets 'acid)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'bass (car names))
+        (acid-demo-bar start)
+        (acid-demo-bar (+ start 2.0))
+        (loop (+ start 4.0) (cdr names)))))
+
+(score-end)

@@ -1,0 +1,440 @@
+;;; api.xtm -- the Scheme side of the studio: instruments, tracks and parameters
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; (studio:start)                    start the studio's audio
+;; (instruments)                     list the instruments you can load
+;; (track 'bass 'acid)               put an acid synth on a track called bass
+;; (track 'bass 'acid 'squelchy)     ... starting from its squelchy preset
+;; (ctl 'bass 'cutoff 900)           change a parameter
+;; (preset 'bass 'rubber)            change them all at once
+;; (params 'bass)                    list a track's parameters
+;; (note-on 'bass 36 0.8 0.5)        play a note: pitch, velocity, seconds
+;;
+;; def-instrument, at the bottom, is how an instrument file describes itself.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-api)
+(define *xtmlib-studio-api-loaded* #t)
+
+(sys:load "libs/studio/mixer.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the instrument registry ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; name -> (doc params presets sounds), where
+;;   params  is a list of (name index default doc)
+;;   presets is a list of (name (param value) ...)
+;;   sounds  is a list of (name pitch), for instruments like drum kits whose
+;;           notes are different sounds
+(define *studio:instruments* '())
+
+(define studio:register-instrument
+  (lambda (name doc params presets sounds)
+    (set! *studio:instruments*
+          (cons (list name doc params presets sounds)
+                (cl:remove-if (lambda (entry) (eq? (car entry) name)) *studio:instruments*)))
+    name))
+
+(define studio:instrument-info
+  (lambda (name)
+    (let ((entry (assoc name *studio:instruments*)))
+      (if entry (cdr entry) #f))))
+
+(define studio:instrument-doc (lambda (name) (list-ref (studio:instrument-info name) 0)))
+(define studio:instrument-params (lambda (name) (list-ref (studio:instrument-info name) 1)))
+(define studio:instrument-presets (lambda (name) (list-ref (studio:instrument-info name) 2)))
+(define studio:instrument-sounds (lambda (name) (list-ref (studio:instrument-info name) 3)))
+
+(define studio:instrument-file
+  (lambda (name)
+    (string-append "libs/studio/instruments/" (symbol->string name) ".xtm")))
+
+(define studio:load-instrument
+  (lambda (name)
+    (if (not (studio:instrument-info name))
+        (sys:load (studio:instrument-file name)))
+    (if (not (studio:instrument-info name))
+        (begin (print-with-colors 'red 'default #t (print "studio: "))
+               (println "there is no instrument called" name)
+               #f)
+        name)))
+
+;;;;;;;;;;;;
+;; tracks ;;
+;;;;;;;;;;;;
+
+(define *studio:num-tracks* 16)
+
+;; each slot is #f or (track-name instrument-name)
+(define *studio:tracks* (make-vector *studio:num-tracks* #f))
+
+;; the size of the memory zone each instrument instance gets
+(define *studio:instrument-zone-size* (* 32 1024 1024))
+
+;; the mixer parameters every track has, in the order of the STRIP_ constants
+(define *studio:strip-params*
+  '((gain 0 1.0 "track level (1.0 is unity)")
+    (pan 1 0.5 "0.0 left, 0.5 centre, 1.0 right")
+    (reverb 2 0.0 "reverb send level")
+    (delay 3 0.0 "delay send level")
+    (lpf 4 20000.0 "lowpass cutoff in Hz (20000: off)")
+    (hpf 5 20.0 "highpass cutoff in Hz (20: off)")
+    (lpq 6 0.0 "resonance of the track's filters, 0.0 to 1.0")
+    (shape 7 0.0 "saturation, 0.0 to 1.0")
+    (mute 8 0.0 "1.0 mutes the track")))
+
+;; the master bus parameters, in the order of the MASTER_ constants
+(define *studio:master-params*
+  '((gain 0 1.0 "master level (1.0 is unity)")
+    (reverb-level 1 1.0 "reverb return level")
+    (reverb-size 2 0.7 "how long the reverb rings, 0.0 to 1.0")
+    (reverb-damping 3 0.35 "how dark the reverb tail is, 0.0 to 1.0")
+    (reverb-predelay 4 0.015 "seconds before the reverb starts")
+    (delay-level 5 1.0 "delay return level")
+    (delay-time 6 0.375 "delay time in seconds")
+    (delay-feedback 7 0.45 "how much each echo feeds back, 0.0 to 0.95")
+    (delay-tone 8 0.45 "how dark the echoes get, 0.0 to 1.0")
+    (delay-cross 9 1.0 "0.0 stereo, 1.0 ping-pong")
+    (delay-reverb 10 0.2 "how much of the delay feeds the reverb")
+    (comp-threshold 11 -14.0 "compressor threshold in dB")
+    (comp-ratio 12 3.0 "compressor ratio (1.0: off)")
+    (comp-attack 13 15.0 "compressor attack in milliseconds")
+    (comp-release 14 180.0 "compressor release in milliseconds")
+    (comp-makeup 15 4.0 "gain after the compressor, in dB")))
+
+(define studio:track-index
+  (lambda (name)
+    (if (integer? name)
+        name
+        (let loop ((i 0))
+          (cond ((>= i *studio:num-tracks*) #f)
+                ((and (vector-ref *studio:tracks* i)
+                      (eq? (car (vector-ref *studio:tracks* i)) name))
+                 i)
+                (else (loop (+ i 1))))))))
+
+(define studio:free-track-index
+  (lambda ()
+    (let loop ((i 0))
+      (cond ((>= i *studio:num-tracks*) #f)
+            ((not (vector-ref *studio:tracks* i)) i)
+            (else (loop (+ i 1)))))))
+
+(define studio:track-instrument
+  (lambda (name)
+    (let ((i (studio:track-index name)))
+      (if (and i (vector-ref *studio:tracks* i))
+          (cadr (vector-ref *studio:tracks* i))
+          #f))))
+
+(define studio:error
+  (lambda args
+    (print-with-colors 'red 'default #t (print "studio: "))
+    (apply println args)
+    #f))
+
+(define studio:make-instance
+  (lambda (instrument)
+    (let ((make (eval (string->symbol (string-append (symbol->string instrument) "_make")))))
+      ;; the instance lives in a memory zone of its own
+      (sys:push-memzone (sys:create-mzone *studio:instrument-zone-size*))
+      (let ((inst (make)))
+        (sys:pop-memzone)
+        inst))))
+
+(define track
+  (lambda (name instrument . preset-name)
+    (if (studio:load-instrument instrument)
+        (let ((i (or (studio:track-index name) (studio:free-track-index))))
+          (cond ((not i)
+                 (studio:error "all" *studio:num-tracks* "tracks are in use"))
+                (else
+                  ;; re-evaluating the same (track ...) form leaves the
+                  ;; instrument playing, so it's safe to do mid-performance
+                  (if (not (equal? (vector-ref *studio:tracks* i) (list name instrument)))
+                      (begin
+                        (studio_set_instrument i (studio:make-instance instrument))
+                        (vector-set! *studio:tracks* i (list name instrument))))
+                  (if (not (null? preset-name))
+                      (preset name (car preset-name)))
+                  name)))
+        #f)))
+
+(define untrack
+  (lambda (name)
+    (let ((i (studio:track-index name)))
+      (if i
+          (begin
+            (studio_set_instrument i (sys:make-cptr 0))
+            (vector-set! *studio:tracks* i #f)))
+      name)))
+
+(define tracks
+  (lambda ()
+    (dotimes (i *studio:num-tracks*)
+      (if (vector-ref *studio:tracks* i)
+          (println i (car (vector-ref *studio:tracks* i)) '-- (cadr (vector-ref *studio:tracks* i)))))
+    #t))
+
+;;;;;;;;;;;;;;;;
+;; parameters ;;
+;;;;;;;;;;;;;;;;
+
+(define studio:event-note-on 0)
+(define studio:event-note-off 1)
+(define studio:event-inst-param 2)
+(define studio:event-track-param 3)
+(define studio:event-master-param 4)
+(define studio:event-all-off 5)
+
+(define studio:send
+  (lambda (time kind track i x y)
+    (studio_send_event (real->integer time) kind track i (* 1.0 x) (* 1.0 y))))
+
+;; where a parameter lives: (event-kind index), or #f if the track has no
+;; parameter with that name
+(define studio:find-param
+  (lambda (track-name param)
+    (if (eq? track-name 'master)
+        (let ((p (assoc param *studio:master-params*)))
+          (if p (list studio:event-master-param (cadr p)) #f))
+        (let* ((instrument (studio:track-instrument track-name))
+               (p (and instrument (assoc param (studio:instrument-params instrument)))))
+          (if p
+              (list studio:event-inst-param (cadr p))
+              (let ((p (assoc param *studio:strip-params*)))
+                (if p (list studio:event-track-param (cadr p)) #f)))))))
+
+(define studio:ctl-at
+  (lambda (time track-name param value)
+    (let ((where (studio:find-param track-name param))
+          (i (if (eq? track-name 'master) 0 (studio:track-index track-name))))
+      (cond ((not i) (studio:error "there is no track called" track-name))
+            ((not where) (studio:error track-name "has no parameter called" param))
+            (else (studio:send time (car where) i (cadr where) value 0.0))))))
+
+(define ctl
+  (lambda (track-name . params-and-values)
+    (let loop ((lst params-and-values))
+      (if (and (pair? lst) (pair? (cdr lst)))
+          (begin
+            (studio:ctl-at (studio_now) track-name (car lst) (cadr lst))
+            (loop (cddr lst)))))
+    track-name))
+
+(define master
+  (lambda params-and-values
+    (apply ctl 'master params-and-values)))
+
+(define studio:param-value
+  (lambda (track-name param)
+    (let ((where (studio:find-param track-name param))
+          (i (if (eq? track-name 'master) 0 (studio:track-index track-name))))
+      (cond ((or (not i) (not where)) #f)
+            ((= (car where) studio:event-master-param) (studio_master_param (cadr where)))
+            ((= (car where) studio:event-inst-param) (studio_inst_param i (cadr where)))
+            (else (studio_track_param i (cadr where)))))))
+
+(define studio:preset-values
+  (lambda (instrument preset-name)
+    (let ((p (assoc preset-name (studio:instrument-presets instrument))))
+      (if p (cdr p) #f))))
+
+(define studio:preset-at
+  (lambda (time track-name preset-name)
+    (let* ((instrument (studio:track-instrument track-name))
+           (values (and instrument (studio:preset-values instrument preset-name))))
+      (cond ((not instrument) (studio:error "there is no track called" track-name))
+            ((not values) (studio:error instrument "has no preset called" preset-name))
+            (else
+              ;; a preset starts from the defaults and changes what it names
+              (for-each (lambda (p) (studio:ctl-at time track-name (car p) (caddr p)))
+                        (studio:instrument-params instrument))
+              (for-each (lambda (pv) (studio:ctl-at time track-name (car pv) (cadr pv)))
+                        values)
+              preset-name)))))
+
+(define preset
+  (lambda (track-name preset-name)
+    (studio:preset-at (studio_now) track-name preset-name)))
+
+(define studio:print-params
+  (lambda (track-name params)
+    (for-each (lambda (p)
+                (print-with-colors 'green 'default #t (print "  " (car p)))
+                (print " " (studio:param-value track-name (car p)))
+                (print-with-colors 'black 'default #t (print "  " (cadddr p)))
+                (println))
+              params)))
+
+(define params
+  (lambda (track-name)
+    (if (eq? track-name 'master)
+        (studio:print-params 'master *studio:master-params*)
+        (let ((instrument (studio:track-instrument track-name)))
+          (if (not instrument)
+              (studio:error "there is no track called" track-name)
+              (begin
+                (println track-name '-- instrument)
+                (studio:print-params track-name (studio:instrument-params instrument))
+                (println "mixer")
+                (studio:print-params track-name *studio:strip-params*)))))
+    #t))
+
+(define presets
+  (lambda (name)
+    (let ((instrument (or (studio:track-instrument name) name)))
+      (if (studio:load-instrument instrument)
+          (map car (studio:instrument-presets instrument))
+          '()))))
+
+(define sounds
+  (lambda (name)
+    (let ((instrument (or (studio:track-instrument name) name)))
+      (if (studio:load-instrument instrument)
+          (map car (studio:instrument-sounds instrument))
+          '()))))
+
+(define instruments
+  (lambda ()
+    (let ((names (map (lambda (f) (string->symbol (car (regex:split (filename-from-path f) "[.]"))))
+                      (sys:directory-list (string-append (sys:share-dir) "/libs/studio/instruments")))))
+      (for-each (lambda (name)
+                  (if (studio:load-instrument name)
+                      (begin
+                        (print-with-colors 'green 'default #t (print name))
+                        (println " --" (studio:instrument-doc name)))))
+                (sort names (lambda (a b) (string<? (symbol->string a) (symbol->string b)))))
+      #t)))
+
+;;;;;;;;;;;
+;; notes ;;
+;;;;;;;;;;;
+
+(define *studio:samplerate* (integer->real *samplerate*))
+
+(define studio:note-at
+  (lambda (time track-name pitch velocity seconds)
+    (let ((i (studio:track-index track-name)))
+      (if i
+          (studio:send time studio:event-note-on i
+                       (max 1 (real->integer (* seconds *studio:samplerate*)))
+                       pitch velocity)
+          (studio:error "there is no track called" track-name)))))
+
+(define note-on
+  (lambda (track-name pitch velocity seconds)
+    (studio:note-at (studio_now) track-name pitch velocity seconds)))
+
+(define studio:all-off
+  (lambda ()
+    (studio_clear_events)
+    (dotimes (i *studio:num-tracks*)
+      (studio:send (studio_now) studio:event-all-off i 0 0.0 0.0))))
+
+(define studio:start
+  (lambda ()
+    (dsp:set! studio_dsp)
+    #t))
+
+;;;;;;;;;;;;
+;; scores ;;
+;;;;;;;;;;;;
+
+;; A score is a piece which is queued up in full before it plays. That's how
+;; to render audio to a file (extempore --audio-outfile), where time runs much
+;; faster than the clock on the wall and nothing can be scheduled on the fly.
+;;
+;;   (score-begin)
+;;   (track 'bass 'acid)
+;;   (score-note 0.0 'bass 36 0.8 0.2)    ; seconds from the start, then as note-on
+;;   (score-ctl 1.0 'bass 'cutoff 900)
+;;   (score-end)
+
+(define *studio:score-start* 0)
+
+(define score-begin
+  (lambda ()
+    (studio_hold)
+    (set! *studio:score-start* (studio_now))
+    #t))
+
+(define studio:score-time
+  (lambda (seconds)
+    (+ *studio:score-start* (* seconds *studio:samplerate*))))
+
+(define score-note
+  (lambda (seconds track-name pitch velocity duration)
+    (studio:note-at (studio:score-time seconds) track-name pitch velocity duration)))
+
+(define score-ctl
+  (lambda (seconds track-name param value)
+    (studio:ctl-at (studio:score-time seconds) track-name param value)))
+
+(define score-preset
+  (lambda (seconds track-name preset-name)
+    (studio:preset-at (studio:score-time seconds) track-name preset-name)))
+
+(define score-end
+  (lambda ()
+    (studio:start)
+    (studio_release)
+    #t))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; describing instruments ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (def-instrument name
+;;   "one line describing it"
+;;   (params (param-name default "what it does") ...)
+;;   (presets (preset-name (param-name value) ...) ...)
+;;   (sounds (sound-name pitch) ...))
+;;
+;; The presets and sounds clauses are optional. For an instrument called acid
+;; with a parameter called cutoff, def-instrument defines
+;;
+;;   (acid_cutoff p)    an xtlang macro: the value of cutoff in the parameter array p
+;;   (acid_nparams)     an xtlang macro: the number of parameters
+;;   (acid_defaults p)  an xtlang function: set every parameter to its default
+;;
+;; and expects the file to go on to define acid_make, an xtlang function of no
+;; arguments which returns a new Inst*.
+(define-macro (def-instrument name doc . clauses)
+  (let* ((clause (lambda (key)
+                   (let ((c (assoc key clauses)))
+                     (if c (cdr c) '()))))
+         (prefix (string-append (symbol->string name) "_"))
+         ;; xtlang names use underscores: (acid_env_mod p) for the parameter env-mod
+         (prefixed (lambda (sym)
+                     (string->symbol
+                       (string-append prefix (regex:replace-all (symbol->string sym) "-" "_")))))
+         (indices (let loop ((i 0) (ps (clause 'params)) (acc '()))
+                    (if (null? ps) (reverse acc) (loop (+ i 1) (cdr ps) (cons i acc)))))
+         (params (map (lambda (p i)
+                        (list (car p) i (* 1.0 (cadr p)) (if (null? (cddr p)) "" (caddr p))))
+                      (clause 'params)
+                      indices)))
+    (for-each (lambda (p)
+                (if (assoc (car p) *studio:strip-params*)
+                    (studio:error name "can't have a parameter called" (car p)
+                                  "--- every track's mixer already has one")))
+              params)
+    `(begin
+      ,@(map (lambda (p)
+               `(bind-macro ,(cadddr p) (,(prefixed (car p)) params) (list 'pref params ,(cadr p))))
+             params)
+      (bind-macro ,(string-append "the number of parameters " (symbol->string name) " has")
+                  (,(prefixed 'nparams))
+                  ,(length params))
+      (bind-func ,(prefixed 'defaults)
+        (lambda (params:SAMPLE*)
+          ,@(map (lambda (p) `(pset! params ,(cadr p) ,(caddr p))) params)
+          void))
+      (studio:register-instrument ',name ,doc ',params ',(clause 'presets) ',(clause 'sounds)))))

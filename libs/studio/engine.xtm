@@ -1,0 +1,404 @@
+;;; engine.xtm -- voices, instruments and the event queue for the studio
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The studio is a small, self-contained audio path: polyphonic instruments
+;; written in xtlang, a mixer with send effects, and a pattern language for
+;; playing them. This file holds the part every instrument shares.
+;;
+;; A *voice* is one sounding note. Its state lives in a Voice struct (pitch,
+;; velocity, gate, age) and its sound comes from a *voice function*: a closure
+;; which is called once per audio frame and adds its output to a stereo frame.
+;;
+;; An *instrument* (Inst) is a set of voices, a table of parameters which all
+;; of its voices read, and an optional effect which processes the summed
+;; output. The engine decides which voice plays each note; an instrument file
+;; only has to say what a voice sounds like.
+;;
+;; Notes and parameter changes arrive as timestamped *events*. Scheme pushes
+;; them onto a queue ahead of time and the audio thread applies each one on
+;; exactly the right frame.
+;;
+;; libs/studio/README.md describes how to write an instrument.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-engine)
+(define *xtmlib-studio-engine-loaded* #t)
+
+(sys:load "libs/core/audio_dsp.xtm")
+
+;;;;;;;;;;;;
+;; voices ;;
+;;;;;;;;;;;;
+
+;; 0 pitch   MIDI note number (fractional pitches are fine)
+;; 1 freq    the same pitch in Hz
+;; 2 vel     velocity, 0.0 to 1.0
+;; 3 gate    1.0 while the note is held, 0.0 once it is released
+;; 4 age     frames since the note started (0 on a voice's first frame)
+;; 5 hold    frames of gate left (0 means held until a note-off arrives)
+;; 6 active  is this voice sounding?
+;; 7 legato  did this note start while the last one was held? (mono only)
+(bind-type Voice <SAMPLE,SAMPLE,SAMPLE,SAMPLE,i64,i64,i1,i1> (printer? . #f))
+
+(bind-macro "the voice's pitch as a MIDI note number" (voice_pitch v) `(tref ,v 0))
+(bind-macro "the voice's frequency in Hz" (voice_freq v) `(tref ,v 1))
+(bind-macro "the voice's velocity (0.0 to 1.0)" (voice_vel v) `(tref ,v 2))
+(bind-macro "1.0 while the note is held, 0.0 after release" (voice_gate v) `(tref ,v 3))
+(bind-macro "frames since the note started" (voice_age v) `(tref ,v 4))
+(bind-macro "is this the voice's first frame?" (voice_start? v) `(= (tref ,v 4) 0))
+(bind-macro "did this note start legato? (mono instruments)" (voice_legato v) `(tref ,v 7))
+(bind-macro "is the voice sounding?" (voice_active v) `(tref ,v 6))
+(bind-macro
+  "a voice function calls this when its sound has finished, to free the voice"
+  (voice_done v)
+  `(tset! ,v 6 #f))
+
+;; a voice function adds one frame of its sound to the stereo frame `out`
+(bind-alias VoiceFn [void,Voice*,SAMPLE*]*)
+;; an effect processes a stereo frame in place
+(bind-alias FrameFn [void,SAMPLE*]*)
+
+(bind-macro
+  "add the mono sample x to a stereo frame at pan position pan (0 left, 0.5 centre, 1 right)"
+  (frame_add_mono out x pan)
+  `(let ((frame_x ,x) (frame_pan ,pan))
+    (pset! ,out 0 (+ (pref ,out 0) (* frame_x (cos (* frame_pan 1.5707963)))))
+    (pset! ,out 1 (+ (pref ,out 1) (* frame_x (sin (* frame_pan 1.5707963)))))))
+
+(bind-macro
+  "add the mono sample x to both channels of a stereo frame (centre, -3 dB)"
+  (frame_add out x)
+  `(let ((frame_x (* 0.70710678 ,x)))
+    (pset! ,out 0 (+ (pref ,out 0) frame_x))
+    (pset! ,out 1 (+ (pref ,out 1) frame_x))))
+
+(bind-macro
+  "add the stereo sample (l, r) to a stereo frame"
+  (frame_add_stereo out l r)
+  `(begin
+    (pset! ,out 0 (+ (pref ,out 0) ,l))
+    (pset! ,out 1 (+ (pref ,out 1) ,r))))
+
+;;;;;;;;;;;;;;;;;
+;; instruments ;;
+;;;;;;;;;;;;;;;;;
+
+;; how an instrument chooses a voice for a new note
+(bind-val INST_POLY i64 0)  ;; any free voice, stealing the oldest if none
+(bind-val INST_MONO i64 1)  ;; one voice; overlapping notes play legato
+(bind-val INST_KEYED i64 2) ;; each pitch has its own voice (drum kits)
+
+;; 0 name
+;; 1 number of voices
+;; 2 voice states
+;; 3 voice functions
+;; 4 number of parameters
+;; 5 parameter values
+;; 6 effect, applied to the sum of the voices
+;; 7 voice allocation mode (INST_POLY, INST_MONO or INST_KEYED)
+;; 8 keymap: for INST_KEYED, the voice index for each MIDI pitch (-1 for none)
+(bind-type Inst <i8*,i64,Voice*,VoiceFn*,i64,SAMPLE*,FrameFn,i64,i64*> (printer? . #f))
+
+(bind-macro "the instrument's parameter array" (inst_params inst) `(tref ,inst 5))
+(bind-macro "the instrument's number of voices" (inst_nvoices inst) `(tref ,inst 1))
+
+(bind-func static inst_no_fx
+  (lambda ()
+    (lambda (frame:SAMPLE*)
+      void)))
+
+(bind-func static inst_silent_voice
+  (lambda ()
+    (lambda (v:Voice* out:SAMPLE*)
+      (voice_done v)
+      void)))
+
+(bind-func inst_make
+  "make an instrument with room for nvoices voices and nparams parameters.
+
+Every voice starts out silent: give each one a voice function with
+inst_set_voice."
+  (lambda (name:i8* nvoices:i64 nparams:i64)
+    (let ((voices:Voice* (zalloc nvoices))
+          (fns:VoiceFn* (zalloc nvoices))
+          (params:SAMPLE* (zalloc (+ nparams 1)))
+          (keymap:i64* (zalloc 128))
+          (silent (inst_silent_voice))
+          (i:i64 0))
+      (dotimes (i nvoices)
+        (tfill! (pref-ptr voices i) 60.0 261.6 0.0 0.0 0 0 #f #f)
+        (pset! fns i silent))
+      (dotimes (i 128)
+        (pset! keymap i -1))
+      (Inst name nvoices voices fns nparams params (inst_no_fx) INST_POLY keymap))))
+
+(bind-func inst_set_voice
+  "use the voice function fn for voice number idx"
+  (lambda (inst:Inst* idx:i64 fn:VoiceFn)
+    (if (and (>= idx 0) (< idx (tref inst 1)))
+        (pset! (tref inst 3) idx fn))
+    void))
+
+(bind-func inst_set_fx
+  "process the instrument's summed output with fx"
+  (lambda (inst:Inst* fx:FrameFn)
+    (tset! inst 6 fx)
+    void))
+
+(bind-func inst_set_mode
+  (lambda (inst:Inst* mode:i64)
+    (tset! inst 7 mode)
+    void))
+
+(bind-func inst_map_key
+  "for an INST_KEYED instrument: play MIDI note `pitch` on voice number idx"
+  (lambda (inst:Inst* pitch:i64 idx:i64)
+    (if (and (>= pitch 0) (< pitch 128))
+        (pset! (tref inst 8) pitch idx))
+    void))
+
+(bind-func inst_set_param
+  (lambda (inst:Inst* idx:i64 value:SAMPLE)
+    (if (and (>= idx 0) (< idx (tref inst 4)))
+        (pset! (tref inst 5) idx value))
+    void))
+
+(bind-func inst_get_param
+  (lambda (inst:Inst* idx:i64)
+    (if (and (>= idx 0) (< idx (tref inst 4)))
+        (pref (tref inst 5) idx)
+        0.0)))
+
+(bind-func inst_note_on
+  "start a note. dur is the gate time in frames; 0 holds it until inst_note_off"
+  (lambda (inst:Inst* pitch:SAMPLE vel:SAMPLE dur:i64)
+    (let ((n (tref inst 1))
+          (voices (tref inst 2))
+          (mode (tref inst 7))
+          (idx:i64 -1)
+          (steal:i64 0)
+          (oldest:i64 -1)
+          (score:i64 0)
+          (legato:i1 #f)
+          (v:Voice* null)
+          (i:i64 0))
+      (cond ((= mode INST_KEYED)
+             (set! idx (pref (tref inst 8) (clamp (convert pitch i64) 0 127))))
+            ((= mode INST_MONO)
+             (set! idx 0))
+            (else
+              ;; take a free voice if there is one. Otherwise steal the voice
+              ;; that will be missed least: a released one if possible, and
+              ;; the oldest of those.
+              (dotimes (i n)
+                (set! v (pref-ptr voices i))
+                (if (and (< idx 0) (not (tref v 6)))
+                    (set! idx i))
+                (set! score (+ (tref v 4) (if (< (tref v 3) 0.5) 100000000 0)))
+                (if (> score oldest)
+                    (begin (set! oldest score) (set! steal i))))
+              (if (< idx 0) (set! idx steal))))
+      (if (and (>= idx 0) (< idx n))
+          (begin
+            (set! v (pref-ptr voices idx))
+            (set! legato (and (= mode INST_MONO) (tref v 6) (> (tref v 3) 0.5)))
+            (tset! v 0 pitch)
+            (tset! v 1 (midi2frq pitch))
+            (tset! v 2 vel)
+            (tset! v 3 1.0)
+            (tset! v 5 dur)
+            (tset! v 7 legato)
+            (if (not legato) (tset! v 4 0))
+            (tset! v 6 #t)))
+      void)))
+
+(bind-func inst_note_off
+  "release every held voice playing `pitch`"
+  (lambda (inst:Inst* pitch:SAMPLE)
+    (let ((n (tref inst 1))
+          (voices (tref inst 2))
+          (v:Voice* null)
+          (i:i64 0))
+      (dotimes (i n)
+        (set! v (pref-ptr voices i))
+        (if (and (tref v 6) (< (fabs (- (tref v 0) pitch)) 0.01))
+            (begin (tset! v 3 0.0) (tset! v 5 0))))
+      void)))
+
+(bind-func inst_all_off
+  "release every voice"
+  (lambda (inst:Inst*)
+    (let ((n (tref inst 1))
+          (voices (tref inst 2))
+          (i:i64 0))
+      (dotimes (i n)
+        (tset! (pref-ptr voices i) 3 0.0)
+        (tset! (pref-ptr voices i) 5 0))
+      void)))
+
+(bind-func inst_active_voices
+  (lambda (inst:Inst*)
+    (let ((n (tref inst 1))
+          (voices (tref inst 2))
+          (count:i64 0)
+          (i:i64 0))
+      (dotimes (i n)
+        (if (tref (pref-ptr voices i) 6) (set! count (+ count 1))))
+      count)))
+
+(bind-func inst_tick
+  "render one stereo frame of the instrument into out"
+  (lambda (inst:Inst* out:SAMPLE*)
+    (let ((n (tref inst 1))
+          (voices (tref inst 2))
+          (fns (tref inst 3))
+          (fx (tref inst 6))
+          (v:Voice* null)
+          (hold:i64 0)
+          (i:i64 0))
+      (pset! out 0 0.0)
+      (pset! out 1 0.0)
+      (dotimes (i n)
+        (set! v (pref-ptr voices i))
+        (if (tref v 6)
+            (begin
+              ((pref fns i) v out)
+              (tset! v 4 (+ (tref v 4) 1))
+              ;; count the gate time down, and release the note when it's up
+              (set! hold (tref v 5))
+              (if (> hold 0)
+                  (begin
+                    (tset! v 5 (- hold 1))
+                    (if (= hold 1) (tset! v 3 0.0)))))))
+      (fx out)
+      void)))
+
+;;;;;;;;;;;;
+;; events ;;
+;;;;;;;;;;;;
+
+(bind-val EVT_NOTE_ON i64 0)      ;; x: pitch, y: velocity, i: gate time in frames
+(bind-val EVT_NOTE_OFF i64 1)     ;; x: pitch
+(bind-val EVT_INST_PARAM i64 2)   ;; i: parameter index, x: value
+(bind-val EVT_TRACK_PARAM i64 3)  ;; i: parameter index, x: value
+(bind-val EVT_MASTER_PARAM i64 4) ;; i: parameter index, x: value
+(bind-val EVT_ALL_OFF i64 5)      ;; release every voice on the track
+
+;; 0 time (frames), 1 sequence number, 2 kind, 3 track, 4 i, 5 x, 6 y
+(bind-type StudioEvent <i64,i64,i64,i64,i64,SAMPLE,SAMPLE> (printer? . #f))
+
+(bind-func static studio_event_copy
+  (lambda (to:StudioEvent* from:StudioEvent*)
+    (tfill! to (tref from 0) (tref from 1) (tref from 2) (tref from 3) (tref from 4) (tref from 5) (tref from 6))
+    void))
+
+(bind-func static studio_event_before
+  "does event a come before event b? Events at the same time keep the order they
+were sent in, so a parameter change sent just before a note applies to it."
+  (lambda (a:StudioEvent* b:StudioEvent*)
+    (or (< (tref a 0) (tref b 0))
+        (and (= (tref a 0) (tref b 0)) (< (tref a 1) (tref b 1))))))
+
+;; Events cross from the Scheme thread to the audio thread through the inbox,
+;; a ring buffer with one writer and one reader. The audio thread moves them
+;; into a binary heap ordered by time, which only it touches.
+(bind-val STUDIO_QUEUE_SIZE i64 65536)
+
+(bind-func static studio_alloc_events
+  (lambda ()
+    (let ((events:StudioEvent* (halloc STUDIO_QUEUE_SIZE)))
+      events)))
+
+(bind-val studio_inbox StudioEvent* (studio_alloc_events))
+(bind-val studio_inbox_write i64 0)
+(bind-val studio_inbox_read i64 0)
+(bind-val studio_inbox_seen i64 0)
+(bind-val studio_heap StudioEvent* (studio_alloc_events))
+(bind-val studio_heap_size i64 0)
+(bind-val studio_events_dropped i64 0)
+
+(bind-func studio_send_event
+  "queue an event for the audio thread. Call this from one thread only."
+  (lambda (time:i64 kind:i64 track:i64 i:i64 x:SAMPLE y:SAMPLE)
+    (if (>= (- studio_inbox_write studio_inbox_read) STUDIO_QUEUE_SIZE)
+        (begin (set! studio_events_dropped (+ studio_events_dropped 1)) void)
+        (begin
+          (tfill! (pref-ptr studio_inbox (% studio_inbox_write STUDIO_QUEUE_SIZE))
+                  time studio_inbox_write kind track i x y)
+          (set! studio_inbox_write (+ studio_inbox_write 1))
+          void))
+    void))
+
+(bind-func static studio_heap_push
+  (lambda (evt:StudioEvent*)
+    (if (>= studio_heap_size STUDIO_QUEUE_SIZE)
+        (begin (set! studio_events_dropped (+ studio_events_dropped 1)) void)
+        (let ((i studio_heap_size)
+              (parent:i64 0)
+              (climbing:i1 #t))
+          (set! studio_heap_size (+ studio_heap_size 1))
+          ;; walk up from the new leaf, moving later events down out of the way
+          (while (and climbing (> i 0))
+            (set! parent (/ (- i 1) 2))
+            (if (studio_event_before evt (pref-ptr studio_heap parent))
+                (begin
+                  (studio_event_copy (pref-ptr studio_heap i) (pref-ptr studio_heap parent))
+                  (set! i parent)
+                  void)
+                (begin (set! climbing #f) void)))
+          (studio_event_copy (pref-ptr studio_heap i) evt)
+          void))
+    void))
+
+(bind-func static studio_heap_pop
+  "copy the earliest event into `to` and remove it from the heap"
+  (lambda (to:StudioEvent*)
+    (studio_event_copy to (pref-ptr studio_heap 0))
+    (set! studio_heap_size (- studio_heap_size 1))
+    (let ((last (pref-ptr studio_heap studio_heap_size))
+          (n studio_heap_size)
+          (i:i64 0)
+          (child:i64 0)
+          (sinking:i1 #t))
+      ;; walk down from the root, moving earlier events up into the gap, until
+      ;; the old last event fits
+      (while (and sinking (< (+ (* 2 i) 1) n))
+        (set! child (+ (* 2 i) 1))
+        (if (and (< (+ child 1) n)
+                 (studio_event_before (pref-ptr studio_heap (+ child 1)) (pref-ptr studio_heap child)))
+            (set! child (+ child 1)))
+        (if (studio_event_before (pref-ptr studio_heap child) last)
+            (begin
+              (studio_event_copy (pref-ptr studio_heap i) (pref-ptr studio_heap child))
+              (set! i child)
+              void)
+            (begin (set! sinking #f) void)))
+      (if (> n 0)
+          (studio_event_copy (pref-ptr studio_heap i) last))
+      void)))
+
+(bind-func static studio_drain_inbox
+  "move newly arrived events into the heap (audio thread only).
+
+An event is taken one frame after it was first seen, which gives the writing
+thread time to finish storing it."
+  (lambda ()
+    (let ((seen studio_inbox_seen))
+      (set! studio_inbox_seen studio_inbox_write)
+      (while (< studio_inbox_read seen)
+        (studio_heap_push (pref-ptr studio_inbox (% studio_inbox_read STUDIO_QUEUE_SIZE)))
+        (set! studio_inbox_read (+ studio_inbox_read 1)))
+      void)))
+
+(bind-func studio_clear_events
+  "forget every queued event"
+  (lambda ()
+    (set! studio_inbox_read studio_inbox_write)
+    (set! studio_inbox_seen studio_inbox_write)
+    (set! studio_heap_size 0)
+    void))

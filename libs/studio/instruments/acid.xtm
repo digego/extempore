@@ -1,0 +1,122 @@
+;;; acid.xtm -- a monophonic acid bassline synth
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A bass synth in the style of the Roland TB-303: one oscillator (saw or
+;; square) into a resonant lowpass filter which is swept by a decaying
+;; envelope.
+;;
+;; Two things give it the acid sound. A loud note (velocity above 0.8) is an
+;; *accent*: it's louder, and it opens the filter further and faster. And a
+;; note which starts before the last one has finished *slides*: the pitch
+;; glides to the new note and the envelopes carry on without restarting.
+;;
+;; This is an original implementation, built from published descriptions of
+;; how the 303 behaves.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-acid)
+(define *xtmlib-studio-acid-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument acid
+  "a squelchy monophonic bassline synth in the style of the TB-303"
+  (params
+    (wave 0.0 "oscillator shape: 0.0 is a saw, 1.0 is a square")
+    (tune 0.0 "transpose, in semitones")
+    (cutoff 320.0 "filter cutoff in Hz")
+    (res 0.72 "filter resonance, 0.0 to 1.0")
+    (envmod 0.55 "how far the envelope opens the filter, 0.0 to 1.0")
+    (decay 0.35 "how long the filter envelope takes to close, in seconds")
+    (accent 0.6 "how much harder accented notes (velocity above 0.8) hit, 0.0 to 1.0")
+    (slide 0.06 "how long the pitch takes to glide to a legato note, in seconds")
+    (drive 0.15 "output overdrive, 0.0 to 1.0")
+    (level 0.8 "output level"))
+  (presets
+    (classic)
+    (squelchy (cutoff 220.0) (res 0.88) (envmod 0.75) (decay 0.25) (accent 0.8))
+    (rubber (wave 1.0) (cutoff 180.0) (res 0.6) (envmod 0.4) (decay 0.5) (drive 0.0))
+    (screamer (cutoff 500.0) (res 0.93) (envmod 0.9) (decay 0.6) (accent 1.0) (drive 0.7))
+    (deep (wave 1.0) (cutoff 110.0) (res 0.3) (envmod 0.25) (decay 0.8) (accent 0.3) (drive 0.3))))
+
+(bind-func acid_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((filter (ladder_c))
+          (phase:SAMPLE 0.0)
+          (freq:SAMPLE 110.0)
+          (inc:SAMPLE 0.0)
+          (saw:SAMPLE 0.0)
+          (square:SAMPLE 0.0)
+          (filter_env:SAMPLE 0.0)
+          (accent_env:SAMPLE 0.0)
+          (amp_env:SAMPLE 0.0)
+          (accented:SAMPLE 0.0)
+          (cutoff:SAMPLE 0.0)
+          (x:SAMPLE 0.0)
+          (pre:SAMPLE 0.0)
+          ;; these depend on parameters, and are worked out every 32 frames
+          (tune_ratio:SAMPLE 1.0)
+          (glide:SAMPLE 1.0)
+          (filter_decay:SAMPLE 0.999)
+          (amp_attack (smoothing_coeff 0.002))
+          (amp_release (smoothing_coeff 0.008))
+          (accent_smooth (smoothing_coeff 0.03)))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              ;; a new note (not a slide): jump to the pitch, restart the envelope
+              (set! freq (* tune_ratio (voice_freq v)))
+              (set! filter_env 1.0)
+              (set! accented (if (> (voice_vel v) 0.8) 1.0 0.0))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! tune_ratio (semitones (acid_tune p)))
+              (set! glide (smoothing_coeff (* 0.3 (acid_slide p))))
+              ;; accented notes always have a short, snappy filter decay
+              (set! x (if (> accented 0.5) 0.2 (acid_decay p)))
+              (set! filter_decay (exp (/ -1.0 (* (clamp x 0.01 10.0) SRf))))))
+        ;; oscillator: a saw and a square, with their corners rounded off
+        ;; (poly_blep) so that they don't alias
+        (set! freq (+ freq (* glide (- (* tune_ratio (voice_freq v)) freq))))
+        (set! inc (/ freq SRf))
+        (set! phase (+ phase inc))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (set! saw (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t)))
+        (set! x (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
+        (set! square (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
+                        (poly_blep x inc 1.0 #t)))
+        (set! x (+ saw (* (acid_wave p) (- square saw))))
+        ;; envelopes. The accent envelope is a smoothed copy of the filter
+        ;; envelope, so quick runs of accents pile up and push the filter
+        ;; further open each time.
+        (set! filter_env (* filter_env filter_decay))
+        (set! accent_env (+ accent_env (* accent_smooth (- (* accented filter_env) accent_env))))
+        (set! amp_env (+ amp_env (* (if (> (voice_gate v) 0.5) amp_attack amp_release)
+                                    (- (voice_gate v) amp_env))))
+        ;; the envelopes move the cutoff by up to four octaves, plus two more for accents
+        (set! cutoff (* (acid_cutoff p)
+                        (pow 2.0 (+ (* 4.0 (acid_envmod p) filter_env)
+                                    (* 2.0 (acid_accent p) accent_env)))))
+        (set! x (filter (* 0.5 x) cutoff (* 0.95 (acid_res p))))
+        ;; amplifier: accents are louder
+        (set! x (* x amp_env (+ 0.7 (* 0.6 (acid_accent p) accented))))
+        (set! pre (+ 1.0 (* 6.0 (acid_drive p))))
+        (set! x (/ (tanh (* pre x)) (tanh pre)))
+        (frame_add out (* (acid_level p) x))
+        ;; the note is over once it has been released and has faded away
+        (if (and (< (voice_gate v) 0.5) (< amp_env 0.0005))
+            (voice_done v))
+        void))))
+
+(bind-func acid_make
+  (lambda ()
+    (let ((inst (inst_make "acid" 1 (acid_nparams))))
+      (acid_defaults (inst_params inst))
+      (inst_set_voice inst 0 (acid_voice_c (inst_params inst)))
+      (inst_set_mode inst INST_MONO)
+      inst)))

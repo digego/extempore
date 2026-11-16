@@ -1,0 +1,131 @@
+;;; dsp.xtm -- small DSP building blocks shared by the studio's instruments and effects
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; libs/core/audio_dsp.xtm has the oscillators, filters and envelopes. This
+;; file adds the few pieces the studio needs which aren't there: a delay line
+;; you can tap anywhere, parameter smoothing, and a soft clipper.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-dsp)
+(define *xtmlib-studio-dsp-loaded* #t)
+
+(sys:load "libs/core/audio_dsp.xtm")
+
+;;;;;;;;;;;;;;;;;
+;; delay lines ;;
+;;;;;;;;;;;;;;;;;
+
+;; 0 buffer, 1 length (frames), 2 write position
+(bind-type DelayLine <SAMPLE*,i64,i64> (printer? . #f))
+
+(bind-func dl_make
+  "make a delay line which can hold `frames` frames"
+  (lambda (frames:i64)
+    (let ((len (if (< frames 4) 4 frames))
+          (buf:SAMPLE* (zalloc len))
+          (i:i64 0))
+      (dotimes (i len)
+        (pset! buf i 0.0))
+      (DelayLine buf len 0))))
+
+(bind-func static dl_write
+  "write x into the delay line and move on to the next frame"
+  (lambda (d:DelayLine* x:SAMPLE)
+    (let ((w (tref d 2)))
+      (pset! (tref d 0) w x)
+      (tset! d 2 (if (>= (+ w 1) (tref d 1)) 0 (+ w 1)))
+      void)))
+
+(bind-func static dl_read
+  "the sample written n frames ago (1 <= n <= length)"
+  (lambda (d:DelayLine* n:i64)
+    (let ((i (- (tref d 2) n)))
+      (pref (tref d 0) (if (< i 0) (+ i (tref d 1)) i)))))
+
+(bind-func static dl_readf
+  "the sample written n frames ago, for fractional n (linear interpolation)"
+  (lambda (d:DelayLine* n:SAMPLE)
+    (let ((whole:i64 (convert n))
+          (frac (- n (convert whole SAMPLE)))
+          (a (dl_read d whole))
+          (b (dl_read d (+ whole 1))))
+      (+ a (* frac (- b a))))))
+
+(bind-func static dl_allpass
+  "use the whole delay line as an allpass filter with coefficient g"
+  (lambda (d:DelayLine* x:SAMPLE g:SAMPLE)
+    (let ((delayed (dl_read d (tref d 1)))
+          (v (- x (* g delayed))))
+      (dl_write d v)
+      (+ delayed (* g v)))))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; shaping a signal ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static soft_clip
+  "leave x alone below the knee, then bend it smoothly so it never passes 1.0"
+  (lambda (x:SAMPLE knee:SAMPLE)
+    (let ((mag (fabs x))
+          (room (- 1.0 knee)))
+      (if (< mag knee)
+          x
+          (* (if (< x 0.0) -1.0 1.0)
+             (+ knee (* room (tanh (/ (- mag knee) room)))))))))
+
+(bind-func static smoothing_coeff
+  "the one-pole coefficient for a smoother which settles in about `seconds`.
+
+Use it as (set! y (+ y (* coeff (- target y)))) once per frame."
+  (lambda (seconds:SAMPLE)
+    (- 1.0 (exp (/ -1.0 (* (if (< seconds 0.00001) 0.00001 seconds) SRf))))))
+
+(bind-func static semitones
+  "the frequency ratio for an interval of n semitones"
+  (lambda (n:SAMPLE)
+    (pow 2.0 (/ n 12.0))))
+
+;;;;;;;;;;;;;
+;; filters ;;
+;;;;;;;;;;;;;
+
+(bind-func ladder_c
+  "a four-pole (24 dB/octave) resonant lowpass, in the style of a transistor
+ladder filter.
+
+Four one-pole lowpasses in a row, with the output fed back to the input
+(inverted) to make the resonance. The feedback is solved exactly each frame
+rather than delayed by one, so the filter stays in tune as the resonance comes
+up, and a tanh at the input lets it growl when it's pushed.
+
+@param x - input
+@param cutoff - cutoff frequency in Hz
+@param res - resonance: 0.0 is none, 1.0 is the edge of self-oscillation"
+  (lambda ()
+    (let ((s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (s3:SAMPLE 0.0) (s4:SAMPLE 0.0)
+          (g:SAMPLE 0.0) (big_g:SAMPLE 0.0) (k:SAMPLE 0.0)
+          (feedback:SAMPLE 0.0) (u:SAMPLE 0.0) (v:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (old_cutoff:SAMPLE -1.0))
+      (lambda (x:SAMPLE cutoff:SAMPLE res:SAMPLE)
+        (if (<> cutoff old_cutoff)
+            (begin
+              (set! old_cutoff cutoff)
+              (set! g (tan (* SPI (/ (clamp cutoff 10.0 (* 0.45 SRf)) SRf))))
+              (set! big_g (/ g (+ 1.0 g)))))
+        (set! k (* 4.0 res))
+        ;; what the four stages would feed back if the input were silent
+        (set! feedback (* (- 1.0 big_g)
+                          (+ (* big_g big_g big_g s1) (* big_g big_g s2) (* big_g s3) s4)))
+        (set! u (tanh (/ (- (* x (+ 1.0 res)) (* k feedback))
+                         (+ 1.0 (* k big_g big_g big_g big_g)))))
+        ;; the four stages
+        (set! v (* big_g (- u s1))) (set! y (+ v s1)) (set! s1 (+ y v))
+        (set! v (* big_g (- y s2))) (set! y (+ v s2)) (set! s2 (+ y v))
+        (set! v (* big_g (- y s3))) (set! y (+ v s3)) (set! s3 (+ y v))
+        (set! v (* big_g (- y s4))) (set! y (+ v s4)) (set! s4 (+ y v))
+        y))))

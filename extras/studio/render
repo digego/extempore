@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Render an .xtm file to a WAV file, offline, and describe the result.
+#
+#   extras/studio/render <file.xtm> <out.wav> <seconds> [port]
+#
+# The file should queue its notes as a score (score-begin ... score-end, see
+# libs/studio/api.xtm). Rendering stops <seconds> after the audio starts.
+# Give each concurrent render its own port (extempore also takes port - 1).
+# Also writes <out>.png (a spectrogram) and <out>.mp3.
+set -euo pipefail
+
+if [ $# -lt 3 ]; then
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+fi
+
+root=$(cd "$(dirname "$0")/../.." && pwd)
+file=$(realpath "$1")
+wav=$(realpath -m "$2")
+seconds=$3
+port=${4:-7099}
+log="${wav%.wav}.log"
+
+cd "$root"
+if ! timeout 600 build/extempore --term nocolor --port "$port" \
+    --audio-outfile "$wav" --duration "$seconds" --run "$file" >"$log" 2>&1; then
+    echo "render failed or timed out --- see $log"
+    grep -n -i -B2 -A6 "error" "$log" | head -60
+    exit 1
+fi
+if grep -q -i "error" "$log"; then
+    echo "the render finished, but the log has errors --- see $log"
+    grep -n -i -B2 -A6 "error" "$log" | head -60
+fi
+ffmpeg -loglevel error -y -i "$wav" -codec:a libmp3lame -q:a 4 "${wav%.wav}.mp3"
+"$root/extras/studio/analyse.py" "$wav" --png "${wav%.wav}.png"

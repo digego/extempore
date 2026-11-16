@@ -1,0 +1,286 @@
+;;; mixer.xtm -- the studio's tracks, send effects, master bus and DSP callback
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The mixer has STUDIO_TRACKS tracks. Each one holds an instrument and a
+;; channel strip, and can send some of its signal to a shared delay and a
+;; shared reverb. Everything meets at the master bus, which has a compressor
+;; and a soft clipper.
+;;
+;;   track 0: instrument -> strip --+--> master: compressor -> gain -> clip
+;;   track 1: instrument -> strip --+        ^
+;;   ...                            |        |
+;;                                  +-> delay -> reverb
+;;
+;; studio_dsp is the audio callback. Once per frame it applies the events
+;; which are due, then runs the signal path above.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-mixer)
+(define *xtmlib-studio-mixer-loaded* #t)
+
+(sys:load "libs/studio/engine.xtm")
+(sys:load "libs/studio/fx.xtm")
+
+(bind-val STUDIO_TRACKS i64 16)
+
+;; the master bus parameters
+(bind-val MASTER_GAIN i64 0)            ;; linear gain (1.0 is unity)
+(bind-val MASTER_REVERB_LEVEL i64 1)    ;; reverb return level
+(bind-val MASTER_REVERB_SIZE i64 2)     ;; 0.0 to 1.0
+(bind-val MASTER_REVERB_DAMPING i64 3)  ;; 0.0 to 1.0
+(bind-val MASTER_REVERB_PREDELAY i64 4) ;; seconds
+(bind-val MASTER_DELAY_LEVEL i64 5)     ;; delay return level
+(bind-val MASTER_DELAY_TIME i64 6)      ;; seconds
+(bind-val MASTER_DELAY_FEEDBACK i64 7)  ;; 0.0 to 0.95
+(bind-val MASTER_DELAY_TONE i64 8)      ;; 0.0 (bright echoes) to 1.0 (dark)
+(bind-val MASTER_DELAY_CROSS i64 9)     ;; 0.0 (stereo) to 1.0 (ping-pong)
+(bind-val MASTER_DELAY_REVERB i64 10)   ;; how much of the delay feeds the reverb
+(bind-val MASTER_COMP_THRESHOLD i64 11) ;; dB
+(bind-val MASTER_COMP_RATIO i64 12)     ;; 1.0 turns the compressor off
+(bind-val MASTER_COMP_ATTACK i64 13)    ;; milliseconds
+(bind-val MASTER_COMP_RELEASE i64 14)   ;; milliseconds
+(bind-val MASTER_COMP_MAKEUP i64 15)    ;; dB
+(bind-val MASTER_NPARAMS i64 16)
+
+;; 0 instrument (null for an empty track)
+;; 1 channel strip parameters (see the STRIP_ constants in fx.xtm)
+;; 2 channel strip
+;; 3 peak level since it was last read
+(bind-type Track <Inst*,SAMPLE*,[void,SAMPLE*,SAMPLE*]*,SAMPLE> (printer? . #f))
+
+(bind-val studio_tracks Track* 0)
+(bind-val studio_master SAMPLE* 0)
+(bind-val studio_master_peak SAMPLE 0.0)
+(bind-val studio_gain_reduction SAMPLE 0.0)
+
+;; The studio keeps its own clock, so that a render can queue up a whole piece
+;; before time starts. It runs in frames and matches (now) unless it has been
+;; held.
+(bind-val studio_time_offset i64 0)
+(bind-val studio_held i64 0)
+(bind-val studio_frozen_time i64 0)
+
+(bind-func studio_now
+  "the studio's time, in frames"
+  (lambda ()
+    (if (> studio_held 0)
+        studio_frozen_time
+        (- (now) studio_time_offset))))
+
+(bind-func studio_hold
+  "stop the studio's clock: it goes silent, and queued events wait"
+  (lambda ()
+    (if (= studio_held 0)
+        (begin
+          (set! studio_frozen_time (- (now) studio_time_offset))
+          (set! studio_held 1)))
+    void))
+
+(bind-func studio_release
+  "restart the studio's clock from where it stopped"
+  (lambda ()
+    (if (> studio_held 0)
+        (begin
+          (set! studio_time_offset (- (now) studio_frozen_time))
+          (set! studio_held 0)))
+    void))
+
+(bind-func static studio_master_defaults
+  (lambda (p:SAMPLE*)
+    (pset! p MASTER_GAIN 1.0)
+    (pset! p MASTER_REVERB_LEVEL 1.0)
+    (pset! p MASTER_REVERB_SIZE 0.7)
+    (pset! p MASTER_REVERB_DAMPING 0.35)
+    (pset! p MASTER_REVERB_PREDELAY 0.015)
+    (pset! p MASTER_DELAY_LEVEL 1.0)
+    (pset! p MASTER_DELAY_TIME 0.375)
+    (pset! p MASTER_DELAY_FEEDBACK 0.45)
+    (pset! p MASTER_DELAY_TONE 0.45)
+    (pset! p MASTER_DELAY_CROSS 1.0)
+    (pset! p MASTER_DELAY_REVERB 0.2)
+    (pset! p MASTER_COMP_THRESHOLD -14.0)
+    (pset! p MASTER_COMP_RATIO 3.0)
+    (pset! p MASTER_COMP_ATTACK 15.0)
+    (pset! p MASTER_COMP_RELEASE 180.0)
+    (pset! p MASTER_COMP_MAKEUP 4.0)
+    void))
+
+(bind-func studio_set_instrument
+  "put an instrument on a track (null empties it)"
+  (lambda (track:i64 inst:Inst*)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
+        (tset! (pref-ptr studio_tracks track) 0 inst))
+    void))
+
+(bind-func studio_get_instrument
+  (lambda (track:i64)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
+        (tref (pref-ptr studio_tracks track) 0)
+        null)))
+
+(bind-func studio_track_param
+  "read a track's mixer parameter"
+  (lambda (track:i64 idx:i64)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (>= idx 0) (< idx STRIP_NPARAMS)
+             (not (null? studio_tracks)))
+        (pref (tref (pref-ptr studio_tracks track) 1) idx)
+        0.0)))
+
+(bind-func studio_inst_param
+  "read a parameter of the instrument on a track"
+  (lambda (track:i64 idx:i64)
+    (let ((inst (studio_get_instrument track)))
+      (if (null? inst)
+          0.0
+          (inst_get_param inst idx)))))
+
+(bind-func studio_master_param
+  (lambda (idx:i64)
+    (if (and (>= idx 0) (< idx MASTER_NPARAMS) (not (null? studio_master)))
+        (pref studio_master idx)
+        0.0)))
+
+(bind-func studio_track_peak
+  "the track's peak level since this was last called"
+  (lambda (track:i64)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
+        (let ((trk (pref-ptr studio_tracks track))
+              (peak (tref trk 3)))
+          (tset! trk 3 0.0)
+          peak)
+        0.0)))
+
+(bind-func studio_peak
+  "the master bus's peak level since this was last called"
+  (lambda ()
+    (let ((peak studio_master_peak))
+      (set! studio_master_peak 0.0)
+      peak)))
+
+(bind-func static studio_apply_event
+  (lambda (evt:StudioEvent*)
+    (let ((kind (tref evt 2))
+          (track (tref evt 3))
+          (i (tref evt 4))
+          (x (tref evt 5))
+          (y (tref evt 6))
+          (trk:Track* null)
+          (inst:Inst* null))
+      (if (and (= kind EVT_MASTER_PARAM) (>= i 0) (< i MASTER_NPARAMS))
+          (pset! studio_master i x))
+      (if (and (>= track 0) (< track STUDIO_TRACKS) (<> kind EVT_MASTER_PARAM))
+          (begin
+            (set! trk (pref-ptr studio_tracks track))
+            (set! inst (tref trk 0))
+            (if (and (= kind EVT_TRACK_PARAM) (>= i 0) (< i STRIP_NPARAMS))
+                (pset! (tref trk 1) i x))
+            (if (not (null? inst))
+                (begin
+                  (if (= kind EVT_NOTE_ON) (inst_note_on inst x y i))
+                  (if (= kind EVT_NOTE_OFF) (inst_note_off inst x))
+                  (if (= kind EVT_INST_PARAM) (inst_set_param inst i x))
+                  (if (= kind EVT_ALL_OFF) (inst_all_off inst))
+                  void))
+            void))
+      void)))
+
+(bind-func studio_dsp:DSP 16000000
+  (let ((tracks:Track* (zalloc STUDIO_TRACKS))
+        (master:SAMPLE* (zalloc MASTER_NPARAMS))
+        (frame:SAMPLE* (zalloc 2))
+        (mix:SAMPLE* (zalloc 2))
+        (delay_in:SAMPLE* (zalloc 2))
+        (delay_out:SAMPLE* (zalloc 2))
+        (reverb_in:SAMPLE* (zalloc 2))
+        (reverb_out:SAMPLE* (zalloc 2))
+        (evt:StudioEvent* (zalloc))
+        (delay (stereo_delay_c 4.0))
+        (reverb (plate_reverb_c))
+        (compressor (compressor_c))
+        (trk:Track* null)
+        (inst:Inst* null)
+        (strip:SAMPLE* null)
+        (time_now:i64 0)
+        (peak:SAMPLE 0.0)
+        (i:i64 0))
+    (dotimes (i STUDIO_TRACKS)
+      (let ((params:SAMPLE* (zalloc STRIP_NPARAMS)))
+        (strip_defaults params)
+        (tfill! (pref-ptr tracks i) null params (strip_c) 0.0)))
+    (studio_master_defaults master)
+    (set! studio_tracks tracks)
+    (set! studio_master master)
+    (lambda (in time chan dat)
+      (if (= chan 0)
+          (begin
+            (studio_drain_inbox)
+            (pfill! mix 0.0 0.0)
+            (if (= studio_held 0)
+                (begin
+                  ;; apply every event which is due
+                  (set! time_now (- time studio_time_offset))
+                  (while (and (> studio_heap_size 0)
+                              (<= (tref studio_heap 0) time_now))
+                    (studio_heap_pop evt)
+                    (studio_apply_event evt))
+                  ;; the tracks
+                  (pfill! delay_in 0.0 0.0)
+                  (pfill! reverb_in 0.0 0.0)
+                  (dotimes (i STUDIO_TRACKS)
+                    (set! trk (pref-ptr tracks i))
+                    (set! inst (tref trk 0))
+                    (if (not (null? inst))
+                        (begin
+                          (set! strip (tref trk 1))
+                          (inst_tick inst frame)
+                          ((tref trk 2) frame strip)
+                          (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
+                          (if (> peak (tref trk 3)) (tset! trk 3 peak))
+                          (frame_add_stereo mix (pref frame 0) (pref frame 1))
+                          (frame_add_stereo delay_in
+                                            (* (pref strip STRIP_DELAY) (pref frame 0))
+                                            (* (pref strip STRIP_DELAY) (pref frame 1)))
+                          (frame_add_stereo reverb_in
+                                            (* (pref strip STRIP_REVERB) (pref frame 0))
+                                            (* (pref strip STRIP_REVERB) (pref frame 1))))))
+                  ;; the send effects. Some of the delay feeds the reverb,
+                  ;; which sits the echoes back in the mix.
+                  (delay delay_in delay_out
+                         (pref master MASTER_DELAY_TIME)
+                         (pref master MASTER_DELAY_FEEDBACK)
+                         (pref master MASTER_DELAY_TONE)
+                         (pref master MASTER_DELAY_CROSS))
+                  (frame_add_stereo reverb_in
+                                    (* (pref master MASTER_DELAY_REVERB) (pref delay_out 0))
+                                    (* (pref master MASTER_DELAY_REVERB) (pref delay_out 1)))
+                  (reverb reverb_in reverb_out
+                          (pref master MASTER_REVERB_SIZE)
+                          (pref master MASTER_REVERB_DAMPING)
+                          (pref master MASTER_REVERB_PREDELAY))
+                  (frame_add_stereo mix
+                                    (* (pref master MASTER_DELAY_LEVEL) (pref delay_out 0))
+                                    (* (pref master MASTER_DELAY_LEVEL) (pref delay_out 1)))
+                  (frame_add_stereo mix
+                                    (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 0))
+                                    (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 1)))
+                  ;; the master bus
+                  (set! studio_gain_reduction
+                        (compressor mix
+                                    (pref master MASTER_COMP_THRESHOLD)
+                                    (pref master MASTER_COMP_RATIO)
+                                    (pref master MASTER_COMP_ATTACK)
+                                    (pref master MASTER_COMP_RELEASE)
+                                    (pref master MASTER_COMP_MAKEUP)))
+                  (pset! mix 0 (soft_clip (* (pref master MASTER_GAIN) (pref mix 0)) 0.8))
+                  (pset! mix 1 (soft_clip (* (pref master MASTER_GAIN) (pref mix 1)) 0.8))
+                  (set! peak (max (fabs (pref mix 0)) (fabs (pref mix 1))))
+                  (if (> peak studio_master_peak) (set! studio_master_peak peak))
+                  void))))
+      (if (< chan 2)
+          (pref mix chan)
+          0.0))))

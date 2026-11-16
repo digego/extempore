@@ -1,0 +1,281 @@
+;;; fx.xtm -- the studio's mixer effects: channel strip, delay, reverb and compressor
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Each effect here is a closure constructor (the name ends in _c). Call it
+;; once to get a closure with its own state, then call that closure once per
+;; audio frame.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-fx)
+(define *xtmlib-studio-fx-loaded* #t)
+
+(sys:load "libs/studio/dsp.xtm")
+
+;;;;;;;;;;;;;;;;;;;
+;; channel strip ;;
+;;;;;;;;;;;;;;;;;;;
+
+;; a track's mixer parameters
+(bind-val STRIP_GAIN i64 0)   ;; linear gain (1.0 is unity)
+(bind-val STRIP_PAN i64 1)    ;; 0.0 left, 0.5 centre, 1.0 right
+(bind-val STRIP_REVERB i64 2) ;; reverb send level
+(bind-val STRIP_DELAY i64 3)  ;; delay send level
+(bind-val STRIP_LPF i64 4)    ;; lowpass cutoff in Hz (20000 and up: off)
+(bind-val STRIP_HPF i64 5)    ;; highpass cutoff in Hz (20 and below: off)
+(bind-val STRIP_LPQ i64 6)    ;; resonance of both filters, 0.0 to 1.0
+(bind-val STRIP_SHAPE i64 7)  ;; saturation amount, 0.0 to 1.0
+(bind-val STRIP_MUTE i64 8)   ;; 1.0 mutes the track
+(bind-val STRIP_NPARAMS i64 9)
+
+(bind-func static strip_defaults
+  (lambda (p:SAMPLE*)
+    (pset! p STRIP_GAIN 1.0)
+    (pset! p STRIP_PAN 0.5)
+    (pset! p STRIP_REVERB 0.0)
+    (pset! p STRIP_DELAY 0.0)
+    (pset! p STRIP_LPF 20000.0)
+    (pset! p STRIP_HPF 20.0)
+    (pset! p STRIP_LPQ 0.0)
+    (pset! p STRIP_SHAPE 0.0)
+    (pset! p STRIP_MUTE 0.0)
+    void))
+
+(bind-func strip_c
+  "a channel strip: highpass, lowpass, drive, gain and pan, in that order.
+
+The returned closure processes the stereo frame in place, reading its settings
+from the parameter array p (see the STRIP_ constants)."
+  (lambda ()
+    (let ((smooth (smoothing_coeff 0.005))
+          (gain_l 0.7071) (gain_r 0.7071)
+          ;; lowpass and highpass are state variable filters, one per channel
+          (lp_g 0.0) (lp_a1 0.0) (lp_a2 0.0)
+          (lp_l1 0.0) (lp_l2 0.0) (lp_r1 0.0) (lp_r2 0.0)
+          (hp_g 0.0) (hp_a1 0.0) (hp_a2 0.0)
+          (hp_l1 0.0) (hp_l2 0.0) (hp_r1 0.0) (hp_r2 0.0)
+          (k 2.0)
+          (old_lpf -1.0) (old_hpf -1.0) (old_res -1.0)
+          (v1 0.0) (v2 0.0)
+          (l 0.0) (r 0.0)
+          (target 0.0) (pre 0.0))
+      (lambda (frame:SAMPLE* p:SAMPLE*)
+        (set! l (pref frame 0))
+        (set! r (pref frame 1))
+        ;; recalculate the filter coefficients only when a setting changes
+        (if (or (<> (pref p STRIP_LPF) old_lpf)
+                (<> (pref p STRIP_HPF) old_hpf)
+                (<> (pref p STRIP_LPQ) old_res))
+            (begin
+              (set! old_lpf (pref p STRIP_LPF))
+              (set! old_hpf (pref p STRIP_HPF))
+              (set! old_res (pref p STRIP_LPQ))
+              (set! k (- 1.414 (* 1.3 (clamp old_res 0.0 1.0))))
+              (set! lp_g (tan (* SPI (/ (clamp old_lpf 20.0 (* 0.45 SRf)) SRf))))
+              (set! lp_a1 (/ 1.0 (+ 1.0 (* lp_g (+ lp_g k)))))
+              (set! lp_a2 (* lp_g lp_a1))
+              (set! hp_g (tan (* SPI (/ (clamp old_hpf 10.0 (* 0.45 SRf)) SRf))))
+              (set! hp_a1 (/ 1.0 (+ 1.0 (* hp_g (+ hp_g k)))))
+              (set! hp_a2 (* hp_g hp_a1))))
+        (if (> old_hpf 20.5)
+            (begin
+              (set! v1 (+ (* hp_a1 hp_l1) (* hp_a2 (- l hp_l2))))
+              (set! v2 (+ hp_l2 (* hp_g v1)))
+              (set! hp_l1 (- (* 2.0 v1) hp_l1))
+              (set! hp_l2 (- (* 2.0 v2) hp_l2))
+              (set! l (- (- l (* k v1)) v2))
+              (set! v1 (+ (* hp_a1 hp_r1) (* hp_a2 (- r hp_r2))))
+              (set! v2 (+ hp_r2 (* hp_g v1)))
+              (set! hp_r1 (- (* 2.0 v1) hp_r1))
+              (set! hp_r2 (- (* 2.0 v2) hp_r2))
+              (set! r (- (- r (* k v1)) v2))))
+        (if (< old_lpf 19999.0)
+            (begin
+              (set! v1 (+ (* lp_a1 lp_l1) (* lp_a2 (- l lp_l2))))
+              (set! v2 (+ lp_l2 (* lp_g v1)))
+              (set! lp_l1 (- (* 2.0 v1) lp_l1))
+              (set! lp_l2 (- (* 2.0 v2) lp_l2))
+              (set! l v2)
+              (set! v1 (+ (* lp_a1 lp_r1) (* lp_a2 (- r lp_r2))))
+              (set! v2 (+ lp_r2 (* lp_g v1)))
+              (set! lp_r1 (- (* 2.0 v1) lp_r1))
+              (set! lp_r2 (- (* 2.0 v2) lp_r2))
+              (set! r v2)))
+        (if (> (pref p STRIP_SHAPE) 0.001)
+            (begin
+              ;; push the signal into a tanh curve, then turn it back down so
+              ;; more drive means more dirt rather than more level
+              (set! pre (+ 1.0 (* 9.0 (pref p STRIP_SHAPE))))
+              (set! l (/ (tanh (* pre l)) (tanh pre)))
+              (set! r (/ (tanh (* pre r)) (tanh pre)))))
+        ;; equal-power pan, smoothed so that changes don't click
+        (set! target (if (> (pref p STRIP_MUTE) 0.5) 0.0 (* 1.41421356 (pref p STRIP_GAIN))))
+        (set! pre (* 1.5707963 (clamp (pref p STRIP_PAN) 0.0 1.0)))
+        (set! gain_l (+ gain_l (* smooth (- (* target (cos pre)) gain_l))))
+        (set! gain_r (+ gain_r (* smooth (- (* target (sin pre)) gain_r))))
+        (pset! frame 0 (* l gain_l))
+        (pset! frame 1 (* r gain_r))
+        void))))
+
+;;;;;;;;;;;
+;; delay ;;
+;;;;;;;;;;;
+
+(bind-func stereo_delay_c
+  "a stereo delay with a darkening feedback path.
+
+The returned closure reads the stereo frame `in` and writes the echoes (only)
+to `out`.
+
+@param time - delay time in seconds (up to max_seconds)
+@param feedback - how much of each echo is fed back, 0.0 to 0.95
+@param tone - how quickly the echoes lose their top end, 0.0 (never) to 1.0
+@param cross - 0.0 keeps left and right separate, 1.0 bounces each echo to the
+other side (ping-pong)"
+  (lambda (max_seconds:SAMPLE)
+    (let ((len:i64 (convert (* max_seconds SRf)))
+          (line_l (dl_make len))
+          (line_r (dl_make len))
+          (glide (smoothing_coeff 0.1))
+          (frames 1000.0)
+          (lp_l 0.0) (lp_r 0.0)
+          (l 0.0) (r 0.0) (fb 0.0) (damp 0.0))
+      (lambda (in:SAMPLE* out:SAMPLE* time:SAMPLE feedback:SAMPLE tone:SAMPLE cross:SAMPLE)
+        ;; glide to a new delay time, like turning the knob on a tape echo
+        (set! frames (+ frames (* glide (- (clamp (* time SRf) 2.0 (convert (- len 2) SAMPLE)) frames))))
+        (set! l (dl_readf line_l frames))
+        (set! r (dl_readf line_r frames))
+        ;; a one-pole lowpass in the feedback path
+        (set! damp (* 0.9 (clamp tone 0.0 1.0)))
+        (set! lp_l (+ (* (- 1.0 damp) l) (* damp lp_l)))
+        (set! lp_r (+ (* (- 1.0 damp) r) (* damp lp_r)))
+        (set! fb (clamp feedback 0.0 0.95))
+        (dl_write line_l (+ (pref in 0) (* cross (pref in 1))
+                            (* fb (+ (* (- 1.0 cross) lp_l) (* cross lp_r)))))
+        (dl_write line_r (+ (* (- 1.0 cross) (pref in 1))
+                            (* fb (+ (* (- 1.0 cross) lp_r) (* cross lp_l)))))
+        (pset! out 0 lp_l)
+        (pset! out 1 lp_r)
+        void))))
+
+;;;;;;;;;;;;
+;; reverb ;;
+;;;;;;;;;;;;
+
+(bind-func static plate_frames
+  "the plate reverb's delay lengths are given for a 29761 Hz sample rate"
+  (lambda (n:SAMPLE)
+    (* n (/ SRf 29761.0))))
+
+(bind-func static plate_line
+  (lambda (n:SAMPLE)
+    (dl_make (+ 2 (convert (plate_frames n) i64)))))
+
+(bind-func static plate_tap
+  (lambda (line:DelayLine* n:SAMPLE)
+    (dl_read line (+ 1 (convert (plate_frames n) i64)))))
+
+(bind-func plate_reverb_c
+  "a plate reverb, after Jon Dattorro's 'Effect Design Part 1' (JAES, 1997).
+
+The input is smeared by four allpass filters and then circulates around a
+'tank': two cross-coupled loops, each with a modulated allpass, a delay, a
+lowpass, another allpass and another delay. The output is a sum of taps from
+around the tank.
+
+The returned closure reads the stereo frame `in` and writes the reverb (only)
+to `out`.
+
+@param size - how long the reverb rings, 0.0 to 1.0
+@param damping - how quickly the tail loses its top end, 0.0 to 1.0
+@param predelay - seconds of silence before the reverb starts (up to 0.25)"
+  (lambda ()
+    (let ((pre (dl_make (convert (* 0.25 SRf) i64)))
+          (in1 (plate_line 142.0)) (in2 (plate_line 107.0))
+          (in3 (plate_line 379.0)) (in4 (plate_line 277.0))
+          ;; the modulated allpasses need headroom for their wobble
+          (ap_l1 (plate_line 712.0)) (ap_r1 (plate_line 948.0))
+          (del_l1 (plate_line 4453.0)) (del_r1 (plate_line 4217.0))
+          (ap_l2 (plate_line 1800.0)) (ap_r2 (plate_line 2656.0))
+          (del_l2 (plate_line 3720.0)) (del_r2 (plate_line 3163.0))
+          (bandwidth:SAMPLE 0.9995)
+          (lp_in:SAMPLE 0.0) (lp_l:SAMPLE 0.0) (lp_r:SAMPLE 0.0)
+          (phase:SAMPLE 0.0)
+          (phase_inc:SAMPLE (/ (* STWOPI 0.8) SRf))
+          (excursion:SAMPLE (plate_frames 12.0))
+          (x:SAMPLE 0.0) (decay:SAMPLE 0.0) (damp:SAMPLE 0.0)
+          (delayed:SAMPLE 0.0) (v:SAMPLE 0.0) (tank_l:SAMPLE 0.0) (tank_r:SAMPLE 0.0))
+      (lambda (in:SAMPLE* out:SAMPLE* size:SAMPLE damping:SAMPLE predelay:SAMPLE)
+        (set! decay (+ 0.35 (* 0.63 (clamp size 0.0 1.0))))
+        (set! damp (* 0.85 (clamp damping 0.0 1.0)))
+        ;; predelay, then a gentle lowpass on the way in
+        (dl_write pre (* 0.5 (+ (pref in 0) (pref in 1))))
+        (set! x (clamp predelay 0.0 0.24))
+        (set! x (dl_read pre (+ 1 (convert (* x SRf) i64))))
+        (set! lp_in (+ (* bandwidth x) (* (- 1.0 bandwidth) lp_in)))
+        ;; input diffusion
+        (set! x (dl_allpass in1 lp_in 0.75))
+        (set! x (dl_allpass in2 x 0.75))
+        (set! x (dl_allpass in3 x 0.625))
+        (set! x (dl_allpass in4 x 0.625))
+        ;; each half of the tank is fed by the input and by the other half
+        (set! tank_l (+ x (* decay (plate_tap del_r2 3163.0))))
+        (set! tank_r (+ x (* decay (plate_tap del_l2 3720.0))))
+        (set! phase (+ phase phase_inc))
+        (if (> phase STWOPI) (set! phase (- phase STWOPI)))
+        ;; left half
+        (set! delayed (dl_readf ap_l1 (+ (plate_frames 672.0) (* excursion (sin phase)))))
+        (set! v (+ tank_l (* 0.7 delayed)))
+        (dl_write ap_l1 v)
+        (dl_write del_l1 (- delayed (* 0.7 v)))
+        (set! lp_l (+ (* (- 1.0 damp) (plate_tap del_l1 4453.0)) (* damp lp_l)))
+        (dl_write del_l2 (dl_allpass ap_l2 (* decay lp_l) 0.5))
+        ;; right half
+        (set! delayed (dl_readf ap_r1 (+ (plate_frames 908.0) (* excursion (cos phase)))))
+        (set! v (+ tank_r (* 0.7 delayed)))
+        (dl_write ap_r1 v)
+        (dl_write del_r1 (- delayed (* 0.7 v)))
+        (set! lp_r (+ (* (- 1.0 damp) (plate_tap del_r1 4217.0)) (* damp lp_r)))
+        (dl_write del_r2 (dl_allpass ap_r2 (* decay lp_r) 0.5))
+        ;; the output taps
+        (pset! out 0 (* 0.6 (- (+ (plate_tap del_r1 266.0) (plate_tap del_r1 2974.0) (plate_tap del_r2 1996.0))
+                               (+ (plate_tap ap_r2 1913.0) (plate_tap del_l1 1990.0)
+                                  (plate_tap ap_l2 187.0) (plate_tap del_l2 1066.0)))))
+        (pset! out 1 (* 0.6 (- (+ (plate_tap del_l1 353.0) (plate_tap del_l1 3627.0) (plate_tap del_l2 2673.0))
+                               (+ (plate_tap ap_l2 1228.0) (plate_tap del_r1 2111.0)
+                                  (plate_tap ap_r2 335.0) (plate_tap del_r2 121.0)))))
+        void))))
+
+;;;;;;;;;;;;;;;;
+;; compressor ;;
+;;;;;;;;;;;;;;;;
+
+(bind-func compressor_c
+  "a stereo compressor: turns the loud parts down so that everything can come up.
+
+The returned closure processes the stereo frame in place and returns the gain
+reduction it applied, in dB.
+
+@param threshold - level (dB) above which the signal is turned down
+@param ratio - how hard: 4.0 means 4 dB over the threshold comes out as 1 dB
+@param attack - how quickly it clamps down, in milliseconds
+@param release - how quickly it lets go, in milliseconds
+@param makeup - gain (dB) added afterwards"
+  (lambda ()
+    (let ((env 0.0)
+          (level 0.0) (coeff 0.0) (over 0.0) (reduction 0.0) (gain 1.0))
+      (lambda (frame:SAMPLE* threshold:SAMPLE ratio:SAMPLE attack:SAMPLE release:SAMPLE makeup:SAMPLE)
+        ;; follow the level of the louder channel, so the stereo image stays put
+        (set! level (max (fabs (pref frame 0)) (fabs (pref frame 1))))
+        (set! coeff (smoothing_coeff (* 0.001 (if (> level env) attack release))))
+        (set! env (+ env (* coeff (- level env))))
+        (set! over (- (* 8.6858896 (log (+ env 0.000001))) threshold))
+        (set! reduction (if (> over 0.0) (* over (- (/ 1.0 (max ratio 1.0)) 1.0)) 0.0))
+        (set! gain (exp (* 0.11512925 (+ reduction makeup))))
+        (pset! frame 0 (* gain (pref frame 0)))
+        (pset! frame 1 (* gain (pref frame 1)))
+        reduction))))
