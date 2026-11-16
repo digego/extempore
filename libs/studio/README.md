@@ -19,14 +19,17 @@ people who want to write an instrument.
 
 ## How the pieces fit
 
-| file           | what's in it                                                |
-| -------------- | ----------------------------------------------------------- |
-| `engine.xtm`   | voices, instruments, the timestamped event queue            |
-| `dsp.xtm`      | delay lines, a ladder filter, smoothing, a soft clipper     |
-| `fx.xtm`       | channel strip, stereo delay, plate reverb, compressor       |
-| `mixer.xtm`    | sixteen tracks, the send effects, the master bus, the DSP   |
-| `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument` |
-| `instruments/` | one file per instrument, loaded on first use                |
+| file           | what's in it                                                 |
+| -------------- | ------------------------------------------------------------ |
+| `engine.xtm`   | voices, instruments, the timestamped event queue             |
+| `dsp.xtm`      | delay lines, a ladder filter, smoothing, a soft clipper      |
+| `fx.xtm`       | channel strip, stereo delay, plate reverb, compressor, limiter |
+| `mixer.xtm`    | sixteen tracks, the send effects, the master bus, the DSP    |
+| `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument`  |
+| `pattern.xtm`  | the pattern language and its clock                           |
+| `sampler.xtm`  | the sample-playback engine, and its SFZ and folder loaders   |
+| `studio.xtm`   | loads all of the above                                       |
+| `instruments/` | one file per instrument, loaded on first use                 |
 
 A _voice_ is one sounding note. An _instrument_ is a set of voices, a table of
 parameters they all read, and an optional effect on their sum. The engine
@@ -207,7 +210,9 @@ rounds off the corner of a saw or square so that it doesn't alias.
 `extras/studio/render` renders a file offline, far faster than real time, and
 `extras/studio/analyse.py` reports on the result: peak and RMS level, clipping,
 stereo balance, where the energy sits, pitch and level over time, and a
-spectrogram.
+spectrogram. `extras/studio/levels.py <instrument>` plays one note with each of
+an instrument's presets and prints how loud each is, which is the quick way to
+check that a new preset sits level with the others.
 
 ```bash
 extras/studio/render examples/studio/demos/acid.xtm /tmp/acid.wav 12
