@@ -59,6 +59,7 @@
           (cutoff:SAMPLE 0.0)
           (x:SAMPLE 0.0)
           (pre:SAMPLE 0.0)
+          (os (os_make))
           ;; these depend on parameters, and are worked out every 32 frames
           (tune_ratio:SAMPLE 1.0)
           (glide:SAMPLE 1.0)
@@ -80,16 +81,14 @@
               ;; accented notes always have a short, snappy filter decay
               (set! x (if (> accented 0.5) 0.2 (acid_decay p)))
               (set! filter_decay (exp (/ -1.0 (* (clamp x 0.01 10.0) SRf))))))
-        ;; oscillator: a saw and a square, with their corners rounded off
-        ;; (poly_blep) so that they don't alias
+        ;; oscillator: a saw and a square, band-limited (blep_saw, blep_pulse)
+        ;; so that they don't alias
         (set! freq (+ freq (* glide (- (* tune_ratio (voice_freq v)) freq))))
         (set! inc (/ freq SRf))
         (set! phase (+ phase inc))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! saw (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t)))
-        (set! x (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
-        (set! square (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
-                        (poly_blep x inc 1.0 #t)))
+        (set! saw (blep_saw phase inc))
+        (set! square (blep_pulse phase inc 0.5))
         (set! x (+ saw (* (acid_wave p) (- square saw))))
         ;; envelopes. The accent envelope is a smoothed copy of the filter
         ;; envelope, so quick runs of accents pile up and push the filter
@@ -106,7 +105,7 @@
         ;; amplifier: accents are louder
         (set! x (* x amp_env (+ 0.7 (* 0.6 (acid_accent p) accented))))
         (set! pre (+ 1.0 (* 6.0 (acid_drive p))))
-        (set! x (/ (tanh (* pre x)) (tanh pre)))
+        (set! x (oversat4 os x pre))
         (frame_add out (* (acid_level p) x))
         ;; the note is over once it has been released and has faded away
         (if (and (< (voice_gate v) 0.5) (< amp_env 0.0005))
