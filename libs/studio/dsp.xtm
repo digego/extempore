@@ -5,9 +5,49 @@
 
 ;;; Commentary:
 
-;; libs/core/audio_dsp.xtm has the oscillators, filters and envelopes. This
-;; file adds the few pieces the studio needs which aren't there: a delay line
-;; you can tap anywhere, parameter smoothing, and a soft clipper.
+;; libs/core/audio_dsp.xtm has the oscillators, filters and envelopes of the
+;; older instrument libraries. This file is the studio's own kit: the blocks
+;; which its instruments and effects are built from, written once so that an
+;; instrument file only has to say what is particular to that instrument.
+;;
+;;   delay lines        dl_make dl_write dl_read dl_readf dl_readc dl_allpass
+;;   shaping            soft_clip tanh_fast clampf
+;;   smoothing          smoothing_coeff onepole_coeff onepole_lp onepole_hp
+;;                      dc_coeff dc_block
+;;   filters            ladder_c, and the state-variable filter: svf_set
+;;                      svf_lp svf_bp svf_hp svf_peak svf_tick svf_filter_c
+;;   envelopes          decay_mult, adsr_set adsr_tick adsr_env_c
+;;   oscillators        polyblep polyblamp blep_saw blep_pulse blep_tri,
+;;                      sine_at sine_wrap, noise_white
+;;   oversampling       os_up2 os_down2 os_up4 os_down4, oversat2 oversat4
+;;   Fourier transform  fft_twiddles fft_radix2
+;;
+;; What each block costs matters as much as what it does, because a voice
+;; runs its blocks once per frame and an instrument has many voices. xtlang
+;; compiles every bind-func separately and never inlines one into another, so
+;; a call always costs something: a couple of nanoseconds for a `static'
+;; function and two or three times that for a closure, where the arithmetic
+;; of a small filter takes one or two.
+;; So each block comes in the cheapest form which suits it, and sometimes in
+;; more than one:
+;;
+;; - a bind-macro, which is pasted into the caller and costs nothing to call.
+;;   The smallest blocks (a saturator, a table lookup, one step of a filter)
+;;   are macros, working on variables which the caller holds. A macro's
+;;   arguments which are state (they say so) must be plain variables, since
+;;   the macro assigns to them.
+;; - a static function over a small array of state (a SAMPLE*), made by a
+;;   _make function. This is the usual form: its settings can be changed at
+;;   a lower rate than it runs (svf_set every 32 frames, svf_lp every frame),
+;;   and an instrument can keep a bank of them in one block of memory.
+;; - a closure constructor (the name ends in _c), which holds its own state
+;;   and does its own housekeeping. It is the most convenient form and the
+;;   slowest to call: use it in an instrument's effect, which runs once per
+;;   frame, not in a voice.
+;;
+;; The audio threads flush denormal numbers to zero (see src/AudioDevice.cpp),
+;; so the blocks here don't add the tiny constants which recursive filters
+;; otherwise need to stay fast as they decay into silence.
 
 ;;; Code:
 
@@ -19,6 +59,10 @@
 ;;;;;;;;;;;;;;;;;
 ;; delay lines ;;
 ;;;;;;;;;;;;;;;;;
+
+;; A delay line is a ring of memory: each frame is written at the next
+;; position round, over the oldest one, and reading n positions behind the
+;; write position gives the signal as it was n frames ago.
 
 ;; 0 buffer, 1 length (frames), 2 write position
 (bind-type DelayLine <SAMPLE*,i64,i64> (printer? . #f))
@@ -50,10 +94,17 @@
 (bind-func static dl_readf
   "the sample written n frames ago, for fractional n (linear interpolation)"
   (lambda (d:DelayLine* n:SAMPLE)
+    ;; (the two frames are found here rather than by calling dl_read twice,
+    ;; which would cost more than the interpolation does)
     (let ((whole:i64 (convert n))
           (frac (- n (convert whole SAMPLE)))
-          (a (dl_read d whole))
-          (b (dl_read d (+ whole 1))))
+          (buf (tref d 0))
+          (len (tref d 1))
+          (i (- (tref d 2) (+ whole 1)))
+          (ib:i64 (if (< i 0) (+ i len) i))
+          (ia:i64 (if (>= (+ ib 1) len) (- (+ ib 1) len) (+ ib 1)))
+          (a (pref buf ia))
+          (b (pref buf ib)))
       (+ a (* frac (- b a))))))
 
 (bind-func static dl_allpass
@@ -64,9 +115,79 @@
       (dl_write d v)
       (+ delayed (* g v)))))
 
+;; A chorus, an ensemble or a plucked string reads its delay line at a point
+;; which moves, so the point falls between frames. dl_readf joins the two
+;; frames either side with a straight line, which is a lowpass filter whose
+;; cutoff depends on where between them the point is: the top end dulls and
+;; brightens as the point sweeps. A cubic curve through the four nearest
+;; frames (the Catmull-Rom spline, which is the same curve as four-point
+;; Hermite interpolation) is flat to much higher up, for twice the arithmetic.
+(bind-func static dl_readc
+  "the sample written n frames ago, for fractional n (cubic interpolation).
+
+n must be at least 2.0 and at most the line's length less 2: the curve needs
+the frame after the read point and the two before it."
+  (lambda (d:DelayLine* n:SAMPLE)
+    (let ((whole:i64 (convert n))
+          (f (- n (convert whole SAMPLE)))
+          (buf (tref d 0))
+          (len (tref d 1))
+          ;; the four frames are next to each other in the buffer, the oldest
+          ;; first, unless they straddle its end
+          (i (- (tref d 2) (+ whole 2)))
+          (i2:i64 (if (< i 0) (+ i len) i))
+          (i1:i64 (if (>= (+ i2 1) len) (- (+ i2 1) len) (+ i2 1)))
+          (i0:i64 (if (>= (+ i1 1) len) (- (+ i1 1) len) (+ i1 1)))
+          (im1:i64 (if (>= (+ i0 1) len) (- (+ i0 1) len) (+ i0 1)))
+          (y2 (pref buf i2))
+          (y1 (pref buf i1))
+          (y0 (pref buf i0))
+          (ym1 (pref buf im1))
+          (c1 (* 0.5 (- y1 ym1)))
+          (c2 (- (+ ym1 (* 2.0 y1)) (+ (* 2.5 y0) (* 0.5 y2))))
+          (c3 (+ (* 0.5 (- y2 ym1)) (* 1.5 (- y0 y1)))))
+      (+ y0 (* f (+ c1 (* f (+ c2 (* f c3)))))))))
+
+(bind-func static dl_clear
+  "fill the delay line with silence"
+  (lambda (d:DelayLine*)
+    (let ((buf (tref d 0))
+          (i:i64 0))
+      (dotimes (i (tref d 1))
+        (pset! buf i 0.0))
+      void)))
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; shaping a signal ;;
 ;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-macro
+  "x limited to lo..hi, as a SAMPLE.
+
+The built-in clamp expands to an `if' whose type the compiler can fail to pin
+down in the middle of an expression. This one names the type, so it can go
+anywhere, and it evaluates each argument once."
+  (clampf x lo hi)
+  `(let ((clampf_x:SAMPLE ,x) (clampf_lo:SAMPLE ,lo) (clampf_hi:SAMPLE ,hi))
+     (if (< clampf_x clampf_lo) clampf_lo (if (> clampf_x clampf_hi) clampf_hi clampf_x))))
+
+;; tanh is the classic saturation curve: a straight line through zero which
+;; bends over and levels off at 1.0, as a valve or a tape does when it's
+;; pushed. The library's tanh takes about 10 ns, which is a lot to spend on
+;; every sample of every voice. This stand-in is the ratio of two polynomials
+;; (a Pade approximation), within 3% of tanh everywhere. It reaches 1.0 at
+;; x = 3 with a slope of exactly zero, so holding it at 1.0 beyond there
+;; leaves no corner to make harsh high harmonics.
+(bind-macro
+  "a smooth saturator: tanh(x), approximated by x (27 + x^2) / (27 + 9 x^2)
+and held at +-1.0 beyond x = +-3"
+  (tanh_fast x)
+  `(let ((tanh_x:SAMPLE ,x)
+         (tanh_xx:SAMPLE (* tanh_x tanh_x))
+         (tanh_one:SAMPLE 1.0))
+     (if (> tanh_x 3.0) tanh_one
+         (if (< tanh_x -3.0) (- 0.0 tanh_one)
+             (/ (* tanh_x (+ 27.0 tanh_xx)) (+ 27.0 (* 9.0 tanh_xx)))))))
 
 (bind-func static soft_clip
   "leave x alone below the knee, then bend it smoothly so it never passes 1.0"
@@ -89,6 +210,60 @@ Use it as (set! y (+ y (* coeff (- target y)))) once per frame."
   "the frequency ratio for an interval of n semitones"
   (lambda (n:SAMPLE)
     (pow 2.0 (/ n 12.0))))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; one-pole filters ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; The smallest filter there is: each frame, move the output a fixed fraction
+;; of the way towards the input. Its state is one number. It is a lowpass
+;; falling at 6 dB/octave, and (the same thing seen another way) a smoother
+;; which follows a control with an exponential glide. Taking its output away
+;; from its input leaves a highpass.
+;;
+;; smoothing_coeff gives the fraction for a glide of so many seconds;
+;; onepole_coeff gives it for a cutoff frequency. They are the same curve:
+;; a cutoff of f Hz is a time constant of 1 / (2 pi f) seconds.
+
+(bind-func static onepole_coeff
+  "the coefficient for a one-pole lowpass (or highpass) with its cutoff at freq Hz"
+  (lambda (freq:SAMPLE)
+    (- 1.0 (exp (/ (* -2.0 SPI freq) SRf)))))
+
+(bind-macro
+  "one frame of a one-pole lowpass: move `state' (a variable) towards x by the
+fraction coeff, and return it. With a smoothing_coeff, this is a smoother."
+  (onepole_lp state coeff x)
+  `(begin (set! ,state (+ ,state (* ,coeff (- ,x ,state))))
+          ,state))
+
+(bind-macro
+  "one frame of a one-pole highpass: x less its lowpass, whose state is the
+variable `state'"
+  (onepole_hp state coeff x)
+  `(let ((onepole_x:SAMPLE ,x))
+     (set! ,state (+ ,state (* ,coeff (- onepole_x ,state))))
+     (- onepole_x ,state)))
+
+;; A DC blocker takes out a constant offset, which an asymmetrical waveshaper
+;; or a pulse wave adds and which eats headroom without being heard. It is a
+;; differentiator (which removes DC entirely) followed by a leaky integrator
+;; (which undoes the differentiator everywhere except near DC): unlike
+;; onepole_hp it has a true zero at DC, and it costs the same.
+
+(bind-func static dc_coeff
+  "the coefficient for dc_block to cut below about freq Hz (10 to 30 is usual)"
+  (lambda (freq:SAMPLE)
+    (exp (/ (* -2.0 SPI freq) SRf))))
+
+(bind-macro
+  "one frame of a DC blocker. x1 and y1 are its state (variables: the last
+input and the last output) and coeff is from dc_coeff."
+  (dc_block x1 y1 coeff x)
+  `(let ((dc_x:SAMPLE ,x))
+     (set! ,y1 (+ (- dc_x ,x1) (* ,coeff ,y1)))
+     (set! ,x1 dc_x)
+     ,y1))
 
 ;;;;;;;;;;;;;
 ;; filters ;;
@@ -129,3 +304,750 @@ up, and a tanh at the input lets it growl when it's pushed.
         (set! v (* big_g (- y s3))) (set! y (+ v s3)) (set! s3 (+ y v))
         (set! v (* big_g (- y s4))) (set! y (+ v s4)) (set! s4 (+ y v))
         y))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the state-variable filter ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A two-pole (12 dB/octave) filter which gives a lowpass, a bandpass and a
+;; highpass from the same two numbers of state. It is two integrators in a
+;; loop, as in an analogue synthesiser's filter, and it is the form described
+;; by Andrew Simper ("Linear Trapezoidal Integrated SVF", Cytomic, 2013) and
+;; by Vadim Zavalishin ("The Art of VA Filter Design"): each integrator uses
+;; the trapezoidal rule, and the loop is solved exactly on every frame rather
+;; than fed back a frame late. That keeps it stable and in tune right up to
+;; the top of the audio band, at any resonance, and lets its cutoff be swept
+;; as fast as you like.
+;;
+;; Its coefficients come from two numbers:
+;;
+;;   g = tan(pi * cutoff / sample rate)
+;;   k = 1 / Q    (k = 2 is no resonance at all, 1.414 is the flattest
+;;                 response, 0.1 is a peak of 20 dB, 0 would ring for ever)
+;;
+;;   a1 = 1 / (1 + g (g + k)),  a2 = g a1,  a3 = g a2
+;;
+;; and one frame, with the state in ic1 and ic2, is
+;;
+;;   v3 = x - ic2
+;;   v1 = a1 ic1 + a2 v3          the bandpass
+;;   v2 = ic2 + a2 ic1 + a3 v3    the lowpass
+;;   ic1 = 2 v1 - ic1
+;;   ic2 = 2 v2 - ic2
+;;
+;; The highpass is x - k v1 - v2. The bandpass v1 peaks at 1 / k, so k v1 is
+;; a bandpass with a gain of exactly 1.0 at its centre; x - k v1 is a notch;
+;; and x + c k v1 is a peaking equaliser.
+;;
+;; The tan and the division cost far more than a frame of the filter, which
+;; is why setting the filter (svf_set) is separate from running it (svf_lp
+;; and the others): a voice sets its filter every 16 or 32 frames and runs
+;; it on every one.
+;;
+;; One filter is eight numbers at a SAMPLE*: 0 a1, 1 a2, 2 a3, 3 k, 4 ic1,
+;; 5 ic2, 6 the peaking equaliser's gain, 7 spare. A bank of n filters is
+;; one block of 8 n numbers (filter i is at (pref-ptr bank (* SVF_SIZE i))).
+
+(bind-val SVF_SIZE i64 8)
+
+;; the outputs, for svf_filter_c
+(bind-val SVF_LP i64 0)
+(bind-val SVF_BP i64 1)
+(bind-val SVF_HP i64 2)
+
+(bind-func static svf_g
+  "the state-variable filter's g for a cutoff of freq Hz at a sample rate of
+`rate' (which is SRf, unless the filter runs oversampled). The cutoff is kept
+between 5 Hz and 0.45 of the sample rate."
+  (lambda (freq:SAMPLE rate:SAMPLE)
+    (let ((top:SAMPLE (* 0.45 rate))
+          (f:SAMPLE (if (< freq 5.0) 5.0 (if (> freq top) top freq))))
+      (tan (* SPI (/ f rate))))))
+
+(bind-func static svf_set_g
+  "set the filter s from g and k themselves (see svf_g, and above): for a
+filter which works g out its own way, or wants a k outside what svf_set allows"
+  (lambda (s:SAMPLE* g:SAMPLE k:SAMPLE)
+    (let ((a1 (/ 1.0 (+ 1.0 (* g (+ g k))))))
+      (pset! s 0 a1)
+      (pset! s 1 (* g a1))
+      (pset! s 2 (* g g a1))
+      (pset! s 3 k)
+      void)))
+
+(bind-func static svf_set
+  "set the filter s to a cutoff (or centre) of freq Hz and a resonance of q.
+
+q is the height of the peak at the cutoff: 0.5 is none, 0.7071 the flattest
+lowpass, 10.0 a peak of 20 dB. This leaves the filter's state alone, so it can
+be called as often as the cutoff moves."
+  (lambda (s:SAMPLE* freq:SAMPLE q:SAMPLE)
+    (svf_set_g s (svf_g freq SRf) (/ 1.0 (if (< q 0.01) 0.01 q)))))
+
+(bind-func static svf_set_peak
+  "set the filter s up as a peaking equaliser, for svf_peak: a boost (or, if
+db is negative, a cut) of db decibels around freq Hz, q wide"
+  (lambda (s:SAMPLE* freq:SAMPLE q:SAMPLE db:SAMPLE)
+    (let ((big_a:SAMPLE (pow 10.0 (/ db 40.0)))
+          (k:SAMPLE (/ 1.0 (* (if (< q 0.01) 0.01 q) big_a))))
+      (svf_set_g s (svf_g freq SRf) k)
+      (pset! s 6 (* k (- (* big_a big_a) 1.0)))
+      void)))
+
+(bind-func static svf_clear
+  "forget what the filter s was doing (set its state to silence)"
+  (lambda (s:SAMPLE*)
+    (pset! s 4 0.0)
+    (pset! s 5 0.0)
+    void))
+
+(bind-func svf_make
+  "make n state-variable filters in one block, each set to a 1 kHz lowpass.
+Filter i is at (pref-ptr block (* SVF_SIZE i))."
+  (lambda (n:i64)
+    (let ((s:SAMPLE* (zalloc (* SVF_SIZE n)))
+          (i:i64 0))
+      (dotimes (i (* SVF_SIZE n)) (pset! s i 0.0))
+      (dotimes (i n) (svf_set (pref-ptr s (* SVF_SIZE i)) 1000.0 0.7071))
+      s)))
+
+(bind-macro
+  "one frame of the state-variable filter, on state and coefficients which the
+caller holds in variables of its own: the form for a voice's inner loop.
+
+s1 and s2 are the state and a1 a2 a3 the coefficients (as svf_set_g works them
+out). bp and lp are variables which get the outputs: lp the lowpass, and bp
+the bandpass before it's scaled by k. The highpass is x - k bp - lp."
+  (svf_tick x s1 s2 a1 a2 a3 bp lp)
+  `(let ((svf_v3:SAMPLE (- ,x ,s2))
+         (svf_v1:SAMPLE (+ (* ,a1 ,s1) (* ,a2 svf_v3)))
+         (svf_v2:SAMPLE (+ ,s2 (* ,a2 ,s1) (* ,a3 svf_v3))))
+     (set! ,s1 (- (* 2.0 svf_v1) ,s1))
+     (set! ,s2 (- (* 2.0 svf_v2) ,s2))
+     (set! ,bp svf_v1)
+     (set! ,lp svf_v2)
+     void))
+
+(bind-func static svf_lp
+  "run the filter s for one frame and return its lowpass output"
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((ic1 (pref s 4)) (ic2 (pref s 5)) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0))
+      (svf_tick x ic1 ic2 (pref s 0) (pref s 1) (pref s 2) bp lp)
+      (pset! s 4 ic1)
+      (pset! s 5 ic2)
+      lp)))
+
+(bind-func static svf_bp
+  "run the filter s for one frame and return its bandpass output, which has a
+gain of 1.0 at the centre frequency whatever the q"
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((ic1 (pref s 4)) (ic2 (pref s 5)) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0))
+      (svf_tick x ic1 ic2 (pref s 0) (pref s 1) (pref s 2) bp lp)
+      (pset! s 4 ic1)
+      (pset! s 5 ic2)
+      (* (pref s 3) bp))))
+
+(bind-func static svf_hp
+  "run the filter s for one frame and return its highpass output"
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((ic1 (pref s 4)) (ic2 (pref s 5)) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0))
+      (svf_tick x ic1 ic2 (pref s 0) (pref s 1) (pref s 2) bp lp)
+      (pset! s 4 ic1)
+      (pset! s 5 ic2)
+      (- (- x (* (pref s 3) bp)) lp))))
+
+(bind-func static svf_peak
+  "run the filter s (set with svf_set_peak) for one frame as a peaking equaliser"
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((ic1 (pref s 4)) (ic2 (pref s 5)) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0))
+      (svf_tick x ic1 ic2 (pref s 0) (pref s 1) (pref s 2) bp lp)
+      (pset! s 4 ic1)
+      (pset! s 5 ic2)
+      (+ x (* (pref s 6) bp)))))
+
+(bind-func svf_filter_c
+  "a state-variable filter as a closure, which sets itself whenever its
+frequency or q changes: the convenient form, for where a call per frame is
+affordable.
+
+@param x - input
+@param freq - cutoff or centre frequency in Hz
+@param q - resonance (0.5 is none, 0.7071 flat, 5.0 a narrow peak)
+@param mode - SVF_LP, SVF_BP (unity gain at the centre) or SVF_HP"
+  (lambda ()
+    (let ((s (svf_make 1))
+          (old_freq:SAMPLE -1.0) (old_q:SAMPLE -1.0))
+      (lambda (x:SAMPLE freq:SAMPLE q:SAMPLE mode:i64)
+        (if (or (<> freq old_freq) (<> q old_q))
+            (begin
+              (set! old_freq freq)
+              (set! old_q q)
+              (svf_set s freq q)))
+        (cond ((= mode SVF_LP) (svf_lp s x))
+              ((= mode SVF_BP) (svf_bp s x))
+              (else (svf_hp s x)))))))
+
+;;;;;;;;;;;;;;;
+;; envelopes ;;
+;;;;;;;;;;;;;;;
+
+;; The simplest envelope is a level which is multiplied by a number a little
+;; less than 1.0 on every frame, which makes it die away exponentially, as a
+;; struck thing does: (set! env (* env mult)).
+
+(bind-func static decay_mult
+  "the per-frame multiplier which makes a level fall by 60 dB (to a thousandth)
+in `seconds'"
+  (lambda (seconds:SAMPLE)
+    (exp (/ -6.9077553 (* (if (< seconds 0.0001) 0.0001 seconds) SRf)))))
+
+;; The ADSR is the analogue synthesiser's envelope generator: a capacitor
+;; charged and discharged through resistors. Each stage moves the level a
+;; fixed fraction of the way to a target on every step, which traces the
+;; capacitor's exponential curve.
+;;
+;; - attack: towards 1.3, stopping at 1.0. Aiming past the top makes the
+;;   rise steep to the end and its arrival firm, the way an analogue attack
+;;   is (aiming at 1.0 would never quite get there). `attack' is the time it
+;;   takes from silence.
+;; - decay: towards the sustain level. `decay' is the time to cover 99% of
+;;   the distance (40 dB).
+;; - release: towards silence, from wherever the level is. `release' is the
+;;   time to fall by 40 dB; a fall of 60 dB takes half as long again.
+;;
+;; A new note starts the attack from the current level, so a voice which is
+;; retriggered or stolen while it sounds doesn't click. With a sustain of 0.0
+;; it is an attack-decay envelope for a struck or plucked sound.
+;;
+;; The three rates each need an exp, so they are set (adsr_set) at a lower
+;; rate than the envelope runs (adsr_tick). An envelope which only steers a
+;; filter can itself run every few frames: tell adsr_set how many frames pass
+;; between ticks.
+;;
+;; One envelope is eight numbers at a SAMPLE*: 0 the level, 1 the stage (0.0
+;; released or silent, 1.0 attack, 2.0 decay and sustain), 2 3 4 the attack,
+;; decay and release rates, 5 the sustain level, 6 and 7 spare.
+
+(bind-val ADSR_SIZE i64 8)
+
+(bind-func adsr_make
+  "make an envelope for adsr_set and adsr_tick, silent"
+  (lambda ()
+    (let ((e:SAMPLE* (zalloc ADSR_SIZE))
+          (i:i64 0))
+      (dotimes (i ADSR_SIZE) (pset! e i 0.0))
+      e)))
+
+(bind-func static adsr_set
+  "set the envelope's times (seconds) and sustain level (0.0 to 1.0).
+
+@param step - how many frames pass between calls to adsr_tick (1.0 for every frame)"
+  (lambda (e:SAMPLE* attack:SAMPLE decay:SAMPLE sustain:SAMPLE release:SAMPLE step:SAMPLE)
+    ;; a rise from 0.0 towards 1.3 reaches 1.0 after ln(1.3 / 0.3) = 1.466
+    ;; time constants; 99% of a fall takes ln(100) = 4.6
+    (pset! e 2 (smoothing_coeff (/ attack (* 1.466 step))))
+    (pset! e 3 (smoothing_coeff (/ decay (* 4.6 step))))
+    (pset! e 4 (smoothing_coeff (/ release (* 4.6 step))))
+    (pset! e 5 (if (< sustain 0.0) 0.0 (if (> sustain 1.0) 1.0 sustain)))
+    void))
+
+(bind-func static adsr_tick
+  "step the envelope e on and return its level.
+
+@param start - true on a note's first frame (voice_start?)
+@param gate - 1.0 while the note is held (voice_gate)"
+  (lambda (e:SAMPLE* start:i1 gate:SAMPLE)
+    (let ((env (pref e 0))
+          (stage (pref e 1)))
+      (if start (set! stage 1.0))
+      (if (and (< gate 0.5) (> stage 0.5)) (set! stage 0.0))
+      (cond ((> stage 1.5)
+             (set! env (+ env (* (pref e 3) (- (pref e 5) env))))
+             void)
+            ((> stage 0.5)
+             (set! env (+ env (* (pref e 2) (- 1.3 env))))
+             (if (>= env 1.0) (begin (set! env 1.0) (set! stage 2.0) void))
+             void)
+            (else
+              (set! env (- env (* (pref e 4) env)))
+              ;; settle on silence, rather than creep towards it for ever
+              (if (< env 1.0e-9) (set! env 0.0))
+              void))
+      (pset! e 0 env)
+      (pset! e 1 stage)
+      env)))
+
+(bind-func adsr_env_c
+  "an ADSR envelope as a closure, which reads its times again every 64 frames:
+the convenient form of adsr_set and adsr_tick.
+
+@param step - how many frames pass between calls (1 for every frame)
+@param start - true on the first call of a note
+@param gate - 1.0 while the note is held
+@param attack, decay, release - seconds
+@param sustain - 0.0 to 1.0"
+  (lambda (step:i64)
+    (let ((e (adsr_make))
+          (count:i64 0))
+      (lambda (start:i1 gate:SAMPLE attack:SAMPLE decay:SAMPLE sustain:SAMPLE release:SAMPLE)
+        (if (or start (<= count 0))
+            (begin
+              (adsr_set e attack decay sustain release (convert step SAMPLE))
+              (set! count 64)))
+        (set! count (- count step))
+        (adsr_tick e start gate)))))
+
+;;;;;;;;;;;;;;;;;
+;; oscillators ;;
+;;;;;;;;;;;;;;;;;
+
+;; An oscillator here is a function of its phase (0.0 to 1.0 through the
+;; cycle) and of inc, how far the phase moves each frame (the frequency over
+;; the sample rate, between 0.0 and 0.5). The caller keeps the phase and
+;; moves it on:
+;;
+;;   (set! phase (+ phase inc))
+;;   (if (>= phase 1.0) (set! phase (- phase 1.0)))
+;;
+;; A sawtooth drawn straight from the phase jumps from 1.0 to -1.0 in no time
+;; at all, and a jump has harmonics all the way up. Those above half the
+;; sample rate can't be represented, and fold back down as aliasing: tones at
+;; frequencies unrelated to the note, which is what makes a naive digital
+;; oscillator sound harsh and glassy. PolyBLEP (Valimaki and Huovilainen, IEEE
+;; Signal Processing Magazine, 2007) rounds the jump off over the two frames
+;; either side of it by adding a short polynomial curve, the difference
+;; between an ideal band-limited step and a naive one. For a sawtooth at 1
+;; kHz that takes 15 dB off the aliasing as a whole and more than 70 dB off
+;; what lands below the note, where a stray tone is easiest to hear. It costs
+;; a few operations, and only on the two frames in each cycle which are next
+;; to the jump.
+;;
+;; A triangle has no jumps but it has corners, where its slope jumps, and
+;; they alias too (less: the harmonics of a corner fall away twice as fast).
+;; PolyBLAMP is the same idea for a corner: the integral of the PolyBLEP curve.
+
+(bind-macro
+  "the PolyBLEP correction for an upward jump of 2.0 at phase 0.0: add it to
+a waveform which jumps up there, take it away from one which jumps down. It is
+zero except within inc of the jump, on either side."
+  (polyblep phase inc)
+  `(let ((blep_p:SAMPLE ,phase) (blep_inc:SAMPLE ,inc)
+         (blep_t:SAMPLE 0.0) (blep_y:SAMPLE 0.0))
+     (if (> blep_p (- 1.0 blep_inc))
+         (begin ;; just before the jump
+           (set! blep_t (/ (- blep_p 1.0) blep_inc))
+           (set! blep_y (+ (* blep_t blep_t) (* 2.0 blep_t) 1.0)))
+         (if (< blep_p blep_inc)
+             (begin ;; just after it
+               (set! blep_t (/ blep_p blep_inc))
+               (set! blep_y (- (* 2.0 blep_t) (* blep_t blep_t) 1.0)))))
+     blep_y))
+
+(bind-macro
+  "the PolyBLAMP correction for a corner t frames away (-1.0 < t < 1.0), where
+the slope changes by 1.0 per frame: (1 - |t|)^3 / 6"
+  (polyblamp t)
+  `(let ((blamp_u:SAMPLE (- 1.0 (fabs ,t))))
+     (/ (* blamp_u blamp_u blamp_u) 6.0)))
+
+(bind-func static blep_saw
+  "a band-limited sawtooth, rising from -1.0 to 1.0 through the cycle"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (- (- (* 2.0 phase) 1.0) (polyblep phase inc))))
+
+(bind-func static blep_pulse
+  "a band-limited pulse wave, high for the first `width' of each cycle (0.5 is
+a square wave).
+
+It jumps up at phase 0.0 and down at phase `width', and each jump gets its own
+correction. Its average, 2 width - 1, is taken away, so that changing the
+width doesn't move the waveform up and down."
+  (lambda (phase:SAMPLE inc:SAMPLE width:SAMPLE)
+    (let ((fall:SAMPLE (- phase width)))
+      (if (< fall 0.0) (set! fall (+ fall 1.0)))
+      (- (- (+ (if (< phase width) 1.0 -1.0) (polyblep phase inc))
+            (polyblep fall inc))
+         (- (* 2.0 width) 1.0)))))
+
+(bind-func static blep_tri
+  "a band-limited triangle, with its trough (-1.0) at phase 0.0 and its peak at 0.5"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (let ((y:SAMPLE (- 1.0 (* 4.0 (fabs (- phase 0.5)))))
+          (peak:SAMPLE (+ phase 0.5))
+          ;; the slope changes by 8 (from -4 to +4 or back) per cycle, so by
+          ;; 8 inc per frame
+          (k:SAMPLE (* 8.0 inc)))
+      (if (>= peak 1.0) (set! peak (- peak 1.0)))
+      ;; round off the trough (where the slope rises) and the peak (where it falls)
+      (if (< phase inc) (set! y (+ y (* k (polyblamp (/ phase inc))))))
+      (if (> phase (- 1.0 inc)) (set! y (+ y (* k (polyblamp (/ (- phase 1.0) inc))))))
+      (if (< peak inc) (set! y (- y (* k (polyblamp (/ peak inc))))))
+      (if (> peak (- 1.0 inc)) (set! y (- y (* k (polyblamp (/ (- peak 1.0) inc))))))
+      y)))
+
+;; A sine wave needs no band-limiting, but calling sin costs 10 to 20 ns,
+;; which is too much for an FM voice with six of them or a drum machine with
+;; a dozen. Instead: one cycle, worked out once, in a table of 4096 points,
+;; read with a straight line between neighbouring points. The error is below
+;; -120 dB, quieter than the rounding of the samples themselves.
+
+(bind-val SINE_TABLE_SIZE i64 4096) ;; sine_at and sine_wrap assume this size
+
+(bind-func sine_table_make
+  (lambda ()
+    ;; two extra points, so that reading on from the last one stays in bounds
+    (let ((table:SAMPLE* (halloc (+ SINE_TABLE_SIZE 2)))
+          (i:i64 0))
+      (dotimes (i (+ SINE_TABLE_SIZE 2))
+        (pset! table i (convert (sin (/ (* 6.283185307179586 (convert i double))
+                                        (convert SINE_TABLE_SIZE double)))
+                                SAMPLE)))
+      table)))
+
+(bind-val sine_table SAMPLE* (sine_table_make))
+
+(bind-macro
+  "sin(2 pi phase) from the table, for a phase from 0.0 to 1.0 (no further:
+see sine_wrap). For the cosine, add 0.25 to the phase and use sine_wrap."
+  (sine_at phase)
+  `(let ((sine_x:SAMPLE (* 4096.0 ,phase))
+         (sine_i:i64 (convert sine_x i64))
+         (sine_a:SAMPLE (pref sine_table sine_i)))
+     (+ sine_a (* (- sine_x (convert sine_i SAMPLE))
+                  (- (pref sine_table (+ sine_i 1)) sine_a)))))
+
+(bind-macro
+  "x less its whole number of cycles, 0.0 to 1.0, for any x (negative too).
+This is quicker than calling floor."
+  (wrap01 x)
+  ;; converting to an integer rounds towards zero, so a negative x comes out
+  ;; one cycle short
+  `(let ((wrap_x:SAMPLE ,x)
+         (wrap_y:SAMPLE (- wrap_x (convert (convert wrap_x i64) SAMPLE))))
+     (if (< wrap_y 0.0) (+ wrap_y 1.0) wrap_y)))
+
+(bind-macro
+  "sin(2 pi phase) from the table, for any phase: for phase modulation, where
+the phase has had something added to it"
+  (sine_wrap phase)
+  `(sine_at (wrap01 ,phase)))
+
+;; White noise is a stream of random numbers. The generator is a linear
+;; congruential one (multiply the last number by a constant, add another,
+;; keep the low 32 bits), with the constants from Numerical Recipes: three
+;; operations, and as random as the ear can tell. Its state is a number
+;; which the caller holds, so each voice can have its own sequence, the same
+;; every time it's played.
+
+(bind-macro
+  "the next sample of white noise, from -1.0 to 1.0. `seed' is the generator's
+state: an i64 variable of the caller's, starting anywhere from 0 to 2^32 - 1."
+  (noise_white seed)
+  `(begin (set! ,seed (& (+ (* ,seed 1664525) 1013904223) 4294967295))
+          (- (* (convert ,seed SAMPLE) 4.656612873e-10) 1.0)))
+
+;;;;;;;;;;;;;;;;;;
+;; oversampling ;;
+;;;;;;;;;;;;;;;;;;
+
+;; Anything which bends a waveform (a saturator, a clipper, a wavefolder)
+;; adds harmonics, and the harder it bends the higher they go. Like the
+;; harmonics of a naive sawtooth, those above half the sample rate fold back
+;; as aliasing, which is why digital distortion can sound gritty where an
+;; analogue circuit sounds warm. There is no cheap correction for it as there
+;; is for a sawtooth's jump. The answer is to run the waveshaper at a higher
+;; sample rate, where there is room for its harmonics, and filter them off
+;; before coming back down:
+;;
+;;   1. upsample: make 2 (or 4) samples from each one, without changing what
+;;      is heard
+;;   2. shape each of them
+;;   3. downsample: lowpass at the top of the audio band and keep one in 2
+;;      (or 4)
+;;
+;; At twice the rate, a harmonic has to be above 1.5 times the original
+;; sample rate before it folds into the audible band, by which point there is
+;; much less of it; at four times, above 3.5 times.
+;;
+;; Both the upsampling and the downsampling need a `halfband' lowpass, which
+;; passes the lower half of the spectrum and stops the upper half. The ones
+;; here are made from allpass filters (which change only the timing of each
+;; frequency, not its level). Two chains of allpasses, one of them run half a
+;; sample later than the other, agree with each other in the lower half of
+;; the spectrum, where their outputs add, and are opposed in the upper half,
+;; where they cancel. Because each chain takes every other sample, the
+;; filters run at the lower of the two rates, and one allpass costs two
+;; multiplications. (This is the polyphase IIR halfband filter of Valenzuela
+;; and Constantinides, 1983; the coefficients are designed by the method in
+;; Laurent de Soras's HIIR library.)
+;;
+;; The filter between the original rate and twice it has four allpasses. It
+;; is flat to 0.4 of the original sample rate (19.2 kHz at 48 kHz) and 70 dB
+;; down from 0.6 of it. The one between twice and four times the rate has
+;; more room to turn in, so two allpasses make it 62 dB down.
+;;
+;; The price is a delay of two or three frames, which varies a little with
+;; frequency: the sound is unchanged, but it no longer cancels against a copy
+;; of itself which didn't go through. Mix a dry signal in before the
+;; oversampler, not around it.
+;;
+;; One oversampler is 24 numbers at a SAMPLE*: 0 to 3 the oversampled
+;; samples (which the caller shapes in place), 4 to 15 the allpasses' state,
+;; and 16 to 19 are oversat's (its fade, the last drive, the gain which goes
+;; with it, and the fade's step).
+
+(bind-val OS_SIZE i64 24)
+
+(bind-func static os_clear
+  "forget what the oversampler s was doing"
+  (lambda (s:SAMPLE*)
+    (let ((i:i64 0))
+      (dotimes (i 17) (pset! s i 0.0))
+      void)))
+
+(bind-func os_make
+  "make an oversampler, for os_up2 and os_down2 (or the 4 pair), oversat2 or oversat4"
+  (lambda ()
+    (let ((s:SAMPLE* (zalloc OS_SIZE))
+          (i:i64 0))
+      (dotimes (i OS_SIZE) (pset! s i 0.0))
+      ;; oversat fades itself in and out over five milliseconds
+      (pset! s 19 (/ 200.0 SRf))
+      s)))
+
+(bind-macro
+  "one frame of a first-order allpass with coefficient c, whose state is
+number i of s"
+  (os_allpass s i c x)
+  `(let ((ap_x:SAMPLE ,x)
+         (ap_y:SAMPLE (+ (* ,c ap_x) (pref ,s ,i))))
+     (pset! ,s ,i (- ap_x (* ,c ap_y)))
+     ap_y))
+
+(bind-func static os_up2
+  "upsample by two: from the sample x, make two samples at twice the sample
+rate, in (pref s 0) and (pref s 1). Shape them there, then call os_down2."
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (pset! s 0 (os_allpass s 5 0.5453236511 (os_allpass s 4 0.0798664262 x)))
+    (pset! s 1 (os_allpass s 7 0.8344118915 (os_allpass s 6 0.2838293449 x)))
+    void))
+
+(bind-func static os_down2
+  "downsample by two: lowpass the two samples at (pref s 0) and (pref s 1) and
+return one at the original rate"
+  (lambda (s:SAMPLE*)
+    (* 0.5 (+ (os_allpass s 9 0.5453236511 (os_allpass s 8 0.0798664262 (pref s 1)))
+              (os_allpass s 11 0.8344118915 (os_allpass s 10 0.2838293449 (pref s 0)))))))
+
+(bind-func static os_up4
+  "upsample by four: from the sample x, make four samples at four times the
+sample rate, in (pref s 0) to (pref s 3). Shape them there, then call os_down4."
+  (lambda (s:SAMPLE* x:SAMPLE)
+    (let ((a:SAMPLE (os_allpass s 5 0.5453236511 (os_allpass s 4 0.0798664262 x)))
+          (b:SAMPLE (os_allpass s 7 0.8344118915 (os_allpass s 6 0.2838293449 x))))
+      (pset! s 0 (os_allpass s 12 0.1380249941 a))
+      (pset! s 1 (os_allpass s 13 0.5846832575 a))
+      (pset! s 2 (os_allpass s 12 0.1380249941 b))
+      (pset! s 3 (os_allpass s 13 0.5846832575 b))
+      void)))
+
+(bind-func static os_down4
+  "downsample by four: lowpass the four samples at (pref s 0) to (pref s 3)
+and return one at the original rate"
+  (lambda (s:SAMPLE*)
+    (let ((a:SAMPLE (* 0.5 (+ (os_allpass s 14 0.1380249941 (pref s 1))
+                              (os_allpass s 15 0.5846832575 (pref s 0)))))
+          (b:SAMPLE (* 0.5 (+ (os_allpass s 14 0.1380249941 (pref s 3))
+                              (os_allpass s 15 0.5846832575 (pref s 2))))))
+      (* 0.5 (+ (os_allpass s 9 0.5453236511 (os_allpass s 8 0.0798664262 b))
+                (os_allpass s 11 0.8344118915 (os_allpass s 10 0.2838293449 a)))))))
+
+;; The oversampled saturator: tanh_fast, with `drive' as the gain in front of
+;; it, turned back down afterwards so that a full-scale input still comes out
+;; at full scale:
+;;
+;;   y = tanh(drive x) / tanh(drive)
+;;
+;; More drive is more dirt, not more level (though quiet sounds come up, as
+;; they do through any saturator). As the drive goes to zero the curve
+;; straightens out into y = x, so the drive can be swept from nothing without
+;; a step: 0.5 is a gentle warmth, 2.0 is clearly overdriven, 10.0 is fuzz.
+;;
+;; Four times oversampled, it costs about what two calls to the library's
+;; tanh do (which is what the plain version of this curve needs), and the
+;; aliasing of a hard-driven 7 kHz sine wave comes down by 37 dB; at twice,
+;; by 11 dB for two thirds of the cost.
+;;
+;; A drive of zero costs a comparison: the signal is passed straight through
+;; and the filters rest. When the drive leaves zero (or returns to it) the
+;; saturator fades in (or out) over five milliseconds, because its filters
+;; delay the signal by a couple of frames and switching between a signal and
+;; a delayed copy of it would click.
+
+(bind-macro
+  "what oversat2 and oversat4 share: work out the fade and the gains for this
+frame. Returns true if the frame is to be passed straight through."
+  (oversat_prepare s drive mix)
+  `(if (and (< ,drive 0.001) (<= ,mix 0.0))
+       #t
+       (begin
+         (if (>= ,drive 0.001)
+             (begin
+               (if (<> ,drive (pref ,s 17))
+                   (begin
+                     (pset! ,s 17 ,drive)
+                     (pset! ,s 18 (/ 1.0 (tanh_fast ,drive)))))
+               (set! ,mix (+ ,mix (pref ,s 19)))
+               (if (> ,mix 1.0) (set! ,mix 1.0))
+               void)
+             (begin
+               (set! ,mix (- ,mix (pref ,s 19)))
+               (if (< ,mix 0.0) (set! ,mix 0.0))
+               void))
+         #f)))
+
+(bind-func static oversat4
+  "saturate x at four times the sample rate (see above). s is from os_make.
+
+@param drive - the gain into the saturator: 0.0 (off, and nearly free) upwards"
+  (lambda (s:SAMPLE* x:SAMPLE drive:SAMPLE)
+    (let ((mix:SAMPLE (pref s 16))
+          (g:SAMPLE 0.0)
+          (y:SAMPLE 0.0))
+      (if (oversat_prepare s drive mix)
+          x
+          (begin
+            (set! g (pref s 17))
+            (os_up4 s x)
+            (pset! s 0 (tanh_fast (* g (pref s 0))))
+            (pset! s 1 (tanh_fast (* g (pref s 1))))
+            (pset! s 2 (tanh_fast (* g (pref s 2))))
+            (pset! s 3 (tanh_fast (* g (pref s 3))))
+            (set! y (* (pref s 18) (os_down4 s)))
+            (if (<= mix 0.0) (os_clear s))
+            (pset! s 16 mix)
+            (+ x (* mix (- y x))))))))
+
+(bind-func static oversat2
+  "saturate x at twice the sample rate: two thirds of the cost of oversat4,
+and enough for a gentle drive or a signal without much top end"
+  (lambda (s:SAMPLE* x:SAMPLE drive:SAMPLE)
+    (let ((mix:SAMPLE (pref s 16))
+          (g:SAMPLE 0.0)
+          (y:SAMPLE 0.0))
+      (if (oversat_prepare s drive mix)
+          x
+          (begin
+            (set! g (pref s 17))
+            (os_up2 s x)
+            (pset! s 0 (tanh_fast (* g (pref s 0))))
+            (pset! s 1 (tanh_fast (* g (pref s 1))))
+            (set! y (* (pref s 18) (os_down2 s)))
+            (if (<= mix 0.0) (os_clear s))
+            (pset! s 16 mix)
+            (+ x (* mix (- y x))))))))
+
+(bind-func oversat_c
+  "the four-times oversampled saturator as a closure.
+
+@param x - input
+@param drive - the gain into the saturator: 0.0 (off) upwards"
+  (lambda ()
+    (let ((s (os_make)))
+      (lambda (x:SAMPLE drive:SAMPLE)
+        (oversat4 s x drive)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the fast Fourier transform ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The Fourier transform takes n samples of a waveform and gives the level
+;; and phase of each of the n sine waves which add up to it, and the inverse
+;; transform goes back. An instrument which builds its waveforms from a list
+;; of harmonics (a wavetable, a pad) writes the harmonics down and inverse
+;; transforms them, which is far quicker than adding up the sine waves one
+;; by one. This is not for use in a voice: it is for building tables when an
+;; instrument is made.
+;;
+;; The numbers are complex, held as an array of real parts and an array of
+;; imaginary parts. In a spectrum of n points, point k is the sine wave with
+;; k cycles in the n samples, for k up to n / 2; the points above n / 2 are
+;; the negative frequencies, and for a real waveform point n - k is the
+;; mirror image (the complex conjugate) of point k. A wave a cos(2 pi k j / n
+;; + p) is a / 2 e^(ip) at point k and a / 2 e^(-ip) at point n - k.
+
+(bind-func fft_twiddles
+  "fill tw (n doubles) with the `twiddle factors' for transforms of up to n
+points, n a power of two: cos(2 pi k / n) for k < n / 2, then sin of the same"
+  (lambda (tw:double* n:i64)
+    (let ((half (/ n 2))
+          (angle:double 0.0)
+          (k:i64 0))
+      (dotimes (k half)
+        (set! angle (/ (* 6.283185307179586 (convert k double)) (convert n double)))
+        (pset! tw k (cos angle))
+        (pset! tw (+ half k) (sin angle)))
+      void)))
+
+(bind-func fft_radix2
+  "an in-place radix-2 fast Fourier transform of n complex points (n a power
+of two), held as real parts re and imaginary parts im.
+
+The forward transform is X[k] = sum over j of x[j] e^(-2 pi i j k / n). The
+inverse (inverse true) uses e^(+2 pi i j k / n) and is not divided by n, so a
+forward transform and then an inverse one give back n times the input.
+
+tw is a table from fft_twiddles for transforms of tw_n points, where tw_n is n
+or any larger power of two: one table serves every size up to its own.
+
+This is the iterative Cooley-Tukey algorithm. A transform of n points is two
+transforms of n/2 points (the even-numbered inputs and the odd-numbered ones)
+combined by `butterflies': X[k] = E[k] + w^k O[k] and X[k + n/2] = E[k] - w^k
+O[k], where w = e^(-2 pi i / n). Applied recursively, this needs the inputs in
+bit-reversed order (input j goes where j's binary digits, reversed, say), so
+the first step shuffles them. Then passes of butterflies combine transforms of
+2 points, then 4, and so on up to n."
+  (lambda (re:double* im:double* n:i64 tw:double* tw_n:i64 inverse:i1)
+    (let ((i:i64 1) (j:i64 0) (bit:i64 0) (tmp:double 0.0)
+          (len:i64 2) (half:i64 0) (step:i64 0) (start:i64 0) (k:i64 0)
+          (a:i64 0) (b:i64 0)
+          (cos_t:double* tw)
+          (sin_t:double* (pref-ptr tw (/ tw_n 2)))
+          (sign:double (if inverse 1.0 -1.0))
+          (wr:double 0.0) (wi:double 0.0) (tr:double 0.0) (ti:double 0.0))
+      ;; the bit-reversal shuffle: j counts up in reversed binary as i
+      ;; counts up normally (adding one from the top bit down), and each
+      ;; pair is swapped once
+      (while (< i n)
+        (set! bit (/ n 2))
+        (while (<> (& j bit) 0)
+          (set! j (- j bit))
+          (set! bit (/ bit 2)))
+        (set! j (+ j bit))
+        (if (< i j)
+            (begin
+              (set! tmp (pref re i)) (pset! re i (pref re j)) (pset! re j tmp)
+              (set! tmp (pref im i)) (pset! im i (pref im j)) (pset! im j tmp)
+              void))
+        (set! i (+ i 1)))
+      ;; the butterflies, in passes of transforms of length len
+      (while (<= len n)
+        (set! half (/ len 2))
+        (set! step (/ tw_n len))
+        (set! start 0)
+        (while (< start n)
+          (dotimes (k half)
+            ;; w^k = e^(-+2 pi i k / len)
+            (set! wr (pref cos_t (* k step)))
+            (set! wi (* sign (pref sin_t (* k step))))
+            (set! a (+ start k))
+            (set! b (+ a half))
+            (set! tr (- (* wr (pref re b)) (* wi (pref im b))))
+            (set! ti (+ (* wr (pref im b)) (* wi (pref re b))))
+            (pset! re b (- (pref re a) tr))
+            (pset! im b (- (pref im a) ti))
+            (pset! re a (+ (pref re a) tr))
+            (pset! im a (+ (pref im a) ti)))
+          (set! start (+ start len)))
+        (set! len (* len 2)))
+      void)))

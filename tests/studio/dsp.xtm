@@ -1,0 +1,698 @@
+;;; tests/studio/dsp.xtm -- tests for the studio's shared DSP kit
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Each test is an xtlang function which returns 1 if every measurement it
+;; makes is within tolerance, and prints the ones which aren't. Frequencies
+;; are given as fractions of the sample rate, so the tests don't care what
+;; the sample rate is.
+
+;;; Code:
+
+(sys:load "libs/studio/dsp.xtm" 'quiet)
+
+;;;;;;;;;;;;;
+;; helpers ;;
+;;;;;;;;;;;;;
+
+(bind-func test_near
+  "is x within tol of target? Says so if it isn't."
+  (lambda (name:i8* x:double target:double tol:double)
+    (if (and (>= x (- target tol)) (<= x (+ target tol)))
+        1
+        (begin (printf "    OUT OF TOLERANCE %s: %f (expected %f +- %f)\n" name x target tol)
+               0))))
+
+(bind-func test_db
+  (lambda (ratio:double)
+    (* 20.0 (log10 (+ ratio 1.0e-30)))))
+
+;; the tests' scratch space: a signal, and a spectrum's real and imaginary parts
+(bind-val TEST_N i64 8192)
+(bind-val test_buf SAMPLE* (halloc 32768))
+(bind-val test_re double* (halloc 8192))
+(bind-val test_im double* (halloc 8192))
+(bind-val test_tw double* (halloc 8192))
+
+(bind-func test_setup
+  (lambda ()
+    (fft_twiddles test_tw TEST_N)
+    1))
+
+(test_setup)
+
+(bind-func test_alias_db
+  "the part of the energy of the n samples in test_buf which is not at a
+harmonic of bin k0 (or at DC), in dB relative to the whole: for a periodic
+waveform with k0 cycles in n samples, where k0 and n share no factor, that
+is its aliasing"
+  (lambda (n:i64 k0:i64)
+    (let ((i:i64 0) (total:double 0.0) (harmonic:double 0.0) (e:double 0.0))
+      (dotimes (i n)
+        (pset! test_re i (convert (pref test_buf i) double))
+        (pset! test_im i 0.0))
+      (fft_radix2 test_re test_im n test_tw TEST_N #f)
+      (dotimes (i (/ n 2))
+        (set! e (+ (* (pref test_re i) (pref test_re i)) (* (pref test_im i) (pref test_im i))))
+        (if (> i 0) (set! total (+ total e)))
+        (if (and (> i 0) (= (% i k0) 0)) (set! harmonic (+ harmonic e))))
+      (* 10.0 (log10 (+ (/ (- total harmonic) total) 1.0e-30))))))
+
+(bind-func test_low_db
+  "after test_alias_db: the energy below the fundamental (bin k0), where there
+should be none at all, in dB relative to the whole"
+  (lambda (n:i64 k0:i64)
+    (let ((i:i64 0) (total:double 0.0) (low:double 0.0) (e:double 0.0))
+      (dotimes (i (/ n 2))
+        (set! e (+ (* (pref test_re i) (pref test_re i)) (* (pref test_im i) (pref test_im i))))
+        (if (> i 0) (set! total (+ total e)))
+        (if (and (> i 0) (< i k0)) (set! low (+ low e))))
+      (* 10.0 (log10 (+ (/ low total) 1.0e-30))))))
+
+;;;;;;;;;;;;;;;;;
+;; delay lines ;;
+;;;;;;;;;;;;;;;;;
+
+;; A straight line is read back exactly by both interpolators. A sine near
+;; the top of the band isn't: the cubic read must be the closer of the two.
+(bind-func test_delay_reads
+  (lambda ()
+    (let ((d (dl_make 64))
+          (i:i64 0) (ok:i64 1)
+          (w:double (* 6.283185307179586 0.2))
+          (truth:double 0.0) (err_f:double 0.0) (err_c:double 0.0) (e:double 0.0)
+          (n:SAMPLE 0.0))
+      (dotimes (i 1000) (dl_write d (convert i SAMPLE)))
+      ;; the last frame written was 999, one frame ago
+      (set! ok (* ok (test_near "linear read of a ramp" (convert (dl_readf d 10.25) double) 989.75 0.001)))
+      (set! ok (* ok (test_near "cubic read of a ramp" (convert (dl_readc d 10.25) double) 989.75 0.001)))
+      (set! ok (* ok (test_near "cubic read at the wrap" (convert (dl_readc d 61.5) double) 938.5 0.001)))
+      (set! ok (* ok (test_near "whole-frame read" (convert (dl_readc d 7.0) double) 993.0 0.001)))
+      (dotimes (i 1000) (dl_write d (convert (sin (* w (convert i double))) SAMPLE)))
+      (dotimes (i 40)
+        (set! n (+ 3.0 (* 1.37 (convert i SAMPLE))))
+        (set! truth (sin (* w (- 1000.0 (convert n double)))))
+        (set! e (fabs (- (convert (dl_readf d n) double) truth)))
+        (if (> e err_f) (set! err_f e))
+        (set! e (fabs (- (convert (dl_readc d n) double) truth)))
+        (if (> e err_c) (set! err_c e)))
+      (set! ok (* ok (test_near "linear read's error at 0.2 SR" err_f 0.19 0.05)))
+      (set! ok (* ok (test_near "cubic read's error at 0.2 SR" err_c 0.045 0.02)))
+      (dl_clear d)
+      (set! ok (* ok (test_near "a cleared line" (convert (dl_readc d 20.5) double) 0.0 0.0)))
+      ok)))
+
+(xtmtest-result (test_delay_reads) 1 "delay-line-interpolated-reads")
+
+;;;;;;;;;;;;;
+;; shaping ;;
+;;;;;;;;;;;;;
+
+(bind-func test_tanh_fast
+  (lambda ()
+    (let ((i:i64 0) (ok:i64 1) (x:SAMPLE 0.0) (y:SAMPLE 0.0) (worst:double 0.0) (e:double 0.0)
+          (last:SAMPLE -2.0) (rising:i64 1))
+      (dotimes (i 801)
+        (set! x (* 0.01 (convert (- i 400) SAMPLE)))
+        (set! y (tanh_fast x))
+        (if (< y (- last 0.000001)) (set! rising 0))
+        (set! last y)
+        (set! e (fabs (- (convert y double) (tanh (convert x double)))))
+        (if (> e worst) (set! worst e)))
+      (set! ok (* ok rising))
+      (set! ok (* ok (test_near "tanh_fast's worst error" worst 0.0 0.03)))
+      (set! ok (* ok (test_near "tanh_fast beyond 3" (convert (tanh_fast 7.0) double) 1.0 0.0)))
+      (set! ok (* ok (test_near "tanh_fast beyond -3" (convert (tanh_fast -3.5) double) -1.0 0.0)))
+      (set! ok (* ok (test_near "tanh_fast's slope at 0" (convert (tanh_fast 0.001) double) 0.001 0.000001)))
+      (set! ok (* ok (test_near "clampf low" (convert (+ 1.0 (clampf -3.0 0.0 0.24)) double) 1.0 0.0)))
+      (set! ok (* ok (test_near "clampf high" (convert (+ 1.0 (clampf 3.0 0.0 0.25)) double) 1.25 0.0)))
+      ok)))
+
+(xtmtest-result (test_tanh_fast) 1 "tanh-fast-follows-tanh")
+
+;;;;;;;;;;;;;
+;; filters ;;
+;;;;;;;;;;;;;
+
+;; which filter test_gain runs
+(bind-val TEST_SVF_LP i64 0)
+(bind-val TEST_SVF_BP i64 1)
+(bind-val TEST_SVF_HP i64 2)
+(bind-val TEST_SVF_PEAK i64 3)
+(bind-val TEST_ONEPOLE_LP i64 4)
+(bind-val TEST_ONEPOLE_HP i64 5)
+(bind-val TEST_DC i64 6)
+(bind-val TEST_OS2 i64 7)
+(bind-val TEST_OS4 i64 8)
+
+(bind-func test_gain
+  "the gain in dB of filter `kind', set to `cutoff' (a fraction of the sample
+rate) and q, for a sine wave at `freq' (the same)"
+  (lambda (kind:i64 cutoff:double q:SAMPLE freq:double)
+    (let ((s (svf_make 1))
+          (os (os_make))
+          (state:SAMPLE 0.0) (x1:SAMPLE 0.0) (y1:SAMPLE 0.0)
+          (coeff:SAMPLE (onepole_coeff (* (convert cutoff SAMPLE) SRf)))
+          (r:SAMPLE (dc_coeff (* (convert cutoff SAMPLE) SRf)))
+          (i:i64 0) (x:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (in_sq:double 0.0) (out_sq:double 0.0)
+          (w:double (* 6.283185307179586 freq)))
+      (if (= kind TEST_SVF_PEAK)
+          (svf_set_peak s (* (convert cutoff SAMPLE) SRf) q 6.0)
+          (svf_set s (* (convert cutoff SAMPLE) SRf) q))
+      (dotimes (i 40000)
+        (set! x (convert (sin (* w (convert i double))) SAMPLE))
+        (set! y (cond ((= kind TEST_SVF_LP) (svf_lp s x))
+                      ((= kind TEST_SVF_BP) (svf_bp s x))
+                      ((= kind TEST_SVF_HP) (svf_hp s x))
+                      ((= kind TEST_SVF_PEAK) (svf_peak s x))
+                      ((= kind TEST_ONEPOLE_LP) (onepole_lp state coeff x))
+                      ((= kind TEST_ONEPOLE_HP) (onepole_hp state coeff x))
+                      ((= kind TEST_DC) (dc_block x1 y1 r x))
+                      ((= kind TEST_OS2) (os_up2 os x) (os_down2 os))
+                      (else (os_up4 os x) (os_down4 os))))
+        (if (>= i 20000)
+            (begin
+              (set! in_sq (+ in_sq (convert (* x x) double)))
+              (set! out_sq (+ out_sq (convert (* y y) double))))))
+      (* 10.0 (log10 (+ (/ out_sq in_sq) 1.0e-30))))))
+
+(bind-func test_svf_gains
+  (lambda ()
+    (let ((ok:i64 1) (fc:double (/ 1.0 48.0)))
+      ;; a flat (Butterworth) lowpass: 0 dB well below the cutoff, -3 dB at it,
+      ;; 12 dB/octave above
+      (set! ok (* ok (test_near "lowpass a decade below" (test_gain TEST_SVF_LP fc 0.7071 (* 0.1 fc)) 0.0 0.05)))
+      (set! ok (* ok (test_near "lowpass at the cutoff" (test_gain TEST_SVF_LP fc 0.7071 fc) -3.01 0.05)))
+      (set! ok (* ok (test_near "lowpass two octaves above" (test_gain TEST_SVF_LP fc 0.7071 (* 4.0 fc)) -24.6 0.5)))
+      ;; resonance: the peak at the cutoff is q
+      (set! ok (* ok (test_near "lowpass peak, q 10" (test_gain TEST_SVF_LP fc 10.0 fc) 20.0 0.1)))
+      (set! ok (* ok (test_near "highpass a decade above" (test_gain TEST_SVF_HP fc 0.7071 (* 10.0 fc)) 0.0 0.05)))
+      (set! ok (* ok (test_near "highpass at the cutoff" (test_gain TEST_SVF_HP fc 0.7071 fc) -3.01 0.05)))
+      (set! ok (* ok (test_near "highpass two octaves below" (test_gain TEST_SVF_HP fc 0.7071 (* 0.25 fc)) -24.1 0.3)))
+      ;; the bandpass has unity gain at its centre whatever the q
+      (set! ok (* ok (test_near "bandpass centre, q 5" (test_gain TEST_SVF_BP fc 5.0 fc) 0.0 0.05)))
+      (set! ok (* ok (test_near "bandpass centre, q 0.7" (test_gain TEST_SVF_BP fc 0.7 fc) 0.0 0.05)))
+      (set! ok (* ok (test_near "bandpass an octave above, q 5" (test_gain TEST_SVF_BP fc 5.0 (* 2.0 fc)) -17.8 0.5)))
+      (set! ok (* ok (test_near "peak at the centre" (test_gain TEST_SVF_PEAK fc 2.0 fc) 6.0 0.05)))
+      (set! ok (* ok (test_near "peak far below" (test_gain TEST_SVF_PEAK fc 2.0 (* 0.05 fc)) 0.0 0.05)))
+      ;; right up at the top of the band, where simpler filters go out of tune
+      (set! ok (* ok (test_near "lowpass at a cutoff of 0.4 SR" (test_gain TEST_SVF_LP 0.4 0.7071 0.4) -3.01 0.05)))
+      ok)))
+
+(xtmtest-result (test_svf_gains) 1 "state-variable-filter-gains")
+
+;; the macro, the static functions and the closure are the same filter
+(bind-func test_svf_forms_agree
+  (lambda ()
+    (let ((s (svf_make 2)) (f (svf_filter_c))
+          (s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0)
+          (seed:i64 1) (x:SAMPLE 0.0) (i:i64 0) (same:i64 1)
+          (b (pref-ptr s SVF_SIZE)))
+      (svf_set s 700.0 3.0)
+      (svf_set b 700.0 3.0)
+      (dotimes (i 2000)
+        (set! x (noise_white seed))
+        (svf_tick x s1 s2 (pref s 0) (pref s 1) (pref s 2) bp lp)
+        (if (<> lp (svf_lp s x)) (set! same 0))
+        (if (<> (- (- x (* (pref s 3) bp)) lp) (svf_hp b x)) (set! same 0))
+        (if (<> lp (f x 700.0 3.0 SVF_LP)) (set! same 0)))
+      (svf_clear s)
+      (if (<> (svf_lp s 0.0) 0.0) (set! same 0))
+      same)))
+
+(xtmtest-result (test_svf_forms_agree) 1 "state-variable-filter-forms-agree")
+
+(bind-func test_onepole_gains
+  (lambda ()
+    (let ((ok:i64 1) (fc:double (/ 1.0 96.0))
+          (x1:SAMPLE 0.0) (y1:SAMPLE 0.0) (r:SAMPLE (dc_coeff 20.0)) (i:i64 0) (y:SAMPLE 0.0))
+      (set! ok (* ok (test_near "one-pole lowpass well below" (test_gain TEST_ONEPOLE_LP fc 0.0 (* 0.05 fc)) 0.0 0.05)))
+      (set! ok (* ok (test_near "one-pole lowpass at the cutoff" (test_gain TEST_ONEPOLE_LP fc 0.0 fc) -3.0 0.15)))
+      (set! ok (* ok (test_near "one-pole lowpass a decade above" (test_gain TEST_ONEPOLE_LP fc 0.0 (* 10.0 fc)) -20.3 0.5)))
+      ;; (the highpass is the input less the lowpass, and the two are only
+      ;; both 3 dB down at the cutoff when it is far below the sample rate)
+      (set! ok (* ok (test_near "one-pole highpass at the cutoff" (test_gain TEST_ONEPOLE_HP fc 0.0 fc) -3.2 0.25)))
+      (set! ok (* ok (test_near "one-pole highpass a decade below" (test_gain TEST_ONEPOLE_HP fc 0.0 (* 0.1 fc)) -20.0 0.3)))
+      (set! ok (* ok (test_near "DC blocker in the audio band" (test_gain TEST_DC (/ 20.0 48000.0) 0.0 0.01) 0.0 0.01)))
+      (set! ok (* ok (test_near "DC blocker at its corner" (test_gain TEST_DC 0.001 0.0 0.001) -3.0 0.15)))
+      ;; a constant offset is gone within a second
+      (dotimes (i (convert SRf i64))
+        (set! y (dc_block x1 y1 r 1.0)))
+      (set! ok (* ok (test_near "DC blocker on a constant" (convert y double) 0.0 0.000001)))
+      ok)))
+
+(xtmtest-result (test_onepole_gains) 1 "one-pole-filter-gains")
+
+;;;;;;;;;;;;;;;
+;; envelopes ;;
+;;;;;;;;;;;;;;;
+
+(bind-func test_adsr
+  (lambda ()
+    (let ((e (adsr_make))
+          (ok:i64 1) (i:i64 0) (env:SAMPLE 0.0) (last:SAMPLE 0.0)
+          (sr:double (convert SRf double))
+          (hit:i64 -1) (peak:SAMPLE 0.0) (monotonic:i64 1) (at_release:SAMPLE 0.0))
+      (adsr_set e 0.05 0.2 0.4 0.3 1.0)
+      ;; attack: rises to exactly 1.0 after the attack time
+      (dotimes (i (convert (* 0.1 sr) i64))
+        (set! env (adsr_tick e (= i 0) 1.0))
+        (if (and (< hit 0) (>= env 1.0)) (set! hit i)))
+      (set! ok (* ok (test_near "attack time (s)" (/ (convert hit double) sr) 0.05 0.001)))
+      ;; decay: 99% of the way to the sustain level after the decay time
+      ;; (0.05 s of the decay have passed already)
+      (dotimes (i (convert (* 0.15 sr) i64))
+        (set! env (adsr_tick e #f 1.0)))
+      (set! ok (* ok (test_near "level after the decay time" (convert env double) 0.406 0.001)))
+      (dotimes (i (convert (* 2.0 sr) i64))
+        (set! env (adsr_tick e #f 1.0)))
+      (set! ok (* ok (test_near "sustain level" (convert env double) 0.4 0.0001)))
+      ;; release: down by 40 dB after the release time
+      (dotimes (i (convert (* 0.3 sr) i64))
+        (set! env (adsr_tick e #f 0.0)))
+      (set! ok (* ok (test_near "level after the release time" (convert env double) 0.004 0.0001)))
+      ;; ... and it settles on exactly zero
+      (dotimes (i (convert (* 3.0 sr) i64))
+        (set! env (adsr_tick e #f 0.0)))
+      (set! ok (* ok (test_near "silence" (convert env double) 0.0 0.0)))
+      ;; a note which starts during another's release carries on from its level
+      (dotimes (i (convert (* 0.1 sr) i64))
+        (set! env (adsr_tick e (= i 0) 1.0)))
+      (dotimes (i (convert (* 0.05 sr) i64))
+        (set! env (adsr_tick e #f 0.0)))
+      (set! at_release env)
+      (set! last env)
+      (dotimes (i (convert (* 0.03 sr) i64))
+        (set! env (adsr_tick e (= i 0) 1.0))
+        (if (< env last) (set! monotonic 0))
+        (set! last env))
+      (set! ok (* ok monotonic))
+      (set! ok (* ok (if (and (> at_release 0.1) (< at_release 0.9)) 1 0)))
+      ;; an envelope stepped every 8 frames keeps the same times
+      (adsr_set e 0.05 0.2 0.4 0.3 8.0)
+      (pset! e 0 0.0)
+      (set! hit -1)
+      (dotimes (i (convert (* 0.1 (/ sr 8.0)) i64))
+        (set! env (adsr_tick e (= i 0) 1.0))
+        (if (and (< hit 0) (>= env 1.0)) (set! hit i)))
+      (set! ok (* ok (test_near "attack time at a step of 8 (s)" (/ (* 8.0 (convert hit double)) sr) 0.05 0.002)))
+      ok)))
+
+(xtmtest-result (test_adsr) 1 "adsr-timing-and-restart")
+
+(bind-func test_adsr_closure_agrees
+  (lambda ()
+    (let ((e (adsr_make)) (c (adsr_env_c 1))
+          (i:i64 0) (same:i64 1) (gate:SAMPLE 0.0))
+      (adsr_set e 0.01 0.1 0.5 0.2 1.0)
+      (dotimes (i 30000)
+        (set! gate (if (< (% i 12000) 7000) 1.0 0.0))
+        (if (<> (adsr_tick e (= (% i 12000) 0) gate)
+                (c (= (% i 12000) 0) gate 0.01 0.1 0.5 0.2))
+            (set! same 0)))
+      same)))
+
+(xtmtest-result (test_adsr_closure_agrees) 1 "adsr-closure-agrees")
+
+(bind-func test_decay_mult
+  (lambda ()
+    (let ((mult (decay_mult 0.25)) (env:SAMPLE 1.0) (i:i64 0))
+      (dotimes (i (convert (* 0.25 SRf) i64))
+        (set! env (* env mult)))
+      (test_near "level after the decay time" (convert env double) 0.001 0.00005))))
+
+(xtmtest-result (test_decay_mult) 1 "decay-multiplier-falls-60-dB")
+
+;;;;;;;;;;;;;;;;;
+;; oscillators ;;
+;;;;;;;;;;;;;;;;;
+
+;; which oscillator test_osc_render runs
+(bind-val TEST_SAW i64 0)
+(bind-val TEST_PULSE i64 1)
+(bind-val TEST_TRI i64 2)
+(bind-val TEST_NAIVE_SAW i64 3)
+(bind-val TEST_SINE i64 4)
+
+(bind-func test_osc_render
+  "fill test_buf with n frames of an oscillator which makes k0 cycles in them"
+  (lambda (kind:i64 n:i64 k0:i64)
+    (let ((inc:SAMPLE (/ (convert k0 SAMPLE) (convert n SAMPLE)))
+          (phase:SAMPLE 0.0) (i:i64 0))
+      (dotimes (i n)
+        ;; the phase is worked out afresh each frame, so that rounding
+        ;; doesn't build up and every cycle is the same
+        (set! phase (convert (/ (convert (% (* i k0) n) double) (convert n double)) SAMPLE))
+        (pset! test_buf i
+               (cond ((= kind TEST_SAW) (blep_saw phase inc))
+                     ((= kind TEST_PULSE) (blep_pulse phase inc 0.3))
+                     ((= kind TEST_TRI) (blep_tri phase inc))
+                     ((= kind TEST_SINE) (sine_at phase))
+                     (else (- (* 2.0 phase) 1.0)))))
+      void)))
+
+(bind-func test_osc_stats
+  "of the n frames in test_buf: 0 the mean, 1 the peak, 2 how many times it
+crosses zero going up"
+  (lambda (n:i64 which:i64)
+    (let ((i:i64 0) (sum:double 0.0) (peak:double 0.0) (crossings:i64 0) (x:double 0.0) (last:double 0.0))
+      (set! last (convert (pref test_buf (- n 1)) double))
+      (dotimes (i n)
+        (set! x (convert (pref test_buf i) double))
+        (set! sum (+ sum x))
+        (if (> (fabs x) peak) (set! peak (fabs x)))
+        (if (and (< last 0.0) (>= x 0.0)) (set! crossings (+ crossings 1)))
+        (set! last x))
+      (cond ((= which 0) (/ sum (convert n double)))
+            ((= which 1) peak)
+            (else (convert crossings double))))))
+
+(bind-func test_oscillators
+  (lambda ()
+    (let ((ok:i64 1) (naive:double 0.0) (blep:double 0.0) (naive_low:double 0.0) (blep_low:double 0.0))
+      ;; 181 cycles in 8192 frames is about 1060 Hz at 48 kHz; a waveform with
+      ;; a whole number of cycles has a spectrum of clean lines, and anything
+      ;; between the harmonics is aliasing
+      (test_osc_render TEST_NAIVE_SAW 8192 181)
+      (set! naive (test_alias_db 8192 181))
+      (set! naive_low (test_low_db 8192 181))
+      (test_osc_render TEST_SAW 8192 181)
+      (set! blep (test_alias_db 8192 181))
+      (set! blep_low (test_low_db 8192 181))
+      (set! ok (* ok (test_near "saw: DC" (test_osc_stats 8192 0) 0.0 0.0005)))
+      (set! ok (* ok (test_near "saw: peak" (test_osc_stats 8192 1) 1.0 0.1)))
+      (set! ok (* ok (test_near "saw: cycles" (test_osc_stats 8192 2) 181.0 0.0)))
+      (printf "    aliasing of a 1 kHz saw: naive %.1f dB, PolyBLEP %.1f dB; below the fundamental: naive %.1f dB, PolyBLEP %.1f dB\n"
+              naive blep naive_low blep_low)
+      ;; a naive saw's harmonics above half the sample rate (the 23rd up, here)
+      ;; hold 2.7% of its energy, all of which folds back
+      (set! ok (* ok (test_near "naive saw: aliasing (dB)" naive -15.7 1.0)))
+      (set! ok (* ok (if (< blep (- naive 12.0)) 1 0)))
+      (set! ok (* ok (if (< blep_low (- naive_low 30.0)) 1 0)))
+      (test_osc_render TEST_PULSE 8192 181)
+      (set! ok (* ok (test_near "pulse: DC" (test_osc_stats 8192 0) 0.0 0.0005)))
+      (set! ok (* ok (test_near "pulse: cycles" (test_osc_stats 8192 2) 181.0 0.0)))
+      (set! ok (* ok (if (< (test_alias_db 8192 181) -28.0) 1 0)))
+      (test_osc_render TEST_TRI 8192 181)
+      (set! ok (* ok (test_near "triangle: DC" (test_osc_stats 8192 0) 0.0 0.0005)))
+      (set! ok (* ok (test_near "triangle: peak" (test_osc_stats 8192 1) 1.0 0.03)))
+      (set! ok (* ok (test_near "triangle: cycles" (test_osc_stats 8192 2) 181.0 0.0)))
+      (set! ok (* ok (if (< (test_alias_db 8192 181) -55.0) 1 0)))
+      ;; a high note, where a naive oscillator is at its worst
+      (test_osc_render TEST_SAW 8192 1021)
+      (set! ok (* ok (test_near "high saw: DC" (test_osc_stats 8192 0) 0.0 0.002)))
+      (set! ok (* ok (test_near "high saw: cycles" (test_osc_stats 8192 2) 1021.0 0.0)))
+      (set! ok (* ok (if (< (test_alias_db 8192 1021) -22.0) 1 0)))
+      ok)))
+
+(xtmtest-result (test_oscillators) 1 "band-limited-oscillators")
+
+;; the kit's oscillators are the ones the instruments had: the same numbers
+;; as audio_dsp.xtm's poly_blep gives
+(bind-func test_blep_matches_poly_blep
+  (lambda ()
+    (let ((i:i64 0) (same:i64 1) (phase:SAMPLE 0.0) (inc:SAMPLE 0.0371) (fall:SAMPLE 0.0))
+      (dotimes (i 5000)
+        (set! phase (+ phase inc))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (if (<> (blep_saw phase inc) (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t)))
+            (set! same 0))
+        (set! fall (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
+        (if (<> (blep_pulse phase inc 0.5)
+                (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
+                   (poly_blep fall inc 1.0 #t)))
+            (set! same 0)))
+      same)))
+
+(xtmtest-result (test_blep_matches_poly_blep) 1 "blep-oscillators-match-poly-blep")
+
+(bind-func test_sine_table
+  (lambda ()
+    (let ((ok:i64 1) (i:i64 0) (phase:SAMPLE 0.0) (worst:double 0.0) (e:double 0.0) (x:SAMPLE 0.0))
+      (dotimes (i 100000)
+        (set! phase (* 0.00001 (convert i SAMPLE)))
+        (set! e (fabs (- (convert (sine_at phase) double)
+                         (sin (* 6.283185307179586 (convert phase double))))))
+        (if (> e worst) (set! worst e)))
+      (set! ok (* ok (test_near "sine_at's worst error" worst 0.0 0.000001)))
+      ;; any phase at all: negative, or many cycles on
+      (dotimes (i 1000)
+        (set! x (- (* 0.0173 (convert i SAMPLE)) 8.3))
+        (set! e (fabs (- (convert (sine_wrap x) double)
+                         (sin (* 6.283185307179586 (convert x double))))))
+        (if (> e worst) (set! worst e)))
+      (set! ok (* ok (test_near "sine_wrap's worst error" worst 0.0 0.00001)))
+      (set! ok (* ok (test_near "wrap01 of 2.25" (convert (wrap01 2.25) double) 0.25 0.0)))
+      (set! ok (* ok (test_near "wrap01 of -0.25" (convert (wrap01 -0.25) double) 0.75 0.0)))
+      (set! ok (* ok (test_near "the cosine" (convert (sine_wrap (+ 0.5 0.25)) double) -1.0 0.0000001)))
+      ;; as an oscillator: in tune, and nothing but the fundamental
+      (test_osc_render TEST_SINE 8192 181)
+      (set! ok (* ok (test_near "sine: DC" (test_osc_stats 8192 0) 0.0 0.00001)))
+      (set! ok (* ok (test_near "sine: cycles" (test_osc_stats 8192 2) 181.0 0.0)))
+      (set! ok (* ok (if (< (test_alias_db 8192 181) -110.0) 1 0)))
+      ok)))
+
+(xtmtest-result (test_sine_table) 1 "sine-table")
+
+(bind-func test_noise
+  (lambda ()
+    (let ((ok:i64 1) (seed:i64 12345) (i:i64 0) (x:double 0.0) (last:double 0.0)
+          (sum:double 0.0) (sq:double 0.0) (lag:double 0.0) (peak:double 0.0)
+          (n:double 200000.0))
+      (dotimes (i 200000)
+        (set! x (convert (noise_white seed) double))
+        (set! sum (+ sum x))
+        (set! sq (+ sq (* x x)))
+        (set! lag (+ lag (* x last)))
+        (if (> (fabs x) peak) (set! peak (fabs x)))
+        (set! last x))
+      (set! ok (* ok (test_near "noise: mean" (/ sum n) 0.0 0.005)))
+      ;; evenly spread from -1 to 1: an RMS of 1 / sqrt(3)
+      (set! ok (* ok (test_near "noise: RMS" (sqrt (/ sq n)) 0.57735 0.005)))
+      (set! ok (* ok (test_near "noise: peak" peak 1.0 0.001)))
+      ;; white: each sample has nothing to do with the last
+      (set! ok (* ok (test_near "noise: correlation with the last sample" (/ lag sq) 0.0 0.01)))
+      ok)))
+
+(xtmtest-result (test_noise) 1 "white-noise-statistics")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the Fourier transform ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; cos(3 w) + 0.5 sin(5 w) over 64 points is 32 at bins 3 and 61, and -16i at
+;; bin 5 and +16i at bin 59, and nothing anywhere else. The twiddle table is
+;; for 8192 points, so this checks the reading of a larger table too.
+(bind-func test_fft_known
+  (lambda ()
+    (let ((n:i64 64) (i:i64 0) (ok:i64 1) (rest:double 0.0)
+          (w:double (/ 6.283185307179586 64.0)))
+      (dotimes (i n)
+        (pset! test_re i (+ (cos (* 3.0 w (convert i double))) (* 0.5 (sin (* 5.0 w (convert i double))))))
+        (pset! test_im i 0.0))
+      (fft_radix2 test_re test_im n test_tw TEST_N #f)
+      (set! ok (* ok (test_near "re X[3]" (pref test_re 3) 32.0 0.000001)))
+      (set! ok (* ok (test_near "re X[61]" (pref test_re 61) 32.0 0.000001)))
+      (set! ok (* ok (test_near "im X[5]" (pref test_im 5) -16.0 0.000001)))
+      (set! ok (* ok (test_near "im X[59]" (pref test_im 59) 16.0 0.000001)))
+      (dotimes (i n)
+        (if (and (<> i 3) (<> i 61)) (set! rest (+ rest (fabs (pref test_re i)))))
+        (if (and (<> i 5) (<> i 59)) (set! rest (+ rest (fabs (pref test_im i))))))
+      (set! ok (* ok (test_near "every other bin" rest 0.0 0.000001)))
+      ;; and the inverse: one harmonic in, one cosine out
+      (dotimes (i n) (pset! test_re i 0.0) (pset! test_im i 0.0))
+      (pset! test_re 2 0.5)
+      (pset! test_re 62 0.5)
+      (fft_radix2 test_re test_im n test_tw TEST_N #t)
+      (set! rest 0.0)
+      (dotimes (i n)
+        (set! rest (+ rest (fabs (- (pref test_re i) (cos (* 2.0 w (convert i double))))) (fabs (pref test_im i)))))
+      (set! ok (* ok (test_near "inverse of one harmonic" rest 0.0 0.000001)))
+      ok)))
+
+(xtmtest-result (test_fft_known) 1 "fft-of-a-known-signal")
+
+(bind-func test_fft_round_trip
+  (lambda ()
+    (let ((n:i64 8192) (i:i64 0) (seed:i64 99) (worst:double 0.0) (e:double 0.0)
+          (orig:double* (halloc 16384)))
+      (dotimes (i n)
+        (pset! orig i (convert (noise_white seed) double))
+        (pset! orig (+ n i) (convert (noise_white seed) double))
+        (pset! test_re i (pref orig i))
+        (pset! test_im i (pref orig (+ n i))))
+      (fft_radix2 test_re test_im n test_tw TEST_N #f)
+      (fft_radix2 test_re test_im n test_tw TEST_N #t)
+      ;; forward and back gives n times the input
+      (dotimes (i n)
+        (set! e (fabs (- (/ (pref test_re i) (convert n double)) (pref orig i))))
+        (if (> e worst) (set! worst e))
+        (set! e (fabs (- (/ (pref test_im i) (convert n double)) (pref orig (+ n i)))))
+        (if (> e worst) (set! worst e)))
+      (free orig)
+      (test_near "round trip's worst error" worst 0.0 0.000000001))))
+
+(xtmtest-result (test_fft_round_trip) 1 "fft-round-trip")
+
+;;;;;;;;;;;;;;;;;;
+;; oversampling ;;
+;;;;;;;;;;;;;;;;;;
+
+;; up and straight back down again changes nothing which can be heard
+(bind-func test_oversampler_is_flat
+  (lambda ()
+    (let ((ok:i64 1))
+      (set! ok (* ok (test_near "2x: gain at SR/48" (test_gain TEST_OS2 0.0 0.0 (/ 1.0 48.0)) 0.0 0.001)))
+      (set! ok (* ok (test_near "2x: gain at 0.3 SR" (test_gain TEST_OS2 0.0 0.0 0.3) 0.0 0.001)))
+      (set! ok (* ok (test_near "2x: gain at 0.4 SR" (test_gain TEST_OS2 0.0 0.0 0.4) 0.0 0.01)))
+      (set! ok (* ok (test_near "4x: gain at SR/48" (test_gain TEST_OS4 0.0 0.0 (/ 1.0 48.0)) 0.0 0.001)))
+      (set! ok (* ok (test_near "4x: gain at 0.3 SR" (test_gain TEST_OS4 0.0 0.0 0.3) 0.0 0.001)))
+      (set! ok (* ok (test_near "4x: gain at 0.4 SR" (test_gain TEST_OS4 0.0 0.0 0.4) 0.0 0.01)))
+      ok)))
+
+(xtmtest-result (test_oversampler_is_flat) 1 "oversampler-passes-the-audio-band")
+
+;; Upsampling a sine wave at f should give a sine wave at f and nothing else.
+;; What it must not leave behind is the `image' at (sample rate - f), which
+;; is there in the samples before they're filtered.
+(bind-func test_upsampler_rejects_images
+  (lambda ()
+    (let ((s (os_make)) (ok:i64 1) (i:i64 0) (j:i64 0) (n:i64 2048) (k0:i64 205)
+          (w:double (/ (* 6.283185307179586 205.0) 2048.0))
+          (e_signal:double 0.0) (e_image:double 0.0) (e:double 0.0))
+      ;; by two: 205 cycles in 2048 frames (0.1 SR) is bin 205 of the 4096
+      ;; samples at twice the rate, and its image is at bin 2048 - 205
+      (dotimes (i (* 2 n))
+        (os_up2 s (convert (sin (* w (convert i double))) SAMPLE))
+        (if (>= i n)
+            (begin (pset! test_re (* 2 (- i n)) (convert (pref s 0) double))
+                   (pset! test_re (+ (* 2 (- i n)) 1) (convert (pref s 1) double)))))
+      (dotimes (i (* 2 n)) (pset! test_im i 0.0))
+      (fft_radix2 test_re test_im (* 2 n) test_tw TEST_N #f)
+      (set! e_signal (+ (* (pref test_re k0) (pref test_re k0)) (* (pref test_im k0) (pref test_im k0))))
+      (set! j (- n k0))
+      (set! e_image (+ (* (pref test_re j) (pref test_re j)) (* (pref test_im j) (pref test_im j))))
+      (set! ok (* ok (test_near "2x: level of the signal" (test_db (/ (sqrt e_signal) (convert n double))) 0.0 0.01)))
+      (set! ok (* ok (if (< (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30))) -65.0) 1 0)))
+      (if (>= (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30))) -65.0)
+          (printf "    2x image at %f dB\n" (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30)))))
+      ;; by four: everything which isn't the signal
+      (os_clear s)
+      (dotimes (i (* 2 n))
+        (os_up4 s (convert (sin (* w (convert i double))) SAMPLE))
+        (if (>= i n)
+            (dotimes (j 4)
+              (pset! test_re (+ (* 4 (- i n)) j) (convert (pref s j) double)))))
+      (dotimes (i (* 4 n)) (pset! test_im i 0.0))
+      (fft_radix2 test_re test_im (* 4 n) test_tw TEST_N #f)
+      (set! e_signal 0.0)
+      (set! e_image 0.0)
+      (dotimes (i (* 2 n))
+        (set! e (+ (* (pref test_re i) (pref test_re i)) (* (pref test_im i) (pref test_im i))))
+        (if (= i k0) (set! e_signal e) (set! e_image (+ e_image e))))
+      (set! ok (* ok (if (< (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30))) -58.0) 1 0)))
+      (if (>= (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30))) -58.0)
+          (printf "    4x images at %f dB\n" (* 10.0 (log10 (+ (/ e_image e_signal) 1.0e-30)))))
+      ok)))
+
+(xtmtest-result (test_upsampler_rejects_images) 1 "upsampler-rejects-images")
+
+;; which saturator test_saturate runs
+(bind-val TEST_SAT_NAIVE i64 0)
+(bind-val TEST_SAT_2X i64 1)
+(bind-val TEST_SAT_4X i64 2)
+
+(bind-func test_saturate
+  "fill test_buf with n frames of a sine wave (k0 cycles in n frames, of
+amplitude `amp') through a saturator, once it has settled"
+  (lambda (kind:i64 n:i64 k0:i64 amp:SAMPLE drive:SAMPLE)
+    (let ((s (os_make)) (i:i64 0) (x:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (w:double (/ (* 6.283185307179586 (convert k0 double)) (convert n double))))
+      (dotimes (i (* 2 n))
+        (set! x (* amp (convert (sin (* w (convert i double))) SAMPLE)))
+        (set! y (cond ((= kind TEST_SAT_2X) (oversat2 s x drive))
+                      ((= kind TEST_SAT_4X) (oversat4 s x drive))
+                      (else (/ (tanh_fast (* drive x)) (tanh_fast drive)))))
+        (if (>= i n) (pset! test_buf (- i n) y)))
+      void)))
+
+(bind-func test_buf_rms
+  (lambda (n:i64)
+    (let ((i:i64 0) (sq:double 0.0))
+      (dotimes (i n)
+        (set! sq (+ sq (convert (* (pref test_buf i) (pref test_buf i)) double))))
+      (sqrt (/ sq (convert n double))))))
+
+;; A sine wave at 1237 cycles in 8192 frames (7.2 kHz at 48 kHz), driven hard.
+;; Its third harmonic is in the band; the fifth and above are over half the
+;; sample rate, and whatever is found between the harmonics is those, folded
+;; back down.
+(bind-func test_oversat_aliasing
+  (lambda ()
+    (let ((ok:i64 1) (naive:double 0.0) (two:double 0.0) (four:double 0.0)
+          (rms_naive:double 0.0))
+      (test_saturate TEST_SAT_NAIVE 8192 1237 1.0 8.0)
+      (set! naive (test_alias_db 8192 1237))
+      (set! rms_naive (test_buf_rms 8192))
+      (test_saturate TEST_SAT_2X 8192 1237 1.0 8.0)
+      (set! two (test_alias_db 8192 1237))
+      (test_saturate TEST_SAT_4X 8192 1237 1.0 8.0)
+      (set! four (test_alias_db 8192 1237))
+      (printf "    aliasing of a hard-driven 7.2 kHz sine: naive %.1f dB, 2x %.1f dB, 4x %.1f dB\n" naive two four)
+      (set! ok (* ok (test_near "naive saturator's aliasing (dB)" naive -13.4 2.0)))
+      (set! ok (* ok (if (< two (- naive 10.0)) 1 0)))
+      (set! ok (* ok (if (< four (- naive 22.0)) 1 0)))
+      ;; the fundamental and third harmonic are what the naive one has, so
+      ;; the level is the naive one's less the energy which was aliasing
+      (set! ok (* ok (test_near "4x: level against naive (dB)" (test_db (/ (test_buf_rms 8192) rms_naive)) -0.6 0.5)))
+      ok)))
+
+(xtmtest-result (test_oversat_aliasing) 1 "oversampled-saturator-reduces-aliasing")
+
+(bind-func test_oversat_level
+  (lambda ()
+    (let ((ok:i64 1) (s (os_make)) (i:i64 0) (x:SAMPLE 0.0) (same:i64 1) (peak:double 0.0)
+          (biggest_step:double 0.0) (last:SAMPLE 0.0) (y:SAMPLE 0.0))
+      ;; a full-scale low sine, driven hard, still peaks at full scale
+      (test_saturate TEST_SAT_4X 8192 37 1.0 6.0)
+      (dotimes (i 8192)
+        (if (> (fabs (convert (pref test_buf i) double)) peak)
+            (set! peak (fabs (convert (pref test_buf i) double)))))
+      (set! ok (* ok (test_near "4x: peak of a driven full-scale sine" peak 1.0 0.02)))
+      ;; a quiet signal comes up by drive / tanh(drive)
+      (test_saturate TEST_SAT_4X 8192 37 0.01 2.0)
+      (set! ok (* ok (test_near "4x: gain for a quiet signal (dB)"
+                                (test_db (/ (test_buf_rms 8192) 0.00707107)) 6.16 0.05)))
+      (test_saturate TEST_SAT_2X 8192 37 0.01 2.0)
+      (set! ok (* ok (test_near "2x: gain for a quiet signal (dB)"
+                                (test_db (/ (test_buf_rms 8192) 0.00707107)) 6.16 0.05)))
+      ;; a very small drive is as good as none
+      (test_saturate TEST_SAT_4X 8192 37 0.5 0.01)
+      (set! ok (* ok (test_near "4x: gain at a drive of 0.01 (dB)"
+                                (test_db (/ (test_buf_rms 8192) 0.35355339)) 0.0 0.001)))
+      ;; with no drive the signal is passed through untouched
+      (dotimes (i 1000)
+        (set! x (convert (sin (* 0.05 (convert i double))) SAMPLE))
+        (if (<> (oversat4 s x 0.0) x) (set! same 0)))
+      (set! ok (* ok same))
+      ;; turning the drive on and off again doesn't click: the output never
+      ;; moves much further in one frame than the input does (0.05 at most
+      ;; here, and up to 4 times that with the drive's gain)
+      (set! last 0.0)
+      (dotimes (i 6000)
+        (set! x (convert (sin (* 0.05 (convert i double))) SAMPLE))
+        (set! y (oversat4 s x (if (and (>= i 1000) (< i 3000)) 4.0 0.0)))
+        (if (> (fabs (convert (- y last) double)) biggest_step)
+            (set! biggest_step (fabs (convert (- y last) double))))
+        (set! last y)
+        ;; ... and five milliseconds after the drive goes, it's untouched again
+        (if (and (> i 3500) (<> y x)) (set! same 0)))
+      (set! ok (* ok same))
+      (set! ok (* ok (test_near "biggest step while switching" biggest_step 0.1 0.11)))
+      ok)))
+
+(xtmtest-result (test_oversat_level) 1 "oversampled-saturator-level-and-bypass")
