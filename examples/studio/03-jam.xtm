@@ -1,0 +1,153 @@
+;;; 03-jam.xtm -- putting a track together, live
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; This file builds a track up one layer at a time, the way you might in a
+;; performance: a beat, a bassline, chords, a melody, and then the moves which
+;; turn a loop into a piece of music. Evaluate it one expression at a time, and
+;; change things as you go.
+;;
+;; examples/studio/songs has finished pieces in half a dozen styles, written
+;; as scores so that they can be rendered to audio files.
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+(studio:start)
+(bpm 120)
+
+;; Loading an instrument compiles it, which takes a few seconds each, so set
+;; the tracks up before you start.
+(track 'drums 'kit909)
+(track 'bass 'acid 'rubber)
+(track 'pad 'strings)
+(track 'keys 'epiano 'suitcase)
+(track 'bells 'resonator 'vibes)
+
+;; a rough mix
+(ctl 'drums 'reverb 0.06)
+(ctl 'pad 'gain 0.5 'reverb 0.4 'hpf 180)
+(ctl 'keys 'reverb 0.25 'pan 0.4)
+(ctl 'bells 'gain 0.8 'reverb 0.45 'delay 0.3 'pan 0.65)
+
+;;;;;;;;;;;;;;
+;; the beat ;;
+;;;;;;;;;;;;;;
+
+;; four on the floor
+(d1 (sound 'bd*4))
+
+;; claps on two and four, open hats on the off-beats
+(d1 (stack (sound 'bd*4)
+           (sound '(~ cp ~ cp))
+           (sound '((~ oh)*4))))
+
+;; sixteenth-note hats with an accent pattern, and a few left out at random
+(d2 (sound 'hh*16)
+    (vel '(0.5 0.25 0.4 0.25))
+    (degrade-by 0.15))
+
+;;;;;;;;;;;;;;;;
+;; the chords ;;
+;;;;;;;;;;;;;;;;
+
+;; Four chords, one per cycle: C minor 9, A flat major 7, E flat major 7 and
+;; B flat. Each <...> is one voice of the chord, moving from chord to chord.
+(define chords
+  '#(<c3 ab2 eb3 bb2> <eb3 c3 g3 d3> <g3 eb3 bb3 f3> <bb3 g3 d4 a3> <d4 c4 f4 c4>))
+
+(d3 (note chords)
+    (sound 'pad)
+    (vel 0.6)
+    (legato 1))
+
+;; the electric piano plays the same chords as a rhythm
+(d4 (note chords)
+    (sound 'keys)
+    (struct '(~ t ~ ~ t ~ ~ ~))
+    (vel 0.5)
+    (legato 1.5))
+
+;;;;;;;;;;;;;;
+;; the bass ;;
+;;;;;;;;;;;;;;
+
+;; The line is written on C, and (add (note ...)) moves it to each chord's
+;; root. On the acid synth a velocity above 0.8 is an accent, and a note
+;; longer than its step slides into the next.
+(d5 (note '(c2 ~ c2 c3 ~ c2 g2 c3))
+    (add (note '(<0 -4 3 -2>)))
+    (sound 'bass)
+    (vel '(0.7 0.7 0.7 1 0.7 0.7 1 0.7))
+    (legato '(0.5 0.5 0.5 0.5 0.5 1.2 0.5 0.5)))
+
+;; open its filter slowly, over eight cycles
+(d5 (note '(c2 ~ c2 c3 ~ c2 g2 c3))
+    (add (note '(<0 -4 3 -2>)))
+    (sound 'bass)
+    (vel '(0.7 0.7 0.7 1 0.7 0.7 1 0.7))
+    (legato '(0.5 0.5 0.5 0.5 0.5 1.2 0.5 0.5))
+    (param 'cutoff (between 150 900 (slow 8 sine))))
+
+;; or grab the knob yourself
+(preset 'bass 'squelchy)
+(ctl 'bass 'cutoff 500)
+
+;;;;;;;;;;;;;;;
+;; on top    ;;
+;;;;;;;;;;;;;;;
+
+;; arp plays each chord's notes one after another: here eight to the cycle,
+;; an octave up
+(d6 (note chords)
+    (arp 8)
+    (add (note 12))
+    (sound 'bells)
+    (vel (between 0.35 0.7 perlin))
+    (legato 2))
+
+;; a melody of its own, a different bar each cycle
+(d6 (note (scale 'c5 'minor-pentatonic
+                 '(<(4 ~ 3 4) (2 ~ ~ 1) (4 ~ 3 2) (1 ~ ~ 0)> ~ <(~ 2) ~ (~ 5) ~> <1 0 4 2>)))
+    (sound 'bells)
+    (vel 0.7)
+    (legato 2))
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; making it a piece  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a fill at the end of every fourth cycle: the last quarter of the beat,
+;; doubled
+(d1 (stack (sound 'bd*4)
+           (sound '(~ cp ~ cp))
+           (sound '((~ oh)*4)))
+    (every-from 4 3 (within 3/4 1 (ply 2))))
+
+;; a breakdown: take the drums and bass out ...
+(d1 silence)
+(d2 silence)
+(d5 silence)
+
+;; ... close the pad's filter down, and open it up again
+(ctl 'pad 'lpf 600)
+(ctl 'pad 'lpf 20000)
+
+;; a snare roll to come back in on: once plays one cycle, straight away
+(once (sound '(~ ~ ~ ~ sd sd*2 sd*2 sd*4)) (vel (between 0.4 0.9 saw)))
+
+;; ... and back in (evaluate the d1, d2 and d5 forms above again)
+
+;; change the tempo, the reverb, the echo
+(bpm 126)
+(master 'reverb-size 0.9)
+(master 'delay-time (/ 3/16 (cps)) 'delay-feedback 0.6)
+
+;; how loud is everything?
+(levels)
+
+;; and stop
+(hush)
