@@ -1,0 +1,349 @@
+;;; chip.xtm -- a chiptune synth in the style of 8-bit game consoles
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The sound chips in 1980s game consoles and home computers (the NES's 2A03,
+;; the Game Boy, the Commodore 64's SID) each had three or four simple
+;; channels. A channel played one waveform at a time, at a pitch and a volume
+;; which the game's sound driver set, typically once per video frame (60 times
+;; a second, or 50 in PAL countries).
+;;
+;; This instrument is one such channel, eight times over. The waveforms:
+;;
+;; - wave 0, a *pulse*: high for part of each cycle and low for the rest. The
+;;   fraction of the cycle it spends high is the duty cycle, and the NES
+;;   offered 12.5%, 25% and 50%. 50% is a square wave, hollow and woody; the
+;;   narrower pulses are thinner and more nasal.
+;; - wave 1, the NES *triangle*: not a smooth triangle but a 4-bit staircase,
+;;   32 steps per cycle (15, 14 ... 1, 0, 0, 1 ... 15). The steps add a faint
+;;   buzz high above the note, which is why NES basslines sound the way they do.
+;; - wave 2, a *saw*, as on the SID.
+;; - wave 3, a *ring-modulated triangle*, as on the SID: a triangle whose sign
+;;   is flipped by a square wave at another pitch (the `ring` parameter), which
+;;   makes clangorous, bell-like tones.
+;;
+;; The chips had no filters and no effects, so composers got their sounds by
+;; moving pitch and volume from frame to frame. Those tricks are the
+;; parameters here:
+;;
+;; - a fast *arpeggio* (arp1, arp2, arp-rate) cycles a note through three
+;;   pitches, the note and two intervals above it, so quickly that the ear
+;;   hears a shimmering chord: a chord on a single channel.
+;; - *vibrato* which starts after a delay, as a singer's does.
+;; - a *slide* into each note from a few semitones away.
+;; - a *duty-cycle sweep* (pwm), which moves the pulse's width back and forth.
+;; - a volume envelope which moves in *steps*: the NES's volume register was 4
+;;   bits wide, so a fading note falls through 16 audible levels.
+;;
+;; Vibrato, slide and the duty sweep move once per 1/60 s frame, as they did
+;; under a real sound driver, so they too move in small steps.
+;;
+;; The one way this differs from the hardware is aliasing. The chips ran their
+;; oscillators at hundreds of kilohertz or more, so a pulse wave's harmonics
+;; went far above hearing and were never folded back. At 44.1 or 48 kHz a
+;; naive pulse wave folds its upper harmonics back down as inharmonic whistles,
+;; worse the higher the note. So every edge here is rounded off with poly_blep
+;; (see libs/core/audio_dsp.xtm), which removes most of the folding, and the
+;; harshness comes from the waveforms themselves rather than from aliasing.
+;;
+;; The instrument's effect is an optional bit-crusher (bits) and sample-rate
+;; reducer (srate), for a deliberately lo-fi sound.
+;;
+;; This is an original implementation, built from published descriptions of
+;; how these chips behave.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-chip)
+(define *xtmlib-studio-chip-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument chip
+  "a chiptune synth: pulse, stepped triangle, saw and ring waves, with arpeggio, vibrato and slide"
+  (params
+    (wave 0.0 "0 pulse, 1 the NES's stepped triangle, 2 saw, 3 ring-modulated triangle")
+    (duty 0.5 "pulse width, 0.0 to 1.0: 0.125, 0.25 and 0.5 are the classic settings")
+    (pwm 0.0 "how far the duty-cycle sweep narrows the pulse, 0.0 to 1.0")
+    (pwm-rate 0.5 "duty-cycle sweep rate in Hz")
+    (ring 19.0 "for wave 3: pitch of the ring modulator above the note, in semitones")
+    (arp1 0.0 "arpeggio: the second note, in semitones above the first")
+    (arp2 0.0 "arpeggio: the third note, in semitones above the first")
+    (arp-rate 60.0 "arpeggio speed, in notes per second")
+    (vib 0.0 "vibrato depth in semitones")
+    (vib-rate 6.0 "vibrato rate in Hz")
+    (vib-delay 0.2 "seconds before the vibrato starts")
+    (slide 0.0 "each note starts this many semitones away from its pitch and slides to it")
+    (slide-time 0.05 "seconds the slide takes")
+    (attack 0.0 "seconds to rise to full volume")
+    (decay 1.5 "seconds the volume would take to fall from full to silence; it stops at the sustain level")
+    (sustain 0.75 "volume while the note is held, 0.0 to 1.0")
+    (release 0.08 "seconds to fall from full volume to silence after the note ends")
+    (steps 16.0 "volume levels: 16.0 is a 4-bit volume register, 0.0 a smooth envelope")
+    (bits 16.0 "bit-crusher: output bit depth, 2.0 to 16.0 (16.0 is off)")
+    (srate 0.0 "sample-rate reducer: output sample rate in Hz (0.0 is off)")
+    (level 0.35 "output level"))
+  (presets
+    (square)
+    (thin (duty 0.125) (level 0.3))
+    (major (duty 0.25) (arp1 4.0) (arp2 7.0) (decay 0.8) (sustain 0.5) (level 0.3))
+    (minor (duty 0.25) (arp1 3.0) (arp2 7.0) (decay 0.8) (sustain 0.5) (level 0.3))
+    (bass (wave 1.0) (sustain 1.0) (release 0.03) (level 0.4))
+    (vibrato (duty 0.25) (vib 0.3) (vib-rate 5.5) (vib-delay 0.25) (slide -1.0) (slide-time 0.06)
+             (decay 3.0) (sustain 0.6) (release 0.15) (level 0.3))
+    (pwm (pwm 0.8) (pwm-rate 0.6) (attack 0.12) (decay 2.0) (sustain 0.8) (release 0.5) (level 0.2))
+    (blip (duty 0.25) (decay 0.15) (sustain 0.0) (release 0.02) (level 0.3))
+    (sid (wave 2.0) (vib 0.2) (vib-rate 6.5) (vib-delay 0.3) (slide -2.0) (slide-time 0.04)
+         (sustain 0.8) (release 0.2) (level 0.3))
+    (bell (wave 3.0) (decay 1.2) (sustain 0.0) (release 0.6) (level 0.3))))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; the oscillators ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; Each oscillator is a function of the phase (0.0 to 1.0 through the cycle)
+;; and inc, how far the phase moves each frame (frequency / sample rate).
+;; chipkit.xtm uses them too.
+
+(bind-func static chip_pulse
+  "a pulse wave, high for the first `duty` of each cycle. The mean is taken
+out, so the pulse has no DC offset whatever its width."
+  (lambda (phase:SAMPLE inc:SAMPLE duty:SAMPLE)
+    (let ((fall_phase (- phase duty)))
+      (if (< fall_phase 0.0) (set! fall_phase (+ fall_phase 1.0)))
+      ;; the rising edge is at phase 0, the falling edge at phase `duty`
+      (- (+ (if (< phase duty) 1.0 -1.0)
+            (poly_blep phase inc 1.0 #t))
+         (poly_blep fall_phase inc 1.0 #t)
+         (- (* 2.0 duty) 1.0)))))
+
+;; The NES triangle counts down 15 to 0 and back up 0 to 15, one step every
+;; 1/32 of a cycle. Here that staircase is built as a smooth triangle (`ramp`)
+;; plus the small, fast sawtooth which turns it into steps (`stair`): within
+;; each step the ramp keeps moving and the sawtooth cancels it out, and at
+;; each step's edge the sawtooth jumps by one level.
+;;
+;; The jumps are rounded off with poly_blep. They come 32 times per cycle,
+;; so for high notes they arrive faster than poly_blep can handle, and the
+;; steps fade out between about B4 and G#5. By then their buzz, at 32 times
+;; the note's frequency, is above 15 kHz.
+(bind-func static chip_triangle
+  "the NES's 4-bit stepped triangle, from -1.0 to 1.0, starting at the top"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (let ((u (* 32.0 phase))               ;; 0 to 32 through the cycle
+          (k:i64 (convert u i64))          ;; which step we're on
+          (f (- u (convert k SAMPLE)))     ;; how far through it
+          (falling (< k 16))
+          (ramp:SAMPLE (if falling (- 15.5 u) (- u 16.5)))
+          (stair:SAMPLE (if falling (- f 0.5) (- 0.5 f)))
+          ;; the nearest step edge. There's no jump at 0 and 16, where the
+          ;; staircase turns round and repeats a level.
+          (edge:i64 (if (> f 0.5) (+ k 1) k))
+          (inc32 (* 32.0 inc))
+          (fade:SAMPLE (* 4.0 (- 0.6 inc32))))
+      (if (> fade 1.0) (set! fade 1.0))
+      (if (> fade 0.0)
+          (begin
+            (if (<> (% edge 16) 0)
+                (set! stair (+ stair (poly_blep f inc32 0.5 (> edge 16)))))
+            (set! ramp (+ ramp (* fade stair)))))
+      (/ (- ramp 7.5) 7.5))))
+
+(bind-func static chip_saw
+  "a rising sawtooth, -1.0 to 1.0"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t))))
+
+;; The SID's ring modulation replaces a triangle's top bit with the
+;; exclusive-or of it and another oscillator's square wave: in effect, the
+;; triangle is multiplied by that square. The triangle here is a smooth one,
+;; which has no hard edges and so barely aliases; the square's edges are
+;; rounded off by chip_pulse.
+(bind-func static chip_ringmod
+  "a triangle at `phase` multiplied by a square wave at `ring_phase`"
+  (lambda (phase:SAMPLE ring_phase:SAMPLE ring_inc:SAMPLE)
+    (* (- (* 4.0 (fabs (- phase 0.5))) 1.0)
+       (chip_pulse ring_phase ring_inc 0.5))))
+
+(bind-func static chip_inc
+  "the phase increment for a frequency in Hz, kept between 0.0 and 0.45 (just
+under the Nyquist frequency), so the oscillators stay well behaved whatever the
+parameters ask for"
+  (lambda (freq:SAMPLE)
+    (let ((inc (/ freq SRf)))
+      (if (< inc 0.0) (set! inc 0.0))
+      (if (> inc 0.45) (set! inc 0.45))
+      inc)))
+
+(bind-func static chip_wrap
+  "move a phase back into 0.0 to 1.0"
+  (lambda (phase:SAMPLE)
+    (if (>= phase 1.0) (- phase 1.0) phase)))
+
+;;;;;;;;;;;;;;;;;;;
+;; the envelope ;;
+;;;;;;;;;;;;;;;;;;;
+
+(bind-func static chip_ramp_step
+  "how far a straight-line envelope moves each frame, to go between 0.0 and
+1.0 in `seconds`"
+  (lambda (seconds:SAMPLE)
+    (/ 1.0 (* SRf (if (< seconds 0.0005) 0.0005 seconds)))))
+
+(bind-func static chip_volume_steps
+  "round the volume `vol` (0.0 to 1.0) up to the next of `levels` steps,
+as a volume register `levels` + 1 values wide would hold it (0.0 is silent).
+Fewer than one level leaves the volume alone."
+  (lambda (vol:SAMPLE levels:SAMPLE)
+    (if (< levels 1.0)
+        vol
+        (/ (ceil (* vol levels)) levels))))
+
+;;;;;;;;;;;;;;;
+;; the voice ;;
+;;;;;;;;;;;;;;;
+
+;; Every 32 audio frames the voice works out its pitch, duty and envelope
+;; rates from the parameters, as a game's sound driver did once per video
+;; frame. Then, every audio frame, it runs the oscillator and the envelope.
+;;
+;; The envelope is linear, like the NES's: its level falls by the same amount
+;; each frame. The volume (envelope times velocity) is rounded up to one of
+;; `steps` levels, and then smoothed over less than a millisecond, which takes
+;; the click out of each step (and out of a note's hard start) without
+;; blurring the steps themselves.
+;;
+;; The oscillators run freely from note to note, as the hardware's did; the
+;; volume starts from wherever it was, so a stolen voice doesn't click.
+
+(bind-func chip_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
+          (ring_phase:SAMPLE 0.0) (ring_inc:SAMPLE 0.0)
+          (wave:i64 0) (duty:SAMPLE 0.5)
+          (t:SAMPLE 0.0) (frame_t:SAMPLE 0.0)
+          (arp_step:i64 0) (offset:SAMPLE 0.0) (sweep:SAMPLE 0.0)
+          ;; the envelope
+          (env:SAMPLE 0.0) (attacking:i1 #f)
+          (attack_step:SAMPLE 1.0) (decay_step:SAMPLE 0.0) (release_step:SAMPLE 0.0)
+          (sustain:SAMPLE 1.0) (levels:SAMPLE 15.0)
+          (vol:SAMPLE 0.0) (gain:SAMPLE 0.0)
+          (smooth (smoothing_coeff 0.0007))
+          (x:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (set! attacking #t))
+        ;; the sound driver, every 32 frames
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! t (/ (convert (voice_age v) SAMPLE) SRf))
+              ;; the time at the start of the current 1/60 s video frame
+              (set! frame_t (/ (floor (* t 60.0)) 60.0))
+              ;; the arpeggio: the note, then arp1 above it, then arp2
+              (set! arp_step (% (convert (* t (chip_arp_rate p)) i64) 3))
+              (set! offset 0.0)
+              (if (= arp_step 1) (set! offset (chip_arp1 p)))
+              (if (= arp_step 2) (set! offset (chip_arp2 p)))
+              ;; vibrato, once the delay is over
+              (if (> frame_t (chip_vib_delay p))
+                  (set! offset (+ offset (* (chip_vib p)
+                                            (sin (* STWOPI (chip_vib_rate p)
+                                                    (- frame_t (chip_vib_delay p))))))))
+              ;; the slide from `slide` semitones away
+              (if (< frame_t (chip_slide_time p))
+                  (set! offset (+ offset (* (chip_slide p) (- 1.0 (/ frame_t (chip_slide_time p)))))))
+              (set! inc (chip_inc (* (voice_freq v) (semitones offset))))
+              (set! ring_inc (chip_inc (* (voice_freq v) (semitones (+ offset (chip_ring p))))))
+              ;; the duty-cycle sweep: a triangle LFO which narrows the pulse
+              ;; and widens it again, by up to 85% of its width
+              (set! sweep (* (chip_pwm_rate p) frame_t))
+              (set! sweep (fabs (- (* 2.0 (- sweep (floor sweep))) 1.0)))
+              (set! duty (* (chip_duty p) (- 1.0 (* 0.85 (chip_pwm p) (- 1.0 sweep)))))
+              (if (< duty 0.02) (set! duty 0.02))
+              (if (> duty 0.98) (set! duty 0.98))
+              (set! wave (convert (+ (chip_wave p) 0.5) i64))
+              ;; the envelope's step per frame for each stage
+              (set! attack_step (chip_ramp_step (chip_attack p)))
+              (set! decay_step (chip_ramp_step (chip_decay p)))
+              (set! release_step (chip_ramp_step (chip_release p)))
+              (set! sustain (chip_sustain p))
+              (set! levels (- (chip_steps p) 1.0))))
+        ;; the oscillator
+        (set! phase (chip_wrap (+ phase inc)))
+        (set! ring_phase (chip_wrap (+ ring_phase ring_inc)))
+        (set! x (cond ((= wave 1) (chip_triangle phase inc))
+                      ((= wave 2) (chip_saw phase inc))
+                      ((= wave 3) (chip_ringmod phase ring_phase ring_inc))
+                      (else (chip_pulse phase inc duty))))
+        ;; the envelope: up to full, down to the sustain level, and down to
+        ;; silence once the note is released
+        (cond ((< (voice_gate v) 0.5)
+               (set! attacking #f)
+               (set! env (- env release_step))
+               void)
+              (attacking
+               (set! env (+ env attack_step))
+               (if (>= env 1.0) (begin (set! env 1.0) (set! attacking #f)))
+               void)
+              ((> env sustain)
+               (set! env (- env decay_step))
+               (if (< env sustain) (set! env sustain))
+               void)
+              (else void))
+        (if (< env 0.0) (set! env 0.0))
+        ;; the volume register
+        (set! vol (chip_volume_steps (* env (voice_vel v)) levels))
+        (set! gain (+ gain (* smooth (- vol gain))))
+        (frame_add out (* (chip_level p) gain x))
+        ;; the note is over once its volume has reached zero
+        (if (and (not attacking) (<= env 0.0) (< gain 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; the bit-crusher ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; The sample-rate reducer holds each sample for 1/srate seconds, which
+;; aliases on purpose: a gritty, metallic fold-over. The bit-crusher then
+;; rounds each sample to one of 2^bits levels across -0.5 to 0.5, about the
+;; range a chord on this instrument covers. Both are off by default.
+
+(bind-func chip_fx_c
+  (lambda (p:SAMPLE*)
+    (let ((hold_phase:SAMPLE 1.0)
+          (held_l:SAMPLE 0.0) (held_r:SAMPLE 0.0)
+          (bits:SAMPLE -1.0) (scale:SAMPLE 1.0))
+      (lambda (frame:SAMPLE*)
+        (if (> (chip_srate p) 0.0)
+            (begin
+              (set! hold_phase (+ hold_phase (/ (chip_srate p) SRf)))
+              (if (>= hold_phase 1.0)
+                  (begin
+                    (set! hold_phase (- hold_phase (floor hold_phase)))
+                    (set! held_l (pref frame 0))
+                    (set! held_r (pref frame 1))))
+              (pset! frame 0 held_l)
+              (pset! frame 1 held_r)))
+        (if (< (chip_bits p) 15.5)
+            (begin
+              (if (<> (chip_bits p) bits)
+                  (begin
+                    (set! bits (chip_bits p))
+                    (set! scale (pow 2.0 (if (< bits 2.0) 2.0 bits)))))
+              (pset! frame 0 (/ (floor (+ 0.5 (* scale (pref frame 0)))) scale))
+              (pset! frame 1 (/ (floor (+ 0.5 (* scale (pref frame 1)))) scale))))
+        void))))
+
+(bind-func chip_make
+  (lambda ()
+    (let ((inst (inst_make "chip" 8 (chip_nparams)))
+          (i:i64 0))
+      (chip_defaults (inst_params inst))
+      (dotimes (i 8)
+        (inst_set_voice inst i (chip_voice_c (inst_params inst))))
+      (inst_set_fx inst (chip_fx_c (inst_params inst)))
+      inst)))

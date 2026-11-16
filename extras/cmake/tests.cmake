@@ -216,7 +216,7 @@ extempore_add_audio_offline_test(hello-sweep
 # pushes notes through the whole signal path; the check is only that sound
 # came out. (The sampled instruments need the optional assets, so they aren't
 # rendered here.)
-set(_studio_demos acid epiano fm kit808 kit909 macro organ polysynth resonator strings)
+set(_studio_demos acid chip epiano fm kit808 kit909 macro organ polysynth resonator strings)
 foreach(_demo ${_studio_demos})
     extempore_add_audio_offline_test(studio-${_demo}
         examples/studio/demos/${_demo}.xtm 3.0

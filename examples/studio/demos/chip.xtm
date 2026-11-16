@@ -1,0 +1,186 @@
+;;; chip.xtm -- a tour of the chip synth and the chipkit drums, and a short chiptune
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; First each of the chip synth's presets plays something which suits it,
+;; then each of the chipkit's presets plays two bars of a beat, and then all
+;; of them play a short tune in A minor, in the style of an 8-bit game: a lead
+;; with vibrato, a triangle bassline, a channel of fast arpeggios standing in
+;; for chords, and the drums.
+;;
+;;   extras/studio/render examples/studio/demos/chip.xtm /tmp/chip.wav 80
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 150)
+
+(track 'lead 'chip 'vibrato)
+(track 'chords 'chip 'minor)
+(track 'bass 'chip 'bass)
+(track 'drums 'chipkit)
+
+(ctl 'lead 'gain 0.55 'delay 0.2 'reverb 0.1 'pan 0.55)
+(ctl 'chords 'gain 0.36 'pan 0.42 'reverb 0.1)
+(ctl 'bass 'gain 0.6)
+(ctl 'drums 'gain 0.55)
+(master 'delay-time (/ 3/16 (cps)) 'delay-feedback 0.3 'reverb-size 0.4)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a tour of the presets ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; play a list of (pitch seconds) on a track from `start`, one after another,
+;; each note lasting `legato` of its time
+(define chip-demo-line
+  (lambda (start track notes legato)
+    (let loop ((t start) (notes notes))
+      (if (pair? notes)
+          (begin
+            (score-note t track (car (car notes)) 0.85 (* legato (cadr (car notes))))
+            (loop (+ t (cadr (car notes))) (cdr notes)))))))
+
+;; play the pitches together, as a chord
+(define chip-demo-chord
+  (lambda (start track pitches seconds)
+    (for-each (lambda (pitch) (score-note start track pitch 0.7 seconds)) pitches)))
+
+(define chip-demo-melody
+  '((69 0.2) (72 0.2) (76 0.4) (74 0.2) (72 0.2) (71 0.4) (72 0.2) (74 0.2)
+    (76 0.4) (79 0.4) (76 0.8)))
+
+;; square, thin: the same tune, so the two widths can be compared
+(score-preset 0.0 'lead 'square)
+(chip-demo-line 0.0 'lead chip-demo-melody 0.85)
+(score-preset 4.0 'lead 'thin)
+(chip-demo-line 4.0 'lead chip-demo-melody 0.85)
+
+;; major, minor: one note each, which the arpeggio turns into a chord
+(score-preset 8.0 'lead 'major)
+(chip-demo-line 8.0 'lead '((60 1.0) (65 1.0) (67 1.0) (60 1.0)) 0.9)
+(score-preset 12.0 'lead 'minor)
+(chip-demo-line 12.0 'lead '((57 1.0) (62 1.0) (64 1.0) (57 1.0)) 0.9)
+
+;; bass: the stepped triangle, bouncing between octaves
+(score-preset 16.0 'lead 'bass)
+(chip-demo-line 16.0 'lead
+                '((33 0.2) (45 0.2) (33 0.2) (45 0.2) (29 0.2) (41 0.2) (29 0.2) (41 0.2)
+                  (36 0.2) (48 0.2) (36 0.2) (48 0.2) (31 0.2) (43 0.2) (31 0.2) (43 0.2)
+                  (33 0.8))
+                0.8)
+
+;; vibrato: long notes, so the vibrato has time to arrive
+(score-preset 20.0 'lead 'vibrato)
+(chip-demo-line 20.0 'lead '((76 0.8) (74 0.4) (72 0.4) (71 1.2) (69 1.2)) 0.95)
+
+;; pwm: a slow pad, two chords
+(score-preset 24.0 'lead 'pwm)
+(chip-demo-chord 24.0 'lead '(57 60 64) 1.8)
+(chip-demo-chord 26.0 'lead '(53 57 60 65) 1.8)
+
+;; blip: fast runs up and down the chords
+(score-preset 28.0 'lead 'blip)
+(chip-demo-line 28.0 'lead
+                (map (lambda (pitch) (list pitch 0.083))
+                     '(69 72 76 81 76 72 69 72 76 81 76 72
+                       65 69 72 77 72 69 65 69 72 77 72 69
+                       67 71 74 79 74 71 67 71 74 79 74 71
+                       69 72 76 81 84 81 76 72))
+                0.9)
+
+;; sid: a saw lead which slides into each note
+(score-preset 32.0 'lead 'sid)
+(chip-demo-line 32.0 'lead '((64 0.4) (67 0.4) (69 0.8) (72 0.4) (71 0.4) (67 0.4) (69 1.2)) 0.9)
+
+;; bell: the ring-modulated triangle, slowly
+(score-preset 36.0 'lead 'bell)
+(chip-demo-line 36.0 'lead '((76 0.5) (72 0.5) (69 0.5) (76 0.5) (74 1.0) (69 1.0)) 1.0)
+(score-preset 40.0 'lead 'vibrato)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the drums, preset by preset ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; one cycle is a bar: 1.6 seconds at 150 bpm. The tour of the chip's presets
+;; takes 40 seconds, 25 bars.
+
+(define chip-demo-beat
+  (stack (with (sound '(bd ~ ~ bd sd ~ ~ ~ bd ~ bd ~ sd ~ ~ ~)) (vel 0.95))
+         (with (sound '(hh hh hh oh hh hh hh hh)) (vel '(0.8 0.5 0.7 0.6 0.8 0.5 0.7 0.5)))))
+
+(define chip-demo-fill
+  (stack (with (sound '(bd ~ ~ bd sd ~ ~ ~ ht ht mt mt lt lt sd sd)) (vel 0.9))
+         (with (sound '(hh hh hh hh)) (vel 0.6))))
+
+;; two bars of each kit preset, the second ending in a fill
+(let loop ((bar 25) (names (presets 'chipkit)))
+  (if (pair? names)
+      (begin
+        (score-preset (* bar 1.6) 'drums (car names))
+        (score-pattern bar (+ bar 1) chip-demo-beat)
+        (score-pattern (+ bar 1) (+ bar 2) chip-demo-fill)
+        (loop (+ bar 2) (cdr names)))))
+
+;;;;;;;;;;;;;;;
+;; the tune ;;
+;;;;;;;;;;;;;;;
+
+;; It starts at bar 36, after the drum tour, with the nes kit back on.
+;; A minor, F, C, G: four bars which go round three times.
+(define chip-demo-start 36)
+(score-preset (* chip-demo-start 1.6) 'drums 'nes)
+
+;; the bass bounces between octaves in eighth notes
+(define chip-demo-bass
+  (with (note '((<a1 f1 c2 g1> <a2 f2 c3 g2>)!4))
+        (sound 'bass)
+        (vel 0.9)
+        (legato 0.7)))
+
+;; one note per beat on the arpeggio channel. arp1 makes each chord minor
+;; (3 semitones) or major (4); arp2 is always the fifth.
+(define chip-demo-chords
+  (with (note '(<a4 f4 c5 g4>!4))
+        (sound 'chords)
+        (param 'arp1 '(<3 4 4 4>))
+        (vel '(0.8 0.6 0.7 0.6))
+        (legato 0.9)))
+
+;; the lead, eight bars: _ holds the note before it
+(define chip-demo-lead
+  (with (note (cat '(a4 _ c5 e5 a5 _ g5 e5)
+                   '(f5 _ e5 c5 a4 _ c5 _)
+                   '(g5 _ e5 g5 c6 _ b5 g5)
+                   '(d6 _ b5 g5 d5 _ _ ~)
+                   '(e5 _ a5 _ b5 c6 b5 a5)
+                   '(c6 _ a5 f5 a5 _ c6 _)
+                   '(e6 _ d6 c6 g5 _ e5 g5)
+                   '(d6 _ _ b5 g5 _ b5 ~)))
+        (sound 'lead)
+        (vel 0.85)
+        (legato 0.95)))
+
+(define chip-demo-crash (with (sound '(cr ~)) (vel 0.8)))
+
+(let ((s chip-demo-start))
+  ;; four bars of bass and chords alone
+  (score-pattern s (+ s 12) chip-demo-bass)
+  (score-pattern s (+ s 12) chip-demo-chords)
+  ;; then the drums and the lead
+  (score-pattern (+ s 4) (+ s 11) chip-demo-beat)
+  (score-pattern (+ s 11) (+ s 12) chip-demo-fill)
+  (score-pattern (+ s 4) (+ s 5) chip-demo-crash)
+  (score-pattern (+ s 8) (+ s 9) chip-demo-crash)
+  (score-pattern (+ s 4) (+ s 12) chip-demo-lead)
+  ;; and a last chord
+  (score-pattern (+ s 12) (+ s 13) (note 'a1) (sound 'bass) (vel 0.9) (legato 0.9))
+  (score-pattern (+ s 12) (+ s 13) (note 'a4) (sound 'chords) (param 'arp1 3) (vel 0.8) (legato 0.9))
+  (score-pattern (+ s 12) (+ s 13) (note 'a5) (sound 'lead) (vel 0.8) (legato 0.9))
+  (score-pattern (+ s 12) (+ s 13) (with (sound '(bd cr)) (vel 0.9))))
+
+(score-end)

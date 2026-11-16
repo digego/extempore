@@ -1,0 +1,431 @@
+;;; chipkit.xtm -- chiptune drums, made the way 8-bit game consoles made them
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A drum kit for chiptune, made from the same few parts as the sound chips in
+;; 8-bit consoles: a triangle oscillator, a pulse oscillator and a noise
+;; generator, each with a 4-bit volume. Its notes follow General MIDI (36
+;; kick, 38 snare, 42 closed hat and so on; the sounds clause below lists
+;; them), and it pairs with the chip instrument, whose oscillators it uses.
+;;
+;; The noise is the heart of it. The NES's noise channel isn't white noise
+;; but a 15-bit *linear-feedback shift register*: on each clock the register
+;; shifts one place to the right, and the exclusive-or of its two lowest bits
+;; is fed back in at the top. The lowest bit is the output, high or low. The
+;; register runs through 32767 states before it repeats, so it sounds like
+;; noise, and how fast it is clocked sets its colour: clocked fast it hisses,
+;; clocked slowly it rumbles and crackles. In its short mode the feedback
+;; comes from bit 6 instead of bit 1 and the sequence repeats after only 93
+;; steps. That is short enough to have a pitch, and the result is a metallic,
+;; ringing noise (the `metal` parameter). The clock rates used here are ones
+;; the NES offered.
+;;
+;; The sounds:
+;;
+;; - the kick is the triangle, swept down three octaves in a few tens of
+;;   milliseconds, with a click of noise on top
+;; - the snare is noise with a short decay, over a brief triangle tone
+;; - the hats and the cymbal are fast-clocked noise, short for the closed
+;;   hat, longer for the open one, long for the cymbal. The two hats share a
+;;   voice, so each cuts the other off.
+;; - the toms are the triangle, swept down an octave
+;; - the clap is three quick bursts of noise and a tail
+;; - the rim shot is a short blip of a narrow pulse
+;;
+;; Every envelope falls in a straight line and moves through 16 levels, like
+;; the NES's hardware envelope (fewer with `steps`).
+;;
+;; This is an original implementation, built from published descriptions of
+;; how these chips behave.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-chipkit)
+(define *xtmlib-studio-chipkit-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+;; for the oscillators (chip_triangle, chip_pulse, chip_inc) and the envelope helpers
+(sys:load "libs/studio/instruments/chip.xtm")
+
+(def-instrument chipkit
+  "chiptune drums: swept triangles and shift-register noise, as on the NES"
+  (params
+    (noise-tune 0.0 "moves every noise sound's clock, in semitones: lower is darker and grainier")
+    (metal 0.0 "0.0 is long-mode noise for the hats and cymbal, 1.0 the short, metallic mode")
+    (steps 16.0 "volume levels: 16.0 is a 4-bit volume, 0.0 smooth envelopes")
+    (bd-tune 55.0 "the pitch the kick sweeps down to, in Hz")
+    (bd-decay 0.3 "seconds for the kick to fade out")
+    (bd-level 0.8 "kick level, 0.0 to 1.0")
+    (sd-tune 190.0 "the pitch of the snare's tone, in Hz")
+    (sd-decay 0.2 "seconds for the snare to fade out")
+    (sd-level 0.8 "snare level, 0.0 to 1.0")
+    (hh-decay 0.05 "seconds for the closed hi-hat to fade out")
+    (hh-level 0.7 "closed hi-hat level, 0.0 to 1.0")
+    (oh-decay 0.35 "seconds for the open hi-hat to fade out")
+    (oh-level 0.7 "open hi-hat level, 0.0 to 1.0")
+    (cr-decay 1.4 "seconds for the cymbal to fade out")
+    (cr-level 0.7 "cymbal level, 0.0 to 1.0")
+    (tom-tune 110.0 "the low tom's pitch in Hz (the mid and high toms are 5 and 10 semitones up)")
+    (tom-decay 0.3 "seconds for the toms to fade out")
+    (tom-level 0.8 "tom level, 0.0 to 1.0")
+    (cp-decay 0.2 "seconds for the clap's tail to fade out")
+    (cp-level 0.7 "clap level, 0.0 to 1.0")
+    (rs-level 0.7 "rim shot level, 0.0 to 1.0"))
+  (presets
+    (nes)
+    (metal (metal 1.0) (hh-decay 0.06) (oh-decay 0.3) (cr-decay 1.0))
+    (tight (bd-decay 0.18) (sd-decay 0.12) (hh-decay 0.03) (oh-decay 0.18) (cr-decay 0.7)
+           (tom-decay 0.18) (cp-decay 0.12))
+    (big (bd-tune 45.0) (bd-decay 0.55) (sd-tune 160.0) (sd-decay 0.35) (oh-decay 0.5)
+         (cr-decay 2.5) (tom-tune 90.0) (tom-decay 0.5) (cp-decay 0.35))
+    (crunch (noise-tune -12.0) (steps 6.0) (bd-decay 0.25) (sd-decay 0.25) (hh-decay 0.07)))
+  (sounds
+    (bd 36) (rs 37) (sd 38) (cp 39) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50)))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; building blocks ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; The noise clocks, in Hz: the NES's CPU clock (1.79 MHz) divided by some of
+;; the periods its noise channel offered.
+(bind-val CHIPKIT_NOISE_HISS SAMPLE 447443.0)   ;; period 4: hats
+(bind-val CHIPKIT_NOISE_BRIGHT SAMPLE 111861.0) ;; period 16: cymbal
+(bind-val CHIPKIT_NOISE_CLICK SAMPLE 27965.0)   ;; period 64: kick and tom clicks
+(bind-val CHIPKIT_NOISE_SNARE SAMPLE 18643.0)   ;; period 96: snare
+(bind-val CHIPKIT_NOISE_CLAP SAMPLE 13983.0)    ;; period 128: clap
+
+(bind-func chipkit_noise_c
+  "the NES's noise generator: a 15-bit linear-feedback shift register clocked
+at `clock` Hz, from -1.0 to 1.0, in its long mode or (short #t) its 93-step
+metallic mode.
+
+The register is often clocked many times per sample. Rather than take its
+value at the instant of each sample, which would fold the high frequencies
+down as harsh aliasing, the output is its average value over the sample's
+duration. When that average covers many clocks it is quieter than a single
+value would be, so it is scaled back up to keep the loudness the same."
+  (lambda ()
+    (let ((reg:i64 1) (out:SAMPLE 1.0) (feedback:i64 0)
+          (phase:SAMPLE 0.0) (left:SAMPLE 0.0) (sum:SAMPLE 0.0) (n:SAMPLE 1.0))
+      (lambda (clock:SAMPLE short:i1)
+        ;; how many clocks this sample lasts
+        (set! n (/ clock SRf))
+        (if (< n 0.001) (set! n 0.001))
+        (if (> n 50.0) (set! n 50.0))
+        (set! left n)
+        (set! sum 0.0)
+        (while (>= (+ phase left) 1.0)
+          (set! sum (+ sum (* out (- 1.0 phase))))
+          (set! left (- left (- 1.0 phase)))
+          (set! phase 0.0)
+          ;; one clock of the register
+          (set! feedback (bitwise-and (bitwise-eor reg (bitwise-shift-right reg (if short 6 1))) 1))
+          (set! reg (bitwise-or (bitwise-shift-right reg 1) (bitwise-shift-left feedback 14)))
+          (set! out (if (= (bitwise-and reg 1) 0) 1.0 -1.0)))
+        (set! sum (+ sum (* out left)))
+        (set! phase (+ phase left))
+        (* (/ sum n) (sqrt (if (< n 1.0) 1.0 n)))))))
+
+(bind-func chipkit_volume_c
+  "a 4-bit volume register. The volume `vol` (0.0 to 1.0) is rounded up to one
+of `levels` steps above zero, then smoothed over a fraction of a millisecond
+so that each step doesn't click."
+  (lambda ()
+    (let ((gain:SAMPLE 0.0) (smooth (smoothing_coeff 0.0003)))
+      (lambda (vol:SAMPLE levels:SAMPLE)
+        (set! gain (+ gain (* smooth (- (chip_volume_steps vol levels) gain))))
+        gain))))
+
+(bind-func chipkit_highpass_c
+  "a one-pole highpass filter at `freq` Hz"
+  (lambda (freq:SAMPLE)
+    (let ((a (exp (/ (* -2.0 SPI freq) SRf))) (low:SAMPLE 0.0))
+      (lambda (x:SAMPLE)
+        (set! low (+ (* a low) (* (- 1.0 a) x) 1.0e-18))
+        (- x low)))))
+
+(bind-func static chipkit_levels
+  (lambda (p:SAMPLE*)
+    (- (chipkit_steps p) 1.0)))
+
+(bind-func static chipkit_noise_ratio
+  (lambda (p:SAMPLE*)
+    (semitones (chipkit_noise_tune p))))
+
+;;;;;;;;;;
+;; kick ;;
+;;;;;;;;;;
+
+;; The triangle, starting three octaves above bd-tune and falling to it
+;; exponentially (the remaining sweep halves every 8 ms). For the first 10 ms
+;; a click of noise sits on top. A kick which starts from silence starts its
+;; triangle at a zero crossing, so the onset is the same every time.
+
+(bind-func chipkit_bd_c
+  (lambda (p:SAMPLE*)
+    (let ((volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
+          (sweep:SAMPLE 0.0) (sweep_mult (exp (/ -0.693 (* 0.008 SRf))))
+          (env:SAMPLE 0.0) (fall:SAMPLE 0.0)
+          (click:SAMPLE 0.0) (click_fall (chip_ramp_step 0.01))
+          (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (if (< env 0.01) (set! phase 0.25))
+              (set! env 1.0) (set! click 1.0) (set! sweep 1.0)
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (set! fall (chip_ramp_step (chipkit_bd_decay p))))
+        (set! inc (chip_inc (* (chipkit_bd_tune p) (pow 2.0 (* 3.0 sweep)))))
+        (set! phase (chip_wrap (+ phase inc)))
+        (set! y (chip_triangle phase inc))
+        (if (> click 0.0)
+            (begin
+              (set! y (+ y (* 0.5 click (noise CHIPKIT_NOISE_CLICK #f))))
+              (set! click (- click click_fall))))
+        (set! sweep (* sweep sweep_mult))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add out (* 0.36 (chipkit_bd_level p) g y))
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;
+;; snare ;;
+;;;;;;;;;;;
+
+;; Noise clocked at about 18.6 kHz, which leaves it bright but not hissy,
+;; fading over sd-decay. Under it, a triangle at sd-tune which starts a fifth
+;; higher and drops, lasting a third as long: the drum's body.
+
+(bind-func chipkit_sd_c
+  (lambda (p:SAMPLE*)
+    (let ((noise_volume (chipkit_volume_c))
+          (tone_volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
+          (sweep:SAMPLE 0.0) (sweep_mult (exp (/ -0.693 (* 0.01 SRf))))
+          (env:SAMPLE 0.0) (fall:SAMPLE 0.0) (tone_env:SAMPLE 0.0)
+          (vel:SAMPLE 0.0) (levels:SAMPLE 15.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (if (< env 0.01) (set! phase 0.25))
+              (set! env 1.0) (set! tone_env 1.0) (set! sweep 1.0)
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! fall (chip_ramp_step (chipkit_sd_decay p)))
+              (set! levels (chipkit_levels p))))
+        (set! inc (chip_inc (* (chipkit_sd_tune p) (+ 1.0 (* 0.5 sweep)))))
+        (set! phase (chip_wrap (+ phase inc)))
+        (set! g (noise_volume (* vel env) levels))
+        (set! y (+ (* g (noise (* CHIPKIT_NOISE_SNARE (chipkit_noise_ratio p)) #f))
+                   (* 0.8 (tone_volume (* vel tone_env) levels) (chip_triangle phase inc))))
+        (set! sweep (* sweep sweep_mult))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! tone_env (- tone_env (* 3.0 fall)))
+        (if (< tone_env 0.0) (set! tone_env 0.0))
+        (frame_add out (* 0.3 (chipkit_sd_level p) y))
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; hi-hats and the cymbal ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The hats are noise at the fastest clock the NES had, through a highpass
+;; which takes away the low end. Pitch 42 plays the closed hat and 46 the
+;; open one; both are mapped to this one voice, so each cuts the other off.
+;; In the short (metal) mode the 93-step sequence rings at about 4.8 kHz,
+;; with a dense spray of partials above it.
+
+(bind-func chipkit_hh_c
+  (lambda (p:SAMPLE*)
+    (let ((volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (highpass (chipkit_highpass_c 3000.0))
+          (open:i1 #f) (env:SAMPLE 0.0) (fall:SAMPLE 0.0) (level:SAMPLE 0.0)
+          (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! open (> (voice_pitch v) 44.0))
+              (set! env 1.0)
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! fall (chip_ramp_step (if open (chipkit_oh_decay p) (chipkit_hh_decay p))))
+              (set! level (if open (chipkit_oh_level p) (chipkit_hh_level p)))))
+        (set! y (highpass (noise (* CHIPKIT_NOISE_HISS (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5))))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add_mono out (* 0.2 level g y) 0.6)
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;; The cymbal is the same, clocked a little slower (so it has more body) and
+;; fading for much longer.
+
+(bind-func chipkit_cr_c
+  (lambda (p:SAMPLE*)
+    (let ((volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (highpass (chipkit_highpass_c 1500.0))
+          (env:SAMPLE 0.0) (fall:SAMPLE 0.0) (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! env 1.0) (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (set! fall (chip_ramp_step (chipkit_cr_decay p))))
+        (set! y (highpass (noise (* CHIPKIT_NOISE_BRIGHT (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5))))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add_mono out (* 0.2 (chipkit_cr_level p) g y) 0.4)
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;
+;; toms ;;
+;;;;;;;;;;
+
+;; Like the kick, but swept down only an octave, more slowly (the remaining
+;; sweep halves every 25 ms), and with a shorter click. `which` is 0 for the
+;; low tom, 1 for the mid and 2 for the high.
+
+(bind-func chipkit_tom_c
+  (lambda (p:SAMPLE* which:i64 pan:SAMPLE)
+    (let ((volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (ratio:SAMPLE (semitones (* 5.0 (convert which SAMPLE))))
+          (phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
+          (sweep:SAMPLE 0.0) (sweep_mult (exp (/ -0.693 (* 0.025 SRf))))
+          (env:SAMPLE 0.0) (fall:SAMPLE 0.0)
+          (click:SAMPLE 0.0) (click_fall (chip_ramp_step 0.006))
+          (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (if (< env 0.01) (set! phase 0.25))
+              (set! env 1.0) (set! click 1.0) (set! sweep 1.0)
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (set! fall (chip_ramp_step (chipkit_tom_decay p))))
+        (set! inc (chip_inc (* ratio (chipkit_tom_tune p) (+ 1.0 sweep))))
+        (set! phase (chip_wrap (+ phase inc)))
+        (set! y (chip_triangle phase inc))
+        (if (> click 0.0)
+            (begin
+              (set! y (+ y (* 0.4 click (noise CHIPKIT_NOISE_CLICK #f))))
+              (set! click (- click click_fall))))
+        (set! sweep (* sweep sweep_mult))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add_mono out (* 0.36 (chipkit_tom_level p) g y) pan)
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; clap and rim shot ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Three 10 ms bursts of noise in a row, each starting at full volume and
+;; falling away, then a tail which fades over cp-decay: the separate hands,
+;; then the room. A highpass keeps it out of the snare's way.
+
+(bind-func chipkit_cp_c
+  (lambda (p:SAMPLE*)
+    (let ((volume (chipkit_volume_c))
+          (noise (chipkit_noise_c))
+          (highpass (chipkit_highpass_c 900.0))
+          (spacing:i64 (convert (/ SRf 100.0) i64))
+          (env:SAMPLE 0.0) (fall:SAMPLE 0.0) (burst_fall (chip_ramp_step 0.012))
+          (age:i64 0) (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (set! age (voice_age v))
+        (if (voice_start? v)
+            (set! vel (voice_vel v)))
+        (if (or (= age 0) (= age spacing) (= age (* 2 spacing)) (= age (* 3 spacing)))
+            (set! env 1.0))
+        (if (= (% age 32) 0)
+            (set! fall (if (< age (* 3 spacing)) burst_fall (chip_ramp_step (chipkit_cp_decay p)))))
+        (set! y (highpass (noise (* CHIPKIT_NOISE_CLAP (chipkit_noise_ratio p)) #f)))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add_mono out (* 0.3 (chipkit_cp_level p) g y) 0.52)
+        (if (and (> age (* 3 spacing)) (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;; A 12.5% pulse at 1.2 kHz which drops a little in pitch and is gone in
+;; 40 ms: a hard, woody knock.
+
+(bind-func chipkit_rs_c
+  (lambda (p:SAMPLE*)
+    (let ((volume (chipkit_volume_c))
+          (phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
+          (env:SAMPLE 0.0) (fall (chip_ramp_step 0.04))
+          (vel:SAMPLE 0.0) (g:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! env 1.0) (set! vel (voice_vel v))))
+        (set! inc (chip_inc (* 1200.0 (+ 0.85 (* 0.15 env)))))
+        (set! phase (chip_wrap (+ phase inc)))
+        (set! env (- env fall))
+        (if (< env 0.0) (set! env 0.0))
+        (set! g (volume (* vel env) (chipkit_levels p)))
+        (frame_add_mono out (* 0.2 (chipkit_rs_level p) g
+                               (chip_pulse phase inc 0.125))
+                        0.45)
+        (if (and (<= env 0.0) (< g 0.0001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; making the kit ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; voice numbers: 0 kick, 1 rim shot, 2 snare, 3 clap, 4 hi-hats (closed and
+;; open), 5-7 toms, 8 cymbal
+(bind-func chipkit_make
+  (lambda ()
+    (let ((inst (inst_make "chipkit" 9 (chipkit_nparams)))
+          (p (inst_params inst)))
+      (chipkit_defaults p)
+      (inst_set_mode inst INST_KEYED)
+      (inst_set_voice inst 0 (chipkit_bd_c p))
+      (inst_set_voice inst 1 (chipkit_rs_c p))
+      (inst_set_voice inst 2 (chipkit_sd_c p))
+      (inst_set_voice inst 3 (chipkit_cp_c p))
+      (inst_set_voice inst 4 (chipkit_hh_c p))
+      (inst_set_voice inst 5 (chipkit_tom_c p 0 0.4))
+      (inst_set_voice inst 6 (chipkit_tom_c p 1 0.5))
+      (inst_set_voice inst 7 (chipkit_tom_c p 2 0.6))
+      (inst_set_voice inst 8 (chipkit_cr_c p))
+      (inst_map_key inst 36 0)
+      (inst_map_key inst 37 1)
+      (inst_map_key inst 38 2)
+      (inst_map_key inst 39 3)
+      (inst_map_key inst 42 4)
+      (inst_map_key inst 46 4)
+      (inst_map_key inst 45 5)
+      (inst_map_key inst 47 6)
+      (inst_map_key inst 50 7)
+      (inst_map_key inst 49 8)
+      inst)))
