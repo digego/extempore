@@ -454,10 +454,28 @@
   (lambda (seconds track-name preset-name)
     (studio:preset-at (studio:score-time seconds) track-name preset-name)))
 
+;; print (levels) this many seconds into the score: a way to check a mix
+;; which is being rendered to a file
+(define *studio:score-level-times* '())
+
+(define score-levels
+  (lambda (seconds)
+    (set! *studio:score-level-times* (cons seconds *studio:score-level-times*))
+    #t))
+
+(define studio:score-report
+  (lambda (seconds)
+    (studio:say "levels at" seconds "seconds")
+    (levels)))
+
 (define score-end
   (lambda ()
     (studio:start)
     (studio_release)
+    (for-each (lambda (seconds)
+                (callback (+ (now) (* seconds *studio:samplerate*)) 'studio:score-report seconds))
+              *studio:score-level-times*)
+    (set! *studio:score-level-times* '())
     #t))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
