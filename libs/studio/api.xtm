@@ -104,7 +104,8 @@
     (comp-ratio 12 3.0 "compressor ratio (1.0: off)")
     (comp-attack 13 15.0 "compressor attack in milliseconds")
     (comp-release 14 180.0 "compressor release in milliseconds")
-    (comp-makeup 15 4.0 "gain after the compressor, in dB")))
+    (comp-makeup 15 4.0 "gain after the compressor, in dB")
+    (ceiling 16 0.9 "the limiter's ceiling (1.0 is full scale)")))
 
 (define studio:track-index
   (lambda (name)
@@ -441,7 +442,9 @@
 (define score-begin
   (lambda ()
     (studio_hold)
-    (set! *studio:score-start* (studio_now))
+    ;; the score starts a twentieth of a second after the clock does, so that
+    ;; nothing at time zero is caught by the clock starting up
+    (set! *studio:score-start* (+ (studio_now) (* 0.05 *studio:samplerate*)))
     #t))
 
 (define studio:score-time

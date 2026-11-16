@@ -1,0 +1,657 @@
+;;; polysynth.xtm -- an eight-voice analogue-style polysynth with a stereo chorus
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A subtractive polysynth in the spirit of the classic analogue poly keyboards
+;; of around 1980: the Roland Juno-106, the Oberheim OB-X and the Sequential
+;; Prophet-5. Each of its eight voices is the same simple patch:
+;;
+;;   oscillator 1 --+
+;;   oscillator 2 --+
+;;   sub-oscillator +--> mixer --> filter --> amplifier --> pan
+;;   noise ---------+                 ^           ^
+;;                     filter envelope + LFO     amp envelope
+;;
+;; and the summed voices go through a chorus.
+;;
+;; The oscillators are band-limited (PolyBLEP, after Valimaki and colleagues):
+;; each waveform is computed naively and the sample or two either side of a
+;; jump (saw, pulse) or a corner (triangle) is corrected so that the harmonics
+;; which would fold back above half the sample rate are mostly removed.
+;;
+;; The filter is either a 24 dB/octave transistor ladder (the Juno and the
+;; Prophet both have four-pole lowpass filters) or a 12 dB/octave
+;; state-variable filter, which is closer to the OB-X and sounds brighter and
+;; more open. Both are zero-delay-feedback designs (after Zavalishin, "The Art
+;; of VA Filter Design"), so they stay in tune and stable as they're swept.
+;; The ladder is the same design as ladder_c in dsp.xtm, with a cheaper
+;; saturator and its coefficients worked out every few frames, because eight
+;; of them run at once.
+;;
+;; The envelopes behave like analogue ones: each stage is an exponential curve
+;; towards a target, the attack aims past full level so that it arrives with a
+;; firm shape, and a retriggered envelope starts from wherever it is.
+;;
+;; Analogue polysynths are never quite in tune with themselves. Each voice
+;; here has its own small fixed tuning and cutoff offsets and a slow random
+;; wander (the `drift` parameter), and its own place in the stereo field.
+;;
+;; With `mono` on, it plays one note at a time, like a lead or bass synth: a
+;; note which starts while the last is held carries on its envelopes and
+;; glides to the new pitch.
+;;
+;; The chorus models the bucket-brigade chorus of the Juno-60 and Juno-106:
+;; two short delay lines, swept in opposite directions by one triangle LFO,
+;; each mixed with the dry signal for one side. Mode I is slow and gentle,
+;; mode II faster and more obvious, and I and II together a fast, shallow
+;; shimmer. The rates and delay ranges follow published measurements of the
+;; hardware. Much of the warmth people hear in these synths is this chorus.
+;;
+;; This is an original implementation, built from published descriptions of
+;; the hardware and the DSP literature cited above.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-polysynth)
+(define *xtmlib-studio-polysynth-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument polysynth
+  "an eight-voice analogue polysynth with a Juno-style chorus"
+  (params
+    (osc1 0.0 "oscillator 1 shape: 0.0 saw, 0.5 pulse, 1.0 triangle (crossfades between)")
+    (osc1-level 1.0 "oscillator 1 level, 0.0 to 1.0")
+    (osc2 0.0 "oscillator 2 shape: 0.0 saw, 0.5 pulse, 1.0 triangle")
+    (osc2-level 0.6 "oscillator 2 level, 0.0 to 1.0")
+    (osc2-semi 0.0 "oscillator 2 tuning, in semitones (12 is an octave up)")
+    (detune 8.0 "how far apart the two oscillators are tuned, in cents")
+    (pw 0.5 "pulse width, 0.05 to 0.95 (0.5 is a square wave)")
+    (sub 0.35 "level of the sub-oscillator, a square an octave below oscillator 1, 0.0 to 1.0")
+    (noise 0.0 "white noise level, 0.0 to 1.0")
+    (cutoff 1400.0 "filter cutoff in Hz, at middle C with the envelope closed")
+    (res 0.2 "filter resonance, 0.0 to 1.0 (the ladder self-oscillates near 1.0)")
+    (poles 4.0 "filter slope: 4 is the 24 dB/octave ladder, 2 the 12 dB/octave state-variable filter")
+    (key-track 0.5 "how far the cutoff follows the note, 0.0 to 1.0 (1.0: an octave per octave)")
+    (env-amt 2.5 "how far the filter envelope opens the cutoff, in octaves (negative closes it)")
+    (velocity 0.5 "how much velocity changes the loudness and the filter envelope, 0.0 to 1.0")
+    (f-attack 0.004 "filter envelope attack, in seconds")
+    (f-decay 0.7 "filter envelope decay, in seconds")
+    (f-sustain 0.3 "filter envelope sustain level, 0.0 to 1.0")
+    (f-release 0.5 "filter envelope release, in seconds")
+    (attack 0.004 "amp envelope attack, in seconds")
+    (decay 1.2 "amp envelope decay, in seconds")
+    (sustain 0.75 "amp envelope sustain level, 0.0 to 1.0")
+    (release 0.45 "amp envelope release, in seconds")
+    (lfo-rate 5.0 "LFO rate in Hz (a triangle wave which restarts with each note)")
+    (lfo-delay 0.6 "seconds after the start of a note until the LFO has faded fully in")
+    (lfo-pitch 0.0 "how far the LFO moves the pitch (vibrato), in semitones")
+    (lfo-pwm 0.0 "how far the LFO moves the pulse width, 0.0 to 1.0")
+    (lfo-cutoff 0.0 "how far the LFO moves the cutoff, in octaves")
+    (drift 0.3 "how far each voice wanders out of tune, 0.0 to 1.0 (1.0: about 10 cents)")
+    (spread 0.5 "how widely the voices are spread across the stereo field, 0.0 to 1.0")
+    (mono 0.0 "1.0 plays one note at a time (a note which overlaps the last doesn't restart the envelopes); 0.0 is polyphonic")
+    (glide 0.0 "portamento: seconds to slide to each note from the one before (when polyphonic, the one before on the same voice)")
+    (chorus 1.0 "chorus mode: 0 off, 1 mode I, 2 mode II, 3 modes I and II together")
+    (level 0.75 "output level, 0.0 to 1.0"))
+  (presets
+    (poly)
+    (brass (osc2-level 0.9) (detune 10.0) (sub 0.0) (cutoff 380.0) (res 0.15) (poles 2.0)
+           (key-track 0.6) (env-amt 3.2) (velocity 0.6)
+           (f-attack 0.07) (f-decay 0.9) (f-sustain 0.45) (f-release 0.25)
+           (attack 0.02) (decay 1.5) (sustain 0.85) (release 0.25)
+           (lfo-rate 5.5) (lfo-delay 0.8) (lfo-pitch 0.1) (chorus 0.0) (level 0.85))
+    (pad (osc1 0.5) (osc2-level 0.5) (osc2-semi -12.0) (sub 0.25) (cutoff 900.0) (res 0.15)
+         (env-amt 1.2) (f-attack 1.5) (f-decay 2.5) (f-sustain 0.4) (f-release 2.0)
+         (attack 0.9) (decay 2.0) (sustain 0.9) (release 2.2)
+         (lfo-rate 0.5) (lfo-delay 0.0) (lfo-pwm 0.6) (lfo-cutoff 0.15) (spread 0.7) (chorus 2.0)
+         (level 0.6))
+    (strings (osc2-level 0.8) (detune 6.0) (sub 0.0) (cutoff 1700.0) (res 0.05) (poles 2.0)
+             (key-track 0.6) (env-amt 0.5) (velocity 0.3)
+             (f-attack 0.4) (f-decay 1.0) (f-sustain 0.6) (f-release 1.0)
+             (attack 0.35) (decay 1.0) (sustain 1.0) (release 1.3)
+             (lfo-rate 5.2) (lfo-delay 0.9) (lfo-pitch 0.08) (spread 0.8) (chorus 2.0))
+    (bass (osc2 0.5) (osc2-level 0.5) (osc2-semi -12.0) (detune 4.0) (sub 0.0)
+          (cutoff 240.0) (res 0.35) (key-track 0.3) (env-amt 3.4) (velocity 0.7)
+          (f-decay 0.35) (f-sustain 0.12) (f-release 0.1)
+          (attack 0.002) (decay 1.0) (sustain 0.9) (release 0.07)
+          (drift 0.15) (spread 0.0) (mono 1.0) (glide 0.02) (chorus 0.0) (level 0.85))
+    (pluck (osc1 0.45) (osc2-level 0.35) (osc2-semi 12.0) (detune 6.0) (pw 0.4) (sub 0.0)
+           (cutoff 450.0) (res 0.3) (key-track 0.7) (env-amt 4.2) (velocity 0.8)
+           (f-decay 0.28) (f-sustain 0.0) (f-release 0.3)
+           (attack 0.001) (decay 0.7) (sustain 0.0) (release 0.35) (spread 0.7) (level 0.85))
+    (lead (osc2-level 0.9) (detune 14.0) (sub 0.3) (cutoff 1100.0) (res 0.4)
+          (env-amt 2.0) (f-attack 0.01) (f-decay 0.5) (f-sustain 0.55)
+          (attack 0.005) (decay 1.0) (sustain 0.9) (release 0.2)
+          (lfo-rate 5.6) (lfo-delay 0.5) (lfo-pitch 0.3) (spread 0.0)
+          (mono 1.0) (glide 0.09) (chorus 0.0) (level 0.6))
+    (keys (osc1 0.5) (osc2 1.0) (osc2-level 0.6) (osc2-semi 12.0) (detune 4.0) (sub 0.0)
+          (cutoff 800.0) (res 0.1) (key-track 0.7) (env-amt 2.4) (velocity 0.8)
+          (f-decay 0.9) (f-sustain 0.15) (f-release 0.4)
+          (attack 0.002) (decay 2.2) (sustain 0.2) (release 0.4) (chorus 3.0)
+          (level 0.65))
+    (sweep (osc2-level 0.8) (detune 12.0) (sub 0.4) (cutoff 220.0) (res 0.72) (key-track 0.3)
+           (env-amt 3.8) (f-attack 3.0) (f-decay 4.0) (f-sustain 0.2) (f-release 2.0)
+           (attack 0.4) (decay 2.0) (sustain 0.9) (release 2.0)
+           (lfo-rate 0.18) (lfo-delay 0.0) (lfo-cutoff 1.2) (spread 0.8) (chorus 2.0)
+           (level 0.6))))
+
+;;;;;;;;;;;;;;;;;
+;; oscillators ;;
+;;;;;;;;;;;;;;;;;
+
+;; Each oscillator takes its phase (0.0 to 1.0) and its phase increment per
+;; frame (the frequency over the sample rate).
+
+(bind-func static polysynth_saw
+  "a band-limited sawtooth, falling from 1.0 to -1.0 at phase 0"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t))))
+
+(bind-func static polysynth_pulse
+  "a band-limited pulse wave, high for the first `width` of each cycle.
+
+The naive pulse jumps up at phase 0 and down at phase `width`, and each jump
+gets its own PolyBLEP correction. Its average, 2 * width - 1, is taken away so
+that pulse-width modulation doesn't move the waveform up and down."
+  (lambda (phase:SAMPLE inc:SAMPLE width:SAMPLE)
+    (let ((fall:SAMPLE (- phase width)))
+      (if (< fall 0.0) (set! fall (+ fall 1.0)))
+      (- (- (+ (if (< phase width) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
+            (poly_blep fall inc 1.0 #t))
+         (- (* 2.0 width) 1.0)))))
+
+(bind-func static polysynth_blamp
+  "the PolyBLAMP residual for a corner t samples away (-1.0 < t < 1.0).
+
+A triangle has corners (jumps in slope) rather than jumps. The two-sample
+correction for a corner is the integral of the PolyBLEP correction for a jump:
+(1 - |t|)^3 / 6 for a change of slope of one unit per sample."
+  (lambda (t:SAMPLE)
+    (let ((u:SAMPLE (- 1.0 (fabs t))))
+      (/ (* u u u) 6.0))))
+
+(bind-func static polysynth_tri
+  "a band-limited triangle, with its trough at phase 0 and its peak at 0.5"
+  (lambda (phase:SAMPLE inc:SAMPLE)
+    (let ((y:SAMPLE (- 1.0 (* 4.0 (fabs (- phase 0.5)))))
+          (peak:SAMPLE (+ phase 0.5))
+          ;; the slope changes by 8 (from -4 to +4 or back) per cycle, so by
+          ;; 8 * inc per frame
+          (k:SAMPLE (* 8.0 inc)))
+      (if (>= peak 1.0) (set! peak (- peak 1.0)))
+      ;; round off the trough (slope rising) and the peak (slope falling)
+      (if (< phase inc) (set! y (+ y (* k (polysynth_blamp (/ phase inc))))))
+      (if (> phase (- 1.0 inc)) (set! y (+ y (* k (polysynth_blamp (/ (- phase 1.0) inc))))))
+      (if (< peak inc) (set! y (- y (* k (polysynth_blamp (/ peak inc))))))
+      (if (> peak (- 1.0 inc)) (set! y (- y (* k (polysynth_blamp (/ (- peak 1.0) inc))))))
+      y)))
+
+(bind-func static polysynth_osc
+  "one frame of an oscillator whose shape runs from saw (0.0) through pulse
+(0.5) to triangle (1.0), crossfading between neighbours"
+  (lambda (phase:SAMPLE inc:SAMPLE shape:SAMPLE width:SAMPLE)
+    (let ((a:SAMPLE 0.0))
+      (cond ((<= shape 0.0) (polysynth_saw phase inc))
+            ((< shape 0.5)
+             (set! a (* 2.0 shape))
+             (+ (* (- 1.0 a) (polysynth_saw phase inc))
+                (* a (polysynth_pulse phase inc width))))
+            ((= shape 0.5) (polysynth_pulse phase inc width))
+            ((< shape 1.0)
+             (set! a (* 2.0 (- shape 0.5)))
+             (+ (* (- 1.0 a) (polysynth_pulse phase inc width))
+                (* a (polysynth_tri phase inc))))
+            (else (polysynth_tri phase inc))))))
+
+;; A small random number generator (a linear congruential one) for the noise
+;; source and the drift, so that each voice has its own repeatable sequence.
+
+(bind-func static polysynth_next_seed
+  (lambda (seed:i64)
+    (% (+ (* seed 1664525) 1013904223) 4294967296)))
+
+(bind-func static polysynth_bipolar
+  "the seed as a number from -1.0 to 1.0"
+  (lambda (seed:i64)
+    (- (* (convert seed SAMPLE) 4.656612873e-10) 1.0)))
+
+;;;;;;;;;;;;;;;
+;; envelopes ;;
+;;;;;;;;;;;;;;;
+
+(bind-func polysynth_adsr_c
+  "an analogue-style ADSR envelope generator.
+
+Each stage moves the level a fixed fraction of the way to a target at every
+step, which traces the exponential curve of a capacitor charging through a
+resistor. The attack aims at 1.3 and stops at 1.0, so it rises steeply and
+arrives firmly, the way an analogue attack does. Decay and release times are
+the time to cover 99% of the distance. On a new note the attack starts from the
+current level, so a voice which is still sounding doesn't click.
+
+@param step - how many frames pass between calls (1 for every frame)
+@param start - true on the first call of a note
+@param gate - 1.0 while the note is held"
+  (lambda (step:i64)
+    (let ((env:SAMPLE 0.0)
+          (stage:i64 0) ;; 0 release (or silent), 1 attack, 2 decay then sustain
+          (frames:SAMPLE (convert step SAMPLE))
+          (count:i64 0)
+          (attack_coeff:SAMPLE 0.0)
+          (decay_coeff:SAMPLE 0.0)
+          (release_coeff:SAMPLE 0.0)
+          (level:SAMPLE 0.0))
+      (lambda (start:i1 gate:SAMPLE attack:SAMPLE decay:SAMPLE sustain:SAMPLE release:SAMPLE)
+        (if start (begin (set! stage 1) (set! count 0) void))
+        (if (and (< gate 0.5) (> stage 0)) (set! stage 0))
+        ;; the coefficients need an exp each, so work them out every 64 frames.
+        ;; An attack from 0.0 aiming at 1.3 reaches 1.0 after ln(1.3 / 0.3) =
+        ;; 1.47 time constants; 99% of a decay takes ln(100) = 4.6.
+        (if (<= count 0)
+            (begin
+              (set! attack_coeff (smoothing_coeff (/ attack (* 1.466 frames))))
+              (set! decay_coeff (smoothing_coeff (/ decay (* 4.6 frames))))
+              (set! release_coeff (smoothing_coeff (/ release (* 4.6 frames))))
+              (set! level (clamp sustain 0.0 1.0))
+              (set! count 64)
+              void))
+        (set! count (- count step))
+        (cond ((= stage 1)
+               (set! env (+ env (* attack_coeff (- 1.3 env))))
+               (if (>= env 1.0) (begin (set! env 1.0) (set! stage 2) void))
+               void)
+              ((= stage 2)
+               (set! env (+ env (* decay_coeff (- level env))))
+               void)
+              (else
+                (set! env (- env (* release_coeff env)))
+                ;; flush the tail to zero before it reaches denormal numbers
+                (if (< env 1.0e-9) (set! env 0.0))
+                void))
+        env))))
+
+;;;;;;;;;;;;;
+;; filters ;;
+;;;;;;;;;;;;;
+
+;; Both filters take their coefficients ready-made, so that the tan and the
+;; divisions are worked out every few frames rather than every frame.
+
+(bind-func static polysynth_tanh
+  "a cheap, smooth stand-in for tanh (a rational approximation), for saturation"
+  (lambda (x:SAMPLE)
+    (cond ((> x 3.0) 1.0)
+          ((< x -3.0) -1.0)
+          (else (let ((xx (* x x)))
+                  (/ (* x (+ 27.0 xx)) (+ 27.0 (* 9.0 xx))))))))
+
+(bind-func polysynth_ladder_c
+  "a four-pole (24 dB/octave) transistor-ladder lowpass.
+
+Four one-pole lowpasses in a row, with the output fed back to the input
+(inverted) to make the resonance. The feedback is solved exactly each frame
+(Zavalishin's zero-delay-feedback method): `s` is what the four stages would
+output if the input were silent, so the input which satisfies the loop can be
+found directly. A saturator at the input lets it growl when it's driven, and
+keeps self-oscillation in bounds.
+
+@param x - input
+@param big_g - g / (1 + g), where g = tan(pi * cutoff / sample rate)
+@param k - feedback, 0.0 to 4.0 (4.0 is the edge of self-oscillation)"
+  (lambda ()
+    (let ((s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (s3:SAMPLE 0.0) (s4:SAMPLE 0.0)
+          (s:SAMPLE 0.0) (u:SAMPLE 0.0) (v:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (g2:SAMPLE 0.0))
+      (lambda (x:SAMPLE big_g:SAMPLE k:SAMPLE)
+        (set! g2 (* big_g big_g))
+        (set! s (* (- 1.0 big_g) (+ (* g2 big_g s1) (* g2 s2) (* big_g s3) s4)))
+        ;; the input gain makes up some of the bass which resonance takes away
+        (set! u (polysynth_tanh (/ (- (* x (+ 1.0 (* 0.5 k))) (* k s))
+                                   (+ 1.0 (* k g2 g2)))))
+        (set! v (* big_g (- u s1))) (set! y (+ v s1)) (set! s1 (+ y v))
+        (set! v (* big_g (- y s2))) (set! y (+ v s2)) (set! s2 (+ y v))
+        (set! v (* big_g (- y s3))) (set! y (+ v s3)) (set! s3 (+ y v))
+        (set! v (* big_g (- y s4))) (set! y (+ v s4)) (set! s4 (+ y v))
+        y))))
+
+(bind-func polysynth_svf_c
+  "a two-pole (12 dB/octave) state-variable lowpass, in its zero-delay-feedback
+(TPT) form, after Zavalishin.
+
+@param x - input
+@param g - tan(pi * cutoff / sample rate)
+@param damping - 1.0 for no resonance, smaller for more (the peak is 1 / (2 * damping))
+@param h - 1 / (1 + 2 * damping * g + g * g)"
+  (lambda ()
+    (let ((s1:SAMPLE 0.0) (s2:SAMPLE 0.0)
+          (hp:SAMPLE 0.0) (bp:SAMPLE 0.0) (lp:SAMPLE 0.0))
+      (lambda (x:SAMPLE g:SAMPLE damping:SAMPLE h:SAMPLE)
+        (set! hp (* h (- (- x (* (+ (* 2.0 damping) g) s1)) s2)))
+        (set! bp (+ (* g hp) s1))
+        (set! s1 (+ (* g hp) bp))
+        (set! lp (+ (* g bp) s2))
+        (set! s2 (+ (* g bp) lp))
+        lp))))
+
+;;;;;;;;;;;
+;; voice ;;
+;;;;;;;;;;;
+
+(bind-func static polysynth_place:[SAMPLE,i64]*
+  "where voice idx sits in the stereo field (-1.0 left, 1.0 right) at full spread"
+  (lambda (idx:i64)
+    (let ((k (% idx 8)))
+      (cond ((= k 1) -0.7) ((= k 2) 0.7)
+            ((= k 3) -0.35) ((= k 4) 0.35)
+            ((= k 5) -1.0) ((= k 6) 1.0)
+            (else 0.0)))))
+
+(bind-func polysynth_voice_c
+  "voice number idx of the polysynth"
+  (lambda (p:SAMPLE* idx:i64)
+    (let ((ladder (polysynth_ladder_c))
+          (svf (polysynth_svf_c))
+          (amp_env (polysynth_adsr_c 1))
+          ;; the filter envelope only moves the cutoff, which changes every 8 frames
+          (filter_env (polysynth_adsr_c 8))
+          (seed:i64 (+ 4242 (* 7919 idx)))
+          ;; this voice's analogue character: a fixed offset for each
+          ;; oscillator and the cutoff, and a slow random wander
+          (offset1:SAMPLE 0.0)
+          (offset2:SAMPLE 0.0)
+          (offset_cutoff:SAMPLE 0.0)
+          (wander1:SAMPLE 0.0)
+          (wander2:SAMPLE 0.0)
+          (aim1:SAMPLE 0.0)
+          (aim2:SAMPLE 0.0)
+          (wander_coeff:SAMPLE (smoothing_coeff (/ 0.6 64.0)))
+          (wander_count:i64 0)
+          ;; where this voice sits in the stereo field, from -1.0 (left) to
+          ;; 1.0 (right). A note takes the first free voice, so voice 0 (which
+          ;; plays most single notes) is in the middle, and the voices after
+          ;; it alternate left and right: a chord spreads out evenly
+          (place:SAMPLE (polysynth_place idx))
+          (pan:SAMPLE 0.5)
+          (gain_l:SAMPLE 0.7)
+          (gain_r:SAMPLE 0.7)
+          ;; pitch, in MIDI note numbers, and the oscillators
+          (pitch:SAMPLE -1.0)
+          (glide:SAMPLE 1.0)
+          (shift1:SAMPLE 0.0)
+          (shift2:SAMPLE 0.0)
+          (ratio2:SAMPLE 1.0)
+          (freq:SAMPLE 0.0)
+          (phase1:SAMPLE 0.0)
+          (phase2:SAMPLE 0.0)
+          (flip:SAMPLE 0.0)
+          (inc1:SAMPLE 0.0)
+          (inc2:SAMPLE 0.0)
+          (width:SAMPLE 0.5)
+          ;; LFO
+          (lfo_phase:SAMPLE 0.25)
+          (lfo:SAMPLE 0.0)
+          (fade:SAMPLE 0.0)
+          (since:SAMPLE 0.0)
+          (delay:SAMPLE 0.0)
+          ;; filter
+          (cutoff:SAMPLE 1000.0)
+          (res:SAMPLE 0.0)
+          (damping:SAMPLE 1.0)
+          (g:SAMPLE 0.0)
+          (big_g:SAMPLE 0.0)
+          (h:SAMPLE 0.0)
+          ;; envelopes and amplifier
+          (fenv:SAMPLE 0.0)
+          (aenv:SAMPLE 0.0)
+          (vscale:SAMPLE 1.0)
+          (attack:SAMPLE 0.0)
+          (release:SAMPLE 0.0)
+          (x:SAMPLE 0.0)
+          (mix:SAMPLE 0.0))
+      (set! seed (polysynth_next_seed seed))
+      (set! offset1 (polysynth_bipolar seed))
+      (set! seed (polysynth_next_seed seed))
+      (set! offset2 (polysynth_bipolar seed))
+      (set! seed (polysynth_next_seed seed))
+      (set! offset_cutoff (polysynth_bipolar seed))
+      ;; free-running oscillators start anywhere in their cycle
+      (set! seed (polysynth_next_seed seed))
+      (set! phase1 (* 0.5 (+ 1.0 (polysynth_bipolar seed))))
+      (set! seed (polysynth_next_seed seed))
+      (set! phase2 (* 0.5 (+ 1.0 (polysynth_bipolar seed))))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              ;; the first note this voice plays (or any note, without glide)
+              ;; starts at its own pitch; otherwise slide from the last one
+              (if (or (< pitch 0.0) (< (polysynth_glide p) 0.001))
+                  (set! pitch (voice_pitch v)))
+              (set! lfo_phase 0.25)
+              void))
+        (set! attack (polysynth_attack p))
+        (set! release (polysynth_release p))
+        ;; a little attack and release at the very least, so notes never click
+        (set! aenv (amp_env (voice_start? v) (voice_gate v)
+                            (if (< attack 0.0015) 0.0015 attack) (polysynth_decay p)
+                            (polysynth_sustain p) (if (< release 0.004) 0.004 release)))
+        ;; every 64 frames: anything which needs an exp or a trig function
+        ;; and moves slowly
+        (if (= (% (voice_age v) 64) 0)
+            (begin
+              ;; the drift wanders towards a new random aim every 4096 frames
+              (if (= (% wander_count 64) 0)
+                  (begin
+                    (set! seed (polysynth_next_seed seed))
+                    (set! aim1 (polysynth_bipolar seed))
+                    (set! seed (polysynth_next_seed seed))
+                    (set! aim2 (polysynth_bipolar seed))
+                    void))
+              (set! wander_count (+ wander_count 1))
+              (set! wander1 (+ wander1 (* wander_coeff (- aim1 wander1))))
+              (set! wander2 (+ wander2 (* wander_coeff (- aim2 wander2))))
+              ;; each oscillator's offset from the note in semitones: half the
+              ;; detune either side, plus drift of up to about 10 cents
+              (set! x (* 0.01 (polysynth_drift p)))
+              (set! shift1 (+ (* -0.005 (polysynth_detune p))
+                              (* x (+ (* 5.0 offset1) (* 5.0 wander1)))))
+              (set! shift2 (+ (* 0.005 (polysynth_detune p))
+                              (* x (+ (* 5.0 offset2) (* 5.0 wander2)))))
+              (set! ratio2 (semitones (+ (polysynth_osc2_semi p) (- shift2 shift1))))
+              (set! glide (if (< (polysynth_glide p) 0.001)
+                              1.0
+                              ;; 99% of the slide in `glide` seconds, in steps of 8 frames
+                              (smoothing_coeff (/ (polysynth_glide p) (* 4.6 8.0)))))
+              (set! res (clamp (polysynth_res p) 0.0 1.0))
+              ;; the state-variable filter's damping: 1.0 is no resonance,
+              ;; 0.05 (at res 1.0) a peak 26 dB high
+              (set! damping (pow 0.05 res))
+              (set! vscale (- 1.0 (* (clamp (polysynth_velocity p) 0.0 1.0) (- 1.0 (voice_vel v)))))
+              (set! pan (+ 0.5 (* 0.5 (clamp (polysynth_spread p) 0.0 1.0) place)))
+              (set! gain_l (cos (* pan 1.5707963)))
+              (set! gain_r (sin (* pan 1.5707963)))
+              void))
+        ;; every 8 frames: the modulation of pitch, pulse width and cutoff
+        (if (= (% (voice_age v) 8) 0)
+            (begin
+              (set! fenv (filter_env (voice_start? v) (voice_gate v)
+                                     (polysynth_f_attack p) (polysynth_f_decay p)
+                                     (polysynth_f_sustain p) (polysynth_f_release p)))
+              ;; LFO: a triangle, faded in over the second half of lfo-delay
+              (set! lfo_phase (+ lfo_phase (/ (* 8.0 (polysynth_lfo_rate p)) SRf)))
+              (if (>= lfo_phase 1.0) (set! lfo_phase (- lfo_phase 1.0)))
+              (set! since (/ (convert (voice_age v) SAMPLE) SRf))
+              (set! delay (* 0.5 (polysynth_lfo_delay p)))
+              (set! fade (if (< delay 0.001) 1.0 (clamp (- (/ since delay) 1.0) 0.0 1.0)))
+              (set! lfo (* fade (- 1.0 (* 4.0 (fabs (- lfo_phase 0.5))))))
+              ;; pitch, with glide
+              (set! pitch (+ pitch (* glide (- (voice_pitch v) pitch))))
+              (set! freq (* 440.0 (exp (* 0.057762265
+                                          (- (+ pitch shift1 (* lfo (polysynth_lfo_pitch p))) 69.0)))))
+              (set! inc1 (clamp (/ freq SRf) 0.0 0.45))
+              (set! inc2 (clamp (* inc1 ratio2) 0.0 0.45))
+              (set! width (clamp (+ (polysynth_pw p) (* 0.45 lfo (polysynth_lfo_pwm p))) 0.05 0.95))
+              ;; cutoff: the knob, then octaves of envelope, key tracking (from
+              ;; middle C), LFO and this voice's own small offset
+              (set! x (+ (* vscale (polysynth_env_amt p) fenv)
+                         (/ (* (polysynth_key_track p) (- pitch 60.0)) 12.0)
+                         (* lfo (polysynth_lfo_cutoff p))
+                         (* 0.25 (polysynth_drift p) offset_cutoff)))
+              (set! cutoff (clamp (* (polysynth_cutoff p) (exp (* 0.693147 x))) 20.0 (* 0.45 SRf)))
+              (set! g (tan (* SPI (/ cutoff SRf))))
+              (set! big_g (/ g (+ 1.0 g)))
+              (set! h (/ 1.0 (+ 1.0 (* 2.0 damping g) (* g g))))
+              void))
+        ;; oscillators. The sub-oscillator is a square at half the speed of
+        ;; oscillator 1: `flip` changes every time oscillator 1 wraps, which
+        ;; makes (phase1 + flip) / 2 a phase which runs at half the speed.
+        (set! phase1 (+ phase1 inc1))
+        (if (>= phase1 1.0) (begin (set! phase1 (- phase1 1.0)) (set! flip (- 1.0 flip)) void))
+        (set! phase2 (+ phase2 inc2))
+        (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
+        ;; mixer
+        (set! mix 0.0)
+        (if (> (polysynth_osc1_level p) 0.0)
+            (set! mix (* (polysynth_osc1_level p) (polysynth_osc phase1 inc1 (polysynth_osc1 p) width))))
+        (if (> (polysynth_osc2_level p) 0.0)
+            (set! mix (+ mix (* (polysynth_osc2_level p) (polysynth_osc phase2 inc2 (polysynth_osc2 p) width)))))
+        (if (> (polysynth_sub p) 0.0)
+            (set! mix (+ mix (* (polysynth_sub p) (polysynth_pulse (* 0.5 (+ phase1 flip)) (* 0.5 inc1) 0.5)))))
+        (if (> (polysynth_noise p) 0.0)
+            (begin
+              (set! seed (polysynth_next_seed seed))
+              (set! mix (+ mix (* (polysynth_noise p) (polysynth_bipolar seed))))
+              void))
+        ;; (the tiny constant keeps the filters out of denormal numbers if
+        ;; every source is turned down)
+        (set! mix (+ (* 0.4 mix) 1.0e-18))
+        ;; filter
+        (if (< (polysynth_poles p) 3.0)
+            ;; the saturator gives the state-variable filter the same gentle
+            ;; drive as the ladder. Resonance lifts the peak but not the
+            ;; passband, so take some level back as the damping falls.
+            (set! x (* (+ 0.45 (* 0.55 damping)) (svf (polysynth_tanh mix) g damping h)))
+            (set! x (ladder mix big_g (* 4.0 res))))
+        ;; amplifier, and out
+        (set! x (* x aenv vscale (polysynth_level p) 0.8))
+        (frame_add_stereo out (* gain_l x) (* gain_r x))
+        (if (and (< (voice_gate v) 0.5) (< aenv 0.0002))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;
+;; chorus ;;
+;;;;;;;;;;;;
+
+(bind-func polysynth_fx_c
+  "the instrument's effect: the chorus, and the switch between poly and mono.
+
+The chorus is two delay lines, one for each side, each 1.7 to 5.4 ms long. One
+triangle LFO lengthens the left delay as it shortens the right, so the pitch of
+each wet signal bends up and down slightly, in opposite directions. Each side
+mixes the dry signal with its own wet signal, and the comb filtering between
+them sweeps, which is what spreads and thickens the sound. The wet signal is
+gently lowpassed, as the filters around the Juno's bucket-brigade delay chips
+do.
+
+The instrument effect runs once per frame, which makes it a convenient place to
+apply the mono parameter, and to take away any DC the voices have made."
+  (lambda (p:SAMPLE* inst:Inst*)
+    (let ((left (dl_make (convert (/ SRf 100.0) i64)))
+          (right (dl_make (convert (/ SRf 100.0) i64)))
+          (mode:i64 0)
+          (count:i64 0)
+          (lfo_phase:SAMPLE 0.0)
+          (lfo:SAMPLE 0.0)
+          (lfo_coeff:SAMPLE 0.1)
+          ;; rate (Hz), the middle of the delay sweep and how far it moves
+          ;; either way (ms), and how much wet signal there is: where each is
+          ;; heading, and where it is, so that changing mode doesn't click
+          (rate_aim:SAMPLE 0.513)
+          (centre_aim:SAMPLE 3.5)
+          (depth_aim:SAMPLE 1.85)
+          (wet_aim:SAMPLE 0.0)
+          (rate:SAMPLE 0.513)
+          (centre:SAMPLE 3.5)
+          (depth:SAMPLE 1.85)
+          (wet:SAMPLE 0.0)
+          (smooth:SAMPLE (smoothing_coeff 0.05))
+          (frames_per_ms:SAMPLE (/ SRf 1000.0))
+          ;; two one-pole lowpasses (about 9 kHz) on each wet signal
+          (bbd:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 9000.0) SRf))))
+          (l1:SAMPLE 0.0) (l2:SAMPLE 0.0) (r1:SAMPLE 0.0) (r2:SAMPLE 0.0)
+          (tri:SAMPLE 0.0)
+          (dry_l:SAMPLE 0.0)
+          (dry_r:SAMPLE 0.0)
+          (makeup:SAMPLE 1.0)
+          ;; a DC blocker: what's left after taking away a 12 Hz lowpass
+          (dc_coeff:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 12.0) SRf))))
+          (dc_l:SAMPLE 0.0)
+          (dc_r:SAMPLE 0.0))
+      (lambda (frame:SAMPLE*)
+        (if (= (% count 64) 0)
+            (begin
+              (set! mode (convert (floor (+ 0.5 (polysynth_chorus p))) i64))
+              ;; I: 0.5 Hz, 1.66 to 5.35 ms. II: the same range at 0.86 Hz.
+              ;; I and II: 9.75 Hz over a narrow range, 3.22 to 3.56 ms.
+              (cond ((= mode 1) (set! rate_aim 0.513) (set! centre_aim 3.5) (set! depth_aim 1.85) (set! wet_aim 1.0) void)
+                    ((= mode 2) (set! rate_aim 0.863) (set! centre_aim 3.5) (set! depth_aim 1.85) (set! wet_aim 1.0) void)
+                    ((= mode 3) (set! rate_aim 9.75) (set! centre_aim 3.39) (set! depth_aim 0.17) (set! wet_aim 1.0) void)
+                    (else (set! wet_aim 0.0) void))
+              ;; round off the triangle's corners a little
+              (set! lfo_coeff (smoothing_coeff (/ 0.02 rate)))
+              void))
+        (set! count (+ count 1))
+        ;; the mode is read every frame, so a note which starts on the frame
+        ;; after the mono parameter changes is allocated the new way
+        (inst_set_mode inst (if (> (polysynth_mono p) 0.5) INST_MONO INST_POLY))
+        (set! rate (+ rate (* smooth (- rate_aim rate))))
+        (set! centre (+ centre (* smooth (- centre_aim centre))))
+        (set! depth (+ depth (* smooth (- depth_aim depth))))
+        (set! wet (+ wet (* smooth (- wet_aim wet))))
+        ;; the filters' saturation bends lopsided waveforms (a saw plus the
+        ;; sub-oscillator, say) more on one side than the other, which leaves
+        ;; a little DC. Analogue synths block it with a capacitor; this is the
+        ;; same thing.
+        (set! dc_l (+ dc_l (* dc_coeff (- (+ (pref frame 0) 1.0e-18) dc_l))))
+        (set! dc_r (+ dc_r (* dc_coeff (- (+ (pref frame 1) 1.0e-18) dc_r))))
+        (set! dry_l (- (pref frame 0) dc_l))
+        (set! dry_r (- (pref frame 1) dc_r))
+        (pset! frame 0 dry_l)
+        (pset! frame 1 dry_r)
+        (dl_write left dry_l)
+        (dl_write right dry_r)
+        (if (> wet 0.0001)
+            (begin
+              (set! lfo_phase (+ lfo_phase (/ rate SRf)))
+              (if (>= lfo_phase 1.0) (set! lfo_phase (- lfo_phase 1.0)))
+              (set! tri (- 1.0 (* 4.0 (fabs (- lfo_phase 0.5)))))
+              (set! lfo (+ lfo (* lfo_coeff (- tri lfo))))
+              ;; the tiny constant keeps the lowpasses out of denormals
+              (set! l1 (+ l1 (* bbd (- (+ (dl_readf left (* frames_per_ms (+ centre (* depth lfo)))) 1.0e-18) l1))))
+              (set! l2 (+ l2 (* bbd (- l1 l2))))
+              (set! r1 (+ r1 (* bbd (- (+ (dl_readf right (* frames_per_ms (- centre (* depth lfo)))) 1.0e-18) r1))))
+              (set! r2 (+ r2 (* bbd (- r1 r2))))
+              ;; dry plus wet is louder than dry alone: bring it back down
+              (set! makeup (- 1.0 (* 0.25 wet)))
+              (pset! frame 0 (* makeup (+ dry_l (* wet l2))))
+              (pset! frame 1 (* makeup (+ dry_r (* wet r2))))
+              void))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; making the instrument ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func polysynth_make
+  (lambda ()
+    (let ((inst (inst_make "polysynth" 8 (polysynth_nparams)))
+          (i:i64 0))
+      (polysynth_defaults (inst_params inst))
+      (dotimes (i 8)
+        (inst_set_voice inst i (polysynth_voice_c (inst_params inst) i)))
+      (inst_set_fx inst (polysynth_fx_c (inst_params inst) inst))
+      inst)))

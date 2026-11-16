@@ -1,0 +1,624 @@
+;;; kit808.xtm -- a synthesised drum machine in the style of the TR-808
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A drum kit in the style of the Roland TR-808, where every sound is
+;; synthesised, as it was in the original. Each sound has its own voice, and
+;; the notes follow General MIDI: 36 kick, 38 snare, 42 closed hat and so on
+;; (the sounds clause below lists them all).
+;;
+;; The 808 makes its sounds from a few circuits, and this file follows them:
+;;
+;; - The kick, toms, congas, rim shot and claves are *struck resonators*. In
+;;   the hardware these are bridged-T filters tuned close to oscillation, and
+;;   a short trigger pulse sets them ringing. A struck resonator rings as a
+;;   sine wave which dies away exponentially, so here each one is a sine
+;;   oscillator with an exponential envelope, which is cheaper and easier to
+;;   tune than the filter itself.
+;; - The snare is two of those resonators (the drum's two lowest modes) plus
+;;   filtered white noise for the snares.
+;; - The clap is bandpassed noise, opened three times in quick succession and
+;;   then left to fade, which sounds like several people clapping at once.
+;; - The hi-hats, cymbal and cowbell share a bank of six square-wave
+;;   oscillators at unrelated frequencies. Summed, they make a dense,
+;;   clangorous spectrum, and bandpass filters pick out the part each sound
+;;   needs.
+;;
+;; Velocity sets the level of every sound, and on most it also sets the tone:
+;; a harder kick has more click, a harder snare or clap is brighter.
+;;
+;; The closed and open hi-hats share one voice, so either one cuts the other
+;; off, as on the original.
+;;
+;; This is an original implementation, built from published descriptions of
+;; the 808's circuits and its sound.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-kit808)
+(define *xtmlib-studio-kit808-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument kit808
+  "a synthesised drum machine in the style of the TR-808"
+  (params
+    (bd-tune 50.0 "kick pitch in Hz")
+    (bd-decay 0.9 "seconds for the kick to die away")
+    (bd-tone 0.35 "kick click, 0.0 (soft) to 1.0 (hard)")
+    (bd-drive 0.0 "kick saturation, 0.0 to 1.0")
+    (bd-level 0.7 "kick level, 0.0 to 1.0")
+    (sd-tune 185.0 "snare pitch in Hz (the lower of its two tones)")
+    (sd-tone 0.5 "snare brightness, 0.0 to 1.0")
+    (sd-snappy 0.55 "how loud the snares are against the drum, 0.0 to 1.0")
+    (sd-level 0.7 "snare level, 0.0 to 1.0")
+    (rs-level 0.7 "rim shot level, 0.0 to 1.0")
+    (cp-decay 0.3 "seconds for the clap's tail to die away")
+    (cp-level 0.7 "clap level, 0.0 to 1.0")
+    (hh-decay 0.09 "seconds for the closed hi-hat to die away")
+    (hh-level 0.7 "closed hi-hat level, 0.0 to 1.0")
+    (oh-decay 0.5 "seconds for the open hi-hat to die away")
+    (oh-level 0.7 "open hi-hat level, 0.0 to 1.0")
+    (cr-decay 1.6 "seconds for the cymbal to die away")
+    (cr-tone 0.5 "cymbal brightness, 0.0 to 1.0")
+    (cr-level 0.7 "cymbal level, 0.0 to 1.0")
+    (tom-decay 0.5 "seconds for the toms to die away")
+    (lt-tune 90.0 "low tom pitch in Hz")
+    (lt-level 0.7 "low tom level, 0.0 to 1.0")
+    (mt-tune 130.0 "mid tom pitch in Hz")
+    (mt-level 0.7 "mid tom level, 0.0 to 1.0")
+    (ht-tune 175.0 "high tom pitch in Hz")
+    (ht-level 0.7 "high tom level, 0.0 to 1.0")
+    (conga-decay 0.25 "seconds for the congas to die away")
+    (lc-tune 165.0 "low conga pitch in Hz")
+    (lc-level 0.7 "low conga level, 0.0 to 1.0")
+    (mc-tune 250.0 "mid conga pitch in Hz")
+    (mc-level 0.7 "mid conga level, 0.0 to 1.0")
+    (hc-tune 370.0 "high conga pitch in Hz")
+    (hc-level 0.7 "high conga level, 0.0 to 1.0")
+    (cb-level 0.7 "cowbell level, 0.0 to 1.0")
+    (cl-level 0.7 "claves level, 0.0 to 1.0")
+    (ma-level 0.7 "maracas level, 0.0 to 1.0"))
+  (presets
+    (classic)
+    (boomy (bd-tune 45.0) (bd-decay 2.6) (bd-tone 0.15) (sd-tone 0.35) (hh-decay 0.12))
+    (tight (bd-tune 55.0) (bd-decay 0.35) (bd-tone 0.55) (sd-snappy 0.7) (sd-tone 0.7)
+           (cp-decay 0.15) (hh-decay 0.045) (oh-decay 0.25) (tom-decay 0.25) (conga-decay 0.15))
+    (trap (bd-tune 43.0) (bd-decay 2.2) (bd-tone 0.4) (bd-drive 0.6) (sd-tune 200.0)
+          (sd-snappy 0.75) (sd-tone 0.75) (cp-decay 0.4) (hh-decay 0.05) (hh-level 0.6))
+    (electro (bd-tune 56.0) (bd-decay 0.6) (bd-tone 0.8) (bd-drive 0.25) (sd-tune 205.0)
+             (sd-snappy 0.65) (sd-tone 0.65) (cr-tone 0.7) (lt-tune 100.0) (mt-tune 145.0)
+             (ht-tune 195.0))
+    (dusty (bd-tune 48.0) (bd-decay 1.1) (bd-tone 0.1) (sd-tune 170.0) (sd-tone 0.15)
+           (sd-snappy 0.4) (cp-decay 0.22) (hh-decay 0.07) (oh-decay 0.35) (cr-tone 0.2)
+           (hh-level 0.55) (oh-level 0.55)))
+  (sounds
+    (bd 36) (rs 37) (sd 38) (cp 39) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50)
+    (cb 56) (hc 62) (mc 63) (lc 64) (ma 70) (cl 75)))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; building blocks ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static kit808_decay
+  "the per-frame multiplier which makes an envelope fall by 60 dB in `seconds`"
+  (lambda (seconds:SAMPLE)
+    (exp (/ -6.9077553 (* (if (< seconds 0.002) 0.002 seconds) SRf)))))
+
+(bind-func static kit808_clamp
+  (lambda (x:SAMPLE lo:SAMPLE hi:SAMPLE)
+    (if (< x lo) lo (if (> x hi) hi x))))
+
+(bind-func static kit808_out
+  "add the mono sample y to the stereo frame out, at pan position pan"
+  (lambda (out:SAMPLE* y:SAMPLE pan:SAMPLE)
+    (frame_add_mono out y pan)
+    void))
+
+(bind-func kit808_noise_c
+  "white noise from -1.0 to 1.0 (a linear congruential generator)"
+  (lambda (seed:i64)
+    (let ((state seed))
+      (lambda ()
+        (set! state (% (+ (* state 1103515245) 12345) 2147483648))
+        (- (* (convert state SAMPLE) 0.00000000093132257) 1.0)))))
+
+(bind-func kit808_svf_c
+  "a two-pole state-variable filter, in the trapezoidal form described by
+Andrew Simper. It stays stable and in tune right up to the top of the audio
+band, which matters for the hi-hats.
+
+@param x - input
+@param freq - cutoff or centre frequency in Hz
+@param q - resonance (0.5 is gentle, 5.0 is a narrow peak)
+@param mode - 0 lowpass, 1 bandpass (unity gain at the centre), 2 highpass"
+  (lambda ()
+    (let ((ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
+          (g:SAMPLE 0.0) (k:SAMPLE 1.0)
+          (a1:SAMPLE 0.0) (a2:SAMPLE 0.0) (a3:SAMPLE 0.0)
+          (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0)
+          (old_freq:SAMPLE -1.0) (old_q:SAMPLE -1.0))
+      (lambda (x:SAMPLE freq:SAMPLE q:SAMPLE mode:i64)
+        (if (or (<> freq old_freq) (<> q old_q))
+            (begin
+              (set! old_freq freq)
+              (set! old_q q)
+              (set! g (tan (* SPI (/ (kit808_clamp freq 20.0 (* 0.45 SRf)) SRf))))
+              (set! k (/ 1.0 (kit808_clamp q 0.3 30.0)))
+              (set! a1 (/ 1.0 (+ 1.0 (* g (+ g k)))))
+              (set! a2 (* g a1))
+              (set! a3 (* g a2))))
+        (set! v3 (- x ic2))
+        (set! v1 (+ (* a1 ic1) (* a2 v3)))
+        (set! v2 (+ ic2 (* a2 ic1) (* a3 v3)))
+        ;; the tiny constant keeps the state out of denormal numbers
+        (set! ic1 (+ (- (* 2.0 v1) ic1) 1.0e-18))
+        (set! ic2 (- (* 2.0 v2) ic2))
+        (cond ((= mode 0) v2)
+              ((= mode 1) (* k v1))
+              (else (- x (* k v1) v2)))))))
+
+(bind-func kit808_square_c
+  "a square wave, -1.0 to 1.0, with its edges rounded off by poly_blep so that
+it doesn't alias. It runs freely from note to note, as the 808's oscillators
+do, so no two hits start from quite the same place."
+  (lambda (start_phase:SAMPLE)
+    (let ((phase start_phase) (inc:SAMPLE 0.0) (x:SAMPLE 0.0))
+      (lambda (freq:SAMPLE)
+        (set! inc (/ freq SRf))
+        (set! phase (+ phase inc))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (set! x (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
+        (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
+           (poly_blep x inc 1.0 #t))))))
+
+(bind-func kit808_metal_c
+  "the 808's metallic source: six square waves at unrelated frequencies,
+summed. Their harmonics land everywhere, so the sum is a dense, clangorous
+spectrum rather than a chord."
+  (lambda ()
+    (let ((o1 (kit808_square_c 0.0)) (o2 (kit808_square_c 0.31))
+          (o3 (kit808_square_c 0.57)) (o4 (kit808_square_c 0.13))
+          (o5 (kit808_square_c 0.79)) (o6 (kit808_square_c 0.44)))
+      (lambda ()
+        (* 0.1667 (+ (o1 205.3) (o2 304.4) (o3 369.6) (o4 522.7) (o5 540.0) (o6 800.0)))))))
+
+;;;;;;;;;;
+;; kick ;;
+;;;;;;;;;;
+
+;; A sine, struck at full level, which dies away over as long as a couple of
+;; seconds: that long, pure boom is the 808 kick. Its pitch starts a few
+;; semitones sharp and settles within about 50 ms, as the hardware
+;; resonator's does when the trigger pulse first hits it. On top sits the
+;; click: the trigger pulse itself, leaking through a lowpass filter which the
+;; tone control opens.
+;;
+;; A kick can be retriggered while the last one is still sounding. The last
+;; output value is carried into the new note and faded out over a few
+;; milliseconds (`carry`), so the jump doesn't click.
+
+(bind-func kit808_bd_c
+  (lambda (p:SAMPLE*)
+    (let ((phase:SAMPLE 0.0)
+          (amp:SAMPLE 0.0)
+          (amp_coeff:SAMPLE 0.999)
+          (sweep:SAMPLE 0.0)
+          (sweep_coeff (kit808_decay 0.15))
+          (click:SAMPLE 0.0)
+          (click_coeff:SAMPLE 0.5)
+          (pulse_frames:i64 (convert (/ SRf 1600.0) i64))
+          (vel:SAMPLE 0.0)
+          (pre:SAMPLE 1.0)
+          (y:SAMPLE 0.0)
+          (last:SAMPLE 0.0)
+          (carry:SAMPLE 0.0)
+          (carry_coeff (kit808_decay 0.02)))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! carry last)
+              (set! phase 0.0)
+              (set! amp 1.0)
+              (set! sweep 1.0)
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! amp_coeff (kit808_decay (kit808_bd_decay p)))
+              ;; the tone control opens the click's lowpass from 600 Hz to 8 kHz
+              (set! click_coeff (- 1.0 (exp (/ (* -6.2831853 (+ 600.0 (* 7400.0 (kit808_bd_tone p) vel)))
+                                               SRf))))
+              (set! pre (+ 1.0 (* 5.0 (kit808_bd_drive p))))))
+        ;; the resonator
+        (set! phase (+ phase (/ (* (kit808_bd_tune p) (+ 1.0 (* 0.5 sweep))) SRf)))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (set! y (* amp (sin (* STWOPI phase))))
+        (set! amp (* amp amp_coeff))
+        (set! sweep (* sweep sweep_coeff))
+        ;; the click: a 0.6 ms pulse through a one-pole lowpass. Its level goes
+        ;; up with velocity as well as tone, so harder hits are clickier.
+        (set! click (+ click (* click_coeff (- (if (< (voice_age v) pulse_frames) 1.0 0.0) click))))
+        (set! y (+ y (* (+ 0.1 (* 0.9 (kit808_bd_tone p))) vel click)))
+        ;; drive: saturate, then scale back so that the peak stays put. The
+        ;; flattened wave carries more energy, so turn it down a little too.
+        (set! y (/ (tanh (* pre y)) (tanh pre)))
+        (set! y (* 0.42 (- 1.0 (* 0.35 (kit808_bd_drive p))) (kit808_bd_level p) vel y))
+        (set! carry (* carry carry_coeff))
+        (set! last (+ y carry))
+        (kit808_out out last 0.5)
+        (if (and (< amp 0.0005) (< (fabs carry) 0.0001))
+            (begin (set! last 0.0) (voice_done v)))
+        void))))
+
+;;;;;;;;;;;
+;; snare ;;
+;;;;;;;;;;;
+
+;; Two resonators for the drum, at roughly the ratio of a drum head's two
+;; lowest modes, each starting a little sharp and falling quickly to pitch. White noise
+;; through a highpass and a lowpass makes the snares. Tone and velocity open
+;; the noise lowpass and bring up the upper resonator, so a harder hit is
+;; brighter as well as louder.
+
+(bind-func kit808_sd_c
+  (lambda (p:SAMPLE*)
+    (let ((noise (kit808_noise_c 4711))
+          (hp (kit808_svf_c))
+          (lp (kit808_svf_c))
+          (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0)
+          (env1:SAMPLE 0.0) (env2:SAMPLE 0.0) (env_noise:SAMPLE 0.0)
+          (coeff1 (kit808_decay 0.2))
+          (coeff2 (kit808_decay 0.13))
+          (coeff_noise (kit808_decay 0.28))
+          (sweep:SAMPLE 0.0)
+          (sweep_coeff (kit808_decay 0.03))
+          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
+          (f:SAMPLE 0.0) (body:SAMPLE 0.0) (snares:SAMPLE 0.0)
+          (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
+          (carry_coeff (kit808_decay 0.02)))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! carry last)
+              (set! phase1 0.0) (set! phase2 0.0)
+              (set! env1 1.0) (set! env2 1.0) (set! env_noise 1.0)
+              (set! sweep 1.0)
+              (set! vel (voice_vel v))))
+        (set! bright (* (kit808_sd_tone p) (+ 0.5 (* 0.5 vel))))
+        ;; the drum
+        (set! f (* (kit808_sd_tune p) (+ 1.0 (* 0.12 sweep))))
+        (set! phase1 (+ phase1 (/ f SRf)))
+        (if (>= phase1 1.0) (set! phase1 (- phase1 1.0)))
+        (set! phase2 (+ phase2 (/ (* 1.78 f) SRf)))
+        (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
+        (set! body (+ (* env1 (sin (* STWOPI phase1)))
+                      (* env2 (+ 0.35 (* 0.65 bright)) (sin (* STWOPI phase2)))))
+        ;; the snares
+        (set! snares (lp (hp (noise) 1800.0 0.7 2) (+ 4000.0 (* 9000.0 bright)) 0.7 0))
+        (set! snares (* env_noise (+ 0.3 (* 1.2 (kit808_sd_snappy p) (+ 0.6 (* 0.4 vel)))) snares))
+        (set! env1 (* env1 coeff1))
+        (set! env2 (* env2 coeff2))
+        (set! env_noise (* env_noise coeff_noise))
+        (set! sweep (* sweep sweep_coeff))
+        (set! carry (* carry carry_coeff))
+        (set! last (+ (* 0.22 (kit808_sd_level p) vel (+ (* 0.75 body) snares)) carry))
+        (kit808_out out last 0.5)
+        (if (and (< env_noise 0.001) (< env1 0.001) (< (fabs carry) 0.0001))
+            (begin (set! last 0.0) (voice_done v)))
+        void))))
+
+;;;;;;;;;;
+;; clap ;;
+;;;;;;;;;;
+
+;; Noise through a bandpass around 1 kHz. Its envelope snaps open and dies
+;; three times, 11 ms apart, then opens once more and fades over cp-decay:
+;; the bursts are the separate hands, and the tail is the room.
+
+(bind-func kit808_cp_c
+  (lambda (p:SAMPLE*)
+    (let ((noise (kit808_noise_c 90210))
+          (bp (kit808_svf_c))
+          (hp (kit808_svf_c))
+          (env:SAMPLE 0.0)
+          (burst_coeff (kit808_decay 0.02))
+          (tail_coeff:SAMPLE 0.999)
+          (spacing:i64 (convert (/ SRf 90.0) i64))
+          (age:i64 0)
+          (tail:i1 #f)
+          (vel:SAMPLE 0.0)
+          (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (set! age (voice_age v))
+        (if (voice_start? v)
+            (begin (set! env 1.0) (set! tail #f) (set! vel (voice_vel v))))
+        (if (or (= age spacing) (= age (* 2 spacing)))
+            (set! env 1.0))
+        (if (= age (* 3 spacing))
+            (begin (set! env 0.8) (set! tail #t)))
+        (if (= (% age 32) 0)
+            (set! tail_coeff (kit808_decay (kit808_cp_decay p))))
+        ;; the highpass comes after the envelope, to take out the thump of
+        ;; each burst's sudden start
+        (set! y (* env (bp (noise) (+ 900.0 (* 350.0 vel)) 1.6 1)))
+        (set! y (hp y 400.0 0.7 2))
+        (set! env (* env (if tail tail_coeff burst_coeff)))
+        (kit808_out out (* 0.88 (kit808_cp_level p) vel y) 0.52)
+        (if (and tail (< env 0.001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;
+;; hi-hats ;;
+;;;;;;;;;;;;;
+
+;; The metal bank through a bandpass at 8 kHz, an envelope, and a highpass
+;; which takes away what's left of the low end. Pitch 42 plays the closed
+;; hat and 46 the open one; both are mapped to this one voice, so each cuts
+;; the other off. Velocity pushes the bandpass up a little.
+
+(bind-func kit808_hh_c
+  (lambda (p:SAMPLE*)
+    (let ((metal (kit808_metal_c))
+          (bp (kit808_svf_c))
+          (hp (kit808_svf_c))
+          (env:SAMPLE 0.0)
+          (coeff:SAMPLE 0.99)
+          (open:i1 #f)
+          (vel:SAMPLE 0.0)
+          (level:SAMPLE 0.0)
+          (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! env 1.0)
+              (set! open (> (voice_pitch v) 44.0))
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! coeff (kit808_decay (if open (kit808_oh_decay p) (kit808_hh_decay p))))
+              (set! level (if open (kit808_oh_level p) (kit808_hh_level p)))))
+        (set! y (bp (metal) (+ 7000.0 (* 2000.0 vel)) 1.2 1))
+        (set! y (hp (* env y) 6500.0 0.7 2))
+        (set! env (* env coeff))
+        (kit808_out out (* 1.45 level vel y) 0.62)
+        (if (< env 0.001)
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;
+;; cymbal ;;
+;;;;;;;;;;;;
+
+;; The same metal bank, split in two. A band around 3.4 kHz gives the cymbal
+;; its clang and dies away quickly; a band from 7 kHz up is the shimmer, and
+;; lasts the full cr-decay. Tone and velocity set the balance between them.
+
+(bind-func kit808_cr_c
+  (lambda (p:SAMPLE*)
+    (let ((metal (kit808_metal_c))
+          (bp_low (kit808_svf_c))
+          (bp_high (kit808_svf_c))
+          (hp (kit808_svf_c))
+          (env_low:SAMPLE 0.0) (env_high:SAMPLE 0.0)
+          (coeff_low:SAMPLE 0.99) (coeff_high:SAMPLE 0.99)
+          (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
+          (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! env_low 1.0) (set! env_high 1.0) (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! coeff_low (kit808_decay (* 0.3 (kit808_cr_decay p))))
+              (set! coeff_high (kit808_decay (kit808_cr_decay p)))
+              (set! bright (* (kit808_cr_tone p) (+ 0.6 (* 0.4 vel))))))
+        (set! x (metal))
+        (set! y (+ (* env_low (- 1.0 (* 0.6 bright)) (bp_low x 3400.0 2.0 1))
+                   (* env_high (+ 0.5 bright) (hp (bp_high x 8000.0 0.8 1) 6000.0 0.7 2))))
+        (set! env_low (* env_low coeff_low))
+        (set! env_high (* env_high coeff_high))
+        (kit808_out out (* 0.95 (kit808_cr_level p) vel y) 0.38)
+        (if (< env_high 0.001)
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; toms and congas ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; The toms and congas are the same circuit at different tunings. Each is a
+;; resonator whose pitch falls a little at the start. The toms have more of
+;; that fall and a puff of low noise, which the congas don't.
+;;
+;; `which` says which drum this voice plays: 0 low tom, 1 mid tom, 2 high
+;; tom, 3 low conga, 4 mid conga, 5 high conga.
+
+(bind-func static kit808_tom_tune
+  (lambda (p:SAMPLE* which:i64)
+    (cond ((= which 0) (kit808_lt_tune p))
+          ((= which 1) (kit808_mt_tune p))
+          ((= which 2) (kit808_ht_tune p))
+          ((= which 3) (kit808_lc_tune p))
+          ((= which 4) (kit808_mc_tune p))
+          (else (kit808_hc_tune p)))))
+
+(bind-func static kit808_tom_level
+  (lambda (p:SAMPLE* which:i64)
+    (cond ((= which 0) (kit808_lt_level p))
+          ((= which 1) (kit808_mt_level p))
+          ((= which 2) (kit808_ht_level p))
+          ((= which 3) (kit808_lc_level p))
+          ((= which 4) (kit808_mc_level p))
+          (else (kit808_hc_level p)))))
+
+(bind-func kit808_tom_c
+  (lambda (p:SAMPLE* which:i64 pan:SAMPLE)
+    (let ((noise (kit808_noise_c (+ 17 which)))
+          (lp (kit808_svf_c))
+          (conga (> which 2))
+          (depth:SAMPLE (if (> which 2) 0.06 0.18))
+          (phase:SAMPLE 0.0)
+          (amp:SAMPLE 0.0) (amp_coeff:SAMPLE 0.999)
+          (sweep:SAMPLE 0.0)
+          (sweep_coeff (kit808_decay (if (> which 2) 0.04 0.2)))
+          (env_noise:SAMPLE 0.0)
+          (noise_coeff (kit808_decay 0.12))
+          (vel:SAMPLE 0.0) (y:SAMPLE 0.0)
+          (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
+          (carry_coeff (kit808_decay 0.02)))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! carry last)
+              (set! phase 0.0) (set! amp 1.0) (set! sweep 1.0)
+              (set! env_noise (if conga 0.0 1.0))
+              (set! vel (voice_vel v))))
+        (if (= (% (voice_age v) 32) 0)
+            (set! amp_coeff (kit808_decay (if conga (kit808_conga_decay p) (kit808_tom_decay p)))))
+        (set! phase (+ phase (/ (* (kit808_tom_tune p which) (+ 1.0 (* depth sweep))) SRf)))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (set! y (+ (* amp (sin (* STWOPI phase)))
+                   (* env_noise 0.25 vel (lp (noise) 1200.0 0.7 0))))
+        (set! amp (* amp amp_coeff))
+        (set! sweep (* sweep sweep_coeff))
+        (set! env_noise (* env_noise noise_coeff))
+        (set! carry (* carry carry_coeff))
+        (set! last (+ (* 0.3 (kit808_tom_level p which) vel y) carry))
+        (kit808_out out last pan)
+        (if (and (< amp 0.001) (< (fabs carry) 0.0001))
+            (begin (set! last 0.0) (voice_done v)))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; rim shot, claves, maracas and cowbell ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The rim shot is two very short resonators (500 Hz and 1.7 kHz), clipped
+;; for bite and highpassed so it's all knock and no body.
+
+(bind-func kit808_rs_c
+  (lambda (p:SAMPLE*)
+    (let ((hp (kit808_svf_c))
+          (phase1:SAMPLE 0.0) (phase2:SAMPLE 0.0)
+          (env:SAMPLE 0.0) (coeff (kit808_decay 0.035))
+          (vel:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! phase1 0.0) (set! phase2 0.0) (set! env 1.0) (set! vel (voice_vel v))))
+        (set! phase1 (+ phase1 (/ 500.0 SRf)))
+        (if (>= phase1 1.0) (set! phase1 (- phase1 1.0)))
+        (set! phase2 (+ phase2 (/ 1700.0 SRf)))
+        (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
+        (set! y (* env (+ (* 0.6 (sin (* STWOPI phase1))) (sin (* STWOPI phase2)))))
+        (set! y (hp (tanh (* 2.0 y)) 350.0 0.7 2))
+        (set! env (* env coeff))
+        (kit808_out out (* 0.21 (kit808_rs_level p) vel y) 0.45)
+        (if (< env 0.001) (voice_done v))
+        void))))
+
+;; The claves are a single resonator at 2.5 kHz with a short ring.
+
+(bind-func kit808_cl_c
+  (lambda (p:SAMPLE*)
+    (let ((phase:SAMPLE 0.0)
+          (env:SAMPLE 0.0) (coeff (kit808_decay 0.09))
+          (vel:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! phase 0.0) (set! env 1.0) (set! vel (voice_vel v))))
+        (set! phase (+ phase (/ 2500.0 SRf)))
+        (if (>= phase 1.0) (set! phase (- phase 1.0)))
+        (kit808_out out (* 0.23 (kit808_cl_level p) vel env (sin (* STWOPI phase))) 0.36)
+        (set! env (* env coeff))
+        (if (< env 0.001) (voice_done v))
+        void))))
+
+;; The maracas are highpassed noise with a soft 4 ms attack and a short fade.
+
+(bind-func kit808_ma_c
+  (lambda (p:SAMPLE*)
+    (let ((noise (kit808_noise_c 31337))
+          (hp (kit808_svf_c))
+          (rise:SAMPLE 0.0) (rise_coeff (smoothing_coeff 0.004))
+          (env:SAMPLE 0.0) (coeff (kit808_decay 0.08))
+          (vel:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! rise 0.0) (set! env 1.0) (set! vel (voice_vel v))))
+        (set! rise (+ rise (* rise_coeff (- 1.0 rise))))
+        (kit808_out out (* 0.28 (kit808_ma_level p) vel rise env (hp (noise) 5500.0 0.8 2)) 0.66)
+        (set! env (* env coeff))
+        (if (< env 0.001) (voice_done v))
+        void))))
+
+;; The cowbell is two of the metal bank's square waves, 540 and 800 Hz,
+;; through a bandpass. Its envelope is two decays added together: a sharp
+;; one for the strike and a longer one for the ring.
+
+(bind-func kit808_cb_c
+  (lambda (p:SAMPLE*)
+    (let ((o1 (kit808_square_c 0.0))
+          (o2 (kit808_square_c 0.25))
+          (bp (kit808_svf_c))
+          (lp (kit808_svf_c))
+          (strike:SAMPLE 0.0) (strike_coeff (kit808_decay 0.05))
+          (ring:SAMPLE 0.0) (ring_coeff (kit808_decay 0.45))
+          (vel:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin (set! strike 1.0) (set! ring 1.0) (set! vel (voice_vel v))))
+        (set! y (lp (bp (+ (o1 540.0) (o2 800.0)) 1000.0 1.2 1) 4000.0 0.7 0))
+        (set! y (* (+ (* 0.65 strike) (* 0.35 ring)) y))
+        (set! strike (* strike strike_coeff))
+        (set! ring (* ring ring_coeff))
+        (kit808_out out (* 0.14 (kit808_cb_level p) vel y) 0.58)
+        (if (< ring 0.001) (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; making the kit ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; voice numbers: 0 kick, 1 rim shot, 2 snare, 3 clap, 4 hi-hats (closed and
+;; open), 5-7 toms, 8 cymbal, 9 cowbell, 10 maracas, 11 claves, 12-14 congas
+(bind-func kit808_make
+  (lambda ()
+    (let ((inst (inst_make "kit808" 15 (kit808_nparams)))
+          (p (inst_params inst)))
+      (kit808_defaults p)
+      (inst_set_mode inst INST_KEYED)
+      (inst_set_voice inst 0 (kit808_bd_c p))
+      (inst_set_voice inst 1 (kit808_rs_c p))
+      (inst_set_voice inst 2 (kit808_sd_c p))
+      (inst_set_voice inst 3 (kit808_cp_c p))
+      (inst_set_voice inst 4 (kit808_hh_c p))
+      (inst_set_voice inst 5 (kit808_tom_c p 0 0.4))
+      (inst_set_voice inst 6 (kit808_tom_c p 1 0.5))
+      (inst_set_voice inst 7 (kit808_tom_c p 2 0.6))
+      (inst_set_voice inst 8 (kit808_cr_c p))
+      (inst_set_voice inst 9 (kit808_cb_c p))
+      (inst_set_voice inst 10 (kit808_ma_c p))
+      (inst_set_voice inst 11 (kit808_cl_c p))
+      (inst_set_voice inst 12 (kit808_tom_c p 3 0.62))
+      (inst_set_voice inst 13 (kit808_tom_c p 4 0.55))
+      (inst_set_voice inst 14 (kit808_tom_c p 5 0.45))
+      (inst_map_key inst 36 0)
+      (inst_map_key inst 37 1)
+      (inst_map_key inst 38 2)
+      (inst_map_key inst 39 3)
+      (inst_map_key inst 42 4)
+      (inst_map_key inst 46 4)
+      (inst_map_key inst 45 5)
+      (inst_map_key inst 47 6)
+      (inst_map_key inst 50 7)
+      (inst_map_key inst 49 8)
+      (inst_map_key inst 56 9)
+      (inst_map_key inst 70 10)
+      (inst_map_key inst 75 11)
+      (inst_map_key inst 64 12)
+      (inst_map_key inst 63 13)
+      (inst_map_key inst 62 14)
+      inst)))

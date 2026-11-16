@@ -8,9 +8,9 @@
 ;; The mixer has STUDIO_TRACKS tracks. Each one holds an instrument and a
 ;; channel strip, and can send some of its signal to a shared delay and a
 ;; shared reverb. Everything meets at the master bus, which has a compressor
-;; and a soft clipper.
+;; and a limiter.
 ;;
-;;   track 0: instrument -> strip --+--> master: compressor -> gain -> clip
+;;   track 0: instrument -> strip --+--> master: compressor -> gain -> limiter
 ;;   track 1: instrument -> strip --+        ^
 ;;   ...                            |        |
 ;;                                  +-> delay -> reverb
@@ -45,7 +45,8 @@
 (bind-val MASTER_COMP_ATTACK i64 13)    ;; milliseconds
 (bind-val MASTER_COMP_RELEASE i64 14)   ;; milliseconds
 (bind-val MASTER_COMP_MAKEUP i64 15)    ;; dB
-(bind-val MASTER_NPARAMS i64 16)
+(bind-val MASTER_CEILING i64 16)        ;; the limiter's ceiling (1.0 is full scale)
+(bind-val MASTER_NPARAMS i64 17)
 
 ;; 0 instrument (null for an empty track)
 ;; 1 channel strip parameters (see the STRIP_ constants in fx.xtm)
@@ -115,6 +116,7 @@
     (pset! p MASTER_COMP_ATTACK 15.0)
     (pset! p MASTER_COMP_RELEASE 180.0)
     (pset! p MASTER_COMP_MAKEUP 4.0)
+    (pset! p MASTER_CEILING 0.9)
     void))
 
 (bind-func studio_set_instrument
@@ -239,6 +241,7 @@
         (delay (stereo_delay_c 4.0))
         (reverb (plate_reverb_c))
         (compressor (compressor_c))
+        (limiter (limiter_c))
         (trk:Track* null)
         (inst:Inst* null)
         (strip:SAMPLE* null)
@@ -321,8 +324,9 @@
                                     (pref master MASTER_COMP_ATTACK)
                                     (pref master MASTER_COMP_RELEASE)
                                     (pref master MASTER_COMP_MAKEUP)))
-                  (pset! mix 0 (soft_clip (* (pref master MASTER_GAIN) (pref mix 0)) 0.8))
-                  (pset! mix 1 (soft_clip (* (pref master MASTER_GAIN) (pref mix 1)) 0.8))
+                  (pset! mix 0 (* (pref master MASTER_GAIN) (pref mix 0)))
+                  (pset! mix 1 (* (pref master MASTER_GAIN) (pref mix 1)))
+                  (limiter mix (pref master MASTER_CEILING) 120.0)
                   (set! peak (max (fabs (pref mix 0)) (fabs (pref mix 1))))
                   (if (> peak studio_master_peak) (set! studio_master_peak peak))
                   void))))

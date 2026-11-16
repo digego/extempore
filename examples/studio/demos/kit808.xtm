@@ -1,0 +1,95 @@
+;;; kit808.xtm -- a tour of the 808 drum kit's presets
+
+;; Evaluate the whole file to hear every sound in turn, then a beat for each
+;; preset, or render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/kit808.xtm /tmp/kit808.wav 43
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'drums 'kit808)
+(score-ctl 0 'drums 'reverb 0.06)
+
+;; the kit's sounds and their General MIDI notes
+(define kit808-demo-notes
+  '((bd . 36) (rs . 37) (sd . 38) (cp . 39) (hh . 42) (lt . 45) (oh . 46) (mt . 47)
+    (cr . 49) (ht . 50) (cb . 56) (hc . 62) (mc . 63) (lc . 64) (ma . 70) (cl . 75)))
+
+;; Play one bar starting at `start` seconds. Each line is a sound and a
+;; string of steps: X is a loud hit, x a normal one, o a soft one and . a
+;; rest. A line of 16 steps plays sixteenth notes, 32 steps thirty-seconds.
+;; `swing` (0.0 to 0.5) delays every second step by that fraction of a step.
+(define kit808-demo-bar
+  (lambda (start bar-seconds swing lines)
+    (for-each
+      (lambda (line)
+        (let* ((pitch (cdr (assq (car line) kit808-demo-notes)))
+               (steps (cadr line))
+               (n (string-length steps))
+               (step (/ bar-seconds n)))
+          (dotimes (i n)
+            (let ((vel (case (string-ref steps i)
+                         ((#\X) 1.0) ((#\x) 0.7) ((#\o) 0.4) (else 0.0))))
+              (if (> vel 0.0)
+                  (score-note (+ start (* i step) (if (odd? i) (* swing step) 0.0))
+                              'drums pitch vel 0.1))))))
+      lines)))
+
+;; one bar of every sound in turn, at 100 bpm
+(let loop ((i 0) (notes kit808-demo-notes))
+  (if (pair? notes)
+      (begin
+        (score-note (* i 0.15) 'drums (cdr (car notes)) 0.9 0.1)
+        (loop (+ i 1) (cdr notes)))))
+
+;; for each preset: its tempo in bpm, the swing, and a two-bar pattern
+(define kit808-demo-beats
+  '((classic 112 0.0
+     ((bd "X......X..X.....") (sd "....X.......X...") (hh "x.x.x.x.x.x.x.o.")
+      (oh "..............x.") (cb ".......x........") (cl "...x.....x......"))
+     ((bd "X......X..X...x.") (sd "....X.......X.oX") (cp "............X...")
+      (hh "x.x.x.x.x.x.....") (cb ".......x......x.")))
+    (boomy 86 0.12
+     ((bd "X.........X.....") (sd "....X.......X...") (hh "x.x.x.x.x.x.x.x."))
+     ((bd "X.........X..x..") (sd "....X.......X...") (hh "x.x.x.x.x.x.x...")
+      (oh "..............x.")))
+    (tight 124 0.0
+     ((bd "X...X...X...X...") (cp "....X.......X...") (hh "X.xxX.xxX.xxX.xx")
+      (hc "..x...x...x..x..") (lc "x.....x.........") (ma "x.x.x.x.x.x.x.x."))
+     ((bd "X...X...X...X...") (cp "....X.......X...") (hh "X.xxX.xxX.xx....")
+      (oh "............x...") (hc "..x...x...x.....") (mc "...........xx.x.")
+      (lc "x.....x.......x.")))
+    (trap 140 0.0
+     ((bd "X.......X.X.....") (sd "........X.......") (cp "........X.......")
+      (hh "x.x.x.x.x.x.x.x.x.x.x.x.xxxxx.x."))
+     ((bd "X.......X...X..x") (sd "........X.......") (cp "........X.......")
+      (hh "x.x.x.x.x.x.x.x.xxxxxxxxx.x.oxox")))
+    (electro 126 0.0
+     ((bd "X.....X...X...X.") (sd "....X.......X...") (cp "....X.......X...")
+      (hh "x.xxx.xxx.xxx.xx") (cb "x..x..x...x..x..") (cl "..x..x..x.......")
+      (cr "X..............."))
+     ((bd "X.....X...X.....") (sd "....X.......X...") (cp "....X.......X...")
+      (hh "x.xxx.xxx.x.....") (cb "x..x..x.........") (ht "............X...")
+      (mt ".............X..") (lt "..............XX")))
+    (dusty 92 0.18
+     ((bd "X.......X.X.....") (rs "....X.......X...") (sd "......o........o")
+      (hh "x.x.x.x.x.x.x.x.") (ma ".o.o.o.o.o.o.o.o"))
+     ((bd "X.......X.X...x.") (rs "....X.......X...") (sd "......o....o..o.")
+      (hh "x.x.x.x.x.x.x...") (oh "..............x.") (ma ".o.o.o.o.o.o.o.o")))))
+
+;; each preset plays its two bars, repeated if need be so that it lasts at
+;; least four seconds
+(let loop ((start 2.6) (beats kit808-demo-beats))
+  (if (pair? beats)
+      (let* ((beat (car beats))
+             (bar-seconds (/ 240.0 (cadr beat)))
+             (repeats (if (< (* 2.0 bar-seconds) 4.0) 2 1)))
+        (score-preset start 'drums (car beat))
+        (dotimes (r repeats)
+          (kit808-demo-bar (+ start (* 2 r bar-seconds)) bar-seconds (caddr beat) (cadddr beat))
+          (kit808-demo-bar (+ start (* (+ (* 2 r) 1) bar-seconds)) bar-seconds (caddr beat)
+                           (car (cddddr beat))))
+        (loop (+ start (* 2 repeats bar-seconds)) (cdr beats)))))
+
+(score-end)

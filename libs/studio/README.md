@@ -182,6 +182,10 @@ The compiler is strict in ways that are easy to trip over.
   short, and an array of them overruns its memory. In any `bind-type`, put the
   8-byte fields first and the 4-byte fields after them in pairs, and use `i64`
   for flags.
+- **"floating point constant invalid for type".** A literal which a `float`
+  can't hold exactly (`0.004`, say), multiplied by a `SAMPLE` inside a
+  `convert`, fails with this error. Divide by a value which is exact instead:
+  `(convert (/ SRf 250.0) i64)`, not `(convert (* 0.004 SRf) i64)`.
 - **Declare loop variables.** `(dotimes (i n) ...)` needs `(i:i64 0)` in an
   enclosing `let`.
 - **Convert explicitly.** `(convert x i64)` and `(convert n SAMPLE)`.

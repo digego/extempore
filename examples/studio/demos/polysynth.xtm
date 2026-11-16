@@ -1,0 +1,119 @@
+;;; polysynth.xtm -- a tour of the analogue polysynth's presets
+
+;; Evaluate the whole file to hear each preset in turn, playing something
+;; which suits it, or render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/polysynth.xtm /tmp/polysynth.wav 68
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'poly 'polysynth)
+(score-ctl 0 'poly 'reverb 0.2)
+
+;; play a list of pitches together
+(define polysynth-demo-chord
+  (lambda (start pitches velocity seconds)
+    (for-each (lambda (pitch) (score-note start 'poly pitch velocity seconds))
+              pitches)))
+
+;; play a list of (pitch beat seconds velocity), with beats of `beat` seconds
+(define polysynth-demo-line
+  (lambda (start beat notes)
+    (for-each (lambda (n)
+                (score-note (+ start (* beat (cadr n))) 'poly (car n) (cadddr n) (caddr n)))
+              notes)))
+
+;; each preset changes a moment before its section starts, so that the first
+;; notes are played by the new sound
+(define polysynth-demo-preset
+  (lambda (start name)
+    (score-preset (- start 0.05) 'poly name)))
+
+;; poly (0 s): an offbeat chord riff
+(polysynth-demo-preset 0.0 'poly)
+(let loop ((bar 0)
+           (chords '((45 57 60 64 67) (41 57 60 64 65) (48 55 60 64 67) (43 55 59 62 67))))
+  (if (pair? chords)
+      (let ((start (* bar 1.75)))
+        (polysynth-demo-chord start (car chords) 0.9 0.2)
+        (polysynth-demo-chord (+ start 0.66) (car chords) 0.7 0.2)
+        (polysynth-demo-chord (+ start 1.31) (cdr (car chords)) 0.8 0.35)
+        (loop (+ bar 1) (cdr chords)))))
+
+;; brass (7.5 s): swelling chords
+(polysynth-demo-preset 7.5 'brass)
+(polysynth-demo-chord 7.5 '(50 58 62 65) 0.9 1.3)
+(polysynth-demo-chord 9.0 '(51 58 63 67) 0.9 1.3)
+(polysynth-demo-chord 10.5 '(53 57 60 65) 0.85 0.55)
+(polysynth-demo-chord 11.1 '(55 58 62 67) 1.0 0.55)
+(polysynth-demo-chord 11.7 '(46 58 62 65 70) 1.0 1.9)
+
+;; pad (14.5 s): two long chords
+(polysynth-demo-preset 14.5 'pad)
+(polysynth-demo-chord 14.5 '(48 55 59 62 64) 0.8 3.4)
+(polysynth-demo-chord 18.2 '(45 52 55 59 60) 0.8 2.6)
+
+;; strings (22.5 s)
+(polysynth-demo-preset 22.5 'strings)
+(polysynth-demo-chord 22.5 '(50 57 62 65) 0.8 1.6)
+(polysynth-demo-chord 24.2 '(46 58 62 65) 0.8 1.6)
+(polysynth-demo-chord 25.9 '(48 57 60 65 72) 0.8 1.6)
+(polysynth-demo-chord 27.6 '(48 55 64 67 72) 0.85 1.4)
+
+;; bass (30 s): a sixteenth-note line. It plays one note at a time, and the
+;; notes which overlap the next slide into it. One note sounds quieter than
+;; the chords around it, so the track is turned up for it.
+(score-ctl 29.95 'poly 'gain 1.6)
+(polysynth-demo-preset 30.0 'bass)
+(let ((bar '((33 0 0.1 0.95) (33 2 0.1 0.6) (45 3 0.1 0.8) (33 4 0.1 0.6) (43 6 0.2 0.8)
+             (45 7 0.1 0.7) (36 8 0.1 0.95) (33 10 0.1 0.6) (40 11 0.2 0.8) (38 12 0.1 0.7)
+             (36 14 0.1 0.6) (31 15 0.1 0.8))))
+  (polysynth-demo-line 30.0 0.125 bar)
+  (polysynth-demo-line 32.0 0.125 bar)
+  (polysynth-demo-line 34.0 0.125 (map (lambda (n) (cons (- (car n) 4) (cdr n))) bar)))
+
+;; pluck (36.5 s): arpeggios
+(score-ctl 36.45 'poly 'gain 1.0)
+(score-ctl 36.45 'poly 'delay 0.25)
+(polysynth-demo-preset 36.5 'pluck)
+(let loop ((bar 0)
+           (chords '((57 60 64 69) (53 57 60 65) (55 60 64 67) (55 59 62 67))))
+  (if (pair? chords)
+      (let ((c (car chords)))
+        (polysynth-demo-line (+ 36.5 (* bar 1.5)) 0.125
+                             (map (lambda (pitch step) (list pitch step 0.1 (if (= 0 (modulo step 4)) 0.9 0.7)))
+                                  (list (list-ref c 0) (list-ref c 1) (list-ref c 2) (list-ref c 3)
+                                        (+ 12 (list-ref c 1)) (list-ref c 3) (list-ref c 2) (list-ref c 1)
+                                        (list-ref c 0) (list-ref c 2) (list-ref c 3) (+ 12 (list-ref c 2)))
+                                  '(0 1 2 3 4 5 6 7 8 9 10 11)))
+        (score-note (+ 36.5 (* bar 1.5)) 'poly (- (car c) 24) 0.8 1.2)
+        (loop (+ bar 1) (cdr chords)))))
+
+;; lead (43 s): a melody, with the legato notes sliding into each other
+(score-ctl 42.95 'poly 'gain 1.5)
+(score-ctl 42.95 'poly 'delay 0.18)
+(polysynth-demo-preset 43.0 'lead)
+(polysynth-demo-line 43.0 0.25
+                     '((69 0 0.4 0.85) (72 2 0.4 0.85) (76 4 1.3 0.9) (74 9 0.35 0.85)
+                       (72 10 0.35 0.8) (71 11 0.3 0.8) (72 12 1.4 0.85) (76 18 0.3 0.85)
+                       (79 19 1.4 0.9) (81 25 0.3 0.85) (79 26 0.8 0.85)))
+
+;; keys (50.5 s): chords comping
+(score-ctl 50.45 'poly 'gain 1.0)
+(score-ctl 50.45 'poly 'delay 0.0)
+(polysynth-demo-preset 50.5 'keys)
+(let loop ((bar 0)
+           (chords '((50 57 60 64 65) (43 55 59 65 69) (48 55 59 62 64) (45 55 61 64 67))))
+  (if (pair? chords)
+      (let ((start (+ 50.5 (* bar 1.5))))
+        (polysynth-demo-chord start (car chords) 0.85 0.5)
+        (polysynth-demo-chord (+ start 0.75) (cdr (car chords)) 0.6 0.25)
+        (polysynth-demo-chord (+ start 1.125) (cdr (car chords)) 0.7 0.3)
+        (loop (+ bar 1) (cdr chords)))))
+
+;; sweep (57 s): one held chord while the filter opens and the LFO moves it
+(polysynth-demo-preset 57.0 'sweep)
+(polysynth-demo-chord 57.0 '(45 52 57 60 64 67) 0.9 7.5)
+
+(score-end)

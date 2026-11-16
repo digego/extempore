@@ -1,0 +1,94 @@
+;;; kit909.xtm -- a tour of the 909 drum kit's presets
+
+;; Evaluate the whole file to hear every sound in turn, then a beat for each
+;; preset, or render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/kit909.xtm /tmp/kit909.wav 46
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'drums 'kit909)
+(score-ctl 0 'drums 'reverb 0.06)
+
+;; the kit's sounds and their General MIDI notes
+(define kit909-demo-notes
+  '((bd . 36) (rs . 37) (sd . 38) (cp . 39) (hh . 42) (lt . 45) (oh . 46) (mt . 47)
+    (cr . 49) (ht . 50) (rd . 51)))
+
+;; Play one bar starting at `start` seconds. Each line is a sound and a
+;; string of steps: X is a loud hit, x a normal one, o a soft one and . a
+;; rest. A line of 16 steps plays sixteenth notes, 32 steps thirty-seconds.
+;; `swing` (0.0 to 0.5) delays every second step by that fraction of a step.
+(define kit909-demo-bar
+  (lambda (start bar-seconds swing lines)
+    (for-each
+      (lambda (line)
+        (let* ((pitch (cdr (assq (car line) kit909-demo-notes)))
+               (steps (cadr line))
+               (n (string-length steps))
+               (step (/ bar-seconds n)))
+          (dotimes (i n)
+            (let ((vel (case (string-ref steps i)
+                         ((#\X) 1.0) ((#\x) 0.7) ((#\o) 0.4) (else 0.0))))
+              (if (> vel 0.0)
+                  (score-note (+ start (* i step) (if (odd? i) (* swing step) 0.0))
+                              'drums pitch vel 0.1))))))
+      lines)))
+
+;; one bar of every sound in turn (the cymbals last, so they can ring)
+(let loop ((i 0) (notes kit909-demo-notes))
+  (if (pair? notes)
+      (begin
+        (score-note (* i 0.2) 'drums (cdr (car notes)) 0.9 0.1)
+        (loop (+ i 1) (cdr notes)))))
+
+;; for each preset: its tempo in bpm, the swing, and a two-bar pattern
+(define kit909-demo-beats
+  '((classic 126 0.0
+     ((bd "X...X...X...X...") (sd "....X.......X...") (cp "....X.......X...")
+      (hh "x.x.x.x.x.x.x.x.") (oh "..x...x...x...x.") (cr "X..............."))
+     ((bd "X...X...X...X...") (sd "....X.......X.oo") (cp "....X.......X...")
+      (hh "x.x.x.x.x.x.x.x.") (oh "..x...x...x...x.")))
+    (hard 134 0.0
+     ((bd "X...X...X...X...") (cp "....X.......X...") (hh "XxxxXxxxXxxxXxxx")
+      (oh "..X...X...X...X.") (rd "x.x.x.x.x.x.x.x."))
+     ((bd "X...X...X...X.x.") (cp "....X.......X...") (hh "XxxxXxxxXxxxXxxx")
+      (oh "..X...X...X...X.") (rd "x.x.x.x.x.x.x.x.") (sd "............XxXX")))
+    (deep 120 0.08
+     ((bd "X...X...X...X...") (cp "....X.......X...") (oh "..x...x...x...x.")
+      (rd "o.o.o.o.o.o.o.o.") (rs "...x..x.....x..."))
+     ((bd "X...X...X...X...") (cp "....X.......X...") (oh "..x...x...x...x.")
+      (rd "o.o.o.o.o.o.o.o.") (rs "...x..x...x..x..")))
+    (house 124 0.15
+     ((bd "X...X...X...X...") (cp "....X.......X...") (hh "x.x.x.x.x.x.x.x.")
+      (oh "..x...x...x...x.") (rs "......x.......x.") (cr "X..............."))
+     ((bd "X...X...X...X...") (cp "....X.......X...") (hh "x.x.x.x.x.x.x.x.")
+      (oh "..x...x...x.....") (ht ".............X..") (mt "..............X.")
+      (lt "...............X")))
+    (tight 128 0.0
+     ((bd "X.....X...X.....") (sd "....X..o.o..X...") (hh "xxxxxxxxxxxxxxxx")
+      (rs "..............x."))
+     ((bd "X.....X...X..X..") (sd "....X..o.o..X.oo") (hh "xxxxxxxxxxxx....")
+      (oh "............x...")))
+    (rave 150 0.0
+     ((bd "X...X...X...X...") (cp "....X.......X...") (oh "..X...X...X...X.")
+      (hh "x.x.x.x.x.x.x.x.") (cr "X..............."))
+     ((bd "X...X...X...X...") (cp "....X.......X...") (oh "..X...X...X...X.")
+      (hh "x.x.x.x.x.x.x.x.") (sd "........xxxxXXXX")))))
+
+;; each preset plays its two bars, repeated if need be so that it lasts at
+;; least four seconds
+(let loop ((start 2.4) (beats kit909-demo-beats))
+  (if (pair? beats)
+      (let* ((beat (car beats))
+             (bar-seconds (/ 240.0 (cadr beat)))
+             (repeats (if (< (* 2.0 bar-seconds) 4.0) 2 1)))
+        (score-preset start 'drums (car beat))
+        (dotimes (r repeats)
+          (kit909-demo-bar (+ start (* 2 r bar-seconds)) bar-seconds (caddr beat) (cadddr beat))
+          (kit909-demo-bar (+ start (* (+ (* 2 r) 1) bar-seconds)) bar-seconds (caddr beat)
+                           (car (cddddr beat))))
+        (loop (+ start (* 2 repeats bar-seconds)) (cdr beats)))))
+
+(score-end)
