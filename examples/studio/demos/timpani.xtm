@@ -1,0 +1,35 @@
+;;; timpani.xtm -- a tour of the timpani's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/timpani.xtm /tmp/timpani.wav 44
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'timpani 'timpani)
+(score-ctl 0 'timpani 'reverb 0.15)
+
+;; the phrase, a note every 0.4 seconds
+(define timpani-demo-notes '(43 43 48 43 48 48 43 41))
+
+(define timpani-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes timpani-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.4)) 'timpani (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.3)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'timpani)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'timpani (car names))
+        (timpani-demo-phrase start)
+        (timpani-demo-phrase (+ start 4.0))
+        (loop (+ start 8) (cdr names)))))
+
+(score-end)

@@ -1,0 +1,54 @@
+;;; upright.xtm -- an upright piano
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A Kawai upright recorded in a living room, one dynamic, every few
+;; keys. Its bass notes loop, so they sustain for as long as they're held.
+;; It's smaller and plainer than the grand in piano.xtm, and lighter to
+;; load.
+;;
+;; The samples are CC0 (public domain), from
+;; FreePats (the Upright Piano KW, small version).
+;; They live in assets/studio/freepats-upright-piano-kw-small, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-upright)
+(define *xtmlib-studio-upright-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument upright
+  "a sampled upright piano (FreePats Upright Piano KW)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.6 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 26.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.35 "output level"))
+  (presets
+    (upright)
+    (soft (dynamics 16.0) (level 0.45))
+    (staccato (release 0.12) (length 0.3))
+    (pedal (release 3.0))
+    (toy (tune 24.0) (release 0.2))))
+
+(bind-func upright_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "upright" 32 (upright_nparams))))
+      (upright_defaults (inst_params inst))
+      inst)))
+
+(define upright-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'upright "freepats-upright-piano-kw-small/UprightPianoKW-small-20190703.sfz")))

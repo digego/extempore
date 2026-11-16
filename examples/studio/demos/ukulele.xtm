@@ -1,0 +1,35 @@
+;;; ukulele.xtm -- a tour of the ukulele's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/ukulele.xtm /tmp/ukulele.wav 29
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'ukulele 'ukulele)
+(score-ctl 0 'ukulele 'reverb 0.15)
+
+;; the phrase, a note every 0.2 seconds
+(define ukulele-demo-notes '(67 60 64 69 67 64 60 64))
+
+(define ukulele-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes ukulele-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.2)) 'ukulele (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.5)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'ukulele)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'ukulele (car names))
+        (ukulele-demo-phrase start)
+        (ukulele-demo-phrase (+ start 2.5))
+        (loop (+ start 5) (cdr names)))))
+
+(score-end)

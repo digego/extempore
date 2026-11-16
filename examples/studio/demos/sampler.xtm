@@ -1,0 +1,40 @@
+;;; sampler.xtm -- loading your own samples into the sampler
+
+;; Two empty samplers: one loads an SFZ instrument (a xylophone from the
+;; Versilian Community Sample Library in assets/studio), the other a folder
+;; of drum samples named by MIDI note (the 808 in assets/samples). Then the
+;; xylophone tours the sampler's presets over the drums.
+;;
+;;   extras/studio/render examples/studio/demos/sampler.xtm /tmp/sampler.wav 34
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+
+(track 'xylo 'sampler)
+(sampler-load 'xylo "assets/studio/VCSL/Idiophones/Struck Idiophones/Xylophone - Medium Mallets.sfz")
+(score-ctl 0 'xylo 'reverb 0.15)
+
+(track 'beat 'sampler)
+(sampler-load-folder 'beat "assets/samples/808" 'drums)
+(score-ctl 0 'beat 'level 0.3)
+
+(define sampler-demo-tune '(72 76 79 84 83 79 76 74 72 71 67 71 72 76 74 72))
+
+(let loop ((start 0.0) (names (presets 'xylo)))
+  (if (pair? names)
+      (begin
+        ;; the presets apply to the xylophone only
+        (score-preset start 'xylo (car names))
+        (let notes ((ns sampler-demo-tune) (i 0))
+          (if (pair? ns)
+              (begin
+                (score-note (+ start (* i 0.25)) 'xylo (car ns) (if (even? i) 0.9 0.6) 0.2)
+                (notes (cdr ns) (+ i 1)))))
+        ;; kick, clap and hats from the 808 folder, on their own keys
+        (dotimes (i 8)
+          (score-note (+ start (* i 0.5)) 'beat (if (even? i) 36 39) 0.9 0.1)
+          (score-note (+ start (* i 0.5) 0.25) 'beat 42 0.6 0.1))
+        (loop (+ start 4.5) (cdr names)))))
+
+(score-end)

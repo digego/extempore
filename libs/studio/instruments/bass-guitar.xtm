@@ -1,0 +1,52 @@
+;;; bass-guitar.xtm -- an electric bass, played fingerstyle
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A clean Yamaha electric bass, played with the fingers and recorded
+;; direct, in mono.
+;;
+;; The samples are CC0 (public domain), from
+;; FreePats (Finger Bass YR, a Yamaha RBX bass).
+;; They live in assets/studio/freepats-electric-bass-finger, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-bass-guitar)
+(define *xtmlib-studio-bass-guitar-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument bass-guitar
+  "a sampled electric bass, fingerstyle (FreePats Finger Bass YR)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.3 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 20.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.35 "output level"))
+  (presets
+    (finger)
+    (short (length 0.15) (release 0.05))
+    (long (release 0.6))
+    (soft (dynamics 12.0))
+    (octave (tune 12.0))))
+
+(bind-func bass-guitar_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "bass-guitar" 32 (bass-guitar_nparams))))
+      (bass-guitar_defaults (inst_params inst))
+      inst)))
+
+(define bass-guitar-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'bass-guitar "freepats-electric-bass-finger/FingerBassYR 20190930.sfz")))

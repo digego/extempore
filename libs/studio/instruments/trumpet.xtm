@@ -1,0 +1,52 @@
+;;; trumpet.xtm -- a trumpet, sustained
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A trumpet playing long, straight notes. The recordings aren't looped,
+;; so a note held longer than its recording ends with it.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Studios Chamber Orchestra, Community Edition (VSCO 2 CE).
+;; They live in assets/studio/VSCO-2-CE, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-trumpet)
+(define *xtmlib-studio-trumpet-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument trumpet
+  "a sampled trumpet, sustained (VSCO 2 CE)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.01 "seconds to fade in")
+    (release 0.25 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 18.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.2 "output level"))
+  (presets
+    (open)
+    (soft (hardness -0.5) (dynamics 12.0))
+    (stab (length 0.15) (release 0.08))
+    (swell (attack 0.5) (release 0.8))
+    (low (tune -12.0))))
+
+(bind-func trumpet_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "trumpet" 32 (trumpet_nparams))))
+      (trumpet_defaults (inst_params inst))
+      inst)))
+
+(define trumpet-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'trumpet "VSCO-2-CE/TrumpetSus.sfz")))

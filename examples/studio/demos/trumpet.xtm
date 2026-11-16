@@ -1,0 +1,35 @@
+;;; trumpet.xtm -- a tour of the trumpet's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/trumpet.xtm /tmp/trumpet.wav 44
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'trumpet 'trumpet)
+(score-ctl 0 'trumpet 'reverb 0.15)
+
+;; the phrase, a note every 0.5 seconds
+(define trumpet-demo-notes '(60 64 67 72 67 64))
+
+(define trumpet-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes trumpet-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.5)) 'trumpet (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.45)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'trumpet)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'trumpet (car names))
+        (trumpet-demo-phrase start)
+        (trumpet-demo-phrase (+ start 4.0))
+        (loop (+ start 8) (cdr names)))))
+
+(score-end)

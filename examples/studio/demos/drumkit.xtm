@@ -1,0 +1,41 @@
+;;; drumkit.xtm -- a tour of the acoustic drum kit's presets
+
+;; Each preset plays two bars of a rock beat with a fill: kick, snare, a
+;; closed hi-hat which opens on the last eighth (and is choked by the next
+;; closed one), toms, a crash and a ride.
+;;
+;;   extras/studio/render examples/studio/demos/drumkit.xtm /tmp/drumkit.wav 30
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'drums 'drumkit)
+(score-ctl 0 'drums 'reverb 0.12)
+
+;; one bar is eight eighth notes at 120 bpm: (step sound velocity) where
+;; step counts eighths from the start of the bar
+(define drumkit-demo-groove
+  '((0 bd 1.0) (0 cr 0.8) (2 sd 0.95) (3 bd 0.7) (4 bd 0.9) (6 sd 1.0) (7 sd 0.35)
+    (0 hh 0.8) (1 hh 0.5) (2 hh 0.75) (3 hh 0.5) (4 hh 0.8) (5 hh 0.5) (6 hh 0.75) (7 oh 0.7)))
+
+(define drumkit-demo-fill
+  '((0 bd 1.0) (0 rd 0.8) (1 rd 0.6) (2 sd 0.95) (2 rd 0.8) (3 rd 0.6) (3 bd 0.7)
+    (4 ht 0.9) (5 ht 0.7) (5 mt 0.8) (6 mt 0.9) (6 lt 0.85) (7 lt 1.0) (7 bd 0.9)))
+
+(define drumkit-demo-bar
+  (lambda (start hits)
+    (for-each (lambda (hit)
+                (score-note (+ start (* 0.25 (car hit))) 'drums
+                            (cadr (assq (cadr hit) (studio:instrument-sounds 'drumkit)))
+                            (caddr hit) 0.2))
+              hits)))
+
+(let loop ((start 0.0) (names (presets 'drums)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'drums (car names))
+        (drumkit-demo-bar start drumkit-demo-groove)
+        (drumkit-demo-bar (+ start 2.0) drumkit-demo-fill)
+        (loop (+ start 4.5) (cdr names)))))
+
+(score-end)

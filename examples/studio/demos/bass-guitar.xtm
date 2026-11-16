@@ -1,0 +1,35 @@
+;;; bass-guitar.xtm -- a tour of the bass-guitar's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/bass-guitar.xtm /tmp/bass-guitar.wav 29
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'bass-guitar 'bass-guitar)
+(score-ctl 0 'bass-guitar 'reverb 0.15)
+
+;; the phrase, a note every 0.25 seconds
+(define bass-guitar-demo-notes '(28 28 40 28 31 33 35 38))
+
+(define bass-guitar-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes bass-guitar-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.25)) 'bass-guitar (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.22)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'bass-guitar)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'bass-guitar (car names))
+        (bass-guitar-demo-phrase start)
+        (bass-guitar-demo-phrase (+ start 2.5))
+        (loop (+ start 5) (cdr names)))))
+
+(score-end)

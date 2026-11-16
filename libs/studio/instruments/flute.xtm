@@ -1,0 +1,52 @@
+;;; flute.xtm -- a concert flute, sustained with vibrato
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A concert flute playing long notes with vibrato. The recordings aren't
+;; looped, so a note held longer than its recording ends with it.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Studios Chamber Orchestra, Community Edition (VSCO 2 CE).
+;; They live in assets/studio/VSCO-2-CE, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-flute)
+(define *xtmlib-studio-flute-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument flute
+  "a sampled flute, sustained (VSCO 2 CE)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.03 "seconds to fade in")
+    (release 0.5 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 18.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 2.0 "output level"))
+  (presets
+    (concert)
+    (breathy (attack 0.3) (release 0.8) (hardness -0.5))
+    (short (length 0.2) (release 0.1))
+    (low (tune -12.0))
+    (piccolo (tune 12.0))))
+
+(bind-func flute_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "flute" 32 (flute_nparams))))
+      (flute_defaults (inst_params inst))
+      inst)))
+
+(define flute-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'flute "VSCO-2-CE/FluteSusVib.sfz")))

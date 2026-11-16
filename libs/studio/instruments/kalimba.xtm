@@ -1,0 +1,52 @@
+;;; kalimba.xtm -- a Kenyan kalimba
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A kalimba (a thumb piano) from Kenya. Its metal tines buzz a little
+;; against the bridge, which is part of the sound.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Community Sample Library (VCSL).
+;; They live in assets/studio/VCSL, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-kalimba)
+(define *xtmlib-studio-kalimba-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument kalimba
+  "a sampled kalimba (VCSL)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 1.5 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 24.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.9 "output level"))
+  (presets
+    (thumb)
+    (soft (hardness -0.4) (dynamics 16.0))
+    (short (length 0.25) (release 0.1))
+    (high (tune 12.0))
+    (low (tune -12.0) (release 1.5))))
+
+(bind-func kalimba_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "kalimba" 32 (kalimba_nparams))))
+      (kalimba_defaults (inst_params inst))
+      inst)))
+
+(define kalimba-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'kalimba "VCSL/Idiophones/Plucked Idiophones/Kalimba, Kenya.sfz")))

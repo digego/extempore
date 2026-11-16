@@ -1,0 +1,35 @@
+;;; nylon.xtm -- a tour of the nylon's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/nylon.xtm /tmp/nylon.wav 34
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'nylon 'nylon)
+(score-ctl 0 'nylon 'reverb 0.15)
+
+;; the phrase, a note every 0.22 seconds
+(define nylon-demo-notes '(40 47 52 55 59 55 52 47))
+
+(define nylon-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes nylon-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.22)) 'nylon (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.8)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'nylon)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'nylon (car names))
+        (nylon-demo-phrase start)
+        (nylon-demo-phrase (+ start 3.0))
+        (loop (+ start 6) (cdr names)))))
+
+(score-end)

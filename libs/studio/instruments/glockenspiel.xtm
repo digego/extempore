@@ -1,0 +1,54 @@
+;;; glockenspiel.xtm -- a glockenspiel
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A glockenspiel at three dynamics, which the SFZ file crossfades by
+;; velocity. Like the real thing it sounds two octaves above the written
+;; note, and its steel bars ring on long after they're struck, so a
+;; released note fades slowly (4 seconds to fade 60 dB).
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Community Sample Library (VCSL).
+;; They live in assets/studio/VCSL, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-glockenspiel)
+(define *xtmlib-studio-glockenspiel-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument glockenspiel
+  "a sampled glockenspiel (VCSL)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 4.0 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 24.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.45 "output level"))
+  (presets
+    (bright)
+    (soft (hardness -0.5) (dynamics 16.0))
+    (damped (length 0.4) (release 0.2))
+    (music-box (tune 12.0) (length 0.6) (release 0.3))
+    (low (tune -12.0))))
+
+(bind-func glockenspiel_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "glockenspiel" 32 (glockenspiel_nparams))))
+      (glockenspiel_defaults (inst_params inst))
+      inst)))
+
+(define glockenspiel-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'glockenspiel "VCSL/Idiophones/Struck Idiophones/Glockenspiel.sfz")))

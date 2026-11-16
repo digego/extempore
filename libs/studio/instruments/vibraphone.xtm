@@ -1,0 +1,54 @@
+;;; vibraphone.xtm -- a vibraphone played with soft mallets
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A vibraphone struck with soft mallets, motor off, recorded at several
+;; dynamics. The SFZ file holds a long ring on each bar, so a released note
+;; is damped over the release time, as a player's pedal would.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Community Sample Library (VCSL).
+;; They live in assets/studio/VCSL, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-vibraphone)
+(define *xtmlib-studio-vibraphone-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument vibraphone
+  "a sampled vibraphone, soft mallets (VCSL)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.6 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 24.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.9 "output level"))
+  (presets
+    (mallets)
+    (pedal (release 4.0))
+    (damped (release 0.15) (length 0.3))
+    (hard (hardness 0.4) (dynamics 18.0))
+    (bells (tune 12.0) (release 1.5))
+    (low (tune -12.0) (release 1.2))))
+
+(bind-func vibraphone_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "vibraphone" 32 (vibraphone_nparams))))
+      (vibraphone_defaults (inst_params inst))
+      inst)))
+
+(define vibraphone-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'vibraphone "VCSL/Idiophones/Struck Idiophones/Vibraphone - Soft Mallets.sfz")))

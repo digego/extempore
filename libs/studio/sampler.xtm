@@ -1,0 +1,1322 @@
+;;; sampler.xtm -- play recorded sounds: a sample engine and its loaders
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A sampler instrument is an ordinary studio instrument whose voices play
+;; recordings instead of oscillators. Its sounds are described by *regions*,
+;; the same idea the SFZ format uses: a region is one sample file plus the
+;; rules for when and how to play it --- which keys and velocities it answers
+;; to, the key it was recorded at, how loud, where in the stereo field,
+;; whether it loops, and so on. A note plays every region which matches it,
+;; so a piano can crossfade between a soft and a loud recording of the same
+;; key, and a drum kit can rotate through several takes of the same snare.
+;;
+;; The xtlang half of this file is the engine: reading WAV and AIFF files
+;; onto the heap, keeping a table of regions for each instrument, and the
+;; voice which plays them. The Scheme half loads regions into that table:
+;; from an SFZ file (sampler-load), from a folder of files named by MIDI note
+;; (sampler-load-folder), or one at a time (sampler:add-region), which is how
+;; the instruments in libs/studio/instruments describe themselves.
+;;
+;;   (track 'keys 'sampler)
+;;   (sampler-load 'keys "assets/studio/some-library/instrument.sfz")
+;;   (sampler-load-folder 'perc "~/samples/my-kit" 'drums)
+;;
+;; Playing a sample at another pitch means reading it faster or slower, so
+;; the read position falls between the recorded frames. The voice
+;; interpolates between the four nearest frames with a cubic Hermite curve,
+;; which is smooth enough that shifting by a few semitones adds no audible
+;; grit. It doesn't filter before reading faster, so a sample shifted up by
+;; an octave or more will alias a little; sample sets which record every few
+;; keys never need that.
+;;
+;; Sample data is large (the piano is a couple of hundred megabytes), so it
+;; lives on the heap rather than in an instrument's memory zone, and each
+;; file is read once: two tracks playing the same instrument share it. A
+;; region is published to the audio thread only once it is complete, so
+;; loading never disturbs what is already playing.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-sampler)
+(define *xtmlib-studio-sampler-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+(sys:load "libs/core/audiobuffer.xtm")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading audio files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; audiobuffer.xtm parses WAV and AIFF files, and this reader uses its chunk
+;; finder and sample converters. It does three things differently, which is
+;; why it exists: it puts the sample data on the heap, it reads AIFC files
+;; (the 808 kit is 32-bit float AIFC), and it scales integer samples so that
+;; full scale is 1.0 (audiobuffer.xtm's converters divide by twice the range,
+;; which leaves PCM files 6 dB quieter than float ones).
+
+(bind-val sampler_bytes_loaded i64 0)
+
+(bind-func static sampler_be16
+  "a big-endian 16-bit integer at p"
+  (lambda (p:i8*)
+    (i16toi64 (swapi16 (pref (cast p i16*) 0)))))
+
+(bind-func static sampler_be32
+  "a big-endian 32-bit integer at p"
+  (lambda (p:i8*)
+    (i32toi64 (swapi32 (pref (cast p i32*) 0)))))
+
+(bind-func static sampler_tag_is
+  "do the four bytes at p spell tag?"
+  (lambda (p:i8* tag:i8*)
+    (= (strncmp p tag 4) 0)))
+
+(bind-func sampler_read_audio
+  "read a WAV, AIFF or AIFC file into a new AudioBuffer on the heap.
+
+Keeps at most max_seconds of it (0.0 keeps it all), fading out the last part
+of a shortened file so that it doesn't end with a click. Returns null if the
+file can't be read."
+  (lambda (path:i8* max_seconds:double)
+    (let ((lenptr:i64* (salloc 1))
+          (chunklen:i64* (salloc 1))
+          (file (audiofile_slurp path lenptr))
+          (filelen (pref lenptr 0))
+          (chunks:i8* null)
+          (chunkslen:i64 0)
+          (fmt:i8* null)
+          (body:i8* null)
+          (bodylen:i64 0)
+          (kind:i64 WAVE_FORMAT_PCM)
+          (le:i1 #t)
+          (nchan:i64 0)
+          (bits:i64 0)
+          (samplerate:double 0.0)
+          (declared:i64 -1)
+          (ok:i1 #f))
+      (if (or (null? file) (< filelen IFF_FORM_HEADER_SIZE))
+          (begin
+            (if (not (null? file)) (free file))
+            null)
+          (begin
+            (set! chunks (pref-ptr file IFF_FORM_HEADER_SIZE))
+            (set! chunkslen (- filelen IFF_FORM_HEADER_SIZE))
+            (cond
+              ;; WAV: little-endian, a "fmt " chunk and a "data" chunk
+              ((wave_validate file)
+               (set! fmt (iffchunk_find chunks chunkslen "fmt " #t chunklen))
+               (if (and (not (null? fmt)) (>= (pref chunklen 0) WAVE_FMT_CHUNK_MIN_SIZE))
+                   (begin
+                     (set! fmt (pref-ptr fmt IFF_CHUNK_HEADER_SIZE))
+                     (set! kind (i16toi64 (pref (cast fmt i16*) 0)))
+                     (set! nchan (i16toi64 (pref (cast (pref-ptr fmt 2) i16*) 0)))
+                     (set! samplerate (i32tod (pref (cast (pref-ptr fmt 4) i32*) 0)))
+                     (set! bits (i16toi64 (pref (cast (pref-ptr fmt 14) i16*) 0)))
+                     ;; WAVE_FORMAT_EXTENSIBLE keeps the real format in the
+                     ;; first two bytes of a GUID further along
+                     (if (and (= kind WAVE_FORMAT_EXTENSIBLE) (>= (pref chunklen 0) 26))
+                         (set! kind (i16toi64 (pref (cast (pref-ptr fmt 24) i16*) 0))))
+                     (set! body (iffchunk_find chunks chunkslen "data" #t chunklen))
+                     (if (not (null? body))
+                         (begin
+                           (set! bodylen (pref chunklen 0))
+                           (set! body (pref-ptr body IFF_CHUNK_HEADER_SIZE))
+                           (set! ok #t)))))
+               void)
+              ;; AIFF and AIFC: big-endian, a "COMM" chunk and an "SSND" chunk
+              ((and (sampler_tag_is file "FORM")
+                    (or (sampler_tag_is (pref-ptr file 8) "AIFF") (sampler_tag_is (pref-ptr file 8) "AIFC")))
+               (set! le #f)
+               (set! fmt (iffchunk_find chunks chunkslen "COMM" #f chunklen))
+               (if (and (not (null? fmt)) (>= (pref chunklen 0) AIFF_COMM_CHUNK_MIN_SIZE))
+                   (begin
+                     (set! fmt (pref-ptr fmt IFF_CHUNK_HEADER_SIZE))
+                     (set! nchan (sampler_be16 fmt))
+                     (set! declared (sampler_be32 (pref-ptr fmt 2)))
+                     (set! bits (sampler_be16 (pref-ptr fmt 6)))
+                     (set! samplerate (fp80ptrtod (pref-ptr fmt 8)))
+                     ;; AIFC names its encoding: NONE and twos are big-endian
+                     ;; integers, sowt little-endian ones, fl32 floats
+                     (if (and (sampler_tag_is (pref-ptr file 8) "AIFC") (>= (pref chunklen 0) 22))
+                         (let ((enc (pref-ptr fmt 18)))
+                           (cond ((or (sampler_tag_is enc "fl32") (sampler_tag_is enc "FL32"))
+                                  (set! kind WAVE_FORMAT_IEEE_FLOAT) void)
+                                 ((sampler_tag_is enc "sowt")
+                                  (set! le #t) void)
+                                 ((not (or (sampler_tag_is enc "NONE") (sampler_tag_is enc "twos")))
+                                  (set! kind -1) void))))
+                     (set! body (iffchunk_find chunks chunkslen "SSND" #f chunklen))
+                     (if (and (not (null? body)) (>= (pref chunklen 0) AIFF_SSND_PREAMBLE_SIZE))
+                         (let ((skip (sampler_be32 (pref-ptr body IFF_CHUNK_HEADER_SIZE))))
+                           (set! bodylen (- (pref chunklen 0) (+ AIFF_SSND_PREAMBLE_SIZE skip)))
+                           (set! body (pref-ptr body (+ IFF_CHUNK_HEADER_SIZE AIFF_SSND_PREAMBLE_SIZE skip)))
+                           (set! ok #t)
+                           void))))
+               void)
+              (else void))
+            (if (or (not ok) (< nchan 1) (< bits 8) (< samplerate 1.0) (< kind 0))
+                (begin (free file) null)
+                (let ((framebytes (* nchan (/ bits 8)))
+                      (frames (/ bodylen framebytes))
+                      (keep:i64 0)
+                      (data:SAMPLE* null)
+                      (fade:i64 0)
+                      (scale:SAMPLE (if (= kind WAVE_FORMAT_IEEE_FLOAT) 1.0 2.0))
+                      (g:SAMPLE 0.0)
+                      (i:i64 0)
+                      (c:i64 0))
+                  (if (and (>= declared 0) (< declared frames)) (set! frames declared))
+                  (set! keep (if (> max_seconds 0.0)
+                                 (min frames (convert (* max_seconds samplerate) i64))
+                                 frames))
+                  (set! data (halloc (* (max keep 1) nchan)))
+                  (if (not (audiofile_copy_samples body data (* keep nchan) bits kind le))
+                      (begin (free (cast data i8*)) (free file) null)
+                      (begin
+                        (free file)
+                        ;; a shortened recording fades out over its last half
+                        ;; second (or quarter, if it's short), along half a cosine
+                        (set! fade (if (< keep frames) (min (/ keep 4) (convert (* 0.5 samplerate) i64)) 0))
+                        (dotimes (i keep)
+                          (set! g scale)
+                          (if (>= i (- keep fade))
+                              (set! g (* scale 0.5 (+ 1.0 (cos (* SPI (/ (convert (- i (- keep fade)) SAMPLE)
+                                                                         (convert fade SAMPLE))))))))
+                          (dotimes (c nchan)
+                            (pset! data (+ (* i nchan) c) (* g (pref data (+ (* i nchan) c))))))
+                        (set! sampler_bytes_loaded (+ sampler_bytes_loaded (* keep nchan 4)))
+                        (AudioBuffer_h (String_h path) 0 keep nchan data samplerate 0 0 60 0.0))))))))))
+
+(bind-func sampler_buffer_rms
+  "the RMS level, in dB, of the first `seconds` of a buffer (all channels)"
+  (lambda (ab:AudioBuffer* seconds:double)
+    (let ((n (min (* (AudioBuffer_frames ab) (AudioBuffer_channels ab))
+                  (* (AudioBuffer_channels ab) (convert (* seconds (AudioBuffer_samplerate ab)) i64))))
+          (data (AudioBuffer_data ab))
+          (sum:double 0.0)
+          (x:double 0.0)
+          (i:i64 0))
+      (dotimes (i n)
+        (set! x (convert (pref data i) double))
+        (set! sum (+ sum (* x x))))
+      (* 10.0 (log10 (+ 1.0e-20 (/ sum (convert (max n 1) double))))))))
+
+(bind-func sampler_buffer_onset
+  "the frame a few milliseconds before the buffer first rises above
+`threshold` (relative to its peak): where its sound starts"
+  (lambda (ab:AudioBuffer* threshold:double)
+    (let ((n (* (AudioBuffer_frames ab) (AudioBuffer_channels ab)))
+          (data (AudioBuffer_data ab))
+          (peak:double 0.0)
+          (onset:i64 -1)
+          (i:i64 0))
+      (dotimes (i n)
+        (set! peak (max peak (fabs (convert (pref data i) double)))))
+      (dotimes (i n)
+        (if (and (< onset 0) (> (fabs (convert (pref data i) double)) (* threshold peak)))
+            (set! onset (/ i (AudioBuffer_channels ab)))))
+      (max 0 (- onset (convert (* 0.003 (AudioBuffer_samplerate ab)) i64))))))
+
+(bind-func sampler_buffer_seconds
+  (lambda (ab:AudioBuffer*)
+    (/ (convert (AudioBuffer_frames ab) double) (AudioBuffer_samplerate ab))))
+
+(bind-func sampler_megabytes_loaded
+  (lambda ()
+    (/ (convert sampler_bytes_loaded double) 1048576.0)))
+
+;;;;;;;;;;;;;
+;; regions ;;
+;;;;;;;;;;;;;
+
+;; A region is a sample and a row of numbers. The numbers are named after
+;; the SFZ opcodes they hold and use the same units, so an SFZ loader only
+;; has to look each opcode up in this list. Each entry is
+;; (opcode default "meaning").
+(define *sampler:opcodes*
+  '((lokey 0 "lowest key which plays the region")
+    (hikey 127 "highest key")
+    (lovel 0 "lowest velocity, 0 to 127")
+    (hivel 127 "highest velocity")
+    (pitch_keycenter 60 "the key the sample plays at its recorded pitch")
+    (pitch_keytrack 100 "cents per key: 0 plays every key at the same pitch")
+    (tune 0 "cents")
+    (transpose 0 "semitones")
+    (volume 0 "dB")
+    (pan 0 "-100 (left) to 100 (right)")
+    (offset 0 "frames to skip at the start")
+    (end -1 "the last frame to play (-1: the whole sample)")
+    (loop_mode 0 "0 no_loop, 1 one_shot, 2 loop_continuous, 3 loop_sustain")
+    (loop_start 0 "the first frame of the loop")
+    (loop_end -1 "the last frame of the loop (-1: the end of the sample)")
+    (ampeg_attack 0 "seconds; the longer of this and the attack parameter applies")
+    (ampeg_release 0 "seconds to fade by 60 dB; the longer of this and the release parameter applies")
+    (group 0 "a note in this group silences regions whose off_by names it")
+    (off_by 0 "the group which silences this region")
+    (seq_length 1 "the length of the round-robin cycle")
+    (seq_position 1 "this region's place in the cycle, from 1")
+    (lorand 0 "plays when a random number from 0 to 1 is at least this...")
+    (hirand 1 "...and less than this")
+    (xfin_lovel 0 "velocity at which the region starts to fade in")
+    (xfin_hivel 0 "velocity at which it is fully in")
+    (xfout_lovel 127 "velocity at which it starts to fade out")
+    (xfout_hivel 127 "velocity at which it is fully out")
+    (xf_velcurve 0 "0 power (for unrelated recordings), 1 gain (for recordings which add in phase)")))
+
+(define sampler:opcode-index
+  (lambda (opcode)
+    (let loop ((lst *sampler:opcodes*) (i 0))
+      (cond ((null? lst) #f)
+            ((eq? (caar lst) opcode) i)
+            (else (loop (cdr lst) (+ i 1)))))))
+
+;; For xtlang, each opcode's position becomes a constant (SFZ_LOKEY and so
+;; on), and sampler_region_defaults fills a row with the defaults.
+(define-macro (sampler:define-opcodes)
+  (let ((xt-name (lambda (opcode)
+                   (string->symbol (string-append "SFZ_" (string-upcase (symbol->string opcode)))))))
+    `(begin
+      ,@(map (lambda (op) `(bind-val ,(xt-name (car op)) i64 ,(sampler:opcode-index (car op))))
+             *sampler:opcodes*)
+      (bind-val SAMPLER_NOPCODES i64 ,(length *sampler:opcodes*))
+      (bind-func sampler_region_defaults
+        (lambda (row:double*)
+          ,@(map (lambda (op) `(pset! row ,(sampler:opcode-index (car op)) ,(* 1.0 (cadr op))))
+                 *sampler:opcodes*)
+          void)))))
+
+(sampler:define-opcodes)
+
+(bind-val SAMPLER_NO_LOOP i64 0)
+(bind-val SAMPLER_ONE_SHOT i64 1)        ;; plays to the end, ignoring note-off
+(bind-val SAMPLER_LOOP_CONTINUOUS i64 2) ;; loops until the sound has faded
+(bind-val SAMPLER_LOOP_SUSTAIN i64 3)    ;; loops while the key is held
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; what a sampler voice tracks ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A voice plays one note, and a note may play several regions at once (two
+;; velocity layers in the middle of a crossfade, say). Each region sounding
+;; in a voice has a *slot*. A voice has eight, so that it can start a new
+;; note while the slots of the note it replaces fade out.
+(bind-val SAMPLER_SLOTS i64 8)
+
+;; envelope stages
+(bind-val SAMPLER_ATTACK i64 0)
+(bind-val SAMPLER_SUSTAIN i64 1)
+(bind-val SAMPLER_RELEASE i64 2)
+
+;; 0 active?
+;; 1 the voice's note number this slot belongs to (a voice counts its notes)
+;; 2 sample data (interleaved)
+;; 3 channels in the data
+;; 4 channels to read (1 or 2)
+;; 5 the frame to stop at
+;; 6 read position, in frames
+;; 7 frames to advance per output frame, before the tune parameter
+;; 8 loop mode
+;; 9 loop start
+;; 10 loop end (the frame after the last one in the loop)
+;; 11 left gain
+;; 12 right gain
+;; 13 envelope level
+;; 14 envelope stage
+;; 15 attack: envelope rise per frame
+;; 16 the region's own release time (ampeg_release)
+;; 17 release: envelope multiplier per frame
+;; 18 the group which silences this slot (off_by)
+(bind-type SamplerSlot <i1,i64,SAMPLE*,i64,i64,double,double,double,i64,double,double,SAMPLE,SAMPLE,SAMPLE,i64,SAMPLE,SAMPLE,SAMPLE,i64> (printer? . #f))
+
+;; 0 the instrument
+;; 1 the most regions it can hold
+;; 2 how many regions the audio thread may use (set last, when one is complete)
+;; 3 each region's sample
+;; 4 each region's opcode values, SAMPLER_NOPCODES to a region
+;; 5 the slots, SAMPLER_SLOTS for each voice
+;; 6 round-robin counters, one for each key
+(bind-type SamplerBank <Inst*,i64,i64,AudioBuffer**,double*,SamplerSlot*,i64*> (printer? . #f))
+
+(bind-val SAMPLER_MAX_REGIONS i64 4096)
+
+;; a slot whose envelope falls below this (-80 dB) has finished
+(bind-val SAMPLER_SILENT SAMPLE 0.0001)
+;; how quickly a slot is silenced when it's choked or its voice is stolen
+(bind-val SAMPLER_CHOKE_SECONDS SAMPLE 0.03)
+
+(bind-func static sampler_release_coeff
+  "the per-frame multiplier which takes an envelope down 60 dB in `seconds`"
+  (lambda (seconds:SAMPLE)
+    (exp (/ -6.9077553 (* (max seconds 0.001) SRf)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the parameters every sampler instrument has ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The voice reads these by position, so a sampler instrument's
+;; def-instrument must list them first, in this order. (sampler:check-params
+;; complains if it doesn't.) The defaults here are for the generic sampler;
+;; each instrument chooses its own.
+(define *sampler:params*
+  '((attack 0.002 "seconds to fade in (a region's ampeg_attack applies if it's longer)")
+    (release 0.3 "seconds for a released note to fade by 60 dB (a region's ampeg_release applies if it's longer)")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 30.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: shifts which velocity layer plays without changing the level")
+    (length 0.0 "seconds after which every note fades out over the release parameter's time, even a one-shot (0.0: no limit)")
+    (level 0.5 "output level")))
+
+(bind-val SAMPLER_P_ATTACK i64 0)
+(bind-val SAMPLER_P_RELEASE i64 1)
+(bind-val SAMPLER_P_TUNE i64 2)
+(bind-val SAMPLER_P_DYNAMICS i64 3)
+(bind-val SAMPLER_P_HARDNESS i64 4)
+(bind-val SAMPLER_P_LENGTH i64 5)
+(bind-val SAMPLER_P_LEVEL i64 6)
+
+(define sampler:check-params
+  (lambda (instrument)
+    (let ((names (map car (studio:instrument-params instrument)))
+          (wanted (map car *sampler:params*)))
+      (if (and (>= (length names) (length wanted))
+               (equal? wanted (list-head names (length wanted))))
+          #t
+          (studio:error instrument "is a sampler, so its first parameters must be" wanted)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a bank of regions per instrument ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The compiler under-counts the size of a struct with mixed field sizes
+;; (it doesn't allow for the padding LLVM puts before an i64), so (zalloc n)
+;; of SamplerSlots would come up short and the last voices' slots would
+;; overrun the array. Ask for the memory in bytes, using the real stride.
+(bind-func static sampler_alloc_slots
+  (lambda (n:i64)
+    (let ((stride (ptrtoi64 (cast (pref-ptr (cast null SamplerSlot*) 1) i8*)))
+          (raw:i8* (zalloc (* n stride))))
+      (cast raw SamplerSlot*))))
+
+(bind-func sampler_bank_make
+  (lambda (inst:Inst*)
+    (let ((nslots (* (inst_nvoices inst) SAMPLER_SLOTS))
+          (slots (sampler_alloc_slots nslots))
+          (bank (SamplerBank inst
+                             SAMPLER_MAX_REGIONS
+                             0
+                             (zalloc SAMPLER_MAX_REGIONS)
+                             (zalloc (* SAMPLER_MAX_REGIONS SAMPLER_NOPCODES))
+                             slots
+                             (zalloc 128)))
+          (i:i64 0))
+      (dotimes (i nslots)
+        (tset! (pref-ptr slots i) 0 #f))
+      (dotimes (i 128)
+        (pset! (tref bank 6) i 0))
+      bank)))
+
+;; Scheme hands the loaders an instrument (an Inst*), so each bank is
+;; registered against its instrument.
+(bind-val SAMPLER_REGISTRY_SIZE i64 64)
+
+(bind-func static sampler_alloc_registry
+  (lambda ()
+    (let ((banks:SamplerBank** (halloc SAMPLER_REGISTRY_SIZE))
+          (i:i64 0))
+      (dotimes (i SAMPLER_REGISTRY_SIZE)
+        (pset! banks i null))
+      banks)))
+
+(bind-val sampler_registry SamplerBank** (sampler_alloc_registry))
+(bind-val sampler_registry_next i64 0)
+
+(bind-func sampler_bank
+  "the bank of regions which belongs to the instrument inst, or null"
+  (lambda (inst:Inst*)
+    (let ((found:SamplerBank* null)
+          (b:SamplerBank* null)
+          (i:i64 0))
+      (dotimes (i SAMPLER_REGISTRY_SIZE)
+        (set! b (pref sampler_registry i))
+        (if (and (not (null? b)) (= (ptrtoi64 (cast (tref b 0) i8*)) (ptrtoi64 (cast inst i8*))))
+            (set! found b)))
+      found)))
+
+(bind-func sampler_region_count
+  (lambda (bank:SamplerBank*)
+    (tref bank 2)))
+
+(bind-func sampler_region_ref
+  (lambda (bank:SamplerBank* r:i64 opcode:i64)
+    (pref (tref bank 4) (+ (* r SAMPLER_NOPCODES) opcode))))
+
+;; Loading a region takes three calls: sampler_region_new fills the row
+;; after the last published region with defaults, sampler_region_set
+;; changes it, and sampler_region_publish makes it playable. Until then the
+;; audio thread doesn't look at it, so the row can be filled at leisure.
+
+(bind-func sampler_region_new
+  "start a region with the sample ab. Returns its index, or -1 if the bank is full"
+  (lambda (bank:SamplerBank* ab:AudioBuffer*)
+    (let ((r (tref bank 2)))
+      (if (>= r (tref bank 1))
+          -1
+          (begin
+            (pset! (tref bank 3) r ab)
+            (sampler_region_defaults (pref-ptr (tref bank 4) (* r SAMPLER_NOPCODES)))
+            r)))))
+
+(bind-func sampler_region_set
+  (lambda (bank:SamplerBank* r:i64 opcode:i64 value:double)
+    (if (and (>= r 0) (< r (tref bank 1)) (>= opcode 0) (< opcode SAMPLER_NOPCODES))
+        (pset! (tref bank 4) (+ (* r SAMPLER_NOPCODES) opcode) value))
+    void))
+
+(bind-func sampler_region_publish
+  "make region r (the one sampler_region_new returned) playable"
+  (lambda (bank:SamplerBank* r:i64)
+    ;; the region is complete, and this store is what the audio thread reads
+    (if (= r (tref bank 2))
+        (tset! bank 2 (+ r 1)))
+    void))
+
+(bind-func sampler_clear
+  "forget every region. Notes which are sounding play on."
+  (lambda (bank:SamplerBank*)
+    (tset! bank 2 0)
+    void))
+
+;;;;;;;;;;;;;;;;;;;;;
+;; starting a note ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static sampler_xfade
+  "the gain of a region at velocity vel, given its xfin and xfout ranges.
+
+Two recordings which are unrelated (different takes, say) add in power, so
+they crossfade along quarter sines whose squares sum to one. Two which add
+in phase (the same piano key played softly and loudly, with the same
+microphones) add in amplitude, so they crossfade along straight lines
+instead; quarter sines would leave them 3 dB loud halfway across."
+  (lambda (vel:double in_lo:double in_hi:double out_lo:double out_hi:double linear:i1)
+    (let ((g:double 1.0)
+          (t:double 0.0))
+      (if (> in_hi in_lo)
+          (begin
+            (set! t (/ (- vel in_lo) (- in_hi in_lo)))
+            (set! t (if (< t 0.0) 0.0 (if (> t 1.0) 1.0 t)))
+            (set! g (* g (if linear t (sin (* 1.5707963 t)))))))
+      (if (> out_hi out_lo)
+          (begin
+            (set! t (/ (- vel out_lo) (- out_hi out_lo)))
+            (set! t (if (< t 0.0) 0.0 (if (> t 1.0) 1.0 t)))
+            (set! g (* g (if linear (- 1.0 t) (cos (* 1.5707963 t)))))))
+      g)))
+
+(bind-func static sampler_free_slot
+  "a slot in `slots` to start a region in: an idle one if there is one,
+otherwise the quietest"
+  (lambda (slots:SamplerSlot*)
+    (let ((best:i64 -1)
+          (quietest:SAMPLE 10.0)
+          (s:SamplerSlot* null)
+          (i:i64 0))
+      (dotimes (i SAMPLER_SLOTS)
+        (set! s (pref-ptr slots i))
+        (if (not (tref s 0))
+            (begin (set! best i) (set! quietest -1.0))
+            (if (< (tref s 13) quietest)
+                (begin (set! best i) (set! quietest (tref s 13))))))
+      (pref-ptr slots best))))
+
+(bind-func static sampler_choke
+  "fade a slot out quickly"
+  (lambda (s:SamplerSlot*)
+    (let ((fast (sampler_release_coeff SAMPLER_CHOKE_SECONDS)))
+      (tset! s 14 SAMPLER_RELEASE)
+      (if (or (< (tref s 17) fast) (= (tref s 17) 0.0))
+          (tset! s 17 fast))
+      void)))
+
+(bind-func static sampler_start_region
+  "start region r in slot s, for the note the voice v is playing"
+  (lambda (bank:SamplerBank* r:i64 s:SamplerSlot* v:Voice* note:i64 amp:double selvel:double)
+    (let ((ab (pref (tref bank 3) r))
+          (row (pref-ptr (tref bank 4) (* r SAMPLER_NOPCODES)))
+          (p (inst_params (tref bank 0)))
+          (frames (AudioBuffer_frames ab))
+          (last (convert (pref row SFZ_END) i64))
+          (stop:i64 (if (and (> last 0) (< last frames)) (+ last 1) frames))
+          (loop_start (pref row SFZ_LOOP_START))
+          (loop_end (+ 1.0 (pref row SFZ_LOOP_END)))
+          ;; the interval from the recorded key, in semitones
+          (semis (+ (* (- (convert (voice_pitch v) double) (pref row SFZ_PITCH_KEYCENTER))
+                       (/ (pref row SFZ_PITCH_KEYTRACK) 100.0))
+                    (pref row SFZ_TRANSPOSE)
+                    (/ (pref row SFZ_TUNE) 100.0)))
+          (gain (* amp
+                   (pow 10.0 (/ (pref row SFZ_VOLUME) 20.0))
+                   (sampler_xfade selvel
+                                  (pref row SFZ_XFIN_LOVEL) (pref row SFZ_XFIN_HIVEL)
+                                  (pref row SFZ_XFOUT_LOVEL) (pref row SFZ_XFOUT_HIVEL)
+                                  (> (pref row SFZ_XF_VELCURVE) 0.5))))
+          (pan (/ (pref row SFZ_PAN) 100.0))
+          (attack (max (convert (pref row SFZ_AMPEG_ATTACK) SAMPLE) (pref p SAMPLER_P_ATTACK)))
+          (nchan (AudioBuffer_channels ab)))
+      (if (or (<= loop_end loop_start) (> loop_end (convert stop double)))
+          (begin
+            (set! loop_start 0.0)
+            (set! loop_end (convert stop double))))
+      (tfill! s
+              #t note (AudioBuffer_data ab) nchan (if (> nchan 1) 2 1)
+              (convert stop double)
+              (pref row SFZ_OFFSET)
+              ;; compensate for a file recorded at a different rate from the engine's
+              (* (pow 2.0 (/ semis 12.0)) (/ (AudioBuffer_samplerate ab) (convert SRf double)))
+              (convert (pref row SFZ_LOOP_MODE) i64)
+              loop_start loop_end
+              ;; a mono sample is panned at equal power; a stereo one is balanced
+              (convert (if (= nchan 1)
+                           (* gain (cos (* 0.78539816 (+ pan 1.0))))
+                           (* gain (min 1.0 (- 1.0 pan))))
+                       SAMPLE)
+              (convert (if (= nchan 1)
+                           (* gain (sin (* 0.78539816 (+ pan 1.0))))
+                           (* gain (min 1.0 (+ 1.0 pan))))
+                       SAMPLE)
+              ;; every region fades in from silence: over a millisecond or two
+              ;; this softens no transient, but it stops a sample which begins
+              ;; mid-waveform (an offset, a stolen voice) from clicking
+              0.0
+              SAMPLER_ATTACK
+              (/ 1.0 (* (max attack 0.0005) SRf))
+              (convert (pref row SFZ_AMPEG_RELEASE) SAMPLE)
+              0.0
+              (convert (pref row SFZ_OFF_BY) i64))
+      void)))
+
+(bind-func sampler_start_note
+  "start every region which matches the note voice number idx has just begun"
+  (lambda (bank:SamplerBank* idx:i64 v:Voice* note:i64)
+    (let ((inst (tref bank 0))
+          (p (inst_params inst))
+          (voices (tref inst 2))
+          (nvoices (inst_nvoices inst))
+          (all_slots (tref bank 5))
+          (slots (pref-ptr all_slots (* idx SAMPLER_SLOTS)))
+          (nregions (tref bank 2))
+          (pitch (voice_pitch v))
+          (key:i64 (convert (floor (+ pitch 0.5)) i64))
+          (vel:double (convert (voice_vel v) double))
+          ;; hardness moves the velocity which picks the layers, not the level
+          (selvel:double (* 127.0 (+ vel (convert (pref p SAMPLER_P_HARDNESS) double))))
+          (midivel:double (* 127.0 vel))
+          ;; the level follows velocity along a power curve: `dynamics` dB
+          ;; down at velocity 0.1
+          (amp:double (pow vel (/ (convert (pref p SAMPLER_P_DYNAMICS) double) 20.0)))
+          (rand:double (random))
+          (count:i64 0)
+          (row:double* null)
+          (seq_length:i64 0)
+          (group:i64 0)
+          (other:Voice* null)
+          (s:SamplerSlot* null)
+          (r:i64 0)
+          (i:i64 0))
+      (set! selvel (if (< selvel 0.0) 0.0 (if (> selvel 127.0) 127.0 selvel)))
+      (set! key (if (< key 0) 0 (if (> key 127) 127 key)))
+      (pset! (tref bank 6) key (+ 1 (pref (tref bank 6) key)))
+      (set! count (pref (tref bank 6) key))
+      ;; if the engine has stolen this voice, its old regions are still
+      ;; sounding: fade them out rather than cutting them off
+      (dotimes (i SAMPLER_SLOTS)
+        (if (tref (pref-ptr slots i) 0) (sampler_choke (pref-ptr slots i))))
+      ;; a key struck again while it is still held lets go of the old note,
+      ;; which fades out at its release rate
+      (dotimes (i nvoices)
+        (set! other (pref-ptr voices i))
+        (if (and (<> i idx) (voice_active other) (> (voice_gate other) 0.5)
+                 (< (fabs (- (voice_pitch other) pitch)) 0.01))
+            (begin (tset! other 3 0.0) (tset! other 5 0) void)))
+      (dotimes (r nregions)
+        (set! row (pref-ptr (tref bank 4) (* r SAMPLER_NOPCODES)))
+        (set! seq_length (convert (pref row SFZ_SEQ_LENGTH) i64))
+        (if (and (>= (convert key double) (pref row SFZ_LOKEY))
+                 (<= (convert key double) (pref row SFZ_HIKEY))
+                 (>= selvel (pref row SFZ_LOVEL))
+                 (<= selvel (+ (pref row SFZ_HIVEL) 0.999))
+                 (>= rand (pref row SFZ_LORAND))
+                 (< rand (pref row SFZ_HIRAND))
+                 (or (<= seq_length 1)
+                     (= (+ 1 (% (- count 1) seq_length)) (convert (pref row SFZ_SEQ_POSITION) i64)))
+                 ;; a region crossfaded right out at this velocity would only waste a slot
+                 (> (sampler_xfade selvel (pref row SFZ_XFIN_LOVEL) (pref row SFZ_XFIN_HIVEL)
+                                   (pref row SFZ_XFOUT_LOVEL) (pref row SFZ_XFOUT_HIVEL) #t)
+                    0.0))
+            (begin
+              (sampler_start_region bank r (sampler_free_slot slots) v note amp selvel)
+              ;; this region's group silences every other slot whose off_by names it
+              (set! group (convert (pref row SFZ_GROUP) i64))
+              (if (<> group 0)
+                  (dotimes (i (* nvoices SAMPLER_SLOTS))
+                    (set! s (pref-ptr all_slots i))
+                    (if (and (tref s 0) (= (tref s 18) group)
+                             (not (and (= (/ i SAMPLER_SLOTS) idx) (= (tref s 1) note))))
+                        (sampler_choke s)))))))
+      void)))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; playing a region ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static sampler_hermite
+  "a cubic Hermite (Catmull-Rom) curve through x0 and x1, at fraction t of
+the way between them, shaped by their neighbours xm1 and x2"
+  (lambda (t:SAMPLE xm1:SAMPLE x0:SAMPLE x1:SAMPLE x2:SAMPLE)
+    (let ((c1 (* 0.5 (- x1 xm1)))
+          (c2 (+ xm1 (* -2.5 x0) (* 2.0 x1) (* -0.5 x2)))
+          (c3 (+ (* 0.5 (- x2 xm1)) (* 1.5 (- x0 x1)))))
+      (+ x0 (* t (+ c1 (* t (+ c2 (* t c3)))))))))
+
+(bind-func static sampler_frame
+  "the sample at frame i, channel c of slot s. A looping slot reads past its
+loop end from the loop start; outside the sample there is silence."
+  (lambda (s:SamplerSlot* i:i64 c:i64 looping:i1)
+    (let ((loop_end:i64 (convert (tref s 10) i64))
+          (j:i64 (if (and looping (>= i loop_end))
+                     (- i (- loop_end (convert (tref s 9) i64)))
+                     i)))
+      (if (or (< j 0) (>= j (convert (tref s 5) i64)))
+          0.0
+          (pref (tref s 2) (+ (* j (tref s 3)) c))))))
+
+(bind-func static sampler_slot_play
+  "add one frame of slot s to out"
+  (lambda (s:SamplerSlot* out:SAMPLE* tune_ratio:double level:SAMPLE)
+    (let ((pos (tref s 6))
+          (i:i64 (convert (floor pos) i64))
+          (t:SAMPLE (convert (- pos (floor pos)) SAMPLE))
+          (stage (tref s 14))
+          (mode (tref s 8))
+          (looping (or (= mode SAMPLER_LOOP_CONTINUOUS)
+                       (and (= mode SAMPLER_LOOP_SUSTAIN) (< stage SAMPLER_RELEASE))))
+          (env (tref s 13))
+          (l:SAMPLE 0.0)
+          (r:SAMPLE 0.0))
+      ;; the envelope: a straight rise, then the sample's own shape, then
+      ;; an exponential fall once released
+      (cond ((= stage SAMPLER_ATTACK)
+             (set! env (+ env (tref s 15)))
+             (if (>= env 1.0)
+                 (begin (set! env 1.0) (tset! s 14 SAMPLER_SUSTAIN)))
+             void)
+            ((= stage SAMPLER_RELEASE)
+             (set! env (* env (tref s 17)))
+             (if (< env SAMPLER_SILENT) (tset! s 0 #f))
+             void)
+            (else void))
+      (tset! s 13 env)
+      (if (and (>= i 1) (< (+ i 2) (convert (if looping (tref s 10) (tref s 5)) i64)))
+          ;; the four frames are all inside the sample (or the loop): read
+          ;; them straight from the data, which is nearly always the case
+          (let ((stride (tref s 3))
+                (d (pref-ptr (tref s 2) (* (- i 1) stride))))
+            (set! l (sampler_hermite t (pref d 0) (pref d stride) (pref d (* 2 stride)) (pref d (* 3 stride))))
+            (set! r (if (= (tref s 4) 1)
+                        l
+                        (sampler_hermite t (pref d 1) (pref d (+ stride 1))
+                                         (pref d (+ (* 2 stride) 1)) (pref d (+ (* 3 stride) 1)))))
+            void)
+          ;; near an edge: wrap round the loop, or read silence
+          (begin
+            (set! l (sampler_hermite t (sampler_frame s (- i 1) 0 looping) (sampler_frame s i 0 looping)
+                                     (sampler_frame s (+ i 1) 0 looping) (sampler_frame s (+ i 2) 0 looping)))
+            (set! r (if (= (tref s 4) 1)
+                        l
+                        (sampler_hermite t (sampler_frame s (- i 1) 1 looping) (sampler_frame s i 1 looping)
+                                         (sampler_frame s (+ i 1) 1 looping) (sampler_frame s (+ i 2) 1 looping))))
+            void))
+      (frame_add_stereo out (* level env (tref s 11) l) (* level env (tref s 12) r))
+      ;; move on, round the loop if there is one
+      (set! pos (+ pos (* (tref s 7) tune_ratio)))
+      (if (and looping (>= pos (tref s 10)))
+          (set! pos (- pos (- (tref s 10) (tref s 9)))))
+      (tset! s 6 pos)
+      (if (>= pos (tref s 5)) (tset! s 0 #f))
+      void)))
+
+(bind-func static sampler_release_slots
+  "release the slots of note `note`: all of them if force, otherwise all but
+one-shots. A forced release (the length parameter) takes `release` seconds;
+otherwise a region's own ampeg_release applies if it's longer."
+  (lambda (slots:SamplerSlot* note:i64 release:SAMPLE force:i1)
+    (let ((s:SamplerSlot* null)
+          (coeff:SAMPLE 0.0)
+          (i:i64 0))
+      (dotimes (i SAMPLER_SLOTS)
+        (set! s (pref-ptr slots i))
+        (if (and (tref s 0) (= (tref s 1) note) (or force (<> (tref s 8) SAMPLER_ONE_SHOT)))
+            (begin
+              (set! coeff (sampler_release_coeff (if force release (max release (tref s 16)))))
+              ;; a slot already fading keeps the quicker of its fade and this one
+              (if (or (< (tref s 14) SAMPLER_RELEASE) (< coeff (tref s 17)))
+                  (begin
+                    (tset! s 14 SAMPLER_RELEASE)
+                    (tset! s 17 coeff)
+                    void))
+              void)))
+      void)))
+
+(bind-func sampler_voice_c
+  "the voice function for voice number idx of a sampler instrument"
+  (lambda (bank:SamplerBank* idx:i64)
+    (let ((p (inst_params (tref bank 0)))
+          (slots (pref-ptr (tref bank 5) (* idx SAMPLER_SLOTS)))
+          (note:i64 0)
+          (let_go:i1 #f)
+          (timed_out:i1 #f)
+          (tune_ratio:double 1.0)
+          (level:SAMPLE 0.0)
+          (length_frames:i64 0)
+          (busy:i1 #f)
+          (i:i64 0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! note (+ note 1))
+              (set! let_go #f)
+              (set! timed_out #f)
+              (sampler_start_note bank idx v note)))
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! tune_ratio (pow 2.0 (/ (convert (pref p SAMPLER_P_TUNE) double) 12.0)))
+              (set! level (pref p SAMPLER_P_LEVEL))
+              (set! length_frames (convert (* (pref p SAMPLER_P_LENGTH) SRf) i64))))
+        ;; the key is up: release the note (one-shots play on)
+        (if (and (not let_go) (< (voice_gate v) 0.5))
+            (begin
+              (set! let_go #t)
+              (sampler_release_slots slots note (pref p SAMPLER_P_RELEASE) #f)))
+        ;; the note has played for `length`: release everything
+        (if (and (not timed_out) (> length_frames 0) (>= (voice_age v) length_frames))
+            (begin
+              (set! timed_out #t)
+              (sampler_release_slots slots note (pref p SAMPLER_P_RELEASE) #t)))
+        (set! busy #f)
+        (dotimes (i SAMPLER_SLOTS)
+          (if (tref (pref-ptr slots i) 0)
+              (begin
+                (sampler_slot_play (pref-ptr slots i) out tune_ratio level)
+                (set! busy #t))))
+        (if (not busy) (voice_done v))
+        void))))
+
+(bind-func sampler_inst_make
+  "make a sampler instrument called name, with nvoices voices and nparams
+parameters (the first seven are *sampler:params*)"
+  (lambda (name:i8* nvoices:i64 nparams:i64)
+    (let ((inst (inst_make name nvoices nparams))
+          (bank (sampler_bank_make inst))
+          (i:i64 0))
+      (dotimes (i nvoices)
+        (inst_set_voice inst i (sampler_voice_c bank i)))
+      (pset! sampler_registry (% sampler_registry_next SAMPLER_REGISTRY_SIZE) bank)
+      (set! sampler_registry_next (+ sampler_registry_next 1))
+      inst)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; loading regions (Scheme from here on) ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; path -> AudioBuffer, so that each file is read once however many tracks
+;; play it. The key includes the length kept, since a shortened copy is a
+;; different buffer.
+(define *sampler:buffers* (make-hash-table))
+
+(bind-func sampler_null
+  (lambda (p:i8*)
+    (null? p)))
+
+(define sampler:null?
+  (lambda (ptr)
+    ;; an i1 comes back to Scheme as 1 or 0
+    (or (not (cptr? ptr)) (eqv? (sampler_null ptr) 1))))
+
+(define sampler:buffer
+  (lambda (path max-seconds)
+    (let* ((key (string-append path "@" (number->string max-seconds)))
+           (cached (hash-table-ref *sampler:buffers* key)))
+      (or cached
+          (let ((ab (sampler_read_audio path (* 1.0 max-seconds))))
+            (if (sampler:null? ab)
+                #f
+                (begin (hash-table-set! *sampler:buffers* key ab) ab)))))))
+
+(define sampler:playable-file?
+  (lambda (path)
+    (regex:match? (string-downcase path) "\\.(wav|wave|aif|aiff|aifc)$")))
+
+;; Add a region to an instrument's bank. opcodes is a list of
+;; (opcode value) pairs, as in *sampler:opcodes*; those it leaves out take
+;; their defaults. Returns the region's index, or #f if the sample couldn't
+;; be read.
+(define sampler:add-region
+  (lambda (bank path opcodes . max-seconds)
+    (let ((ab (and (sampler:playable-file? path)
+                   (sampler:buffer path (if (null? max-seconds) 0.0 (car max-seconds))))))
+      (if (not ab)
+          #f
+          (let ((r (sampler_region_new bank ab)))
+            (if (< r 0)
+                (begin (studio:error "this sampler is full: it holds" (sampler_region_count bank) "regions") #f)
+                (begin
+                  (for-each (lambda (op)
+                              (let ((i (sampler:opcode-index (car op))))
+                                (if i (sampler_region_set bank r i (* 1.0 (cadr op))))))
+                            opcodes)
+                  ;; only now can the audio thread see it
+                  (sampler_region_publish bank r)
+                  r)))))))
+
+;; The bank of the instrument on a track, or #f with a message saying why not
+(define sampler:track-bank
+  (lambda (track-name)
+    (let* ((i (studio:track-index track-name))
+           (inst (and i (studio_get_instrument i)))
+           (bank (and inst (not (sampler:null? inst)) (sampler_bank inst))))
+      (cond ((not i) (studio:error "there is no track called" track-name))
+            ((or (not bank) (sampler:null? bank))
+             (studio:error track-name "isn't playing a sampler: try (track '" track-name " 'sampler)"))
+            (else bank)))))
+
+;; where a sample instrument's files live. The assets folder is an optional
+;; download, so say clearly what's missing.
+(define sampler:asset-folder
+  (lambda (instrument subpath)
+    (let ((dir (string-append (sys:share-dir) "/assets/" subpath)))
+      (if (null? (sys:directory-list dir))
+          (begin
+            (if (regex:match? subpath "^studio/")
+                ;; the libraries in assets/studio aren't part of the assets
+                ;; download yet
+                (studio:error instrument "needs the samples in" dir
+                              "--- they aren't there, so it will be silent. That library"
+                              "isn't part of Extempore's assets download yet.")
+                (studio:error instrument "needs the samples in" dir
+                              "--- they aren't there, so it will be silent. They come with"
+                              "Extempore's optional assets download: run"
+                              "`cmake --build build --target assets` in the Extempore folder,"
+                              "or see assets/README.md."))
+            #f)
+          dir))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; reading note names and paths ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; "c#4" -> 61, "eb2" -> 39, "60" -> 60; #f for anything else. Middle C is
+;; c4, as in SFZ.
+(define sampler:note-number
+  (lambda (str)
+    (let ((n (string->number str)))
+      (if n
+          n
+          (let ((s (string-downcase str)))
+            (if (and (> (string-length s) 1)
+                     (memv (string-ref s 0) '(#\c #\d #\e #\f #\g #\a #\b)))
+                (let* ((pc (cdr (assv (string-ref s 0)
+                                      '((#\c . 0) (#\d . 2) (#\e . 4) (#\f . 5) (#\g . 7) (#\a . 9) (#\b . 11)))))
+                       (accidental (string-ref s 1))
+                       (shift (cond ((char=? accidental #\#) 1)
+                                    ((char=? accidental #\b) -1)
+                                    (else 0)))
+                       (octave (string->number (substring s (if (= shift 0) 1 2)))))
+                  (if (integer? octave)
+                      (+ pc shift (* 12 (+ octave 1)))
+                      #f))
+                #f))))))
+
+(define sampler:string-replace
+  (lambda (s from to)
+    (let loop ((s s) (start 0))
+      (let ((i (string-position from s start)))
+        (if (not i)
+            s
+            (loop (string-append (substring s 0 i) to (substring s (+ i (string-length from))))
+                  (+ i (string-length to))))))))
+
+(define sampler:directory-of
+  (lambda (path)
+    (let loop ((i (- (string-length path) 1)))
+      (cond ((< i 0) ".")
+            ((char=? (string-ref path i) #\/) (substring path 0 i))
+            (else (loop (- i 1)))))))
+
+;; join a directory and an SFZ-style relative path (which may use
+;; backslashes, and may start with ./)
+(define sampler:join-path
+  (lambda (dir rel)
+    (let ((rel (sampler:string-replace rel "\\" "/")))
+      (cond ((and (> (string-length rel) 0) (char=? (string-ref rel 0) #\/)) rel)
+            ((and (> (string-length rel) 1) (string=? (substring rel 0 2) "./"))
+             (sampler:join-path dir (substring rel 2)))
+            ((string=? dir "") rel)
+            (else (string-append dir "/" rel))))))
+
+;; a path as the user typed it: absolute, relative to the working
+;; directory, or relative to the Extempore folder
+(define sampler:find-path
+  (lambda (path)
+    (let ((path (sys:expand-path path)))
+      (let ((exists? (lambda (p) (or (file-exists? p) (pair? (sys:directory-list p))))))
+        (cond ((exists? path) path)
+              ((exists? (string-append (sys:share-dir) "/" path))
+               (string-append (sys:share-dir) "/" path))
+              (else #f))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; loading a folder of files ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The files in dir which are named by MIDI note number (36.wav, 37.aif ...),
+;; as a sorted list of (note path)
+(define sampler:numbered-files
+  (lambda (dir)
+    (cl:sort
+      (let loop ((names (sys:directory-list dir)) (acc '()))
+        (if (null? names)
+            acc
+            (let* ((name (car names))
+                   (dot (char-position #\. name))
+                   (n (and dot (string->number (substring name 0 dot)))))
+              (loop (cdr names)
+                    (if (and (integer? n) (<= 0 n 127) (sampler:playable-file? name))
+                        (cons (list n (string-append dir "/" name)) acc)
+                        acc)))))
+      (lambda (a b) (< (car a) (car b))))))
+
+;; Regions for a folder of numbered files. With mode 'drums each file plays
+;; on its own key, at its own pitch, to the end; with mode 'pitched each
+;; file also covers the keys up to halfway to its neighbours, transposed.
+(define sampler:folder-regions
+  (lambda (files mode)
+    (let loop ((files files) (prev #f) (acc '()))
+      (if (null? files)
+          (reverse acc)
+          (let* ((n (car (car files)))
+                 (next (if (null? (cdr files)) #f (car (cadr files))))
+                 (lo (cond ((eq? mode 'drums) n) (prev (+ (quotient (+ prev n) 2) 1)) (else 0)))
+                 (hi (cond ((eq? mode 'drums) n) (next (quotient (+ n next) 2)) (else 127))))
+            (loop (cdr files) n
+                  (cons (list (cadr (car files))
+                              `((lokey ,lo) (hikey ,hi) (pitch_keycenter ,n)
+                                (loop_mode ,(if (eq? mode 'drums) 1 0))))
+                        acc)))))))
+
+;;;;;;;;;;;;;;;
+;; SFZ files ;;
+;;;;;;;;;;;;;;;
+
+;; An SFZ file is plain text: <headers> which start a section, and
+;; opcode=value pairs which belong to the section above them. A <region> is
+;; one sample; it inherits every opcode set in the <group> above it, which
+;; inherits from <master> and <global>. <control> sets default_path, a
+;; folder in front of every sample's path. #define $NAME value and
+;; #include "file.sfz" work as they do in C.
+
+(define sampler:strip-comments
+  (lambda (text)
+    (let ((n (string-length text))
+          (out (open-output-string)))
+      (let loop ((i 0))
+        (cond ((>= i n) (get-output-string out))
+              ((and (char=? (string-ref text i) #\/) (< (+ i 1) n) (char=? (string-ref text (+ i 1)) #\/))
+               (let skip ((j i))
+                 (if (and (< j n) (not (char=? (string-ref text j) #\newline)))
+                     (skip (+ j 1))
+                     (loop j))))
+              ((and (char=? (string-ref text i) #\/) (< (+ i 1) n) (char=? (string-ref text (+ i 1)) #\*))
+               (let ((end (string-position "*/" text (+ i 2))))
+                 (loop (if end (+ end 2) n))))
+              (else
+                (write-char (string-ref text i) out)
+                (loop (+ i 1))))))))
+
+;; The text of an SFZ file with its comments removed, its #include files
+;; spliced in and its #define names replaced. defines is a list of
+;; (name . value), which grows as the file is read.
+(define sampler:sfz-text
+  (lambda (path root defines-box depth)
+    (let ((text (and (< depth 8) (file-exists? path) (sys:slurp-file path))))
+      (if (not text)
+          (begin (if (> depth 0) (studio:error "can't read the SFZ include" path)) "")
+          (let ((out (open-output-string)))
+            (for-each
+              (lambda (line)
+                (let ((trimmed (sampler:trim line)))
+                  (cond ((and (> (string-length trimmed) 7) (string=? (substring trimmed 0 7) "#define"))
+                         (let ((parts (regex:split (sampler:trim (substring trimmed 7)) "\\s+")))
+                           (if (>= (length parts) 2)
+                               (set-car! defines-box (cons (cons (car parts) (cadr parts)) (car defines-box))))))
+                        ((and (> (string-length trimmed) 8) (string=? (substring trimmed 0 8) "#include"))
+                         (let ((name (sampler:string-replace (sampler:trim (substring trimmed 8)) "\"" "")))
+                           (write-string (sampler:sfz-text (sampler:join-path root name) root defines-box (+ depth 1)) out)
+                           (newline out)))
+                        (else
+                          ;; longest names first, so $NOTE doesn't eat part of $NOTE_LO
+                          (write-string
+                            (let loop ((s line)
+                                       (ds (cl:sort (car defines-box)
+                                                    (lambda (a b) (> (string-length (car a)) (string-length (car b)))))))
+                              (if (or (null? ds) (not (char-position #\$ s)))
+                                  s
+                                  (loop (sampler:string-replace s (caar ds) (cdar ds)) (cdr ds))))
+                            out)
+                          (newline out)))))
+              (regex:split (sampler:strip-comments text) "\r?\n"))
+            (get-output-string out))))))
+
+(define sampler:trim
+  (lambda (s)
+    (let* ((n (string-length s))
+           (start (let loop ((i 0)) (if (and (< i n) (char-whitespace? (string-ref s i))) (loop (+ i 1)) i)))
+           (end (let loop ((i n)) (if (and (> i start) (char-whitespace? (string-ref s (- i 1)))) (loop (- i 1)) i))))
+      (substring s start end))))
+
+(define sampler:opcode-char?
+  (lambda (c)
+    (or (char-alphabetic? c) (char-numeric? c) (char=? c #\_))))
+
+;; does an opcode (name=) start at position i of text?
+(define sampler:opcode-at?
+  (lambda (text i)
+    (let ((n (string-length text)))
+      (let loop ((j i))
+        (cond ((>= j n) #f)
+              ((sampler:opcode-char? (string-ref text j)) (loop (+ j 1)))
+              (else (and (> j i) (char=? (string-ref text j) #\=))))))))
+
+;; Split SFZ text into a list of (header "name") and (opcode "name" "value").
+;; Most values end at whitespace; a sample path may contain spaces, so it
+;; runs to the end of the line or the next opcode.
+(define sampler:sfz-tokens
+  (lambda (text)
+    (let ((n (string-length text)))
+      (let loop ((i 0) (acc '()))
+        (cond
+          ((>= i n) (reverse acc))
+          ((char-whitespace? (string-ref text i)) (loop (+ i 1) acc))
+          ((char=? (string-ref text i) #\<)
+           (let ((end (or (char-position #\> text i) n)))
+             (loop (+ end 1) (cons (list 'header (substring text (+ i 1) (min end n))) acc))))
+          ((sampler:opcode-at? text i)
+           (let* ((eq (char-position #\= text i))
+                  (name (substring text i eq))
+                  (spaces? (member name '("sample" "default_path")))
+                  (end (let scan ((j (+ eq 1)))
+                         (cond ((>= j n) n)
+                               ((char=? (string-ref text j) #\newline) j)
+                               ((char=? (string-ref text j) #\<) j)
+                               ((and (char-whitespace? (string-ref text j))
+                                     (or (not spaces?)
+                                         (let skip ((k j))
+                                           (cond ((>= k n) #t)
+                                                 ((char-whitespace? (string-ref text k))
+                                                  (if (char=? (string-ref text k) #\newline) #t (skip (+ k 1))))
+                                                 (else (sampler:opcode-at? text k))))))
+                                j)
+                               (else (scan (+ j 1)))))))
+             (loop end (cons (list 'opcode name (sampler:trim (substring text (+ eq 1) end))) acc))))
+          (else
+            ;; a stray word: skip it
+            (let skip ((j i))
+              (if (and (< j n) (not (char-whitespace? (string-ref text j))))
+                  (skip (+ j 1))
+                  (loop j acc)))))))))
+
+(define *sampler:loop-modes*
+  '(("no_loop" . 0) ("one_shot" . 1) ("loop_continuous" . 2) ("loop_sustain" . 3)))
+
+;; older spellings of opcodes the engine knows
+(define *sampler:opcode-aliases*
+  '(("loopmode" . "loop_mode") ("loopstart" . "loop_start") ("loopend" . "loop_end")
+    ("offby" . "off_by") ("polyphony_group" . "group")))
+
+;; the engine's (opcode value) pairs for one region, given every opcode
+;; which applies to it in order (global first, region last), or a string
+;; saying why it can't be played
+(define sampler:sfz-region-opcodes
+  (lambda (pairs unknown ignore)
+    (let loop ((pairs pairs) (acc '()) (sample #f) (skip #f))
+      (if (null? pairs)
+          (cond (skip skip)
+                ((not sample) "it has no sample")
+                (else (cons sample (reverse acc))))
+          (let* ((name (let ((a (assoc (caar pairs) *sampler:opcode-aliases*)))
+                         (if a (cdr a) (caar pairs))))
+                 (value (cdar pairs))
+                 (op (string->symbol name))
+                 (note (lambda () (sampler:note-number value))))
+            (cond
+              ((memq op ignore) (loop (cdr pairs) acc sample skip))
+              ((string=? name "sample") (loop (cdr pairs) acc value skip))
+              ((string=? name "key")
+               (let ((k (note)))
+                 (loop (cdr pairs)
+                       (if k (append `((pitch_keycenter ,k) (hikey ,k) (lokey ,k)) acc) acc)
+                       sample skip)))
+              ((member name '("lokey" "hikey" "pitch_keycenter"))
+               (let ((k (note))) (loop (cdr pairs) (if k (cons (list op k) acc) acc) sample skip)))
+              ((string=? name "loop_mode")
+               (let ((m (assoc value *sampler:loop-modes*)))
+                 (loop (cdr pairs) (if m (cons (list op (cdr m)) acc) acc) sample skip)))
+              ((string=? name "xf_velcurve")
+               (loop (cdr pairs) (cons (list op (if (string=? value "gain") 1 0)) acc) sample skip))
+              ((string=? name "trigger")
+               ;; release triggers (a damper's thump, say) are left out
+               (loop (cdr pairs) acc sample
+                     (if (member value '("attack" "first" "legato")) skip "it plays on note-off")))
+              ((sampler:opcode-index op)
+               (let ((x (string->number value)))
+                 (loop (cdr pairs) (if x (cons (list op x) acc) acc) sample skip)))
+              (else
+                (hash-table-set! unknown name (+ 1 (or (hash-table-ref unknown name) 0)))
+                (loop (cdr pairs) acc sample skip))))))))
+
+;; Load an SFZ file into bank, leaving out the opcodes (symbols) in the
+;; optional list ignore. Returns (regions-loaded regions-skipped
+;; unknown-opcodes)
+(define sampler:load-sfz
+  (lambda (bank path . ignore)
+    (let* ((root (sampler:directory-of path))
+           (tokens (sampler:sfz-tokens (sampler:sfz-text path root (list '()) 0)))
+           (unknown (make-hash-table))
+           (loaded 0)
+           (skipped '()))
+      (let loop ((tokens tokens)
+                 (section 'none)
+                 (control '()) (global '()) (master '()) (group '()) (region #f))
+        ;; a region ends where the next header (or the file) starts
+        (define emit
+          (lambda ()
+            (if region
+                (let* ((default-path (let ((d (assoc "default_path" control))) (if d (cdr d) "")))
+                       (ops (sampler:sfz-region-opcodes
+                              (append (reverse global) (reverse master) (reverse group) (reverse region))
+                              unknown
+                              (if (null? ignore) '() (car ignore)))))
+                  (if (string? ops)
+                      (set! skipped (cons ops skipped))
+                      (let ((file (sampler:join-path root (string-append (sampler:string-replace default-path "\\" "/")
+                                                                         (car ops)))))
+                        (cond ((char=? (string-ref (car ops) 0) #\*)
+                               (set! skipped (cons "it uses a built-in generator" skipped)))
+                              ((not (sampler:playable-file? file))
+                               (set! skipped (cons (string-append "its sample isn't WAV or AIFF: " (car ops)) skipped)))
+                              ((sampler:add-region bank file (cdr ops))
+                               (set! loaded (+ loaded 1)))
+                              (else
+                                (set! skipped (cons (string-append "can't read " file) skipped))))))))))
+        (if (null? tokens)
+            (emit)
+            (let ((tok (car tokens)))
+              (if (eq? (car tok) 'header)
+                  (let ((h (string->symbol (cadr tok))))
+                    (emit)
+                    (case h
+                      ((control) (loop (cdr tokens) h '() global master group #f))
+                      ((global) (loop (cdr tokens) h control '() '() '() #f))
+                      ((master) (loop (cdr tokens) h control global '() '() #f))
+                      ((group) (loop (cdr tokens) h control global master '() #f))
+                      ((region) (loop (cdr tokens) h control global master group '()))
+                      (else (loop (cdr tokens) 'other control global master group #f))))
+                  (let ((pair (cons (cadr tok) (caddr tok))))
+                    (case section
+                      ((control) (loop (cdr tokens) section (cons pair control) global master group region))
+                      ((global) (loop (cdr tokens) section control (cons pair global) master group region))
+                      ((master) (loop (cdr tokens) section control global (cons pair master) group region))
+                      ((group) (loop (cdr tokens) section control global master (cons pair group) region))
+                      ((region) (loop (cdr tokens) section control global master group (cons pair region)))
+                      (else (loop (cdr tokens) section control global master group region))))))))
+      (list loaded (reverse skipped) (map (lambda (kv) (list (car kv) (cdr kv))) unknown)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; loading samples onto a track (the user's side) ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define sampler:report
+  (lambda (what seconds loaded skipped unknown)
+    (let ((tenths (lambda (x) (/ (round (* 10.0 x)) 10.0))))
+      (studio:say "sampler: loaded" what "---" loaded "regions in" (tenths seconds) "s,"
+                  (round (sampler_megabytes_loaded)) "MB of samples in memory in all")
+      (if (pair? skipped)
+          (let ((reasons (let loop ((lst skipped) (acc '()))
+                           (if (null? lst) (reverse acc)
+                               (loop (cdr lst) (if (member (car lst) acc) acc (cons (car lst) acc)))))))
+            (studio:say "  skipped" (length skipped) "regions, because")
+            (for-each (lambda (r) (studio:say "   " r)) (list-head reasons (min 5 (length reasons))))))
+      (if (pair? unknown)
+          (apply studio:say "  ignored opcodes (and how often):"
+                 (map (lambda (u) (string-append (car u) " (" (number->string (cadr u)) ")")) unknown))))))
+
+;; (sampler-load 'track "path/to/instrument.sfz")
+;; Replaces whatever the track's sampler held. Notes still sounding play on.
+(define sampler-load
+  (lambda (track-name sfz-path)
+    (let ((bank (sampler:track-bank track-name))
+          (path (sampler:find-path sfz-path))
+          (start (clock:clock)))
+      (cond ((not bank) #f)
+            ((not path) (studio:error "there is no file called" sfz-path))
+            (else
+              (sampler_clear bank)
+              (let ((result (sampler:load-sfz bank path)))
+                (sampler:report sfz-path (- (clock:clock) start) (car result) (cadr result) (caddr result))
+                (car result)))))))
+
+;; (sampler-load-folder 'track "path/to/folder")           ; pitched: spread across the keys
+;; (sampler-load-folder 'track "path/to/folder" 'drums)    ; one sound per key
+;; The files are named by MIDI note number: 36.wav, 37.aif and so on.
+(define sampler-load-folder
+  (lambda (track-name dir . mode)
+    (let ((bank (sampler:track-bank track-name))
+          (path (sampler:find-path dir))
+          (mode (if (null? mode) 'pitched (car mode)))
+          (start (clock:clock)))
+      (cond ((not bank) #f)
+            ((or (not path) (null? (sampler:numbered-files path)))
+             (studio:error "there are no files named by note number (36.wav ...) in" dir))
+            (else
+              (sampler_clear bank)
+              (let ((loaded (length (cl:remove-if not (map (lambda (fr) (sampler:add-region bank (car fr) (cadr fr)))
+                                                           (sampler:folder-regions (sampler:numbered-files path) mode))))))
+                (sampler:report dir (- (clock:clock) start) loaded '() '())
+                loaded))))))
+
+;; For an instrument file which wraps one of the SFZ libraries in
+;; assets/studio: load it into the new instrument inst, or say what's
+;; missing. sfz is relative to assets/studio. The library's own envelope
+;; times are left out, so that the instrument's attack and release
+;; parameters (whose defaults the instrument file chooses) always apply.
+(define sampler:setup-sfz
+  (lambda (inst instrument sfz)
+    (let ((dir (sampler:asset-folder instrument (string-append "studio/" (sampler:directory-of sfz))))
+          (bank (sampler_bank inst))
+          (start (clock:clock)))
+      (if (and dir (sampler:check-params instrument))
+          (let ((result (sampler:load-sfz bank (string-append (sys:share-dir) "/assets/studio/" sfz)
+                                          '(ampeg_attack ampeg_release))))
+            (sampler:report instrument (- (clock:clock) start) (car result) (cadr result) (caddr result))
+            (car result))
+          #f))))
+
+;; (sampler-clear 'track) silences a sampler track by forgetting its regions
+(define sampler-clear
+  (lambda (track-name)
+    (let ((bank (sampler:track-bank track-name)))
+      (if bank (sampler_clear bank))
+      track-name)))

@@ -1,0 +1,34 @@
+;;; flute.xtm -- a tour of the flute's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/flute.xtm /tmp/flute.wav 29
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'flute 'flute)
+(score-ctl 0 'flute 'reverb 0.15)
+
+;; the phrase, a note every 0.4 seconds
+(define flute-demo-notes '(72 74 76 79 77 76 74 72))
+
+(define flute-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes flute-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.4)) 'flute (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.38)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase for each preset
+(let loop ((start 0.0) (names (presets 'flute)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'flute (car names))
+        (flute-demo-phrase start)
+        (loop (+ start 5) (cdr names)))))
+
+(score-end)

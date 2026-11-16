@@ -1,0 +1,186 @@
+;;; piano.xtm -- the Salamander grand piano
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A Yamaha C5 grand, recorded by Alexander Holm as the Salamander Grand
+;; Piano (CC-BY). Extempore's assets download has a cut-down set of it: every
+;; third key (A, C, D# and F# in each octave) at three dynamics, pp, mf and
+;; ff, in assets/samples/salamander-piano. Each recording plays the key it
+;; was made on and the keys either side of it, transposed by a semitone at
+;; most, which is too little to hear.
+;;
+;; The three dynamics are three velocity layers: pp up to velocity 0.4, mf
+;; to 0.8 and ff above that. The recordings keep the piano's own dynamics (a
+;; pp note is 15 to 25 dB quieter than the ff note on the same key), but
+;; those steps differ from key to key, so the level would jump where one
+;; layer hands over to the next. Instead, each recording is matched in
+;; level to the ff recording of the same key when it's loaded, and velocity
+;; sets the level along one smooth curve (the dynamics parameter: 30 dB from
+;; velocity 1.0 down to 0.1). The layers then change only the tone, which
+;; darkens as you play softer.
+;;
+;; The handover is a switch, not a crossfade. Two recordings of the same key
+;; are partly in phase, by different amounts on different keys, so mixing
+;; them made the level bulge by up to 3 dB on some keys and dip on others;
+;; matched in level, a switch measures within half a decibel of the curve.
+;; (*piano:xfade*, below, brings the crossfade back.)
+;;
+;; Each recording starts with up to 40 ms of quiet before the hammer
+;; strikes, which would make every note late; the loader finds the strike
+;; and starts each note 3 ms before it.
+;;
+;; When a key is released, its damper falls on the strings and the note
+;; dies away over the release time (by default 0.7 seconds to fade 60 dB).
+;; A real piano has no dampers on its top octave and a half, so keys from
+;; F6 (MIDI 89) up ring to the end of their recording whenever they're
+;; released, as they do on the real thing. A key struck again while it's
+;; still held lets go of the old note, as the hammer would.
+;;
+;; All of it is about 400 MB of audio as the engine stores it, which takes
+;; a while to load and more memory than a sketch should need. So by default
+;; each recording is kept for its first 8 seconds, fading out over the last
+;; half second: about 215 MB, which loads in well under a second once the
+;; files are in the disk cache. By 8 seconds most notes have faded by 30 dB
+;; or more; only the lowest octave is still clearly ringing. To keep more
+;; or less, or fewer layers, set these before the first (track ... 'piano):
+;;
+;;   (define *piano:seconds* 20.0)    ; 0.0 keeps whole recordings
+;;   (define *piano:layers* '(mf ff)) ; any of pp, mf and ff, softest first
+;;
+;; The piano is tuned as real pianos are, with its octaves stretched a
+;; little wider than equal temperament (each string's overtones run sharp,
+;; and the tuner follows them): measured against equal temperament, the
+;; middle three octaves are within 5 cents, the bass up to 10 cents flat and
+;; the top octave 10 to 25 cents sharp. The engine itself transposes
+;; exactly.
+;;
+;; Without the assets folder the piano prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-piano)
+(define *xtmlib-studio-piano-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument piano
+  "a sampled Yamaha grand piano (the Salamander piano)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.7 "seconds for a released note to fade by 60 dB (the damper)")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 30.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note is released (0.0: no limit)")
+    (level 0.3 "output level"))
+  (presets
+    (grand)
+    (soft (dynamics 16.0) (hardness -0.2) (level 0.4))
+    (bright (dynamics 22.0) (hardness 0.4))
+    (felt (hardness -0.7) (release 0.35) (level 0.45))
+    (staccato (release 0.12) (length 0.3))
+    (swell (attack 0.4) (release 2.5) (hardness -0.2))
+    (deep (tune -12.0) (release 1.5) (hardness 0.2))))
+
+(bind-func piano_make
+  (lambda ()
+    ;; 32 voices: with the sustain held down, a few bars of arpeggios keep
+    ;; that many notes ringing
+    (let ((inst (sampler_inst_make "piano" 32 (piano_nparams))))
+      (piano_defaults (inst_params inst))
+      inst)))
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; loading the piano ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(if (not (defined? '*piano:seconds*)) (define *piano:seconds* 8.0))
+(if (not (defined? '*piano:layers*)) (define *piano:layers* '(pp mf ff)))
+
+;; the velocity (0 to 127) at the centre of each layer's range
+(define *piano:layer-centres* '((pp . 25) (mf . 76) (ff . 120)))
+
+;; dampers stop at this key
+(define *piano:undamped-from* 89)
+
+;; Velocity ranges for the chosen layers: (layer lovel hivel xfin-lo xfin-hi
+;; xfout-lo xfout-hi). Neighbouring layers meet halfway between their
+;; centres, and crossfade over *piano:xfade* velocity steps either side
+;; (0 switches from one to the next).
+(if (not (defined? (quote *piano:xfade*))) (define *piano:xfade* 0))
+
+(define piano:layer-ranges
+  (lambda (layers)
+    (let ((centres (map (lambda (l) (cdr (assq l *piano:layer-centres*))) layers))
+          (w *piano:xfade*))
+      (let loop ((ls layers) (cs centres) (prev #f) (acc '()))
+        (if (null? ls)
+            (reverse acc)
+            (let* ((c (car cs))
+                   (below (and prev (round (/ (+ prev c) 2))))
+                   (above (and (pair? (cdr cs)) (round (/ (+ c (cadr cs)) 2)))))
+              (loop (cdr ls) (cdr cs) c
+                    (cons (list (car ls)
+                                (if below (+ (- below w) (if (= w 0) 1 0)) 0)
+                                (if above (+ above w) 127)
+                                (if below (- below w) 0) (if below (+ below w) 0)
+                                (if above (- above w) 127) (if above (+ above w) 127))
+                          acc))))))))
+
+;; "C#4-mf.wav" -> 61
+(define piano:file-key
+  (lambda (name)
+    (sampler:note-number (car (regex:split name "-")))))
+
+;; the recordings in one layer's folder, as a sorted list of (key path)
+(define piano:layer-files
+  (lambda (dir layer)
+    (let ((folder (string-append dir "/" (symbol->string layer))))
+      (cl:sort (map (lambda (name) (list (piano:file-key name) (string-append folder "/" name)))
+                    (cl:remove-if-not sampler:playable-file? (sys:directory-list folder)))
+               (lambda (a b) (< (car a) (car b)))))))
+
+(define piano-setup
+  (lambda (inst)
+    (let ((dir (sampler:asset-folder 'piano "samples/salamander-piano"))
+          (bank (sampler_bank inst))
+          (start (clock:clock)))
+      (if (and dir (sampler:check-params 'piano))
+          (let* ((ranges (piano:layer-ranges *piano:layers*))
+                 ;; each key's loudest layer is the level the others match
+                 (top (car (car (reverse ranges))))
+                 (reference (map (lambda (kf)
+                                   (cons (car kf) (sampler_buffer_rms (sampler:buffer (cadr kf) *piano:seconds*) 0.3)))
+                                 (piano:layer-files dir top)))
+                 (count 0))
+            (for-each
+              (lambda (range)
+                (let ((files (piano:layer-files dir (car range))))
+                  (for-each
+                    (lambda (kf)
+                      (let* ((key (car kf))
+                             (ab (sampler:buffer (cadr kf) *piano:seconds*))
+                             (match (- (cdr (assv key reference)) (sampler_buffer_rms ab 0.3))))
+                        (if (sampler:add-region
+                              bank (cadr kf)
+                              `((lokey ,(if (= key (car (car files))) 0 (- key 1)))
+                                (hikey ,(if (= key (car (car (reverse files)))) 127 (+ key 1)))
+                                (pitch_keycenter ,key)
+                                (lovel ,(list-ref range 1)) (hivel ,(list-ref range 2))
+                                (xfin_lovel ,(list-ref range 3)) (xfin_hivel ,(list-ref range 4))
+                                (xfout_lovel ,(list-ref range 5)) (xfout_hivel ,(list-ref range 6))
+                                (xf_velcurve 1)
+                                ;; start a few milliseconds before the hammer
+                                ;; strikes, not at the start of the file
+                                (offset ,(sampler_buffer_onset ab 0.02))
+                                (volume ,match)
+                                (loop_mode ,(if (>= (- key 1) *piano:undamped-from*) 1 0)))
+                              *piano:seconds*)
+                            (set! count (+ count 1)))))
+                    files)))
+              ranges)
+            (sampler:report 'piano (- (clock:clock) start) count '() '()))))))

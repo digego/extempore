@@ -1,0 +1,35 @@
+;;; upright.xtm -- a tour of the upright's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/upright.xtm /tmp/upright.wav 39
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'upright 'upright)
+(score-ctl 0 'upright 'reverb 0.15)
+
+;; the phrase, a note every 0.3 seconds
+(define upright-demo-notes '(48 55 60 64 67 64 60 55))
+
+(define upright-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes upright-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.3)) 'upright (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.6)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'upright)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'upright (car names))
+        (upright-demo-phrase start)
+        (upright-demo-phrase (+ start 3.5))
+        (loop (+ start 7) (cdr names)))))
+
+(score-end)

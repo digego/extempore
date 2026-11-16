@@ -1,0 +1,128 @@
+;;; drumkit.xtm -- the Salamander acoustic drum kit
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A real drum kit, recorded by Alexander Holm as the Salamander Drumkit
+;; (CC-BY-SA): a birch kit with an 18" kick, a 12" rack tom and a 14" floor
+;; tom, two snares, Stagg hi-hats and a mix of Paiste and Stagg cymbals.
+;; Extempore's assets download has one recording of each sound, in
+;; assets/samples/salamander-kit, named by the General MIDI note it plays
+;; on.
+;;
+;; The files don't say what they are, so the names below come from
+;; listening with a spectrum analyser: the kicks sit almost entirely below
+;; 150 Hz, the snare has its tone near 200 Hz under a spray of noise, the
+;; toms ring at 70 and 140 Hz, the cymbals run for ten seconds with their
+;; energy above 3 kHz, and so on. Most of the kit follows General MIDI. Two
+;; things don't: the kit has only two toms, so the mid tom is the rack tom
+;; played five semitones lower, and there is no hand clap, so cp is left
+;; out.
+;;
+;; Every sound is a one-shot: it plays to the end of its recording whatever
+;; the note's length, unless the length parameter cuts it short. The
+;; closed and pedal hi-hats choke the open one, as a drummer's foot does,
+;; and an open hi-hat struck again chokes the last one.
+;;
+;; Without the assets folder the kit prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-drumkit)
+(define *xtmlib-studio-drumkit-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument drumkit
+  "a sampled acoustic drum kit (the Salamander kit)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.0005 "seconds to fade in")
+    (release 0.08 "seconds to fade by 60 dB once a hit is cut short by length")
+    (tune 0.0 "transpose every drum, in semitones")
+    (dynamics 24.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "unused: the kit has one recording of each drum")
+    (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
+    (level 0.28 "output level"))
+  (presets
+    (kit)
+    (tight (tune 1.0) (length 0.35))
+    (deep (tune -3.0) (dynamics 20.0))
+    (high (tune 3.0) (length 0.6))
+    (gated (length 0.12) (release 0.03))
+    (dynamic (dynamics 40.0) (level 0.4)))
+  (sounds
+    (bd 36) (rs 37) (sd 38) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (rd 51) (cb 56)
+    (bd2 35) (sd2 40) (ph 44) (cn 52) (rb 53) (sp 55) (cr2 57) (rd2 59)))
+
+(bind-func drumkit_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "drumkit" 32 (drumkit_nparams))))
+      (drumkit_defaults (inst_params inst))
+      inst)))
+
+;;;;;;;;;;;;;;;;;;;;
+;; loading the kit ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; (key file (opcode value) ...): the recording each key plays, with any
+;; opcodes it needs beyond being a one-shot at its recorded pitch. The
+;; volumes balance the kit: the recordings are each normalised to full
+;; scale, which leaves the cymbals and hi-hats far louder than they'd be
+;; in the room.
+(define *drumkit:map*
+  '((35 "35.wav")                              ; second kick
+    (36 "36.wav")                              ; kick
+    (37 "37.wav" (volume -4))                  ; side stick
+    (38 "38.wav" (volume 1))                   ; snare
+    (39 "39.wav" (volume -4))                  ; a low, ringing drum hit
+    (40 "40.wav" (volume 0))                   ; second snare
+    (41 "41.wav" (volume -3))                  ; a short, pitched drum hit
+    (42 "42.wav" (volume -6) (group 1))        ; closed hi-hat
+    (44 "44.wav" (volume -6) (group 1))        ; pedal hi-hat
+    (45 "45.wav" (volume -4))                  ; floor tom
+    (46 "46.wav" (volume -8) (group 1) (off_by 1)) ; open hi-hat
+    (47 "50.wav" (volume -5) (pitch_keycenter 52)) ; the rack tom, a fourth down
+    (48 "48.wav" (volume -3))                  ; a short snare-like hit
+    (49 "49.wav" (volume -6))                  ; crash
+    (50 "50.wav" (volume -5))                  ; rack tom
+    (51 "51.wav" (volume -3))                  ; ride
+    (52 "52.wav" (volume -9))                  ; china
+    (53 "53.wav" (volume -8))                  ; ride bell
+    (54 "54.wav" (volume -8))                  ; accent cymbal
+    (55 "55.wav" (volume -8))                  ; splash
+    (56 "56.wav" (volume -6))                  ; cowbell
+    (57 "57.wav" (volume -8))                  ; second crash
+    (58 "58.wav" (volume -9) (group 1))        ; hi-hat, half open
+    (59 "59.wav" (volume -9))                  ; second ride
+    (60 "60.wav" (volume -8))                  ; cymbals
+    (61 "61.wav" (volume -9))
+    (62 "62.wav" (volume -9))
+    (63 "63.wav" (volume -3))))                ; a short snare-like hit
+
+(define drumkit-setup
+  (lambda (inst)
+    (let ((dir (sampler:asset-folder 'drumkit "samples/salamander-kit"))
+          (bank (sampler_bank inst))
+          (start (clock:clock)))
+      (if (and dir (sampler:check-params 'drumkit))
+          (let ((count 0))
+            (for-each
+              (lambda (entry)
+                (let* ((path (string-append dir "/" (cadr entry)))
+                       (ab (sampler:buffer path 0.0)))
+                  (if (and ab (sampler:add-region
+                                bank path
+                                `((lokey ,(car entry)) (hikey ,(car entry))
+                                  (pitch_keycenter ,(car entry))
+                                  (loop_mode 1)
+                                  ;; some recordings (the kicks) have up to
+                                  ;; 15 ms of silence before the hit, which
+                                  ;; would make them late: start just before it
+                                  (offset ,(sampler_buffer_onset ab 0.05))
+                                  ,@(cddr entry))))
+                      (set! count (+ count 1)))))
+              *drumkit:map*)
+            (sampler:report 'drumkit (- (clock:clock) start) count '() '()))))))

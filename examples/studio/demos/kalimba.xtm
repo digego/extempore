@@ -1,0 +1,35 @@
+;;; kalimba.xtm -- a tour of the kalimba's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/kalimba.xtm /tmp/kalimba.wav 29
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'kalimba 'kalimba)
+(score-ctl 0 'kalimba 'reverb 0.15)
+
+;; the phrase, a note every 0.2 seconds
+(define kalimba-demo-notes '(60 64 67 69 72 69 67 64))
+
+(define kalimba-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes kalimba-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.2)) 'kalimba (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.3)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'kalimba)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'kalimba (car names))
+        (kalimba-demo-phrase start)
+        (kalimba-demo-phrase (+ start 2.5))
+        (loop (+ start 5) (cdr names)))))
+
+(score-end)

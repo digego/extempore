@@ -1,0 +1,53 @@
+;;; pizzicato.xtm -- a double bass, plucked
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A double bass played pizzicato (plucked), in two rotating takes per
+;; note, so repeated notes don't sound mechanical. Good for walking bass
+;; lines.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Studios Chamber Orchestra, Community Edition (VSCO 2 CE).
+;; They live in assets/studio/VSCO-2-CE, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-pizzicato)
+(define *xtmlib-studio-pizzicato-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument pizzicato
+  "a sampled double bass, pizzicato (VSCO 2 CE)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.6 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 20.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 1.6 "output level"))
+  (presets
+    (plucked)
+    (ringing (release 1.5))
+    (muted (length 0.25) (release 0.1))
+    (soft (hardness -0.5) (dynamics 14.0))
+    (high (tune 12.0))))
+
+(bind-func pizzicato_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "pizzicato" 32 (pizzicato_nparams))))
+      (pizzicato_defaults (inst_params inst))
+      inst)))
+
+(define pizzicato-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'pizzicato "VSCO-2-CE/ContrabassPizz.sfz")))

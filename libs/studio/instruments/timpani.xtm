@@ -1,0 +1,53 @@
+;;; timpani.xtm -- orchestral timpani
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Orchestral timpani, single strokes in two rotating takes. The drums
+;; ring long, so a released note fades slowly (3 seconds to fade 60 dB);
+;; the damped preset stops them short, as a timpanist's hand does.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Studios Chamber Orchestra, Community Edition (VSCO 2 CE).
+;; They live in assets/studio/VSCO-2-CE, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-timpani)
+(define *xtmlib-studio-timpani-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument timpani
+  "sampled orchestral timpani (VSCO 2 CE)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 3.0 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 24.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.9 "output level"))
+  (presets
+    (orchestral)
+    (damped (length 0.4) (release 0.2))
+    (soft (hardness -0.5) (dynamics 16.0))
+    (deep (tune -5.0))
+    (thunder (tune -12.0) (dynamics 12.0))))
+
+(bind-func timpani_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "timpani" 32 (timpani_nparams))))
+      (timpani_defaults (inst_params inst))
+      inst)))
+
+(define timpani-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'timpani "VSCO-2-CE/Timpani.sfz")))

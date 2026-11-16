@@ -1,0 +1,35 @@
+;;; glockenspiel.xtm -- a tour of the glockenspiel's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/glockenspiel.xtm /tmp/glockenspiel.wav 29
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'glockenspiel 'glockenspiel)
+(score-ctl 0 'glockenspiel 'reverb 0.15)
+
+;; the phrase, a note every 0.22 seconds
+(define glockenspiel-demo-notes '(72 76 79 84 79 76 74 71))
+
+(define glockenspiel-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes glockenspiel-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.22)) 'glockenspiel (+ -12 (car notes))
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.2)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'glockenspiel)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'glockenspiel (car names))
+        (glockenspiel-demo-phrase start)
+        (glockenspiel-demo-phrase (+ start 2.5))
+        (loop (+ start 5) (cdr names)))))
+
+(score-end)

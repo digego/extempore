@@ -1,0 +1,42 @@
+;;; kit808s.xtm -- a tour of the sampled 808's presets
+
+;; Each preset plays two bars of an electro beat: the long 808 kick, claps
+;; and snare, closed hi-hats with an open one choked by the next, a
+;; cowbell, toms, and the cymbal to finish.
+;;
+;;   extras/studio/render examples/studio/demos/kit808s.xtm /tmp/kit808s.wav 30
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'drums 'kit808s)
+(score-ctl 0 'drums 'reverb 0.08)
+
+;; sixteen sixteenths at 120 bpm: (step sound velocity)
+(define kit808s-demo-bar1
+  '((0 bd 1.0) (6 bd 0.8) (10 bd 0.9) (4 cp 0.9) (12 cp 0.9) (12 sd 0.6)
+    (0 hh 0.8) (2 hh 0.6) (4 hh 0.8) (6 oh 0.6) (8 hh 0.8) (10 hh 0.6) (11 hh 0.4) (12 hh 0.8) (14 oh 0.6)
+    (3 cb 0.6) (9 cb 0.5)))
+
+(define kit808s-demo-bar2
+  '((0 bd 1.0) (6 bd 0.8) (4 cp 0.9) (12 sd 0.9) (13 sd 0.5)
+    (0 hh 0.8) (2 hh 0.6) (4 hh 0.8) (6 hh 0.6) (8 hh 0.8)
+    (8 ht 0.8) (10 mt 0.8) (12 lt 0.9) (14 lt 0.7) (15 rs 0.7) (0 cr 0.5)))
+
+(define kit808s-demo-bar
+  (lambda (start hits)
+    (for-each (lambda (hit)
+                (score-note (+ start (* 0.125 (car hit))) 'drums
+                            (cadr (assq (cadr hit) (studio:instrument-sounds 'kit808s)))
+                            (caddr hit) 0.1))
+              hits)))
+
+(let loop ((start 0.0) (names (presets 'drums)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'drums (car names))
+        (kit808s-demo-bar start kit808s-demo-bar1)
+        (kit808s-demo-bar (+ start 2.0) kit808s-demo-bar2)
+        (loop (+ start 4.5) (cdr names)))))
+
+(score-end)

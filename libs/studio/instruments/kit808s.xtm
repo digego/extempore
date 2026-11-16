@@ -1,0 +1,110 @@
+;;; kit808s.xtm -- a sampled Roland TR-808
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Recordings of a Roland TR-808 drum machine, from Extempore's assets
+;; download (assets/samples/808), one file per sound, named by MIDI note.
+;; The folder has no notes on what each one is, so the names below come
+;; from measuring them: the 808 kick is a decaying sine near 50 Hz, its
+;; snare a pair of tones near 180 and 330 Hz under noise, its toms falling
+;; sines from 65 to 260 Hz with a puff of noise, its congas the same sines
+;; without the noise, its cowbell two square waves near 540 and 800 Hz,
+;; and its hats and cymbal six detuned square waves through a band-pass,
+;; which puts nearly all their energy above 5 kHz.
+;;
+;; The files follow General MIDI loosely. Where they don't, the kit plays
+;; the right sound on the standard key: the toms are on 41, 43 and 45 in
+;; the folder and are moved to lt 45, mt 47 and ht 50, and the cowbell
+;; moves from 61 to cb 56. The 808 has no ride cymbal, so there is no rd.
+;; Every other file stays on its own key, so the congas, claves, maracas
+;; and the long, booming kicks (53 and 66) are there to play too.
+;;
+;; Every sound is a one-shot, and the closed hi-hat chokes the open one.
+;; The 808's own decay knobs are the length parameter here: it fades every
+;; sound out after that many seconds.
+;;
+;; Without the assets folder the kit prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-kit808s)
+(define *xtmlib-studio-kit808s-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument kit808s
+  "a sampled Roland TR-808 drum machine"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.0005 "seconds to fade in")
+    (release 0.04 "seconds to fade by 60 dB once a hit is cut short by length")
+    (tune 0.0 "transpose every sound, in semitones")
+    (dynamics 20.0 "how much quieter a soft hit is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "unused: there is one recording of each sound")
+    (length 0.0 "seconds after which every hit fades out (0.0: let it ring)")
+    (level 0.3 "output level"))
+  (presets
+    (classic)
+    (tight (length 0.12))
+    (low (tune -4.0))
+    (high (tune 4.0) (length 0.3))
+    (boom (tune -2.0) (release 0.3) (dynamics 12.0))
+    (dynamic (dynamics 36.0) (level 0.35)))
+  (sounds
+    (bd 36) (rs 37) (sd 38) (cp 39) (hh 42) (lt 45) (oh 46) (mt 47) (cr 49) (ht 50) (cb 56)
+    (sd2 40) (boom 53) (cg 48) (ma 51) (cl 63)))
+
+(bind-func kit808s_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "kit808s" 32 (kit808s_nparams))))
+      (kit808s_defaults (inst_params inst))
+      inst)))
+
+;;;;;;;;;;;;;;;;;;;;
+;; loading the kit ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; Keys whose sound comes from another file, and the hi-hats' choke group.
+;; Every other file plays on its own key.
+(define *kit808s:moved*
+  '((45 "41.aif")    ; low tom
+    (47 "43.aif")    ; mid tom
+    (50 "45.aif")    ; high tom
+    (56 "61.aif")))  ; cowbell
+
+(define *kit808s:extra*
+  '((42 (group 1))              ; closed hi-hat
+    (44 (group 1))              ; a second closed hi-hat
+    (46 (group 1) (off_by 1))   ; open hi-hat
+    (64 (group 1) (off_by 1)))) ; a second open hi-hat
+
+;; the level of each sound, in dB, to balance the kit
+(define *kit808s:volumes*
+  '((36 . 0) (37 . -6) (38 . -1) (39 . -1) (40 . -3) (42 . -2) (44 . -3) (46 . -7)
+    (49 . -9) (55 . -9) (56 . -4) (63 . -4) (64 . -7)))
+
+(define kit808s-setup
+  (lambda (inst)
+    (let ((dir (sampler:asset-folder 'kit808s "samples/808"))
+          (bank (sampler_bank inst))
+          (start (clock:clock)))
+      (if (and dir (sampler:check-params 'kit808s))
+          (let ((count 0))
+            (for-each
+              (lambda (kf)
+                (let* ((key (car kf))
+                       (moved (assv key *kit808s:moved*))
+                       (path (if moved (string-append dir "/" (cadr moved)) (cadr kf)))
+                       (extra (assv key *kit808s:extra*))
+                       (volume (assv key *kit808s:volumes*)))
+                  (if (sampler:add-region bank path
+                                          `((lokey ,key) (hikey ,key) (pitch_keycenter ,key)
+                                            (loop_mode 1)
+                                            (volume ,(if volume (cdr volume) -3))
+                                            ,@(if extra (cdr extra) '())))
+                      (set! count (+ count 1)))))
+              (sampler:numbered-files dir))
+            (sampler:report 'kit808s (- (clock:clock) start) count '() '()))))))

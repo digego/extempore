@@ -1,0 +1,35 @@
+;;; harp.xtm -- a tour of the harp's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/harp.xtm /tmp/harp.wav 40
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'harp 'harp)
+(score-ctl 0 'harp 'reverb 0.15)
+
+;; the phrase, a note every 0.15 seconds
+(define harp-demo-notes '(48 55 60 64 67 72 76 79))
+
+(define harp-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes harp-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.15)) 'harp (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 1.2)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'harp)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'harp (car names))
+        (harp-demo-phrase start)
+        (harp-demo-phrase (+ start 3.0))
+        (loop (+ start 6) (cdr names)))))
+
+(score-end)

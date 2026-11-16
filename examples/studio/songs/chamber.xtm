@@ -1,0 +1,64 @@
+;;; chamber.xtm -- harp, strings, flute and timpani
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Sampled orchestral instruments: a harp plays broken chords, the violins
+;; hold the harmony, a flute has the tune, the basses play pizzicato and the
+;; timpani arrive for the ending. D major, slow.
+;;
+;; This piece needs the sample libraries in the assets folder.
+;;
+;;   extras/studio/render examples/studio/songs/chamber.xtm /tmp/chamber.wav 60
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(cps 0.3)
+
+(track 'harp 'harp)
+(track 'violins 'violins)
+(track 'flute 'flute)
+(track 'basses 'pizzicato)
+(track 'timpani 'timpani)
+
+(ctl 'harp 'gain 0.85 'reverb 0.35 'pan 0.3)
+(ctl 'violins 'gain 0.55 'reverb 0.4 'pan 0.45)
+(ctl 'flute 'gain 0.3 'reverb 0.4 'pan 0.6)
+(ctl 'basses 'gain 1.4 'reverb 0.3 'pan 0.65)
+(ctl 'timpani 'gain 0.9 'reverb 0.4)
+(master 'reverb-size 0.85 'reverb-damping 0.4 'reverb-predelay 0.03)
+
+;; D, B minor, G and A: each <...> is one voice
+(define chamber-chords '#(<d3 b2 g2 a2> <f#3 d3 b2 c#3> <a3 f#3 d3 e3> <d4 b3 g3 a3> <f#4 d4 b3 c#4>))
+
+;; the harp plays each chord from the bottom up and back down
+(score-pattern 0 16 (note chamber-chords) (arp 8) (sound 'harp)
+               (every 2 (within 1/2 1 rev)) (vel (between 0.45 0.7 (slow 4 sine))) (legato 2))
+
+;; the violins come in with the upper three notes of each chord, held
+(score-pattern 4 16 (note '#(<a3 f#3 d3 e3> <d4 b3 g3 a3> <f#4 d4 b3 c#4>)) (add (note 12))
+               (sound 'violins) (vel 0.5) (legato 1.0))
+
+;; pizzicato basses on the roots: beats one and three
+(score-pattern 4 16 (note '(<d2 b1 g1 a1> ~ <a1 f#1 d2 e2> ~)) (sound 'basses) (vel 0.7))
+
+;; the flute's tune, eight cycles long
+(score-pattern 8 16
+               (note '(<(f#5 _ _ e5 d5 _ a5 _) (f#5 _ _ _ d5 _ _ _) (b5 _ _ a5 g5 _ d5 _) (e5 _ _ _ c#5 _ _ _)
+                        (d5 _ e5 f#5 a5 _ d6 _) (b5 _ _ a5 f#5 _ _ _) (g5 _ a5 b5 d6 _ b5 _) (a5 _ _ _ _ _ _ _)>))
+               (sound 'flute) (vel 0.65) (legato 1.0))
+
+;; timpani for the last two cycles, and the final chord
+(score-pattern 14 16 (note '(<(a2 ~ ~ a2) (a2 a2 a2 a2*2)>)) (sound 'timpani) (vel (between 0.4 0.9 (slow 2 saw))))
+(score-pattern 16 17 (note 'd2) (sound 'timpani) (vel 0.9))
+(score-pattern 16 17 (note '#(d2 a2 d3 f#3 a3 d4 f#4 a4 d5)) (sound 'harp) (strum 0.03) (vel 0.75) (legato 3))
+(score-pattern 16 17 (note '#(f#4 a4 d5)) (sound 'violins) (vel 0.6) (legato 1.5))
+(score-pattern 16 17 (note 'd6) (sound 'flute) (vel 0.6) (legato 1.5))
+(score-pattern 16 17 (note 'd1) (sound 'basses) (vel 0.8))
+
+(score-end)

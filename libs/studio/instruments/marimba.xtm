@@ -1,0 +1,54 @@
+;;; marimba.xtm -- a rosewood marimba
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A marimba recorded at several dynamics across its range. Its bars ring
+;; only briefly, so the release barely matters: each note is mostly the
+;; strike and the tube's resonance.
+;;
+;; The samples are CC0 (public domain), from
+;; the Versilian Community Sample Library (VCSL).
+;; They live in assets/studio/VCSL, and this
+;; file is a thin wrapper which loads the library's SFZ file into a
+;; sampler (libs/studio/sampler.xtm): the SFZ says which recording plays
+;; on each key and velocity. Without the assets folder the instrument
+;; prints where it looked, and is silent.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-marimba)
+(define *xtmlib-studio-marimba-loaded* #t)
+
+(sys:load "libs/studio/sampler.xtm")
+
+(def-instrument marimba
+  "a sampled marimba (VCSL)"
+  ;; the engine reads these seven by position (see *sampler:params*)
+  (params
+    (attack 0.002 "seconds to fade in")
+    (release 0.4 "seconds for a released note to fade by 60 dB")
+    (tune 0.0 "transpose, in semitones")
+    (dynamics 24.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
+    (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
+    (length 0.0 "seconds after which every note fades out (0.0: no limit)")
+    (level 0.6 "output level"))
+  (presets
+    (rosewood)
+    (soft (hardness -0.4) (dynamics 16.0))
+    (hard (hardness 0.4))
+    (short (length 0.2) (release 0.08))
+    (high (tune 12.0))
+    (low (tune -12.0))))
+
+(bind-func marimba_make
+  (lambda ()
+    (let ((inst (sampler_inst_make "marimba" 32 (marimba_nparams))))
+      (marimba_defaults (inst_params inst))
+      inst)))
+
+(define marimba-setup
+  (lambda (inst)
+    (sampler:setup-sfz inst 'marimba "VCSL/Idiophones/Struck Idiophones/Marimba.sfz")))

@@ -1,0 +1,45 @@
+;;; piano.xtm -- a tour of the piano's presets
+
+;; Each preset plays the same four bars: a bass note and a broken chord in
+;; each, with the notes held over as if the sustain pedal were down, so you
+;; can hear the release and the velocity layers. The first load reads about
+;; 220 MB of samples, which takes a few seconds.
+;;
+;;   extras/studio/render examples/studio/demos/piano.xtm /tmp/piano.wav 44
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'keys 'piano)
+(score-ctl 0 'keys 'reverb 0.2)
+
+;; (bass chord): C, A minor, F, G
+(define piano-demo-bars
+  '((36 (60 64 67 72)) (45 (60 64 69 72)) (41 (60 65 69 72)) (43 (59 62 67 74))))
+
+(define piano-demo-phrase
+  (lambda (start)
+    (let loop ((bars piano-demo-bars) (t start))
+      (if (pair? bars)
+          (let ((bass (car (car bars)))
+                (chord (cadr (car bars))))
+            ;; the bass note held for the whole bar, then the chord rising,
+            ;; louder towards the top, each note held to the end of the bar
+            (score-note t 'keys bass 0.75 1.2)
+            (score-note t 'keys (+ bass 12) 0.55 1.2)
+            (let chord-loop ((ns chord) (i 0))
+              (if (pair? ns)
+                  (begin
+                    (score-note (+ t 0.15 (* i 0.15)) 'keys (car ns) (+ 0.35 (* 0.15 i))
+                                (- 1.15 (* i 0.15)))
+                    (chord-loop (cdr ns) (+ i 1)))))
+            (loop (cdr bars) (+ t 1.2)))))))
+
+(let loop ((start 0.0) (names (presets 'keys)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'keys (car names))
+        (piano-demo-phrase start)
+        (loop (+ start 6.0) (cdr names)))))
+
+(score-end)

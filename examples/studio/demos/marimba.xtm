@@ -1,0 +1,35 @@
+;;; marimba.xtm -- a tour of the marimba's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/marimba.xtm /tmp/marimba.wav 28
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'marimba 'marimba)
+(score-ctl 0 'marimba 'reverb 0.15)
+
+;; the phrase, a note every 0.18 seconds
+(define marimba-demo-notes '(60 64 67 72 71 67 64 62))
+
+(define marimba-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes marimba-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.18)) 'marimba (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.2)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'marimba)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'marimba (car names))
+        (marimba-demo-phrase start)
+        (marimba-demo-phrase (+ start 2.0))
+        (loop (+ start 4.0) (cdr names)))))
+
+(score-end)

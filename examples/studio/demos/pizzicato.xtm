@@ -1,0 +1,35 @@
+;;; pizzicato.xtm -- a tour of the pizzicato's presets
+
+;; Evaluate the whole file to hear each preset play the same phrase, or
+;; render it to a file:
+;;
+;;   extras/studio/render examples/studio/demos/pizzicato.xtm /tmp/pizzicato.wav 39
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'pizzicato 'pizzicato)
+(score-ctl 0 'pizzicato 'reverb 0.15)
+
+;; the phrase, a note every 0.35 seconds
+(define pizzicato-demo-notes '(36 40 43 45 46 45 43 40))
+
+(define pizzicato-demo-phrase
+  (lambda (start)
+    (let loop ((i 0) (notes pizzicato-demo-notes))
+      (if (pair? notes)
+          (begin
+            (score-note (+ start (* i 0.35)) 'pizzicato (car notes)
+                        (+ 0.6 (* 0.4 (/ (modulo (* i 5) 8) 7.0))) 0.3)
+            (loop (+ i 1) (cdr notes)))))))
+
+;; the phrase twice for each preset
+(let loop ((start 0.0) (names (presets 'pizzicato)))
+  (if (pair? names)
+      (begin
+        (score-preset start 'pizzicato (car names))
+        (pizzicato-demo-phrase start)
+        (pizzicato-demo-phrase (+ start 3.5))
+        (loop (+ start 7) (cdr names)))))
+
+(score-end)
