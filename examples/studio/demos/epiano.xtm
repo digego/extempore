@@ -1,0 +1,95 @@
+;;; epiano.xtm -- a tour of the electric piano's presets
+
+;; Evaluate the whole file to hear each preset in turn, or render it to a
+;; file:
+;;
+;;   extras/studio/render examples/studio/demos/epiano.xtm /tmp/epiano.wav 50
+;;
+;; Listen for the touch. Soft notes are round and bell-like; hard ones bark,
+;; and the bark fades as each note dies away.
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(track 'keys 'epiano)
+(score-ctl 0 'keys 'reverb 0.12)
+
+;; a phrase is a list of (beat pitches velocity beats), where pitches is a
+;; MIDI note or a list of them (a chord)
+(define epiano-demo-beat 0.6)
+
+(define epiano-demo-play
+  (lambda (start phrase)
+    (for-each (lambda (event)
+                (let ((t (+ start (* epiano-demo-beat (car event))))
+                      (pitches (cadr event))
+                      (vel (caddr event))
+                      (dur (* epiano-demo-beat (cadddr event))))
+                  (for-each (lambda (pitch) (score-note t 'keys pitch vel dur))
+                            (if (list? pitches) pitches (list pitches)))))
+              phrase)))
+
+;; suitcase: neo-soul chords, played softly then digging in, with a line on top
+(define epiano-demo-suitcase
+  '((0 (41 52 55 57 60) 0.45 3.8) (2.5 67 0.5 0.5) (3 69 0.55 1)
+    (4 (40 50 55 59 62) 0.6 3.8) (6.5 71 0.6 0.5) (7 72 0.75 1)
+    (8 (38 48 53 57 60) 0.8 3.8) (9 74 0.85 0.5) (9.5 72 0.7 0.5) (10 69 0.6 2)))
+
+;; stage: a funky comping figure; the accents bark
+(define epiano-demo-stage
+  '((0 (52 55 59 62) 0.95 0.4) (0.75 (52 55 59 62) 0.45 0.2) (1.5 (52 55 59 62) 0.7 0.4)
+    (2.5 (53 57 60 64) 1.0 0.8) (3.5 (52 55 59 62) 0.5 0.4)
+    (4 (52 55 59 62) 0.95 0.4) (4.75 (52 55 59 62) 0.45 0.2) (5.5 (52 55 59 62) 0.7 0.4)
+    (6.5 (50 53 57 60) 1.0 0.8) (7.5 (48 52 55 59) 0.8 2.0)
+    (0 40 0.9 1.5) (2.5 41 0.9 1) (4 40 0.9 1.5) (6.5 38 0.9 1) (7.5 36 0.9 2)))
+
+;; bark: hard low voicings and a growling riff
+(define epiano-demo-bark
+  '((0 (38 45 48 53) 1.0 1.5) (2 (36 43 46 52) 0.95 1.5)
+    (4 50 1.0 0.5) (4.5 53 0.8 0.5) (5 55 1.0 0.5) (5.5 56 0.7 0.25) (5.75 57 1.0 0.75)
+    (6.5 55 0.8 0.5) (7 53 0.95 0.5) (7.5 50 1.0 1.5)
+    (8 (38 45 48 53) 1.0 3)))
+
+;; dyno: bright arpeggios high on the keyboard, where the bell rings out
+(define epiano-demo-dyno
+  '((0 72 0.7 0.5) (0.5 76 0.6 0.5) (1 79 0.75 0.5) (1.5 83 0.6 0.5) (2 84 0.8 1.5)
+    (4 74 0.7 0.5) (4.5 77 0.6 0.5) (5 81 0.75 0.5) (5.5 84 0.6 0.5) (6 86 0.85 1.5)
+    (0 (48 55 64 71) 0.55 3.5) (4 (50 57 65 72) 0.55 3.5)
+    (8 (79 84 88 91) 0.55 3)))
+
+;; ballad: soft, wide chords and a slow melody
+(define epiano-demo-ballad
+  '((0 (36 43 52 59 64) 0.35 3.8) (1 67 0.4 1) (2 64 0.35 1) (3 62 0.4 1)
+    (4 (33 40 52 55 60) 0.3 3.8) (5 64 0.45 2) (7 60 0.35 1)
+    (8 (29 41 52 57 60) 0.4 3.8) (9 62 0.5 3)))
+
+;; phased: slow sustained chords under the sweep
+(define epiano-demo-phased
+  '((0 (45 52 55 60 64) 0.6 3.8) (4 (43 50 53 57 62) 0.6 3.8)
+    (8 (41 48 52 57 60) 0.65 3.5)
+    (2 76 0.55 2) (6 74 0.6 2) (8 72 0.7 3)))
+
+;; wurly: a bluesy riff on the reed piano
+(define epiano-demo-wurly
+  '((0 (55 58 62) 0.9 0.4) (0.5 (55 58 62) 0.5 0.4) (1 (55 59 62) 0.85 0.4) (1.5 (55 58 62) 0.5 0.9)
+    (2.5 (55 60 64) 0.95 0.9) (3.5 (55 59 62) 0.6 0.5)
+    (4 (53 57 60) 0.9 0.4) (4.5 (53 57 60) 0.5 0.4) (5 (53 57 60) 0.85 0.9)
+    (6 67 0.8 0.5) (6.5 70 0.9 0.5) (7 67 0.6 0.5) (7.5 65 0.8 0.5) (8 (55 58 62 67) 1.0 2.5)
+    (0 43 0.8 1.5) (2.5 43 0.8 1) (4 41 0.8 1.5) (6 43 0.7 2) (8 43 0.8 2.5)))
+
+;; each preset gets eight seconds
+(let loop ((start 0.0)
+           (tour (list (cons 'suitcase epiano-demo-suitcase)
+                       (cons 'stage epiano-demo-stage)
+                       (cons 'bark epiano-demo-bark)
+                       (cons 'dyno epiano-demo-dyno)
+                       (cons 'ballad epiano-demo-ballad)
+                       (cons 'phased epiano-demo-phased)
+                       (cons 'wurly epiano-demo-wurly))))
+  (if (pair? tour)
+      (begin
+        (score-preset start 'keys (car (car tour)))
+        (epiano-demo-play start (cdr (car tour)))
+        (loop (+ start 8.0) (cdr tour)))))
+
+(score-end)

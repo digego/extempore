@@ -154,9 +154,9 @@ other side (ping-pong)"
         (set! lp_l (+ (* (- 1.0 damp) l) (* damp lp_l)))
         (set! lp_r (+ (* (- 1.0 damp) r) (* damp lp_r)))
         (set! fb (clamp feedback 0.0 0.95))
-        (dl_write line_l (+ (pref in 0) (* cross (pref in 1))
+        (dl_write line_l (+ (pref in 0) (* cross (pref in 1)) 1.0e-18
                             (* fb (+ (* (- 1.0 cross) lp_l) (* cross lp_r)))))
-        (dl_write line_r (+ (* (- 1.0 cross) (pref in 1))
+        (dl_write line_r (+ (* (- 1.0 cross) (pref in 1)) 1.0e-18
                             (* fb (+ (* (- 1.0 cross) lp_r) (* cross lp_l)))))
         (pset! out 0 lp_l)
         (pset! out 1 lp_r)
@@ -223,8 +223,10 @@ to `out`.
         (set! x (dl_allpass in3 x 0.625))
         (set! x (dl_allpass in4 x 0.625))
         ;; each half of the tank is fed by the input and by the other half
-        (set! tank_l (+ x (* decay (plate_tap del_r2 3163.0))))
-        (set! tank_r (+ x (* decay (plate_tap del_l2 3720.0))))
+        ;; (the tiny constant keeps the tank out of denormal numbers, which
+        ;; are very slow, as it decays to silence)
+        (set! tank_l (+ x 1.0e-18 (* decay (plate_tap del_r2 3163.0))))
+        (set! tank_r (+ x 1.0e-18 (* decay (plate_tap del_l2 3720.0))))
         (set! phase (+ phase phase_inc))
         (if (> phase STWOPI) (set! phase (- phase STWOPI)))
         ;; left half

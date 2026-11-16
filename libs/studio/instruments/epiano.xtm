@@ -1,0 +1,412 @@
+;;; epiano.xtm -- an electric piano: struck tines or reeds through a pickup
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; An electric piano in the style of the Fender Rhodes, with a Wurlitzer-style
+;; reed piano as a variant.
+;;
+;; In a Rhodes, a felt-tipped hammer strikes a thin steel rod, the tine, which
+;; is fixed at one end. The tine rings mostly at its fundamental. Its second
+;; bending mode, about seven times higher and not a whole multiple of the
+;; fundamental, rings too, but only for a fraction of a second: that's the
+;; glassy "bell" at the start of a note. Low tines ring for many seconds, high
+;; ones for much less.
+;;
+;; Most of the character comes from the pickup. The tip of the tine swings
+;; past a small magnetic pickup, and the magnetic flux through the coil
+;; depends on how far the tip is from the pickup's axis, along a bell-shaped
+;; curve. The coil's voltage follows the rate of change of that flux. A soft
+;; note moves the tip only a little way along the curve, which is nearly
+;; straight there, so the note is nearly a sine. A hard note swings the tip
+;; across the curve's peak and down the other side, which folds the waveform
+;; and adds strong harmonics: the "bark" of a Rhodes played hard. As the note
+;; decays the swing shrinks, so the harmonics fade before the fundamental
+;; does. How far the pickup sits off the tine's axis decides which harmonics
+;; come out: close to the axis gives a hollow sound heavy in even harmonics
+;; (the octave), further off a rounder one.
+;;
+;; A Wurlitzer has a steel reed instead of a tine, and an electrostatic
+;; pickup: the reed is one plate of a capacitor and swings towards and away
+;; from the other. The capacitance goes as one over the gap, so the reed's
+;; swing towards the plate counts for more than its swing away, and the
+;; result is reedier and more nasal. The `reed` parameter moves between the
+;; two pickups.
+;;
+;; Each voice here is a small physically-informed model: two decaying sine
+;; waves for the tine's two modes, the first passed through the pickup's
+;; curve, plus a short burst of filtered noise for the hammer's thump and the
+;; damper's thunk. The instrument's effect is the amplifier: tone controls, a
+;; little saturation, a phaser, and the stereo tremolo of the Rhodes suitcase
+;; model, which pans the sound between its two speakers.
+;;
+;; This is an original implementation, built from published descriptions of
+;; how these instruments work.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-epiano)
+(define *xtmlib-studio-epiano-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+(def-instrument epiano
+  "an electric piano: struck tines (or reeds) through a pickup, with suitcase tremolo"
+  (params
+    (bark 0.4 "how far a hard-struck tine swings across the pickup, 0.0 to 1.0: more is more growl")
+    (pickup 0.4 "how far the pickup sits off the tine's axis, 0.0 to 1.0: low is hollow, high is round")
+    (bell 0.4 "level of the bell partial at the start of each note, 0.0 to 1.0")
+    (decay 5.0 "seconds for a held middle C to fade by 60 dB (lower notes ring longer)")
+    (release 0.2 "seconds for the damper to silence a released note (by 60 dB)")
+    (thump 0.5 "hammer and damper noise, 0.0 to 1.0")
+    (reed 0.0 "0.0 is a tine piano (Rhodes), 1.0 a reed piano (Wurlitzer)")
+    (bass 2.0 "bass tone control in dB, -12.0 to 12.0")
+    (treble 0.0 "treble tone control in dB, -12.0 to 12.0")
+    (drive 0.2 "amplifier saturation, 0.0 to 1.0")
+    (trem-rate 4.5 "tremolo rate in Hz")
+    (trem-depth 0.45 "tremolo depth, 0.0 to 1.0")
+    (trem-stereo 1.0 "0.0 is a mono tremolo, 1.0 pans between the two speakers")
+    (phaser 0.0 "phaser depth, 0.0 to 1.0")
+    (phaser-rate 0.4 "phaser sweep rate in Hz")
+    (level 0.19 "output level"))
+  (presets
+    (suitcase)
+    (stage (bark 0.5) (drive 0.3) (bass 0.0) (treble 1.5) (trem-depth 0.0) (level 0.23))
+    (bark (bark 0.8) (pickup 0.3) (bell 0.3) (bass 1.0) (treble 3.0) (drive 0.55) (trem-depth 0.0)
+          (level 0.24))
+    (dyno (bell 0.9) (bark 0.25) (pickup 0.7) (bass -2.0) (treble 6.0) (decay 4.0)
+          (trem-depth 0.25) (trem-rate 5.5) (level 0.18))
+    (ballad (bark 0.15) (bell 0.2) (thump 0.3) (bass 3.0) (treble -6.0) (drive 0.1)
+            (decay 6.5) (release 0.3) (trem-depth 0.3) (trem-rate 2.8) (level 0.24))
+    (phased (bark 0.45) (trem-depth 0.0) (phaser 0.7) (phaser-rate 0.35) (level 0.25))
+    (wurly (reed 1.0) (bark 0.45) (bell 0.15) (decay 2.5) (bass 0.0) (drive 0.4)
+           (trem-depth 0.5) (trem-rate 5.5) (trem-stereo 0.0) (level 0.29))))
+
+;;;;;;;;;;;;;;;;;
+;; the pickups ;;
+;;;;;;;;;;;;;;;;;
+
+;; The tine pickup's flux, as a function of where the tine's tip is (u, in
+;; units of the pickup's width, 0.0 on its axis). It is largest on the axis and
+;; falls away on either side. Its steepest slope is 0.65, at u = 0.577.
+(bind-func static epiano_tine_flux
+  (lambda (u:SAMPLE)
+    (/ 1.0 (+ 1.0 (* u u)))))
+
+;; The reed pickup's capacitance, with the reed at x (0.0 at rest, 1.0 most
+;; of the way to the plate). It goes as one over the gap, which is never
+;; allowed to close completely. Its slope at rest is 0.8.
+(bind-func static epiano_reed_charge
+  (lambda (x:SAMPLE)
+    (let ((gap:SAMPLE (- 1.0 (* 0.8 x))))
+      (/ 1.0 (if (< gap 0.2) 0.2 gap)))))
+
+;;;;;;;;;;;;;;;
+;; the voice ;;
+;;;;;;;;;;;;;;;
+
+(bind-func epiano_voice_c
+  (lambda (p:SAMPLE*)
+    (let (;; the tine's fundamental and its bell mode, each a phasor (c, s)
+          ;; turned by a fixed rotation (rc, rs) every frame
+          (c:SAMPLE 1.0) (s:SAMPLE 0.0) (rc:SAMPLE 1.0) (rs:SAMPLE 0.0)
+          (bc:SAMPLE 1.0) (bs:SAMPLE 0.0) (brc:SAMPLE 1.0) (brs:SAMPLE 0.0)
+          (tmp:SAMPLE 0.0)
+          ;; how far the tine swings (1.0 at full velocity), and the bell's level
+          (amp:SAMPLE 0.0) (amp_peak:SAMPLE 0.0) (amp_mult:SAMPLE 1.0)
+          (bell:SAMPLE 0.0) (bell_peak:SAMPLE 0.0) (bell_mult:SAMPLE 1.0) (bell_t60:SAMPLE 0.5)
+          (attack:SAMPLE 0.0) (attack_frames:i64 0)
+          (t60:SAMPLE 5.0) (fast:SAMPLE 1.0) (damp:SAMPLE 1.0)
+          (released:i1 #f) (fresh:i1 #t)
+          ;; the pickup
+          (offset:SAMPLE 0.35) (offset_target:SAMPLE 0.35)
+          (swing:SAMPLE 1.0) (swing_target:SAMPLE 1.0)
+          (reed:SAMPLE 0.0) (reed_target:SAMPLE 0.0) (slope:SAMPLE 1.0)
+          (x:SAMPLE 0.0) (u:SAMPLE 0.0) (flux:SAMPLE 0.0) (last_flux:SAMPLE 0.0)
+          (diff_gain:SAMPLE 1.0) (gain:SAMPLE 1.0) (gain_target:SAMPLE 1.0)
+          (key_drive:SAMPLE 1.0) (vel_amp:SAMPLE 1.0)
+          (freq:SAMPLE 261.6) (bell_freq:SAMPLE 1800.0) (key:SAMPLE 0.0)
+          ;; noise through a bandpass for the hammer and damper, as a
+          ;; state-variable filter (g, k) with state (ic1, ic2)
+          (noise:SAMPLE 0.0) (noise_mult:SAMPLE 0.0)
+          (ng:SAMPLE 0.1) (nk:SAMPLE 1.4) (na1:SAMPLE 0.0) (na2:SAMPLE 0.0) (na3:SAMPLE 0.0)
+          (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0) (v1:SAMPLE 0.0) (v2:SAMPLE 0.0) (v3:SAMPLE 0.0)
+          (rnd:SAMPLE 0.0)
+          (y:SAMPLE 0.0)
+          (smooth (smoothing_coeff 0.005)))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              (set! freq (voice_freq v))
+              (set! key (- (voice_pitch v) 60.0))
+              (set! rc (cos (* STWOPI (/ freq SRf))))
+              (set! rs (sin (* STWOPI (/ freq SRf))))
+              ;; the bell mode sits about seven times above the fundamental,
+              ;; a little lower for a reed. Above about 0.45 of the sample
+              ;; rate it can't be played without aliasing, so it fades out.
+              (set! bell_freq (* freq (- 7.0 (* 0.01 key) (* 0.7 (epiano_reed p)))))
+              (set! brc (cos (* STWOPI (/ bell_freq SRf))))
+              (set! brs (sin (* STWOPI (/ bell_freq SRf))))
+              ;; the phasors keep turning from where they were, so a stolen
+              ;; voice changes pitch without a jump in the tine's position
+              (set! fresh (< amp 0.0001))
+              (if fresh
+                  (begin (set! c 1.0) (set! s 0.0) (set! bc 1.0) (set! bs 0.0)))
+              ;; harder notes swing further. High tines are short and stiff and
+              ;; swing less, which also keeps their harmonics below Nyquist.
+              (set! vel_amp (pow (voice_vel v) 1.5))
+              (set! key_drive (if (> key 12.0) (pow 2.0 (/ (- 12.0 key) 12.0)) 1.0))
+              (set! amp_peak (* vel_amp key_drive))
+              ;; the bell is excited more by a hard, short hammer blow, and is
+              ;; quieter on the short tines at the top
+              (set! tmp (/ (- (* 0.45 SRf) bell_freq) (* 0.05 SRf)))
+              (set! bell_peak (* (epiano_bell p) vel_amp (voice_vel v) (clamp tmp 0.0 1.0)))
+              (if (> key 12.0) (set! bell_peak (* bell_peak (pow 2.0 (/ (- 12.0 key) 24.0)))))
+              (set! bell_t60 (* 0.5 (pow 2.0 (/ key -24.0))))
+              ;; a harder blow is a shorter one, so the attack is quicker
+              (set! tmp (- 0.004 (* 0.003 (voice_vel v))))
+              (set! attack (- 1.0 (exp (/ -1.0 (* tmp SRf)))))
+              (set! attack_frames (convert (* 5.0 tmp SRf) i64))
+              (set! released #f)
+              ;; the pickup output is the derivative of the flux, which grows
+              ;; with frequency: undo that (the first difference of a sine at
+              ;; freq has amplitude 2 sin(pi freq / SR)), then make up for the
+              ;; smaller swing of high notes. High notes also decay fast and
+              ;; have few harmonics, so they get up to 4 dB more level to
+              ;; stay balanced with the rest of the keyboard.
+              (set! diff_gain (/ 1.0 (* 2.0 (sin (* SPI (/ freq SRf))))))
+              (set! tmp (clamp key 0.0 24.0))
+              (set! gain_target (/ (pow 2.0 (/ tmp 36.0)) key_drive))
+              (if fresh (set! gain gain_target))
+              ;; the hammer's thump: a short burst of noise around the second harmonic
+              (set! noise (* 0.2 (epiano_thump p) (voice_vel v) (voice_vel v)))
+              (set! noise_mult (exp (/ -6.9 (* 0.012 SRf))))
+              (set! tmp (* 2.0 freq))
+              (set! ng (tan (* SPI (/ (clamp tmp 200.0 2000.0) SRf))))
+              (set! na1 (/ 1.0 (+ 1.0 (* ng (+ ng nk)))))
+              (set! na2 (* ng na1))
+              (set! na3 (* ng na2))))
+        ;; parameters, every 32 frames
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! reed_target (clamp (epiano_reed p) 0.0 1.0))
+              (set! offset_target (+ 0.2 (* 0.4 (clamp (epiano_pickup p) 0.0 1.0))))
+              (set! swing_target (+ 0.3 (* 1.7 (clamp (epiano_bark p) 0.0 1.0))))
+              ;; the pickups' slope at rest, used to keep soft notes at the same
+              ;; level whatever the pickup settings
+              (set! tmp (+ 1.0 (* offset_target offset_target)))
+              (set! slope (+ (* (- 1.0 reed_target) (/ (* 2.0 offset_target) (* tmp tmp)))
+                             (* reed_target 0.8 0.75)))
+              ;; Low notes ring longer. A struck tine also loses energy
+              ;; faster at first than once it has settled into ringing, so
+              ;; the decay starts three times as fast and slows over about a
+              ;; quarter of a second.
+              (set! t60 (* (clamp (epiano_decay p) 0.1 30.0) (pow 2.0 (/ key -20.0))))
+              (set! fast (+ 1.0 (* 2.0 (exp (/ (convert (voice_age v) SAMPLE) (* -0.25 SRf))))))
+              (set! damp (if released
+                             (exp (/ -6.9 (* (clamp (epiano_release p) 0.01 5.0) SRf)))
+                             1.0))
+              (set! amp_mult (* damp (exp (/ (* -6.9 fast) (* t60 SRf)))))
+              (set! bell_mult (* damp (exp (/ -6.9 (* bell_t60 SRf)))))))
+        ;; a voice which was silent takes up the pickup settings at once
+        (if (and fresh (voice_start? v))
+            (begin (set! offset offset_target) (set! swing swing_target) (set! reed reed_target)))
+        ;; the damper: when the key is let go, felt presses on the tine and
+        ;; stops it over a few tens of milliseconds, with a soft thunk
+        (if (and (< (voice_gate v) 0.5) (not released))
+            (begin
+              (set! released #t)
+              (set! tmp (exp (/ -6.9 (* (clamp (epiano_release p) 0.01 5.0) SRf))))
+              (set! amp_mult (* amp_mult tmp))
+              (set! bell_mult (* bell_mult tmp))
+              (set! noise (+ noise (* 0.05 (epiano_thump p) (sqrt amp))))
+              (set! noise_mult (exp (/ -6.9 (* 0.03 SRf))))
+              (set! tmp (* 0.5 freq))
+              (set! ng (tan (* SPI (/ (clamp tmp 80.0 400.0) SRf))))
+              (set! na1 (/ 1.0 (+ 1.0 (* ng (+ ng nk)))))
+              (set! na2 (* ng na1))
+              (set! na3 (* ng na2))))
+        ;; the tine's motion. Every 32 frames the phasors are pulled back to
+        ;; unit length, so rounding errors don't build up.
+        (set! tmp (- (* c rc) (* s rs)))
+        (set! s (+ (* s rc) (* c rs)))
+        (set! c tmp)
+        (if (= (% (voice_age v) 32) 0)
+            (begin
+              (set! tmp (/ 1.0 (sqrt (+ (* c c) (* s s)))))
+              (set! c (* c tmp))
+              (set! s (* s tmp))
+              (set! tmp (/ 1.0 (sqrt (+ (* bc bc) (* bs bs)))))
+              (set! bc (* bc tmp))
+              (set! bs (* bs tmp))))
+        (if (< (voice_age v) attack_frames)
+            (set! amp (+ amp (* attack (- amp_peak amp))))
+            (set! amp (* amp amp_mult)))
+        (set! offset (+ offset (* smooth (- offset_target offset))))
+        (set! swing (+ swing (* smooth (- swing_target swing))))
+        (set! reed (+ reed (* smooth (- reed_target reed))))
+        ;; the pickup. Its output is the change in flux (or charge) from the
+        ;; last frame, scaled so that a soft note comes out with the tine's
+        ;; own amplitude. The flux is measured from its value with the tine
+        ;; at rest, so that moving the pickup (a change of `pickup` or
+        ;; `reed`) changes the sound of a ringing note but makes no sound of
+        ;; its own.
+        (set! x (* swing amp s))
+        (set! u (- offset x))
+        (set! flux (+ (* (- 1.0 reed) (- (epiano_tine_flux u) (epiano_tine_flux offset)))
+                      (* reed (- (epiano_reed_charge (* 0.75 x)) 1.0))))
+        (set! gain (+ gain (* smooth (- gain_target gain))))
+        (set! y (/ (* gain (- flux last_flux) diff_gain) (* slope swing)))
+        (set! last_flux flux)
+        ;; the bell mode, added after the pickup
+        (if (> (+ bell bell_peak) 0.000001)
+            (begin
+              (set! tmp (- (* bc brc) (* bs brs)))
+              (set! bs (+ (* bs brc) (* bc brs)))
+              (set! bc tmp)
+              (if (< (voice_age v) attack_frames)
+                  (set! bell (+ bell (* attack (- bell_peak bell))))
+                  (begin (set! bell (* bell bell_mult)) (set! bell_peak 0.0)))
+              (set! y (+ y (* bell bs)))))
+        ;; hammer and damper noise
+        (if (> noise 0.00001)
+            (begin
+              (set! rnd (random))
+              (set! v3 (- (* noise (- (* 2.0 rnd) 1.0)) ic2))
+              (set! v1 (+ (* na1 ic1) (* na2 v3)))
+              (set! v2 (+ ic2 (* na2 ic1) (* na3 v3)))
+              (set! ic1 (- (* 2.0 v1) ic1))
+              (set! ic2 (- (* 2.0 v2) ic2))
+              (set! noise (* noise noise_mult))
+              (set! y (+ y v1))
+              void)
+            (begin (set! ic1 0.0) (set! ic2 0.0) void))
+        (set! y (* (epiano_level p) y))
+        (frame_add_stereo out y y)
+        ;; the note is over once the tine has stopped moving
+        (if (and (> (voice_age v) attack_frames)
+                 (< amp 0.0001) (< bell 0.0001) (< noise 0.00001))
+            (voice_done v))
+        void))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; the amplifier ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; The voices add the same signal to both channels; this effect works on that
+;; mono signal and spreads it to stereo at the end, in the tremolo. Every
+;; setting glides to a new value over a few milliseconds, so that changing a
+;; parameter (or a preset) while notes are sounding doesn't click.
+(bind-func epiano_fx_c
+  (lambda (p:SAMPLE*)
+    (let ((x:SAMPLE 0.0) (tmp:SAMPLE 0.0)
+          (smooth (smoothing_coeff 0.01))
+          ;; tone controls: shelving filters made from one-pole lowpasses
+          (bass_lp:SAMPLE 0.0) (treble_lp:SAMPLE 0.0)
+          (bass_coeff:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 250.0) SRf))))
+          (treble_coeff:SAMPLE (- 1.0 (exp (/ (* -2.0 SPI 2500.0) SRf))))
+          (bass_db:SAMPLE -100.0) (treble_db:SAMPLE -100.0)
+          (bass_target:SAMPLE 1.0) (treble_target:SAMPLE 1.0)
+          (bass_gain:SAMPLE 1.0) (treble_gain:SAMPLE 1.0)
+          ;; the reed piano's nasal resonance, a bandpass around 1.2 kHz
+          (fg:SAMPLE (tan (* SPI (/ 1200.0 SRf)))) (fk:SAMPLE 0.7)
+          (fa1:SAMPLE 0.0) (fa2:SAMPLE 0.0)
+          (f1:SAMPLE 0.0) (f2:SAMPLE 0.0) (v1:SAMPLE 0.0) (v2:SAMPLE 0.0)
+          (reed:SAMPLE 0.0)
+          ;; saturation
+          (drive:SAMPLE -1.0) (pre_target:SAMPLE 1.0) (makeup_target:SAMPLE 1.0)
+          (pre:SAMPLE 1.0) (makeup:SAMPLE 1.0)
+          ;; phaser: four first-order allpasses swept by a slow LFO
+          (ph_phase:SAMPLE 0.0) (ph_coeff:SAMPLE 0.0) (ph_fb:SAMPLE 0.0)
+          (ap1:SAMPLE 0.0) (ap2:SAMPLE 0.0) (ap3:SAMPLE 0.0) (ap4:SAMPLE 0.0)
+          (ph:SAMPLE 0.0) (w:SAMPLE 0.0) (ph_depth:SAMPLE 0.0)
+          ;; tremolo
+          (tr_phase:SAMPLE 0.0) (lfo:SAMPLE 0.0) (angle:SAMPLE 0.0)
+          (tr_depth:SAMPLE 0.0) (tr_stereo:SAMPLE 1.0)
+          (mono:SAMPLE 0.0) (gl:SAMPLE 0.0) (gr:SAMPLE 0.0))
+      (set! fa1 (/ 1.0 (+ 1.0 (* fg (+ fg fk)))))
+      (set! fa2 (* fg fa1))
+      (lambda (frame:SAMPLE*)
+        ;; (the tiny offset keeps the filters out of denormal numbers in silence)
+        (set! x (+ (pref frame 0) 1.0e-18))
+        ;; tone controls: boost or cut what's below 250 Hz and above 2.5 kHz
+        (if (<> (epiano_bass p) bass_db)
+            (begin
+              (set! bass_db (epiano_bass p))
+              (set! bass_target (pow 10.0 (/ (clamp bass_db -12.0 12.0) 20.0)))))
+        (if (<> (epiano_treble p) treble_db)
+            (begin
+              (set! treble_db (epiano_treble p))
+              (set! treble_target (pow 10.0 (/ (clamp treble_db -12.0 12.0) 20.0)))))
+        (set! bass_gain (+ bass_gain (* smooth (- bass_target bass_gain))))
+        (set! treble_gain (+ treble_gain (* smooth (- treble_target treble_gain))))
+        (set! bass_lp (+ bass_lp (* bass_coeff (- x bass_lp))))
+        (set! x (+ x (* (- bass_gain 1.0) bass_lp)))
+        (set! treble_lp (+ treble_lp (* treble_coeff (- x treble_lp))))
+        (set! x (+ x (* (- treble_gain 1.0) (- x treble_lp))))
+        ;; the reed piano's resonance, up to +5 dB
+        (set! tmp (clamp (epiano_reed p) 0.0 1.0))
+        (set! reed (+ reed (* smooth (- tmp reed))))
+        (if (> reed 0.0001)
+            (begin
+              (set! v1 (+ (* fa1 f1) (* fa2 (- x f2))))
+              (set! v2 (+ f2 (* fg v1)))
+              (set! f1 (- (* 2.0 v1) f1))
+              (set! f2 (- (* 2.0 v2) f2))
+              (set! x (+ x (* 0.8 reed fk v1)))))
+        ;; saturation: a tanh, scaled so that a single loud note (about 0.3)
+        ;; keeps its level and quieter ones are pushed up into the curve
+        (if (<> (epiano_drive p) drive)
+            (begin
+              (set! drive (epiano_drive p))
+              (set! tmp (clamp drive 0.0 1.0))
+              (set! pre_target (+ 1.0 (* 6.0 tmp tmp)))
+              (set! makeup_target (/ 0.3 (tanh (* 0.3 pre_target))))))
+        (set! pre (+ pre (* smooth (- pre_target pre))))
+        (set! makeup (+ makeup (* smooth (- makeup_target makeup))))
+        (set! x (* makeup (tanh (* pre x))))
+        ;; phaser. The notches sweep between about 250 Hz and 2 kHz; each
+        ;; allpass coefficient uses tan(w) ~ w, close enough below 2 kHz.
+        (set! tmp (clamp (epiano_phaser p) 0.0 1.0))
+        (set! ph_depth (+ ph_depth (* smooth (- tmp ph_depth))))
+        (if (> ph_depth 0.0001)
+            (begin
+              (set! ph_phase (+ ph_phase (/ (epiano_phaser_rate p) SRf)))
+              (if (>= ph_phase 1.0) (set! ph_phase (- ph_phase 1.0)))
+              (set! w (* SPI (/ (* 250.0 (exp (* 1.04 (- 1.0 (cos (* STWOPI ph_phase)))))) SRf)))
+              (set! ph_coeff (/ (- w 1.0) (+ w 1.0)))
+              (set! ph (+ x (* 0.4 ph_fb)))
+              (set! tmp (+ (* ph_coeff ph) ap1)) (set! ap1 (- ph (* ph_coeff tmp))) (set! ph tmp)
+              (set! tmp (+ (* ph_coeff ph) ap2)) (set! ap2 (- ph (* ph_coeff tmp))) (set! ph tmp)
+              (set! tmp (+ (* ph_coeff ph) ap3)) (set! ap3 (- ph (* ph_coeff tmp))) (set! ph tmp)
+              (set! tmp (+ (* ph_coeff ph) ap4)) (set! ap4 (- ph (* ph_coeff tmp))) (set! ph tmp)
+              (set! ph_fb ph)
+              (set! x (+ (* x (- 1.0 (* 0.5 ph_depth))) (* 0.5 ph_depth ph)))))
+        ;; Tremolo. The suitcase model pans between its two speakers along an
+        ;; equal-power curve; a mono tremolo dips the level of both together.
+        (set! tr_phase (+ tr_phase (/ (epiano_trem_rate p) SRf)))
+        (if (>= tr_phase 1.0) (set! tr_phase (- tr_phase 1.0)))
+        (set! lfo (sin (* STWOPI tr_phase)))
+        (set! tmp (clamp (epiano_trem_depth p) 0.0 1.0))
+        (set! tr_depth (+ tr_depth (* smooth (- tmp tr_depth))))
+        (set! tmp (clamp (epiano_trem_stereo p) 0.0 1.0))
+        (set! tr_stereo (+ tr_stereo (* smooth (- tmp tr_stereo))))
+        (set! angle (* 0.78539816 (+ 1.0 (* tr_depth lfo))))
+        (set! mono (* 0.70710678 (- 1.0 (* 0.5 tr_depth (- 1.0 lfo)))))
+        (set! gl (+ mono (* tr_stereo (- (cos angle) mono))))
+        (set! gr (+ mono (* tr_stereo (- (sin angle) mono))))
+        (pset! frame 0 (* gl x))
+        (pset! frame 1 (* gr x))
+        void))))
+
+(bind-func epiano_make
+  (lambda ()
+    (let ((inst (inst_make "epiano" 12 (epiano_nparams)))
+          (i:i64 0))
+      (epiano_defaults (inst_params inst))
+      (dotimes (i 12)
+        (inst_set_voice inst i (epiano_voice_c (inst_params inst))))
+      (inst_set_fx inst (epiano_fx_c (inst_params inst)))
+      inst)))
