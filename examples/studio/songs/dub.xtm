@@ -1,0 +1,81 @@
+;;; dub.xtm -- a one-drop rhythm with the delay turned up
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Dub is as much about the mixing desk as the instruments: a heavy bassline
+;; and a sparse drum pattern, with the chords thrown into a long, dark delay.
+;; Here the score rides the delay sends the way an engineer would.
+;;
+;;   extras/studio/render examples/studio/songs/dub.xtm /tmp/dub.wav 60
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 72)
+
+(track 'drums 'kit808 'classic)
+(track 'bass 'acid 'deep)
+(track 'organ 'organ 'reggae)
+(track 'skank 'epiano 'stage)
+(track 'horn 'polysynth 'brass)
+
+(ctl 'drums 'gain 1.9 'reverb 0.1 'hh-level 0.9)
+(ctl 'bass 'gain 0.8 'lpf 500)
+(ctl 'organ 'gain 0.7 'pan 0.35 'reverb 0.2)
+(ctl 'skank 'gain 2.2 'pan 0.65 'reverb 0.25 'hpf 300)
+(ctl 'horn 'gain 1.1 'reverb 0.4 'delay 0.5)
+;; a long, dark, dotted-eighth echo
+(master 'reverb-size 0.8 'delay-time (/ 3/16 (cps)) 'delay-feedback 0.7 'delay-tone 0.75
+        'delay-reverb 0.4)
+
+;; the one drop: nothing on the first beat, kick and rim together on the third
+(define dub-beat
+  (stack (with (sound '(~ ~ #(bd rs) ~)) (vel 0.9))
+         (with (sound '((hh (hh hh) hh (hh <hh oh>))*2)) (vel '(0.5 0.3 0.4)) (swing 1/4 8))
+         (with (sound '(~ ~ ~ ~ ~ ~ ~ <~ ~ ~ (mt lt)>)) (vel 0.6))))
+
+;; A minor to D minor, two cycles each
+(define dub-bass
+  (with (note '(<a1 a1 d2 d2> ~ ~ <a1 a1 d2 d2> ~ <c2 c2 f2 f2> <e2 e2 a2 a2> ~
+                <a1 a1 d2 d2> ~ ~ ~ <g1 g1 c2 c2> ~ ~ ~))
+        (sound 'bass)
+        (vel 0.7)
+        (legato 0.9)))
+
+(define dub-chords '#(<a3 a3 a3 a3> <c4 c4 d4 d4> <e4 e4 f4 f4>))
+
+;; the skank: chords on the off-beats
+(define dub-skank
+  (with (note dub-chords) (struct '(~ t ~ t ~ t ~ t)) (sound 'skank) (vel 0.6) (legato 0.35)))
+
+;; the organ bubble: quiet sixteenths either side of each off-beat
+(define dub-bubble
+  (with (note dub-chords) (struct '(~ ~ t t ~ ~ t t ~ ~ t t ~ ~ t t)) (sound 'organ)
+        (vel '(0.35 0.55)) (legato 0.5)))
+
+(score-pattern 0 24 dub-beat)
+(score-pattern 2 24 dub-bass)
+(score-pattern 0 24 dub-skank)
+(score-pattern 4 24 dub-bubble)
+(score-pattern 8 24 (note '(<e4 ~ ~ ~> ~ <~ g4 ~ ~> <a4 ~ ~ ~>)) (sound 'horn) (vel 0.6) (legato 0.8))
+
+;; riding the desk: throw the skank into the delay for a beat, here and there,
+;; and drop the drums out so the echoes can be heard
+(for-each
+  (lambda (cycle)
+    (score-ctl (/ (+ cycle 3/4) (cps)) 'skank 'delay 0.9)
+    (score-ctl (/ (+ cycle 1) (cps)) 'skank 'delay 0.0))
+  '(3 7 11 13 15 19 21 23))
+(score-ctl (/ 12 (cps)) 'drums 'mute 1.0)
+(score-ctl (/ 12 (cps)) 'bass 'lpf 250)
+(score-ctl (/ 14 (cps)) 'drums 'mute 0.0)
+(score-ctl (/ 14 (cps)) 'bass 'lpf 500)
+(score-ctl (/ 20 (cps)) 'drums 'delay 0.5)
+(score-ctl (/ 20.25 (cps)) 'drums 'delay 0.0)
+
+(score-end)

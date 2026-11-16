@@ -1,0 +1,71 @@
+;;; funk.xtm -- clavinet, organ and slap bass over a tight beat
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A one-chord vamp on E9 at 104 bpm. The clavinet and the bass are both FM
+;; patches; the organ stabs on the off-beats, and its rotary speaker speeds up
+;; for the second half.
+;;
+;;   extras/studio/render examples/studio/songs/funk.xtm /tmp/funk.wav 42
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 104)
+
+(track 'drums 'kit909 'tight)
+(track 'bass 'fm 'bass)
+(track 'clav 'fm 'clav)
+(track 'organ 'organ 'rock)
+
+(ctl 'drums 'gain 1.9 'reverb 0.07 'hh-level 0.9 'oh-level 0.85)
+(ctl 'bass 'gain 0.9)
+(ctl 'clav 'gain 1.25 'pan 0.35 'reverb 0.12 'hpf 150)
+(ctl 'organ 'gain 0.95 'pan 0.65 'reverb 0.2)
+(master 'reverb-size 0.45 'delay-time (/ 1/8 (cps)) 'delay-feedback 0.3)
+
+(define funk-beat
+  (stack (with (sound '(bd ~ ~ bd ~ ~ bd ~ ~ bd ~ ~ ~ ~ bd ~)) (vel 0.9))
+         (with (sound '(~ ~ ~ ~ sd ~ ~ sd? ~ ~ ~ ~ sd ~ ~ ~)) (vel '(0.8 0.4 0.85)))
+         (with (sound '((hh hh <hh oh> hh)*4)) (vel '(0.6 0.3 0.5 0.3)))))
+
+;; sixteenths: the gaps matter as much as the notes
+(define funk-bass
+  (with (note '(e1 ~ ~ e1 ~ e2 ~ ~ ~ e1 ~ g1 a1 ~ b1 d2))
+        (sound 'bass)
+        (vel '(0.9 0.6 0.6 0.7 0.6 0.95 0.6 0.6))
+        (legato 0.7)))
+
+(define funk-clav
+  (with (note '(~ e3 ~ g3 ~ e3 a3 ~ ~ e3 ~ b3 <d4 d4 d4 e4> ~ e3 ~))
+        (sound 'clav)
+        (vel '(0.6 0.8 0.5 0.7 0.5 0.9))
+        (legato 0.5)))
+
+;; E9 without its root: G sharp, B, D and F sharp
+(define funk-stabs
+  (with (note '#(g#3 b3 d4 f#4))
+        (struct '(~ ~ t ~ ~ ~ ~ t ~ ~ t ~ ~ ~ ~ ~))
+        (sound 'organ)
+        (vel 0.7)
+        (legato 0.6)))
+
+(score-pattern 0 2 funk-clav)
+(score-pattern 1 2 (sound '(~ ~ ~ ~ ~ ~ ~ ~ sd ~ sd sd sd*2 sd*2 sd*2 sd*2)) (vel (between 0.4 1.0 saw)))
+(score-pattern 2 16 funk-beat (every 4 (within 3/4 1 (ply 2))))
+(score-pattern 2 16 funk-bass (every-from 4 3 (within 1/2 1 (add (note 12)))))
+(score-pattern 2 16 funk-clav (sometimes-by 0.2 (add (note 12))))
+(score-pattern 4 16 funk-stabs)
+;; the rotary speaker spins up for the second half
+(score-ctl (/ 10 (cps)) 'organ 'speed 6.7)
+(score-pattern 10 16 (note '(<b4 d5 e5 d5> ~ ~ ~)) (sound 'organ) (vel 0.6) (legato 0.9))
+(score-pattern 16 17 (note '#(e2 g#3 b3 d4 f#4)) (sound 'organ) (vel 0.8) (legato 0.9))
+(score-pattern 16 17 (note 'e1) (sound 'bass) (vel 0.9))
+(score-pattern 16 17 (sound '#(bd cr)))
+
+(score-end)

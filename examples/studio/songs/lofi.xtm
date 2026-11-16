@@ -1,0 +1,65 @@
+;;; lofi.xtm -- a slow, swung beat with electric piano and vibraphone
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A ii-V-I-VI in C at 84 bpm: a dusty 808, an electric piano, a round synth
+;; bass and a vibraphone which plays a different line each time round.
+;;
+;;   extras/studio/render examples/studio/songs/lofi.xtm /tmp/lofi.wav 50
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 84)
+
+(track 'drums 'kit808 'dusty)
+(track 'keys 'epiano 'ballad)
+(track 'bass 'polysynth 'bass)
+(track 'vibes 'resonator 'vibes)
+
+(ctl 'drums 'gain 0.6 'lpf 9000 'shape 0.25 'reverb 0.08 'hh-level 0.95)
+(ctl 'keys 'gain 1.6 'reverb 0.3 'pan 0.42 'lpf 5000)
+(ctl 'bass 'gain 1.6 'lpf 900)
+(ctl 'vibes 'gain 1.3 'reverb 0.45 'delay 0.25 'pan 0.62)
+(master 'reverb-size 0.6 'reverb-damping 0.6 'delay-time (/ 3/8 (cps)) 'delay-feedback 0.35)
+
+;; D minor 9, G13, C major 9, A7 with a sharp five. Each <...> is one voice.
+(define lofi-chords
+  '#(<d3 g2 c3 a2> <f3 f3 e3 g3> <a3 b3 g3 c#4> <c4 e4 b3 f4> <e4 a4 d4 bb4>))
+
+;; every second eighth note is late, by a third of an eighth
+(define lofi-swing (swing 1/3 4))
+
+(define lofi-beat
+  (stack (with (sound '(bd ~ ~ bd ~ ~ <~ bd> ~)) (vel 0.9))
+         (with (sound '(~ ~ sd ~ ~ ~ sd <~ ~ ~ rs>)) (vel 0.75))
+         (with (sound 'hh*8) (vel '(0.55 0.3 0.45 0.3)) (degrade-by 0.1) lofi-swing)))
+
+(define lofi-bass
+  (with (note '(<d2 g1 c2 a1> ~ ~ <d2 g1 c2 a1> ~ ~ <a2 d2 g2 e2> ~))
+        (sound 'bass)
+        (vel 0.7)
+        (legato 0.8)))
+
+;; the piano on its own, then the beat and bass, then the vibraphone
+(score-pattern 0 16 (note lofi-chords) (sound 'keys)
+               (struct '(t ~ ~ <~ t> ~ ~ t ~)) (vel '(0.55 0.4 0.45)) (legato 2.5) lofi-swing)
+(score-pattern 2 16 lofi-beat)
+(score-pattern 2 16 lofi-bass lofi-swing)
+;; a new line each cycle: random notes of the scale, most of them left out
+(score-pattern 6 16
+               (note (scale 'c5 'major (segment 8 (irand 8))))
+               (sound 'vibes)
+               (degrade-by 0.55)
+               (vel (between 0.3 0.7 rand))
+               (legato 3)
+               lofi-swing)
+(score-pattern 16 17 (note '#(c3 e3 g3 b3 d4)) (sound 'keys) (vel 0.45) (legato 2))
+(score-pattern 16 17 (note 'c2) (sound 'bass) (vel 0.6))
+
+(score-end)

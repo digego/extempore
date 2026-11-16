@@ -1,0 +1,71 @@
+;;; 01-first-sounds.xtm -- instruments, tracks and the mixer
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The studio is a set of instruments, a mixer and a pattern language which
+;; work together out of the box. This file is a tour of the first two.
+;; Evaluate it one expression at a time.
+
+;;; Code:
+
+;; load the studio, and start its audio
+(sys:load "libs/studio/studio.xtm")
+(studio:start)
+
+;; what is there to play?
+(instruments)
+
+;; put an instrument on a track. The track's name is up to you.
+(track 'bass 'acid)
+
+;; play a note: track, pitch (MIDI note number: 60 is middle C), velocity (0.0
+;; to 1.0) and length in seconds
+(note-on 'bass 36 0.7 0.5)
+(note-on 'bass 48 1.0 0.25)
+
+;; every instrument has parameters ...
+(params 'bass)
+
+;; ... which you can change while it plays
+(ctl 'bass 'cutoff 900)
+(note-on 'bass 36 0.7 0.5)
+(ctl 'bass 'cutoff 200 'res 0.9 'decay 0.8)
+(note-on 'bass 36 0.7 0.5)
+
+;; and presets, which set them all at once
+(presets 'bass)
+(preset 'bass 'squelchy)
+(note-on 'bass 36 1.0 0.5)
+
+;; you can ask for a preset when you make the track, too
+(track 'keys 'epiano 'suitcase)
+(note-on 'keys 60 0.6 2.0)
+
+;; a chord is several notes at once
+(for-each (lambda (pitch) (note-on 'keys pitch 0.6 3.0)) '(48 55 60 64 67))
+
+;; Every track has a mixer strip, with the same parameters whatever the
+;; instrument: gain, pan, reverb, delay, lpf, hpf, lpq, shape and mute.
+(ctl 'keys 'reverb 0.4)
+(ctl 'keys 'pan 0.3)
+(for-each (lambda (pitch) (note-on 'keys pitch 0.6 3.0)) '(48 55 60 64 67))
+
+;; reverb and delay are sends: how much of the track goes to the one reverb
+;; and one delay which all the tracks share. Their settings are on the master
+;; bus, along with a compressor which glues the mix together.
+(params 'master)
+(master 'reverb-size 0.9)
+(master 'delay-time 0.25 'delay-feedback 0.6)
+(ctl 'bass 'delay 0.4)
+(note-on 'bass 48 1.0 0.1)
+
+;; what's on the mixer?
+(tracks)
+
+;; take a track away again
+(untrack 'keys)
+
+;; That's the whole of the instrument side. Next: 02-patterns.xtm.

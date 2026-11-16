@@ -1,0 +1,173 @@
+;;; 02-patterns.xtm -- the pattern language
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A pattern language in the manner of TidalCycles. Patterns repeat every
+;; cycle (two seconds, to begin with), and you change the music by evaluating
+;; a pattern again with something different in it.
+;;
+;; Evaluate this file one expression at a time.
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+(studio:start)
+
+(track 'drums 'kit808)
+(track 'bass 'acid)
+
+;;;;;;;;;;;;;;;;
+;; sequences  ;;
+;;;;;;;;;;;;;;;;
+
+;; d1 plays a pattern. A quoted list is a sequence: its steps share the cycle
+;; equally. These are sounds from the kit on the drums track.
+(d1 (sound '(bd sd bd sd)))
+
+;; what sounds does the kit have?
+(sounds 'drums)
+
+;; a sublist squeezes its steps into one step
+(d1 (sound '(bd (sd sd) bd (sd cp))))
+
+;; ~ is a rest
+(d1 (sound '(bd ~ (~ bd) sd)))
+
+;; *2 plays a step twice as fast, and works on sublists too
+(d1 (sound '(bd*2 sd (hh hh)*2 sd)))
+
+;; <a b c> plays one of its steps each cycle, in turn
+(d1 (sound '(bd*2 <sd cp> hh*4 <sd (sd sd)>)))
+
+;; a vector plays its steps at the same time
+(d1 (sound '(#(bd hh) hh #(sd hh) hh)))
+
+;; _ makes the step before it longer, @3 makes a step three times as long,
+;; !3 repeats a step three times, and ? plays it half the time
+(d1 (sound '(bd _ _ sd)))
+(d1 (sound '(bd@3 sd)))
+(d1 (sound '(hh!3 oh)))
+(d1 (sound '(bd*2 hh*8?)))
+
+;; (euclid 3 8 x) spreads 3 hits as evenly as it can over 8 steps
+(d1 (sound '((euclid 3 8 bd))))
+(d1 (sound '(#((euclid 3 8 bd) (euclid 5 8 hh)))))
+
+;; d1 to d8 each play their own pattern. stack plays patterns together.
+(d1 (stack (sound '(bd*2 <sd cp>))
+           (sound 'hh*8)))
+
+;; hush stops everything
+(hush)
+
+;;;;;;;;;;;
+;; notes ;;
+;;;;;;;;;;;
+
+;; A track's own name is a sound too. Give it notes by name (c4 is middle C;
+;; sharps are c#4 or cs4, flats are eb4 or ef4) or by MIDI number.
+(d2 (note '(c2 c2 eb2 c3))
+    (sound 'bass))
+
+;; d2 takes a list of things. Patterns are merged: the first one says when
+;; things happen, and the others add to each event.
+(d2 (note '(c2 c2 <eb2 g2> c3))
+    (sound 'bass)
+    (vel '(0.6 0.6 1 0.6)))
+
+;; on the acid bass a velocity above 0.8 is an accent. And a note longer than
+;; its step runs into the next one, which makes the pitch slide.
+(d2 (note '(c2 c2 <eb2 g2> c3))
+    (sound 'bass)
+    (vel '(0.6 0.6 1 0.6))
+    (legato '(0.5 0.5 1.2 0.5)))
+
+;; scale turns scale degrees into notes
+(d2 (note (scale 'c2 'minor '(0 0 <2 4> 7 0 <6 5> 4 7)))
+    (sound 'bass))
+
+;; any parameter of the instrument or of the track's mixer strip can be
+;; patterned. The mixer's have their own functions (gain pan reverb delay lpf
+;; hpf lpq shape); for the instrument's, use param.
+(d2 (note (scale 'c2 'minor '(0 0 <2 4> 7 0 <6 5> 4 7)))
+    (sound 'bass)
+    (param 'cutoff '(200 400 800 1600))
+    (delay '(0 0 0 0.5)))
+
+;; sine, saw, tri, square, rand and perlin are signals: they have a value at
+;; every moment, running from 0 to 1 once per cycle. between stretches one to
+;; the range you want, and slow stretches it over more cycles.
+(d2 (note (scale 'c2 'minor '(0 0 <2 4> 7 0 <6 5> 4 7)))
+    (sound 'bass)
+    (param 'cutoff (between 150 1500 (slow 4 sine)))
+    (pan (between 0.3 0.7 perlin)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; changing patterns   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(d1 (sound '(bd*2 <sd cp> hh*4 sd)))
+
+;; A function in d1's list transforms the pattern above it. fast and slow
+;; change its speed ...
+(d1 (sound '(bd*2 <sd cp> hh*4 sd))
+    (fast 2))
+
+;; ... rev plays each cycle backwards ...
+(d1 (sound '(bd*2 <sd cp> hh*4 sd))
+    rev)
+
+;; ... and every applies a transformation only on some cycles
+(d1 (sound '(bd*2 <sd cp> hh*4 sd))
+    (every 4 (fast 2)))
+
+(d1 (sound '(bd*2 <sd cp> hh*4 sd))
+    (every 4 (fast 2))
+    (every-from 4 2 rev))
+
+;; off layers a shifted copy over the pattern, with a transformation applied
+;; to the copy: here, a quiet echo a sixteenth later
+(d1 (sound '(bd*2 <sd cp> hh*4 sd))
+    (off 1/16 (vel 0.3)))
+
+;; and here the copy is a fifth up
+(d2 (note (scale 'c2 'minor '(0 ~ <2 4> 7)))
+    (sound 'bass)
+    (off 1/8 (add (note 7))))
+
+;; sometimes applies a transformation to about half of the events; often and
+;; rarely do what they say. ply repeats each event.
+(d1 (sound '(bd sd hh sd))
+    (sometimes (ply 2)))
+
+;; degrade-by drops events at random
+(d1 (sound 'hh*16)
+    (degrade-by 0.3)
+    (vel (between 0.3 0.9 rand)))
+
+;; swing delays every second step: here by a third of a step, at 8 to the cycle
+(d1 (sound '(bd hh sd hh bd hh sd hh))
+    (swing 1/3 4))
+
+;; More of these: late early palindrome iter linger chunk within inside
+;; superimpose echo struct mask segment arp chord. Each has a comment in
+;; libs/studio/pattern.xtm, and show prints what a pattern does:
+(show (every 2 rev '(a b c)) 0 2)
+
+;;;;;;;;;;;
+;; tempo ;;
+;;;;;;;;;;;
+
+;; cps is cycles per second; bpm assumes four beats to the cycle
+(cps 0.6)
+(bpm 132)
+
+;; once plays one cycle of a pattern straight away, without looping it
+(once (sound '(cp cp cp cp*2)))
+
+(hush)
+
+;; Next: 03-jam.xtm puts a whole track together.

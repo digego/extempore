@@ -1,0 +1,124 @@
+;;; house.xtm -- a house track which uses most of the studio's synths
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Eight instruments, four chords and the pattern language, arranged as a
+;; score so that it can be rendered to a file:
+;;
+;;   extras/studio/render examples/studio/songs/house.xtm /tmp/house.wav 70
+;;
+;; It also plays in real time if you evaluate the whole file. To pull it
+;; apart and play with the pieces, see examples/studio/03-jam.xtm, which
+;; builds the same track up live.
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm")
+
+(score-begin)
+(bpm 120)
+
+(track 'drums 'kit909)
+(track 'bass 'acid 'rubber)
+(track 'pad 'strings 'classic)
+(track 'keys 'epiano 'suitcase)
+(track 'bells 'resonator 'vibes)
+(track 'lead 'polysynth 'lead)
+(track 'pluck 'fm 'marimba)
+(track 'organ 'organ 'jazz)
+
+;; the mix
+(score-ctl 0 'drums 'gain 1.6)
+(score-ctl 0 'drums 'reverb 0.06)
+(score-ctl 0 'drums 'hh-level 0.9)
+(score-ctl 0 'drums 'oh-level 0.85)
+(score-ctl 0 'bass 'gain 0.8)
+(score-ctl 0 'pad 'gain 0.4)
+(score-ctl 0 'pad 'reverb 0.4)
+(score-ctl 0 'pad 'hpf 180)
+(score-ctl 0 'keys 'gain 1.7)
+(score-ctl 0 'keys 'reverb 0.25)
+(score-ctl 0 'keys 'pan 0.4)
+(score-ctl 0 'bells 'gain 0.85)
+(score-ctl 0 'bells 'reverb 0.45)
+(score-ctl 0 'bells 'delay 0.3)
+(score-ctl 0 'bells 'pan 0.65)
+(score-ctl 0 'lead 'gain 1.0)
+(score-ctl 0 'lead 'reverb 0.3)
+(score-ctl 0 'lead 'delay 0.35)
+(score-ctl 0 'pluck 'gain 0.7)
+(score-ctl 0 'pluck 'reverb 0.3)
+(score-ctl 0 'pluck 'pan 0.3)
+(score-ctl 0 'organ 'gain 0.35)
+(score-ctl 0 'organ 'reverb 0.2)
+(score-ctl 0 'organ 'pan 0.6)
+(score-ctl 0 'master 'reverb-size 0.8)
+;; echoes on the dotted eighth: three sixteenths of a two-second cycle
+(score-ctl 0 'master 'delay-time 0.375)
+
+;; Four chords, one per cycle: C minor 9, A flat major 7, E flat major 7 and
+;; B flat. Each <...> is one voice of the chord, moving from chord to chord.
+(define song-chords
+  '#(<c3 ab2 eb3 bb2> <eb3 c3 g3 d3> <g3 eb3 bb3 f3> <bb3 g3 d4 a3> <d4 c4 f4 c4>))
+
+;; the bassline is written on C, and follows the chords' roots
+(define song-roots '(<0 -4 3 -2>))
+
+(define song-bass
+  (with (note '(c2 ~ c2 c3 ~ c2 g2 c3))
+        (add (note song-roots))
+        (sound 'bass)
+        (vel '(0.7 0.7 0.7 1 0.7 0.7 1 0.7))
+        (legato '(0.5 0.5 0.5 0.5 0.5 1.2 0.5 0.5))))
+
+(define song-beat
+  (stack (with (sound 'bd*4) (vel 0.9))
+         (with (sound '(~ cp ~ cp)) (vel 0.7))
+         (with (sound '((~ oh)*4)) (vel 0.5))
+         (with (sound 'hh*16) (vel '(0.5 0.25 0.4 0.25)) (degrade-by 0.15))))
+
+;; cycles 0 to 4: the pad and the electric piano on their own
+(score-pattern 0 32 (note song-chords) (sound 'pad) (vel 0.6) (legato 1.0))
+(score-pattern 0 8 (note song-chords) (sound 'keys) (struct '(t ~ ~ t ~ ~ t ~)) (vel '(0.6 0.4 0.5)) (legato 2))
+
+;; cycles 4 to 8: hats, then the bass comes in with its filter nearly shut
+(score-pattern 4 8 (sound 'hh*8) (vel '(0.5 0.3)))
+(score-pattern 6 8 (sound '(bd ~ ~ ~ bd ~ ~ (bd bd))) (vel 0.8))
+(score-pattern 4 8 song-bass (param 'cutoff (between 90 400 (slow 4 saw))))
+
+;; cycles 8 to 16: the beat, the bass opening up, vibraphone arpeggios
+(score-pattern 8 16 song-beat)
+(score-pattern 8 16 song-bass (param 'cutoff (between 250 900 (slow 8 sine))))
+(score-pattern 8 16 (note song-chords) (arp 8) (add (note 12)) (sound 'bells)
+               (vel (between 0.35 0.7 perlin)) (legato 2))
+(score-pattern 8 16 (note song-chords) (sound 'keys) (struct '(~ t ~ ~ t ~ ~ ~)) (vel 0.5) (legato 1.5))
+(score-pattern 12 16 (note song-chords) (arp 4) (sound 'pluck) (off 1/8 (add (note 12))) (vel 0.5))
+
+;; cycles 16 to 20: the drums drop out
+(score-pattern 16 20 (note song-chords) (arp 8) (add (note 12)) (sound 'bells)
+               (vel (between 0.3 0.6 perlin)) (legato 3))
+(score-pattern 16 20 (note song-chords) (sound 'organ) (vel 0.6) (legato 0.95))
+(score-pattern 18 20 (sound 'hh*8) (vel (between 0.2 0.7 (slow 2 saw))))
+(score-pattern 19 20 (sound '(~ ~ ~ ~ sd sd*2 sd*2 sd*4)) (vel (between 0.4 0.9 saw)))
+
+;; cycles 20 to 28: everything, with a lead line and a busier beat
+(score-pattern 20 28 song-beat (every 4 (within 3/4 1 (ply 2))))
+(score-pattern 20 28 song-bass (param 'cutoff (between 400 1400 (slow 8 sine))))
+(score-pattern 20 28 (note song-chords) (arp 8) (add (note 12)) (sound 'bells)
+               (vel (between 0.35 0.7 perlin)) (legato 2))
+(score-pattern 20 28 (note song-chords) (sound 'organ) (struct '(~ t ~ t ~ t ~ t)) (vel 0.5) (legato 0.6))
+(score-pattern 20 28
+               (note (scale 'c4 'minor-pentatonic '(<(4 ~ 3 4) (2 ~ ~ 1) (4 ~ 3 2) (1 ~ ~ 0)> ~ <(~ 2) ~ (~ 5) ~> <1 0 4 2>)))
+               (sound 'lead) (vel 0.7) (legato 1.4))
+
+;; cycles 28 to 32: the way out
+(score-pattern 28 32 (note song-chords) (sound 'keys) (struct '(t ~ ~ t ~ ~ t ~)) (vel '(0.5 0.35 0.4)) (legato 2))
+(score-pattern 28 30 song-bass (param 'cutoff (between 400 100 (slow 2 saw))))
+(score-pattern 28 31 (sound 'hh*8) (vel '(0.4 0.2)))
+(score-pattern 32 33 (note '#(c2 c3 g3 eb4 bb4 d5)) (sound 'keys) (vel 0.5) (legato 3))
+(score-pattern 32 33 (note 'c2) (sound 'bass) (vel 0.6) (legato 0.9) (param 'cutoff 200))
+
+(score-end)
