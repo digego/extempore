@@ -25,6 +25,7 @@
 
 (sys:load "libs/studio/engine.xtm")
 (sys:load "libs/studio/fx.xtm")
+(sys:load "libs/studio/hall.xtm")
 
 (bind-val STUDIO_TRACKS i64 16)
 
@@ -46,7 +47,8 @@
 (bind-val MASTER_COMP_RELEASE i64 14)   ;; milliseconds
 (bind-val MASTER_COMP_MAKEUP i64 15)    ;; dB
 (bind-val MASTER_CEILING i64 16)        ;; the limiter's ceiling (1.0 is full scale)
-(bind-val MASTER_NPARAMS i64 17)
+(bind-val MASTER_REVERB_TYPE i64 17)    ;; 0.0: the plate reverb, 1.0: the hall
+(bind-val MASTER_NPARAMS i64 18)
 
 ;; 0 instrument (null for an empty track)
 ;; 1 channel strip parameters (see the STRIP_ constants in fx.xtm)
@@ -117,6 +119,7 @@
     (pset! p MASTER_COMP_RELEASE 180.0)
     (pset! p MASTER_COMP_MAKEUP 4.0)
     (pset! p MASTER_CEILING 0.9)
+    (pset! p MASTER_REVERB_TYPE 0.0)
     void))
 
 (bind-func studio_set_instrument
@@ -251,7 +254,8 @@
         (reverb_out:SAMPLE* (zalloc 2))
         (evt:StudioEvent* (zalloc))
         (delay (stereo_delay_c 4.0))
-        (reverb (plate_reverb_c))
+        (plate (plate_reverb_c))
+        (hall (hall_reverb_c))
         (compressor (compressor_c))
         (limiter (limiter_c))
         (trk:Track* null)
@@ -318,10 +322,18 @@
                   (frame_add_stereo reverb_in
                                     (* (pref master MASTER_DELAY_REVERB) (pref delay_out 0))
                                     (* (pref master MASTER_DELAY_REVERB) (pref delay_out 1)))
-                  (reverb reverb_in reverb_out
-                          (pref master MASTER_REVERB_SIZE)
-                          (pref master MASTER_REVERB_DAMPING)
-                          (pref master MASTER_REVERB_PREDELAY))
+                  ;; only the reverb which is in use runs: the other keeps
+                  ;; whatever tail it had, so switch between them in a quiet
+                  ;; moment
+                  (if (> (pref master MASTER_REVERB_TYPE) 0.5)
+                      (hall reverb_in reverb_out
+                              (pref master MASTER_REVERB_SIZE)
+                              (pref master MASTER_REVERB_DAMPING)
+                              (pref master MASTER_REVERB_PREDELAY))
+                      (plate reverb_in reverb_out
+                              (pref master MASTER_REVERB_SIZE)
+                              (pref master MASTER_REVERB_DAMPING)
+                              (pref master MASTER_REVERB_PREDELAY)))
                   (frame_add_stereo mix
                                     (* (pref master MASTER_DELAY_LEVEL) (pref delay_out 0))
                                     (* (pref master MASTER_DELAY_LEVEL) (pref delay_out 1)))

@@ -24,6 +24,7 @@ people who want to write an instrument.
 | `engine.xtm`   | voices, instruments, the timestamped event queue             |
 | `dsp.xtm`      | delay lines, a ladder filter, smoothing, a soft clipper      |
 | `fx.xtm`       | channel strip, stereo delay, plate reverb, compressor, limiter |
+| `hall.xtm`     | a second reverb: a concert hall (a feedback delay network)     |
 | `mixer.xtm`    | sixteen tracks, the send effects, the master bus, the DSP    |
 | `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument`  |
 | `pattern.xtm`  | the pattern language and its clock                           |

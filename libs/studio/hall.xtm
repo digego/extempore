@@ -1,0 +1,367 @@
+;;; hall.xtm -- a hall reverb: early reflections into an eight-line feedback delay network
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A concert hall answers a sound in two stages. First come a handful of
+;; distinct early reflections off the nearest walls and the stage, which tell
+;; the ear how big the room is and where the source sits. Then the reflections
+;; multiply until they merge into a dense, smooth tail which dies away, faster
+;; in the treble than in the bass. This reverb builds the two stages
+;; separately:
+;;
+;;   in L,R --> input lines --+--> early reflections ------------------+
+;;              (predelay)    |        |                               |
+;;                            |        v (half)                        v
+;;                            +--> late input --> 8-line network --> sum --> tone --> out L,R
+;;
+;; The input lines hold the last third of a second of each input channel. A
+;; read at the predelay gives the delayed input, and twelve more reads after
+;; it give the early reflections: six per side, each with its own time and
+;; sign, some taken from the opposite channel so that a source panned hard to
+;; one side still lights up both. The pattern is fixed and doesn't grow with
+;; the size control.
+;;
+;; The tail comes from a feedback delay network (FDN), the structure described
+;; by Stautner and Puckette ('Designing multi-channel reverberators', 1982)
+;; and developed by Jot and Chaigne ('Digital delay networks for designing
+;; artificial reverberators', 1991). Eight delay lines, each 70 to 140 ms
+;; long at the largest size, run side by side. Every frame, the eight values
+;; leaving the lines are mixed by an 8x8 Hadamard matrix and the eight mixtures
+;; are written back in. Each output of the matrix is a sum or difference of
+;; all eight inputs, so every echo is split into eight new ones, at eight
+;; different times, on every trip around the loop: the echo count grows
+;; geometrically, which is what a room does. The matrix (scaled by 1/sqrt(8))
+;; is orthonormal, so it neither adds nor loses energy, and all the decay
+;; comes from the gains we put in the lines. That's the attraction of an FDN:
+;; the mixing and the decay are separate, and the decay time can be set
+;; exactly. The delay lengths are primes with no simple ratios between them,
+;; so their echoes don't line up into audible patterns.
+;;
+;; Each line also has a short allpass filter (5 to 12 ms). It passes every
+;; frequency at the same level but smears each echo into a decaying train of
+;; echoes, which fills in the gaps between the long delays and gets the tail
+;; dense within about a tenth of a second.
+;;
+;; The decay. An echo which goes once round line i, L_i frames long, is
+;; multiplied by g = 10^(-3 L_i / (fs T)) for a tail which falls 60 dB in T
+;; seconds, so longer lines get smaller gains and all eight die together. Real
+;; rooms keep their bass longer than their treble (air and soft surfaces
+;; absorb high frequencies), so each line has two filters:
+;;
+;; - a low shelf: the mids get the gain for the mid decay time Tm, and below
+;;   250 Hz a one-pole lowpass adds back enough to give the gain for 1.25 Tm
+;; - a one-pole lowpass whose response at the damping frequency f2 is exactly
+;;   the mid gain again, so at f2 the loop gain is squared and the treble
+;;   decays in half the time; above f2 it decays faster still
+;;
+;; Since g depends on L_i, every line has its own filter coefficients. The
+;; size control sets Tm (half a second to twelve) and also stretches the delay
+;; lines, so a short reverb sounds like a small room rather than a big room
+;; with its tail cut off. The damping control moves f2 from 16 kHz down to
+;; 1.3 kHz.
+;;
+;; The modulation. However well the delays are chosen, a network of fixed
+;; delays has fixed resonances, and a long tail can ring at them, a faint
+;; metallic pitch. Each main delay is moved slowly (0.83 and 1.19 Hz) by a
+;; fraction of a millisecond, each line in a different phase, so the
+;; resonances wander and blur into each other. The movement is too small and
+;; slow to hear as vibrato. The delays are read between samples with an
+;; allpass interpolator, which unlike linear interpolation doesn't dull the
+;; treble on each of the hundred or so trips an echo makes round a long tail.
+;;
+;; The output. The left output sums four of the lines and the right sums the
+;; other four, so the two sides are uncorrelated and the tail sounds wide.
+;; It's taken from the lines' outputs, so the first sound from the network has
+;; already been through an allpass and the matrix: there's no clean copy of
+;; the input in it. A longer decay holds more energy, so the output gain falls
+;; as the square root of Tm to keep the reverb at about the same loudness at
+;; every size. A highpass at 25 Hz and a lowpass at 12 kHz trim the result.
+;;
+;; This is an original implementation, written from a functional
+;; specification of the design (its delay lengths, tap pattern and control
+;; mappings are its own).
+
+;;; Code:
+
+(sys:load-preload-check 'studio-hall)
+(define *xtmlib-studio-hall-loaded* #t)
+
+(sys:load "libs/studio/dsp.xtm")
+
+(bind-func static hall_butterfly
+  "replace x[i] and x[j] with their sum and difference"
+  (lambda (x:SAMPLE* i:i64 j:i64)
+    (let ((a (pref x i))
+          (b (pref x j)))
+      (pset! x i (+ a b))
+      (pset! x j (- a b))
+      void)))
+
+(bind-func static hall_tap
+  "read d at n + frac frames ago (0 <= frac < 1), interpolating linearly"
+  (lambda (d:DelayLine* n:i64 frac:SAMPLE)
+    (let ((a (dl_read d n)))
+      (+ a (* frac (- (dl_read d (+ n 1)) a))))))
+
+(bind-func hall_reverb_c
+  "a hall reverb: early reflections and an eight-line feedback delay network.
+
+The returned closure reads the stereo frame `in` and writes the reverb (only)
+to `out`. It takes the same arguments as plate_reverb_c.
+
+@param size - how big the hall is and how long it rings, 0.0 (0.5 seconds) to
+1.0 (12 seconds)
+@param damping - how much faster the treble dies than the mids, 0.0 to 1.0
+@param predelay - seconds of silence before the first reflection (up to 0.25)"
+  (lambda ()
+    (let ((fs:double (convert SRf))
+          ;; delay lengths below are given in frames at 48 kHz
+          (rho:double (/ fs 48000.0))
+          ;; the input lines: up to 0.25 s of predelay plus 50 ms of reflections
+          (in_len:i64 (+ 5 (convert (* 0.31 fs) i64)))
+          (in_l (dl_make in_len))
+          (in_r (dl_make in_len))
+          ;; the early reflections: times in seconds, rounded to whole frames
+          ;; so that every tap shares the predelay's fraction
+          (er_secs:double* (zalloc 12))
+          (er_t:i64* (zalloc 12))
+          ;; the network: each array has one entry per line
+          (base:SAMPLE* (zalloc 8))
+          ;; the sign of each line's input and of its allpass coefficient
+          (in_sign:SAMPLE* (zalloc 8))
+          (ap_sign:SAMPLE* (zalloc 8))
+          (ap_len:i64* (zalloc 8))
+          (max_d:SAMPLE* (zalloc 8))
+          (mains:DelayLine** (zalloc 8))
+          (aps:DelayLine** (zalloc 8))
+          (gain_mid:SAMPLE* (zalloc 8))
+          (gain_low:SAMPLE* (zalloc 8))
+          (pole:SAMPLE* (zalloc 8))
+          (shelf:SAMPLE* (zalloc 8))
+          (treble:SAMPLE* (zalloc 8))
+          (lfo:SAMPLE* (zalloc 8))
+          ;; each line's output this frame (also its interpolator's state)
+          (v:SAMPLE* (zalloc 8))
+          (u:SAMPLE* (zalloc 8))
+          ;; slow sines and cosines (0.83 Hz and 1.19 Hz), made by turning two
+          ;; unit vectors a little each frame. The second starts a quarter
+          ;; cycle on.
+          (sin_a:SAMPLE 0.0) (cos_a:SAMPLE 1.0)
+          (sin_b:SAMPLE 1.0) (cos_b:SAMPLE 0.0)
+          (turn_sin_a:SAMPLE (convert (sin (/ (* 2.0 3.141592653589793 0.83) fs))))
+          (turn_cos_a:SAMPLE (convert (cos (/ (* 2.0 3.141592653589793 0.83) fs))))
+          (turn_sin_b:SAMPLE (convert (sin (/ (* 2.0 3.141592653589793 1.19) fs))))
+          (turn_cos_b:SAMPLE (convert (cos (/ (* 2.0 3.141592653589793 1.19) fs))))
+          ;; how far the delays move: 0.2 ms each way
+          (depth:SAMPLE (convert (/ fs 5000.0)))
+          ;; one-pole coefficients
+          (k_low:SAMPLE (convert (- 1.0 (exp (/ (* -2.0 3.141592653589793 250.0) fs)))))
+          (k_hp:SAMPLE (convert (- 1.0 (exp (/ (* -2.0 3.141592653589793 25.0) fs)))))
+          (k_lp:SAMPLE (convert (- 1.0 (exp (/ (* -2.0 3.141592653589793 12000.0) fs)))))
+          (k_size (smoothing_coeff 0.05))
+          (k_room:double (- 1.0 (exp (/ -1.0 (* 0.25 fs)))))
+          (k_pre:double (- 1.0 (exp (/ -1.0 (* 0.1 fs)))))
+          ;; the smoothed controls
+          (size_s:SAMPLE 0.0) (damping_s:SAMPLE 0.0)
+          ;; these two are doubles: a float's steps are too coarse, and a slow
+          ;; smoother in floats stops short of its target (by a frame or more
+          ;; of predelay)
+          (pre_s:double 0.0) (room:double 0.0) (target_d:double 0.0)
+          (room_f:SAMPLE 0.0)
+          (target:SAMPLE 0.0)
+          (fresh:i64 1)
+          (count:i64 0)
+          ;; worked out every 32 frames
+          (t_mid:double 1.0) (f2:double 1.0) (c2:double 1.0)
+          (len:double 0.0) (g:double 0.0) (b:double 0.0)
+          (gain_out:SAMPLE 0.0)
+          ;; per frame
+          (pre:SAMPLE 0.0)
+          (xp_l:SAMPLE 0.0) (xp_r:SAMPLE 0.0)
+          (er_l:SAMPLE 0.0) (er_r:SAMPLE 0.0)
+          (e_l:SAMPLE 0.0) (e_r:SAMPLE 0.0)
+          (d:SAMPLE 0.0) (whole:i64 0) (frac:SAMPLE 0.0) (eta:SAMPLE 0.0)
+          (x:SAMPLE 0.0) (w:SAMPLE 0.0) (r:SAMPLE 0.0) (s:SAMPLE 0.0) (ga:SAMPLE 0.0)
+          (tmp:SAMPLE 0.0)
+          (wet_l:SAMPLE 0.0) (wet_r:SAMPLE 0.0)
+          (hp_l:SAMPLE 0.0) (hp_r:SAMPLE 0.0)
+          (lp_l:SAMPLE 0.0) (lp_r:SAMPLE 0.0)
+          (i:i64 0))
+      ;; One minus sign in each group of four input signs spreads the input
+      ;; evenly over all eight rows of the matrix. Had they alternated like
+      ;; the allpass signs, the part of the input which passes straight
+      ;; through the allpasses would reach the matrix with the same sign on
+      ;; all four lines, and the matrix would send it all to two lines, both
+      ;; on the left.
+      ;;
+      ;; line:            0      1      2      3      4      5      6      7
+      (pfill! base    7253.0 5261.0 9013.0 6163.0 8017.0 4889.0 9473.0 6679.0)
+      (pfill! ap_len     349    509    283    571    313    449    227    389)
+      (pfill! ap_sign    1.0   -1.0    1.0   -1.0    1.0   -1.0    1.0   -1.0)
+      (pfill! in_sign    1.0    1.0    1.0   -1.0    1.0    1.0    1.0   -1.0)
+      ;; reflections: left side, then right side
+      (pfill! er_secs 0.0071 0.0113 0.0169 0.0247 0.0336 0.0452
+                      0.0083 0.0126 0.0184 0.0269 0.0361 0.0498)
+      (dotimes (i 12)
+        (pset! er_t i (convert (+ 0.5 (* (pref er_secs i) fs)) i64)))
+      (dotimes (i 8)
+        ;; from here on, every length is in frames at the running rate
+        (pset! base i (* (pref base i) (convert rho SAMPLE)))
+        (pset! ap_len i (max 1 (convert (+ 0.5 (* rho (convert (pref ap_len i) double))) i64)))
+        (pset! aps i (dl_make (pref ap_len i)))
+        ;; room for the longest delay plus the wobble
+        (set! whole (+ 4 (convert (+ (* 0.7 (convert (pref base i) double)) (/ fs 5000.0)) i64)))
+        (pset! mains i (dl_make whole))
+        (pset! max_d i (convert (- whole 2)))
+        (pset! gain_mid i 0.0)
+        (pset! gain_low i 0.0)
+        (pset! pole i 0.0)
+        (pset! shelf i 0.0)
+        (pset! treble i 0.0)
+        (pset! lfo i 0.0)
+        (pset! v i 0.0)
+        (pset! u i 0.0))
+      (lambda (in:SAMPLE* out:SAMPLE* size:SAMPLE damping:SAMPLE predelay:SAMPLE)
+        ;; smooth the controls, so that moving them never clicks. Changing the
+        ;; size glides the delay lengths, which bends the pitch of the tail a
+        ;; little, like a tape machine slowing down.
+        (set! target (clamp size 0.0 1.0))
+        (if (= fresh 1) (set! size_s target))
+        (set! size_s (+ size_s (* k_size (- target size_s))))
+        (set! target_d (+ 0.25 (* 0.45 (convert size_s double))))
+        (if (= fresh 1) (set! room target_d))
+        (set! room (+ room (* k_room (- target_d room))))
+        (set! room_f (convert room))
+        (set! target (clamp damping 0.0 1.0))
+        (if (= fresh 1) (set! damping_s target))
+        (set! damping_s (+ damping_s (* k_size (- target damping_s))))
+        (set! target (clamp predelay 0.0 0.25))
+        (set! target_d (* fs (convert target double)))
+        (if (= fresh 1) (set! pre_s target_d))
+        (set! pre_s (+ pre_s (* k_pre (- target_d pre_s))))
+        (set! fresh 0)
+        ;; every 32 frames, set each line's gains and filters for the decay
+        ;; times we want
+        (if (= (% count 32) 0)
+            (begin
+              (set! t_mid (* 0.5 (pow 24.0 (convert size_s double))))
+              (set! f2 (* 16000.0 (pow (/ 1.0 12.0) (convert damping_s double))))
+              (if (> f2 (* 0.45 fs)) (set! f2 (* 0.45 fs)))
+              (set! c2 (cos (/ (* 2.0 3.141592653589793 f2) fs)))
+              (dotimes (i 8)
+                ;; the loop's length in frames: main delay plus allpass
+                (set! len (+ (* (convert (pref base i) double) room)
+                             (convert (pref ap_len i) double)))
+                ;; the gains which give a 60 dB fall in Tm and in 1.25 Tm
+                (set! g (exp (/ (* -6.907755278982137 len) (* fs t_mid))))
+                (pset! gain_mid i (convert g))
+                (pset! gain_low i (convert (exp (/ (* -6.907755278982137 len) (* fs 1.25 t_mid)))))
+                ;; the one-pole lowpass with gain 1 at DC and g at f2
+                (set! b (/ (- 1.0 (* g g c2)) (- 1.0 (* g g))))
+                (pset! pole i (convert (- b (sqrt (- (* b b) 1.0))))))
+              ;; the tail's energy grows with Tm and shrinks with the length
+              ;; of the loops (7093.5 and 386.25 are the mean main and
+              ;; allpass delays): scale the output to hold the level steady.
+              ;; The 2.45 sets it level with the plate.
+              (set! gain_out (convert (* 2.45 (sqrt (/ (/ (+ (* 7093.5 room) 386.25) 48000.0)
+                                                      t_mid)))))
+              ;; rounding errors would slowly change the LFO vectors' lengths:
+              ;; pull them back
+              (set! tmp (- 1.5 (* 0.5 (+ (* sin_a sin_a) (* cos_a cos_a)))))
+              (set! sin_a (* sin_a tmp))
+              (set! cos_a (* cos_a tmp))
+              (set! tmp (- 1.5 (* 0.5 (+ (* sin_b sin_b) (* cos_b cos_b)))))
+              (set! sin_b (* sin_b tmp))
+              (set! cos_b (* cos_b tmp))
+              void))
+        (set! count (+ count 1))
+        ;; the input lines. Write first, so that a read at 1.0 is this frame.
+        (dl_write in_l (pref in 0))
+        (dl_write in_r (pref in 1))
+        (set! pre (convert (+ 1.0 pre_s)))
+        (set! whole (convert pre))
+        (set! frac (- pre (convert whole SAMPLE)))
+        (set! xp_l (hall_tap in_l whole frac))
+        (set! xp_r (hall_tap in_r whole frac))
+        ;; the early reflections
+        (set! er_l (+ (* 0.8 (hall_tap in_l (+ whole (pref er_t 0)) frac))
+                      (* 0.55 (hall_tap in_r (+ whole (pref er_t 1)) frac))
+                      (* -0.62 (hall_tap in_l (+ whole (pref er_t 2)) frac))
+                      (* 0.5 (hall_tap in_l (+ whole (pref er_t 3)) frac))
+                      (* -0.4 (hall_tap in_r (+ whole (pref er_t 4)) frac))
+                      (* -0.33 (hall_tap in_l (+ whole (pref er_t 5)) frac))))
+        (set! er_r (+ (* 0.8 (hall_tap in_r (+ whole (pref er_t 6)) frac))
+                      (* 0.55 (hall_tap in_l (+ whole (pref er_t 7)) frac))
+                      (* -0.62 (hall_tap in_r (+ whole (pref er_t 8)) frac))
+                      (* 0.5 (hall_tap in_r (+ whole (pref er_t 9)) frac))
+                      (* -0.4 (hall_tap in_l (+ whole (pref er_t 10)) frac))
+                      (* -0.33 (hall_tap in_r (+ whole (pref er_t 11)) frac))))
+        ;; what goes into the network: the input and half the reflections
+        (set! e_l (+ xp_l (* 0.5 er_l)))
+        (set! e_r (+ xp_r (* 0.5 er_r)))
+        ;; turn the LFO vectors. Lines 0-3 follow the first, 4-7 the second,
+        ;; each in a different phase (sine, cosine and their negatives).
+        (set! tmp (- (* cos_a turn_cos_a) (* sin_a turn_sin_a)))
+        (set! sin_a (+ (* sin_a turn_cos_a) (* cos_a turn_sin_a)))
+        (set! cos_a tmp)
+        (set! tmp (- (* cos_b turn_cos_b) (* sin_b turn_sin_b)))
+        (set! sin_b (+ (* sin_b turn_cos_b) (* cos_b turn_sin_b)))
+        (set! cos_b tmp)
+        (pfill! lfo sin_a cos_a (* -1.0 sin_a) (* -1.0 cos_a)
+                    sin_b cos_b (* -1.0 sin_b) (* -1.0 cos_b))
+        (dotimes (i 8)
+          ;; read the line between samples with an allpass interpolator: the
+          ;; integer part is chosen so that the fraction lies between 0.5 and
+          ;; 1.5, where the interpolator's coefficient stays small
+          (set! d (+ (* (pref base i) room_f) (* depth (pref lfo i))))
+          (if (< d 2.0) (set! d 2.0))
+          (if (> d (pref max_d i)) (set! d (pref max_d i)))
+          (set! whole (convert (- d 0.5)))
+          (set! frac (- d (convert whole SAMPLE)))
+          (set! eta (/ (- 1.0 frac) (+ 1.0 frac)))
+          (set! x (- (+ (* eta (dl_read (pref mains i) whole))
+                        (dl_read (pref mains i) (+ whole 1)))
+                     (* eta (pref v i))))
+          (pset! v i x)
+          ;; damping: the mid gain, plus a lowpassed copy to lift the lows to
+          ;; their gain, then the treble lowpass
+          (pset! shelf i (+ (pref shelf i) (* k_low (- x (pref shelf i)))))
+          (set! w (+ (* (pref gain_mid i) x)
+                     (* (- (pref gain_low i) (pref gain_mid i)) (pref shelf i))))
+          (pset! treble i (+ w (* (pref pole i) (- (pref treble i) w))))
+          ;; add the input: lines 0-3 take the left, 4-7 the right (the tiny
+          ;; constant keeps the network out of denormal numbers, which are
+          ;; very slow, as it decays to silence)
+          (set! x (+ (pref treble i) 1.0e-18
+                     (* (pref in_sign i) (if (< i 4) e_l e_r))))
+          ;; the allpass, H(z) = (-g + z^-A) / (1 - g z^-A), with g = 0.62
+          ;; on even lines and -0.62 on odd ones
+          (set! ga (* 0.62 (pref ap_sign i)))
+          (set! r (dl_read (pref aps i) (pref ap_len i)))
+          (set! s (+ x (* ga r)))
+          (dl_write (pref aps i) s)
+          (pset! u i (- r (* ga s))))
+        ;; mix the lines with the Hadamard matrix: three rounds of sums and
+        ;; differences, then scale by 1/sqrt(8) and write back into the lines
+        (hall_butterfly u 0 1) (hall_butterfly u 2 3) (hall_butterfly u 4 5) (hall_butterfly u 6 7)
+        (hall_butterfly u 0 2) (hall_butterfly u 1 3) (hall_butterfly u 4 6) (hall_butterfly u 5 7)
+        (hall_butterfly u 0 4) (hall_butterfly u 1 5) (hall_butterfly u 2 6) (hall_butterfly u 3 7)
+        (dotimes (i 8)
+          (dl_write (pref mains i) (* 0.35355339 (pref u i))))
+        ;; the output: four lines on each side, plus the reflections
+        (set! wet_l (+ (* gain_out (- (+ (pref v 0) (pref v 4)) (+ (pref v 3) (pref v 7))))
+                       (* 0.35 er_l)))
+        (set! wet_r (+ (* gain_out (- (+ (pref v 1) (pref v 5)) (+ (pref v 2) (pref v 6))))
+                       (* 0.35 er_r)))
+        ;; tone: a highpass at 25 Hz (the input minus a lowpassed copy) and a
+        ;; lowpass at 12 kHz
+        (set! hp_l (+ hp_l (* k_hp (- wet_l hp_l))))
+        (set! hp_r (+ hp_r (* k_hp (- wet_r hp_r))))
+        (set! lp_l (+ lp_l (* k_lp (- (- wet_l hp_l) lp_l))))
+        (set! lp_r (+ lp_r (* k_lp (- (- wet_r hp_r) lp_r))))
+        (pset! out 0 lp_l)
+        (pset! out 1 lp_r)
+        void))))

@@ -125,6 +125,9 @@ has a compressor which glues the mix together. Their settings are parameters of
 (master 'delay-time 0.25 'delay-feedback 0.6)
 ```
 
+There are two reverbs to choose from: a plate, which is the default, and a
+concert hall, which is bigger and smoother: `(master 'reverb-type 1)`.
+
 `(tracks)` lists the mixer's tracks, `(levels)` prints each track's peak level,
 and `(untrack 'keys)` takes a track away.
 
