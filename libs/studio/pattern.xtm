@@ -1121,7 +1121,9 @@
     (if (not *studio:clock-running*)
         (begin
           (set! *studio:clock-running* #t)
-          (set! *studio:clock-time* (studio_now))
+          ;; cycle 0 starts a moment from now, so that its first events have
+          ;; time to be queued
+          (set! *studio:clock-time* (+ (studio_now) (* 0.1 *studio:samplerate*)))
           (set! *studio:clock-cycle* 0.0)
           (set! *studio:scheduled-to* 0.0)
           (studio:tick)))

@@ -57,6 +57,8 @@
 (bind-val studio_master SAMPLE* 0)
 (bind-val studio_master_peak SAMPLE 0.0)
 (bind-val studio_gain_reduction SAMPLE 0.0)
+;; notes which arrived after the time they were meant to start
+(bind-val studio_late_notes i64 0)
 
 ;; The studio keeps its own clock, so that a render can queue up a whole piece
 ;; before time starts. It runs in frames and matches (now) unless it has been
@@ -155,6 +157,19 @@
           peak)
         0.0)))
 
+(bind-func studio_late_note_count
+  (lambda ()
+    studio_late_notes))
+
+(bind-func studio_dropped_event_count
+  (lambda ()
+    studio_events_dropped))
+
+(bind-func studio_gain_reduction_db
+  "how hard the master compressor is working, in dB (negative)"
+  (lambda ()
+    studio_gain_reduction))
+
 (bind-func studio_peak
   "the master bus's peak level since this was last called"
   (lambda ()
@@ -227,6 +242,8 @@
                   (while (and (> studio_heap_size 0)
                               (<= (tref studio_heap 0) time_now))
                     (studio_heap_pop evt)
+                    (if (and (= (tref evt 2) EVT_NOTE_ON) (< (tref evt 0) (- time_now 2048)))
+                        (set! studio_late_notes (+ studio_late_notes 1)))
                     (studio_apply_event evt))
                   ;; the tracks
                   (pfill! delay_in 0.0 0.0)

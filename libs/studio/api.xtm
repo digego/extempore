@@ -381,6 +381,23 @@
     (studio:say "ready. (instruments) lists what you can put on a track.")
     #t))
 
+;; how is the mix going? Prints the peak level of each track and of the master
+;; bus since the last time this was called (1.0 is full scale), and how hard
+;; the master compressor is working.
+(define levels
+  (lambda ()
+    (dotimes (i *studio:num-tracks*)
+      (if (vector-ref *studio:tracks* i)
+          (studio:say (car (vector-ref *studio:tracks* i))
+                      (/ (round (* 1000.0 (studio_track_peak i))) 1000.0))))
+    (studio:say "master" (/ (round (* 1000.0 (studio_peak))) 1000.0)
+                "compressor" (/ (round (* 10.0 (studio_gain_reduction_db))) 10.0) "dB")
+    (if (> (studio_late_note_count) 0)
+        (studio:say (studio_late_note_count) "notes have arrived late"))
+    (if (> (studio_dropped_event_count) 0)
+        (studio:say (studio_dropped_event_count) "events were dropped: the queue was full"))
+    #t))
+
 ;;;;;;;;;;;;
 ;; scores ;;
 ;;;;;;;;;;;;
