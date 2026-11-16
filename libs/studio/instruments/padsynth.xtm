@@ -108,6 +108,7 @@
 (define *xtmlib-studio-padsynth-loaded* #t)
 
 (sys:load "libs/studio/api.xtm")
+(sys:load "libs/studio/dsp.xtm")
 
 (def-instrument padsynth
   "PADsynth pads: string ensembles, choirs, glass and organ from long, looping spectral tables"
@@ -876,10 +877,6 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
           (c3 (+ (* 0.5 (- y2 ym1)) (* 1.5 (- y0 y1)))))
       (+ y0 (* mu (+ c1 (* mu (+ c2 (* mu c3)))))))))
 
-(bind-func static padsynth_clamp
-  (lambda (x:SAMPLE lo:SAMPLE hi:SAMPLE)
-    (if (< x lo) lo (if (> x hi) hi x))))
-
 (bind-func static padsynth_wrap
   "x, brought back into [0, n) (for 0 <= x < 2n)"
   (lambda (x:double n:double)
@@ -908,7 +905,8 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
           (fstep:SAMPLE 0.0) (frcoef:SAMPLE 0.0) (sus:SAMPLE 1.0)
           ;; the filter, one per channel
           (s1l:SAMPLE 0.0) (s2l:SAMPLE 0.0) (s1r:SAMPLE 0.0) (s2r:SAMPLE 0.0)
-          (fg:SAMPLE 0.0) (fk:SAMPLE 2.0) (fh:SAMPLE 1.0)
+          (fg:SAMPLE 0.0) (fk:SAMPLE 2.0)
+          (a1:SAMPLE 1.0) (a2:SAMPLE 0.0) (a3:SAMPLE 0.0)
           ;; vibrato, drift and morph
           (vib_ph:SAMPLE 0.0) (vib_t:SAMPLE 0.0)
           (d1a:SAMPLE 0.0) (d1b:SAMPLE 0.0) (d1ph:SAMPLE 0.0)
@@ -939,14 +937,14 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
               (if (voice_start? v)
                   (begin
                     (set! x (padsynth_timbre p))
-                    (set! new_tau (convert (floor (+ (padsynth_clamp x 0.0 7.0) 0.5)) i64))
+                    (set! new_tau (convert (floor (+ (clampf x 0.0 7.0) 0.5)) i64))
                     (if (> ea 0.0001)
                         (if (or (<> (voice_pitch v) note) (<> new_tau tau))
                             (begin (if (= fade 0) (set! fade fade_len)) void)
                             (begin
                               (set! rho (sqrt ea))
                               (set! stage 0)
-                              (set! x (padsynth_clamp (padsynth_vel_sens p) 0.0 1.0))
+                              (set! x (clampf (padsynth_vel_sens p) 0.0 1.0))
                               (set! vel_gain (pow 10.0 (* -1.2 x (- 1.0 (voice_vel v)))))
                               void))
                         (begin (set! pending 1) void))))
@@ -962,7 +960,7 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                     (set! note (voice_pitch v))
                     (set! tau new_tau)
                     (set! tau2 (% (+ tau 1) PADSYNTH_TIMBRES))
-                    (set! x (padsynth_clamp (padsynth_vel_sens p) 0.0 1.0))
+                    (set! x (clampf (padsynth_vel_sens p) 0.0 1.0))
                     (set! vel_gain (pow 10.0 (* -1.2 x (- 1.0 (voice_vel v)))))
                     (set! rho 0.0) (set! ea 0.0) (set! ef 0.0) (set! stage 0)
                     (set! s1l 0.0) (set! s2l 0.0) (set! s1r 0.0) (set! s2r 0.0)
@@ -975,20 +973,20 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                     (set! d1ph 0.0) (set! d2ph 0.0)
                     (set! za -1) (set! zb -1)
                     (set! x (padsynth_morph p))
-                    (set! morph_s (padsynth_clamp x 0.0 1.0))
-                    (set! level_s (padsynth_clamp (padsynth_level p) 0.0 4.0))
-                    (set! width_s (padsynth_clamp (padsynth_width p) 0.0 1.0))
+                    (set! morph_s (clampf x 0.0 1.0))
+                    (set! level_s (clampf (padsynth_level p) 0.0 4.0))
+                    (set! width_s (clampf (padsynth_width p) 0.0 1.0))
                     (set! tick 0)
                     void))
               ;;;; the control rate: every 16 frames
               (if (= (bitwise-and tick 15) 0)
                   (begin
                     ;; vibrato, fading in over the attack (at least half a second)
-                    (set! x (padsynth_clamp (padsynth_attack p) 0.005 20.0))
-                    (set! t (/ vib_t (* SRf (padsynth_clamp x 0.5 20.0))))
+                    (set! x (clampf (padsynth_attack p) 0.005 20.0))
+                    (set! t (/ vib_t (* SRf (clampf x 0.5 20.0))))
                     (if (> t 1.0) (set! t 1.0))
-                    (set! cents (* (padsynth_clamp (padsynth_vib_depth p) 0.0 50.0) t (sin vib_ph)))
-                    (set! x (padsynth_clamp (padsynth_vib_rate p) 0.1 8.0))
+                    (set! cents (* (clampf (padsynth_vib_depth p) 0.0 50.0) t (sin vib_ph)))
+                    (set! x (clampf (padsynth_vib_rate p) 0.1 8.0))
                     (set! vib_ph (+ vib_ph (/ (* STWOPI 16.0 x) SRf)))
                     (if (> vib_ph STWOPI) (set! vib_ph (- vib_ph STWOPI)))
                     (set! vib_t (+ vib_t 16.0))
@@ -1004,7 +1002,7 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                                (set! d2b (- (* 2.0 (convert (padsynth_rand rng) SAMPLE)) 1.0)) void))
                     (set! d1 (+ d1a (* (- d1b d1a) 0.5 (- 1.0 (cos (* SPI d1ph))))))
                     (set! d2 (+ d2a (* (- d2b d2a) 0.5 (- 1.0 (cos (* SPI d2ph))))))
-                    (set! x (padsynth_clamp (padsynth_drift p) 0.0 1.0))
+                    (set! x (clampf (padsynth_drift p) 0.0 1.0))
                     (set! cents (+ cents (* 7.0 x d1)))
                     (set! mu (* 0.15 x d2))
                     ;; the pitch
@@ -1042,7 +1040,7 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                     (set! incb (convert (/ f (pref padsynth_bases zb)) double))
                     ;; morph: smoothed, plus the slow drift
                     (set! x (padsynth_morph p))
-                    (set! morph_s (+ morph_s (* morph_coef (- (padsynth_clamp x 0.0 1.0) morph_s))))
+                    (set! morph_s (+ morph_s (* morph_coef (- (clampf x 0.0 1.0) morph_s))))
                     (set! mu (+ mu morph_s))
                     (if (< mu 0.0) (set! mu 0.0))
                     (if (> mu 1.0) (set! mu 1.0))
@@ -1067,30 +1065,32 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                     (set! ob1 (* ob1 PADSYNTH_LEN))
                     (set! ob2 (* ob2 PADSYNTH_LEN))
                     ;; the filter: cutoff follows the key and the envelope
-                    (set! x (padsynth_clamp (padsynth_keytrack p) 0.0 1.0))
-                    (set! fc (* (padsynth_clamp (padsynth_cutoff p) 40.0 20000.0) (pow (/ f 261.63) x)))
-                    (set! x (padsynth_clamp (padsynth_fenv_amount p) -4.0 6.0))
+                    (set! x (clampf (padsynth_keytrack p) 0.0 1.0))
+                    (set! fc (* (clampf (padsynth_cutoff p) 40.0 20000.0) (pow (/ f 261.63) x)))
+                    (set! x (clampf (padsynth_fenv_amount p) -4.0 6.0))
                     (set! fc (* fc (pow 2.0 (* x ef))))
                     (set! x (* 0.45 SRf))
                     (if (> fc x) (set! fc x))
                     (if (< fc 20.0) (set! fc 20.0))
                     (set! fg (tan (* SPI (/ fc SRf))))
-                    (set! q (+ 0.5 (* 1.5 (padsynth_clamp (padsynth_resonance p) 0.0 1.0))))
+                    (set! q (+ 0.5 (* 1.5 (clampf (padsynth_resonance p) 0.0 1.0))))
                     (set! fk (/ 1.0 q))
-                    (set! fh (/ 1.0 (+ 1.0 (* fg (+ fg fk)))))
+                    (set! a1 (/ 1.0 (+ 1.0 (* fg (+ fg fk)))))
+                    (set! a2 (* fg a1))
+                    (set! a3 (* fg a2))
                     ;; envelope rates. A factor of 0.001 (-60 dB) over T
                     ;; seconds is exp(ln(0.001) / (T SR)) a frame.
-                    (set! astep (/ 1.0 (* (padsynth_clamp (padsynth_attack p) 0.005 20.0) SRf)))
-                    (set! dcoef (exp (/ -6.9077553 (* (padsynth_clamp (padsynth_decay p) 0.01 20.0) SRf))))
-                    (set! x (padsynth_clamp (padsynth_release p) 0.02 30.0))
+                    (set! astep (/ 1.0 (* (clampf (padsynth_attack p) 0.005 20.0) SRf)))
+                    (set! dcoef (exp (/ -6.9077553 (* (clampf (padsynth_decay p) 0.01 20.0) SRf))))
+                    (set! x (clampf (padsynth_release p) 0.02 30.0))
                     (set! rcoef (exp (/ -6.9077553 (* x SRf))))
                     (set! frcoef (exp (/ -4.6051702 (* x SRf))))
-                    (set! fstep (/ 1.0 (* (padsynth_clamp (padsynth_fenv_attack p) 0.005 20.0) SRf)))
-                    (set! sus (padsynth_clamp (padsynth_sustain p) 0.0 1.0))
+                    (set! fstep (/ 1.0 (* (clampf (padsynth_fenv_attack p) 0.005 20.0) SRf)))
+                    (set! sus (clampf (padsynth_sustain p) 0.0 1.0))
                     ;; level, and the stereo width: each channel is a mix of
                     ;; the two reads, scaled to keep its power for any width
-                    (set! level_t (padsynth_clamp (padsynth_level p) 0.0 4.0))
-                    (set! x (padsynth_clamp (padsynth_width p) 0.0 1.0))
+                    (set! level_t (clampf (padsynth_level p) 0.0 4.0))
+                    (set! x (clampf (padsynth_width p) 0.0 1.0))
                     (set! width_s (+ width_s (* width_coef (- x width_s))))
                     (set! x (sqrt (/ 2.0 (+ 1.0 (* width_s width_s)))))
                     (set! wide (* x 0.5 (+ 1.0 width_s)))
@@ -1120,7 +1120,7 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
               ;;;; (Per-frame temporaries live in this let, where the compiler
               ;;;; can keep them in registers.)
               (let ((ul:SAMPLE 0.0) (ur:SAMPLE 0.0) (yl:SAMPLE 0.0) (yr:SAMPLE 0.0)
-                    (hp:SAMPLE 0.0) (bp:SAMPLE 0.0) (gain:SAMPLE 0.0)
+                    (lp:SAMPLE 0.0) (bp:SAMPLE 0.0) (gain:SAMPLE 0.0)
                     (tabs padsynth_tables))
                 (if (<> ca1 0.0)
                     (begin
@@ -1149,18 +1149,12 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                 ;; stereo width (the mix is worked out at the control rate)
                 (set! yl (+ (* wide ul) (* narrow ur)))
                 (set! yr (+ (* narrow ul) (* wide ur)))
-                ;; the filter: a state-variable lowpass in its trapezoidal
-                ;; (topology-preserving) form, stable however fast it moves
-                (set! hp (* fh (- (+ yl 1.0e-18) (* (+ fg fk) s1l) s2l)))
-                (set! bp (+ (* fg hp) s1l))
-                (set! s1l (+ (* fg hp) bp))
-                (set! yl (+ (* fg bp) s2l))
-                (set! s2l (+ (* fg bp) yl))
-                (set! hp (* fh (- (+ yr 1.0e-18) (* (+ fg fk) s1r) s2r)))
-                (set! bp (+ (* fg hp) s1r))
-                (set! s1r (+ (* fg hp) bp))
-                (set! yr (+ (* fg bp) s2r))
-                (set! s2r (+ (* fg bp) yr))
+                ;; the filter: a state-variable lowpass (svf_tick, from
+                ;; dsp.xtm), stable however fast it moves
+                (svf_tick yl s1l s2l a1 a2 a3 bp lp)
+                (set! yl lp)
+                (svf_tick yr s1r s2r a1 a2 a3 bp lp)
+                (set! yr lp)
                 ;; output
                 (set! level_s (+ level_s (* glide (- level_t level_s))))
                 (set! gain (* 0.07 level_s vel_gain ea))

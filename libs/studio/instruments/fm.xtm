@@ -53,6 +53,7 @@
 (define *xtmlib-studio-fm-loaded* #t)
 
 (sys:load "libs/studio/api.xtm")
+(sys:load "libs/studio/dsp.xtm")
 
 (def-instrument fm
   "a six-operator FM synth in the style of the Yamaha DX7"
@@ -212,39 +213,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Six operators in each of eight voices is 48 sine waves a frame, too many to
-;; call sin for. Every operator reads one shared table instead, with linear
-;; interpolation between its 4096 points, which is accurate to about -120 dB.
-
-(bind-val FM_TABLE_SIZE i64 4096) ;; fm_sin below assumes this size
-
-(bind-func static fm_sine_table_make
-  (lambda ()
-    ;; two extra points, so that interpolating from the last one stays in bounds
-    (let ((table:SAMPLE* (halloc (+ FM_TABLE_SIZE 2)))
-          (i:i64 0))
-      (dotimes (i (+ FM_TABLE_SIZE 2))
-        (pset! table i (convert (sin (/ (* 6.283185307179586 (convert i double))
-                                        (convert FM_TABLE_SIZE double)))
-                                SAMPLE)))
-      table)))
-
-(bind-val fm_sine SAMPLE* (fm_sine_table_make))
-
-;; These two are macros rather than functions, so that they're compiled into
-;; the voice's inner loop instead of being called 50 times a frame.
-(bind-macro "x minus its whole number of cycles, 0.0 to 1.0 (faster than calling floor)"
-  (fm_wrap x)
-  ;; converting to an integer rounds towards zero, so negative x needs one more cycle
-  `(let ((fm_x:SAMPLE ,x)
-         (fm_y:SAMPLE (- fm_x (convert (convert fm_x i64) SAMPLE))))
-     (if (< fm_y 0.0) (+ fm_y 1.0) fm_y)))
-
-(bind-macro "sin(2πx) for a phase x in cycles (any value, not just 0.0 to 1.0)"
-  (fm_sin x)
-  `(let ((fm_pos:SAMPLE (* (fm_wrap ,x) 4096.0))
-         (fm_i:i64 (convert fm_pos i64))
-         (fm_a:SAMPLE (pref fm_sine fm_i)))
-     (+ fm_a (* (- fm_pos (convert fm_i SAMPLE)) (- (pref fm_sine (+ fm_i 1)) fm_a)))))
+;; call sin for. Every operator reads the shared table in dsp.xtm instead
+;; (sine_wrap, which takes any phase in cycles, and wrap01, which brings a
+;; phase back into 0.0 to 1.0).
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; the algorithms ;;
@@ -468,8 +439,8 @@
                 (set! x (/ 0.025 (pref inc fb_to)))
                 (set! fb_amount (* 0.25 (fm_feedback p) (if (< x 1.0) x 1.0)))))
           (set! lfo_phase (+ lfo_phase (/ (fm_lfo_rate p) SRf)))
-          (set! lfo_phase (fm_wrap lfo_phase))
-          (set! lfo (fm_sin lfo_phase))
+          (set! lfo_phase (wrap01 lfo_phase))
+          (set! lfo (sine_wrap lfo_phase))
           (if (and (< (voice_gate v) 0.5) (not released))
               (begin
                 (set! released #t)
@@ -511,8 +482,8 @@
             (if (= k fb_to)
                 (set! m (+ m (* fb_amount 0.5 (+ fb1 fb2)))))
             (set! x (* e (pref gain k)))
-            (pset! raw k (if (= x 0.0) 0.0 (* x (fm_sin (+ (pref phase k) m)))))
-            (pset! phase k (fm_wrap (+ (pref phase k) (pref inc k))))
+            (pset! raw k (if (= x 0.0) 0.0 (* x (sine_wrap (+ (pref phase k) m)))))
+            (pset! phase k (wrap01 (+ (pref phase k) (pref inc k))))
             ;; carriers are what we hear. The note is over once every carrier
             ;; has decayed or been released to silence.
             (if (> (pref alg (+ 36 k)) 0.5)
@@ -547,7 +518,7 @@
 (bind-func fm_output_c
   (lambda (p:SAMPLE*)
     (let ((line (dl_make 1024))
-          (dc_coeff:SAMPLE (- 1.0 (/ (* STWOPI 10.0) SRf)))
+          (dc_k:SAMPLE (- 1.0 (/ (* STWOPI 10.0) SRf)))
           (dc_in:SAMPLE 0.0)
           (dc_out:SAMPLE 0.0)
           (phase:SAMPLE 0.0)
@@ -558,18 +529,15 @@
           (r:SAMPLE 0.0))
       (lambda (frame:SAMPLE*)
         (set! x (pref frame 0))
-        ;; the tiny constant keeps the filter out of denormal numbers in silence
-        (set! dc_out (+ (- x dc_in) (* dc_coeff dc_out) 1.0e-18))
-        (set! dc_in x)
-        (set! x dc_out)
+        (set! x (dc_block dc_in dc_out dc_k x))
         (dl_write line x)
         (set! mix (fm_chorus p))
         (if (> mix 0.0)
             (begin
               (set! mix (if (> mix 1.0) 1.0 mix))
-              (set! phase (fm_wrap (+ phase (/ 0.45 SRf))))
-              (set! l (dl_readf line (* ms (+ 7.0 (* 3.0 (fm_sin phase))))))
-              (set! r (dl_readf line (* ms (+ 7.0 (* 3.0 (fm_sin (+ phase 0.5)))))))
+              (set! phase (wrap01 (+ phase (/ 0.45 SRf))))
+              (set! l (dl_readf line (* ms (+ 7.0 (* 3.0 (sine_wrap phase))))))
+              (set! r (dl_readf line (* ms (+ 7.0 (* 3.0 (sine_wrap (+ phase 0.5)))))))
               (pset! frame 0 (+ (* (- 1.0 (* 0.4 mix)) x) (* 0.6 mix l)))
               (pset! frame 1 (+ (* (- 1.0 (* 0.4 mix)) x) (* 0.6 mix r)))
               void)
