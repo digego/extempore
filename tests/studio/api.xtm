@@ -1,0 +1,97 @@
+;;; tests/studio/api.xtm -- tests for the studio's tracks, parameters and scores
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Tests run without an audio device, so nothing calls the studio's DSP
+;; callback. run_studio does it by hand, which is enough to move the studio's
+;; clock on and have it apply the events which have been queued.
+
+;;; Code:
+
+(sys:load "libs/studio/studio.xtm" 'quiet)
+
+(bind-func run_studio
+  "run the studio's DSP for some seconds, and return the loudest sample it made"
+  (lambda (seconds:double)
+    (let ((frames:i64 (convert (* seconds (convert SRf double))))
+          (start (now))
+          (peak:SAMPLE 0.0)
+          (x:SAMPLE 0.0)
+          (i:i64 0))
+      (dotimes (i frames)
+        (set! x (studio_dsp 0.0 (+ start i) 0 null))
+        (if (> (fabs x) peak) (set! peak (fabs x)))
+        (studio_dsp 0.0 (+ start i) 1 null))
+      peak)))
+
+;; a score holds the clock still until score-end, so that queued events and
+;; the frames we run line up
+(score-begin)
+
+;;;;;;;;;;;;
+;; tracks ;;
+;;;;;;;;;;;;
+
+(xtmtest-result (track 'bass 'acid) 'bass "track-loads-an-instrument")
+(xtmtest-result (studio:track-index 'bass) 0 "the-first-track-is-track-0")
+(xtmtest-result (studio:track-instrument 'bass) 'acid "track-knows-its-instrument")
+(xtmtest-result (track 'bass 'acid) 'bass "track-can-be-evaluated-again")
+(xtmtest-result (studio:track-index 'bass) 0 "and-stays-where-it-was")
+(xtmtest-result (track 'lead 'acid 'squelchy) 'lead "track-with-a-preset")
+(xtmtest-result (studio:track-index 'lead) 1 "a-second-track")
+(xtmtest-result (track 'nope 'no-such-instrument) #f "an-unknown-instrument-is-refused")
+(xtmtest-result (list? (member 'squelchy (presets 'bass))) #t "presets-are-listed")
+
+;;;;;;;;;;;;;;;;
+;; parameters ;;
+;;;;;;;;;;;;;;;;
+
+(xtmtest-result (studio:param-value 'bass 'cutoff) 320.0 "a-parameter-starts-at-its-default")
+(ctl 'bass 'cutoff 900 'pan 0.25)
+(master 'reverb-size 0.5)
+(studio_release)
+(run_studio 0.01)
+(xtmtest-result (studio:param-value 'bass 'cutoff) 900.0 "ctl-sets-an-instrument-parameter")
+(xtmtest-result (studio:param-value 'bass 'pan) 0.25 "ctl-sets-a-mixer-parameter")
+(xtmtest-result (studio:param-value 'master 'reverb-size) 0.5 "master-sets-a-master-parameter")
+(xtmtest-result (studio:param-value 'lead 'cutoff) 220.0 "the-preset-was-applied")
+(xtmtest-result (ctl 'bass 'no-such-parameter 1.0) 'bass "an-unknown-parameter-is-reported-not-fatal")
+(xtmtest-result (studio:find-param 'bass 'no-such-parameter) #f "and-is-not-found")
+
+(preset 'bass 'rubber)
+(run_studio 0.01)
+(xtmtest-result (studio:param-value 'bass 'wave) 1.0 "preset-sets-what-it-names")
+(xtmtest-result (studio:param-value 'bass 'tune) 0.0 "and-resets-the-rest-to-their-defaults")
+
+;;;;;;;;;;;
+;; notes ;;
+;;;;;;;;;;;
+
+(xtmtest-result (< (run_studio 0.2) 0.0001) #t "silence-before-any-note")
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "a-note-makes-sound")
+(run_studio 2.0)
+(ctl 'bass 'mute 1.0)
+(run_studio 0.1) ;; the mute fades in over a few milliseconds
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (< (run_studio 0.2) 0.0001) #t "a-muted-track-is-silent")
+(ctl 'bass 'mute 0.0)
+(run_studio 1.0)
+
+;;;;;;;;;;;;;;
+;; patterns ;;
+;;;;;;;;;;;;;;
+
+(xtmtest-result (studio:resolve-sound 'bass) '(0 . #f) "a-track-name-is-a-sound")
+(once (note '(c2 c3)) (sound 'bass))
+(xtmtest-result (> (run_studio 0.5) 0.05) #t "a-pattern-plays-its-track")
+(run_studio 3.0)
+
+(xtmtest-result (untrack 'lead) 'lead "untrack")
+(xtmtest-result (studio:track-index 'lead) #f "the-track-has-gone")
+(xtmtest-result (reload 'bass) 'bass "reload-makes-a-new-instance")
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "which-plays")

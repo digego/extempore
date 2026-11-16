@@ -196,7 +196,7 @@
     (let ((i (studio:track-index name)))
       (if i
           (begin
-            (studio_set_instrument i (sys:make-cptr 0))
+            (studio_clear_track i)
             (vector-set! *studio:tracks* i #f)))
       name)))
 
@@ -367,6 +367,24 @@
 (define note-on
   (lambda (track-name pitch velocity seconds)
     (studio:note-at (studio_now) track-name pitch velocity seconds)))
+
+;; Play a note from code which runs on Extempore's beat clock (*metro*), where
+;; a variable called `beat` is in scope: a temporal recursion, or the :>
+;; pattern language in libs/core/pattern-language.xtm. It takes what the older
+;; `play` macro takes, with a track's name in place of an instrument: pitch,
+;; velocity (0 to 127) and a length in beats, with an optional offset in beats
+;; first.
+;;
+;;   (:> A 4 0 (play-on 'bass @1 80 dur) '(36 36 39 48))
+(define-macro (play-on . args)
+  (let* ((offset? (> (length args) 4))
+         (offset (if offset? (car args) 0))
+         (rest (if offset? (cdr args) args)))
+    `(studio:note-at (*metro* (+ beat ,offset))
+                     ,(car rest)
+                     ,(cadr rest)
+                     (/ ,(caddr rest) 127.0)
+                     (/ (*metro* 'dur ,(cadddr rest)) *studio:samplerate*))))
 
 (define studio:all-off
   (lambda ()
