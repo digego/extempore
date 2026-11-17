@@ -19,18 +19,18 @@ people who want to write an instrument.
 
 ## How the pieces fit
 
-| file           | what's in it                                                 |
-| -------------- | ------------------------------------------------------------ |
-| `engine.xtm`   | voices, instruments, the timestamped event queue             |
+| file           | what's in it                                                   |
+| -------------- | -------------------------------------------------------------- |
+| `engine.xtm`   | voices, instruments, the timestamped event queue               |
 | `dsp.xtm`      | the shared building blocks: filters, envelopes, oscillators... |
 | `fx.xtm`       | channel strip, stereo delay, plate reverb, compressor, limiter |
 | `hall.xtm`     | a second reverb: a concert hall (a feedback delay network)     |
-| `mixer.xtm`    | sixteen tracks, the send effects, the master bus, the DSP    |
-| `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument`  |
-| `pattern.xtm`  | the pattern language and its clock                           |
-| `sampler.xtm`  | the sample-playback engine, and its SFZ and folder loaders   |
-| `studio.xtm`   | loads all of the above                                       |
-| `instruments/` | one file per instrument, loaded on first use                 |
+| `mixer.xtm`    | sixteen tracks, the send effects, the master bus, the DSP      |
+| `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument`    |
+| `pattern.xtm`  | the pattern language and its clock                             |
+| `sampler.xtm`  | the sample-playback engine, and its SFZ and folder loaders     |
+| `studio.xtm`   | loads all of the above                                         |
+| `instruments/` | one file per instrument, loaded on first use                   |
 
 A _voice_ is one sounding note. An _instrument_ is a set of voices, a table of
 parameters they all read, and an optional effect on their sum. The engine
@@ -206,15 +206,15 @@ The compiler is strict in ways that are easy to trip over.
 
 Useful constants and functions: `SRf` (sample rate), `SPI`, `STWOPI`,
 `midi2frq`, `(random)` (give the result a type: `(r:SAMPLE (random))`), and
-`sin cos tan tanh exp log pow sqrt fabs floor`. 
+`sin cos tan tanh exp log pow sqrt fabs floor`.
 
-Before writing a filter, envelope or oscillator of your own, look in
-`dsp.xtm`: it has state-variable and ladder filters, one-pole filters and a DC
-blocker, an ADSR, band-limited saw, pulse and triangle oscillators, a sine
-table, noise, a fast tanh, delay lines with linear and cubic reads, an
-oversampled saturator and an FFT. Each comes in the form which is cheapest
-for its usual place: a macro or a plain function over a small state array for
-a voice's inner loop, and a closure where convenience matters more.
+Before writing a filter, envelope or oscillator of your own, look in `dsp.xtm`:
+it has state-variable and ladder filters, one-pole filters and a DC blocker, an
+ADSR, band-limited saw, pulse and triangle oscillators, a sine table, noise, a
+fast tanh, delay lines with linear and cubic reads, an oversampled saturator and
+an FFT. Each comes in the form which is cheapest for its usual place: a macro or
+a plain function over a small state array for a voice's inner loop, and a
+closure where convenience matters more.
 
 ## Hearing it without a sound card
 
