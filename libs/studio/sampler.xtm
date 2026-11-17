@@ -391,20 +391,10 @@ file can't be read."
 ;; a bank of regions per instrument ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The compiler under-counts the size of a struct with mixed field sizes
-;; (it doesn't allow for the padding LLVM puts before an i64), so (zalloc n)
-;; of SamplerSlots would come up short and the last voices' slots would
-;; overrun the array. Ask for the memory in bytes, using the real stride.
-(bind-func static sampler_alloc_slots
-  (lambda (n:i64)
-    (let ((stride (ptrtoi64 (cast (pref-ptr (cast null SamplerSlot*) 1) i8*)))
-          (raw:i8* (zalloc (* n stride))))
-      (cast raw SamplerSlot*))))
-
 (bind-func sampler_bank_make
   (lambda (inst:Inst*)
     (let ((nslots (* (inst_nvoices inst) SAMPLER_SLOTS))
-          (slots (sampler_alloc_slots nslots))
+          (slots:SamplerSlot* (zalloc nslots))
           (bank (SamplerBank inst
                              SAMPLER_MAX_REGIONS
                              0

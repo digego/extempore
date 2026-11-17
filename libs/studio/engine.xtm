@@ -124,13 +124,7 @@
 Every voice starts out silent: give each one a voice function with
 inst_set_voice."
   (lambda (name:i8* nvoices:i64 nparams:i64)
-    (let (;; The compiler works out a struct's size as if an i64 only needed
-          ;; to start on a 4-byte boundary, but LLVM lays one out on an 8-byte
-          ;; boundary. So (zalloc nvoices) would come up a few bytes short per
-          ;; voice, and the last voices would overrun the array. Ask for the
-          ;; memory in bytes instead, with room to spare.
-          (voice_bytes:i8* (zalloc (* 64 nvoices)))
-          (voices:Voice* (cast voice_bytes Voice*))
+    (let ((voices:Voice* (zalloc nvoices))
           (fns:VoiceFn* (zalloc nvoices))
           (params:SAMPLE* (zalloc (+ nparams 1)))
           (keymap:i64* (zalloc 128))

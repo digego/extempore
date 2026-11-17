@@ -56,10 +56,7 @@
 ;; 3 peak level since it was last read
 ;; 4 the sum of its squared samples, and
 ;; 5 the number of frames, since the RMS level was last read
-;;
-;; (Every field is eight bytes wide, so that an array of tracks is laid out
-;; the way the compiler expects: see the note in inst_make.)
-(bind-type Track <Inst*,SAMPLE*,[void,SAMPLE*,SAMPLE*]*,double,double,i64> (printer? . #f))
+(bind-type Track <Inst*,SAMPLE*,[void,SAMPLE*,SAMPLE*]*,SAMPLE,double,i64> (printer? . #f))
 
 (bind-val studio_tracks Track* 0)
 (bind-val studio_master SAMPLE* 0)
@@ -180,7 +177,7 @@
   (lambda (track:i64)
     (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
         (let ((trk (pref-ptr studio_tracks track))
-              (peak:SAMPLE (convert (tref trk 3))))
+              (peak:SAMPLE (tref trk 3)))
           (tset! trk 3 0.0)
           peak)
         0.0)))
@@ -264,7 +261,7 @@
         (strip:SAMPLE* null)
         (time_now:i64 0)
         (peak:SAMPLE 0.0)
-        (track_peak:double 0.0)
+        (power:SAMPLE 0.0)
         (i:i64 0))
     (dotimes (i STUDIO_TRACKS)
       (let ((params:SAMPLE* (zalloc STRIP_NPARAMS)))
@@ -299,12 +296,11 @@
                           (set! strip (tref trk 1))
                           (inst_tick inst frame)
                           ((tref trk 2) frame strip)
-                          (set! track_peak (convert (max (fabs (pref frame 0)) (fabs (pref frame 1)))))
-                          (if (> track_peak (tref trk 3)) (tset! trk 3 track_peak))
-                          (set! peak (* 0.5 (+ (* (pref frame 0) (pref frame 0))
-                                               (* (pref frame 1) (pref frame 1)))))
-                          (set! track_peak (convert peak))
-                          (tset! trk 4 (+ (tref trk 4) track_peak))
+                          (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
+                          (if (> peak (tref trk 3)) (tset! trk 3 peak))
+                          (set! power (* 0.5 (+ (* (pref frame 0) (pref frame 0))
+                                                (* (pref frame 1) (pref frame 1)))))
+                          (tset! trk 4 (+ (tref trk 4) (convert power double)))
                           (tset! trk 5 (+ (tref trk 5) 1))
                           (frame_add_stereo mix (pref frame 0) (pref frame 1))
                           (frame_add_stereo delay_in

@@ -179,13 +179,6 @@ The compiler is strict in ways that are easy to trip over.
   `(x:SAMPLE 0.0)` in `let` bindings. `clamp`, `min` and `max` are macros which
   expand to `if`, so `(clamp x 0.0 0.24)` in the middle of an expression can
   fail the same way: assign it to a typed variable first.
-- **Keep structs free of padding.** The compiler works out a struct's size as if
-  an `i64`, `double` or pointer only needed a 4-byte boundary, but LLVM puts
-  them on 8-byte boundaries. A struct whose layout needs padding (an `i1` or an
-  odd number of `SAMPLE`s before an `i64`, say) is then allocated a few bytes
-  short, and an array of them overruns its memory. In any `bind-type`, put the
-  8-byte fields first and the 4-byte fields after them in pairs, and use `i64`
-  for flags.
 - **"floating point constant invalid for type".** A literal which a `float`
   can't hold exactly (`0.004`, say), multiplied by a `SAMPLE` inside a
   `convert`, fails with this error. Divide by a value which is exact instead:
