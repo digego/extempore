@@ -168,3 +168,27 @@
          (dsptest_close (convert (hermite_interp 0.0:f 1.0 2.0 3.0 4.0) double) 2.0)
          (dsptest_close (convert (hermite_interp 0.25:f 1.0 2.0 3.0 4.0) double) 2.25))))
 (xtmtest-result (test_hermite_interp_linear) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; comb filters       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; an impulse every 10 samples through a 3-sample delay on an 8-sample line
+;; comes out 3 samples later every time, across several wraps of the line. A
+;; head that reaches maxdelay before wrapping reads and writes one past the
+;; line (reported under the sanitize-asan preset).
+(bind-func test_comb_wraps
+  (lambda ()
+    (let ((comb (comb_c 8))
+          (apf (comb_apf_c 8))
+          (x:SAMPLE 0.0)
+          (y:SAMPLE 0.0)
+          (i:i64 0)
+          (echoes:i64 0))
+      (dotimes (i 40)
+        (set! x (if (= (% i 10) 0) 1.0 0.0))
+        (set! y (comb x 3.0 1.0 1.0 0.0))
+        (apf x 3.0 0.5)
+        (if (> y 0.5) (set! echoes (+ echoes i))))
+      echoes)))
+(xtmtest-result (test_comb_wraps) 72)
