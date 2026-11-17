@@ -68,6 +68,10 @@
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#ifdef EXTEMPORE_ASAN
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#endif
 
 #include "SchemeFFIRegistry.h"
 
@@ -158,6 +162,45 @@ static pointer optimizationLevel(scheme* Scheme, pointer Args)
     EXTLLVM::OPTIMIZATION_LEVEL = level;
     return mk_integer(Scheme, level);
 }
+
+#ifdef EXTEMPORE_ASAN
+// In an ASan build the JIT-compiled xtlang is instrumented as well, so its
+// loads and stores are checked against the same shadow memory as the C++
+// runtime. No module constructor runs, so globals can't be registered with
+// the runtime: leave them uninstrumented.
+static void instrumentForASan(llvm::Module& M)
+{
+    static const bool globalsOff = [] {
+        auto& opts = llvm::cl::getRegisteredOptions();
+        static_cast<llvm::cl::opt<bool>*>(opts["asan-globals"])->setValue(false);
+        return true;
+    }();
+    (void)globalsOff;
+
+    for (auto& F : M) {
+        if (!F.isDeclaration()) {
+            F.addFnAttr(llvm::Attribute::SanitizeAddress);
+        }
+    }
+
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+    llvm::PassBuilder PB;
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    llvm::ModulePassManager MPM;
+    MPM.addPass(llvm::AddressSanitizerPass(llvm::AddressSanitizerOptions{},
+                                           /*UseGlobalGC=*/false, /*UseOdrIndicator=*/false,
+                                           llvm::AsanDtorKind::None, llvm::AsanCtorKind::None));
+    MPM.run(M, MAM);
+}
+#endif
 
 static pointer jitCompileIRString(scheme* Scheme, pointer Args)
 {
@@ -1173,6 +1216,9 @@ static llvm::Module* jitCompile(const std::string& irString) {
             ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(optLevel);
             MPM.run(*mod, MAM);
         }
+#ifdef EXTEMPORE_ASAN
+        instrumentForASan(*mod);
+#endif
 
         // Work out what the module exports and imports, clone it for
         // the metadata view, and hand both to the JIT under one tracker.

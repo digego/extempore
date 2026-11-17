@@ -8,6 +8,20 @@
 #include <malloc.h>  // _aligned_malloc / _aligned_free
 #endif
 
+// In an ASan build, zone memory outside live allocations (free space, each
+// allocation's header and its rounding padding) is poisoned, so an xtlang
+// write past the end of a zalloc'd block is reported rather than landing in
+// the next one. The size word just before each payload stays readable for
+// llvm_zone_ptr_size.
+#ifdef EXTEMPORE_ASAN
+#include <sanitizer/asan_interface.h>
+#define ZONE_POISON(addr, size) ASAN_POISON_MEMORY_REGION(addr, size)
+#define ZONE_UNPOISON(addr, size) ASAN_UNPOISON_MEMORY_REGION(addr, size)
+#else
+#define ZONE_POISON(addr, size) ((void)(addr), (void)(size))
+#define ZONE_UNPOISON(addr, size) ((void)(addr), (void)(size))
+#endif
+
 constexpr bool DEBUG_ZONE_ALLOC = false;
 constexpr bool DEBUG_ZONE_STACK = false;
 
@@ -54,6 +68,9 @@ llvm_zone_t* llvm_zone_create(uint64_t size) {
         size = 0;
     }
     zone->size = size;
+    if (zone->memory) {
+        ZONE_POISON(zone->memory, size_t(size));
+    }
     zone->cleanup_hooks = nullptr;
     zone->memories = nullptr;
     return zone;
@@ -67,12 +84,18 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
     if (Zone->memories) {
         llvm_zone_destroy(Zone->memories);
     }
+    if (Zone->memory) {
+        ZONE_UNPOISON(Zone->memory, size_t(Zone->size));
+    }
     zone_aligned_free(Zone->memory);
     free(Zone);
 }
 
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
     Zone->offset = 0;
+    if (Zone->memory) {
+        ZONE_POISON(Zone->memory, size_t(Zone->size));
+    }
     return Zone;
 }
 
@@ -142,9 +165,12 @@ EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
         zone_extend(zone, footprint);
     }
     auto block = reinterpret_cast<char*>(zone->memory) + zone->offset;
+    ZONE_UNPOISON(block, size_t(footprint));
     memset(block, 0, size_t(footprint));
     auto newptr = block + LLVM_ZONE_ALIGN;  // skip past size header
     *(reinterpret_cast<uint64_t*>(newptr) - 1) = size;
+    ZONE_POISON(block, LLVM_ZONE_ALIGN - sizeof(uint64_t));
+    ZONE_POISON(newptr + size, size_t(footprint - LLVM_ZONE_ALIGN - size));
     zone->offset += footprint;
     return newptr;
 }
