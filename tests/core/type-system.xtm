@@ -161,8 +161,9 @@
 (xtmtest-result (pad1_last_field) 12345)
 
 ;; A callback's argument block is a struct of the arguments, padding included.
-;; The stores into it happen when the callback is scheduled, so a short block
-;; is a heap overflow there (caught under the ASan preset).
+;; This only checks that a callback with mixed-width arguments compiles and
+;; schedules: a short block overflows from JIT code, which ASan doesn't
+;; instrument, and the callback itself runs after the test file has finished.
 (bind-func callback_float_i64_target
   (lambda (time:i64 a:float b:i64)
     void))
