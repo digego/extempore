@@ -6,6 +6,7 @@
 #include "EXTZones.h"
 
 using extemp::EXTZones::llvm_ptr_in_zone;
+using extemp::EXTZones::llvm_zone_copy_ptr;
 using extemp::EXTZones::llvm_zone_create;
 using extemp::EXTZones::llvm_zone_destroy;
 using extemp::EXTZones::llvm_zone_malloc;
@@ -43,7 +44,7 @@ TEST(Zones, AllocationThatFitsStaysInsideTheZone) {
     EXPECT_EQ(zone.z->memories, nullptr);
     EXPECT_GE(p, old_memory + LLVM_ZONE_ALIGN);
     EXPECT_LE(p + 960, old_memory + 1000);
-    EXPECT_EQ(llvm_zone_ptr_size(p), footprint(960));
+    EXPECT_EQ(llvm_zone_ptr_size(p), 960u);
     EXPECT_EQ(zone.z->offset, footprint(960));
     EXPECT_TRUE(llvm_ptr_in_zone(zone.z, p));
 }
@@ -64,7 +65,7 @@ TEST(Zones, RoundedFootprintIsCheckedNotTheRawSize) {
     EXPECT_EQ(zone.z->offset, footprint(961));
     EXPECT_GE(p, zone.base() + LLVM_ZONE_ALIGN);
     EXPECT_LE(p + 961, zone.base() + zone.z->size);
-    EXPECT_EQ(llvm_zone_ptr_size(p), 1024u);
+    EXPECT_EQ(llvm_zone_ptr_size(p), 961u);
 }
 
 TEST(Zones, PointersFromEarlierBlocksRemainValidAfterExtension) {
@@ -93,6 +94,25 @@ TEST(Zones, EmptyZoneIsReplacedRatherThanChained) {
     EXPECT_EQ(zone.z->memories, nullptr);
     EXPECT_EQ(zone.z->size, 1024u);
     EXPECT_TRUE(llvm_ptr_in_zone(zone.z, p));
+}
+
+TEST(Zones, CopyPtrCopiesThePayloadAndNothingAfterIt) {
+    Zone zone(4096);
+    auto* src = static_cast<char*>(llvm_zone_malloc(zone.z, 10));
+    auto* dst = static_cast<char*>(llvm_zone_malloc(zone.z, 10));
+    auto* after = static_cast<char*>(llvm_zone_malloc(zone.z, 40));
+    std::memset(src, 0x5a, 10);
+    std::memset(after, 0x77, 40);
+    EXPECT_FALSE(llvm_zone_copy_ptr(src, dst)) << "equal sizes copy";
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_EQ(dst[i], 0x5a);
+    }
+    EXPECT_EQ(llvm_zone_ptr_size(after), 40u) << "the next allocation's header is untouched";
+    for (int i = 0; i < 40; ++i) {
+        EXPECT_EQ(after[i], 0x77) << "the next allocation is untouched";
+    }
+    auto* other = static_cast<char*>(llvm_zone_malloc(zone.z, 11));
+    EXPECT_TRUE(llvm_zone_copy_ptr(src, other)) << "different sizes refuse";
 }
 
 TEST(Zones, RequestTooLargeToRepresentAborts) {

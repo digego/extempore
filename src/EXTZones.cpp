@@ -76,8 +76,9 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
     return Zone;
 }
 
-// Every allocation is laid out as [size header: LLVM_ZONE_ALIGN bytes][payload],
-// rounded up as a whole to a multiple of LLVM_ZONE_ALIGN. The footprint is
+// Every allocation is laid out as [header: LLVM_ZONE_ALIGN bytes][payload],
+// rounded up as a whole to a multiple of LLVM_ZONE_ALIGN; the header's last
+// eight bytes hold the payload size, for llvm_zone_ptr_size. The footprint is
 // computed once, up front, and both the capacity check and the memset use that
 // same number -- checking the unrounded size and then rounding up is how the
 // old allocator wrote past the end of a nearly-full zone.
@@ -143,7 +144,7 @@ EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
     auto block = reinterpret_cast<char*>(zone->memory) + zone->offset;
     memset(block, 0, size_t(footprint));
     auto newptr = block + LLVM_ZONE_ALIGN;  // skip past size header
-    *(reinterpret_cast<uint64_t*>(newptr) - 1) = footprint;
+    *(reinterpret_cast<uint64_t*>(newptr) - 1) = size;
     zone->offset += footprint;
     return newptr;
 }
