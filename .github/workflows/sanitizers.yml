@@ -33,8 +33,10 @@ jobs:
         include:
           - preset: sanitize-tsan
             name: ThreadSanitizer
+            labels: "libs-core|cpp-unit"
           - preset: sanitize-asan-ubsan
             name: Address+UB Sanitizer
+            labels: "libs-core|cpp-unit|libs-external|libs-studio|audio-offline"
     name: ${{ matrix.name }}
 
     steps:
@@ -70,18 +72,21 @@ jobs:
 
       - name: Test
         timeout-minutes: 90
-        # Restricted to the fast, deterministic suites. The example/audio tests
-        # carry tight per-test timeouts that instrumentation's 5-15x slowdown
-        # would trip, drowning real findings in spurious timeouts. compiler-unit
-        # is left out for the same reason plus budget: its AOT round-trip test
+        # Restricted to the fast, deterministic suites. The example tests carry
+        # tight per-test timeouts that instrumentation's 5-15x slowdown would
+        # trip, drowning real findings in spurious timeouts. compiler-unit is
+        # left out for the same reason plus budget: its AOT round-trip test
         # drives its own un-scaled sub-process timeouts, and libs-core alone
         # already fills a good part of this step at 15x. Promote it once a run
-        # shows headroom.
+        # shows headroom. The ASan job also runs the studio and the offline
+        # renders, which its smaller slowdown fits: under ASan the JIT-compiled
+        # xtlang is instrumented and zone memory poisoned (EXTEMPORE_ASAN in
+        # CMakeLists.txt), so they exercise most of the xtlang memory traffic.
         env:
           TSAN_OPTIONS: "halt_on_error=0 second_deadlock_stack=1"
           ASAN_OPTIONS: "halt_on_error=0:detect_leaks=0:abort_on_error=1:detect_container_overflow=0"
           UBSAN_OPTIONS: "halt_on_error=0:print_stacktrace=1"
-        run: setarch -R ctest --test-dir build --build-config Release --label-regex "libs-core|cpp-unit" --output-on-failure
+        run: setarch -R ctest --test-dir build --build-config Release --label-regex "${{ matrix.labels }}" --output-on-failure
 
   clang-tidy:
     runs-on: ubuntu-24.04
