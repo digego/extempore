@@ -241,19 +241,19 @@ void* audioCallbackMT(void* Args) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     outbuf[iout + k] =
                         audio_sanity(cache_wrapper(zone, (void*)closure, inbuf[iin + k],
-                                                   (i + LTIME), k, &(indata[0])));
+                                                   (i + LTIME), k, indata.data()));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else if (UNIV::IN_CHANNELS == 1) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     outbuf[iout + k] = audio_sanity(cache_wrapper(
-                        zone, (void*)closure, inbuf[iin], (i + LTIME), k, &(indata[0])));
+                        zone, (void*)closure, inbuf[iin], (i + LTIME), k, indata.data()));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
                     outbuf[iout + k] = audio_sanity(
-                        cache_wrapper(zone, (void*)closure, 0.0, (i + LTIME), k, &(indata[0])));
+                        cache_wrapper(zone, (void*)closure, 0.0, (i + LTIME), k, indata.data()));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             }
