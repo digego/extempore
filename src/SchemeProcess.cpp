@@ -247,12 +247,16 @@ void* SchemeProcess::taskImpl() {
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
-        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+        // The startup tasks' deadlines are in audio time, which an offline
+        // render (--audio-outfile) runs many times faster than the wall
+        // clock, so they get an hour rather than the default timeout.
+        const uint64_t startupBudget = 60 * 60 * UNIV::SECOND();
+        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, startupBudget,
                                     new std::string("(sys:compile-init-ll)"), "file_init",
                                     SchemeTask::Type::LOCAL_PROCESS_STRING));
 
         if (extemp::UNIV::EXT_LOADBASE) {
-            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration,
+            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, startupBudget,
                                         new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"),
                                         "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
@@ -261,7 +265,7 @@ void* SchemeProcess::taskImpl() {
             printf("\nEvaluating expression: ");
             ascii_normal();
             printf("%s\n\n", m_initExpr.c_str());
-            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME + 1000, 60 * 60 * UNIV::SECOND(),
+            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME + 1000, startupBudget,
                                         new std::string(m_initExpr), "file_init",
                                         SchemeTask::Type::LOCAL_PROCESS_STRING));
         }

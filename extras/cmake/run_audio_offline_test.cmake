@@ -17,6 +17,8 @@
 #                   every offline test would sit on the default 7099 and
 #                   collide under `ctest --parallel`. The verify phase gets
 #                   PORT-1, which the caller leaves free for it.
+#
+# Optional: EXTRA_ARGS, a list of further arguments for the render phase.
 
 foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION ASSERT_EXPR RENDER_TIMEOUT VERIFY_TIMEOUT PORT)
     if(NOT DEFINED ${var})
@@ -33,6 +35,7 @@ execute_process(
         --batch "(sys:load \"${RENDER_XTM}\")"
         --audio-outfile "${WAV_PATH}"
         --duration ${DURATION}
+        ${EXTRA_ARGS}
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE render_rc
     TIMEOUT ${RENDER_TIMEOUT})

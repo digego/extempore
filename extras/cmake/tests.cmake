@@ -79,6 +79,7 @@ endmacro()
 #
 # duration is the length of audio to render (seconds). Two-phase: implemented
 # as a cmake -P script so it works cross-platform.
+# Any further arguments are passed to extempore for the render phase.
 macro(extempore_add_audio_offline_test testname renderfile duration assert_expr label)
     extempore_get_next_port(_port)
     set(_wav "${CMAKE_CURRENT_BINARY_DIR}/audio_offline_${testname}.wav")
@@ -93,6 +94,7 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
             -DRENDER_TIMEOUT=60
             -DVERIFY_TIMEOUT=60
             -DPORT=${_port}
+            "-DEXTRA_ARGS=${ARGN}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_audio_offline_test.cmake)
     set_tests_properties(audio-offline/${testname} PROPERTIES
         TIMEOUT 180
@@ -198,6 +200,14 @@ extempore_add_audio_offline_test(hello-sine
     examples/core/hello-sine.xtm 1.0
     "(audiotest_assert_sine \"@WAV@\" 440.0)"
     audio-offline)
+# With big buffers the free-running clock races through audio time while the
+# base library is still loading at startup, so this catches a startup task
+# that's held to an audio-time deadline.
+extempore_add_audio_offline_test(hello-sine-big-buffers
+    examples/core/hello-sine.xtm 1.0
+    "(audiotest_assert_sine \"@WAV@\" 440.0)"
+    audio-offline
+    --frames 16384)
 extempore_add_audio_offline_test(hello-stereo
     examples/core/hello-stereo.xtm 1.0
     "(audiotest_assert_stereo_sine \"@WAV@\" 330.0 550.0)"
