@@ -92,10 +92,12 @@ EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
 }
 
 llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
-    Zone->offset = 0;
+    // only the part handed out needs poisoning again: the audio callbacks
+    // reset their zone after every sample, so the whole block would be slow
     if (Zone->memory) {
-        ZONE_POISON(Zone->memory, size_t(Zone->size));
+        ZONE_POISON(Zone->memory, size_t(Zone->offset));
     }
+    Zone->offset = 0;
     return Zone;
 }
 
