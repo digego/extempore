@@ -946,82 +946,58 @@
           (else type))))
 
 
-(define xtc:codegen:get-alignment
-  (lambda (t)
-    (let  ((nt (xtc:cache:get-namedtype-type t)))
-      (if nt (set! t nt)))
-    (cond ((xtc:codegen:pointer? t) (/ (sys:pointer-size) 8))
-          ((xtc:codegen:array? t) (xtc:codegen:get-type-size (caddr t))) ;; align to array element type
-          ((xtc:codegen:vector? t) (xtc:codegen:get-type-size t)) ;; align to full size of vector
-          ((or  ;; tuples align to their largest internal aligment
-               (xtc:codegen:closure? t)
-               (xtc:codegen:tuple? t))
-           (apply max (map (lambda (tt)
-                             (xtc:codegen:get-alignment tt))
-                           (cdr t))))
-          ;; (else (xtc:codegen:get-type-size t)))))
-          (else ;; under MCJIT i64 appears to be 4-byte aligned, not
-                ;; 8-byte aligned. WTF?
-                (if (= t 2) 4 (xtc:codegen:get-type-size t))))))
-
-
-(define xtc:codegen:get-tuple-type-size
+;; Type sizes come from LLVM, measured with the JIT's DataLayout, so an
+;; allocation always matches the layout getelementptr uses to reach its
+;; fields.  layout-type-str renders a type for llvm:get-type-size: named
+;; types expanded to their bodies (the query parses the string on its own,
+;; where a %name would be an empty opaque struct) and every pointer as ptr.
+(define xtc:codegen:layout-type-str
   (lambda (type)
-    (let ((t (cons *xtc:codegen:tuple* (xtc:codegen:get-tuple-type-from-str (xtc:codegen:get-type-str type)))))
-      ;; if tuple is pointer return pointer-size
-      (if (> (car t) *xtc:codegen:pointer*) (/ (sys:pointer-size) 8)
-          ;; otherwise
-          (let ((et '()) ;; element type
-                (size 0)
-                (largest 0)
-                (align 0)
-                (offset 0)
-                (this_size 0)
-                (elmts (- (length t) 1)))
-            (dotimes (i elmts)
-              (set! et (list-ref t (+ i 1)))
-              (set! this_size (xtc:codegen:get-type-size et))
-              (set! align (xtc:codegen:get-alignment et))
-              (if (> align largest) (set! largest align))
-              (set! offset (modulo size align))
-              (if (> offset 0) (set! offset (- align offset)))
-              (set! size (+ size this_size offset)))
-            ;; finally the whole struct should be aligned
-            ;; to the largest internal aligment
-            (if (> (modulo size largest) 0)
-                (set! size (+ size (- largest (modulo size largest)))))
-            size)))))
+    (cond ((string? type)
+           (cond ((xtc:codegen:pointer? type) "ptr")
+                 ((xtc:cache:namedtype-exists? type)
+                  (xtc:codegen:layout-type-str (xtc:cache:get-namedtype-type type)))
+                 (else
+                   ;; get-type-from-str hands a %name that is not a registered
+                   ;; named type straight back, so recursing on it would spin
+                   ;; forever: it is an error instead
+                   (let ((t (xtc:codegen:get-type-from-str type)))
+                     (if (equal? t type)
+                         (xtc:diagnostics:print-compiler-error "get-type-size: unresolved named type" type)
+                         (xtc:codegen:layout-type-str t))))))
+          ((list? type)
+           (let ((t (car type))
+                 (elts (lambda (ts) (string-join (map xtc:codegen:layout-type-str ts) ","))))
+             (cond ((xtc:codegen:pointer? t) "ptr")
+                   ((xtc:codegen:closure? t) "{ptr,ptr,ptr}")
+                   ((xtc:codegen:tuple? t) (string-append "{" (elts (cdr type)) "}"))
+                   ((xtc:codegen:array? t)
+                    (string-append "[" (number->string (cadr type)) " x " (xtc:codegen:layout-type-str (caddr type)) "]"))
+                   ((xtc:codegen:vector? t)
+                    (string-append "<" (number->string (cadr type)) " x " (xtc:codegen:layout-type-str (caddr type)) ">"))
+                   (else (xtc:diagnostics:print-bad-type-error type "bad type in get-size")))))
+          ;; a recursive reference (\N) inside a named type is only legal
+          ;; behind a pointer
+          ((and (integer? type) (<= type (* -1 *xtc:codegen:pointer*))) "ptr")
+          ((and (integer? type) (xtc:codegen:pointer? type)) "ptr")
+          ((and (integer? type) (= type *xtc:codegen:closure*)) "{ptr,ptr,ptr}")
+          ((and (integer? type) (>= type 0) (< type *xtc:codegen:null*))
+           (xtc:codegen:get-type-str type))
+          (else (xtc:diagnostics:print-bad-type-error type "bad type in get-size")))))
 
+;; memoised by layout string; a layout is fixed for the process
+(define *xtc:codegen:type-size-cache* (make-hashtable 256))
 
 (define xtc:codegen:get-type-size
   (lambda (type)
-    (if (string? type)
-        ;; if this is a named type string
-        (if (xtc:cache:namedtype-exists? type)
-            (if (xtc:codegen:pointer? type)
-                (/ (sys:pointer-size) 8) ;; in bytes not bits
-                (xtc:codegen:get-type-size (xtc:cache:get-namedtype-type type)))
-            ;; get-type-from-str hands a %name that is not a registered
-            ;; named type straight back, so recursing on it would spin
-            ;; forever: it is an error instead
-            (let ((t (xtc:codegen:get-type-from-str type)))
-              (if (equal? t type)
-                  (xtc:diagnostics:print-compiler-error "get-type-size: unresolved named type" type)
-                  (xtc:codegen:get-type-size t))))
-        (let ((t (xtc:codegen:str-list-check type)))
-          (if (xtc:codegen:pointer? t) (/ (sys:pointer-size) 8) ;; in bytes not bits
-              (cond ((member t (list *xtc:codegen:fp64* *xtc:codegen:si64* *xtc:codegen:ui64*)) 8) ; 8 byte stuff
-                    ((member t (list *xtc:codegen:fp32* *xtc:codegen:si32* *xtc:codegen:ui32*)) 4) ; 4 byte stuff
-                    ((member t (list *xtc:codegen:si16* *xtc:codegen:ui16*)) 2) ; 2 byte stuff
-                    ((member t (list *xtc:codegen:char* *xtc:codegen:si8* *xtc:codegen:ui8* *xtc:codegen:i1*)) 1) ; 1 bytes stuff
-                    ((= t *xtc:codegen:closure*) (* (xtc:codegen:get-type-size "i8*") 3))
-                    ((= t *xtc:codegen:array*) (* (xtc:codegen:get-type-size (caddr type)) (cadr type)))
-                    ((= t *xtc:codegen:vector*) (* (xtc:codegen:get-type-size (caddr type)) (cadr type)))
-                    ((= t *xtc:codegen:tuple*)
-                     (xtc:codegen:get-tuple-type-size type)
-                     ;; (llvm:get-struct-size (xtc:codegen:get-type-str type))
-                     )
-                    (else (xtc:diagnostics:print-bad-type-error type "bad type in get-size"))))))))
+    (let* ((lt (xtc:codegen:layout-type-str type))
+           (cached (hashtable-ref *xtc:codegen:type-size-cache* lt)))
+      (or cached
+          (let ((size (llvm:get-type-size lt)))
+            (if (not size)
+                (xtc:diagnostics:print-bad-type-error type "LLVM could not size type"))
+            (hashtable-set! *xtc:codegen:type-size-cache* lt size)
+            size)))))
 
 (define xtc:codegen:strip-ptr-depth
   (lambda (type . ptr-depth)
@@ -3922,8 +3898,7 @@
                                                    (map (lambda (a) (string-append ", " (cadr (cdr a)))) (cdr args)))
                                             "}*")))
            (total_size1 (* (/ (sys:pointer-size) 8) 3))
-           ;; this is the last usage of xtc:codegen:get-type-size in xtc-codegen.xtm - need to get rid of it as well
-           (total_size2 (apply + (map (lambda (a) (xtc:codegen:get-type-size (cadr (cdr a)))) args))))
+           (total_size2 (if (null? args) 0 (xtc:codegen:get-type-size (xtc:codegen:strip-ptr-depth struct_type2)))))
       (if (not (xtc:codegen:fixed-point? (cadr time)))
           (xtc:diagnostics:print-compiler-error "arg 1 of callback must be an i64 time value"))
       (if (<> (length args) (length (cdr ftypes)))

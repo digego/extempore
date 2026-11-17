@@ -90,6 +90,88 @@
     nx))
 (xtmtest-result (integer? (doloop_typed_count 2)) #t)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Struct layout and allocation sizes
+;;
+;; Allocation sizes must match the layout getelementptr uses, padding included:
+;; an i64 after a narrower field, tail padding after one, a non-power-of-two
+;; vector (rounded up by LLVM), nested tuples and array fields.
+
+(xtmtest-result (xtc:codegen:get-type-size "{i1,i64}") 16 "type-size {i1,i64}")
+(xtmtest-result (xtc:codegen:get-type-size "{i64,float}") 16 "type-size {i64,float}")
+(xtmtest-result (xtc:codegen:get-type-size "{i32,i64,i32}") 24 "type-size {i32,i64,i32}")
+(xtmtest-result (xtc:codegen:get-type-size "<3 x float>") 16 "type-size <3 x float>")
+(xtmtest-result (xtc:codegen:get-type-size "{<3 x float>,i1}") 32 "type-size {<3 x float>,i1}")
+(xtmtest-result (xtc:codegen:get-type-size "{i1,{i32,i64}}") 24 "type-size {i1,{i32,i64}}")
+(xtmtest-result (xtc:codegen:get-type-size "{[3 x i8],i64}") 16 "type-size {[3 x i8],i64}")
+
+(bind-type Pad1 <i1,i64>)
+(bind-type Pad2 <i64,float>)
+(bind-type Pad3 <i32,i64,i32>)
+(bind-type Pad4 </3,float/,i1>)
+(bind-type Pad5 <i1,<i32,i64>>)
+(bind-type Pad6 <|3,i8|,i64>)
+
+;; For each type: obj-size equals the GEP stride, and filling n elements of a
+;; zalloc'd array (all of it, to the stride of element n) leaves the next
+;; allocation in the zone untouched. n is large enough that a short block
+;; overruns even after the zone rounds it up.
+(define-macro (xtmtest-padded-type name)
+  (let* ((n (symbol->string name))
+         (sym (lambda (s) (string->symbol (string-append (string-downcase n) s))))
+         (ptr (string->symbol (string-append "a:" n "*"))))
+    `(begin
+      (bind-func ,(sym "_stride")
+        (lambda ()
+          (let ((,ptr (zalloc 2)))
+            (- (obj-size a 1)
+               (- (convert (pref-ptr a 1) i64) (convert a i64))))))
+      (xtmtest-result (,(sym "_stride")) 0)
+      (bind-func ,(sym "_overrun")
+        (lambda ()
+          (memzone 65536
+            (let ((,ptr (zalloc 64))
+                  (sentinel:i64* (zalloc)))
+              (pset! sentinel 0 12345)
+              (memset (cast a i8*) 255
+                      (- (convert (pref-ptr a 64) i64) (convert a i64)))
+              (pref sentinel 0)))))
+      (xtmtest-result (,(sym "_overrun")) 12345))))
+
+(xtmtest-padded-type Pad1)
+(xtmtest-padded-type Pad2)
+(xtmtest-padded-type Pad3)
+(xtmtest-padded-type Pad4)
+(xtmtest-padded-type Pad5)
+(xtmtest-padded-type Pad6)
+
+;; the last field of the last element, written through tset!, stays inside
+;; the block
+(bind-func pad1_last_field
+  (lambda ()
+    (memzone 65536
+      (let ((a:Pad1* (zalloc 64))
+            (sentinel:i64* (zalloc)))
+        (pset! sentinel 0 12345)
+        (doloop (i 64)
+          (tset! (pref-ptr a i) 0 #t)
+          (tset! (pref-ptr a i) 1 -1))
+        (pref sentinel 0)))))
+(xtmtest-result (pad1_last_field) 12345)
+
+;; A callback's argument block is a struct of the arguments, padding included.
+;; The stores into it happen when the callback is scheduled, so a short block
+;; is a heap overflow there (caught under the ASan preset).
+(bind-func callback_float_i64_target
+  (lambda (time:i64 a:float b:i64)
+    void))
+
+(bind-func callback_float_i64
+  (lambda ()
+    (callback (+ (now) 44100) callback_float_i64_target (+ (now) 44100) 1.5 123456789)))
+(xtmtest-runs (callback_float_i64))
+
 ;; vref through a vector pointer takes an index of any integer type
 (bind-func vref_i64_index
   (lambda (i:i64)

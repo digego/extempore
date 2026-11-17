@@ -208,30 +208,23 @@ static pointer get_globalvar(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, const_cast<llvm::GlobalVariable*>(var));
 }
 
-static pointer get_struct_size(scheme* Scheme, pointer Args)
+// The alloc size (the array stride, tail padding included) of an LLVM type
+// string, measured with the JIT's DataLayout: the layout every compiled module
+// gets.  The string must be self-contained: a %named type would parse as a
+// fresh opaque struct, so the caller expands named types first.
+static pointer get_type_size(scheme* Scheme, pointer Args)
 {
-    const char* struct_type_str = argString(Scheme, Args, 1);
-    unsigned long long hash = string_hash(struct_type_str);
-    char name[128];
-    snprintf(name, sizeof(name), "_xtmT%llu", hash);
-    char assm[1024];
-    snprintf(assm, sizeof(assm), "%%%s = type %s", name, struct_type_str);
-
+    const char* type_str = argString(Scheme, Args, 1);
     long size = -1;
     EXTLLVM::getThreadSafeContext().withContextDo([&](llvm::LLVMContext* ctx) {
-    llvm::SMDiagnostic pa;
-        auto newM(llvm::parseAssemblyString(assm, pa, *ctx));
-    if (!newM) {
-            return;
-    }
-        auto type(llvm::StructType::getTypeByName(*ctx, name));
-    if (!type) {
+        llvm::Module scratch("xtm_type_size", *ctx);
+        llvm::SMDiagnostic err;
+        auto type(llvm::parseType(type_str, err, scratch));
+        if (!type || !type->isSized()) {
             return;
         }
-        const auto& layout = newM->getDataLayout();
-        size = layout.getStructLayout(type)->getSizeInBytes();
+        size = EXTLLVM::JIT->getDataLayout().getTypeAllocSize(type).getFixedValue();
     });
-
     if (size < 0) {
         return Scheme->F;
     }
@@ -1303,7 +1296,7 @@ std::span<const FFIEntry> llvmDefs()
         FFI_DEF("llvm:ffi-get-name", ff_get_name, 1, 0, false),
         FFI_DEF("llvm:get-function", get_function, 1, 0, false),
         FFI_DEF("llvm:get-globalvar", get_globalvar, 1, 0, false),
-        FFI_DEF("llvm:get-struct-size", get_struct_size, 1, 0, false),
+        FFI_DEF("llvm:get-type-size", get_type_size, 1, 0, false),
         FFI_DEF("llvm:get-named-struct-size", get_named_struct_size, 1, 0, false),
         FFI_DEF("llvm:get-function-args", get_function_args, 1, 0, false),
         FFI_DEF("llvm:get-function-varargs", get_function_varargs, 1, 0, false),
