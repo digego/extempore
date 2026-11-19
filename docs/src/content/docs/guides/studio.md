@@ -54,31 +54,31 @@ and presets, which set them all at once.
 
 Synthesised, needing nothing but Extempore:
 
-| name        | what it is                                                            |
-| ----------- | --------------------------------------------------------------------- |
-| `acid`      | a squelchy monophonic bassline synth in the style of the TB-303       |
-| `polysynth` | an eight-voice analogue polysynth with a Juno-style chorus            |
-| `fm`        | a six-operator FM synth in the style of the Yamaha DX7                |
-| `strings`   | a string machine with an ensemble chorus, in the style of the Solina  |
-| `organ`     | a tonewheel organ with drawbars, through a rotary speaker             |
-| `epiano`    | an electric piano: struck tines through a pickup, with tremolo        |
-| `guitar`    | plucked strings through an amplifier: acoustic, clean and overdriven  |
-| `macro`     | a macro-oscillator: six engines from Mutable Instruments Plaits       |
-| `resonator` | struck and plucked physical models, from Mutable Instruments Rings    |
-| `chip`      | chiptune leads, arpeggios and basses in the style of 8-bit consoles   |
-| `kit808`    | a synthesised drum machine in the style of the TR-808                 |
-| `kit909`    | a synthesised drum machine in the style of the TR-909                 |
-| `chipkit`   | drums from pitch sweeps and a shift-register noise channel            |
+| name        | what it is                                                           |
+| ----------- | -------------------------------------------------------------------- |
+| `acid`      | a squelchy monophonic bassline synth in the style of the TB-303      |
+| `polysynth` | an eight-voice analogue polysynth with a Juno-style chorus           |
+| `fm`        | a six-operator FM synth in the style of the Yamaha DX7               |
+| `strings`   | a string machine with an ensemble chorus, in the style of the Solina |
+| `organ`     | a tonewheel organ with drawbars, through a rotary speaker            |
+| `epiano`    | an electric piano: struck tines through a pickup, with tremolo       |
+| `guitar`    | plucked strings through an amplifier: acoustic, clean and overdriven |
+| `macro`     | a macro-oscillator: six engines from Mutable Instruments Plaits      |
+| `resonator` | struck and plucked physical models, from Mutable Instruments Rings   |
+| `chip`      | chiptune leads, arpeggios and basses in the style of 8-bit consoles  |
+| `kit808`    | a synthesised drum machine in the style of the TR-808                |
+| `kit909`    | a synthesised drum machine in the style of the TR-909                |
+| `chipkit`   | drums from pitch sweeps and a shift-register noise channel           |
 
 Sampled, needing the Extempore assets (build with `-DASSETS=ON`, or put a copy
 of the assets in an `assets` folder next to `libs`):
 
-| name      | what it is                                                    |
-| --------- | ------------------------------------------------------------- |
-| `piano`   | the Salamander grand piano                                    |
-| `drumkit` | the Salamander acoustic drum kit                              |
-| `kit808s` | a sampled TR-808                                              |
-| `sampler` | an empty sampler, for your own samples or SFZ instruments     |
+| name      | what it is                                                |
+| --------- | --------------------------------------------------------- |
+| `piano`   | the Salamander grand piano                                |
+| `drumkit` | the Salamander acoustic drum kit                          |
+| `kit808s` | a sampled TR-808                                          |
+| `sampler` | an empty sampler, for your own samples or SFZ instruments |
 
 Load your own sounds into a `sampler` track with
 `(sampler-load 'track "path/to/instrument.sfz")` or
