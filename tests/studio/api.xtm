@@ -111,3 +111,40 @@
 (xtmtest-result (< (run_studio 0.3) 0.01) #t "hush-forgets-queued-notes")
 (note-on 'bass 36 0.8 0.1)
 (xtmtest-result (> (run_studio 0.2) 0.05) #t "notes-play-again-after-hush")
+
+;;;;;;;;;;;;;;;;;
+;; bad samples ;;
+;;;;;;;;;;;;;;;;;
+
+;; an instrument whose every sample is not-a-number while `bad` is up
+(def-instrument nantest
+  "a test instrument which goes wrong on request"
+  (params (bad 0.0 "above 0.5: put out not-a-number")))
+
+(bind-func nantest_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((zero:SAMPLE 0.0)
+          (level:SAMPLE 0.125))
+      (lambda (v:Voice* out:SAMPLE*)
+        (frame_add out (if (> (nantest_bad p) 0.5) (/ zero zero) level))
+        (if (< (voice_gate v) 0.5) (voice_done v))
+        void))))
+
+(bind-func nantest_make
+  (lambda ()
+    (let ((inst (inst_make "nantest" 1 (nantest_nparams))))
+      (nantest_defaults (inst_params inst))
+      (inst_set_voice inst 0 (nantest_voice_c (inst_params inst)))
+      inst)))
+
+(run_studio 2.0)
+(track 'broken 'nantest)
+(ctl 'broken 'bad 1.0 'reverb 0.5 'delay 0.5)
+(note-on 'broken 60 0.8 0.2)
+(xtmtest-result (< (run_studio 0.5) 0.0001) #t "a-track-putting-out-NaN-is-silenced")
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "and-the-rest-of-the-mix-plays-on")
+(run_studio 2.0)
+(ctl 'broken 'bad 0.0)
+(note-on 'broken 60 0.8 0.2)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "as-does-the-track-once-it-recovers")

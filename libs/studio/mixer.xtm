@@ -241,6 +241,16 @@
             void))
       void)))
 
+;; xtlang's comparisons of floats are unordered: one with a not-a-number
+;; operand is true. So the first test below catches not-a-number as well as
+;; infinity; the second is the same test for a compiler whose comparisons are
+;; ordered, where it is the one which catches it.
+(bind-macro
+  "is the sample x not a number, infinite, or far too large to be audio?"
+  (sample_bad x)
+  `(let ((bad_x:SAMPLE (fabs ,x)))
+     (or (> bad_x 1000.0) (not (< bad_x 1000.0)))))
+
 (bind-func studio_dsp:DSP 16000000
   (let ((tracks:Track* (zalloc STUDIO_TRACKS))
         (master:SAMPLE* (zalloc MASTER_NPARAMS))
@@ -295,6 +305,12 @@
                         (begin
                           (set! strip (tref trk 1))
                           (inst_tick inst frame)
+                          ;; One infinite or not-a-number sample would stay
+                          ;; in the strip's filters, the send effects and the
+                          ;; compressor for good, so a frame with one in it
+                          ;; is silenced before it reaches any of them.
+                          (if (or (sample_bad (pref frame 0)) (sample_bad (pref frame 1)))
+                              (pfill! frame 0.0 0.0))
                           ((tref trk 2) frame strip)
                           (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
                           (if (> peak (tref trk 3)) (tset! trk 3 peak))
@@ -337,11 +353,11 @@
                   (frame_add_stereo mix
                                     (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 0))
                                     (* (pref master MASTER_REVERB_LEVEL) (pref reverb_out 1)))
-                  ;; the master bus. One infinite or not-a-number sample
-                  ;; from a misbehaving instrument would stick in the
-                  ;; compressor and the effects for good, so stop it here.
-                  (if (not (< (fabs (pref mix 0)) 1000.0)) (pset! mix 0 0.0))
-                  (if (not (< (fabs (pref mix 1)) 1000.0)) (pset! mix 1 0.0))
+                  ;; the master bus. The same check again, to keep a bad
+                  ;; sample from the send effects out of the compressor and
+                  ;; the limiter.
+                  (if (sample_bad (pref mix 0)) (pset! mix 0 0.0))
+                  (if (sample_bad (pref mix 1)) (pset! mix 1 0.0))
                   (set! studio_gain_reduction
                         (compressor mix
                                     (pref master MASTER_COMP_THRESHOLD)
