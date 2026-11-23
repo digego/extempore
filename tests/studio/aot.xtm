@@ -1,0 +1,32 @@
+;;; tests/studio/aot.xtm -- tests for the studio's check of its compiled caches
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A cache is used only while the files it was compiled from have the
+;; checksums noted beside it (see libs/studio/aot.xtm).
+
+;;; Code:
+
+(sys:load "libs/studio/aot.xtm" 'quiet)
+
+(define dsp "libs/studio/dsp.xtm")
+(define fx "libs/studio/fx.xtm")
+(define note (list (cons dsp (studio:aot:checksum dsp))))
+
+(xtmtest-result (> (studio:aot:checksum dsp) 0) #t "a-file-has-a-checksum")
+(xtmtest-result (= (studio:aot:checksum dsp) (studio:aot:checksum fx)) #f "two-files-have-two")
+(xtmtest-result (studio:aot:fresh? note (list dsp)) #t "a-cache-is-fresh-while-its-source-is-as-it-was")
+(xtmtest-result (studio:aot:fresh? (list (cons dsp 1)) (list dsp)) #f "and-stale-once-the-source-changes")
+(xtmtest-result (studio:aot:fresh? note (list dsp fx)) #f "or-once-the-library-is-built-on-another-file")
+(xtmtest-result (studio:aot:fresh? #f (list dsp)) #f "no-note-no-cache")
+(xtmtest-result (studio:aot:read-note "no-such-cache") #f "a-cache-which-isn't-there-has-no-note")
+
+;; After a build the caches are there and up to date, and the studio loads
+;; from them: only a cache defines a library's load timer. (If this fails
+;; after an edit to one of the studio's libraries, build again.)
+(sys:load "libs/studio/mixer.xtm" 'quiet)
+(xtmtest-result (defined? '*xtmlib-studio_mixer-loaded-timer*) #t "the-mixer-loads-from-its-cache")
+(xtmtest-result (defined? '*xtmlib-studio_dsp-loaded-timer*) #t "and-so-does-what-it-is-built-on")

@@ -52,10 +52,18 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'studio-dsp)
-(define *xtmlib-studio-dsp-loaded* #t)
+(sys:load "libs/studio/aot.xtm" 'quiet)
+(studio:aot-load "studio_dsp" '("libs/studio/dsp.xtm"))
+(sys:load-preload-check 'studio_dsp)
+(define *xtmlib-studio_dsp-loaded* #t)
 
-(sys:load "libs/core/audio_dsp.xtm")
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/core/audio_dsp.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/core/audio_dsp.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmstudio_dsp")
+(xtc:aot:import-ll "xtmstudio_dsp")
 
 ;;;;;;;;;;;;;;;;;
 ;; delay lines ;;
@@ -1112,3 +1120,5 @@ the first step shuffles them. Then passes of butterflies combine transforms of
           (set! start (+ start len)))
         (set! len (* len 2)))
       void)))
+
+(xtc:aot:insert-footer "xtmstudio_dsp")

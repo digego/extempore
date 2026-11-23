@@ -30,6 +30,7 @@ people who want to write an instrument.
 | `pattern.xtm`  | the pattern language and its clock                             |
 | `sampler.xtm`  | the sample-playback engine, and its SFZ and folder loaders     |
 | `studio.xtm`   | loads all of the above                                         |
+| `aot.xtm`      | checks a library's compiled cache against its sources          |
 | `instruments/` | one file per instrument, loaded on first use                   |
 
 A _voice_ is one sounding note. An _instrument_ is a set of voices, a table of

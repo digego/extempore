@@ -11,10 +11,18 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'studio-fx)
-(define *xtmlib-studio-fx-loaded* #t)
+(sys:load "libs/studio/aot.xtm" 'quiet)
+(studio:aot-load "studio_fx" '("libs/studio/fx.xtm" "libs/studio/dsp.xtm"))
+(sys:load-preload-check 'studio_fx)
+(define *xtmlib-studio_fx-loaded* #t)
 
-(sys:load "libs/studio/dsp.xtm")
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/studio/dsp.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/studio/dsp.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmstudio_fx")
+(xtc:aot:import-ll "xtmstudio_fx")
 
 ;;;;;;;;;;;;;;;;;;;
 ;; channel strip ;;
@@ -436,3 +444,5 @@ The returned closure processes the stereo frame in place.
         (pset! frame 0 (* gain (dl_read line_l (+ lookahead 1))))
         (pset! frame 1 (* gain (dl_read line_r (+ lookahead 1))))
         void))))
+
+(xtc:aot:insert-footer "xtmstudio_fx")

@@ -20,12 +20,27 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'studio-mixer)
-(define *xtmlib-studio-mixer-loaded* #t)
+(sys:load "libs/studio/aot.xtm" 'quiet)
+(studio:aot-load "studio_mixer"
+                 '("libs/studio/mixer.xtm"
+                   "libs/studio/engine.xtm"
+                   "libs/studio/fx.xtm"
+                   "libs/studio/hall.xtm"
+                   "libs/studio/dsp.xtm"))
+(sys:load-preload-check 'studio_mixer)
+(define *xtmlib-studio_mixer-loaded* #t)
 
-(sys:load "libs/studio/engine.xtm")
-(sys:load "libs/studio/fx.xtm")
-(sys:load "libs/studio/hall.xtm")
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/studio/engine.xtm")
+  (sys:load "libs/studio/fx.xtm")
+  (sys:load "libs/studio/hall.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/studio/engine.xtm" 'quiet)
+  (sys:load "libs/studio/fx.xtm" 'quiet)
+  (sys:load "libs/studio/hall.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmstudio_mixer")
+(xtc:aot:import-ll "xtmstudio_mixer")
 
 (bind-val STUDIO_TRACKS i64 16)
 
@@ -405,3 +420,5 @@ infinity, since this was last called"
       (if (< chan 2)
           (pref mix chan)
           0.0))))
+
+(xtc:aot:insert-footer "xtmstudio_mixer")

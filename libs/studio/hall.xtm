@@ -86,10 +86,18 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'studio-hall)
-(define *xtmlib-studio-hall-loaded* #t)
+(sys:load "libs/studio/aot.xtm" 'quiet)
+(studio:aot-load "studio_hall" '("libs/studio/hall.xtm" "libs/studio/dsp.xtm"))
+(sys:load-preload-check 'studio_hall)
+(define *xtmlib-studio_hall-loaded* #t)
 
-(sys:load "libs/studio/dsp.xtm")
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/studio/dsp.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/studio/dsp.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmstudio_hall")
+(xtc:aot:import-ll "xtmstudio_hall")
 
 (bind-func static hall_butterfly
   "replace x[i] and x[j] with their sum and difference"
@@ -365,3 +373,5 @@ to `out`. It takes the same arguments as plate_reverb_c.
         (pset! out 0 lp_l)
         (pset! out 1 lp_r)
         void))))
+
+(xtc:aot:insert-footer "xtmstudio_hall")

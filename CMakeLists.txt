@@ -559,6 +559,11 @@ file(GLOB AOT_RUNTIME_DEPS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.xtm
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.ll)
 
+# aotcompile_lib(libfile group deps...) names the cache after the library's
+# file. aotcompile_lib_as(name libfile group deps...) gives it another name,
+# for a library whose file name is too common for the cache's one flat
+# directory (libs/studio/dsp.xtm is cached as studio_dsp). The deps are cache
+# names.
 macro(aotcompile_lib libfile group)
     get_filename_component(_aot_name ${libfile} NAME_WE)
     aotcompile_lib_as(${_aot_name} ${libfile} ${group} ${ARGN})
@@ -614,6 +619,17 @@ aotcompile_lib(libs/core/rational.xtm core base)
 aotcompile_lib(libs/core/audiobuffer.xtm core base)
 aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
 aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
+
+# The studio's xtlang libraries. libs/studio/aot.xtm has how a cache is checked
+# against its sources when it is loaded.
+add_custom_target(aot_studio ALL)
+set_target_properties(aot_studio PROPERTIES FOLDER AOT)
+aotcompile_lib_as(studio_engine libs/studio/engine.xtm core base audio_dsp)
+aotcompile_lib_as(studio_dsp libs/studio/dsp.xtm core base audio_dsp)
+aotcompile_lib_as(studio_fx libs/studio/fx.xtm core base audio_dsp studio_dsp)
+aotcompile_lib_as(studio_hall libs/studio/hall.xtm core base audio_dsp studio_dsp)
+aotcompile_lib_as(studio_mixer libs/studio/mixer.xtm core base audio_dsp studio_engine studio_fx studio_hall)
+add_dependencies(aot_studio aot_studio_engine aot_studio_dsp aot_studio_fx aot_studio_hall aot_studio_mixer)
 
 # External audio libs
 if(EXTERNAL_SHLIBS_AUDIO)

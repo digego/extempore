@@ -84,6 +84,11 @@ instrument interface and the xtlang traps. `extras/studio/render` renders an
 `.xtm` score to a WAV offline and prints an analysis of it, which is how to
 check a sound without listening to it.
 
+Its `engine`, `dsp`, `fx`, `hall` and `mixer` files are AOT-compiled (target
+`aot_studio`). Unlike a core library's, a cache whose sources have changed is
+skipped (`libs/studio/aot.xtm`), so an edit to one of them takes effect without
+a rebuild, compiled from source.
+
 ## Docs site
 
 The docs are an Astro/Starlight site in `docs/` (run commands there, with

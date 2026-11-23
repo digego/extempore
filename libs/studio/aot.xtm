@@ -1,0 +1,107 @@
+;;; aot.xtm -- load a studio library's compiled cache, if it is up to date
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; The studio's five xtlang libraries (engine, dsp, fx, hall and mixer) are
+;; compiled ahead of time when Extempore is built, like the core libraries,
+;; into libs/aot-cache. Loading one from its cache is several times quicker
+;; than compiling it.
+;;
+;; A core library's cache is loaded whatever has happened to its source since,
+;; so an edit to the source does nothing until the cache is built again. The
+;; studio's libraries are meant to be edited, so each cache is kept with a
+;; note of what it was compiled from: a checksum of the library's source file
+;; and of the studio files it loads (whose macros are compiled into it). The
+;; cache is used only while those files still have those checksums. Edit one
+;; and the libraries built on it compile from source, as they would with no
+;; cache, until the next build.
+;;
+;; A library starts with
+;;
+;;   (sys:load "libs/studio/aot.xtm" 'quiet)
+;;   (studio:aot-load "studio_fx" '("libs/studio/fx.xtm" "libs/studio/dsp.xtm"))
+;;
+;; and carries on as a core library does (the preload check, then the
+;; xtc:aot: forms which write its cache's header and footer).
+
+;;; Code:
+
+;; path -> checksum, so that a file which several libraries are built on is
+;; read once
+(if (not (defined? '*studio:aot:checksums*))
+    (define *studio:aot:checksums* '()))
+
+;; as sys:load finds a file: as given, then in the share directory
+(define studio:aot:slurp
+  (lambda (path)
+    (or (sys:slurp-file path)
+        (sys:slurp-file (string-append (sys:share-dir) "/" path)))))
+
+(define studio:aot:checksum
+  (lambda (path)
+    (let ((known (assoc path *studio:aot:checksums*)))
+      (if known
+          (cdr known)
+          (let* ((text (or (studio:aot:slurp path) ""))
+                 (n (string-length text))
+                 (sum (let loop ((i 0) (h 5381))
+                        (if (>= i n)
+                            h
+                            (loop (+ i 1)
+                                  (modulo (+ (* 33 h) (char->integer (string-ref text i)))
+                                          4294967291))))))
+            (set! *studio:aot:checksums* (cons (cons path sum) *studio:aot:checksums*))
+            sum)))))
+
+(define studio:aot:note-path
+  (lambda (name)
+    (string-append (sys:share-dir) "/libs/aot-cache/" name ".sources")))
+
+;; the cache's note: a list of (path . checksum), or #f if there isn't one
+(define studio:aot:read-note
+  (lambda (name)
+    (let ((text (sys:slurp-file (studio:aot:note-path name))))
+      (and text
+           (> (string-length text) 0)
+           (let ((note (read (open-input-string text))))
+             (and (list? note) note))))))
+
+;; is this what the cache was compiled from?
+(define studio:aot:fresh?
+  (lambda (note sources)
+    (and (pair? note)
+         (= (length note) (length sources))
+         (let loop ((sources sources))
+           (or (null? sources)
+               (let ((was (assoc (car sources) note)))
+                 (and was
+                      (= (cdr was) (studio:aot:checksum (car sources)))
+                      (loop (cdr sources)))))))))
+
+;; `name` is the cache's name and `sources` the files it is compiled from: the
+;; library's own, and the studio files it loads. While Extempore is compiling
+;; the cache, this writes its note. Otherwise it loads the cache, if there is
+;; one and it is up to date.
+(define studio:aot-load
+  (lambda (name sources)
+    (cond ((output-port? *xtc:aot:current-output-port*)
+           (let ((port (open-output-file (studio:aot:note-path name))))
+             (write (map (lambda (path) (cons path (studio:aot:checksum path))) sources) port)
+             (newline port)
+             (close-port port)
+             #t))
+          ;; the library is loaded already: nothing to do
+          ((defined? (string->symbol (string-append "*xtmlib-" name "-loaded*"))) #f)
+          (else
+            (let ((note (and *xtc:globals:with-cache* (studio:aot:read-note name))))
+              (cond ((not note) #f)
+                    ((studio:aot:fresh? note sources)
+                     (sys:load (string-append "libs/aot-cache/" name ".xtm") 'quiet))
+                    (else
+                      (print "The compiled cache of ")
+                      (print-with-colors 'blue 'default #t (print name))
+                      (print " is older than its source: compiling it afresh\n")
+                      #f)))))))

@@ -32,10 +32,18 @@
 
 ;;; Code:
 
-(sys:load-preload-check 'studio-engine)
-(define *xtmlib-studio-engine-loaded* #t)
+(sys:load "libs/studio/aot.xtm" 'quiet)
+(studio:aot-load "studio_engine" '("libs/studio/engine.xtm"))
+(sys:load-preload-check 'studio_engine)
+(define *xtmlib-studio_engine-loaded* #t)
 
-(sys:load "libs/core/audio_dsp.xtm")
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/core/audio_dsp.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/core/audio_dsp.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmstudio_engine")
+(xtc:aot:import-ll "xtmstudio_engine")
 
 ;;;;;;;;;;;;
 ;; voices ;;
@@ -531,3 +539,5 @@ next time it looks at the queue."
   (lambda ()
     (set! studio_clear_request studio_inbox_write)
     void))
+
+(xtc:aot:insert-footer "xtmstudio_engine")
