@@ -176,3 +176,37 @@
 (ctl 'broken 'bad 0.0)
 (note-on 'broken 60 0.8 0.2)
 (xtmtest-result (> (run_studio 0.2) 0.05) #t "as-does-the-track-once-it-recovers")
+
+;;;;;;;;;;
+;; solo ;;
+;;;;;;;;;;
+
+;; (the last note went to the delay and the reverb: let them die away)
+(run_studio 15.0)
+(solo 'bass)
+(run_studio 0.1)
+(note-on 'new 36 0.8 0.1)
+(xtmtest-result (< (run_studio 0.3) 0.0001) #t "a-track-which-isn't-soloed-is-silent")
+(note-on 'bass 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.3) 0.05) #t "the-soloed-track-plays")
+(unsolo)
+(run_studio 2.0)
+(note-on 'new 36 0.8 0.1)
+(xtmtest-result (> (run_studio 0.3) 0.05) #t "unsolo-brings-the-rest-back")
+(xtmtest-result (solo 'nope) #f "solo-of-an-unknown-track-is-refused")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the echo's time, in beats   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bpm 120)
+(delay-beats 3/4)
+(run_studio 0.01)
+(xtmtest-result (studio:param-value 'master 'delay-time) 0.375 "delay-beats-sets-the-delay-time")
+(bpm 90)
+(run_studio 0.01)
+(xtmtest-result (studio:param-value 'master 'delay-time) 0.5 "and-follows-the-tempo")
+(master 'delay-time 0.25)
+(bpm 120)
+(run_studio 0.01)
+(xtmtest-result (studio:param-value 'master 'delay-time) 0.25 "until-the-time-is-set-in-seconds")

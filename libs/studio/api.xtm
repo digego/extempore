@@ -12,6 +12,7 @@
 ;; (ctl 'bass 'cutoff 900)           change a parameter
 ;; (preset 'bass 'rubber)            change them all at once
 ;; (params 'bass)                    list a track's parameters
+;; (solo 'bass)                      hear only that track, until (unsolo)
 ;; (note-on 'bass 36 0.8 0.5)        play a note: pitch, velocity, seconds
 ;; (note-on 'bass 36 0.8)            ... or hold it until (note-off 'bass 36)
 ;;
@@ -56,10 +57,18 @@
   (lambda (name)
     (string-append "libs/studio/instruments/" (symbol->string name) ".xtm")))
 
+;; Loading an instrument compiles it, which keeps Scheme busy for a second or
+;; more. The pattern clock (pattern.xtm) puts a function here which queues
+;; that many seconds of the patterns first, so that they play on meanwhile.
+(define *studio:before-compiling* (lambda (seconds) #t))
+(define *studio:compile-seconds* 3.0)
+
 (define studio:load-instrument
   (lambda (name)
     (if (not (studio:instrument-info name))
-        (sys:load (studio:instrument-file name)))
+        (begin
+          (*studio:before-compiling* *studio:compile-seconds*)
+          (sys:load (studio:instrument-file name))))
     (if (not (studio:instrument-info name))
         (studio:error "there is no instrument called" name)
         name)))
@@ -177,11 +186,38 @@
                   (if (not (equal? (vector-ref *studio:tracks* i) (list name instrument)))
                       (begin
                         (studio_set_instrument i (studio:make-instance instrument))
-                        (vector-set! *studio:tracks* i (list name instrument))))
+                        (vector-set! *studio:tracks* i (list name instrument))
+                        ;; a new track is silent if others are soloed
+                        (if (pair? *studio:solo*) (studio:apply-solo))))
                   (if (not (null? preset-name))
                       (preset name (car preset-name)))
                   name)))
         #f)))
+
+;; Hear only the tracks named: (solo 'drums 'bass). (solo) with no names, or
+;; (unsolo), brings the rest back. A track's own mute still applies.
+(define *studio:solo* '())
+
+(define studio:apply-solo
+  (lambda ()
+    (dotimes (i *studio:num-tracks*)
+      (let ((slot (vector-ref *studio:tracks* i)))
+        ;; (9 is STRIP_SOLO in fx.xtm)
+        (studio:send (studio_now) studio:event-track-param i 9
+                     (if (and slot (pair? *studio:solo*) (not (memq (car slot) *studio:solo*))) 1.0 0.0)
+                     0.0)))))
+
+(define solo
+  (lambda names
+    (let ((unknown (cl:remove-if studio:track-index names)))
+      (if (pair? unknown)
+          (studio:error "there is no track called" (car unknown))
+          (begin
+            (set! *studio:solo* names)
+            (studio:apply-solo)
+            names)))))
+
+(define unsolo (lambda () (solo)))
 
 ;; make a track's instrument afresh. Use this after changing an instrument's
 ;; code, so that the track picks up the new version.
@@ -281,6 +317,10 @@
 
 (define master
   (lambda params-and-values
+    ;; a delay time in seconds stops the delay following the tempo (see
+    ;; delay-beats in pattern.xtm)
+    (if (and (memq 'delay-time params-and-values) (defined? '*studio:delay-beats*))
+        (set! *studio:delay-beats* #f))
     (apply ctl 'master params-and-values)))
 
 (define studio:param-value
@@ -478,6 +518,10 @@
     (studio:say "master peak" (studio:db (studio_peak)))
     (if (> (studio_late_note_count) 0)
         (studio:say (studio_late_note_count) "notes have arrived late"))
+    (if (and (defined? '*studio:clock-gaps*) (> *studio:clock-gaps* 0))
+        (studio:say "the patterns have had" *studio:clock-gaps* "gaps,"
+                    (/ (round (* 10.0 *studio:clock-gap-seconds*)) 10.0)
+                    "seconds in all, while Scheme was busy"))
     (if (> (studio_dropped_event_count) 0)
         (studio:say (studio_dropped_event_count) "events were dropped: the queue was full"))
     #t))

@@ -135,8 +135,9 @@ has a compressor which glues the mix together. Their settings are parameters of
 There are two reverbs to choose from: a plate, which is the default, and a
 concert hall, which is bigger and smoother: `(master 'reverb-type 1)`.
 
-`(tracks)` lists the mixer's tracks, `(levels)` prints each track's peak level,
-and `(untrack 'keys)` takes a track away.
+`(tracks)` lists the mixer's tracks, `(levels)` prints each track's level, and
+`(untrack 'keys)` takes a track away. `(solo 'keys 'bass)` silences every track
+but those, until `(unsolo)`.
 
 ## Patterns
 
@@ -286,6 +287,16 @@ quickest way to see what a transformation does.
 ```
 
 `(once pattern)` plays one cycle of a pattern straight away, without looping it.
+
+`(delay-beats 3/4)` sets the echo's time in beats (here a dotted eighth note),
+and it follows the tempo from then on.
+
+The patterns' clock runs in Scheme, a quarter of a second ahead of the sound.
+Anything which keeps Scheme busy for longer than that (compiling a big xtlang
+function, say) leaves a gap in the patterns, and `(levels)` reports how many
+there have been. `track` avoids it when it has to compile an instrument, by
+queueing the next few seconds of the patterns first, and you can do the same
+before something slow of your own: `(studio:play-ahead 5)`.
 
 ## Rendering to a file
 

@@ -1206,6 +1206,11 @@
 (define *studio:clock-running* #f)
 (define *studio:lookahead* 0.25)    ;; seconds ahead of the clock that events are queued
 (define *studio:tick* 0.05)         ;; seconds between looks
+;; The clock runs in the Scheme process, so whatever keeps Scheme busy for
+;; longer than the lookahead (compiling an instrument, say) leaves a gap in
+;; the patterns. How many times that has happened, and the seconds lost:
+(define *studio:clock-gaps* 0)
+(define *studio:clock-gap-seconds* 0.0)
 
 ;; name -> pattern, for everything which is playing
 (define *studio:patterns* '())
@@ -1220,6 +1225,23 @@
     (+ *studio:clock-time*
        (* *studio:frames-per-second* (/ (- (studio:exact cycle) *studio:clock-cycle*) *studio:cps*)))))
 
+;; The echo's time in beats (four to the cycle), which follows the tempo:
+;; (delay-beats 3/4) is a dotted eighth note. (master 'delay-time ...) sets
+;; it in seconds, and stops it following.
+(define *studio:delay-beats* #f)
+
+(define studio:set-delay-time
+  (lambda ()
+    (if *studio:delay-beats*
+        (studio:ctl-at (studio_now) 'master 'delay-time
+                       (* 1.0 (/ *studio:delay-beats* (* 4 *studio:cps*)))))))
+
+(define delay-beats
+  (lambda (beats)
+    (set! *studio:delay-beats* (if (and (number? beats) (> beats 0)) beats #f))
+    (studio:set-delay-time)
+    beats))
+
 ;; set (or with no argument, get) the tempo in cycles per second
 (define cps
   (lambda args
@@ -1230,7 +1252,8 @@
               (let ((time (studio:time-at *studio:scheduled-to*)))
                 (set! *studio:clock-cycle* *studio:scheduled-to*)
                 (set! *studio:clock-time* time)))
-          (set! *studio:cps* (studio:exact (car args)))))
+          (set! *studio:cps* (studio:exact (car args)))
+          (studio:set-delay-time)))
     *studio:cps*))
 
 ;; the tempo in beats per minute, at four beats to the cycle
@@ -1245,8 +1268,15 @@
         (let* ((now (studio_now))
                (end (studio:cycle-at
                       (+ now (studio:exact (round (* *studio:lookahead* *studio:samplerate*))))))
+               (current (studio:cycle-at now))
                ;; if Scheme was busy and the clock got ahead of us, skip what was missed
-               (from (max *studio:scheduled-to* (studio:cycle-at now))))
+               (from (max *studio:scheduled-to* current)))
+          (if (and (> current *studio:scheduled-to*) (pair? *studio:patterns*))
+              (begin
+                (set! *studio:clock-gaps* (+ *studio:clock-gaps* 1))
+                (set! *studio:clock-gap-seconds*
+                      (+ *studio:clock-gap-seconds*
+                         (* 1.0 (/ (- current *studio:scheduled-to*) *studio:cps*))))))
           (if (> end from)
               (begin
                 (for-each
@@ -1259,6 +1289,31 @@
                   *studio:patterns*)
                 (set! *studio:scheduled-to* end)))
           (callback (+ (now) (* *studio:tick* *studio:samplerate*)) 'studio:tick)))))
+
+;; Queue the patterns for the next so many seconds straight away, further
+;; ahead than the clock usually looks. Call it before something which will
+;; keep Scheme busy (track does, before it compiles an instrument), and the
+;; patterns play on through it. Changes to a pattern aren't heard until what
+;; was queued has played.
+(define studio:play-ahead
+  (lambda (seconds)
+    (if (and *studio:clock-running* (pair? *studio:patterns*))
+        (let* ((now (studio_now))
+               (end (studio:cycle-at
+                      (+ now (studio:exact (round (* seconds *studio:samplerate*))))))
+               (from (max *studio:scheduled-to* (studio:cycle-at now))))
+          (if (> end from)
+              (begin
+                (for-each
+                  (lambda (entry)
+                    (*s7-catch* #t
+                                (lambda () (studio:play-span (cdr entry) from end studio:time-at))
+                                (lambda args #f)))
+                  *studio:patterns*)
+                (set! *studio:scheduled-to* end)))))
+    #t))
+
+(set! *studio:before-compiling* studio:play-ahead)
 
 (define studio:start-clock
   (lambda ()
