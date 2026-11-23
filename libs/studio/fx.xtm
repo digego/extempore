@@ -30,7 +30,8 @@
 (bind-val STRIP_LPQ i64 6)    ;; resonance of both filters, 0.0 to 1.0
 (bind-val STRIP_SHAPE i64 7)  ;; saturation amount, 0.0 to 1.0
 (bind-val STRIP_MUTE i64 8)   ;; 1.0 mutes the track
-(bind-val STRIP_NPARAMS i64 9)
+(bind-val STRIP_SOLO i64 9)   ;; 1.0 silences the track while others are soloed
+(bind-val STRIP_NPARAMS i64 10)
 
 (bind-func static strip_defaults
   (lambda (p:SAMPLE*)
@@ -43,6 +44,7 @@
     (pset! p STRIP_LPQ 0.0)
     (pset! p STRIP_SHAPE 0.0)
     (pset! p STRIP_MUTE 0.0)
+    (pset! p STRIP_SOLO 0.0)
     void))
 
 (bind-func strip_c
@@ -115,7 +117,9 @@ from the parameter array p (see the STRIP_ constants)."
         (set! l (oversat4 sat_l l pre))
         (set! r (oversat4 sat_r r pre))
         ;; equal-power pan, smoothed so that changes don't click
-        (set! target (if (> (pref p STRIP_MUTE) 0.5) 0.0 (* 1.41421356 (pref p STRIP_GAIN))))
+        (set! target (if (or (> (pref p STRIP_MUTE) 0.5) (> (pref p STRIP_SOLO) 0.5))
+                         0.0
+                         (* 1.41421356 (pref p STRIP_GAIN))))
         (set! pre (* 1.5707963 (clamp (pref p STRIP_PAN) 0.0 1.0)))
         (set! gain_l (+ gain_l (* smooth (- (* target (cos pre)) gain_l))))
         (set! gain_r (+ gain_r (* smooth (- (* target (sin pre)) gain_r))))
@@ -133,7 +137,7 @@ from the parameter array p (see the STRIP_ constants)."
 The returned closure reads the stereo frame `in` and writes the echoes (only)
 to `out`.
 
-@param time - delay time in seconds (up to max_seconds)
+@param time - delay time in seconds (up to max_seconds), to the nearest frame
 @param feedback - how much of each echo is fed back, 0.0 to 0.95
 @param tone - how quickly the echoes lose their top end, 0.0 (never) to 1.0
 @param cross - 0.0 keeps left and right separate, 1.0 bounces each echo to the
@@ -142,24 +146,33 @@ other side (ping-pong)"
     (let ((len:i64 (convert (* max_seconds SRf)))
           (line_l (dl_make len))
           (line_r (dl_make len))
-          (glide (smoothing_coeff 0.1))
-          (frames 1000.0)
+          ;; The delay glides to a new time, like turning the knob on a tape
+          ;; echo, and settles on a whole number of frames. Between frames
+          ;; the read is a straight line between two of them, which takes
+          ;; some of the top off every echo, more each time round; on a
+          ;; whole frame it takes none. The glide is in doubles: in floats it
+          ;; would stop a few frames short of where it is going.
+          (glide:double (- 1.0 (exp (/ -10.0 (convert SRf double)))))
+          (frames:double 1000.0)
+          (target:double 1000.0)
           (lp_l 0.0) (lp_r 0.0)
           (l 0.0) (r 0.0) (fb 0.0) (damp 0.0))
       (lambda (in:SAMPLE* out:SAMPLE* time:SAMPLE feedback:SAMPLE tone:SAMPLE cross:SAMPLE)
-        ;; glide to a new delay time, like turning the knob on a tape echo
-        (set! frames (+ frames (* glide (- (clamp (* time SRf) 2.0 (convert (- len 2) SAMPLE)) frames))))
-        (set! l (dl_readf line_l frames))
-        (set! r (dl_readf line_r frames))
+        (set! target (floor (+ 0.5 (* (convert time double) (convert SRf double)))))
+        (if (< target 2.0) (set! target 2.0))
+        (if (> target (convert (- len 2) double)) (set! target (convert (- len 2) double)))
+        (set! frames (+ frames (* glide (- target frames))))
+        (set! l (dl_readf line_l (convert frames SAMPLE)))
+        (set! r (dl_readf line_r (convert frames SAMPLE)))
         ;; a one-pole lowpass in the feedback path
         (set! damp (* 0.9 (clamp tone 0.0 1.0)))
         (set! lp_l (+ (* (- 1.0 damp) l) (* damp lp_l)))
         (set! lp_r (+ (* (- 1.0 damp) r) (* damp lp_r)))
         (set! fb (clamp feedback 0.0 0.95))
         (set! cross (clamp cross 0.0 1.0))
-        (dl_write line_l (+ (pref in 0) (* cross (pref in 1)) 1.0e-18
+        (dl_write line_l (+ (pref in 0) (* cross (pref in 1))
                             (* fb (+ (* (- 1.0 cross) lp_l) (* cross lp_r)))))
-        (dl_write line_r (+ (* (- 1.0 cross) (pref in 1)) 1.0e-18
+        (dl_write line_r (+ (* (- 1.0 cross) (pref in 1))
                             (* fb (+ (* (- 1.0 cross) lp_r) (* cross lp_l)))))
         (pset! out 0 lp_l)
         (pset! out 1 lp_r)
@@ -185,10 +198,12 @@ other side (ping-pong)"
 (bind-func plate_reverb_c
   "a plate reverb, after Jon Dattorro's 'Effect Design Part 1' (JAES, 1997).
 
-The input is smeared by four allpass filters and then circulates around a
-'tank': two cross-coupled loops, each with a modulated allpass, a delay, a
-lowpass, another allpass and another delay. The output is a sum of taps from
-around the tank.
+The input is smeared by six allpass filters (Dattorro's four and two more,
+which make the reverb dense within a seventh of a second of a drum hit rather
+than a third) and then circulates around a 'tank': two cross-coupled loops,
+each with a modulated allpass, a delay, a lowpass, another allpass and another
+delay. The output is a sum of taps from around the tank, turned down as the
+size goes up, so that a longer tail isn't a louder reverb.
 
 The returned closure reads the stereo frame `in` and writes the reverb (only)
 to `out`.
@@ -200,6 +215,7 @@ to `out`.
     (let ((pre (dl_make (convert (* 0.25 SRf) i64)))
           (in1 (plate_line 142.0)) (in2 (plate_line 107.0))
           (in3 (plate_line 379.0)) (in4 (plate_line 277.0))
+          (in5 (plate_line 211.0)) (in6 (plate_line 163.0))
           ;; the modulated allpasses need headroom for their wobble
           (ap_l1 (plate_line 712.0)) (ap_r1 (plate_line 948.0))
           (del_l1 (plate_line 4453.0)) (del_r1 (plate_line 4217.0))
@@ -214,9 +230,18 @@ to `out`.
           (turn_cos:SAMPLE (cos (/ (* STWOPI 0.8) SRf)))
           (excursion:SAMPLE (plate_frames 12.0))
           (x:SAMPLE 0.0) (decay:SAMPLE 0.0) (damp:SAMPLE 0.0)
+          (old_size:SAMPLE -1.0) (level:SAMPLE 0.6)
           (delayed:SAMPLE 0.0) (v:SAMPLE 0.0) (tank_l:SAMPLE 0.0) (tank_r:SAMPLE 0.0))
       (lambda (in:SAMPLE* out:SAMPLE* size:SAMPLE damping:SAMPLE predelay:SAMPLE)
         (set! decay (+ 0.35 (* 0.63 (clamp size 0.0 1.0))))
+        ;; A sound goes round the whole tank through four gains of `decay`,
+        ;; so the tail holds 1 / (1 - decay^4) times the energy which went
+        ;; in. The output level takes that out again (0.8044 is 1 - decay^4
+        ;; at a size of 0.5, where the level is Dattorro's 0.6).
+        (if (<> size old_size)
+            (begin
+              (set! old_size size)
+              (set! level (* 0.6 (sqrt (/ (- 1.0 (* decay decay decay decay)) 0.8044))))))
         (set! damp (* 0.85 (clamp damping 0.0 1.0)))
         ;; predelay, then a gentle lowpass on the way in
         (dl_write pre (* 0.5 (+ (pref in 0) (pref in 1))))
@@ -228,11 +253,11 @@ to `out`.
         (set! x (dl_allpass in2 x 0.75))
         (set! x (dl_allpass in3 x 0.625))
         (set! x (dl_allpass in4 x 0.625))
+        (set! x (dl_allpass in5 x 0.6))
+        (set! x (dl_allpass in6 x 0.6))
         ;; each half of the tank is fed by the input and by the other half
-        ;; (the tiny constant keeps the tank out of denormal numbers, which
-        ;; are very slow, as it decays to silence)
-        (set! tank_l (+ x 1.0e-18 (* decay (plate_tap del_r2 3163.0))))
-        (set! tank_r (+ x 1.0e-18 (* decay (plate_tap del_l2 3720.0))))
+        (set! tank_l (+ x (* decay (plate_tap del_r2 3163.0))))
+        (set! tank_r (+ x (* decay (plate_tap del_l2 3720.0))))
         (set! lfo_tmp (- (* lfo_cos turn_cos) (* lfo_sin turn_sin)))
         (set! lfo_sin (+ (* lfo_sin turn_cos) (* lfo_cos turn_sin)))
         (set! lfo_cos lfo_tmp)
@@ -255,10 +280,10 @@ to `out`.
         (set! lp_r (+ (* (- 1.0 damp) (plate_tap del_r1 4217.0)) (* damp lp_r)))
         (dl_write del_r2 (dl_allpass ap_r2 (* decay lp_r) 0.5))
         ;; the output taps
-        (pset! out 0 (* 0.6 (- (+ (plate_tap del_r1 266.0) (plate_tap del_r1 2974.0) (plate_tap del_r2 1996.0))
+        (pset! out 0 (* level (- (+ (plate_tap del_r1 266.0) (plate_tap del_r1 2974.0) (plate_tap del_r2 1996.0))
                                (+ (plate_tap ap_r2 1913.0) (plate_tap del_l1 1990.0)
                                   (plate_tap ap_l2 187.0) (plate_tap del_l2 1066.0)))))
-        (pset! out 1 (* 0.6 (- (+ (plate_tap del_l1 353.0) (plate_tap del_l1 3627.0) (plate_tap del_l2 2673.0))
+        (pset! out 1 (* level (- (+ (plate_tap del_l1 353.0) (plate_tap del_l1 3627.0) (plate_tap del_l2 2673.0))
                                (+ (plate_tap ap_l2 1228.0) (plate_tap del_r1 2111.0)
                                   (plate_tap ap_r2 335.0) (plate_tap del_r2 121.0)))))
         void))))

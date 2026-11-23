@@ -1,0 +1,107 @@
+;;; tests/studio/fx.xtm -- tests for the studio's mixer effects
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Each test is an xtlang function which runs an effect on a signal it makes
+;; itself and returns 1 if what comes out is as it should be.
+
+;;; Code:
+
+(sys:load "libs/studio/fx.xtm" 'quiet)
+
+;;;;;;;;;;;
+;; delay ;;
+;;;;;;;;;;;
+
+;; A delay time which falls between frames settles on the nearest whole one,
+;; so an echo is the sound itself and not a blurred copy of it: a click comes
+;; back as one sample, at full height, however long the delay has been
+;; running.
+(bind-func test_delay_echo_is_exact
+  (lambda ()
+    (let ((d (stereo_delay_c 1.0))
+          (in:SAMPLE* (alloc 2))
+          (out:SAMPLE* (alloc 2))
+          ;; 0.1 seconds and a third of a frame
+          (time:SAMPLE (/ (+ (* 0.1 SRf) 0.33) SRf))
+          (frames:i64 (convert (+ 0.5 (* (convert time double) (convert SRf double)))))
+          (peak:SAMPLE 0.0) (peak_at:i64 0) (rest:SAMPLE 0.0)
+          (i:i64 0))
+      (pfill! in 0.0 0.0)
+      ;; let the delay time settle
+      (dotimes (i (convert (* 4.0 SRf) i64))
+        (d in out time 0.0 0.0 0.0))
+      (dotimes (i (* 2 frames))
+        (pfill! in (if (= i 0) 1.0 0.0) 0.0)
+        (d in out time 0.0 0.0 0.0)
+        (if (> (fabs (pref out 0)) peak)
+            (begin
+              (set! rest (+ rest peak))
+              (set! peak (fabs (pref out 0)))
+              (set! peak_at i)
+              void)
+            (begin (set! rest (+ rest (fabs (pref out 0)))) void)))
+      (if (and (= peak_at frames) (> peak 0.9999) (< rest 0.0001))
+          1
+          (begin
+            (printf "    the echo: %f at frame %lld (expected 1.0 at %lld), with %f around it\n"
+                    (convert peak double) peak_at frames (convert rest double))
+            0)))))
+
+(xtmtest-result (test_delay_echo_is_exact) 1 "an-echo-is-an-exact-copy")
+
+;;;;;;;;;;;;
+;; reverb ;;
+;;;;;;;;;;;;
+
+(bind-func test_plate_energy
+  "the energy of the plate's answer to a click, over `seconds`, in dB"
+  (lambda (size:SAMPLE seconds:double)
+    (let ((plate (plate_reverb_c))
+          (in:SAMPLE* (alloc 2))
+          (out:SAMPLE* (alloc 2))
+          (energy:double 0.0)
+          (i:i64 0))
+      (dotimes (i (convert (* seconds (convert SRf double)) i64))
+        (pfill! in (if (= i 0) 1.0 0.0) (if (= i 0) 1.0 0.0))
+        (plate in out size 0.35 0.0)
+        (set! energy (+ energy (convert (+ (* (pref out 0) (pref out 0)) (* (pref out 1) (pref out 1))) double))))
+      (* 10.0 (log10 (+ energy 1.0e-30))))))
+
+;; a longer tail is not a louder reverb: from a small size to a large one the
+;; energy stays within 3 dB (without the output's correction it rises by 7)
+(bind-func test_plate_level_holds
+  (lambda ()
+    (let ((small (test_plate_energy 0.2 8.0))
+          (large (test_plate_energy 0.9 30.0)))
+      (if (< (fabs (- large small)) 3.0)
+          1
+          (begin (printf "    plate energy: %f dB at size 0.2, %f dB at 0.9\n" small large) 0)))))
+
+(xtmtest-result (test_plate_level_holds) 1 "the-plate's-level-holds-as-its-size-changes")
+
+;;;;;;;;;;;
+;; strip ;;
+;;;;;;;;;;;
+
+(bind-func test_strip_level
+  "the level a strip settles at, for a steady input of 0.5 a side"
+  (lambda (mute:SAMPLE solo:SAMPLE)
+    (let ((strip (strip_c))
+          (p:SAMPLE* (alloc STRIP_NPARAMS))
+          (frame:SAMPLE* (alloc 2))
+          (i:i64 0))
+      (strip_defaults p)
+      (pset! p STRIP_MUTE mute)
+      (pset! p STRIP_SOLO solo)
+      (dotimes (i 20000)
+        (pfill! frame 0.5 0.5)
+        (strip frame p))
+      (convert (+ 0.5 (* 1000.0 (convert (pref frame 0) double))) i64))))
+
+(xtmtest-result (test_strip_level 0.0 0.0) 500 "a-strip-passes-its-input-at-unity")
+(xtmtest-result (test_strip_level 1.0 0.0) 0 "a-muted-strip-is-silent")
+(xtmtest-result (test_strip_level 0.0 1.0) 0 "so-is-one-which-isn't-soloed-when-others-are")
