@@ -33,9 +33,14 @@ people who want to write an instrument.
 | `instruments/` | one file per instrument, loaded on first use                   |
 
 A _voice_ is one sounding note. An _instrument_ is a set of voices, a table of
-parameters they all read, and an optional effect on their sum. The engine
-allocates voices, counts down note lengths and delivers parameter changes on the
-right frame. An instrument file says only what one voice sounds like.
+parameters, and an optional effect on their sum. The engine allocates voices,
+counts down note lengths and delivers parameter changes on the right frame. An
+instrument file says only what one voice sounds like.
+
+Each voice reads its own copy of the parameters. `ctl` changes every copy; a
+parameter sent with a note (from a pattern, or `note-on`) goes only to the voice
+which plays that note, so each note can have its own. The engine also gives
+each note a gain and a pan of its own, applied to whatever the voice puts out.
 
 ## Writing an instrument
 
@@ -79,8 +84,8 @@ The names `gain`, `pan`, `reverb`, `delay`, `lpf`, `hpf`, `lpq`, `shape` and
 ### 2. Write a voice
 
 A voice function is a closure which is called once per frame for as long as its
-note sounds. It reads the note from a `Voice*` and _adds_ its output to a stereo
-frame.
+note sounds. It reads the note from a `Voice*` and its parameters from the array
+`p` it was made with, and _adds_ its output to a stereo frame.
 
 ```scheme
 (bind-func beep_voice_c
@@ -142,7 +147,7 @@ The rules:
           (i:i64 0))
       (beep_defaults (inst_params inst))
       (dotimes (i 8)
-        (inst_set_voice inst i (beep_voice_c (inst_params inst))))
+        (inst_set_voice inst i (beep_voice_c (inst_voice_params inst i))))
       inst)))
 ```
 
@@ -150,6 +155,12 @@ The rules:
 The function must be called `<name>_make`: that's how `(track 'x 'beep)` finds
 it. Each instance is made in its own 32 MB memory zone, so `zalloc` whatever
 buffers the instrument needs here or in the voice constructor.
+
+`(inst_voice_params inst i)` is voice `i`'s own copy of the parameters: make
+each voice with it, after setting the defaults. `(inst_params inst)` is the
+instrument's copy, which is what an effect on the summed voices should read. (A
+voice made with `(inst_params inst)` still works, but then a note's own
+parameters change every voice.)
 
 Three more things `<name>_make` can set:
 

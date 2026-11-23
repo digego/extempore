@@ -13,6 +13,7 @@
 ;; (preset 'bass 'rubber)            change them all at once
 ;; (params 'bass)                    list a track's parameters
 ;; (note-on 'bass 36 0.8 0.5)        play a note: pitch, velocity, seconds
+;; (note-on 'bass 36 0.8)            ... or hold it until (note-off 'bass 36)
 ;;
 ;; def-instrument, at the bottom, is how an instrument file describes itself.
 
@@ -221,6 +222,12 @@
 (define studio:event-track-param 3)
 (define studio:event-master-param 4)
 (define studio:event-all-off 5)
+(define studio:event-note-param 6)
+
+;; in place of a parameter's index in a note-param event: the note's own gain
+;; and pan (NOTE_GAIN and NOTE_PAN in engine.xtm)
+(define studio:note-gain -1)
+(define studio:note-pan -2)
 
 (define studio:send
   (lambda (time kind track i x y)
@@ -240,6 +247,20 @@
               (list studio:event-inst-param (cadr p))
               (let ((p (assoc param *studio:strip-params*)))
                 (if p (list studio:event-track-param (cadr p)) #f)))))))
+
+;; Where a parameter which comes with a note goes. An instrument's parameter
+;; goes to the voice which plays the note, and so do gain and pan: each note
+;; has its own, on top of the track's. The rest of the mixer strip (the
+;; filters, the sends, shape and mute) is one for the whole track.
+(define studio:find-note-param
+  (lambda (track-name param)
+    (cond ((eq? param 'gain) (list studio:event-note-param studio:note-gain))
+          ((eq? param 'pan) (list studio:event-note-param studio:note-pan))
+          (else
+            (let ((where (studio:find-param track-name param)))
+              (if (and where (= (car where) studio:event-inst-param))
+                  (list studio:event-note-param (cadr where))
+                  where))))))
 
 (define studio:ctl-at
   (lambda (time track-name param value)
@@ -360,18 +381,42 @@
 
 (define *studio:samplerate* (integer->real *samplerate*))
 
+;; seconds is the note's length, or #f for a note which is held until its
+;; note-off. params-and-values (name value name value ...) are parameters for
+;; this note alone: see studio:find-note-param.
 (define studio:note-at
-  (lambda (time track-name pitch velocity seconds)
+  (lambda (time track-name pitch velocity seconds . params-and-values)
     (let ((i (studio:track-index track-name)))
       (if i
-          (studio:send time studio:event-note-on i
-                       (max 1 (real->integer (* seconds *studio:samplerate*)))
-                       pitch velocity)
+          (begin
+            (let loop ((lst params-and-values))
+              (if (and (pair? lst) (pair? (cdr lst)))
+                  (let ((where (studio:find-note-param track-name (car lst))))
+                    (if where
+                        (studio:send time (car where) i (cadr where) (cadr lst) 0.0)
+                        (studio:error track-name "has no parameter called" (car lst)))
+                    (loop (cddr lst)))))
+            (studio:send time studio:event-note-on i
+                         (if seconds (max 1 (real->integer (* seconds *studio:samplerate*))) 0)
+                         pitch velocity))
           (studio:error "there is no track called" track-name)))))
 
+;; (note-on 'bass 36 0.8 0.5)               pitch, velocity, seconds
+;; (note-on 'bass 36 0.8)                   held until (note-off 'bass 36)
+;; (note-on 'bass 36 0.8 0.5 'cutoff 900)   with parameters of its own
 (define note-on
-  (lambda (track-name pitch velocity seconds)
-    (studio:note-at (studio_now) track-name pitch velocity seconds)))
+  (lambda (track-name pitch velocity . more)
+    (if (and (pair? more) (number? (car more)))
+        (apply studio:note-at (studio_now) track-name pitch velocity (car more) (cdr more))
+        (apply studio:note-at (studio_now) track-name pitch velocity #f more))))
+
+;; release a held note (every voice of the track which is playing the pitch)
+(define note-off
+  (lambda (track-name pitch)
+    (let ((i (studio:track-index track-name)))
+      (if i
+          (studio:send (studio_now) studio:event-note-off i 0 pitch 0.0)
+          (studio:error "there is no track called" track-name)))))
 
 ;; Play a note from code which runs on Extempore's beat clock (*metro*), where
 ;; a variable called `beat` is in scope: a temporal recursion, or the :>
@@ -460,8 +505,9 @@
     (+ *studio:score-start* (* seconds *studio:samplerate*))))
 
 (define score-note
-  (lambda (seconds track-name pitch velocity duration)
-    (studio:note-at (studio:score-time seconds) track-name pitch velocity duration)))
+  (lambda (seconds track-name pitch velocity duration . params-and-values)
+    (apply studio:note-at (studio:score-time seconds) track-name pitch velocity duration
+           params-and-values)))
 
 (define score-ctl
   (lambda (seconds track-name param value)

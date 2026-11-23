@@ -36,6 +36,13 @@ middle C), a velocity from 0.0 to 1.0 and a length in seconds.
 (note-on 'bass 36 0.7 0.5)
 ```
 
+Leave the length off and the note is held until its `note-off`:
+
+```extempore
+(note-on 'bass 36 0.7)
+(note-off 'bass 36)
+```
+
 Every instrument has parameters, which you can list and change while it plays,
 and presets, which set them all at once.
 
@@ -188,16 +195,25 @@ each note, cycling through its four values.
 
 Anything about the note or its track can be patterned.
 
-| function                                                | what it sets                                            |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| `sound`                                                 | which track or kit sound plays                          |
-| `note` (or `n`)                                         | pitch                                                   |
-| `vel`                                                   | velocity, 0.0 to 1.0                                    |
-| `legato`                                                | length as a fraction of the step (more than 1 overlaps) |
-| `dur`                                                   | length in seconds                                       |
-| `nudge`                                                 | seconds to shift the note later                         |
-| `gain` `pan` `reverb` `delay` `lpf` `hpf` `lpq` `shape` | the track's mixer strip                                 |
-| `(param 'name ...)`                                     | any parameter of the track's instrument                 |
+| function                                   | what it sets                                            |
+| ------------------------------------------ | ------------------------------------------------------- |
+| `sound`                                    | which track or kit sound plays                          |
+| `note` (or `n`)                            | pitch                                                   |
+| `vel`                                      | velocity, 0.0 to 1.0                                    |
+| `legato`                                   | length as a fraction of the step (more than 1 overlaps) |
+| `dur`                                      | length in seconds                                       |
+| `nudge`                                    | seconds to shift the note later                         |
+| `gain` `pan`                               | the note's own level and place, on top of the track's   |
+| `(param 'name ...)`                        | any parameter of the track's instrument, for that note  |
+| `reverb` `delay` `lpf` `hpf` `lpq` `shape` | the rest of the track's mixer strip                     |
+
+`gain`, `pan` and an instrument's parameters belong to the note: they go to the
+voice which plays it, and the notes already sounding keep their own. So
+`(pan sine)` on a kit's hi-hats leaves the kick in the middle, and each note of
+a chord can have its own filter cutoff. The strip's filters, sends and `shape`
+are one for the whole track. `ctl` still sets a parameter for every voice at
+once, and `note-on` takes parameters for its one note:
+`(note-on 'bass 36 0.8 0.5 'cutoff 900 'pan 0.2)`.
 
 `sine`, `saw`, `tri`, `square`, `rand` and `perlin` are signals: patterns with a
 value at every moment, which run from 0 to 1 once per cycle. `between` stretches
@@ -280,6 +296,7 @@ anything on the fly, so queue the whole piece first as a _score_.
 (score-pattern 0 8 (sound '(bd*2 <sd cp> hh*4 sd)))        ; cycles 0 to 8
 (score-pattern 4 8 (note '(c2 c2 eb2 c3)) (sound 'bass))
 (score-note 16.0 'bass 36 1.0 2.0)                         ; at 16 seconds
+(score-note 18.0 'bass 36 1.0 2.0 'cutoff 900)             ; with a parameter of its own
 (score-ctl 16.0 'bass 'reverb 0.5)
 (score-end)
 ```

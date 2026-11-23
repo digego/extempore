@@ -175,6 +175,89 @@
 
 (xtmtest-result (test_params_are_bounded) 0.5 "parameters-outside-the-table-are-ignored")
 
+;; each voice has its own copy of the parameters. One set for a note goes to
+;; that note's voice (and the instrument); one set outright goes to them all.
+(bind-func test_param_voice_c
+  (lambda (p:SAMPLE*)
+    (lambda (v:Voice* out:SAMPLE*)
+      (frame_add out (pref p 0))
+      (if (< (voice_gate v) 0.5) (voice_done v))
+      void)))
+
+(bind-func test_param_inst
+  (lambda ()
+    (let ((inst (inst_make "test" 2 2))
+          (i:i64 0))
+      (pset! (inst_params inst) 0 0.25)
+      (dotimes (i 2)
+        (inst_set_voice inst i (test_param_voice_c (inst_voice_params inst i))))
+      inst)))
+
+(bind-func test_voice_param
+  "voice idx's copy of parameter 0, in hundredths"
+  (lambda (inst:Inst* idx:i64)
+    (convert (+ 0.5 (* 100.0 (convert (pref (tref inst 9) (* idx (+ (tref inst 4) 1))) double))) i64)))
+
+(bind-func test_note_params
+  (lambda ()
+    (let ((inst (test_param_inst))
+          (before:i64 0))
+      (inst_note_on inst 60.0 0.8 0)
+      (inst_note_param inst 0 0.5)
+      (inst_note_on inst 64.0 0.8 0)
+      (set! before (+ (* 10000 (test_voice_param inst 0))
+                      (* 100 (test_voice_param inst 1))
+                      (convert (+ 0.5 (* 100.0 (convert (inst_get_param inst 0) double))) i64)))
+      ;; a note without parameters of its own takes the instrument's, and
+      ;; leaves the other voice alone
+      (inst_note_off inst 60.0)
+      (test_tick inst 10)
+      (inst_note_on inst 67.0 0.8 0)
+      (+ (* 1000000 before)
+         (* 100 (test_voice_param inst 0))
+         (test_voice_param inst 1)))))
+
+(xtmtest-result (test_note_params) 255050005050 "a-note's-parameters-go-to-its-own-voice")
+
+(bind-func test_set_param_reaches_every_voice
+  (lambda ()
+    (let ((inst (test_param_inst)))
+      (inst_note_on inst 60.0 0.8 0)
+      (inst_note_param inst 0 0.5)
+      (inst_note_on inst 64.0 0.8 0)
+      (inst_set_param inst 0 0.75)
+      (+ (* 100 (test_voice_param inst 0)) (test_voice_param inst 1)))))
+
+(xtmtest-result (test_set_param_reaches_every_voice) 7575 "set-param-reaches-every-voice")
+
+(bind-func test_frame_left_right
+  "run the instrument for one frame: 10000 times its left sample, plus its right, each in thousandths"
+  (lambda (inst:Inst*)
+    (let ((frame:SAMPLE* (alloc 2)))
+      (inst_tick inst frame)
+      (+ (* 10000 (convert (+ 0.5 (* 1000.0 (convert (pref frame 0) double))) i64))
+         (convert (+ 0.5 (* 1000.0 (convert (pref frame 1) double))) i64)))))
+
+;; a voice's output is 0.1 x velocity in the centre (0.0566 a side at 0.8).
+;; Panned hard left it is 0.08 on the left alone; at half gain in the centre,
+;; 0.0283 a side. The next note is back in the centre at full gain.
+(bind-func test_note_gain_and_pan
+  (lambda ()
+    (let ((inst (test_inst 1))
+          (left:i64 0) (quiet:i64 0))
+      (inst_note_param inst NOTE_PAN 0.0)
+      (inst_note_on inst 60.0 0.8 0)
+      (set! left (test_frame_left_right inst))
+      (inst_note_param inst NOTE_GAIN 0.5)
+      (inst_note_on inst 60.0 0.8 0)
+      (set! quiet (test_frame_left_right inst))
+      (inst_note_on inst 60.0 0.8 0)
+      (if (and (= left 800000) (= quiet 280028) (= (test_frame_left_right inst) 570057))
+          1
+          (begin (printf "    left %lld, quiet %lld\n" left quiet) 0)))))
+
+(xtmtest-result (test_note_gain_and_pan) 1 "a-note-has-its-own-gain-and-pan")
+
 ;;;;;;;;;;;;;;;;;
 ;; delay lines ;;
 ;;;;;;;;;;;;;;;;;

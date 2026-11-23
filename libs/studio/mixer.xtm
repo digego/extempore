@@ -214,6 +214,9 @@
       (set! studio_master_peak 0.0)
       peak)))
 
+;; is a parameter waiting on some track for its note? (see EVT_NOTE_PARAM)
+(bind-val studio_note_params_waiting i64 0)
+
 (bind-func static studio_apply_event
   (lambda (evt:StudioEvent*)
     (let ((kind (tref evt 2))
@@ -236,6 +239,10 @@
                   (if (= kind EVT_NOTE_ON) (inst_note_on inst x y i))
                   (if (= kind EVT_NOTE_OFF) (inst_note_off inst x))
                   (if (= kind EVT_INST_PARAM) (inst_set_param inst i x))
+                  (if (= kind EVT_NOTE_PARAM)
+                      (begin
+                        (inst_note_param inst i x)
+                        (set! studio_note_params_waiting 1)))
                   (if (= kind EVT_ALL_OFF) (inst_all_off inst))
                   void))
             void))
@@ -295,6 +302,15 @@
                     (if (and (= (tref evt 2) EVT_NOTE_ON) (< (tref evt 0) (- time_now 2048)))
                         (set! studio_late_notes (+ studio_late_notes 1)))
                     (studio_apply_event evt))
+                  ;; A note's parameters arrive just before it, at the same
+                  ;; time. Any still waiting now have no note to go with, and
+                  ;; mustn't be left for some later one.
+                  (if (> studio_note_params_waiting 0)
+                      (begin
+                        (set! studio_note_params_waiting 0)
+                        (dotimes (i STUDIO_TRACKS)
+                          (set! inst (tref (pref-ptr tracks i) 0))
+                          (if (not (null? inst)) (inst_clear_note_params inst)))))
                   ;; the tracks
                   (pfill! delay_in 0.0 0.0)
                   (pfill! reverb_in 0.0 0.0)

@@ -13,10 +13,16 @@
 ;; velocity, gate, age) and its sound comes from a *voice function*: a closure
 ;; which is called once per audio frame and adds its output to a stereo frame.
 ;;
-;; An *instrument* (Inst) is a set of voices, a table of parameters which all
-;; of its voices read, and an optional effect which processes the summed
-;; output. The engine decides which voice plays each note; an instrument file
-;; only has to say what a voice sounds like.
+;; An *instrument* (Inst) is a set of voices, a table of parameters, and an
+;; optional effect which processes the summed output. The engine decides which
+;; voice plays each note; an instrument file only has to say what a voice
+;; sounds like.
+;;
+;; Each voice reads a copy of the instrument's parameters which is its own.
+;; Setting a parameter (ctl) changes every copy at once. A note can also be
+;; sent with parameters of its own, which go only to the voice that plays it:
+;; that is how a pattern gives each note its own filter cutoff, or pans the
+;; hi-hats of a kit and leaves the kick where it is.
 ;;
 ;; Notes and parameter changes arrive as timestamped *events*. Scheme pushes
 ;; them onto a queue ahead of time and the audio thread applies each one on
@@ -43,7 +49,9 @@
 ;; 5 hold    frames of gate left (0 means held until a note-off arrives)
 ;; 6 active  is this voice sounding?
 ;; 7 legato  did this note start while the last one was held? (mono only)
-(bind-type Voice <SAMPLE,SAMPLE,SAMPLE,SAMPLE,i64,i64,i1,i1> (printer? . #f))
+;; 8, 9      the gain the engine gives the voice's left and right output
+;; 10, 11    the gains its note asked for, which 8 and 9 glide to
+(bind-type Voice <SAMPLE,SAMPLE,SAMPLE,SAMPLE,i64,i64,i1,i1,SAMPLE,SAMPLE,SAMPLE,SAMPLE> (printer? . #f))
 
 (bind-macro "the voice's pitch as a MIDI note number" (voice_pitch v) `(tref ,v 0))
 (bind-macro "the voice's frequency in Hz" (voice_freq v) `(tref ,v 1))
@@ -102,9 +110,25 @@
 ;; 6 effect, applied to the sum of the voices
 ;; 7 voice allocation mode (INST_POLY, INST_MONO or INST_KEYED)
 ;; 8 keymap: for INST_KEYED, the voice index for each MIDI pitch (-1 for none)
-(bind-type Inst <i8*,i64,Voice*,VoiceFn*,i64,SAMPLE*,FrameFn,i64,i64*> (printer? . #f))
+;; 9 the voices' own copies of the parameters, one after another
+;; 10 a stereo frame for one voice's output
+;; 11 how many parameters are waiting for the next note, 12 which they are
+;;    and 13 their values
+;; 14 the gain and 15 the pan waiting for the next note
+(bind-type Inst <i8*,i64,Voice*,VoiceFn*,i64,SAMPLE*,FrameFn,i64,i64*,SAMPLE*,SAMPLE*,i64,i64*,SAMPLE*,SAMPLE,SAMPLE> (printer? . #f))
 
-(bind-macro "the instrument's parameter array" (inst_params inst) `(tref ,inst 5))
+;; how many parameters one note can carry
+(bind-val INST_NOTE_PARAMS i64 16)
+;; in place of a parameter's index, for inst_note_param: the note's own gain
+;; (1.0 is unity) and pan (0.0 left, 0.5 centre, 1.0 right)
+(bind-val NOTE_GAIN i64 -1)
+(bind-val NOTE_PAN i64 -2)
+
+(bind-macro
+  "the instrument's parameter array: what its effect reads, and what every
+voice's copy is made from"
+  (inst_params inst)
+  `(tref ,inst 5))
 (bind-macro "the instrument's number of voices" (inst_nvoices inst) `(tref ,inst 1))
 
 (bind-func static inst_no_fx
@@ -127,15 +151,38 @@ inst_set_voice."
     (let ((voices:Voice* (zalloc nvoices))
           (fns:VoiceFn* (zalloc nvoices))
           (params:SAMPLE* (zalloc (+ nparams 1)))
+          (voice_params:SAMPLE* (zalloc (* nvoices (+ nparams 1))))
+          (scratch:SAMPLE* (zalloc 2))
+          (waiting:i64* (zalloc INST_NOTE_PARAMS))
+          (waiting_values:SAMPLE* (zalloc INST_NOTE_PARAMS))
           (keymap:i64* (zalloc 128))
           (silent (inst_silent_voice))
           (i:i64 0))
       (dotimes (i nvoices)
-        (tfill! (pref-ptr voices i) 60.0 261.6 0.0 0.0 0 0 #f #f)
+        (tfill! (pref-ptr voices i) 60.0 261.6 0.0 0.0 0 0 #f #f 1.0 1.0 1.0 1.0)
         (pset! fns i silent))
+      (dotimes (i (+ nparams 1))
+        (pset! params i 0.0))
+      (dotimes (i (* nvoices (+ nparams 1)))
+        (pset! voice_params i 0.0))
       (dotimes (i 128)
         (pset! keymap i -1))
-      (Inst name nvoices voices fns nparams params (inst_no_fx) INST_POLY keymap))))
+      (Inst name nvoices voices fns nparams params (inst_no_fx) INST_POLY keymap
+            voice_params scratch 0 waiting waiting_values 1.0 0.5))))
+
+(bind-func inst_voice_params
+  "the parameter array of voice number idx, for the voice's constructor: the
+voice's own copy of the instrument's parameters, as they stand now.
+
+Set the instrument's defaults before making its voices."
+  (lambda (inst:Inst* idx:i64)
+    (let ((size (+ (tref inst 4) 1))
+          (base (tref inst 5))
+          (p (pref-ptr (tref inst 9) (* idx size)))
+          (i:i64 0))
+      (dotimes (i size)
+        (pset! p i (pref base i)))
+      p)))
 
 (bind-func inst_set_voice
   "use the voice function fn for voice number idx"
@@ -163,9 +210,38 @@ inst_set_voice."
     void))
 
 (bind-func inst_set_param
+  "set a parameter, for the instrument and for every voice"
   (lambda (inst:Inst* idx:i64 value:SAMPLE)
-    (if (and (>= idx 0) (< idx (tref inst 4)))
-        (pset! (tref inst 5) idx value))
+    (let ((size (+ (tref inst 4) 1))
+          (i:i64 0))
+      (if (and (>= idx 0) (< idx (tref inst 4)))
+          (begin
+            (pset! (tref inst 5) idx value)
+            (dotimes (i (tref inst 1))
+              (pset! (tref inst 9) (+ (* i size) idx) value))))
+      void)))
+
+(bind-func inst_note_param
+  "set a parameter for the next note only: it goes to the voice which plays
+that note, and to the instrument, and the voices already sounding keep what
+they have. idx is a parameter's index, or NOTE_GAIN or NOTE_PAN."
+  (lambda (inst:Inst* idx:i64 value:SAMPLE)
+    (let ((n (tref inst 11)))
+      (if (= idx NOTE_GAIN) (tset! inst 14 value))
+      (if (= idx NOTE_PAN) (tset! inst 15 value))
+      (if (and (>= idx 0) (< idx (tref inst 4)) (< n INST_NOTE_PARAMS))
+          (begin
+            (pset! (tref inst 12) n idx)
+            (pset! (tref inst 13) n value)
+            (tset! inst 11 (+ n 1))))
+      void)))
+
+(bind-func inst_clear_note_params
+  "forget whatever inst_note_param has set"
+  (lambda (inst:Inst*)
+    (tset! inst 11 0)
+    (tset! inst 14 1.0)
+    (tset! inst 15 0.5)
     void))
 
 (bind-func inst_get_param
@@ -186,6 +262,11 @@ inst_set_voice."
           (score:i64 0)
           (legato:i1 #f)
           (v:Voice* null)
+          (size (+ (tref inst 4) 1))
+          (base (tref inst 5))
+          (p:SAMPLE* null)
+          (gain:SAMPLE (tref inst 14))
+          (pan:SAMPLE (tref inst 15))
           (i:i64 0))
       (cond ((= mode INST_KEYED)
              (set! idx (pref (tref inst 8) (clamp (convert pitch i64) 0 127))))
@@ -214,7 +295,25 @@ inst_set_voice."
             (tset! v 5 dur)
             (tset! v 7 legato)
             (if (not legato) (tset! v 4 0))
-            (tset! v 6 #t)))
+            (tset! v 6 #t)
+            ;; the voice's parameters: the instrument's, then the note's own
+            (set! p (pref-ptr (tref inst 9) (* idx size)))
+            (dotimes (i size)
+              (pset! p i (pref base i)))
+            (dotimes (i (tref inst 11))
+              (pset! p (pref (tref inst 12) i) (pref (tref inst 13) i))
+              (pset! base (pref (tref inst 12) i) (pref (tref inst 13) i)))
+            ;; the note's gain and pan, by the same equal-power law as a
+            ;; track's pan. A legato note glides to them; any other starts
+            ;; with them.
+            (set! pan (* 1.5707963 (if (< pan 0.0) 0.0 (if (> pan 1.0) 1.0 pan))))
+            (tset! v 10 (* 1.41421356 gain (cos pan)))
+            (tset! v 11 (* 1.41421356 gain (sin pan)))
+            (if (not legato)
+                (begin
+                  (tset! v 8 (tref v 10))
+                  (tset! v 9 (tref v 11))))))
+      (inst_clear_note_params inst)
       void)))
 
 (bind-func inst_note_off
@@ -251,6 +350,14 @@ inst_set_voice."
         (if (tref (pref-ptr voices i) 6) (set! count (+ count 1))))
       count)))
 
+;; how fast a legato note's gain and pan glide to their new values: a time
+;; constant of ten milliseconds
+(bind-func static voice_gain_glide_coeff
+  (lambda ()
+    (- 1.0 (exp (/ -100.0 SRf)))))
+
+(bind-val voice_gain_glide SAMPLE (voice_gain_glide_coeff))
+
 (bind-func inst_tick
   "render one stereo frame of the instrument into out"
   (lambda (inst:Inst* out:SAMPLE*)
@@ -258,6 +365,7 @@ inst_set_voice."
           (voices (tref inst 2))
           (fns (tref inst 3))
           (fx (tref inst 6))
+          (scratch (tref inst 10))
           (v:Voice* null)
           (hold:i64 0)
           (i:i64 0))
@@ -267,7 +375,15 @@ inst_set_voice."
         (set! v (pref-ptr voices i))
         (if (tref v 6)
             (begin
-              ((pref fns i) v out)
+              ;; the voice plays into a frame of its own, which is added to
+              ;; the instrument's at the voice's gain and pan
+              (pset! scratch 0 0.0)
+              (pset! scratch 1 0.0)
+              ((pref fns i) v scratch)
+              (tset! v 8 (+ (tref v 8) (* voice_gain_glide (- (tref v 10) (tref v 8)))))
+              (tset! v 9 (+ (tref v 9) (* voice_gain_glide (- (tref v 11) (tref v 9)))))
+              (pset! out 0 (+ (pref out 0) (* (tref v 8) (pref scratch 0))))
+              (pset! out 1 (+ (pref out 1) (* (tref v 9) (pref scratch 1))))
               (tset! v 4 (+ (tref v 4) 1))
               ;; count the gate time down, and release the note when it's up
               (set! hold (tref v 5))
@@ -288,6 +404,7 @@ inst_set_voice."
 (bind-val EVT_TRACK_PARAM i64 3)  ;; i: parameter index, x: value
 (bind-val EVT_MASTER_PARAM i64 4) ;; i: parameter index, x: value
 (bind-val EVT_ALL_OFF i64 5)      ;; release every voice on the track
+(bind-val EVT_NOTE_PARAM i64 6)   ;; i: parameter index, x: value, for the next note only
 
 ;; 0 time (frames), 1 sequence number, 2 kind, 3 track, 4 i, 5 x, 6 y
 (bind-type StudioEvent <i64,i64,i64,i64,i64,SAMPLE,SAMPLE> (printer? . #f))

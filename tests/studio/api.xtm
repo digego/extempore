@@ -112,6 +112,33 @@
 (note-on 'bass 36 0.8 0.1)
 (xtmtest-result (> (run_studio 0.2) 0.05) #t "notes-play-again-after-hush")
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a note's own parameters   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a pattern's pan and gain belong to its notes, and leave the track's alone
+(run_studio 2.0)
+(ctl 'bass 'pan 0.5 'gain 1.0)
+(once (note '(c2 c3)) (sound 'bass) (pan 0.1) (gain 0.5) (param 'cutoff 700))
+(xtmtest-result (> (run_studio 0.6) 0.01) #t "a-pattern-with-pan-and-gain-plays")
+(xtmtest-result (studio:param-value 'bass 'pan) 0.5 "its-pan-is-not-the-track's")
+(xtmtest-result (studio:param-value 'bass 'gain) 1.0 "nor-is-its-gain")
+(xtmtest-result (studio:param-value 'bass 'cutoff) 700.0 "an-instrument-parameter-reaches-the-instrument-too")
+(xtmtest-result (studio:find-note-param 'bass 'lpf) (studio:find-param 'bass 'lpf) "the-strip's-filter-is-the-track's")
+(run_studio 2.0)
+
+;; note-on can carry parameters, and can hold a note until its note-off
+(note-on 'bass 36 0.8 0.1 'cutoff 450)
+(run_studio 0.3)
+(xtmtest-result (studio:param-value 'bass 'cutoff) 450.0 "note-on-with-a-parameter")
+(run_studio 2.0)
+(note-on 'bass 36 0.8)
+(run_studio 2.0)
+(xtmtest-result (> (run_studio 0.2) 0.05) #t "a-note-without-a-length-is-held")
+(note-off 'bass 36)
+(run_studio 2.0)
+(xtmtest-result (< (run_studio 0.2) 0.0001) #t "until-its-note-off")
+
 ;;;;;;;;;;;;;;;;;
 ;; bad samples ;;
 ;;;;;;;;;;;;;;;;;

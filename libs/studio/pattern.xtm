@@ -814,14 +814,17 @@
 ;; move the note later by this many seconds
 (define nudge (studio:control 'nudge studio:identity))
 
-;; any parameter of the track's instrument or mixer strip: (param 'cutoff 800)
+;; Any parameter of the track's instrument or mixer strip: (param 'cutoff 800).
+;; An instrument's parameter is the note's own: it goes to the voice which
+;; plays the note, and the notes already sounding keep theirs.
 (define param
   (lambda (name x)
     ((studio:control name studio:identity) x)))
 
-;; the mixer strip's parameters
+;; each note's own level and place, on top of the track's
 (define gain (studio:control 'gain studio:identity))
 (define pan (studio:control 'pan studio:identity))
+;; the rest of the mixer strip, which is one for the whole track
 (define reverb (studio:control 'reverb studio:identity))
 (define delay (studio:control 'delay studio:identity))
 (define lpf (studio:control 'lpf studio:identity))
@@ -1072,23 +1075,26 @@
                          (pitch (or (cdr where) (studio:control-value value 'note 60)))
                          (length (or (studio:control-value value 'dur #f)
                                      (* seconds (studio:control-value value 'legato 0.9)))))
-                    ;; anything which isn't about the note itself is a
-                    ;; parameter of the track, set just before the note
-                    (for-each
-                      (lambda (pair)
-                        (if (and (not (memq (car pair) *studio:special-controls*))
-                                 (number? (cdr pair)))
-                            (let ((p (studio:find-param track-name (car pair))))
-                              (if p
-                                  (studio:send when (car p) i (cadr p) (cdr pair) 0.0)
-                                  (studio:warn-once (list track-name (car pair))
-                                                    track-name "has no parameter called" (car pair))))))
-                      value)
                     (if (number? pitch)
-                        (studio:send when studio:event-note-on i
-                                     (max 1 (real->integer (* length *studio:samplerate*)))
-                                     pitch
-                                     (studio:control-value value 'vel 0.75))))))))))
+                        (begin
+                          ;; anything which isn't about the note itself is
+                          ;; a parameter, sent just before the note: the
+                          ;; note's own if it can be (see
+                          ;; studio:find-note-param), the track's if not
+                          (for-each
+                            (lambda (pair)
+                              (if (and (not (memq (car pair) *studio:special-controls*))
+                                       (number? (cdr pair)))
+                                  (let ((p (studio:find-note-param track-name (car pair))))
+                                    (if p
+                                        (studio:send when (car p) i (cadr p) (cdr pair) 0.0)
+                                        (studio:warn-once (list track-name (car pair))
+                                                          track-name "has no parameter called" (car pair))))))
+                            value)
+                          (studio:send when studio:event-note-on i
+                                       (max 1 (real->integer (* length *studio:samplerate*)))
+                                       pitch
+                                       (studio:control-value value 'vel 0.75)))))))))))
 
 ;; play the events of a pattern which start between two cycles, given a
 ;; function which turns a cycle into a time in frames

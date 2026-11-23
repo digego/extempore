@@ -54,14 +54,15 @@
             (voice_done v))
         void))))
 
-;; Last, make the instrument: eight voices, each with a voice function.
+;; Last, make the instrument: eight voices, each with a voice function and
+;; its own copy of the parameters (so that each note can have its own).
 (bind-func beep_make
   (lambda ()
     (let ((inst (inst_make "beep" 8 (beep_nparams)))
           (i:i64 0))
       (beep_defaults (inst_params inst))
       (dotimes (i 8)
-        (inst_set_voice inst i (beep_voice_c (inst_params inst))))
+        (inst_set_voice inst i (beep_voice_c (inst_voice_params inst i))))
       inst)))
 
 ;; It's an instrument like any other.
@@ -120,7 +121,7 @@
           (i:i64 0))
       (beep_defaults (inst_params inst))
       (dotimes (i 8)
-        (inst_set_voice inst i (beep_voice_c (inst_params inst))))
+        (inst_set_voice inst i (beep_voice_c (inst_voice_params inst i))))
       inst)))
 
 ;; ... and the track has to be told to make itself a new one
@@ -130,6 +131,12 @@
     (sound 'lead)
     (vel (between 0.3 1.0 (slow 2 sine)))
     (off 1/8 (add (note 12))))
+
+;; a parameter in a pattern belongs to its note: here each note has its own
+;; release, and the long ones ring on over the short ones
+(d1 (note (scale 'c4 'pentatonic '(0 2 4 <7 5> 4 2 <9 8> 4)))
+    (sound 'lead)
+    (param 'release '(0.05 0.05 1.5 0.05)))
 
 (hush)
 
