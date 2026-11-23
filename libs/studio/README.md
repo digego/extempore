@@ -39,8 +39,8 @@ instrument file says only what one voice sounds like.
 
 Each voice reads its own copy of the parameters. `ctl` changes every copy; a
 parameter sent with a note (from a pattern, or `note-on`) goes only to the voice
-which plays that note, so each note can have its own. The engine also gives
-each note a gain and a pan of its own, applied to whatever the voice puts out.
+which plays that note, so each note can have its own. The engine also gives each
+note a gain and a pan of its own, applied to whatever the voice puts out.
 
 ## Writing an instrument
 
