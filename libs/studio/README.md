@@ -207,6 +207,10 @@ The compiler is strict in ways that are easy to trip over.
   first `Error`.
 - **Macros evaluate their arguments more than once**, so don't pass
   `clamp`/`min`/`max` an expression with a side effect.
+- **A macro's own variables can hide yours.** `dc_block` binds `dc_x` and
+  `onepole_hp` binds `onepole_x`, so a voice with a variable of the same name
+  passed to that macro reads the macro's instead, and compiles without
+  complaint. Give state variables names of your own (`hum_in`, not `dc_x`).
 
 Useful constants and functions: `SRf` (sample rate), `SPI`, `STWOPI`,
 `midi2frq`, `(random)` (give the result a type: `(r:SAMPLE (random))`), and
