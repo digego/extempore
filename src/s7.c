@@ -89695,6 +89695,12 @@ static void op_safe_closure_pp_1(s7_scheme *sc)  /* sc->code as above */
 static void op_any_closure_3p(s7_scheme *sc)     /* sc->code: (g-1 (lambda (b c) (+ b c)) 2 3) */
 {
   s7_pointer args = cdr(sc->code); /* sc->code: e.g. s7test (recompose 32 (lambda (a) (cons 1 a)) ()) */
+  /* The pushes below don't check the stack's size (op_any_closure_4p does),
+     so a deep enough recursion through a three-argument call wrote past the
+     stack's end, and the evaluation was abandoned with no error.
+     [extempore-local change vs upstream s7; re-apply on s7 upgrade -- see
+     tests/core/scheme-compat.xtm] */
+  check_stack_size(sc);
   if (has_fx(args))
     {
       sc->args = fx_call(sc, args);

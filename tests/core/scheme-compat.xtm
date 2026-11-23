@@ -78,3 +78,37 @@
                   (equal? (with-input-from-string (get-output-string port) read) alist))
                 #t
                 "write-long-alist-round-trips")
+
+;; A deep non-tail recursion through a call with three non-trivial arguments
+;; (s7's op_any_closure_3p) once wrote past the end of s7's stack when the
+;; stack had to grow: the evaluation was abandoned with no error, and a
+;; compiler pass shaped like this silently dropped the bind-func. This is the
+;; shape of the old recursive cond desugarer; 20000 deep forces several
+;; resizes during the recursion, whatever the stack's size beforehand.
+(define scheme-compat-make-if
+  (lambda (test then else-branch) (list 'if test then else-branch)))
+
+(define scheme-compat-make-begin
+  (lambda (exprs) (cons 'begin exprs)))
+
+(define scheme-compat-deep3
+  (lambda (ast)
+    (cl:remove '()
+               (if (null? ast)
+                   '()
+                   (scheme-compat-make-if
+                     (caar ast)
+                     (if (null? (cdar ast)) (error 'bad) (scheme-compat-make-begin (cdar ast)))
+                     (if (and (not (null? (cdr ast))) (eq? (caadr ast) 'else))
+                         (scheme-compat-make-begin (cdadr ast))
+                         (if (not (null? (cdr ast))) (scheme-compat-deep3 (cdr ast)))))))))
+
+(xtmtest-result (let loop ((node (scheme-compat-deep3
+                                   (let build ((i 0) (acc '((else last))))
+                                     (if (= i 20000) acc (build (+ i 1) (cons (list i 'b) acc))))))
+                           (depth 0))
+                  (if (and (pair? node) (eq? (car node) 'if))
+                      (loop (cadddr node) (+ depth 1))
+                      depth))
+                20000
+                "deep-three-argument-recursion")
