@@ -1218,9 +1218,12 @@
     (let* ((os (xtc:emit:new-buffer))
            (args t))
       (emit "{"os)
-      (dotimes (i (length args))
-        (if (> i 0) (emit ", " os))
-        (emit  (xtc:codegen:get-type-str (cdr (list-ref args i))) "*" os))
+      (let loop ((as args) (first #t))
+        (if (pair? as)
+            (begin
+              (if (not first) (emit ", " os))
+              (emit (xtc:codegen:get-type-str (cdr (car as))) "*" os)
+              (loop (cdr as) #f))))
       (emit "}" os)
       (xtc:codegen:strip-space os))))
 
@@ -1488,23 +1491,24 @@
 
       ;; first we need to pull evironment values
       (if (not (null? env))
-          (begin (emit "; setup environment\n" os)
-            (emit (string-append "%impenv = bitcast i8* %_impenv to "
-                                 (xtc:codegen:make-struct-str-env env) "*\n") os)
-            (dotimes (i (length env))
-              (let ((e (list-ref env i)))
-                ;; need to strip __sub's
-                (if (regex:match? (symbol->string (car e)) "__sub$")
-                    (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
-                                  (cdr e))))
-                ;(print 'e: e)
-                (emit (string-append "%" (symbol->string (car e)) "Ptr_ = getelementptr "
-                                     (xtc:codegen:make-struct-str-env env) ", " (xtc:codegen:make-struct-str-env env) "* %impenv, "
-                                     "i32 0, i32 " (number->string i) "\n") os)
-                (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
-                                     (xtc:codegen:get-type-str (cdr e)) "*, "
-                                     (xtc:codegen:get-type-str (cdr e)) "** %"
-                                     (symbol->string (car e)) "Ptr_\n") os)))))
+          (let ((estruct (xtc:codegen:make-struct-str-env env)))
+            (emit "; setup environment\n" os)
+            (emit (string-append "%impenv = bitcast i8* %_impenv to " estruct "*\n") os)
+            (let loop ((es env) (i 0))
+              (if (pair? es)
+                  (let ((e (car es)))
+                    ;; need to strip __sub's
+                    (if (regex:match? (symbol->string (car e)) "__sub$")
+                        (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
+                                      (cdr e))))
+                    (emit (string-append "%" (symbol->string (car e)) "Ptr_ = getelementptr "
+                                         estruct ", " estruct "* %impenv, "
+                                         "i32 0, i32 " (number->string i) "\n") os)
+                    (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
+                                         (xtc:codegen:get-type-str (cdr e)) "*, "
+                                         (xtc:codegen:get-type-str (cdr e)) "** %"
+                                         (symbol->string (car e)) "Ptr_\n") os)
+                    (loop (cdr es) (+ i 1)))))))
       ;; next we pull the function arguments
       (emit "\n; setup arguments\n" os)
       (dotimes (i (length args))
