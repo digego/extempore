@@ -676,40 +676,33 @@ It is zero except within inc of the jump, on either side."
 a waveform which jumps up there, take it away from one which jumps down. It is
 zero except within three frames (3 inc) of the jump, on either side."
   (polyblep phase inc)
+  ;; (every branch of every `if' below is a SAMPLE, so that the macro can sit
+  ;; anywhere in an expression)
   `(let ((blep_p:SAMPLE ,phase) (blep_inc:SAMPLE ,inc)
-         ;; frames from the jump, the sign and size of the correction (after
-         ;; the jump: 2.0, before it: -2.0), and the correction
-         (blep_t:SAMPLE 3.0) (blep_s:SAMPLE 2.0) (blep_y:SAMPLE 0.0))
+         (blep_far:SAMPLE 3.0) (blep_none:SAMPLE 0.0)
+         (blep_after:SAMPLE 2.0) (blep_before:SAMPLE -2.0)
+         ;; frames from the jump (3.0 or more: out of its reach)
+         (blep_t:SAMPLE (if (< blep_p (* 3.0 blep_inc))
+                            (/ blep_p blep_inc)
+                            (if (> blep_p (- 1.0 (* 3.0 blep_inc)))
+                                (/ (- 1.0 blep_p) blep_inc)
+                                blep_far)))
+         ;; the size of the jump, and its sign on this side of it
+         (blep_s:SAMPLE (if (< blep_p (* 3.0 blep_inc)) blep_after blep_before))
+         (blep_u:SAMPLE (* (- 3.0 blep_t) (- 3.0 blep_t))))
      (if (> blep_inc 0.1666)
-         (begin (set! blep_y (polyblep2 blep_p blep_inc)) void)
-         (begin
-           (if (< blep_p (* 3.0 blep_inc))
-               (begin (set! blep_t (/ blep_p blep_inc)) void)
-               (if (> blep_p (- 1.0 (* 3.0 blep_inc)))
-                   (begin
-                     (set! blep_t (/ (- 1.0 blep_p) blep_inc))
-                     (set! blep_s -2.0)
-                     void)))
-           (if (< blep_t 1.0)
-               (begin
-                 (set! blep_y (+ -0.5 (* blep_t (+ 0.916666667
-                                                    (* blep_t blep_t (+ -0.583333333 (* 0.229166667 blep_t)))))))
-                 void)
-               (if (< blep_t 2.0)
-                   (begin
-                     (set! blep_y (+ -0.822916667
-                                     (* blep_t (+ 2.208333333
-                                                  (* blep_t (+ -1.9375
-                                                               (* blep_t (+ 0.708333333 (* -0.09375 blep_t)))))))))
-                     void)
-                   (if (< blep_t 3.0)
-                       (begin
-                         (set! blep_y (* (- 3.0 blep_t) (- 3.0 blep_t)))
-                         (set! blep_y (* 0.010416667 blep_y blep_y))
-                         void))))
-           (set! blep_y (* blep_s blep_y))
-           void))
-     blep_y))
+         (polyblep2 blep_p blep_inc)
+         (if (< blep_t 1.0)
+             (* blep_s (+ -0.5 (* blep_t (+ 0.916666667
+                                            (* blep_t blep_t (+ -0.583333333 (* 0.229166667 blep_t)))))))
+             (if (< blep_t 2.0)
+                 (* blep_s (+ -0.822916667
+                              (* blep_t (+ 2.208333333
+                                           (* blep_t (+ -1.9375
+                                                        (* blep_t (+ 0.708333333 (* -0.09375 blep_t)))))))))
+                 (if (< blep_t 3.0)
+                     (* blep_s 0.010416667 blep_u blep_u)
+                     blep_none))))))
 
 (bind-macro
   "the PolyBLAMP correction for a corner t frames away (-1.0 < t < 1.0), where
