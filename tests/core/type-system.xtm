@@ -179,3 +179,17 @@
       (vset! v i 1.5)
       (vref v i))))
 (xtmtest-result (vref_i64_index 2) 1.5)
+
+;; a tuple of 128 fields: its constructors' names, which encode the whole
+;; type, run past LLVM's default 1024-character cap on local names
+(eval `(bind-type Wide128 ,(string->symbol (string-append "<" (string-join (make-list 128 "double") ",") ">")))
+      (interaction-environment))
+
+(eval `(xtmtest-compile
+        (bind-func wide128_last
+          (lambda ()
+            (let ((t (Wide128_h ,@(make-list-with-proc 128 (lambda (i) (* 1.0 i))))))
+              (tref t 127)))))
+      (interaction-environment))
+
+(xtmtest-result (wide128_last) 127.0)

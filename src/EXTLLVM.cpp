@@ -59,6 +59,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/OptimizationLevel.h"
 
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1218,6 +1219,19 @@ void initLLVM() {
     llvm::InitializeNativeTargetAsmPrinter();
     llvm::InitializeNativeTargetAsmParser();
     llvm::InitializeNativeTargetDisassembler();
+
+    // LLVM cuts local value names off at 1024 characters by default, and
+    // xtlang's names can be longer: a specialisation's name carries an encoding
+    // of its whole type (a 128-field tuple's constructor names run to 1200
+    // characters), so two locals which differ only past the cut collided as
+    // "multiple definition of local value". -1 is no limit.
+    {
+        auto& opts = llvm::cl::getRegisteredOptions();
+        auto it = opts.find("non-global-value-max-name-size");
+        if (it != opts.end()) {
+            static_cast<llvm::cl::opt<int>*>(it->second)->setValue(-1);
+        }
+    }
 
     // Create thread-safe context
     TSC = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
