@@ -142,7 +142,8 @@ spectrum rather than a chord. ph is from kit808_metal_make."
 ;; A sine, struck at full level, which dies away over as long as a couple of
 ;; seconds: that long, pure boom is the 808 kick. Its pitch starts a few
 ;; semitones sharp and settles within about 50 ms, as the hardware
-;; resonator's does when the trigger pulse first hits it. On top sits the
+;; resonator's does when the trigger pulse first hits it; a harder hit
+;; starts further sharp, as it does in the circuit. On top sits the
 ;; click: the trigger pulse itself, leaking through a lowpass filter which the
 ;; tone control opens.
 ;;
@@ -161,7 +162,8 @@ spectrum rather than a chord. ph is from kit808_metal_make."
           (click_coeff:SAMPLE 0.5)
           (pulse_frames:i64 (convert (/ SRf 1600.0) i64))
           (vel:SAMPLE 0.0)
-          (pre:SAMPLE 1.0)
+          (pre:SAMPLE 1.0) (pre_norm:SAMPLE 1.0)
+          (sigh:SAMPLE 0.5)
           (y:SAMPLE 0.0)
           (last:SAMPLE 0.0)
           (carry:SAMPLE 0.0)
@@ -173,15 +175,17 @@ spectrum rather than a chord. ph is from kit808_metal_make."
               (set! phase 0.0)
               (set! amp 1.0)
               (set! sweep 1.0)
-              (set! vel (voice_vel v))))
+              (set! vel (voice_vel v))
+              (set! sigh (+ 0.2 (* 0.3 vel)))))
         (if (= (% (voice_age v) 32) 0)
             (begin
               (set! amp_coeff (decay_mult (clampf (kit808_bd_decay p) 0.002 100.0)))
               ;; the tone control opens the click's lowpass from 600 Hz to 8 kHz
               (set! click_coeff (onepole_coeff (+ 600.0 (* 7400.0 (kit808_bd_tone p) vel))))
-              (set! pre (+ 1.0 (* 5.0 (kit808_bd_drive p))))))
+              (set! pre (+ 1.0 (* 5.0 (kit808_bd_drive p))))
+              (set! pre_norm (/ 1.0 (tanh_fast pre)))))
         ;; the resonator
-        (set! phase (+ phase (/ (* (kit808_bd_tune p) (+ 1.0 (* 0.5 sweep))) SRf)))
+        (set! phase (+ phase (/ (* (kit808_bd_tune p) (+ 1.0 (* sigh sweep))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
         (set! y (* amp (sine_at phase)))
         (set! amp (* amp amp_coeff))
@@ -192,7 +196,7 @@ spectrum rather than a chord. ph is from kit808_metal_make."
         (set! y (+ y (* (+ 0.1 (* 0.9 (kit808_bd_tone p))) vel click)))
         ;; drive: saturate, then scale back so that the peak stays put. The
         ;; flattened wave carries more energy, so turn it down a little too.
-        (set! y (/ (tanh (* pre y)) (tanh pre)))
+        (set! y (* pre_norm (tanh_fast (* pre y))))
         (set! y (* 0.42 (- 1.0 (* 0.35 (kit808_bd_drive p))) (kit808_bd_level p) vel y))
         (set! carry (* carry carry_coeff))
         (set! last (+ y carry))
@@ -344,7 +348,7 @@ spectrum rather than a chord. ph is from kit808_metal_make."
         (set! y (svf_bp bp (kit808_metal metal)))
         (set! y (svf_hp hp (* env y)))
         (set! env (* env coeff))
-        (frame_add_mono out (* 1.45 level vel y) 0.62)
+        (frame_add_mono out (* 2.4 level vel y) 0.62)
         (if (< env 0.001)
             (voice_done v))
         void))))
@@ -478,7 +482,7 @@ spectrum rather than a chord. ph is from kit808_metal_make."
         (set! phase2 (+ phase2 (/ 1700.0 SRf)))
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
         (set! y (* env (+ (* 0.6 (sine_at phase1)) (sine_at phase2))))
-        (set! y (svf_hp hp (tanh (* 2.0 y))))
+        (set! y (svf_hp hp (tanh_fast (* 2.0 y))))
         (set! env (* env coeff))
         (frame_add_mono out (* 0.21 (kit808_rs_level p) vel y) 0.45)
         (if (< env 0.001) (voice_done v))
@@ -515,7 +519,7 @@ spectrum rather than a chord. ph is from kit808_metal_make."
         (if (voice_start? v)
             (begin (set! rise 0.0) (set! env 1.0) (set! vel (voice_vel v))))
         (onepole_lp rise rise_coeff 1.0)
-        (frame_add_mono out (* 0.28 (kit808_ma_level p) vel rise env (svf_hp hp (noise_white seed))) 0.66)
+        (frame_add_mono out (* 0.56 (kit808_ma_level p) vel rise env (svf_hp hp (noise_white seed))) 0.66)
         (set! env (* env coeff))
         (if (< env 0.001) (voice_done v))
         void))))
