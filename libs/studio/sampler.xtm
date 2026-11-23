@@ -989,10 +989,9 @@ otherwise the quietest"
 
 (bind-func static sampler_start_region
   "start region r in slot s, for the note the voice v is playing"
-  (lambda (bank:SamplerBank* r:i64 s:SamplerSlot* v:Voice* note:i64 amp:double selvel:double)
+  (lambda (bank:SamplerBank* r:i64 s:SamplerSlot* v:Voice* note:i64 amp:double selvel:double p:SAMPLE*)
     (let ((ab (pref (tref bank 3) r))
           (row (pref-ptr (tref bank 4) (* r SAMPLER_NOPCODES)))
-          (p (inst_params (tref bank 0)))
           (frames (AudioBuffer_frames ab))
           (last (convert (pref row SFZ_END) i64))
           (stop:i64 (if (and (> last 0) (< last frames)) (+ last 1) frames))
@@ -1045,10 +1044,10 @@ otherwise the quietest"
       void)))
 
 (bind-func sampler_start_note
-  "start every region which matches the note voice number idx has just begun"
-  (lambda (bank:SamplerBank* idx:i64 v:Voice* note:i64)
+  "start every region which matches the note voice number idx has just begun.
+p is the voice's own parameters."
+  (lambda (bank:SamplerBank* idx:i64 v:Voice* note:i64 p:SAMPLE*)
     (let ((inst (tref bank 0))
-          (p (inst_params inst))
           (voices (tref inst 2))
           (nvoices (inst_nvoices inst))
           (all_slots (tref bank 5))
@@ -1103,7 +1102,7 @@ otherwise the quietest"
                                    (pref row SFZ_XFOUT_LOVEL) (pref row SFZ_XFOUT_HIVEL) #t)
                     0.0))
             (begin
-              (sampler_start_region bank r (sampler_free_slot slots) v note amp selvel)
+              (sampler_start_region bank r (sampler_free_slot slots) v note amp selvel p)
               ;; this region's group silences every other slot whose off_by names it
               (set! group (convert (pref row SFZ_GROUP) i64))
               (if (<> group 0)
@@ -1219,7 +1218,7 @@ otherwise a region's own ampeg_release applies if it's longer."
 (bind-func sampler_voice_c
   "the voice function for voice number idx of a sampler instrument"
   (lambda (bank:SamplerBank* idx:i64)
-    (let ((p (inst_params (tref bank 0)))
+    (let ((p (inst_voice_params (tref bank 0) idx))
           (slots (pref-ptr (tref bank 5) (* idx SAMPLER_SLOTS)))
           (note:i64 0)
           (let_go:i1 #f)
@@ -1235,7 +1234,7 @@ otherwise a region's own ampeg_release applies if it's longer."
               (set! note (+ note 1))
               (set! let_go #f)
               (set! timed_out #f)
-              (sampler_start_note bank idx v note)))
+              (sampler_start_note bank idx v note p)))
         (if (= (% (voice_age v) 32) 0)
             (begin
               (set! tune_ratio (pow 2.0 (/ (convert (pref p SAMPLER_P_TUNE) double) 12.0)))
