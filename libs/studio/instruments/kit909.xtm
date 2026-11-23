@@ -105,10 +105,11 @@
 ;; multipliers are dsp.xtm's. What follows is what is particular to this kit.
 
 (bind-func static kit909_shape
-  "soft saturation: tanh, scaled so that an input of 1.0 still gives 1.0.
-`drive` 1.0 is nearly clean; more bends the waveform towards a square."
-  (lambda (x:SAMPLE drive:SAMPLE)
-    (/ (tanh (* drive x)) (tanh drive))))
+  "soft saturation: tanh_fast, scaled so that an input of 1.0 still gives 1.0.
+`drive` 1.0 is nearly clean; more bends the waveform towards a square. `norm`
+is 1.0 / (tanh_fast drive), which the caller works out when drive changes."
+  (lambda (x:SAMPLE drive:SAMPLE norm:SAMPLE)
+    (* norm (tanh_fast (* drive x)))))
 
 (bind-macro
   "one frame of a square wave from the oscillator whose phase is number i of
@@ -148,7 +149,7 @@ different scales share no partials. ph is from kit909_metal_make."
 ;; slow one (about 250 ms) which bends the last stretch down to the note.
 ;; bd-sweep scales both, and velocity adds a little.
 ;;
-;; The oscillator is a sine pushed gently into tanh, which rounds its peaks
+;; The oscillator is a sine pushed gently into a tanh curve, which rounds its peaks
 ;; towards a square and adds the odd harmonics that make a 909 kick sound
 ;; harder than an 808's. The click is a short pulse plus a burst of
 ;; bandpassed noise, and bd-attack sets its level.
@@ -169,7 +170,7 @@ different scales share no partials. ph is from kit909_metal_make."
           (pulse:SAMPLE 0.0) (pulse_coeff (onepole_coeff 5000.0))
           (pulse_frames:i64 (convert (/ SRf 2000.0) i64))
           (burst:SAMPLE 0.0) (burst_coeff (decay_mult 0.015))
-          (vel:SAMPLE 0.0) (pre:SAMPLE 1.0)
+          (vel:SAMPLE 0.0) (pre:SAMPLE 1.0) (pre_norm:SAMPLE 1.0)
           (y:SAMPLE 0.0) (click:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
           (carry_coeff (decay_mult 0.02)))
@@ -185,7 +186,8 @@ different scales share no partials. ph is from kit909_metal_make."
             (begin
               (set! amp_coeff (decay_mult (clampf (kit909_bd_decay p) 0.002 100.0)))
               (set! depth (* (kit909_bd_sweep p) (+ 0.7 (* 0.3 vel))))
-              (set! pre (+ 1.6 (* 6.0 (kit909_bd_drive p))))))
+              (set! pre (+ 1.6 (* 6.0 (kit909_bd_drive p))))
+              (set! pre_norm (/ 1.0 (tanh_fast pre)))))
         ;; the oscillator
         (set! phase (+ phase (/ (* (kit909_bd_tune p) (+ 1.0 (* depth (+ (* 5.0 fast) (* 1.5 slow))))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
@@ -201,7 +203,7 @@ different scales share no partials. ph is from kit909_metal_make."
         (set! y (+ y (* (kit909_bd_attack p) vel click)))
         ;; drive flattens the wave, which carries more energy at the same
         ;; peak, so turn it down a little as the drive goes up
-        (set! y (kit909_shape y pre))
+        (set! y (kit909_shape y pre pre_norm))
         (set! y (* 0.47 (- 1.0 (* 0.35 (kit909_bd_drive p))) (kit909_bd_level p) vel y))
         (set! carry (* carry carry_coeff))
         (set! last (+ y carry))
@@ -233,7 +235,8 @@ different scales share no partials. ph is from kit909_metal_make."
           (vel:SAMPLE 0.0) (bright:SAMPLE 0.0) (last_bright:SAMPLE -1.0)
           (f:SAMPLE 0.0) (body:SAMPLE 0.0) (snares:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (decay_mult 0.02)))
+          (carry_coeff (decay_mult 0.02))
+          (body_norm:SAMPLE (/ 1.0 (tanh_fast 1.5))))
       (svf_set hp 700.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
@@ -256,7 +259,7 @@ different scales share no partials. ph is from kit909_metal_make."
         (if (>= phase2 1.0) (set! phase2 (- phase2 1.0)))
         (set! body (kit909_shape (+ (* env1 (sine_at phase1))
                                     (* 0.6 env2 (sine_at phase2)))
-                                 1.5))
+                                 1.5 body_norm))
         ;; the snares
         (set! snares (svf_lp lp (svf_hp hp (noise_white seed))))
         (set! snares (* env_noise (+ 0.25 (* 1.3 (kit909_sd_snappy p) (+ 0.6 (* 0.4 vel)))) snares))
@@ -345,7 +348,7 @@ different scales share no partials. ph is from kit909_metal_make."
         (set! y (* env (+ (* 0.5 (sine_at phase1))
                           (sine_at phase2)
                           (* 0.6 (sine_at phase3)))))
-        (set! y (svf_hp hp (tanh (* 2.5 y))))
+        (set! y (svf_hp hp (tanh_fast (* 2.5 y))))
         (set! env (* env coeff))
         (frame_add_mono out (* 0.21 (kit909_rs_level p) vel y) 0.45)
         (if (< env 0.001) (voice_done v))
@@ -355,7 +358,7 @@ different scales share no partials. ph is from kit909_metal_make."
 ;; hi-hats ;;
 ;;;;;;;;;;;;;
 
-;; A metal bank mixed with white noise, through a bandpass at about 10 kHz,
+;; A metal bank mixed with white noise, through a bandpass at about 8 kHz,
 ;; an envelope and a highpass. The noise makes these crisper and less
 ;; pitched than the 808's hats. Pitch 42 plays the closed hat and 46 the
 ;; open one; both are mapped to this one voice, so each cuts the other off.
@@ -372,14 +375,14 @@ different scales share no partials. ph is from kit909_metal_make."
           (vel:SAMPLE 0.0)
           (level:SAMPLE 0.0)
           (y:SAMPLE 0.0))
-      (svf_set hp 7500.0 0.7)
+      (svf_set hp 6000.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
             (begin
               (set! env 1.0)
               (set! open (> (voice_pitch v) 44.0))
               (set! vel (voice_vel v))
-              (svf_set bp (+ 9000.0 (* 2000.0 vel)) 0.9)))
+              (svf_set bp (+ 7500.0 (* 1500.0 vel)) 0.9)))
         (if (= (% (voice_age v) 32) 0)
             (begin
               (set! coeff (decay_mult (clampf (if open (kit909_oh_decay p) (kit909_hh_decay p)) 0.002 100.0)))
@@ -387,7 +390,7 @@ different scales share no partials. ph is from kit909_metal_make."
         (set! y (svf_bp bp (+ (kit909_metal metal 1.0) (* 0.6 (noise_white seed)))))
         (set! y (svf_hp hp (* env y)))
         (set! env (* env coeff))
-        (frame_add_mono out (* 0.28 level vel y) 0.62)
+        (frame_add_mono out (* 0.56 level vel y) 0.62)
         (if (< env 0.001)
             (voice_done v))
         void))))
@@ -398,15 +401,22 @@ different scales share no partials. ph is from kit909_metal_make."
 
 ;; The crash multiplies two metal banks tuned apart (ring modulation), so
 ;; every partial of one meets every partial of the other and the spectrum
-;; fills in. A band around 5 kHz gives the crash its body and fades in
-;; about half of cr-decay; the band above 8 kHz is the shimmer and lasts
-;; the full time. A few milliseconds of rise soften the hit.
+;; fills in. Each bank is lowpassed at 10 kHz before they are multiplied, so
+;; that the product, which is twice as wide as either, stays below the sample
+;; rate's Nyquist frequency and doesn't fold back; a lowpass at 14 kHz after it
+;; keeps the top where the 909's recordings leave it. A band around 5 kHz
+;; gives the crash its body and fades in about half of cr-decay; the band
+;; above 8 kHz is the shimmer and lasts the full time. A few milliseconds of
+;; rise soften the hit.
 
 (bind-func kit909_cr_c
   (lambda (p:SAMPLE*)
     (let ((metal_a (kit909_metal_make))
           (metal_b (kit909_metal_make))
           (seed:i64 5150)
+          (lp_a1 (svf_make 1)) (lp_a2 (svf_make 1))
+          (lp_b1 (svf_make 1)) (lp_b2 (svf_make 1))
+          (lp_top (svf_make 1)) (lp_top2 (svf_make 1))
           (bp_mid (svf_make 1))
           (hp_high (svf_make 1))
           (hp_low (svf_make 1))
@@ -415,6 +425,9 @@ different scales share no partials. ph is from kit909_metal_make."
           (coeff_mid:SAMPLE 0.99) (coeff_high:SAMPLE 0.99)
           (vel:SAMPLE 0.0) (bright:SAMPLE 0.0)
           (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set lp_a1 10000.0 0.7) (svf_set lp_a2 10000.0 0.7)
+      (svf_set lp_b1 10000.0 0.7) (svf_set lp_b2 10000.0 0.7)
+      (svf_set lp_top 14000.0 0.7) (svf_set lp_top2 14000.0 0.7)
       (svf_set bp_mid 5000.0 1.0)
       (svf_set hp_high 8000.0 0.7)
       (svf_set hp_low 2500.0 0.7)
@@ -426,14 +439,17 @@ different scales share no partials. ph is from kit909_metal_make."
               (set! coeff_mid (decay_mult (clampf (* 0.45 (kit909_cr_decay p)) 0.002 100.0)))
               (set! coeff_high (decay_mult (clampf (kit909_cr_decay p) 0.002 100.0)))
               (set! bright (* (kit909_cr_tone p) (+ 0.6 (* 0.4 vel))))))
-        (set! x (+ (* 4.0 (kit909_metal metal_a 1.0) (kit909_metal metal_b 1.37)) (* 0.4 (noise_white seed))))
+        (set! x (svf_lp lp_top (svf_lp lp_top2
+                  (+ (* 4.0 (svf_lp lp_a2 (svf_lp lp_a1 (kit909_metal metal_a 1.0)))
+                            (svf_lp lp_b2 (svf_lp lp_b1 (kit909_metal metal_b 1.37))))
+                     (* 0.4 (noise_white seed))))))
         (set! y (+ (* env_mid (- 1.0 (* 0.5 bright)) (svf_bp bp_mid x))
                    (* env_high (+ 0.4 bright) (svf_hp hp_high x))))
         (set! y (* rise (svf_hp hp_low y)))
         (onepole_lp rise rise_coeff 1.0)
         (set! env_mid (* env_mid coeff_mid))
         (set! env_high (* env_high coeff_high))
-        (frame_add_mono out (* 0.29 (kit909_cr_level p) vel y) 0.38)
+        (frame_add_mono out (* 0.45 (kit909_cr_level p) vel y) 0.38)
         (if (< env_high 0.001)
             (voice_done v))
         void))))
@@ -447,6 +463,9 @@ different scales share no partials. ph is from kit909_metal_make."
   (lambda (p:SAMPLE*)
     (let ((metal_a (kit909_metal_make))
           (metal_b (kit909_metal_make))
+          (lp_a1 (svf_make 1)) (lp_a2 (svf_make 1))
+          (lp_b1 (svf_make 1)) (lp_b2 (svf_make 1))
+          (lp_top (svf_make 1)) (lp_top2 (svf_make 1))
           (ping1 (svf_make 1))
           (ping2 (svf_make 1))
           (wash (svf_make 1))
@@ -454,6 +473,9 @@ different scales share no partials. ph is from kit909_metal_make."
           (coeff_ping:SAMPLE 0.99) (coeff_wash:SAMPLE 0.99)
           (vel:SAMPLE 0.0)
           (x:SAMPLE 0.0) (y:SAMPLE 0.0))
+      (svf_set lp_a1 10000.0 0.7) (svf_set lp_a2 10000.0 0.7)
+      (svf_set lp_b1 10000.0 0.7) (svf_set lp_b2 10000.0 0.7)
+      (svf_set lp_top 14000.0 0.7) (svf_set lp_top2 14000.0 0.7)
       (svf_set ping1 3200.0 8.0)
       (svf_set ping2 5300.0 8.0)
       (svf_set wash 7000.0 0.7)
@@ -464,12 +486,14 @@ different scales share no partials. ph is from kit909_metal_make."
             (begin
               (set! coeff_ping (decay_mult (clampf (* 0.35 (kit909_rd_decay p)) 0.002 100.0)))
               (set! coeff_wash (decay_mult (clampf (kit909_rd_decay p) 0.002 100.0)))))
-        (set! x (* 4.0 (kit909_metal metal_a 1.19) (kit909_metal metal_b 1.61)))
+        (set! x (svf_lp lp_top (svf_lp lp_top2
+                  (* 4.0 (svf_lp lp_a2 (svf_lp lp_a1 (kit909_metal metal_a 1.19)))
+                         (svf_lp lp_b2 (svf_lp lp_b1 (kit909_metal metal_b 1.61)))))))
         (set! y (+ (* env_ping (+ (svf_bp ping1 x) (* 0.8 (svf_bp ping2 x))))
                    (* env_wash (+ 0.25 (* 0.2 vel)) (svf_hp wash x))))
         (set! env_ping (* env_ping coeff_ping))
         (set! env_wash (* env_wash coeff_wash))
-        (frame_add_mono out (* 0.25 (kit909_rd_level p) vel y) 0.64)
+        (frame_add_mono out (* 0.34 (kit909_rd_level p) vel y) 0.64)
         (if (< env_wash 0.001)
             (voice_done v))
         void))))
@@ -504,7 +528,8 @@ different scales share no partials. ph is from kit909_metal_make."
           (env_noise:SAMPLE 0.0) (noise_coeff (decay_mult 0.08))
           (vel:SAMPLE 0.0) (y:SAMPLE 0.0)
           (last:SAMPLE 0.0) (carry:SAMPLE 0.0)
-          (carry_coeff (decay_mult 0.02)))
+          (carry_coeff (decay_mult 0.02))
+          (shape_norm:SAMPLE (/ 1.0 (tanh_fast 1.5))))
       (svf_set lp 2500.0 0.7)
       (lambda (v:Voice* out:SAMPLE*)
         (if (voice_start? v)
@@ -516,7 +541,7 @@ different scales share no partials. ph is from kit909_metal_make."
             (set! amp_coeff (decay_mult (clampf (kit909_tom_decay p) 0.002 100.0))))
         (set! phase (+ phase (/ (* (kit909_tom_tune p which) (+ 1.0 (* 0.5 sweep))) SRf)))
         (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (set! y (+ (* amp (kit909_shape (sine_at phase) 1.5))
+        (set! y (+ (* amp (kit909_shape (sine_at phase) 1.5 shape_norm))
                    (* env_noise 0.3 vel (svf_lp lp (noise_white seed)))))
         (set! amp (* amp amp_coeff))
         (set! sweep (* sweep sweep_coeff))
