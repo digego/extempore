@@ -5,8 +5,10 @@
 
 ;;; Commentary:
 
-;; A concert flute playing long notes with vibrato. The recordings aren't
-;; looped, so a note held longer than its recording ends with it.
+;; A concert flute playing long notes with vibrato. The recordings last a
+;; few seconds, so the loader finds a steady stretch of each to repeat for
+;; as long as the key is held. It also levels the recordings to one
+;; loudness, so that the dynamics parameter alone sets how loud a note is.
 ;;
 ;; The samples are CC0 (public domain), from
 ;; the Versilian Studios Chamber Orchestra, Community Edition (VSCO 2 CE).
@@ -33,7 +35,7 @@
     (dynamics 18.0 "how much quieter a soft note is: dB between velocity 1.0 and 0.1")
     (hardness 0.0 "-1.0 to 1.0: plays a softer or harder layer than the velocity would, at the same level")
     (length 0.0 "seconds after which every note fades out (0.0: no limit)")
-    (level 2.0 "output level"))
+    (level 1.0 "output level"))
   (presets
     (concert)
     (breathy (attack 0.3) (release 0.8) (hardness -0.5))
@@ -49,4 +51,4 @@
 
 (define flute-setup
   (lambda (inst)
-    (sampler:setup-sfz inst 'flute "VSCO-2-CE/FluteSusVib.sfz")))
+    (sampler:setup-sfz inst 'flute "VSCO-2-CE/FluteSusVib.sfz" '(loop) '(match -21.0 16 0.6))))
