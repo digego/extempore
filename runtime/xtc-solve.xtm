@@ -482,7 +482,27 @@
 ;; branch in the search cannot leak its prunes into a sibling branch.)
 ;; Returns (subst remaining progress?), or 'conflict if any overload has no
 ;; viable candidate (no later binding can rescue an empty set).
+;;
+;; The pass sweeps forwards, then (if that committed anything) backwards over
+;; what is left.  Within a sweep a commit can only help the overloads after it,
+;; so a forward sweep alone resolves a chain whose types flow backwards (an
+;; untyped chain fixed by its last use) one link per pass: quadratic.  The
+;; order cannot change what is committed: a substitution only grows, so an
+;; overload with one viable candidate keeps it, and the commits reach the same
+;; fixpoint.  The remaining overloads keep their original order, which the
+;; search's tie-break reads.
 (define xtc:solve:commit-pass
+  (lambda (pending intern subst classes)
+    (let ((fwd (xtc:solve:commit-sweep pending intern subst classes)))
+      (if (or (eq? fwd 'conflict) (not (caddr fwd)) (null? (cadr fwd)))
+          fwd
+          (let ((bwd (xtc:solve:commit-sweep (reverse (cadr fwd)) intern (car fwd) classes)))
+            (if (eq? bwd 'conflict)
+                bwd
+                (list (car bwd) (reverse (cadr bwd)) #t)))))))
+
+;; One sweep of a commit pass, in the order of `pending'.
+(define xtc:solve:commit-sweep
   (lambda (pending intern subst classes)
     (let loop ((ps pending) (subst subst) (still '()) (progress #f))
       (if (null? ps)
