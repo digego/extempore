@@ -29,15 +29,50 @@
 ;; the read position falls between the recorded frames. The voice
 ;; interpolates between the four nearest frames with a cubic Hermite curve,
 ;; which is smooth enough that shifting by a few semitones adds no audible
-;; grit. It doesn't filter before reading faster, so a sample shifted up by
-;; an octave or more will alias a little; sample sets which record every few
-;; keys never need that.
+;; grit. It doesn't filter before reading faster, so a sample with energy
+;; above a quarter of the sample rate which is shifted up by an octave or
+;; more will alias a little; sample sets which record every few keys never
+;; need that. A file recorded at another rate than the engine's is converted
+;; once, as it is loaded, by a windowed sinc, so only the transposition goes
+;; through the cubic read. A region with no offset of its own starts 3 ms
+;; before its sound does (the first frame within 40 dB of the file's peak,
+;; and no later than 0.3 seconds in), so that the silence at the head of a
+;; recording doesn't delay the note.
 ;;
 ;; Sample data is large (the piano is a couple of hundred megabytes), so it
 ;; lives on the heap rather than in an instrument's memory zone, and each
 ;; file is read once: two tracks playing the same instrument share it. A
 ;; region is published to the audio thread only once it is complete, so
 ;; loading never disturbs what is already playing.
+;;
+;; The SFZ opcodes the engine reads (anything else is listed in a message
+;; when the file is loaded, and ignored):
+;;
+;;   keys and velocities: lokey, hikey, key, lovel, hivel, pitch_keycenter,
+;;     pitch_keytrack, tune, transpose
+;;   level and place: volume, pan, xfin_lovel, xfin_hivel, xfout_lovel,
+;;     xfout_hivel, xf_velcurve
+;;   playback: offset, end, loop_mode (no_loop, one_shot, loop_continuous,
+;;     loop_sustain), loop_start, loop_end, loop_crossfade
+;;   envelope: ampeg_attack, ampeg_release (an instrument usually leaves its
+;;     library's out, so that its own attack and release parameters apply)
+;;   choosing and choking: group, off_by, seq_length, seq_position, lorand,
+;;     hirand
+;;   file structure: <control> default_path, <global>, <master>, <group>,
+;;     <region>, #define and #include
+;;
+;; Not read: the rest of the envelope (ampeg_decay, ampeg_sustain,
+;; ampeg_hold, the velocity-to-envelope opcodes), amp_veltrack and the
+;; velocity curves, release-trigger regions (trigger=release regions are
+;; left out), key switches and controller ranges (sw_*, locc/hicc), filters
+;; and pitch envelopes, key crossfades, polyphony limits, off_mode (a choke
+;; always takes 30 ms), and the loop points stored in a WAV file's own
+;; smpl chunk. A file's loop_crossfade is read by the loader, not the voice:
+;; see the sustain loops below.
+;;
+;; Where a library has no loops for a sustained instrument, sampler:setup-sfz
+;; can find them (its loop option), and its other options level the library's
+;; recordings, tune them and spread them over more keys.
 
 ;;; Code:
 
@@ -75,6 +110,118 @@
   (lambda (p:i8* tag:i8*)
     (= (strncmp p tag 4) 0)))
 
+;; Playing a file recorded at another rate than the engine's would mean
+;; reading it at a ratio near 1.088 or 0.919 through the cubic read, which
+;; would pass everything above 20 kHz straight into aliases. A file is
+;; converted once, as it is loaded, by a Kaiser-windowed sinc: the kernel for
+;; each of the output frame's fractional positions is worked out once (there
+;; are only rate_out / gcd(rate_in, rate_out) of them) and the conversion is
+;; then a row of multiply-adds per output frame.
+
+(bind-func sampler_i0
+  "the modified Bessel function I0, summed from its power series"
+  (lambda (x:double)
+    (let ((h:double (* 0.5 x))
+          (sum:double 1.0)
+          (term:double 1.0)
+          (k:double 1.0)
+          (i:i64 0))
+      (dotimes (i 40)
+        (set! term (* term (/ (* h h) (* k k))))
+        (set! sum (+ sum term))
+        (set! k (+ k 1.0)))
+      sum)))
+
+(bind-func sampler_gcd
+  (lambda (a:i64 b:i64)
+    (let ((x:i64 a)
+          (y:i64 b)
+          (t:i64 0)
+          (i:i64 0))
+      (dotimes (i 64)
+        (if (> y 0)
+            (begin (set! t (% x y)) (set! x y) (set! y t) void)))
+      x)))
+
+(bind-func sampler_resample_data
+  "convert interleaved frames from rate_in to rate_out Hz, returning new
+heap data and storing its length in frames in outframes[0] (null, and 0, if
+the two rates have more than 4096 fractional positions)"
+  (lambda (src:SAMPLE* frames:i64 nchan:i64 rate_in:i64 rate_out:i64 outframes:i64*)
+    (let ((g (sampler_gcd rate_in rate_out))
+          (a (/ rate_in g))
+          (b (/ rate_out g))
+          (s:double (if (> a b) (/ (* 0.94 (convert b double)) (convert a double)) 1.0))
+          (tw:i64 (convert (+ 1.0 (/ 24.0 s)) i64))
+          (ntaps (* 2 tw))
+          (nout (/ (* frames b) a))
+          (pi:double 3.141592653589793)
+          (beta:double 8.0)
+          (norm:double (sampler_i0 8.0))
+          (w:SAMPLE* null)
+          (out:SAMPLE* null)
+          (wp:SAMPLE* null)
+          (f:double 0.0)
+          (x:double 0.0)
+          (y:double 0.0)
+          (q:double 0.0)
+          (sum:double 0.0)
+          (acc:double 0.0)
+          (num:i64 0)
+          (ip:i64 0)
+          (ph:i64 0)
+          (first:i64 0)
+          (m:i64 0)
+          (p:i64 0)
+          (k:i64 0)
+          (o:i64 0)
+          (c:i64 0))
+      (if (> b 4096)
+          (begin (pset! outframes 0 0) null)
+          (begin
+            (set! w (halloc (* b ntaps)))
+            (set! out (halloc (* (max nout 1) nchan)))
+            (dotimes (p b)
+              (set! f (/ (convert p double) (convert b double)))
+              (set! sum 0.0)
+              (dotimes (k ntaps)
+                (set! x (- (convert (+ (- k tw) 1) double) f))
+                (set! y (* s x))
+                (set! q (- 1.0 (* (/ x (convert tw double)) (/ x (convert tw double)))))
+                (if (< q 0.0) (set! q 0.0))
+                (set! q (* (if (< (fabs y) 1.0e-9) 1.0 (/ (sin (* pi y)) (* pi y)))
+                           (/ (sampler_i0 (* beta (sqrt q))) norm)))
+                (set! sum (+ sum q))
+                (pset! w (+ (* p ntaps) k) (convert q SAMPLE)))
+              (dotimes (k ntaps)
+                (pset! w (+ (* p ntaps) k)
+                       (convert (/ (convert (pref w (+ (* p ntaps) k)) double) sum) SAMPLE))))
+            (dotimes (o nout)
+              (set! num (* o a))
+              (set! ip (/ num b))
+              (set! ph (% num b))
+              (set! wp (pref-ptr w (* ph ntaps)))
+              (set! first (+ (- ip tw) 1))
+              (dotimes (c nchan)
+                (set! acc 0.0)
+                (if (and (>= first 0) (< (+ first ntaps) frames))
+                    (begin
+                      (dotimes (k ntaps)
+                        (set! acc (+ acc (* (convert (pref wp k) double)
+                                            (convert (pref src (+ (* (+ first k) nchan) c)) double)))))
+                      void)
+                    (begin
+                      (dotimes (k ntaps)
+                        (set! m (+ first k))
+                        (if (and (>= m 0) (< m frames))
+                            (set! acc (+ acc (* (convert (pref wp k) double)
+                                                (convert (pref src (+ (* m nchan) c)) double))))))
+                      void))
+                (pset! out (+ (* o nchan) c) (convert acc SAMPLE))))
+            (free (cast w i8*))
+            (pset! outframes 0 nout)
+            out)))))
+
 (bind-func sampler_read_audio
   "read a WAV, AIFF or AIFC file into a new AudioBuffer on the heap.
 
@@ -84,6 +231,8 @@ file can't be read."
   (lambda (path:i8* max_seconds:double)
     (let ((lenptr:i64* (salloc 1))
           (chunklen:i64* (salloc 1))
+          (outn:i64* (salloc 1))
+          (converted:SAMPLE* null)
           (file (audiofile_slurp path lenptr))
           (filelen (pref lenptr 0))
           (chunks:i8* null)
@@ -188,6 +337,19 @@ file can't be read."
                                                                          (convert fade SAMPLE))))))))
                           (dotimes (c nchan)
                             (pset! data (+ (* i nchan) c) (* g (pref data (+ (* i nchan) c))))))
+                        ;; a file at another rate is converted to the engine's
+                        (if (> (fabs (- samplerate (convert SRf double))) 0.5)
+                            (begin
+                              (set! converted (sampler_resample_data data keep nchan (convert samplerate i64)
+                                                                     (convert SRf i64) outn))
+                              (if (not (null? converted))
+                                  (begin
+                                    (free (cast data i8*))
+                                    (set! data converted)
+                                    (set! keep (pref outn 0))
+                                    (set! samplerate (convert SRf double))
+                                    void))
+                              void))
                         (set! sampler_bytes_loaded (+ sampler_bytes_loaded (* keep nchan 4)))
                         (AudioBuffer_h (String_h path) 0 keep nchan data samplerate 0 0 60 0.0))))))))))
 
@@ -253,6 +415,7 @@ file can't be read."
     (loop_mode 0 "0 no_loop, 1 one_shot, 2 loop_continuous, 3 loop_sustain")
     (loop_start 0 "the first frame of the loop")
     (loop_end -1 "the last frame of the loop (-1: the end of the sample)")
+    (loop_crossfade 0 "seconds of the sample's lead-in to the loop which the loader mixes into the loop's end (informational: the mix is made in the sample)")
     (ampeg_attack 0 "seconds; the longer of this and the attack parameter applies")
     (ampeg_release 0 "seconds to fade by 60 dB; the longer of this and the release parameter applies")
     (group 0 "a note in this group silences regions whose off_by names it")
@@ -479,6 +642,298 @@ file can't be read."
   (lambda (bank:SamplerBank*)
     (tset! bank 2 0)
     void))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; preparing regions as they are loaded ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func sampler_region_buffer_id
+  "an integer which names the sample of region r"
+  (lambda (bank:SamplerBank* r:i64)
+    (ptrtoi64 (cast (pref (tref bank 3) r) i8*))))
+
+(bind-func sampler_buffer_lead
+  "the frames of leading silence to skip: up to where the sound starts (see
+sampler_buffer_onset), but no more than 0.3 seconds"
+  (lambda (ab:AudioBuffer*)
+    (let ((on (sampler_buffer_onset ab 0.01))
+          (cap (convert (* 0.3 (AudioBuffer_samplerate ab)) i64)))
+      (if (< on cap) on cap))))
+
+(bind-func sampler_region_match
+  "set the volume of region r so that a quarter of a second of its sample,
+starting from_s seconds after its offset, has an RMS level of target_db,
+unless that would put its peak above ceiling_db"
+  (lambda (bank:SamplerBank* r:i64 target_db:double ceiling_db:double from_s:double)
+    (let ((ab (pref (tref bank 3) r))
+          (sr (AudioBuffer_samplerate ab))
+          (nch (AudioBuffer_channels ab))
+          (data (AudioBuffer_data ab))
+          (frames (AudioBuffer_frames ab))
+          (off:i64 (convert (sampler_region_ref bank r SFZ_OFFSET) i64))
+          (start:i64 (+ (convert (sampler_region_ref bank r SFZ_OFFSET) i64) (convert (* from_s sr) i64)))
+          (n:i64 (convert (* 0.25 sr) i64))
+          (sum:double 0.0)
+          (peak:double 0.0)
+          (x:double 0.0)
+          (gain:double 0.0)
+          (i:i64 0)
+          (c:i64 0))
+      (if (> (+ start n) frames) (set! n (- frames start)))
+      (if (> n 64)
+          (begin
+            (dotimes (i n)
+              (dotimes (c nch)
+                (set! x (convert (pref data (+ (* (+ start i) nch) c)) double))
+                (set! sum (+ sum (* x x)))))
+            (dotimes (i (* (- frames off) nch))
+              (set! x (fabs (convert (pref data (+ (* off nch) i)) double)))
+              (if (> x peak) (set! peak x)))
+            (set! gain (- target_db (* 10.0 (log10 (+ 1.0e-20 (/ sum (convert (* n nch) double)))))))
+            (if (> (+ gain (* 20.0 (log10 (+ 1.0e-20 peak)))) ceiling_db)
+                (set! gain (- ceiling_db (* 20.0 (log10 (+ 1.0e-20 peak))))))
+            (sampler_region_set bank r SFZ_VOLUME gain)))
+      void)))
+
+;; A sustained note has to go on for as long as the key is down, and a
+;; recording of a note ends. So the loader finds a stretch of the steady part
+;; of the sample to repeat. The stretch is a whole number of the note's
+;; periods long, about a second and a half, and its start is chosen from
+;; a spread of candidates, with the length adjusted by up to half a period
+;; either way, by how well the sound just before the end of the stretch
+;; matches the sound just before its start (the normalised correlation of
+;; the two, scaled down if their levels differ). The loop's last quarter
+;; second is then replaced by a crossfade from the end of the stretch to the
+;; sound before its start, so that the wrap from the end to the start
+;; continues the waveform. The crossfade's gains keep its power constant for
+;; the correlation which was measured: a fade between two unrelated sounds
+;; adds in power (quarter sines), and between two copies of the same
+;; sound in amplitude (straight lines); this one is exact for any correlation
+;; in between.
+
+(bind-func static sampler_mono
+  (lambda (data:SAMPLE* nchan:i64 i:i64)
+    (if (> nchan 1)
+        (* 0.5 (+ (pref data (* i nchan)) (pref data (+ (* i nchan) 1))))
+        (pref data i))))
+
+(bind-func sampler_find_loop
+  "find a loop for the sample ab, whose note has the frequency freq and whose
+sound starts at frame onset. Stores the loop's first frame, the frame after
+its last, its crossfade length in frames and the correlation measured
+(times 1000) in out[0] to out[3]; returns the score (0 to 1), or -1.0 if the
+sample has no steady part long enough"
+  (lambda (ab:AudioBuffer* freq:double onset:i64 out:i64*)
+    (let ((data (AudioBuffer_data ab))
+          (nchan (AudioBuffer_channels ab))
+          (n (AudioBuffer_frames ab))
+          (sr (AudioBuffer_samplerate ab))
+          (p:double (/ (AudioBuffer_samplerate ab) freq))
+          (a:i64 0)
+          (b:i64 0)
+          (w:i64 0)
+          (lo:i64 0)
+          (nlags:i64 0)
+          (lag:i64 0)
+          (best:double -2.0)
+          (bestlag:i64 0)
+          (rm:double 0.0)
+          (r0:double 0.0)
+          (rp:double 0.0)
+          (target:i64 0)
+          (k:i64 0)
+          (len:i64 0)
+          (xf:i64 0)
+          (hp:i64 0)
+          (ls_min:i64 0)
+          (ls_max:i64 0)
+          (ls:i64 0)
+          (ld:i64 0)
+          (bls:i64 0)
+          (bld:i64 0)
+          (exx:double 0.0)
+          (eyy:double 0.0)
+          (exy:double 0.0)
+          (xv:double 0.0)
+          (yv:double 0.0)
+          (rho:double 0.0)
+          (lvl:double 0.0)
+          (score:double 0.0)
+          (bestscore:double -1.0)
+          (bestrho:double 0.0)
+          (env:SAMPLE* null)
+          (nh:i64 0)
+          (j0:i64 0)
+          (j1:i64 0)
+          (sd:double 0.0)
+          (mean:double 0.0)
+          (i:i64 0)
+          (j:i64 0)
+          (m:i64 0)
+          (t:i64 0))
+      ;; the steady part runs from 0.4 seconds after the onset (or an eighth
+      ;; of the way through the sample) to four fifths of the way through
+      (set! a (+ onset (convert (* 0.4 sr) i64)))
+      (if (< a (/ n 8)) (set! a (/ n 8)))
+      (set! b (convert (* 0.8 (convert n double)) i64))
+      (set! w (convert (* 0.4 sr) i64))
+      ;; the note's period, from the autocorrelation near the nominal one
+      (set! lo (convert (* 0.93 p) i64))
+      (set! nlags (+ 2 (convert (* 0.14 p) i64)))
+      (if (> (+ a w (* 2 (convert p i64))) b)
+          (begin (pset! out 0 0) -1.0)
+          (begin
+            (dotimes (i nlags)
+              (set! lag (+ lo i))
+              (set! exx 0.0)
+              (set! eyy 0.0)
+              (set! exy 0.0)
+              (dotimes (j (/ w 2))
+                (set! xv (convert (sampler_mono data nchan (+ a (* j 2))) double))
+                (set! yv (convert (sampler_mono data nchan (+ a (* j 2) lag)) double))
+                (set! exx (+ exx (* xv xv)))
+                (set! eyy (+ eyy (* yv yv)))
+                (set! exy (+ exy (* xv yv))))
+              (set! rho (/ exy (sqrt (+ (* exx eyy) 1.0e-20))))
+              (if (> rho best)
+                  (begin (set! best rho) (set! bestlag lag) void)))
+            ;; refine to a fraction of a frame by a parabola through the peak
+            (set! p (convert bestlag double))
+            (set! rm 0.0)
+            (set! r0 0.0)
+            (set! rp 0.0)
+            (dotimes (m 3)
+              (set! lag (+ (- bestlag 1) m))
+              (set! exx 0.0)
+              (set! eyy 0.0)
+              (set! exy 0.0)
+              (dotimes (j (/ w 2))
+                (set! xv (convert (sampler_mono data nchan (+ a (* j 2))) double))
+                (set! yv (convert (sampler_mono data nchan (+ a (* j 2) lag)) double))
+                (set! exx (+ exx (* xv xv)))
+                (set! eyy (+ eyy (* yv yv)))
+                (set! exy (+ exy (* xv yv))))
+              (set! rho (/ exy (sqrt (+ (* exx eyy) 1.0e-20))))
+              (if (= m 0) (set! rm rho))
+              (if (= m 1) (set! r0 rho))
+              (if (= m 2) (set! rp rho)))
+            (if (> (fabs (+ (- rm (* 2.0 r0)) rp)) 1.0e-9)
+                (set! p (+ p (/ (* 0.5 (- rm rp)) (+ (- rm (* 2.0 r0)) rp)))))
+            ;; the loop is about 1.5 seconds, or less in a short sample
+            (set! target (convert (* 1.5 sr) i64))
+            (if (> target (convert (* 0.4 (convert (- b a) double)) i64))
+                (set! target (convert (* 0.4 (convert (- b a) double)) i64)))
+            (set! k (convert (+ 0.5 (/ (convert target double) p)) i64))
+            (if (< k 1) (set! k 1))
+            (set! len (convert (+ 0.5 (* (convert k double) p)) i64))
+            (set! xf (convert (* 0.25 sr) i64))
+            (if (> xf (/ len 4)) (set! xf (/ len 4)))
+            (set! hp (+ 1 (convert (* 0.5 p) i64)))
+            (set! ls_min (+ a xf))
+            (set! ls_max (- b (+ len hp 1)))
+            (if (<= ls_max ls_min)
+                (begin (pset! out 0 0) -1.0)
+                (begin
+                  ;; the sound's level in dB over each 1024 frames, so that a
+                  ;; stretch whose level swings (the beating of an ensemble)
+                  ;; is passed over for a steadier one
+                  (set! nh (/ n 1024))
+                  (set! env (halloc nh))
+                  (dotimes (j nh)
+                    (set! exx 0.0)
+                    (dotimes (i 1024)
+                      (set! xv (convert (sampler_mono data nchan (+ (* j 1024) i)) double))
+                      (set! exx (+ exx (* xv xv))))
+                    (pset! env j (convert (* 10.0 (log10 (+ 1.0e-12 (/ exx 1024.0)))) SAMPLE)))
+                  (dotimes (j 16)
+                    (set! ls (+ ls_min (/ (* (- ls_max ls_min) j) 15)))
+                    (dotimes (m (+ 1 (* 2 hp)))
+                      (set! ld (+ (- len hp) m))
+                      (set! exx 0.0)
+                      (set! eyy 0.0)
+                      (set! exy 0.0)
+                      (dotimes (t (/ xf 7))
+                        (set! xv (convert (sampler_mono data nchan (+ (- ls xf) (* t 7))) double))
+                        (set! yv (convert (sampler_mono data nchan (+ (- (+ ls ld) xf) (* t 7))) double))
+                        (set! exx (+ exx (* xv xv)))
+                        (set! eyy (+ eyy (* yv yv)))
+                        (set! exy (+ exy (* xv yv))))
+                      (set! rho (/ exy (sqrt (+ (* exx eyy) 1.0e-20))))
+                      (set! lvl (if (< exx eyy)
+                                    (sqrt (/ exx (+ eyy 1.0e-20)))
+                                    (sqrt (/ eyy (+ exx 1.0e-20)))))
+                      (set! j0 (/ ls 1024))
+                      (set! j1 (/ (+ ls ld) 1024))
+                      (set! mean 0.0)
+                      (set! sd 0.0)
+                      (dotimes (i (- j1 j0))
+                        (set! mean (+ mean (convert (pref env (+ j0 i)) double))))
+                      (set! mean (/ mean (convert (max 1 (- j1 j0)) double)))
+                      (dotimes (i (- j1 j0))
+                        (set! xv (- (convert (pref env (+ j0 i)) double) mean))
+                        (set! sd (+ sd (* xv xv))))
+                      (set! sd (sqrt (/ sd (convert (max 1 (- j1 j0)) double))))
+                      (set! score (* rho lvl (- 1.0 (if (< sd 6.0) (/ sd 10.0) 0.6))))
+                      (if (> score bestscore)
+                          (begin
+                            (set! bestscore score)
+                            (set! bestrho rho)
+                            (set! bls ls)
+                            (set! bld ld)
+                            void))))
+                  (free (cast env i8*))
+                  (pset! out 0 bls)
+                  (pset! out 1 (+ bls bld))
+                  (pset! out 2 xf)
+                  (pset! out 3 (convert (* 1000.0 (if (< bestrho 0.0) 0.0 bestrho)) i64))
+                  bestscore)))))))
+
+(bind-func sampler_bake_loop
+  "replace the last xf frames of the loop from ls to le (the frame after its
+last) with a crossfade into the xf frames before ls, for signals of
+correlation rho"
+  (lambda (ab:AudioBuffer* ls:i64 le:i64 xf:i64 rho:double)
+    (let ((data (AudioBuffer_data ab))
+          (nchan (AudioBuffer_channels ab))
+          (len (- le ls))
+          (pi:double 3.141592653589793)
+          (g1:double 0.0)
+          (g2:double 0.0)
+          (t:double 0.0)
+          (i:i64 0)
+          (c:i64 0)
+          (x:double 0.0)
+          (y:double 0.0))
+      (if (and (>= ls xf) (> len (* 2 xf)))
+          (dotimes (i xf)
+            (set! t (/ (+ (convert i double) 0.5) (convert xf double)))
+            (set! g2 (sin (* 0.5 pi t)))
+            (set! g1 (- (sqrt (- 1.0 (* (- 1.0 (* rho rho)) g2 g2))) (* rho g2)))
+            (dotimes (c nchan)
+              (set! x (convert (pref data (+ (* (+ (- le xf) i) nchan) c)) double))
+              (set! y (convert (pref data (+ (* (+ (- ls xf) i) nchan) c)) double))
+              (pset! data (+ (* (+ (- le xf) i) nchan) c) (convert (+ (* g1 x) (* g2 y)) SAMPLE)))))
+      void)))
+
+(bind-func sampler_region_autoloop
+  "give region r a sustain loop (see sampler_find_loop) and return its
+score, or -1.0 if it hasn't one"
+  (lambda (bank:SamplerBank* r:i64)
+    (let ((ab (pref (tref bank 3) r))
+          (out:i64* (salloc 4))
+          (freq (* 440.0 (pow 2.0 (/ (- (sampler_region_ref bank r SFZ_PITCH_KEYCENTER) 69.0) 12.0))))
+          (score:double 0.0))
+      (set! score (sampler_find_loop ab freq (convert (sampler_region_ref bank r SFZ_OFFSET) i64) out))
+      (if (> score 0.0)
+          (begin
+            (sampler_bake_loop ab (pref out 0) (pref out 1) (pref out 2)
+                               (/ (convert (pref out 3) double) 1000.0))
+            (sampler_region_set bank r SFZ_LOOP_START (convert (pref out 0) double))
+            (sampler_region_set bank r SFZ_LOOP_END (convert (- (pref out 1) 1) double))
+            (sampler_region_set bank r SFZ_LOOP_MODE 2.0)
+            (sampler_region_set bank r SFZ_LOOP_CROSSFADE
+                                (/ (convert (pref out 2) double) (AudioBuffer_samplerate ab)))))
+      score)))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; starting a note ;;
@@ -864,6 +1319,8 @@ parameters (the first seven are *sampler:params*)"
             (if (< r 0)
                 (begin (studio:error "this sampler is full: it holds" (sampler_region_count bank) "regions") #f)
                 (begin
+                  ;; a region with no offset of its own starts where its sound does
+                  (sampler_region_set bank r (sampler:opcode-index 'offset) (* 1.0 (sampler_buffer_lead ab)))
                   (for-each (lambda (op)
                               (let ((i (sampler:opcode-index (car op))))
                                 (if i (sampler_region_set bank r i (* 1.0 (cadr op))))))
@@ -1287,19 +1744,137 @@ parameters (the first seven are *sampler:params*)"
                 (sampler:report dir (- (clock:clock) start) loaded '() '())
                 loaded))))))
 
+;; Fitting a library's samples to the engine. These work on the regions an
+;; SFZ file has loaded into a bank, and setup-sfz applies the ones its caller
+;; asks for.
+
+;; the opcode value of region r
+(define sampler:ref
+  (lambda (bank r opcode)
+    (sampler_region_ref bank r (sampler:opcode-index opcode))))
+
+(define sampler:set
+  (lambda (bank r opcode value)
+    (sampler_region_set bank r (sampler:opcode-index opcode) (* 1.0 value))))
+
+(define sampler:each-region
+  (lambda (bank proc)
+    (let loop ((r 0))
+      (if (< r (sampler_region_count bank))
+          (begin (proc r) (loop (+ r 1)))))))
+
+;; Sustain loops, found once for each sample however many regions share it
+;; (the loop is mixed into the sample itself, so finding it twice would mix
+;; it twice).
+(define *sampler:loops* (make-hash-table))
+
+(define sampler:auto-loops
+  (lambda (bank)
+    (let ((found 0) (scores '()))
+      (sampler:each-region
+        bank
+        (lambda (r)
+          (if (< (sampler:ref bank r 'loop_mode) 2)
+              (let* ((id (sampler_region_buffer_id bank r))
+                     (known (hash-table-ref *sampler:loops* id)))
+                (if known
+                    (begin
+                      (for-each (lambda (op v) (sampler:set bank r op v))
+                                '(loop_start loop_end loop_crossfade loop_mode) known)
+                      (set! found (+ found 1)))
+                    (let ((score (sampler_region_autoloop bank r)))
+                      (if (> score 0.0)
+                          (begin
+                            (hash-table-set! *sampler:loops* id
+                                             (map (lambda (op) (sampler:ref bank r op))
+                                                  '(loop_start loop_end loop_crossfade loop_mode)))
+                            (set! scores (cons score scores))
+                            (set! found (+ found 1))))))))))
+      (list found (if (null? scores) 0.0 (apply min scores))))))
+
+;; Move every region's level to one RMS level, in dB: the volume which the
+;; library gave each region is replaced
+(define sampler:match-levels
+  (lambda (bank target ceiling from)
+    (sampler:each-region bank (lambda (r) (sampler_region_match bank r (* 1.0 target) (* 1.0 ceiling) (* 1.0 from))))))
+
+(define sampler:detune
+  (lambda (bank cents)
+    (sampler:each-region bank (lambda (r) (sampler:set bank r 'tune (+ cents (sampler:ref bank r 'tune)))))))
+
+;; Spread the regions at the edges of the keyboard's range over up to
+;; `semitones` more keys, so that notes just outside the range play, from
+;; the nearest sample, instead of nothing. keep-out lists keys which play
+;; something else (percussive hits): regions on them don't count as the
+;; edge, and a region isn't spread down over them.
+(define sampler:extend-range
+  (lambda (bank semitones keep-out)
+    (let* ((edge? (lambda (r) (not (memv (inexact->exact (sampler:ref bank r 'lokey)) keep-out))))
+           (all (let loop ((r (- (sampler_region_count bank) 1)) (acc '()))
+                  (if (< r 0) acc (loop (- r 1) (if (edge? r) (cons r acc) acc)))))
+           (low (apply min (map (lambda (r) (sampler:ref bank r 'lokey)) all)))
+           (high (apply max (map (lambda (r) (sampler:ref bank r 'hikey)) all)))
+           (floor-key (let loop ((ks keep-out) (m 0))
+                        (cond ((null? ks) m)
+                              ((< (car ks) low) (loop (cdr ks) (max m (+ (car ks) 1))))
+                              (else (loop (cdr ks) m))))))
+      (for-each
+        (lambda (r)
+          (if (= (sampler:ref bank r 'lokey) low)
+              (sampler:set bank r 'lokey (max floor-key (- low semitones))))
+          (if (= (sampler:ref bank r 'hikey) high)
+              (sampler:set bank r 'hikey (min 127 (+ high semitones)))))
+        all))))
+
+;; the option named `name` in a setup-sfz option list: (name value ...)
+(define sampler:option
+  (lambda (options name)
+    (assq name options)))
+
 ;; For an instrument file which wraps one of the SFZ libraries in
 ;; assets/studio: load it into the new instrument inst, or say what's
 ;; missing. sfz is relative to assets/studio. The library's own envelope
 ;; times are left out, so that the instrument's attack and release
 ;; parameters (whose defaults the instrument file chooses) always apply.
+;;
+;; The options which follow adapt the library to the engine (each is a list
+;; starting with its name):
+;;   (match db [crest [from]])
+;;                       replace the library's volumes by one level, the RMS
+;;                       of a quarter of a second of each sample (from
+;;                       seconds into the sound, default 0), so that
+;;                       neighbouring keys and layers are level; a region
+;;                       whose peak would then be more than crest dB
+;;                       (default 16) above that level is turned down to it
+;;   (loop)              find a sustain loop in each sample which has none,
+;;                       for instruments whose notes outlast their recordings
+;;   (tune cents)        add a fixed detune to every region
+;;   (extend n)          spread the regions at either end of the range over
+;;                       up to n more keys (default 12; 0 leaves them)
+;;   (keep-out key ...)  keys which play something other than a note of the
+;;                       instrument: the extension steers clear of them
 (define sampler:setup-sfz
-  (lambda (inst instrument sfz)
+  (lambda (inst instrument sfz . options)
     (let ((dir (sampler:asset-folder instrument (string-append "studio/" (sampler:directory-of sfz))))
           (bank (sampler_bank inst))
           (start (clock:clock)))
       (if (and dir (sampler:check-params instrument))
           (let ((result (sampler:load-sfz bank (string-append (sys:share-dir) "/assets/studio/" sfz)
-                                          '(ampeg_attack ampeg_release))))
+                                          '(ampeg_attack ampeg_release)))
+                (opt (lambda (name) (sampler:option options name))))
+            (if (opt 'tune) (sampler:detune bank (cadr (opt 'tune))))
+            (if (opt 'loop)
+                (let ((loops (sampler:auto-loops bank)))
+                  (studio:say "sampler:" instrument "--- sustain loops in" (car loops)
+                              "regions, worst match" (/ (round (* 100.0 (cadr loops))) 100.0))))
+            (if (opt 'match)
+                (let ((m (cdr (opt 'match))))
+                  (sampler:match-levels bank (car m)
+                                        (+ (car m) (if (pair? (cdr m)) (cadr m) 16.0))
+                                        (if (and (pair? (cdr m)) (pair? (cddr m))) (caddr m) 0.0))))
+            (let ((n (if (opt 'extend) (cadr (opt 'extend)) 12)))
+              (if (> n 0)
+                  (sampler:extend-range bank n (if (opt 'keep-out) (cdr (opt 'keep-out)) '()))))
             (sampler:report instrument (- (clock:clock) start) (car result) (cadr result) (caddr result))
             (car result))
           #f))))
