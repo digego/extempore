@@ -73,16 +73,18 @@
 ;;   filters and sweeps a rotating capacitor across its taps about seven times
 ;;   a second, which shifts the pitch up and down. In its "C" (chorus)
 ;;   settings it mixes this with the dry signal, so the two beat against each
-;;   other. Here it's a modulated delay line, mixed half and half with the dry
-;;   signal: `vibrato` at 1.0 is roughly the C3 setting.
+;;   other. Here it's a modulated delay line: `vibrato` sets its depth (1.0 is
+;;   the deepest setting, 3) and `vib-wet` how much of the delayed signal is
+;;   heard, 0.5 for the chorus settings (half and half with the dry signal)
+;;   or 1.0 for the pure vibrato of V1 to V3.
 ;;
 ;; - the Leslie's valve amplifier, which overdrives when it's pushed. A tanh
 ;;   with a small offset clips softly and a little asymmetrically, which adds
 ;;   the even harmonics of a valve stage.
-;;   The curve is applied at twice the sample rate (with the oversampler in
+;;   The curve is applied at four times the sample rate (with the oversampler in
 ;;   dsp.xtm), so that its harmonics don't fold back down as aliasing.
 ;;
-;; - the rotary speaker. A crossover at 800 Hz splits the sound between a
+;; - the rotary speaker. A Linkwitz-Riley crossover at 800 Hz splits the sound between a
 ;;   treble horn and a bass drum, which spin at their own speeds. A spinning
 ;;   source moves towards and away from the listener, so it's heard through a
 ;;   delay which grows and shrinks (Doppler shift); it points towards and away
@@ -128,7 +130,8 @@
     (perc-decay 0.6 "seconds for the percussion to die away: about 0.6 is fast, 2.5 slow")
     (click 0.5 "key click, 0.0 to 1.0")
     (leakage 0.4 "tonewheel crosstalk, 0.0 to 1.0")
-    (vibrato 0.0 "scanner chorus-vibrato depth, 0.0 (off) to 1.0 (C3)")
+    (vibrato 0.0 "scanner depth, 0.0 (off) to 1.0 (3, the deepest setting of the real scanner)")
+    (vib-wet 0.5 "how much of the scanner's delayed signal is heard, 0.5 for chorus (C1 to C3), 1.0 for pure vibrato (V1 to V3)")
     (drive 0.15 "overdrive in the speaker's amplifier, 0.0 to 1.0")
     (speed 0.8 "rotor speed in Hz: 0.0 brake, 0.8 chorale, 6.7 tremolo")
     (spread 0.7 "stereo width of the rotary speaker, 0.0 to 1.0")
@@ -335,12 +338,12 @@ and fading to nothing between 1 and 0"
           (perc_decay:SAMPLE 0.999)
           (perc_rise:SAMPLE (/ 1.0 (* 0.001 SRf)))
           ;; scanner
-          (scanner (dl_make 64))
+          (scanner (dl_make (+ 16 (convert (/ SRf 1000.0) i64))))
           (scan_phase:SAMPLE 0.0)
           (scan_inc:SAMPLE (/ 6.9 SRf))
           (scan_depth:SAMPLE 0.0)
           (scan_mix:SAMPLE 0.0)
-          ;; overdrive, at twice the sample rate, and its DC blocker
+          ;; overdrive, at four times the sample rate, and its DC blocker
           (os (os_make))
           (pre:SAMPLE 1.0)
           (bias:SAMPLE 0.0)
@@ -348,14 +351,19 @@ and fading to nothing between 1 and 0"
           (post:SAMPLE 1.0)
           (dc_in:SAMPLE 0.0)
           (dc_out:SAMPLE 0.0)
-          (dc_pole:SAMPLE 0.9985)
-          ;; crossover: a state-variable filter at 800 Hz, Q 0.707
+          (dc_pole:SAMPLE (dc_coeff 10.0))
+          ;; crossover: a Linkwitz-Riley pair at 800 Hz (two state-variable
+          ;; filters of Q 0.707 in series, for each of the low and high bands),
+          ;; whose two bands add back to a flat response
           (xover (svf_make 1))
           (xk:SAMPLE 1.4142)
           (ic1:SAMPLE 0.0) (ic2:SAMPLE 0.0)
+          (ic3:SAMPLE 0.0) (ic4:SAMPLE 0.0)
+          (ic5:SAMPLE 0.0) (ic6:SAMPLE 0.0)
+          (v3:SAMPLE 0.0) (v4:SAMPLE 0.0)
           ;; the rotors: angle in turns, speed in Hz
-          (horn (dl_make 256))
-          (drum (dl_make 256))
+          (horn (dl_make (+ 16 (convert (/ SRf 300.0) i64))))
+          (drum (dl_make (+ 16 (convert (/ SRf 300.0) i64))))
           (horn_angle:SAMPLE 0.0)
           (drum_angle:SAMPLE 0.37)
           (horn_speed:SAMPLE -1.0)
@@ -412,7 +420,8 @@ and fading to nothing between 1 and 0"
                 (tset! bus 8 (if (< (organ_perc_harmonic p) 2.5) 3 4))
                 (set! perc_decay (exp (/ -6.9 (* (clamp (organ_perc_decay p) 0.05 20.0) SRf))))
                 (set! scan_depth (* (clamp (organ_vibrato p) 0.0 1.0) 0.0003 SRf))
-                (set! scan_mix (* 0.5 (clamp (* 20.0 (organ_vibrato p)) 0.0 1.0)))
+                (set! x (clamp (organ_vib_wet p) 0.0 1.0))
+                (set! scan_mix (* x (clamp (* 20.0 (organ_vibrato p)) 0.0 1.0)))
                 (set! x (clamp (organ_drive p) 0.0 1.0))
                 (set! pre (+ 1.0 (* 24.0 x x)))
                 (set! bias (* 0.15 x))
@@ -451,17 +460,23 @@ and fading to nothing between 1 and 0"
           (set! y (dl_readf scanner (+ 1.0 (* scan_depth (+ 1.0 (sine_at scan_phase))))))
           (set! x (+ x (* scan_mix (- y x))))
           ;; overdrive, then a DC blocker for what the asymmetry adds. The
-          ;; curve is applied at twice the sample rate, so that its harmonics
+          ;; curve is applied at four times the sample rate, so that its harmonics
           ;; don't fold back down as aliasing.
-          (os_up2 os x)
+          (os_up4 os x)
           (pset! os 0 (* post (- (tanh_fast (+ (* pre (pref os 0)) bias)) bias_t)))
           (pset! os 1 (* post (- (tanh_fast (+ (* pre (pref os 1)) bias)) bias_t)))
-          (set! y (os_down2 os))
+          (pset! os 2 (* post (- (tanh_fast (+ (* pre (pref os 2)) bias)) bias_t)))
+          (pset! os 3 (* post (- (tanh_fast (+ (* pre (pref os 3)) bias)) bias_t)))
+          (set! y (os_down4 os))
           (set! x (dc_block dc_in dc_out dc_pole y))
-          ;; crossover: below 800 Hz to the drum, above to the horn
+          ;; crossover: below 800 Hz to the drum, above to the horn. Each
+          ;; band runs through the same filter twice.
           (svf_tick x ic1 ic2 (pref xover 0) (pref xover 1) (pref xover 2) v1 v2)
-          (dl_write horn (- x (* xk v1) v2))
-          (dl_write drum v2)
+          (set! y (- x (* xk v1) v2))
+          (svf_tick v2 ic3 ic4 (pref xover 0) (pref xover 1) (pref xover 2) v3 v4)
+          (dl_write drum v4)
+          (svf_tick y ic5 ic6 (pref xover 0) (pref xover 1) (pref xover 2) v3 v4)
+          (dl_write horn (- y (* xk v3) v4))
           ;; the rotors wind up and down towards the speed set
           (set! target (clamp (organ_speed p) 0.0 12.0))
           (set! horn_speed (+ horn_speed (* (if (> target horn_speed) horn_up horn_down)
@@ -479,13 +494,13 @@ and fading to nothing between 1 and 0"
           ;; points away.
           (set! c (sine_wrap (+ horn_angle 0.25)))
           (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
-                     (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
+                     (* 0.2 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
           (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
           (onepole_lp horn_lp_l a y)
           ;; horn, right mic
           (set! c (sine_wrap (+ (- horn_angle mic_angle) 0.25)))
           (set! y (+ (* (- 1.0 (* 0.3 (- 1.0 c))) (dl_readf horn (+ 2.0 (* horn_r (- 1.0 c)))))
-                     (* 0.35 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
+                     (* 0.2 (- 1.0 (* 0.3 (+ 1.0 c))) (dl_readf horn (+ 2.0 bounce (* horn_r (+ 1.0 c)))))))
           (set! a (+ dull (* (- bright dull) 0.5 (+ 1.0 c))))
           (onepole_lp horn_lp_r a y)
           ;; drum: less Doppler and a gentler throb than the horn
