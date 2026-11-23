@@ -66,7 +66,9 @@
 ;; four; then every harmonic, and the sub-octave and fifth used by the organ,
 ;; land exactly on an even bin, and the tables are perfectly in tune. A zone
 ;; holds nothing above about 14 kHz, so it can be read up to half an octave
-;; sharp without aliasing.
+;; sharp without the sound itself folding over. (The cubic read adds faint
+;; images of strong high lines; the glass and organ, which are made of lines,
+;; stop at 8.8 kHz to keep those quiet.)
 ;;
 ;; A note reads the two zones either side of its pitch, at the speed which
 ;; puts it in tune, and crossfades between them with equal-power weights (the
@@ -127,7 +129,7 @@
     (fenv-attack 1.5 "seconds for the filter envelope to rise")
     (vib-rate 4.5 "vibrato rate in Hz")
     (vib-depth 0.0 "vibrato depth in cents (0 to 50); it fades in over the attack")
-    (drift 0.3 "slow random wander of pitch (up to 7 cents) and morph, 0.0 to 1.0")
+    (drift 0.3 "slow random wander of pitch (up to 7 cents, and never less than 1.4) and morph, 0.0 to 1.0")
     (width 1.0 "stereo width, 0.0 (mono) to 1.0")
     (vel-sens 0.5 "how much velocity changes the level, 0.0 (none) to 1.0 (24 dB)"))
   (presets
@@ -147,7 +149,7 @@
     (air (timbre 4.0) (morph 0.3) (level 0.9) (attack 2.5) (decay 5.0) (release 6.0)
          (cutoff 2500.0) (resonance 0.2) (keytrack 0.3) (fenv-amount 2.0) (fenv-attack 4.0)
          (vib-rate 0.3) (vib-depth 3.0) (drift 0.5) (vel-sens 0.2))
-    (glass (timbre 5.0) (attack 0.05) (decay 4.0) (sustain 0.6) (release 5.0) (cutoff 12000.0)
+    (glass (timbre 5.0) (level 1.25) (attack 0.05) (decay 4.0) (sustain 0.6) (release 5.0) (cutoff 12000.0)
            (keytrack 0.3) (fenv-amount -1.0) (fenv-attack 3.0) (drift 0.2) (vel-sens 0.6))
     (frozen (timbre 5.0) (morph 0.6) (level 0.85) (attack 4.0) (decay 8.0) (release 10.0)
             (cutoff 8000.0) (resonance 0.05) (keytrack 0.2) (fenv-amount -1.5) (fenv-attack 8.0)
@@ -155,7 +157,7 @@
     (organ (timbre 6.0) (level 0.9) (attack 0.15) (decay 1.0) (release 0.8) (cutoff 8000.0)
            (resonance 0.0) (keytrack 0.3) (fenv-attack 0.5) (vib-rate 6.0) (vib-depth 4.0)
            (drift 0.1) (width 0.6) (vel-sens 0.3))
-    (sub (timbre 7.0) (level 0.8) (attack 1.0) (decay 3.0) (release 3.0) (cutoff 1200.0)
+    (sub (timbre 7.0) (level 1.05) (attack 1.0) (decay 3.0) (release 3.0) (cutoff 1200.0)
          (resonance 0.2) (keytrack 1.0) (fenv-amount 0.5) (drift 0.15) (width 0.5) (vel-sens 0.4))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -705,13 +707,18 @@ so every partial carries the same power however wide it is."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (bind-func padsynth_zone_limit
-  "the highest frequency a zone may hold. A note reads a zone at up to half an
-octave above its base (the top zone a whole octave), and the result must stay
-below 0.45 times the sample rate."
-  (lambda (zone:i64 sr:double)
-    (if (= zone (- PADSYNTH_ZONES 1))
-        (/ (* 0.45 sr) 2.0)
-        (/ (* 0.45 sr) 1.4142135623730951))))
+  "the highest frequency a zone of timbre tau may hold. A note reads a zone at
+up to half an octave above its base (the top zone a whole octave), and the
+result must stay below 0.45 times the sample rate. The glass and the organ
+are made of separate lines, which show up as faint extra lines where the
+cubic read is not exact, so their zones stop at 0.2 times the sample rate."
+  (lambda (zone:i64 tau:i64 sr:double)
+    (let ((lim:double (if (= zone (- PADSYNTH_ZONES 1))
+                          (/ (* 0.45 sr) 2.0)
+                          (/ (* 0.45 sr) 1.4142135623730951))))
+      (if (and (>= tau 5) (<= tau 6) (> lim (* 0.2 sr)))
+          (* 0.2 sr)
+          lim))))
 
 (bind-func padsynth_store
   "quantise the real (part 0) or imaginary (part 1) parts of z into table
@@ -766,7 +773,7 @@ random phase and the upper half is filled in as the conjugates."
         (set! zone (+ (* 2 m) slot))
         (set! bk (convert (pref padsynth_bases zone) double))
         (set! beta (/ (* bk nn) sr))
-        (set! flim (padsynth_zone_limit zone sr))
+        (set! flim (padsynth_zone_limit zone tau sr))
         (set! jmax (convert (floor (/ (* flim nn) sr)) i64))
         (set! layers (padsynth_recipe tau bk l))
         ;; the first layer sets the reference; each other layer is scaled so
@@ -1003,8 +1010,11 @@ interpolation. Stored entries i to i + 3 are the samples at i - 1 to i + 2."
                     (set! d1 (+ d1a (* (- d1b d1a) 0.5 (- 1.0 (cos (* SPI d1ph))))))
                     (set! d2 (+ d2a (* (- d2b d2a) 0.5 (- 1.0 (cos (* SPI d2ph))))))
                     (set! x (clampf (padsynth_drift p) 0.0 1.0))
-                    (set! cents (+ cents (* 7.0 x d1)))
                     (set! mu (* 0.15 x d2))
+                    ;; the pitch wanders by at least 1.4 cents, so that a held
+                    ;; note does not run round its table exactly in step
+                    (if (< x 0.2) (set! x 0.2))
+                    (set! cents (+ cents (* 7.0 x d1)))
                     ;; the pitch
                     (set! f (* 440.0 (pow 2.0 (+ (/ (- note 69.0) 12.0) (/ cents 1200.0)))))
                     (set! x (* 0.5 (pref padsynth_bases 0)))
