@@ -29,7 +29,9 @@
 ;; of VA Filter Design"), so they stay in tune and stable as they're swept.
 ;; The ladder is the same design as ladder_c in dsp.xtm, with a cheaper
 ;; saturator and its coefficients worked out every few frames, because eight
-;; of them run at once.
+;; of them run at once. It runs at twice the sample rate (os_up2, os_down2 in
+;; dsp.xtm), so that the harmonics its saturator makes fold back less: a
+;; resonant ladder would otherwise add aliasing near its peak.
 ;;
 ;; The envelopes behave like analogue ones: each stage is an exponential curve
 ;; towards a target, the attack aims past full level so that it arrives with a
@@ -113,12 +115,12 @@
              (key-track 0.6) (env-amt 0.5) (velocity 0.3)
              (f-attack 0.4) (f-decay 1.0) (f-sustain 0.6) (f-release 1.0)
              (attack 0.35) (decay 1.0) (sustain 1.0) (release 1.3)
-             (lfo-rate 5.2) (lfo-delay 0.9) (lfo-pitch 0.08) (spread 0.8) (chorus 2.0))
+             (lfo-rate 5.2) (lfo-delay 0.9) (lfo-pitch 0.08) (spread 0.8) (chorus 2.0) (level 0.5))
     (bass (osc2 0.5) (osc2-level 0.5) (osc2-semi -12.0) (detune 4.0) (sub 0.0)
           (cutoff 240.0) (res 0.35) (key-track 0.3) (env-amt 3.4) (velocity 0.7)
           (f-decay 0.35) (f-sustain 0.12) (f-release 0.1)
           (attack 0.002) (decay 1.0) (sustain 0.9) (release 0.07)
-          (drift 0.15) (spread 0.0) (mono 1.0) (glide 0.02) (chorus 0.0) (level 0.85))
+          (drift 0.15) (spread 0.0) (mono 1.0) (glide 0.02) (chorus 0.0) (level 0.7))
     (pluck (osc1 0.45) (osc2-level 0.35) (osc2-semi 12.0) (detune 6.0) (pw 0.4) (sub 0.0)
            (cutoff 450.0) (res 0.3) (key-track 0.7) (env-amt 4.2) (velocity 0.8)
            (f-decay 0.28) (f-sustain 0.0) (f-release 0.3)
@@ -127,7 +129,7 @@
           (env-amt 2.0) (f-attack 0.01) (f-decay 0.5) (f-sustain 0.55)
           (attack 0.005) (decay 1.0) (sustain 0.9) (release 0.2)
           (lfo-rate 5.6) (lfo-delay 0.5) (lfo-pitch 0.3) (spread 0.0)
-          (mono 1.0) (glide 0.09) (chorus 0.0) (level 0.6))
+          (mono 1.0) (glide 0.09) (chorus 0.0) (level 0.7))
     (keys (osc1 0.5) (osc2 1.0) (osc2-level 0.6) (osc2-semi 12.0) (detune 4.0) (sub 0.0)
           (cutoff 800.0) (res 0.1) (key-track 0.7) (env-amt 2.4) (velocity 0.8)
           (f-decay 0.9) (f-sustain 0.15) (f-release 0.4)
@@ -183,7 +185,7 @@ found directly. A saturator at the input lets it growl when it's driven, and
 keeps self-oscillation in bounds.
 
 @param x - input
-@param big_g - g / (1 + g), where g = tan(pi * cutoff / sample rate)
+@param big_g - g / (1 + g), where g = tan(pi * cutoff / sample rate) for the rate at which the ladder runs
 @param k - feedback, 0.0 to 4.0 (4.0 is the edge of self-oscillation)"
   (lambda ()
     (let ((s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (s3:SAMPLE 0.0) (s4:SAMPLE 0.0)
@@ -218,6 +220,8 @@ keeps self-oscillation in bounds.
   "voice number idx of the polysynth"
   (lambda (p:SAMPLE* idx:i64)
     (let ((ladder (polysynth_ladder_c))
+          ;; the ladder runs at twice the sample rate (see the filter below)
+          (os (os_make))
           (amp_env (adsr_env_c 1))
           ;; the filter envelope only moves the cutoff, which changes every 8 frames
           (filter_env (adsr_env_c 8))
@@ -362,7 +366,9 @@ keeps self-oscillation in bounds.
                          (* 0.25 (polysynth_drift p) offset_cutoff)))
               (set! cutoff (clamp (* (polysynth_cutoff p) (exp (* 0.693147 x))) 20.0 (* 0.45 SRf)))
               (set! g (tan (* SPI (/ cutoff SRf))))
-              (set! big_g (/ g (+ 1.0 g)))
+              ;; the ladder runs at twice the sample rate, so its g is for that
+              (set! big_g (tan (* SPI (/ cutoff (* 2.0 SRf)))))
+              (set! big_g (/ big_g (+ 1.0 big_g)))
               (set! a1 (/ 1.0 (+ 1.0 (* 2.0 damping g) (* g g))))
               (set! a2 (* g a1))
               (set! a3 (* g a2))
@@ -397,7 +403,11 @@ keeps self-oscillation in bounds.
             (begin
               (svf_tick (tanh_fast mix) ic1 ic2 a1 a2 a3 bp lp)
               (set! x (* (+ 0.45 (* 0.55 damping)) lp)))
-            (set! x (ladder mix big_g (* 4.0 res))))
+            (begin
+              (os_up2 os mix)
+              (pset! os 0 (ladder (pref os 0) big_g (* 4.0 res)))
+              (pset! os 1 (ladder (pref os 1) big_g (* 4.0 res)))
+              (set! x (os_down2 os))))
         ;; amplifier, and out
         (set! x (* x aenv vscale (polysynth_level p) 0.8))
         (frame_add_stereo out (* gain_l x) (* gain_r x))
@@ -412,13 +422,13 @@ keeps self-oscillation in bounds.
 (bind-func polysynth_fx_c
   "the instrument's effect: the chorus, and the switch between poly and mono.
 
-The chorus is two delay lines, one for each side, each 1.7 to 5.4 ms long. One
-triangle LFO lengthens the left delay as it shortens the right, so the pitch of
+The chorus is two delay lines, one for each side, each 1.7 to 5.4 ms long and
+read with a cubic curve, so that the top end doesn't dull and brighten as the
+delay sweeps. One triangle LFO lengthens the left delay as it shortens the right, so the pitch of
 each wet signal bends up and down slightly, in opposite directions. Each side
 mixes the dry signal with its own wet signal, and the comb filtering between
 them sweeps, which is what spreads and thickens the sound. The wet signal is
-gently lowpassed, as the filters around the Juno's bucket-brigade delay chips
-do.
+lowpassed, as the filters around the Juno's bucket-brigade delay chips are.
 
 The instrument effect runs once per frame, which makes it a convenient place to
 apply the mono parameter, and to take away any DC the voices have made."
@@ -443,9 +453,11 @@ apply the mono parameter, and to take away any DC the voices have made."
           (wet:SAMPLE 0.0)
           (smooth:SAMPLE (smoothing_coeff 0.05))
           (frames_per_ms:SAMPLE (/ SRf 1000.0))
-          ;; two one-pole lowpasses (about 9 kHz) on each wet signal
-          (bbd:SAMPLE (onepole_coeff 9000.0))
-          (l1:SAMPLE 0.0) (l2:SAMPLE 0.0) (r1:SAMPLE 0.0) (r2:SAMPLE 0.0)
+          ;; four one-pole lowpasses on each wet signal: together -3 dB at about
+          ;; 5.8 kHz and falling at 24 dB/octave
+          (bbd:SAMPLE (onepole_coeff 13300.0))
+          (l1:SAMPLE 0.0) (l2:SAMPLE 0.0) (l3:SAMPLE 0.0) (l4:SAMPLE 0.0)
+          (r1:SAMPLE 0.0) (r2:SAMPLE 0.0) (r3:SAMPLE 0.0) (r4:SAMPLE 0.0)
           (tri:SAMPLE 0.0)
           (dry_l:SAMPLE 0.0)
           (dry_r:SAMPLE 0.0)
@@ -491,14 +503,18 @@ apply the mono parameter, and to take away any DC the voices have made."
               (if (>= lfo_phase 1.0) (set! lfo_phase (- lfo_phase 1.0)))
               (set! tri (- 1.0 (* 4.0 (fabs (- lfo_phase 0.5)))))
               (set! lfo (+ lfo (* lfo_coeff (- tri lfo))))
-              (onepole_lp l1 bbd (dl_readf left (* frames_per_ms (+ centre (* depth lfo)))))
+              (onepole_lp l1 bbd (dl_readc left (* frames_per_ms (+ centre (* depth lfo)))))
               (onepole_lp l2 bbd l1)
-              (onepole_lp r1 bbd (dl_readf right (* frames_per_ms (- centre (* depth lfo)))))
+              (onepole_lp l3 bbd l2)
+              (onepole_lp l4 bbd l3)
+              (onepole_lp r1 bbd (dl_readc right (* frames_per_ms (- centre (* depth lfo)))))
               (onepole_lp r2 bbd r1)
+              (onepole_lp r3 bbd r2)
+              (onepole_lp r4 bbd r3)
               ;; dry plus wet is louder than dry alone: bring it back down
               (set! makeup (- 1.0 (* 0.25 wet)))
-              (pset! frame 0 (* makeup (+ dry_l (* wet l2))))
-              (pset! frame 1 (* makeup (+ dry_r (* wet r2))))
+              (pset! frame 0 (* makeup (+ dry_l (* wet l4))))
+              (pset! frame 1 (* makeup (+ dry_r (* wet r4))))
               void))
         void))))
 
