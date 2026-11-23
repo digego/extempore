@@ -113,6 +113,23 @@ back to its input sharpens the peaks between the notches.
         (set! last y)
         y))))
 
+;; Voices which sound together add: a chord of saws locked to the same
+;; octaves sums to peaks several times higher than one note. Above a knee of
+;; 0.4 the output is bent over smoothly so that a big chord approaches full
+;; scale without clipping, and a single note, well under the knee, is not
+;; touched.
+(bind-func static strings_knee
+  "x, bent over smoothly above +-0.4 so that it never passes +-1.0"
+  (lambda (x:SAMPLE)
+    (let ((m:SAMPLE (fabs x))
+          (y:SAMPLE x))
+      (if (> m 0.4)
+          (begin
+            (set! y (+ 0.4 (* 0.6 (tanh_fast (/ (- m 0.4) 0.6)))))
+            (if (< x 0.0) (set! y (- 0.0 y)))
+            y)
+          y))))
+
 (bind-func strings_fx_c
   "the effect on the summed voices: tone shaping, the ensemble, then the phaser"
   (lambda (p:SAMPLE*)
@@ -241,8 +258,8 @@ back to its input sharpens the peaks between the notches.
                     (set! fb (* 0.7 (clamp (strings_phaser_feedback p) 0.0 1.0)))))
               (set! l (+ l (* 0.5 ph_mix (- (phaser_l l a_l fb) l))))
               (set! r (+ r (* 0.5 ph_mix (- (phaser_r r a_r fb) r))))))
-        (pset! frame 0 l)
-        (pset! frame 1 r)
+        (pset! frame 0 (strings_knee l))
+        (pset! frame 1 (strings_knee r))
         void))))
 
 ;;;;;;;;;;;;;;;
