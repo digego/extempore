@@ -40,7 +40,11 @@
 ;; middle C; on a modulator, that stops high notes getting harsh, and keeps
 ;; their sidebands below the Nyquist frequency where they would alias.
 ;; Operators whose frequency approaches the Nyquist frequency fade out for the
-;; same reason.
+;; same reason, and a modulator's index is turned down as the note climbs until
+;; the spectrum it makes fits under half the sample rate, so that a patch
+;; without any keyboard scaling stays clean too (it just gets duller). Levels,
+;; frequencies, feedback and brightness glide to their new values over a few
+;; milliseconds, so that moving them during a note doesn't make zipper noise.
 ;;
 ;; This is a clean-room implementation, built from the published DX7
 ;; documentation (the algorithm chart and the description of the operators
@@ -322,7 +326,13 @@
   (lambda (p:SAMPLE*)
     (let ((phase:SAMPLE* (zalloc 6))   ; each operator's phase, in cycles
           (inc:SAMPLE* (zalloc 6))     ; ... and how far it moves each frame
-          (gain:SAMPLE* (zalloc 6))    ; level, after velocity and keyboard scaling
+          (gain:SAMPLE* (zalloc 6))    ; level, after velocity, keyboard scaling and the index limit
+          (tinc:SAMPLE* (zalloc 6))    ; where inc and gain are heading
+          (tgain:SAMPLE* (zalloc 6))
+          (fhz:SAMPLE* (zalloc 6))     ; each operator's frequency in Hz
+          (g0:SAMPLE* (zalloc 6))      ; its level before the index limit
+          (top:SAMPLE* (zalloc 6))     ; the highest frequency in its spectrum, in Hz
+          (lim:SAMPLE* (zalloc 6))     ; how far the index limit turns it down as a modulator
           (raw:SAMPLE* (zalloc 6))     ; this frame's output of each operator
           ;; the envelopes: stage 0 is the attack, 1 the decay and sustain, 2 the release
           (env:SAMPLE* (zalloc 6))
@@ -336,6 +346,10 @@
           (fb_from:i64 5)
           (fb_to:i64 5)
           (fb_amount:SAMPLE 0.0)
+          (fb_target:SAMPLE 0.0)
+          (depth_target:SAMPLE 2.0)
+          (glide:SAMPLE (- 1.0 (exp (/ -200.0 SRf))))   ; 5 ms
+          (live:i1 #f)                 ; is the voice still sounding from a note before?
           (fb1:SAMPLE 0.0)
           (fb2:SAMPLE 0.0)
           (depth:SAMPLE 2.0)
@@ -352,34 +366,45 @@
           (k:i64 0))
       (dotimes (k 6)
         (pset! phase k 0.0) (pset! inc k 0.0) (pset! gain k 0.0) (pset! raw k 0.0)
+        (pset! tinc k 0.0) (pset! tgain k 0.0) (pset! fhz k 0.0) (pset! g0 k 0.0)
+        (pset! top k 0.0) (pset! lim k 1.0)
         (pset! env k 0.0) (pset! stage k 2) (pset! attack k 1.0) (pset! decay k 0.0)
         (pset! release k 0.0) (pset! sustain k 0.0))
       (lambda (v:Voice* out:SAMPLE*)
         ;; scratch variables are declared here rather than with the voice's
         ;; state above, so that the compiler can keep them in registers
-        (let ((f:SAMPLE 0.0)
+        (let ((start:i1 (voice_start? v))
+              (f:SAMPLE 0.0)
               (x:SAMPLE 0.0)
               (e:SAMPLE 0.0)
               (s:SAMPLE 0.0)
               (m:SAMPLE 0.0)
               (y:SAMPLE 0.0)
+              (r:SAMPLE 0.0)
               (finished:i1 #f)
               (a:i64 0)
               (k:i64 0)
               (j:i64 0)
               (n:i64 0))
-          (if (voice_start? v)
+          (if start
               (begin
-                ;; restart every operator from phase zero, so that each note's
-                ;; attack sounds the same. The envelopes restart from wherever
-                ;; they are, so that a stolen voice doesn't click.
+                ;; a voice which was silent restarts every operator from phase
+                ;; zero, so that each note's attack sounds the same. One which
+                ;; is still sounding (a stolen voice, or a retrigger) keeps its
+                ;; phases, and its gains and frequencies glide to the new
+                ;; note's, so that it doesn't click. The envelopes restart from
+                ;; wherever they are.
                 (set! released #f)
                 (set! lfo_phase 0.0)
-                (set! fb1 0.0)
-                (set! fb2 0.0)
+                (if (not live)
+                    (begin
+                      (set! fb1 0.0)
+                      (set! fb2 0.0)
+                      (dotimes (k 6)
+                        (pset! phase k 0.0)
+                        (pset! raw k 0.0))
+                      void))
                 (dotimes (k 6)
-                  (pset! phase k 0.0)
-                  (pset! raw k 0.0)
                   (pset! stage k 0))))
           ;; every 64 frames (1.5 ms), turn the parameters into frequencies,
           ;; gains and envelope rates
@@ -392,7 +417,7 @@
                 (set! fb_to (convert (pref alg 43)))
                 ;; a modulator at level 1.0 swings its carrier's phase by two
                 ;; whole cycles (a modulation index of 4π)
-                (set! depth (* 2.0 (fm_bright p)))
+                (set! depth_target (* 2.0 (fm_bright p)))
                 (set! carriers 0.0)
                 (dotimes (k 6)
                   (set! carriers (+ carriers (pref alg (+ 36 k)))))
@@ -414,7 +439,8 @@
                   (if (<= f 0.0)
                       (set! f (* (fm_op_param p k 0) note_freq)))
                   (set! f (* f vibrato (pow 2.0 (/ (fm_op_param p k 2) 1200.0))))
-                  (pset! inc k (/ f SRf))
+                  (pset! fhz k f)
+                  (pset! tinc k (/ f SRf))
                   ;; level, scaled by velocity and by how far above middle C the note is
                   (set! x (* (fm_op_param p k 3)
                              (- 1.0 (* (fm_op_param p k 8) (- 1.0 (voice_vel v))))
@@ -422,7 +448,7 @@
                   ;; fade out an operator between 0.4 and 0.48 of the sample rate,
                   ;; before it reaches the Nyquist frequency and aliases
                   (set! s (/ (- (* 0.48 SRf) f) (* 0.08 SRf)))
-                  (pset! gain k (* x (clamp s 0.0 1.0)))
+                  (pset! g0 k (* x (clamp s 0.0 1.0)))
                   ;; envelope rates, sped up for higher notes by key-rate
                   (set! x (fm_op_param p k 4))
                   (pset! attack k (/ rate (* (if (< x 0.0005) 0.0005 x) SRf)))
@@ -432,12 +458,84 @@
                   (pset! release k (exp (/ (* -6.9078 rate) (* (if (< x 0.001) 0.001 x) SRf))))
                   (set! x (fm_op_param p k 6))
                   (pset! sustain k (clamp x 0.0 1.0)))
+                ;; The index limit. A modulator which swings a carrier's phase by
+                ;; an index I puts sidebands at multiples of its own frequency,
+                ;; strong out to about I + 3 of them either side of the carrier. So
+                ;; each operator's highest frequency is its own plus (I + 3)
+                ;; times the highest frequency of its modulators, and the
+                ;; modulators' indices are turned down together until that is
+                ;; half the sample rate. Working from operator 6 down means a
+                ;; modulator's own highest frequency is known by the time its
+                ;; carriers are reached. The limit follows the pitch smoothly:
+                ;; low notes are untouched, and a note which climbs loses its
+                ;; modulation gradually.
+                (dotimes (k 6)
+                  (pset! lim k 1.0))
+                (dotimes (n 6)
+                  (set! k (- 5 n))
+                  (set! s 0.0)
+                  (set! y 1.0)
+                  (set! j (+ k 1))
+                  (while (< j 6)
+                    (if (> (pref alg (+ (* 6 k) j)) 0.5)
+                        (begin
+                          (set! s (+ s (* 6.2831853 depth_target (pref g0 j))))
+                          (if (> (pref top j) y) (set! y (pref top j)))
+                          void))
+                    (set! j (+ j 1)))
+                  (pset! top k (pref fhz k))
+                  (if (> s 0.0)
+                      (begin
+                        ;; the largest total index which keeps the spectrum
+                        ;; under half the sample rate, and the factor which
+                        ;; brings the modulators' indices down to it. The
+                        ;; sidebands which matter reach I + 3 I^(1/3) + 2
+                        ;; modulator frequencies from the carrier, and the
+                        ;; index is held to what that allows (found by
+                        ;; bisection).
+                        (set! x (- (/ (- (* 0.5 SRf) (pref fhz k)) y) 2.0))
+                        (if (< x 0.0) (set! x 0.0))
+                        (set! e (if (< x s) x s))
+                        (if (> (+ e (* 3.0 (pow e 0.3333333))) x)
+                            (begin
+                              (set! e 0.0)
+                              (set! f x)
+                              (dotimes (a 9)
+                                (set! r (* 0.5 (+ e f)))
+                                (if (> (+ r (* 3.0 (pow r 0.3333333))) x)
+                                    (set! f r)
+                                    (set! e r)))
+                              void))
+                        (set! m (/ e s))
+                        (pset! top k (+ (pref fhz k) (* (+ e (* 3.0 (pow e 0.3333333)) 2.0) y)))
+                        (set! j (+ k 1))
+                        (while (< j 6)
+                          (if (and (> (pref alg (+ (* 6 k) j)) 0.5) (< m (pref lim j)))
+                              (pset! lim j m))
+                          (set! j (+ j 1)))
+                        void)))
+                (dotimes (k 6)
+                  (pset! tgain k (* (pref g0 k) (pref lim k))))
                 ;; feedback 1.0 swings the phase by a quarter of a cycle, about as
                 ;; far as it can go before the sawtooth breaks up into noise. Its
-                ;; harmonics go on forever, so above about 1 kHz it's turned down
+                ;; harmonics go on forever, so above about 650 Hz it's turned down
                 ;; to keep them from aliasing.
-                (set! x (/ 0.025 (pref inc fb_to)))
-                (set! fb_amount (* 0.25 (fm_feedback p) (if (< x 1.0) x 1.0)))))
+                (set! x (/ 0.015 (pref tinc fb_to)))
+                (set! fb_target (* 0.25 (fm_feedback p) (if (< x 1.0) x 1.0)))))
+          ;; a voice which was silent starts at the note's own values
+          (if (and start (not live))
+              (begin
+                (dotimes (k 6)
+                  (pset! inc k (pref tinc k))
+                  (pset! gain k (pref tgain k)))
+                (set! depth depth_target)
+                (set! fb_amount fb_target)
+                void))
+          (dotimes (k 6)
+            (pset! inc k (+ (pref inc k) (* glide (- (pref tinc k) (pref inc k)))))
+            (pset! gain k (+ (pref gain k) (* glide (- (pref tgain k) (pref gain k))))))
+          (set! depth (+ depth (* glide (- depth_target depth))))
+          (set! fb_amount (+ fb_amount (* glide (- fb_target fb_amount))))
           (set! lfo_phase (+ lfo_phase (/ (fm_lfo_rate p) SRf)))
           (set! lfo_phase (wrap01 lfo_phase))
           (set! lfo (sine_wrap lfo_phase))
@@ -497,6 +595,7 @@
           ;; tremolo dips the level by up to lfo-amp
           (set! x (- 1.0 (* (fm_lfo_amp p) lfo_amount 0.5 (+ 1.0 lfo))))
           (frame_add out (* y out_scale x))
+          (set! live (not finished))
           (if finished (voice_done v))
           void)))))
 
