@@ -24,14 +24,15 @@
 ;;   1 fold --- waveshaping. A variable-slope triangle (morph: its asymmetry)
 ;;     goes through a waveshaper (harmonics: from a soft inverse-tangent curve
 ;;     at 0.0, through linear at 0.5, to bumpy curves at 1.0) and then a sine
-;;     wavefolder (timbre: how hard it's driven). AUX is a triangle turned into
-;;     a sine and crossfaded, by timbre, into a model of the Buchla 259's
-;;     wavefolder.
+;;     wavefolder (timbre: how hard it's driven), at twice the sample rate on
+;;     notes above about 265 Hz. AUX is a triangle turned into a sine and
+;;     crossfaded, by timbre, into a model of the Buchla 259's wavefolder.
 ;;   2 fm --- two-operator FM, computed at four times the sample rate.
 ;;     Harmonics picks the frequency ratio of modulator to carrier, from a list
 ;;     of musically useful ones (0.5, 0.71, 1, 1.41, 2, 3, pi, 4 and so on,
 ;;     with a few slightly detuned ones in between). Timbre is the modulation
-;;     index. Morph is feedback: above 0.5 the carrier modulates the
+;;     index, which is eased back on high notes and high ratios so that the
+;;     sidebands stay below the Nyquist frequency. Morph is feedback: above 0.5 the carrier modulates the
 ;;     modulator's phase (towards noise), below 0.5 its frequency (towards
 ;;     chaos). AUX is a sine an octave below, modulated by the carrier.
 ;;   3 grain --- formant synthesis. Each cycle of the note fires a short burst
@@ -88,7 +89,17 @@
 ;; first frame of each 24-frame block, when it works out its new targets and
 ;; aims a ramp at each, and MACRO_SAMPLE on the frames in between, when it
 ;; steps the ramps and renders one sample. MACRO_NOTE_START is a block start
-;; on which the ramps jump straight to their targets.
+;; on which the ramps jump straight to their targets, and MACRO_NOTE_RESET is
+;; the same with the phases of the oscillators whose relative phase shapes the
+;; sound (the virtual analogue and FM engines) set back to their starting
+;; values, so that a note sounds the same whatever the voice played before.
+;;
+;; Harmonics, timbre and morph glide towards their settings with a time
+;; constant of 10 ms, so that a stepped `ctl` doesn't click. A note which
+;; starts on a voice that is still sounding fades the old one out over 5 ms
+;; and then starts, so that a stolen voice doesn't click. A new note's DC
+;; blockers start as a running mean, which removes the offset of a pulse wave
+;; within a few periods instead of the 30 ms a fixed 5 Hz highpass takes.
 ;;
 ;; Plaits works in normalised frequency (cycles per sample, at 48 kHz) and
 ;; reads its pitch, sine and shaper curves from tables. Here frequencies are
@@ -152,28 +163,29 @@
     (width 0.0 "how far OUT and AUX are spread to the left and right, 0.0 to 1.0")
     (level 0.8 "output level"))
   (presets
-    (poly (level 0.45))
+    (poly (level 0.72))
     (pluck (harmonics 0.5) (timbre 0.55) (morph 0.5) (sustain 0.0) (decay 0.6)
            (colour 0.1) (timbre-env 0.4))
     (sync (timbre 0.6) (morph 0.55) (timbre-env 0.5) (decay 0.5) (sustain 0.7)
           (aux 0.5) (width 0.8) (release 0.15))
     (folded (engine 1.0) (harmonics 0.35) (timbre 0.25) (morph 0.5) (timbre-env 0.6)
-            (decay 0.5) (sustain 0.2) (colour 0.3) (aux 0.3) (width 0.5))
+            (decay 0.5) (sustain 0.2) (colour 0.3) (aux 0.3) (width 0.5) (level 1.1))
     (epiano (engine 2.0) (harmonics 0.35) (timbre 0.2) (morph 0.5) (timbre-env 0.45)
             (decay 0.7) (sustain 0.25) (colour 0.6) (aux 0.4) (width 0.6) (release 0.4)
-            (level 0.6))
+            (level 0.78))
     (bell (engine 2.0) (harmonics 0.82) (timbre 0.35) (morph 0.5) (timbre-env 0.3)
-          (decay 0.85) (sustain 0.0) (colour 0.8) (aux 0.15) (width 0.6) (release 1.5))
+          (decay 0.85) (sustain 0.0) (colour 0.8) (aux 0.15) (width 0.6) (release 1.5)
+          (level 0.86))
     (vowel (engine 3.0) (harmonics 0.62) (timbre 0.4) (morph 0.3)
-           (sustain 0.8) (colour 0.7) (aux 0.0) (attack 0.03) (release 0.3))
+           (sustain 0.8) (colour 0.7) (aux 0.0) (attack 0.03) (release 0.3) (level 0.85))
     (organ (engine 4.0) (harmonics 0.0) (timbre 0.3) (morph 0.85) (sustain 1.0)
            (colour 0.9) (aux 1.0) (attack 0.005) (release 0.08)
-           (level 0.45))
+           (level 0.5))
     (glass (engine 4.0) (harmonics 0.45) (timbre 0.55) (morph 0.35) (timbre-env 0.3)
            (decay 0.8) (sustain 0.35) (colour 0.7) (aux 0.4) (width 0.8) (release 0.8)
-           (level 1.0))
+           (level 1.17))
     (swarm (engine 5.0) (harmonics 0.28) (timbre 0.6) (morph 0.8) (sustain 1.0)
-           (colour 0.6) (aux 0.4) (width 1.0) (attack 0.4) (release 1.2) (level 0.6))))
+           (colour 0.6) (aux 0.4) (width 1.0) (attack 0.4) (release 1.2) (level 0.78))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; small building blocks ;;
@@ -186,6 +198,13 @@
 (bind-val MACRO_SAMPLE i64 0)      ;; render one sample
 (bind-val MACRO_BLOCK_START i64 1) ;; take new settings, then render
 (bind-val MACRO_NOTE_START i64 2)  ;; the same, jumping to them at once
+(bind-val MACRO_NOTE_RESET i64 3)  ;; the same, and the oscillators restart their phases
+
+;; Above this f0 (cycles per sample, about 265 Hz at 44.1 kHz) the waveshaping
+;; engine runs at twice the sample rate and comes back down through the kit's
+;; halfband filter, which keeps the harmonics the shaper and folder add from
+;; folding into the audible band as hard.
+(bind-val MACRO_OS_F SAMPLE 0.006)
 
 ;; an engine: (ctl f0 harmonics timbre morph out) renders one frame, writing
 ;; OUT to out[0] and AUX to out[1]. f0 is the note's frequency in cycles per
@@ -433,13 +452,22 @@ The waveshape goes from a triangle (0.0) through a saw (0.5) to a pulse
 (1.0), with pw skewing it. Every step and corner is rounded off with
 polyBLEPs, including the ones the sync makes. Returns a value in -1.0 to 1.0.
 
-@param master_phase - where the master starts, in cycles"
+@param master_phase - where the master starts, in cycles; restart returns
+the oscillator to that and to the start of its own cycle"
   (lambda (master_phase:SAMPLE)
     (let ((slave_phase:SAMPLE 0.0)
           (next:SAMPLE 0.0)
           (previous_pw:SAMPLE 0.5)
-          (high:i1 #f))
-      (lambda (master_f:SAMPLE slave_f:SAMPLE pw_in:SAMPLE waveshape:SAMPLE)
+          (high:i1 #f)
+          (start_phase:SAMPLE master_phase))
+      (lambda (master_f:SAMPLE slave_f:SAMPLE pw_in:SAMPLE waveshape:SAMPLE restart:i1)
+        (if restart
+            (begin
+              (set! master_phase start_phase)
+              (set! slave_phase 0.0)
+              (set! next 0.0)
+              (set! previous_pw 0.5)
+              (set! high #f)))
         (let ((mf (if (> master_f 0.25) 0.25 master_f))
               (f (if (> slave_f 0.25) 0.25 slave_f))
               (pw (if (>= f 0.25) 0.5 (macro_clamp pw_in (* 2.0 f) (- 1.0 (* 2.0 f)))))
@@ -515,7 +543,9 @@ polyBLEPs, including the ones the sync makes. Returns a value in -1.0 to 1.0.
           (previous_pw:SAMPLE 0.5)
           (high:i1 #f)
           (depth:SAMPLE 0.2))
-      (lambda (freq:SAMPLE pw_in:SAMPLE waveshape:SAMPLE)
+      (lambda (freq:SAMPLE pw_in:SAMPLE waveshape:SAMPLE restart:i1)
+        (if restart
+            (begin (set! phase 0.0) (set! next 0.0) (set! previous_pw 0.5) (set! high #f)))
         (let ((f (if (> freq 0.25) 0.25 freq))
               (pw (if (>= f 0.25) 0.5 (macro_clamp pw_in (* 2.0 f) (- 1.0 (* 2.0 f)))))
               (triangle waveshape)
@@ -560,7 +590,9 @@ fraction pw of each cycle and falls for the rest, with its corners rounded off."
     (let ((phase:SAMPLE 0.5)
           (next:SAMPLE 0.0)
           (high:i1 #t))
-      (lambda (freq:SAMPLE pw_in:SAMPLE)
+      (lambda (freq:SAMPLE pw_in:SAMPLE restart:i1)
+        (if restart
+            (begin (set! phase 0.5) (set! next 0.0) (set! high #t)))
         (let ((f (macro_clamp freq 0.000001 0.25))
               (pw (macro_clamp pw_in (* 2.0 f) (- 1.0 (* 2.0 f))))
               (slope_up (/ 1.0 pw))
@@ -644,7 +676,7 @@ each (Plaits' ComputeDetuning)"
       (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
         (if (<> ctl MACRO_SAMPLE)
             (begin
-              (set! jump (= ctl MACRO_NOTE_START))
+              (set! jump (>= ctl MACRO_NOTE_START))
               (set! sync_amount (* timbre timbre))
               (set! detune (macro_va_detune harmonics))
               (macro_ramp_to (pref-ptr r 0) f0 jump)
@@ -668,7 +700,8 @@ each (Plaits' ComputeDetuning)"
               (set! norm (/ 1.0 (if (> square_gain saw_gain) square_gain saw_gain)))
               (macro_ramp_to (pref-ptr r 10) (* 0.3 norm square_gain) jump)
               (macro_ramp_to (pref-ptr r 11) (* 0.5 norm saw_gain) jump)))
-        (let ((f (macro_ramp (pref-ptr r 0)))
+        (let ((restart (= ctl MACRO_NOTE_RESET))
+              (f (macro_ramp (pref-ptr r 0)))
               (fd (macro_ramp (pref-ptr r 1)))
               (fs (macro_ramp (pref-ptr r 2)))
               (fds (macro_ramp (pref-ptr r 3)))
@@ -681,12 +714,12 @@ each (Plaits' ComputeDetuning)"
               (gs (macro_ramp (pref-ptr r 10)))
               (gw (macro_ramp (pref-ptr r 11))))
           ;; AUX: the difference of the two synced oscillators
-          (set! a (primary f fs pw shape))
-          (set! b (auxiliary fd fds pw shape))
+          (set! a (primary f fs pw shape restart))
+          (set! b (auxiliary fd fds pw shape restart))
           (pset! out 1 (* 0.5 (- b a)))
           ;; OUT: the square plus the detuned saw
-          (pset! out 0 (+ (* gs (square f square_f square_pw 1.0))
-                          (* gw (saw fd saw_pw saw_shape))))
+          (pset! out 0 (+ (* gs (square f square_f square_pw 1.0 restart))
+                          (* gw (saw fd saw_pw saw_shape restart))))
           void)))))
 
 ;; engine 1: waveshaping (Plaits' WaveshapingEngine)
@@ -705,13 +738,15 @@ to f0 * harmonics, made `order` times richer, stays below the Nyquist frequency"
     (let ((slope (macro_slope_c))
           (triangle (macro_slope_c))
           (r (macro_ramp_make 4))
+          (os_o (os_make)) (os_a (os_make)) (k:i64 0) (steps:i64 1)
+          (o0:SAMPLE 0.0) (o1:SAMPLE 0.0) (fo:SAMPLE 0.0)
           (f0r:SAMPLE 0.0) (steep:SAMPLE 0.0) (amount:SAMPLE 0.0) (att:SAMPLE 0.0)
           (x:SAMPLE 0.0) (jump:i1 #f))
       ;; the ramps: 0 slope pw, 1 waveshaper, 2 folder gain, 3 overtone gain
       (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
         (if (<> ctl MACRO_SAMPLE)
             (begin
-              (set! jump (= ctl MACRO_NOTE_START))
+              (set! jump (>= ctl MACRO_NOTE_START))
               (set! f0r f0)
               (macro_ramp_to (pref-ptr r 0) (+ 0.5 (* 0.45 morph)) jump)
               ;; estimate how rich the shaped wave will be, and hold the
@@ -724,31 +759,44 @@ to f0 * harmonics, made `order` times richer, stays below the Nyquist frequency"
               (macro_ramp_to (pref-ptr r 2) (+ 0.03 (* 0.46 timbre att)) jump)
               (set! x (* timbre (- 2.0 timbre)))
               (macro_ramp_to (pref-ptr r 3) (* x (- 2.0 x)) jump)))
-        (let ((s (slope f0r (macro_ramp (pref-ptr r 0))))
-              (tri (triangle f0r 0.5))
+        (let ((restart (= ctl MACRO_NOTE_RESET))
+              (pwr (macro_ramp (pref-ptr r 0)))
               (shape (* 3.9999 (macro_ramp (pref-ptr r 1))))
               (wf_gain (macro_ramp (pref-ptr r 2)))
               (overtone (macro_ramp (pref-ptr r 3)))
               (si:i64 (convert shape))
               (sf (- shape (convert si SAMPLE)))
-              ;; waveshape the slope through two neighbouring curves and blend
-              (pos (macro_clamp (+ 128.0 (* 127.0 s)) 0.0 255.99))
-              (wi:i64 (convert pos))
-              (pf (- pos (convert wi SAMPLE)))
               (c1 (pref-ptr macro_ws_table (* si 257)))
-              (c2 (pref-ptr macro_ws_table (* (+ si 1) 257)))
-              (y1 (+ (pref c1 wi) (* pf (- (pref c1 (+ wi 1)) (pref c1 wi)))))
-              (y2 (+ (pref c2 wi) (* pf (- (pref c2 (+ wi 1)) (pref c2 wi)))))
-              (index (+ 0.5 (* wf_gain (+ y1 (* sf (- y2 y1))))))
-              (sine (macro_sine (+ 0.5 (* 0.25 tri))))
-              (fold2 (* -1.0 (macro_hermite (pref-ptr macro_fold_table 517) index 512.0))))
-          (pset! out 0 (macro_hermite (pref-ptr macro_fold_table 1) index 512.0))
-          ;; inverted, so that it adds to OUT rather than cancelling it when
-          ;; the two are mixed (on Plaits they're separate sockets)
-          (pset! out 1 (* -1.0 (+ sine (* overtone (- fold2 sine)))))
+              (c2 (pref-ptr macro_ws_table (* (+ si 1) 257))))
+          (if restart (begin (os_clear os_o) (os_clear os_a)))
+          (set! steps (if (> f0r MACRO_OS_F) 2 1))
+          (set! fo (if (> f0r MACRO_OS_F) (* 0.5 f0r) f0r))
+          (dotimes (k steps)
+            (let ((s (slope fo pwr (and restart (= k 0))))
+                  (tri (triangle fo 0.5 (and restart (= k 0))))
+                  ;; waveshape the slope through two neighbouring curves and blend
+                  (pos (macro_clamp (+ 128.0 (* 127.0 s)) 0.0 255.99))
+                  (wi:i64 (convert pos))
+                  (pf (- pos (convert wi SAMPLE)))
+                  (y1 (+ (pref c1 wi) (* pf (- (pref c1 (+ wi 1)) (pref c1 wi)))))
+                  (y2 (+ (pref c2 wi) (* pf (- (pref c2 (+ wi 1)) (pref c2 wi)))))
+                  (index (+ 0.5 (* wf_gain (+ y1 (* sf (- y2 y1))))))
+                  (sine (macro_sine (+ 0.5 (* 0.25 tri))))
+                  (fold2 (* -1.0 (macro_hermite (pref-ptr macro_fold_table 517) index 512.0))))
+              (set! o0 (macro_hermite (pref-ptr macro_fold_table 1) index 512.0))
+              ;; inverted, so that it adds to OUT rather than cancelling it when
+              ;; the two are mixed (on Plaits they're separate sockets)
+              (set! o1 (* -1.0 (+ sine (* overtone (- fold2 sine)))))
+              (pset! os_o k o0)
+              (pset! os_a k o1)))
+          (if (= steps 2)
+              (begin (pset! out 0 (os_down2 os_o)) (pset! out 1 (os_down2 os_a)))
+              (begin (pset! out 0 o0) (pset! out 1 o1)))
           void)))))
 
 ;; engine 2: two-operator FM (Plaits' FMEngine)
+
+(bind-val MACRO_FM_REACH SAMPLE 0.33)
 
 (bind-func macro_fm_c
   (lambda ()
@@ -761,6 +809,7 @@ to f0 * harmonics, made `order` times richer, stays below the Nyquist frequency"
           (fir:SAMPLE* (zalloc 4))
           (r (macro_ramp_make 4))
           (ratio:SAMPLE 0.0) (x:SAMPLE 0.0) (note:SAMPLE 0.0) (taming:SAMPLE 0.0)
+          (rat:SAMPLE 1.0) (idx:SAMPLE 0.0) (cap:SAMPLE 0.0)
           (jump:i1 #f) (j:i64 0))
       ;; half of an 8-tap lowpass, used to come back down from 4x
       (pfill! fir 0.02442415 0.09297315 0.16712938 0.21547332)
@@ -768,21 +817,34 @@ to f0 * harmonics, made `order` times richer, stays below the Nyquist frequency"
       (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
         (if (<> ctl MACRO_SAMPLE)
             (begin
-              (set! jump (= ctl MACRO_NOTE_START))
+              (set! jump (>= ctl MACRO_NOTE_START))
               ;; frequencies are per oversampled step, so a quarter of f0
               (set! x (* 128.0 harmonics))
               (set! j (convert x))
               (set! x (- x (convert j SAMPLE)))
               (set! ratio (+ (pref macro_fm_table j) (* x (- (pref macro_fm_table (+ j 1)) (pref macro_fm_table j)))))
               (macro_ramp_to (pref-ptr r 0) (* 0.25 f0) jump)
-              (macro_ramp_to (pref-ptr r 1) (macro_clamp (* 0.25 f0 (semitones ratio)) 0.0 0.5) jump)
+              (set! rat (semitones ratio))
+              (macro_ramp_to (pref-ptr r 1) (macro_clamp (* 0.25 f0 rat) 0.0 0.5) jump)
               ;; less modulation for high modulators, to keep the sidebands
               ;; below the Nyquist frequency. `note` is the modulator's pitch
               ;; in Plaits' terms (MIDI note, two octaves down at 4x)
               (set! note (+ 45.0 ratio (* 17.31234 (log (/ (* f0 48000.0) 440.0)))))
               (set! taming (macro_clamp (- 1.0 (* 0.025 (- note 72.0))) 0.0 1.0))
-              (macro_ramp_to (pref-ptr r 2) (* 2.0 timbre timbre taming taming) jump)
+              (set! idx (* 2.0 timbre timbre taming taming))
+              ;; The sidebands reach about (2 pi index + 2) modulator
+              ;; frequencies above the carrier. Keep that below MACRO_FM_REACH
+              ;; of the sample rate, bending the index over smoothly as it
+              ;; nears the limit
+              (set! cap (/ (- (/ MACRO_FM_REACH (* rat f0)) 2.0) STWOPI))
+              (if (< cap 0.01) (set! cap 0.01))
+              (set! idx (/ (* idx cap) (sqrt (sqrt (+ (* idx idx idx idx) (* cap cap cap cap))))))
+              (macro_ramp_to (pref-ptr r 2) idx jump)
               (macro_ramp_to (pref-ptr r 3) (- (* 2.0 morph) 1.0) jump)))
+        (if (= ctl MACRO_NOTE_RESET)
+            (begin
+              (set! modulator_phase 0.0) (set! carrier_phase 0.0) (set! sub_phase 0.0)
+              (set! previous 0.0) (set! carrier_head 0.0) (set! sub_head 0.0)))
         (let ((fc (macro_ramp (pref-ptr r 0)))
               (fm (macro_ramp (pref-ptr r 1)))
               (index (macro_ramp (pref-ptr r 2)))
@@ -961,7 +1023,7 @@ waveforms"
       (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
         (if (<> ctl MACRO_SAMPLE)
             (begin
-              (set! jump (= ctl MACRO_NOTE_START))
+              (set! jump (>= ctl MACRO_NOTE_START))
               (set! f0r f0)
               ;; the formant is a fixed frequency, MIDI note 24 to 108
               (macro_ramp_to (pref-ptr r 0) (/ (midi2frq (+ 24.0 (* 84.0 timbre))) SRf) jump)
@@ -1026,7 +1088,7 @@ waveforms"
         (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
           (if (<> ctl MACRO_SAMPLE)
               (begin
-                (set! jump (= ctl MACRO_NOTE_START))
+                (set! jump (>= ctl MACRO_NOTE_START))
                 (set! f0r f0)
                 (set! centroid timbre)
                 (set! raw (* morph (- 1.0 (* 0.6 harmonics))))
@@ -1105,7 +1167,7 @@ waveforms"
       (lambda (ctl:i64 f0:SAMPLE harmonics:SAMPLE timbre:SAMPLE morph:SAMPLE out:SAMPLE*)
         (if (<> ctl MACRO_SAMPLE)
             (begin
-              (set! jump (= ctl MACRO_NOTE_START))
+              (set! jump (>= ctl MACRO_NOTE_START))
               ;; grains per block: timbre 0.0 is one every few seconds, 1.0 is ~200 a second
               (set! density (* 0.025 (midi2frq (* 120.0 timbre)) (/ (convert MACRO_BLOCK SAMPLE) SRf)))
               (set! spread (* harmonics harmonics harmonics))
@@ -1245,7 +1307,20 @@ full-velocity note to about -12 dBFS"
           (hf_bleed:SAMPLE 0.0)
           ;; the gate's filter (stmlib's Svf), one each for OUT and AUX
           (g:SAMPLE 0.0) (h:SAMPLE 0.0) (r:SAMPLE 2.5)
+          ;; the DC blockers. Each starts as a running mean over the note so far
+          ;; (with a quarter of a period's worth of samples counted as already
+          ;; seen), so that the offset of a pulse wave is gone within a few
+          ;; periods, and settles to a one-pole highpass at 5 Hz
           (dc_a:SAMPLE 0.0) (dc_b:SAMPLE 0.0) (dc_coeff (* STWOPI (/ 5.0 SRf)))
+          (dc_c:SAMPLE 0.0) (dc_n0:SAMPLE 1.0) (dc_k:SAMPLE 0.0)
+          ;; a note starting on a voice which is still sounding fades the old
+          ;; one out over 5 ms first; the new one begins when that is done
+          (fade:i64 0) (fade_len:i64 (convert (/ SRf 200.0) i64)) (pending:i1 #f)
+          (begin_now:i1 #f) (next_vel:SAMPLE 0.0) (fg:SAMPLE 1.0)
+          ;; harmonics, timbre and morph glide towards their settings with a
+          ;; time constant of 10 ms, taken once a block
+          (hs:SAMPLE 0.0) (ts:SAMPLE 0.0) (ms:SAMPLE 0.0)
+          (sm:SAMPLE (- 1.0 (exp (/ -2400.0 SRf))))
           (s1:SAMPLE 0.0) (s2:SAMPLE 0.0) (s3:SAMPLE 0.0) (s4:SAMPLE 0.0)
           ;; the attack and release envelope
           (amp_env:SAMPLE 0.0)
@@ -1263,15 +1338,35 @@ full-velocity note to about -12 dBFS"
       (pset! engines 4 (macro_harmonic_c))
       (pset! engines 5 (macro_swarm_c))
       (lambda (v:Voice* out:SAMPLE*)
+        (set! begin_now #f)
         (if (voice_start? v)
+            (begin
+              (set! next_vel (voice_vel v))
+              (if (> (* amp_env vactrol) 0.0005)
+                  (begin (set! fade fade_len) (set! pending #t) void)
+                  (begin (set! begin_now #t) void))))
+        (if (> fade 0)
+            (begin
+              (set! fade (- fade 1))
+              (if (and (= fade 0) pending)
+                  (begin (set! pending #f) (set! begin_now #t)))
+              void))
+        (if begin_now
             (begin
               ;; ping the vactrol open, as far as the velocity says: Plaits'
               ;; curve for its LEVEL input, which squashes towards 1.0
-              (set! peak (macro_clamp (/ (* 1.3 (voice_vel v)) (+ 0.3 (voice_vel v))) 0.0 1.0))
+              (set! peak (macro_clamp (/ (* 1.3 next_vel) (+ 0.3 next_vel)) 0.0 1.0))
               (set! pinging #t)
-              (set! decay_env 1.0)))
+              (set! decay_env 1.0)
+              (set! vactrol 0.0)
+              (set! amp_env 0.0)
+              (set! s1 0.0) (set! s2 0.0) (set! s3 0.0) (set! s4 0.0)
+              (set! dc_a 0.0) (set! dc_b 0.0) (set! dc_k 0.0)
+              (set! dc_n0 (/ SRf (* 4.0 (voice_freq v))))
+              (macro_ramp_to gain 0.0 #t)
+              void))
         (set! ctl MACRO_SAMPLE)
-        (if (voice_start? v) (set! countdown 0))
+        (if begin_now (set! countdown 0))
         (set! countdown (- countdown 1))
         (if (<= countdown 0)
             (begin
@@ -1279,7 +1374,9 @@ full-velocity note to about -12 dBFS"
               (set! index (convert (macro_clamp (+ 0.5 (macro_engine p)) 0.0 (- (convert MACRO_ENGINES SAMPLE) 1.0)) i64))
               (set! engine (pref engines index))
               ;; a new note, or a change of engine, sets the engine's ramps at once
-              (set! ctl (if (or (voice_start? v) (<> index previous_index)) MACRO_NOTE_START MACRO_BLOCK_START))
+              (set! ctl (if begin_now
+                            MACRO_NOTE_RESET
+                            (if (<> index previous_index) MACRO_NOTE_START MACRO_BLOCK_START)))
               (set! previous_index index)
               (set! f0 (/ (voice_freq v) SRf))
               (if (or (<> decay (macro_decay p)) (<> colour (macro_colour p)))
@@ -1315,11 +1412,21 @@ full-velocity note to about -12 dBFS"
               (set! tail (* tail tail))
               (set! hf_bleed (* (+ tail (* (- 1.0 tail) colour)) colour colour))
               ;; the decay envelope moves timbre and morph
+              (if begin_now
+                  (begin (set! hs (macro_harmonics p)) (set! ts (macro_timbre p)) (set! ms (macro_morph p)) void)
+                  (begin
+                    (set! hs (+ hs (* sm (- (macro_harmonics p) hs))))
+                    (set! ts (+ ts (* sm (- (macro_timbre p) ts))))
+                    (set! ms (+ ms (* sm (- (macro_morph p) ms))))
+                    void))
               (set! amount (macro_timbre_env p))
-              (set! timbre (macro_clamp (+ (macro_timbre p) (* amount (fabs amount) decay_env)) 0.0 1.0))
+              (set! timbre (macro_clamp (+ ts (* amount (fabs amount) decay_env)) 0.0 1.0))
               (set! amount (macro_morph_env p))
-              (set! morph (macro_clamp (+ (macro_morph p) (* amount (fabs amount) decay_env)) 0.0 1.0))
-              (set! harmonics (macro_clamp (macro_harmonics p) 0.0 1.0))
+              (set! morph (macro_clamp (+ ms (* amount (fabs amount) decay_env)) 0.0 1.0))
+              (set! harmonics (macro_clamp hs 0.0 1.0))
+              (set! dc_c (/ 1.0 (+ dc_n0 dc_k)))
+              (if (< dc_c dc_coeff) (set! dc_c dc_coeff))
+              (set! dc_k (+ dc_k (convert MACRO_BLOCK SAMPLE)))
               ;; how much of OUT and AUX goes to each side
               (set! aux_l (macro_clamp (- (macro_aux p) (* 0.5 (macro_width p))) 0.0 1.0))
               (set! aux_r (macro_clamp (+ (macro_aux p) (* 0.5 (macro_width p))) 0.0 1.0))
@@ -1331,8 +1438,8 @@ full-velocity note to about -12 dBFS"
                   (begin (set! release (macro_release p)) (set! release_coeff (smoothing_coeff release))))))
         (engine ctl f0 harmonics timbre morph osc)
         ;; block DC (a pulse wave has plenty), as the module's output coupling does
-        (set! dc_a (+ dc_a (* dc_coeff (- (pref osc 0) dc_a))))
-        (set! dc_b (+ dc_b (* dc_coeff (- (pref osc 1) dc_b))))
+        (set! dc_a (+ dc_a (* dc_c (- (pref osc 0) dc_a))))
+        (set! dc_b (+ dc_b (* dc_c (- (pref osc 1) dc_b))))
         ;; the low-pass gate: amplify by the vactrol, filter, and let the
         ;; highs bleed past by the colour
         (let ((vca (macro_ramp gain))
@@ -1354,10 +1461,11 @@ full-velocity note to about -12 dBFS"
           ;; the attack and release envelope
           (set! amp_env (+ amp_env (* (if (> (voice_gate v) 0.5) attack_coeff release_coeff)
                                       (- (voice_gate v) amp_env))))
+          (set! fg (if (> fade 0) (/ (convert fade SAMPLE) (convert fade_len SAMPLE)) 1.0))
           (frame_add_stereo out
-                            (* amp_env (+ a (* aux_l (- b a))))
-                            (* amp_env (+ a (* aux_r (- b a))))))
-        (if (and (< (voice_gate v) 0.5) (not pinging) (< (* amp_env vactrol) 0.0001))
+                            (* amp_env fg (+ a (* aux_l (- b a))))
+                            (* amp_env fg (+ a (* aux_r (- b a))))))
+        (if (and (< (voice_gate v) 0.5) (not pinging) (not pending) (< (* amp_env vactrol) 0.0001))
             (voice_done v))
         void))))
 
