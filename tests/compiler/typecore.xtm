@@ -38,11 +38,18 @@
                 'i64
                 "base-binds-var")
 
-(xtmtest-result (xtc:type:apply-subst
-                  (xtc:type:var 1)
-                  (xtc:type:unify (xtc:type:var 1) (xtc:type:var 2) xtc:type:empty-subst))
-                (xtc:type:var 2)
+;; two free variables unify to one: either may bind to the other (the younger
+;; binds to the older), so check they resolve alike, whichever is left
+(xtmtest-result (let ((s (xtc:type:unify (xtc:type:var 1) (xtc:type:var 2) xtc:type:empty-subst)))
+                  (equal? (xtc:type:apply-subst (xtc:type:var 1) s)
+                          (xtc:type:apply-subst (xtc:type:var 2) s)))
+                #t
                 "var-binds-var")
+
+(xtmtest-result (let ((s (xtc:type:unify (xtc:type:var 1) (xtc:type:var 2) xtc:type:empty-subst)))
+                  (xtc:type:apply-subst (xtc:type:var 1) s))
+                (xtc:type:var 1)
+                "younger-var-binds-older")
 
 (xtmtest-result (xtc:type:apply-subst
                   (xtc:type:var 1)

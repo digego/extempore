@@ -262,6 +262,15 @@
         ((and (xtc:type:var? rs) (xtc:type:var? rt)
               (= (xtc:type:var-id rs) (xtc:type:var-id rt)))
          subst)
+        ;; two unbound variables: the younger (higher id) binds to the older.
+        ;; Either way round they resolve alike, but a long-lived variable (a
+        ;; local assigned again and again) then stays the end of its chain;
+        ;; bound to each new result in turn, its chain grew by a link per use
+        ;; and every resolve of it walked the lot
+        ((and (xtc:type:var? rs) (xtc:type:var? rt))
+         (if (> (xtc:type:var-id rs) (xtc:type:var-id rt))
+             (xtc:type:bind (xtc:type:var-id rs) rt subst)
+             (xtc:type:bind (xtc:type:var-id rt) rs subst)))
         ;; a variable binds to the other side's VARIABLE when it has one (not
         ;; to that variable's resolution), so binding chains stay connected
         ;; and a later refinement of the chain's end (refine-named below)
