@@ -352,20 +352,46 @@
 ;; object each per solve, so a stale empty-subst '() carried over from a previous
 ;; solve cannot match (its classes/intern differ); within a solve the rep list is
 ;; read-only, so sharing it across overloads is sound.
+;;
+;; A commit pass extends the substitution after every commit, so the cache would
+;; miss on nearly every overload, and a full rebuild resolves every key through
+;; the whole substitution: cubic in the size of a big DSP function.  But a
+;; substitution only grows by consing bindings onto the front, so when the new
+;; one extends the cached one, only the reps those new bindings bind can have
+;; moved; the rest are carried over.  (refine-named can rebind a variable that
+;; is already bound, but only to a non-variable term, and a rep that isn't a
+;; variable is never matched: admit-datum looks up variables only.)
 (define *xtc:solve:class-reps-cache* #f)
+
+;; The bindings `subst' adds to `old', or #f if it isn't an extension of `old'.
+(define xtc:solve:subst-since
+  (lambda (subst old)
+    (let loop ((s subst) (added '()))
+      (cond ((eq? s old) added)
+            ((null? s) #f)
+            (else (loop (cdr s) (cons (car s) added)))))))
 
 (define xtc:solve:class-reps
   (lambda (classes intern subst)
-    (let ((c *xtc:solve:class-reps-cache*))
-      (if (and c (eq? (car c) subst) (eq? (cadr c) classes) (eq? (caddr c) intern))
-          (cadddr c)
-          (let ((reps (map (lambda (cl)
-                             (cons (xtc:type:resolve
-                                     (xtc:type:from-intcode (car cl) intern) subst)
-                                   (cdr cl)))
-                           classes)))
-            (set! *xtc:solve:class-reps-cache* (list subst classes intern reps))
-            reps)))))
+    (let* ((c *xtc:solve:class-reps-cache*)
+           (same-solve (and c (eq? (cadr c) classes) (eq? (caddr c) intern)))
+           (added (and same-solve (xtc:solve:subst-since subst (car c))))
+           (reps (cond ((not added)
+                        (map (lambda (cl)
+                               (cons (xtc:type:resolve
+                                       (xtc:type:from-intcode (car cl) intern) subst)
+                                     (cdr cl)))
+                             classes))
+                       ((null? added) (cadddr c))
+                       (else
+                         (map (lambda (r)
+                                (if (and (xtc:type:var? (car r))
+                                         (assv (xtc:type:var-id (car r)) added))
+                                    (cons (xtc:type:resolve (car r) subst) (cdr r))
+                                    r))
+                              (cadddr c))))))
+      (set! *xtc:solve:class-reps-cache* (list subst classes intern reps))
+      reps)))
 
 ;; The candidates of overload `c' that unify with its result and argument keys
 ;; under `subst', each paired with the substitution that unifying it produces:
