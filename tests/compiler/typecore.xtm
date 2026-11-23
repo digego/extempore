@@ -304,3 +304,40 @@
                   (xtc:type:apply-subst v s2))
                 (xtc:type:ptr (xtc:type:napp "S" 'i64))
                 "refine-named-keeps-instance")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the substitution map ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; ids spread over the trie's bits, every one found, unbound ones not
+(define typecore-ids
+  (let loop ((i 0) (acc '()))
+    (if (= i 2000) acc (loop (+ i 1) (cons (+ 1 (modulo (* i 7919) 100003)) acc)))))
+
+(define typecore-big
+  (let loop ((ids typecore-ids) (s xtc:type:empty-subst))
+    (if (null? ids) s (loop (cdr ids) (xtc:type:subst-extend (car ids) (car ids) s)))))
+
+(xtmtest-result (and (= (xtc:type:subst-size typecore-big) 2000)
+                     (cl:every (lambda (id) (eqv? (xtc:type:subst-ref id typecore-big) id))
+                               typecore-ids)
+                     (not (xtc:type:subst-ref 100004 typecore-big)))
+                #t
+                "subst-many-bindings")
+
+;; rebinding an id (refine-named does) shadows it in the new version only
+(xtmtest-result (let* ((id (car typecore-ids))
+                       (s2 (xtc:type:subst-extend id 'i64 typecore-big)))
+                  (list (xtc:type:subst-ref id s2) (eqv? (xtc:type:subst-ref id typecore-big) id)))
+                (list 'i64 #t)
+                "subst-rebind-persistent")
+
+(xtmtest-result (let* ((s1 (xtc:type:subst-extend 1 'i64 xtc:type:empty-subst))
+                       (s2 (xtc:type:subst-extend 2 'i32 s1))
+                       (s3 (xtc:type:subst-extend 3 'float s2))
+                       (other (xtc:type:subst-extend 4 'double s1)))
+                  (list (xtc:type:subst-since s3 s1)
+                        (xtc:type:subst-since s3 s3)
+                        (xtc:type:subst-since s3 other)))
+                (list '((2 . i32) (3 . float)) '() #f)
+                "subst-since")

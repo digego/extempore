@@ -349,7 +349,7 @@
 ;; over instruments.xtm) when the result changes only when subst does.  A
 ;; single-entry cache keyed on the identities of all three inputs collapses that
 ;; to one rebuild per distinct substitution.  Safety: classes and intern are one
-;; object each per solve, so a stale empty-subst '() carried over from a previous
+;; object each per solve, so a stale empty substitution carried over from a previous
 ;; solve cannot match (its classes/intern differ); within a solve the rep list is
 ;; read-only, so sharing it across overloads is sound.
 ;;
@@ -363,19 +363,11 @@
 ;; variable is never matched: admit-datum looks up variables only.)
 (define *xtc:solve:class-reps-cache* #f)
 
-;; The bindings `subst' adds to `old', or #f if it isn't an extension of `old'.
-(define xtc:solve:subst-since
-  (lambda (subst old)
-    (let loop ((s subst) (added '()))
-      (cond ((eq? s old) added)
-            ((null? s) #f)
-            (else (loop (cdr s) (cons (car s) added)))))))
-
 (define xtc:solve:class-reps
   (lambda (classes intern subst)
     (let* ((c *xtc:solve:class-reps-cache*)
            (same-solve (and c (eq? (cadr c) classes) (eq? (caddr c) intern)))
-           (added (and same-solve (xtc:solve:subst-since subst (car c))))
+           (added (and same-solve (xtc:type:subst-since subst (car c))))
            (reps (cond ((not added)
                         (map (lambda (cl)
                                (cons (xtc:type:resolve
@@ -768,7 +760,7 @@
                    ;; literal at a width its uses contradict
                    (let ((subst2 (xtc:solve:apply-defaults-for-deferred
                                    constraints intern (car step) projects)))
-                     (if (> (length subst2) (length (car step)))
+                     (if (> (xtc:type:subst-size subst2) (xtc:type:subst-size (car step)))
                          (loop subst2 (cadr step) projects)
                          (let ((r (xtc:solve:search (cadr step) projects intern
                                                     (car step) classes)))
@@ -785,7 +777,7 @@
                     ;; overloads done: numeric defaulting for whatever literals
                     ;; no use ever pinned (it can wake a pending projection)
                     (let ((subst2 (xtc:solve:apply-defaults constraints intern subst)))
-                      (if (> (length subst2) (length subst))
+                      (if (> (xtc:type:subst-size subst2) (xtc:type:subst-size subst))
                           (loop subst2 pending projects)
                           subst2))))))))))))
 

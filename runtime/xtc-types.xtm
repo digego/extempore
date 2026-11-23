@@ -124,21 +124,83 @@
 ;; substitutions       ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A substitution is an immutable association list mapping variable ids to
-;; terms.  It is threaded through unification functionally; the empty
-;; substitution is the empty list, which --- unlike #f --- is a true value, so
-;; "unified with no new bindings" and "failed to unify" stay distinct.
+;; A substitution is an immutable map from variable ids to terms, threaded
+;; through unification functionally: extending one leaves the original intact,
+;; so the solver can try several candidates from one substitution and
+;; backtrack by keeping the old one.  It is a vector #(log trie size):
+;;
+;;   log   the bindings as an association list, newest first (extending conses
+;;         onto it, so an extension shares its original's log as a tail)
+;;   trie  the same bindings in a persistent Patricia trie keyed on the id,
+;;         for lookup in O(log n) rather than a scan of the log
+;;   size  how many bindings it has
+;;
+;; A big DSP function's substitution holds thousands of bindings, looked up
+;; hundreds of thousands of times, so a scan of an association list made the
+;; solve cubic in the function's size.  Every substitution, the empty one
+;; included, is a true value, so "unified with no new bindings" and "failed to
+;; unify" (#f) stay distinct.
 
-(define xtc:type:empty-subst '())
+;; The trie: little-endian Patricia (Okasaki and Gill, "Fast Mergeable Integer
+;; Maps"), branching on the lowest bit at which two keys differ.  A node is '()
+;; (empty), #(key value) (a leaf) or #(prefix bit zero-side one-side) (a
+;; branch: every key below it agrees with prefix on the bits below bit).
+(define xtc:type:trie-ref
+  (lambda (t k)
+    (cond ((null? t) #f)
+          ((= (vector-length t) 2) (and (= (vector-ref t 0) k) (vector-ref t 1)))
+          ((= 0 (logand k (vector-ref t 1))) (xtc:type:trie-ref (vector-ref t 2) k))
+          (else (xtc:type:trie-ref (vector-ref t 3) k)))))
+
+(define xtc:type:trie-join
+  (lambda (k0 t0 k1 t1)
+    (let* ((x (logxor k0 k1))
+           (bit (logand x (- x)))
+           (prefix (logand k0 (- bit 1))))
+      (if (= 0 (logand k0 bit))
+          (vector prefix bit t0 t1)
+          (vector prefix bit t1 t0)))))
+
+(define xtc:type:trie-set
+  (lambda (t k v)
+    (cond ((null? t) (vector k v))
+          ((= (vector-length t) 2)
+           (if (= (vector-ref t 0) k)
+               (vector k v)
+               (xtc:type:trie-join k (vector k v) (vector-ref t 0) t)))
+          (else
+            (let ((prefix (vector-ref t 0)) (bit (vector-ref t 1)))
+              (cond ((not (= (logand k (- bit 1)) prefix))
+                     (xtc:type:trie-join k (vector k v) prefix t))
+                    ((= 0 (logand k bit))
+                     (vector prefix bit (xtc:type:trie-set (vector-ref t 2) k v) (vector-ref t 3)))
+                    (else
+                      (vector prefix bit (vector-ref t 2) (xtc:type:trie-set (vector-ref t 3) k v)))))))))
+
+(define xtc:type:empty-subst (vector '() '() 0))
 
 (define xtc:type:subst-ref
   (lambda (id subst)
-    (let ((cell (assv id subst)))
-      (if cell (cdr cell) #f))))
+    (xtc:type:trie-ref (vector-ref subst 1) id)))
 
 (define xtc:type:subst-extend
   (lambda (id t subst)
-    (cons (cons id t) subst)))
+    (vector (cons (cons id t) (vector-ref subst 0))
+            (xtc:type:trie-set (vector-ref subst 1) id t)
+            (+ 1 (vector-ref subst 2)))))
+
+(define xtc:type:subst-size
+  (lambda (subst) (vector-ref subst 2)))
+
+;; The bindings `subst' adds to `old', oldest first, or #f if it isn't an
+;; extension of `old'.
+(define xtc:type:subst-since
+  (lambda (subst old)
+    (let ((stop (vector-ref old 0)))
+      (let loop ((log (vector-ref subst 0)) (added '()))
+        (cond ((eq? log stop) added)
+              ((null? log) #f)
+              (else (loop (cdr log) (cons (car log) added))))))))
 
 ;; Follow the substitution chain for a variable to the term it currently
 ;; stands for, stopping at the first non-variable or unbound variable.  This is
