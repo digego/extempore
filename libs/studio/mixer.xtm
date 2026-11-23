@@ -56,7 +56,9 @@
 ;; 3 peak level since it was last read
 ;; 4 the sum of its squared samples, and
 ;; 5 the number of frames, since the RMS level was last read
-(bind-type Track <Inst*,SAMPLE*,[void,SAMPLE*,SAMPLE*]*,SAMPLE,double,i64> (printer? . #f))
+;; 6 the number of frames which were silenced for holding a bad sample (see
+;;   sample_bad), since that was last read
+(bind-type Track <Inst*,SAMPLE*,[void,SAMPLE*,SAMPLE*]*,SAMPLE,double,i64,i64> (printer? . #f))
 
 (bind-val studio_tracks Track* 0)
 (bind-val studio_master SAMPLE* 0)
@@ -194,6 +196,17 @@
           (convert rms SAMPLE))
         0.0)))
 
+(bind-func studio_track_bad_frames
+  "how many of the track's frames have been silenced for holding a NaN or an
+infinity, since this was last called"
+  (lambda (track:i64)
+    (if (and (>= track 0) (< track STUDIO_TRACKS) (not (null? studio_tracks)))
+        (let ((trk (pref-ptr studio_tracks track))
+              (count (tref trk 6)))
+          (tset! trk 6 0)
+          count)
+        0)))
+
 (bind-func studio_late_note_count
   (lambda ()
     studio_late_notes))
@@ -283,7 +296,7 @@
     (dotimes (i STUDIO_TRACKS)
       (let ((params:SAMPLE* (zalloc STRIP_NPARAMS)))
         (strip_defaults params)
-        (tfill! (pref-ptr tracks i) null params (strip_c) 0.0 0.0 0)))
+        (tfill! (pref-ptr tracks i) null params (strip_c) 0.0 0.0 0 0)))
     (studio_master_defaults master)
     (set! studio_tracks tracks)
     (set! studio_master master)
@@ -326,7 +339,9 @@
                           ;; compressor for good, so a frame with one in it
                           ;; is silenced before it reaches any of them.
                           (if (or (sample_bad (pref frame 0)) (sample_bad (pref frame 1)))
-                              (pfill! frame 0.0 0.0))
+                              (begin
+                                (pfill! frame 0.0 0.0)
+                                (tset! trk 6 (+ (tref trk 6) 1))))
                           ((tref trk 2) frame strip)
                           (set! peak (max (fabs (pref frame 0)) (fabs (pref frame 1))))
                           (if (> peak (tref trk 3)) (tset! trk 3 peak))

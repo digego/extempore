@@ -466,9 +466,15 @@
   (lambda ()
     (dotimes (i *studio:num-tracks*)
       (if (vector-ref *studio:tracks* i)
-          (studio:say (car (vector-ref *studio:tracks* i))
-                      "rms" (studio:db (studio_track_rms i))
-                      "peak" (studio:db (studio_track_peak i)))))
+          (let ((name (car (vector-ref *studio:tracks* i)))
+                (bad (studio_track_bad_frames i)))
+            (studio:say name
+                        "rms" (studio:db (studio_track_rms i))
+                        "peak" (studio:db (studio_track_peak i)))
+            (if (> bad 0)
+                (studio:error name "has put out" bad
+                              "frames which weren't numbers (they were silenced):"
+                              (list 'reload (list 'quote name)) "makes its instrument afresh")))))
     (studio:say "master peak" (studio:db (studio_peak)))
     (if (> (studio_late_note_count) 0)
         (studio:say (studio_late_note_count) "notes have arrived late"))
