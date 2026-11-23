@@ -35,10 +35,13 @@
 ;; result is reedier and more nasal. The `reed` parameter moves between the
 ;; two pickups.
 ;;
-;; Each voice here is a small physically-informed model: two decaying sine
-;; waves for the tine's two modes, the first passed through the pickup's
-;; curve, plus a short burst of filtered noise for the hammer's thump and the
-;; damper's thunk. The instrument's effect is the amplifier: tone controls, a
+;; Each voice here is a small physically-informed model: decaying sine
+;; waves for the tine's fundamental and its bell mode, and a third for the
+;; tonebar, which is tuned a few cents away from the tine and loses its
+;; energy more slowly (so the note beats gently and decays in two stages), all
+;; summed into the tip's position and passed through the pickup's curve, plus
+;; a short burst of filtered noise for the hammer's thump and the damper's
+;; thunk. The instrument's effect is the amplifier: tone controls, a
 ;; little saturation, a phaser, and the stereo tremolo of the Rhodes suitcase
 ;; model, which pans the sound between its two speakers.
 ;;
@@ -113,6 +116,10 @@
           ;; turned by a fixed rotation (rc, rs) every frame
           (c:SAMPLE 1.0) (s:SAMPLE 0.0) (rc:SAMPLE 1.0) (rs:SAMPLE 0.0)
           (bc:SAMPLE 1.0) (bs:SAMPLE 0.0) (brc:SAMPLE 1.0) (brs:SAMPLE 0.0)
+          ;; the tonebar's, which rings a few cents away from the tine
+          (tc:SAMPLE 1.0) (ts:SAMPLE 0.0) (trc:SAMPLE 1.0) (trs:SAMPLE 0.0)
+          (tb:SAMPLE 0.0) (tb_peak:SAMPLE 0.0) (tb_mult:SAMPLE 1.0)
+          (bell_in:SAMPLE 0.0) (bell_comp:SAMPLE 1.0)
           (tmp:SAMPLE 0.0)
           ;; how far the tine swings (1.0 at full velocity), and the bell's level
           (amp:SAMPLE 0.0) (amp_peak:SAMPLE 0.0) (amp_mult:SAMPLE 1.0)
@@ -140,24 +147,35 @@
             (begin
               (set! freq (voice_freq v))
               (set! key (- (voice_pitch v) 60.0))
-              (set! rc (cos (* STWOPI (/ freq SRf))))
-              (set! rs (sin (* STWOPI (/ freq SRf))))
-              ;; the bell mode sits about seven times above the fundamental,
-              ;; a little lower for a reed. Above about 0.45 of the sample
-              ;; rate it can't be played without aliasing, so it fades out.
-              (set! bell_freq (* freq (- 7.0 (* 0.01 key) (* 0.7 (epiano_reed p)))))
+              (set! rc (cos (* STWOPI (/ (* 0.99981 freq) SRf))))
+              (set! rs (sin (* STWOPI (/ (* 0.99981 freq) SRf))))
+              ;; the bell mode sits 6.27 times above the fundamental, the
+              ;; second bending mode of a rod fixed at one end. Above about
+              ;; 0.45 of the sample rate it can't be played without aliasing,
+              ;; so it fades out.
+              (set! bell_freq (* freq 6.267))
               (set! brc (cos (* STWOPI (/ bell_freq SRf))))
               (set! brs (sin (* STWOPI (/ bell_freq SRf))))
+              ;; The tonebar is tuned a little sharp of the tine (the tine itself
+              ;; a fraction of a cent flat), by a cent or so which differs from
+              ;; key to key, so the two beat slowly while the pitch stays put.
+              (set! tmp (* freq (pow 2.0 (/ (+ 0.7 (* 0.3 (cos (* 1.7 key)))) 1200.0))))
+              (set! trc (cos (* STWOPI (/ tmp SRf))))
+              (set! trs (sin (* STWOPI (/ tmp SRf))))
               ;; the phasors keep turning from where they were, so a stolen
               ;; voice changes pitch without a jump in the tine's position
               (set! fresh (< amp 0.0001))
               (if fresh
-                  (begin (set! c 1.0) (set! s 0.0) (set! bc 1.0) (set! bs 0.0)))
+                  (begin (set! c 1.0) (set! s 0.0) (set! bc 1.0) (set! bs 0.0)
+                         (set! tc 1.0) (set! ts 0.0)))
               ;; harder notes swing further. High tines are short and stiff and
               ;; swing less, which also keeps their harmonics below Nyquist.
               (set! vel_amp (pow (voice_vel v) 1.5))
               (set! key_drive (if (> key 12.0) (pow 2.0 (/ (- 12.0 key) 12.0)) 1.0))
-              (set! amp_peak (* vel_amp key_drive))
+              (set! amp_peak (* 0.8 vel_amp key_drive))
+              ;; the tonebar swings a little less than the tine
+              (set! tb_peak (* 0.4 amp_peak))
+              (set! bell_comp (/ (sin (* SPI (/ freq SRf))) (sin (* SPI (/ bell_freq SRf)))))
               ;; the bell is excited more by a hard, short hammer blow, and is
               ;; quieter on the short tines at the top
               (set! tmp (/ (- (* 0.45 SRf) bell_freq) (* 0.05 SRf)))
@@ -203,8 +221,12 @@
               (set! damp (if released
                              (exp (/ -6.9 (* (clamp (epiano_release p) 0.01 5.0) SRf)))
                              1.0))
-              (set! amp_mult (* damp (exp (/ (* -6.9 fast) (* t60 SRf)))))
-              (set! bell_mult (* damp (exp (/ -6.9 (* bell_t60 SRf)))))))
+              (set! amp_mult (* damp (exp (/ (* -6.9 fast) (* 0.6 t60 SRf)))))
+              (set! bell_mult (* damp (exp (/ -6.9 (* bell_t60 SRf)))))
+              ;; The tine loses its energy into the tonebar and the frame, so it
+              ;; fades quickly; the tonebar fades more slowly and is what is
+              ;; left, which gives the two-stage decay.
+              (set! tb_mult (* damp (exp (/ -6.9 (* 1.2 t60 SRf)))))))
         ;; a voice which was silent takes up the pickup settings at once
         (if (and fresh (voice_start? v))
             (begin (set! offset offset_target) (set! swing swing_target) (set! reed reed_target)))
@@ -216,6 +238,7 @@
               (set! tmp (exp (/ -6.9 (* (clamp (epiano_release p) 0.01 5.0) SRf))))
               (set! amp_mult (* amp_mult tmp))
               (set! bell_mult (* bell_mult tmp))
+              (set! tb_mult (* tb_mult tmp))
               (set! noise (+ noise (* 0.05 (epiano_thump p) (sqrt amp))))
               (set! noise_mult (exp (/ -6.9 (* 0.03 SRf))))
               (svf_set nsvf (clampf (* 0.5 freq) 80.0 400.0) (/ 1.0 nk))))
@@ -231,10 +254,26 @@
               (set! s (* s tmp))
               (set! tmp (/ 1.0 (sqrt (+ (* bc bc) (* bs bs)))))
               (set! bc (* bc tmp))
-              (set! bs (* bs tmp))))
+              (set! bs (* bs tmp))
+              (set! tmp (/ 1.0 (sqrt (+ (* tc tc) (* ts ts)))))
+              (set! tc (* tc tmp))
+              (set! ts (* ts tmp))))
+        ;; the tonebar's and the bell's phasors turn too
+        (set! tmp (- (* tc trc) (* ts trs)))
+        (set! ts (+ (* ts trc) (* tc trs)))
+        (set! tc tmp)
+        (set! tmp (- (* bc brc) (* bs brs)))
+        (set! bs (+ (* bs brc) (* bc brs)))
+        (set! bc tmp)
         (if (< (voice_age v) attack_frames)
-            (set! amp (+ amp (* attack (- amp_peak amp))))
-            (set! amp (* amp amp_mult)))
+            (begin
+              (set! amp (+ amp (* attack (- amp_peak amp))))
+              (set! tb (+ tb (* attack (- tb_peak tb))))
+              (set! bell (+ bell (* attack (- bell_peak bell)))))
+            (begin
+              (set! amp (* amp amp_mult))
+              (set! tb (* tb tb_mult))
+              (set! bell (* bell bell_mult))))
         (set! offset (+ offset (* smooth (- offset_target offset))))
         (set! swing (+ swing (* smooth (- swing_target swing))))
         (set! reed (+ reed (* smooth (- reed_target reed))))
@@ -244,23 +283,13 @@
         ;; at rest, so that moving the pickup (a change of `pickup` or
         ;; `reed`) changes the sound of a ringing note but makes no sound of
         ;; its own.
-        (set! x (* swing amp s))
+        (set! x (* swing (+ (* amp s) (* tb ts) (* bell bell_comp bs))))
         (set! u (- offset x))
         (set! flux (+ (* (- 1.0 reed) (- (epiano_tine_flux u) (epiano_tine_flux offset)))
                       (* reed (- (epiano_reed_charge (* 0.75 x)) 1.0))))
         (set! gain (+ gain (* smooth (- gain_target gain))))
         (set! y (/ (* gain (- flux last_flux) diff_gain) (* slope swing)))
         (set! last_flux flux)
-        ;; the bell mode, added after the pickup
-        (if (> (+ bell bell_peak) 0.000001)
-            (begin
-              (set! tmp (- (* bc brc) (* bs brs)))
-              (set! bs (+ (* bs brc) (* bc brs)))
-              (set! bc tmp)
-              (if (< (voice_age v) attack_frames)
-                  (set! bell (+ bell (* attack (- bell_peak bell))))
-                  (begin (set! bell (* bell bell_mult)) (set! bell_peak 0.0)))
-              (set! y (+ y (* bell bs)))))
         ;; hammer and damper noise
         (if (> noise 0.00001)
             (begin
@@ -272,7 +301,7 @@
         (frame_add_stereo out y y)
         ;; the note is over once the tine has stopped moving
         (if (and (> (voice_age v) attack_frames)
-                 (< amp 0.0001) (< bell 0.0001) (< noise 0.00001))
+                 (< amp 0.0001) (< tb 0.0001) (< bell 0.0001) (< noise 0.00001))
             (voice_done v))
         void))))
 
@@ -299,8 +328,8 @@
           (reed_svf (svf_make 1)) (fk:SAMPLE 0.7)
           (reed:SAMPLE 0.0)
           ;; saturation
-          (drive:SAMPLE -1.0) (pre_target:SAMPLE 1.0) (makeup_target:SAMPLE 1.0)
-          (pre:SAMPLE 1.0) (makeup:SAMPLE 1.0)
+          (drive:SAMPLE -1.0) (pre_target:SAMPLE 1.0)
+          (pre:SAMPLE 1.0) (os (os_make))
           ;; phaser: four first-order allpasses swept by a slow LFO
           (ph_phase:SAMPLE 0.0) (ph_coeff:SAMPLE 0.0) (ph_fb:SAMPLE 0.0)
           (ap1:SAMPLE 0.0) (ap2:SAMPLE 0.0) (ap3:SAMPLE 0.0) (ap4:SAMPLE 0.0)
@@ -331,17 +360,16 @@
         (set! reed (+ reed (* smooth (- tmp reed))))
         (if (> reed 0.0001)
             (set! x (+ x (* 0.8 reed (svf_bp reed_svf x)))))
-        ;; saturation: a tanh, scaled so that a single loud note (about 0.3)
-        ;; keeps its level and quieter ones are pushed up into the curve
+        ;; saturation: the kit's oversampled tanh, scaled so that a single loud
+        ;; note (about 0.3) keeps its level and quieter ones are pushed up
+        ;; into the curve
         (if (<> (epiano_drive p) drive)
             (begin
               (set! drive (epiano_drive p))
               (set! tmp (clamp drive 0.0 1.0))
-              (set! pre_target (+ 1.0 (* 6.0 tmp tmp)))
-              (set! makeup_target (/ 0.3 (tanh (* 0.3 pre_target))))))
+              (set! pre_target (+ 1.0 (* 6.0 tmp tmp)))))
         (set! pre (+ pre (* smooth (- pre_target pre))))
-        (set! makeup (+ makeup (* smooth (- makeup_target makeup))))
-        (set! x (* makeup (tanh (* pre x))))
+        (set! x (* 0.3 (oversat4 os (/ x 0.3) (* 0.3 pre))))
         ;; phaser. The notches sweep between about 250 Hz and 2 kHz; each
         ;; allpass coefficient uses tan(w) ~ w, close enough below 2 kHz.
         (set! tmp (clamp (epiano_phaser p) 0.0 1.0))
