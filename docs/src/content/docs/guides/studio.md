@@ -267,6 +267,11 @@ Where one of these takes a function, it also takes a pattern, which is merged
 in: `(off 1/8 (vel 0.3))` is an echo at a velocity of 0.3. And each of them
 works as a plain function of a pattern as well: `(fast 2 '(a b))`.
 
+Where one takes a number (`fast`, `slow`, `late`, `early`, `every`, `off`,
+`ply`, `iter`, `swing`, `segment`, `degrade-by`, `sometimes-by` and `euclid`),
+it takes a pattern of numbers too: `(fast '(<1 2>))` is twice as fast every
+other cycle, and `(euclid '(<3 5>) 8)` changes its rhythm from cycle to cycle.
+
 `stack` plays patterns together, `cat` plays them one cycle each in turn, and
 `seq` squeezes them into one cycle.
 

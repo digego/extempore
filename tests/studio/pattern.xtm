@@ -184,3 +184,19 @@
 
 ;; a rotation can be given without a pattern
 (xtmtest-result (events ((euclid 3 8 2) 'x)) '((1/8 1/4 x) (1/2 5/8 x) (3/4 7/8 x)) "euclid-rotation-curried")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; a pattern where a number would go  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(xtmtest-result (values-of (fast '(<1 2>) '(a b)) 0 2) '(a b a b a b) "fast-takes-a-pattern")
+(xtmtest-result (events (fast '(1 2) '(a b))) '((0 1/2 a) (1/2 3/4 a) (3/4 1 b)) "fast-changes-within-a-cycle")
+(xtmtest-result (events ((fast '(<1 2>)) '(a b)) 1 2)
+                '((1 5/4 a) (5/4 3/2 b) (3/2 7/4 a) (7/4 2 b))
+                "a-patterned-transform-can-wait-for-its-pattern")
+(xtmtest-result (events (slow '(<1 2>) '(a b)) 1 2) '((1 2 b)) "slow-takes-a-pattern")
+(xtmtest-result (events (ply '(1 2) '(a b))) '((0 1/2 a) (1/2 3/4 b) (3/4 1 b)) "ply-takes-a-pattern")
+(xtmtest-result (length (events (euclid '(<3 5>) 8 'x) 0 2)) 8 "euclid-takes-a-pattern")
+(xtmtest-result (events (late '(<0 1/4>) '(a b)) 1 2) '((5/4 7/4 a) (7/4 9/4 b)) "late-takes-a-pattern")
+(xtmtest-result (values-of (every '(<2 3>) rev '(a b)) 0 1) '(b a) "every-takes-a-pattern")
+(xtmtest-result (length (events (degrade-by '(0 1) '(a a a a)))) 2 "degrade-by-takes-a-pattern")

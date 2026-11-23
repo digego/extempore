@@ -36,6 +36,10 @@
 ;; and the modifiers work on a sublist too: '((a b)*2 <c d>!2).
 ;;
 ;; Inside a quasiquoted list, an unquoted pattern is a step: `(a ,(fast 3 x)).
+;;
+;; Where a transformation takes a number, it will take a pattern of numbers
+;; too: (fast '(<1 2>)) is twice as fast every other cycle, and (ply '(1 2 4))
+;; repeats its events more and more through each cycle.
 
 ;;; Code:
 
@@ -148,6 +152,39 @@
             (let ((pat (->pattern (car maybe-pattern))))
               ,@body))))))
 
+;; A number which a transformation takes can be a pattern of numbers instead.
+;; (make n) builds the transformed pattern for the number n. Given a pattern,
+;; this asks it which numbers it holds over each stretch of the time in
+;; question, and asks the pattern made with each number about that stretch.
+;; `who` is the transformation's name, for the complaint if arg is neither.
+(define studio:with-number
+  (lambda (who arg make)
+    (cond ((number? arg) (make arg))
+          ((or (pattern? arg) (pair? arg) (vector? arg))
+           (let ((numbers (->pattern arg))
+                 ;; the patterns made so far, by number
+                 (made '()))
+             (studio:make-pattern
+               (lambda (from end)
+                 (apply append
+                        (map (lambda (h)
+                               (let ((n (studio:hap-value h)))
+                                 (if (not (number? n))
+                                     '()
+                                     (let ((known (assv n made)))
+                                       (if (not known)
+                                           (begin
+                                             ;; a signal has a new number at every
+                                             ;; moment: don't keep them all
+                                             (if (> (length made) 64) (set! made '()))
+                                             (set! known (cons n (->pattern (make n))))
+                                             (set! made (cons known made))))
+                                       (query (cdr known) (studio:hap-part-begin h) (studio:hap-part-end h))))))
+                             (query numbers from end)))))))
+          (else
+            (studio:error who "takes a number or a pattern of numbers, not" arg)
+            (error 'wrong-type-arg "see the studio's message above")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; combining patterns  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -175,15 +212,21 @@
                      (query p (- b offset) (- e offset))))))))))
 
 (define-transform (fast factor)
-  (if (<= factor 0)
-      silence
-      (studio:make-pattern
-        (lambda (from end)
-          (map (lambda (h) (studio:hap-with-time h (lambda (t) (/ t factor))))
-               (query pat (* from factor) (* end factor)))))))
+  (studio:with-number
+    'fast factor
+    (lambda (factor)
+      (if (<= factor 0)
+          silence
+          (studio:make-pattern
+            (lambda (from end)
+              (map (lambda (h) (studio:hap-with-time h (lambda (t) (/ t factor))))
+                   (query pat (* from factor) (* end factor)))))))))
 
 (define-transform (slow factor)
-  (if (<= factor 0) silence (fast (/ 1 factor) pat)))
+  (studio:with-number
+    'slow factor
+    (lambda (factor)
+      (if (<= factor 0) silence (fast (/ 1 factor) pat)))))
 
 ;; all of the patterns in one cycle, one after the other
 (define fastcat
@@ -196,13 +239,16 @@
 (define seq fastcat)
 
 (define-transform (late amount)
-  (studio:make-pattern
-    (lambda (from end)
-      (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t amount))))
-           (query pat (- from amount) (- end amount))))))
+  (studio:with-number
+    'late amount
+    (lambda (amount)
+      (studio:make-pattern
+        (lambda (from end)
+          (map (lambda (h) (studio:hap-with-time h (lambda (t) (+ t amount))))
+               (query pat (- from amount) (- end amount))))))))
 
 (define-transform (early amount)
-  (late (- amount) pat))
+  (studio:with-number 'early amount (lambda (amount) (late (- amount) pat))))
 
 ;; squeeze each cycle of a pattern into the part of the cycle from start to end
 (define studio:compress
@@ -309,7 +355,9 @@
         (query (if (test cycle) transformed pat) b e)))))
 
 (define-transform (every n f)
-  (when-cycle (lambda (cycle) (= 0 (modulo cycle n))) f pat))
+  (studio:with-number
+    'every n
+    (lambda (n) (when-cycle (lambda (cycle) (= 0 (modulo cycle n))) f pat))))
 
 ;; like every, but from the cycle numbered `offset` in each group of n
 (define-transform (every-from n offset f)
@@ -319,32 +367,37 @@
   (stack pat (studio:transform f pat)))
 
 (define-transform (off amount f)
-  (stack pat (studio:transform f (late amount pat))))
+  (studio:with-number
+    'off amount
+    (lambda (amount) (stack pat (studio:transform f (late amount pat))))))
 
 ;; repeat each event n times in its own span
 (define-transform (ply n)
-  (studio:make-pattern
-    (lambda (from end)
-      (apply append
-             (map (lambda (h)
-                    (if (not (studio:hap-whole-begin h))
-                        (list h)
-                        ;; A long event may arrive as several fragments, over
-                        ;; several queries. Each repeat is played by the
-                        ;; fragment which contains its start.
-                        (let* ((wb (studio:hap-whole-begin h))
-                               (step (/ (- (studio:hap-whole-end h) wb) n)))
-                          (let loop ((i 0) (acc '()))
-                            (if (>= i n)
-                                (reverse acc)
-                                (let* ((b (+ wb (* i step)))
-                                       (e (+ b step)))
-                                  (loop (+ i 1)
-                                        (if (and (>= b (studio:hap-part-begin h))
-                                                 (< b (studio:hap-part-end h)))
-                                            (cons (studio:hap b e b (min e end) (studio:hap-value h)) acc)
-                                            acc))))))))
-                  (query pat from end))))))
+  (studio:with-number
+    'ply n
+    (lambda (n)
+      (studio:make-pattern
+        (lambda (from end)
+          (apply append
+                 (map (lambda (h)
+                        (if (not (studio:hap-whole-begin h))
+                            (list h)
+                            ;; A long event may arrive as several fragments,
+                            ;; over several queries. Each repeat is played by
+                            ;; the fragment which contains its start.
+                            (let* ((wb (studio:hap-whole-begin h))
+                                   (step (/ (- (studio:hap-whole-end h) wb) n)))
+                              (let loop ((i 0) (acc '()))
+                                (if (>= i n)
+                                    (reverse acc)
+                                    (let* ((b (+ wb (* i step)))
+                                           (e (+ b step)))
+                                      (loop (+ i 1)
+                                            (if (and (>= b (studio:hap-part-begin h))
+                                                     (< b (studio:hap-part-end h)))
+                                                (cons (studio:hap b e b (min e end) (studio:hap-value h)) acc)
+                                                acc))))))))
+                      (query pat from end))))))))
 
 ;; `count` copies of the pattern, each `time` later and `feedback` times as loud
 (define-transform (echo count time feedback)
@@ -363,11 +416,14 @@
 
 ;; start one step later each cycle, for a pattern of n steps
 (define-transform (iter n)
-  (apply slowcat
-         (let loop ((i 0) (acc '()))
-           (if (>= i n)
-               (reverse acc)
-               (loop (+ i 1) (cons (early (/ i n) pat) acc))))))
+  (studio:with-number
+    'iter n
+    (lambda (n)
+      (apply slowcat
+             (let loop ((i 0) (acc '()))
+               (if (>= i n)
+                   (reverse acc)
+                   (loop (+ i 1) (cons (early (/ i n) pat) acc))))))))
 
 ;; apply f only to the part of each cycle from start to end (0 to 1)
 (define-transform (within start end f)
@@ -387,7 +443,9 @@
 
 ;; delay every second step of n per cycle by `amount` of a step
 (define-transform (swing amount n)
-  (inside n (within 1/2 1 (late (* 1/2 amount))) pat))
+  (studio:with-number
+    'swing amount
+    (lambda (amount) (inside n (within 1/2 1 (late (* 1/2 amount))) pat))))
 
 ;; repeat the first `fraction` of each cycle
 (define-transform (linger fraction)
@@ -423,7 +481,7 @@
 
 ;; sample a continuous pattern n times per cycle
 (define-transform (segment n)
-  (studio:merge (fast n (pure #t)) pat))
+  (studio:with-number 'segment n (lambda (n) (studio:merge (fast n (pure #t)) pat))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; rhythm and chance   ;;
@@ -454,7 +512,8 @@
           (append (list-tail lst k) (list-head lst k))))))
 
 ;; (euclid 3 8 pat) plays pat on 3 of 8 steps, spread evenly. An optional
-;; fourth number rotates the rhythm: (euclid 3 8 2 pat).
+;; fourth number rotates the rhythm: (euclid 3 8 2 pat). Each of the numbers
+;; can be a pattern: (euclid '(<3 5>) 8 pat).
 (define euclid
   (lambda (hits steps . more)
     (cond ((null? more)
@@ -465,9 +524,18 @@
           (else
             (let ((rotation (if (pair? (cdr more)) (car more) 0))
                   (pat (->pattern (if (pair? (cdr more)) (cadr more) (car more)))))
-              (apply fastcat
-                     (map (lambda (hit) (if hit pat silence))
-                          (studio:rotate (studio:bjorklund hits steps) rotation))))))))
+              (studio:with-number
+                'euclid hits
+                (lambda (hits)
+                  (studio:with-number
+                    'euclid steps
+                    (lambda (steps)
+                      (studio:with-number
+                        'euclid rotation
+                        (lambda (rotation)
+                          (apply fastcat
+                                 (map (lambda (hit) (if hit pat silence))
+                                      (studio:rotate (studio:bjorklund hits steps) rotation))))))))))))))
 
 ;; keep the timing of the true events in `bools`, with values from pat
 (define-transform (struct bools)
@@ -528,29 +596,35 @@
 ;; drop events at random, each with the given probability
 (define-transform (degrade-by probability)
   (let ((seed (studio:next-seed)))
-    (studio:make-pattern
-      (lambda (from end)
-        (cl:remove-if
-          (lambda (h)
-            (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
-               probability))
-          (query pat from end))))))
+    (studio:with-number
+      'degrade-by probability
+      (lambda (probability)
+        (studio:make-pattern
+          (lambda (from end)
+            (cl:remove-if
+              (lambda (h)
+                (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+                   probability))
+              (query pat from end))))))))
 
 (define-transform (degrade)
   (degrade-by 0.5 pat))
 
 ;; apply f to events at random, each with the given probability
 (define-transform (sometimes-by probability f)
-  (let* ((seed (studio:next-seed))
-         (chosen? (lambda (h)
-                    (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
-                       probability))))
-    (stack (studio:make-pattern
-             (lambda (from end) (cl:remove-if chosen? (query pat from end))))
-           (studio:transform
-             f
-             (studio:make-pattern
-               (lambda (from end) (cl:remove-if-not chosen? (query pat from end))))))))
+  (let ((seed (studio:next-seed)))
+    (studio:with-number
+      'sometimes-by probability
+      (lambda (probability)
+        (let ((chosen? (lambda (h)
+                         (< (studio:random-at (or (studio:hap-whole-begin h) (studio:hap-part-begin h)) seed)
+                            probability))))
+          (stack (studio:make-pattern
+                   (lambda (from end) (cl:remove-if chosen? (query pat from end))))
+                 (studio:transform
+                   f
+                   (studio:make-pattern
+                     (lambda (from end) (cl:remove-if-not chosen? (query pat from end)))))))))))
 
 (define-transform (sometimes f) (sometimes-by 0.5 f pat))
 (define-transform (often f) (sometimes-by 0.75 f pat))
