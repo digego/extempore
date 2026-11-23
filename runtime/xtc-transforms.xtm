@@ -299,20 +299,32 @@
                          #f
                          (xtc:desugar:or (cdr ast)))))))
 
+;; A chain of ifs, one per clause. It is built from the last clause back, in a
+;; loop: a cond of several hundred clauses recursed that deep, and s7 can
+;; abandon a non-tail recursion that deep without an error.
 (define xtc:desugar:cond
   (lambda (ast)
-    (cl:remove '()
-               (if (null? ast) '()
-                   (ast:make-if (caar ast)
-                                (if (null? (cdar ast))
-                                    (xtc:diagnostics:print-badly-formed-expression-error 'cond ast)
-                                    (ast:make-begin (cdar ast)))
-                                (if (and
-                                      (not (null? (cdr ast)))
-                                      (eq? (caadr ast) 'else))
-                                    (ast:make-begin (cdadr ast))
-                                    (if (not (null? (cdr ast)))
-                                        (xtc:desugar:cond (cdr ast)))))))))
+    (if (null? ast)
+        '()
+        ;; the clauses, last first, as far as an else which follows one; and
+        ;; what the last of them falls through to
+        (let collect ((cs ast) (taken '()))
+          (if (null? (cdar cs))
+              (xtc:diagnostics:print-badly-formed-expression-error 'cond cs))
+          (let ((taken (cons (car cs) taken)))
+            (cond ((and (pair? (cdr cs)) (eq? (caadr cs) 'else))
+                   (xtc:desugar:cond-chain taken (ast:make-begin (cdadr cs))))
+                  ((null? (cdr cs))
+                   (xtc:desugar:cond-chain taken (if #f #f)))
+                  (else (collect (cdr cs) taken))))))))
+
+(define xtc:desugar:cond-chain
+  (lambda (clauses-last-first otherwise)
+    (let loop ((cs clauses-last-first) (otherwise otherwise))
+      (if (null? cs)
+          otherwise
+          (loop (cdr cs)
+                (cl:remove '() (ast:make-if (caar cs) (ast:make-begin (cdar cs)) otherwise)))))))
 
 
 (define xtc:desugar:list

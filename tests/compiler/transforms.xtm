@@ -36,6 +36,23 @@
                 '(if t1 (begin b1) (if t2 (begin b2) (begin b3)))
                 "cond-multi")
 
+;; clauses after an else are dropped
+(xtmtest-result (xtc:desugar:cond '((t1 b1) (else b2) (t3 b3)))
+                '(if t1 (begin b1) (begin b2))
+                "cond-else-ends")
+
+;; a long cond: an if chain as deep as the clauses, ending in the else
+(xtmtest-result (let* ((n 2000)
+                       (clauses (let loop ((i (- n 1)) (acc '((else last))))
+                                  (if (< i 0) acc (loop (- i 1) (cons (list i 'b) acc)))))
+                       (chain (xtc:desugar:cond clauses)))
+                  (let loop ((node chain) (depth 0))
+                    (if (and (pair? node) (eq? (car node) 'if))
+                        (if (= (cadr node) depth) (loop (cadddr node) (+ depth 1)) (list 'bad-test depth))
+                        (list depth node))))
+                '(2000 (begin last))
+                "cond-long")
+
 ;; not
 
 (xtmtest-result (xtc:desugar:not 'x)
