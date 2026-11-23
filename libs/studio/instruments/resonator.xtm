@@ -109,10 +109,10 @@
     (level 1.0 "output level"))
   (presets
     (marimba (damping 0.5) (brightness 0.2) (hardness 0.35))
-    (vibes (damping 0.15) (brightness 0.5) (hardness 0.45) (choke 0.4))
+    (vibes (damping 0.15) (brightness 0.5) (hardness 0.45) (choke 0.4) (level 0.7))
     (bell (structure 0.72) (damping 0.1) (brightness 0.75) (position 0.12) (hardness 0.7))
     (kalimba (structure 0.55) (damping 0.45) (brightness 0.3) (position 0.08) (hardness 0.6))
-    (glass (structure 0.92) (damping 0.2) (brightness 0.85) (position 0.4) (hardness 0.9))
+    (glass (structure 0.92) (damping 0.2) (brightness 0.85) (position 0.4) (hardness 0.9) (level 1.5))
     (pan (structure 0.4) (damping 0.4) (brightness 0.55) (position 0.22) (hardness 0.4) (noise 0.1))
     (harp (model 1.0) (damping 0.25) (brightness 0.45) (position 0.3) (hardness 0.35) (noise 0.3) (choke 0.1))
     (koto (model 1.0) (structure 0.35) (damping 0.45) (brightness 0.75) (position 0.1) (hardness 0.75) (noise 0.5))
@@ -120,11 +120,11 @@
     (dulcimer (model 1.0) (structure 0.5) (damping 0.3) (brightness 0.6) (position 0.12) (hardness 0.6) (noise 0.2))))
 
 ;; the most partials the modal model can have per voice
-(bind-val RESONATOR_MODES i64 20)
+(bind-val RESONATOR_MODES i64 40)
 ;; each mode of the modal bank is one of the kit's state-variable filters
 ;; (SVF_SIZE numbers), with the mode's amplitude in the spare slot 7
-;; the string's delay line, in frames: room for 16 Hz at 48 kHz
-(bind-val RESONATOR_STRING_FRAMES i64 4096)
+;; the string's delay line, in frames: room for 10 Hz
+(bind-val RESONATOR_STRING_FRAMES i64 (convert (/ SRf 10.0) i64))
 ;; output levels for each model, so that a full-velocity note peaks around -12 dB
 (bind-val RESONATOR_MODAL_LEVEL SAMPLE 0.28)
 (bind-val RESONATOR_STRING_LEVEL SAMPLE 0.5)
@@ -157,7 +157,11 @@ Nyquist, rounded up to an even number so that they go in odd/even pairs."
           (harmonic:SAMPLE f)
           (stretch:SAMPLE 1.0)
           ;; the fundamental's q, in units which make its decay time q/pi
-          ;; frames whatever the pitch: from 500 to 5,000,000
+          ;; frames whatever the pitch: from 500 to 5,000,000. Low bars and
+          ;; bells ring longer than high ones, so it is scaled by the square
+          ;; root of the pitch's distance from middle C, between a quarter
+          ;; and two and a half.
+          (pitch_scale:SAMPLE (sqrt (/ (/ 261.63 SRf) f)))
           (q:SAMPLE (* 500.0 (pow 10.0 (* 4.0 damping))))
           ;; each partial's q is the last one's times q_loss, so a lower
           ;; brightness makes the upper partials die sooner. Very low
@@ -173,6 +177,9 @@ Nyquist, rounded up to an even number so that they go in odd/even pairs."
           (m:SAMPLE* null)
           (n:i64 0)
           (i:i64 0))
+      (if (< pitch_scale 0.25) (set! pitch_scale 0.25))
+      (if (> pitch_scale 2.5) (set! pitch_scale 2.5))
+      (set! q (* q pitch_scale))
       (dotimes (i nmax)
         (set! pf (* harmonic stretch))
         (if (>= pf 0.49)
@@ -244,10 +251,10 @@ different amounts, which is what stretches a stiff string's partials."
           ;; the string: its loop, the allpass's delay line, and the loop's
           ;; two filters (a three-tap FIR and a two-pole lowpass)
           (string (dl_make RESONATOR_STRING_FRAMES))
-          (stiff (dl_make 2048))
+          (stiff (dl_make (convert (/ SRf 20.0) i64)))
           (loop_lp (svf_make 1))
           (fir1:SAMPLE 0.0) (fir2:SAMPLE 0.0)
-          (fir_h0:SAMPLE 0.5) (fir_h1:SAMPLE 0.25) (loop_gain:SAMPLE 0.99)
+          (fir_h0:SAMPLE 0.5) (fir_h1:SAMPLE 0.25) (fir_loss:SAMPLE 0.5) (exc_comp:SAMPLE 1.0) (fir_pitch:SAMPLE 1.0) (loop_gain:SAMPLE 0.99)
           (period:SAMPLE 100.0)
           (main_delay:SAMPLE 100.0)
           (ap_delay:i64 0)
@@ -261,7 +268,7 @@ different amounts, which is what stretches a stiff string's partials."
           ;; the exciter: a click and a noise burst, combed (for the string)
           ;; and lowpassed
           (exc_lp (svf_make 1))
-          (exc_comb (dl_make 4096))
+          (exc_comb (dl_make RESONATOR_STRING_FRAMES))
           (comb_delay:SAMPLE 10.0) (comb_gain:SAMPLE 0.0)
           (exc_dc_x:SAMPLE 0.0) (exc_dc_y:SAMPLE 0.0)
           (dc_pole:SAMPLE (- 1.0 (/ 10.0 SRf)))
@@ -305,6 +312,7 @@ different amounts, which is what stretches a stiff string's partials."
               (set! f (/ (voice_freq v) SRf))
               (set! f (if (> f 0.45) 0.45 f))
               (set! period (/ 1.0 f))
+              (set! fir_pitch (/ (/ 261.63 SRf) f))
               (set! position (resonator_position p))
               (dotimes (i (* RESONATOR_MODES SVF_SIZE))
                 (pset! modes i 0.0))
@@ -395,10 +403,19 @@ different amounts, which is what stretches a stiff string's partials."
                               (stretch_point:SAMPLE 0.0))
                           ;; lose 60 dB over rt60 frames: this much per trip
                           (set! loop_gain (pow 2.0 (* -10.0 (/ period rt60))))
+                          ;; the exciter goes in ahead of the loop gain, so a
+                          ;; heavily damped string would swallow it: make that
+                          ;; up (by at most 24 dB)
+                          (set! exc_comp (/ 1.0 (if (< loop_gain 0.0625) 0.0625 loop_gain)))
                           ;; the FIR's taps: brightness 1.0 is a plain delay of
-                          ;; one frame, 0.0 is a gentle lowpass
-                          (set! fir_h0 (* 0.5 (+ 1.0 (* brightness brightness))))
-                          (set! fir_h1 (* 0.25 (- 1.0 (* brightness brightness))))
+                          ;; one frame, 0.0 is a gentle lowpass. Its loss
+                          ;; per second grows as the cube of the pitch, so
+                          ;; above middle C it is reduced as the square of
+                          ;; the distance, and the top octaves keep ringing.
+                          (set! fir_loss (* (- 1.0 (* brightness brightness))
+                                            (if (< fir_pitch 1.0) (* fir_pitch fir_pitch) 1.0)))
+                          (set! fir_h0 (* 0.5 (- 2.0 fir_loss)))
+                          (set! fir_h1 (* 0.25 fir_loss))
                           ;; the lowpass, between 2 and 7 octaves above the note
                           (set! cutoff (if (> cutoff 84.0) 84.0 cutoff))
                           (set! lp_f (* f (pow 2.0 (/ cutoff 12.0))))
@@ -539,7 +556,7 @@ different amounts, which is what stretches a stiff string's partials."
                     void))
               ;; the exciter goes into the loop, then the loop's filters: the
               ;; FIR (which also sets the decay) and the lowpass
-              (set! s (+ s (* 0.7 x)))
+              (set! s (+ s (* 0.7 exc_comp x)))
               (set! y (* loop_gain (+ (* fir_h0 fir1) (* fir_h1 (+ s fir2)))))
               (set! fir2 fir1)
               (set! fir1 s)
