@@ -45,8 +45,8 @@
 ;; oscillators at hundreds of kilohertz or more, so a pulse wave's harmonics
 ;; went far above hearing and were never folded back. At 44.1 or 48 kHz a
 ;; naive pulse wave folds its upper harmonics back down as inharmonic whistles,
-;; worse the higher the note. So every edge here is rounded off with poly_blep
-;; (see libs/core/audio_dsp.xtm), which removes most of the folding, and the
+;; worse the higher the note. So every edge here is rounded off with a
+;; polyblep (see dsp.xtm), which removes most of the folding, and the
 ;; harshness comes from the waveforms themselves rather than from aliasing.
 ;;
 ;; The instrument's effect is an optional bit-crusher (bits) and sample-rate
@@ -66,7 +66,7 @@
   "a chiptune synth: pulse, stepped triangle, saw and ring waves, with arpeggio, vibrato and slide"
   (params
     (wave 0.0 "0 pulse, 1 the NES's stepped triangle, 2 saw, 3 ring-modulated triangle")
-    (duty 0.5 "pulse width, 0.0 to 1.0: 0.125, 0.25 and 0.5 are the classic settings")
+    (duty 0.5 "pulse width, 0.05 to 0.95: 0.125, 0.25 and 0.5 are the classic settings")
     (pwm 0.0 "how far the duty-cycle sweep narrows the pulse, 0.0 to 1.0")
     (pwm-rate 0.5 "duty-cycle sweep rate in Hz")
     (ring 19.0 "for wave 3: pitch of the ring modulator above the note, in semitones")
@@ -112,13 +112,7 @@
   "a pulse wave, high for the first `duty` of each cycle. The mean is taken
 out, so the pulse has no DC offset whatever its width."
   (lambda (phase:SAMPLE inc:SAMPLE duty:SAMPLE)
-    (let ((fall_phase (- phase duty)))
-      (if (< fall_phase 0.0) (set! fall_phase (+ fall_phase 1.0)))
-      ;; the rising edge is at phase 0, the falling edge at phase `duty`
-      (- (+ (if (< phase duty) 1.0 -1.0)
-            (poly_blep phase inc 1.0 #t))
-         (poly_blep fall_phase inc 1.0 #t)
-         (- (* 2.0 duty) 1.0)))))
+    (blep_pulse phase inc duty)))
 
 ;; The NES triangle counts down 15 to 0 and back up 0 to 15, one step every
 ;; 1/32 of a cycle. Here that staircase is built as a smooth triangle (`ramp`)
@@ -155,7 +149,7 @@ out, so the pulse has no DC offset whatever its width."
 (bind-func static chip_saw
   "a rising sawtooth, -1.0 to 1.0"
   (lambda (phase:SAMPLE inc:SAMPLE)
-    (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t))))
+    (blep_saw phase inc)))
 
 ;; The SID's ring modulation replaces a triangle's top bit with the
 ;; exclusive-or of it and another oscillator's square wave: in effect, the
@@ -262,8 +256,8 @@ Fewer than one level leaves the volume alone."
               (set! sweep (* (chip_pwm_rate p) frame_t))
               (set! sweep (fabs (- (* 2.0 (- sweep (floor sweep))) 1.0)))
               (set! duty (* (chip_duty p) (- 1.0 (* 0.85 (chip_pwm p) (- 1.0 sweep)))))
-              (if (< duty 0.02) (set! duty 0.02))
-              (if (> duty 0.98) (set! duty 0.98))
+              (if (< duty 0.05) (set! duty 0.05))
+              (if (> duty 0.95) (set! duty 0.95))
               (set! wave (convert (+ (chip_wave p) 0.5) i64))
               ;; the envelope's step per frame for each stage
               (set! attack_step (chip_ramp_step (chip_attack p)))
@@ -297,7 +291,7 @@ Fewer than one level leaves the volume alone."
         ;; the volume register
         (set! vol (chip_volume_steps (* env (voice_vel v)) levels))
         (set! gain (+ gain (* smooth (- vol gain))))
-        (frame_add out (* (chip_level p) gain x))
+        (frame_add out (* 0.88 (chip_level p) gain x))
         ;; the note is over once its volume has reached zero
         (if (and (not attacking) (<= env 0.0) (< gain 0.0001))
             (voice_done v))
