@@ -538,8 +538,12 @@
     #t))
 
 ;; aot compile llvm bitcode (bc)
+;; cache-name, if given, names the cache in place of the library file's own
+;; name: (xtc:aot:compile-xtm-ll "libs/studio/dsp.xtm" "studio_dsp") writes
+;; libs/aot-cache/studio_dsp.xtm and xtmstudio_dsp.ll. The cache is one flat
+;; directory, so a library whose file name is a common one needs it.
 (define xtc:aot:compile-xtm-ll
-  (lambda (lib-path)
+  (lambda (lib-path . cache-name)
     (set! *xtc:aot:dll* #f)
     (let ((start-time (clock:clock))
           (in-file-port (or
@@ -550,7 +554,9 @@
                                     (print "Error:"))
             (print " no .xtm file at" (sanitize-platform-path lib-path) "\n"))
           (let* ((res (close-port in-file-port))
-                 (libname (sanitize-platform-path (filename-from-path lib-path)))
+                 (libname (if (null? cache-name)
+                              (sanitize-platform-path (filename-from-path lib-path))
+                              (string-append (car cache-name) ".xtm")))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
                  (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
@@ -679,9 +685,15 @@
                         (print "\n\ncannot write AOT-compilation file at " aot-compilation-file-path "\n")
                         (quit 2))))))))))
 
+;; (xtc:aot:compile-xtm-file path)                 a .ll cache named after the file
+;; (xtc:aot:compile-xtm-file path #t)              a shared library
+;; (xtc:aot:compile-xtm-file path #f "cache-name") a .ll cache under another name
 (define xtc:aot:compile-xtm-file
-  (lambda (lib-path . dll)
-    (if (and (not (null? dll)) (car dll))
-        (xtc:aot:compile-xtm-dll lib-path)
-        (xtc:aot:compile-xtm-ll lib-path))))
+  (lambda (lib-path . args)
+    (cond ((and (pair? args) (car args))
+           (xtc:aot:compile-xtm-dll lib-path))
+          ((and (pair? args) (pair? (cdr args)))
+           (xtc:aot:compile-xtm-ll lib-path (cadr args)))
+          (else
+            (xtc:aot:compile-xtm-ll lib-path)))))
 

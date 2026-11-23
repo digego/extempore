@@ -560,7 +560,11 @@ file(GLOB AOT_RUNTIME_DEPS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.ll)
 
 macro(aotcompile_lib libfile group)
-    get_filename_component(_basename ${libfile} NAME_WE)
+    get_filename_component(_aot_name ${libfile} NAME_WE)
+    aotcompile_lib_as(${_aot_name} ${libfile} ${group} ${ARGN})
+endmacro()
+
+macro(aotcompile_lib_as _basename libfile group)
     set(_targetname aot_${_basename})
     set(_ll_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/xtm${_basename}.ll)
     set(_xtm_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/${_basename}.xtm)
@@ -579,7 +583,7 @@ macro(aotcompile_lib libfile group)
 
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
         COMMAND ${_extempore_cmd} --nobase
-            --batch "(xtc:aot:compile-xtm-file \"${libfile}\")"
+            --batch "(xtc:aot:compile-xtm-file \"${libfile}\" #f \"${_basename}\")"
         DEPENDS ${libfile} ${_dep_files} $<TARGET_FILE:extempore> ${AOT_RUNTIME_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         JOB_POOL aot
