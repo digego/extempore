@@ -106,11 +106,19 @@ The register is often clocked many times per sample. Rather than take its
 value at the instant of each sample, which would fold the high frequencies
 down as harsh aliasing, the output is its average value over the sample's
 duration. When that average covers many clocks it is quieter than a single
-value would be, so it is scaled back up to keep the loudness the same."
+value would be, so it is scaled back up to keep the loudness the same, and
+the output is held within 1.5 so that the rare run of equal bits doesn't stand
+well above the rest."
   (lambda ()
     (let ((reg:i64 1) (out:SAMPLE 1.0) (feedback:i64 0)
-          (phase:SAMPLE 0.0) (left:SAMPLE 0.0) (sum:SAMPLE 0.0) (n:SAMPLE 1.0))
+          (phase:SAMPLE 0.0) (left:SAMPLE 0.0) (sum:SAMPLE 0.0) (n:SAMPLE 1.0)
+          (was_short:i1 #f) (y:SAMPLE 0.0))
       (lambda (clock:SAMPLE short:i1)
+        ;; a change of mode starts the register from its power-up state: from
+        ;; wherever it was, the short mode can settle into a cycle shorter
+        ;; than its 93 steps
+        (if (<> short was_short)
+            (begin (set! was_short short) (set! reg 1)))
         ;; how many clocks this sample lasts
         (set! n (/ clock SRf))
         (if (< n 0.001) (set! n 0.001))
@@ -127,7 +135,8 @@ value would be, so it is scaled back up to keep the loudness the same."
           (set! out (if (= (bitwise-and reg 1) 0) 1.0 -1.0)))
         (set! sum (+ sum (* out left)))
         (set! phase (+ phase left))
-        (* (/ sum n) (sqrt (if (< n 1.0) 1.0 n)))))))
+        (set! y (* (/ sum n) (sqrt (if (< n 1.0) 1.0 n))))
+        (clampf y -1.5 1.5)))))
 
 (bind-func chipkit_volume_c
   "a 4-bit volume register. The volume `vol` (0.0 to 1.0) is rounded up to one
@@ -170,6 +179,7 @@ so that each step doesn't click."
           (noise (chipkit_noise_c))
           (phase:SAMPLE 0.0) (inc:SAMPLE 0.0)
           (sweep:SAMPLE 0.0) (sweep_mult (exp (/ -0.693 (* 0.008 SRf))))
+          (ratio:SAMPLE 1.0)
           (env:SAMPLE 0.0) (fall:SAMPLE 0.0)
           (click:SAMPLE 0.0) (click_fall (chip_ramp_step 0.01))
           (vel:SAMPLE 0.0) (g:SAMPLE 0.0) (y:SAMPLE 0.0))
@@ -180,8 +190,10 @@ so that each step doesn't click."
               (set! env 1.0) (set! click 1.0) (set! sweep 1.0)
               (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
-            (set! fall (chip_ramp_step (chipkit_bd_decay p))))
-        (set! inc (chip_inc (* (chipkit_bd_tune p) (pow 2.0 (* 3.0 sweep)))))
+            (begin
+              (set! fall (chip_ramp_step (chipkit_bd_decay p)))
+              (set! ratio (pow 2.0 (* 3.0 sweep)))))
+        (set! inc (chip_inc (* (chipkit_bd_tune p) ratio)))
         (set! phase (chip_wrap (+ phase inc)))
         (set! y (chip_triangle phase inc))
         (if (> click 0.0)
@@ -192,7 +204,7 @@ so that each step doesn't click."
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
-        (frame_add out (* 0.36 (chipkit_bd_level p) g y))
+        (frame_add out (* 0.25 (chipkit_bd_level p) g y))
         (if (and (<= env 0.0) (< g 0.0001))
             (voice_done v))
         void))))
@@ -234,7 +246,7 @@ so that each step doesn't click."
         (if (< env 0.0) (set! env 0.0))
         (set! tone_env (- tone_env (* 3.0 fall)))
         (if (< tone_env 0.0) (set! tone_env 0.0))
-        (frame_add out (* 0.3 (chipkit_sd_level p) y))
+        (frame_add out (* 0.195 (chipkit_sd_level p) y))
         (if (and (<= env 0.0) (< g 0.0001))
             (voice_done v))
         void))))
@@ -247,7 +259,9 @@ so that each step doesn't click."
 ;; which takes away the low end. Pitch 42 plays the closed hat and 46 the
 ;; open one; both are mapped to this one voice, so each cuts the other off.
 ;; In the short (metal) mode the 93-step sequence rings at about 4.8 kHz,
-;; with a dense spray of partials above it.
+;; with a dense spray of partials above it. The 93-step sequence is much
+;; quieter than the long one after the highpass, so the metal mode is turned up
+;; to match.
 
 (bind-func chipkit_hh_c
   (lambda (p:SAMPLE*)
@@ -266,11 +280,12 @@ so that each step doesn't click."
             (begin
               (set! fall (chip_ramp_step (if open (chipkit_oh_decay p) (chipkit_hh_decay p))))
               (set! level (if open (chipkit_oh_level p) (chipkit_hh_level p)))))
-        (set! y (highpass (noise (* CHIPKIT_NOISE_HISS (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5))))
+        (set! y (* (if (> (chipkit_metal p) 0.5) 3.0 1.0)
+                   (highpass (noise (* CHIPKIT_NOISE_HISS (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5)))))
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
-        (frame_add_mono out (* 0.2 level g y) 0.6)
+        (frame_add_mono out (* 0.27 level g y) 0.6)
         (if (and (<= env 0.0) (< g 0.0001))
             (voice_done v))
         void))))
@@ -289,7 +304,8 @@ so that each step doesn't click."
             (begin (set! env 1.0) (set! vel (voice_vel v))))
         (if (= (% (voice_age v) 32) 0)
             (set! fall (chip_ramp_step (chipkit_cr_decay p))))
-        (set! y (highpass (noise (* CHIPKIT_NOISE_BRIGHT (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5))))
+        (set! y (* (if (> (chipkit_metal p) 0.5) 2.5 1.0)
+                   (highpass (noise (* CHIPKIT_NOISE_BRIGHT (chipkit_noise_ratio p)) (> (chipkit_metal p) 0.5)))))
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
@@ -335,7 +351,7 @@ so that each step doesn't click."
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
-        (frame_add_mono out (* 0.36 (chipkit_tom_level p) g y) pan)
+        (frame_add_mono out (* 0.277 (chipkit_tom_level p) g y) pan)
         (if (and (<= env 0.0) (< g 0.0001))
             (voice_done v))
         void))))
@@ -368,7 +384,7 @@ so that each step doesn't click."
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
-        (frame_add_mono out (* 0.3 (chipkit_cp_level p) g y) 0.52)
+        (frame_add_mono out (* 0.245 (chipkit_cp_level p) g y) 0.52)
         (if (and (> age (* 3 spacing)) (<= env 0.0) (< g 0.0001))
             (voice_done v))
         void))))
@@ -390,7 +406,7 @@ so that each step doesn't click."
         (set! env (- env fall))
         (if (< env 0.0) (set! env 0.0))
         (set! g (volume (* vel env) (chipkit_levels p)))
-        (frame_add_mono out (* 0.2 (chipkit_rs_level p) g
+        (frame_add_mono out (* 0.23 (chipkit_rs_level p) g
                                (chip_pulse phase inc 0.125))
                         0.45)
         (if (and (<= env 0.0) (< g 0.0001))
