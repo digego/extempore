@@ -411,24 +411,57 @@ crosses zero going up"
 
 (xtmtest-result (test_oscillators) 1 "band-limited-oscillators")
 
-;; the kit's oscillators are the ones the instruments had: the same numbers
-;; as audio_dsp.xtm's poly_blep gives
-(bind-func test_blep_matches_poly_blep
-  (lambda ()
-    (let ((i:i64 0) (same:i64 1) (phase:SAMPLE 0.0) (inc:SAMPLE 0.0371) (fall:SAMPLE 0.0))
-      (dotimes (i 5000)
-        (set! phase (+ phase inc))
-        (if (>= phase 1.0) (set! phase (- phase 1.0)))
-        (if (<> (blep_saw phase inc) (- (- (* 2.0 phase) 1.0) (poly_blep phase inc 1.0 #t)))
-            (set! same 0))
-        (set! fall (if (< phase 0.5) (+ phase 0.5) (- phase 0.5)))
-        (if (<> (blep_pulse phase inc 0.5)
-                (- (+ (if (< phase 0.5) 1.0 -1.0) (poly_blep phase inc 1.0 #t))
-                   (poly_blep fall inc 1.0 #t)))
-            (set! same 0)))
-      same)))
+;; The oscillators' six-frame PolyBLEP against the two-frame one, on a saw
+;; with 181 cycles in 8192 frames. Most of what either leaves is just under
+;; half the sample rate, where it is hard to hear; the six-frame curve's
+;; gain is lower down, and in keeping the saw's own top harmonics.
+(bind-func test_alias_band_db
+  "after test_alias_db: the energy below bin `top` which is not at a harmonic
+of bin k0, in dB relative to the whole"
+  (lambda (n:i64 k0:i64 top:i64)
+    (let ((i:i64 0) (total:double 0.0) (alias:double 0.0) (e:double 0.0))
+      (dotimes (i (/ n 2))
+        (set! e (+ (* (pref test_re i) (pref test_re i)) (* (pref test_im i) (pref test_im i))))
+        (if (> i 0) (set! total (+ total e)))
+        (if (and (> i 0) (< i top) (<> (% i k0) 0)) (set! alias (+ alias e))))
+      (* 10.0 (log10 (+ (/ alias total) 1.0e-30))))))
 
-(xtmtest-result (test_blep_matches_poly_blep) 1 "blep-oscillators-match-poly-blep")
+(bind-func test_harmonic_db
+  "after test_alias_db: the level of harmonic h of bin k0, in dB relative to
+an ideal sawtooth's (2 / (pi h))"
+  (lambda (n:i64 k0:i64 h:i64)
+    (let ((re (pref test_re (* h k0)))
+          (im (pref test_im (* h k0)))
+          (level (/ (* 2.0 (sqrt (+ (* re re) (* im im)))) (convert n double))))
+      (test_db (/ level (/ 2.0 (* 3.141592653589793 (convert h double))))))))
+
+(bind-func test_blep_six_frames
+  (lambda ()
+    (let ((ok:i64 1) (i:i64 0) (phase:SAMPLE 0.0) (inc:SAMPLE (/ 181.0 8192.0))
+          (two:double 0.0) (two_top:double 0.0) (six:double 0.0) (six_top:double 0.0))
+      (dotimes (i 8192)
+        (set! phase (convert (/ (convert (% (* i 181) 8192) double) 8192.0) SAMPLE))
+        (pset! test_buf i (- (- (* 2.0 phase) 1.0) (polyblep2 phase inc))))
+      (test_alias_db 8192 181)
+      (set! two (test_alias_band_db 8192 181 2048))
+      (set! two_top (test_harmonic_db 8192 181 15))
+      (test_osc_render TEST_SAW 8192 181)
+      (test_alias_db 8192 181)
+      (set! six (test_alias_band_db 8192 181 2048))
+      (set! six_top (test_harmonic_db 8192 181 15))
+      (printf "    a 1 kHz saw's aliasing below a quarter of the sample rate: two frames %.1f dB, six frames %.1f dB; its 15th harmonic: %.1f dB, %.1f dB\n"
+              two six two_top six_top)
+      (set! ok (* ok (if (< six (- two 15.0)) 1 0)))
+      (set! ok (* ok (test_near "six frames: 15th harmonic (dB)" six_top -1.6 0.5)))
+      (set! ok (* ok (if (< two_top (- six_top 1.0)) 1 0)))
+      ;; above a sixth of the sample rate the two are the same curve
+      (set! inc 0.2)
+      (dotimes (i 1000)
+        (set! phase (* 0.001 (convert i SAMPLE)))
+        (if (<> (polyblep phase inc) (polyblep2 phase inc)) (set! ok 0)))
+      ok)))
+
+(xtmtest-result (test_blep_six_frames) 1 "six-frame-polyblep-beats-two-frame")
 
 (bind-func test_sine_table
   (lambda ()

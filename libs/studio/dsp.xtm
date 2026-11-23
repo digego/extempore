@@ -17,7 +17,8 @@
 ;;   filters            ladder_c, and the state-variable filter: svf_set
 ;;                      svf_lp svf_bp svf_hp svf_peak svf_tick svf_filter_c
 ;;   envelopes          decay_mult, adsr_set adsr_tick adsr_env_c
-;;   oscillators        polyblep polyblamp blep_saw blep_pulse blep_tri,
+;;   oscillators        polyblep polyblep2 polyblamp blep_saw blep_pulse
+;;                      blep_tri,
 ;;                      sine_at sine_wrap, noise_white
 ;;   oversampling       os_up2 os_down2 os_up4 os_down4, oversat2 oversat4
 ;;   Fourier transform  fft_twiddles fft_radix2
@@ -296,8 +297,9 @@ up, and a tanh at the input lets it growl when it's pushed.
         ;; what the four stages would feed back if the input were silent
         (set! feedback (* (- 1.0 big_g)
                           (+ (* big_g big_g big_g s1) (* big_g big_g s2) (* big_g s3) s4)))
-        (set! u (tanh (/ (- (+ 1.0e-18 (* x (+ 1.0 res))) (* k feedback))
-                         (+ 1.0 (* k big_g big_g big_g big_g)))))
+        (set! u (/ (- (* x (+ 1.0 res)) (* k feedback))
+                   (+ 1.0 (* k big_g big_g big_g big_g))))
+        (set! u (tanh_fast u))
         ;; the four stages
         (set! v (* big_g (- u s1))) (set! y (+ v s1)) (set! s1 (+ y v))
         (set! v (* big_g (- y s2))) (set! y (+ v s2)) (set! s2 (+ y v))
@@ -613,34 +615,100 @@ the convenient form of adsr_set and adsr_tick.
 ;; at all, and a jump has harmonics all the way up. Those above half the
 ;; sample rate can't be represented, and fold back down as aliasing: tones at
 ;; frequencies unrelated to the note, which is what makes a naive digital
-;; oscillator sound harsh and glassy. PolyBLEP (Valimaki and Huovilainen, IEEE
-;; Signal Processing Magazine, 2007) rounds the jump off over the two frames
-;; either side of it by adding a short polynomial curve, the difference
-;; between an ideal band-limited step and a naive one. For a sawtooth at 1
-;; kHz that takes 15 dB off the aliasing as a whole and more than 70 dB off
-;; what lands below the note, where a stray tone is easiest to hear. It costs
-;; a few operations, and only on the two frames in each cycle which are next
-;; to the jump.
+;; oscillator sound harsh and glassy. A band-limited step (a BLEP) rounds the
+;; jump off over the few frames either side of it, by adding a short curve:
+;; the difference between a step which has been through a lowpass filter and
+;; a naive one. PolyBLEP (Valimaki and Huovilainen, IEEE Signal Processing
+;; Magazine, 2007) is that curve as a polynomial, which needs no table.
+;;
+;; How good it is depends on the lowpass. The simplest one, a straight line
+;; between frames, gives a curve two frames long (polyblep2 below). It leaves
+;; the aliasing of a 1 kHz sawtooth 54 dB below the note in the part of the
+;; spectrum where the ear is sharpest (under 10 kHz), and it dulls the
+;; sawtooth's own top end, by 4 dB at 16 kHz.
+;;
+;; polyblep, which the oscillators here use, takes a cubic B-spline for the
+;; lowpass (Valimaki, Pekonen and Nam, "Perceptually informed synthesis of
+;; bandlimited classical waveforms using integrated polynomial
+;; interpolation", JASA, 2012), which stops far more of what would alias and
+;; dulls the top end more as well. So the spline is sharpened: it is run
+;; through the three-point filter (-1/4, 3/2, -1/4), which lifts the treble
+;; back up. The curve is then six frames long, three either side of the jump,
+;; and comes out as three quartic polynomials. The same sawtooth's aliasing
+;; under 10 kHz is 75 dB below the note, and its top end is within half a
+;; decibel to 12 kHz and 2.7 dB down at 16 kHz.
+;;
+;; With t the time since the jump in frames, and a jump of 1.0, the curve
+;; after the jump is
+;;
+;;   0 <= t < 1:  11/48 t^4 - 7/12 t^3 + 11/12 t - 1/2
+;;   1 <= t < 2:  -3/32 t^4 + 17/24 t^3 - 31/16 t^2 + 53/24 t - 79/96
+;;   2 <= t < 3:  (3 - t)^4 / 96
+;;
+;; and before the jump it is the same curve upside down and back to front.
+;; Above a sixth of the sample rate the curves of one jump and the next would
+;; overlap, so polyblep falls back on polyblep2 there (a wave that high has
+;; two harmonics at most).
 ;;
 ;; A triangle has no jumps but it has corners, where its slope jumps, and
 ;; they alias too (less: the harmonics of a corner fall away twice as fast).
-;; PolyBLAMP is the same idea for a corner: the integral of the PolyBLEP curve.
+;; PolyBLAMP is the same idea for a corner: the integral of the two-frame
+;; PolyBLEP curve.
+
+(bind-macro
+  "the two-frame PolyBLEP correction for an upward jump of 2.0 at phase 0.0.
+It is zero except within inc of the jump, on either side."
+  (polyblep2 phase inc)
+  `(let ((blep2_p:SAMPLE ,phase) (blep2_inc:SAMPLE ,inc)
+         (blep2_t:SAMPLE 0.0) (blep2_y:SAMPLE 0.0))
+     (if (> blep2_p (- 1.0 blep2_inc))
+         (begin ;; just before the jump
+           (set! blep2_t (/ (- blep2_p 1.0) blep2_inc))
+           (set! blep2_y (+ (* blep2_t blep2_t) (* 2.0 blep2_t) 1.0)))
+         (if (< blep2_p blep2_inc)
+             (begin ;; just after it
+               (set! blep2_t (/ blep2_p blep2_inc))
+               (set! blep2_y (- (* 2.0 blep2_t) (* blep2_t blep2_t) 1.0)))))
+     blep2_y))
 
 (bind-macro
   "the PolyBLEP correction for an upward jump of 2.0 at phase 0.0: add it to
 a waveform which jumps up there, take it away from one which jumps down. It is
-zero except within inc of the jump, on either side."
+zero except within three frames (3 inc) of the jump, on either side."
   (polyblep phase inc)
   `(let ((blep_p:SAMPLE ,phase) (blep_inc:SAMPLE ,inc)
-         (blep_t:SAMPLE 0.0) (blep_y:SAMPLE 0.0))
-     (if (> blep_p (- 1.0 blep_inc))
-         (begin ;; just before the jump
-           (set! blep_t (/ (- blep_p 1.0) blep_inc))
-           (set! blep_y (+ (* blep_t blep_t) (* 2.0 blep_t) 1.0)))
-         (if (< blep_p blep_inc)
-             (begin ;; just after it
-               (set! blep_t (/ blep_p blep_inc))
-               (set! blep_y (- (* 2.0 blep_t) (* blep_t blep_t) 1.0)))))
+         ;; frames from the jump, the sign and size of the correction (after
+         ;; the jump: 2.0, before it: -2.0), and the correction
+         (blep_t:SAMPLE 3.0) (blep_s:SAMPLE 2.0) (blep_y:SAMPLE 0.0))
+     (if (> blep_inc 0.1666)
+         (begin (set! blep_y (polyblep2 blep_p blep_inc)) void)
+         (begin
+           (if (< blep_p (* 3.0 blep_inc))
+               (begin (set! blep_t (/ blep_p blep_inc)) void)
+               (if (> blep_p (- 1.0 (* 3.0 blep_inc)))
+                   (begin
+                     (set! blep_t (/ (- 1.0 blep_p) blep_inc))
+                     (set! blep_s -2.0)
+                     void)))
+           (if (< blep_t 1.0)
+               (begin
+                 (set! blep_y (+ -0.5 (* blep_t (+ 0.916666667
+                                                    (* blep_t blep_t (+ -0.583333333 (* 0.229166667 blep_t)))))))
+                 void)
+               (if (< blep_t 2.0)
+                   (begin
+                     (set! blep_y (+ -0.822916667
+                                     (* blep_t (+ 2.208333333
+                                                  (* blep_t (+ -1.9375
+                                                               (* blep_t (+ 0.708333333 (* -0.09375 blep_t)))))))))
+                     void)
+                   (if (< blep_t 3.0)
+                       (begin
+                         (set! blep_y (* (- 3.0 blep_t) (- 3.0 blep_t)))
+                         (set! blep_y (* 0.010416667 blep_y blep_y))
+                         void))))
+           (set! blep_y (* blep_s blep_y))
+           void))
      blep_y))
 
 (bind-macro
