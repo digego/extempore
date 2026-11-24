@@ -193,3 +193,13 @@
       (interaction-environment))
 
 (xtmtest-result (wide128_last) 127.0)
+
+;; convert narrows an integer by truncating it: an i32 to an i16 keeps the
+;; low 16 bits, as every other narrowing conversion does
+(xtmtest-compile
+ (bind-func convert_i32_to_i16
+   (lambda (v:i32)
+     (convert (convert v i16) i64))))
+
+(xtmtest-result (convert_i32_to_i16 70000) 4464)
+(xtmtest-result (convert_i32_to_i16 -2) -2)
