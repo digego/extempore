@@ -1,0 +1,162 @@
+;;; fft.xtm -- tests for libs/core/fft.xtm
+
+;;; Code:
+
+(sys:load "libs/core/fft.xtm")
+
+(bind-func fftest_fill
+  "fill n complex points with a deterministic pseudo-random signal"
+  (lambda (x:float* n:i64)
+    (let ((i:i64 0))
+      (dotimes (i (* 2 n))
+        (pset! x i (convert (sin (* 1.7 (convert (* (+ i 1) (+ i 3)) double))) float)))
+      void)))
+
+(bind-func fftest_maxdiff
+  (lambda (a:float* b:float* len:i64)
+    (let ((m:float 0.0) (d:float 0.0) (i:i64 0))
+      (dotimes (i len)
+        (set! d (fabs (- (pref a i) (pref b i))))
+        (if (> d m) (set! m d)))
+      m)))
+
+;; the DFT by its definition, in double precision
+(bind-func fftest_dft
+  (lambda (x:float* out:float* n:i64 sign:double)
+    (let ((k:i64 0) (j:i64 0) (re:double 0.0) (im:double 0.0)
+          (angle:double 0.0) (xr:double 0.0) (xi:double 0.0))
+      (dotimes (k n)
+        (set! re 0.0) (set! im 0.0)
+        (dotimes (j n)
+          (set! angle (/ (* sign 6.283185307179586 (convert (% (* j k) n) double))
+                         (convert n double)))
+          (set! xr (convert (pref x (* 2 j)) double))
+          (set! xi (convert (pref x (+ 1 (* 2 j))) double))
+          (set! re (+ re (- (* xr (cos angle)) (* xi (sin angle)))))
+          (set! im (+ im (+ (* xr (sin angle)) (* xi (cos angle))))))
+        (pset! out (* 2 k) (convert re float))
+        (pset! out (+ 1 (* 2 k)) (convert im float)))
+      void)))
+
+(bind-func test_fft_matches_dft
+  "the forward and inverse complex FFTs agree with the DFT"
+  (lambda (n:i64 inverse:i64)
+    (let ((x:float* (zalloc (* 2 n)))
+          (want:float* (zalloc (* 2 n)))
+          (got:float* (zalloc (* 2 n))))
+      (fftest_fill x n)
+      (fftest_dft x want n (if (= inverse 1) 1.0 -1.0))
+      (if (= inverse 1)
+          (ifft (cast x Complexf*) (cast got Complexf*) (ifft_config n))
+          (fft (cast x Complexf*) (cast got Complexf*) (fft_config n)))
+      (< (fftest_maxdiff want got (* 2 n)) (* 1e-5 (convert n float))))))
+
+(xtmtest-result (test_fft_matches_dft 1 0) 1)
+(xtmtest-result (test_fft_matches_dft 2 0) 1)
+(xtmtest-result (test_fft_matches_dft 8 0) 1)
+(xtmtest-result (test_fft_matches_dft 64 0) 1)
+(xtmtest-result (test_fft_matches_dft 512 0) 1)
+(xtmtest-result (test_fft_matches_dft 8 1) 1)
+(xtmtest-result (test_fft_matches_dft 512 1) 1)
+
+(bind-func test_fft_in_place
+  "a transform in place gives what one into another buffer does"
+  (lambda (n:i64)
+    (let ((x:float* (zalloc (* 2 n)))
+          (y:float* (zalloc (* 2 n)))
+          (cfg (fft_config n)))
+      (fftest_fill x n)
+      (memcpy (cast y i8*) (cast x i8*) (* 8 n))
+      (fft (cast y Complexf*) (cast y Complexf*) cfg)
+      (fft (cast x Complexf*) (cast x Complexf*) cfg)
+      (fftest_fill x n)
+      (fft (cast x Complexf*) (cast x Complexf*) cfg)
+      (= (fftest_maxdiff x y (* 2 n)) 0.0))))
+
+(xtmtest-result (test_fft_in_place 1024) 1)
+
+(bind-func test_fft_round_trip
+  "an inverse FFT of a forward FFT gives back n times the input"
+  (lambda (n:i64)
+    (let ((x:float* (zalloc (* 2 n)))
+          (y:float* (zalloc (* 2 n)))
+          (i:i64 0))
+      (fftest_fill x n)
+      (fft (cast x Complexf*) (cast y Complexf*) (fft_config n))
+      (ifft (cast y Complexf*) (cast y Complexf*) (ifft_config n))
+      (dotimes (i (* 2 n))
+        (pset! y i (/ (pref y i) (convert n float))))
+      (< (fftest_maxdiff x y (* 2 n)) 1e-5))))
+
+(xtmtest-result (test_fft_round_trip 4096) 1)
+(xtmtest-result (test_fft_round_trip 65536) 1)
+
+(bind-func test_fftr_matches_fft
+  "the real FFT gives bins 0 to n/2 of the complex FFT of the same reals"
+  (lambda (n:i64)
+    (let ((r:float* (zalloc n))
+          (c:float* (zalloc (* 2 n)))
+          (want:float* (zalloc (* 2 n)))
+          (got:float* (zalloc (+ n 2)))
+          (i:i64 0))
+      (fftest_fill r (/ n 2))
+      (dotimes (i n) (pset! c (* 2 i) (pref r i)))
+      (fft (cast c Complexf*) (cast want Complexf*) (fft_config n))
+      (fft r (cast got Complexf*) (fftr_config n))
+      (< (fftest_maxdiff want got (+ n 2)) (* 1e-6 (convert n float))))))
+
+(xtmtest-result (test_fftr_matches_fft 2) 1)
+(xtmtest-result (test_fftr_matches_fft 4) 1)
+(xtmtest-result (test_fftr_matches_fft 16) 1)
+(xtmtest-result (test_fftr_matches_fft 4096) 1)
+
+(bind-func test_fftr_round_trip
+  "an inverse real FFT of a forward one gives back n times the input"
+  (lambda (n:i64)
+    (let ((r:float* (zalloc n))
+          (spectrum:Complexf* (zalloc (+ 1 (/ n 2))))
+          (back:float* (zalloc n))
+          (i:i64 0))
+      (fftest_fill r (/ n 2))
+      (fft r spectrum (fftr_config n))
+      (ifft spectrum back (ifftr_config n))
+      (dotimes (i n)
+        (pset! back i (/ (pref back i) (convert n float))))
+      (< (fftest_maxdiff r back n) 1e-5))))
+
+(xtmtest-result (test_fftr_round_trip 2) 1)
+(xtmtest-result (test_fftr_round_trip 8) 1)
+(xtmtest-result (test_fftr_round_trip 4096) 1)
+
+(bind-func test_fft_sine_bin
+  "a cosine of k cycles lands in bins k and n - k, at n/2"
+  (lambda (n:i64 k:i64)
+    (let ((x:Complexf* (zalloc n))
+          (out:Complexf* (zalloc n))
+          (i:i64 0)
+          (ok:i1 #t)
+          (mag:float 0.0))
+      (dotimes (i n)
+        (tfill! (pref-ptr x i)
+                (convert (cos (/ (* 6.283185307179586 (convert (* k i) double)) (convert n double))) float)
+                0.0))
+      (fft x out (fft_config n))
+      (dotimes (i n)
+        (set! mag (sqrt (+ (* (tref (pref-ptr out i) 0) (tref (pref-ptr out i) 0))
+                           (* (tref (pref-ptr out i) 1) (tref (pref-ptr out i) 1)))))
+        (if (or (= i k) (= i (- n k)))
+            (if (> (fabs (- mag (/ (convert n float) 2.0))) 1e-2) (set! ok #f))
+            (if (> mag 1e-2) (set! ok #f))))
+      ok)))
+
+(xtmtest-result (test_fft_sine_bin 1024 37) 1)
+
+(bind-func test_fft_rejects_bad_lengths
+  (lambda ()
+    (and (null? (fft_config 0))
+         (null? (fft_config 768))
+         (null? (ifft_config 3))
+         (null? (fftr_config 1))
+         (null? (ifftr_config 100)))))
+
+(xtmtest-result (test_fft_rejects_bad_lengths) 1)

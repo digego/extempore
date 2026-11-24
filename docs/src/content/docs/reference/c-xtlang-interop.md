@@ -163,11 +163,12 @@ example).
 
 ## KissFFT: a more useful library {#kissfft-a-more-useful-library}
 
-As a more useful example, let's look at the library `fft.xtm` in the
-`libs/external` directory which comes with Extempore. `fft.xtm` uses the
-excellent [KissFFT](https://github.com/mborgerding/kissfft) library for doing
-[Fourier transforms](http://en.wikipedia.org/wiki/Fourier_transform). The
-library is quite small and clean, and is spread over only a few source
+As a more useful example, let's bind the excellent
+[KissFFT](https://github.com/mborgerding/kissfft) library for doing
+[Fourier transforms](http://en.wikipedia.org/wiki/Fourier_transform).
+(Extempore's own FFTs, in `libs/core/fft.xtm`, are written in xtlang, so you
+don't need this to do FFTs; KissFFT is just a good small library to practise
+on.) The library is quite small and clean, and is spread over only a few source
 files---the main ones being `kiss_fft.h` & `kiss_fft.c`. There's gonna be a bit
 of C in this section. Nothing too complicated, but if you're rusty it might be
 worth picking up a copy of
@@ -177,7 +178,6 @@ through if necessary.
 If you're playing along at home, then you'll need to download the
 [KissFFT source](https://github.com/mborgerding/kissfft), build the
 `kiss_fft.dylib` library and put it somewhere that `bind-dylib` will find it.
-The `fft.xtm` header has some instructions on how to do this.
 
 After that's done, then it's a matter of providing `bind-lib` xtlang definitions
 which tell Extempore about the functions in `kiss_fft.dylib`. But how do we know
@@ -366,9 +366,9 @@ Aliased kiss_fft_cfg >>> kiss_fft_state*
 Bound kiss_fft >>> [i8*,kiss_fft_cfg,kiss_fft_cpx*,kiss_fft_cpx*]*
 ```
 
-There are a few more functions in the actual `fft.xtm` file which I haven't
-included here: helper functions for setting up the `kiss_fft_cfg` struct,
-determining efficient FFT stride lengths and other things like that. You don't
+A full binding would have a few more functions than these: helpers for setting
+up the `kiss_fft_cfg` struct, determining efficient FFT stride lengths and other
+things like that. You don't
 have to `bind-lib` all the functions in the library, just the ones you need,
 although knowing which ones sometimes more of an art than a science. If the
 library has a well defined

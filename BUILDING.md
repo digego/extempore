@@ -49,7 +49,7 @@ users will care about:
 - `BUILD_TESTS` (default `ON`) --- build the test targets (including examples
   registered as ctest tests).
 - `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
-  (portaudio, portmidi, sndfile, kissfft).
+  (portaudio, portmidi, sndfile).
 - `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics stack
   (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of

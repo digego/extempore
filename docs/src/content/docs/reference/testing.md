@@ -111,7 +111,6 @@ The labels are:
 - `libs-core` --- core standard-library tests
 - `compiler-unit` --- compiler-internal unit tests (including the AOT
   round-trip)
-- `libs-external` --- external-library tests
 - `cpp-unit` --- C++ unit tests (GoogleTest)
 - `examples-core`, `examples-audio`, `examples-graphics` --- examples run as
   smoke tests

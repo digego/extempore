@@ -1,8 +1,8 @@
 # External shared library dependencies for Extempore
 # Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS options
 # Sets up: the library targets and the platform-shlibs copy targets. Libraries
-# with a CMake build of their own are ExternalProjects; the few-file ones
-# (kiss_fft, stb_image) are compiled here straight into platform-shlibs.
+# with a CMake build of their own are ExternalProjects; stb_image is compiled
+# here straight into platform-shlibs.
 
 if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
     return()
@@ -58,24 +58,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
         URL_SHA256 ${DEP_PORTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
-    # SOURCE_SUBDIR names a directory without a CMakeLists.txt, so the
-    # sources are fetched but kissfft's own build isn't added.
-    FetchContent_Declare(kissfft
-        URL https://github.com/mborgerding/kissfft/archive/refs/tags/${DEP_KISSFFT_VERSION}.tar.gz
-        URL_HASH SHA256=${DEP_KISSFFT_SHA256}
-        SOURCE_SUBDIR none)
-    FetchContent_MakeAvailable(kissfft)
-    extempore_add_shlib(kiss_fft
-        ${kissfft_SOURCE_DIR}/kiss_fft.c
-        ${kissfft_SOURCE_DIR}/kfc.c
-        ${kissfft_SOURCE_DIR}/kiss_fftnd.c
-        ${kissfft_SOURCE_DIR}/kiss_fftndr.c
-        ${kissfft_SOURCE_DIR}/kiss_fftr.c)
-    target_include_directories(kiss_fft PRIVATE ${kissfft_SOURCE_DIR})
-    if(UNIX)
-        target_link_libraries(kiss_fft PRIVATE m)
-    endif()
-
     # No external codecs (FLAC, Vorbis, Opus, MPEG): each would be another
     # shared library to ship. libsndfile's cmake_minimum_required(3.1..3.18)
     # is below the 3.5 that CMake 4 still accepts, hence the policy floor, and
@@ -105,7 +87,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
     if(UNIX)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile kiss_fft portmidi
+            DEPENDS sndfile portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
@@ -114,7 +96,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
     elseif(WIN32)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile kiss_fft portmidi
+            DEPENDS sndfile portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy bin/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}

@@ -49,7 +49,6 @@ caches `build/_deps/` to speed up CI builds.
 ```bash
 ctest --preset default                       # the suites CI runs
 ctest --test-dir build -L libs-core -j4      # core library tests
-ctest --test-dir build -L libs-external -j4  # external library tests
 ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
 ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
 ```

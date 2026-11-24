@@ -34,11 +34,18 @@ checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
 `extempore.exe` is built into `build\` too. `-DEXTEMPORE_SYSTEM_LLVM=ON` builds
 against an installed LLVM 22.1.
 
-The stb_image (2.10 to 2.30) and kissfft libraries come from upstream instead of
-forks, libsndfile goes from 1.0.29 to 1.2.2, LLVM to 22.1.8 and PCRE2 to 10.49,
+The stb_image library (2.10 to 2.30) comes from upstream instead of a fork,
+libsndfile goes from 1.0.29 to 1.2.2, LLVM to 22.1.8 and PCRE2 to 10.49,
 and rtmidi is no longer built, since nothing used it. Release archives are
 packaged with CPack and carry build-provenance attestations, and clang-tidy runs
 on every push.
+
+The FFTs are now written in xtlang, so kissfft is no longer a dependency. Load
+`libs/core/fft.xtm` instead of `libs/external/fft.xtm`: `fft_config`,
+`fftr_config`, `ifft_config`, `ifftr_config`, `fft` and `ifft` keep their
+signatures and give kissfft's results to float precision, as fast or faster, but
+only for power-of-two lengths. The raw `kiss_fft*` and `kfc_*` bindings and the
+`kiss_fft_cpx`/`kiss_fft_scalar` aliases are gone; use `Complexf` and `float`.
 
 ## v0.11.2
 

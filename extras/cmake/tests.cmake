@@ -171,8 +171,8 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
 
 # Documentation example verifier: run every xtlang snippet in the docs through
 # extempore --batch and check its claimed output, so doc code that drifts from
-# the compiler can be caught. Labelled `docs` (kept out of the libs-core /
-# libs-external runs). This is a LOCAL tool, deliberately excluded from CI (the
+# the compiler can be caught. Labelled `docs` (kept out of the libs-core
+# runs). This is a LOCAL tool, deliberately excluded from CI (the
 # build-and-test workflow's label-regex omits `docs`) --- run it on Linux with
 # `ctest --test-dir build -L docs` before changing the docs.
 find_package(Python3 COMPONENTS Interpreter)
@@ -187,9 +187,6 @@ if(Python3_Interpreter_FOUND)
 else()
     message(STATUS "python3 not found --- skipping docs/verify-examples test")
 endif()
-
-# External library tests
-extempore_add_test(tests/external/fft.xtm libs-external)
 
 # Offline audio-rendering tests: render a DSP to a WAV with --audio-outfile,
 # then verify it contains a sine at the expected frequency. Free-run driver

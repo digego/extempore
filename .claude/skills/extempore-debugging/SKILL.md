@@ -294,7 +294,7 @@ timeout 120 ./build/extempore --noaudio --batch \
   '(sys:load-then-quit "examples/core/fmsynth.xtm" 10)'
 ```
 
-Test labels: `libs-core`, `libs-external`, `examples-audio`, `examples-core`,
+Test labels: `libs-core`, `libs-studio`, `examples-audio`, `examples-core`,
 `examples-graphics`, `audio-offline`. Defined in `extras/cmake/tests.cmake`.
 
 The `audio-offline` label covers two-phase tests that render a DSP file to a WAV

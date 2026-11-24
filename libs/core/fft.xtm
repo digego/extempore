@@ -1,0 +1,306 @@
+;;; fft.xtm -- fast Fourier transforms
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Forward and inverse FFTs of complex and of real signals, in single
+;; precision, for any power-of-two length.
+;;
+;; Make a config for the length and direction once (it allocates, in the
+;; current zone), then transform with it as often as needed:
+;;
+;;   (fft in:Complexf* out:Complexf* (fft_config n))     ;; n complex points
+;;   (ifft in:Complexf* out:Complexf* (ifft_config n))
+;;   (fft in:float* out:Complexf* (fftr_config n))       ;; n reals -> n/2+1 bins
+;;   (ifft in:Complexf* out:float* (ifftr_config n))     ;; n/2+1 bins -> n reals
+;;
+;; The forward transform is X[k] = sum over j of x[j] e^(-2 pi i j k / n); the
+;; inverse uses e^(+2 pi i j k / n) and is not divided by n, so a forward and
+;; then an inverse transform give back n times the input. The complex
+;; transforms may work in place (in = out). A config holds scratch space, so
+;; one config must not be used by two threads at once.
+;;
+;; The real transforms use the standard trick: n reals are n/2 complex
+;; numbers, whose complex FFT is then untangled into the spectrum of the
+;; reals, so they cost about half a complex FFT of the same length.
+
+;;; Code:
+
+(if *xtc:globals:with-cache* (sys:load (sys:build-path "libs/aot-cache/fft.xtm") 'quiet))
+(sys:load-preload-check 'fft)
+(define *xtmlib-fft-loaded* #f)
+
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/base/base.xtm")
+  (sys:load "libs/core/math.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/base/base.xtm" 'quiet)
+  (sys:load "libs/core/math.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmfft")
+(xtc:aot:import-ll "xtmfft")
+
+;;;;;;;;;;;;;
+;; configs ;;
+;;;;;;;;;;;;;
+
+;; A complex config: 0 the length n, 1 the twiddle factors, 2 the
+;; bit-reversal permutation.
+;;
+;; The twiddles for the pass that joins transforms of h points into ones of
+;; 2h are e^(-+2 pi i k / 2h) for k < h, stored as (re, im) float pairs from
+;; pair h - 1 on, so each pass reads its own contiguous run (n - 1 pairs in
+;; all, the k = 0 ones included to keep the indexing plain).
+(bind-type FFT_Config <i64,float*,i32*> (printer? . #f))
+(bind-type IFFT_Config <i64,float*,i32*> (printer? . #f))
+
+;; A real config: 0 the length n, 1 a complex config of length n/2 (as its
+;; twiddles and permutation), 2 its twiddles, 3 its permutation, 4 the
+;; `super twiddles' that untangle the n/2-point spectrum, 5 scratch space of
+;; n/2 complex points.
+(bind-type FFTR_Config <i64,float*,i32*,float*,float*> (printer? . #f))
+(bind-type IFFTR_Config <i64,float*,i32*,float*,float*> (printer? . #f))
+
+(bind-func static fft_power_of_two
+  (lambda (n:i64)
+    (and (> n 0) (= (& n (- n 1)) 0))))
+
+(bind-func static fft_make_twiddles
+  "allocate and fill the twiddles for n points (sign -1 forward, +1 inverse)"
+  (lambda (n:i64 sign:double)
+    (let ((tw:float* (alloc (* 2 (if (> n 1) (- n 1) 1))))
+          (h:i64 1) (k:i64 0) (angle:double 0.0))
+      (while (< h n)
+        (dotimes (k h)
+          (set! angle (/ (* sign 3.141592653589793 (convert k double)) (convert h double)))
+          (pset! tw (* 2 (+ h -1 k)) (convert (cos angle) float))
+          (pset! tw (+ 1 (* 2 (+ h -1 k))) (convert (sin angle) float)))
+        (set! h (* h 2)))
+      tw)))
+
+(bind-func static fft_make_bitrev
+  "allocate and fill the bit-reversal permutation for n points"
+  (lambda (n:i64)
+    (let ((rev:i32* (alloc n))
+          (bits:i64 0) (i:i64 0) (b:i64 0) (r:i64 0))
+      (while (< (<< 1 bits) n) (set! bits (+ bits 1)))
+      (dotimes (i n)
+        (set! r 0)
+        (dotimes (b bits)
+          (set! r (bor (<< r 1) (& (>> i b) 1))))
+        (pset! rev i (convert r i32)))
+      rev)))
+
+(bind-func fft_config:[FFT_Config*,i64]*
+  "a config for forward complex FFTs of n points (a power of two), or null"
+  (lambda (n)
+    (if (not (fft_power_of_two n))
+        (begin (printf "fft_config: length %lld is not a power of two\n" n)
+               null)
+        (FFT_Config n (fft_make_twiddles n -1.0) (fft_make_bitrev n)))))
+
+(bind-func ifft_config:[IFFT_Config*,i64]*
+  "a config for inverse complex FFTs of n points (a power of two), or null"
+  (lambda (n)
+    (if (not (fft_power_of_two n))
+        (begin (printf "ifft_config: length %lld is not a power of two\n" n)
+               null)
+        (IFFT_Config n (fft_make_twiddles n 1.0) (fft_make_bitrev n)))))
+
+(bind-func static fft_make_super_twiddles
+  "e^(-+i pi (k / m + 1/2)) for k = 1 .. m/2, the factors that untangle the
+spectrum of m complex points into that of 2m reals"
+  (lambda (m:i64 sign:double)
+    (let ((count (if (> m 1) (/ m 2) 1))
+          (st:float* (alloc (* 2 count)))
+          (k:i64 0) (phase:double 0.0))
+      (dotimes (k count)
+        (set! phase (* sign 3.141592653589793
+                       (+ 0.5 (/ (convert (+ k 1) double) (convert m double)))))
+        (pset! st (* 2 k) (convert (cos phase) float))
+        (pset! st (+ 1 (* 2 k)) (convert (sin phase) float)))
+      st)))
+
+(bind-func fftr_config:[FFTR_Config*,i64]*
+  "a config for forward FFTs of n reals (n a power of two, at least 2), or null"
+  (lambda (n)
+    (if (or (< n 2) (not (fft_power_of_two n)))
+        (begin (printf "fftr_config: length %lld is not a power of two of at least 2\n" n)
+               null)
+        (let ((m (/ n 2)))
+          (FFTR_Config n (fft_make_twiddles m -1.0) (fft_make_bitrev m)
+                       (fft_make_super_twiddles m -1.0) (alloc n))))))
+
+(bind-func ifftr_config:[IFFTR_Config*,i64]*
+  "a config for inverse FFTs to n reals (n a power of two, at least 2), or null"
+  (lambda (n)
+    (if (or (< n 2) (not (fft_power_of_two n)))
+        (begin (printf "ifftr_config: length %lld is not a power of two of at least 2\n" n)
+               null)
+        (let ((m (/ n 2)))
+          (IFFTR_Config n (fft_make_twiddles m 1.0) (fft_make_bitrev m)
+                        (fft_make_super_twiddles m 1.0) (alloc n))))))
+
+;;;;;;;;;;;;;;;;;;;;
+;; the transforms ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(bind-func static fft_execute
+  "the complex FFT of n points from in to out (both interleaved re, im
+floats; they may be the same buffer), with the given twiddles and
+permutation.
+
+This is the iterative Cooley-Tukey algorithm: shuffle the inputs into
+bit-reversed order, then make passes of `butterflies' that join transforms
+of h points into ones of 2h: X[k] = E[k] + w^k O[k], X[k + h] = E[k] - w^k
+O[k]. The first pass (h = 1, where w^0 = 1) needs no multiplications."
+  (lambda (n:i64 tw:float* rev:i32* in:float* out:float*)
+    (let ((i:i64 0) (j:i64 0) (tmp:float 0.0)
+          (h:i64 2) (start:i64 0) (k:i64 0)
+          (a:float* null) (b:float* null) (w:float* null)
+          (ar:float 0.0) (ai:float 0.0) (br:float 0.0) (bi:float 0.0)
+          (wr:float 0.0) (wi:float 0.0) (tr:float 0.0) (ti:float 0.0))
+      ;; the bit-reversal shuffle
+      (if (= in out)
+          (dotimes (i n)
+            (set! j (convert (pref rev i) i64))
+            (if (< i j)
+                (begin
+                  (set! tmp (pref out (* 2 i)))
+                  (pset! out (* 2 i) (pref out (* 2 j)))
+                  (pset! out (* 2 j) tmp)
+                  (set! tmp (pref out (+ 1 (* 2 i))))
+                  (pset! out (+ 1 (* 2 i)) (pref out (+ 1 (* 2 j))))
+                  (pset! out (+ 1 (* 2 j)) tmp)
+                  void)))
+          (dotimes (i n)
+            (set! j (convert (pref rev i) i64))
+            (pset! out (* 2 i) (pref in (* 2 j)))
+            (pset! out (+ 1 (* 2 i)) (pref in (+ 1 (* 2 j))))))
+      ;; the first pass, h = 1
+      (if (> n 1)
+          (begin
+            (set! start 0)
+            (while (< start n)
+              (set! a (pref-ptr out (* 2 start)))
+              (set! ar (pref a 0)) (set! ai (pref a 1))
+              (set! br (pref a 2)) (set! bi (pref a 3))
+              (pset! a 0 (+ ar br)) (pset! a 1 (+ ai bi))
+              (pset! a 2 (- ar br)) (pset! a 3 (- ai bi))
+              (set! start (+ start 2)))
+            void))
+      ;; the rest, h = 2, 4, ...
+      (while (< h n)
+        (set! w (pref-ptr tw (* 2 (- h 1))))
+        (set! start 0)
+        (while (< start n)
+          (set! a (pref-ptr out (* 2 start)))
+          (set! b (pref-ptr out (* 2 (+ start h))))
+          (dotimes (k h)
+            (set! wr (pref w (* 2 k)))
+            (set! wi (pref w (+ 1 (* 2 k))))
+            (set! br (pref b (* 2 k)))
+            (set! bi (pref b (+ 1 (* 2 k))))
+            (set! tr (- (* wr br) (* wi bi)))
+            (set! ti (+ (* wr bi) (* wi br)))
+            (set! ar (pref a (* 2 k)))
+            (set! ai (pref a (+ 1 (* 2 k))))
+            (pset! b (* 2 k) (- ar tr))
+            (pset! b (+ 1 (* 2 k)) (- ai ti))
+            (pset! a (* 2 k) (+ ar tr))
+            (pset! a (+ 1 (* 2 k)) (+ ai ti)))
+          (set! start (+ start (* 2 h))))
+        (set! h (* h 2)))
+      void)))
+
+(bind-func fft
+  "the forward FFT of n complex points (in may be out)"
+  (lambda (in:Complexf* out:Complexf* config:FFT_Config*)
+    (fft_execute (tref config 0) (tref config 1) (tref config 2)
+                 (cast in float*) (cast out float*))))
+
+(bind-func ifft
+  "the inverse FFT of n complex points, not divided by n (in may be out)"
+  (lambda (in:Complexf* out:Complexf* config:IFFT_Config*)
+    (fft_execute (tref config 0) (tref config 1) (tref config 2)
+                 (cast in float*) (cast out float*))))
+
+(bind-func fft
+  "the forward FFT of n reals, into the n/2 + 1 bins from 0 to n/2 (the rest
+are their complex conjugates)
+
+The reals x are taken as m = n/2 complex points z[j] = x[2j] + i x[2j+1],
+whose FFT Z is untangled into the spectrum of the evens E[k] = (Z[k] +
+conj Z[m-k]) / 2 and of the odds O[k] = -i (Z[k] - conj Z[m-k]) / 2, and then
+X[k] = E[k] + e^(-2 pi i k / n) O[k]."
+  (lambda (in:float* out:Complexf* config:FFTR_Config*)
+    (let ((m (/ (tref config 0) 2))
+          (z:float* (tref config 4))
+          (st:float* (tref config 3))
+          (o:float* (cast out float*))
+          (k:i64 1)
+          (pr:float 0.0) (pi:float 0.0) (qr:float 0.0) (qi:float 0.0)
+          (f1r:float 0.0) (f1i:float 0.0) (f2r:float 0.0) (f2i:float 0.0)
+          (wr:float 0.0) (wi:float 0.0) (tr:float 0.0) (ti:float 0.0))
+      (fft_execute m (tref config 1) (tref config 2) in z)
+      (pset! o 0 (+ (pref z 0) (pref z 1)))
+      (pset! o 1 0.0)
+      (pset! o (* 2 m) (- (pref z 0) (pref z 1)))
+      (pset! o (+ 1 (* 2 m)) 0.0)
+      (while (<= k (/ m 2))
+        ;; Z[k] and conj Z[m-k]
+        (set! pr (pref z (* 2 k)))
+        (set! pi (pref z (+ 1 (* 2 k))))
+        (set! qr (pref z (* 2 (- m k))))
+        (set! qi (- 0.0 (pref z (+ 1 (* 2 (- m k))))))
+        (set! f1r (+ pr qr)) (set! f1i (+ pi qi))
+        (set! f2r (- pr qr)) (set! f2i (- pi qi))
+        (set! wr (pref st (* 2 (- k 1))))
+        (set! wi (pref st (+ 1 (* 2 (- k 1)))))
+        (set! tr (- (* f2r wr) (* f2i wi)))
+        (set! ti (+ (* f2r wi) (* f2i wr)))
+        (pset! o (* 2 k) (* 0.5 (+ f1r tr)))
+        (pset! o (+ 1 (* 2 k)) (* 0.5 (+ f1i ti)))
+        (pset! o (* 2 (- m k)) (* 0.5 (- f1r tr)))
+        (pset! o (+ 1 (* 2 (- m k))) (* -0.5 (- f1i ti)))
+        (set! k (+ k 1)))
+      void)))
+
+(bind-func ifft
+  "the inverse FFT of the n/2 + 1 bins from 0 to n/2 into n reals, not
+divided by n: the forward real FFT run backwards"
+  (lambda (in:Complexf* out:float* config:IFFTR_Config*)
+    (let ((m (/ (tref config 0) 2))
+          (z:float* (tref config 4))
+          (st:float* (tref config 3))
+          (f:float* (cast in float*))
+          (k:i64 1)
+          (pr:float 0.0) (pi:float 0.0) (qr:float 0.0) (qi:float 0.0)
+          (er:float 0.0) (ei:float 0.0) (dr:float 0.0) (di:float 0.0)
+          (wr:float 0.0) (wi:float 0.0) (xr:float 0.0) (xi:float 0.0))
+      (pset! z 0 (+ (pref f 0) (pref f (* 2 m))))
+      (pset! z 1 (- (pref f 0) (pref f (* 2 m))))
+      (while (<= k (/ m 2))
+        ;; F[k] and conj F[m-k]
+        (set! pr (pref f (* 2 k)))
+        (set! pi (pref f (+ 1 (* 2 k))))
+        (set! qr (pref f (* 2 (- m k))))
+        (set! qi (- 0.0 (pref f (+ 1 (* 2 (- m k))))))
+        (set! er (+ pr qr)) (set! ei (+ pi qi))
+        (set! dr (- pr qr)) (set! di (- pi qi))
+        (set! wr (pref st (* 2 (- k 1))))
+        (set! wi (pref st (+ 1 (* 2 (- k 1)))))
+        (set! xr (- (* dr wr) (* di wi)))
+        (set! xi (+ (* dr wi) (* di wr)))
+        (pset! z (* 2 k) (+ er xr))
+        (pset! z (+ 1 (* 2 k)) (+ ei xi))
+        (pset! z (* 2 (- m k)) (- er xr))
+        (pset! z (+ 1 (* 2 (- m k))) (- 0.0 (- ei xi)))
+        (set! k (+ k 1)))
+      (fft_execute m (tref config 1) (tref config 2) z out)
+      void)))
+
+(xtc:aot:insert-footer "xtmfft")
+(define *xtmlib-fft-loaded* #t)
