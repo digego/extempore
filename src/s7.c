@@ -32749,6 +32749,7 @@ static s7_pointer g_with_input_from_string(s7_scheme *sc, s7_pointer args)
       push_input_port(sc, current_input_port(sc));
       set_current_input_port(sc, open_and_protect_input_string(sc, str));
       port_set_string_or_function(current_input_port(sc), str);
+      check_stack_size(sc); /* extempore: see op_any_closure_3p */
       push_stack(sc, OP_UNWIND_INPUT, sc->unused, current_input_port(sc));
       push_stack_op_let(sc, OP_READ_DONE);
       push_stack_op_let(sc, OP_READ_INTERNAL);
@@ -80378,6 +80379,7 @@ static bool op_let_unchecked(s7_scheme *sc)     /* not named, but has vars, call
     sc->value = fx_call(sc, val);
   else
     {
+      check_stack_size(sc); /* extempore: see op_any_closure_3p */
       push_stack(sc, OP_LET1, sc->args, cdr(code));
       sc->code = car(val);
       return(false); /* goto Eval */
@@ -83231,6 +83233,7 @@ static bool op_cond_simple_o(s7_scheme *sc)  /* no =>, no null or multiform cons
       sc->value = fx_call(sc, car(sc->code));
       return(false);
     }
+  check_stack_size(sc); /* extempore: see op_any_closure_3p */
   push_stack_no_args_direct(sc, OP_COND1_SIMPLE_O);
   sc->code = opt3_any(sc->code);  /* caar */
   return(true);
@@ -89612,6 +89615,7 @@ static void op_closure_ap(s7_scheme *sc)            /* sc->code: (ack1 (- m 1) (
   /* (hook-push (undo-hook ind 0) (lambda (hook) (set! u0 #t))) -> #<unused>
    *    g_undo_hook calls s7_eval_c_string so it obviously should be declared unsafe!
    */
+  check_stack_size(sc); /* extempore: see op_any_closure_3p */
   push_stack(sc, OP_CLOSURE_AP_1, opt1_lambda(sc->code), sc->args);
   sc->code = caddr(code);
 }
@@ -89697,7 +89701,9 @@ static void op_any_closure_3p(s7_scheme *sc)     /* sc->code: (g-1 (lambda (b c)
   s7_pointer args = cdr(sc->code); /* sc->code: e.g. s7test (recompose 32 (lambda (a) (cons 1 a)) ()) */
   /* The pushes below don't check the stack's size (op_any_closure_4p does),
      so a deep enough recursion through a three-argument call wrote past the
-     stack's end, and the evaluation was abandoned with no error.
+     stack's end, and the evaluation was abandoned with no error.  The other
+     checks marked "extempore: see op_any_closure_3p" are pushes of the same
+     kind, which S7_DEBUGGING reported skipping a resize over extempore's tests.
      [extempore-local change vs upstream s7; re-apply on s7 upgrade -- see
      tests/core/scheme-compat.xtm] */
   check_stack_size(sc);
@@ -97258,14 +97264,14 @@ static s7_pointer eval(s7_scheme *sc, opcode_t first_op)
 	case OP_IF_AND3_N:   if_not_and3_p(sc) {sc->code = opt1_any(sc->code); goto Eval;} sc->value = sc->nil; continue;
 	case OP_IF_AND3_N_N: if_not_and3_p(sc) {sc->code = opt1_any(sc->code); goto Eval;} sc->code = opt2_any(sc->code); goto Eval;
 
-	    #define if_p_push(op) do {push_stack_no_args(sc, op, opt2_any(cdr(sc->code)));  sc->code = opt3_any(cdr(sc->code));} while (0)
+	    #define if_p_push(op) do {check_stack_size(sc); push_stack_no_args(sc, op, opt2_any(cdr(sc->code)));  sc->code = opt3_any(cdr(sc->code));} while (0) /* extempore: see op_any_closure_3p */
 	case OP_IF_P_P:      if_p_push(OP_IF_PP); goto Eval;
 	case OP_IF_P_N:      if_p_push(OP_IF_PN); goto Eval;
 	case OP_IF_P_P_P:    check_stack_size(sc); if_p_push(OP_IF_PPP); goto Eval;
 	case OP_IF_P_R:      if_p_push(OP_IF_PR); goto Eval;
 	case OP_IF_P_N_N:    if_p_push(OP_IF_PRR); goto Eval;
 
-	    #define if_bp_push(op) do {push_stack_no_args(sc, op, opt2_any(cdr(sc->code)));  sc->code = opt3_pair(cdr(sc->code));} while (0)
+	    #define if_bp_push(op) do {check_stack_size(sc); push_stack_no_args(sc, op, opt2_any(cdr(sc->code)));  sc->code = opt3_pair(cdr(sc->code));} while (0) /* extempore: see op_any_closure_3p */
 	case OP_IF_ANDP_P:   if_bp_push(OP_IF_PP);  goto And_P;
 	case OP_IF_ANDP_R:   if_bp_push(OP_IF_PR);  goto And_P;
 	case OP_IF_ANDP_P_P: if_bp_push(OP_IF_PPP); goto And_P;
@@ -97374,7 +97380,10 @@ static s7_pointer eval(s7_scheme *sc, opcode_t first_op)
 	      goto Or_P;
 	    }
 	  if (is_pair(cdr(sc->code)))
-	    push_stack_no_args(sc, OP_OR_P1, cdr(sc->code)); /* might need to check stack size here */
+	    {
+	      check_stack_size(sc); /* extempore: see op_any_closure_3p */
+	      push_stack_no_args(sc, OP_OR_P1, cdr(sc->code));
+	    }
 	  sc->code = car(sc->code);
 	  goto Eval;
 
