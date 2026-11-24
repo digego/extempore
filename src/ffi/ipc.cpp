@@ -53,7 +53,13 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
     const std::string proc_name(argString(Scheme, Args, 1));
     const int port = int(argInt(Scheme, Args, 2));
     SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
-    sp->start();
+    // A failed start means another process holds the port: connecting anyway
+    // would reach that process's server, and calls to this one would be
+    // answered there.
+    if (!sp->start()) {
+        delete sp;
+        return Scheme->F;
+    }
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
     if (repl->connectToProcessAtHostname("localhost", port)) {
         return pair_car(Args); //return Scheme->T;
