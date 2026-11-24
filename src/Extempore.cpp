@@ -661,11 +661,14 @@ EXPORT int extempore_init(int argc, char** argv) {
                                               0, settings.initexpr);
 
     // The default port being taken (usually by another extempore) costs only
-    // the nREPL server; a port asked for by name is worth stopping for.
+    // the nREPL server; a port asked for by name is worth stopping for. The
+    // utility process's threads are already running, so end the process as
+    // (quit) does: exit() would run static destructors under them.
     if (settings.nrepl &&
         !extemp::nrepl::start(settings.nrepl_bind, settings.nrepl_port) &&
         settings.nrepl_port_given) {
-        exit(1);
+        std::fflush(stdout);
+        std::_Exit(1);
     }
 
 #ifndef _WIN32
