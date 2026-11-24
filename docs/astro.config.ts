@@ -110,6 +110,7 @@ export default defineConfig({
             { label: "Audio signal processing", slug: "guides/audio-signal-processing" },
             { label: "Audio file I/O", slug: "guides/audio-file-io" },
             { label: "Making an instrument", slug: "guides/making-an-instrument" },
+            { label: "MIDI", slug: "guides/midi" },
             { label: "Note-level music", slug: "guides/note-level-music" },
             { label: "Sampler", slug: "guides/sampler" },
           ],

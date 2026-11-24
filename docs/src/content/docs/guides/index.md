@@ -30,5 +30,7 @@ Drive instruments at the note level and sequence them over time:
 
 ## Other guides
 
+- [MIDI](/guides/midi/) --- sending and receiving MIDI, `mplay` in a temporal
+  recursion, and MIDI tracks in the studio.
 - [Audio file I/O](/guides/audio-file-io/) --- reading and playing back audio
   files with `AudioBuffer`.
