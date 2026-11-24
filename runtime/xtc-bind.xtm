@@ -839,9 +839,11 @@
                                              ,(if (number? value)
                                                   ;; can we serialise the value straight into the
                                                   ;;  IR? (e.g. i32/i64/float/double)
-                                                  (if (equal? t *xtc:codegen:fp32*)
-                                                      (llvm:convert-float (atom->string value))
-                                                      (atom->string value))
+                                                  (cond ((equal? t *xtc:codegen:fp32*)
+                                                         (llvm:convert-float (atom->string value)))
+                                                        ((equal? t *xtc:codegen:fp64*)
+                                                         (xtc:codegen:double-literal value))
+                                                        (else (atom->string value)))
                                                   ;; otherwise use zeroinitializer and we'll just use a
                                                   ;; set! inside a call-as-xtlang a bit further down
                                                   "zeroinitializer")))
