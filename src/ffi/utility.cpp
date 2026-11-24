@@ -47,8 +47,8 @@ namespace extemp {
 namespace SchemeFFI {
 
 static pointer asciiColor(scheme* Scheme, pointer Args) {
-    ascii_text_color(bool(argInt(Scheme, Args, 1)), int(argInt(Scheme, Args, 2)),
-                     int(argInt(Scheme, Args, 3)));
+    schemeWriteColor(Scheme, bool(argInt(Scheme, Args, 1)), unsigned(argInt(Scheme, Args, 2)),
+                     unsigned(argInt(Scheme, Args, 3)));
     return Scheme->T;
 }
 

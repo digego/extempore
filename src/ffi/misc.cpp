@@ -251,63 +251,55 @@ static pointer sexprToString(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, extractCell(Scheme, Args, true).c_str());
 }
 
+// The print family writes through s7's current output port (see schemeWrite),
+// so with-output-to-string and nREPL evals capture what it prints.
 static pointer print(scheme* Scheme, pointer Args) {
     if (Args == Scheme->NIL) {
-        putchar('\n');
-        fflush(stdout);
+        schemeWrite(Scheme, "\n");
         return Scheme->T;
     }
-    printf("%s\n", extractCell(Scheme, Args).c_str());
-    fflush(stdout);
+    schemeWrite(Scheme, extractCell(Scheme, Args) + "\n");
     return Scheme->T;
 }
 
 static pointer print_no_new_line(scheme* Scheme, pointer Args) {
     if (Args == Scheme->NIL) {
-        putchar('\n');
-        fflush(stdout);
+        schemeWrite(Scheme, "\n");
         return Scheme->T;
     }
-    printf("%s", extractCell(Scheme, Args, false, false).c_str());
-    fflush(stdout);
+    schemeWrite(Scheme, extractCell(Scheme, Args, false, false));
     return Scheme->T;
 }
 
 static pointer printFull(scheme* Scheme, pointer Args) {
-    printf("%s\n", extractCell(Scheme, Args, true).c_str());
+    schemeWrite(Scheme, extractCell(Scheme, Args, true) + "\n");
     return Scheme->T;
 }
 
 static pointer printFullNoQuotes(scheme* Scheme, pointer Args) {
-    printf("%s\n", extractCell(Scheme, Args, true, false).c_str());
+    schemeWrite(Scheme, extractCell(Scheme, Args, true, false) + "\n");
+    return Scheme->T;
+}
+
+// "LABEL:" in the label's colour, then the arguments in the normal one.
+static pointer printLabelled(scheme* Scheme, pointer Args, const char* Label, unsigned Colour) {
+    schemeWriteColor(Scheme, true, Colour, 9);
+    schemeWrite(Scheme, Label);
+    schemeWriteColor(Scheme, false, 7, 9);
+    schemeWrite(Scheme, " " + extractCell(Scheme, Args, true, false) + "\n");
     return Scheme->T;
 }
 
 static pointer printError(scheme* Scheme, pointer Args) {
-    ascii_error();
-    printf("ERROR:");
-    ascii_normal();
-    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-    fflush(stdout);
-    return Scheme->T;
+    return printLabelled(Scheme, Args, "ERROR:", 1);
 }
 
 static pointer printInfo(scheme* Scheme, pointer Args) {
-    ascii_info();
-    printf("INFO:");
-    ascii_normal();
-    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-    fflush(stdout);
-    return Scheme->T;
+    return printLabelled(Scheme, Args, "INFO:", 6);
 }
 
 static pointer printWarn(scheme* Scheme, pointer Args) {
-    ascii_warning();
-    printf("WARN:");
-    ascii_normal();
-    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-    fflush(stdout);
-    return Scheme->T;
+    return printLabelled(Scheme, Args, "WARN:", 3);
 }
 
 static pointer getClosureEnv(scheme* Scheme, pointer Args) {

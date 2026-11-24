@@ -42,6 +42,7 @@
 
 #include <cstdio>
 #include <span>
+#include <string_view>
 
 namespace extemp {
 
@@ -68,6 +69,34 @@ std::span<const FFIEntry> sysDefs();
 std::span<const FFIEntry> sysDspDefs();
 std::span<const FFIEntry> sysZoneDefs();
 std::span<const FFIEntry> utilityDefs();
+
+// Write Text to s7's current output port: stdout by default, a string port
+// inside with-output-to-string, and during an nREPL eval a port that copies it
+// to the client as well as the console.
+inline void schemeWrite(scheme* Scheme, std::string_view Text) {
+    s7_scheme* sc = Scheme->sc;
+    s7_display(sc, s7_make_string_with_length(sc, Text.data(), s7_int(Text.size())),
+               s7_current_output_port(sc));
+    std::fflush(stdout);
+}
+
+// Switch the text colour of whatever the current output port feeds. The
+// escape sequence travels through the port like any other text; a Windows
+// console in cmd mode is coloured through the console API instead, which only
+// makes sense while the port is the console.
+inline void schemeWriteColor(scheme* Scheme, bool Bold, unsigned Foreground, unsigned Background) {
+    if (UNIV::EXT_TERM == UNIV::TerminalMode::Cmd) [[unlikely]] {
+        s7_scheme* sc = Scheme->sc;
+        if (s7_current_output_port(sc) == s7_name_to_value(sc, "*stdout*")) {
+            ascii_text_color(Bold, Foreground, Background);
+        }
+        return;
+    }
+    const std::string code = ascii_color_code(Bold, Foreground, Background);
+    if (!code.empty()) {
+        schemeWrite(Scheme, code);
+    }
+}
 
 // Console complaint from a primitive that reports a bad argument by returning
 // #f rather than raising.  Message carries its own trailing newline; the

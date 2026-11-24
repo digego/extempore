@@ -38,6 +38,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 
 #include <string>
 #include <string_view>
@@ -170,6 +171,32 @@ extern "C" inline double getRealTime() {
         .count();
 }
 
+// The ANSI escape sequence for a colour, or "" when the terminal mode has no
+// escape sequences (nocolor, or a Windows console set through the console API).
+inline std::string ascii_color_code(bool Bold, unsigned Foreground, unsigned Background) {
+    using extemp::UNIV::TerminalMode;
+    if (extemp::UNIV::EXT_TERM == TerminalMode::NoColor ||
+        extemp::UNIV::EXT_TERM == TerminalMode::Cmd) [[unlikely]] {
+        return {};
+    }
+    // if simple term (that doesn't support defaults)
+    // then default to black background and white text
+    Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
+    Background = (Background > 9 || Background == 8) ? 9 : Background;
+    if (extemp::UNIV::EXT_TERM == TerminalMode::Basic) [[unlikely]] {
+        if (Background == 9) [[unlikely]] {
+            Background = 0;
+        }
+        if (Foreground == 9) [[unlikely]] {
+            Foreground = 7;
+        }
+    }
+    char code[32];
+    snprintf(code, sizeof(code), "\x1b[%u;%u;%um", unsigned(Bold), Foreground + 30,
+             Background + 40);
+    return code;
+}
+
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
     if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor) [[unlikely]] {
         return;
@@ -189,21 +216,8 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
         }
         return;
     }
-#endif  // #else
-    // if simple term (that doesn't support defaults)
-    // then default to black background and white text
-    Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
-    Background = (Background > 9 || Background == 8) ? 9 : Background;
-    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Basic) [[unlikely]] {
-        if (Background == 9) [[unlikely]] {
-            Background = 0;
-        }
-        if (Foreground == 9) [[unlikely]] {
-            Foreground = 7;
-        }
-    }
-    printf("\x1b[%u;%u;%um", Bold, Foreground + 30, Background + 40);
-    // #endif
+#endif
+    fputs(ascii_color_code(Bold, Foreground, Background).c_str(), stdout);
 }
 
 inline void ascii_default() {
