@@ -9,7 +9,7 @@ static std::mutex s_wrapperMapMutex;
 static std::unordered_map<s7_scheme*, scheme*> s_wrapperMap;
 
 scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc) {
-    std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
+    const std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
     auto it = s_wrapperMap.find(raw_sc);
     if (it != s_wrapperMap.end())
         return it->second;
@@ -17,7 +17,7 @@ scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc) {
 }
 
 void scheme_register_wrapper(s7_scheme* raw_sc, scheme* wrapper) {
-    std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
+    const std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
     s_wrapperMap[raw_sc] = wrapper;
 }
 
@@ -51,7 +51,7 @@ template <int N> static s7_pointer ffi_trampoline(s7_scheme* raw_sc, s7_pointer 
     s7_pointer errSym = nullptr;
     s7_pointer errInfo = nullptr;
     try {
-        FFINameScope named(s_ffiNames[N].load(std::memory_order_acquire));
+        const FFINameScope named(s_ffiNames[N].load(std::memory_order_acquire));
         return s_ffiTable[N].load(std::memory_order_acquire)(wrapper, args);
     } catch (const ScmRuntimeError& e) {
         errSym = s7_make_symbol(raw_sc, "wrong-type-arg");
@@ -88,8 +88,8 @@ static s7_pointer lenient_string_ref(s7_scheme* sc, s7_pointer args) {
     if (!s7_is_integer(idx_p)) {
         return s7_wrong_type_arg_error(sc, "string-ref", 2, idx_p, "an integer");
     }
-    s7_int idx = s7_integer(idx_p);
-    s7_int len = s7_string_length(s);
+    const s7_int idx = s7_integer(idx_p);
+    const s7_int len = s7_string_length(s);
     if (idx < 0 || idx >= len) {
         return s7_make_character(sc, 0);
     }
@@ -100,7 +100,7 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
     if (!wrapper)
         return;
-    uint64_t now = extemp::UNIV::TIME;
+    const uint64_t now = extemp::UNIV::TIME;
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
         *val = true;
     }
@@ -126,7 +126,7 @@ scheme* scheme_init_new() {
     sc->value = sc->NIL;
     sc->m_process = nullptr;
     sc->ext_data = nullptr;
-    sc->call_default_time = 44100 * 60;
+    sc->call_default_time = uint64_t{44100} * 60;
     sc->call_start_time = 0;
     sc->call_end_time = 0;
 
@@ -229,7 +229,7 @@ scheme* scheme_init_new() {
 void scheme_deinit(scheme* sc) {
     if (sc && sc->sc) {
         {
-            std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
+            const std::lock_guard<std::mutex> lock(s_wrapperMapMutex);
             s_wrapperMap.erase(sc->sc);
         }
         s7_free(sc->sc);
@@ -300,7 +300,7 @@ static void eval_with_error_trap(scheme* sc, const char* str) {
 
     s7_pointer old_port = s7_current_error_port(sc->sc);
     s7_pointer err_port = s7_open_output_string(sc->sc);
-    s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
+    const s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
     s7_pointer result = eval_source(sc->sc, str, strlen(str));
@@ -330,14 +330,14 @@ void scheme_load_file(scheme* sc, FILE* fin) {
     }
     fclose(fin);
 
-    uint64_t now = extemp::UNIV::TIME;
+    const uint64_t now = extemp::UNIV::TIME;
     sc->call_start_time = now;
     sc->call_end_time = now + sc->call_default_time * 10;
 
     sc->retcode = 0;
     s7_pointer old_port = s7_current_error_port(sc->sc);
     s7_pointer err_port = s7_open_output_string(sc->sc);
-    s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
+    const s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
     // File loads stay on s7_load_c_string: it interleaves read and eval with
@@ -368,7 +368,7 @@ void scheme_load_string(scheme* sc, const char* cmd, uint64_t start_time, uint64
 }
 
 void scheme_apply0(scheme* sc, const char* name) {
-    std::string expr = std::string("(") + name + ")";
+    const std::string expr = std::string("(") + name + ")";
     eval_with_error_trap(sc, expr.c_str());
 }
 
@@ -380,7 +380,7 @@ void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
 
     s7_pointer old_port = s7_current_error_port(sc->sc);
     s7_pointer err_port = s7_open_output_string(sc->sc);
-    s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
+    const s7_int gc_loc = s7_gc_protect(sc->sc, err_port);
     s7_set_current_error_port(sc->sc, err_port);
 
     s7_pointer result = apply_source(sc->sc, func, args);
@@ -545,7 +545,7 @@ std::unordered_map<std::string, int> s_ffiSlots;
 }  // namespace
 
 foreign_func ffi_def(const char* name, foreign_func f, int required, int optional, bool rest) {
-    std::lock_guard<std::mutex> lock(ffiDefMutex());
+    const std::lock_guard<std::mutex> lock(ffiDefMutex());
     ffiDefTable().emplace(reinterpret_cast<void*>(f), FFIDef{name, required, optional, rest});
     return f;
 }
@@ -555,12 +555,12 @@ static pointer makeFFIFunction(scheme* sc, foreign_func f, const std::string& ke
     const char* name = nullptr;
     int slot = -1;
     {
-        std::lock_guard<std::mutex> lock(s_ffiSlotMutex);
+        const std::lock_guard<std::mutex> lock(s_ffiSlotMutex);
         auto res = s_ffiSlots.emplace(key, 0);
         if (!res.second) {
             slot = res.first->second;
         } else {
-            int next = s_ffiCount.load(std::memory_order_relaxed);
+            const int next = s_ffiCount.load(std::memory_order_relaxed);
             if (next >= MAX_FFI_FUNCS) {
                 s_ffiSlots.erase(res.first);
             } else {
@@ -591,7 +591,7 @@ static pointer makeFFIFunction(scheme* sc, foreign_func f, const std::string& ke
 pointer mk_foreign_func(scheme* sc, foreign_func f) {
     FFIDef def{nullptr, 0, 0, true};
     {
-        std::lock_guard<std::mutex> lock(ffiDefMutex());
+        const std::lock_guard<std::mutex> lock(ffiDefMutex());
         auto it = ffiDefTable().find(reinterpret_cast<void*>(f));
         if (it != ffiDefTable().end()) {
             def = it->second;
@@ -844,6 +844,6 @@ void load_file(scheme* sc, FILE* fin) {
 }
 
 void load_string(scheme* sc, const char* input) {
-    uint64_t now = extemp::UNIV::TIME;
+    const uint64_t now = extemp::UNIV::TIME;
     scheme_load_string(sc, input, now, now + sc->call_default_time);
 }

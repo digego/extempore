@@ -198,7 +198,7 @@ llvm_zone_t* llvm_peek_zone_stack() {
         if constexpr (DEBUG_ZONE_STACK) {
             printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
         }
-        llvm_zone_t* z = llvm_zone_create(1024 * 1024 * 1);  // default root zone is 1M
+        llvm_zone_t* z = llvm_zone_create(uint64_t{1024} * 1024);  // default root zone is 1M
         llvm_push_zone_stack(z);
         if constexpr (DEBUG_ZONE_STACK) {
             printf("Creating new 1M default zone %p:%" PRIu64 " on ZStack:%p\n",
@@ -261,8 +261,8 @@ EXPORT uint64_t llvm_zone_ptr_size(void* ptr)  // could be inline version in llv
 // Returns true on failure (generated code treats a non-zero result as an
 // error, see llvm_runtime_error in EXTLLVM.cpp).
 EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2) {
-    uint64_t size1 = llvm_zone_ptr_size(ptr1);
-    uint64_t size2 = llvm_zone_ptr_size(ptr2);
+    const uint64_t size1 = llvm_zone_ptr_size(ptr1);
+    const uint64_t size2 = llvm_zone_ptr_size(ptr2);
     if (size1 != size2 || !size1) [[unlikely]] {
         return true;
     }
@@ -302,7 +302,8 @@ static thread_local llvm_zone_t* tls_llvm_callback_zone = nullptr;
 
 static inline llvm_zone_t* llvm_threads_get_callback_zone() {
     if (!tls_llvm_callback_zone) [[unlikely]] {
-        tls_llvm_callback_zone = llvm_zone_create(1024 * 1024);  // default callback zone 1M
+        tls_llvm_callback_zone =
+            llvm_zone_create(uint64_t{1024} * 1024);  // default callback zone 1M
     }
     return tls_llvm_callback_zone;
 }

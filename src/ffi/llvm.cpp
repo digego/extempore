@@ -111,11 +111,11 @@ static llvm::Module* jitCompile(const std::string& String);
 static std::string formatLLVMType(llvm::Type* Type) {
     if (auto* ST = llvm::dyn_cast<llvm::StructType>(Type)) {
         if (ST->hasName()) {
-            llvm::StringRef name = ST->getName();
+            const llvm::StringRef name = ST->getName();
             auto dotPos = name.rfind('.');
             if (dotPos != llvm::StringRef::npos) {
-                llvm::StringRef suffix = name.substr(dotPos + 1);
-                bool isNumericSuffix =
+                const llvm::StringRef suffix = name.substr(dotPos + 1);
+                const bool isNumericSuffix =
                     !suffix.empty() && std::all_of(suffix.begin(), suffix.end(), ::isdigit);
                 if (isNumericSuffix) {
                     return "%" + name.substr(0, dotPos).str();
@@ -260,7 +260,7 @@ static pointer get_type_size(scheme* Scheme, pointer Args)
     const char* type_str = argString(Scheme, Args, 1);
     long size = -1;
     EXTLLVM::getThreadSafeContext().withContextDo([&](llvm::LLVMContext* ctx) {
-        llvm::Module scratch("xtm_type_size", *ctx);
+        const llvm::Module scratch("xtm_type_size", *ctx);
         llvm::SMDiagnostic err;
         auto type(llvm::parseType(type_str, err, scratch));
         if (!type || !type->isSized()) {
@@ -289,7 +289,7 @@ static pointer get_named_struct_size(scheme* Scheme, pointer Args)
         return Scheme->F;
     }
     auto& DL = EXTLLVM::JIT->getDataLayout();
-    long size = DL.getStructLayout(type)->getSizeInBytes();
+    const long size = DL.getStructLayout(type)->getSizeInBytes();
     return mk_integer(Scheme, size);
 }
 
@@ -304,9 +304,9 @@ static pointer get_function_args(scheme* Scheme, pointer Args)
     for (const auto& arg : func->args()) {
         // the injector must span the cons too: cons can itself trigger GC,
         // and p is only referenced from this frame
-        EnvInjector injector(Scheme, p);
+        const EnvInjector injector(Scheme, p);
         str = mk_string(Scheme, formatLLVMType(arg.getType()).c_str());
-        EnvInjector injector2(Scheme, str);
+        const EnvInjector injector2(Scheme, str);
         p = cons(Scheme, str, p);
     }
     return reverse_in_place(Scheme, Scheme->NIL, p);
@@ -378,7 +378,7 @@ static pointer remove_symbol_and_global(scheme* Scheme, pointer Args)
 
 static pointer llvm_call_void_native(scheme* Scheme, pointer Args)
 {
-    std::string name(argString(Scheme, Args, 1));
+    const std::string name(argString(Scheme, Args, 1));
 
     auto addr = EXTLLVM::getFunctionAddress(name + "_native");
     if (!addr) {
@@ -419,7 +419,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
     }
 
     // Resolve the compiled function address (try with and without _native suffix)
-    std::string name = func->getName().str();
+    const std::string name = func->getName().str();
     auto addr = EXTLLVM::getFunctionAddress(name);
     if (!addr) {
         addr = EXTLLVM::getFunctionAddress(name + "_native");
@@ -430,7 +430,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
 
     // Marshal arguments into raw values first (outside the JIT context).
     struct ArgValue {
-        enum Kind { Int, Float, Double, Ptr } kind;
+        enum Kind : std::uint8_t { Int, Float, Double, Ptr } kind;
         llvm::Type* ty;
         uint64_t intVal;
         double doubleVal;
@@ -461,7 +461,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
                 printf("Bad argument type %u\n", i);
                 return Scheme->F;
             }
-            float f = static_cast<float>(rvalue(p));
+            const float f = static_cast<float>(rvalue(p));
             argValues.push_back({ArgValue::Float, argTy, 0u, 0.0, f, nullptr});
             break;
         }
@@ -534,7 +534,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
 
         auto targetAddrConst = llvm::ConstantInt::get(ptrIntTy, addr);
         auto targetPtr = llvm::ConstantExpr::getIntToPtr(targetAddrConst, llvm::PointerType::get(*ctx, 0));
-        llvm::FunctionCallee callee(funcType, targetPtr);
+        const llvm::FunctionCallee callee(funcType, targetPtr);
 
         auto callInst = builder.CreateCall(callee, argConsts);
         callInst->setCallingConv(func->getCallingConv());
@@ -568,23 +568,23 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
         switch (retTy->getTypeID()) {
         case llvm::Type::FloatTyID: {
             using StubFn = float(*)();
-            float res = reinterpret_cast<StubFn>(stubAddr)();
+            const float res = reinterpret_cast<StubFn>(stubAddr)();
             result = mk_real(Scheme, res);
             break;
         }
         case llvm::Type::DoubleTyID: {
             using StubFn = double(*)();
-            double res = reinterpret_cast<StubFn>(stubAddr)();
+            const double res = reinterpret_cast<StubFn>(stubAddr)();
             result = mk_real(Scheme, res);
             break;
         }
         case llvm::Type::IntegerTyID: {
             auto intTy = llvm::cast<llvm::IntegerType>(retTy);
-            unsigned width = intTy->getBitWidth();
-            uint64_t mask = (width >= 64) ? ~uint64_t(0) : ((uint64_t(1) << width) - 1);
+            const unsigned width = intTy->getBitWidth();
+            const uint64_t mask = (width >= 64) ? ~uint64_t(0) : ((uint64_t(1) << width) - 1);
 
             using StubFn = uint64_t(*)();
-            uint64_t res = reinterpret_cast<StubFn>(stubAddr)() & mask;
+            const uint64_t res = reinterpret_cast<StubFn>(stubAddr)() & mask;
             result = mk_integer(Scheme, res);
             break;
         }
@@ -614,7 +614,7 @@ static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
     if (floatin[0] && floatin[1] == 'x') {
         return argAt(Scheme, Args, 1);
     }
-    llvm::APFloat apf(llvm::APFloat::IEEEsingle(), llvm::StringRef(floatin));
+    const llvm::APFloat apf(llvm::APFloat::IEEEsingle(), llvm::StringRef(floatin));
     // TODO: if necessary, checks for inf/nan can be done here
     auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
     return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
@@ -627,7 +627,7 @@ static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
     if (floatin[0] && floatin[1] == 'x') {
         return argAt(Scheme, Args, 1);
     }
-    llvm::APFloat apf(llvm::APFloat::IEEEdouble(), llvm::StringRef(floatin));
+    const llvm::APFloat apf(llvm::APFloat::IEEEdouble(), llvm::StringRef(floatin));
     // TODO: if necessary, checks for inf/nan can be done here
     // convertToDouble, not convertToFloat: this APFloat is an IEEEdouble, and
     // asking for the float value of one is a hard error in LLVM
@@ -654,7 +654,7 @@ static pointer llvm_count_inc(scheme* Scheme, pointer Args)
 
 static pointer callClosure(scheme* Scheme, pointer Args)
 {
-    uint32_t** closure = reinterpret_cast<uint32_t**>(argCptr(Scheme, Args, 1));
+    uint32_t* const* closure = reinterpret_cast<uint32_t**>(argCptr(Scheme, Args, 1));
     if (!closure) {
         throw ScmRuntimeError("llvm:call-closure: null closure pointer", Args);
     }
@@ -682,7 +682,7 @@ static pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
     rgx += "_.*";
     for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
-            if (func.hasName() && rmatch(rgx.data(), func.getName().data())) {
+            if (func.hasName() && rmatch(rgx.data(), func.getName().str().c_str())) {
                 std::string str;
                 llvm::raw_string_ostream ss(str);
                 ss << func;
@@ -709,11 +709,11 @@ static pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
     auto fname(argString(Scheme, Args, 1));
     for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
-            if (func.hasName() && !strcmp(func.getName().data(), fname)) {
+            if (func.hasName() && func.getName() == fname) {
                 std::string str;
                 llvm::raw_string_ostream ss(str);
                 ss << func;
-                if (ss.str().find_first_of("{") != std::string::npos) {
+                if (ss.str().find('{') != std::string::npos) {
                     std::cout << str << std::endl;
                 }
             }
@@ -730,7 +730,7 @@ static pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
     bool found = false;
     for (auto module : EXTLLVM::getModules()) {
         for (const auto& func : module->getFunctionList()) {
-            if (func.hasName() && rmatch(rgx.data(), func.getName().data())) {
+            if (func.hasName() && rmatch(rgx.data(), func.getName().str().c_str())) {
                 last_name = func.getName().str();
                 found = true;
             }
@@ -744,7 +744,7 @@ static pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
 
 static pointer llvm_disasm(scheme* Scheme, pointer Args)
 {
-    int lgth = list_length(Scheme, Args);
+    const int lgth = list_length(Scheme, Args);
     int syntax = (lgth > 1) ? int(argInt(Scheme, Args, 2)) : 1;
     if (syntax > 1) {
       std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
@@ -756,9 +756,9 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args)
         throw ScmRuntimeError(std::string("llvm:disassemble: no compiled closure named ") +
                               argString(Scheme, Args, 1), Args);
     }
-    EnvInjector injector(Scheme, name);
+    const EnvInjector injector(Scheme, name);
     pointer lookupArgs = cons(Scheme, name, pair_cdr(Args));
-    EnvInjector injector2(Scheme, lookupArgs);
+    const EnvInjector injector2(Scheme, lookupArgs);
     pointer fp = get_function_pointer(Scheme, lookupArgs);
     if (!is_cptr(fp)) {
         throw ScmRuntimeError(std::string("llvm:disassemble: no function pointer for ") +
@@ -814,17 +814,17 @@ static pointer add_llvm_alias(scheme* Scheme, pointer Args)
 {
     std::string alias(argString(Scheme, Args, 1));
     std::string target(argString(Scheme, Args, 2));
-    std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
+    const std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
     LLVM_ALIAS_TABLE[std::move(alias)] = std::move(target);
     return Scheme->T;
 }
 
 static pointer get_llvm_alias(scheme* Scheme, pointer Args)
 {
-    std::string alias(argString(Scheme, Args, 1));
+    const std::string alias(argString(Scheme, Args, 1));
     std::string target;
     {
-        std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
+        const std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
         auto iter(LLVM_ALIAS_TABLE.find(alias));
         if (iter == LLVM_ALIAS_TABLE.end()) {
             return Scheme->F;
@@ -868,9 +868,9 @@ static pointer list_modules(scheme* Scheme, pointer Args)
     // ORC keeps multiple modules. Expose the stored metadata clones.
     pointer p = Scheme->NIL;
     for (auto module : EXTLLVM::getModules()) {
-        EnvInjector injector(Scheme, p);
+        const EnvInjector injector(Scheme, p);
         pointer c = mk_cptr(Scheme, module);
-        EnvInjector injector2(Scheme, c);
+        const EnvInjector injector2(Scheme, c);
         p = cons(Scheme, c, p);
     }
     return reverse_in_place(Scheme, Scheme->NIL, p);
@@ -935,7 +935,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
 
     // Look up the target
     std::string error;
-    llvm::Triple tripleObj(triple);
+    const llvm::Triple tripleObj(triple);
     auto target = llvm::TargetRegistry::lookupTarget(tripleObj, error);
     if (!target) {
         std::cerr << "llvm:emit-object-file: " << error << std::endl;
@@ -943,8 +943,8 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
     }
 
     // Get CPU and features
-    std::string cpu = extemp::UNIV::CPU.empty() ?
-        std::string(llvm::sys::getHostCPUName()) : extemp::UNIV::CPU;
+    const std::string cpu =
+        extemp::UNIV::CPU.empty() ? std::string(llvm::sys::getHostCPUName()) : extemp::UNIV::CPU;
 
     std::string features;
     auto hostFeatures = llvm::sys::getHostCPUFeatures();
@@ -997,13 +997,13 @@ static long long llvm_emitcounter = 0;
 
 // Check if a symbol is an external library function (uses C calling convention).
 static bool isExternalLibFunction(const std::string& name) {
-    std::lock_guard<std::mutex> lock(sExternalLibFunctionNamesMutex);
+    const std::lock_guard<std::mutex> lock(sExternalLibFunctionNamesMutex);
     return sExternalLibFunctionNames.find(name) != sExternalLibFunctionNames.end();
 }
 
 // Register a symbol as an external library function.
 static void registerExternalLibFunction(const std::string& name) {
-    std::lock_guard<std::mutex> lock(sExternalLibFunctionNamesMutex);
+    const std::lock_guard<std::mutex> lock(sExternalLibFunctionNamesMutex);
     sExternalLibFunctionNames.insert(name);
 }
 
@@ -1048,7 +1048,7 @@ static bool loadRuntimeHelpersLockless(llvm::LLVMContext& ctx) {
     if (sRuntimeHelpersLoaded) {
         return true;
     }
-    std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
+    const std::ifstream inStream(UNIV::SHARE_DIR + "/runtime/bitcode.ll");
     std::stringstream ss;
     ss << inStream.rdbuf();
     const std::string text = ss.str();
@@ -1086,7 +1086,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
         // Parse the IR with the preamble it needs prepended.
         std::string fullIR;
         {
-            std::lock_guard<std::mutex> lock(sPreambleMutex);
+            const std::lock_guard<std::mutex> lock(sPreambleMutex);
             if (!loadRuntimeHelpersLockless(*ctx)) {
                 return;
             }
@@ -1117,14 +1117,14 @@ static llvm::Module* jitCompile(const std::string& irString) {
         // compilations can reference them. This handles both individual bind-lib
         // declarations (small IR) and AOT-cached .ll files (large IR).
         // We capture before optimization because LLVM may drop unused declarations.
-        bool isBindLibDeclaration = (irString.find("declare") == 0 && irString.size() < 500);
+        const bool isBindLibDeclaration = (irString.find("declare") == 0 && irString.size() < 500);
         {
-            std::lock_guard<std::mutex> lock(sPreambleMutex);
+            const std::lock_guard<std::mutex> lock(sPreambleMutex);
             for (const auto& func : mod->functions()) {
                 if (!func.isDeclaration() || func.isIntrinsic())
                     continue;
 
-                std::string name = func.getName().str();
+                const std::string name = func.getName().str();
                 if (sPreamble.funcDecls.count(name))
                     continue;
 
@@ -1146,7 +1146,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
             if (func.isIntrinsic())
                 continue;
 
-            std::string name = func.getName().str();
+            const std::string name = func.getName().str();
 
             // Look up in global map of compiled functions.
             auto gv = EXTLLVM::getGlobalValue(name.c_str());
@@ -1172,7 +1172,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
             if (!global.isDeclaration())
                 continue;
 
-            std::string name = global.getName().str();
+            const std::string name = global.getName().str();
 
             auto gv = EXTLLVM::getGlobalValue(name.c_str());
             if (!gv)
@@ -1249,12 +1249,12 @@ static llvm::Module* jitCompile(const std::string& irString) {
             // reference them, and the bitcode.ll helpers among them already
             // have their definitions in the preamble.
             {
-                std::lock_guard<std::mutex> lock(sPreambleMutex);
+                const std::lock_guard<std::mutex> lock(sPreambleMutex);
 
                 // First, add any identified struct types from the module.
                 for (auto* structType : metadata->getIdentifiedStructTypes()) {
                     if (structType->hasName() && !structType->isOpaque()) {
-                        std::string name = structType->getName().str();
+                        const std::string name = structType->getName().str();
                         if (sPreamble.types.count(name)) {
                             continue;
                         }
@@ -1288,7 +1288,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     if (func.isDeclaration() || func.hasLocalLinkage())
                         continue;
 
-                    std::string name = func.getName().str();
+                    const std::string name = func.getName().str();
                     if (sPreamble.funcDecls.count(name)) {
                         continue;
                     }
@@ -1300,7 +1300,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
                     if (glob.hasLocalLinkage()) {
                         continue;
                     }
-                    std::string name = glob.getName().str();
+                    const std::string name = glob.getName().str();
                     if (sPreamble.globals.count(name)) {
                         continue;
                     }

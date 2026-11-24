@@ -105,7 +105,7 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
     pthread_getschedparam(thread, &current_policy, &param);
     param.sched_priority = priority;
     // policy should be SCHED_RR or SCHED_FIFO
-    int res = pthread_setschedparam(thread, policy, &param);
+    const int res = pthread_setschedparam(thread, policy, &param);
     if (res) {
         printf("Failed to set realtime priority for Audio thread: %s\n", strerror(res));
     }
@@ -198,21 +198,21 @@ void* audioCallbackMT(void* Args) {
 #elif _WIN32
     SetThreadPriority(GetCurrentThread(), 15);  // 15 = THREAD_PRIORITY_TIME_CRITICAL
 #endif
-    unsigned idx = uintptr_t(Args);
+    const unsigned idx = uintptr_t(Args);
     auto device(AudioDevice::I());
     // The wrapper, latency mode and buffers are fixed for the life of the
     // worker: initMTAudio() publishes them before starting us and refuses to
     // change them afterwards.
     auto cache_wrapper(device->getDspState()->wrapper);
     auto zone(extemp::EXTZones::llvm_peek_zone_stack());
-    std::span<SAMPLE> slice(device->getMTOutSlice(idx));
+    const std::span<SAMPLE> slice(device->getMTOutSlice(idx));
     const size_t blockSamples = size_t(UNIV::CHANNELS) * UNIV::NUM_FRAMES;
     SAMPLE* outbufs[2] = {slice.data(), slice.data() + blockSamples};
-    std::span<SAMPLE> inbuf(device->getMTInBuffer());
+    const std::span<SAMPLE> inbuf(device->getMTInBuffer());
     // per-worker scratch buffer for one frame of input, sized once before the
     // realtime loop so the loop stays allocation-free
     std::vector<SAMPLE> indata(UNIV::IN_CHANNELS);
-    bool zerolatency = device->getDspState()->zeroLatency;
+    const bool zerolatency = device->getDspState()->zeroLatency;
     bool toggle = false;
     printf("Starting RT Audio MT worker %u\n", idx);
     while (true) {
@@ -230,10 +230,10 @@ void* audioCallbackMT(void* Args) {
         }
         auto cache_closure(getter());
         auto closure = *reinterpret_cast<closure_fn_type*>(cache_closure);
-        uint64_t LTIME = UNIV::DEVICE_TIME;
+        const uint64_t LTIME = UNIV::DEVICE_TIME;
         for (uint32_t i = 0; i < UNIV::NUM_FRAMES; i++) {
-            uint32_t iout = i * UNIV::CHANNELS;
-            uint32_t iin = i * UNIV::IN_CHANNELS;
+            const uint32_t iout = i * UNIV::CHANNELS;
+            const uint32_t iin = i * UNIV::IN_CHANNELS;
             for (unsigned k = 0; k < UNIV::IN_CHANNELS; k++) {
                 indata[k] = inbuf[iin + k];
             }
@@ -296,7 +296,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         auto in(InputBuffer);
         uint64_t time(UNIV::DEVICE_TIME);
         if (likely(!UNIV::IN_CHANNELS)) {
-            float dummy(0.0);
+            const float dummy(0.0);
             for (uint64_t i = 0; i < FramesPerBuffer; ++i, ++time) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; ++k) {
                     *(dat++) = audio_sanity(float(cache_wrapper(
@@ -345,7 +345,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         const unsigned numthreads = state->numThreads;
         const bool zerolatency = state->zeroLatency;
         SAMPLE in[AudioDevice::MAX_RT_AUDIO_THREADS];
-        std::span<SAMPLE> inb(getMTInBuffer());
+        const std::span<SAMPLE> inb(getMTInBuffer());
         if (InputBuffer) {
             for (size_t i = 0; i < inb.size(); i++) {
                 inb[i] = SAMPLE(InputBuffer[i]);
@@ -362,7 +362,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
         dsp_f_ptr_sum cache_wrapper = state->sumWrapper;
         auto closure = *((SAMPLE(**)(SAMPLE*, uint64_t, uint64_t, SAMPLE*))cache_closure);
         llvm_zone_t* zone = extemp::EXTZones::llvm_peek_zone_stack();
-        bool toggle = getToggle();
+        const bool toggle = getToggle();
         // if we are NOT running zerolatency and toggle is FALSE then the
         // workers wrote into the second half of their slice
         const size_t half =
@@ -372,7 +372,7 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
             indats[jj] = getMTOutSlice(jj).data() + half;
         }
         for (uint64_t i = 0; i < UNIV::NUM_FRAMES; i++) {
-            uint32_t iout = i * UNIV::CHANNELS;
+            const uint32_t iout = i * UNIV::CHANNELS;
             float* dat = OutputBuffer;
 
             for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
@@ -521,8 +521,8 @@ bool FileAudioDriver::start(const std::string& path, double maxSeconds) {
     m_path = path;
     m_framesWritten = 0;
     m_maxFrames = (maxSeconds > 0.0) ? static_cast<uint64_t>(maxSeconds * UNIV::SAMPLE_RATE) : 0;
-    m_inBuf.assign(UNIV::IN_CHANNELS * UNIV::NUM_FRAMES, 0.0f);
-    m_outBuf.assign(UNIV::CHANNELS * UNIV::NUM_FRAMES, 0.0f);
+    m_inBuf.assign(size_t{UNIV::IN_CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
+    m_outBuf.assign(size_t{UNIV::CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
     m_stop.store(false);
     m_running.store(true, std::memory_order_release);
     m_thread = std::thread([this] { this->run(); });
@@ -684,7 +684,7 @@ static int findDevice(const std::string& Name) {
         ascii_normal();
         usePattern = false;
     }
-    int numDevices(Pa_GetDeviceCount());
+    const int numDevices(Pa_GetDeviceCount());
     for (int i = 0; i < numDevices; ++i) {
         const char* deviceName = Pa_GetDeviceInfo(i)->name;
         if (usePattern) {
@@ -733,7 +733,7 @@ void AudioDevice::start() {
         ascii_normal();
         std::_Exit(1);
     }
-    int numDevices = Pa_GetDeviceCount();
+    const int numDevices = Pa_GetDeviceCount();
     if (!UNIV::AUDIO_DEVICE_NAME.empty()) {
         UNIV::AUDIO_DEVICE = findDevice(UNIV::AUDIO_DEVICE_NAME);
     }
@@ -859,7 +859,7 @@ void AudioDevice::stop() {
         m_started = false;
         return;
     }
-    PaError err = Pa_StopStream(stream);
+    const PaError err = Pa_StopStream(stream);
     if (err != paNoError) {
         std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;
     }
@@ -926,7 +926,7 @@ double AudioDevice::getCPULoad() {
 }
 
 void AudioDevice::printDevices() {
-    PaError err = Pa_Initialize();
+    const PaError err = Pa_Initialize();
     if (err != paNoError) {
         ascii_error();
         printf("Error: could not initialise PortAudio: %s\n", Pa_GetErrorText(err));
@@ -934,7 +934,7 @@ void AudioDevice::printDevices() {
         std::_Exit(1);
     }
 
-    int numDevices = Pa_GetDeviceCount();
+    const int numDevices = Pa_GetDeviceCount();
     if (numDevices <= 0) {
         printf("Error: no audio devices found! Exiting...\n");
         std::_Exit(1);

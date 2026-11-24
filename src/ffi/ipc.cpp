@@ -50,8 +50,8 @@ namespace SchemeFFI {
 // ipc stuff
 static pointer newSchemeProcess(scheme* Scheme, pointer Args)
 {
-    std::string proc_name(argString(Scheme, Args, 1));
-    int port = int(argInt(Scheme, Args, 2));
+    const std::string proc_name(argString(Scheme, Args, 1));
+    const int port = int(argInt(Scheme, Args, 2));
     SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
     sp->start();
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
@@ -67,9 +67,9 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
 
 static pointer connectToProcess(scheme* Scheme, pointer Args)
 {
-    std::string host_name(argString(Scheme, Args, 1));
-    std::string proc_name(argString(Scheme, Args, 2));
-    int port = int(argInt(Scheme, Args, 3));
+    const std::string host_name(argString(Scheme, Args, 1));
+    const std::string proc_name(argString(Scheme, Args, 2));
+    const int port = int(argInt(Scheme, Args, 3));
     SchemeREPL* repl = new SchemeREPL(proc_name, nullptr);
     if (repl->connectToProcessAtHostname(host_name, port)) {
         return Scheme->T;

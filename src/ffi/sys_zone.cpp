@@ -47,7 +47,7 @@ namespace SchemeFFI {
 static pointer createMallocZone(scheme* Scheme, pointer Args)
 {
     if (Args == Scheme->NIL) {
-        return mk_cptr(Scheme, extemp::EXTZones::llvm_zone_create(1024 * 100));
+        return mk_cptr(Scheme, extemp::EXTZones::llvm_zone_create(uint64_t{1024} * 100));
     }
     return mk_cptr(Scheme, extemp::EXTZones::llvm_zone_create(argInt(Scheme, Args, 1)));
 }

@@ -67,9 +67,9 @@ static pointer getClockTime(scheme* Scheme, pointer Args)
 static pointer lastSampleBlockClock(scheme* Scheme, pointer Args)
 {
     pointer p1 = mk_integer(Scheme, UNIV::TIME);
-    EnvInjector inject1(Scheme, p1);
+    const EnvInjector inject1(Scheme, p1);
     pointer p2 = mk_real(Scheme, AudioDevice::REALTIME + UNIV::CLOCK_OFFSET);
-    EnvInjector inject2(Scheme, p2);
+    const EnvInjector inject2(Scheme, p2);
     return cons(Scheme, p1, p2);
 }
 

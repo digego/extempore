@@ -55,7 +55,7 @@ static pointer asciiColor(scheme* Scheme, pointer Args)
 
 static pointer emit(scheme* Scheme, pointer Args)
 {
-    int lgth = list_length(Scheme, Args);
+    const int lgth = list_length(Scheme, Args);
     pointer io = list_ref(Scheme, lgth - 1, Args);
 
     if (s7_is_output_port(Scheme->sc, io)) {
@@ -90,7 +90,7 @@ static pointer emit(scheme* Scheme, pointer Args)
 
 static pointer exit_extempore(scheme* Scheme, pointer Args)
 {
-    int rc = (Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0;
+    const int rc = (Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0;
     // std::_Exit bypasses destructors AND discards stdio buffers. Flush any
     // pending output (e.g. printf from xtlang tests) and finalize the offline
     // WAV before terminating.

@@ -79,7 +79,7 @@ static pointer setDSPMTWrapper(scheme* Scheme, pointer Args)
 
 static pointer initMTAudio(scheme* Scheme, pointer Args)
 {
-    bool zerolatency = (pair_cadr(Args) == Scheme->T);
+    const bool zerolatency = (pair_cadr(Args) == Scheme->T);
     std::string reason;
     if (!AudioDevice::I()->initMTAudio(int(ivalue(pair_car(Args))), zerolatency, reason)) {
         throw std::runtime_error("sys:init-mt-audio: " + reason);

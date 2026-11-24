@@ -56,13 +56,13 @@ SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
     printf("INFO:");
     ascii_default();
     std::cout << " starting " << m_title << " process..." << std::endl;
-    std::lock_guard<std::mutex> lock(sm_replsMutex);
+    const std::lock_guard<std::mutex> lock(sm_replsMutex);
     sm_repls[m_title] = this;
 }
 
 SchemeREPL::~SchemeREPL() {
     closeREPL();
-    std::lock_guard<std::mutex> lock(sm_replsMutex);
+    const std::lock_guard<std::mutex> lock(sm_replsMutex);
     auto iter(sm_repls.find(m_title));
     if (iter != sm_repls.end() && iter->second == this) {
         sm_repls.erase(iter);
@@ -70,7 +70,7 @@ SchemeREPL::~SchemeREPL() {
 }
 
 SchemeREPL* SchemeREPL::I(const std::string& name) {
-    std::lock_guard<std::mutex> lock(sm_replsMutex);
+    const std::lock_guard<std::mutex> lock(sm_replsMutex);
     auto iter(sm_repls.find(name));
     if (iter == sm_repls.end()) {
         return nullptr;
@@ -82,14 +82,14 @@ void SchemeREPL::writeString(std::string&& String) {
     if (m_serverSocket == INVALID_SOCKET) {
         return;
     }
-    std::lock_guard<std::recursive_mutex> lock(m_writeLock);
+    const std::lock_guard<std::recursive_mutex> lock(m_writeLock);
     String.push_back('\r');
     String.push_back('\n');
     int length = String.length();
     const char* b = String.c_str();
     while (true) {
-        int lth = (length > 1024) ? 1024 : length;
-        long chars_written = net::send(m_serverSocket, b, size_t(lth));
+        const int lth = (length > 1024) ? 1024 : length;
+        const long chars_written = net::send(m_serverSocket, b, size_t(lth));
         if (chars_written != lth) {
             printf("There was an error sending this expression to the interpreter. Check for "
                    "non-ascii characters in your code.\n");
@@ -117,7 +117,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     /* Address resolution stage */
 
     net::ensureInitialised();
-    uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
+    const uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
     if (!resolved) {
         ascii_error();
         printf("Could not resolve host name\n");
@@ -141,11 +141,11 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
         return false;
     }
     int flag = 1;
-    int result = setsockopt(m_serverSocket,     /* socket affected */
-                            IPPROTO_TCP,        /* set option at TCP level */
-                            TCP_NODELAY,        /* name of option */
-                            (const char*)&flag, /* the cast is historical cruft */
-                            int(sizeof(int)));  /* length of option value */
+    const int result = setsockopt(m_serverSocket,     /* socket affected */
+                                  IPPROTO_TCP,        /* set option at TCP level */
+                                  TCP_NODELAY,        /* name of option */
+                                  (const char*)&flag, /* the cast is historical cruft */
+                                  int(sizeof(int)));  /* length of option value */
     if (result < 0) {
         printf("error turning off TCP Nagle ALGO\n");
     }
@@ -157,7 +157,7 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     }
 
     // should now be connected
-    long rc = net::recv(m_serverSocket, m_buf, sizeof(m_buf));
+    const long rc = net::recv(m_serverSocket, m_buf, sizeof(m_buf));
     if (!rc) {
         this->closeREPL();
         ascii_warning();

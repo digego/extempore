@@ -141,13 +141,13 @@ EXPORT void free16(void* Ptr) {
 EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
     // Read big-endian 80-bit value
     unsigned int exponent = (unsigned(bytes[0]) << 8) | bytes[1];
-    uint64_t mantissa = (uint64_t(bytes[2]) << 56) | (uint64_t(bytes[3]) << 48) |
-                        (uint64_t(bytes[4]) << 40) | (uint64_t(bytes[5]) << 32) |
-                        (uint64_t(bytes[6]) << 24) | (uint64_t(bytes[7]) << 16) |
-                        (uint64_t(bytes[8]) << 8) | uint64_t(bytes[9]);
+    const uint64_t mantissa = (uint64_t(bytes[2]) << 56) | (uint64_t(bytes[3]) << 48) |
+                              (uint64_t(bytes[4]) << 40) | (uint64_t(bytes[5]) << 32) |
+                              (uint64_t(bytes[6]) << 24) | (uint64_t(bytes[7]) << 16) |
+                              (uint64_t(bytes[8]) << 8) | uint64_t(bytes[9]);
 
     // Extract sign bit
-    int sign = (exponent >> 15) & 1;
+    const int sign = (exponent >> 15) & 1;
     exponent &= 0x7FFF;
 
     // Handle special cases.
@@ -161,15 +161,15 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
 
     // Convert to double.
     // x86_fp80 exponent bias is 16383, double bias is 1023
-    int64_t exp_unbiased = int64_t(exponent) - 16383;
+    const int64_t exp_unbiased = int64_t(exponent) - 16383;
 
     // The mantissa has an explicit integer bit (bit 63); double has an implicit
     // one, so handle it explicitly.
     if (mantissa & (1ULL << 63)) {
         // Normal number - integer bit is set.
         // Remove the integer bit and shift mantissa to fit in double's 52-bit mantissa.
-        uint64_t double_mantissa = (mantissa & 0x7FFFFFFFFFFFFFFFULL) >> 11;
-        int64_t double_exp = exp_unbiased + 1023;
+        const uint64_t double_mantissa = (mantissa & 0x7FFFFFFFFFFFFFFFULL) >> 11;
+        const int64_t double_exp = exp_unbiased + 1023;
 
         if (double_exp >= 2047) {
             // Overflow to infinity.
@@ -179,7 +179,7 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
             return sign ? -0.0 : 0.0;
         } else {
             // Pack into IEEE 754 double format.
-            uint64_t result_bits =
+            const uint64_t result_bits =
                 (uint64_t(sign) << 63) | (uint64_t(double_exp) << 52) | double_mantissa;
             return std::bit_cast<double>(result_bits);
         }
@@ -208,8 +208,8 @@ EXPORT void llvm_schedule_callback(long long time, void* dat) {
     extemp::SchemeProcess* proc =
         extemp::SchemeProcess::I();  // extemp::SchemeProcess::I()->extemporeCallback(time,dat);
 
-    uint64_t current_time = time;    // task->getStartTime();
-    uint64_t duration = 1000000000;  // task->getDuration();
+    const uint64_t current_time = time;    // task->getStartTime();
+    const uint64_t duration = 1000000000;  // task->getDuration();
     extemp::TaskScheduler::I()->addTask(current_time, duration, proc->getExtemporeCallback(), dat,
                                         0, true);
     return;
@@ -229,7 +229,7 @@ EXPORT char* extitoa(int64_t val) {
 }
 
 EXPORT void llvm_send_udp(char* host, int port, void* message, int message_length) {
-    uint32_t resolved = extemp::net_util::resolve_ipv4(host);
+    const uint32_t resolved = extemp::net_util::resolve_ipv4(host);
     if (!resolved) {
         printf("OSC Error: Could not resolve host name\n");
         return;
@@ -305,8 +305,7 @@ EXPORT void llvm_print_f64(double num) {
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-static thread_local std::minstd_rand sRandGen{
-    static_cast<std::minstd_rand::result_type>(std::time(nullptr))};
+static thread_local std::minstd_rand sRandGen{std::random_device{}()};
 
 EXPORT double xtc_randd() {
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was
@@ -388,7 +387,7 @@ static std::string stripAdhocCounter(std::string_view name) {
     auto pos = name.find("_adhoc_");
     if (pos == std::string_view::npos)
         return "";
-    size_t afterAdhoc = pos + 7;
+    const size_t afterAdhoc = pos + 7;
     size_t counterEnd = afterAdhoc;
     while (counterEnd < name.size() && name[counterEnd] >= '0' && name[counterEnd] <= '9') {
         counterEnd++;
@@ -402,14 +401,14 @@ static std::string stripAdhocCounter(std::string_view name) {
 void registerAdhocAlias(std::string_view fullName) {
     auto alias = stripAdhocCounter(fullName);
     if (!alias.empty()) {
-        std::unique_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
+        const std::unique_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
         sAdhocAliases[alias] = std::string(fullName);
     }
 }
 
 // Full name registered for a counter-less adhoc alias, or empty.
 static std::string lookupAdhocAlias(std::string_view name) {
-    std::shared_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
+    const std::shared_lock<std::shared_mutex> lock(sAdhocAliasesMutex);
     auto it = sAdhocAliases.find(std::string(name));
     return it == sAdhocAliases.end() ? std::string() : it->second;
 }
@@ -509,7 +508,7 @@ class GraceJITLinkMemoryManager final : public llvm::jitlink::JITLinkMemoryManag
     void deallocate(std::vector<FinalizedAlloc> Allocs,
                     OnDeallocatedFunction OnDeallocated) override {
         {
-            std::lock_guard<std::mutex> lock(m_mutex);
+            const std::lock_guard<std::mutex> lock(m_mutex);
             m_graveyard.emplace_back(clock::now(), std::move(Allocs));
         }
         OnDeallocated(llvm::Error::success());
@@ -517,7 +516,7 @@ class GraceJITLinkMemoryManager final : public llvm::jitlink::JITLinkMemoryManag
     void reap(bool All) override {
         std::vector<std::vector<FinalizedAlloc>> expired;
         {
-            std::lock_guard<std::mutex> lock(m_mutex);
+            const std::lock_guard<std::mutex> lock(m_mutex);
             const auto now = clock::now();
             std::vector<Entry> kept;
             for (auto& entry : m_graveyard) {
@@ -564,14 +563,14 @@ class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
         return llvm::sys::Memory::protectMappedMemory(Block, Flags);
     }
     std::error_code releaseMappedMemory(llvm::sys::MemoryBlock& M) override {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        const std::lock_guard<std::mutex> lock(m_mutex);
         m_graveyard.emplace_back(clock::now(), M);
         return std::error_code();
     }
     void reap(bool All) override {
         std::vector<llvm::sys::MemoryBlock> expired;
         {
-            std::lock_guard<std::mutex> lock(m_mutex);
+            const std::lock_guard<std::mutex> lock(m_mutex);
             const auto now = clock::now();
             std::vector<Entry> kept;
             for (auto& entry : m_graveyard) {
@@ -626,7 +625,7 @@ void indexMetadataModule(llvm::Module* Module) {
 }
 
 void unlinkSymbol(const std::string& Name) {
-    llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(Name)};
+    const llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(Name)};
     if (auto err = JIT->getMainJITDylib().remove(names)) {
         llvm::handleAllErrors(
             std::move(err), [](const llvm::orc::SymbolsNotFound&) {},  // already gone
@@ -722,8 +721,9 @@ void releaseOrphans(const std::vector<std::string>& NewExports) {
             if (M->orphanedBy.empty()) {
                 continue;
             }
-            bool replaced = std::any_of(NewExports.begin(), NewExports.end(),
-                                        [&](const std::string& n) { return M->orphanedBy.count(n); });
+            const bool replaced =
+                std::any_of(NewExports.begin(), NewExports.end(),
+                            [&](const std::string& n) { return M->orphanedBy.count(n); });
             if (replaced) {
                 removeModule(M);  // invalidates the iteration
                 changed = true;
@@ -772,7 +772,7 @@ llvm::Error addTrackedModule(llvm::orc::ThreadSafeModule TSM, ModuleSymbols Symb
         return llvm::make_error<llvm::StringError>("JIT not initialized",
                                                    llvm::inconvertibleErrorCode());
     }
-    std::lock_guard<std::mutex> lock(sModulesMutex);
+    const std::lock_guard<std::mutex> lock(sModulesMutex);
     if (sGraceReaper) {
         sGraceReaper->reap(false);
     }
@@ -812,7 +812,7 @@ llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::Threa
         return llvm::make_error<llvm::StringError>("JIT not initialized",
                                                    llvm::inconvertibleErrorCode());
     }
-    std::lock_guard<std::mutex> lock(sModulesMutex);
+    const std::lock_guard<std::mutex> lock(sModulesMutex);
     if (sGraceReaper) {
         sGraceReaper->reap(false);
     }
@@ -824,6 +824,7 @@ llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::Threa
     return RT;
 }
 
+// NOLINTNEXTLINE(performance-unnecessary-value-param): a sink, the caller hands the tracker over
 void removeTransientModule(llvm::orc::ResourceTrackerSP RT) {
     if (auto err = RT->remove()) {
         std::cerr << "LLVM: could not remove module: " << llvm::toString(std::move(err))
@@ -839,14 +840,14 @@ bool removeSymbol(const std::string& name) {
     if (!JIT) {
         return false;
     }
-    std::lock_guard<std::mutex> lock(sModulesMutex);
+    const std::lock_guard<std::mutex> lock(sModulesMutex);
     if (sSymbolOwner.count(name)) {
         sPendingErase.push_back(name);
         return true;
     }
-    llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(name)};
+    const llvm::orc::SymbolNameSet names{JIT->mangleAndIntern(name)};
     if (auto err = JIT->getMainJITDylib().remove(names)) {
-        bool removed = false;
+        const bool removed = false;
         llvm::handleAllErrors(
             std::move(err), [](const llvm::orc::SymbolsNotFound&) {},
             [&](const llvm::ErrorInfoBase& e) {
@@ -890,7 +891,7 @@ const llvm::Function* getFunction(const char* Name) {
 // static destruction can get the order wrong.
 static void cleanupLLVM() {
     {
-        std::lock_guard<std::mutex> lock(sModulesMutex);
+        const std::lock_guard<std::mutex> lock(sModulesMutex);
         sGlobalMap.clear();
         Ms.clear();
         sSymbolOwner.clear();
@@ -912,12 +913,12 @@ static struct EXTLLVMCleanupRegistrar {
 // so decoding stops at the first return instruction (a function with several
 // exits is shown up to its first one) or after kDisassembleLimit bytes.
 std::string llvm_disassemble(const unsigned char* Code, int syntax) {
-    constexpr size_t kDisassembleLimit = 64 * 1024;
+    constexpr size_t kDisassembleLimit = size_t{64} * 1024;
     std::string Error;
 
     // Get target triple from host
-    std::string TripleName = llvm::sys::getProcessTriple();
-    llvm::Triple Triple(TripleName);
+    const std::string TripleName = llvm::sys::getProcessTriple();
+    const llvm::Triple Triple(TripleName);
 
     // Look up target
     const llvm::Target* TheTarget = llvm::TargetRegistry::lookupTarget(Triple, Error);
@@ -925,22 +926,22 @@ std::string llvm_disassemble(const unsigned char* Code, int syntax) {
         return "Disassembler error: " + Error;
     }
 
-    std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Triple));
+    const std::unique_ptr<const llvm::MCRegisterInfo> MRI(TheTarget->createMCRegInfo(Triple));
     if (!MRI)
         return "Failed to create MCRegisterInfo";
 
-    llvm::MCTargetOptions MCOptions;
-    std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(
+    const llvm::MCTargetOptions MCOptions;
+    const std::unique_ptr<const llvm::MCAsmInfo> AsmInfo(
         TheTarget->createMCAsmInfo(*MRI, Triple, MCOptions));
     if (!AsmInfo)
         return "Failed to create MCAsmInfo";
 
-    std::unique_ptr<const llvm::MCSubtargetInfo> STI(
+    const std::unique_ptr<const llvm::MCSubtargetInfo> STI(
         TheTarget->createMCSubtargetInfo(Triple, "", ""));
     if (!STI)
         return "Failed to create MCSubtargetInfo";
 
-    std::unique_ptr<const llvm::MCInstrInfo> MII(TheTarget->createMCInstrInfo());
+    const std::unique_ptr<const llvm::MCInstrInfo> MII(TheTarget->createMCInstrInfo());
     if (!MII)
         return "Failed to create MCInstrInfo";
 
@@ -958,7 +959,7 @@ std::string llvm_disassemble(const unsigned char* Code, int syntax) {
 
     std::string out_str;
     llvm::raw_string_ostream OS(out_str);
-    llvm::ArrayRef<uint8_t> mem(Code, kDisassembleLimit);
+    const llvm::ArrayRef<uint8_t> mem(Code, kDisassembleLimit);
     OS << "\n";
     for (uint64_t index = 0; index < kDisassembleLimit;) {
         llvm::MCInst Inst;
@@ -1179,8 +1180,8 @@ llvm::Error defineAbsoluteSymbol(std::string_view Name, void* Addr) {
         return llvm::make_error<llvm::StringError>("JIT not initialized",
                                                    llvm::inconvertibleErrorCode());
     }
-    std::lock_guard<std::mutex> lock(sModulesMutex);
-    std::string name(Name);
+    const std::lock_guard<std::mutex> lock(sModulesMutex);
+    const std::string name(Name);
     if (sSymbolOwner.count(name)) {
         sPendingErase.push_back(name);
         flushPendingErasures();
@@ -1240,8 +1241,8 @@ void initLLVM() {
     auto JITBuilder = llvm::orc::LLJITBuilder();
 
     // Configure target machine
-    std::string triple = llvm::sys::getProcessTriple();
-    std::string cpu =
+    const std::string triple = llvm::sys::getProcessTriple();
+    const std::string cpu =
         extemp::UNIV::CPU.empty() ? std::string(llvm::sys::getHostCPUName()) : extemp::UNIV::CPU;
 
     // Get host features

@@ -103,7 +103,7 @@ static char base64_std_encoding_table[] = {
 
 static char* base64_std_decoding_table = nullptr;
 static char* base64_codesafe_decoding_table = nullptr;
-static int _base64_mod_table[] = {0, 2, 1};
+static int kBase64ModTable[] = {0, 2, 1};
 
 void base64_std_build_decoding_table() {
 
@@ -140,11 +140,11 @@ EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t octet_a = i < input_length ? data[i++] : 0;
-        uint32_t octet_b = i < input_length ? data[i++] : 0;
-        uint32_t octet_c = i < input_length ? data[i++] : 0;
+        const uint32_t octet_a = i < input_length ? data[i++] : 0;
+        const uint32_t octet_b = i < input_length ? data[i++] : 0;
+        const uint32_t octet_c = i < input_length ? data[i++] : 0;
 
-        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+        const uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 
         encoded_data[j++] = base64_codesafe_encoding_table[(triple >> 3 * 6) & 0x3F];
         encoded_data[j++] = base64_codesafe_encoding_table[(triple >> 2 * 6) & 0x3F];
@@ -152,7 +152,7 @@ EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length
         encoded_data[j++] = base64_codesafe_encoding_table[(triple >> 0 * 6) & 0x3F];
     }
 
-    for (int i = 0; i < _base64_mod_table[input_length % 3]; i++) {
+    for (int i = 0; i < kBase64ModTable[input_length % 3]; i++) {
         encoded_data[*output_length - 1 - i] = 0;  //'$';
     }
 
@@ -168,7 +168,7 @@ EXPORT char* cname_decode(char* data, size_t input_length, size_t* output_length
     // scope so we always know which buffer to free at the end.
     char* pad_buf = nullptr;
     if (input_length % 4 != 0) {
-        int lgthdiff = (4 - (input_length % 4));
+        const int lgthdiff = (4 - (input_length % 4));
         pad_buf = (char*)malloc(input_length + lgthdiff);
         memcpy(pad_buf, data, input_length);
         input_length = input_length + lgthdiff;
@@ -198,17 +198,17 @@ EXPORT char* cname_decode(char* data, size_t input_length, size_t* output_length
     decoded_data[*output_length] = 0;
 
     auto fetch = [&](unsigned& i) -> uint32_t {
-        unsigned char c = static_cast<unsigned char>(data[i++]);
+        const unsigned char c = static_cast<unsigned char>(data[i++]);
         return c == '$' ? 0u : base64_codesafe_decoding_table[c];
     };
 
     for (unsigned i = 0, j = 0; i < input_length;) {
-        uint32_t sextet_a = fetch(i);
-        uint32_t sextet_b = fetch(i);
-        uint32_t sextet_c = fetch(i);
-        uint32_t sextet_d = fetch(i);
+        const uint32_t sextet_a = fetch(i);
+        const uint32_t sextet_b = fetch(i);
+        const uint32_t sextet_c = fetch(i);
+        const uint32_t sextet_d = fetch(i);
 
-        uint32_t triple =
+        const uint32_t triple =
             (sextet_a << 3 * 6) + (sextet_b << 2 * 6) + (sextet_c << 1 * 6) + (sextet_d << 0 * 6);
 
         if (j < *output_length)
@@ -234,11 +234,11 @@ EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t octet_a = i < input_length ? data[i++] : 0;
-        uint32_t octet_b = i < input_length ? data[i++] : 0;
-        uint32_t octet_c = i < input_length ? data[i++] : 0;
+        const uint32_t octet_a = i < input_length ? data[i++] : 0;
+        const uint32_t octet_b = i < input_length ? data[i++] : 0;
+        const uint32_t octet_c = i < input_length ? data[i++] : 0;
 
-        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+        const uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 
         encoded_data[j++] = base64_std_encoding_table[(triple >> 3 * 6) & 0x3F];
         encoded_data[j++] = base64_std_encoding_table[(triple >> 2 * 6) & 0x3F];
@@ -246,7 +246,7 @@ EXPORT char* base64_encode(const unsigned char* data, size_t input_length, size_
         encoded_data[j++] = base64_std_encoding_table[(triple >> 0 * 6) & 0x3F];
     }
 
-    for (int i = 0; i < _base64_mod_table[input_length % 3]; i++)
+    for (int i = 0; i < kBase64ModTable[input_length % 3]; i++)
         encoded_data[*output_length - 1 - i] = '=';
 
     return encoded_data;
@@ -270,18 +270,18 @@ EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_
         return nullptr;
 
     auto fetch = [&](unsigned& i) -> uint32_t {
-        unsigned char c = static_cast<unsigned char>(data[i++]);
+        const unsigned char c = static_cast<unsigned char>(data[i++]);
         return c == '=' ? 0u : base64_std_decoding_table[c];
     };
 
     for (unsigned i = 0, j = 0; i < input_length;) {
 
-        uint32_t sextet_a = fetch(i);
-        uint32_t sextet_b = fetch(i);
-        uint32_t sextet_c = fetch(i);
-        uint32_t sextet_d = fetch(i);
+        const uint32_t sextet_a = fetch(i);
+        const uint32_t sextet_b = fetch(i);
+        const uint32_t sextet_c = fetch(i);
+        const uint32_t sextet_d = fetch(i);
 
-        uint32_t triple =
+        const uint32_t triple =
             (sextet_a << 3 * 6) + (sextet_b << 2 * 6) + (sextet_c << 1 * 6) + (sextet_d << 0 * 6);
 
         if (j < *output_length)
@@ -297,7 +297,7 @@ EXPORT unsigned char* base64_decode(const char* data, size_t input_length, size_
 
 EXPORT bool rmatch(char* regex, const char* str) {
     try {
-        std::regex re(regex);
+        const std::regex re(regex);
         return std::regex_search(str, re);
     } catch (const std::regex_error&) {
         return false;
@@ -307,12 +307,12 @@ EXPORT bool rmatch(char* regex, const char* str) {
 EXPORT int64_t rmatches(char* regex, char* str, char** results, int64_t maxnum) {
     try {
         std::string s(str);
-        std::regex re(regex);
+        const std::regex re(regex);
         int64_t num = 0;
         auto begin = std::sregex_iterator(s.begin(), s.end(), re);
         auto end = std::sregex_iterator();
         for (auto it = begin; it != end && num < maxnum; ++it) {
-            std::string match = (*it)[0].str();
+            const std::string match = (*it)[0].str();
             char* tmp = (char*)malloc(match.length() + 1);
             strcpy(tmp, match.c_str());
             results[num] = tmp;
@@ -330,13 +330,13 @@ EXPORT bool rsplit(const char* regex, const char* str, char* a, char* b) {
     // capacity is tracked as a follow-up backlog task.
     constexpr size_t kAssumedBufSize = 2048;
     try {
-        std::regex re(regex);
+        const std::regex re(regex);
         std::cmatch m;
         if (!std::regex_search(str, m, re) || m.size() != 1)
             return false;
-        size_t range = static_cast<size_t>(m.position(0));
-        size_t range2 = range + static_cast<size_t>(m.length(0));
-        size_t length = strlen(str);
+        const size_t range = static_cast<size_t>(m.position(0));
+        const size_t range2 = range + static_cast<size_t>(m.length(0));
+        const size_t length = strlen(str);
         if (range >= kAssumedBufSize || (length - range2) >= kAssumedBufSize)
             return false;
         memcpy(a, str, range);
@@ -358,15 +358,15 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
     const char* out = str; // fall back to the original on oversize / regex error
     std::string res;
     try {
-        std::regex re(regex);
+        const std::regex re(regex);
         res = std::regex_replace(std::string(str), re, std::string(replacement),
                                  std::regex_constants::format_first_only);
         if (res.length() < kAssumedBufSize)
             out = res.c_str();
-    } catch (const std::regex_error&) {
+    } catch (const std::regex_error&) {  // NOLINT(bugprone-empty-catch)
         // out stays pointed at str
     }
-    size_t n = strnlen(out, kAssumedBufSize - 1);
+    const size_t n = strnlen(out, kAssumedBufSize - 1);
     memcpy(result, out, n);
     result[n] = '\0';
     return result;
@@ -452,7 +452,7 @@ std::string resolve_build_dir(std::string_view share_dir) {
 }
 
 std::string find_file(const std::string& path) {
-    std::filesystem::path p(path);
+    const std::filesystem::path p(path);
     std::error_code ec;
     if (p.is_absolute() || std::filesystem::exists(p, ec)) {
         return path;
@@ -563,7 +563,7 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
         ss << "#<CPTR: " << p << ">";
     } else if (is_vector(val)) {
         ss << "#(";
-        long long num = vector_length(val);
+        const long long num = vector_length(val);
         if (num > 1000 && !full) {
             ss << " -- " << num << " elements -- )";
             return;
@@ -575,7 +575,7 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
         }
         ss << ")";
     } else if (is_pair(val)) {
-        int lgth = list_length(_sc, val);
+        const int lgth = list_length(_sc, val);
         if (lgth < 0) {
             ss << "(";
             printSchemeCell(_sc, ss, pair_car(val), full, stringquotes);

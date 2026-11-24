@@ -105,14 +105,14 @@ static PcrePtr cachedPattern(const char* Pattern, pointer Args)
 
     std::string key(Pattern);
     {
-        std::lock_guard<std::mutex> lock(sPatternCacheMutex);
+        const std::lock_guard<std::mutex> lock(sPatternCacheMutex);
         auto it = sPatternCache.find(key);
         if (it != sPatternCache.end()) {
             return it->second;
         }
     }
     PcrePtr re = compilePattern(Pattern, Args);  // compiled outside the lock
-    std::lock_guard<std::mutex> lock(sPatternCacheMutex);
+    const std::lock_guard<std::mutex> lock(sPatternCacheMutex);
     if (sPatternCache.size() >= MAX_CACHED_PATTERNS) {
         sPatternCache.clear();
     }
@@ -136,7 +136,7 @@ static int regexExec(const PcrePtr& Re, const MatchDataPtr& MatchData, std::stri
 
 static pointer regex_match(scheme* Scheme, pointer Args)
 {
-    std::string_view data(argString(Scheme, Args, 1));
+    const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     return (regexExec(re, matchData, data) > 0) ? Scheme->T : Scheme->F;
@@ -144,10 +144,10 @@ static pointer regex_match(scheme* Scheme, pointer Args)
 
 static pointer regex_matched(scheme* Scheme, pointer Args)
 {
-    std::string_view data(argString(Scheme, Args, 1));
+    const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
-    int rc = regexExec(re, matchData, data);
+    const int rc = regexExec(re, matchData, data);
     pointer list = Scheme->NIL;
     if (rc < 1) {
         return list;
@@ -155,16 +155,16 @@ static pointer regex_matched(scheme* Scheme, pointer Args)
     const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
     for (int i = 0; i < rc; ++i)
     {
-        PCRE2_SIZE start = ovector[i * 2];
-        PCRE2_SIZE end = ovector[i * 2 + 1];
+        const PCRE2_SIZE start = ovector[2 * size_t(i)];
+        const PCRE2_SIZE end = ovector[2 * size_t(i) + 1];
         // cons itself can trigger GC before storing its arguments (new_cell
         // -> try_to_call_gc), and the GC cannot see C-frame locals: BOTH the
         // list and the just-allocated string need protection across the cons
-        EnvInjector injector(Scheme, list);
+        const EnvInjector injector(Scheme, list);
         pointer s = (start == PCRE2_UNSET)
                 ? mk_string(Scheme, "")
                 : mk_counted_string(Scheme, data.data() + start, int(end - start));
-        EnvInjector injector2(Scheme, s);
+        const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
     }
     return reverse_in_place(Scheme, Scheme->NIL, list);
@@ -181,14 +181,14 @@ static pointer regex_match_all(scheme* Scheme, pointer Args)
             break;
         }
         const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
-        EnvInjector injector(Scheme, list);
+        const EnvInjector injector(Scheme, list);
         pointer s = mk_counted_string(
                 Scheme, data.data() + ovector[0], int(ovector[1] - ovector[0]));
-        EnvInjector injector2(Scheme, s);
+        const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
         // a zero-width match leaves the end offset where the search started,
         // so step at least one character or this never terminates
-        size_t advance = (ovector[1] > 0) ? size_t(ovector[1]) : 1;
+        const size_t advance = (ovector[1] > 0) ? size_t(ovector[1]) : 1;
         if (advance >= data.size()) {
             break;
         }
@@ -211,9 +211,9 @@ static pointer regex_split(scheme* Scheme, pointer Args)
                 // protection, `list` and the fresh string (referenced only
                 // from this C frame) are collected and the cons links freed
                 // cells, corrupting whatever reuses them
-                EnvInjector injector(Scheme, list);
+                const EnvInjector injector(Scheme, list);
                 pointer s = mk_counted_string(Scheme, data.data(), int(data.size()));
-                EnvInjector injector2(Scheme, s);
+                const EnvInjector injector2(Scheme, s);
                 list = cons(Scheme, s, list);
             }
             return reverse_in_place(Scheme, Scheme->NIL, list);
@@ -227,9 +227,10 @@ static pointer regex_split(scheme* Scheme, pointer Args)
             piece = 1;
             advance = 1;
         }
-        EnvInjector injector(Scheme, list);
+        const EnvInjector injector(Scheme, list);
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): the length is passed
         pointer s = mk_counted_string(Scheme, data.data(), int(piece));
-        EnvInjector injector2(Scheme, s);
+        const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
         if (advance >= data.size()) {
             return reverse_in_place(Scheme, Scheme->NIL, list);
@@ -244,11 +245,11 @@ static pointer regex_split(scheme* Scheme, pointer Args)
 // isn't a group reference at all.
 static pointer regex_replace(scheme* Scheme, pointer Args)
 {
-    std::string_view data(argString(Scheme, Args, 1));
+    const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     const char* replace = argString(Scheme, Args, 3);
     auto matchData(matchDataFor(re));
-    int rc = regexExec(re, matchData, data);
+    const int rc = regexExec(re, matchData, data);
     if (rc < 1) {
         return mk_counted_string(Scheme, data.data(), int(data.size()));
     }
@@ -274,9 +275,9 @@ static pointer regex_replace(scheme* Scheme, pointer Args)
         }
         // a group beyond what the pattern matched, or one this match left
         // unset, substitutes nothing
-        if (group < uint32_t(rc) && ovector[group * 2] != PCRE2_UNSET) {
-            result.append(data.data() + ovector[group * 2],
-                    size_t(ovector[group * 2 + 1] - ovector[group * 2]));
+        const size_t at = 2 * size_t{group};
+        if (group < uint32_t(rc) && ovector[at] != PCRE2_UNSET) {
+            result.append(data.data() + ovector[at], size_t(ovector[at + 1] - ovector[at]));
         }
     }
     result.append(data.substr(ovector[1]));

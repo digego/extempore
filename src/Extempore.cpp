@@ -46,6 +46,7 @@
 #include <array>
 #include <cerrno>
 #include <charconv>
+#include <cstdint>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -95,12 +96,12 @@ BOOL CtrlHandler(DWORD fdwCtrlType) {
 void sig_handler(int Signo) {
     if (Signo == SIGINT) {
         static const char msg[] = "\nextempore: SIGINT, exiting\n";
-        ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        const ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
         (void)r;
         _Exit(128 + SIGINT);
     } else if (Signo == SIGTERM) {
         static const char msg[] = "\nextempore: SIGTERM, exiting\n";
-        ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        const ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
         (void)r;
         _Exit(128 + SIGTERM);
     }
@@ -123,7 +124,7 @@ static void install_signal_handlers() {
 
 namespace {
 
-enum class Opt {
+enum class Opt : std::uint8_t {
     Help,
     Version,
     Run,
@@ -157,7 +158,7 @@ enum class Opt {
     Duration,
 };
 
-enum class Arg { None, Required };
+enum class Arg : std::uint8_t { None, Required };
 
 struct OptionSpec {
     Opt id;
@@ -254,10 +255,10 @@ template <typename T> bool parse_integer(std::string_view option, std::string_vi
 // strtod rather than from_chars: libc++ only gained floating-point from_chars
 // recently and macOS ships older versions.
 bool parse_real(std::string_view option, std::string_view text, double& out) {
-    std::string copy(text);
+    const std::string copy(text);
     char* end = nullptr;
     errno = 0;
-    double value = strtod(copy.c_str(), &end);
+    const double value = strtod(copy.c_str(), &end);
     if (copy.empty() || end != copy.c_str() + copy.size() || errno == ERANGE) {
         std::cout << "Error: " << option << " expects a number, got \"" << text << "\""
                   << std::endl;
@@ -287,7 +288,7 @@ struct Settings {
     std::string sharedir;  // --sharedir, empty when not given
 };
 
-enum class ParseResult { Continue, Exit };
+enum class ParseResult : std::uint8_t { Continue, Exit };
 
 // Apply one parsed option. `value` is set for Arg::Required options.
 // Returns Exit (with status) when the option ends the run (--help, --version,
@@ -471,7 +472,7 @@ ParseResult apply_option(const OptionSpec& spec, std::string_view value, Setting
 ParseResult parse_args(std::span<char*> args, Settings& settings, int& status) {
     status = 0;
     for (size_t i = 0; i < args.size(); ++i) {
-        std::string_view arg(args[i]);
+        const std::string_view arg(args[i]);
         if (!arg.starts_with("--")) {
             if (arg.starts_with("-")) {
                 std::cout << "Poorly formed argument: " << arg << std::endl;
@@ -617,7 +618,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     // Normal mode: utility + primary processes with server threads
     auto* utility =
         new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
-    bool startup_ok = utility->start();
+    const bool startup_ok = utility->start();
     auto* utility_repl = new extemp::SchemeREPL(utility_name, utility);
     utility_repl->connectToProcessAtHostname(host, utility_port);
 

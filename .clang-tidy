@@ -1,4 +1,12 @@
 ---
+# Left out on purpose:
+# - bugprone-throwing-static-initialization: it flags every process-lifetime
+#   global (a static std::string), and a failed allocation at static init ends
+#   the process however it is written.
+# - performance-avoid-endl: the runtime's output is interactive diagnostics,
+#   where the flush is what's wanted.
+# - cppcoreguidelines-pro-type-static-cast-downcast: its fix is dynamic_cast,
+#   which -fno-rtti rules out.
 Checks: >
   -*,
   bugprone-*,
@@ -7,13 +15,18 @@ Checks: >
   -bugprone-narrowing-conversions,
   -bugprone-branch-clone,
   -bugprone-signed-char-misuse,
-  cppcoreguidelines-pro-type-static-cast-downcast,
+  -bugprone-throwing-static-initialization,
   cppcoreguidelines-slicing,
   misc-const-correctness,
   misc-misplaced-const,
   performance-*,
+  -performance-avoid-endl,
   -performance-no-int-to-ptr,
   readability-misleading-indentation,
   readability-redundant-smartptr-get
-WarningsAsErrors: ''
+WarningsAsErrors: '*'
+CheckOptions:
+  # Pointee constness: its fix-its don't compile where a pointer is passed on
+  # as mutable, and the runtime's C APIs take mutable pointers throughout.
+  misc-const-correctness.AnalyzePointers: false
 HeaderFilterRegex: '^.*/(src|include)/(?!s7|shims|linenoise).*'

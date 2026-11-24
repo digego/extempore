@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <cerrno>
+#include <charconv>
 
 #include <sys/types.h>
 
@@ -103,8 +104,8 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     }
     m_scheme = scheme_init_new();
     m_scheme->m_process = this;
-    m_defaultZone =
-        extemp::EXTZones::llvm_zone_create(50 * 1024 * 1024);  // allocate default zone of 50M
+    m_defaultZone = extemp::EXTZones::llvm_zone_create(uint64_t{50} * 1024 *
+                                                       1024);  // allocate default zone of 50M
     strcpy(m_scheme->name, m_name.c_str());
     m_maxDuration = m_scheme->call_default_time;
     memset(m_schemeOutportString, 0, SCHEME_OUTPORT_STRING_LENGTH);
@@ -183,7 +184,7 @@ bool SchemeProcess::start(bool subsume) {
 
 void SchemeProcess::stop() {
     {
-        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+        const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
         m_running = false;
     }
     m_guardCond.notify_all();  // wake the task thread so it can exit its loop
@@ -203,7 +204,7 @@ SchemeProcess::~SchemeProcess() {
 }
 
 void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type) {
-    std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
     auto currentTime(TaskAdd->getStartTime());
     auto duration(TaskAdd->getDuration());
     auto task(static_cast<Task<SchemeObj*>*>(TaskAdd));
@@ -212,7 +213,7 @@ void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type) {
 }
 
 void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, SchemeTask::Type Type) {
-    std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+    const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
     m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, Arg, Label, Type));
     m_guardCond.notify_one();
 }
@@ -246,11 +247,11 @@ void* SchemeProcess::taskImpl() {
     std::this_thread::sleep_for(std::chrono::seconds(2));  // give time for NSApp etc. to init
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
-        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+        const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
         // The startup tasks' deadlines are in audio time, which an offline
         // render (--audio-outfile) runs many times faster than the wall
         // clock, so they get an hour rather than the default timeout.
-        const uint64_t startupBudget = 60 * 60 * UNIV::SECOND();
+        const uint64_t startupBudget = uint64_t{60} * 60 * UNIV::SECOND();
         m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, startupBudget,
                                     new std::string("(sys:compile-init-ll)"), "file_init",
                                     SchemeTask::Type::LOCAL_PROCESS_STRING));
@@ -278,8 +279,8 @@ void* SchemeProcess::taskImpl() {
             m_guardCond.wait(lock, [this] { return !m_taskQueue.empty() || !m_running; });
         }
         while (!taskQueueEmpty() && m_running) [[likely]] {
-            SchemeTask task = [&]() {
-                std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+            const SchemeTask task = [&]() {
+                const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                 SchemeTask t = m_taskQueue.front();
                 m_taskQueue.pop();
                 return t;
@@ -293,7 +294,7 @@ void* SchemeProcess::taskImpl() {
             {
                 auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                 if (evalString->length() > 2) {
-                    uint64_t now(UNIV::TIME);
+                    const uint64_t now(UNIV::TIME);
                     scheme_load_string(m_scheme, evalString->c_str(), now,
                                        now + task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
@@ -303,20 +304,22 @@ void* SchemeProcess::taskImpl() {
                 delete evalString;
             } break;
             case SchemeTask::Type::REPL: {
-                auto returnSocket(atoi(task.getLabel().c_str()));
+                const std::string& label = task.getLabel();
+                int returnSocket = 0;
+                std::from_chars(label.data(), label.data() + label.size(), returnSocket);
                 auto evalString(reinterpret_cast<std::string*>(task.getPtr()));
                 if (evalString->length() > 1) {
                     std::stringstream ss;
-                    bool write_reply(!!evalString->compare(0, 4, "(ipc"));
+                    const bool write_reply(!!evalString->compare(0, 4, "(ipc"));
                     if ((*evalString)[evalString->length() - 1] == TERMINATION_CHAR) {
                         evalString->erase(--evalString->end());
                     }
-                    uint64_t now(UNIV::TIME);
+                    const uint64_t now(UNIV::TIME);
                     scheme_load_string(m_scheme, (const char*)evalString->c_str(), now,
                                        now + task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         if (write_reply) {
-                            std::string err(m_schemeOutportString);
+                            const std::string err(m_schemeOutportString);
                             if (!err.empty()) {
                                 send(returnSocket, err.c_str(), int(err.length() + 1), 0);
                             } else {
@@ -355,7 +358,7 @@ void* SchemeProcess::taskImpl() {
                 auto args(pair_cdr(pair));
                 if (is_closure(func) || is_macro(func) || is_continuation(func) || is_proc(func) ||
                     is_foreign(func)) {
-                    uint64_t now(UNIV::TIME);
+                    const uint64_t now(UNIV::TIME);
                     scheme_call(m_scheme, func, args, now, now + task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
@@ -378,7 +381,7 @@ void* SchemeProcess::taskImpl() {
                 pointer args = m_scheme->NIL;
                 if (is_closure(func) || is_continuation(func) || is_proc(func) ||
                     is_foreign(func)) {
-                    uint64_t now(UNIV::TIME);
+                    const uint64_t now(UNIV::TIME);
                     scheme_call(m_scheme, func, args, now, now + task.getMaxDuration());
                     if (m_scheme->retcode) {  // scheme error
                         resetOutportString();
@@ -415,7 +418,7 @@ void* SchemeProcess::serverImpl() {
     std::vector<Client> clients;
     std::vector<pollfd> fds;
     constexpr size_t BUFLEN = 1024;
-    constexpr size_t MAX_PENDING = 10 * 1024 * 1024;
+    constexpr size_t MAX_PENDING = size_t{10} * 1024 * 1024;
     char buf[BUFLEN];
     while (m_running) {
         // Level-triggered poll over the listening socket plus every client:
@@ -425,7 +428,7 @@ void* SchemeProcess::serverImpl() {
         for (const auto& client : clients) {
             fds.push_back({client.fd, POLLIN, 0});
         }
-        int res = poll_sockets(fds);
+        const int res = poll_sockets(fds);
         if (res == 0) {  // timeout: loop around and re-check m_running
             continue;
         }
@@ -508,7 +511,7 @@ void* SchemeProcess::serverImpl() {
                     std::string::size_type pos = 0;
                     for (auto end = client.buffer.find("\r\n", pos); end != std::string::npos;
                          pos = end + 2, end = client.buffer.find("\r\n", pos)) {
-                        std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+                        const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                         char c[24];
                         snprintf(c, sizeof(c), "%lld", static_cast<long long>(client.fd));
                         auto* s = new std::string(client.buffer.substr(pos, end - pos + 1));

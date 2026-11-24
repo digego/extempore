@@ -17,7 +17,7 @@
 #include <thread>
 
 static int connect_to_server(const std::string& host, int port) {
-    uint32_t resolved = extemp::net_util::resolve_ipv4(host.c_str());
+    const uint32_t resolved = extemp::net_util::resolve_ipv4(host.c_str());
     if (!resolved) {
         fprintf(stderr, "repl: could not resolve host '%s'\n", host.c_str());
         return -1;
@@ -29,9 +29,9 @@ static int connect_to_server(const std::string& host, int port) {
     sa.sin_port = htons(port);
     sa.sin_addr.s_addr = resolved;
 
-    int retries = 30;
+    const int retries = 30;
     for (int i = 0; i < retries; i++) {
-        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        const int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) {
             fprintf(stderr, "repl: socket creation failed\n");
             return -1;
@@ -53,7 +53,7 @@ static bool read_response(int sock, std::string& out) {
     out.clear();
     char buf[4096];
     while (true) {
-        ssize_t n = recv(sock, buf, sizeof(buf), 0);
+        const ssize_t n = recv(sock, buf, sizeof(buf), 0);
         if (n <= 0) {
             return false;
         }
@@ -67,11 +67,11 @@ static bool read_response(int sock, std::string& out) {
 }
 
 static bool send_expression(int sock, const std::string& expr) {
-    std::string msg = expr + "\r\n";
+    const std::string msg = expr + "\r\n";
     const char* p = msg.c_str();
     size_t remaining = msg.size();
     while (remaining > 0) {
-        ssize_t n = write(sock, p, remaining);
+        const ssize_t n = write(sock, p, remaining);
         if (n <= 0) {
             return false;
         }
@@ -88,7 +88,7 @@ static int paren_depth(const std::string& input) {
     int block_comment_depth = 0;
 
     for (size_t i = 0; i < input.size(); i++) {
-        char c = input[i];
+        const char c = input[i];
 
         if (in_line_comment) {
             if (c == '\n') {
@@ -148,11 +148,11 @@ static const char* history_path() {
 
 void* linenoise_repl(void* dat) {
     auto* args = static_cast<linenoise_repl_args*>(dat);
-    std::string host = args->host;
-    int port = args->port;
+    const std::string host = args->host;
+    const int port = args->port;
     delete args;
 
-    int sock = connect_to_server(host, port);
+    const int sock = connect_to_server(host, port);
     if (sock < 0) {
         return nullptr;
     }
@@ -184,7 +184,7 @@ void* linenoise_repl(void* dat) {
             break;
         }
 
-        std::string input(line);
+        const std::string input(line);
         linenoiseFree(line);
 
         if (input.empty() && accumulator.empty()) {

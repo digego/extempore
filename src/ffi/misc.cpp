@@ -133,7 +133,7 @@ static pointer stringStrip(scheme* Scheme, pointer Args)
     while (*str == ' ') ++str;
     const char* end = str + strlen(str) - 1;
     while (end >= str && *end == ' ') --end;
-    size_t len = (end >= str) ? static_cast<size_t>(end - str + 1) : 0;
+    const size_t len = (end >= str) ? static_cast<size_t>(end - str + 1) : 0;
     return mk_counted_string(Scheme, str, static_cast<int>(len));
 }
 
@@ -145,7 +145,7 @@ static pointer stringHash(scheme* Scheme, pointer Args)
 static pointer Base64Encode(scheme* Scheme, pointer Args)
 {
     auto dat(reinterpret_cast<unsigned char*>(argCptr(Scheme, Args, 1)));
-    size_t datlength = argInt(Scheme, Args, 2);
+    const size_t datlength = argInt(Scheme, Args, 2);
     size_t lth = 0;
     char* encoded = base64_encode(dat, datlength, &lth);
     if (!encoded) {
@@ -206,7 +206,7 @@ static pointer stringJoin(scheme* Scheme, pointer Args)
         return mk_string(Scheme, "");
     }
     const char* joinstr = argString(Scheme, Args, 2);
-    size_t joinlen = strlen(joinstr);
+    const size_t joinlen = strlen(joinstr);
     size_t len = 0;
     size_t count = 0;
     for (pointer p = array; is_pair(p); p = pair_cdr(p), ++count) {
@@ -235,7 +235,7 @@ static pointer callCPPAtTime(scheme* Scheme, pointer Args)
     if (task_type == 1) {
         std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
     } else {
-        bool is_callback = (task_type == 2);
+        const bool is_callback = (task_type == 2);
         auto obj(new SchemeObj(Scheme, argAt(Scheme, Args, 4), argAt(Scheme, Args, 5)));
         auto cm(reinterpret_cast<extemp::CM*>(argCptr(Scheme, Args, 3)));
         pointer when = argAt(Scheme, Args, 1);
@@ -349,7 +349,7 @@ static pointer scmAddForeignFunc(scheme* sc, pointer Args) {
     // mk_symbol can allocate and trigger GC; without protection the fresh
     // ffunc (referenced only from this frame) is collected and the symbol
     // gets bound to a freed cell --- calls then die on whatever reuses it
-    EnvInjector injector(sc, ffunc);
+    const EnvInjector injector(sc, ffunc);
     scheme_define(sc, sc->global_env, mk_symbol(sc, symbol_name), ffunc);
     return ffunc;
 }
@@ -364,7 +364,7 @@ static std::unordered_map<std::string, entry_type> sImpCirDict;
 
 static entry_type getEntry(const char* Key)
 {
-    std::lock_guard<std::mutex> lock(sImpCirDictMutex);
+    const std::lock_guard<std::mutex> lock(sImpCirDictMutex);
     if (!strcmp(Key, "current")) {
         return sDictHistory[0];
     }
@@ -386,10 +386,10 @@ static pointer impcirGetType(scheme* Scheme, pointer Args)
 
 static pointer impcirAdd(scheme* Scheme, pointer Args)
 {
-    std::string key(argString(Scheme, Args, 1));
+    const std::string key(argString(Scheme, Args, 1));
     entry_type entry(argString(Scheme, Args, 2), argString(Scheme, Args, 3));
 
-    std::lock_guard<std::mutex> lock(sImpCirDictMutex);
+    const std::lock_guard<std::mutex> lock(sImpCirDictMutex);
     entry_type& slot = sImpCirDict[key];
     slot = std::move(entry);
     sDictHistory[1] = std::move(sDictHistory[0]);

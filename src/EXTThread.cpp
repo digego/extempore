@@ -131,7 +131,7 @@ int EXTThread::setPriority(int Priority, bool Realtime) {
     if (Realtime) {  // for realtime threads, use SCHED_RR policy
         policy = SCHED_RR;
     }
-    int result = pthread_setschedparam(m_nativeHandle, policy, &param);
+    const int result = pthread_setschedparam(m_nativeHandle, policy, &param);
     if (result) {
         printf("Error: failed to set thread priority: %s\n", strerror(result));
         return 0;

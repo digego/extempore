@@ -74,8 +74,8 @@ static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& 
     // beyond this a double has no fractional part left anyway, and the cast to
     // int64_t would be UB; the comparison is written so NaN takes this branch
     constexpr double INT64_LIMIT = 9.2e18;
-    bool negative = (Val < 0);
-    double x = negative ? -Val : Val;
+    const bool negative = (Val < 0);
+    const double x = negative ? -Val : Val;
     if (!(x < INT64_LIMIT)) {
         NumOut = negative ? -INT64_MAX : INT64_MAX;
         DenOut = 1;
@@ -90,7 +90,7 @@ static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& 
         if (!(v < INT64_LIMIT)) {
             break;
         }
-        int64_t a = int64_t(v);  // v >= 0, so this is floor(v)
+        const int64_t a = int64_t(v);  // v >= 0, so this is floor(v)
         // stop rather than overflow the convergent (all terms are >= 0 here)
         if (a != 0 && hPrev != 0 && a > (INT64_MAX - hPrev2) / hPrev) {
             break;
@@ -98,8 +98,8 @@ static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& 
         if (a != 0 && kPrev != 0 && a > (INT64_MAX - kPrev2) / kPrev) {
             break;
         }
-        int64_t h = a * hPrev + hPrev2;
-        int64_t k = a * kPrev + kPrev2;
+        const int64_t h = a * hPrev + hPrev2;
+        const int64_t k = a * kPrev + kPrev2;
         if (k > MaxDenom) {
             break;
         }
@@ -109,7 +109,7 @@ static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& 
         kPrev = k;
         num = h;
         den = k;
-        double frac = v - double(a);
+        const double frac = v - double(a);
         if (frac <= 0.0) {
             break;
         }

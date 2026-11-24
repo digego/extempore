@@ -167,14 +167,14 @@ static pointer makeCptr(scheme* Scheme, pointer Args)
 
 static pointer slurpFile(scheme* Scheme, pointer Args)
 {
-    std::string filename(argString(Scheme, Args, 1));
+    const std::string filename(argString(Scheme, Args, 1));
 
     std::ifstream in(UNIV::find_file(filename), std::ios::binary);
     if (!in) {
         return Scheme->F;
     }
     in.seekg(0, std::ios::end);
-    std::streamoff length = in.tellg();
+    const std::streamoff length = in.tellg();
     if (length < 0) {
         return Scheme->F;
     }
@@ -190,7 +190,7 @@ static pointer slurpFile(scheme* Scheme, pointer Args)
 
 static pointer dumpStringToFile(scheme* Scheme, pointer Args)
 {
-    std::string filename(argString(Scheme, Args, 1));
+    const std::string filename(argString(Scheme, Args, 1));
     pointer str = argAt(Scheme, Args, 2);
     if (!is_string(str)) {
         ffiWrongType(str, 2, "a string");
@@ -211,12 +211,12 @@ static pointer dirlist(scheme* Scheme, pointer Args)
     // callers such as libs/external/instruments_ext-scm.xtm match the entries
     // against a filename pattern, not a path.
     std::error_code ec;
-    std::filesystem::path dir(argString(Scheme, Args, 1));
+    const std::filesystem::path dir(argString(Scheme, Args, 1));
     pointer list = Scheme->NIL;
     for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
-        EnvInjector injector(Scheme, list);
+        const EnvInjector injector(Scheme, list);
         pointer s = mk_string(Scheme, it->path().filename().string().c_str());
-        EnvInjector injector2(Scheme, s);
+        const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
     }
     if (ec) {
@@ -241,7 +241,7 @@ static pointer pathExpansion(scheme* Scheme, pointer Args)
         }
     }
     std::error_code ec;
-    std::filesystem::path expanded(std::filesystem::weakly_canonical(path, ec));
+    const std::filesystem::path expanded(std::filesystem::weakly_canonical(path, ec));
     if (ec) {
         return mk_string(Scheme, path.c_str());
     }
@@ -251,6 +251,7 @@ static pointer pathExpansion(scheme* Scheme, pointer Args)
 static pointer command(scheme* Scheme, pointer Args)
 {
     // NOTE: doesn't work for Windows yet
+    // NOLINTNEXTLINE(bugprone-command-processor): running a shell command is sys:command's job
     return mk_integer(Scheme, system(argString(Scheme, Args, 1)));
 }
 
@@ -260,6 +261,7 @@ static pointer commandOutput(scheme* Scheme, pointer Args)
 #ifdef _WIN32
     FILE* stream = _popen(cmd, "r");
 #else
+    // NOLINTNEXTLINE(bugprone-command-processor): running a shell command is the point
     FILE* stream = popen(cmd, "r");
 #endif
     if (!stream) {

@@ -129,7 +129,7 @@ std::map<scheme*, OSC*> OSC::SCHEME_MAP;
 std::mutex OSC::SCHEME_MAP_MUTEX;
 
 OSC* OSC::I(scheme* _sc) {
-    std::lock_guard<std::mutex> lock(SCHEME_MAP_MUTEX);
+    const std::lock_guard<std::mutex> lock(SCHEME_MAP_MUTEX);
     auto entry = SCHEME_MAP.find(_sc);
     return entry == SCHEME_MAP.end() ? nullptr : entry->second;
 }
@@ -158,7 +158,7 @@ static OSC* osc_for_scheme(scheme* _sc) {
 // Convert a 64-bit NTP timetag to seconds; (0, 1) is the OSC "immediately" tag.
 static double osc_ntp_to_seconds(uint64_t timetag) {
     int64_t seconds = static_cast<int64_t>(timetag >> 32);
-    uint32_t fractional = static_cast<uint32_t>(timetag & 0xFFFFFFFFu);
+    const uint32_t fractional = static_cast<uint32_t>(timetag & 0xFFFFFFFFu);
     if (seconds == 0 && fractional == 1)
         return 0.0;
     seconds -= 3187296000ul;
@@ -174,7 +174,7 @@ static double osc_ntp_to_seconds(uint64_t timetag) {
 // values. Argument reads go through oscpp's bounds-checked stream, so a
 // truncated argument throws and the message is dropped by the caller.
 static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, double t,
-                                    const char* address, OSCPP::Server::ArgStream argv,
+                                    const char* address, const OSCPP::Server::ArgStream& argv,
                                     bool include_netaddr, const std::string& netaddy, int netport) {
     if (!osc_text::address_is_valid(address)) {
         return;
@@ -260,10 +260,10 @@ static void osc_handle_message(OSC* osc, SchemeProcess* proc, double t,
 static void osc_dispatch_packet(OSC* osc, SchemeProcess* proc, char* buf, int len,
                                 bool include_netaddr, const std::string& netaddy, int netport) {
     try {
-        OSCPP::Server::Packet packet(buf, static_cast<size_t>(len));
+        const OSCPP::Server::Packet packet(buf, static_cast<size_t>(len));
         if (packet.isBundle()) {
             auto bundle = static_cast<OSCPP::Server::Bundle>(packet);
-            double t = osc_ntp_to_seconds(bundle.time());
+            const double t = osc_ntp_to_seconds(bundle.time());
             auto stream = bundle.packets();
             while (!stream.atEnd()) {
                 auto element = stream.next();  // bundle element size is bounds-checked
@@ -276,7 +276,7 @@ static void osc_dispatch_packet(OSC* osc, SchemeProcess* proc, char* buf, int le
             osc_handle_message(osc, proc, 0.0, static_cast<OSCPP::Server::Message>(packet),
                                include_netaddr, netaddy, netport);
         }
-    } catch (const std::exception&) {
+    } catch (const std::exception&) {  // NOLINT(bugprone-empty-catch)
         // malformed or hostile packet -- drop it (no over-read, no crash)
     }
 }
@@ -288,7 +288,7 @@ void* osc_mesg_callback(void* obj_p) {
     std::vector<char> buffer(70000);
     sockaddr_in sender;
     while (true) {
-        long bytes_read = osc->getSocket().recvFrom(buffer.data(), buffer.size(), sender);
+        const long bytes_read = osc->getSocket().recvFrom(buffer.data(), buffer.size(), sender);
         if (bytes_read < 0) {
             // Nothing waiting on the non-blocking socket, or a receive error
             // (e.g. Windows' spurious WSAECONNRESET after a send to a closed
@@ -367,7 +367,7 @@ void* tcp_osc_server_thread(void* obj_p) {
     SchemeProcess* scm = sop->scm_p;
     OSC* osc = sop->osc_p;
 
-    int socket_fd = osc->getTcpSocketFD();
+    const int socket_fd = osc->getTcpSocketFD();
 
     if (socket_fd < 0) {
         ascii_error();
@@ -404,7 +404,7 @@ void* tcp_osc_server_thread(void* obj_p) {
             struct stat st;
             std::vector<int>::iterator pos = client_sockets.begin();
             while (pos != client_sockets.end()) {
-                int result = fstat(*pos, &st);
+                const int result = fstat(*pos, &st);
                 if (result < 0) {
                     FD_CLR(*pos, &rfd);
                     client_sockets.erase(pos);
@@ -429,17 +429,17 @@ void* tcp_osc_server_thread(void* obj_p) {
             FD_SET(res, &rfd);  // add new socket to the FD_SET
             client_sockets.push_back(res);
             data_map[res] = std::vector<char>();
-            std::string outstr("OSC connected over TCP.");
+            const std::string outstr("OSC connected over TCP.");
             write(res, outstr.c_str(), outstr.length() + 1);
             continue;
         }
         std::vector<int>::iterator pos = client_sockets.begin();
-        std::vector<char> oscpacket;
+        const std::vector<char> oscpacket;
 
         while (pos !=
                client_sockets.end()) {     // check through all fd's for matches against FD_ISSET
             if (FD_ISSET(*pos, &c_rfd)) {  // see if any client sockets have data for us
-                int sock = *pos;
+                const int sock = *pos;
                 for (;;) {  // read from stream in BUFLEN blocks
                     res = read(sock, buf, BUFLEN);
                     if (res == 0) {  // close the socket
@@ -458,7 +458,7 @@ void* tcp_osc_server_thread(void* obj_p) {
                         pos++;
                         break;
                     }
-                    bool fullbuf = (res == BUFLEN) ? true : false;
+                    const bool fullbuf = (res == BUFLEN) ? true : false;
                     // first check to see if we are currently
                     // NOT *in* a valid osc SLIP packet
                     char* bufptr = &buf[0];
@@ -482,7 +482,7 @@ void* tcp_osc_server_thread(void* obj_p) {
                     // OK from here we can assume that we are
                     // in a valid OSC SLIP packet and can start
                     // loading up data_map[sock]
-                    int result =
+                    const int result =
                         parse_osc_slip_data(&data_map[sock], bufptr, res, data_active_escape[sock]);
 
                     if (result == 2) {  // complete osc packet
@@ -533,7 +533,7 @@ void* tcp_osc_server_thread(void* obj_p) {
     // std::cout << "Close any client sockets" << std::endl;
     std::vector<int>::iterator pos = client_sockets.begin();
     while (pos != client_sockets.end()) {  // check through all fd's for matches against FD_ISSET
-        int sock = *pos;
+        const int sock = *pos;
         if (sock < 0) {
             std::cout << "BAD FILE DESCRIPTOR!" << std::endl;
             pos = client_sockets.erase(pos);  // erase returns next pos
@@ -583,7 +583,7 @@ void OSC::processArgs(pointer arg, osc::Writer& out, std::string& typetags, sche
 #ifdef _OSC_DEBUG_
     printf("PROCESS ARGS\n");
 #endif
-    int items = list_length(_sc, arg);
+    const int items = list_length(_sc, arg);
     for (int i = 0; i < items; ++i) {
         if (is_string(pair_car(arg))) {
             out.string(string_value(pair_car(arg)));
@@ -626,7 +626,7 @@ void OSC::sendOSC(TaskI* task) {
     }
 
     const char* host = string_value(pair_car(args));
-    int port = ivalue(pair_cadr(args));
+    const int port = ivalue(pair_cadr(args));
 #ifdef _OSC_DEBUG_
     std::cout << "SENDTO: " << host << "  ON PORT: " << port << std::endl;
 #endif
@@ -644,7 +644,7 @@ void OSC::sendOSC(TaskI* task) {
     std::cout << "SENDING MSG of size: " << message.size() << std::endl;
 #endif
 
-    uint32_t resolved = extemp::net_util::resolve_ipv4(host);
+    const uint32_t resolved = extemp::net_util::resolve_ipv4(host);
     if (!resolved) {
         printf("OSC Error: could not resolve host name: %s\n", host);
         delete t->getArg();
@@ -725,7 +725,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
 
     OSC* osc = nullptr;
     {
-        std::lock_guard<std::mutex> lock(SCHEME_MAP_MUTEX);
+        const std::lock_guard<std::mutex> lock(SCHEME_MAP_MUTEX);
         auto& servers = oscServers()[_sc];
         auto entry = servers.find(port);
         if (entry == servers.end()) {
@@ -797,7 +797,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
         // scm->addGlobalCptr((char*)"*io:osc:send-msg*",mk_cb(osc,OSC,sendOSC));
 
 #ifndef _WIN32
-        int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+        const int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (socket_fd == -1) {
             std::cout << "Error opening TCP-OSC socket" << std::endl;
             return _sc->F;
@@ -817,7 +817,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
         }
         // Bind Server Socket
         struct sockaddr_in server_address;
-        size_t server_address_size = sizeof(server_address);
+        const size_t server_address_size = sizeof(server_address);
 
         // start socket
         memset((char*)&server_address, 0, server_address_size);
