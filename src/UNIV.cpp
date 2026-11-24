@@ -561,6 +561,12 @@ void printSchemeCell(scheme* _sc, std::stringstream& ss, pointer val, bool full,
     } else if (is_cptr(val)) {
         void* p = cptr_value(val);
         ss << "#<CPTR: " << p << ">";
+    } else if (s7_is_byte_vector(val) || s7_is_int_vector(val) || s7_is_float_vector(val)) {
+        // these hold raw numbers, not cells, so the walk below would read
+        // them as pointers
+        char* repr = s7_object_to_c_string(_sc->sc, val);
+        ss << (repr ? repr : "#<VECTOR>");
+        free(repr);
     } else if (is_vector(val)) {
         ss << "#(";
         const long long num = vector_length(val);
