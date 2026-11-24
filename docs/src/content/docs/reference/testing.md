@@ -122,6 +122,12 @@ Each test file also writes a JUnit XML report to `test-results/` in the build
 directory (one file per test file), so CI can surface individual assertion
 failures rather than just which `.xtm` file failed.
 
+On Linux and macOS a test which times out is sent `SIGUSR1` before it is killed,
+and extempore writes a hang report into the test's log: the scheduler's queue,
+what each Scheme process is evaluating and its time limit, and (on Linux) a
+backtrace of every thread. `kill -USR1 <pid>` gets the same report from any
+running extempore.
+
 ## Failing tests {#failing-tests}
 
 `tests/failing.xtm` is a quarantine for known-broken tests. It is registered as
