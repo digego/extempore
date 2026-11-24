@@ -378,7 +378,7 @@ Extempore allows you to trigger 'notes' like a MIDI soft synth.
 how Extempore's instrument infrastructure works, so this is more of a 'quick and
 dirty' example instrument just to get a feel for things. All the instrument code
 is just regular xtlang, and this instrument (and others) can be found in
-`libs/core/instruments.xtm` and `libs/external/instruments_ext.xtm`.
+`libs/core/instruments.xtm` and `libs/core/instruments_ext.xtm`.
 
 An instrument is basically two xtlang closures: a **note kernel closure** and an
 **fx closure**. These closures must have specific type signatures to play nice

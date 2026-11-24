@@ -208,7 +208,7 @@ static pointer dumpStringToFile(scheme* Scheme, pointer Args)
 static pointer dirlist(scheme* Scheme, pointer Args)
 {
     // Bare filenames, and no "." or ".." (directory_iterator skips those):
-    // callers such as libs/external/instruments_ext-scm.xtm match the entries
+    // callers such as libs/core/instruments_ext-scm.xtm match the entries
     // against a filename pattern, not a path.
     std::error_code ec;
     const std::filesystem::path dir(argString(Scheme, Args, 1));

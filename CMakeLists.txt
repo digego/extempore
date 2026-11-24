@@ -651,6 +651,8 @@ aotcompile_lib(libs/core/fft.xtm core base math)
 aotcompile_lib(libs/core/png.xtm core base)
 aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
 aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
+aotcompile_lib(libs/core/audio_dsp_ext.xtm core base fft audiofile)
+aotcompile_lib(libs/core/instruments_ext.xtm core base audiofile instruments)
 
 # The studio's xtlang libraries. libs/studio/aot.xtm has how a cache is checked
 # against its sources when it is loaded.
@@ -668,8 +670,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
     add_custom_target(aot_external_audio ALL)
     set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
     add_dependencies(aot_external_audio extempore external_shlibs_audio)
-    aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft audiofile)
-    aotcompile_lib(libs/external/instruments_ext.xtm audio base audiofile instruments)
     aotcompile_lib(libs/external/portmidi.xtm audio base)
 endif()
 
@@ -698,7 +698,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/tests.cmake)
 
 add_custom_target(xtmdoc
     COMMAND extempore --port 17095
-        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/core/png.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/core/png.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/core/instruments_ext.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
     COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
     VERBATIM)
 add_dependencies(xtmdoc extempore)

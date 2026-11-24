@@ -57,7 +57,10 @@ half that, so an `AudioBuffer` read from a PCM file is now 6 dB louder.
 `AudioBuffer_from_wave`, `AudioBuffer_from_aiff` and `audiofile_read_samples`
 are gone, since `AudioBuffer` reads either format. The sampler's offset into a
 file (`set_sample_data_`) is now in frames, as documented; it was multiplied by
-the square of the channel count.
+the square of the channel count. With no C library left to bind, the sampler
+(`instruments_ext.xtm`) and the convolution reverb and spectral DSP
+(`audio_dsp_ext.xtm`) move to `libs/core`; their old paths in `libs/external`
+still load them.
 
 PNG images are now read and written by `libs/core/png.xtm`, in xtlang, so
 stb_image is no longer a dependency, and only PNG is read: convert other images

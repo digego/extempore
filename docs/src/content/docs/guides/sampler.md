@@ -8,7 +8,7 @@ providing digital simulations of acoustic instruments (e.g. a piano sampler
 which plays recorded samples of a _real_ piano when triggered by messages from a
 MIDI keyboard) or they can be used to play and manipulate non-acoustic sounds.
 Since samplers are so useful, Extempore provides a built-in sampler in
-`libs/external/instruments_ext.xtm`.
+`libs/core/instruments_ext.xtm`.
 
 ## Samplers 101 {#samplers-101}
 
@@ -92,13 +92,13 @@ clear 😜
 
 Ok, enough background material---let's make some noise. We'll create an instance
 of Extempore's sampler called `samp1`. To do this, we use the `make-instrument`
-Scheme macro (once we've loaded it from the `libs/external/instruments_ext.xtm`
+Scheme macro (once we've loaded it from the `libs/core/instruments_ext.xtm`
 library file).
 
 :::
 
 ```xtlang
-(sys:load "libs/external/instruments_ext.xtm")
+(sys:load "libs/core/instruments_ext.xtm")
 
 ;; define a sampler (called samp1) using the default sampler note kernel and effects
 (make-instrument samp1 sampler)
@@ -350,7 +350,7 @@ time-consuming---not to mention error-prone! How do we take a list of files
 (such as the output of `ls` above) and tell our sampler which files to load into
 which slots?
 
-To do this, `libs/external/instruments_ext.xtm` provides a helper function
+To do this, `libs/core/instruments_ext.xtm` provides a helper function
 called `load-sampler`. Looking at the definition for `load-sampler`, we see that
 it takes the three arguments:
 
