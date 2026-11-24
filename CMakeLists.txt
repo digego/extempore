@@ -48,7 +48,6 @@ if(EXTEMPORE_SANITIZE AND NOT EXTEMPORE_SANITIZE MATCHES "^(asan|ubsan|tsan|asan
         "EXTEMPORE_SANITIZE must be one of: asan, ubsan, tsan, asan+ubsan "
         "(got '${EXTEMPORE_SANITIZE}')")
 endif()
-option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native)" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 option(EXTEMPORE_SYSTEM_LLVM "use an installed LLVM of the pinned minor version instead of building it" OFF)
@@ -144,8 +143,6 @@ set(DEP_LLVM_SHA256 "922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a99
 # SHA for its modern CMake and five years of platform fixes.
 set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
 set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
-set(DEP_PORTMIDI_VERSION "v2.0.8")
-set(DEP_PORTMIDI_SHA256 "e4ee3152ae42362f30b5e59fc5729b8b7e2a98023e1752f641d849543602f31e")
 set(DEP_GLFW_VERSION "3.5.1")
 set(DEP_GLFW_SHA256 "ea79bc5feffc254c87291980c2d0bce9acebb68c4983b79f961dcd2cb8a611a0")
 set(DEP_WGPU_VERSION "27.0.4.0")
@@ -670,15 +667,10 @@ aotcompile_lib_as(studio_hall libs/studio/hall.xtm core base audio_dsp studio_ds
 aotcompile_lib_as(studio_mixer libs/studio/mixer.xtm core base audio_dsp midi studio_engine studio_fx studio_hall)
 add_dependencies(aot_studio aot_studio_engine aot_studio_dsp aot_studio_fx aot_studio_hall aot_studio_mixer)
 
-# External audio libs
-if(EXTERNAL_SHLIBS_AUDIO)
-    add_custom_target(aot_external_audio ALL)
-    set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
-    add_dependencies(aot_external_audio extempore external_shlibs_audio)
-    file(GLOB AOT_EXTRA_SOURCES_portmidi CONFIGURE_DEPENDS
-         ${CMAKE_CURRENT_SOURCE_DIR}/libs/external/portmidi/*.xtm)
-    aotcompile_lib(libs/external/portmidi.xtm audio base midi)
-endif()
+# PortMidi's API, over libs/core/midi.xtm: nothing external about it but its path
+file(GLOB AOT_EXTRA_SOURCES_portmidi CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/libs/external/portmidi/*.xtm)
+aotcompile_lib(libs/external/portmidi.xtm core base midi)
 
 # External graphics libs (WebGPU)
 if(EXTERNAL_SHLIBS_GRAPHICS)

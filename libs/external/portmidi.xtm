@@ -1,18 +1,14 @@
-;;; portmidi.xtm -- cross-platform MIDI library
+;;; portmidi.xtm -- PortMidi's API
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libportmidi (not on Linux)
 
 ;;; Commentary:
 
 ;; The API of PortMidi, a cross-platform MIDI library by Roger B. Dannenberg,
-;; for code written to it. New code should use libs/core/midi.xtm.
-;;
-;; On Linux the Pm_* functions are xtlang, over libs/core/midi.xtm
-;; (portmidi/native.xtm says what differs). Elsewhere they are bound from
-;; upstream PortMidi (https://github.com/PortMidi/portmidi), which Extempore's
-;; CMake build downloads and builds as a shared library.
+;; for code written to it. New code should use libs/core/midi.xtm, which this
+;; is written over: the Pm_* functions are in portmidi/native.xtm, which says
+;; how they differ from PortMidi's own.
 
 ;;; Code:
 
@@ -622,12 +618,8 @@
 ;;     with latency = 0.)
 ;; */
 
-;; The Pm_* functions themselves. On Linux they are written over
-;; libs/core/midi.xtm; elsewhere, until that library has a backend there, they
-;; are bound from libportmidi.
-(sys:load (string-append "libs/external/portmidi/"
-                         (if (string=? (sys:platform) "Linux") "native" "lib")
-                         ".xtm"))
+;; the Pm_* functions themselves
+(sys:load "libs/external/portmidi/native.xtm")
 
 (bind-func pm_default_in
   "an xtlang wrapper around Pm_GetDefaultInputDeviceID"

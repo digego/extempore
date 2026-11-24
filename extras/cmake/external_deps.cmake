@@ -1,9 +1,9 @@
 # External shared library dependencies for Extempore
-# Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS options
+# Requires: the EXTERNAL_SHLIBS_GRAPHICS option
 # Sets up: the library targets (ExternalProjects, or a prebuilt download for
 # wgpu-native) and the platform-shlibs copy targets.
 
-if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
+if(NOT EXTERNAL_SHLIBS_GRAPHICS)
     return()
 endif()
 
@@ -36,32 +36,6 @@ function(extempore_add_external name)
             ${ARG_CMAKE_ARGS})
     set_target_properties(${name} PROPERTIES FOLDER ${ARG_FOLDER})
 endfunction()
-
-if(EXTERNAL_SHLIBS_AUDIO)
-    extempore_add_external(portmidi
-        URL https://github.com/PortMidi/portmidi/archive/${DEP_PORTMIDI_VERSION}.zip
-        URL_SHA256 ${DEP_PORTMIDI_SHA256}
-        FOLDER EXTERNAL_SHLIBS)
-
-    if(UNIX)
-        add_custom_target(external_shlibs_audio
-            COMMENT "Copying audio shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS portmidi
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-            WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
-        set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
-    elseif(WIN32)
-        add_custom_target(external_shlibs_audio
-            COMMENT "Copying audio .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS portmidi
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy bin/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
-            WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
-        set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
-    endif()
-endif()
 
 ##########################
 # WebGPU graphics stack  #

@@ -48,8 +48,6 @@ users will care about:
   target you can build afterwards.
 - `BUILD_TESTS` (default `ON`) --- build the test targets (including examples
   registered as ctest tests).
-- `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
-  (portaudio, portmidi).
 - `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics stack
   (glfw, wgpu-native). Required for the WebGPU examples.
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
@@ -101,9 +99,6 @@ standard library (for faster startup). Other targets worth knowing about:
 
 - `aot_core` --- AOT-compile just the core standard library (pure-xtlang
   libraries with no external C library dependencies).
-- `aot_external_audio` --- AOT-compile the audio libraries in `libs/external`
-  (portmidi, the sampler, the convolution reverb). This is the default AOT
-  target.
 - `clean_aot` --- remove all AOT-compiled files.
 - `assets` --- download and unpack the assets tarball.
 

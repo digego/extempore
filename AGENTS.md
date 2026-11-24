@@ -57,8 +57,8 @@ Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
 (`xtmtest-run-tests`, `is?` macro). They run in `--batch` mode (which implies
 `--noaudio`), except for `system.xtm` which uses `--eval` for IPC testing.
 
-In addition, building the `aot_external_audio` target (the default) is a pretty
-good sign that things are working.
+In addition, building the `aot_core` target (part of the default build) is a
+pretty good sign that things are working.
 
 NOTE: this project uses GitHub Actions (in particular the
 `.github/workflows/build-and-test.yml` workflow) to build and test on Linux
@@ -72,7 +72,6 @@ runtime finds them beside the binary (`sys:build-dir`). Don't edit them.
 
 ```bash
 cmake --build build --target aot_core            # AOT compile the core stdlib
-cmake --build build --target aot_external_audio  # ... and the audio libs (default)
 cmake --build build --target clean_aot           # delete build/libs/aot-cache
 cmake --build build --target xtmdoc              # generate docs
 cmake --build build --target tidy                # clang-tidy; CI fails on any finding

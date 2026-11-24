@@ -1,8 +1,8 @@
 ;;; tests/core/portmidi.xtm -- libs/external/portmidi.xtm
 
-;; The round trips need two virtual ports, so they run where libs/core/midi.xtm
-;; has a backend which starts (on Linux, where /dev/snd/seq can be opened),
-;; which is also where the Pm_* functions are written over that library.
+;; The round trips need two virtual ports, so they run where the Pm_* functions
+;; are written over libs/core/midi.xtm and that library's backend starts (on
+;; Linux, where /dev/snd/seq can be opened).
 
 (sys:load "libs/core/test.xtm")
 (sys:load "libs/external/portmidi.xtm")
@@ -156,7 +156,7 @@
       (midi_close pm_test_sink)
       res)))
 
-(if (and (string=? (sys:platform) "Linux") (midi:true? (midi_available)))
+(if (and (not (string=? (sys:platform) "Windows")) (midi:true? (midi_available)))
     (begin
       (xtmtest-result (pm_test_open) 11111 "open-streams")
       (xtmtest-result (pm_test_read) 1111111 "read")

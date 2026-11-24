@@ -14,17 +14,25 @@ of the sampled instruments need `assets/studio`, which isn't in the assets
 download yet; without it they are silent.
 
 `libs/core/midi.xtm` is a new MIDI library which talks to the operating system
-directly: ports opened by name, virtual ports, sysex, input delivered to a
-function on the Scheme thread (or read by the audio callback itself), and timed
-output, sent when its frame is heard. `mplay`, `mcc` and `play-midi-note` are in
-it with the arguments they always had, and on one of its ports they land within
-a millisecond of the beat, where a callback could be a whole audio block out. Linux (the ALSA sequencer) is the only backend so far. The
-old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so code
-which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is now
-`*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have moved
-from `libs/external/portmidi.xtm` to the new library, which `portmidi.xtm`
-loads. On Linux `portmidi.xtm` no longer uses libportmidi: its `Pm_*` functions
-are written over the new library, with the same devices in the same order.
+directly (the ALSA sequencer, CoreMIDI, the Windows multimedia API): ports
+opened by name, virtual ports, sysex, input delivered to a function on the
+Scheme thread (or read by the audio callback itself), and timed output, sent
+when its frame is heard. `mplay`, `mcc` and `play-midi-note` are in it with the
+arguments they always had, and on one of its ports they land within a
+millisecond or two of the beat, where a callback could be a whole audio block
+out. MIDI input on Windows is written but has never been run, for want of a
+Windows machine with a MIDI device: reports are welcome.
+
+PortMidi is no longer built or bundled. `libs/external/portmidi.xtm` keeps its
+whole API (`Pm_*` and `pm_*`), written over the new library, with the same
+devices in the same order, so code which uses it needn't change. The
+`EXTERNAL_SHLIBS_AUDIO` build option and the `aot_external_audio` target are
+gone, there being no external audio library left.
+
+The old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so
+code which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is
+now `*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have
+moved from `portmidi.xtm` to the new library, which `portmidi.xtm` loads.
 
 The studio plays MIDI: `(midi-track 'lead "mini" 1)` makes a track which plays
 an external synth with the same `note-on`, `ctl` and patterns as any other, and

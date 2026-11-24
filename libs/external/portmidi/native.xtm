@@ -1,12 +1,12 @@
-;;; native.xtm -- the Pm_* functions, over libs/core/midi.xtm
+;;; native.xtm -- PortMidi's Pm_* functions, over libs/core/midi.xtm
 
 ;; Loaded by libs/external/portmidi.xtm, which has the types.
 ;;
 ;; What differs from libportmidi:
 ;;
 ;; - the devices are those the system had at the last Pm_Initialize, in the
-;;   order libportmidi lists them in (each port as an output, then as an
-;;   input). Call Pm_Initialize again to look afresh: it leaves open streams
+;;   order libportmidi lists them in (on Linux each port as an output, then
+;;   as an input; on macOS and Windows the inputs, then the outputs). Call Pm_Initialize again to look afresh: it leaves open streams
 ;;   alone.
 ;; - a stream's time procedure is never called. A PmEvent's timestamp is
 ;;   what pm_current_time_in_ms would return when the event is read.
@@ -19,6 +19,15 @@
 (bind-val pm_device_b |512,i64|)
 (bind-val pm_device_count i64 0)
 
+;; the name libportmidi gives this platform's MIDI API: decided when this is
+;; compiled
+(eval `(bind-func pm_interface
+         (lambda ()
+           ,(cond ((string=? (sys:platform) "Linux") "ALSA")
+                  ((string=? (sys:platform) "OSX") "CoreMIDI")
+                  (else "MMSystem"))))
+      (interaction-environment))
+
 (bind-func static pm_add_device
   (lambda (port:i64 input:i32)
     (if (< pm_device_count PM_MAX_DEVICES)
@@ -27,7 +36,7 @@
               (info (aref-ptr pm_devices pm_device_count)))
           (strcpy copy name)
           ;; a stream stays open across Pm_Initialize, and so does its flag
-          (tfill! info 200 "ALSA" copy input (- 1 input)
+          (tfill! info 200 (pm_interface) copy input (- 1 input)
                   (if (and (= (aref pm_device_a pm_device_count) (midi_port_address port 0))
                            (= (aref pm_device_b pm_device_count) (midi_port_address port 1)))
                       (tref info 5)
