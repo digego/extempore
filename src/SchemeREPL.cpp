@@ -49,13 +49,8 @@ namespace extemp {
 std::unordered_map<std::string, SchemeREPL*> SchemeREPL::sm_repls;
 std::mutex SchemeREPL::sm_replsMutex;
 
-SchemeREPL::SchemeREPL(const std::string& Title, SchemeProcess* Process)
-    : m_title(Title), m_process(Process), m_serverSocket(INVALID_SOCKET), m_connected(false),
-      m_active(true) {
-    ascii_info();
-    printf("INFO:");
-    ascii_default();
-    std::cout << " starting " << m_title << " process..." << std::endl;
+SchemeREPL::SchemeREPL(const std::string& Title)
+    : m_title(Title), m_serverSocket(INVALID_SOCKET), m_connected(false), m_active(true) {
     const std::lock_guard<std::mutex> lock(sm_replsMutex);
     sm_repls[m_title] = this;
 }

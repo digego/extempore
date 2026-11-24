@@ -45,6 +45,12 @@ function's size, and closures with many captured variables and deeply nested
 environments, which are now addressed as arrays of pointers and take much less
 IR.
 
+Extempore starts three seconds sooner: each Scheme process slept for 3 s before
+evaluating anything. IPC between processes in the same extempore (`ipc:call`,
+`ipc:define`, `ipc:eval`) now goes straight onto the other process's task queue
+in place of a TCP connection to itself, so a call made just after startup is no
+longer lost. `ipc:connect` to another extempore still uses TCP.
+
 Struct sizes now come from the JIT's data layout. The compiler's own rules
 aligned an i64 to 4 bytes, so a struct with padding around an i64 was allocated
 short. `llvm:get-struct-size` is now `llvm:get-type-size`, with no alias. A

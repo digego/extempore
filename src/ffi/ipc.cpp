@@ -48,47 +48,46 @@ namespace extemp {
 namespace SchemeFFI {
 
 // ipc stuff
+
+// A process in this extempore gets IPC expressions straight onto its task
+// queue; one in another extempore (from ipc:connect) through its TCP server.
+// Tasks queued before a new process has loaded the runtime wait for it.
+static bool sendExpr(const std::string& Name, std::string&& Expr) {
+    if (auto* process = SchemeProcess::find(Name)) {
+        process->createSchemeTask(new std::string(std::move(Expr)), "ipc",
+                                  SchemeTask::Type::LOCAL_PROCESS_STRING);
+        return true;
+    }
+    if (auto* repl = SchemeREPL::I(Name)) {
+        repl->writeString(std::move(Expr));
+        return true;
+    }
+    std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
+    return false;
+}
+
 static pointer newSchemeProcess(scheme* Scheme, pointer Args) {
     const std::string proc_name(argString(Scheme, Args, 1));
     const int port = int(argInt(Scheme, Args, 2));
     SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
-    // A failed start means another process holds the port: connecting anyway
-    // would reach that process's server, and calls to this one would be
-    // answered there.
+    // A failed start means another process holds the port.
     if (!sp->start()) {
         delete sp;
         return Scheme->F;
     }
-    SchemeREPL* repl = new SchemeREPL(proc_name, sp);
-    if (repl->connectToProcessAtHostname("localhost", port)) {
-        return pair_car(Args);  // return Scheme->T;
-    }
-    // The REPL deregisters itself from the name table; the process
-    // destructor stops and joins its task and server threads.
-    delete repl;
-    delete sp;
-    return Scheme->F;
+    return pair_car(Args);
 }
 
 static pointer connectToProcess(scheme* Scheme, pointer Args) {
     const std::string host_name(argString(Scheme, Args, 1));
     const std::string proc_name(argString(Scheme, Args, 2));
     const int port = int(argInt(Scheme, Args, 3));
-    SchemeREPL* repl = new SchemeREPL(proc_name, nullptr);
+    SchemeREPL* repl = new SchemeREPL(proc_name);
     if (repl->connectToProcessAtHostname(host_name, port)) {
         return Scheme->T;
     }
     delete repl;
     return Scheme->F;
-}
-
-static SchemeREPL* findREPL(const std::string& Name) {
-    auto repl(SchemeREPL::I(Name));
-    if (!repl) [[unlikely]] {
-        std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
-        return nullptr;
-    }
-    return repl;
 }
 
 static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value) {
@@ -122,10 +121,7 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value) 
 }
 
 static pointer ipcCall(scheme* Scheme, pointer Args) {
-    auto repl(findREPL(argString(Scheme, Args, 1)));
-    if (!repl) {
-        return Scheme->F;
-    }
+    const std::string name(argString(Scheme, Args, 1));
     std::stringstream ss;
     pointer sym = pair_cadr(Args);
     Args = pair_cddr(Args);
@@ -134,48 +130,48 @@ static pointer ipcCall(scheme* Scheme, pointer Args) {
             return Scheme->F;
         }
     }
-    repl->writeString(std::string("(") + symname(sym) + ss.str() + ')');
-    return Scheme->T;
+    return sendExpr(name, std::string("(") + symname(sym) + ss.str() + ')') ? Scheme->T : Scheme->F;
 }
 
 static pointer ipcDefine(scheme* Scheme, pointer Args) {
-    auto repl(findREPL(argString(Scheme, Args, 1)));
-    if (!repl) {
-        return Scheme->F;
-    }
+    const std::string name(argString(Scheme, Args, 1));
     std::stringstream ss;
     pointer sym = pair_cadr(Args);
     if (!appendArg(Scheme, ss, pair_caddr(Args))) {
         return Scheme->F;
     }
-    repl->writeString(std::string("(define ") + symname(sym) + ss.str() + ')');
-    return Scheme->T;
+    return sendExpr(name, std::string("(define ") + symname(sym) + ss.str() + ')') ? Scheme->T
+                                                                                   : Scheme->F;
 }
 
 static pointer ipcEval(scheme* Scheme, pointer Args) {
-    auto repl(findREPL(argString(Scheme, Args, 1)));
-    if (!repl) {
-        return Scheme->F;
+    return sendExpr(argString(Scheme, Args, 1), argString(Scheme, Args, 2)) ? Scheme->T : Scheme->F;
+}
+
+// Priority is a property of a process in this extempore.
+static SchemeProcess* findLocalProcess(const std::string& Name) {
+    auto* process = SchemeProcess::find(Name);
+    if (!process) [[unlikely]] {
+        std::cout << "Error: no scheme process '" << Name << "' in this extempore" << std::endl;
     }
-    repl->writeString(argString(Scheme, Args, 2));
-    return Scheme->T;
+    return process;
 }
 
 static pointer ipcSetPriority(scheme* Scheme, pointer Args) {
-    auto repl(findREPL(argString(Scheme, Args, 1)));
-    if (!repl || !repl->getProcess()) {
+    auto* process = findLocalProcess(argString(Scheme, Args, 1));
+    if (!process) {
         return Scheme->F;
     }
-    repl->getProcess()->setPriority(argInt(Scheme, Args, 2));
+    process->setPriority(argInt(Scheme, Args, 2));
     return Scheme->T;
 }
 
 static pointer ipcGetPriority(scheme* Scheme, pointer Args) {
-    auto repl(findREPL(argString(Scheme, Args, 1)));
-    if (!repl || !repl->getProcess()) {
+    auto* process = findLocalProcess(argString(Scheme, Args, 1));
+    if (!process) {
         return Scheme->F;
     }
-    return mk_integer(Scheme, repl->getProcess()->getPriority());
+    return mk_integer(Scheme, process->getPriority());
 }
 
 static pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args) {

@@ -136,7 +136,8 @@ class SchemeProcess {
 
     static const char* sm_banner;
     static thread_local SchemeProcess* sm_current;
-    // Every live process, for the hang report, which can't take a lock.
+    // Every live process, for the hang report (which can't take a lock) and
+    // for IPC to reach a process in this address space by name.
     static std::array<std::atomic<SchemeProcess*>, 16> sm_live;
 
   private:
@@ -231,6 +232,7 @@ class SchemeProcess {
     static SchemeProcess* I() {
         return sm_current;
     }
+    static SchemeProcess* find(const std::string& Name);
 #ifndef _WIN32
     // For HangReport, from a signal handler: writes each process's state to
     // stderr.

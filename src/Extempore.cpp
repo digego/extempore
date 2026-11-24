@@ -38,7 +38,6 @@
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
 #include "HangReport.h"
-#include "SchemeREPL.h"
 #include "EXTLLVM.h"
 
 #include "ExtemporeVersion.h"
@@ -608,7 +607,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     std::cout << "---------------------------------------" << std::endl;
     ascii_default();
 
-    // The processes and REPLs below live for the whole run and are never
+    // The processes below live for the whole run and are never
     // destroyed: primary->start(true) subsumes this thread and (quit) ends the
     // process with _Exit, so they are deliberately leaked rather than owned.
     if (extemp::UNIV::BATCH_MODE) {
@@ -622,11 +621,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     // Normal mode: utility + primary processes with server threads
     auto* utility =
         new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
-    const bool startup_ok = utility->start();
-    auto* utility_repl = new extemp::SchemeREPL(utility_name, utility);
-    utility_repl->connectToProcessAtHostname(host, utility_port);
-
-    if (!startup_ok) {
+    if (!utility->start()) {
         ascii_error();
         printf("ERROR:");
         ascii_default();
@@ -636,16 +631,10 @@ EXPORT int extempore_init(int argc, char** argv) {
     auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port,
                                               0, settings.initexpr);
 
-    // Fire-and-forget helpers: they run for the life of the process and need
-    // none of EXTThread's scheduling features, so a detached std::thread does.
-    std::thread([primary, host, primary_name, primary_port] {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        auto* primary_repl = new extemp::SchemeREPL(primary_name, primary);
-        primary_repl->connectToProcessAtHostname(host, primary_port);
-    }).detach();
-
 #ifndef _WIN32
     if (settings.repl_mode) {
+        // Runs for the life of the process and needs none of EXTThread's
+        // scheduling features, so a detached std::thread does.
         std::thread([args = linenoise_repl_args{host, primary_port}]() mutable {
             linenoise_repl(&args);
         }).detach();

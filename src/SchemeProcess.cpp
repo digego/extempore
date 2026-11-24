@@ -152,8 +152,22 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     }
 }
 
+SchemeProcess* SchemeProcess::find(const std::string& Name) {
+    for (auto& slot : sm_live) {
+        SchemeProcess* process = slot.load();
+        if (process && process->m_name == Name) {
+            return process;
+        }
+    }
+    return nullptr;
+}
+
 bool SchemeProcess::start(bool subsume) {
     if (!UNIV::BATCH_MODE) {
+        ascii_info();
+        printf("INFO:");
+        ascii_default();
+        std::cout << " starting " << m_name << " process..." << std::endl;
         // set socket options
         int t_reuse = 1;
         setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse),
@@ -245,7 +259,6 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path) {
 void* SchemeProcess::taskImpl() {
     sm_current = this;
     OSC::schemeInit(this);
-    std::this_thread::sleep_for(std::chrono::seconds(1));  // give time for NSApp etc. to init
     loadFile("runtime/scheme.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-globals.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-caches.xtm", UNIV::SHARE_DIR);
@@ -257,7 +270,6 @@ void* SchemeProcess::taskImpl() {
     loadFile("runtime/xtc-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-codegen.xtm", UNIV::SHARE_DIR);
     m_libsLoaded = true;
-    std::this_thread::sleep_for(std::chrono::seconds(2));  // give time for NSApp etc. to init
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);

@@ -44,8 +44,6 @@
 
 namespace extemp {
 
-class SchemeProcess;
-
 class SchemeREPL {
   private:
     typedef std::unordered_map<std::string, SchemeREPL*> repls_type;
@@ -54,7 +52,6 @@ class SchemeREPL {
 
   private:
     std::string m_title;
-    SchemeProcess* m_process;
     SOCKET m_serverSocket;
     char m_buf[BUFLENGTH];
     bool m_connected;
@@ -67,7 +64,7 @@ class SchemeREPL {
     static std::mutex sm_replsMutex;
 
   public:
-    SchemeREPL(const std::string& Title, SchemeProcess* Process);
+    explicit SchemeREPL(const std::string& Title);
     ~SchemeREPL();  // closes the socket and deregisters the title
     SchemeREPL(const SchemeREPL&) = delete;
     SchemeREPL& operator=(const SchemeREPL&) = delete;
@@ -78,9 +75,6 @@ class SchemeREPL {
     void writeString(std::string&&);  // ick (modifying)
     bool connectToProcessAtHostname(const std::string&, int);
     void closeREPL();
-    SchemeProcess* getProcess() {
-        return m_process;
-    }
 
     static SchemeREPL* I(const std::string& name);
 };
