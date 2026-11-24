@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*" # Push events to matching vX.X.X*, e.g. v0.9.8-beta
+  # A dry run: build and package every platform, and attach the archives to the
+  # run instead of publishing a release.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,6 +15,7 @@ jobs:
   # One job creates the release, so the build jobs only upload to it. Its notes
   # are the tag's CHANGELOG.md section, which release.sh checks exists.
   create-release:
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -36,6 +40,8 @@ jobs:
   build:
     name: ${{ matrix.name }}
     needs: create-release
+    # create-release is skipped on a dry run, which would otherwise skip this too
+    if: ${{ !cancelled() && needs.create-release.result != 'failure' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     permissions:
@@ -59,6 +65,9 @@ jobs:
             name: Windows x86_64
             artifact: extempore-windows-x86_64
 
+    env:
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dry-run-{0}', github.sha) }}
+
     steps:
       - uses: actions/checkout@v7
 
@@ -69,7 +78,7 @@ jobs:
         with:
           preset: release
           cache-key-os: ${{ matrix.os }}
-          extra-cmake-args: -DEXTEMPORE_VERSION=${{ github.ref_name }}
+          extra-cmake-args: -DEXTEMPORE_VERSION=${{ env.VERSION }}
 
       # Parallelism is Ninja's default; the AOT compile is throttled by the
       # `aot` job pool declared in CMakeLists.txt.
@@ -82,18 +91,29 @@ jobs:
       - name: Package
         shell: bash
         env:
-          PACKAGE: ${{ matrix.artifact }}-${{ github.ref_name }}
+          PACKAGE: ${{ matrix.artifact }}-${{ env.VERSION }}
         run: |
           "$(dirname "$(command -v cmake)")/cpack" --config build/CPackConfig.cmake \
             -B dist -D CPACK_PACKAGE_FILE_NAME="$PACKAGE"
 
       - uses: actions/attest-build-provenance@v4
+        if: github.ref_type == 'tag'
         with:
           subject-path: dist/*.zip
 
       - name: Upload to release
+        if: github.ref_type == 'tag'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: gh release upload "$TAG" dist/*.zip --clobber
+
+      - name: Attach to the run (dry run)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*.zip
+          retention-days: 7
+          compression-level: 0
