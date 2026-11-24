@@ -86,29 +86,11 @@
 ;; reading audio files ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; audiobuffer.xtm parses WAV and AIFF files, and this reader uses its chunk
-;; finder and sample converters. It does three things differently, which is
-;; why it exists: it puts the sample data on the heap, it reads AIFC files
-;; (the 808 kit is 32-bit float AIFC), and it scales integer samples so that
-;; full scale is 1.0 (audiobuffer.xtm's converters divide by twice the range,
-;; which leaves PCM files 6 dB quieter than float ones).
+;; libs/core/audiofile.xtm reads the file; this reader puts the samples on
+;; the heap, shortens a long file if asked to, and converts a file at another
+;; rate to the engine's.
 
 (bind-val sampler_bytes_loaded i64 0)
-
-(bind-func static sampler_be16
-  "a big-endian 16-bit integer at p"
-  (lambda (p:i8*)
-    (i16toi64 (swapi16 (pref (cast p i16*) 0)))))
-
-(bind-func static sampler_be32
-  "a big-endian 32-bit integer at p"
-  (lambda (p:i8*)
-    (i32toi64 (swapi32 (pref (cast p i32*) 0)))))
-
-(bind-func static sampler_tag_is
-  "do the four bytes at p spell tag?"
-  (lambda (p:i8* tag:i8*)
-    (= (strncmp p tag 4) 0)))
 
 ;; Playing a file recorded at another rate than the engine's would mean
 ;; reading it at a ratio near 1.088 or 0.919 through the cubic read, which
@@ -229,129 +211,54 @@ Keeps at most max_seconds of it (0.0 keeps it all), fading out the last part
 of a shortened file so that it doesn't end with a click. Returns null if the
 file can't be read."
   (lambda (path:i8* max_seconds:double)
-    (let ((lenptr:i64* (salloc 1))
-          (chunklen:i64* (salloc 1))
+    (let ((info:AudioFileInfo* (salloc))
           (outn:i64* (salloc 1))
           (converted:SAMPLE* null)
-          (file (audiofile_slurp path lenptr))
-          (filelen (pref lenptr 0))
-          (chunks:i8* null)
-          (chunkslen:i64 0)
-          (fmt:i8* null)
-          (body:i8* null)
-          (bodylen:i64 0)
-          (kind:i64 WAVE_FORMAT_PCM)
-          (le:i1 #t)
+          (frames:i64 0)
           (nchan:i64 0)
-          (bits:i64 0)
           (samplerate:double 0.0)
-          (declared:i64 -1)
-          (ok:i1 #f))
-      (if (or (null? file) (< filelen IFF_FORM_HEADER_SIZE))
+          (keep:i64 0)
+          (data:SAMPLE* null)
+          (fade:i64 0)
+          (g:SAMPLE 0.0)
+          (i:i64 0)
+          (c:i64 0))
+      (if (not (audiofile_info path info))
+          null
           (begin
-            (if (not (null? file)) (free file))
-            null)
-          (begin
-            (set! chunks (pref-ptr file IFF_FORM_HEADER_SIZE))
-            (set! chunkslen (- filelen IFF_FORM_HEADER_SIZE))
-            (cond
-              ;; WAV: little-endian, a "fmt " chunk and a "data" chunk
-              ((wave_validate file)
-               (set! fmt (iffchunk_find chunks chunkslen "fmt " #t chunklen))
-               (if (and (not (null? fmt)) (>= (pref chunklen 0) WAVE_FMT_CHUNK_MIN_SIZE))
-                   (begin
-                     (set! fmt (pref-ptr fmt IFF_CHUNK_HEADER_SIZE))
-                     (set! kind (i16toi64 (pref (cast fmt i16*) 0)))
-                     (set! nchan (i16toi64 (pref (cast (pref-ptr fmt 2) i16*) 0)))
-                     (set! samplerate (i32tod (pref (cast (pref-ptr fmt 4) i32*) 0)))
-                     (set! bits (i16toi64 (pref (cast (pref-ptr fmt 14) i16*) 0)))
-                     ;; WAVE_FORMAT_EXTENSIBLE keeps the real format in the
-                     ;; first two bytes of a GUID further along
-                     (if (and (= kind WAVE_FORMAT_EXTENSIBLE) (>= (pref chunklen 0) 26))
-                         (set! kind (i16toi64 (pref (cast (pref-ptr fmt 24) i16*) 0))))
-                     (set! body (iffchunk_find chunks chunkslen "data" #t chunklen))
-                     (if (not (null? body))
-                         (begin
-                           (set! bodylen (pref chunklen 0))
-                           (set! body (pref-ptr body IFF_CHUNK_HEADER_SIZE))
-                           (set! ok #t)))))
-               void)
-              ;; AIFF and AIFC: big-endian, a "COMM" chunk and an "SSND" chunk
-              ((and (sampler_tag_is file "FORM")
-                    (or (sampler_tag_is (pref-ptr file 8) "AIFF") (sampler_tag_is (pref-ptr file 8) "AIFC")))
-               (set! le #f)
-               (set! fmt (iffchunk_find chunks chunkslen "COMM" #f chunklen))
-               (if (and (not (null? fmt)) (>= (pref chunklen 0) AIFF_COMM_CHUNK_MIN_SIZE))
-                   (begin
-                     (set! fmt (pref-ptr fmt IFF_CHUNK_HEADER_SIZE))
-                     (set! nchan (sampler_be16 fmt))
-                     (set! declared (sampler_be32 (pref-ptr fmt 2)))
-                     (set! bits (sampler_be16 (pref-ptr fmt 6)))
-                     (set! samplerate (fp80ptrtod (pref-ptr fmt 8)))
-                     ;; AIFC names its encoding: NONE and twos are big-endian
-                     ;; integers, sowt little-endian ones, fl32 floats
-                     (if (and (sampler_tag_is (pref-ptr file 8) "AIFC") (>= (pref chunklen 0) 22))
-                         (let ((enc (pref-ptr fmt 18)))
-                           (cond ((or (sampler_tag_is enc "fl32") (sampler_tag_is enc "FL32"))
-                                  (set! kind WAVE_FORMAT_IEEE_FLOAT) void)
-                                 ((sampler_tag_is enc "sowt")
-                                  (set! le #t) void)
-                                 ((not (or (sampler_tag_is enc "NONE") (sampler_tag_is enc "twos")))
-                                  (set! kind -1) void))))
-                     (set! body (iffchunk_find chunks chunkslen "SSND" #f chunklen))
-                     (if (and (not (null? body)) (>= (pref chunklen 0) AIFF_SSND_PREAMBLE_SIZE))
-                         (let ((skip (sampler_be32 (pref-ptr body IFF_CHUNK_HEADER_SIZE))))
-                           (set! bodylen (- (pref chunklen 0) (+ AIFF_SSND_PREAMBLE_SIZE skip)))
-                           (set! body (pref-ptr body (+ IFF_CHUNK_HEADER_SIZE AIFF_SSND_PREAMBLE_SIZE skip)))
-                           (set! ok #t)
-                           void))))
-               void)
-              (else void))
-            (if (or (not ok) (< nchan 1) (< bits 8) (< samplerate 1.0) (< kind 0))
-                (begin (free file) null)
-                (let ((framebytes (* nchan (/ bits 8)))
-                      (frames (/ bodylen framebytes))
-                      (keep:i64 0)
-                      (data:SAMPLE* null)
-                      (fade:i64 0)
-                      (scale:SAMPLE (if (= kind WAVE_FORMAT_IEEE_FLOAT) 1.0 2.0))
-                      (g:SAMPLE 0.0)
-                      (i:i64 0)
-                      (c:i64 0))
-                  (if (and (>= declared 0) (< declared frames)) (set! frames declared))
-                  (set! keep (if (> max_seconds 0.0)
-                                 (min frames (convert (* max_seconds samplerate) i64))
-                                 frames))
-                  (set! data (halloc (* (max keep 1) nchan)))
-                  (if (not (audiofile_copy_samples body data (* keep nchan) bits kind le))
-                      (begin (free (cast data i8*)) (free file) null)
+            (set! frames (tref info 0))
+            (set! nchan (tref info 1))
+            (set! samplerate (tref info 2))
+            (set! keep (if (> max_seconds 0.0)
+                           (min frames (convert (* max_seconds samplerate) i64))
+                           frames))
+            (set! data (halloc (* (max keep 1) nchan)))
+            (if (<> (audiofile_read path data 0 keep) keep)
+                (begin (free (cast data i8*)) null)
+                (begin
+                  ;; a shortened recording fades out over its last half
+                  ;; second (or quarter, if it's short), along half a cosine
+                  (set! fade (if (< keep frames) (min (/ keep 4) (convert (* 0.5 samplerate) i64)) 0))
+                  (dotimes (i fade)
+                    (set! g (* 0.5 (+ 1.0 (cos (* SPI (/ (convert i SAMPLE) (convert fade SAMPLE)))))))
+                    (dotimes (c nchan)
+                      (pset! data (+ (* (+ i (- keep fade)) nchan) c)
+                             (* g (pref data (+ (* (+ i (- keep fade)) nchan) c))))))
+                  ;; a file at another rate is converted to the engine's
+                  (if (> (fabs (- samplerate (convert SRf double))) 0.5)
                       (begin
-                        (free file)
-                        ;; a shortened recording fades out over its last half
-                        ;; second (or quarter, if it's short), along half a cosine
-                        (set! fade (if (< keep frames) (min (/ keep 4) (convert (* 0.5 samplerate) i64)) 0))
-                        (dotimes (i keep)
-                          (set! g scale)
-                          (if (>= i (- keep fade))
-                              (set! g (* scale 0.5 (+ 1.0 (cos (* SPI (/ (convert (- i (- keep fade)) SAMPLE)
-                                                                         (convert fade SAMPLE))))))))
-                          (dotimes (c nchan)
-                            (pset! data (+ (* i nchan) c) (* g (pref data (+ (* i nchan) c))))))
-                        ;; a file at another rate is converted to the engine's
-                        (if (> (fabs (- samplerate (convert SRf double))) 0.5)
+                        (set! converted (sampler_resample_data data keep nchan (convert samplerate i64)
+                                                               (convert SRf i64) outn))
+                        (if (not (null? converted))
                             (begin
-                              (set! converted (sampler_resample_data data keep nchan (convert samplerate i64)
-                                                                     (convert SRf i64) outn))
-                              (if (not (null? converted))
-                                  (begin
-                                    (free (cast data i8*))
-                                    (set! data converted)
-                                    (set! keep (pref outn 0))
-                                    (set! samplerate (convert SRf double))
-                                    void))
+                              (free (cast data i8*))
+                              (set! data converted)
+                              (set! keep (pref outn 0))
+                              (set! samplerate (convert SRf double))
                               void))
-                        (set! sampler_bytes_loaded (+ sampler_bytes_loaded (* keep nchan 4)))
-                        (AudioBuffer_h (String_h path) 0 keep nchan data samplerate 0 0 60 0.0))))))))))
+                        void))
+                  (set! sampler_bytes_loaded (+ sampler_bytes_loaded (* keep nchan 4)))
+                  (AudioBuffer_h (String_h path) 0 keep nchan data samplerate 0 0 60 0.0))))))))
 
 (bind-func sampler_buffer_rms
   "the RMS level, in dB, of the first `seconds` of a buffer (all channels)"

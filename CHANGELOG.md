@@ -35,8 +35,7 @@ checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
 against an installed LLVM 22.1.
 
 The stb_image library (2.10 to 2.30) comes from upstream instead of a fork,
-libsndfile goes from 1.0.29 to 1.2.2, LLVM to 22.1.8 and PCRE2 to 10.49,
-and rtmidi is no longer built, since nothing used it. Release archives are
+LLVM goes to 22.1.8 and PCRE2 to 10.49, and rtmidi is no longer built, since nothing used it. Release archives are
 packaged with CPack and carry build-provenance attestations, and clang-tidy runs
 on every push.
 
@@ -46,6 +45,20 @@ The FFTs are now written in xtlang, so kissfft is no longer a dependency. Load
 signatures and give kissfft's results to float precision, as fast or faster, but
 only for power-of-two lengths. The raw `kiss_fft*` and `kfc_*` bindings and the
 `kiss_fft_cpx`/`kiss_fft_scalar` aliases are gone; use `Complexf` and `float`.
+
+WAV and AIFF files are now read and written by `libs/core/audiofile.xtm`, in
+xtlang, so libsndfile is no longer a dependency (ours was built without its
+compressed formats anyway). It reads 8 to 32-bit integer and 32 and 64-bit float
+samples from WAV (including WAVE_FORMAT_EXTENSIBLE), AIFF and AIFF-C files,
+reads only the frames asked for, and writes WAV. `libs/external/sndfile.xtm` is
+gone: use `audiofile_frames`, `audiofile_channels`, `audiofile_samplerate`,
+`audiofile_read` and `audiofile_write_wav`. Integer samples are scaled so that
+full scale is 1.0, as libsndfile did, but `AudioBuffer` used to read them at
+half that, so an `AudioBuffer` read from a PCM file is now 6 dB louder.
+`AudioBuffer_from_wave`, `AudioBuffer_from_aiff` and `audiofile_read_samples`
+are gone, since `AudioBuffer` reads either format. The sampler's offset into a
+file (`set_sample_data_`) is now in frames, as documented; it was multiplied by
+the square of the channel count.
 
 ## v0.11.2
 

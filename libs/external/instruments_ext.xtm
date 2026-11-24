@@ -2,17 +2,12 @@
 
 ;; Author: Andrew Sorensen, Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libsndfile
+;; Required dylibs:
 
 ;;; Commentary:
 
-;; This is for instruments which rely on external (that is, C)
-;; libraries.
-;;
-;; The main external instrument is the sampler, which depends on
-;; libsndfile to read the samples from the disk into its sample
-;; buffers. But over time other instruments which depend on external
-;; libraries will be added in here too.
+;; The sampler, which reads WAV and AIFF files from disk into its sample
+;; buffers with libs/core/audiofile.xtm.
 
 ;;; Code:
 
@@ -29,15 +24,14 @@
 
 (xtc:aot:suppress-aot-do
   (sys:load "libs/core/instruments.xtm")
-  (sys:load "libs/external/sndfile.xtm"))
+  (sys:load "libs/core/audiofile.xtm"))
 (xtc:aot:insert-forms (sys:load "libs/core/instruments.xtm" 'quiet))
-(xtc:aot:insert-forms (sys:load "libs/external/sndfile.xtm" 'quiet))
+(xtc:aot:insert-forms (sys:load "libs/core/audiofile.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtminstruments_ext")
 (xtc:aot:import-ll "xtminstruments_ext")
 
 ;; helper function for adding sample data to sampler
-;; this assumes stereo files at the moment!!
 ;; passing 0 for length means read to end of file.
 ;;
 ;; for example:
@@ -47,32 +41,27 @@
 ;; (set-sampler-data sampler "/tmp/piano-C.aif" 60 1000 5000)
 (bind-func set_sample_data_
   (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* filename index:i64 offset lgth bank:i32 print_p:i64)
-    (let ((info:SF_INFO* (salloc))
-          (audiofile (sf_open filename SFM_READ info))
-          (channels:i64 (convert (tref info 2)))
-          (num (if (= 0 lgth)
-                   (- (tref info 0) offset)
-                   lgth)))
-      (if (not (null? audiofile))
-          (let ((adat:SAMPLE* (halloc (* num channels)))
+    (let ((info:AudioFileInfo* (salloc)))
+      (if (not (audiofile_info filename info))
+          0
+          (let ((channels (tref info 1))
+                (num (max 0 (if (= 0 lgth) (- (tref info 0) offset) lgth)))
+                (adat:SAMPLE* (halloc (* (max num 1) channels)))
                 (samples:|20,|128,SAMPLE*||* (inst.samples))
                 (samples_channels:|20,|128,i64||* (inst.samples_channels))
                 (samples_length:|20,|128,i64||* (inst.samples_length))
-                (samples_read (sf_read_file_into_buffer filename adat (* offset channels) num (i64toi1 print_p)))
+                (frames_read (max 0 (audiofile_read filename adat offset num)))
                 (olddat (if (<> 0 (aref (aref-ptr samples_length bank) index))
                             (bitcast (aref (aref-ptr samples bank) index) i8*)
                             null)))
-            ;;(printf "%lld samples read into: %lld\n" samples_read index)
-            (aset! (aref-ptr samples_length bank) index (/ samples_read channels)) ;num)
-            (aset! (aref-ptr samples_channels bank) index (convert channels))
+            (if (<> print_p 0)
+                (printf "---------------\nfile name:     %s\nsamplerate:    %.0f\nchannels:      %lld\nframes:        %lld\nframes read:   %lld\n"
+                        filename (tref info 2) channels (tref info 0) frames_read))
+            (aset! (aref-ptr samples_length bank) index frames_read)
+            (aset! (aref-ptr samples_channels bank) index channels)
             (aset! (aref-ptr samples bank) index adat)
-            (sf_close audiofile)
             (if (not (null? olddat)) (free olddat))
-            1)
-          (begin
-            (printf "libsndfile error: could not read audio file at '%s' (%s)\n" filename (sf_strerror audiofile))
-            (sf_close audiofile)
-            0)))))
+            1)))))
 
 (bind-func clear_sample_data_
   (lambda (inst:[SAMPLE,SAMPLE,i64,i64,SAMPLE*]* index:i64 bank:i32)

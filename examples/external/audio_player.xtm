@@ -2,32 +2,33 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libsndfile
+;; Required dylibs:
 
 ;;; Commentary:
 
-;; You should have a wave file in your assets directory called
-;; assets/bb.wav - if you don't you can grab the whole assets
-;; directory from https://github.com/extemporelang/extempore-assets
+;; This reads assets/samples/xmas_carol.wav, which comes with the assets
+;; (build the `assets` target, or configure with -DASSETS=ON). An AudioBuffer
+;; (see libs/core/audiobuffer.xtm) does the same job with less code; this shows
+;; reading a file into a buffer of your own.
 
 ;;; Code:
 
-(sys:load "libs/external/sndfile.xtm")
+(sys:load "libs/core/audiofile.xtm")
 
 (bind-func dsp:DSP
   (let ((audio_file_path "assets/samples/xmas_carol.wav")
         ;; get number of channels/frames in file
-        (nchan (convert (sf_channels_from_file audio_file_path)))
-        (nframes (sf_frames_from_file audio_file_path))
+        (nchan (audiofile_channels audio_file_path))
+        (nframes (audiofile_frames audio_file_path))
         (nsamp (* nchan nframes))
         ;; allocate memory buffer for audio samples
         (audio_data:SAMPLE* (zalloc nsamp))
         ;; read audio samples into buffer
-        (samples_read (sf_read_file_into_buffer audio_file_path audio_data 0 nframes #t))
+        (frames_read (audiofile_read audio_file_path audio_data 0 nframes))
         ;; markers for keeping track of playback position
         (playhead 0)
         (i 0))
-    (if (< samples_read 0)
+    (if (< frames_read 0)
         (printf "Error reading audio file.\n"))
     (lambda (in time chan dat)
       ;; increment playhead (this is the most basic playback possible

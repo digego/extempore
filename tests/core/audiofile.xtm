@@ -1,0 +1,202 @@
+;;; audiofile.xtm -- tests for libs/core/audiofile.xtm
+
+;;; Commentary:
+
+;; Round trips through audiofile_write_wav for each encoding it writes, and
+;; small files built byte by byte for the encodings it only reads. The files
+;; are written into the working directory under a distinctive prefix and
+;; removed again. tests/core/audiobuffer.xtm covers truncated and malformed
+;; files, and reading part of a file.
+
+;;; Code:
+
+(sys:load "libs/core/audiofile.xtm")
+
+(bind-func static aftest_poke_le
+  (lambda (buf:i8* offset:i64 nbytes:i64 v:i64)
+    (doloop (i nbytes)
+      (pset! buf (+ offset i) (convert (& (>> v (* i 8)) 255) i8)))))
+
+(bind-func static aftest_poke_be
+  (lambda (buf:i8* offset:i64 nbytes:i64 v:i64)
+    (doloop (i nbytes)
+      (pset! buf (+ offset i) (convert (& (>> v (* 8 (- nbytes 1 i))) 255) i8)))))
+
+(bind-func static aftest_poke_id
+  (lambda (buf:i8* offset:i64 id:i8*)
+    (doloop (i 4)
+      (pset! buf (+ offset i) (pref id i)))))
+
+(bind-func static aftest_write_file
+  (lambda (path:i8* buf:i8* len:i64)
+    (let ((fp (fopen path "wb")))
+      (if (null? fp)
+          #f
+          (let ((wrote (fwrite buf 1:i64 len fp)))
+            (fclose fp)
+            (= wrote len))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; writing and reading back each encoding ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A ramp across [-1.25, 1.25] in each of two channels, written in encoding
+;; enc and read back: integer encodings clip to [-1, 1] and come back within
+;; tolerance, float ones keep every value.
+(bind-func test_round_trip
+  (lambda (enc:i64 tolerance:double)
+    (let ((path "xtmtest-audiofile-rt.wav")
+          (n 1000)
+          (src:SAMPLE* (zalloc (* 2 n)))
+          (back:SAMPLE* (zalloc (* 2 n)))
+          (want:double 0.0)
+          (ok #t))
+      (doloop (i (* 2 n))
+        (pset! src i (convert (- (* 2.5 (/ (convert i double) (convert (* 2 n) double))) 1.25) SAMPLE)))
+      (if (not (audiofile_write_wav path src n 2 48000 enc))
+          (begin (set! ok #f) void)
+          (begin
+            (if (not (and (= (audiofile_frames path) n)
+                          (= (audiofile_channels path) 2)
+                          (= (audiofile_samplerate path) 48000.0)
+                          (= (audiofile_read path back 0 n) n)))
+                (set! ok #f))
+            (doloop (i (* 2 n))
+              (set! want (convert (pref src i) double))
+              (if (and (<> enc AUDIOFILE_FLOAT_32) (<> enc AUDIOFILE_FLOAT_64))
+                  (set! want (if (> want 1.0) 1.0 (if (< want -1.0) -1.0 want))))
+              (if (> (fabs (- (convert (pref back i) double) want)) tolerance)
+                  (set! ok #f)))
+            (remove path)
+            void))
+      ok)))
+
+(bind-func test_round_trips
+  "the encodings that pass, one bit each"
+  (lambda ()
+    (+ (if (test_round_trip AUDIOFILE_PCM_16 (/ 1.0 32768.0)) 1 0)
+       (if (test_round_trip AUDIOFILE_PCM_24 (/ 1.0 8388608.0)) 2 0)
+       (if (test_round_trip AUDIOFILE_PCM_32 1e-7) 4 0)
+       (if (test_round_trip AUDIOFILE_FLOAT_32 0.0) 8 0)
+       (if (test_round_trip AUDIOFILE_FLOAT_64 0.0) 16 0))))
+
+(xtmtest-result (test_round_trips) 31)
+
+(bind-func test_write_rejects_bad_arguments
+  (lambda ()
+    (let ((src:SAMPLE* (zalloc 4)))
+      (and (not (audiofile_write_wav "xtmtest-audiofile-bad.wav" src 2 2 44100 AUDIOFILE_PCM_U8))
+           (not (audiofile_write_wav "xtmtest-audiofile-bad.wav" src 2 0 44100 AUDIOFILE_PCM_16))
+           (not (audiofile_write_wav "xtmtest-audiofile-bad.wav" src 2 2 0 AUDIOFILE_PCM_16))))))
+
+(xtmtest-result (test_write_rejects_bad_arguments) 1)
+
+(bind-func test_unreadable_files
+  (lambda ()
+    (let ((dest:SAMPLE* (zalloc 4)))
+      (and (= (audiofile_frames "xtmtest-audiofile-missing.wav") -1)
+           (= (audiofile_read "xtmtest-audiofile-missing.wav" dest 0 2) -1)
+           (= (audiofile_channels "libs/core/audiofile.xtm") -1)))))
+
+(xtmtest-result (test_unreadable_files) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; encodings that are read but not written ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; each file below is mono and holds frames that read back as 0.5 and -0.25
+
+(bind-func static aftest_reads_back
+  "write len bytes of buf to a file and check it reads as 0.5, -0.25"
+  (lambda (path:i8* buf:i8* len:i64)
+    (let ((dest:SAMPLE* (zalloc 2))
+          (res (and (aftest_write_file path buf len)
+                    (= (audiofile_frames path) 2)
+                    (= (audiofile_samplerate path) 44100.0)
+                    (= (audiofile_read path dest 0 2) 2)
+                    (= (pref dest 0) 0.5)
+                    (= (pref dest 1) -0.25))))
+      (remove path)
+      res)))
+
+(bind-func static aftest_wav_header
+  "a RIFF/WAVE header and fmt chunk of fmtlen bytes, data chunk header after"
+  (lambda (buf:i8* fmtlen:i64 tag:i64 bits:i64 datalen:i64)
+    (aftest_poke_id buf 0 "RIFF")
+    (aftest_poke_le buf 4 4 (+ 4 8 fmtlen 8 datalen))
+    (aftest_poke_id buf 8 "WAVE")
+    (aftest_poke_id buf 12 "fmt ")
+    (aftest_poke_le buf 16 4 fmtlen)
+    (aftest_poke_le buf 20 2 tag)
+    (aftest_poke_le buf 22 2 1)
+    (aftest_poke_le buf 24 4 44100)
+    (aftest_poke_le buf 28 4 (* 44100 (/ bits 8)))
+    (aftest_poke_le buf 32 2 (/ bits 8))
+    (aftest_poke_le buf 34 2 bits)
+    (aftest_poke_id buf (+ 20 fmtlen) "data")
+    (aftest_poke_le buf (+ 24 fmtlen) 4 datalen)
+    void))
+
+(bind-func test_wave_unsigned_8
+  (lambda ()
+    (let ((buf:i8* (zalloc 46)))
+      (aftest_wav_header buf 16 1 8 2)
+      (aftest_poke_le buf 44 1 192) ;; 128 + 64
+      (aftest_poke_le buf 45 1 96)  ;; 128 - 32
+      (aftest_reads_back "xtmtest-audiofile-u8.wav" buf 46))))
+
+(xtmtest-result (test_wave_unsigned_8) 1)
+
+;; WAVE_FORMAT_EXTENSIBLE, with the float subformat GUID
+(bind-func test_wave_extensible_float
+  (lambda ()
+    (let ((buf:i8* (zalloc 76)))
+      (aftest_wav_header buf 40 #xfffe 32 8)
+      (aftest_poke_le buf 36 2 22)       ;; cbSize
+      (aftest_poke_le buf 38 2 32)       ;; valid bits
+      (aftest_poke_le buf 40 4 4)        ;; channel mask
+      (aftest_poke_le buf 44 2 3)        ;; the subformat GUID's first two bytes
+      (aftest_poke_le buf 68 4 #x3f000000)
+      (aftest_poke_le buf 72 4 #xbe800000)
+      (aftest_reads_back "xtmtest-audiofile-ext.wav" buf 76))))
+
+(xtmtest-result (test_wave_extensible_float) 1)
+
+(bind-func static aftest_aifc
+  "an AIFF-C file of 2 mono frames of 16 or 32 bits, compressed as comp"
+  (lambda (buf:i8* comp:i8* bits:i64)
+    (let ((datalen (* 2 (/ bits 8))))
+      (aftest_poke_id buf 0 "FORM")
+      (aftest_poke_be buf 4 4 (+ 4 8 24 8 8 datalen))
+      (aftest_poke_id buf 8 "AIFC")
+      (aftest_poke_id buf 12 "COMM")
+      (aftest_poke_be buf 16 4 24)
+      (aftest_poke_be buf 20 2 1)                  ;; channels
+      (aftest_poke_be buf 22 4 2)                  ;; frames
+      (aftest_poke_be buf 26 2 bits)
+      (aftest_poke_be buf 28 2 #x400e)             ;; 44100 as an 80-bit float
+      (aftest_poke_be buf 30 8 #xac44000000000000)
+      (aftest_poke_id buf 38 comp)                 ;; then an empty name
+      (aftest_poke_id buf 44 "SSND")
+      (aftest_poke_be buf 48 4 (+ 8 datalen))
+      52)))                                        ;; where the samples go
+
+(bind-func test_aifc_sowt
+  (lambda ()
+    (let ((buf:i8* (zalloc 64))
+          (at (aftest_aifc buf "sowt" 16)))
+      (aftest_poke_le buf (+ at 8) 2 16384)
+      (aftest_poke_le buf (+ at 10) 2 (- 65536 8192))
+      (aftest_reads_back "xtmtest-audiofile-sowt.aifc" buf (+ at 12)))))
+
+(xtmtest-result (test_aifc_sowt) 1)
+
+(bind-func test_aifc_float
+  (lambda ()
+    (let ((buf:i8* (zalloc 68))
+          (at (aftest_aifc buf "fl32" 32)))
+      (aftest_poke_be buf (+ at 8) 4 #x3f000000)
+      (aftest_poke_be buf (+ at 12) 4 #xbe800000)
+      (aftest_reads_back "xtmtest-audiofile-fl32.aifc" buf (+ at 16)))))
+
+(xtmtest-result (test_aifc_float) 1)

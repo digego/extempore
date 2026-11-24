@@ -2,17 +2,13 @@
 
 ;; Author: Andrew Sorensen
 ;; Keywords: extempore
-;; Required dylibs: libsndfile
+;; Required dylibs:
 
 ;;; Commentary:
 
 ;;
 ;; extended audio_dsp for spectral and
-;; snd file related fucntionality
-;;
-;; hopefully we can bring this back
-;; into core/audio_dsp once we have
-;; native sndfile and fft options.
+;; sound file related functionality
 ;;
 
 ;;; Code:
@@ -24,10 +20,10 @@
 
 (xtc:aot:suppress-aot-do
   (sys:load "libs/core/fft.xtm")
-  (sys:load "libs/external/sndfile.xtm"))
+  (sys:load "libs/core/audiofile.xtm"))
 (xtc:aot:insert-forms
   (sys:load "libs/core/fft.xtm" 'quiet)
-  (sys:load "libs/external/sndfile.xtm" 'quiet))
+  (sys:load "libs/core/audiofile.xtm" 'quiet))
 
 (xtc:aot:insert-header "xtmaudio_dsp_ext")
 (xtc:aot:import-ll "xtmaudio_dsp_ext")
@@ -107,7 +103,7 @@
 ;; expects mono aif/wav audio file at samplerate
 (bind-func creverb_c
   (lambda (filename:i8* len:i64)
-    (let ((ir_len_unpadded (sf_samples_from_file filename)) ;; get size of ir file (assumes mono!!)
+    (let ((ir_len_unpadded (audiofile_frames filename)) ;; get size of ir file (assumes mono!!)
           (ir_len (+ ir_len_unpadded (- len (% ir_len_unpadded len)))) ;; pad to whole multiple of len
           (parts (/ ir_len len)) ;; how many partitions
           (po 0)                 ;; partition offset
@@ -133,7 +129,9 @@
       ;; partition and store IR spectra (circlar convolution so padded)
       (dotimes (i parts)
         (memset (cast A i8*) 0 (convert (* 8 padlgth))) ;; zero pad, assumes Complexf (8 bytes per struct)
-        (sf_read_file_into_buffer filename output (* i len) len #f)
+        ;; the last partition runs past the end of the file
+        (memset (cast output i8*) 0 (* len (convert (pref-ptr (cast null SAMPLE*) 1) i64)))
+        (audiofile_read filename output (* i len) len)
         (Complex_bufferize output A len)
         (fft A (pref-ptr irs (* i padlgth)) f_fft))
       (lambda (in:SAMPLE dry:SAMPLE wet:SAMPLE)

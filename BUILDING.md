@@ -49,13 +49,13 @@ users will care about:
 - `BUILD_TESTS` (default `ON`) --- build the test targets (including examples
   registered as ctest tests).
 - `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
-  (portaudio, portmidi, sndfile).
+  (portaudio, portmidi).
 - `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics stack
   (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
   ALSA.
 - `EXTEMPORE_CCACHE` (default `ON`) --- route compilation through `ccache` when
-  it's installed. The sub-builds (LLVM, portaudio, sndfile, ...) inherit it, so
+  it's installed. The sub-builds (LLVM, portaudio, ...) inherit it, so
   a second build directory costs minutes rather than half an hour.
 - `EXTEMPORE_SANITIZE` (default empty) --- build Extempore's own objects with a
   sanitizer: `asan`, `ubsan`, `tsan` or `asan+ubsan`. Anything else is a
@@ -101,8 +101,9 @@ standard library (for faster startup). Other targets worth knowing about:
 
 - `aot_core` --- AOT-compile just the core standard library (pure-xtlang
   libraries with no external C library dependencies).
-- `aot_external_audio` --- AOT-compile the external audio libraries (portmidi,
-  sndfile, fft, etc). This is the default AOT target.
+- `aot_external_audio` --- AOT-compile the audio libraries in `libs/external`
+  (portmidi, the sampler, the convolution reverb). This is the default AOT
+  target.
 - `clean_aot` --- remove all AOT-compiled files.
 - `assets` --- download and unpack the assets tarball.
 

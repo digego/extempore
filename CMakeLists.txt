@@ -146,8 +146,6 @@ set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
 set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
 set(DEP_PORTMIDI_SHA256 "e4ee3152ae42362f30b5e59fc5729b8b7e2a98023e1752f641d849543602f31e")
-set(DEP_SNDFILE_VERSION "1.2.2")
-set(DEP_SNDFILE_SHA256 "3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e")
 # stb doesn't tag releases. This commit predates the stb_image overhaul begun in
 # late October 2026, whose early commits rejected req_comp = 0.
 set(DEP_STB_COMMIT "003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5")
@@ -650,7 +648,8 @@ add_dependencies(aot_core extempore)
 aotcompile_lib(libs/base/base.xtm core)
 aotcompile_lib(libs/core/math.xtm core base)
 aotcompile_lib(libs/core/rational.xtm core base)
-aotcompile_lib(libs/core/audiobuffer.xtm core base)
+aotcompile_lib(libs/core/audiofile.xtm core base)
+aotcompile_lib(libs/core/audiobuffer.xtm core base audiofile)
 aotcompile_lib(libs/core/fft.xtm core base math)
 aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
 aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
@@ -671,9 +670,8 @@ if(EXTERNAL_SHLIBS_AUDIO)
     add_custom_target(aot_external_audio ALL)
     set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
     add_dependencies(aot_external_audio extempore external_shlibs_audio)
-    aotcompile_lib(libs/external/sndfile.xtm audio base)
-    aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft sndfile)
-    aotcompile_lib(libs/external/instruments_ext.xtm audio base sndfile instruments)
+    aotcompile_lib(libs/external/audio_dsp_ext.xtm audio base fft audiofile)
+    aotcompile_lib(libs/external/instruments_ext.xtm audio base audiofile instruments)
     aotcompile_lib(libs/external/portmidi.xtm audio base)
 endif()
 
@@ -703,7 +701,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/tests.cmake)
 
 add_custom_target(xtmdoc
     COMMAND extempore --port 17095
-        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/external/fft.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/sndfile.xtm\") (sys:load \"libs/external/stb_image.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/stb_image.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
     COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
     VERBATIM)
 add_dependencies(xtmdoc extempore)

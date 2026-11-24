@@ -198,7 +198,7 @@ and lots more like this ...
 If the log doesn't show something like that, then there are a few things which
 could have gone wrong:
 
-- have you set up `libsndfile` properly on your system?
+- is each sample a WAV or AIFF file?
 - are the pathnames to to samples correct?
 - did you define the `samp1` sampler and did it compile properly?
 

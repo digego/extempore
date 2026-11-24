@@ -111,7 +111,7 @@
 ;; Returns 0 (pass) or 1 (fail) and calls (quit ...).
 (bind-func audiotest_assert_sine
   (lambda (path:i8* freq:double)
-    (let ((ab (AudioBuffer_from_wave path)))
+    (let ((ab (AudioBuffer path)))
       (if (null? ab)
           (begin (printf "FAIL: could not read %s\n" path) 1)
           (let ((sr (AudioBuffer_samplerate ab))
@@ -137,7 +137,7 @@
 ;; catching L/R swaps or single-channel-only DSPs.
 (bind-func audiotest_assert_not_silent
   (lambda (path:i8* floor:double)
-    (let ((ab (AudioBuffer_from_wave path)))
+    (let ((ab (AudioBuffer path)))
       (if (null? ab)
           (begin (printf "FAIL: could not read %s\n" path) 1)
           (let ((sr (AudioBuffer_samplerate ab))
@@ -153,7 +153,7 @@
 
 (bind-func audiotest_assert_stereo_sine
   (lambda (path:i8* freq_l:double freq_r:double)
-    (let ((ab (AudioBuffer_from_wave path)))
+    (let ((ab (AudioBuffer path)))
       (if (null? ab)
           (begin (printf "FAIL: could not read %s\n" path) 1)
           (let ((nch (AudioBuffer_channels ab))
@@ -184,7 +184,7 @@
 ;; dominant over neighbor bins that aren't one of the three target pitches.
 (bind-func audiotest_assert_three_sines
   (lambda (path:i8* f1:double f2:double f3:double)
-    (let ((ab (AudioBuffer_from_wave path)))
+    (let ((ab (AudioBuffer path)))
       (if (null? ab)
           (begin (printf "FAIL: could not read %s\n" path) 1)
           (let ((pk (convert (audiotest_peak ab -1) double))
@@ -256,7 +256,7 @@
 ;; guard is expressed in samples; a typical value is 8000 (~180ms at 44.1k).
 (bind-func audiotest_assert_sweep
   (lambda (path:i8* freq_a:double freq_b:double split_frame:i64 guard:i64)
-    (let ((ab (AudioBuffer_from_wave path)))
+    (let ((ab (AudioBuffer path)))
       (if (null? ab)
           (begin (printf "FAIL: could not read %s\n" path) 1)
           (let ((nfr (AudioBuffer_frames ab))

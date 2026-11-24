@@ -58,50 +58,21 @@ if(EXTERNAL_SHLIBS_AUDIO)
         URL_SHA256 ${DEP_PORTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
-    # No external codecs (FLAC, Vorbis, Opus, MPEG): each would be another
-    # shared library to ship. libsndfile's cmake_minimum_required(3.1..3.18)
-    # is below the 3.5 that CMake 4 still accepts, hence the policy floor, and
-    # its CMake raises deprecation warnings that are upstream's to fix.
-    set(_sndfile_args
-        -DBUILD_SHARED_LIBS=ON
-        -DBUILD_PROGRAMS=OFF
-        -DBUILD_EXAMPLES=OFF
-        -DENABLE_EXTERNAL_LIBS=OFF
-        -DENABLE_MPEG=OFF
-        -DBUILD_TESTING=OFF
-        -DENABLE_CPACK=OFF
-        -DENABLE_PACKAGE_CONFIG=OFF
-        -DINSTALL_PKGCONFIG_MODULE=OFF
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-        -Wno-dev
-        -Wno-deprecated)
-    if(WIN32)
-        list(APPEND _sndfile_args -DENABLE_STATIC_RUNTIME=OFF)
-    endif()
-    extempore_add_external(sndfile
-        URL https://github.com/libsndfile/libsndfile/releases/download/${DEP_SNDFILE_VERSION}/libsndfile-${DEP_SNDFILE_VERSION}.tar.xz
-        URL_SHA256 ${DEP_SNDFILE_SHA256}
-        FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS ${_sndfile_args})
-
     if(UNIX)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile portmidi
+            DEPENDS portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
         set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
     elseif(WIN32)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile portmidi
+            DEPENDS portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy bin/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
         set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
     endif()
