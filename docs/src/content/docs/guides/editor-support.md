@@ -28,6 +28,25 @@ knows how to work with Extempore code. The VSCode setup instructions are
 actually listed in the [quickstart](/overview/quickstart/#editor-setup) guide
 already, so you should head over there and get started.
 
+## Helix {#helix}
+
+[Helix](https://helix-editor.com) has no plugins, so it talks to Extempore
+through the [nREPL server](/guides/nrepl/)'s command-line client. With
+`extempore-nrepl` on your `PATH`, this binding in `~/.config/helix/config.toml`
+evaluates the top-level form under the cursor with <kbd>,</kbd> <kbd>e</kbd>:
+
+```toml
+[keys.normal.","]
+e = [":write", ":sh extempore-nrepl eval --editor --wait-for-save --file %{file_path_absolute} --line %{cursor_line} --column %{cursor_column}"]
+```
+
+The output, value or error appears in a popup, which <kbd>Esc</kbd> closes. The
+client reads the form from disk, so the binding saves first, and
+`--wait-for-save` waits for Helix to finish that save. The binding takes over
+Helix's <kbd>,</kbd> (keep primary selection); pick another prefix if you use
+it. Any editor that can run a shell command with the file and cursor position
+can use the same command.
+
 ## Emacs {#emacs}
 
 [extempore-emacs-mode](https://github.com/extemporelang/extempore-emacs-mode) is

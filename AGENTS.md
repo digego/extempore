@@ -51,6 +51,7 @@ ctest --preset default                       # the suites CI runs
 ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
 ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
+ctest --test-dir build -L nrepl -j2         # the nREPL server and its client
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
@@ -114,6 +115,12 @@ There is also a "batch mode" useful for debugging/testing, e.g.
 ```
 
 Note: `--batch` implies `--noaudio`, so there's no need to specify both.
+
+To iterate against a running instance instead, start `build/extempore --noaudio
+--nrepl-port 0` from a scratch directory and send code with
+`extras/nrepl/extempore-nrepl --port $(cat .nrepl-port) eval '...'`: it prints
+values and output, exits 1 on an error, and libraries stay loaded between evals.
+`docs/src/content/docs/guides/nrepl.md` describes the server.
 
 If the final `quit` isn't present, then extempore won't exit. An uncaught error
 in the `--batch` expression exits with status 1, but code that hangs or never
