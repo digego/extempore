@@ -675,6 +675,8 @@ if(EXTERNAL_SHLIBS_AUDIO)
     add_custom_target(aot_external_audio ALL)
     set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
     add_dependencies(aot_external_audio extempore external_shlibs_audio)
+    file(GLOB AOT_EXTRA_SOURCES_portmidi CONFIGURE_DEPENDS
+         ${CMAKE_CURRENT_SOURCE_DIR}/libs/external/portmidi/*.xtm)
     aotcompile_lib(libs/external/portmidi.xtm audio base midi)
 endif()
 

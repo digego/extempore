@@ -21,7 +21,8 @@ old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so code
 which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is now
 `*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have moved
 from `libs/external/portmidi.xtm` to the new library, which `portmidi.xtm`
-loads.
+loads. On Linux `portmidi.xtm` no longer uses libportmidi: its `Pm_*` functions
+are written over the new library, with the same devices in the same order.
 
 The xtlang compiler is much faster on big functions: type solving was cubic in a
 function's size, and closures with many captured variables and deeply nested

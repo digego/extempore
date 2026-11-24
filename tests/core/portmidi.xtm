@@ -1,0 +1,167 @@
+;;; tests/core/portmidi.xtm -- libs/external/portmidi.xtm
+
+;; The round trips need two virtual ports, so they run where libs/core/midi.xtm
+;; has a backend which starts (on Linux, where /dev/snd/seq can be opened),
+;; which is also where the Pm_* functions are written over that library.
+
+(sys:load "libs/core/test.xtm")
+(sys:load "libs/external/portmidi.xtm")
+
+(bind-func pm_test_initialize (lambda () (convert (Pm_Initialize) i64)))
+(xtmtest-result (pm_test_initialize) 0 "initialize")
+
+;; a stream which couldn't be opened is null, and nothing done to it crashes
+(bind-func pm_test_no_stream
+  (lambda ()
+    (let ((stream (pm_create_output_stream 100000))
+          (event:PmEvent* (salloc))
+          (res:i64 0))
+      (if (null? stream) (set! res (+ res 1)))
+      (if (= (pm_send stream MIDI_NOTE_ON 0 60 100) pmBadPtr) (set! res (+ res 10)))
+      (if (= (Pm_Read stream event 1) pmBadPtr) (set! res (+ res 100)))
+      res)))
+(xtmtest-result (pm_test_no_stream) 111 "no-stream-is-null")
+
+(bind-func pm_test_error_text
+  (lambda ()
+    (strlen (Pm_GetErrorText pmInvalidDeviceId))))
+(xtmtest-result (> (pm_test_error_text) 0) #t "error-text")
+
+;; a virtual output for a Pm input to read, and a virtual input for a Pm output
+;; to write to
+(bind-val pm_test_source MidiPort*)
+(bind-val pm_test_sink MidiPort*)
+(bind-val pm_test_in PmStream*)
+(bind-val pm_test_out PmStream*)
+(bind-val pm_test_events PmEvent* 64)
+
+(bind-func pm_test_wait
+  (lambda ()
+    (thread_sleep 0 50000000)
+    void))
+
+(bind-func pm_test_open
+  (lambda ()
+    (set! pm_test_source (midi_open_virtual_out "extempore-pm-test-source"))
+    (set! pm_test_sink (midi_open_virtual_in "extempore-pm-test-sink"))
+    (Pm_Initialize)
+    (let ((in_id (pm_input_device_with_name "extempore-pm-test-source"))
+          (out_id (pm_output_device_with_name "extempore-pm-test-sink"))
+          (res:i64 0))
+      (if (> in_id -1) (set! res (+ res 1)))
+      (if (> out_id -1) (set! res (+ res 10)))
+      (set! pm_test_in (pm_create_input_stream in_id))
+      (set! pm_test_out (pm_create_output_stream out_id))
+      ;; a device which is open can't be opened again
+      (let ((again:PmStream** (salloc)))
+        (if (= (Pm_OpenInput again in_id null 0 null null) pmInvalidDeviceId)
+            (set! res (+ res 100))))
+      (if (= (tref (Pm_GetDeviceInfo in_id) 5) 1) (set! res (+ res 1000)))
+      ;; and stays marked open when the devices are listed again
+      (Pm_Initialize)
+      (if (= (tref (Pm_GetDeviceInfo in_id) 5) 1) (set! res (+ res 10000)))
+      res)))
+
+;; send three messages (and active sensing, which a stream filters out by
+;; default) to the Pm input, and read them back
+(bind-func pm_test_read
+  (lambda ()
+    (let ((res:i64 0) (n:i32 0))
+      (if (= (Pm_Poll pm_test_in) pmNoData) (set! res (+ res 1)))
+      (midi_send pm_test_source #x93 60 100)
+      (midi_send pm_test_source #xFE 0 0)
+      (midi_send pm_test_source #xC1 5 0)
+      (midi_send pm_test_source #xB0 7 127)
+      (pm_test_wait)
+      (if (= (Pm_Poll pm_test_in) pmGotData) (set! res (+ res 10)))
+      (set! n (Pm_Read pm_test_in pm_test_events 64))
+      (if (= n 3) (set! res (+ res 100)))
+      (if (= (tref (pref-ptr pm_test_events 0) 0) (Pm_Message #x93 60 100)) (set! res (+ res 1000)))
+      (if (= (tref (pref-ptr pm_test_events 1) 0) (Pm_Message #xC1 5 0)) (set! res (+ res 10000)))
+      (if (= (tref (pref-ptr pm_test_events 2) 0) (Pm_Message #xB0 7 127)) (set! res (+ res 100000)))
+      (if (= (Pm_Read pm_test_in pm_test_events 64) 0) (set! res (+ res 1000000)))
+      res)))
+
+;; a sysex message arrives four bytes to an event, and a read which stops part
+;; of the way through it carries on next time
+(bind-func pm_test_read_sysex
+  (lambda ()
+    (let ((bytes:i8* (salloc 10)) (res:i64 0))
+      (pfill! bytes (convert #xF0 i8) 1 2 3 4 5 6 7 8 (convert #xF7 i8))
+      (midi_send_sysex pm_test_source bytes 10)
+      (pm_test_wait)
+      (if (= (Pm_Read pm_test_in pm_test_events 2) 2) (set! res (+ res 1)))
+      (if (= (tref (pref-ptr pm_test_events 0) 0) #x030201F0) (set! res (+ res 10)))
+      (if (= (tref (pref-ptr pm_test_events 1) 0) #x07060504) (set! res (+ res 100)))
+      (if (= (Pm_Read pm_test_in pm_test_events 64) 1) (set! res (+ res 1000)))
+      (if (= (tref (pref-ptr pm_test_events 0) 0) #x0000F708) (set! res (+ res 10000)))
+      res)))
+
+(bind-func pm_test_filter
+  (lambda ()
+    (Pm_SetFilter pm_test_in PM_FILT_NOTE)
+    (Pm_SetChannelMask pm_test_in 2) ;; channel 1 only
+    (midi_send pm_test_source #x91 60 100) ;; a note: filtered
+    (midi_send pm_test_source #xB0 7 1)    ;; channel 0: masked
+    (midi_send pm_test_source #xB1 7 2)
+    (pm_test_wait)
+    (let ((n (Pm_Read pm_test_in pm_test_events 64)))
+      (Pm_SetFilter pm_test_in PM_FILT_ACTIVE)
+      (Pm_SetChannelMask pm_test_in #xFFFF)
+      (if (and (= n 1) (= (tref (pref-ptr pm_test_events 0) 0) (Pm_Message #xB1 7 2))) 1 0))))
+
+;; what the sink received: status + 256 * data1 + 65536 * data2, or -1
+(bind-func pm_test_sunk
+  (lambda ()
+    (let ((msg:MidiMsg* (salloc)))
+      (if (midi_receive pm_test_sink msg)
+          (convert (+ (tref msg 1) (* 256 (tref msg 2)) (* 65536 (tref msg 3))) i64)
+          -1))))
+
+(bind-func pm_test_write
+  (lambda ()
+    (pm_send pm_test_out MIDI_NOTE_ON 2 64 90)
+    (pm_test_wait)
+    (pm_test_sunk)))
+
+(bind-func pm_test_write_sysex
+  (lambda ()
+    (let ((bytes:i8* (salloc 6)) (back:i8* (salloc 6)) (msg:MidiMsg* (salloc)) (res:i64 0))
+      (pfill! bytes (convert #xF0 i8) 9 8 7 6 (convert #xF7 i8))
+      (if (= (Pm_WriteSysEx pm_test_out 0 bytes) pmNoError) (set! res (+ res 1)))
+      (pm_test_wait)
+      (if (and (midi_receive pm_test_sink msg) (= (tref msg 1) MIDI_SYSEX) (= (tref msg 2) 6))
+          (set! res (+ res 10)))
+      (if (and (= (midi_receive_sysex pm_test_sink back 6) 6) (= (pref back 4) 6))
+          (set! res (+ res 100)))
+      ;; the same message as events, with a note after it in the same write
+      (tfill! (pref-ptr pm_test_events 0) #x070809F0 0)
+      (tfill! (pref-ptr pm_test_events 1) #x0000F706 0)
+      (tfill! (pref-ptr pm_test_events 2) (Pm_Message #x90 1 2) 0)
+      (if (= (Pm_Write pm_test_out pm_test_events 3) pmNoError) (set! res (+ res 1000)))
+      (pm_test_wait)
+      (if (and (midi_receive pm_test_sink msg) (= (tref msg 1) MIDI_SYSEX) (= (tref msg 2) 6))
+          (set! res (+ res 10000)))
+      (if (= (pm_test_sunk) (+ #x90 256 (* 65536 2))) (set! res (+ res 100000)))
+      res)))
+
+(bind-func pm_test_close
+  (lambda ()
+    (let ((in_id (pm_input_device_with_name "extempore-pm-test-source"))
+          (res:i64 0))
+      (if (= (Pm_Close pm_test_in) pmNoError) (set! res (+ res 1)))
+      (if (= (Pm_Close pm_test_out) pmNoError) (set! res (+ res 10)))
+      (if (= (tref (Pm_GetDeviceInfo in_id) 5) 0) (set! res (+ res 100)))
+      (midi_close pm_test_source)
+      (midi_close pm_test_sink)
+      res)))
+
+(if (and (string=? (sys:platform) "Linux") (midi:true? (midi_available)))
+    (begin
+      (xtmtest-result (pm_test_open) 11111 "open-streams")
+      (xtmtest-result (pm_test_read) 1111111 "read")
+      (xtmtest-result (pm_test_read_sysex) 11111 "read-sysex-four-bytes-to-an-event")
+      (xtmtest-result (pm_test_filter) 1 "filter-and-channel-mask")
+      (xtmtest-result (pm_test_write) (+ #x92 (* 256 64) (* 65536 90)) "write-short")
+      (xtmtest-result (pm_test_write_sysex) 111111 "write-sysex")
+      (xtmtest-result (pm_test_close) 111 "close")))

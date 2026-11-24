@@ -2,15 +2,17 @@
 
 ;; Author: Ben Swift
 ;; Keywords: extempore
-;; Required dylibs: libportmidi
+;; Required dylibs: libportmidi (not on Linux)
 
 ;;; Commentary:
 
-;; PortMidi is a cross-platform MIDI library by Roger B. Dannenberg
-
-;; Extempore's CMake build downloads upstream PortMidi
-;; (https://github.com/PortMidi/portmidi) and builds it as a shared library, so
-;; this file should just work.
+;; The API of PortMidi, a cross-platform MIDI library by Roger B. Dannenberg,
+;; for code written to it. New code should use libs/core/midi.xtm.
+;;
+;; On Linux the Pm_* functions are xtlang, over libs/core/midi.xtm
+;; (portmidi/native.xtm says what differs). Elsewhere they are bound from
+;; upstream PortMidi (https://github.com/PortMidi/portmidi), which Extempore's
+;; CMake build downloads and builds as a shared library.
 
 ;;; Code:
 
@@ -27,15 +29,6 @@
 
 (xtc:aot:insert-header "xtmportmidi")
 
-;; set up the current dylib name and path (for AOT compilation)
-(bind-dylib libportmidi
-  (cond ((string=? (sys:platform) "OSX")
-         "libportmidi.dylib")
-        ((string=? (sys:platform) "Linux")
-         "libportmidi.so")
-        ((string=? (sys:platform) "Windows")
-         "portmidi.dll"))
-  "xtmportmidi")
 
 (xtc:aot:import-ll "xtmportmidi")
 
@@ -91,13 +84,11 @@
 ;;     Pm_Initialize() is the library initialisation function - call this before
 ;;     using the library.
 ;; */
-(bind-lib libportmidi Pm_Initialize [PmError]*)
 
 ;; /**
 ;;     Pm_Terminate() is the library termination function - call this after
 ;;     using the library.
 ;; */
-(bind-lib libportmidi Pm_Terminate [PmError]*)
 
 ;; /**  A single PortMidiStream is a descriptor for an open MIDI device.
 ;; */
@@ -118,20 +109,17 @@
 ;;     the stream, e.g. an input or output operation. Until the error is cleared,
 ;;     no new error codes will be obtained, even for a different stream.
 ;; */
-(bind-lib libportmidi Pm_HasHostError [i32,PortMidiStream*]*)
 
 
 ;; /**  Translate portmidi error number into human readable message.
 ;;     These strings are constants (set at compile time) so client has
 ;;     no need to allocate storage
 ;; */
-(bind-lib libportmidi Pm_GetErrorText [i8*,PmError]*)
 
 ;; /**  Translate portmidi host error into human readable message.
 ;;     These strings are computed at run time, so client has to allocate storage.
 ;;     After this routine executes, the host error is cleared.
 ;; */
-(bind-lib libportmidi Pm_GetHostErrorText [void,i8*,i32]*)
 
 (bind-val HDRLENGTH i32 50)
 (bind-val PM_HOST_ERROR_MSG_LEN i32 256)
@@ -185,7 +173,6 @@
       (String str))))
 
 ;; /**  Get devices count, ids range from 0 to Pm_CountDevices()-1. */
-(bind-lib libportmidi Pm_CountDevices [i32]*)
 ;; /**
 ;;     Pm_GetDefaultInputDeviceID(), Pm_GetDefaultOutputDeviceID()
 
@@ -228,19 +215,7 @@
 ;;     On Linux,
 
 ;; */
-(bind-lib libportmidi Pm_GetDefaultInputDeviceID [PmDeviceID]*)
 ;; /** see PmDeviceID Pm_GetDefaultInputDeviceID() */
-(bind-lib libportmidi Pm_GetDefaultOutputDeviceID [PmDeviceID]*)
-
-(bind-func pm_default_in
-  "an xtlang wrapper around Pm_GetDefaultInputDeviceID"
-  (lambda ()
-    (Pm_GetDefaultInputDeviceID)))
-
-(bind-func pm_default_out
-  "an xtlang wrapper around Pm_GetDefaultOutputDeviceID"
-  (lambda ()
-    (Pm_GetDefaultOutputDeviceID)))
 
 ;; /**
 ;;     PmTimestamp is used to represent a millisecond clock with arbitrary
@@ -268,7 +243,6 @@
 ;;     not be manipulated or freed. The pointer is guaranteed to be valid
 ;;     between calls to Pm_Initialize() and Pm_Terminate().
 ;; */
-(bind-lib libportmidi Pm_GetDeviceInfo [PmDeviceInfo*,PmDeviceID]*)
 
 ;; /**
 ;;     Pm_OpenInput() and Pm_OpenOutput() open devices.
@@ -334,9 +308,7 @@
 ;;     by calling Pm_Close().
 
 ;; */
-(bind-lib libportmidi Pm_OpenInput [PmError,PortMidiStream**,PmDeviceID,i8*,i32,PmTimeProcPtr,i8*]*)
 
-(bind-lib libportmidi Pm_OpenOutput [PmError,PortMidiStream**,PmDeviceID,i8*,i32,PmTimeProcPtr,i8*,i32]*)
 
 ;; /**
 ;;    \defgroup grp_events_filters Events and Filters Handling
@@ -401,7 +373,6 @@
 ;; /** All System Common messages (mtc, song position, song select, tune request) */
 (bind-val PM_FILT_SYSTEMCOMMON i32 (+ PM_FILT_MTC PM_FILT_SONG_POSITION PM_FILT_SONG_SELECT PM_FILT_TUNE))
 
-(bind-lib libportmidi Pm_SetFilter [PmError,PortMidiStream*,i32]*)
 
 ;; /**
 ;;     Pm_SetChannelMask() filters incoming messages based on channel.
@@ -418,7 +389,6 @@
 
 ;;     All channels are allowed by default
 ;; */
-(bind-lib libportmidi Pm_SetChannelMask [PmError,PortMidiStream*,i32]*)
 
 ;; /**
 ;;     Pm_Abort() terminates outgoing messages immediately
@@ -428,14 +398,12 @@
 ;;     ignore messages in the buffer and close an input device at
 ;;     any time.
 ;;  */
-(bind-lib libportmidi Pm_Abort [PmError,PortMidiStream*]*)
 
 ;; /**
 ;;     Pm_Close() closes a midi stream, flushing any pending buffers.
 ;;     (PortMidi attempts to close open streams when the application
 ;;     exits -- this is particularly difficult under Windows.)
 ;; */
-(bind-lib libportmidi Pm_Close [PmError,PortMidiStream*]*)
 
 ;; /**
 ;;     Pm_Message() encodes a short Midi message into a 32-bit word. If data1
@@ -627,13 +595,11 @@
 ;;     message" and will be flushed as well.
 
 ;; */
-(bind-lib libportmidi Pm_Read [i32,PortMidiStream*,PmEvent*,i32]*)
 
 ;; /**
 ;;     Pm_Poll() tests whether input is available,
 ;;     returning TRUE, FALSE, or an error value.
 ;; */
-(bind-lib libportmidi Pm_Poll [PmError,PortMidiStream*]*)
 
 ;; /**
 ;;     Pm_Write() writes midi data from a buffer. This may contain:
@@ -648,7 +614,6 @@
 
 ;;     Sysex data may contain embedded real-time messages.
 ;; */
-(bind-lib libportmidi Pm_Write [PmError,PortMidiStream*,PmEvent*,i32]*)
 
 ;; /**
 ;;     Pm_WriteShort() writes a timestamped non-system-exclusive midi message.
@@ -656,7 +621,23 @@
 ;;     non-decreasing. (But timestamps are ignored if the stream was opened
 ;;     with latency = 0.)
 ;; */
-(bind-lib libportmidi Pm_WriteShort [PmError,PortMidiStream*,PmTimestamp,i32]*)
+
+;; The Pm_* functions themselves. On Linux they are written over
+;; libs/core/midi.xtm; elsewhere, until that library has a backend there, they
+;; are bound from libportmidi.
+(sys:load (string-append "libs/external/portmidi/"
+                         (if (string=? (sys:platform) "Linux") "native" "lib")
+                         ".xtm"))
+
+(bind-func pm_default_in
+  "an xtlang wrapper around Pm_GetDefaultInputDeviceID"
+  (lambda ()
+    (Pm_GetDefaultInputDeviceID)))
+
+(bind-func pm_default_out
+  "an xtlang wrapper around Pm_GetDefaultOutputDeviceID"
+  (lambda ()
+    (Pm_GetDefaultOutputDeviceID)))
 
 (bind-func pm_write
   "a wrapper around Pm_WriteShort with timestamp == 0
@@ -677,7 +658,6 @@ Scheme)"
 ;; /**
 ;;     Pm_WriteSysEx() writes a timestamped system-exclusive midi message.
 ;; */
-(bind-lib libportmidi Pm_WriteSysEx [PmError,PortMidiStream*,PmTimestamp,i8*]*)
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; end portmidi.h ;;
@@ -751,14 +731,17 @@ returns -1 if no output device with that name is found"
 Check the output of pm_print_devices to see the device id of your
 input device(s)
 
-@paran dev - device id of a midi input device"
+@paran dev - device id of a midi input device
+@return - the stream, or null if it couldn't be opened"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
           (res (Pm_OpenInput stream_ptr dev null PM_MIDI_BUFFER_SIZE
                              (convert (get_native_fptr pm_current_time_in_ms)) null)))
       (if (<> res pmNoError)
-          (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res))))
-      (pref stream_ptr 0))))
+          (begin
+            (println "PortMIDI error opening input port:" (String (Pm_GetErrorText res)))
+            (cast null PmStream*))
+          (pref stream_ptr 0)))))
 
 (bind-func pm_create_output_stream
   "create a midi *output* PmStream pointer for device
@@ -766,14 +749,17 @@ input device(s)
 Check the output of pm_print_devices to see the device id of your
 output device(s)
 
-@paran dev - device id of a midi output device"
+@paran dev - device id of a midi output device
+@return - the stream, or null if it couldn't be opened"
   (lambda (dev)
     (let ((stream_ptr:PmStream** (salloc))
           (res (Pm_OpenOutput stream_ptr dev null PM_MIDI_BUFFER_SIZE
                               (convert (get_native_fptr pm_current_time_in_ms)) null 0)))
       (if (<> res pmNoError)
-          (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res))))
-      (pref stream_ptr 0))))
+          (begin
+            (println "PortMIDI error opening output port:" (String (Pm_GetErrorText res)))
+            (cast null PmStream*))
+          (pref stream_ptr 0)))))
 
 ;; these functions work with
 

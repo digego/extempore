@@ -1,0 +1,301 @@
+;;; native.xtm -- the Pm_* functions, over libs/core/midi.xtm
+
+;; Loaded by libs/external/portmidi.xtm, which has the types.
+;;
+;; What differs from libportmidi:
+;;
+;; - the devices are those the system had at the last Pm_Initialize, in the
+;;   order libportmidi lists them in (each port as an output, then as an
+;;   input). Call Pm_Initialize again to look afresh: it leaves open streams
+;;   alone.
+;; - a stream's time procedure is never called. A PmEvent's timestamp is
+;;   what pm_current_time_in_ms would return when the event is read.
+;; - output is sent straight away, whatever the latency and timestamps (as
+;;   libportmidi does with a latency of 0)
+
+(bind-val PM_MAX_DEVICES i64 512)
+(bind-val pm_devices |512,PmDeviceInfo|)
+(bind-val pm_device_a |512,i64|) ;; the port's address: see midi_port_address
+(bind-val pm_device_b |512,i64|)
+(bind-val pm_device_count i64 0)
+
+(bind-func static pm_add_device
+  (lambda (port:i64 input:i32)
+    (if (< pm_device_count PM_MAX_DEVICES)
+        (let ((name (midi_port_name port))
+              (copy:i8* (halloc (+ (strlen name) 1)))
+              (info (aref-ptr pm_devices pm_device_count)))
+          (strcpy copy name)
+          ;; a stream stays open across Pm_Initialize, and so does its flag
+          (tfill! info 200 "ALSA" copy input (- 1 input)
+                  (if (and (= (aref pm_device_a pm_device_count) (midi_port_address port 0))
+                           (= (aref pm_device_b pm_device_count) (midi_port_address port 1)))
+                      (tref info 5)
+                      0:i32))
+          (aset! pm_device_a pm_device_count (midi_port_address port 0))
+          (aset! pm_device_b pm_device_count (midi_port_address port 1))
+          (set! pm_device_count (+ pm_device_count 1))))
+    void))
+
+(bind-func Pm_Initialize
+  (lambda ()
+    (let ((n (midi_port_count))
+          (was pm_device_count)
+          (i:i64 0))
+      (dotimes (i was)
+        (free (tref (aref-ptr pm_devices i) 2)))
+      (set! pm_device_count 0)
+      (dotimes (i n)
+        (if (midi_port_is_output i) (pm_add_device i 0))
+        (if (midi_port_is_input i) (pm_add_device i 1)))
+      ;; no stream can be open on a device which wasn't there before
+      (set! i pm_device_count)
+      (while (< i was)
+        (tset! (aref-ptr pm_devices i) 5 0)
+        (set! i (+ i 1)))
+      pmNoError)))
+
+(bind-func Pm_Terminate
+  (lambda ()
+    pmNoError))
+
+(bind-func Pm_HasHostError
+  (lambda (stream:PortMidiStream*)
+    0:i32))
+
+(bind-func Pm_GetErrorText
+  (lambda (err:PmError)
+    (cond ((= err pmNoError) "")
+          ((= err pmHostError) "PortMidi: Host error")
+          ((= err pmInvalidDeviceId) "PortMidi: Invalid device ID")
+          ((= err pmInsufficientMemory) "PortMidi: Insufficient memory")
+          ((= err pmBufferTooSmall) "PortMidi: Buffer too small")
+          ((= err pmBufferOverflow) "PortMidi: Buffer overflow")
+          ((= err pmBadPtr) "PortMidi: Bad pointer")
+          ((= err pmBadData) "PortMidi: Invalid MIDI message Data")
+          ((= err pmInternalError) "PortMidi: Internal PortMidi Error")
+          ((= err pmBufferMaxSize) "PortMidi: Buffer cannot be made larger")
+          (else "PortMidi: Illegal error number"))))
+
+(bind-func Pm_GetHostErrorText
+  (lambda (msg:i8* len:i32)
+    (if (> len 0) (pset! msg 0 0))
+    void))
+
+(bind-func Pm_CountDevices
+  (lambda ()
+    (convert pm_device_count i32)))
+
+(bind-func Pm_GetDeviceInfo
+  (lambda (id:PmDeviceID)
+    (if (and (> id -1) (< (convert id i64) pm_device_count))
+        (aref-ptr pm_devices (convert id i64))
+        (cast null PmDeviceInfo*))))
+
+(bind-func static pm_first_device
+  (lambda (input:i32)
+    (let ((found:i32 -1)
+          (i:i64 0))
+      (dotimes (i pm_device_count)
+        (if (and (= found -1) (= (tref (aref-ptr pm_devices i) 3) input))
+            (set! found (convert i i32))))
+      found)))
+
+(bind-func Pm_GetDefaultInputDeviceID
+  (lambda ()
+    (pm_first_device 1)))
+
+(bind-func Pm_GetDefaultOutputDeviceID
+  (lambda ()
+    (pm_first_device 0)))
+
+;; what a PortMidiStream* points to: the port, its device, the filters and
+;; channel mask, and a sysex message being read out (or written in) four
+;; bytes to a PmEvent: the buffer, how much of it is the message, and how far
+;; through it we are
+(bind-type PmNative <MidiPort*,i64,i32,i32,i8*,i64,i64> (printer? . #f))
+(bind-val PM_SYSEX_SIZE i64 65536)
+
+(bind-func static pm_open
+  (lambda (stream_p:PortMidiStream** id:PmDeviceID input:i32)
+    (let ((info (Pm_GetDeviceInfo id))
+          (dev (convert id i64))
+          (port:MidiPort* null)
+          (s:PmNative* null))
+      (if (or (null? info) (<> (tref info 3) input) (<> (tref info 5) 0))
+          pmInvalidDeviceId
+          (begin
+            (set! port (midi_open_at (if (= input 1) MIDI_IN MIDI_OUT)
+                                     (aref pm_device_a dev) (aref pm_device_b dev)))
+            (if (null? port)
+                pmHostError
+                (begin
+                  (set! s (halloc))
+                  (tfill! s port dev PM_FILT_ACTIVE #xFFFF (halloc PM_SYSEX_SIZE) 0 0)
+                  (tset! info 5 1)
+                  (pset! stream_p 0 (cast s PortMidiStream*))
+                  pmNoError)))))))
+
+(bind-func Pm_OpenInput
+  (lambda (stream_p:PortMidiStream** id:PmDeviceID driver_info:i8* buffer_size:i32
+           time_proc:PmTimeProcPtr time_info:i8*)
+    (pm_open stream_p id 1)))
+
+(bind-func Pm_OpenOutput
+  (lambda (stream_p:PortMidiStream** id:PmDeviceID driver_info:i8* buffer_size:i32
+           time_proc:PmTimeProcPtr time_info:i8* latency:i32)
+    (pm_open stream_p id 0)))
+
+(bind-func Pm_SetFilter
+  (lambda (stream:PortMidiStream* filters:i32)
+    (if (null? stream)
+        pmBadPtr
+        (begin (tset! (cast stream PmNative*) 2 filters)
+               pmNoError))))
+
+(bind-func Pm_SetChannelMask
+  (lambda (stream:PortMidiStream* mask:i32)
+    (if (null? stream)
+        pmBadPtr
+        (begin (tset! (cast stream PmNative*) 3 mask)
+               pmNoError))))
+
+(bind-func Pm_Close
+  (lambda (stream:PortMidiStream*)
+    (let ((s (cast stream PmNative*)))
+      (if (null? s)
+          pmBadPtr
+          (begin
+            (midi_close (tref s 0))
+            (if (< (tref s 1) pm_device_count)
+                (tset! (aref-ptr pm_devices (tref s 1)) 5 0))
+            (free (tref s 4))
+            (free (cast s i8*))
+            pmNoError)))))
+
+(bind-func Pm_Abort
+  (lambda (stream:PortMidiStream*)
+    (Pm_Close stream)))
+
+;; the filter's bit for a status byte: F0-FF are bits 0-15, and the channel
+;; messages 8n-En are bits 18-1E
+(bind-func static pm_filtered
+  (lambda (s:PmNative* status:i32)
+    (or (<> (& (tref s 2)
+               (<< 1:i32 (if (> status #xEF) (- status #xF0) (+ #x10 (>> status 4)))))
+            0)
+        (and (< status #xF0)
+             (= (& (tref s 3) (<< 1:i32 (& status #x0F))) 0)))))
+
+(bind-func static pm_now_ms
+  (lambda ()
+    (convert (* 1000.:f (/ (convert (now) float) 44100.:f)) i32)))
+
+(bind-func Pm_Read
+  (lambda (stream:PortMidiStream* buffer:PmEvent* length:i32)
+    (let ((s (cast stream PmNative*))
+          (msg:MidiMsg* (salloc))
+          (count:i32 0)
+          (packed:i32 0)
+          (j:i64 0)
+          (more:i1 (not (null? stream)))
+          (ms (pm_now_ms)))
+      (if (null? stream) (set! count pmBadPtr))
+      (while (and more (< count length))
+        (cond ((< (tref s 6) (tref s 5))
+               ;; the next four bytes of a sysex message, low byte first
+               (set! packed 0)
+               (set! j 0)
+               (while (and (< j 4) (< (tref s 6) (tref s 5)))
+                 (set! packed (bor packed (<< (& (convert (pref (tref s 4) (tref s 6)) i32) #xFF)
+                                              (convert (* j 8) i32))))
+                 (tset! s 6 (+ (tref s 6) 1))
+                 (set! j (+ j 1)))
+               (tfill! (pref-ptr buffer count) packed ms)
+               (set! count (+ count 1))
+               void)
+              ((midi_receive (tref s 0) msg)
+               (cond ((= (tref msg 1) MIDI_SYSEX)
+                      (if (pm_filtered s MIDI_SYSEX)
+                          (tset! s 5 0)
+                          (tset! s 5 (midi_receive_sysex (tref s 0) (tref s 4) PM_SYSEX_SIZE)))
+                      (tset! s 6 0)
+                      void)
+                     ((not (pm_filtered s (tref msg 1)))
+                      (tfill! (pref-ptr buffer count)
+                              (bor (tref msg 1) (bor (<< (tref msg 2) 8) (<< (tref msg 3) 16)))
+                              ms)
+                      (set! count (+ count 1))
+                      void)
+                     (else void)))
+              (else
+                (set! more #f)
+                void)))
+      count)))
+
+(bind-func Pm_Poll
+  (lambda (stream:PortMidiStream*)
+    (let ((s (cast stream PmNative*)))
+      (cond ((null? stream) pmBadPtr)
+            ((or (< (tref s 6) (tref s 5))
+                 (> (midi_pending (tref s 0)) 0))
+             pmGotData)
+            (else pmNoData)))))
+
+(bind-func Pm_WriteShort
+  (lambda (stream:PortMidiStream* when:PmTimestamp msg:i32)
+    (cond ((null? stream) pmBadPtr)
+          ((midi_send (tref (cast stream PmNative*) 0)
+                      (& msg #xFF) (& (>> msg 8) #xFF) (& (>> msg 16) #xFF))
+           pmNoError)
+          (else pmHostError))))
+
+(bind-func Pm_WriteSysEx
+  (lambda (stream:PortMidiStream* when:PmTimestamp msg:i8*)
+    (let ((n:i64 0))
+      (if (null? stream)
+          pmBadPtr
+          (begin
+            (while (<> (& (convert (pref msg n) i32) #xFF) #xF7)
+              (set! n (+ n 1)))
+            (if (midi_send_sysex (tref (cast stream PmNative*) 0) msg (+ n 1))
+                pmNoError
+                pmHostError))))))
+
+;; a sysex message arrives four bytes to an event, from one starting with F0
+;; to one containing F7, and is sent when it's all here
+(bind-func Pm_Write
+  (lambda (stream:PortMidiStream* buffer:PmEvent* length:i32)
+    (let ((s (cast stream PmNative*))
+          (err pmNoError)
+          (msg:i32 0)
+          (byte:i32 0)
+          (i:i32 0)
+          (j:i32 0)
+          (ended:i1 #f))
+      (if (null? stream)
+          (begin (set! err pmBadPtr)
+                 (set! length 0)))
+      (dotimes (i length)
+        (set! msg (tref (pref-ptr buffer i) 0))
+        (cond ((or (> (tref s 5) 0) (= (& msg #xFF) #xF0))
+               (set! ended #f)
+               (dotimes (j 4)
+                 (set! byte (& (>> msg (* j 8)) #xFF))
+                 (if (and (not ended) (< (tref s 5) PM_SYSEX_SIZE))
+                     (begin
+                       (pset! (tref s 4) (tref s 5) (convert byte i8))
+                       (tset! s 5 (+ (tref s 5) 1))
+                       (if (= byte #xF7) (set! ended #t)))))
+               (if ended
+                   (begin
+                     (if (not (midi_send_sysex (tref s 0) (tref s 4) (tref s 5)))
+                         (set! err pmHostError))
+                     (tset! s 5 0)
+                     (tset! s 6 0)))
+               void)
+              (else
+                (if (<> (Pm_WriteShort stream 0 msg) pmNoError)
+                    (set! err pmHostError))
+                void)))
+      err)))

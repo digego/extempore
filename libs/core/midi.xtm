@@ -257,6 +257,12 @@ midi_receive_sysex for its bytes, before the next midi_receive."
             #t)
           #f))))
 
+(bind-func midi_pending
+  "how many messages are waiting to be received"
+  (lambda (port:MidiPort*)
+    (let ((pos (tref port 5)))
+      (- (atomic_load_i64 pos) (atomic_load_i64 (pref-ptr pos 1))))))
+
 (bind-func midi_receive_sysex
   "copy the bytes of the sysex message midi_receive just returned (at most max of
 them) into buf. Returns how many."
@@ -486,6 +492,21 @@ to it, and two numbers by which the backend knows it. For a backend's scan."
           port
           (begin (midi_port_free port)
                  (cast null MidiPort*))))))
+
+(bind-func midi_port_address
+  "the two numbers by which the backend knows the i'th port midi_port_count
+found (which = 0 or 1), for midi_open_at"
+  (lambda (i:i64 which:i64)
+    (if (and (> i -1) (< i midi_table_size))
+        (if (= which 0) (aref midi_table_a i) (aref midi_table_b i))
+        -1)))
+
+(bind-func midi_open_at
+  "open the system port with this address (see midi_port_address), which needn't
+be in the current list of ports. kind is MIDI_IN or MIDI_OUT. Returns null on
+failure."
+  (lambda (kind:i64 a:i64 b:i64)
+    (midi_open kind a b null)))
 
 (bind-func midi_open_in
   "open the i'th port midi_port_count found, for reading. Returns null on failure."
