@@ -188,6 +188,10 @@
 
 ;; this code expects that all pretty types
 ;; have already been removed from the ast!
+;;
+;; f rebuilds every list it walks, so a let or lambda with nothing to rename
+;; skips replace-all: copying its whole body at every let made nested lets
+;; quadratic.
 (define xtc:desugar:rename-all-shadow-vars
   (lambda (symname full-ast syms)
     (letrec ((f (lambda (ast fname)
@@ -225,7 +229,7 @@
                                                             (set! syms (cons sym syms))
                                                             #f))))
                                                   (ast:let-bindings ast)))))
-                                       (newast (replace-all ast replace-pairs)))
+                                       (newast (if (null? replace-pairs) ast (replace-all ast replace-pairs))))
                                   ;; now make sure we have code coverage!
                                   (cons (ast:let-tag newast)
                                         (cons (map (lambda (x)
@@ -261,7 +265,7 @@
                                                             (set! syms (cons sym syms))
                                                             #f))))
                                                   (ast:lambda-params ast)))))
-                                       (newast (replace-all ast replace-pairs)))
+                                       (newast (if (null? replace-pairs) ast (replace-all ast replace-pairs))))
                                   (cons (ast:lambda-tag ast)
                                         (cons (ast:lambda-params newast)
                                               (f (ast:lambda-body-forms newast) fname)))))
