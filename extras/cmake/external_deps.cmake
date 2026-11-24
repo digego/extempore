@@ -58,18 +58,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
         URL_SHA256 ${DEP_PORTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
-    set(_rtmidi_args -DRTMIDI_BUILD_TESTING=OFF)
-    if(WIN32)
-        list(APPEND _rtmidi_args
-            -DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}
-            -DCMAKE_INSTALL_BINDIR=${EXT_DEPS_INSTALL_DIR})
-    endif()
-    extempore_add_external(rtmidi
-        URL https://github.com/thestk/rtmidi/archive/${DEP_RTMIDI_VERSION}.zip
-        URL_SHA256 ${DEP_RTMIDI_SHA256}
-        FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS ${_rtmidi_args})
-
     # SOURCE_SUBDIR names a directory without a CMakeLists.txt, so the
     # sources are fetched but kissfft's own build isn't added.
     FetchContent_Declare(kissfft
@@ -90,7 +78,8 @@ if(EXTERNAL_SHLIBS_AUDIO)
 
     # No external codecs (FLAC, Vorbis, Opus, MPEG): each would be another
     # shared library to ship. libsndfile's cmake_minimum_required(3.1..3.18)
-    # is below the 3.5 that CMake 4 still accepts, hence the policy floor.
+    # is below the 3.5 that CMake 4 still accepts, hence the policy floor, and
+    # its CMake raises deprecation warnings that are upstream's to fix.
     set(_sndfile_args
         -DBUILD_SHARED_LIBS=ON
         -DBUILD_PROGRAMS=OFF
@@ -101,7 +90,9 @@ if(EXTERNAL_SHLIBS_AUDIO)
         -DENABLE_CPACK=OFF
         -DENABLE_PACKAGE_CONFIG=OFF
         -DINSTALL_PKGCONFIG_MODULE=OFF
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -Wno-dev
+        -Wno-deprecated)
     if(WIN32)
         list(APPEND _sndfile_args -DENABLE_STATIC_RUNTIME=OFF)
     endif()
@@ -114,22 +105,19 @@ if(EXTERNAL_SHLIBS_AUDIO)
     if(UNIX)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile kiss_fft portmidi rtmidi
+            DEPENDS sndfile kiss_fft portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy librtmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
         set_target_properties(external_shlibs_audio PROPERTIES FOLDER EXTERNAL_SHLIBS)
     elseif(WIN32)
         add_custom_target(external_shlibs_audio
             COMMENT "Copying audio .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS sndfile kiss_fft portmidi rtmidi
+            DEPENDS sndfile kiss_fft portmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy bin/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy rtmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy bin/sndfile.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/sndfile.lib ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})
