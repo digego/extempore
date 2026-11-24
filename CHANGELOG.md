@@ -305,12 +305,12 @@ correct now too. Reported on the mailing list by Minoru.
 Two large strands of work land together: the xtlang compiler now drives every
 compilation through a single constraint-based type-inference engine, and the C++
 runtime gets a broad modernisation. None of it changes what Extempore does ---
-every test suite stays green on Linux (x64 and arm64), macOS (arm64) and Windows
---- but the runtime now needs a C++20 compiler (GCC 13+, a recent Clang, or MSVC
-from Visual Studio 2022), and a good deal of dead code, platform `#ifdef`s and
-latent bugs went out with the tide. There are also two xtlang-visible renames
-(see below); one keeps backwards-compatible aliases for this release, the other
-only affects code that reached into compiler internals.
+every test suite stays green on Linux (x64 and arm64), macOS (arm64) and
+Windows --- but the runtime now needs a C++20 compiler (GCC 13+, a recent Clang,
+or MSVC from Visual Studio 2022), and a good deal of dead code, platform
+`#ifdef`s and latent bugs went out with the tide. There are also two
+xtlang-visible renames (see below); one keeps backwards-compatible aliases for
+this release, the other only affects code that reached into compiler internals.
 
 ### Compiler and type system
 
