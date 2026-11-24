@@ -26,9 +26,8 @@ target_compile_features(extempore_cpp_unit PRIVATE cxx_std_20)
 # CMakeLists.txt), so test code is held to the same standard as what it tests.
 target_compile_options(extempore_cpp_unit PRIVATE ${EXTEMPORE_WARNING_FLAGS})
 
-if(UNIX AND NOT APPLE)
-    target_link_libraries(extempore_cpp_unit PRIVATE pthread)
-endif()
+find_package(Threads REQUIRED)
+target_link_libraries(extempore_cpp_unit PRIVATE Threads::Threads)
 
 include(GoogleTest)
 gtest_discover_tests(extempore_cpp_unit

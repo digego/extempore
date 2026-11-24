@@ -171,7 +171,8 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     target_link_libraries(xtmwebgpu PRIVATE wgpu_native glfw)
 
     if(APPLE)
-        target_compile_options(xtmwebgpu PRIVATE -x objective-c)
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/extras/webgpu/xtmwebgpu.c
+            PROPERTIES LANGUAGE OBJC)
         target_link_libraries(xtmwebgpu PRIVATE
             "-framework QuartzCore"
             "-framework Metal"

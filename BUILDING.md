@@ -8,9 +8,11 @@ in more depth, here's some more information.
 
 - a C++20 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
 - Git
-- CMake >= 3.28
+- CMake >= 4.0
 - Ninja (every preset uses it, on all three platforms)
 - Python >= 3.8 (for LLVM)
+
+`mise.toml` pins CMake, Ninja and Python; `mise install` fetches them.
 
 ## Presets
 

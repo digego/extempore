@@ -107,7 +107,6 @@ endmacro()
 # few that need a bespoke harness (or aren't standalone) are excluded here and
 # registered explicitly below. CONFIGURE_DEPENDS re-globs when a test file is
 # added or removed, so new tests are picked up without editing this file.
-cmake_policy(SET CMP0057 NEW) # enable IN_LIST
 file(GLOB _core_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
      ${CMAKE_CURRENT_SOURCE_DIR}/tests/core/*.xtm)
 file(GLOB _compiler_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -176,10 +175,10 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
 # libs-external runs). This is a LOCAL tool, deliberately excluded from CI (the
 # build-and-test workflow's label-regex omits `docs`) --- run it on Linux with
 # `ctest --test-dir build -L docs` before changing the docs.
-find_program(PYTHON3_EXECUTABLE NAMES python3 python)
-if(PYTHON3_EXECUTABLE)
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
     add_test(NAME docs/verify-examples
-        COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/docs/verify-examples.py)
+        COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/docs/verify-examples.py)
     set_tests_properties(docs/verify-examples PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"

@@ -1,8 +1,18 @@
-cmake_minimum_required(VERSION 3.28...3.31)
-project(Extempore)
+cmake_minimum_required(VERSION 4.0...4.5)
+
+# Read when project() picks the SDK, so it has to be set before it.
+if(CMAKE_HOST_APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0 CACHE STRING "Minimum macOS version")
+endif()
+
+project(Extempore LANGUAGES C CXX)
+if(APPLE)
+    enable_language(OBJC OBJCXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Version --- the git tag is the single source of truth. CI passes the tag
 # explicitly (-DEXTEMPORE_VERSION=${github.ref_name}) since its checkout is
@@ -51,10 +61,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # setup #
 #########
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/platform.cmake)
-extempore_detect_platform()
-
-if(NOT ${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Extempore currently only runs on 64-bit platforms.")
 endif()
 
@@ -62,12 +69,6 @@ if(NOT CMAKE_BUILD_TYPE)
     message(STATUS "Building 'Release' configuration")
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
-
-if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64" OR CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
-    endif()
 endif()
 
 ##########
@@ -87,6 +88,8 @@ if(EXTEMPORE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
         message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
         set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
         set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        set(CMAKE_OBJC_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        set(CMAKE_OBJCXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
     endif()
 endif()
 
@@ -160,18 +163,15 @@ set(DEP_PCRE2_SHA256 "ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42bef
 add_library(s7_lib STATIC src/s7.c)
 target_include_directories(s7_lib PUBLIC include)
 target_compile_definitions(s7_lib PRIVATE
-    -DHAVE_COMPLEX_NUMBERS=0
-    -DWITH_SYSTEM_EXTRAS=0
-    -DWITH_C_LOADER=0
-    -DWITH_GMP=0)
+    HAVE_COMPLEX_NUMBERS=0
+    WITH_SYSTEM_EXTRAS=0
+    WITH_C_LOADER=0
+    WITH_GMP=0)
 if(UNIX)
     target_compile_options(s7_lib PRIVATE -Wno-unused-result)
-    target_link_libraries(s7_lib PRIVATE dl m)
+    target_link_libraries(s7_lib PRIVATE ${CMAKE_DL_LIBS} m)
 endif()
 set_property(TARGET s7_lib PROPERTY C_STANDARD 17)
-if(NOT WIN32)
-    set_property(TARGET s7_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
-endif()
 
 ############
 # linenoise #
@@ -204,33 +204,26 @@ ExternalProject_Add(portaudio_static
 # LLVM #
 ########
 
-if(APPLE)
-    if(UNAME_MACHINE_NAME STREQUAL "arm64")
-        set(LLVM_TARGET_ARCH "AArch64")
-    else()
-        set(LLVM_TARGET_ARCH "X86")
-    endif()
-elseif(UNIX)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-        set(LLVM_TARGET_ARCH "AArch64")
-    else()
-        set(LLVM_TARGET_ARCH "X86")
-    endif()
+# CMAKE_OSX_ARCHITECTURES names the target when it's set (cross-compiling, or
+# an arm64 build under Rosetta); otherwise the processor CMake detected does.
+if(CMAKE_OSX_ARCHITECTURES)
+    set(_target_processor ${CMAKE_OSX_ARCHITECTURES})
 else()
+    set(_target_processor ${CMAKE_SYSTEM_PROCESSOR})
+endif()
+if(_target_processor MATCHES "^(aarch64|arm64|ARM64)$")
+    set(LLVM_TARGET_ARCH "AArch64")
+elseif(_target_processor MATCHES "^(x86_64|AMD64|amd64)$")
     set(LLVM_TARGET_ARCH "X86")
+else()
+    message(FATAL_ERROR "Unsupported target processor: ${_target_processor}")
 endif()
 
 message(STATUS "LLVM target architecture: ${LLVM_TARGET_ARCH}")
 
 include(FetchContent)
 
-# Use direct FetchContent population (CMake 3.30+) to avoid sub-build issues on macOS
-if(POLICY CMP0168)
-    cmake_policy(SET CMP0168 NEW)
-endif()
-
 set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
-set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
@@ -256,7 +249,12 @@ FetchContent_Declare(LLVM
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     EXCLUDE_FROM_ALL)
 
+# LLVM's cmake_minimum_required predates CMP0219 (CMake 4.4), which warns
+# about its backslash-carrying macro calls. Keep the old behaviour it was
+# written for, without the warning.
+set(CMAKE_POLICY_DEFAULT_CMP0219 OLD)
 FetchContent_MakeAvailable(LLVM)
+unset(CMAKE_POLICY_DEFAULT_CMP0219)
 
 # GoogleTest for C++ unit tests.
 if(BUILD_TESTS)
@@ -368,9 +366,9 @@ target_link_libraries(extempore PRIVATE s7_lib pcre2-8 portaudio${CMAKE_STATIC_L
 
 # Compile definitions
 if(EXT_SHARE_DIR)
-    target_compile_definitions(extempore PRIVATE -DEXT_SHARE_DIR="${EXT_SHARE_DIR}")
+    target_compile_definitions(extempore PRIVATE EXT_SHARE_DIR="${EXT_SHARE_DIR}")
 else()
-    target_compile_definitions(extempore PRIVATE -DEXT_SHARE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(extempore PRIVATE EXT_SHARE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 # Warning flags, shared with the C++ unit tests (tests/cpp-unit).
@@ -395,10 +393,10 @@ endif()
 # Platform-specific configuration
 if(UNIX)
     target_compile_definitions(extempore PRIVATE
-        -D_GNU_SOURCE
-        -D__STDC_CONSTANT_MACROS
-        -D__STDC_FORMAT_MACROS
-        -D__STDC_LIMIT_MACROS)
+        _GNU_SOURCE
+        __STDC_CONSTANT_MACROS
+        __STDC_FORMAT_MACROS
+        __STDC_LIMIT_MACROS)
     target_compile_options(extempore PRIVATE
         -fvisibility-inlines-hidden
         -fno-rtti
@@ -433,11 +431,12 @@ if(UNIX)
         message(STATUS "Extempore sanitizers enabled: ${EXTEMPORE_SANITIZE}")
     endif()
 
-    target_link_libraries(extempore PRIVATE pthread linenoise)
+    find_package(Threads REQUIRED)
+    target_link_libraries(extempore PRIVATE Threads::Threads linenoise)
 endif()
 
 if(WIN32)
-    target_compile_definitions(extempore PRIVATE -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX)
+    target_compile_definitions(extempore PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(extempore PRIVATE /bigobj ${EXTEMPORE_WARNING_FLAGS})
     target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
     set_target_properties(extempore PROPERTIES
@@ -449,20 +448,18 @@ if(WIN32)
         ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs)
 elseif(APPLE)
     set_source_files_properties(src/Extempore.cpp src/SchemeFFI.cpp src/UNIV.cpp
-        PROPERTIES COMPILE_FLAGS "-x objective-c++")
+        PROPERTIES LANGUAGE OBJCXX)
     target_link_libraries(extempore PRIVATE
         "-framework Cocoa"
         "-framework CoreAudio"
         "-framework AudioUnit"
         "-framework AudioToolbox")
-    add_custom_command(TARGET extempore POST_BUILD
-        COMMENT "clear file attributes (avoid 'extempore is damaged' error on Big Sur)"
-        COMMAND xattr -cr "$<TARGET_FILE_DIR:extempore>")
 else()
-    # Linux
-    set_property(TARGET extempore PROPERTY POSITION_INDEPENDENT_CODE ON)
-    target_link_libraries(extempore PRIVATE dl asound)
-    target_link_options(extempore PRIVATE -rdynamic)
+    # Linux. ENABLE_EXPORTS puts the executable's symbols in the dynamic symbol
+    # table, where the JIT resolves the runtime's C functions.
+    find_package(ALSA REQUIRED)
+    target_link_libraries(extempore PRIVATE ${CMAKE_DL_LIBS} ALSA::ALSA)
+    set_property(TARGET extempore PROPERTY ENABLE_EXPORTS ON)
 endif()
 
 ##############
@@ -564,12 +561,12 @@ file(GLOB AOT_RUNTIME_DEPS CONFIGURE_DEPENDS
 # for a library whose file name is too common for the cache's one flat
 # directory (libs/studio/dsp.xtm is cached as studio_dsp). The deps are cache
 # names.
-macro(aotcompile_lib libfile group)
+function(aotcompile_lib libfile group)
     get_filename_component(_aot_name ${libfile} NAME_WE)
     aotcompile_lib_as(${_aot_name} ${libfile} ${group} ${ARGN})
-endmacro()
+endfunction()
 
-macro(aotcompile_lib_as _basename libfile group)
+function(aotcompile_lib_as _basename libfile group)
     set(_targetname aot_${_basename})
     set(_ll_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/xtm${_basename}.ll)
     set(_xtm_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/${_basename}.xtm)
@@ -607,7 +604,7 @@ macro(aotcompile_lib_as _basename libfile group)
     foreach(_dep ${ARGN})
         add_dependencies(${_targetname} aot_${_dep})
     endforeach()
-endmacro()
+endfunction()
 
 # Core libs
 add_custom_target(aot_core)
