@@ -12,8 +12,9 @@ cmake --build build
 
 `CMakePresets.json` holds the configurations CI uses: `default`/`ci` (Ninja,
 Release, tests on), `release` (assets, no tests, `EXT_SHARE_DIR=.`) and
-`sanitize-asan`/`sanitize-ubsan`/`sanitize-tsan`/`sanitize-asan-ubsan`. All of
-them build into `build/`.
+`sanitize-asan`/`sanitize-ubsan`/`sanitize-tsan`/`sanitize-asan-ubsan`. The
+sanitizer presets build into `build-asan/` and so on, the rest into `build/`.
+`cmake --workflow --preset default` configures, builds and runs the CI tests.
 
 The presets use Ninja. The AOT steps run in a Ninja job pool capped at 2, so
 build at full parallelism.
@@ -46,6 +47,7 @@ caches `build/_deps/` to speed up CI builds.
 ## Test
 
 ```bash
+ctest --preset default                       # the suites CI runs
 ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-external -j4  # external library tests
 ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)

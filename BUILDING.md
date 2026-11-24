@@ -21,15 +21,20 @@ same thing locally:
 
     cmake --preset default          # Ninja, Release, tests on --- builds into build/
     cmake --build build
+    ctest --preset default          # the test suites CI runs
 
-| Preset                                                                    | What it configures                                              |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `default`, `ci`                                                           | Ninja, `Release`, `BUILD_TESTS=ON`                              |
-| `release`                                                                 | as above plus `ASSETS=ON`, `BUILD_TESTS=OFF`, `EXT_SHARE_DIR=.` |
-| `sanitize-asan`, `sanitize-ubsan`, `sanitize-tsan`, `sanitize-asan-ubsan` | as `default` plus the matching `EXTEMPORE_SANITIZE` value       |
+or all three at once with `cmake --workflow --preset default`.
 
-Presets are a starting point, not a straitjacket --- add `-D` options to the
-`cmake --preset` line as usual.
+| Preset                                                                    | What it configures                                                                            |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `default`, `ci`                                                           | Ninja, `Release`, `BUILD_TESTS=ON`                                                            |
+| `release`                                                                 | as above plus `ASSETS=ON`, `BUILD_TESTS=OFF`, `EXT_SHARE_DIR=.`                               |
+| `sanitize-asan`, `sanitize-ubsan`, `sanitize-tsan`, `sanitize-asan-ubsan` | as `default` plus the matching `EXTEMPORE_SANITIZE` value, built into `build-asan/` and so on |
+
+Each configure preset has a build and test preset of the same name; the
+sanitizer test presets run the suites that fit the instrumentation's slowdown,
+with the sanitizer options CI uses. Add `-D` options to the `cmake --preset`
+line as usual.
 
 ## Build options
 
@@ -64,8 +69,8 @@ users will care about:
 ## LLVM
 
 Extempore links against a specific version of LLVM (currently 22.1.6, pinned in
-`CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's `FetchContent`
---- no system LLVM required.
+`CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's
+`FetchContent` --- no system LLVM required.
 
 The first build takes ~10-30 min because LLVM is compiled from source.
 Subsequent builds reuse the cached artifacts under `build/_deps/llvm-*`. Only
@@ -78,9 +83,9 @@ CI caches `build/_deps/` across runs --- see
 ## PCRE2
 
 The `regex:*` builtins are backed by PCRE2 (currently 10.48, pinned in
-`CMakeLists.txt`), fetched and built in-tree via `FetchContent` alongside LLVM
---- no system PCRE required. Only the static 8-bit library is built and it's
-linked into the binary, so there's nothing extra to ship.
+`CMakeLists.txt`), fetched and built in-tree via `FetchContent` alongside
+LLVM --- no system PCRE required. Only the static 8-bit library is built and
+it's linked into the binary, so there's nothing extra to ship.
 
 The xtlang compiler's type-string grammars use recursive subpatterns and named
 groups, so a PCRE-compatible engine is a hard requirement rather than a
