@@ -1,0 +1,133 @@
+;;; midi.xtm -- the studio's MIDI: tracks which play a synth, keyboards which play a track
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A MIDI track plays an external synth with everything that plays any other
+;; track: note-on, ctl, patterns, a score.
+;;
+;;   (midi-track 'lead "mini" 1)       ;; the output whose name contains "mini", channel 1
+;;   (note-on 'lead 48 0.8 0.5)
+;;   (ctl 'lead 'cc74 0.5)             ;; any controller, 0.0 to 1.0
+;;   (midi-controls 'lead '((cutoff 43) (resonance 44)))
+;;   (ctl 'lead 'cutoff 0.7)           ;; ...by a name of your own
+;;   (ctl 'lead 'bend -0.5 'program 12)
+;;   (midi-offset 'lead 0.012)         ;; seconds to hold this track's MIDI back by
+;;
+;; A port can be a name (part of one, in any case) or a port from midi-out,
+;; midi-virtual-out and so on in libs/core/midi.xtm.
+;;
+;; A MIDI input can play a track:
+;;
+;;   (midi-route "keystep" 'keys)      ;; every channel
+;;   (midi-route "keystep" 'bass 2)    ;; channel 2 only
+;;   (midi-map "keystep" 74 'keys 'cutoff 200 8000)  ;; controller 74 sets cutoff
+;;   (midi-unroute "keystep")
+;;
+;; Notes held on the keyboard are held on the track. The audio thread reads a
+;; routed port, and a port has one reader, so routing a port stops any
+;; midi-listen on it.
+;;
+;; The instrument is libs/studio/instruments/midiout.xtm, and the routing is in
+;; libs/studio/mixer.xtm.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-midi-api)
+(define *xtmlib-studio-midi-api-loaded* #t)
+
+(sys:load "libs/core/midi.xtm")
+(sys:load "libs/studio/api.xtm")
+
+;; ports opened by name stay open, and are found again by that name:
+;; ((name input? . port) ...)
+(define *studio:midi-ports* '())
+
+(define studio:midi-port
+  (lambda (port input?)
+    (if (string? port)
+        (let ((known (let loop ((lst *studio:midi-ports*))
+                       (cond ((null? lst) #f)
+                             ((and (string=? (caar lst) port) (eq? (cadar lst) input?)) (cddar lst))
+                             (else (loop (cdr lst)))))))
+          (or known
+              (let ((opened (if input? (midi-in port) (midi-out port))))
+                (if opened
+                    (set! *studio:midi-ports*
+                          (cons (cons port (cons input? opened)) *studio:midi-ports*)))
+                opened)))
+        port)))
+
+;; (midi-track 'lead "mini")      channel 1
+;; (midi-track 'lead "mini" 3)
+(define midi-track
+  (lambda (name port . channel)
+    (let ((out (studio:midi-port port #f)))
+      (if (not out)
+          #f
+          (let ((slot (studio_midi_add_port out)))
+            (if (< slot 0)
+                (studio:error "too many MIDI ports are in use")
+                (if (track name 'midiout)
+                    (begin
+                      (ctl name 'port slot 'channel (if (pair? channel) (car channel) 1))
+                      name)
+                    #f)))))))
+
+;; (midi-controls 'lead '((cutoff 43) (resonance 44))): names for controllers,
+;; in place of any the track had
+(define midi-controls
+  (lambda (name controls)
+    (set! *studio:param-aliases*
+          (cons (cons name
+                      (map (lambda (c)
+                             (cons (car c)
+                                   (string->symbol (string-append "cc" (number->string (cadr c))))))
+                           controls))
+                (let loop ((lst *studio:param-aliases*))
+                  (cond ((null? lst) '())
+                        ((eq? (caar lst) name) (loop (cdr lst)))
+                        (else (cons (car lst) (loop (cdr lst))))))))
+    name))
+
+(define midi-offset
+  (lambda (name seconds)
+    (ctl name 'offset seconds)))
+
+;; (midi-route "keystep" 'keys)     every channel
+;; (midi-route "keystep" 'keys 2)   channel 2
+(define midi-route
+  (lambda (port track-name . channel)
+    (let ((in (studio:midi-port port #t))
+          (i (studio:track-index track-name)))
+      (cond ((not in) #f)
+            ((not i) (studio:error "there is no track called" track-name))
+            (else
+              (midi-unlisten in)
+              (if (midi:true? (studio_midi_route in i (if (pair? channel) (- (car channel) 1) -1)))
+                  track-name
+                  (studio:error "too many MIDI routes are in use")))))))
+
+;; (midi-map "keystep" 74 'keys 'cutoff 200 8000): the controller sets the
+;; track's parameter, from the first value (at 0) to the second (at 127). The
+;; port must be routed (to any track) for its controllers to be read.
+(define midi-map
+  (lambda (port controller track-name param lo hi)
+    (let ((in (studio:midi-port port #t))
+          (i (if (eq? track-name 'master) 0 (studio:track-index track-name)))
+          (where (studio:find-param track-name param)))
+      (cond ((not in) #f)
+            ((not i) (studio:error "there is no track called" track-name))
+            ((not where) (studio:error track-name "has no parameter called" param))
+            ((midi:true? (studio_midi_map in controller (car where) i (cadr where) (* 1.0 lo) (* 1.0 hi)))
+             param)
+            (else (studio:error "too many MIDI controllers are mapped"))))))
+
+;; stop a port playing anything, and forget its controllers
+(define midi-unroute
+  (lambda (port)
+    (let ((in (studio:midi-port port #t)))
+      (if in (studio_midi_unroute in))
+      #t)))

@@ -31,10 +31,12 @@
 (define *xtmlib-studio_mixer-loaded* #t)
 
 (xtc:aot:suppress-aot-do
+  (sys:load "libs/core/midi.xtm")
   (sys:load "libs/studio/engine.xtm")
   (sys:load "libs/studio/fx.xtm")
   (sys:load "libs/studio/hall.xtm"))
 (xtc:aot:insert-forms
+  (sys:load "libs/core/midi.xtm" 'quiet)
   (sys:load "libs/studio/engine.xtm" 'quiet)
   (sys:load "libs/studio/fx.xtm" 'quiet)
   (sys:load "libs/studio/hall.xtm" 'quiet))
@@ -276,6 +278,176 @@ infinity, since this was last called"
             void))
       void)))
 
+;;;;;;;;;;
+;; MIDI ;;
+;;;;;;;;;;
+
+;; The ports the midi instrument plays (libs/studio/instruments/midi.xtm). A
+;; track's `port` parameter is a slot in this table, because a parameter is a
+;; number.
+(bind-val STUDIO_MIDI_PORTS i64 64)
+(bind-val studio_midi_ports |64,MidiPort*|)
+
+(bind-func studio_midi_add_port
+  "the port's slot in the table of ports, putting it there if need be (-1 if the
+table is full)"
+  (lambda (port:MidiPort*)
+    (let ((slot:i64 -1) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_PORTS)
+        (if (= (cast (aref studio_midi_ports i) i8*) (cast port i8*))
+            (set! slot i)))
+      (dotimes (i STUDIO_MIDI_PORTS)
+        (if (and (< slot 0) (null? (aref studio_midi_ports i)))
+            (begin (aset! studio_midi_ports i port)
+                   (set! slot i))))
+      slot)))
+
+(bind-func studio_midi_port
+  "the port in a slot of the table of ports, or null"
+  (lambda (slot:i64)
+    (if (and (> slot -1) (< slot STUDIO_MIDI_PORTS))
+        (aref studio_midi_ports slot)
+        (cast null MidiPort*))))
+
+;; Routes: a MIDI input which plays a track. The audio thread reads a routed
+;; port itself (so nothing else may: a port has one reader) and turns what
+;; arrives into events for the track.
+;;
+;; a route: the port (null for a free slot), the track, and the MIDI channel
+;; it listens to (0-15, or -1 for all of them)
+(bind-type StudioMidiRoute <MidiPort*,i64,i64> (printer? . #f))
+;; a controller which sets a parameter: the port (null for a free slot), the
+;; controller, the event's kind, track and parameter index, and the values the
+;; parameter takes at 0 and at 127
+(bind-type StudioMidiMap <MidiPort*,i64,i64,i64,i64,SAMPLE,SAMPLE> (printer? . #f))
+
+(bind-val STUDIO_MIDI_ROUTES i64 16)
+(bind-val STUDIO_MIDI_MAPS i64 64)
+
+(bind-func static studio_midi_alloc_routes
+  (lambda ()
+    (let ((routes:StudioMidiRoute* (halloc STUDIO_MIDI_ROUTES)) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_ROUTES)
+        (tfill! (pref-ptr routes i) null 0 -1))
+      routes)))
+
+(bind-func static studio_midi_alloc_maps
+  (lambda ()
+    (let ((maps:StudioMidiMap* (halloc STUDIO_MIDI_MAPS)) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_MAPS)
+        (tfill! (pref-ptr maps i) null 0 0 0 0 0.0 1.0))
+      maps)))
+
+(bind-val studio_midi_routes StudioMidiRoute* (studio_midi_alloc_routes))
+(bind-val studio_midi_maps StudioMidiMap* (studio_midi_alloc_maps))
+(bind-val studio_midi_routed i64 0) ;; how many routes are in use
+
+(bind-func static studio_midi_count_routes
+  (lambda ()
+    (let ((n:i64 0) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_ROUTES)
+        (if (not (null? (tref (pref-ptr studio_midi_routes i) 0))) (set! n (+ n 1))))
+      (set! studio_midi_routed n)
+      void)))
+
+(bind-func studio_midi_route
+  "play track with what arrives at port on channel (0-15, or -1 for any).
+Returns #f if every route is in use."
+  (lambda (port:MidiPort* track:i64 channel:i64)
+    (let ((r:StudioMidiRoute* null) (done:i1 #f) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_ROUTES)
+        (set! r (pref-ptr studio_midi_routes i))
+        (if (and (not done) (null? (tref r 0)))
+            (begin
+              ;; the port last: it's what the audio thread looks at
+              (tset! r 1 track)
+              (tset! r 2 channel)
+              (tset! r 0 port)
+              (set! done #t))))
+      (studio_midi_count_routes)
+      done)))
+
+(bind-func studio_midi_unroute
+  "stop port playing anything, and forget its controllers"
+  (lambda (port:MidiPort*)
+    (let ((i:i64 0))
+      (dotimes (i STUDIO_MIDI_ROUTES)
+        (if (= (cast (tref (pref-ptr studio_midi_routes i) 0) i8*) (cast port i8*))
+            (tset! (pref-ptr studio_midi_routes i) 0 null)))
+      (dotimes (i STUDIO_MIDI_MAPS)
+        (if (= (cast (tref (pref-ptr studio_midi_maps i) 0) i8*) (cast port i8*))
+            (tset! (pref-ptr studio_midi_maps i) 0 null)))
+      (studio_midi_count_routes)
+      void)))
+
+(bind-func studio_midi_map
+  "have a controller of port's set a parameter: kind is the event's
+(EVT_INST_PARAM, EVT_TRACK_PARAM or EVT_MASTER_PARAM), and lo and hi the values
+at 0 and at 127. Returns #f if every map is in use."
+  (lambda (port:MidiPort* controller:i64 kind:i64 track:i64 idx:i64 lo:SAMPLE hi:SAMPLE)
+    (let ((m:StudioMidiMap* null) (done:i1 #f) (i:i64 0))
+      (dotimes (i STUDIO_MIDI_MAPS)
+        (set! m (pref-ptr studio_midi_maps i))
+        (if (and (not done) (null? (tref m 0)))
+            (begin
+              (tfill! m null controller kind track idx lo hi)
+              (tset! m 0 port)
+              (set! done #t))))
+      done)))
+
+;; A message is given the frame a block after the one it arrived in, so that
+;; what is played has a steady delay and doesn't snap to the start of a block.
+(bind-func studio_midi_poll
+  "turn what has arrived at the routed ports into events. For the audio thread;
+time_now is the studio's time, in frames."
+  (lambda (time_now:i64)
+    (let ((msg:MidiMsg* (salloc))
+          (r:StudioMidiRoute* null)
+          (m:StudioMidiMap* null)
+          (port:MidiPort* null)
+          (block_frame (- (now) (- studio_frame time_now)))
+          (block_time (+ (audio_clock_now) (clock_offset)))
+          (when:i64 0)
+          (kind:i32 0)
+          (i:i64 0)
+          (j:i64 0))
+      (dotimes (i STUDIO_MIDI_ROUTES)
+        (set! r (pref-ptr studio_midi_routes i))
+        (set! port (tref r 0))
+        (if (not (null? port))
+            (while (midi_receive port msg)
+              (set! kind (& (tref msg 1) #xF0))
+              (if (and (< (tref msg 1) #xF0)
+                       (or (= (tref r 2) -1)
+                           (= (tref r 2) (convert (& (tref msg 1) #x0F) i64))))
+                  (begin
+                    (set! when (+ block_frame FRAMES
+                                  (convert (* (- (tref msg 0) block_time) (convert SR double)) i64)))
+                    (if (< when time_now) (set! when time_now))
+                    (cond ((and (= kind MIDI_NOTE_ON) (> (tref msg 3) 0))
+                           (studio_push_event when EVT_NOTE_ON (tref r 1) 0
+                                              (convert (tref msg 2) SAMPLE)
+                                              (/ (convert (tref msg 3) SAMPLE) 127.0))
+                           void)
+                          ((or (= kind MIDI_NOTE_ON) (= kind MIDI_NOTE_OFF))
+                           (studio_push_event when EVT_NOTE_OFF (tref r 1) 0
+                                              (convert (tref msg 2) SAMPLE) 0.0)
+                           void)
+                          ((= kind MIDI_CONTROL_CHANGE)
+                           (dotimes (j STUDIO_MIDI_MAPS)
+                             (set! m (pref-ptr studio_midi_maps j))
+                             (if (and (= (cast (tref m 0) i8*) (cast port i8*))
+                                      (= (tref m 1) (convert (tref msg 2) i64)))
+                                 (studio_push_event
+                                   when (tref m 2) (tref m 3) (tref m 4)
+                                   (+ (tref m 5)
+                                      (* (- (tref m 6) (tref m 5))
+                                         (/ (convert (tref msg 3) SAMPLE) 127.0)))
+                                   0.0)))
+                           void)
+                          (else void)))))))
+      void)))
+
 ;; xtlang's comparisons of floats are unordered: one with a not-a-number
 ;; operand is true. So the first test below catches not-a-number as well as
 ;; infinity; the second is the same test for a compiler whose comparisons are
@@ -320,10 +492,13 @@ infinity, since this was last called"
           (begin
             (studio_drain_inbox)
             (pfill! mix 0.0 0.0)
+            (set! studio_frame time)
             (if (= studio_held 0)
                 (begin
-                  ;; apply every event which is due
                   (set! time_now (- time studio_time_offset))
+                  (if (and (> studio_midi_routed 0) (= (% time 64) 0))
+                      (studio_midi_poll time_now))
+                  ;; apply every event which is due
                   (while (and (> studio_heap_size 0)
                               (<= (tref studio_heap 0) time_now))
                     (studio_heap_pop evt)

@@ -1,0 +1,158 @@
+;;; midiout.xtm -- an instrument which plays a MIDI port
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; A track with this instrument (midiout) makes no sound of its own: each note becomes a
+;; note-on and a note-off on a MIDI output, so an external synth plays whatever
+;; the track is given, by note-on or a pattern. (midi-track 'lead "mini" 1) in
+;; libs/studio/midi.xtm sets one up.
+;;
+;; The messages are queued with the frame they belong to (midi_queue in
+;; libs/core/midi.xtm), and sent when that frame is heard.
+;;
+;; Its parameters are the port, the channel and offset, and whatever is sent
+;; when it changes: bend, program, and the 128 controllers cc0 to cc127 (-1,
+;; which they start at, sends nothing).
+;;
+;; Two notes of one pitch which overlap are one note to a synth, and the first
+;; to end ends both.
+;;
+;; A render to a file runs faster than real time, so what this instrument sends
+;; during one arrives all at once: take MIDI tracks out of a score before
+;; rendering it.
+
+;;; Code:
+
+(sys:load-preload-check 'studio-midiout)
+(define *xtmlib-studio-midiout-loaded* #t)
+
+(sys:load "libs/studio/api.xtm")
+
+;; def-instrument with the 128 controllers written out for it
+(eval
+  `(def-instrument midiout
+     "plays a MIDI output port: an external synth"
+     (params
+       (port -1 "which MIDI port: a slot in the studio's table of them (midi-track sets it)")
+       (channel 1 "MIDI channel, 1 to 16")
+       (offset 0.0 "seconds to hold every message back by")
+       (bend 0.0 "pitch bend, -1.0 to 1.0")
+       (program -1 "program number, 0 to 127 (-1: don't send one)")
+       ,@(map (lambda (n)
+                (list (string->symbol (string-append "cc" (number->string n)))
+                      -1
+                      (string-append "controller " (number->string n) ", 0.0 to 1.0 (-1: not sent)")))
+              (range 128))))
+  (interaction-environment))
+
+(bind-val MIDIOUT_VOICES i64 16)
+(bind-val MIDIOUT_CC0 i64 5) ;; the index of cc0: the controllers follow in order
+
+(bind-func midiout_channel_bits
+  "the status byte's low half, from a channel parameter (1 to 16)"
+  (lambda (channel:SAMPLE)
+    (let ((c (- (convert (+ channel 0.5) i32) 1)))
+      (if (< c 0) 0:i32 (if (> c 15) 15:i32 c)))))
+
+(bind-func midiout_byte
+  "a data byte, from a value between 0.0 and 1.0"
+  (lambda (x:SAMPLE)
+    (let ((b (convert (+ (* 127.0 x) 0.5) i32)))
+      (if (< b 0) 0:i32 (if (> b 127) 127:i32 b)))))
+
+(bind-func midiout_frame
+  "the frame to give a message: now, plus the offset parameter"
+  (lambda (offset:SAMPLE)
+    (+ studio_frame (convert (* offset SRf) i64))))
+
+;; A voice remembers what it sent the note-on for, so that the note-off
+;; matches even if the parameters have changed since.
+(bind-func midiout_voice_c
+  (lambda (p:SAMPLE*)
+    (let ((playing:i1 #f)
+          (port:MidiPort* null)
+          (channel:i32 0)
+          (pitch:i32 0))
+      (lambda (v:Voice* out:SAMPLE*)
+        (if (voice_start? v)
+            (begin
+              ;; a stolen voice: end the note it was playing
+              (if (and playing (not (null? port)))
+                  (midi_queue port (midiout_frame (midiout_offset p)) (+ MIDI_NOTE_OFF channel) pitch 0))
+              (set! port (studio_midi_port (convert (midiout_port p) i64)))
+              (set! channel (midiout_channel_bits (midiout_channel p)))
+              (set! pitch (convert (+ (voice_pitch v) 0.5) i32))
+              (set! playing #t)
+              (if (not (null? port))
+                  (midi_queue port (midiout_frame (midiout_offset p)) (+ MIDI_NOTE_ON channel) pitch
+                              (let ((vel (midiout_byte (voice_vel v))))
+                                (if (< vel 1) 1:i32 vel))))))
+        (if (< (voice_gate v) 0.5)
+            (begin
+              (if (and playing (not (null? port)))
+                  (midi_queue port (midiout_frame (midiout_offset p)) (+ MIDI_NOTE_OFF channel) pitch 0))
+              (set! playing #f)
+              (voice_done v)))
+        void))))
+
+;; Once a frame, look at a few of the instrument's parameters and send those
+;; which have changed: all of them are seen every 17 frames.
+(bind-func midiout_fx_c
+  (lambda (p:SAMPLE*)
+    (let ((sent:SAMPLE* (zalloc 130)) ;; 0-127 the controllers, 128 bend, 129 program
+          (next:i64 0)
+          (port:MidiPort* null)
+          (channel:i32 0)
+          (value:SAMPLE 0.0)
+          (bend:i32 0)
+          (k:i64 0)
+          (i:i64 0))
+      (dotimes (i 128) (pset! sent i -1.0))
+      (pset! sent 128 0.0)
+      (pset! sent 129 -1.0)
+      (lambda (frame:SAMPLE*)
+        (set! port (studio_midi_port (convert (midiout_port p) i64)))
+        (if (not (null? port))
+            (begin
+              (set! channel (midiout_channel_bits (midiout_channel p)))
+              (dotimes (i 8)
+                (set! k (% (+ next i) 130))
+                (set! value (cond ((< k 128) (pref p (+ MIDIOUT_CC0 k)))
+                                  ((= k 128) (midiout_bend p))
+                                  (else (midiout_program p))))
+                (if (<> value (pref sent k))
+                    (begin
+                      (pset! sent k value)
+                      (cond ((= k 128)
+                             ;; 14 bits, 8192 in the middle
+                             (set! bend (convert (+ 8192.5 (* 8192.0 value)) i32))
+                             (set! bend (if (< bend 0) 0:i32 (if (> bend 16383) 16383:i32 bend)))
+                             (midi_queue port (midiout_frame (midiout_offset p))
+                                         (+ MIDI_PITCH_BEND channel) (& bend 127) (>> bend 7))
+                             void)
+                            ((< value 0.0) void)
+                            ((= k 129)
+                             (midi_queue port (midiout_frame (midiout_offset p))
+                                         (+ MIDI_PROGRAM_CHANGE channel)
+                                         (convert (+ value 0.5) i32) 0)
+                             void)
+                            (else
+                              (midi_queue port (midiout_frame (midiout_offset p))
+                                          (+ MIDI_CONTROL_CHANGE channel)
+                                          (convert k i32) (midiout_byte value))
+                              void)))))
+              (set! next (% (+ next 8) 130))))
+        void))))
+
+(bind-func midiout_make
+  (lambda ()
+    (let ((inst (inst_make "midiout" MIDIOUT_VOICES (midiout_nparams)))
+          (i:i64 0))
+      (midiout_defaults (inst_params inst))
+      (dotimes (i MIDIOUT_VOICES)
+        (inst_set_voice inst i (midiout_voice_c (inst_voice_params inst i))))
+      (inst_set_fx inst (midiout_fx_c (inst_params inst)))
+      inst)))

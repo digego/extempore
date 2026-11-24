@@ -24,6 +24,11 @@ from `libs/external/portmidi.xtm` to the new library, which `portmidi.xtm`
 loads. On Linux `portmidi.xtm` no longer uses libportmidi: its `Pm_*` functions
 are written over the new library, with the same devices in the same order.
 
+The studio plays MIDI: `(midi-track 'lead "mini" 1)` makes a track which plays
+an external synth with the same `note-on`, `ctl` and patterns as any other, and
+`(midi-route "keystep" 'keys)` has a MIDI keyboard play a track. See
+`libs/studio/midi.xtm`.
+
 The xtlang compiler is much faster on big functions: type solving was cubic in a
 function's size, and closures with many captured variables and deeply nested
 `let`s were quadratic. The generated IR is unchanged except for closure

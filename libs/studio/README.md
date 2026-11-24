@@ -29,6 +29,7 @@ people who want to write an instrument.
 | `api.xtm`      | the Scheme side: `track`, `ctl`, `preset`, `def-instrument`    |
 | `pattern.xtm`  | the pattern language and its clock                             |
 | `sampler.xtm`  | the sample-playback engine, and its SFZ and folder loaders     |
+| `midi.xtm`     | MIDI tracks (`midi-track`) and keyboards which play a track    |
 | `studio.xtm`   | loads all of the above                                         |
 | `aot.xtm`      | checks a library's compiled cache against its sources          |
 | `instruments/` | one file per instrument, loaded on first use                   |

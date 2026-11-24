@@ -667,7 +667,7 @@ aotcompile_lib_as(studio_engine libs/studio/engine.xtm core base audio_dsp)
 aotcompile_lib_as(studio_dsp libs/studio/dsp.xtm core base audio_dsp)
 aotcompile_lib_as(studio_fx libs/studio/fx.xtm core base audio_dsp studio_dsp)
 aotcompile_lib_as(studio_hall libs/studio/hall.xtm core base audio_dsp studio_dsp)
-aotcompile_lib_as(studio_mixer libs/studio/mixer.xtm core base audio_dsp studio_engine studio_fx studio_hall)
+aotcompile_lib_as(studio_mixer libs/studio/mixer.xtm core base audio_dsp midi studio_engine studio_fx studio_hall)
 add_dependencies(aot_studio aot_studio_engine aot_studio_dsp aot_studio_fx aot_studio_hall aot_studio_mixer)
 
 # External audio libs

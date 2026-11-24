@@ -104,6 +104,11 @@
 ;; instruments ;;
 ;;;;;;;;;;;;;;;;;
 
+;; The frame being computed, as (now) counts, which the audio callback sets
+;; before each frame. A voice isn't told the time, and one which does
+;; something other than make sound (the midi instrument's) needs it.
+(bind-val studio_frame i64 0)
+
 ;; how an instrument chooses a voice for a new note
 (bind-val INST_POLY i64 0)  ;; any free voice, stealing the oldest if none
 (bind-val INST_MONO i64 1)  ;; one voice; overlapping notes play legato
@@ -539,6 +544,19 @@ were sent in, so a parameter change sent just before a note applies to it."
         (studio_heap_push (pref-ptr studio_inbox (% read STUDIO_QUEUE_SIZE)))
         (set! read (+ read 1)))
       (atomic_store_i64 (studio_inbox_read) read)
+      void)))
+
+;; events at one time keep the order they were pushed in
+(bind-val studio_pushed i64 0)
+
+(bind-func studio_push_event
+  "queue an event from the audio thread itself (routed MIDI input does). Call
+this from the audio thread only."
+  (lambda (time:i64 kind:i64 track:i64 i:i64 x:SAMPLE y:SAMPLE)
+    (let ((evt:StudioEvent* (salloc)))
+      (tfill! evt time studio_pushed kind track i x y)
+      (set! studio_pushed (+ studio_pushed 1))
+      (studio_heap_push evt)
       void)))
 
 (bind-func studio_clear_events

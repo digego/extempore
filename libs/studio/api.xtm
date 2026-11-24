@@ -270,6 +270,16 @@
     ;; (times may arrive as exact fractions of a frame)
     (studio_send_event (real->integer (* 1.0 time)) kind track i (* 1.0 x) (* 1.0 y))))
 
+;; other names for a track's parameters: ((track (alias . param) ...) ...).
+;; midi-controls gives a MIDI track's controllers names with it.
+(define *studio:param-aliases* '())
+
+(define studio:param-name
+  (lambda (track-name param)
+    (let* ((aliases (assoc track-name *studio:param-aliases*))
+           (alias (and aliases (assoc param (cdr aliases)))))
+      (if alias (cdr alias) param))))
+
 ;; where a parameter lives: (event-kind index), or #f if the track has no
 ;; parameter with that name
 (define studio:find-param
@@ -278,6 +288,7 @@
         (let ((p (assoc param *studio:master-params*)))
           (if p (list studio:event-master-param (cadr p)) #f))
         (let* ((instrument (studio:track-instrument track-name))
+               (param (studio:param-name track-name param))
                (p (and instrument (assoc param (studio:instrument-params instrument)))))
           (if p
               (list studio:event-inst-param (cadr p))

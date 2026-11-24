@@ -1,0 +1,209 @@
+;;; tests/studio/midi.xtm -- the studio's MIDI tracks and routing
+
+;; Everything here goes through loopback ports, so it needs no MIDI on the
+;; machine. What the midiout instrument sends is read from its port's queue
+;; (which nothing empties, on a loopback port), and what a routed port
+;; receives is read from the studio's event queue.
+
+(sys:load "libs/core/test.xtm")
+(sys:load "libs/studio/studio.xtm")
+(studio:load-instrument 'midiout)
+
+(bind-val midi_test_out MidiPort* (midi_open_loopback))
+(bind-val midi_test_msg MidiMsg* (halloc))
+(bind-val midi_test_inst Inst* 0)
+(bind-val midi_test_time double 0.0) ;; when the last message read was due
+
+(bind-func midi_test_setup
+  "a midiout instrument on the loopback port, channel 3"
+  (lambda ()
+    (set! midi_test_inst (midiout_make))
+    (inst_set_param midi_test_inst 0 (convert (studio_midi_add_port midi_test_out) SAMPLE))
+    (inst_set_param midi_test_inst 1 3.0)
+    (set! studio_frame (now))
+    1))
+
+(bind-func midi_test_tick
+  (lambda (n:i64)
+    (let ((frame:SAMPLE* (salloc 2)) (i:i64 0))
+      (dotimes (i n)
+        (inst_tick midi_test_inst frame)
+        (set! studio_frame (+ studio_frame 1)))
+      void)))
+
+;; the next message the instrument queued, as status + 256 * data1 + 65536 *
+;; data2, or -1
+(bind-func midi_test_sent
+  (lambda ()
+    (if (midi_queue_pop midi_test_out 1.0e18 midi_test_msg)
+        (begin
+          (set! midi_test_time (tref midi_test_msg 0))
+          (convert (+ (tref midi_test_msg 1) (* 256 (tref midi_test_msg 2)) (* 65536 (tref midi_test_msg 3))) i64))
+        -1)))
+
+(xtmtest-result (midi_test_setup) 1 "setup")
+
+;; a note of 100 frames: a note-on, then a note-off 100 frames later
+(bind-func midi_test_note
+  (lambda ()
+    (let ((res:i64 0) (start:double 0.0))
+      (inst_note_on midi_test_inst 60.0 0.5 100)
+      (midi_test_tick 50)
+      (if (= (midi_test_sent) (+ #x92 (* 256 60) (* 65536 64))) (set! res (+ res 1)))
+      (set! start midi_test_time)
+      (if (= (midi_test_sent) -1) (set! res (+ res 10)))
+      (midi_test_tick 100)
+      (if (= (midi_test_sent) (+ #x82 (* 256 60))) (set! res (+ res 100)))
+      ;; due 100 frames after the note-on, to within a tenth of a frame
+      (if (< (fabs (- (* (- midi_test_time start) (convert SR double)) 100.0)) 0.1)
+          (set! res (+ res 1000)))
+      (if (= (midi_test_sent) -1) (set! res (+ res 10000)))
+      res)))
+(xtmtest-result (midi_test_note) 11111 "note-on-then-note-off-when-the-gate-closes")
+
+(bind-func midi_test_held_note
+  (lambda ()
+    (let ((res:i64 0))
+      (inst_note_on midi_test_inst 62.0 1.0 0)
+      (midi_test_tick 500)
+      (if (= (midi_test_sent) (+ #x92 (* 256 62) (* 65536 127))) (set! res (+ res 1)))
+      (if (= (midi_test_sent) -1) (set! res (+ res 10)))
+      (inst_note_off midi_test_inst 62.0)
+      (midi_test_tick 2)
+      (if (= (midi_test_sent) (+ #x82 (* 256 62))) (set! res (+ res 100)))
+      res)))
+(xtmtest-result (midi_test_held_note) 111 "held-note-ends-at-note-off")
+
+;; the quietest note is still a note-on
+(bind-func midi_test_quiet_note
+  (lambda ()
+    (inst_note_on midi_test_inst 64.0 0.0 10)
+    (midi_test_tick 20)
+    (let ((on (midi_test_sent)))
+      (midi_test_sent)
+      on)))
+(xtmtest-result (midi_test_quiet_note) (+ #x92 (* 256 64) 65536) "velocity-is-at-least-one")
+
+;; one more note than there are voices: the first is ended to make room
+(bind-func midi_test_steal
+  (lambda ()
+    (let ((i:i64 0) (res:i64 0) (ons:i64 0))
+      (dotimes (i 17)
+        (inst_note_on midi_test_inst (convert (+ 40 i) SAMPLE) 0.5 0)
+        (midi_test_tick 2))
+      (dotimes (i 16)
+        (if (= (midi_test_sent) (+ #x92 (* 256 (+ 40 i)) (* 65536 64))) (set! ons (+ ons 1))))
+      (if (= ons 16) (set! res (+ res 1)))
+      (if (= (midi_test_sent) (+ #x82 (* 256 40))) (set! res (+ res 10)))
+      (if (= (midi_test_sent) (+ #x92 (* 256 56) (* 65536 64))) (set! res (+ res 100)))
+      ;; everything off: a note-off for each of the sixteen
+      (inst_all_off midi_test_inst)
+      (midi_test_tick 2)
+      (set! ons 0)
+      (dotimes (i 16)
+        (if (= (& (midi_test_sent) #xFF) #x82) (set! ons (+ ons 1))))
+      (if (= ons 16) (set! res (+ res 1000)))
+      (if (= (midi_test_sent) -1) (set! res (+ res 10000)))
+      res)))
+(xtmtest-result (midi_test_steal) 11111 "stolen-voice-and-all-off-send-note-offs")
+
+;; parameters are sent when they change, and not otherwise
+(bind-func midi_test_params
+  (lambda ()
+    (let ((res:i64 0))
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) -1) (set! res (+ res 1)))
+      (inst_set_param midi_test_inst (+ MIDIOUT_CC0 74) 0.5)
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) (+ #xB2 (* 256 74) (* 65536 64))) (set! res (+ res 10)))
+      (inst_set_param midi_test_inst 3 -1.0) ;; bend, right down
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) #xE2) (set! res (+ res 100)))
+      (inst_set_param midi_test_inst 3 0.0) ;; and back to the middle
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) (+ #xE2 (* 65536 64))) (set! res (+ res 1000)))
+      (inst_set_param midi_test_inst 4 12.0) ;; program
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) (+ #xC2 (* 256 12))) (set! res (+ res 10000)))
+      (inst_set_param midi_test_inst (+ MIDIOUT_CC0 74) 0.5) ;; no change
+      (midi_test_tick 40)
+      (if (= (midi_test_sent) -1) (set! res (+ res 100000)))
+      res)))
+(xtmtest-result (midi_test_params) 111111 "parameters-sent-when-they-change")
+
+;; a note with a parameter of its own: the controller goes out with it, and
+;; the offset parameter holds both back
+(bind-func midi_test_offset
+  (lambda ()
+    (let ((res:i64 0) (before (midi_frame_time studio_frame)))
+      (inst_set_param midi_test_inst 2 0.5)
+      (inst_note_on midi_test_inst 70.0 0.5 10)
+      (midi_test_tick 1)
+      (if (= (midi_test_sent) (+ #x92 (* 256 70) (* 65536 64))) (set! res (+ res 1)))
+      (if (< (fabs (- (- midi_test_time before) 0.5)) 0.001) (set! res (+ res 10)))
+      (inst_set_param midi_test_inst 2 0.0)
+      (midi_test_tick 20)
+      (midi_test_sent)
+      res)))
+(xtmtest-result (midi_test_offset) 11 "offset-holds-messages-back")
+
+;;;;;;;;;;;;;
+;; routing ;;
+;;;;;;;;;;;;;
+
+(bind-val midi_test_in MidiPort* (midi_open_loopback))
+
+;; what the route queued: kind + 10 * track + 1000 * x (the pitch, or a
+;; parameter's value), or -1
+(bind-func midi_test_routed
+  (lambda ()
+    (let ((evt:StudioEvent* (salloc)))
+      (if (> studio_heap_size 0)
+          (begin
+            (studio_heap_pop evt)
+            (+ (tref evt 2) (* 10 (tref evt 3)) (* 1000 (convert (+ (tref evt 5) 0.5) i64))))
+          -1))))
+
+(bind-func midi_test_route
+  (lambda ()
+    (let ((res:i64 0))
+      (studio_clear_events)
+      (studio_drain_inbox)
+      (if (studio_midi_route midi_test_in 5 1) (set! res (+ res 1))) ;; track 5, channel 1 (of 0-15)
+      (if (= studio_midi_routed 1) (set! res (+ res 10)))
+      (studio_midi_map midi_test_in 74 EVT_INST_PARAM 5 2 100.0 300.0)
+      (midi_send midi_test_in #x91 60 100) ;; a note on the route's channel
+      (midi_send midi_test_in #x90 61 100) ;; another channel: ignored
+      (midi_send midi_test_in #x91 60 0)   ;; note-on, velocity 0: a note-off
+      (midi_send midi_test_in #x81 62 0)
+      (midi_send midi_test_in #xB1 74 127) ;; the mapped controller, at the top
+      (midi_send midi_test_in #xB1 75 127) ;; one which isn't mapped
+      (studio_midi_poll (studio_now))
+      (if (= (midi_test_routed) (+ EVT_NOTE_ON 50 60000)) (set! res (+ res 100)))
+      (if (= (midi_test_routed) (+ EVT_NOTE_OFF 50 60000)) (set! res (+ res 1000)))
+      (if (= (midi_test_routed) (+ EVT_NOTE_OFF 50 62000)) (set! res (+ res 10000)))
+      (if (= (midi_test_routed) (+ EVT_INST_PARAM 50 300000)) (set! res (+ res 100000)))
+      (if (= (midi_test_routed) -1) (set! res (+ res 1000000)))
+      (studio_midi_unroute midi_test_in)
+      (if (= studio_midi_routed 0) (set! res (+ res 10000000)))
+      res)))
+(xtmtest-result (midi_test_route) 11111111 "routed-input-becomes-events")
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; the Scheme side  ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(define midi-test-port (midi-loopback))
+
+(xtmtest-result (midi-track 'lead midi-test-port 2) 'lead "midi-track")
+(xtmtest-result (studio:track-instrument 'lead) 'midiout "midi-track-instrument")
+(xtmtest-result (studio:find-param 'lead 'cutoff) #f "no-alias-yet")
+(midi-controls 'lead '((cutoff 43) (resonance 44)))
+(xtmtest-result (studio:find-param 'lead 'cutoff) (studio:find-param 'lead 'cc43) "controller-by-name")
+(xtmtest-result (pair? (studio:find-param 'lead 'cc127)) #t "controller-by-number")
+;; another track's names are its own
+(xtmtest-result (studio:param-name 'bass 'cutoff) 'cutoff "aliases-belong-to-a-track")
+(xtmtest-result (midi-route midi-test-port 'lead 3) 'lead "midi-route")
+(xtmtest-result (midi-map midi-test-port 1 'lead 'cc1 0 1) 'cc1 "midi-map")
+(xtmtest-result (midi-unroute midi-test-port) #t "midi-unroute")
+(xtmtest-result (midi-track 'other "no port is called this, surely") #f "midi-track-no-such-port")
