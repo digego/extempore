@@ -424,6 +424,11 @@ xtlang's `let' syntax is the same as Scheme"
                         ((atom? ast) '())))))
       (f full-ast)
       syms)))
+;; Pairs already measured by allocate-var? in this closure:convert, by
+;; identity: every let and lambda asks about its whole subtree, so without
+;; them nested lets were quadratic.  #f outside closure:convert.
+(define *xtc:typecheck:allocate-memo* #f)
+
 (define xtc:typecheck:allocate-var?
   (lambda (ast)
     (cond ((null? ast) 0)
@@ -431,13 +436,39 @@ xtlang's `let' syntax is the same as Scheme"
           ((eq? ast 'lambdah) 1)
           ((eq? ast 'lambdas) 2)
           ((pair? ast)
-           (let ((a (xtc:typecheck:allocate-var? (car ast)))
-                 (b (xtc:typecheck:allocate-var? (cdr ast))))
-             (if (> a b) a b)))
+           (let ((memo *xtc:typecheck:allocate-memo*))
+             (or (and memo (hash-table-ref memo ast))
+                 (let* ((a (xtc:typecheck:allocate-var? (car ast)))
+                        (b (xtc:typecheck:allocate-var? (cdr ast)))
+                        (r (if (> a b) a b)))
+                   (if memo (hash-table-set! memo ast r))
+                   r))))
           (else 0))))
+
+;; The environment a closure captures: esyms (innermost first) without
+;; duplicates, keeping each name's first occurrence, outermost first, and
+;; without the compiled function's own name (the outermost).
+(define xtc:typecheck:closure-env
+  (lambda (esyms)
+    (let ((seen (make-hash-table)))
+      (let loop ((es esyms) (acc '()))
+        (if (null? es)
+            (if (null? acc) '() (cdr acc))
+            (loop (cdr es)
+                  (if (hash-table-ref seen (car es))
+                      acc
+                      (begin (hash-table-set! seen (car es) #t)
+                             (cons (car es) acc)))))))))
 
 ;; adds make-closure and make-env tags
 (define xtc:typecheck:closure:convert
+  (lambda (ast esyms)
+    (if *xtc:typecheck:allocate-memo*
+        (xtc:typecheck:closure:convert* ast esyms)
+        (let-temporarily ((*xtc:typecheck:allocate-memo* (make-hash-table 1024 eq?)))
+          (xtc:typecheck:closure:convert* ast esyms)))))
+
+(define xtc:typecheck:closure:convert*
   (lambda (ast esyms)
     (cond ((ast:lambda? ast)
            (let ((allocate-mem-for-vars? (xtc:typecheck:allocate-var? (cdr ast)))
@@ -448,19 +479,19 @@ xtlang's `let' syntax is the same as Scheme"
                                allocate-mem-for-vars?
                                ;; name of compiled function is always last
                                ;; so we can remove it by dropping it off the end
-                               (cdr (reverse (cl:remove-duplicates esyms))) ;env
+                               (xtc:typecheck:closure-env esyms)
                                params
-                               (xtc:typecheck:closure:convert (ast:lambda-body ast) (append params esyms)))))
+                               (xtc:typecheck:closure:convert* (ast:lambda-body ast) (append params esyms)))))
           ((ast:let? ast)
            (let* ((allocate-mem-for-vars? (xtc:typecheck:allocate-var? ast))
                   (bindings (map ast:binding-var (ast:let-bindings ast))))
              (ast:make-env '__make-env
                            allocate-mem-for-vars?
-                           (xtc:typecheck:closure:convert (ast:let-bindings ast) (append bindings esyms))
-                           (xtc:typecheck:closure:convert (ast:let-body ast) (append bindings esyms)))))
+                           (xtc:typecheck:closure:convert* (ast:let-bindings ast) (append bindings esyms))
+                           (xtc:typecheck:closure:convert* (ast:let-body ast) (append bindings esyms)))))
           ((pair? ast)
-           (cons (xtc:typecheck:closure:convert (car ast) esyms)
-                 (xtc:typecheck:closure:convert (cdr ast) esyms)))
+           (cons (xtc:typecheck:closure:convert* (car ast) esyms)
+                 (xtc:typecheck:closure:convert* (cdr ast) esyms)))
           ((atom? ast) ast))))
 
 
