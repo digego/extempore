@@ -3,6 +3,53 @@
 First, a confession: the Extempore maintainers (i.e. Andrew & Ben) have been
 really bad at keeping a changelog. But hopefully we'll be better in the future.
 
+## Unreleased
+
+Toolchain. Building Extempore now needs CMake 4 and a C++23 compiler: GCC 13 or
+later, a recent Clang or Apple Clang, or MSVC from Visual Studio 2022 or later.
+`mise.toml` pins CMake, Ninja, Python, uv and clang-tidy, and CI installs them
+through mise, so `mise install` gives a local build the versions CI uses. The
+C++ standard is set on Extempore's own targets, and LLVM builds at its own
+default, C++17. To build against an installed LLVM 22.1 instead of compiling it,
+configure with `-DEXTEMPORE_SYSTEM_LLVM=ON`.
+
+Generated files go in the build tree. The AOT cache, the shared libraries xtlang
+binds and the output of `--compile` used to be written into the source tree
+(`libs/aot-cache/`, `libs/platform-shlibs/`). They now go in `libs/` beside the
+binary: `build/libs/` for a source build, and the install prefix for an
+installed tree, so a release archive has the same layout as before. Each build
+directory has its own AOT cache, which means a sanitizer build no longer
+overwrites the main build's. On Windows, `extempore.exe` is built into `build\`
+like on the other platforms, instead of the source root. `(sys:build-dir)` names
+the directory, as `(sys:share-dir)` names the share directory, and a relative
+path given to `sys:load` or `sys:slurp-file` is looked for in the working
+directory, then the build directory, then the share directory. If you are
+upgrading a source checkout, delete its `libs/aot-cache/` and
+`libs/platform-shlibs/`; configure warns while they are there.
+
+Dependencies. libsndfile moves from a 2019 snapshot (1.0.29) to 1.2.2, which
+brings several years of security fixes. stb_image moves from v2.10 (2016) to
+v2.30 and kissfft to 131.2.0; both are now fetched from upstream and compiled
+in-tree, and the `extemporelang` forks are no longer used. LLVM moves to 22.1.8,
+PCRE2 to 10.49, GLFW to 3.5.1 and googletest to 1.18. rtmidi is no longer built:
+it was shipped on every platform, but no xtlang library bound it, and all MIDI
+goes through PortMidi. PortAudio is now built as part of the main build, so a
+host API's own libraries are linked with it, and it builds only ALSA (plus JACK
+with `-DJACK=ON`) on Linux whatever other development headers are installed.
+
+Releases and CI. CPack builds the release archives from what `cmake --install`
+lays out, each archive carries a build-provenance attestation, and a release's
+notes are its section of this file. Running the Release workflow by hand builds
+and packages all four platforms without publishing anything. CI uses the
+`windows-2025` image, third-party actions are pinned by commit with Dependabot
+keeping them current, and clang-tidy 22 runs on every push and fails on any
+finding. Clearing its existing findings fixed three places that passed an
+`llvm::StringRef`'s `data()`, which need not be null-terminated, to C string
+functions. `CMakePresets.json` gained test and workflow presets
+(`cmake --workflow --preset default` configures, builds and runs the suites CI
+runs), and the sanitizer presets build into their own directories, `build-asan/`
+and so on.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to
