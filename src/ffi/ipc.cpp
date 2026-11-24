@@ -48,8 +48,7 @@ namespace extemp {
 namespace SchemeFFI {
 
 // ipc stuff
-static pointer newSchemeProcess(scheme* Scheme, pointer Args)
-{
+static pointer newSchemeProcess(scheme* Scheme, pointer Args) {
     const std::string proc_name(argString(Scheme, Args, 1));
     const int port = int(argInt(Scheme, Args, 2));
     SchemeProcess* sp = new SchemeProcess(UNIV::SHARE_DIR, proc_name, port, 0);
@@ -62,7 +61,7 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
     }
     SchemeREPL* repl = new SchemeREPL(proc_name, sp);
     if (repl->connectToProcessAtHostname("localhost", port)) {
-        return pair_car(Args); //return Scheme->T;
+        return pair_car(Args);  // return Scheme->T;
     }
     // The REPL deregisters itself from the name table; the process
     // destructor stops and joins its task and server threads.
@@ -71,8 +70,7 @@ static pointer newSchemeProcess(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static pointer connectToProcess(scheme* Scheme, pointer Args)
-{
+static pointer connectToProcess(scheme* Scheme, pointer Args) {
     const std::string host_name(argString(Scheme, Args, 1));
     const std::string proc_name(argString(Scheme, Args, 2));
     const int port = int(argInt(Scheme, Args, 3));
@@ -84,22 +82,20 @@ static pointer connectToProcess(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static SchemeREPL* findREPL(const std::string& Name)
-{
+static SchemeREPL* findREPL(const std::string& Name) {
     auto repl(SchemeREPL::I(Name));
     if (!repl) [[unlikely]] {
-      std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
-      return nullptr;
-   }
-   return repl;
+        std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
+        return nullptr;
+    }
+    return repl;
 }
 
-static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value)
-{
+static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value) {
     Stream << ' ';
     if (is_pair(Value) || is_vector(Value) || is_symbol(Value)) {
         Stream << "'";
-        UNIV::printSchemeCell(Scheme, Stream, Value,true);
+        UNIV::printSchemeCell(Scheme, Stream, Value, true);
     } else if (Scheme->NIL == Value) {
         Stream << "'()";
     } else if (Value == Scheme->F) {
@@ -118,17 +114,17 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value)
     } else if (is_string(Value) || is_number(Value) || is_symbol(Value)) {
         UNIV::printSchemeCell(Scheme, Stream, Value, true);
     } else {
-        ffiPrintError("Extempore's IPC mechanism cannot serialise this type - this maybe related to the return type as well as the arguments.\n");
+        ffiPrintError("Extempore's IPC mechanism cannot serialise this type - this maybe related "
+                      "to the return type as well as the arguments.\n");
         return false;
     }
     return true;
 }
 
-static pointer ipcCall(scheme* Scheme, pointer Args)
-{
+static pointer ipcCall(scheme* Scheme, pointer Args) {
     auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
-      return Scheme->F;
+        return Scheme->F;
     }
     std::stringstream ss;
     pointer sym = pair_cadr(Args);
@@ -142,8 +138,7 @@ static pointer ipcCall(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer ipcDefine(scheme* Scheme, pointer Args)
-{
+static pointer ipcDefine(scheme* Scheme, pointer Args) {
     auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
         return Scheme->F;
@@ -153,12 +148,11 @@ static pointer ipcDefine(scheme* Scheme, pointer Args)
     if (!appendArg(Scheme, ss, pair_caddr(Args))) {
         return Scheme->F;
     }
-    repl->writeString(std::string("(define ") + symname(sym) + ss.str() +')');
+    repl->writeString(std::string("(define ") + symname(sym) + ss.str() + ')');
     return Scheme->T;
 }
 
-static pointer ipcEval(scheme* Scheme, pointer Args)
-{
+static pointer ipcEval(scheme* Scheme, pointer Args) {
     auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl) {
         return Scheme->F;
@@ -167,8 +161,7 @@ static pointer ipcEval(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer ipcSetPriority(scheme* Scheme, pointer Args)
-{
+static pointer ipcSetPriority(scheme* Scheme, pointer Args) {
     auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl || !repl->getProcess()) {
         return Scheme->F;
@@ -177,8 +170,7 @@ static pointer ipcSetPriority(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer ipcGetPriority(scheme* Scheme, pointer Args)
-{
+static pointer ipcGetPriority(scheme* Scheme, pointer Args) {
     auto repl(findREPL(argString(Scheme, Args, 1)));
     if (!repl || !repl->getProcess()) {
         return Scheme->F;
@@ -186,13 +178,11 @@ static pointer ipcGetPriority(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, repl->getProcess()->getPriority());
 }
 
-static pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args)
-{
+static pointer getNameOfCurrentProcess(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, Scheme->m_process->getName().c_str());
 }
 
-std::span<const FFIEntry> ipcDefs()
-{
+std::span<const FFIEntry> ipcDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("ipc:new", newSchemeProcess, 2, 0, false),
         FFI_DEF("ipc:connect", connectToProcess, 3, 0, false),

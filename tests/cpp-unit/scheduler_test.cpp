@@ -17,7 +17,7 @@ namespace extemp {
 namespace UNIV {
 uint32_t SAMPLE_RATE = 44100;
 }
-}  // namespace UNIV
+}  // namespace extemp
 
 using extemp::EXTThread;
 

@@ -197,29 +197,36 @@ static void osc_emit_scheme_message(SchemeProcess* proc, const char* fname, doub
     int depth = 0;  // nesting of OSC array type tags, emitted as Scheme lists
     while (!tags.atEnd()) {
         switch (tags.getChar()) {
-            case 'i': form += " " + std::to_string(args.getInt32()); break;
-            case 'f': form += " " + osc_text::scheme_real_literal(args.getFloat32()); break;
-            case 'd': form += " " + osc_text::scheme_real_literal(args.getFloat64()); break;
-            case 'h':
-                form += " " + std::to_string(static_cast<int64_t>(args.getUInt64()));
-                break;
-            case 't':
-                form += " " + osc_text::scheme_real_literal(osc_ntp_to_seconds(args.getUInt64()));
-                break;
-            case 's':
-                form += " " + osc_text::scheme_string_literal(std::string_view(args.getString()));
-                break;
-            case '[':
-                form += " (list ";
-                ++depth;
-                break;
-            case ']':
-                if (--depth < 0) {
-                    return;  // unbalanced array tags: drop the message
-                }
-                form += ")";
-                break;
-            default: return;  // unsupported type tag: drop the message
+        case 'i':
+            form += " " + std::to_string(args.getInt32());
+            break;
+        case 'f':
+            form += " " + osc_text::scheme_real_literal(args.getFloat32());
+            break;
+        case 'd':
+            form += " " + osc_text::scheme_real_literal(args.getFloat64());
+            break;
+        case 'h':
+            form += " " + std::to_string(static_cast<int64_t>(args.getUInt64()));
+            break;
+        case 't':
+            form += " " + osc_text::scheme_real_literal(osc_ntp_to_seconds(args.getUInt64()));
+            break;
+        case 's':
+            form += " " + osc_text::scheme_string_literal(std::string_view(args.getString()));
+            break;
+        case '[':
+            form += " (list ";
+            ++depth;
+            break;
+        case ']':
+            if (--depth < 0) {
+                return;  // unbalanced array tags: drop the message
+            }
+            form += ")";
+            break;
+        default:
+            return;  // unsupported type tag: drop the message
         }
     }
     if (depth != 0) {
@@ -678,8 +685,7 @@ void OSC::sendOSC(TaskI* task) {
             printf("Error: OSC message of %zu bytes is too large for one UDP datagram\n",
                    message.size());
         } else {
-            printf("Error: problem sending OSC message: %s\n",
-                   UdpSocket::errorText(error).c_str());
+            printf("Error: problem sending OSC message: %s\n", UdpSocket::errorText(error).c_str());
         }
     }
 

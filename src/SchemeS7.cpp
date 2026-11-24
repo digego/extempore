@@ -41,8 +41,12 @@ namespace {
 // set: a primitive can call back into Scheme, which can call another one.
 struct FFINameScope {
     const char* prev;
-    explicit FFINameScope(const char* Name): prev(s_currentFFIName) { s_currentFFIName = Name; }
-    ~FFINameScope() { s_currentFFIName = prev; }
+    explicit FFINameScope(const char* Name) : prev(s_currentFFIName) {
+        s_currentFFIName = Name;
+    }
+    ~FFINameScope() {
+        s_currentFFIName = prev;
+    }
 };
 }  // namespace
 
@@ -276,8 +280,7 @@ void scheme_set_output_port_string(scheme* sc, char* start, char* past_the_end) 
 static s7_pointer eval_source(s7_scheme* s7, const char* str, s7_int len) {
     s7_pointer eval_string = s7_name_to_value(s7, "sys:eval-string");
     if (s7_is_procedure(eval_string)) {
-        return s7_call(s7, eval_string,
-                       s7_list(s7, 1, s7_make_string_with_length(s7, str, len)));
+        return s7_call(s7, eval_string, s7_list(s7, 1, s7_make_string_with_length(s7, str, len)));
     }
     return s7_load_c_string(s7, str, len);
 }
@@ -450,7 +453,6 @@ pointer reverse_in_place(scheme* sc, pointer term, pointer list) {
 pointer append(scheme* sc, pointer a, pointer b) {
     return s7_append(sc->sc, a, b);
 }
-
 
 pointer _cons(scheme* sc, pointer a, pointer b, int immutable) {
     pointer p = s7_cons(sc->sc, a, b);

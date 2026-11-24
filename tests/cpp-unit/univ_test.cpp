@@ -15,9 +15,9 @@ namespace {
 // unique across processes: a per-process counter is not.
 std::string write_temp(const std::string& contents) {
     const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
-    auto p = std::filesystem::temp_directory_path() /
-             (std::string("extempore_test_") + info->test_suite_name() + "_" +
-              info->name() + ".bin");
+    auto p =
+        std::filesystem::temp_directory_path() /
+        (std::string("extempore_test_") + info->test_suite_name() + "_" + info->name() + ".bin");
     std::ofstream f(p, std::ios::binary);
     f.write(contents.data(), static_cast<std::streamsize>(contents.size()));
     f.close();

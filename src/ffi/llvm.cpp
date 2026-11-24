@@ -144,21 +144,21 @@ static IRPreamble::Entries sPreamble;
 static std::mutex sPreambleMutex;
 static bool sRuntimeHelpersLoaded = false;
 
-static pointer optimizeCompiles(scheme* Scheme, pointer Args)
-{
+static pointer optimizeCompiles(scheme* Scheme, pointer Args) {
     EXTLLVM::OPTIMIZE_COMPILES = (argAt(Scheme, Args, 1) == Scheme->T);
     return Scheme->T;
 }
 
-static pointer optimizationLevel(scheme* Scheme, pointer Args)
-{
+static pointer optimizationLevel(scheme* Scheme, pointer Args) {
     if (Args == Scheme->NIL) {
         return mk_integer(Scheme, EXTLLVM::OPTIMIZATION_LEVEL);
     }
     // Set optimization level (0-3)
     int level = int(argInt(Scheme, Args, 1));
-    if (level < 0) level = 0;
-    if (level > 3) level = 3;
+    if (level < 0)
+        level = 0;
+    if (level > 3)
+        level = 3;
     EXTLLVM::OPTIMIZATION_LEVEL = level;
     return mk_integer(Scheme, level);
 }
@@ -168,8 +168,7 @@ static pointer optimizationLevel(scheme* Scheme, pointer Args)
 // loads and stores are checked against the same shadow memory as the C++
 // runtime. No module constructor runs, so globals can't be registered with
 // the runtime: leave them uninstrumented.
-static void instrumentForASan(llvm::Module& M)
-{
+static void instrumentForASan(llvm::Module& M) {
     static const bool globalsOff = [] {
         auto& opts = llvm::cl::getRegisteredOptions();
         static_cast<llvm::cl::opt<bool>*>(opts["asan-globals"])->setValue(false);
@@ -202,8 +201,7 @@ static void instrumentForASan(llvm::Module& M)
 }
 #endif
 
-static pointer jitCompileIRString(scheme* Scheme, pointer Args)
-{
+static pointer jitCompileIRString(scheme* Scheme, pointer Args) {
     auto modulePtr(jitCompile(argString(Scheme, Args, 1)));
     if (!modulePtr) {
         return Scheme->F;
@@ -211,30 +209,27 @@ static pointer jitCompileIRString(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, modulePtr);
 }
 
-static pointer ff_set_name(scheme* Scheme, pointer Args)
-{
-   pointer x = argAt(Scheme, Args, 1);
-   // In the s7 adapter, foreign functions don't expose their raw function pointer.
-   // This is a no-op for now — ff_set_name/ff_get_name are used for debugging only.
-   (void)x;
-   return Scheme->T;
+static pointer ff_set_name(scheme* Scheme, pointer Args) {
+    pointer x = argAt(Scheme, Args, 1);
+    // In the s7 adapter, foreign functions don't expose their raw function pointer.
+    // This is a no-op for now — ff_set_name/ff_get_name are used for debugging only.
+    (void)x;
+    return Scheme->T;
 }
 
-static pointer ff_get_name(scheme* Scheme, pointer Args)
-{
-   pointer x = argAt(Scheme, Args, 1);
-   // Return the s7 function name if available
-   if (s7_is_function(x)) {
-       char* name = s7_object_to_c_string(Scheme->sc, x);
-       pointer result = mk_string(Scheme, name ? name : "#<unknown>");
-       free(name);
-       return result;
-   }
-   return mk_string(Scheme, "#<unknown>");
+static pointer ff_get_name(scheme* Scheme, pointer Args) {
+    pointer x = argAt(Scheme, Args, 1);
+    // Return the s7 function name if available
+    if (s7_is_function(x)) {
+        char* name = s7_object_to_c_string(Scheme->sc, x);
+        pointer result = mk_string(Scheme, name ? name : "#<unknown>");
+        free(name);
+        return result;
+    }
+    return mk_string(Scheme, "#<unknown>");
 }
 
-static pointer get_function(scheme* Scheme, pointer Args)
-{
+static pointer get_function(scheme* Scheme, pointer Args) {
     auto func(extemp::EXTLLVM::getFunction(argString(Scheme, Args, 1)));
     if (!func) {
         return Scheme->F;
@@ -242,8 +237,7 @@ static pointer get_function(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, const_cast<llvm::Function*>(func));
 }
 
-static pointer get_globalvar(scheme* Scheme, pointer Args)
-{
+static pointer get_globalvar(scheme* Scheme, pointer Args) {
     auto var(extemp::EXTLLVM::getGlobalVariable(argString(Scheme, Args, 1)));
     if (!var) {
         return Scheme->F;
@@ -255,8 +249,7 @@ static pointer get_globalvar(scheme* Scheme, pointer Args)
 // string, measured with the JIT's DataLayout: the layout every compiled module
 // gets.  The string must be self-contained: a %named type would parse as a
 // fresh opaque struct, so the caller expands named types first.
-static pointer get_type_size(scheme* Scheme, pointer Args)
-{
+static pointer get_type_size(scheme* Scheme, pointer Args) {
     const char* type_str = argString(Scheme, Args, 1);
     long size = -1;
     EXTLLVM::getThreadSafeContext().withContextDo([&](llvm::LLVMContext* ctx) {
@@ -276,14 +269,12 @@ static pointer get_type_size(scheme* Scheme, pointer Args)
 
 static llvm::StructType* getNamedType(const char* name) {
     llvm::StructType* result = nullptr;
-    EXTLLVM::getThreadSafeContext().withContextDo([&](llvm::LLVMContext* ctx) {
-        result = llvm::StructType::getTypeByName(*ctx, name);
-    });
+    EXTLLVM::getThreadSafeContext().withContextDo(
+        [&](llvm::LLVMContext* ctx) { result = llvm::StructType::getTypeByName(*ctx, name); });
     return result;
 }
 
-static pointer get_named_struct_size(scheme* Scheme, pointer Args)
-{
+static pointer get_named_struct_size(scheme* Scheme, pointer Args) {
     auto type(getNamedType(argString(Scheme, Args, 1)));
     if (!type) {
         return Scheme->F;
@@ -293,8 +284,7 @@ static pointer get_named_struct_size(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, size);
 }
 
-static pointer get_function_args(scheme* Scheme, pointer Args)
-{
+static pointer get_function_args(scheme* Scheme, pointer Args) {
     auto func(extemp::EXTLLVM::getFunction(argString(Scheme, Args, 1)));
     if (!func) {
         return Scheme->F;
@@ -312,14 +302,12 @@ static pointer get_function_args(scheme* Scheme, pointer Args)
     return reverse_in_place(Scheme, Scheme->NIL, p);
 }
 
-static pointer get_function_varargs(scheme* Scheme, pointer Args)
-{
+static pointer get_function_varargs(scheme* Scheme, pointer Args) {
     auto func(extemp::EXTLLVM::getFunction(argString(Scheme, Args, 1)));
     return (func && func->isVarArg()) ? Scheme->T : Scheme->F;
 }
 
-static pointer get_function_type(scheme* Scheme, pointer Args)
-{
+static pointer get_function_type(scheme* Scheme, pointer Args) {
     auto func(extemp::EXTLLVM::getFunction(argString(Scheme, Args, 1)));
     if (!func) {
         return Scheme->F;
@@ -330,8 +318,7 @@ static pointer get_function_type(scheme* Scheme, pointer Args)
     return mk_string(Scheme, ss.str().c_str());
 }
 
-static pointer get_function_calling_conv(scheme* Scheme, pointer Args)
-{
+static pointer get_function_calling_conv(scheme* Scheme, pointer Args) {
     auto func(extemp::EXTLLVM::getFunction(argString(Scheme, Args, 1)));
     if (!func) {
         return Scheme->F;
@@ -339,8 +326,7 @@ static pointer get_function_calling_conv(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, func->getCallingConv());
 }
 
-static pointer get_global_variable_type(scheme* Scheme, pointer Args)
-{
+static pointer get_global_variable_type(scheme* Scheme, pointer Args) {
     using namespace llvm;
     auto var(extemp::EXTLLVM::getGlobalVariable(argString(Scheme, Args, 1)));
     if (!var) {
@@ -352,8 +338,7 @@ static pointer get_global_variable_type(scheme* Scheme, pointer Args)
     return mk_string(Scheme, ss.str().c_str());
 }
 
-static pointer get_function_pointer(scheme* Scheme, pointer Args)
-{
+static pointer get_function_pointer(scheme* Scheme, pointer Args) {
     auto name(argString(Scheme, Args, 1));
     auto addr = EXTLLVM::getFunctionAddress(name);
     if (!addr) {
@@ -366,8 +351,7 @@ static pointer get_function_pointer(scheme* Scheme, pointer Args)
 // the same operation --- remove a JIT symbol and drop its global-map entry ---
 // so one body is registered under all three names. They share an identity, so
 // an argument error from any of them reports the first.
-static pointer remove_symbol_and_global(scheme* Scheme, pointer Args)
-{
+static pointer remove_symbol_and_global(scheme* Scheme, pointer Args) {
     const char* name = argString(Scheme, Args, 1);
     if (EXTLLVM::removeSymbol(name)) {
         EXTLLVM::removeFromGlobalMap(name);
@@ -376,8 +360,7 @@ static pointer remove_symbol_and_global(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static pointer llvm_call_void_native(scheme* Scheme, pointer Args)
-{
+static pointer llvm_call_void_native(scheme* Scheme, pointer Args) {
     const std::string name(argString(Scheme, Args, 1));
 
     auto addr = EXTLLVM::getFunctionAddress(name + "_native");
@@ -388,15 +371,14 @@ static pointer llvm_call_void_native(scheme* Scheme, pointer Args)
             return Scheme->F;
         }
     }
-    auto p = reinterpret_cast<void(*)(void)>(addr);
+    auto p = reinterpret_cast<void (*)(void)>(addr);
     p();
     return Scheme->T;
 }
 
 static std::atomic<uint64_t> CALL_STUB_COUNTER{0};
 
-static pointer call_compiled(scheme* Scheme, pointer Args)
-{
+static pointer call_compiled(scheme* Scheme, pointer Args) {
     // Get the llvm::Function* from the cptr argument
     auto func = reinterpret_cast<llvm::Function*>(cptr_value(pair_car(Args)));
     if (unlikely(!func)) {
@@ -453,7 +435,8 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
                 printf("Bad argument type %u\n", i);
                 return Scheme->F;
             }
-            argValues.push_back({ArgValue::Int, argTy, static_cast<uint64_t>(ivalue(p)), 0.0, 0.0f, nullptr});
+            argValues.push_back(
+                {ArgValue::Int, argTy, static_cast<uint64_t>(ivalue(p)), 0.0, 0.0f, nullptr});
             break;
         }
         case llvm::Type::FloatTyID: {
@@ -515,7 +498,8 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
                 argConsts.push_back(llvm::ConstantFP::get(av.ty, av.doubleVal));
                 break;
             case ArgValue::Ptr: {
-                auto ptrAsInt = llvm::ConstantInt::get(ptrIntTy, reinterpret_cast<uintptr_t>(av.ptrVal));
+                auto ptrAsInt =
+                    llvm::ConstantInt::get(ptrIntTy, reinterpret_cast<uintptr_t>(av.ptrVal));
                 argConsts.push_back(llvm::ConstantExpr::getIntToPtr(ptrAsInt, av.ty));
                 break;
             }
@@ -526,14 +510,16 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
         module->setDataLayout(DL);
 
         auto stubType = llvm::FunctionType::get(funcType->getReturnType(), false);
-        auto stubFunc = llvm::Function::Create(stubType, llvm::Function::ExternalLinkage, stubName, module.get());
+        auto stubFunc = llvm::Function::Create(stubType, llvm::Function::ExternalLinkage, stubName,
+                                               module.get());
         stubFunc->setCallingConv(func->getCallingConv());
 
         auto entryBB = llvm::BasicBlock::Create(*ctx, "entry", stubFunc);
         llvm::IRBuilder<> builder(entryBB);
 
         auto targetAddrConst = llvm::ConstantInt::get(ptrIntTy, addr);
-        auto targetPtr = llvm::ConstantExpr::getIntToPtr(targetAddrConst, llvm::PointerType::get(*ctx, 0));
+        auto targetPtr =
+            llvm::ConstantExpr::getIntToPtr(targetAddrConst, llvm::PointerType::get(*ctx, 0));
         const llvm::FunctionCallee callee(funcType, targetPtr);
 
         auto callInst = builder.CreateCall(callee, argConsts);
@@ -551,10 +537,12 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
     }
 
     // JIT the stub; it is removed again once the call has returned.
-    auto TSM = llvm::orc::ThreadSafeModule(std::move(module), extemp::EXTLLVM::getThreadSafeContext());
+    auto TSM =
+        llvm::orc::ThreadSafeModule(std::move(module), extemp::EXTLLVM::getThreadSafeContext());
     auto stubTracker = extemp::EXTLLVM::addTransientModule(std::move(TSM));
     if (!stubTracker) {
-        std::cerr << "Failed to JIT call stub: " << llvm::toString(stubTracker.takeError()) << std::endl;
+        std::cerr << "Failed to JIT call stub: " << llvm::toString(stubTracker.takeError())
+                  << std::endl;
         return Scheme->F;
     }
 
@@ -567,13 +555,13 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
         auto retTy = funcType->getReturnType();
         switch (retTy->getTypeID()) {
         case llvm::Type::FloatTyID: {
-            using StubFn = float(*)();
+            using StubFn = float (*)();
             const float res = reinterpret_cast<StubFn>(stubAddr)();
             result = mk_real(Scheme, res);
             break;
         }
         case llvm::Type::DoubleTyID: {
-            using StubFn = double(*)();
+            using StubFn = double (*)();
             const double res = reinterpret_cast<StubFn>(stubAddr)();
             result = mk_real(Scheme, res);
             break;
@@ -583,19 +571,19 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
             const unsigned width = intTy->getBitWidth();
             const uint64_t mask = (width >= 64) ? ~uint64_t(0) : ((uint64_t(1) << width) - 1);
 
-            using StubFn = uint64_t(*)();
+            using StubFn = uint64_t (*)();
             const uint64_t res = reinterpret_cast<StubFn>(stubAddr)() & mask;
             result = mk_integer(Scheme, res);
             break;
         }
         case llvm::Type::PointerTyID: {
-            using StubFn = void*(*)();
+            using StubFn = void* (*)();
             void* res = reinterpret_cast<StubFn>(stubAddr)();
             result = mk_cptr(Scheme, res);
             break;
         }
         case llvm::Type::VoidTyID: {
-            using StubFn = void(*)();
+            using StubFn = void (*)();
             reinterpret_cast<StubFn>(stubAddr)();
             result = Scheme->T;
             break;
@@ -608,8 +596,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args)
     return result;
 }
 
-static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
-{
+static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args) {
     const char* floatin = argString(Scheme, Args, 1);
     if (floatin[0] && floatin[1] == 'x') {
         return argAt(Scheme, Args, 1);
@@ -617,11 +604,11 @@ static pointer llvm_convert_float_constant(scheme* Scheme, pointer Args)
     const llvm::APFloat apf(llvm::APFloat::IEEEsingle(), llvm::StringRef(floatin));
     // TODO: if necessary, checks for inf/nan can be done here
     auto ival(llvm::APInt::doubleToBits(apf.convertToFloat()));
-    return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+    return mk_string(Scheme,
+                     (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
 
-static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
-{
+static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args) {
     static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) must be 8 bytes");
     const char* floatin = argString(Scheme, Args, 1);
     if (floatin[0] && floatin[1] == 'x') {
@@ -632,28 +619,25 @@ static pointer llvm_convert_double_constant(scheme* Scheme, pointer Args)
     // convertToDouble, not convertToFloat: this APFloat is an IEEEdouble, and
     // asking for the float value of one is a hard error in LLVM
     auto ival(llvm::APInt::doubleToBits(apf.convertToDouble()));
-    return mk_string(Scheme, (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
+    return mk_string(Scheme,
+                     (std::string("0x") + llvm::utohexstr(ival.getLimitedValue(), true)).c_str());
 }
 
-static pointer llvm_count(scheme* Scheme, pointer Args)
-{
+static pointer llvm_count(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, EXTLLVM::LLVM_COUNT);
 }
 
-static pointer llvm_count_set(scheme* Scheme, pointer Args)
-{
+static pointer llvm_count_set(scheme* Scheme, pointer Args) {
     EXTLLVM::LLVM_COUNT = argInt(Scheme, Args, 1);
     return llvm_count(Scheme, Args);
 }
 
-static pointer llvm_count_inc(scheme* Scheme, pointer Args)
-{
+static pointer llvm_count_inc(scheme* Scheme, pointer Args) {
     ++EXTLLVM::LLVM_COUNT;
     return llvm_count(Scheme, Args);
 }
 
-static pointer callClosure(scheme* Scheme, pointer Args)
-{
+static pointer callClosure(scheme* Scheme, pointer Args) {
     uint32_t* const* closure = reinterpret_cast<uint32_t**>(argCptr(Scheme, Args, 1));
     if (!closure) {
         throw ScmRuntimeError("llvm:call-closure: null closure pointer", Args);
@@ -662,8 +646,7 @@ static pointer callClosure(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, (*fptr)(closure[0], argInt(Scheme, Args, 2)));
 }
 
-static pointer printLLVMFunction(scheme* Scheme, pointer Args)
-{
+static pointer printLLVMFunction(scheme* Scheme, pointer Args) {
     const char* name = argString(Scheme, Args, 1);
     auto func(extemp::EXTLLVM::getFunction(name));
     if (!func) {
@@ -676,7 +659,7 @@ static pointer printLLVMFunction(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
+static pointer llvm_print_all_closures(scheme* Scheme, pointer Args)  // TODO
 {
     std::string rgx(argString(Scheme, Args, 1));
     rgx += "_.*";
@@ -686,14 +669,15 @@ static pointer llvm_print_all_closures(scheme* Scheme, pointer Args) // TODO
                 std::string str;
                 llvm::raw_string_ostream ss(str);
                 ss << func;
-                printf("\n---------------------------------------------------\n%s", ss.str().c_str());
+                printf("\n---------------------------------------------------\n%s",
+                       ss.str().c_str());
             }
         }
     }
     return Scheme->T;
 }
 
-static pointer llvm_print_all_modules(scheme* Scheme, pointer Args) // TODO
+static pointer llvm_print_all_modules(scheme* Scheme, pointer Args)  // TODO
 {
     for (auto module : EXTLLVM::getModules()) {
         std::string str;
@@ -704,7 +688,7 @@ static pointer llvm_print_all_modules(scheme* Scheme, pointer Args) // TODO
     return Scheme->T;
 }
 
-static pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
+static pointer llvm_print_closure(scheme* Scheme, pointer Args)  // TODO
 {
     auto fname(argString(Scheme, Args, 1));
     for (auto module : EXTLLVM::getModules()) {
@@ -722,8 +706,7 @@ static pointer llvm_print_closure(scheme* Scheme, pointer Args) // TODO
     return Scheme->T;
 }
 
-static pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
-{
+static pointer llvm_closure_last_name(scheme* Scheme, pointer Args) {
     std::string rgx(argString(Scheme, Args, 1));
     rgx += "__[0-9]*";
     std::string last_name;
@@ -742,27 +725,27 @@ static pointer llvm_closure_last_name(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static pointer llvm_disasm(scheme* Scheme, pointer Args)
-{
+static pointer llvm_disasm(scheme* Scheme, pointer Args) {
     const int lgth = list_length(Scheme, Args);
     int syntax = (lgth > 1) ? int(argInt(Scheme, Args, 2)) : 1;
     if (syntax > 1) {
-      std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
-      std::cout << "The default is 1: intel" << std::endl;
-      syntax = 1;
+        std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
+        std::cout << "The default is 1: intel" << std::endl;
+        syntax = 1;
     }
     pointer name(llvm_closure_last_name(Scheme, Args));
     if (!is_string(name)) {
         throw ScmRuntimeError(std::string("llvm:disassemble: no compiled closure named ") +
-                              argString(Scheme, Args, 1), Args);
+                                  argString(Scheme, Args, 1),
+                              Args);
     }
     const EnvInjector injector(Scheme, name);
     pointer lookupArgs = cons(Scheme, name, pair_cdr(Args));
     const EnvInjector injector2(Scheme, lookupArgs);
     pointer fp = get_function_pointer(Scheme, lookupArgs);
     if (!is_cptr(fp)) {
-        throw ScmRuntimeError(std::string("llvm:disassemble: no function pointer for ") +
-                              string_value(name), Args);
+        throw ScmRuntimeError(
+            std::string("llvm:disassemble: no function pointer for ") + string_value(name), Args);
     }
     auto fptr(reinterpret_cast<unsigned char*>(cptr_value(fp)));
     return mk_string(Scheme, extemp::EXTLLVM::llvm_disassemble(fptr, syntax).c_str());
@@ -772,15 +755,14 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args)
 // earlier mapping. Reports failure to the console and returns false.
 static bool defineJITSymbol(const char* name, void* addr) {
     if (auto err = EXTLLVM::defineAbsoluteSymbol(name, addr)) {
-        std::cerr << "Error: could not bind symbol " << name << ": " << llvm::toString(std::move(err))
-                  << std::endl;
+        std::cerr << "Error: could not bind symbol " << name << ": "
+                  << llvm::toString(std::move(err)) << std::endl;
         return false;
     }
     return true;
 }
 
-static pointer bind_symbol(scheme* Scheme, pointer Args)
-{
+static pointer bind_symbol(scheme* Scheme, pointer Args) {
     auto library(argCptr(Scheme, Args, 1));
     auto sym(argString(Scheme, Args, 2));
 
@@ -795,8 +777,7 @@ static pointer bind_symbol(scheme* Scheme, pointer Args)
     return Scheme->F;
 }
 
-static pointer update_mapping(scheme* Scheme, pointer Args)
-{
+static pointer update_mapping(scheme* Scheme, pointer Args) {
     auto sym(argString(Scheme, Args, 1));
     auto ptr(argCptr(Scheme, Args, 2));
 
@@ -810,8 +791,7 @@ static pointer update_mapping(scheme* Scheme, pointer Args)
 static std::mutex LLVM_ALIAS_TABLE_MUTEX;
 static std::unordered_map<std::string, std::string> LLVM_ALIAS_TABLE;
 
-static pointer add_llvm_alias(scheme* Scheme, pointer Args)
-{
+static pointer add_llvm_alias(scheme* Scheme, pointer Args) {
     std::string alias(argString(Scheme, Args, 1));
     std::string target(argString(Scheme, Args, 2));
     const std::lock_guard<std::mutex> lock(LLVM_ALIAS_TABLE_MUTEX);
@@ -819,8 +799,7 @@ static pointer add_llvm_alias(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer get_llvm_alias(scheme* Scheme, pointer Args)
-{
+static pointer get_llvm_alias(scheme* Scheme, pointer Args) {
     const std::string alias(argString(Scheme, Args, 1));
     std::string target;
     {
@@ -834,8 +813,7 @@ static pointer get_llvm_alias(scheme* Scheme, pointer Args)
     return mk_string(Scheme, target.c_str());
 }
 
-static pointer get_named_type(scheme* Scheme, pointer Args)
-{
+static pointer get_named_type(scheme* Scheme, pointer Args) {
     const char* name = argString(Scheme, Args, 1);
     if (name[0] == '%') {
         ++name;
@@ -853,7 +831,8 @@ static pointer get_named_type(scheme* Scheme, pointer Args)
         ss << "{ ";
         bool first = true;
         for (auto* elem : st->elements()) {
-            if (!first) ss << ", ";
+            if (!first)
+                ss << ", ";
             first = false;
             elem->print(ss);
         }
@@ -863,8 +842,7 @@ static pointer get_named_type(scheme* Scheme, pointer Args)
     return Scheme->NIL;
 }
 
-static pointer list_modules(scheme* Scheme, pointer Args)
-{
+static pointer list_modules(scheme* Scheme, pointer Args) {
     // ORC keeps multiple modules. Expose the stored metadata clones.
     pointer p = Scheme->NIL;
     for (auto module : EXTLLVM::getModules()) {
@@ -876,8 +854,7 @@ static pointer list_modules(scheme* Scheme, pointer Args)
     return reverse_in_place(Scheme, Scheme->NIL, p);
 }
 
-static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
-{
+static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args) {
     auto m(reinterpret_cast<llvm::Module*>(argCptr(Scheme, Args, 1)));
     if (!m) {
         return Scheme->F;
@@ -905,22 +882,21 @@ static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args)
         irStr.replace(pos, oldStr.length(), newStr);
         pos += newStr.length();
     }
-    fout << irStr; //ss.str();
+    fout << irStr;  // ss.str();
     fout.close();
 #else
     std::error_code errcode;
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::OF_None);
     if (errcode) {
-      std::cout << errcode.message() << std::endl;
-      return Scheme->F;
+        std::cout << errcode.message() << std::endl;
+        return Scheme->F;
     }
     llvm::WriteBitcodeToFile(*m, ss);
 #endif
     return Scheme->T;
 }
 
-static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
-{
+static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
     auto m = reinterpret_cast<llvm::Module*>(argCptr(Scheme, Args, 1));
     if (!m) {
         return Scheme->F;
@@ -949,7 +925,8 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
     std::string features;
     auto hostFeatures = llvm::sys::getHostCPUFeatures();
     for (auto& feature : hostFeatures) {
-        if (!features.empty()) features += ",";
+        if (!features.empty())
+            features += ",";
         features += (feature.getValue() ? "+" : "-");
         features += feature.getKey().str();
     }
@@ -957,11 +934,9 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
     // Create target machine
     llvm::TargetOptions opt;
     opt.GuaranteedTailCallOpt = true;  // equivalent to llc -tailcallopt
-    std::unique_ptr<llvm::TargetMachine> targetMachine(target->createTargetMachine(
-        llvm::Triple(triple), cpu, features, opt,
-        llvm::Reloc::PIC_,
-        std::nullopt,
-        llvm::CodeGenOptLevel::Aggressive));
+    std::unique_ptr<llvm::TargetMachine> targetMachine(
+        target->createTargetMachine(llvm::Triple(triple), cpu, features, opt, llvm::Reloc::PIC_,
+                                    std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
     if (!targetMachine) {
         std::cerr << "llvm:emit-object-file: failed to create target machine" << std::endl;
@@ -982,7 +957,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args)
     // Emit object file
     llvm::legacy::PassManager pass;
     if (targetMachine->addPassesToEmitFile(pass, dest, nullptr,
-            llvm::CodeGenFileType::ObjectFile)) {
+                                           llvm::CodeGenFileType::ObjectFile)) {
         std::cerr << "llvm:emit-object-file: target machine can't emit object files" << std::endl;
         return Scheme->F;
     }
@@ -1332,8 +1307,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
     return modulePtr;
 }
 
-std::span<const FFIEntry> llvmDefs()
-{
+std::span<const FFIEntry> llvmDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("llvm:optimize", optimizeCompiles, 1, 0, false),
         FFI_DEF("llvm:optimization-level", optimizationLevel, 0, 1, false),

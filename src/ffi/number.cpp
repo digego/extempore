@@ -44,18 +44,15 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-static pointer randomReal(scheme* Scheme, pointer Args)
-{
+static pointer randomReal(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, xtc_randd());
 }
 
-static pointer randomInt(scheme* Scheme, pointer Args)
-{
+static pointer randomInt(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, xtc_rand1_i64(argInt(Scheme, Args, 1)));
 }
 
-static pointer realToInteger(scheme* Scheme, pointer Args)
-{
+static pointer realToInteger(scheme* Scheme, pointer Args) {
     // int64_t, not uint64_t: casting a negative double to an unsigned type is
     // UB, and on ARM64 it saturates to 0 rather than wrapping
     return mk_integer(Scheme, int64_t(argReal(Scheme, Args, 1)));
@@ -69,8 +66,7 @@ static constexpr int64_t REAL_TO_RATIONAL_MAX_DENOM = 10000000;
 // MaxDenom, by continued-fraction expansion. Multiplying through by a fixed
 // denominator instead overflowed int64 for |Val| above about 9.2e11, and gave
 // a needlessly large ratio for values that are exactly representable.
-static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& DenOut)
-{
+static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& DenOut) {
     // beyond this a double has no fractional part left anyway, and the cast to
     // int64_t would be UB; the comparison is written so NaN takes this branch
     constexpr double INT64_LIMIT = 9.2e18;
@@ -119,35 +115,30 @@ static void realToRatio(double Val, int64_t MaxDenom, int64_t& NumOut, int64_t& 
     DenOut = (den > 0) ? den : 1;
 }
 
-static pointer realToRational(scheme* Scheme, pointer Args)
-{
+static pointer realToRational(scheme* Scheme, pointer Args) {
     int64_t num = 0;
     int64_t den = 1;
     realToRatio(argReal(Scheme, Args, 1), REAL_TO_RATIONAL_MAX_DENOM, num, den);
     return mk_rational(Scheme, num, den);
 }
 
-static pointer rationalToReal(scheme* Scheme, pointer Args)
-{
+static pointer rationalToReal(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, argReal(Scheme, Args, 1));
 }
 
-static pointer integerToReal(scheme* Scheme, pointer Args)
-{
+static pointer integerToReal(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, double(argInt(Scheme, Args, 1)));
 }
 
-static pointer rationalToNumerator(scheme* Scheme, pointer Args)
-{
+static pointer rationalToNumerator(scheme* Scheme, pointer Args) {
     pointer rat = argAt(Scheme, Args, 1);
     if (!is_rational(rat)) {
-       return mk_integer(Scheme, argInt(Scheme, Args, 1));
+        return mk_integer(Scheme, argInt(Scheme, Args, 1));
     }
     return mk_integer(Scheme, s7_numerator(rat));
 }
 
-static pointer rationalToDenominator(scheme* Scheme, pointer Args)
-{
+static pointer rationalToDenominator(scheme* Scheme, pointer Args) {
     pointer rat = argAt(Scheme, Args, 1);
     if (!is_rational(rat)) {
         return mk_integer(Scheme, 1);
@@ -155,8 +146,7 @@ static pointer rationalToDenominator(scheme* Scheme, pointer Args)
     return mk_integer(Scheme, s7_denominator(rat));
 }
 
-std::span<const FFIEntry> numberDefs()
-{
+std::span<const FFIEntry> numberDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("random-real", randomReal, 0, 0, false),
         FFI_DEF("random-int", randomInt, 1, 0, false),

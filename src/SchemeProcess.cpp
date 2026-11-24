@@ -130,8 +130,8 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
         ascii_error();
         printf("ERROR:");
         ascii_normal();
-        std::cout << " could not open a TCP socket for the " << m_name
-                  << " process, exiting." << std::endl;
+        std::cout << " could not open a TCP socket for the " << m_name << " process, exiting."
+                  << std::endl;
         exit(1);
     }
     int flag = 1;

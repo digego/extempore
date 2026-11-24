@@ -46,15 +46,13 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-static pointer asciiColor(scheme* Scheme, pointer Args)
-{
+static pointer asciiColor(scheme* Scheme, pointer Args) {
     ascii_text_color(bool(argInt(Scheme, Args, 1)), int(argInt(Scheme, Args, 2)),
-            int(argInt(Scheme, Args, 3)));
+                     int(argInt(Scheme, Args, 3)));
     return Scheme->T;
 }
 
-static pointer emit(scheme* Scheme, pointer Args)
-{
+static pointer emit(scheme* Scheme, pointer Args) {
     const int lgth = list_length(Scheme, Args);
     pointer io = list_ref(Scheme, lgth - 1, Args);
 
@@ -88,8 +86,7 @@ static pointer emit(scheme* Scheme, pointer Args)
     return mk_string(Scheme, ss.str().c_str());
 }
 
-static pointer exit_extempore(scheme* Scheme, pointer Args)
-{
+static pointer exit_extempore(scheme* Scheme, pointer Args) {
     const int rc = (Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0;
     // std::_Exit bypasses destructors AND discards stdio buffers. Flush any
     // pending output (e.g. printf from xtlang tests) and finalize the offline
@@ -99,8 +96,7 @@ static pointer exit_extempore(scheme* Scheme, pointer Args)
     std::_Exit(rc);
 }
 
-std::span<const FFIEntry> utilityDefs()
-{
+std::span<const FFIEntry> utilityDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("ascii-print-color", asciiColor, 3, 0, false),
         FFI_DEF("emit", emit, 1, 0, true),

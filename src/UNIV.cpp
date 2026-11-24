@@ -355,7 +355,7 @@ EXPORT char* rreplace(char* regex, char* str, char* replacement, char* result) {
     // past the buffer --- truncate rather than overflow. A capacity-aware API
     // is tracked as a follow-up backlog task.
     constexpr size_t kAssumedBufSize = 4096;
-    const char* out = str; // fall back to the original on oversize / regex error
+    const char* out = str;  // fall back to the original on oversize / regex error
     std::string res;
     try {
         const std::regex re(regex);

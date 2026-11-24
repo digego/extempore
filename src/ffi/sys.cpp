@@ -57,18 +57,15 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-static pointer pointerSize(scheme* Scheme, pointer Args)
-{
+static pointer pointerSize(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, 8 * sizeof(uintptr_t));
 }
 
-static pointer mcjitEnabled(scheme* Scheme, pointer Args)
-{
+static pointer mcjitEnabled(scheme* Scheme, pointer Args) {
     return Scheme->T;
 }
 
-static pointer platform(scheme* Scheme, pointer Args)
-{
+static pointer platform(scheme* Scheme, pointer Args) {
 #ifdef __APPLE__
     return mk_string(Scheme, "OSX");
 #elif __linux__
@@ -80,18 +77,15 @@ static pointer platform(scheme* Scheme, pointer Args)
 #endif
 }
 
-static pointer getShareDir(scheme* Scheme, pointer Args)
-{
+static pointer getShareDir(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, UNIV::SHARE_DIR.c_str());
 }
 
-static pointer getBuildDir(scheme* Scheme, pointer Args)
-{
+static pointer getBuildDir(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, UNIV::BUILD_DIR.c_str());
 }
 
-static pointer cmdarg(scheme* Scheme, pointer Args)
-{
+static pointer cmdarg(scheme* Scheme, pointer Args) {
     auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
     if (iter == UNIV::CMDPARAMS.end()) {
         return Scheme->F;
@@ -99,23 +93,21 @@ static pointer cmdarg(scheme* Scheme, pointer Args)
     return mk_string(Scheme, iter->second.c_str());
 }
 
-static pointer openDynamicLib(scheme* Scheme, pointer Args)
-{
+static pointer openDynamicLib(scheme* Scheme, pointer Args) {
     const char* libname = argString(Scheme, Args, 1);
 #ifdef _WIN32
     // set up the DLL load path
-    SetDllDirectory(""); // Plug "binary planting" security hole.
+    SetDllDirectory("");  // Plug "binary planting" security hole.
     if (!SetDllDirectory((extemp::UNIV::BUILD_DIR + "/libs/aot-cache").c_str())) {
         std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
     }
     void* lib_handle = LoadLibraryA(libname);
 #else
-    void* lib_handle = dlopen(libname, RTLD_LAZY|RTLD_GLOBAL);  // TODO: RTLD_NOW
+    void* lib_handle = dlopen(libname, RTLD_LAZY | RTLD_GLOBAL);  // TODO: RTLD_NOW
 #endif
     if (!lib_handle) {
         // if an optional second argument is non-nil, print the error
-        if (pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F)
-        {
+        if (pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F) {
 #ifdef _WIN32
             std::cout << "LoadLibraryA() error:" << GetLastError() << std::endl;
 #else
@@ -127,8 +119,7 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, lib_handle);
 }
 
-static pointer closeDynamicLib(scheme* Scheme, pointer Args)
-{
+static pointer closeDynamicLib(scheme* Scheme, pointer Args) {
 #ifdef _WIN32
     FreeLibrary((HMODULE)argCptr(Scheme, Args, 1));
 #else
@@ -137,12 +128,11 @@ static pointer closeDynamicLib(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer symbol_pointer(scheme* Scheme, pointer Args)
-{
+static pointer symbol_pointer(scheme* Scheme, pointer Args) {
     void* library = argCptr(Scheme, Args, 1);
     char* symname = argString(Scheme, Args, 2);
 #ifdef _WIN32
-    void* ptr = (void*) GetProcAddress(HMODULE(library), symname);
+    void* ptr = (void*)GetProcAddress(HMODULE(library), symname);
 #else
     void* ptr = dlsym(library, symname);
 #endif
@@ -152,21 +142,19 @@ static pointer symbol_pointer(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, ptr);
 }
 
-static pointer makeCptr(scheme* Scheme, pointer Args)
-{
-     auto num_bytes(argInt(Scheme, Args, 1));
-     if (num_bytes <= 0) {
-         return Scheme->F;
-     }
-     void* ptr = calloc(1, size_t(num_bytes));
-     if (!ptr) {
-         return Scheme->F;
-     }
-     return mk_cptr(Scheme, ptr);
+static pointer makeCptr(scheme* Scheme, pointer Args) {
+    auto num_bytes(argInt(Scheme, Args, 1));
+    if (num_bytes <= 0) {
+        return Scheme->F;
+    }
+    void* ptr = calloc(1, size_t(num_bytes));
+    if (!ptr) {
+        return Scheme->F;
+    }
+    return mk_cptr(Scheme, ptr);
 }
 
-static pointer slurpFile(scheme* Scheme, pointer Args)
-{
+static pointer slurpFile(scheme* Scheme, pointer Args) {
     const std::string filename(argString(Scheme, Args, 1));
 
     std::ifstream in(UNIV::find_file(filename), std::ios::binary);
@@ -188,8 +176,7 @@ static pointer slurpFile(scheme* Scheme, pointer Args)
     return mk_counted_string(Scheme, contents.data(), int(contents.size()));
 }
 
-static pointer dumpStringToFile(scheme* Scheme, pointer Args)
-{
+static pointer dumpStringToFile(scheme* Scheme, pointer Args) {
     const std::string filename(argString(Scheme, Args, 1));
     pointer str = argAt(Scheme, Args, 2);
     if (!is_string(str)) {
@@ -205,8 +192,7 @@ static pointer dumpStringToFile(scheme* Scheme, pointer Args)
     return out ? Scheme->T : Scheme->F;
 }
 
-static pointer dirlist(scheme* Scheme, pointer Args)
-{
+static pointer dirlist(scheme* Scheme, pointer Args) {
     // Bare filenames, and no "." or ".." (directory_iterator skips those):
     // callers such as libs/core/instruments_ext-scm.xtm match the entries
     // against a filename pattern, not a path.
@@ -225,8 +211,7 @@ static pointer dirlist(scheme* Scheme, pointer Args)
     return reverse(Scheme, list);
 }
 
-static pointer pathExpansion(scheme* Scheme, pointer Args)
-{
+static pointer pathExpansion(scheme* Scheme, pointer Args) {
     std::string path(argString(Scheme, Args, 1));
     if (!path.empty() && path[0] == '~') {
         const char* home = std::getenv("HOME");
@@ -248,15 +233,13 @@ static pointer pathExpansion(scheme* Scheme, pointer Args)
     return mk_string(Scheme, expanded.string().c_str());
 }
 
-static pointer command(scheme* Scheme, pointer Args)
-{
+static pointer command(scheme* Scheme, pointer Args) {
     // NOTE: doesn't work for Windows yet
     // NOLINTNEXTLINE(bugprone-command-processor): running a shell command is sys:command's job
     return mk_integer(Scheme, system(argString(Scheme, Args, 1)));
 }
 
-static pointer commandOutput(scheme* Scheme, pointer Args)
-{
+static pointer commandOutput(scheme* Scheme, pointer Args) {
     const char* cmd = argString(Scheme, Args, 1);
 #ifdef _WIN32
     FILE* stream = _popen(cmd, "r");
@@ -291,20 +274,18 @@ static pointer commandOutput(scheme* Scheme, pointer Args)
     return mk_counted_string(Scheme, out.data(), int(out.size()));
 }
 
-static pointer getEnv(scheme* Scheme, pointer Args)
-{
-  const char* var = argString(Scheme, Args, 1);
-  const char* val = std::getenv(var);
+static pointer getEnv(scheme* Scheme, pointer Args) {
+    const char* var = argString(Scheme, Args, 1);
+    const char* val = std::getenv(var);
 
-  if (val != NULL){
-	return mk_string(Scheme, val);
-  }else{
-    return Scheme->F;
-  }
+    if (val != NULL) {
+        return mk_string(Scheme, val);
+    } else {
+        return Scheme->F;
+    }
 }
 
-static pointer setEnv(scheme* Scheme, pointer Args)
-{
+static pointer setEnv(scheme* Scheme, pointer Args) {
     char* var = argString(Scheme, Args, 1);
     char* val = argString(Scheme, Args, 2);
 
@@ -312,24 +293,21 @@ static pointer setEnv(scheme* Scheme, pointer Args)
 #ifdef _WIN32
     res = _putenv_s(var, val);
 #else
-    res = setenv(var, val, 1); // overwrite = TRUE
+    res = setenv(var, val, 1);  // overwrite = TRUE
 #endif
     return mk_integer(Scheme, res);
 }
 
-static pointer setDefaultTimeout(scheme* Scheme, pointer Args)
-{
+static pointer setDefaultTimeout(scheme* Scheme, pointer Args) {
     Scheme->m_process->setMaxDuration(argInt(Scheme, Args, 1));
     return Scheme->T;
 }
 
-static pointer getDefaultTimeout(scheme* Scheme, pointer Args)
-{
+static pointer getDefaultTimeout(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, Scheme->m_process->getMaxDuration());
 }
 
-std::span<const FFIEntry> sysDefs()
-{
+std::span<const FFIEntry> sysDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("sys:pointer-size", pointerSize, 0, 0, false),
         FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false),

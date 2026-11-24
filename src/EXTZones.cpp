@@ -110,8 +110,8 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
 static uint64_t zone_footprint(uint64_t size) {
     // Refuse sizes that would wrap when the header and padding are added.
     if (size > UINT64_MAX - LLVM_ZONE_ALIGN - LLVM_ZONE_ALIGNPAD) [[unlikely]] {
-        fprintf(stderr, "\nZone allocation of %" PRIu64 " bytes is not representable ... exiting!\n",
-                size);
+        fprintf(stderr,
+                "\nZone allocation of %" PRIu64 " bytes is not representable ... exiting!\n", size);
         fflush(nullptr);
         abort();
     }
@@ -159,8 +159,8 @@ static void zone_extend(llvm_zone_t* zone, uint64_t footprint) {
 
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
     if constexpr (DEBUG_ZONE_ALLOC) {
-        printf("MallocZone: %p:%p:%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n",
-               static_cast<void*>(zone), zone->memory, zone->offset, zone->size, size);
+        printf("MallocZone: %p:%p:%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", static_cast<void*>(zone),
+               zone->memory, zone->offset, zone->size, size);
     }
     const uint64_t footprint = zone_footprint(size);
     if (zone->offset + footprint >= zone->size) [[unlikely]] {
@@ -271,8 +271,8 @@ EXPORT bool llvm_zone_copy_ptr(void* ptr1, void* ptr2) {
 }
 
 EXPORT bool llvm_ptr_in_zone(llvm_zone_t* zone, void* ptr) {
-    while (zone && (ptr < zone->memory ||
-                    ptr >= reinterpret_cast<char*>(zone->memory) + zone->size)) {
+    while (zone &&
+           (ptr < zone->memory || ptr >= reinterpret_cast<char*>(zone->memory) + zone->size)) {
         zone = zone->memories;
     }
     return zone != nullptr;

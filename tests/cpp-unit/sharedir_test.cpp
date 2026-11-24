@@ -12,15 +12,15 @@ namespace {
 // A directory that looks like an Extempore tree: the share-dir probe only asks
 // for runtime/init.xtm, so that is all these fixtures need to contain.
 class TempTree {
-public:
+  public:
     explicit TempTree(bool with_runtime) {
         static std::atomic<unsigned> counter{0};
         // ctest runs each test in its own process, in parallel, so the counter
         // alone does not make the name unique: the test name does.
         const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
         m_path = std::filesystem::temp_directory_path() /
-                 (std::string("extempore_sharedir_test_") + info->test_suite_name() +
-                  "_" + info->name() + "_" + std::to_string(counter.fetch_add(1)));
+                 (std::string("extempore_sharedir_test_") + info->test_suite_name() + "_" +
+                  info->name() + "_" + std::to_string(counter.fetch_add(1)));
         std::filesystem::create_directories(m_path);
         if (with_runtime) {
             std::filesystem::create_directories(m_path / "runtime");
@@ -34,9 +34,11 @@ public:
     TempTree(const TempTree&) = delete;
     TempTree& operator=(const TempTree&) = delete;
 
-    const std::filesystem::path& path() const { return m_path; }
+    const std::filesystem::path& path() const {
+        return m_path;
+    }
 
-private:
+  private:
     std::filesystem::path m_path;
 };
 
@@ -69,8 +71,7 @@ TEST(PickShareDir, FallsBackWhenTheExecutableHasNoTreeBesideIt) {
 }
 
 TEST(PickShareDir, FallsBackWhenTheExecutablePathIsUnknown) {
-    EXPECT_EQ(extemp::share_dir::pick("", std::filesystem::path(), "/compiled/in"),
-              "/compiled/in");
+    EXPECT_EQ(extemp::share_dir::pick("", std::filesystem::path(), "/compiled/in"), "/compiled/in");
 }
 
 TEST(HoldsRuntimeFiles, NeedsRuntimeInitXtm) {

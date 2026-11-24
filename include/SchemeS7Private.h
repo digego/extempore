@@ -50,12 +50,11 @@ struct scheme {
 scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc);
 void scheme_register_wrapper(s7_scheme* raw_sc, scheme* wrapper);
 
-struct EnvInjector
-{
+struct EnvInjector {
     s7_scheme* sc;
     s7_int loc;
 
-    EnvInjector(scheme* Scheme, pointer Pointer): sc(Scheme->sc) {
+    EnvInjector(scheme* Scheme, pointer Pointer) : sc(Scheme->sc) {
         loc = s7_gc_protect(sc, Pointer);
     }
     ~EnvInjector() {
@@ -63,11 +62,11 @@ struct EnvInjector
     }
 };
 
-inline int list_length(scheme* sc, pointer a)
-{
+inline int list_length(scheme* sc, pointer a) {
     return static_cast<int>(s7_list_length(sc->sc, a));
 }
 
+// clang-format off
 inline pointer pair_caar(pointer p) { return pair_car(pair_car(p)); }
 inline pointer pair_cadr(pointer p) { return pair_car(pair_cdr(p)); }
 inline pointer pair_cdar(pointer p) { return pair_cdr(pair_car(p)); }
@@ -85,40 +84,40 @@ inline pointer pair_cdddddr(pointer p) { return pair_cdr(pair_cddddr(p)); }
 inline pointer pair_cadddddr(pointer p) { return pair_car(pair_cdddddr(p)); }
 inline pointer pair_cddddddr(pointer p) { return pair_cdr(pair_cdddddr(p)); }
 inline pointer pair_caddddddr(pointer p) { return pair_car(pair_cddddddr(p)); }
+// clang-format on
 
 // One entry of a *_DEFS table in src/ffi/*.inc.  Declaring the arity next to
 // the name and the function is what lets s7 reject a wrong-arity call with a
 // message naming the primitive, instead of the body walking off the end of the
 // argument list.  REST is true only for genuinely variadic primitives.
-#define FFI_DEF(NAME, FN, REQUIRED, OPTIONAL, REST) \
-        { NAME, ffi_def(NAME, &FN, REQUIRED, OPTIONAL, REST) }
+#define FFI_DEF(NAME, FN, REQUIRED, OPTIONAL, REST)                                                \
+    { NAME, ffi_def(NAME, &FN, REQUIRED, OPTIONAL, REST) }
 
 // Argument accessors for FFI primitive bodies.  s7 has already checked the
 // arity by the time a body runs, so these only check types; a bad type raises
 // a Scheme error naming the primitive and the (1-based) argument position
 // rather than reading through whatever the cell happens to hold.
 
-[[noreturn]] inline void ffiWrongType(pointer Arg, int ArgN, const char* Expected)
-{
-    throw ScmRuntimeError(std::string(ffi_current_name()) + ": argument " +
-                          std::to_string(ArgN) + " must be " + Expected, Arg);
+[[noreturn]] inline void ffiWrongType(pointer Arg, int ArgN, const char* Expected) {
+    throw ScmRuntimeError(std::string(ffi_current_name()) + ": argument " + std::to_string(ArgN) +
+                              " must be " + Expected,
+                          Arg);
 }
 
-inline pointer argAt(scheme* Scheme, pointer Args, int ArgN)
-{
+inline pointer argAt(scheme* Scheme, pointer Args, int ArgN) {
     pointer p = Args;
     for (int i = 1; i < ArgN && is_pair(p); ++i) {
         p = pair_cdr(p);
     }
     if (!is_pair(p)) {
         throw ScmRuntimeError(std::string(ffi_current_name()) + ": missing argument " +
-                              std::to_string(ArgN), Scheme->NIL);
+                                  std::to_string(ArgN),
+                              Scheme->NIL);
     }
     return pair_car(p);
 }
 
-inline int64_t argInt(scheme* Scheme, pointer Args, int ArgN)
-{
+inline int64_t argInt(scheme* Scheme, pointer Args, int ArgN) {
     pointer p = argAt(Scheme, Args, ArgN);
     if (!is_number(p)) {
         ffiWrongType(p, ArgN, "a number");
@@ -126,8 +125,7 @@ inline int64_t argInt(scheme* Scheme, pointer Args, int ArgN)
     return ivalue(p);
 }
 
-inline double argReal(scheme* Scheme, pointer Args, int ArgN)
-{
+inline double argReal(scheme* Scheme, pointer Args, int ArgN) {
     pointer p = argAt(Scheme, Args, ArgN);
     if (!is_number(p)) {
         ffiWrongType(p, ArgN, "a number");
@@ -137,8 +135,7 @@ inline double argReal(scheme* Scheme, pointer Args, int ArgN)
 
 // char*, not const char*, to match string_value: s7 strings are mutable and a
 // few callers (regex:replace) walk the buffer with strtol.
-inline char* argString(scheme* Scheme, pointer Args, int ArgN)
-{
+inline char* argString(scheme* Scheme, pointer Args, int ArgN) {
     pointer p = argAt(Scheme, Args, ArgN);
     if (!is_string(p)) {
         ffiWrongType(p, ArgN, "a string");
@@ -148,8 +145,7 @@ inline char* argString(scheme* Scheme, pointer Args, int ArgN)
 
 // Strings are accepted wherever a cptr is: cptr_value hands back the character
 // data, which xtlang relies on for passing strings to native code.
-inline void* argCptr(scheme* Scheme, pointer Args, int ArgN)
-{
+inline void* argCptr(scheme* Scheme, pointer Args, int ArgN) {
     pointer p = argAt(Scheme, Args, ArgN);
     if (!is_cptr_or_str(p)) {
         ffiWrongType(p, ArgN, "a cptr or string");

@@ -21,8 +21,7 @@ namespace osc {
 // On a little-endian host -- every platform we target -- converting a value
 // to/from the wire is a byte reversal. std::bit_cast does the type-pun without
 // the unsigned char* aliasing games.
-template <class T>
-inline T byteswap(T Value) {
+template <class T> inline T byteswap(T Value) {
     if constexpr (std::endian::native == std::endian::little) {
         auto bytes = std::bit_cast<std::array<std::byte, sizeof(T)>>(Value);
         std::reverse(bytes.begin(), bytes.end());
@@ -68,8 +67,7 @@ class Writer {
     }
 
   private:
-    template <class T>
-    void appendScalar(T Value) {
+    template <class T> void appendScalar(T Value) {
         appendBytes(&Value, sizeof(Value));
     }
     void appendBytes(const void* Src, std::size_t Size) {

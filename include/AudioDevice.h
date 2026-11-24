@@ -120,8 +120,7 @@ class AudioDevice {
             return false;
         }
         publishDspState([&](DspState& State) {
-            State.mtClosures[unsigned(Index)] =
-                reinterpret_cast<closure_getter_fn_type>(Function);
+            State.mtClosures[unsigned(Index)] = reinterpret_cast<closure_getter_fn_type>(Function);
         });
         return true;
     }
@@ -208,8 +207,7 @@ class AudioDevice {
     // freed: the audio thread may still be reading one, and there is no point
     // at which reclaiming it is provably safe. A dsp:set! is a human-scale
     // event, so the handful of small structs a session retires costs nothing.
-    template <class Mutation>
-    void publishDspState(Mutation&& Mutate) {
+    template <class Mutation> void publishDspState(Mutation&& Mutate) {
         std::lock_guard<std::mutex> lock(m_dspPublishMutex);
         auto* next = new DspState(*m_dspState.load(std::memory_order_relaxed));
         Mutate(*next);

@@ -59,48 +59,39 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-template <typename T>
-static T* getPtr(scheme* Scheme, pointer Args)
-{
+template <typename T> static T* getPtr(scheme* Scheme, pointer Args) {
     return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(argCptr(Scheme, Args, 1)) +
-            argInt(Scheme, Args, 2));
+                                argInt(Scheme, Args, 2));
 }
 
-static pointer dataGETi64(scheme* Scheme, pointer Args)
-{
+static pointer dataGETi64(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, *getPtr<int64_t>(Scheme, Args));
 }
 
-static pointer dataGETdouble(scheme* Scheme, pointer Args)
-{
+static pointer dataGETdouble(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, *getPtr<double>(Scheme, Args));
 }
 
-static pointer dataGETfloat(scheme* Scheme, pointer Args)
-{
+static pointer dataGETfloat(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, *getPtr<float>(Scheme, Args));
 }
 
-static pointer dataSETi64(scheme* Scheme, pointer Args)
-{
+static pointer dataSETi64(scheme* Scheme, pointer Args) {
     *getPtr<int64_t>(Scheme, Args) = argInt(Scheme, Args, 3);
     return Scheme->T;
 }
 
-static pointer dataSETdouble(scheme* Scheme, pointer Args)
-{
+static pointer dataSETdouble(scheme* Scheme, pointer Args) {
     *getPtr<double>(Scheme, Args) = argReal(Scheme, Args, 3);
     return Scheme->T;
 }
 
-static pointer dataSETfloat(scheme* Scheme, pointer Args)
-{
+static pointer dataSETfloat(scheme* Scheme, pointer Args) {
     *getPtr<float>(Scheme, Args) = float(argReal(Scheme, Args, 3));
     return Scheme->T;
 }
 
-static pointer cptrToString(scheme* Scheme, pointer Args)
-{
+static pointer cptrToString(scheme* Scheme, pointer Args) {
     auto cstr(reinterpret_cast<const char*>(argCptr(Scheme, Args, 1)));
     if (!cstr) {
         return Scheme->F;
@@ -108,8 +99,7 @@ static pointer cptrToString(scheme* Scheme, pointer Args)
     return mk_string(Scheme, cstr);
 }
 
-static pointer stringToCptr(scheme* Scheme, pointer Args)
-{
+static pointer stringToCptr(scheme* Scheme, pointer Args) {
     auto cstr(reinterpret_cast<const char*>(argCptr(Scheme, Args, 1)));
     if (!cstr) {
         return Scheme->F;
@@ -120,8 +110,7 @@ static pointer stringToCptr(scheme* Scheme, pointer Args)
     return mk_cptr(Scheme, strdup(cstr));
 }
 
-static pointer stringStrip(scheme* Scheme, pointer Args)
-{
+static pointer stringStrip(scheme* Scheme, pointer Args) {
     pointer arg = argAt(Scheme, Args, 1);
     const char* str;
     if (s7_is_output_port(Scheme->sc, arg)) {
@@ -129,21 +118,22 @@ static pointer stringStrip(scheme* Scheme, pointer Args)
     } else {
         str = string_value(arg);
     }
-    if (!str || !*str) return mk_string(Scheme, "");
-    while (*str == ' ') ++str;
+    if (!str || !*str)
+        return mk_string(Scheme, "");
+    while (*str == ' ')
+        ++str;
     const char* end = str + strlen(str) - 1;
-    while (end >= str && *end == ' ') --end;
+    while (end >= str && *end == ' ')
+        --end;
     const size_t len = (end >= str) ? static_cast<size_t>(end - str + 1) : 0;
     return mk_counted_string(Scheme, str, static_cast<int>(len));
 }
 
-static pointer stringHash(scheme* Scheme, pointer Args)
-{
+static pointer stringHash(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, string_hash(argString(Scheme, Args, 1)));
 }
 
-static pointer Base64Encode(scheme* Scheme, pointer Args)
-{
+static pointer Base64Encode(scheme* Scheme, pointer Args) {
     auto dat(reinterpret_cast<unsigned char*>(argCptr(Scheme, Args, 1)));
     const size_t datlength = argInt(Scheme, Args, 2);
     size_t lth = 0;
@@ -156,8 +146,7 @@ static pointer Base64Encode(scheme* Scheme, pointer Args)
     return result;
 }
 
-static pointer Base64Decode(scheme* Scheme, pointer Args)
-{
+static pointer Base64Decode(scheme* Scheme, pointer Args) {
     char* str = argString(Scheme, Args, 1);
     size_t lth = 0;
     char* decoded = reinterpret_cast<char*>(base64_decode(str, strlen(str), &lth));
@@ -171,8 +160,7 @@ static pointer Base64Decode(scheme* Scheme, pointer Args)
     return result;
 }
 
-static pointer CNameEncode(scheme* Scheme, pointer Args)
-{
+static pointer CNameEncode(scheme* Scheme, pointer Args) {
     char* str = argString(Scheme, Args, 1);
     size_t lth = 0;
     char* encoded = cname_encode(str, strlen(str), &lth);
@@ -186,8 +174,7 @@ static pointer CNameEncode(scheme* Scheme, pointer Args)
     return result;
 }
 
-static pointer CNameDecode(scheme* Scheme, pointer Args)
-{
+static pointer CNameDecode(scheme* Scheme, pointer Args) {
     char* str = argString(Scheme, Args, 1);
     size_t lth = 0;
     char* decoded = cname_decode(str, strlen(str), &lth);
@@ -199,8 +186,7 @@ static pointer CNameDecode(scheme* Scheme, pointer Args)
     return result;
 }
 
-static pointer stringJoin(scheme* Scheme, pointer Args)
-{
+static pointer stringJoin(scheme* Scheme, pointer Args) {
     pointer array = argAt(Scheme, Args, 1);
     if (unlikely(!is_pair(array))) {
         return mk_string(Scheme, "");
@@ -223,8 +209,7 @@ static pointer stringJoin(scheme* Scheme, pointer Args)
     return mk_counted_string(Scheme, result.data(), int(result.size()));
 }
 
-static pointer callCPPAtTime(scheme* Scheme, pointer Args)
-{
+static pointer callCPPAtTime(scheme* Scheme, pointer Args) {
     if (unlikely(!is_cptr(argAt(Scheme, Args, 3)))) {
         printf("Bad task needs valid CM ptr");
         return Scheme->F;
@@ -240,36 +225,33 @@ static pointer callCPPAtTime(scheme* Scheme, pointer Args)
         auto cm(reinterpret_cast<extemp::CM*>(argCptr(Scheme, Args, 3)));
         pointer when = argAt(Scheme, Args, 1);
         if (is_pair(when)) {
-            extemp::TaskScheduler::I()->addTask(ivalue(pair_car(when)), ivalue(pair_cdr(when)),
-                    cm, obj, 0, is_callback);
+            extemp::TaskScheduler::I()->addTask(ivalue(pair_car(when)), ivalue(pair_cdr(when)), cm,
+                                                obj, 0, is_callback);
         } else {
-            extemp::TaskScheduler::I()->addTask(ivalue(when), Scheme->call_default_time, cm, obj,
-                    0, is_callback);
+            extemp::TaskScheduler::I()->addTask(ivalue(when), Scheme->call_default_time, cm, obj, 0,
+                                                is_callback);
         }
     }
     return Scheme->T;
 }
 
-static pointer getTime(scheme* Scheme, pointer Args)
-{
+static pointer getTime(scheme* Scheme, pointer Args) {
     return mk_integer(Scheme, extemp::UNIV::TIME);
 }
 
-static std::string extractCell(scheme* Scheme, pointer Args, bool Full = false, bool StringQuotes = true)
-{
+static std::string extractCell(scheme* Scheme, pointer Args, bool Full = false,
+                               bool StringQuotes = true) {
     std::stringstream ss;
     UNIV::printSchemeCell(Scheme, ss, Args, Full, StringQuotes);
     auto s(ss.str());
     return s.substr(1, s.length() - 2);
 }
 
-static pointer sexprToString(scheme* Scheme, pointer Args)
-{
+static pointer sexprToString(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, extractCell(Scheme, Args, true).c_str());
 }
 
-static pointer print(scheme* Scheme, pointer Args)
-{
+static pointer print(scheme* Scheme, pointer Args) {
     if (Args == Scheme->NIL) {
         putchar('\n');
         fflush(stdout);
@@ -280,8 +262,7 @@ static pointer print(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer print_no_new_line(scheme* Scheme, pointer Args)
-{
+static pointer print_no_new_line(scheme* Scheme, pointer Args) {
     if (Args == Scheme->NIL) {
         putchar('\n');
         fflush(stdout);
@@ -292,50 +273,44 @@ static pointer print_no_new_line(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer printFull(scheme* Scheme, pointer Args)
-{
+static pointer printFull(scheme* Scheme, pointer Args) {
     printf("%s\n", extractCell(Scheme, Args, true).c_str());
     return Scheme->T;
 }
 
-static pointer printFullNoQuotes(scheme* Scheme, pointer Args)
-{
+static pointer printFullNoQuotes(scheme* Scheme, pointer Args) {
     printf("%s\n", extractCell(Scheme, Args, true, false).c_str());
     return Scheme->T;
 }
 
-static pointer printError(scheme* Scheme, pointer Args)
-{
-  ascii_error();
-  printf("ERROR:");
-  ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-  fflush(stdout);
-  return Scheme->T;
+static pointer printError(scheme* Scheme, pointer Args) {
+    ascii_error();
+    printf("ERROR:");
+    ascii_normal();
+    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+    fflush(stdout);
+    return Scheme->T;
 }
 
-static pointer printInfo(scheme* Scheme, pointer Args)
-{
-  ascii_info();
-  printf("INFO:");
-  ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-  fflush(stdout);
-  return Scheme->T;
+static pointer printInfo(scheme* Scheme, pointer Args) {
+    ascii_info();
+    printf("INFO:");
+    ascii_normal();
+    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+    fflush(stdout);
+    return Scheme->T;
 }
 
-static pointer printWarn(scheme* Scheme, pointer Args)
-{
-  ascii_warning();
-  printf("WARN:");
-  ascii_normal();
-  printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
-  fflush(stdout);
-  return Scheme->T;
+static pointer printWarn(scheme* Scheme, pointer Args) {
+    ascii_warning();
+    printf("WARN:");
+    ascii_normal();
+    printf(" %s\n", extractCell(Scheme, Args, true, false).c_str());
+    fflush(stdout);
+    return Scheme->T;
 }
 
-static pointer getClosureEnv(scheme* Scheme, pointer Args)
-{
+static pointer getClosureEnv(scheme* Scheme, pointer Args) {
     // closure_env has no s7_scheme* to reach the funclet through, so there has
     // never been an environment to hand back here
     pointer env = closure_env(argAt(Scheme, Args, 1));
@@ -362,8 +337,7 @@ static std::mutex sImpCirDictMutex;
 static entry_type sDictHistory[2];
 static std::unordered_map<std::string, entry_type> sImpCirDict;
 
-static entry_type getEntry(const char* Key)
-{
+static entry_type getEntry(const char* Key) {
     const std::lock_guard<std::mutex> lock(sImpCirDictMutex);
     if (!strcmp(Key, "current")) {
         return sDictHistory[0];
@@ -374,18 +348,15 @@ static entry_type getEntry(const char* Key)
     return sImpCirDict[Key];
 }
 
-static pointer impcirGetName(scheme* Scheme, pointer Args)
-{
+static pointer impcirGetName(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, getEntry(argString(Scheme, Args, 1)).first.c_str());
 }
 
-static pointer impcirGetType(scheme* Scheme, pointer Args)
-{
+static pointer impcirGetType(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, getEntry(argString(Scheme, Args, 1)).second.c_str());
 }
 
-static pointer impcirAdd(scheme* Scheme, pointer Args)
-{
+static pointer impcirAdd(scheme* Scheme, pointer Args) {
     const std::string key(argString(Scheme, Args, 1));
     entry_type entry(argString(Scheme, Args, 2), argString(Scheme, Args, 3));
 
@@ -397,8 +368,7 @@ static pointer impcirAdd(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-std::span<const FFIEntry> miscDefs()
-{
+std::span<const FFIEntry> miscDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("cptr:get-i64", dataGETi64, 2, 0, false),
         FFI_DEF("cptr:get-double", dataGETdouble, 2, 0, false),

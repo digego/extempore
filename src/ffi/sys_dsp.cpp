@@ -45,40 +45,36 @@ namespace extemp {
 
 namespace SchemeFFI {
 
-static pointer setDSPClosure(scheme* Scheme, pointer Args)
-{
+static pointer setDSPClosure(scheme* Scheme, pointer Args) {
     AudioDevice::I()->setDSPClosure(cptr_value(pair_car(Args)));
     return Scheme->T;
 }
 
-static pointer setDSPMTClosure(scheme* Scheme, pointer Args)
-{
+static pointer setDSPMTClosure(scheme* Scheme, pointer Args) {
     // The index selects one of a fixed number of realtime worker slots; a
     // Scheme integer must never index past the table.
     const int64_t index = ivalue(pair_cadr(Args));
     if (index < 0 || index >= int64_t(AudioDevice::MAX_RT_AUDIO_THREADS) ||
-            !AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(Args)), int(index))) {
+        !AudioDevice::I()->setDSPMTClosure(cptr_value(pair_car(Args)), int(index))) {
         throw std::runtime_error("sys:set-dspmt-closure: thread index " + std::to_string(index) +
-                " is outside 0.." + std::to_string(AudioDevice::MAX_RT_AUDIO_THREADS - 1));
+                                 " is outside 0.." +
+                                 std::to_string(AudioDevice::MAX_RT_AUDIO_THREADS - 1));
     }
     return Scheme->T;
 }
 
-static pointer setDSPWrapper(scheme* Scheme, pointer Args)
-{
+static pointer setDSPWrapper(scheme* Scheme, pointer Args) {
     AudioDevice::I()->setDSPWrapper(dsp_f_ptr(cptr_value(pair_car(Args))));
     return Scheme->T;
 }
 
-static pointer setDSPMTWrapper(scheme* Scheme, pointer Args)
-{
+static pointer setDSPMTWrapper(scheme* Scheme, pointer Args) {
     AudioDevice::I()->setDSPMTWrapper(dsp_f_ptr_sum(cptr_value(pair_car(Args))),
-            dsp_f_ptr(cptr_value(pair_cadr(Args))));
+                                      dsp_f_ptr(cptr_value(pair_cadr(Args))));
     return Scheme->T;
 }
 
-static pointer initMTAudio(scheme* Scheme, pointer Args)
-{
+static pointer initMTAudio(scheme* Scheme, pointer Args) {
     const bool zerolatency = (pair_cadr(Args) == Scheme->T);
     std::string reason;
     if (!AudioDevice::I()->initMTAudio(int(ivalue(pair_car(Args))), zerolatency, reason)) {
@@ -87,21 +83,18 @@ static pointer initMTAudio(scheme* Scheme, pointer Args)
     return Scheme->T;
 }
 
-static pointer getAudioLoad(scheme* Scheme, pointer Args)
-{
+static pointer getAudioLoad(scheme* Scheme, pointer Args) {
     return mk_real(Scheme, double(AudioDevice::getCPULoad()));
 }
 
 // (underflows . overflows) since startup, as counted by the audio callback
-static pointer getAudioXruns(scheme* Scheme, pointer Args)
-{
+static pointer getAudioXruns(scheme* Scheme, pointer Args) {
     auto counts = AudioDevice::I()->getXrunCounts();
     return cons(Scheme, mk_integer(Scheme, int64_t(counts.first)),
-            mk_integer(Scheme, int64_t(counts.second)));
+                mk_integer(Scheme, int64_t(counts.second)));
 }
 
-std::span<const FFIEntry> sysDspDefs()
-{
+std::span<const FFIEntry> sysDspDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("sys:set-dsp-closure", setDSPClosure, 1, 0, false),
         FFI_DEF("sys:set-dspmt-closure", setDSPMTClosure, 2, 0, false),

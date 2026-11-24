@@ -592,12 +592,12 @@ class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
 
 struct TrackedModule {
     llvm::orc::ResourceTrackerSP tracker;
-    std::vector<std::string> exports;        // strong symbols this module defines
-    std::vector<std::string> imports;        // external symbols it references
-    std::unique_ptr<llvm::Module> metadata;  // clone exposed via getModules()
-    bool reclaimable = false;                // defines no global variables
-    bool pinned = false;                     // a symbol was unlinked on its own
-    bool everReferenced = false;             // a later module imported an export
+    std::vector<std::string> exports;          // strong symbols this module defines
+    std::vector<std::string> imports;          // external symbols it references
+    std::unique_ptr<llvm::Module> metadata;    // clone exposed via getModules()
+    bool reclaimable = false;                  // defines no global variables
+    bool pinned = false;                       // a symbol was unlinked on its own
+    bool everReferenced = false;               // a later module imported an export
     std::unordered_set<std::string> erased;    // exports Scheme has erased ...
     std::unordered_set<std::string> unlinked;  // ... and which are already unlinked
     // Non-empty for an orphan: exports of the module whose removal orphaned
@@ -1129,7 +1129,8 @@ EXPORT int64_t thread_sleep(int64_t Secs, int64_t Nanosecs) {
 static const std::pair<const char*, void*> kRuntimeSymbols[] = {
     {"llvm_zone_destroy", (void*)&extemp::EXTZones::llvm_zone_destroy},
     {"llvm_zone_malloc", (void*)&extemp::EXTZones::llvm_zone_malloc},
-    {"llvm_zone_malloc_from_current_zone", (void*)&extemp::EXTZones::llvm_zone_malloc_from_current_zone},
+    {"llvm_zone_malloc_from_current_zone",
+     (void*)&extemp::EXTZones::llvm_zone_malloc_from_current_zone},
     {"llvm_zone_print", (void*)&extemp::EXTZones::llvm_zone_print},
     {"llvm_zone_ptr_size", (void*)&extemp::EXTZones::llvm_zone_ptr_size},
     {"llvm_zone_copy_ptr", (void*)&extemp::EXTZones::llvm_zone_copy_ptr},
@@ -1271,8 +1272,7 @@ void initLLVM() {
 
     // Set up target machine builder with actual CPU features.
     llvm::orc::JITTargetMachineBuilder JTMB{llvm::Triple(triple)};
-    JTMB.setCPU(cpu).addFeatures(featureVec).setCodeGenOptLevel(
-        llvm::CodeGenOptLevel::Aggressive);
+    JTMB.setCPU(cpu).addFeatures(featureVec).setCodeGenOptLevel(llvm::CodeGenOptLevel::Aggressive);
 
     // Mirror LLJITBuilder's own linker choice (JITLink except on COFF, with the
     // code and relocation models it sets for JITLink), but supply memory

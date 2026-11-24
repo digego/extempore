@@ -53,8 +53,8 @@ class UdpSocket {
             return false;
         }
         int broadcast = 1;
-        ::setsockopt(handle, SOL_SOCKET, SO_BROADCAST,
-                     reinterpret_cast<const char*>(&broadcast), sizeof(broadcast));
+        ::setsockopt(handle, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&broadcast),
+                     sizeof(broadcast));
         setNonBlocking(handle);
         m_handle = handle;
         return true;

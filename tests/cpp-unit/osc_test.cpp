@@ -37,23 +37,34 @@ bool read_scheme_string(const std::string& Literal, std::string& Out) {
             return false;
         }
         switch (Literal[i]) {
-            case '\\': Out.push_back('\\'); break;
-            case '"': Out.push_back('"'); break;
-            case 'n': Out.push_back('\n'); break;
-            case 't': Out.push_back('\t'); break;
-            case 'r': Out.push_back('\r'); break;
-            case 'x': {
-                std::string hex;
-                while (++i < Literal.size() && Literal[i] != ';') {
-                    hex.push_back(Literal[i]);
-                }
-                if (i >= Literal.size() || hex.empty()) {
-                    return false;
-                }
-                Out.push_back(static_cast<char>(std::stoi(hex, nullptr, 16)));
-                break;
+        case '\\':
+            Out.push_back('\\');
+            break;
+        case '"':
+            Out.push_back('"');
+            break;
+        case 'n':
+            Out.push_back('\n');
+            break;
+        case 't':
+            Out.push_back('\t');
+            break;
+        case 'r':
+            Out.push_back('\r');
+            break;
+        case 'x': {
+            std::string hex;
+            while (++i < Literal.size() && Literal[i] != ';') {
+                hex.push_back(Literal[i]);
             }
-            default: return false;  // an escape s7 would reject
+            if (i >= Literal.size() || hex.empty()) {
+                return false;
+            }
+            Out.push_back(static_cast<char>(std::stoi(hex, nullptr, 16)));
+            break;
+        }
+        default:
+            return false;  // an escape s7 would reject
         }
     }
     // the literal must be exactly one string constant: closing quote, then end
@@ -92,9 +103,12 @@ TEST(OscAddress, RejectsSpaceAndPatternCharacters) {
 }
 
 TEST(OscAddress, RejectsNonPrintableBytes) {
-    EXPECT_FALSE(address_is_valid(std::string("/a\x01" "b")));
-    EXPECT_FALSE(address_is_valid(std::string("/a\x7f" "b")));
-    EXPECT_FALSE(address_is_valid(std::string("/a\xe9" "b")));
+    EXPECT_FALSE(address_is_valid(std::string("/a\x01"
+                                              "b")));
+    EXPECT_FALSE(address_is_valid(std::string("/a\x7f"
+                                              "b")));
+    EXPECT_FALSE(address_is_valid(std::string("/a\xe9"
+                                              "b")));
     EXPECT_FALSE(address_is_valid(std::string("/a\n")));
     EXPECT_FALSE(address_is_valid(std::string("/a\0b", 4)));
 }
@@ -219,11 +233,11 @@ TEST(OscWriter, MessageBytesMatchWireFormat) {
     msg.append(args);
 
     const std::vector<unsigned char> expected = {
-        '/',  't',  'e',  's',  't',  0,    0,    0,     // address, padded to 8
-        ',',  's',  'i',  'f',  0,    0,    0,    0,     // type tags, padded to 8
-        'h',  'i',  0,    0,                             // "hi", padded to 4
-        0x00, 0x00, 0x01, 0xf4,                          // 500, big-endian
-        0x40, 0xd0, 0x00, 0x00,                          // 6.5f, big-endian
+        '/',  't',  'e',  's',  't', 0, 0, 0,  // address, padded to 8
+        ',',  's',  'i',  'f',  0,   0, 0, 0,  // type tags, padded to 8
+        'h',  'i',  0,    0,                   // "hi", padded to 4
+        0x00, 0x00, 0x01, 0xf4,                // 500, big-endian
+        0x40, 0xd0, 0x00, 0x00,                // 6.5f, big-endian
     };
     ASSERT_EQ(msg.size(), expected.size());
     EXPECT_EQ(std::memcmp(msg.data(), expected.data(), expected.size()), 0);

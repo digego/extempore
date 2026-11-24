@@ -72,7 +72,8 @@ class TaskI {
 
   protected:
     // Callback is accepted for the callers that pass it and otherwise unused.
-    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag, bool /*Callback*/ = false)
+    TaskI(uint64_t StartTime, uint64_t Duration, CM* ClassMember, int Tag,
+          bool /*Callback*/ = false)
         : m_startTime(StartTime), m_duration(Duration), m_classMember(ClassMember), m_tag(Tag) {}
 
   public:

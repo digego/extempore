@@ -60,9 +60,10 @@ using PcrePtr = std::shared_ptr<pcre2_code>;
 // it was made for. That block is per-match state rather than shared, so each
 // call below makes its own and reuses it across the iterations of the looping
 // bodies.
-struct MatchDataDeleter
-{
-    void operator()(pcre2_match_data* MatchData) const { pcre2_match_data_free(MatchData); }
+struct MatchDataDeleter {
+    void operator()(pcre2_match_data* MatchData) const {
+        pcre2_match_data_free(MatchData);
+    }
 };
 
 using MatchDataPtr = std::unique_ptr<pcre2_match_data, MatchDataDeleter>;
@@ -75,19 +76,18 @@ static constexpr uint32_t REGEX_MAX_GROUP = 100000;
 // A pattern pcre2 rejects is a Scheme error carrying pcre2's message and the
 // offset it stopped at, so a typo in a compiler regex is loud instead of
 // quietly matching nothing.
-static PcrePtr compilePattern(const char* Pattern, pointer Args)
-{
+static PcrePtr compilePattern(const char* Pattern, pointer Args) {
     int errorcode = 0;
     PCRE2_SIZE erroroffset = 0;
     pcre2_code* re = pcre2_compile(reinterpret_cast<PCRE2_SPTR>(Pattern), PCRE2_ZERO_TERMINATED, 0,
-            &errorcode, &erroroffset, nullptr);
+                                   &errorcode, &erroroffset, nullptr);
     if (!re) {
         PCRE2_UCHAR message[256];
         pcre2_get_error_message(errorcode, message, sizeof(message));
-        throw ScmRuntimeError(std::string(ffi_current_name()) + ": invalid regex \"" + Pattern
-                        + "\" at offset " + std::to_string(erroroffset) + ": "
-                        + reinterpret_cast<const char*>(message),
-                Args);
+        throw ScmRuntimeError(std::string(ffi_current_name()) + ": invalid regex \"" + Pattern +
+                                  "\" at offset " + std::to_string(erroroffset) + ": " +
+                                  reinterpret_cast<const char*>(message),
+                              Args);
     }
     return PcrePtr(re, [](pcre2_code* Code) { pcre2_code_free(Code); });
 }
@@ -97,8 +97,7 @@ static PcrePtr compilePattern(const char* Pattern, pointer Args)
 // Plain bounded map rather than an LRU: the working set is the handful of
 // patterns in runtime/*.xtm, and dropping the lot on overflow costs one
 // recompile each.
-static PcrePtr cachedPattern(const char* Pattern, pointer Args)
-{
+static PcrePtr cachedPattern(const char* Pattern, pointer Args) {
     static constexpr size_t MAX_CACHED_PATTERNS = 512;
     static std::mutex sPatternCacheMutex;
     static std::unordered_map<std::string, PcrePtr> sPatternCache;
@@ -120,30 +119,26 @@ static PcrePtr cachedPattern(const char* Pattern, pointer Args)
     return re;
 }
 
-static MatchDataPtr matchDataFor(const PcrePtr& Re)
-{
+static MatchDataPtr matchDataFor(const PcrePtr& Re) {
     return MatchDataPtr(pcre2_match_data_create_from_pattern(Re.get(), nullptr));
 }
 
 // Sizing the match data from the pattern means the ovector always has room for
 // every capture, so pcre2_match returns the capture count or a negative code,
 // never 0.
-static int regexExec(const PcrePtr& Re, const MatchDataPtr& MatchData, std::string_view Data)
-{
+static int regexExec(const PcrePtr& Re, const MatchDataPtr& MatchData, std::string_view Data) {
     return pcre2_match(Re.get(), reinterpret_cast<PCRE2_SPTR>(Data.data()), Data.size(), 0, 0,
-            MatchData.get(), nullptr);
+                       MatchData.get(), nullptr);
 }
 
-static pointer regex_match(scheme* Scheme, pointer Args)
-{
+static pointer regex_match(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     return (regexExec(re, matchData, data) > 0) ? Scheme->T : Scheme->F;
 }
 
-static pointer regex_matched(scheme* Scheme, pointer Args)
-{
+static pointer regex_matched(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
@@ -153,8 +148,7 @@ static pointer regex_matched(scheme* Scheme, pointer Args)
         return list;
     }
     const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
-    for (int i = 0; i < rc; ++i)
-    {
+    for (int i = 0; i < rc; ++i) {
         const PCRE2_SIZE start = ovector[2 * size_t(i)];
         const PCRE2_SIZE end = ovector[2 * size_t(i) + 1];
         // cons itself can trigger GC before storing its arguments (new_cell
@@ -162,16 +156,15 @@ static pointer regex_matched(scheme* Scheme, pointer Args)
         // list and the just-allocated string need protection across the cons
         const EnvInjector injector(Scheme, list);
         pointer s = (start == PCRE2_UNSET)
-                ? mk_string(Scheme, "")
-                : mk_counted_string(Scheme, data.data() + start, int(end - start));
+                        ? mk_string(Scheme, "")
+                        : mk_counted_string(Scheme, data.data() + start, int(end - start));
         const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
     }
     return reverse_in_place(Scheme, Scheme->NIL, list);
 }
 
-static pointer regex_match_all(scheme* Scheme, pointer Args)
-{
+static pointer regex_match_all(scheme* Scheme, pointer Args) {
     std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
@@ -182,8 +175,8 @@ static pointer regex_match_all(scheme* Scheme, pointer Args)
         }
         const PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(matchData.get());
         const EnvInjector injector(Scheme, list);
-        pointer s = mk_counted_string(
-                Scheme, data.data() + ovector[0], int(ovector[1] - ovector[0]));
+        pointer s =
+            mk_counted_string(Scheme, data.data() + ovector[0], int(ovector[1] - ovector[0]));
         const EnvInjector injector2(Scheme, s);
         list = cons(Scheme, s, list);
         // a zero-width match leaves the end offset where the search started,
@@ -197,15 +190,14 @@ static pointer regex_match_all(scheme* Scheme, pointer Args)
     return reverse_in_place(Scheme, Scheme->NIL, list);
 }
 
-static pointer regex_split(scheme* Scheme, pointer Args)
-{
+static pointer regex_split(scheme* Scheme, pointer Args) {
     std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     auto matchData(matchDataFor(re));
     pointer list = Scheme->NIL;
     while (true) {
         if (data.empty() || regexExec(re, matchData, data) < 1) {
-            if (!data.empty()) // append remaining chars if any left
+            if (!data.empty())  // append remaining chars if any left
             {
                 // mk_counted_string and cons can each trigger GC: without
                 // protection, `list` and the fresh string (referenced only
@@ -243,8 +235,7 @@ static pointer regex_split(scheme* Scheme, pointer Args)
 // treats three things this API has always allowed as errors: a $N naming a
 // group the pattern doesn't have, a $N the match didn't fill, and a '$' that
 // isn't a group reference at all.
-static pointer regex_replace(scheme* Scheme, pointer Args)
-{
+static pointer regex_replace(scheme* Scheme, pointer Args) {
     const std::string_view data(argString(Scheme, Args, 1));
     auto re(cachedPattern(argString(Scheme, Args, 2), Args));
     const char* replace = argString(Scheme, Args, 3);
@@ -284,8 +275,7 @@ static pointer regex_replace(scheme* Scheme, pointer Args)
     return mk_counted_string(Scheme, result.data(), int(result.size()));
 }
 
-std::span<const FFIEntry> regexDefs()
-{
+std::span<const FFIEntry> regexDefs() {
     static const FFIEntry defs[] = {
         FFI_DEF("regex:match?", regex_match, 2, 0, false),
         FFI_DEF("regex:matched", regex_matched, 2, 0, false),

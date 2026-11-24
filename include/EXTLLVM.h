@@ -57,7 +57,6 @@ struct _llvm_callback_struct_ {
 
 struct closure_address_table;
 
-
 ///////////////////////////////////////////////////
 // this added for dogdy continuations support
 /* ucontext_t* llvm_make_ucontext(); */

@@ -239,15 +239,14 @@ void* audioCallbackMT(void* Args) {
             }
             if (UNIV::IN_CHANNELS == UNIV::CHANNELS) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
-                    outbuf[iout + k] =
-                        audio_sanity(cache_wrapper(zone, (void*)closure, inbuf[iin + k],
-                                                   (i + LTIME), k, indata.data()));
+                    outbuf[iout + k] = audio_sanity(cache_wrapper(
+                        zone, (void*)closure, inbuf[iin + k], (i + LTIME), k, indata.data()));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else if (UNIV::IN_CHANNELS == 1) {
                 for (uint64_t k = 0; k < UNIV::CHANNELS; k++) {
-                    outbuf[iout + k] = audio_sanity(cache_wrapper(
-                        zone, (void*)closure, inbuf[iin], (i + LTIME), k, indata.data()));
+                    outbuf[iout + k] = audio_sanity(cache_wrapper(zone, (void*)closure, inbuf[iin],
+                                                                  (i + LTIME), k, indata.data()));
                     extemp::EXTZones::llvm_zone_reset(zone);
                 }
             } else {
@@ -679,8 +678,8 @@ static int findDevice(const std::string& Name) {
         pattern = std::regex(Name);
     } catch (const std::regex_error& e) {
         ascii_warning();
-        printf("Warning: '%s' is not a valid regex (%s); matching it as plain text\n",
-               Name.c_str(), e.what());
+        printf("Warning: '%s' is not a valid regex (%s); matching it as plain text\n", Name.c_str(),
+               e.what());
         ascii_normal();
         usePattern = false;
     }
@@ -882,8 +881,7 @@ bool AudioDevice::initMTAudio(int Num, bool ZeroLatency, std::string& Reason) {
         if (state->numThreads != n || state->zeroLatency != ZeroLatency) {
             Reason = "multi-threaded audio is already running with " +
                      std::to_string(state->numThreads) + " threads (zero-latency " +
-                     (state->zeroLatency ? "on" : "off") +
-                     "); restart Extempore to change that";
+                     (state->zeroLatency ? "on" : "off") + "); restart Extempore to change that";
             return false;
         }
         return true;

@@ -187,8 +187,7 @@ constexpr std::array<OptionSpec, 31> kOptions{{
     {Opt::OptLevel, "--opt-level", Arg::Required, "LLVM optimization level 0-3"},
     {Opt::SampleRate, "--samplerate", Arg::Required, "audio samplerate"},
     {Opt::Frames, "--frames", Arg::Required, "attempts to force frames [1024]"},
-    {Opt::Channels, "--channels", Arg::Required,
-     "attempts to force num of output audio channels"},
+    {Opt::Channels, "--channels", Arg::Required, "attempts to force num of output audio channels"},
     {Opt::InChannels, "--inchannels", Arg::Required,
      "attempts to force num of input audio channels"},
     {Opt::NoAudio, "--noaudio", Arg::None,
@@ -545,8 +544,8 @@ EXPORT int extempore_init(int argc, char** argv) {
 
     Settings settings;
     int status = 0;
-    if (parse_args(std::span<char*>(argv + 1, size_t(argc > 0 ? argc - 1 : 0)), settings,
-                   status) == ParseResult::Exit) {
+    if (parse_args(std::span<char*>(argv + 1, size_t(argc > 0 ? argc - 1 : 0)), settings, status) ==
+        ParseResult::Exit) {
         return status;
     }
     extemp::UNIV::SHARE_DIR = extemp::UNIV::resolve_share_dir(settings.sharedir);
@@ -634,8 +633,8 @@ EXPORT int extempore_init(int argc, char** argv) {
         std::cout << " one or more processes failed to start, exiting." << std::endl;
         exit(1);
     }
-    auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name,
-                                              primary_port, 0, settings.initexpr);
+    auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port,
+                                              0, settings.initexpr);
 
     // Fire-and-forget helpers: they run for the life of the process and need
     // none of EXTThread's scheduling features, so a detached std::thread does.

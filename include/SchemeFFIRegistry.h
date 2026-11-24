@@ -72,8 +72,7 @@ std::span<const FFIEntry> utilityDefs();
 // Console complaint from a primitive that reports a bad argument by returning
 // #f rather than raising.  Message carries its own trailing newline; the
 // colour is reset after it, as the Scheme-side print-error does.
-inline void ffiPrintError(const char* Message)
-{
+inline void ffiPrintError(const char* Message) {
     ascii_error();
     std::fputs(Message, stdout);
     ascii_normal();

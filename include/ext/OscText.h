@@ -23,15 +23,17 @@ inline bool address_char_ok(unsigned char Char) {
         return false;
     }
     switch (Char) {
-        case '#':
-        case '*':
-        case ',':
-        case '?':
-        case '[':
-        case ']':
-        case '{':
-        case '}': return false;
-        default: return true;
+    case '#':
+    case '*':
+    case ',':
+    case '?':
+    case '[':
+    case ']':
+    case '{':
+    case '}':
+        return false;
+    default:
+        return true;
     }
 }
 
@@ -94,8 +96,7 @@ inline bool round_trips(const char* Text, float Value) {
 // Shortest decimal that reads back as the same value, tagged so the s7 reader
 // produces a real rather than an integer. Non-finite values would otherwise
 // print as "nan"/"inf", which the reader takes for symbols.
-template <class T>
-inline std::string scheme_real_literal(T Value) {
+template <class T> inline std::string scheme_real_literal(T Value) {
     static_assert(std::is_floating_point_v<T>, "scheme_real_literal is for floats");
     if (std::isnan(Value)) {
         return "+nan.0";

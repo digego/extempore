@@ -24,8 +24,7 @@
 
 /* --- surface creation (vendored from glfw3webgpu) --- */
 
-WGPUSurface xtm_wgpu_create_surface(WGPUInstance instance,
-                                     GLFWwindow *window) {
+WGPUSurface xtm_wgpu_create_surface(WGPUInstance instance, GLFWwindow* window) {
 #ifdef _WIN32
     HWND hwnd = glfwGetWin32Window(window);
     HINSTANCE hinstance = GetModuleHandle(NULL);
@@ -35,40 +34,40 @@ WGPUSurface xtm_wgpu_create_surface(WGPUInstance instance,
         .hwnd = hwnd,
     };
     WGPUSurfaceDescriptor desc = {
-        .nextInChain = (const WGPUChainedStruct *)&source,
+        .nextInChain = (const WGPUChainedStruct*)&source,
     };
     return wgpuInstanceCreateSurface(instance, &desc);
 
 #elif defined(__APPLE__)
-    NSWindow *nswindow = glfwGetCocoaWindow(window);
-    NSView *view = [nswindow contentView];
+    NSWindow* nswindow = glfwGetCocoaWindow(window);
+    NSView* view = [nswindow contentView];
     [view setWantsLayer:YES];
-    CAMetalLayer *layer = [CAMetalLayer layer];
+    CAMetalLayer* layer = [CAMetalLayer layer];
     [view setLayer:layer];
     WGPUSurfaceSourceMetalLayer source = {
         .chain = {.sType = WGPUSType_SurfaceSourceMetalLayer},
-        .layer = (__bridge void *)layer,
+        .layer = (__bridge void*)layer,
     };
     WGPUSurfaceDescriptor desc = {
-        .nextInChain = (const WGPUChainedStruct *)&source,
+        .nextInChain = (const WGPUChainedStruct*)&source,
     };
     return wgpuInstanceCreateSurface(instance, &desc);
 
 #elif defined(GLFW_EXPOSE_NATIVE_WAYLAND)
-    struct wl_display *display = glfwGetWaylandDisplay();
-    struct wl_surface *wl_surface = glfwGetWaylandWindow(window);
+    struct wl_display* display = glfwGetWaylandDisplay();
+    struct wl_surface* wl_surface = glfwGetWaylandWindow(window);
     WGPUSurfaceSourceWaylandSurface source = {
         .chain = {.sType = WGPUSType_SurfaceSourceWaylandSurface},
         .display = display,
         .surface = wl_surface,
     };
     WGPUSurfaceDescriptor desc = {
-        .nextInChain = (const WGPUChainedStruct *)&source,
+        .nextInChain = (const WGPUChainedStruct*)&source,
     };
     return wgpuInstanceCreateSurface(instance, &desc);
 
 #else
-    Display *x11_display = glfwGetX11Display();
+    Display* x11_display = glfwGetX11Display();
     Window x11_window = glfwGetX11Window(window);
     WGPUSurfaceSourceXlibWindow source = {
         .chain = {.sType = WGPUSType_SurfaceSourceXlibWindow},
@@ -76,7 +75,7 @@ WGPUSurface xtm_wgpu_create_surface(WGPUInstance instance,
         .window = (uint64_t)x11_window,
     };
     WGPUSurfaceDescriptor desc = {
-        .nextInChain = (const WGPUChainedStruct *)&source,
+        .nextInChain = (const WGPUChainedStruct*)&source,
     };
     return wgpuInstanceCreateSurface(instance, &desc);
 #endif
@@ -89,23 +88,20 @@ typedef struct {
     int done;
 } AdapterResult;
 
-static void on_adapter(WGPURequestAdapterStatus status, WGPUAdapter adapter,
-                        WGPUStringView message, void *userdata1,
-                        void *userdata2) {
-    AdapterResult *result = (AdapterResult *)userdata1;
+static void on_adapter(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
+                       void* userdata1, void* userdata2) {
+    AdapterResult* result = (AdapterResult*)userdata1;
     (void)userdata2;
     if (status == WGPURequestAdapterStatus_Success) {
         result->adapter = adapter;
     } else {
-        fprintf(stderr, "wgpu adapter request failed: %.*s\n",
-                (int)message.length, message.data);
+        fprintf(stderr, "wgpu adapter request failed: %.*s\n", (int)message.length, message.data);
         result->adapter = NULL;
     }
     result->done = 1;
 }
 
-WGPUAdapter xtm_wgpu_request_adapter(WGPUInstance instance,
-                                      WGPUSurface surface) {
+WGPUAdapter xtm_wgpu_request_adapter(WGPUInstance instance, WGPUSurface surface) {
     WGPURequestAdapterOptions opts = {
         .compatibleSurface = surface,
         .powerPreference = WGPUPowerPreference_HighPerformance,
@@ -125,14 +121,13 @@ WGPUAdapter xtm_wgpu_request_adapter(WGPUInstance instance,
 
 /* --- uncaptured error handler (log instead of abort) --- */
 
-static void on_uncaptured_error(WGPUDevice const *device,
-                                 WGPUErrorType type, WGPUStringView message,
-                                 void *userdata1, void *userdata2) {
+static void on_uncaptured_error(WGPUDevice const* device, WGPUErrorType type,
+                                WGPUStringView message, void* userdata1, void* userdata2) {
     (void)device;
     (void)userdata1;
     (void)userdata2;
-    printf("wgpu uncaptured error (type %d, len %zu):\n%.*s\n", (int)type,
-           message.length, (int)message.length, message.data);
+    printf("wgpu uncaptured error (type %d, len %zu):\n%.*s\n", (int)type, message.length,
+           (int)message.length, message.data);
     fflush(stdout);
 }
 
@@ -143,23 +138,20 @@ typedef struct {
     int done;
 } DeviceResult;
 
-static void on_device(WGPURequestDeviceStatus status, WGPUDevice device,
-                       WGPUStringView message, void *userdata1,
-                       void *userdata2) {
-    DeviceResult *result = (DeviceResult *)userdata1;
+static void on_device(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
+                      void* userdata1, void* userdata2) {
+    DeviceResult* result = (DeviceResult*)userdata1;
     (void)userdata2;
     if (status == WGPURequestDeviceStatus_Success) {
         result->device = device;
     } else {
-        fprintf(stderr, "wgpu device request failed: %.*s\n",
-                (int)message.length, message.data);
+        fprintf(stderr, "wgpu device request failed: %.*s\n", (int)message.length, message.data);
         result->device = NULL;
     }
     result->done = 1;
 }
 
-WGPUDevice xtm_wgpu_request_device(WGPUInstance instance,
-                                    WGPUAdapter adapter) {
+WGPUDevice xtm_wgpu_request_device(WGPUInstance instance, WGPUAdapter adapter) {
     WGPUDeviceDescriptor desc = {0};
     desc.defaultQueue.label = (WGPUStringView){.data = "default", .length = 7};
     desc.uncapturedErrorCallbackInfo = (WGPUUncapturedErrorCallbackInfo){
@@ -180,8 +172,8 @@ WGPUDevice xtm_wgpu_request_device(WGPUInstance instance,
 
 /* --- surface configuration --- */
 
-void xtm_wgpu_configure_surface(WGPUSurface surface, WGPUDevice device,
-                                 uint32_t format, GLFWwindow *window) {
+void xtm_wgpu_configure_surface(WGPUSurface surface, WGPUDevice device, uint32_t format,
+                                GLFWwindow* window) {
     int fb_width, fb_height;
     glfwGetFramebufferSize(window, &fb_width, &fb_height);
     WGPUSurfaceConfiguration config = {
@@ -208,24 +200,22 @@ uint32_t xtm_wgpu_surface_format(WGPUSurface surface, WGPUAdapter adapter) {
 
 /* --- shader module --- */
 
-WGPUShaderModule xtm_wgpu_create_shader(WGPUDevice device, const char *wgsl) {
+WGPUShaderModule xtm_wgpu_create_shader(WGPUDevice device, const char* wgsl) {
     WGPUShaderSourceWGSL wgsl_source = {
         .chain = {.sType = WGPUSType_ShaderSourceWGSL},
         .code = {.data = wgsl, .length = strlen(wgsl)},
     };
     WGPUShaderModuleDescriptor desc = {
-        .nextInChain = (const WGPUChainedStruct *)&wgsl_source,
+        .nextInChain = (const WGPUChainedStruct*)&wgsl_source,
     };
     return wgpuDeviceCreateShaderModule(device, &desc);
 }
 
 /* --- render pipeline --- */
 
-WGPURenderPipeline xtm_wgpu_create_pipeline(WGPUDevice device,
-                                              WGPUShaderModule shader,
-                                              uint32_t format,
-                                              const char *vs_entry,
-                                              const char *fs_entry) {
+WGPURenderPipeline xtm_wgpu_create_pipeline(WGPUDevice device, WGPUShaderModule shader,
+                                            uint32_t format, const char* vs_entry,
+                                            const char* fs_entry) {
     WGPUColorTargetState color_target = {
         .format = (WGPUTextureFormat)format,
         .writeMask = WGPUColorWriteMask_All,
@@ -258,17 +248,14 @@ WGPURenderPipeline xtm_wgpu_create_pipeline(WGPUDevice device,
 
 /* --- begin frame --- */
 
-void xtm_wgpu_begin_frame(WGPUSurface surface, WGPUDevice device, double r,
-                            double g, double b, double a,
-                            WGPUCommandEncoder *out_encoder,
-                            WGPURenderPassEncoder *out_pass,
-                            WGPUTextureView *out_view) {
+void xtm_wgpu_begin_frame(WGPUSurface surface, WGPUDevice device, double r, double g, double b,
+                          double a, WGPUCommandEncoder* out_encoder,
+                          WGPURenderPassEncoder* out_pass, WGPUTextureView* out_view) {
     WGPUSurfaceTexture st;
     wgpuSurfaceGetCurrentTexture(surface, &st);
     if (st.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal &&
         st.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal) {
-        fprintf(stderr, "wgpu: failed to get surface texture (status %d)\n",
-                st.status);
+        fprintf(stderr, "wgpu: failed to get surface texture (status %d)\n", st.status);
         *out_encoder = NULL;
         *out_pass = NULL;
         *out_view = NULL;
@@ -278,8 +265,7 @@ void xtm_wgpu_begin_frame(WGPUSurface surface, WGPUDevice device, double r,
     WGPUTextureView view = wgpuTextureCreateView(st.texture, NULL);
 
     WGPUCommandEncoderDescriptor enc_desc = {0};
-    WGPUCommandEncoder encoder =
-        wgpuDeviceCreateCommandEncoder(device, &enc_desc);
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &enc_desc);
 
     WGPURenderPassColorAttachment color_att = {
         .view = view,
@@ -292,8 +278,7 @@ void xtm_wgpu_begin_frame(WGPUSurface surface, WGPUDevice device, double r,
         .colorAttachmentCount = 1,
         .colorAttachments = &color_att,
     };
-    WGPURenderPassEncoder pass =
-        wgpuCommandEncoderBeginRenderPass(encoder, &rp_desc);
+    WGPURenderPassEncoder pass = wgpuCommandEncoderBeginRenderPass(encoder, &rp_desc);
 
     *out_encoder = encoder;
     *out_pass = pass;
@@ -302,9 +287,8 @@ void xtm_wgpu_begin_frame(WGPUSurface surface, WGPUDevice device, double r,
 
 /* --- end frame --- */
 
-void xtm_wgpu_end_frame(WGPUSurface surface, WGPUQueue queue,
-                          WGPUCommandEncoder encoder,
-                          WGPURenderPassEncoder pass, WGPUTextureView view) {
+void xtm_wgpu_end_frame(WGPUSurface surface, WGPUQueue queue, WGPUCommandEncoder encoder,
+                        WGPURenderPassEncoder pass, WGPUTextureView view) {
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 
@@ -321,8 +305,7 @@ void xtm_wgpu_end_frame(WGPUSurface surface, WGPUQueue queue,
 
 /* --- buffer creation --- */
 
-WGPUBuffer xtm_wgpu_create_buffer(WGPUDevice device, uint64_t size,
-                                    uint32_t usage) {
+WGPUBuffer xtm_wgpu_create_buffer(WGPUDevice device, uint64_t size, uint32_t usage) {
     WGPUBufferDescriptor desc = {
         .size = size,
         .usage = (WGPUBufferUsage)usage,
@@ -352,10 +335,8 @@ WGPUBindGroupLayout xtm_wgpu_create_uniform_layout(WGPUDevice device) {
 
 /* --- uniform bind group (single buffer at binding 0) --- */
 
-WGPUBindGroup xtm_wgpu_create_uniform_bind_group(WGPUDevice device,
-                                                    WGPUBindGroupLayout layout,
-                                                    WGPUBuffer buffer,
-                                                    uint64_t size) {
+WGPUBindGroup xtm_wgpu_create_uniform_bind_group(WGPUDevice device, WGPUBindGroupLayout layout,
+                                                 WGPUBuffer buffer, uint64_t size) {
     WGPUBindGroupEntry entry = {
         .binding = 0,
         .buffer = buffer,
@@ -372,16 +353,15 @@ WGPUBindGroup xtm_wgpu_create_uniform_bind_group(WGPUDevice device,
 
 /* --- render pipeline with bind group layout --- */
 
-WGPURenderPipeline xtm_wgpu_create_pipeline_with_layout(
-    WGPUDevice device, WGPUShaderModule shader, uint32_t format,
-    const char *vs_entry, const char *fs_entry,
-    WGPUBindGroupLayout bind_group_layout) {
+WGPURenderPipeline xtm_wgpu_create_pipeline_with_layout(WGPUDevice device, WGPUShaderModule shader,
+                                                        uint32_t format, const char* vs_entry,
+                                                        const char* fs_entry,
+                                                        WGPUBindGroupLayout bind_group_layout) {
     WGPUPipelineLayoutDescriptor pl_desc = {
         .bindGroupLayoutCount = 1,
         .bindGroupLayouts = &bind_group_layout,
     };
-    WGPUPipelineLayout layout =
-        wgpuDeviceCreatePipelineLayout(device, &pl_desc);
+    WGPUPipelineLayout layout = wgpuDeviceCreatePipelineLayout(device, &pl_desc);
 
     WGPUColorTargetState color_target = {
         .format = (WGPUTextureFormat)format,
@@ -411,8 +391,7 @@ WGPURenderPipeline xtm_wgpu_create_pipeline_with_layout(
             },
         .fragment = &fragment,
     };
-    WGPURenderPipeline pipeline =
-        wgpuDeviceCreateRenderPipeline(device, &desc);
+    WGPURenderPipeline pipeline = wgpuDeviceCreateRenderPipeline(device, &desc);
     wgpuPipelineLayoutRelease(layout);
     return pipeline;
 }

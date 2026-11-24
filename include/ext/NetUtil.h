@@ -34,13 +34,15 @@ inline void ensure_winsock_initialised() {
 // Resolves `host` (IPv4) to an address in network byte order.
 // Returns 0 on failure. Thread-safe (uses getaddrinfo, not gethostbyname).
 inline uint32_t resolve_ipv4(const char* host) {
-    if (!host) return 0;
+    if (!host)
+        return 0;
     ensure_winsock_initialised();
-    struct addrinfo hints{};
+    struct addrinfo hints {};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo* res = nullptr;
-    if (getaddrinfo(host, nullptr, &hints, &res) != 0 || !res) return 0;
+    if (getaddrinfo(host, nullptr, &hints, &res) != 0 || !res)
+        return 0;
     uint32_t addr = reinterpret_cast<sockaddr_in*>(res->ai_addr)->sin_addr.s_addr;
     freeaddrinfo(res);
     return addr;

@@ -164,7 +164,7 @@ enum scheme_types {
 // site (e.g. by the argument accessors, which name the primitive).
 class ScmRuntimeError {
   public:
-    ScmRuntimeError(std::string _msg, pointer _p): msg(std::move(_msg)), p(_p) {}
+    ScmRuntimeError(std::string _msg, pointer _p) : msg(std::move(_msg)), p(_p) {}
     std::string msg;
     pointer p;
 };
