@@ -3,11 +3,10 @@ id: TASK-070
 title: >-
   Investigate intermittent timeouts of the osc, system and topclock_metro tests
   in the full suite
-status: In Progress
-assignee:
-  - '@claude'
+status: To Do
+assignee: []
 created_date: '2026-11-24T11:16:22Z'
-updated_date: '2026-11-24T19:20:20Z'
+updated_date: '2026-11-24T20:08:52Z'
 labels:
   - tests
 dependencies: []
@@ -50,4 +49,6 @@ The 10:59 failure in the session which filed this had no other extempore running
 Concurrent copies of a test do collide: two system.xtm runs at once hang exactly as the failure did (the second can't bind 17599, ipc:new connects to the first's server, and the reply never comes back), and two osc.xtm runs fail on 17755. Fixed in 1980f76b (ipc:new returns #f when its port is taken) and 8fb4ed82 (the two tests search for a free port). Two topclock_metro runs at once both finish.
 
 Side find, not fixed: SchemeProcess.cpp:362 and :385 pass an end time where scheme_call takes a duration, so callback deadlines are about 2*now + maxDuration (longer than meant, so not a hang).
+
+2026-11-25, later: fixed the callback time limit (7153bc73: callbacks got about three times the current time instead of call_default_time, and s7 abandoned an evaluation at its limit without a word, which would hang a test silently; it now prints 'evaluation stopped at its time limit'). Added a hang report (8b19eb15): ctest sends SIGUSR1 to a test which times out, and extempore writes the scheduler queue, each process's task and time limit, and every thread's backtrace into the log; stdout is now line-buffered so a killed test keeps its last lines (before, the 'last line printed' evidence above could be missing up to 4 KB). Only osc.xtm, system.xtm and topclock_metro resume inside a callback continuation, which is why these three and no others hang. Six more runs of the failing recipe (touch libs/core/midi.xtm, rebuild, full suite, sequencer readable) all passed, as did 96-way stress runs of osc.xtm and system.xtm: 3 failures in 29 full runs, none since. Next occurrence: read the hang report in build/Testing/Temporary/LastTest.log.
 <!-- SECTION:NOTES:END -->
