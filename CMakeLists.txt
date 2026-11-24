@@ -340,6 +340,7 @@ set(EXTEMPORE_SOURCES
     src/EXTClosureAddressTable.cpp
     src/EXTLLVM.cpp
     src/EXTThread.cpp
+    src/HangReport.cpp
     src/shims/__hash_memory.cpp
     src/OSC.cpp
     src/SchemeS7.cpp

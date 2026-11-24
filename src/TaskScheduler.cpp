@@ -35,6 +35,7 @@
 
 #include "TaskScheduler.h"
 #include "AudioDevice.h"
+#include "HangReport.h"
 #include <cmath>
 #include <iostream>
 #include <thread>
@@ -55,6 +56,12 @@ TaskScheduler::~TaskScheduler() {
     m_tick.release();
 }
 
+static int64_t steadyNanoseconds() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
 static uint64_t AUDIO_DEVICE_START_OFFSET = 0;
 static double LAST_REALTIME_STAMP = 0.0;
 
@@ -68,6 +75,7 @@ void TaskScheduler::timeSlice() {
     }
     LAST_REALTIME_STAMP = getRealTime();
     do {
+        m_lastPass.store(steadyNanoseconds());
         m_queueMutex.lock();
         auto task(m_queue.peek());
         while (task && task->getStartTime() < UNIV::TIME + frames) {
@@ -112,6 +120,31 @@ void TaskScheduler::timeSlice() {
         }
     } while (!m_queueThread.stopRequested());
 }
+
+#ifndef _WIN32
+void TaskScheduler::writeHangReport() {
+    HangReport::Line line;
+    line << "scheduler: TIME " << UNIV::TIME << ", last pass ";
+    const int64_t last = m_lastPass.load();
+    if (last == 0) {
+        line << "never";
+    } else {
+        line << uint64_t((steadyNanoseconds() - last) / 1'000'000) << " ms ago";
+    }
+    if (m_queueMutex.try_lock()) {
+        const TaskI* next = m_queue.peek();
+        line << ", " << uint64_t(m_queue.size()) << " tasks queued";
+        if (next) {
+            line << ", the first due in ";
+            line.seconds(int64_t(next->getStartTime()) - int64_t(UNIV::TIME));
+        }
+        m_queueMutex.unlock();
+    } else {
+        line << ", queue locked";
+    }
+    line.write();
+}
+#endif
 
 void* TaskScheduler::queueThreadImpl() {
     if (UNIV::TIME_DIVISION == 1) [[likely]] {

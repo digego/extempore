@@ -35,6 +35,7 @@
 
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
+#include "HangReport.h"
 #include "SchemeFFI.h"
 #include "OSC.h"
 #include "ExtemporeVersion.h"
@@ -43,6 +44,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <cerrno>
+#include <algorithm>
 #include <charconv>
 
 #include <sys/types.h>
@@ -77,6 +79,7 @@ llvm_zone_t* llvm_zone_create(uint64_t);
 namespace extemp {
 
 thread_local SchemeProcess* SchemeProcess::sm_current = nullptr;
+std::array<std::atomic<SchemeProcess*>, 16> SchemeProcess::sm_live{};
 const char* SchemeProcess::sm_banner = "\n"
                                        "##########################################\n"
                                        "##                                      ##\n"
@@ -141,6 +144,12 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
                   mk_cptr(m_scheme, mk_cb(this, SchemeProcess, schemeCallback)));
     m_extemporeCallback = mk_cb(this, SchemeProcess, extemporeCallback);
     SchemeFFI::initSchemeFFI(m_scheme);
+    for (auto& slot : sm_live) {
+        SchemeProcess* empty = nullptr;
+        if (slot.compare_exchange_strong(empty, this)) {
+            break;
+        }
+    }
 }
 
 bool SchemeProcess::start(bool subsume) {
@@ -192,6 +201,10 @@ void SchemeProcess::stop() {
 }
 
 SchemeProcess::~SchemeProcess() {
+    for (auto& slot : sm_live) {
+        SchemeProcess* self = this;
+        slot.compare_exchange_strong(self, nullptr);
+    }
     stop();
     m_threadTask.join();
     m_threadServer.join();
@@ -285,6 +298,8 @@ void* SchemeProcess::taskImpl() {
                 m_taskQueue.pop();
                 return t;
             }();
+            m_taskType.store(int(task.getType()));
+            m_taskStart.store(std::max<uint64_t>(UNIV::TIME, 1));
             switch (task.getType()) {
             case SchemeTask::Type::DESTROY_ENV:
                 m_scheme->imp_env.erase(reinterpret_cast<pointer>(task.getPtr()));
@@ -401,11 +416,52 @@ void* SchemeProcess::taskImpl() {
             default:
                 std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;
             }
+            m_taskStart.store(0);
         }
     }
     std::cout << "Exiting task thread" << std::endl;
     return this;
 }
+
+#ifndef _WIN32
+void SchemeProcess::writeHangReports() {
+    static const char* const typeNames[] = {
+        "REPL", "SCHEME_CALLBACK",      "DESTROY_ENV",       "CALLBACK_SYMBOL",
+        "?",    "LOCAL_PROCESS_STRING", "EXTEMPORE_CALLBACK"};
+    for (auto& slot : sm_live) {
+        SchemeProcess* process = slot.load();
+        if (!process) {
+            continue;
+        }
+        HangReport::Line line;
+        line << "process " << process->m_name.c_str() << ": ";
+        const uint64_t start = process->m_taskStart.load();
+        if (start == 0) {
+            line << "idle";
+        } else {
+            const int type = process->m_taskType.load();
+            line << "evaluating a " << (type >= 0 && type <= 6 ? typeNames[type] : "?")
+                 << " task for ";
+            line.seconds(int64_t(UNIV::TIME) - int64_t(start));
+            line << ", its time limit ";
+            const uint64_t end = process->m_scheme->call_end_time;
+            if (end == 0) {
+                line << "unset";
+            } else {
+                line << "in ";
+                line.seconds(int64_t(end) - int64_t(UNIV::TIME));
+            }
+        }
+        if (process->m_guardMutex.try_lock()) {
+            line << ", " << uint64_t(process->m_taskQueue.size()) << " tasks queued";
+            process->m_guardMutex.unlock();
+        } else {
+            line << ", queue locked";
+        }
+        line.write();
+    }
+}
+#endif
 
 void* SchemeProcess::serverImpl() {
     while (!m_libsLoaded && m_running) {

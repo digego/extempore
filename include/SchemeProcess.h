@@ -41,6 +41,7 @@
 #include <string>
 #include "Task.h"
 #include "EXTThread.h"
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -128,8 +129,15 @@ class SchemeProcess {
     extemp::CM* m_extemporeCallback;
     char m_schemeOutportString[SCHEME_OUTPORT_STRING_LENGTH];
 
+    // The task being evaluated, for the hang report: the TIME it started (0
+    // while idle) and its type.
+    std::atomic<uint64_t> m_taskStart{0};
+    std::atomic<int> m_taskType{0};
+
     static const char* sm_banner;
     static thread_local SchemeProcess* sm_current;
+    // Every live process, for the hang report, which can't take a lock.
+    static std::array<std::atomic<SchemeProcess*>, 16> sm_live;
 
   private:
     void schemeCallback(TaskI* Task) {
@@ -223,6 +231,11 @@ class SchemeProcess {
     static SchemeProcess* I() {
         return sm_current;
     }
+#ifndef _WIN32
+    // For HangReport, from a signal handler: writes each process's state to
+    // stderr.
+    static void writeHangReports();
+#endif
 };
 
 class SchemeObj {

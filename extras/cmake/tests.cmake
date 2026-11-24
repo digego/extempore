@@ -27,6 +27,14 @@ else()
     set(EXTEMPORE_TEST_TIMEOUT 120)
 endif()
 
+# On a timeout ctest first sends SIGUSR1, and extempore writes a hang report
+# (include/HangReport.h) into the test's log before it is killed.
+if(WIN32)
+    set(EXTEMPORE_TIMEOUT_SIGNAL)
+else()
+    set(EXTEMPORE_TIMEOUT_SIGNAL TIMEOUT_SIGNAL_NAME SIGUSR1 TIMEOUT_SIGNAL_GRACE_PERIOD 5)
+endif()
+
 function(extempore_get_next_port OUT_VAR)
     set(${OUT_VAR} ${EXTEMPORE_TEST_PORT_COUNTER} PARENT_SCOPE)
     math(EXPR _new_port "${EXTEMPORE_TEST_PORT_COUNTER} - 2")
@@ -42,6 +50,7 @@ macro(extempore_add_test testfile label)
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        ${EXTEMPORE_TIMEOUT_SIGNAL}
         LABELS ${label})
 endmacro()
 
@@ -54,6 +63,7 @@ macro(extempore_add_ipc_test testfile label)
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        ${EXTEMPORE_TIMEOUT_SIGNAL}
         LABELS ${label})
 endmacro()
 
@@ -65,6 +75,7 @@ macro(extempore_add_example_as_test examplefile timeout label)
     set_tests_properties(${examplefile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT 300
+        ${EXTEMPORE_TIMEOUT_SIGNAL}
         LABELS ${label})
 endmacro()
 

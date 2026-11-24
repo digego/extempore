@@ -57,6 +57,9 @@ class TaskScheduler {
     // just coalesces with the next.
     std::binary_semaphore m_tick{0};
     std::recursive_mutex m_queueMutex;
+    // steady_clock nanoseconds at the start of the latest pass, for the hang
+    // report
+    std::atomic<int64_t> m_lastPass{0};
 
     static TaskScheduler sm_instance;
 
@@ -93,6 +96,11 @@ class TaskScheduler {
                         int Tag, bool Callback) {
         sm_instance.add(new Task<T>(StartTime, Duration, ClassMember, Arg, Tag, Callback));
     };
+
+#ifndef _WIN32
+    // For HangReport, from a signal handler: writes the queue's state to stderr.
+    void writeHangReport();
+#endif
 
     static TaskScheduler* I() {
         return &sm_instance;

@@ -37,6 +37,7 @@
 #include "SchemeProcess.h"
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
+#include "HangReport.h"
 #include "SchemeREPL.h"
 #include "EXTLLVM.h"
 
@@ -118,6 +119,7 @@ static void install_signal_handlers() {
     if (sigaction(SIGTERM, &sa, nullptr) != 0) {
         printf("\nWarning: can't catch SIGTERM.\n");
     }
+    extemp::HangReport::install();
 }
 
 #endif
@@ -530,6 +532,9 @@ EXPORT int extempore_init(int argc, char** argv) {
     const std::string host("localhost");
     const std::string primary_name("primary");
     const std::string utility_name("utility");
+    // Under ctest or a pipe stdout would be fully buffered, and a process
+    // killed for hanging would lose the lines which say how far it got.
+    std::setvbuf(stdout, nullptr, _IOLBF, BUFSIZ);
 #ifndef _WIN32
     install_signal_handlers();
 #else
