@@ -1,12 +1,15 @@
 # External shared library dependencies for Extempore
 # Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS options
-# Sets up: ExternalProject targets and platform-shlibs copy targets
+# Sets up: the library targets and the platform-shlibs copy targets. Libraries
+# with a CMake build of their own are ExternalProjects; the few-file ones
+# (kiss_fft, stb_image) are compiled here straight into platform-shlibs.
 
 if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
     return()
 endif()
 
 include(ExternalProject)
+include(FetchContent)
 
 set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
 set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs)
@@ -32,10 +35,21 @@ function(extempore_add_external name)
             -DCMAKE_C_FLAGS=${EXT_DEPS_C_FLAGS}
             -DCMAKE_CXX_FLAGS=${EXT_DEPS_CXX_FLAGS}
             -DCMAKE_INSTALL_PREFIX=${EXT_DEPS_INSTALL_DIR}
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
             ${EXT_DEPS_TOOLCHAIN_ARGS}
             ${ARG_CMAKE_ARGS})
     set_target_properties(${name} PROPERTIES FOLDER ${ARG_FOLDER})
+endfunction()
+
+# extempore_add_shlib(name sources...) compiles a shared library into
+# platform-shlibs, exporting every symbol on Windows as the other platforms do.
+function(extempore_add_shlib name)
+    add_library(${name} SHARED ${ARGN})
+    set_target_properties(${name} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
+        ARCHIVE_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        FOLDER EXTERNAL_SHLIBS)
 endfunction()
 
 if(EXTERNAL_SHLIBS_AUDIO)
@@ -52,13 +66,28 @@ if(EXTERNAL_SHLIBS_AUDIO)
             $<$<BOOL:${WIN32}>:-DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}>
             $<$<BOOL:${WIN32}>:-DCMAKE_INSTALL_BINDIR=${EXT_DEPS_INSTALL_DIR}>)
 
-    extempore_add_external(kiss_fft
-        URL https://github.com/extemporelang/kiss_fft/archive/${DEP_KISS_FFT_VERSION}.zip
-        URL_SHA256 ${DEP_KISS_FFT_SHA256}
-        FOLDER EXTERNAL_SHLIBS)
+    # SOURCE_SUBDIR names a directory without a CMakeLists.txt, so the
+    # sources are fetched but kissfft's own build isn't added.
+    FetchContent_Declare(kissfft
+        URL https://github.com/mborgerding/kissfft/archive/refs/tags/${DEP_KISSFFT_VERSION}.tar.gz
+        URL_HASH SHA256=${DEP_KISSFFT_SHA256}
+        SOURCE_SUBDIR none)
+    FetchContent_MakeAvailable(kissfft)
+    extempore_add_shlib(kiss_fft
+        ${kissfft_SOURCE_DIR}/kiss_fft.c
+        ${kissfft_SOURCE_DIR}/kfc.c
+        ${kissfft_SOURCE_DIR}/kiss_fftnd.c
+        ${kissfft_SOURCE_DIR}/kiss_fftndr.c
+        ${kissfft_SOURCE_DIR}/kiss_fftr.c)
+    target_include_directories(kiss_fft PRIVATE ${kissfft_SOURCE_DIR})
+    if(UNIX)
+        target_link_libraries(kiss_fft PRIVATE m)
+    endif()
 
+    # No external codecs (FLAC, Vorbis, Opus, MPEG): each would be another
+    # shared library to ship.
     extempore_add_external(sndfile
-        URL https://github.com/erikd/libsndfile/archive/${DEP_SNDFILE_COMMIT}.zip
+        URL https://github.com/libsndfile/libsndfile/releases/download/${DEP_SNDFILE_VERSION}/libsndfile-${DEP_SNDFILE_VERSION}.tar.xz
         URL_SHA256 ${DEP_SNDFILE_SHA256}
         FOLDER EXTERNAL_SHLIBS
         CMAKE_ARGS
@@ -66,9 +95,11 @@ if(EXTERNAL_SHLIBS_AUDIO)
             -DBUILD_PROGRAMS=OFF
             -DBUILD_EXAMPLES=OFF
             -DENABLE_EXTERNAL_LIBS=OFF
+            -DENABLE_MPEG=OFF
             -DBUILD_TESTING=OFF
             -DENABLE_CPACK=OFF
             -DENABLE_PACKAGE_CONFIG=OFF
+            -DINSTALL_PKGCONFIG_MODULE=OFF
             $<$<BOOL:${WIN32}>:-DENABLE_STATIC_RUNTIME=OFF>)
 
     if(UNIX)
@@ -76,7 +107,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
             COMMENT "Copying audio shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
             DEPENDS sndfile kiss_fft portmidi rtmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy libkiss_fft${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libportmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy librtmidi${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libsndfile${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
@@ -87,8 +117,6 @@ if(EXTERNAL_SHLIBS_AUDIO)
             COMMENT "Copying audio .dll and .lib files to ${EXT_PLATFORM_SHLIBS_DIR}"
             DEPENDS sndfile kiss_fft portmidi rtmidi
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/kiss_fft.lib ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy bin/portmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/portmidi.lib ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy rtmidi.dll ${EXT_PLATFORM_SHLIBS_DIR}
@@ -105,10 +133,16 @@ endif()
 ##########################
 
 if(EXTERNAL_SHLIBS_GRAPHICS)
-    extempore_add_external(stb_image
-        URL https://github.com/extemporelang/stb/archive/${DEP_STB_COMMIT}.zip
-        URL_SHA256 ${DEP_STB_SHA256}
-        FOLDER EXTERNAL_SHLIBS)
+    FetchContent_Declare(stb
+        URL https://github.com/nothings/stb/archive/${DEP_STB_COMMIT}.tar.gz
+        URL_HASH SHA256=${DEP_STB_SHA256}
+        SOURCE_SUBDIR none)
+    FetchContent_MakeAvailable(stb)
+    extempore_add_shlib(stb_image ${CMAKE_CURRENT_SOURCE_DIR}/extras/stb/stb_image.c)
+    target_include_directories(stb_image PRIVATE ${stb_SOURCE_DIR})
+    if(UNIX)
+        target_link_libraries(stb_image PRIVATE m)
+    endif()
 
     extempore_add_external(glfw3
         URL https://github.com/glfw/glfw/releases/download/${DEP_GLFW_VERSION}/glfw-${DEP_GLFW_VERSION}.zip
@@ -195,7 +229,6 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
             DEPENDS glfw3 stb_image wgpu_native_download xtmwebgpu
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy libstb_image${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy ${_wgpu_dir}/lib/${_wgpu_lib_name} ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR}/lib)
         set_target_properties(external_shlibs_graphics PROPERTIES FOLDER EXTERNAL_SHLIBS)
@@ -206,8 +239,6 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
-            COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.dll ${EXT_PLATFORM_SHLIBS_DIR}
-            COMMAND ${CMAKE_COMMAND} -E copy lib/stb_image.lib ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy ${_wgpu_dir}/lib/${_wgpu_lib_name} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy ${_wgpu_dir}/lib/wgpu_native.lib ${EXT_PLATFORM_SHLIBS_DIR}
             WORKING_DIRECTORY ${EXT_DEPS_INSTALL_DIR})

@@ -68,9 +68,11 @@ users will care about:
 
 ## LLVM
 
-Extempore links against a specific version of LLVM (currently 22.1.6, pinned in
+Extempore links against a specific version of LLVM (currently 22.1.8, pinned in
 `CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's
-`FetchContent` --- no system LLVM required.
+`FetchContent` --- no system LLVM required. To use an installed LLVM of the
+same minor version instead, configure with `-DEXTEMPORE_SYSTEM_LLVM=ON` (and
+`-DLLVM_DIR=<prefix>/lib/cmake/llvm` if CMake doesn't find it).
 
 The first build takes ~10-30 min because LLVM is compiled from source.
 Subsequent builds reuse the cached artifacts under `build/_deps/llvm-*`. Only
@@ -82,7 +84,7 @@ CI caches `build/_deps/` across runs --- see
 
 ## PCRE2
 
-The `regex:*` builtins are backed by PCRE2 (currently 10.48, pinned in
+The `regex:*` builtins are backed by PCRE2 (currently 10.49, pinned in
 `CMakeLists.txt`), fetched and built in-tree via `FetchContent` alongside
 LLVM --- no system PCRE required. Only the static 8-bit library is built and
 it's linked into the binary, so there's nothing extra to ship.

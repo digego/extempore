@@ -53,6 +53,7 @@ endif()
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
 option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native, stb_image)" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
+option(EXTEMPORE_SYSTEM_LLVM "use an installed LLVM of the pinned minor version instead of building it" OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -97,13 +98,13 @@ endif()
 # external sub-build toolchain args #
 #####################################
 
-# Every dependency is built by a nested CMake project (ExternalProject or
-# FetchContent), which re-detects its own toolchain from scratch. Forward the
-# settings that have to match --- compiler, ccache launcher, macOS deployment
-# settings --- but only the ones actually set, since an empty -D would override
-# the sub-build's own detection with nothing. Values are joined with `|` and
-# every consumer passes LIST_SEPARATOR, so a multi-value setting such as
-# CMAKE_OSX_ARCHITECTURES survives the trip.
+# The shared libraries xtlang loads (extras/cmake/external_deps.cmake) are
+# built by ExternalProject, a nested CMake project which re-detects its own
+# toolchain from scratch. Forward the settings that have to match --- compiler,
+# ccache launcher, macOS deployment settings --- but only the ones actually set,
+# since an empty -D would override the sub-build's own detection with nothing.
+# Values are joined with `|` and every consumer passes LIST_SEPARATOR, so a
+# multi-value setting such as CMAKE_OSX_ARCHITECTURES survives the trip.
 set(EXT_DEPS_TOOLCHAIN_ARGS "")
 foreach(_var
         CMAKE_C_COMPILER
@@ -125,25 +126,26 @@ endforeach()
 # Every archive is pinned by SHA256 so a re-tagged or tampered-with download is
 # rejected rather than built. Hashes come from the upstream release assets /
 # GitHub source archives at the pinned version.
-set(DEP_LLVM_VERSION "22.1.6")
-set(DEP_LLVM_SHA256 "6e0b376a1f6d9873e7dfb09ae6e04b9c7024400f01733fa4c29be69d5c138bc2")
+set(DEP_LLVM_VERSION "22.1.8")
+set(DEP_LLVM_SHA256 "922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a9965888")
 # PortAudio tags releases rarely (v19.7.0 is from 2021), so pin master by commit
-# SHA for its modern CMake (3.10 -- which lets us drop the policy-version floor
-# the old 2.8 CMake needed) and five years of platform fixes. Still built static.
+# SHA for its modern CMake and five years of platform fixes.
 set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
 set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
 set(DEP_PORTMIDI_SHA256 "e4ee3152ae42362f30b5e59fc5729b8b7e2a98023e1752f641d849543602f31e")
-set(DEP_RTMIDI_VERSION "6.0.0")
-set(DEP_RTMIDI_SHA256 "55f1e7636160204a8b04dc7aacf959b7c66df0011124e7ddfa6d9c06c8b3363e")
-set(DEP_KISS_FFT_VERSION "1.3.0")
-set(DEP_KISS_FFT_SHA256 "fd6d82f4aa4a22d2fc3d192a66b919abf43b9c001b78585dc5c3290218981fcd")
-set(DEP_SNDFILE_COMMIT "ae64caf9b5946d365971c550875000342e763de6")
-set(DEP_SNDFILE_SHA256 "d9335f7c7113b5030ab5e6c1d77a5efb2cfcae6c5ddaae5010dd0cb9b3107f02")
-set(DEP_STB_COMMIT "152a250a702bf28951bb0220d63bc0c99830c498")
-set(DEP_STB_SHA256 "6772c4240031ba162ed317d8e13fce5a4e18987937e6f28364819c0a262a0d22")
-set(DEP_GLFW_VERSION "3.4")
-set(DEP_GLFW_SHA256 "b5ec004b2712fd08e8861dc271428f048775200a2df719ccf575143ba749a3e9")
+set(DEP_RTMIDI_VERSION "6.1.0")
+set(DEP_RTMIDI_SHA256 "ae9889e8219bfbed52320f5fa891c155b67c018868edfa145f4debefdc7ed9e4")
+set(DEP_KISSFFT_VERSION "131.2.0")
+set(DEP_KISSFFT_SHA256 "205a8f6a448ef12b091f8ac6a514b5091bb5f6b0b543431ed75f673116cf5cbf")
+set(DEP_SNDFILE_VERSION "1.2.2")
+set(DEP_SNDFILE_SHA256 "3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e")
+# stb doesn't tag releases. This commit predates the stb_image overhaul begun in
+# late October 2026, whose early commits rejected req_comp = 0.
+set(DEP_STB_COMMIT "003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5")
+set(DEP_STB_SHA256 "a6c31950b3bdf05eb92258768ba2a11bd44449490574b1aac67028452288c40d")
+set(DEP_GLFW_VERSION "3.5.1")
+set(DEP_GLFW_SHA256 "ea79bc5feffc254c87291980c2d0bce9acebb68c4983b79f961dcd2cb8a611a0")
 set(DEP_WGPU_VERSION "27.0.4.0")
 # wgpu-native ships prebuilt binaries, so the hash is per platform archive.
 set(DEP_WGPU_SHA256_LINUX_X86_64 "271481ef76fbf3ea09631a6079e9493636ecf813cd9c92306c44a1a452991ba1")
@@ -151,10 +153,10 @@ set(DEP_WGPU_SHA256_LINUX_AARCH64 "a2f22248200997b69373273b10d50a58164f6ed840877
 set(DEP_WGPU_SHA256_MACOS_X86_64 "660fe9be59b555ec1d7c839e5cf8b6c71762938af61ab444a7a58dd87970dba2")
 set(DEP_WGPU_SHA256_MACOS_AARCH64 "15367c26fdbe6892db35007d39f3883593384e777360b70e6bd704cb5dedde53")
 set(DEP_WGPU_SHA256_WINDOWS_X86_64 "f14ca334b4d253881bde2605bd147f332178d705f56fbd74f81458797c77fce1")
-set(DEP_GOOGLETEST_VERSION "1.15.2")
-set(DEP_GOOGLETEST_SHA256 "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926")
-set(DEP_PCRE2_VERSION "10.48")
-set(DEP_PCRE2_SHA256 "ebcc25aadf2a51fa1fefa9b8bc9e7a79b3dae86870a0f1152a22e42befd46888")
+set(DEP_GOOGLETEST_VERSION "1.18.0")
+set(DEP_GOOGLETEST_SHA256 "6e3191c1455468b3fc35a417fb565c1c5071aee1b7e7f85e30cf48a98d37d8b5")
+set(DEP_PCRE2_VERSION "10.49")
+set(DEP_PCRE2_SHA256 "929f0b20e62879252a15886b06c89f1edef61a363cbd5826fb041080a5e557ae")
 
 ######
 # s7 #
@@ -186,19 +188,21 @@ endif()
 # portaudio #
 #############
 
-include(ExternalProject)
+include(FetchContent)
 
-ExternalProject_Add(portaudio_static
-    PREFIX portaudio
+# Static, so nothing has to ship beside the binary. PortAudio turns on every
+# host API whose development files it finds; name the ones a build uses, so a
+# stray libpulse-dev can't add a runtime dependency to a release binary.
+FetchContent_Declare(portaudio
     URL https://github.com/PortAudio/portaudio/archive/${DEP_PORTAUDIO_VERSION}.zip
     URL_HASH SHA256=${DEP_PORTAUDIO_SHA256}
-    LIST_SEPARATOR |
-    CMAKE_ARGS
-        -DPA_BUILD_SHARED_LIBS=OFF
-        -DPA_USE_JACK=${JACK}
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/portaudio
-        ${EXT_DEPS_TOOLCHAIN_ARGS})
+    SYSTEM
+    EXCLUDE_FROM_ALL)
+set(PA_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(PA_USE_JACK ${JACK} CACHE BOOL "" FORCE)
+set(PA_USE_PULSEAUDIO OFF CACHE BOOL "" FORCE)
+set(PA_USE_SNDIO OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(portaudio)
 
 ########
 # LLVM #
@@ -221,40 +225,51 @@ endif()
 
 message(STATUS "LLVM target architecture: ${LLVM_TARGET_ARCH}")
 
-include(FetchContent)
+if(EXTEMPORE_SYSTEM_LLVM)
+    # LLVM's package config accepts any patch release of the same minor.
+    string(REGEX MATCH "^[0-9]+\\.[0-9]+" _llvm_minor ${DEP_LLVM_VERSION})
+    find_package(LLVM ${_llvm_minor} CONFIG REQUIRED)
+    message(STATUS "Using LLVM ${LLVM_PACKAGE_VERSION} from ${LLVM_DIR}")
+else()
+    set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
+    set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
+    set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
+    set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_TOOLS OFF CACHE BOOL "" FORCE)
+    set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
+    set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
+    set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
+    set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
+    # A Debug build would otherwise run a Debug tablegen, which is very slow.
+    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "" FORCE)
 
-set(LLVM_TARGETS_TO_BUILD ${LLVM_TARGET_ARCH} CACHE STRING "" FORCE)
-set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_TOOLS OFF CACHE BOOL "" FORCE)
-set(LLVM_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_UTILS OFF CACHE BOOL "" FORCE)
-set(LLVM_BUILD_RUNTIME OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_OCAMLDOC OFF CACHE BOOL "" FORCE)
+    # DOWNLOAD_EXTRACT_TIMESTAMP keeps the archive's mtimes on the extracted
+    # sources. CI restores a cached LLVM build into a fresh checkout, where
+    # configure extracts the sources again; stamped with the extraction time they
+    # would be newer than every cached object and Ninja would rebuild all of LLVM.
+    FetchContent_Declare(LLVM
+        URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
+        URL_HASH SHA256=${DEP_LLVM_SHA256}
+        SOURCE_SUBDIR llvm
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        EXCLUDE_FROM_ALL)
 
-# DOWNLOAD_EXTRACT_TIMESTAMP keeps the archive's mtimes on the extracted
-# sources. CI restores a cached LLVM build into a fresh checkout, where
-# configure extracts the sources again; stamped with the extraction time they
-# would be newer than every cached object and Ninja would rebuild all of LLVM.
-FetchContent_Declare(LLVM
-    URL https://github.com/llvm/llvm-project/releases/download/llvmorg-${DEP_LLVM_VERSION}/llvm-project-${DEP_LLVM_VERSION}.src.tar.xz
-    URL_HASH SHA256=${DEP_LLVM_SHA256}
-    SOURCE_SUBDIR llvm
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    EXCLUDE_FROM_ALL)
+    # LLVM's cmake_minimum_required predates CMP0219 (CMake 4.4), which warns
+    # about its backslash-carrying macro calls. Keep the old behaviour it was
+    # written for, without the warning.
+    set(CMAKE_POLICY_DEFAULT_CMP0219 OLD)
+    FetchContent_MakeAvailable(LLVM)
+    unset(CMAKE_POLICY_DEFAULT_CMP0219)
 
-# LLVM's cmake_minimum_required predates CMP0219 (CMake 4.4), which warns
-# about its backslash-carrying macro calls. Keep the old behaviour it was
-# written for, without the warning.
-set(CMAKE_POLICY_DEFAULT_CMP0219 OLD)
-FetchContent_MakeAvailable(LLVM)
-unset(CMAKE_POLICY_DEFAULT_CMP0219)
+    set(LLVM_INCLUDE_DIRS
+        ${llvm_SOURCE_DIR}/llvm/include
+        ${llvm_BINARY_DIR}/include)
+endif()
 
 # GoogleTest for C++ unit tests.
 if(BUILD_TESTS)
@@ -311,11 +326,9 @@ llvm_map_components_to_libnames(LLVM_LIBRARIES ${EXTEMPORE_LLVM_COMPONENTS})
 message(STATUS "LLVM libraries: ${LLVM_LIBRARIES}")
 
 # Target for building just LLVM (useful for CI caching)
-add_custom_target(llvm-libs DEPENDS ${LLVM_LIBRARIES})
-
-set(LLVM_INCLUDE_DIRS
-    ${llvm_SOURCE_DIR}/llvm/include
-    ${llvm_BINARY_DIR}/include)
+if(NOT EXTEMPORE_SYSTEM_LLVM)
+    add_custom_target(llvm-libs DEPENDS ${LLVM_LIBRARIES})
+endif()
 
 #############
 # extempore #
@@ -350,7 +363,6 @@ set(EXTEMPORE_SOURCES
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
 
-add_dependencies(extempore s7_lib portaudio_static)
 
 target_include_directories(extempore PRIVATE
     include
@@ -358,11 +370,9 @@ target_include_directories(extempore PRIVATE
 
 target_include_directories(extempore SYSTEM PRIVATE
     src/oscpp/include
-    ${CMAKE_BINARY_DIR}/portaudio/include
     ${LLVM_INCLUDE_DIRS})
 
-target_link_directories(extempore PRIVATE ${CMAKE_BINARY_DIR}/portaudio/lib)
-target_link_libraries(extempore PRIVATE s7_lib pcre2-8 portaudio${CMAKE_STATIC_LIBRARY_SUFFIX} ${LLVM_LIBRARIES})
+target_link_libraries(extempore PRIVATE s7_lib pcre2-8 portaudio ${LLVM_LIBRARIES})
 
 # Compile definitions
 if(EXT_SHARE_DIR)

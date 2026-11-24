@@ -32,14 +32,14 @@ changes about the language, but a lot changes underneath it.
   directory and can be moved wherever you like.
 - **Less vendored code** --- the 2019 Networking TS snapshot and PCRE 8.38 are
   gone; sockets go through one small shim on every platform and regular
-  expressions use PCRE2 10.48.
+  expressions use PCRE2 10.49.
 - **Behaviour worth knowing about before you upgrade** --- `pcg32_boundedrand`
   now matches reference PCG32, so seeded streams differ;
   `io:osc:set-integer-64bit?` and `io:osc:send-from-server-socket?` are removed;
   and `topclock` no longer starts its network loop at load when
   `*topclock-autostart*` is `#f`.
 
-Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 22.1.6
+Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 22.1.8
 with the ORC JIT (in place of the legacy MCJIT), s7 Scheme (in place of
 TinyScheme), a single constraint-based type inference engine in the xtlang
 compiler, a C++20 runtime, first-class Linux aarch64, and an interactive

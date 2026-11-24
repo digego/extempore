@@ -165,7 +165,7 @@ example).
 
 As a more useful example, let's look at the library `fft.xtm` in the
 `libs/external` directory which comes with Extempore. `fft.xtm` uses the
-excellent [KissFFT](http://sourceforge.net/projects/kissfft/) library for doing
+excellent [KissFFT](https://github.com/mborgerding/kissfft) library for doing
 [Fourier transforms](http://en.wikipedia.org/wiki/Fourier_transform). The
 library is quite small and clean, and is spread over only a few source
 files---the main ones being `kiss_fft.h` & `kiss_fft.c`. There's gonna be a bit
@@ -175,7 +175,7 @@ worth picking up a copy of
 through if necessary.
 
 If you're playing along at home, then you'll need to download the
-[KissFFT source](https://github.com/extemporelang/kiss_fft), build the
+[KissFFT source](https://github.com/mborgerding/kissfft), build the
 `kiss_fft.dylib` library and put it somewhere that `bind-dylib` will find it.
 The `fft.xtm` header has some instructions on how to do this.
 
