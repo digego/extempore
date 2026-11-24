@@ -181,225 +181,287 @@
 (define *xtc:globals:pretty-print-error-color* 'red)
 (define *xtc:globals:pretty-print-code-color* 'cyan)
 
-;; Structured compiler error handling
+;; Compiler diagnostics
 ;;
-;; Error records: (compiler-error category label message details)
-;;   category --- symbol: type-error, syntax-error, generics-error,
-;;                compiler-error, unresolved-type
-;;   label    --- human-readable category string (e.g. "Type Error")
-;;   message  --- the main error description
-;;   details  --- alist of optional context ((name . val) (type . val) (ast . val))
+;; Each xtc:diagnostics:print-*-error function prints a coloured report to the
+;; console and raises an error whose type names its kind (xtlang-type-error,
+;; xtlang-syntax-error, xtlang-generics-error, xtlang-compile-error,
+;; xtlang-error) and whose message is the report as plain text. Under AOT
+;; compilation it aborts the build instead.
+;;
+;; The report goes to the console only, never to the current output port, so a
+;; client that captures an eval's output (an nREPL eval) gets it once, as the
+;; error. Notes are the solver's explanation of a type conflict, printed just
+;; before the report; they join the next report's message.
+
+(define *xtc:diagnostics:notes* '())
+
+(define xtc:diagnostics:to-console
+  (lambda (text)
+    (#_display text *stdout*)
+    (flush-output-port *stdout*)))
+
+(define xtc:diagnostics:strip-ansi
+  (lambda (str)
+    (let ((out (open-output-string))
+          (n (string-length str))
+          (esc (integer->char 27)))
+      ;; an escape sequence runs from ESC to its final letter
+      (let loop ((i 0) (in-escape #f))
+        (if (< i n)
+            (let ((c (string-ref str i)))
+              (cond (in-escape (loop (+ i 1) (not (char-alphabetic? c))))
+                    ((char=? c esc) (loop (+ i 1) #t))
+                    (else (write-char c out) (loop (+ i 1) #f))))
+            (get-output-string out))))))
+
+(define xtc:diagnostics:trim-end
+  (lambda (str)
+    (let loop ((end (string-length str)))
+      (if (and (> end 0) (char-whitespace? (string-ref str (- end 1))))
+          (loop (- end 1))
+          (substring str 0 end)))))
+
+(define xtc:diagnostics:note
+  (lambda args
+    (let ((text (with-output-to-string (lambda () (apply print args)))))
+      (xtc:diagnostics:to-console text)
+      (set! *xtc:diagnostics:notes* (cons text *xtc:diagnostics:notes*)))))
+
+(define xtc:diagnostics:raise
+  (lambda (kind print-report)
+    (let ((report (with-output-to-string print-report))
+          (notes (apply string-append (reverse *xtc:diagnostics:notes*))))
+      (set! *xtc:diagnostics:notes* '())
+      (xtc:diagnostics:to-console report)
+      (if (xtc:aot:currently-compiling?)
+          (xtc:aot:abort-compilation)
+          (error kind "~A"
+                 (xtc:diagnostics:trim-end
+                   (xtc:diagnostics:strip-ansi (string-append notes report))))))))
 
 (define xtc:diagnostics:print-error-header
   (lambda (label)
     (print-with-colors *xtc:globals:pretty-print-error-color*
                        'default #t (print label))))
 
-(define xtc:diagnostics:throw-or-quit
-  (lambda ()
-    (if (xtc:aot:currently-compiling?)
-        (xtc:aot:abort-compilation)
-        (throw ""))))
-
 (define xtc:diagnostics:print-double-colon-error
   (lambda (var)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " double colon error for ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print var "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " double colon error for ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print var "\n"))))))
 
 (define xtc:diagnostics:print-bad-type-error
   (lambda (type . message)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " bad type ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type))
-    (if (not (null? message))
-        (print " " (car message)))
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " bad type ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type))
+        (if (not (null? message))
+            (print " " (car message)))
+        (println)))))
 
 (define xtc:diagnostics:print-bad-numeric-value-error
   (lambda (value expected-type)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " bad numeric value ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print value))
-    (print ", should be ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print expected-type "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " bad numeric value ")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print value))
+        (print ", should be ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print expected-type "\n"))))))
 
 (define xtc:diagnostics:print-bad-type-error-with-ast
   (lambda (type message ast)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " bad type ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type))
-    (print " " message " ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " bad type ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type))
+        (print " " message " ")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-badly-formed-expression-error
   (lambda (expr-type ast)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " badly formed ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-type))
-    (print " expression:\n")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " badly formed ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-type))
+        (print " expression:\n")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-index-oob-error
   (lambda (type ast)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print type))
-    (print " index out of bounds: ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print type))
+        (print " index out of bounds: ")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-cannot-expand-non-generic-error
   (lambda (name)
-    (xtc:diagnostics:print-error-header "Generics Error")
-    (print " cannot expand on non-generic ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print name "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-generics-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Generics Error")
+        (print " cannot expand on non-generic ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print name "\n"))))))
 
 (define xtc:diagnostics:print-expansion-arity-error
   (lambda (before after)
-    (xtc:diagnostics:print-error-header "Generics Error")
-    (print " expansion arity error ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print before))
-    (print " -> ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print after "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-generics-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Generics Error")
+        (print " expansion arity error ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print before))
+        (print " -> ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print after "\n"))))))
 
 (define xtc:diagnostics:print-shadow-var-error
   (lambda (name)
-    (xtc:diagnostics:print-error-header "Compiler Error")
-    (print " cannot define ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
-    (print " as a shadow variable\n")
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error")
+        (print " cannot define ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
+        (print " as a shadow variable\n")))))
 
 (define xtc:diagnostics:print-already-bound-error
   (lambda (name type)
-    (xtc:diagnostics:print-error-header "Compiler Error ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
-    (print " already bound as ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name))
+        (print " already bound as ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type "\n"))))))
 
 (define xtc:diagnostics:print-no-redefinitions-error
   (lambda (name oldtype newtype)
-    (xtc:diagnostics:print-error-header "Compiler Error")
-    (print " cannot redefine or overload the type signature of existing functions.  In this case, ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name)) (print " from ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print oldtype)) (print " to ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print newtype "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error")
+        (print " cannot redefine or overload the type signature of existing functions.  In this case, ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name)) (print " from ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print oldtype)) (print " to ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print newtype "\n"))))))
 
 (define xtc:diagnostics:print-bad-arity-error
   (lambda (ast)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " bad arity in expression:\n")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " bad arity in expression:\n")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-no-retval-error
   (lambda (ast)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " no return value for body: ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " no return value for body: ")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-needs-zone-size-error
   (lambda (expr-name)
-    (xtc:diagnostics:print-error-header "Syntax Error")
-    (print " ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-name))
-    (print " requires a zone size as its first argument\n")
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-syntax-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Syntax Error")
+        (print " ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print expr-name))
+        (print " requires a zone size as its first argument\n")))))
 
 (define *xtc:globals:top-level-generic-error* #f)
 
 (define xtc:diagnostics:print-type-mismatch-error
   (lambda (got expected . name)
-    (if *xtc:globals:top-level-generic-error*
-        (begin
-          (set! name (list (car *xtc:globals:top-level-generic-error*)))))
-    (if (and (not (null? name))
-             (list? (car name))
-             (symbol? (caar name)))
-        (set! name (list (car (regex:type-split (symbol->string (caar name)) "_poly_")))))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (if *xtc:globals:top-level-generic-error*
+            (begin
+              (set! name (list (car *xtc:globals:top-level-generic-error*)))))
+        (if (and (not (null? name))
+                 (list? (car name))
+                 (symbol? (caar name)))
+            (set! name (list (car (regex:type-split (symbol->string (caar name)) "_poly_")))))
 
-    (xtc:diagnostics:print-error-header "Type Error")
+        (xtc:diagnostics:print-error-header "Type Error")
 
-    (if (not (null? name))
-        (begin (print " with ")
-          (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t
-                             (print  (car name)))
-          (print ",")))
+        (if (not (null? name))
+            (begin (print " with ")
+              (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t
+                                 (print  (car name)))
+              (print ",")))
 
-    (print " got " )
+        (print " got " )
 
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f
-                       (print (xtc:codegen:pretty-print-type got)))
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f
+                           (print (xtc:codegen:pretty-print-type got)))
 
-    (print ", was expecting ")
+        (print ", was expecting ")
 
-    (if (and (list? expected)
-             (= 1 (length expected)))
-        (set! expected (car expected)))
+        (if (and (list? expected)
+                 (= 1 (length expected)))
+            (set! expected (car expected)))
 
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f
-                       (print (xtc:codegen:pretty-print-type expected)))
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f
+                           (print (xtc:codegen:pretty-print-type expected)))
 
-    (println)
-    (if *xtc:globals:top-level-generic-error*
-        (set! *xtc:globals:top-level-generic-error* #f))
-    (xtc:diagnostics:throw-or-quit)))
+        (println)
+        (if *xtc:globals:top-level-generic-error*
+            (set! *xtc:globals:top-level-generic-error* #f))))))
 
 
 (define xtc:diagnostics:print-type-conflict-error
   (lambda (type1 type2 ast)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " conflicting " )
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type1))
-    (print " with ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type2))
-    (if *xtc:globals:top-level-generic-error*
-        (begin
-          (print " calling ")
-          (print-with-colors *xtc:globals:pretty-print-name-color* 'default #f
-                             (print (car *xtc:globals:top-level-generic-error*)))
-          (print "\n")
-          (set! *xtc:globals:top-level-generic-error* #f))
-        (begin
-          (print " in ")
-          (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " conflicting " )
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type1))
+        (print " with ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type2))
+        (if *xtc:globals:top-level-generic-error*
+            (begin
+              (print " calling ")
+              (print-with-colors *xtc:globals:pretty-print-name-color* 'default #f
+                                 (print (car *xtc:globals:top-level-generic-error*)))
+              (print "\n")
+              (set! *xtc:globals:top-level-generic-error* #f))
+            (begin
+              (print " in ")
+              (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))))
 
 (define xtc:diagnostics:print-if-type-conflict-error
   (lambda (then else)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " type conflict between " )
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print "then"))
-    (print " (")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print then))
-    (print ") and ")
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print "else"))
-    (print " (")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print else))
-    (print ") branch of " )
-    (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print  "if"))
-    (print " statement\n")
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " type conflict between " )
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print "then"))
+        (print " (")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print then))
+        (print ") and ")
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print "else"))
+        (print " (")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print else))
+        (print ") branch of " )
+        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print  "if"))
+        (print " statement\n")))))
 
 (define xtc:diagnostics:print-unsupported-conversion-error
   (lambda (from to)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " unsupported conversion from " )
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (if (number? from) (xtc:codegen:get-type-str from) from)))
-    (print " to ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (if (number? to) (xtc:codegen:get-type-str to) to) "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " unsupported conversion from " )
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (if (number? from) (xtc:codegen:get-type-str from) from)))
+        (print " to ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (if (number? to) (xtc:codegen:get-type-str to) to) "\n"))))))
 
 (define xtc:diagnostics:print-could-not-resolve-types_find-expr
   (lambda (name ast)
@@ -417,84 +479,92 @@
 
 (define xtc:diagnostics:print-could-not-resolve-type-error
   (lambda (types . message)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (if (list? types)
-        (print " couldn't resolve types: ")
-        (print " couldn't resolve type: "))
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print types))
-    (if (not (null? message))
-        (print " " (car message)))
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (if (list? types)
+            (print " couldn't resolve types: ")
+            (print " couldn't resolve type: "))
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print types))
+        (if (not (null? message))
+            (print " " (car message)))
+        (println)))))
 
 (define xtc:diagnostics:print-could-not-resolve-generic-type-error
   (lambda (types ast)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (if (list? types)
-        (print " couldn't resolve generic types: ")
-        (print " couldn't resolve generic type: "))
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print types))
-    (print " ")
-    (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (if (list? types)
+            (print " couldn't resolve generic types: ")
+            (print " couldn't resolve generic type: "))
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print types))
+        (print " ")
+        (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print ast "\n"))))))
 
 (define xtc:diagnostics:print-missing-identifier-error
   (lambda (name type)
-    (xtc:diagnostics:print-error-header "Compiler Error")
-    (print " cannot find" type "")
-    (if (xtc:codegen:poly-or-adhoc? (symbol->string name))
-        (let ((split-name (xtc:codegen:split-and-decode-poly-adhoc-name (symbol->string name))))
-          (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print (car split-name)))
-          (print ":")
-          (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (cadr split-name) "\n")))
-        (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name "\n")))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error")
+        (print " cannot find" type "")
+        (if (xtc:codegen:poly-or-adhoc? (symbol->string name))
+            (let ((split-name (xtc:codegen:split-and-decode-poly-adhoc-name (symbol->string name))))
+              (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print (car split-name)))
+              (print ":")
+              (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print (cadr split-name) "\n")))
+            (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print name "\n")))))))
 
 (define xtc:diagnostics:print-missing-generic-type-error
   (lambda (type-name)
-    (xtc:diagnostics:print-error-header "Type Error")
-    (print " cannot find generic type ")
-    (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type-name "\n"))
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-type-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Type Error")
+        (print " cannot find generic type ")
+        (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f (print type-name "\n"))))))
 
 (define xtc:diagnostics:print-not-during-aot-error
   (lambda (message)
-    (xtc:diagnostics:print-error-header "Compiler Error")
-    (print " cannot access LLVM during AOT-compilation.")
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error")
+        (print " cannot access LLVM during AOT-compilation.")
+        (println)))))
 
 (define xtc:diagnostics:print-compiler-error
   (lambda (message . ast)
-    (xtc:diagnostics:print-error-header "Compiler Error")
-    (print " " message)
-    (if (not (null? ast))
-        (begin (print " ast: ")
-          (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f
-                             (print (car ast)))))
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Compiler Error")
+        (print " " message)
+        (if (not (null? ast))
+            (begin (print " ast: ")
+              (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f
+                                 (print (car ast)))))
+        (println)))))
 
 ;; a generic error with no more specific diagnostic (a dylib that failed to
 ;; load, a reserved name): print it and throw, or quit under AOT compilation
 (define xtc:diagnostics:print-error
   (lambda (message)
-    (xtc:diagnostics:print-error-header "Error")
-    (print " " message)
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-error
+      (lambda ()
+        (xtc:diagnostics:print-error-header "Error")
+        (print " " message)
+        (println)))))
 
 (define xtc:diagnostics:print-compiler-warning
   (lambda (message . ast)
-    (print-with-colors *xtc:globals:pretty-print-type-color*
-                       'default #t (print "Compiler Warning"))
-    (print " " message)
-    (if (not (null? ast))
-        (begin (print " ast: ")
-          (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f
-                             (print (car ast)))))
-    (println)
-    (xtc:diagnostics:throw-or-quit)))
+    (xtc:diagnostics:raise 'xtlang-compile-error
+      (lambda ()
+        (print-with-colors *xtc:globals:pretty-print-type-color*
+                           'default #t (print "Compiler Warning"))
+        (print " " message)
+        (if (not (null? ast))
+            (begin (print " ast: ")
+              (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f
+                                 (print (car ast)))))
+        (println)))))
 
 (define xtc:diagnostics:print-binding-details-to-log
   (lambda (lead-string symname type)

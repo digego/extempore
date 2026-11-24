@@ -134,13 +134,20 @@
            (eval ',form (interaction-environment))
            (xtmtest-record name 'compile-ok 'compile-only #t #t))))
 
-;; assert that FORM does NOT compile (e.g. a deliberate type error)
+;; assert that FORM does NOT compile (e.g. a deliberate type error): the
+;; compiler must reject it with a diagnostic, so any other error (a typo in the
+;; test, say) fails
 (define-macro (xtmtest-compile-fails form)
   `(let ((name ',(cadr form)))
     (xtmtest:announce name)
-    (catch (xtmtest-record name 'pass 'compile-only 'compile-should-fail 'did-not-compile)
-           (eval ',form (interaction-environment))
-           (xtmtest-record name 'fail 'compile-only 'compile-should-fail 'compiled))))
+    (*s7-catch* #t
+      (lambda ()
+        (eval ',form (interaction-environment))
+        (xtmtest-record name 'fail 'compile-only 'compile-should-fail 'compiled))
+      (lambda (tag info)
+        (if (sys:xtlang-error? tag)
+            (xtmtest-record name 'pass 'compile-only 'compile-should-fail 'did-not-compile)
+            (xtmtest-record name 'fail 'compile-only 'compile-should-fail tag))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; fixtures            ;;

@@ -119,9 +119,21 @@
 ;; trap (eval_with_error_trap in SchemeS7.cpp) captures and relays as the
 ;; editor's reply once the whole eval returns.
 
+;; An xtlang compiler diagnostic (xtc:diagnostics:raise) has already printed
+;; its report, and the form s7 blames is the compiler's own raise, so its
+;; report is just the kind and any location the caller supplies.
+(define (sys:xtlang-error? tag)
+  (and (symbol? tag)
+       (let ((name (symbol->string tag)))
+         (and (> (string-length name) 7)
+              (string=? (substring name 0 7) "xtlang-")))))
+
 (define (sys:error-report-string tag info . location)
   (*s7-catch* #t
     (lambda ()
+      (if (sys:xtlang-error? tag)
+          (#_format #f ";~A~A~%" tag
+            (if (pair? location) (#_format #f "~%;    ~A" (car location)) ""))
       (let* ((ow (owlet))
              (msg (if (and (pair? info) (string? (car info)))
                       (apply #_format #f info)
@@ -141,7 +153,7 @@
               (#_format #f "~A, line ~A, position: ~A"
                 (if (string? file) file "")
                 (let-ref ow 'error-line)
-                (let-ref ow 'error-position))))))
+                (let-ref ow 'error-position)))))))
     ;; the reporter must never itself throw
     (lambda (t i) (#_format #f "~%;~S ~S~%" tag info))))
 

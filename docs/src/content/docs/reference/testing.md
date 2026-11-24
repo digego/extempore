@@ -38,8 +38,9 @@ suite). Fixtures nest.
 ```
 
 For tests about compilation itself, use `xtmtest-compile` (asserts a form
-compiles) or `xtmtest-compile-fails` (asserts it does _not_ --- e.g. a type
-error the checker is meant to catch):
+compiles) or `xtmtest-compile-fails` (asserts the compiler rejects it with a
+diagnostic --- e.g. a type error the checker is meant to catch; any other error,
+such as a typo in the test, fails):
 
 ```xtlang
 (xtmtest-compile
