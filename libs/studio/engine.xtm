@@ -431,7 +431,10 @@ were sent in, so a parameter change sent just before a note applies to it."
 
 ;; Events cross from the Scheme thread to the audio thread through the inbox,
 ;; a ring buffer with one writer and one reader. The audio thread moves them
-;; into a binary heap ordered by time, which only it touches.
+;; into a binary heap ordered by time, which only it touches. The positions
+;; both threads read are atomics (studio_inbox_pos): the writer fills a slot
+;; and then stores the write position, so the reader never sees a slot before
+;; it's full.
 (bind-val STUDIO_QUEUE_SIZE i64 65536)
 
 (bind-func static studio_alloc_events
@@ -439,10 +442,21 @@ were sent in, so a parameter change sent just before a note applies to it."
     (let ((events:StudioEvent* (halloc STUDIO_QUEUE_SIZE)))
       events)))
 
+(bind-func static studio_alloc_inbox_pos
+  (lambda ()
+    (let ((pos:i64* (halloc 3)))
+      (pfill! pos 0 0 -1)
+      pos)))
+
 (bind-val studio_inbox StudioEvent* (studio_alloc_events))
-(bind-val studio_inbox_write i64 0)
-(bind-val studio_inbox_read i64 0)
-(bind-val studio_inbox_seen i64 0)
+;; events written (Scheme thread), events read (audio thread), and the write
+;; position up to which everything should be forgotten, or -1 (Scheme thread)
+(bind-val studio_inbox_pos i64* (studio_alloc_inbox_pos))
+(bind-macro (studio_inbox_write) `(pref-ptr studio_inbox_pos 0))
+(bind-macro (studio_inbox_read) `(pref-ptr studio_inbox_pos 1))
+(bind-macro (studio_inbox_clear) `(pref-ptr studio_inbox_pos 2))
+;; the last clear request carried out (audio thread only)
+(bind-val studio_inbox_cleared i64 -1)
 (bind-val studio_heap StudioEvent* (studio_alloc_events))
 (bind-val studio_heap_size i64 0)
 (bind-val studio_events_dropped i64 0)
@@ -450,14 +464,15 @@ were sent in, so a parameter change sent just before a note applies to it."
 (bind-func studio_send_event
   "queue an event for the audio thread. Call this from one thread only."
   (lambda (time:i64 kind:i64 track:i64 i:i64 x:SAMPLE y:SAMPLE)
-    (if (>= (- studio_inbox_write studio_inbox_read) STUDIO_QUEUE_SIZE)
-        (begin (set! studio_events_dropped (+ studio_events_dropped 1)) void)
-        (begin
-          (tfill! (pref-ptr studio_inbox (% studio_inbox_write STUDIO_QUEUE_SIZE))
-                  time studio_inbox_write kind track i x y)
-          (set! studio_inbox_write (+ studio_inbox_write 1))
-          void))
-    void))
+    (let ((write (atomic_load_i64 (studio_inbox_write))))
+      (if (>= (- write (atomic_load_i64 (studio_inbox_read))) STUDIO_QUEUE_SIZE)
+          (begin (set! studio_events_dropped (+ studio_events_dropped 1)) void)
+          (begin
+            (tfill! (pref-ptr studio_inbox (% write STUDIO_QUEUE_SIZE))
+                    time write kind track i x y)
+            (atomic_store_i64 (studio_inbox_write) (+ write 1))
+            void))
+      void)))
 
 (bind-func static studio_heap_push
   (lambda (evt:StudioEvent*)
@@ -507,37 +522,30 @@ were sent in, so a parameter change sent just before a note applies to it."
           (studio_event_copy (pref-ptr studio_heap i) last))
       void)))
 
-;; the inbox position up to which everything should be forgotten, or -1
-(bind-val studio_clear_request i64 -1)
-
 (bind-func static studio_drain_inbox
-  "move newly arrived events into the heap (audio thread only).
-
-An event is taken one frame after it was first seen, which gives the writing
-thread time to finish storing it."
+  "move newly arrived events into the heap (audio thread only)"
   (lambda ()
-    ;; a request to forget everything (see studio_clear_events) is carried out
-    ;; here, on the audio thread, which is the only one to touch the heap
-    (if (>= studio_clear_request 0)
-        (begin
-          (set! studio_heap_size 0)
-          (if (> studio_clear_request studio_inbox_read)
-              (set! studio_inbox_read studio_clear_request))
-          (if (> studio_clear_request studio_inbox_seen)
-              (set! studio_inbox_seen studio_clear_request))
-          (set! studio_clear_request -1)))
-    (let ((seen studio_inbox_seen))
-      (set! studio_inbox_seen studio_inbox_write)
-      (while (< studio_inbox_read seen)
-        (studio_heap_push (pref-ptr studio_inbox (% studio_inbox_read STUDIO_QUEUE_SIZE)))
-        (set! studio_inbox_read (+ studio_inbox_read 1)))
+    (let ((write (atomic_load_i64 (studio_inbox_write)))
+          (read (atomic_load_i64 (studio_inbox_read)))
+          (clear (atomic_load_i64 (studio_inbox_clear))))
+      ;; a request to forget everything (see studio_clear_events) is carried
+      ;; out here, on the audio thread, which is the only one to touch the heap
+      (if (> clear studio_inbox_cleared)
+          (begin
+            (set! studio_inbox_cleared clear)
+            (set! studio_heap_size 0)
+            (if (> clear read) (set! read clear))))
+      (while (< read write)
+        (studio_heap_push (pref-ptr studio_inbox (% read STUDIO_QUEUE_SIZE)))
+        (set! read (+ read 1)))
+      (atomic_store_i64 (studio_inbox_read) read)
       void)))
 
 (bind-func studio_clear_events
   "forget every event queued so far. The audio thread does the forgetting, the
 next time it looks at the queue."
   (lambda ()
-    (set! studio_clear_request studio_inbox_write)
+    (atomic_store_i64 (studio_inbox_clear) (atomic_load_i64 (studio_inbox_write)))
     void))
 
 (xtc:aot:insert-footer "xtmstudio_engine")
