@@ -19,7 +19,11 @@
   (lambda (a)
     (* a 5)))
 
-(ipc:new "test-process" 17599)
+;; take the first free port from 17599, so that a concurrent run (another
+;; worktree's suite, say) can't answer this one's calls
+(let loop ((port 17599))
+  (if (and (not (ipc:new "test-process" port)) (< port 17699))
+      (loop (+ port 2))))
 
 (ipc:define "test-process" 'times-5 times-5)
 

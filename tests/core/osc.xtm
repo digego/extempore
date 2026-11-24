@@ -13,7 +13,13 @@
 
 ;;; Code:
 
-(io:osc:start-server 17755 "osc-test-receive")
+;; the first free port from 17755, so that a concurrent run can't take this
+;; test's packets
+(define *osc-test-port*
+  (let loop ((port 17755))
+    (if (or (io:osc:start-server port "osc-test-receive") (> port 17855))
+        port
+        (loop (+ port 1)))))
 
 (define *osc-test-received* '())
 (define *osc-test-injected* #f)
@@ -21,7 +27,7 @@
 (define (osc-test-receive timestamp address . args)
   (set! *osc-test-received* (cons address args)))
 
-(define *osc-test-addy* (cons "127.0.0.1" 17755))
+(define *osc-test-addy* (cons "127.0.0.1" *osc-test-port*))
 
 ;; half a second is ample for a loopback datagram plus the queued eval; sleeping
 ;; (rather than spinning) hands the interpreter back so the queued form runs
