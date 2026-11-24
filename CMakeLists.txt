@@ -10,8 +10,6 @@ if(APPLE)
     enable_language(OBJC OBJCXX)
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Version --- the git tag is the single source of truth. CI passes the tag
@@ -362,6 +360,12 @@ set(EXTEMPORE_SOURCES
     src/LinenoiseREPL.cpp)
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
+
+# Set per target, not with CMAKE_CXX_STANDARD, so LLVM builds at the standard it
+# chooses for itself.
+set_target_properties(extempore PROPERTIES
+    CXX_STANDARD 23
+    CXX_STANDARD_REQUIRED ON)
 
 
 target_include_directories(extempore PRIVATE

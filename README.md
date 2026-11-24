@@ -42,7 +42,7 @@ changes about the language, but a lot changes underneath it.
 Extempore's current stack came together over v0.9.0 and v0.10.0: LLVM 22.1.8
 with the ORC JIT (in place of the legacy MCJIT), s7 Scheme (in place of
 TinyScheme), a single constraint-based type inference engine in the xtlang
-compiler, a C++20 runtime, first-class Linux aarch64, and an interactive
+compiler, a C++23 runtime, first-class Linux aarch64, and an interactive
 `--repl` (Linux and macOS only). Graphics is now a lean set of WebGPU bindings
 (via `wgpu-native`, enabled with `-DEXTERNAL_SHLIBS_GRAPHICS=ON`); the old
 OpenGL stack has been retired. If you hit any breakage, please

@@ -6,7 +6,8 @@ in more depth, here's some more information.
 
 ## Build-time deps
 
-- a C++20 compiler (recent `clang` or `gcc`; MSVC from Visual Studio 2022)
+- a C++23 compiler (GCC 13 or later, a recent Clang or Apple Clang, or MSVC from
+  Visual Studio 2022 or later)
 - Git
 - CMake >= 4.0
 - Ninja (every preset uses it, on all three platforms)
