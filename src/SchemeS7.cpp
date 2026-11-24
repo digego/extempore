@@ -102,6 +102,9 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
         return;
     const uint64_t now = extemp::UNIV::TIME;
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
+        // s7 abandons the evaluation without raising an error, so say so here.
+        fprintf(stderr, "Error: evaluation stopped at its time limit (%.1f s over)\n",
+                double(now - wrapper->call_end_time) / extemp::UNIV::SAMPLE_RATE);
         *val = true;
     }
 }

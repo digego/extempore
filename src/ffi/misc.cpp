@@ -243,8 +243,8 @@ static pointer callCPPAtTime(scheme* Scheme, pointer Args)
             extemp::TaskScheduler::I()->addTask(ivalue(pair_car(when)), ivalue(pair_cdr(when)),
                     cm, obj, 0, is_callback);
         } else {
-            extemp::TaskScheduler::I()->addTask(ivalue(when),
-                    ivalue(when) + Scheme->call_default_time, cm, obj, 0, is_callback);
+            extemp::TaskScheduler::I()->addTask(ivalue(when), Scheme->call_default_time, cm, obj,
+                    0, is_callback);
         }
     }
     return Scheme->T;

@@ -359,7 +359,7 @@ void* SchemeProcess::taskImpl() {
                 if (is_closure(func) || is_macro(func) || is_continuation(func) || is_proc(func) ||
                     is_foreign(func)) {
                     const uint64_t now(UNIV::TIME);
-                    scheme_call(m_scheme, func, args, now, now + task.getMaxDuration());
+                    scheme_call(m_scheme, func, args, now, task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
                     }
@@ -382,7 +382,7 @@ void* SchemeProcess::taskImpl() {
                 if (is_closure(func) || is_continuation(func) || is_proc(func) ||
                     is_foreign(func)) {
                     const uint64_t now(UNIV::TIME);
-                    scheme_call(m_scheme, func, args, now, now + task.getMaxDuration());
+                    scheme_call(m_scheme, func, args, now, task.getMaxDuration());
                     if (m_scheme->retcode) {  // scheme error
                         resetOutportString();
                     }
