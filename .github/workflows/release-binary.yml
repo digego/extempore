@@ -5,13 +5,43 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*" # Push events to matching vX.X.X*, e.g. v0.9.8-beta
 
+permissions:
+  contents: read
+
 jobs:
+  # One job creates the release, so the build jobs only upload to it. Its notes
+  # are the tag's CHANGELOG.md section, which release.sh checks exists.
+  create-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists"
+            exit 0
+          fi
+          awk -v h="## $TAG" '$0 == h {on=1; next} on && /^## / {exit} on' CHANGELOG.md > notes.md
+          prerelease=()
+          [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md "${prerelease[@]}"
+
   build:
     name: ${{ matrix.name }}
+    needs: create-release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +55,7 @@ jobs:
           - os: macos-15
             name: macOS aarch64
             artifact: extempore-macos-aarch64
-          - os: windows-2022
+          - os: windows-2025
             name: Windows x86_64
             artifact: extempore-windows-x86_64
 
@@ -46,50 +76,24 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
+      # CPack zips what `cmake --install` lays out, under a top-level directory
+      # named after the archive. It's run from beside cmake because the Windows
+      # images also put Chocolatey's unrelated `cpack` on PATH.
+      - name: Package
+        shell: bash
         env:
-          ARTIFACT: ${{ matrix.artifact }}
-          REF_NAME: ${{ github.ref_name }}
+          PACKAGE: ${{ matrix.artifact }}-${{ github.ref_name }}
         run: |
-          set -eu
-          STAGE="${ARTIFACT}-${REF_NAME}"
-          mkdir -p "dist/${STAGE}"
-          cp build/extempore "dist/${STAGE}/"
-          for d in libs runtime examples assets; do
-            [ -d "$d" ] && cp -r "$d" "dist/${STAGE}/"
-          done
-          for f in README.md BUILDING.md CHANGELOG.md; do
-            [ -f "$f" ] && cp "$f" "dist/${STAGE}/"
-          done
-          (cd dist && zip -r "../build/extempore.zip" "${STAGE}")
+          "$(dirname "$(command -v cmake)")/cpack" --config build/CPackConfig.cmake \
+            -B dist -D CPACK_PACKAGE_FILE_NAME="$PACKAGE"
 
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          ARTIFACT: ${{ matrix.artifact }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          $stage = "$env:ARTIFACT-$env:REF_NAME"
-          New-Item -ItemType Directory -Force -Path "dist/$stage" | Out-Null
-          # On Windows extempore.exe is placed at the source-dir root, not build/
-          Copy-Item extempore.exe "dist/$stage/"
-          foreach ($d in 'libs','runtime','examples','assets') {
-            if (Test-Path $d) { Copy-Item -Recurse $d "dist/$stage/" }
-          }
-          foreach ($f in 'README.md','BUILDING.md','CHANGELOG.md') {
-            if (Test-Path $f) { Copy-Item $f "dist/$stage/" }
-          }
-          New-Item -ItemType Directory -Force -Path build | Out-Null
-          Compress-Archive -Path "dist/$stage" -DestinationPath build/extempore.zip
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*.zip
 
       - name: Upload to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/extempore.zip
-          asset_name: ${{ matrix.artifact }}-${{ github.ref_name }}.zip
-          tag: ${{ github.ref }}
-          overwrite: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" dist/*.zip --clobber

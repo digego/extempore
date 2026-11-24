@@ -512,12 +512,13 @@ endif()
 # install #
 ###########
 
-# `cmake --install build --prefix <dir>` reproduces the layout of the binary
-# release archives (see .github/workflows/release-binary.yml): the executable at
-# the top of the prefix with runtime/, libs/ (AOT cache and platform shlibs
-# included) and examples/ beside it. That is the layout the binary looks for
-# beside itself (UNIV::resolve_share_dir), so an installed tree is relocatable
-# and runs from any working directory.
+# `cmake --install build --prefix <dir>` lays out a binary release: the
+# executable at the top of the prefix with runtime/, libs/ (AOT cache and
+# platform shlibs included) and examples/ beside it. That is the layout the
+# binary looks for beside itself (UNIV::resolve_share_dir), so an installed tree
+# is relocatable and runs from any working directory. `cpack --config
+# build/CPackConfig.cmake` zips it, which is how the release workflow builds its
+# archives.
 install(TARGETS extempore RUNTIME DESTINATION .)
 install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime
@@ -530,6 +531,13 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/BUILDING.md
     ${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.md
     DESTINATION .)
+
+set(CPACK_GENERATOR ZIP)
+set(CPACK_SOURCE_GENERATOR "")
+set(CPACK_PACKAGE_NAME extempore)
+set(CPACK_PACKAGE_VERSION ${EXTEMPORE_VERSION})
+set(CPACK_PACKAGE_FILE_NAME extempore-${EXTEMPORE_VERSION})
+include(CPack)
 
 ########################################
 # external shared library dependencies #

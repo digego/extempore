@@ -70,8 +70,8 @@ users will care about:
 
 Extempore links against a specific version of LLVM (currently 22.1.8, pinned in
 `CMakeLists.txt`). LLVM is fetched and built in-tree via CMake's
-`FetchContent` --- no system LLVM required. To use an installed LLVM of the
-same minor version instead, configure with `-DEXTEMPORE_SYSTEM_LLVM=ON` (and
+`FetchContent` --- no system LLVM required. To use an installed LLVM of the same
+minor version instead, configure with `-DEXTEMPORE_SYSTEM_LLVM=ON` (and
 `-DLLVM_DIR=<prefix>/lib/cmake/llvm` if CMake doesn't find it).
 
 The first build takes ~10-30 min because LLVM is compiled from source.
@@ -162,12 +162,12 @@ You'll need the ALSA dev headers for PortAudio. On Ubuntu:
 For the WebGPU graphics build (`-DEXTERNAL_SHLIBS_GRAPHICS=ON`) you'll also
 need:
 
-    sudo apt-get install xorg-dev libglu1-mesa-dev
+    sudo apt-get install xorg-dev
 
 ### Windows
 
-Extempore is built & tested on Windows Server 2022 with Visual Studio 2022. If
-you don't already have VS installed, download the free
+Extempore is built & tested on Windows Server 2025 with Visual Studio. If you
+don't already have VS installed, download the free
 [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/).
 
 CI builds Windows with Ninja from a Visual Studio developer prompt, which is
