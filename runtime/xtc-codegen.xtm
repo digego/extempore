@@ -1348,9 +1348,13 @@
             (else
               (emit (xtc:codegen:ssa-temp "envptr" "i8*") " = call i8* @llvm_zone_malloc("
                     "%mzone* " (car (xtc:codegen:ssa-temp "zone")) ", i64 " (number->string (xtc:codegen:get-type-size estruct)) ")\n" os2)))
-      (emit (xtc:codegen:ssa-temp "environment" (string-append estruct "*"))
+      ;; Every field of the environment is a pointer, so it is addressed as an
+      ;; array of pointers: a getelementptr through the struct type would spell
+      ;; out the whole struct (every captured variable's type) once per
+      ;; variable, which made the IR quadratic in the environment's size.
+      (emit (xtc:codegen:ssa-temp "environment" "i8**")
             " = bitcast i8* " (car (xtc:codegen:ssa-temp "envptr"))
-            " to " estruct "*\n" os2)
+            " to i8**\n" os2)
       ;; make new closure_address_table
       (emit "\n; malloc closure address table\n" os2)
       (emit (xtc:codegen:ssa-temp "addytable" "%clsvar*") " = call %clsvar* @new_address_table()\n" os2)
@@ -1385,26 +1389,22 @@
       (emit (xtc:codegen:ssa-temp "address-table" "i8*") " = bitcast %clsvar* " (car table) " to i8*\n" os2)
       ;; add data to environment structure
       (emit "; add data to environment\n" os1)
-      (dotimes (i (length env))
-        (let* ((e (list-ref env i))
-               (alloc? (not (regex:match? (symbol->string (car e)) "__sub$"))))
-          ;; first fixup mangled name if not allocing
-          (if (not alloc?) (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
-                                         (cdr e))))
-          (define t (begin (xtc:codegen:ssa-temp (string-append (symbol->string (car e)) "EnvPtr")
-                                                 (string-append (xtc:codegen:get-type-str (cdr e)) "*"))
-                      (xtc:codegen:ssa-temp)))
-
-          (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
-          (emit (xtc:codegen:ssa-temp "tmp_envptr" (string-append (cadr t) "*")) " = getelementptr "
-                estruct ", " estruct "* " (car (xtc:codegen:ssa-temp "environment")) ", "
-                "i32 0, i32 " (number->string i) "\n" os1)
-          ;;(emit (xtc:codegen:ssa-temp "tmpttff" "i8*") " = bitcast " (cadr t) " %" (symbol->string (car e)) "Ptr to i8*\n" os1)
-          ;;(emit "call ccc void @llvm_print_i32(i32 " (number->string i) ")\n" os1)
-          ;;(emit "call ccc void @llvm_print_pointer(i8* " (car (xtc:codegen:ssa-temp)) ")\n" os1)
-          (emit "store " (cadr t) " %" (symbol->string (car e)) "Ptr"
-                ", "
-                (cadr t) "* " (car (xtc:codegen:ssa-temp "tmp_envptr")) "\n\n" os1)))
+      (let loop ((es env) (i 0))
+        (if (pair? es)
+            (let* ((e (car es))
+                   (alloc? (not (regex:match? (symbol->string (car e)) "__sub$"))))
+              ;; first fixup mangled name if not allocing
+              (if (not alloc?) (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
+                                             (cdr e))))
+              (let ((ptrtype (string-append (xtc:codegen:get-type-str (cdr e)) "*")))
+                (emit "; don't need to alloc for env var " (symbol->string (car e)) "\n" os1)
+                (emit (xtc:codegen:ssa-temp "tmp_envslot" "i8**") " = getelementptr i8*, i8** "
+                      (car (xtc:codegen:ssa-temp "environment")) ", i32 " (number->string i) "\n" os1)
+                (emit (xtc:codegen:ssa-temp "tmp_envptr" (string-append ptrtype "*")) " = bitcast i8** "
+                      (car (xtc:codegen:ssa-temp "tmp_envslot")) " to " ptrtype "*\n" os1)
+                (emit "store " ptrtype " %" (symbol->string (car e)) "Ptr, "
+                      ptrtype "* " (car (xtc:codegen:ssa-temp "tmp_envptr")) "\n\n" os1))
+              (loop (cdr es) (+ i 1)))))
 
       (emit "\n" os1)
 
@@ -1491,9 +1491,10 @@
 
       ;; first we need to pull evironment values
       (if (not (null? env))
-          (let ((estruct (xtc:codegen:make-struct-str-env env)))
+          (begin
+            ;; the environment as an array of pointers (see make-closureenv)
             (emit "; setup environment\n" os)
-            (emit (string-append "%impenv = bitcast i8* %_impenv to " estruct "*\n") os)
+            (emit "%impenv = bitcast i8* %_impenv to i8**\n" os)
             (let loop ((es env) (i 0))
               (if (pair? es)
                   (let ((e (car es)))
@@ -1501,9 +1502,11 @@
                     (if (regex:match? (symbol->string (car e)) "__sub$")
                         (set! e (cons (string->symbol (car (regex:split (symbol->string (car e)) "__sub$")))
                                       (cdr e))))
-                    (emit (string-append "%" (symbol->string (car e)) "Ptr_ = getelementptr "
-                                         estruct ", " estruct "* %impenv, "
-                                         "i32 0, i32 " (number->string i) "\n") os)
+                    (emit (string-append "%" (symbol->string (car e)) "Slot_ = getelementptr i8*, i8** %impenv, i32 "
+                                         (number->string i) "\n"
+                                         "%" (symbol->string (car e)) "Ptr_ = bitcast i8** %"
+                                         (symbol->string (car e)) "Slot_ to "
+                                         (xtc:codegen:get-type-str (cdr e)) "**\n") os)
                     (emit (string-append "%" (symbol->string (car e)) "Ptr = load "
                                          (xtc:codegen:get-type-str (cdr e)) "*, "
                                          (xtc:codegen:get-type-str (cdr e)) "** %"
