@@ -285,12 +285,15 @@
 ;; a simpler but still valid R5RS scheme code
 ;;
 
+;; Each operand appears once in the result, so it is evaluated at most once. The
+;; branches are #t and #f rather than the operand itself, which is the same
+;; value: an operand is an if's test, so it is already an i1.
 (define xtc:desugar:and
   (lambda (ast)
     (if (pair? ast)
         (ast:make-if (car ast)
                      (if (null? (cdr ast))
-                         (car ast)
+                         #t
                          (xtc:desugar:and (cdr ast)))
                      #f))))
 
@@ -298,7 +301,7 @@
   (lambda (ast)
     (if (pair? ast)
         (ast:make-if (car ast)
-                     (car ast)
+                     #t
                      (if (null? (cdr ast))
                          #f
                          (xtc:desugar:or (cdr ast)))))))
@@ -700,15 +703,25 @@ e.g.
      ,(car (reverse args)))))
 
 
+;; (>= a b) is (or (> a b) (= a b)), which names each operand twice, so an
+;; operand that isn't an atom is let-bound first to evaluate it once. Atoms are
+;; left in place: a literal must stay a literal to take the other operand's type.
+(define xtc:desugar:compare-or-equal
+  (lambda (op a b)
+    (let* ((a-tmp (if (pair? a) '_cmp_lhs a))
+           (b-tmp (if (pair? b) '_cmp_rhs b))
+           (binds (append (if (pair? a) `((,a-tmp ,a)) '())
+                          (if (pair? b) `((,b-tmp ,b)) '())))
+           (body `(or (,op ,a-tmp ,b-tmp) (= ,a-tmp ,b-tmp))))
+      (if (null? binds) body `(let ,binds ,body)))))
+
 (define xtc:desugar:gteq
   (lambda (ast)
-    `(or (> ,(cadr ast) ,(caddr ast))
-      (= ,(cadr ast) ,(caddr ast)))))
+    (xtc:desugar:compare-or-equal '> (cadr ast) (caddr ast))))
 
 (define xtc:desugar:lteq
   (lambda (ast)
-    `(or (< ,(cadr ast) ,(caddr ast))
-      (= ,(cadr ast) ,(caddr ast)))))
+    (xtc:desugar:compare-or-equal '< (cadr ast) (caddr ast))))
 
 
 ;; This to auto surround dotimes with a let

@@ -2367,10 +2367,14 @@
   (lambda (ast types)
     (let* ((os (xtc:emit:new-buffer))
            (loop-num-string (number->string (llvm:count++)))
+           (test (string-append "%whiletest" loop-num-string))
            (loop (string-append "%loop" loop-num-string))
            (after (string-append "%after" loop-num-string)))
       (emit "; while loop\n" os)
-      ;; initial test
+      ;; the test is emitted once, in a block the body branches back to: a
+      ;; let in the test would otherwise define its locals twice
+      (emit "br label " test "\n" os)
+      (emit "\nwhiletest" loop-num-string ":\n" os)
       (emit (xtc:codegen:compiler (car ast) types) os)
       (emit "br i1 " (car (xtc:codegen:ssa-temp))
             ", label " loop
@@ -2380,13 +2384,7 @@
       ;; loop body
       (emit  "\nloop" loop-num-string ":\n" os)
       (emit (xtc:codegen:compiler (cdr ast) types) os)
-
-      ;; re-test loop condition
-      (emit (xtc:codegen:compiler (car ast) types) os)
-      (emit "br i1 " (car (xtc:codegen:ssa-temp))
-            ", label " loop
-            ", label " after
-            "\n" os)
+      (emit "br label " test "\n" os)
       (emit  "\nafter" loop-num-string ":\n" os)
       (xtc:codegen:ssa-temp "voidmark" (xtc:codegen:get-type-str *xtc:codegen:void*))
       ;; (println 'output 'string:) (println os)

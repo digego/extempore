@@ -5,21 +5,21 @@
 ;; and
 
 (xtmtest-result (xtc:desugar:and '(a))
-                '(if a a #f)
+                '(if a #t #f)
                 "and-single")
 
 (xtmtest-result (xtc:desugar:and '(a b c))
-                '(if a (if b (if c c #f) #f) #f)
+                '(if a (if b (if c #t #f) #f) #f)
                 "and-chain")
 
 ;; or
 
 (xtmtest-result (xtc:desugar:or '(a))
-                '(if a a #f)
+                '(if a #t #f)
                 "or-single")
 
 (xtmtest-result (xtc:desugar:or '(a b))
-                '(if a a (if b b #f))
+                '(if a #t (if b #t #f))
                 "or-chain")
 
 ;; cond
@@ -68,6 +68,15 @@
 (xtmtest-result (xtc:desugar:lteq '(<= a b))
                 '(or (< a b) (= a b))
                 "lteq")
+
+(xtmtest-result (xtc:desugar:gteq '(>= (f) 0))
+                '(let ((_cmp_lhs (f))) (or (> _cmp_lhs 0) (= _cmp_lhs 0)))
+                "gteq-call-lhs")
+
+(xtmtest-result (xtc:desugar:lteq '(<= (f) (g)))
+                '(let ((_cmp_lhs (f)) (_cmp_rhs (g)))
+                   (or (< _cmp_lhs _cmp_rhs) (= _cmp_lhs _cmp_rhs)))
+                "lteq-call-both")
 
 ;; list -> cons chain
 

@@ -1,0 +1,76 @@
+;;; tests/compiler/compare.xtm -- >=, <=, and and or evaluate each operand once
+
+(sys:load "libs/core/test.xtm")
+
+(bind-val compare_calls i64 0)
+
+(bind-func compare_tick
+  (lambda ()
+    (set! compare_calls (+ compare_calls 1))
+    compare_calls))
+
+;; returns how many times the operands ran, then the result, as one number
+(bind-func compare_count_gteq
+  (lambda ()
+    (set! compare_calls 0)
+    (let ((r (>= (compare_tick) 1)))
+      (+ (* 10 compare_calls) (if r 1 0)))))
+(xtmtest-result (compare_count_gteq) 11 "gteq-call-evaluated-once")
+
+(bind-func compare_count_lteq
+  (lambda ()
+    (set! compare_calls 0)
+    (let ((r (<= 1 (compare_tick))))
+      (+ (* 10 compare_calls) (if r 1 0)))))
+(xtmtest-result (compare_count_lteq) 11 "lteq-call-evaluated-once")
+
+;; both operands are calls: each runs once, left first (1 >= 2 is false)
+(bind-func compare_count_both
+  (lambda ()
+    (set! compare_calls 0)
+    (let ((r (>= (compare_tick) (compare_tick))))
+      (+ (* 10 compare_calls) (if r 1 0)))))
+(xtmtest-result (compare_count_both) 20 "gteq-both-calls-in-order")
+
+;; a literal still takes the other operand's type
+(bind-func compare_float_literal
+  (lambda (x:float)
+    (if (>= (* x 2.0) 1.0) 1 0)))
+(xtmtest-result (compare_float_literal 0.5) 1 "gteq-float-literal-equal")
+(xtmtest-result (compare_float_literal 0.25) 0 "gteq-float-literal-below")
+
+;; and, or: an operand that decides the result runs once
+(bind-func compare_true
+  (lambda ()
+    (compare_tick)
+    #t))
+
+(bind-func compare_count_or
+  (lambda ()
+    (set! compare_calls 0)
+    (let ((r (or (compare_true) #f)))
+      (+ (* 10 compare_calls) (if r 1 0)))))
+(xtmtest-result (compare_count_or) 11 "or-call-evaluated-once")
+
+(bind-func compare_count_and
+  (lambda ()
+    (set! compare_calls 0)
+    (let ((r (and #t (compare_true))))
+      (+ (* 10 compare_calls) (if r 1 0)))))
+(xtmtest-result (compare_count_and) 11 "and-call-evaluated-once")
+
+;; several >= in one function, inside an or (their temporaries must not clash)
+(bind-func compare_in_or
+  (lambda (a:i64)
+    (if (or (>= (+ a 1) 2) (<= (+ a 1) 0)) 1 0)))
+(xtmtest-result (compare_in_or 1) 1 "gteq-in-or")
+(xtmtest-result (compare_in_or 0) 0 "lteq-in-or")
+
+;; a >= with a call operand in a while test (the test's let is emitted once)
+(bind-func compare_in_while
+  (lambda (a:i64)
+    (let ((i:i64 0))
+      (while (<= (+ i 1) a)
+        (set! i (+ i 1)))
+      i)))
+(xtmtest-result (compare_in_while 5) 5 "lteq-in-while")
