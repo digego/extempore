@@ -38,6 +38,11 @@ second line just says which definition failed. A handful of errors (literal
 mismatches, unbound names, parse errors) have their own specific messages,
 covered below.
 
+Code that catches a compiler error sees its kind as the error type
+(`xtlang-type-error`, `xtlang-syntax-error`, `xtlang-generics-error`,
+`xtlang-compile-error` or `xtlang-error`) and the report, as plain text, as its
+message.
+
 :::
 
 ### `couldn't resolve type` (unconstrained) {#could-not-resolve-types}
@@ -340,11 +345,12 @@ report shows the unbalanced text and the frame that read it.
 **Fix.** Close the paren. In an interactive session your editor's paren-matching
 will usually catch this; in `--batch` or file loads it's easier to miss.
 
-:::caution[Batch mode hangs on parse errors]
+:::note[Batch mode exits on an uncaught error]
 
-When `--batch` encounters a read error it prints the message but does _not_
-exit. Use `timeout` (e.g. `timeout 10 ./extempore --batch "..."`) when running
-untested scripts.
+When the `--batch` expression raises an error it doesn't catch, read errors
+included, extempore prints the report and exits with status 1. A script that
+loops forever or never reaches `(quit)` still runs until it's killed, so use
+`timeout` (e.g. `timeout 10 ./extempore --batch "..."`) for untested scripts.
 
 :::
 

@@ -39,6 +39,7 @@
 #include "SchemeFFI.h"
 #include "OSC.h"
 #include "ExtemporeVersion.h"
+#include "AudioDevice.h"
 
 #include <iosfwd>
 #include <iomanip>
@@ -326,6 +327,14 @@ void* SchemeProcess::taskImpl() {
                                        now + task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
+                        // Nothing else will ever end a batch run whose startup
+                        // expression failed before reaching its (quit).
+                        if (UNIV::BATCH_MODE && task.getLabel() == "file_init") {
+                            std::cout << "Error: uncaught error in the --batch expression, exiting"
+                                      << std::endl;
+                            AudioDevice::stopFileDriver();
+                            std::_Exit(1);
+                        }
                     }
                 }
                 delete evalString;

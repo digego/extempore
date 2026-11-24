@@ -115,9 +115,7 @@ There is also a "batch mode" useful for debugging/testing, e.g.
 
 Note: `--batch` implies `--noaudio`, so there's no need to specify both.
 
-If the final `quit` isn't present, then extempore won't exit. And if the eval'ed
-code throws an error, extempore won't exit either (it will print the scheme
-stacktrace and then await further instructions); `sys:load-then-quit` can't
-rescue a compilation error either. For this reason, for scripted debugging it's
-often helpful to use `timeout` (combined with `--batch`) with a short value
-(e.g. 10s) to ensure that whatever happens the script will exit.
+If the final `quit` isn't present, then extempore won't exit. An uncaught error
+in the `--batch` expression exits with status 1, but code that hangs or never
+reaches `quit` still runs forever, so for scripted debugging use `timeout` with
+a short value (e.g. 10s) as well.
