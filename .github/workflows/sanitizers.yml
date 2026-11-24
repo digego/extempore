@@ -1,7 +1,7 @@
 name: Sanitizers
 
-# Sanitizer and clang-tidy runs are slow and memory-hungry, so they run on a
-# weekly schedule and on demand rather than on every push. They are
+# Sanitizer runs are slow and memory-hungry, so they run on a weekly schedule
+# and on demand rather than on every push. They are
 # intentionally NOT required checks: treat a red run as a list of things to
 # triage, not a merge blocker. Once a configuration has proven reliably green it
 # can be promoted into the main build-and-test matrix (.github/workflows/
@@ -76,34 +76,3 @@ jobs:
       - name: Test
         timeout-minutes: 90
         run: setarch -R ctest --preset ${{ matrix.preset }} --test-dir build
-
-  clang-tidy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    # Informational until the tree is confirmed clean against .clang-tidy; the
-    # check set there is curated but has never been enforced in CI. Promote to a
-    # required check (and set WarningsAsErrors) once it reports clean.
-    continue-on-error: true
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: ./.github/actions/setup-build
-        with:
-          preset: ci
-          cache-key-os: ubuntu-24.04
-          save-llvm-cache: "false"
-
-      # The PyPI wheel, pinned in mise.toml to LLVM's major version.
-      - name: Install clang-tidy
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        with:
-          install_args: uv pipx:clang-tidy
-
-      - name: Generate sources and headers
-        # clang-tidy needs the generated headers (e.g. ExtemporeVersion.h) and a
-        # populated compile_commands.json to parse the translation units.
-        run: cmake --build build --target extempore
-
-      - name: Run clang-tidy
-        run: cmake --build build --target tidy

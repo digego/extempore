@@ -76,6 +76,7 @@ cmake --build build --target aot_core            # AOT compile the core stdlib
 cmake --build build --target aot_external_audio  # ... and the audio libs (default)
 cmake --build build --target clean_aot           # delete build/libs/aot-cache
 cmake --build build --target xtmdoc              # generate docs
+cmake --build build --target tidy                # clang-tidy; CI fails on any finding
 build/extempore --noaudio                        # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)
 ```

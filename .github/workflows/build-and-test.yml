@@ -82,3 +82,31 @@ jobs:
       - name: Test
         timeout-minutes: 30
         run: ctest --preset ci
+
+  # .clang-tidy sets WarningsAsErrors, so a finding fails the job.
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-build
+        with:
+          preset: ci
+          cache-key-os: ubuntu-24.04
+          save-llvm-cache: "false"
+
+      # The PyPI wheel, pinned in mise.toml to LLVM's major version.
+      - name: Install clang-tidy
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          install_args: uv pipx:clang-tidy
+
+      # clang-tidy needs the generated headers (e.g. ExtemporeVersion.h) and a
+      # populated compile_commands.json to parse the translation units.
+      - name: Generate sources and headers
+        run: cmake --build build --target extempore
+
+      - name: Run clang-tidy
+        run: cmake --build build --target tidy
