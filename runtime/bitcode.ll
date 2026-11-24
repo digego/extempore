@@ -290,6 +290,25 @@ define private i1 @impc_false() nounwind alwaysinline
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ATOMICS
+;;
+;; For a value one thread writes and another reads, such as the indices of a
+;; single-writer, single-reader ring buffer: the writer fills a slot and then
+;; stores the index, and a reader which loads that index sees the slot filled.
+
+define private i64 @atomic_load_i64(i64* %p) nounwind alwaysinline
+{
+  %v = load atomic i64, i64* %p acquire, align 8
+  ret i64 %v
+}
+
+define private void @atomic_store_i64(i64* %p, i64 %v) nounwind alwaysinline
+{
+  store atomic i64 %v, i64* %p release, align 8
+  ret void
+}
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CASTING STUFF
 
 define private i64 @i1toi64(i1 %a) alwaysinline

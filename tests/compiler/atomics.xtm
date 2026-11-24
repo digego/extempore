@@ -1,0 +1,30 @@
+;;; tests/compiler/atomics.xtm -- atomic_load_i64 and atomic_store_i64
+
+(sys:load "libs/core/test.xtm")
+
+(bind-func atomics_alloc
+  (lambda ()
+    (let ((cells:i64* (halloc 2)))
+      (pfill! cells 0 0)
+      cells)))
+
+(bind-val atomics_cells i64* (atomics_alloc))
+
+(bind-func atomics_roundtrip
+  (lambda (a:i64 b:i64)
+    (atomic_store_i64 atomics_cells a)
+    (atomic_store_i64 (pref-ptr atomics_cells 1) b)
+    (- (atomic_load_i64 atomics_cells)
+       (atomic_load_i64 (pref-ptr atomics_cells 1)))))
+
+(xtmtest-result (atomics_roundtrip 42 2) 40 "atomic-store-then-load")
+(xtmtest-result (atomics_roundtrip -1 9223372036854775807) -9223372036854775808 "atomic-full-width")
+
+;; a plain read sees what an atomic store wrote, and the other way round
+(bind-func atomics_mixed
+  (lambda ()
+    (atomic_store_i64 atomics_cells 7)
+    (pset! atomics_cells 1 (+ (pref atomics_cells 0) 1))
+    (atomic_load_i64 (pref-ptr atomics_cells 1))))
+
+(xtmtest-result (atomics_mixed) 8 "atomic-and-plain-access-agree")
