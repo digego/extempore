@@ -34,10 +34,9 @@ checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
 `extempore.exe` is built into `build\` too. `-DEXTEMPORE_SYSTEM_LLVM=ON` builds
 against an installed LLVM 22.1.
 
-The stb_image library (2.10 to 2.30) comes from upstream instead of a fork,
-LLVM goes to 22.1.8 and PCRE2 to 10.49, and rtmidi is no longer built, since nothing used it. Release archives are
-packaged with CPack and carry build-provenance attestations, and clang-tidy runs
-on every push.
+LLVM goes to 22.1.8 and PCRE2 to 10.49, and rtmidi is no longer built, since
+nothing used it. Release archives are packaged with CPack and carry
+build-provenance attestations, and clang-tidy runs on every push.
 
 The FFTs are now written in xtlang, so kissfft is no longer a dependency. Load
 `libs/core/fft.xtm` instead of `libs/external/fft.xtm`: `fft_config`,
@@ -59,6 +58,16 @@ half that, so an `AudioBuffer` read from a PCM file is now 6 dB louder.
 are gone, since `AudioBuffer` reads either format. The sampler's offset into a
 file (`set_sample_data_`) is now in frames, as documented; it was multiplied by
 the square of the channel count.
+
+PNG images are now read and written by `libs/core/png.xtm`, in xtlang, so
+stb_image is no longer a dependency, and only PNG is read: convert other images
+first (`magick mogrify -format png *.jpg`, say). Load `libs/core/png.xtm`
+instead of `libs/external/stb_image.xtm`. It keeps stb_image's names and
+signatures (`stbi_load`, `stbi_load_from_memory`, `stbi_load_16`, `stbi_info`,
+`stbi_image_free`, `stbi_failure_reason`, `stbi_set_flip_vertically_on_load`,
+the `stbi_zlib_decode_*` functions and `stbi_write_png`), decodes every PngSuite
+image exactly as stb_image does, and runs about as fast. The HDR and float
+loaders and the BMP, TGA and HDR writers are gone.
 
 ## v0.11.2
 

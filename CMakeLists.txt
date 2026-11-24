@@ -49,7 +49,7 @@ if(EXTEMPORE_SANITIZE AND NOT EXTEMPORE_SANITIZE MATCHES "^(asan|ubsan|tsan|asan
         "(got '${EXTEMPORE_SANITIZE}')")
 endif()
 option(EXTERNAL_SHLIBS_AUDIO "download & build audio-related external library dependencies" ON)
-option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native, stb_image)" OFF)
+option(EXTERNAL_SHLIBS_GRAPHICS "WebGPU graphics (GLFW, wgpu-native)" OFF)
 option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 option(EXTEMPORE_SYSTEM_LLVM "use an installed LLVM of the pinned minor version instead of building it" OFF)
 
@@ -146,10 +146,6 @@ set(DEP_PORTAUDIO_VERSION "b0fe9de7ec86ebe5a26086f1d662ab74d7ebfae4")
 set(DEP_PORTAUDIO_SHA256 "bb0a1a388b523e7c2e46675bd157b026a1c4676d069c254c89b33d9d2b7ac7d2")
 set(DEP_PORTMIDI_VERSION "v2.0.8")
 set(DEP_PORTMIDI_SHA256 "e4ee3152ae42362f30b5e59fc5729b8b7e2a98023e1752f641d849543602f31e")
-# stb doesn't tag releases. This commit predates the stb_image overhaul begun in
-# late October 2026, whose early commits rejected req_comp = 0.
-set(DEP_STB_COMMIT "003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5")
-set(DEP_STB_SHA256 "a6c31950b3bdf05eb92258768ba2a11bd44449490574b1aac67028452288c40d")
 set(DEP_GLFW_VERSION "3.5.1")
 set(DEP_GLFW_SHA256 "ea79bc5feffc254c87291980c2d0bce9acebb68c4983b79f961dcd2cb8a611a0")
 set(DEP_WGPU_VERSION "27.0.4.0")
@@ -641,8 +637,9 @@ function(aotcompile_lib_as _basename libfile group)
     endforeach()
 endfunction()
 
-# Core libs
-add_custom_target(aot_core)
+# Core libs. ALL builds every one, including those (png) no other AOT
+# target depends on.
+add_custom_target(aot_core ALL)
 set_target_properties(aot_core PROPERTIES FOLDER AOT)
 add_dependencies(aot_core extempore)
 aotcompile_lib(libs/base/base.xtm core)
@@ -651,6 +648,7 @@ aotcompile_lib(libs/core/rational.xtm core base)
 aotcompile_lib(libs/core/audiofile.xtm core base)
 aotcompile_lib(libs/core/audiobuffer.xtm core base audiofile)
 aotcompile_lib(libs/core/fft.xtm core base math)
+aotcompile_lib(libs/core/png.xtm core base)
 aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
 aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
 
@@ -680,7 +678,6 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     add_custom_target(aot_external_graphics)
     set_target_properties(aot_external_graphics PROPERTIES FOLDER AOT)
     add_dependencies(aot_external_graphics extempore external_shlibs_graphics)
-    aotcompile_lib(libs/external/stb_image.xtm graphics base)
     aotcompile_lib(libs/external/glfw3.xtm graphics base)
     aotcompile_lib(libs/external/webgpu.xtm graphics base glfw3)
 endif()
@@ -701,7 +698,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/tests.cmake)
 
 add_custom_target(xtmdoc
     COMMAND extempore --port 17095
-        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/stb_image.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/core/png.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/external/instruments_ext.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
     COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
     VERBATIM)
 add_dependencies(xtmdoc extempore)

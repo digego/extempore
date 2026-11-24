@@ -1,0 +1,521 @@
+;;; png.xtm:tests -- tests for the PNG library
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; Tests for libs/core/png.xtm.
+;;
+;; The fixtures in tests/assets/png are a subset of PngSuite (2017jul19,
+;; http://www.schaik.com/pngsuite/; licence in PngSuite.LICENSE there). They
+;; cover every colour type and bit depth, palettes and tRNS, interlacing, the
+;; five filters, odd sizes, zlib streams from stored to maximum compression,
+;; split IDATs, and the deliberately corrupt x*.png files.
+;;
+;; Each fixture's expected value is a 32-bit FNV-1a hash over everything
+;; libstb_image 2.30 returned for it: stbi_info_from_memory (x and y as four
+;; little-endian bytes each, then comp, or the byte #xEE on failure), then
+;; stbi_is_16_bit_from_memory, then stbi_load_from_memory and
+;; stbi_load_16_from_memory with desired_channels 0 to 4 (x, y, comp and the
+;; pixel bytes, or #xEE on failure). pngtest_hash_mem computes the same thing,
+;; so a match means this library agrees with stb_image byte for byte.
+
+;;; Code:
+
+(sys:load "libs/core/png.xtm")
+
+(define *pngtest-dir* "tests/assets/png/")
+
+;;;;;;;;;;;;;
+;; helpers ;;
+;;;;;;;;;;;;;
+
+(bind-func pngtest_slurp
+  "read a whole file into a buffer of exactly its length"
+  (lambda (path:i8* lenptr:i64*)
+    (let ((fp (fopen path "rb"))
+          (len 0)
+          (buf:i8* null))
+      (if (null? fp)
+          null
+          (begin
+            (fseek fp 0 2)
+            (set! len (ftell fp))
+            (fseek fp 0 0)
+            (set! buf (malloc len))
+            (fread buf 1 len fp)
+            (fclose fp)
+            (pset! lenptr 0 len)
+            buf)))))
+
+(bind-macro
+  (pngtest_mix v)
+  `(set! h (& (* (^ h (& ,v 255)) 16777619) #xFFFFFFFF)))
+
+(bind-macro
+  (pngtest_mix32 v)
+  `(begin (pngtest_mix ,v) (pngtest_mix (>> ,v 8)) (pngtest_mix (>> ,v 16)) (pngtest_mix (>> ,v 24)) void))
+
+(bind-func pngtest_hash_mem
+  "the hash described in the commentary, of the LEN bytes of PNG at BUF"
+  (lambda (buf:i8* len:i64)
+    (let ((h 2166136261)
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (bits 8) (req 0) (p:i8* null) (n 0) (i 0) (v 0))
+      (if (= (stbi_info_from_memory buf (convert len i32) x y c) 1)
+          (begin
+            (set! v (convert (pref x 0) i64))
+            (pngtest_mix32 v)
+            (set! v (convert (pref y 0) i64))
+            (pngtest_mix32 v)
+            (pngtest_mix (convert (pref c 0) i64))
+            void)
+          (begin (pngtest_mix #xEE) void))
+      (pngtest_mix (convert (stbi_is_16_bit_from_memory buf (convert len i32)) i64))
+      (while (<= bits 16)
+        (set! req 0)
+        (while (<= req 4)
+          (set! p (if (= bits 8)
+                      (stbi_load_from_memory buf (convert len i32) x y c (convert req i32))
+                      (cast (stbi_load_16_from_memory buf (convert len i32) x y c (convert req i32)) i8*)))
+          (if (null? p)
+              (begin (pngtest_mix #xEE) void)
+              (begin
+                (set! v (convert (pref x 0) i64))
+                (pngtest_mix32 v)
+                (set! v (convert (pref y 0) i64))
+                (pngtest_mix32 v)
+                (pngtest_mix (convert (pref c 0) i64))
+                (set! n (* (convert (pref x 0) i64) (convert (pref y 0) i64)
+                           (if (= req 0) (convert (pref c 0) i64) req) (/ bits 8)))
+                (set! i 0)
+                (while (< i n)
+                  (pngtest_mix (i8toui64 (pref p i)))
+                  (set! i (+ i 1)))
+                (stbi_image_free p)
+                void))
+          (set! req (+ req 1)))
+        (set! bits (+ bits 8)))
+      h)))
+
+(bind-func pngtest_hash_file
+  (lambda (path:i8*)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (pngtest_slurp path lenptr))
+          (h -1))
+      (if (not (null? buf))
+          (begin
+            (set! h (pngtest_hash_mem buf (pref lenptr 0)))
+            (free buf)
+            void))
+      h)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; agreement with stb_image on PngSuite ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define *pngtest-fixtures*
+  '(
+    ("basi0g01.png" 2284999628)
+    ("basi0g02.png" 3956788690)
+    ("basi0g04.png" 1314414418)
+    ("basi0g08.png" 1370253878)
+    ("basi0g16.png" 842329421)
+    ("basi2c08.png" 1949747292)
+    ("basi2c16.png" 2049075331)
+    ("basi3p01.png" 3964632444)
+    ("basi3p02.png" 1421028988)
+    ("basi3p04.png" 2646460220)
+    ("basi3p08.png" 2543079884)
+    ("basi4a08.png" 3219771879)
+    ("basi4a16.png" 512941336)
+    ("basi6a08.png" 3210856097)
+    ("basi6a16.png" 1954614608)
+    ("basn0g01.png" 2284999628)
+    ("basn0g02.png" 3956788690)
+    ("basn0g04.png" 1314414418)
+    ("basn0g08.png" 1370253878)
+    ("basn0g16.png" 842329421)
+    ("basn2c08.png" 1949747292)
+    ("basn2c16.png" 2049075331)
+    ("basn3p01.png" 3964632444)
+    ("basn3p02.png" 1421028988)
+    ("basn3p04.png" 2646460220)
+    ("basn3p08.png" 2543079884)
+    ("basn4a08.png" 3219771879)
+    ("basn4a16.png" 512941336)
+    ("basn6a08.png" 3210856097)
+    ("basn6a16.png" 1954614608)
+    ("bgai4a16.png" 512941336)
+    ("ccwn2c08.png" 2440493297)
+    ("ch1n3p04.png" 2646460220)
+    ("cs3n2c16.png" 3006031279)
+    ("exif2c08.png" 1190707386)
+    ("f00n0g08.png" 118512736)
+    ("f00n2c08.png" 4096896583)
+    ("f01n0g08.png" 812196613)
+    ("f01n2c08.png" 3860736473)
+    ("f02n0g08.png" 859803287)
+    ("f02n2c08.png" 3568479507)
+    ("f03n0g08.png" 3226141553)
+    ("f03n2c08.png" 1559090493)
+    ("f04n0g08.png" 1443414848)
+    ("f04n2c08.png" 1321203779)
+    ("f99n0g04.png" 3889250566)
+    ("oi1n0g16.png" 842329421)
+    ("oi1n2c16.png" 2049075331)
+    ("oi4n0g16.png" 842329421)
+    ("oi4n2c16.png" 2049075331)
+    ("oi9n0g16.png" 842329421)
+    ("oi9n2c16.png" 2049075331)
+    ("pp0n6a08.png" 339803765)
+    ("s01i3p01.png" 3790705389)
+    ("s01n3p01.png" 3790705389)
+    ("s02i3p01.png" 3350333804)
+    ("s02n3p01.png" 3350333804)
+    ("s03i3p01.png" 2339792358)
+    ("s03n3p01.png" 2339792358)
+    ("s04i3p01.png" 1911448636)
+    ("s04n3p01.png" 1911448636)
+    ("s05i3p02.png" 1228311106)
+    ("s05n3p02.png" 1228311106)
+    ("s06i3p02.png" 3308439764)
+    ("s06n3p02.png" 3308439764)
+    ("s07i3p02.png" 148397140)
+    ("s07n3p02.png" 148397140)
+    ("s08i3p02.png" 4214317720)
+    ("s08n3p02.png" 4214317720)
+    ("s09i3p02.png" 1020105483)
+    ("s09n3p02.png" 1020105483)
+    ("s32i3p04.png" 2896158240)
+    ("s32n3p04.png" 2896158240)
+    ("s39i3p04.png" 815178155)
+    ("s39n3p04.png" 815178155)
+    ("tbbn0g04.png" 1768223924)
+    ("tbbn2c16.png" 279458461)
+    ("tbbn3p08.png" 3350930911)
+    ("tbgn2c16.png" 279458461)
+    ("tbgn3p08.png" 3350930911)
+    ("tbrn2c08.png" 4150807492)
+    ("tbwn0g16.png" 3070737080)
+    ("tbwn3p08.png" 3350930911)
+    ("tbyn3p08.png" 3350930911)
+    ("tm3n3p02.png" 1794939273)
+    ("tp0n0g08.png" 830789875)
+    ("tp0n2c08.png" 3294541234)
+    ("tp0n3p08.png" 45040354)
+    ("tp1n3p08.png" 3350930911)
+    ("xc1n0g08.png" 4141913851)
+    ("xc9n2c08.png" 4141913851)
+    ("xcrn0g04.png" 4141913851)
+    ("xcsn0g01.png" 2284999628)
+    ("xd0n2c08.png" 4141913851)
+    ("xd3n2c08.png" 4141913851)
+    ("xd9n2c08.png" 4141913851)
+    ("xdtn0g01.png" 1619751232)
+    ("xhdn0g08.png" 1370253878)
+    ("xlfn0g04.png" 4141913851)
+    ("xs1n0g01.png" 4141913851)
+    ("xs2n0g01.png" 4141913851)
+    ("xs4n0g01.png" 4141913851)
+    ("xs7n0g01.png" 4141913851)
+    ("z00n2c08.png" 3033457658)
+    ("z03n2c08.png" 3033457658)
+    ("z06n2c08.png" 3033457658)
+    ("z09n2c08.png" 3033457658)))
+
+(for-each (lambda (fixture)
+            (xtmtest-result (pngtest_hash_file (string-append *pngtest-dir* (car fixture)))
+                            (cadr fixture)
+                            (car fixture)))
+          *pngtest-fixtures*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; header and channel counts ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; width * 10000 + height * 10 + channels, from stbi_info
+(bind-func pngtest_info
+  (lambda (path:i8*)
+    (let ((x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1)))
+      (if (= (stbi_info path x y c) 1)
+          (+ (* (convert (pref x 0) i64) 10000) (* (convert (pref y 0) i64) 10) (convert (pref c 0) i64))
+          -1))))
+
+(xtmtest-result (pngtest_info "tests/assets/png/basn6a08.png") 320324 "info-rgba")
+(xtmtest-result (pngtest_info "tests/assets/png/basn3p08.png") 320323 "info-palette")
+;; tRNS adds an alpha channel, to a palette or a colour key alike
+(xtmtest-result (pngtest_info "tests/assets/png/tbbn3p08.png") 320324 "info-palette-trns")
+(xtmtest-result (pngtest_info "tests/assets/png/tbrn2c08.png") 320324 "info-rgb-trns")
+(xtmtest-result (pngtest_info "tests/assets/png/s01n3p01.png") 10013 "info-1x1")
+(xtmtest-result (pngtest_info "tests/assets/png/no-such-file.png") -1 "info-missing")
+(xtmtest-result (stbi_is_16_bit "tests/assets/png/basn0g16.png") 1 "is-16-bit")
+(xtmtest-result (stbi_is_16_bit "tests/assets/png/basn0g08.png") 0 "is-not-16-bit")
+
+;;;;;;;;;;;;;;
+;; failures ;;
+;;;;;;;;;;;;;;
+
+;; anything which isn't a PNG fails, and the reason says what to do about it
+(bind-func pngtest_not_png
+  (lambda ()
+    (let ((jpeg:i8* (salloc 16))
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1)))
+      (pfill! jpeg (convert #xFF i8) (convert #xD8 i8) (convert #xFF i8) (convert #xE0 i8)
+              (convert 0 i8) (convert 16 i8) (convert 74 i8) (convert 70 i8))
+      (and (null? (stbi_load_from_memory jpeg 16 x y c 0))
+           (not (null? (strstr (stbi_failure_reason) "only PNG")))
+           (not (null? (strstr (stbi_failure_reason) "magick mogrify")))
+           (= (stbi_info_from_memory jpeg 16 x y c) 0)
+           (null? (stbi_load_from_memory jpeg 0 x y c 0))))))
+(xtmtest-result (pngtest_not_png) 1)
+
+(bind-func pngtest_missing_file
+  (lambda ()
+    (let ((x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1)))
+      (and (null? (stbi_load "tests/assets/png/no-such-file.png" x y c 0))
+           (= (strcmp (stbi_failure_reason) "Unable to open file") 0)))))
+(xtmtest-result (pngtest_missing_file) 1)
+
+(bind-func pngtest_bad_channels
+  (lambda ()
+    (let ((x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1)))
+      (and (null? (stbi_load "tests/assets/png/basn6a08.png" x y c 5))
+           (null? (stbi_load "tests/assets/png/basn6a08.png" x y c -1))))))
+(xtmtest-result (pngtest_bad_channels) 1)
+
+;; every proper prefix of a file fails cleanly, short of losing only the
+;; IEND chunk's CRC (which, like stb_image, the decoder doesn't read). Each
+;; prefix is copied to a buffer of exactly its length, so ASan builds catch a
+;; read past the end.
+(bind-func pngtest_truncations
+  (lambda (path:i8*)
+    (let ((lenptr:i64* (salloc 1))
+          (orig (pngtest_slurp path lenptr))
+          (len (pref lenptr 0))
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (cut 0) (buf:i8* null) (p:i8* null) (q:i16* null) (loaded 0))
+      (while (< cut (- len 4))
+        (set! buf (malloc cut))
+        (memcpy buf orig cut)
+        (set! p (stbi_load_from_memory buf (convert cut i32) x y c 0))
+        (set! q (stbi_load_16_from_memory buf (convert cut i32) x y c 4))
+        (if (not (null? p)) (begin (set! loaded (+ loaded 1)) (stbi_image_free p)))
+        (if (not (null? q)) (begin (set! loaded (+ loaded 1)) (stbi_image_free (cast q i8*))))
+        (free buf)
+        (set! cut (+ cut 1)))
+      (set! p (stbi_load_from_memory orig (convert (- len 4) i32) x y c 0))
+      (if (null? p) (begin (set! loaded (+ loaded 1000)) void) (stbi_image_free p))
+      (free orig)
+      loaded)))
+
+(xtmtest-result (pngtest_truncations "tests/assets/png/basn6a08.png") 0 "truncated-rgba")
+(xtmtest-result (pngtest_truncations "tests/assets/png/basi3p02.png") 0 "truncated-interlaced-palette")
+(xtmtest-result (pngtest_truncations "tests/assets/png/tbrn2c08.png") 0 "truncated-colour-key")
+(xtmtest-result (pngtest_truncations "tests/assets/png/z00n2c08.png") 0 "truncated-stored-blocks")
+(xtmtest-result (pngtest_truncations "tests/assets/png/oi9n2c16.png") 0 "truncated-split-idat")
+
+(bind-func static pngtest_lcg
+  (lambda (s:i64)
+    (+ (* s 6364136223846793005) 1442695040888963407)))
+
+;; overwrite a few random bytes (and sometimes truncate) many times over, and
+;; run each result through every loader. The point is that nothing crashes or
+;; reads out of bounds (which ASan builds check); returns ITERS on completion.
+(bind-func pngtest_fuzz
+  (lambda (path:i8* iters:i64 seed:i64)
+    (let ((lenptr:i64* (salloc 1))
+          (orig (pngtest_slurp path lenptr))
+          (len (pref lenptr 0))
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (s seed) (k 0) (j 0) (m 0) (cut 0) (req 0)
+          (buf:i8* null) (p:i8* null))
+      (dotimes (k iters)
+        (set! s (pngtest_lcg s))
+        (set! cut (if (= (% (>> s 33) 4) 0) (% (>> s 40) len) len))
+        (set! buf (malloc cut))
+        (memcpy buf orig cut)
+        (set! s (pngtest_lcg s))
+        (set! m (+ 1 (% (>> s 33) 4)))
+        (dotimes (j m)
+          (set! s (pngtest_lcg s))
+          (if (> cut 8)
+              (pset! buf (+ 8 (% (>> s 33) (- cut 8))) (convert (>> s 20) i8))))
+        (stbi_info_from_memory buf (convert cut i32) x y c)
+        (dotimes (req 5)
+          (set! p (stbi_load_from_memory buf (convert cut i32) x y c (convert req i32)))
+          (stbi_image_free p)
+          (set! p (cast (stbi_load_16_from_memory buf (convert cut i32) x y c (convert req i32)) i8*))
+          (stbi_image_free p))
+        (free buf))
+      (free orig)
+      iters)))
+
+(xtmtest-result (pngtest_fuzz "tests/assets/png/basn6a08.png" 300 1) 300 "fuzz-rgba")
+(xtmtest-result (pngtest_fuzz "tests/assets/png/basi0g04.png" 300 2) 300 "fuzz-interlaced-grey")
+(xtmtest-result (pngtest_fuzz "tests/assets/png/tbbn3p08.png" 300 3) 300 "fuzz-palette-trns")
+(xtmtest-result (pngtest_fuzz "tests/assets/png/basn4a16.png" 300 4) 300 "fuzz-16-bit")
+(xtmtest-result (pngtest_fuzz "tests/assets/png/z00n2c08.png" 300 5) 300 "fuzz-stored-blocks")
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; vertical flipping ;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
+;; loaded flipped, row r is row h - 1 - r of the image loaded the right way up
+(bind-func pngtest_flip_on_load
+  (lambda (path:i8*)
+    (let ((x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (a (stbi_load path x y c 4))
+          (b:i8* (begin (stbi_set_flip_vertically_on_load 1) (stbi_load path x y c 4)))
+          (w (convert (pref x 0) i64))
+          (h (convert (pref y 0) i64))
+          (row (* w 4))
+          (r 0) (ok #t))
+      (stbi_set_flip_vertically_on_load 0)
+      (dotimes (r h)
+        (if (<> (memcmp (pref-ptr a (* r row)) (pref-ptr b (* (- h 1 r) row)) row) 0)
+            (set! ok #f)))
+      (stbi_flip_vertically (pref x 0) (pref y 0) 4 b)
+      (and ok (= (memcmp a b (* row h)) 0)))))
+(xtmtest-result (pngtest_flip_on_load "tests/assets/png/basn6a08.png") 1 "flip-on-load")
+(xtmtest-result (pngtest_flip_on_load "tests/assets/png/s09n3p02.png") 1 "flip-on-load-odd-height")
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; zlib, there and back ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; text-like runs with some noise mixed in, so the encoder finds both
+;; literals and matches at many distances
+(bind-func pngtest_sample_data
+  (lambda (n:i64)
+    (let ((d:i8* (malloc n)) (i 0) (s 7))
+      (dotimes (i n)
+        (set! s (pngtest_lcg s))
+        (pset! d i (convert (if (= (% (>> s 33) 5) 0)
+                                (>> s 40)
+                                (+ 97 (% (/ i 3) 26) (% (/ i 1000) 7)))
+                            i8)))
+      d)))
+
+(bind-func pngtest_zlib_roundtrip
+  (lambda (n:i64)
+    (let ((data (pngtest_sample_data n))
+          (zlen:i32* (salloc 1)) (olen:i32* (salloc 1))
+          (z (stbi_zlib_compress data (convert n i32) zlen 8))
+          (out (stbi_zlib_decode_malloc z (pref zlen 0) olen))
+          (out2 (stbi_zlib_decode_malloc_guesssize z (pref zlen 0) 1 olen))
+          (raw (stbi_zlib_decode_noheader_malloc (pref-ptr z 2) (- (pref zlen 0) 6) olen))
+          (buf:i8* (malloc (+ n 1)))
+          (ok (and (not (null? out)) (not (null? out2)) (not (null? raw))
+                   (= (memcmp out data n) 0)
+                   (= (memcmp out2 data n) 0)
+                   (= (memcmp raw data n) 0)
+                   (= (convert (pref olen 0) i64) n)
+                   ;; a buffer just big enough, one byte short, and raw deflate
+                   (= (convert (stbi_zlib_decode_buffer buf (convert n i32) z (pref zlen 0)) i64) n)
+                   (= (memcmp buf data n) 0)
+                   (or (= n 0) (= (stbi_zlib_decode_buffer buf (convert (- n 1) i32) z (pref zlen 0)) -1))
+                   (= (convert (stbi_zlib_decode_noheader_buffer buf (convert n i32) (pref-ptr z 2) (- (pref zlen 0) 6)) i64) n))))
+      (free data) (free z) (free out) (free out2) (free raw) (free buf)
+      ok)))
+(xtmtest-result (pngtest_zlib_roundtrip 0) 1 "zlib-empty")
+(xtmtest-result (pngtest_zlib_roundtrip 1) 1 "zlib-one-byte")
+(xtmtest-result (pngtest_zlib_roundtrip 1000) 1 "zlib-small")
+(xtmtest-result (pngtest_zlib_roundtrip 300000) 1 "zlib-large")
+
+(bind-func pngtest_zlib_garbage
+  (lambda ()
+    (let ((d (pngtest_sample_data 5000))
+          (olen:i32* (salloc 1)))
+      ;; a valid zlib header followed by noise
+      (pset! d 0 (convert #x78 i8))
+      (pset! d 1 (convert #x9c i8))
+      (and (null? (stbi_zlib_decode_malloc d 5000 olen))
+           (null? (stbi_zlib_decode_malloc d 1 olen))))))
+(xtmtest-result (pngtest_zlib_garbage) 1)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; writing, there and back ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; a W x H image of N channels with rows STRIDE bytes apart; smooth areas,
+;; edges and noise, so every filter gets used
+(bind-func pngtest_image
+  (lambda (w:i64 h:i64 n:i64 stride:i64)
+    (let ((img:i8* (malloc (* stride h))) (r 0) (x 0) (k 0) (s 3))
+      (memset img 0 (* stride h))
+      (dotimes (r h)
+        (dotimes (x w)
+          (dotimes (k n)
+            (set! s (pngtest_lcg s))
+            (pset! img (+ (* r stride) (* x n) k)
+                   (convert (cond ((< x (/ w 3)) (+ (* r 3) (* k 40)))
+                                  ((< x (/ (* 2 w) 3)) (if (= (% (+ r x) 7) 0) 255 (* k 60)))
+                                  (else (>> s 50)))
+                            i8)))))
+      img)))
+
+(bind-func pngtest_write_roundtrip
+  (lambda (w:i64 h:i64 n:i64 pad:i64)
+    (let ((stride (+ (* w n) pad))
+          (img (pngtest_image w h n stride))
+          (len:i32* (salloc 1))
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (png (stbi_write_png_to_mem img (convert stride i32) (convert w i32) (convert h i32) (convert n i32) len))
+          (back (stbi_load_from_memory png (pref len 0) x y c 0))
+          (r 0) (ok (and (not (null? back))
+                         (= (convert (pref x 0) i64) w)
+                         (= (convert (pref y 0) i64) h)
+                         (= (convert (pref c 0) i64) n))))
+      (if ok
+          (dotimes (r h)
+            (if (<> (memcmp (pref-ptr img (* r stride)) (pref-ptr back (* r w n)) (* w n)) 0)
+                (set! ok #f))))
+      (free img) (free png) (stbi_image_free back)
+      ok)))
+(xtmtest-result (pngtest_write_roundtrip 37 23 1 0) 1 "write-grey")
+(xtmtest-result (pngtest_write_roundtrip 37 23 2 3) 1 "write-grey-alpha-stride")
+(xtmtest-result (pngtest_write_roundtrip 37 23 3 5) 1 "write-rgb-stride")
+(xtmtest-result (pngtest_write_roundtrip 300 200 4 0) 1 "write-rgba")
+(xtmtest-result (pngtest_write_roundtrip 1 1 4 0) 1 "write-1x1")
+
+;; through a file, and upside down
+(bind-func pngtest_write_file
+  (lambda ()
+    (let ((path "xtmtest-png-write.png")
+          (w 50) (h 40)
+          (img (pngtest_image w h 3 (* w 3)))
+          (x:i32* (salloc 1)) (y:i32* (salloc 1)) (c:i32* (salloc 1))
+          (back:i8* null) (r 0)
+          (ok (= (stbi_write_png path (convert w i32) (convert h i32) 3 img 0) 1)))
+      (set! back (stbi_load path x y c 3))
+      (set! ok (and ok (not (null? back)) (= (memcmp img back (* w h 3)) 0)))
+      (stbi_image_free back)
+      (stbi_flip_vertically_on_write 1)
+      (set! ok (and ok (= (stbi_write_png path (convert w i32) (convert h i32) 3 img 0) 1)))
+      (stbi_flip_vertically_on_write 0)
+      (set! back (stbi_load path x y c 3))
+      (if (null? back)
+          (begin (set! ok #f) void)
+          (dotimes (r h)
+            (if (<> (memcmp (pref-ptr img (* r w 3)) (pref-ptr back (* (- h 1 r) w 3)) (* w 3)) 0)
+                (set! ok #f))))
+      (stbi_image_free back)
+      (free img)
+      (remove path)
+      ok)))
+(xtmtest-result (pngtest_write_file) 1)
+
+(bind-func pngtest_write_bad_args
+  (lambda ()
+    (let ((img (pngtest_image 4 4 4 16))
+          (len:i32* (salloc 1))
+          (ok (and (null? (stbi_write_png_to_mem img 0 4 4 5 len))
+                   (null? (stbi_write_png_to_mem img 0 4 4 0 len))
+                   (null? (stbi_write_png_to_mem img 0 0 4 4 len))
+                   (= (stbi_write_png "/no/such/dir/x.png" 4 4 4 img 0) 0))))
+      (free img)
+      ok)))
+(xtmtest-result (pngtest_write_bad_args) 1)

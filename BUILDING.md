@@ -51,7 +51,7 @@ users will care about:
 - `EXTERNAL_SHLIBS_AUDIO` (default `ON`) --- build the audio dependencies
   (portaudio, portmidi).
 - `EXTERNAL_SHLIBS_GRAPHICS` (default `OFF`) --- build the WebGPU graphics stack
-  (glfw, wgpu-native, stb_image). Required for the WebGPU examples.
+  (glfw, wgpu-native). Required for the WebGPU examples.
 - `JACK` (default `OFF`) --- use the Jack PortAudio backend on Linux instead of
   ALSA.
 - `EXTEMPORE_CCACHE` (default `ON`) --- route compilation through `ccache` when

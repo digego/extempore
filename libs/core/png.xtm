@@ -1,0 +1,1757 @@
+;;; png.xtm -- read and write PNG images, in pure xtlang
+
+;; Author: Ben Swift
+;; Keywords: extempore
+;; Required dylibs:
+
+;;; Commentary:
+
+;; A PNG decoder and encoder which takes the place of the stb_image library.
+;; The functions have stb_image's names and C signatures, so code written
+;; against libs/external/stb_image.xtm needs only to load this file instead:
+;;
+;;   (sys:load "libs/core/png.xtm")
+;;   (bind-func load_texture
+;;     (lambda (path:i8*)
+;;       (let ((w:i32* (salloc 1)) (h:i32* (salloc 1)) (n:i32* (salloc 1))
+;;             (pixels (stbi_load path w h n 4)))   ; 4 channels: RGBA
+;;         (if (null? pixels)
+;;             (printf "can't load %s: %s\n" path (stbi_failure_reason))
+;;             (begin
+;;               ;; ... use the (pref w 0) x (pref h 0) RGBA pixels ...
+;;               (stbi_image_free pixels)
+;;               0:i32)))))
+;;
+;; Only PNG is read. Convert images in other formats first, for instance with
+;; ImageMagick: `magick mogrify -format png *.jpg`.
+;;
+;; Reading covers every colour type and bit depth, palettes and tRNS
+;; transparency, and Adam7 interlacing. Like stb_image it ignores the CRCs and
+;; the Adler-32 checksum, and it treats its input as untrusted: a truncated or
+;; corrupt file makes a load fail, with a reason in `stbi_failure_reason`.
+;; Images come back in malloc'd memory, so free them with `stbi_image_free`.
+;; Two differences from stb_image: it rejects bit depths the PNG specification
+;; doesn't allow for a colour type (4-bit RGB, say), and a palette index past
+;; the end of the palette comes out opaque black.
+;;
+;; Writing (`stbi_write_png`) produces 8-bit greyscale, grey+alpha, RGB or RGBA
+;; images. Its deflate encoder uses fixed Huffman codes and a hash-chain match
+;; finder: files come out smaller than stb_image_write's but larger than
+;; zlib's (a third or more, for photographs).
+;;
+;; `stbi_load_16` returns an i16*; cast it to i8* for `stbi_image_free`.
+;;
+;; Not provided: the HDR and float loaders (`stbi_loadf` etc.), the other image
+;; formats, the BMP/TGA/HDR/JPG writers, the callback-based loaders, and
+;; iPhone-optimised (CgBI) PNGs.
+;;
+;; Like stb_image, the failure reason and the flip flags are global, so loading
+;; images from more than one thread at once leaves the reason unreliable.
+
+;;; Code:
+
+(if *xtc:globals:with-cache* (sys:load (sys:build-path "libs/aot-cache/png.xtm") 'quiet))
+(sys:load-preload-check 'png)
+(define *xtmlib-png-loaded* #t)
+
+(xtc:aot:suppress-aot-do
+  (sys:load "libs/base/base.xtm"))
+(xtc:aot:insert-forms
+  (sys:load "libs/base/base.xtm" 'quiet))
+
+(xtc:aot:insert-header "xtmpng")
+(xtc:aot:import-ll "xtmpng")
+
+(bind-alias stbi_uc i8)
+(bind-alias stbi_us i16)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; global state and tables ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-val png_failure i8* "")
+(bind-val png_flip_on_load i32 0)
+(bind-val png_flip_on_write i32 0)
+
+(bind-func png_fail
+  "record MSG as the failure reason"
+  (lambda (msg:i8*)
+    (set! png_failure msg)
+    void))
+
+(bind-macro
+  "record MSG as the failure reason and set the local STATUS to -1"
+  (png_err msg)
+  `(begin (png_fail ,msg) (set! status -1) void))
+
+(bind-macro
+  "evaluate BODY when C is true; a one-armed if whose branch has any type"
+  (png_when c . body)
+  `(if ,c (begin ,@body void) void))
+
+(bind-macro
+  "the byte at P[I] as an unsigned i64"
+  (png_u8 p i)
+  `(i8toui64 (pref ,p ,i)))
+
+(bind-macro
+  "the big-endian 32-bit value at P[I]"
+  (png_be32 p i)
+  `(bor (bor (<< (png_u8 ,p ,i) 24) (<< (png_u8 ,p (+ ,i 1)) 16))
+        (bor (<< (png_u8 ,p (+ ,i 2)) 8) (png_u8 ,p (+ ,i 3)))))
+
+(bind-macro
+  "the big-endian 16-bit value at P[I]"
+  (png_be16 p i)
+  `(bor (<< (png_u8 ,p ,i) 8) (png_u8 ,p (+ ,i 1))))
+
+(bind-func static png_bitrev
+  "reverse the low N bits of V"
+  (lambda (v:i64 n:i64)
+    (let ((r v))
+      (set! r (bor (>> (& r #xAAAA) 1) (<< (& r #x5555) 1)))
+      (set! r (bor (>> (& r #xCCCC) 2) (<< (& r #x3333) 2)))
+      (set! r (bor (>> (& r #xF0F0) 4) (<< (& r #x0F0F) 4)))
+      (set! r (bor (>> (& r #xFF00) 8) (<< (& r #x00FF) 8)))
+      (>> r (- 16 n)))))
+
+;; png_tables holds the small constant tables, at these offsets:
+;;
+;;    0  deflate length base, by length code - 257 (29)
+;;   32  extra bits for each length code (29)
+;;   64  deflate distance base, by distance code (30)
+;;   96  extra bits for each distance code (30)
+;;  128  the order of the code length code lengths (19)
+;;  160  CRC-32 of each byte value (256)
+;;  416  fixed Huffman literal/length codes, as (length << 16) | reversed code (288)
+;;  704  the length code - 257 for each match length 3..258 (259)
+;;  964  the distance code for each distance 1..256, at distance - 1 (256)
+;; 1220  the distance code for distances over 256, at (distance - 1) >> 7 (256)
+;; 1476  Adam7 x origin, y origin, x spacing and y spacing of each pass (4 x 7)
+;; 1504  the factor which scales a 1, 2 or 4-bit grey value to 0..255, by depth (9)
+;; 1520  5-bit codes, reversed (32)
+;; 1552  the filter a row-0 filter type becomes when there's no previous row (5)
+
+(bind-func png_build_tables
+  (lambda ()
+    (let ((t:i64* (cast (malloc (* 1560 8)) i64*))
+          (i 0) (c 0) (d 0) (n 0) (code 0) (len 0))
+      (memset (cast t i8*) 0 (* 1560 8))
+      (pfill! (pref-ptr t 0)
+              3 4 5 6 7 8 9 10 11 13 15 17 19 23 27 31 35 43 51 59 67 83 99 115 131 163 195 227 258)
+      (pfill! (pref-ptr t 32)
+              0 0 0 0 0 0 0 0 1 1 1 1 2 2 2 2 3 3 3 3 4 4 4 4 5 5 5 5 0)
+      (pfill! (pref-ptr t 64)
+              1 2 3 4 5 7 9 13 17 25 33 49 65 97 129 193 257 385 513 769 1025 1537 2049 3073
+              4097 6145 8193 12289 16385 24577)
+      (pfill! (pref-ptr t 96)
+              0 0 0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10 10 11 11 12 12 13 13)
+      (pfill! (pref-ptr t 128)
+              16 17 18 0 8 7 9 6 10 5 11 4 12 3 13 2 14 1 15)
+      ;; CRC-32
+      (dotimes (i 256)
+        (set! c i)
+        (dotimes (n 8)
+          (if (= (& c 1) 1)
+              (begin (set! c (^ #xEDB88320 (>> c 1))) void)
+              (begin (set! c (>> c 1)) void)))
+        (pset! t (+ 160 i) c))
+      ;; fixed literal/length codes
+      (dotimes (i 288)
+        (cond ((< i 144) (set! code (+ #x30 i)) (set! len 8) void)
+              ((< i 256) (set! code (+ #x190 (- i 144))) (set! len 9) void)
+              ((< i 280) (set! code (- i 256)) (set! len 7) void)
+              (else (set! code (+ #xC0 (- i 280))) (set! len 8) void))
+        (pset! t (+ 416 i) (bor (<< len 16) (png_bitrev code len))))
+      ;; match length -> length code
+      (dotimes (c 28)
+        (set! len (pref t c))
+        (while (and (< len (+ (pref t c) (<< 1 (pref t (+ 32 c))))) (< len 258))
+          (pset! t (+ 704 len) c)
+          (set! len (+ len 1))))
+      (pset! t (+ 704 258) 28)
+      ;; distance -> distance code
+      (dotimes (c 30)
+        (set! d (pref t (+ 64 c)))
+        (while (< d (+ (pref t (+ 64 c)) (<< 1 (pref t (+ 96 c)))))
+          (if (<= d 256)
+              (pset! t (+ 964 (- d 1)) c)
+              (pset! t (+ 1220 (>> (- d 1) 7)) c))
+          (set! d (+ d 1))))
+      ;; Adam7
+      (pfill! (pref-ptr t 1476) 0 4 0 2 0 1 0)
+      (pfill! (pref-ptr t 1483) 0 0 4 0 2 0 1)
+      (pfill! (pref-ptr t 1490) 8 8 4 4 2 2 1)
+      (pfill! (pref-ptr t 1497) 8 8 8 4 4 2 2)
+      (pfill! (pref-ptr t 1504) 0 255 85 0 17 0 0 0 1)
+      (dotimes (i 32)
+        (pset! t (+ 1520 i) (png_bitrev i 5)))
+      (pfill! (pref-ptr t 1552) 0 1 0 5 1)
+      t)))
+
+(bind-val png_tables i64* (png_build_tables))
+
+;;;;;;;;;;;;;
+;; inflate ;;
+;;;;;;;;;;;;;
+
+;; A Huffman decoding table is an i32 array of PNG_HSIZE (1652) entries:
+;;
+;;    0  fast lookup on the next 10 bits: (code length << 9) | symbol, or 0 (1024)
+;; 1024  first code of each length (17)
+;; 1041  one past the last code of each length, shifted to 16 bits (18)
+;; 1059  index of the first symbol of each length (17)
+;; 1076  code length of each sorted symbol (288)
+;; 1364  value of each sorted symbol (288)
+;;
+;; This is stb_image's scheme: codes up to 10 bits long decode with one table
+;; lookup, longer ones with a canonical-code search (png_zslow).
+
+(bind-func png_zbuild
+  "build a Huffman decoding table in Z from NUM code lengths at SL, returning 1, or 0 if they don't form a valid code"
+  (lambda (z:i32* sl:i8* num:i64)
+    (let ((sizes:i64* (salloc 17))
+          (next:i64* (salloc 17))
+          (i 0) (k 0) (code 0) (ok 1) (s 0) (c 0) (j 0) (fv:i32 0))
+      (memset (cast sizes i8*) 0 (* 17 8))
+      (memset (cast z i8*) 0 (* 1024 4))
+      (while (< i num)
+        (set! s (png_u8 sl i))
+        (if (< s 16) (pset! sizes s (+ (pref sizes s) 1)) (begin (set! ok 0) 0))
+        (set! i (+ i 1)))
+      (pset! sizes 0 0)
+      (set! i 1)
+      (while (< i 16)
+        (png_when (> (pref sizes i) (<< 1 i)) (set! ok 0))
+        (set! i (+ i 1)))
+      (set! i 1)
+      (while (< i 16)
+        (pset! next i code)
+        (pset! z (+ 1024 i) (convert code i32))
+        (pset! z (+ 1059 i) (convert k i32))
+        (set! code (+ code (pref sizes i)))
+        (png_when (and (> (pref sizes i) 0) (>= (- code 1) (<< 1 i))) (set! ok 0))
+        (pset! z (+ 1041 i) (convert (<< code (- 16 i)) i32))
+        (set! code (<< code 1))
+        (set! k (+ k (pref sizes i)))
+        (set! i (+ i 1)))
+      (pset! z (+ 1041 16) (convert 65536 i32))
+      (png_when (= ok 1)
+          (begin
+            (set! i 0)
+            (while (< i num)
+              (set! s (png_u8 sl i))
+              (png_when (> s 0)
+                  (begin
+                    (set! c (+ (- (pref next s) (convert (pref z (+ 1024 s)) i64))
+                               (convert (pref z (+ 1059 s)) i64)))
+                    (pset! z (+ 1076 c) (convert s i32))
+                    (pset! z (+ 1364 c) (convert i i32))
+                    (png_when (<= s 10)
+                        (begin
+                          (set! fv (convert (bor (<< s 9) i) i32))
+                          (set! j (png_bitrev (pref next s) s))
+                          (while (< j 1024)
+                            (pset! z j fv)
+                            (set! j (+ j (<< 1 s))))
+                          void))
+                    (pset! next s (+ (pref next s) 1))
+                    void))
+              (set! i (+ i 1)))
+            void))
+      ok)))
+
+(bind-func png_zslow
+  "decode a code longer than 10 bits from the bits BB with table Z: (length << 9) | symbol, or -1"
+  (lambda (z:i32* bb:i64)
+    (let ((k (png_bitrev (& bb 65535) 16))
+          (s 11) (b 0) (res -1))
+      (while (and (< s 16) (>= k (convert (pref z (+ 1041 s)) i64)))
+        (set! s (+ s 1)))
+      (png_when (< s 16)
+          (begin
+            (set! b (+ (- (>> k (- 16 s)) (convert (pref z (+ 1024 s)) i64))
+                       (convert (pref z (+ 1059 s)) i64)))
+            (png_when (and (>= b 0) (< b 288) (= (convert (pref z (+ 1076 b)) i64) s))
+                (set! res (bor (<< s 9) (convert (pref z (+ 1364 b)) i64))))
+            void))
+      res)))
+
+(bind-func png_build_fixed
+  "the Huffman tables for deflate's fixed codes: literal/length, then distance"
+  (lambda ()
+    (let ((z:i32* (cast (malloc (* 2 1652 4)) i32*))
+          (lens:i8* (malloc 320))
+          (i 0))
+      (dotimes (i 288)
+        (pset! lens i (convert (cond ((< i 144) 8) ((< i 256) 9) ((< i 280) 7) (else 8)) i8)))
+      (png_zbuild z lens 288)
+      (memset lens 5 32)
+      (png_zbuild (pref-ptr z 1652) lens 32)
+      (free lens)
+      z)))
+
+(bind-val png_fixed_tables i32* (png_build_fixed))
+
+;; The decoder's bit buffer is an i64 holding BITCNT valid bits, least
+;; significant first. png_refill tops it up to at least 56 bits, eight bytes at
+;; a time while that many remain (bits above BITCNT then hold the bits which
+;; follow, which the next refill rewrites with the same values). Past the end
+;; of the input it feeds in zero bytes, counting them in PHANTOM: consuming any
+;; of them means the stream was truncated, which the end-of-block checks catch.
+
+(bind-macro
+  "top up the inflate bit buffer to at least 56 bits"
+  (png_refill)
+  `(png_when (< bitcnt 48)
+       (if (<= (+ ip 8) srclen)
+           (begin
+             (set! bitbuf (bor bitbuf (<< (pref (cast (pref-ptr src ip) i64*) 0) bitcnt)))
+             (set! ip (+ ip (>> (- 63 bitcnt) 3)))
+             (set! bitcnt (bor bitcnt 56))
+             void)
+           (begin
+             (while (< bitcnt 56)
+               (if (< ip srclen)
+                   (begin
+                     (set! bitbuf (bor bitbuf (<< (png_u8 src ip) bitcnt)))
+                     (set! ip (+ ip 1))
+                     void)
+                   (begin (set! phantom (+ phantom 1)) void))
+               (set! bitcnt (+ bitcnt 8)))
+             (png_when (and (> phantom 16) (= status 0))
+                 (png_err "Corrupt PNG: unexpected end of compressed data"))
+             void))))
+
+(bind-macro
+  "decode one Huffman symbol with table Z into TARGET (-1 if invalid)"
+  (png_zdecode z target)
+  `(begin
+     (set! he (convert (pref ,z (& bitbuf 1023)) i64))
+     (png_when (= he 0) (set! he (png_zslow ,z bitbuf)))
+     (if (< he 0)
+         (begin (set! ,target -1) void)
+         (begin
+           (set! hs (>> he 9))
+           (set! bitbuf (>> bitbuf hs))
+           (set! bitcnt (- bitcnt hs))
+           (set! ,target (& he 511))
+           void))
+     void))
+
+(bind-macro
+  "take N bits from the inflate bit buffer into TARGET"
+  (png_zbits n target)
+  `(begin
+     (set! ,target (& bitbuf (- (<< 1 ,n) 1)))
+     (set! bitbuf (>> bitbuf ,n))
+     (set! bitcnt (- bitcnt ,n))
+     void))
+
+(bind-macro
+  "make room for N more bytes of inflate output"
+  (png_zexpand n)
+  `(if (not expandable)
+       (begin (png_err "Corrupt PNG: output buffer limit") void)
+       (begin
+         (set! newcap (if (< ocap 64) 64 ocap))
+         (while (< newcap (+ op ,n)) (set! newcap (* newcap 2)))
+         (if (> newcap 2147483647)
+             (png_err "Out of memory")
+             (begin
+               (set! tmpp (realloc out newcap))
+               (if (null? tmpp)
+                   (png_err "Out of memory")
+                   (begin (set! out tmpp) (set! ocap newcap) void))
+               void))
+         void)))
+
+(bind-func png_inflate
+  "inflate SRCLEN bytes of zlib (or with PARSE_HEADER false, raw deflate) data at SRC
+
+The output goes to OBUF, which holds OCAP bytes. If EXPANDABLE, OBUF must be
+from malloc, and it is realloc'd as needed. On return RESULT points to the
+output buffer (OBUF or its replacement) and OUTLEN holds the number of bytes
+decoded. Returns 1 on success, 0 on failure (with the reason set)."
+  (lambda (src:i8* srclen:i64 obuf:i8* ocap0:i64 expandable:i1 parse_header:i1 result:i8** outlen:i64*)
+    (let ((out obuf) (ocap ocap0) (op 0) (newcap 0) (tmpp:i8* null)
+          (ip 0) (bitbuf 0) (bitcnt 0) (phantom 0)
+          (status 0) (final 0) (btype 0) (blockdone 0)
+          (tabs png_tables)
+          (lbase tabs) (lextra (pref-ptr tabs 32))
+          (dbase (pref-ptr tabs 64)) (dextra (pref-ptr tabs 96))
+          (dezigzag (pref-ptr tabs 128))
+          (zdyn:i32* (cast (malloc (* 3 1652 4)) i32*))
+          (zc (pref-ptr zdyn (* 2 1652)))
+          (tl:i32* null) (td:i32* null)
+          (lens:i8* (malloc 512))
+          (he 0) (hs 0) (sym 0) (dsym 0) (len 0) (nlen 0) (dist 0) (ex 0) (sp 0) (k 0)
+          (hlit 0) (hdist 0) (hclen 0) (n 0) (rep 0) (fill 0) (cmf 0) (flg 0))
+      (png_when (or (null? zdyn) (null? lens))
+          (png_err "Out of memory"))
+      (png_when (< srclen 0) (set! srclen 0))
+      ;; zlib header
+      (png_when (and parse_header (= status 0))
+          (if (<= srclen 2)
+              (png_err "Corrupt PNG: bad zlib header")
+              (begin
+                (set! cmf (png_u8 src 0))
+                (set! flg (png_u8 src 1))
+                (set! ip 2)
+                (cond ((<> (% (+ (* cmf 256) flg) 31) 0)
+                       (png_err "Corrupt PNG: bad zlib header"))
+                      ((<> (& flg 32) 0)
+                       (png_err "Corrupt PNG: preset dictionary not allowed"))
+                      ((<> (& cmf 15) 8)
+                       (png_err "Corrupt PNG: bad compression method")))
+                void)))
+      (while (= status 0)
+        (png_refill)
+        (png_zbits 1 final)
+        (png_zbits 2 btype)
+        (cond
+          ((= btype 0)
+           ;; stored: go to a byte boundary, hand back the whole bytes left in
+           ;; the bit buffer, then copy
+           (set! k (& bitcnt 7))
+           (png_zbits k sp)
+           (set! k (>> bitcnt 3))
+           (if (> phantom k)
+               (png_err "Corrupt PNG: unexpected end of compressed data")
+               (begin
+                 (set! ip (- ip (- k phantom)))
+                 (set! phantom 0)
+                 (set! bitbuf 0)
+                 (set! bitcnt 0)
+                 (if (> (+ ip 4) srclen)
+                     (png_err "Corrupt PNG: unexpected end of compressed data")
+                     (begin
+                       (set! len (bor (png_u8 src ip) (<< (png_u8 src (+ ip 1)) 8)))
+                       (set! nlen (bor (png_u8 src (+ ip 2)) (<< (png_u8 src (+ ip 3)) 8)))
+                       (set! ip (+ ip 4))
+                       (cond ((<> nlen (^ len 65535))
+                              (png_err "Corrupt PNG: bad stored block length"))
+                             ((> (+ ip len) srclen)
+                              (png_err "Corrupt PNG: read past end of compressed data"))
+                             (else
+                              (png_when (> (+ op len) ocap) (png_zexpand len))
+                              (png_when (= status 0)
+                                  (begin
+                                    (memcpy (pref-ptr out op) (pref-ptr src ip) len)
+                                    (set! ip (+ ip len))
+                                    (set! op (+ op len))
+                                    void))))
+                       void))
+                 void))
+           void)
+          ((= btype 3)
+           (png_err "Corrupt PNG: bad block type")
+           void)
+          (else
+           (if (= btype 1)
+               (begin
+                 (set! tl png_fixed_tables)
+                 (set! td (pref-ptr png_fixed_tables 1652))
+                 void)
+               (begin
+                 ;; dynamic: read the code length code, then the code lengths
+                 (png_zbits 5 hlit)
+                 (png_zbits 5 hdist)
+                 (png_zbits 4 hclen)
+                 (set! hlit (+ hlit 257))
+                 (set! hdist (+ hdist 1))
+                 (set! hclen (+ hclen 4))
+                 (memset lens 0 19)
+                 (set! k 0)
+                 (while (< k hclen)
+                   (png_refill)
+                   (png_zbits 3 n)
+                   (pset! lens (pref dezigzag k) (convert n i8))
+                   (set! k (+ k 1)))
+                 (png_when (= (png_zbuild zc lens 19) 0)
+                     (png_err "Corrupt PNG: bad code lengths"))
+                 (set! n 0)
+                 (while (and (= status 0) (< n (+ hlit hdist)))
+                   (png_refill)
+                   (png_zdecode zc sym)
+                   (cond ((or (< sym 0) (>= sym 19))
+                          (png_err "Corrupt PNG: bad code lengths"))
+                         ((< sym 16)
+                          (pset! lens n (convert sym i8))
+                          (set! n (+ n 1)) void)
+                         (else
+                          (set! fill 0)
+                          (cond ((= sym 16)
+                                 (png_zbits 2 rep)
+                                 (set! rep (+ rep 3))
+                                 (if (= n 0)
+                                     (png_err "Corrupt PNG: bad code lengths")
+                                     (begin (set! fill (png_u8 lens (- n 1))) void)))
+                                ((= sym 17)
+                                 (png_zbits 3 rep)
+                                 (set! rep (+ rep 3)) void)
+                                (else
+                                 (png_zbits 7 rep)
+                                 (set! rep (+ rep 11)) void))
+                          (png_when (< (- (+ hlit hdist) n) rep)
+                              (png_err "Corrupt PNG: bad code lengths"))
+                          (png_when (= status 0)
+                              (begin
+                                (memset (pref-ptr lens n) (convert fill i32) rep)
+                                (set! n (+ n rep))
+                                void))
+                          void)))
+                 (png_when (= status 0)
+                     (png_when (or (= (png_zbuild zdyn lens hlit) 0)
+                             (= (png_zbuild (pref-ptr zdyn 1652) (pref-ptr lens hlit) hdist) 0))
+                         (png_err "Corrupt PNG: bad Huffman code lengths")))
+                 (set! tl zdyn)
+                 (set! td (pref-ptr zdyn 1652))
+                 void))
+           ;; the compressed data itself
+           (set! blockdone 0)
+           (while (and (= status 0) (= blockdone 0))
+             (png_refill)
+             (png_zdecode tl sym)
+             (cond
+               ((< sym 0)
+                (png_err "Corrupt PNG: bad Huffman code"))
+               ((< sym 256)
+                (png_when (>= op ocap) (png_zexpand 1))
+                (png_when (= status 0)
+                    (begin
+                      (pset! out op (convert sym i8))
+                      (set! op (+ op 1))
+                      void)))
+               ((= sym 256)
+                (set! blockdone 1)
+                (png_when (< bitcnt (* phantom 8))
+                    (png_err "Corrupt PNG: unexpected end of compressed data")))
+               ((> sym 285)
+                (png_err "Corrupt PNG: bad Huffman code"))
+               (else
+                (set! sym (- sym 257))
+                (set! ex (pref lextra sym))
+                (png_zbits ex len)
+                (set! len (+ len (pref lbase sym)))
+                (png_zdecode td dsym)
+                (if (or (< dsym 0) (> dsym 29))
+                    (png_err "Corrupt PNG: bad Huffman code")
+                    (begin
+                      (set! ex (pref dextra dsym))
+                      (png_zbits ex dist)
+                      (set! dist (+ dist (pref dbase dsym)))
+                      (if (> dist op)
+                          (png_err "Corrupt PNG: bad distance")
+                          (begin
+                            (png_when (> len (- ocap op)) (png_zexpand len))
+                            (png_when (= status 0)
+                                (begin
+                                  (set! sp (- op dist))
+                                  (if (and (>= dist 8) (<= (+ op len 8) ocap))
+                                      (begin
+                                        (set! k 0)
+                                        (while (< k len)
+                                          (pset! (cast (pref-ptr out (+ op k)) i64*) 0
+                                                 (pref (cast (pref-ptr out (+ sp k)) i64*) 0))
+                                          (set! k (+ k 8)))
+                                        void)
+                                      (if (= dist 1)
+                                          (begin
+                                            (memset (pref-ptr out op) (i8toui32 (pref out sp)) len)
+                                            void)
+                                          (begin
+                                            (set! k 0)
+                                            (while (< k len)
+                                              (pset! out (+ op k) (pref out (+ sp k)))
+                                              (set! k (+ k 1)))
+                                            void)))
+                                  (set! op (+ op len))
+                                  void))
+                            void))
+                      void))
+                void)))
+           void))
+        (png_when (and (= status 0) (= final 1))
+            (set! status 1)))
+      (png_when (not (null? zdyn)) (free (cast zdyn i8*)))
+      (png_when (not (null? lens)) (free lens))
+      (pset! result 0 out)
+      (pset! outlen 0 op)
+      (if (= status 1) 1 0))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; unfiltering and expansion ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func png_create_raw
+  "unfilter an X by Y image of IMG_N channels of DEPTH bits from RAW into a new malloc'd image of OUT_N channels (OUT_N may be IMG_N + 1, adding an opaque alpha channel), or null on failure
+
+Samples of fewer than 8 bits are expanded to bytes, scaled to 0..255 when COLOR
+is 0 (grey) and left as indices for a palette. 16-bit samples become native
+16-bit values."
+  (lambda (raw:i8* rawlen:i64 out_n:i64 x:i64 y:i64 img_n:i64 depth:i64 color:i64)
+    (let ((bytes (if (= depth 16) 2 1))
+          (stride (* x out_n bytes))
+          (wb (>> (+ (* img_n x depth) 7) 3))
+          (imglen (* (+ wb 1) y))
+          (fb (if (< depth 8) 1 (* img_n bytes)))
+          (direct (and (= depth 8) (= img_n out_n)))
+          (out:i8* null) (fbuf:i8* null)
+          (cur:i8* null) (prior:i8* null) (dest:i8* null) (rp raw)
+          (d16:i16* null)
+          (j 0) (k 0) (f 0) (ok 1) (i 0)
+          (a 0) (b 0) (c 0) (th 0) (lo 0) (hi 0) (t0 0)
+          (nsmp (* x img_n)) (inb 0) (scale 1) (sh 0) (mask 0) (perb 0) (pshift 0))
+      (png_when (< rawlen imglen)
+          (begin (png_fail "Corrupt PNG: not enough pixels") (set! ok 0)))
+      (png_when (= ok 1)
+          (begin
+            (set! out (malloc (+ (* stride y) 8)))
+            (set! fbuf (malloc (+ (* wb 2) 8)))
+            (png_when (or (null? out) (null? fbuf))
+                (begin (png_fail "Out of memory") (set! ok 0)))
+            void))
+      (png_when (< depth 8)
+          (begin
+            (set! scale (if (= color 0) (pref png_tables (+ 1504 depth)) 1))
+            (set! sh (- 8 depth))
+            (set! mask (- (<< 1 depth) 1))
+            (set! perb (/ 8 depth))
+            (set! pshift (cond ((= depth 1) 3) ((= depth 2) 2) (else 1)))
+            void))
+      (while (and (= ok 1) (< j y))
+        (set! dest (pref-ptr out (* j stride)))
+        (if direct
+            (begin
+              (set! cur dest)
+              (set! prior (pref-ptr dest (- 0 stride)))
+              void)
+            (begin
+              (set! cur (pref-ptr fbuf (* (& j 1) wb)))
+              (set! prior (pref-ptr fbuf (* (- 1 (& j 1)) wb)))
+              void))
+        (set! f (png_u8 rp 0))
+        (set! rp (pref-ptr rp 1))
+        (png_when (> f 4)
+            (begin (png_fail "Corrupt PNG: invalid filter") (set! ok 0)))
+        (png_when (and (= ok 1) (= j 0)) (set! f (pref png_tables (+ 1552 f))))
+        (png_when (= ok 1)
+            (begin
+              (cond
+                ((= f 0)
+                 (memcpy cur rp wb))
+                ((= f 1)
+                 (memcpy cur rp fb)
+                 (set! k fb)
+                 (while (< k wb)
+                   (pset! cur k (+ (pref rp k) (pref cur (- k fb))))
+                   (set! k (+ k 1))))
+                ((= f 2)
+                 (set! k 0)
+                 (while (< k wb)
+                   (pset! cur k (+ (pref rp k) (pref prior k)))
+                   (set! k (+ k 1))))
+                ((= f 3)
+                 (set! k 0)
+                 (while (< k fb)
+                   (pset! cur k (+ (pref rp k) (convert (>> (png_u8 prior k) 1) i8)))
+                   (set! k (+ k 1)))
+                 (while (< k wb)
+                   (pset! cur k (+ (pref rp k)
+                                   (convert (>> (+ (png_u8 prior k) (png_u8 cur (- k fb))) 1) i8)))
+                   (set! k (+ k 1))))
+                ((= f 4)
+                 (set! k 0)
+                 (while (< k fb)
+                   (pset! cur k (+ (pref rp k) (pref prior k)))
+                   (set! k (+ k 1)))
+                 (while (< k wb)
+                   (set! a (png_u8 cur (- k fb)))
+                   (set! b (png_u8 prior k))
+                   (set! c (png_u8 prior (- k fb)))
+                   (set! th (- (* c 3) (+ a b)))
+                   (set! lo (if (< a b) a b))
+                   (set! hi (if (< a b) b a))
+                   (set! t0 (if (<= hi th) lo c))
+                   (pset! cur k (+ (pref rp k) (convert (if (<= th lo) hi t0) i8)))
+                   (set! k (+ k 1))))
+                (else
+                 ;; average, on the first row
+                 (memcpy cur rp fb)
+                 (set! k fb)
+                 (while (< k wb)
+                   (pset! cur k (+ (pref rp k) (convert (>> (png_u8 cur (- k fb)) 1) i8)))
+                   (set! k (+ k 1)))))
+              (set! rp (pref-ptr rp wb))
+              ;; expand the row into DEST
+              (cond
+                (direct void)
+                ((< depth 8)
+                 (set! i 0)
+                 (while (< i nsmp)
+                   (png_when (= (& i (- perb 1)) 0)
+                       (set! inb (png_u8 cur (>> i pshift))))
+                   (pset! dest i (convert (* scale (& (>> inb sh) mask)) i8))
+                   (set! inb (<< inb depth))
+                   (set! i (+ i 1)))
+                 (png_when (<> img_n out_n)
+                     (begin
+                       ;; grey -> grey + alpha, back to front since it's in place
+                       (set! i (- x 1))
+                       (while (>= i 0)
+                         (pset! dest (+ (* i 2) 1) (convert 255 i8))
+                         (pset! dest (* i 2) (pref dest i))
+                         (set! i (- i 1)))
+                       void))
+                 void)
+                ((= depth 8)
+                 (if (= img_n 1)
+                     (begin
+                       (set! i 0)
+                       (while (< i x)
+                         (pset! dest (* i 2) (pref cur i))
+                         (pset! dest (+ (* i 2) 1) (convert 255 i8))
+                         (set! i (+ i 1)))
+                       void)
+                     (begin
+                       (set! i 0)
+                       (while (< i x)
+                         (pset! dest (* i 4) (pref cur (* i 3)))
+                         (pset! dest (+ (* i 4) 1) (pref cur (+ (* i 3) 1)))
+                         (pset! dest (+ (* i 4) 2) (pref cur (+ (* i 3) 2)))
+                         (pset! dest (+ (* i 4) 3) (convert 255 i8))
+                         (set! i (+ i 1)))
+                       void)))
+                (else
+                 (set! d16 (cast dest i16*))
+                 (cond
+                   ((= img_n out_n)
+                    (set! i 0)
+                    (while (< i nsmp)
+                      (pset! d16 i (convert (png_be16 cur (* i 2)) i16))
+                      (set! i (+ i 1))))
+                   ((= img_n 1)
+                    (set! i 0)
+                    (while (< i x)
+                      (pset! d16 (* i 2) (convert (png_be16 cur (* i 2)) i16))
+                      (pset! d16 (+ (* i 2) 1) (convert 65535 i16))
+                      (set! i (+ i 1))))
+                   (else
+                    (set! i 0)
+                    (while (< i x)
+                      (pset! d16 (* i 4) (convert (png_be16 cur (* i 6)) i16))
+                      (pset! d16 (+ (* i 4) 1) (convert (png_be16 cur (+ (* i 6) 2)) i16))
+                      (pset! d16 (+ (* i 4) 2) (convert (png_be16 cur (+ (* i 6) 4)) i16))
+                      (pset! d16 (+ (* i 4) 3) (convert 65535 i16))
+                      (set! i (+ i 1)))))
+                 void))
+              void))
+        (set! j (+ j 1)))
+      (png_when (not (null? fbuf)) (free fbuf))
+      (png_when (and (= ok 0) (not (null? out)))
+          (begin (free out) (set! out null) void))
+      out)))
+
+(bind-func png_create_image
+  "unfilter (and, if INTERLACED, de-interlace) the X by Y image in RAW; see png_create_raw"
+  (lambda (raw:i8* rawlen:i64 out_n:i64 x:i64 y:i64 img_n:i64 depth:i64 color:i64 interlaced:i64)
+    (if (= interlaced 0)
+        (png_create_raw raw rawlen out_n x y img_n depth color)
+        (let ((ob (* out_n (if (= depth 16) 2 1)))
+              (final:i8* (malloc (+ (* x y ob) 8)))
+              (sub:i8* null)
+              (tabs png_tables)
+              (p 0) (px 0) (py 0) (xo 0) (yo 0) (xs 0) (ys 0)
+              (ii 0) (jj 0) (b 0) (src 0) (dst 0) (ok 1) (off 0) (plen 0))
+          (png_when (null? final)
+              (begin (png_fail "Out of memory") (set! ok 0)))
+          (while (and (= ok 1) (< p 7))
+            (set! xo (pref tabs (+ 1476 p)))
+            (set! yo (pref tabs (+ 1483 p)))
+            (set! xs (pref tabs (+ 1490 p)))
+            (set! ys (pref tabs (+ 1497 p)))
+            (set! px (/ (+ (- x xo) xs -1) xs))
+            (set! py (/ (+ (- y yo) ys -1) ys))
+            (png_when (and (> px 0) (> py 0))
+                (begin
+                  (set! plen (* (+ (>> (+ (* img_n px depth) 7) 3) 1) py))
+                  (set! sub (png_create_raw (pref-ptr raw off) (- rawlen off) out_n px py img_n depth color))
+                  (if (null? sub)
+                      (begin (set! ok 0) void)
+                      (begin
+                        (set! jj 0)
+                        (while (< jj py)
+                          (set! ii 0)
+                          (while (< ii px)
+                            (set! src (* (+ (* jj px) ii) ob))
+                            (set! dst (* (+ (* (+ (* jj ys) yo) x) (* ii xs) xo) ob))
+                            (set! b 0)
+                            (while (< b ob)
+                              (pset! final (+ dst b) (pref sub (+ src b)))
+                              (set! b (+ b 1)))
+                            (set! ii (+ ii 1)))
+                          (set! jj (+ jj 1)))
+                        (free sub)
+                        (set! off (+ off plen))
+                        void))
+                  void))
+            (set! p (+ p 1)))
+          (png_when (and (= ok 0) (not (null? final)))
+              (begin (free final) (set! final null) void))
+          final))))
+
+(bind-func png_apply_trans8
+  "make the pixels matching the colour key TC transparent (OUT_N is 2 or 4, alpha already opaque)"
+  (lambda (p:i8* npix:i64 out_n:i64 tc:i64*)
+    (let ((i 0) (t0 (convert (pref tc 0) i8)) (t1 (convert (pref tc 1) i8)) (t2 (convert (pref tc 2) i8)))
+      (if (= out_n 2)
+          (while (< i npix)
+            (pset! p (+ (* i 2) 1) (if (= (pref p (* i 2)) t0) (convert 0 i8) (convert 255 i8)))
+            (set! i (+ i 1)))
+          (while (< i npix)
+            (png_when (and (= (pref p (* i 4)) t0) (= (pref p (+ (* i 4) 1)) t1) (= (pref p (+ (* i 4) 2)) t2))
+                (pset! p (+ (* i 4) 3) (convert 0 i8)))
+            (set! i (+ i 1))))
+      void)))
+
+(bind-func png_apply_trans16
+  (lambda (p:i16* npix:i64 out_n:i64 tc:i64*)
+    (let ((i 0) (t0 (convert (pref tc 0) i16)) (t1 (convert (pref tc 1) i16)) (t2 (convert (pref tc 2) i16)))
+      (if (= out_n 2)
+          (while (< i npix)
+            (pset! p (+ (* i 2) 1) (if (= (pref p (* i 2)) t0) (convert 0 i16) (convert 65535 i16)))
+            (set! i (+ i 1)))
+          (while (< i npix)
+            (png_when (and (= (pref p (* i 4)) t0) (= (pref p (+ (* i 4) 1)) t1) (= (pref p (+ (* i 4) 2)) t2))
+                (pset! p (+ (* i 4) 3) (convert 0 i16)))
+            (set! i (+ i 1))))
+      void)))
+
+(bind-func png_expand_palette
+  "a new image of N (3 or 4) channels from the NPIX palette indices at IDX, or null"
+  (lambda (idx:i8* npix:i64 pal:i8* n:i64)
+    (let ((p:i8* (malloc (+ (* npix n) 8)))
+          (i 0) (k 0))
+      (if (null? p)
+          (png_fail "Out of memory")
+          (if (= n 3)
+              (while (< i npix)
+                (set! k (* (png_u8 idx i) 4))
+                (pset! p (* i 3) (pref pal k))
+                (pset! p (+ (* i 3) 1) (pref pal (+ k 1)))
+                (pset! p (+ (* i 3) 2) (pref pal (+ k 2)))
+                (set! i (+ i 1)))
+              (while (< i npix)
+                (set! k (* (png_u8 idx i) 4))
+                (pset! (cast (pref-ptr p (* i 4)) i32*) 0 (pref (cast (pref-ptr pal k) i32*) 0))
+                (set! i (+ i 1)))))
+      p)))
+
+;;;;;;;;;;;;;;;;;;;;
+;; the PNG parser ;;
+;;;;;;;;;;;;;;;;;;;;
+
+(bind-func png_parse
+  "parse the LEN bytes of PNG at BUF
+
+SCAN is 0 to decode the image, 1 to check only the signature, or 2 to read the
+header (stopping at the first IDAT, as stb_image does). INFO (5 slots) receives
+the width, height, channels in the file, bit depth and channels in the decoded
+image. When decoding, RESULT receives the image: IMG_OUT_N channels of 8 bits
+(depth <= 8) or 16. REQ is the channel count asked for, which can save a
+conversion. Returns 1 on success, 0 on failure."
+  (lambda (buf:i8* len:i64 scan:i64 req:i64 info:i64* result:i8**)
+    (let ((status 0) (pos 8) (first 1) (clen 0) (ctype 0) (avail #t)
+          (x 0) (y 0) (depth 0) (color 0) (interlace 0) (img_n 0) (img_out_n 0)
+          (pal_img_n 0) (pal_len 0) (has_trans 0) (k 0) (i 0) (v 0)
+          (palette:i8* (salloc 1024))
+          (tc:i64* (salloc 3))
+          (idata:i8* null) (ioff 0) (ilimit 0) (tmpp:i8* null)
+          (expanded:i8* null) (rawlen:i64* (salloc 1)) (exres:i8** (salloc 1))
+          (out:i8* null) (out2:i8* null) (guess 0))
+      (pset! result 0 null)
+      (dotimes (i 3) (pset! tc i 0))
+      (dotimes (i 256)
+        (pset! (cast palette i32*) i (convert #xFF000000 i32)))
+      (png_when (or (< len 8)
+              (<> (png_u8 buf 0) 137) (<> (png_u8 buf 1) 80) (<> (png_u8 buf 2) 78) (<> (png_u8 buf 3) 71)
+              (<> (png_u8 buf 4) 13) (<> (png_u8 buf 5) 10) (<> (png_u8 buf 6) 26) (<> (png_u8 buf 7) 10))
+          (png_err "Not a PNG: only PNG images are supported. Convert the image to PNG first, e.g. with `magick mogrify -format png <file>`"))
+      (png_when (and (= status 0) (= scan 1)) (set! status 1))
+      (while (= status 0)
+        (if (> (+ pos 8) len)
+            (png_err "Corrupt PNG: truncated file")
+            (begin
+              (set! clen (png_be32 buf pos))
+              (set! ctype (png_be32 buf (+ pos 4)))
+              (set! pos (+ pos 8))
+              (set! avail (<= clen (- len pos)))
+              (cond
+                ;; IHDR
+                ((= ctype #x49484452)
+                 (cond
+                   ((= first 0) (png_err "Corrupt PNG: multiple IHDR"))
+                   ((<> clen 13) (png_err "Corrupt PNG: bad IHDR length"))
+                   ((not avail) (png_err "Corrupt PNG: truncated file"))
+                   (else
+                    (set! first 0)
+                    (set! x (png_be32 buf pos))
+                    (set! y (png_be32 buf (+ pos 4)))
+                    (set! depth (png_u8 buf (+ pos 8)))
+                    (set! color (png_u8 buf (+ pos 9)))
+                    (set! interlace (png_u8 buf (+ pos 12)))
+                    (cond
+                      ((or (> x 16777216) (> y 16777216))
+                       (png_err "Very large image (corrupt?)"))
+                      ((not (or (= depth 1) (= depth 2) (= depth 4) (= depth 8) (= depth 16)))
+                       (png_err "PNG not supported: 1/2/4/8/16-bit only"))
+                      ((or (> color 6) (= color 1) (= color 5)
+                           (and (= color 3) (= depth 16))
+                           (and (= (& color 2) 2) (<> color 3) (< depth 8))
+                           (and (= color 4) (< depth 8)))
+                       (png_err "Corrupt PNG: bad colour type"))
+                      ((<> (png_u8 buf (+ pos 10)) 0)
+                       (png_err "Corrupt PNG: bad compression method"))
+                      ((<> (png_u8 buf (+ pos 11)) 0)
+                       (png_err "Corrupt PNG: bad filter method"))
+                      ((> interlace 1)
+                       (png_err "Corrupt PNG: bad interlace method"))
+                      ((or (= x 0) (= y 0))
+                       (png_err "Corrupt PNG: 0-pixel image"))
+                      ((= color 3)
+                       (set! pal_img_n 3)
+                       (set! img_n 1)
+                       (png_when (< (/ (/ 1073741824 x) 4) y)
+                           (png_err "Corrupt PNG: image too large")))
+                      (else
+                       (set! img_n (+ (if (= (& color 2) 2) 3 1) (if (= (& color 4) 4) 1 0)))
+                       (png_when (< (/ (/ 1073741824 x) img_n) y)
+                           (png_err "Image too large to decode"))))
+                    void))
+                 void)
+                ((= first 1)
+                 (png_err "Corrupt PNG: first chunk not IHDR")
+                 void)
+                ;; PLTE
+                ((= ctype #x504C5445)
+                 (cond
+                   ((not avail) (png_err "Corrupt PNG: truncated file"))
+                   ((or (> clen 768) (<> (* (/ clen 3) 3) clen))
+                    (png_err "Corrupt PNG: invalid PLTE"))
+                   (else
+                    (set! pal_len (/ clen 3))
+                    (dotimes (i pal_len)
+                      (pset! palette (* i 4) (pref buf (+ pos (* i 3))))
+                      (pset! palette (+ (* i 4) 1) (pref buf (+ pos (* i 3) 1)))
+                      (pset! palette (+ (* i 4) 2) (pref buf (+ pos (* i 3) 2)))
+                      (pset! palette (+ (* i 4) 3) (convert 255 i8)))
+                    void))
+                 void)
+                ;; tRNS
+                ((= ctype #x74524E53)
+                 ;; a header scan stops here, before reading the chunk's data
+                 (cond
+                   ((not (null? idata)) (png_err "Corrupt PNG: tRNS after IDAT"))
+                   ((> pal_img_n 0)
+                    (cond ((= scan 2) (set! img_n 4) (set! status 1) void)
+                          ((not avail) (png_err "Corrupt PNG: truncated file"))
+                          ((= pal_len 0) (png_err "Corrupt PNG: tRNS before PLTE"))
+                          ((> clen pal_len) (png_err "Corrupt PNG: bad tRNS length"))
+                          (else
+                           (set! pal_img_n 4)
+                           (dotimes (i clen)
+                             (pset! palette (+ (* i 4) 3) (pref buf (+ pos i))))
+                           void)))
+                   ((= (& img_n 1) 0) (png_err "Corrupt PNG: tRNS with alpha"))
+                   ((<> clen (* img_n 2)) (png_err "Corrupt PNG: bad tRNS length"))
+                   ((= scan 2) (set! img_n (+ img_n 1)) (set! status 1) void)
+                   ((not avail) (png_err "Corrupt PNG: truncated file"))
+                   (else
+                    (set! has_trans 1)
+                    (dotimes (k img_n)
+                          (set! v (png_be16 buf (+ pos (* k 2))))
+                          (pset! tc k (if (= depth 16)
+                                          v
+                                          (& (* (& v 255) (pref png_tables (+ 1504 depth))) 255))))
+                    void))
+                 void)
+                ;; IDAT
+                ((= ctype #x49444154)
+                 (cond
+                   ((and (> pal_img_n 0) (= pal_len 0)) (png_err "Corrupt PNG: no PLTE"))
+                   ((= scan 2)
+                    (png_when (> pal_img_n 0) (set! img_n pal_img_n))
+                    (set! status 1) void)
+                   ((or (not avail) (> clen 1073741824))
+                    (png_err "Corrupt PNG: truncated file"))
+                   (else
+                    (png_when (> (+ ioff clen) ilimit)
+                        (begin
+                          (png_when (= ilimit 0) (set! ilimit (if (> clen 4096) clen 4096)))
+                          (while (> (+ ioff clen) ilimit) (set! ilimit (* ilimit 2)))
+                          (set! tmpp (realloc idata ilimit))
+                          (if (null? tmpp)
+                              (png_err "Out of memory")
+                              (begin (set! idata tmpp) void))
+                          void))
+                    (png_when (= status 0)
+                        (begin
+                          (memcpy (pref-ptr idata ioff) (pref-ptr buf pos) clen)
+                          (set! ioff (+ ioff clen))
+                          void))
+                    void))
+                 void)
+                ;; IEND
+                ((= ctype #x49454E44)
+                 (cond
+                   ((<> scan 0) (set! status 1) void)
+                   ((null? idata) (png_err "Corrupt PNG: no IDAT"))
+                   (else
+                    (set! guess (+ (* (+ (>> (+ (* img_n x depth) 7) 3) 1) y) 64))
+                    (set! expanded (malloc guess))
+                    (if (null? expanded)
+                        (png_err "Out of memory")
+                        (begin
+                          (png_when (= (png_inflate idata ioff expanded guess #t #t exres rawlen) 0)
+                              (set! status -1))
+                          (set! expanded (pref exres 0))
+                          void))
+                    (free idata)
+                    (set! idata null)
+                    (png_when (= status 0)
+                        (begin
+                          (set! img_out_n
+                                (if (or (and (= req (+ img_n 1)) (<> req 3) (= pal_img_n 0))
+                                        (= has_trans 1))
+                                    (+ img_n 1)
+                                    img_n))
+                          (set! out (png_create_image expanded (pref rawlen 0) img_out_n x y img_n depth color interlace))
+                          (png_when (null? out) (set! status -1))
+                          void))
+                    (png_when (not (null? expanded)) (free expanded))
+                    (set! expanded null)
+                    (png_when (= status 0)
+                        (begin
+                          (png_when (= has_trans 1)
+                              (if (= depth 16)
+                                  (png_apply_trans16 (cast out i16*) (* x y) img_out_n tc)
+                                  (png_apply_trans8 out (* x y) img_out_n tc)))
+                          (cond
+                            ((> pal_img_n 0)
+                             (set! img_n pal_img_n)
+                             (set! img_out_n (if (>= req 3) req pal_img_n))
+                             (set! out2 (png_expand_palette out (* x y) palette img_out_n))
+                             (free out)
+                             (set! out out2)
+                             (png_when (null? out) (set! status -1)))
+                            ((= has_trans 1)
+                             (set! img_n (+ img_n 1)) void))
+                          (png_when (= status 0) (set! status 1))
+                          void))
+                    void))
+                 void)
+                ;; anything else: skip it if it's ancillary
+                ((= (& ctype #x20000000) 0)
+                 (png_err "PNG not supported: unknown critical PNG chunk type")
+                 void)
+                (else void))
+              (set! pos (+ pos clen 4))
+              void)))
+      (png_when (not (null? idata)) (free idata))
+      (pset! info 0 x)
+      (pset! info 1 y)
+      (pset! info 2 img_n)
+      (pset! info 3 depth)
+      (pset! info 4 img_out_n)
+      (if (= status 1)
+          (begin (pset! result 0 out) 1)
+          (begin (png_when (not (null? out)) (free out)) 0)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; format conversion and postprocess ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-macro
+  "loop over NPIX pixels, stepping the src index S by A and the dest index D by B"
+  (png_cvt a b body)
+  `(begin
+     (set! i 0) (set! s 0) (set! d 0)
+     (while (< i npix)
+       ,body
+       (set! s (+ s ,a))
+       (set! d (+ d ,b))
+       (set! i (+ i 1)))
+     void))
+
+(bind-macro
+  "stb_image's luma from three samples of SRC at S"
+  (png_luma src)
+  `(>> (+ (* (png_u8 ,src s) 77) (* (png_u8 ,src (+ s 1)) 150) (* (png_u8 ,src (+ s 2)) 29)) 8))
+
+(bind-macro
+  "stb_image's luma from three 16-bit samples of SRC at S"
+  (png_luma16 src)
+  `(>> (+ (* (i16toui64 (pref ,src s)) 77) (* (i16toui64 (pref ,src (+ s 1))) 150)
+          (* (i16toui64 (pref ,src (+ s 2))) 29))
+       8))
+
+(bind-func png_convert8
+  "convert NPIX pixels of IMG_N 8-bit channels to REQ channels, freeing DATA; null on failure"
+  (lambda (data:i8* img_n:i64 req:i64 npix:i64)
+    (let ((g:i8* (malloc (+ (* npix req) 8)))
+          (combo (+ (* img_n 8) req))
+          (i 0) (s 0) (d 0) (ff (convert 255 i8)))
+      (if (null? g)
+          (png_fail "Out of memory")
+          (cond
+            ((= combo 10) (png_cvt 1 2 (begin (pset! g d (pref data s)) (pset! g (+ d 1) ff))))
+            ((= combo 11) (png_cvt 1 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)))))
+            ((= combo 12) (png_cvt 1 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)) (pset! g (+ d 3) ff))))
+            ((= combo 17) (png_cvt 2 1 (pset! g d (pref data s))))
+            ((= combo 19) (png_cvt 2 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)))))
+            ((= combo 20) (png_cvt 2 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)) (pset! g (+ d 3) (pref data (+ s 1))))))
+            ((= combo 28) (png_cvt 3 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data (+ s 1))) (pset! g (+ d 2) (pref data (+ s 2))) (pset! g (+ d 3) ff))))
+            ((= combo 25) (png_cvt 3 1 (pset! g d (convert (png_luma data) i8))))
+            ((= combo 26) (png_cvt 3 2 (begin (pset! g d (convert (png_luma data) i8)) (pset! g (+ d 1) ff))))
+            ((= combo 33) (png_cvt 4 1 (pset! g d (convert (png_luma data) i8))))
+            ((= combo 34) (png_cvt 4 2 (begin (pset! g d (convert (png_luma data) i8)) (pset! g (+ d 1) (pref data (+ s 3))))))
+            ((= combo 35) (png_cvt 4 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data (+ s 1))) (pset! g (+ d 2) (pref data (+ s 2))))))
+            (else
+             (png_fail "Unsupported format conversion")
+             (free g)
+             (set! g null)
+             void)))
+      (free data)
+      g)))
+
+(bind-func png_convert16
+  "convert NPIX pixels of IMG_N 16-bit channels to REQ channels, freeing DATA; null on failure"
+  (lambda (data:i16* img_n:i64 req:i64 npix:i64)
+    (let ((g:i16* (cast (malloc (+ (* npix req 2) 8)) i16*))
+          (combo (+ (* img_n 8) req))
+          (i 0) (s 0) (d 0) (ff (convert 65535 i16)))
+      (if (null? g)
+          (png_fail "Out of memory")
+          (cond
+            ((= combo 10) (png_cvt 1 2 (begin (pset! g d (pref data s)) (pset! g (+ d 1) ff))))
+            ((= combo 11) (png_cvt 1 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)))))
+            ((= combo 12) (png_cvt 1 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)) (pset! g (+ d 3) ff))))
+            ((= combo 17) (png_cvt 2 1 (pset! g d (pref data s))))
+            ((= combo 19) (png_cvt 2 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)))))
+            ((= combo 20) (png_cvt 2 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data s)) (pset! g (+ d 2) (pref data s)) (pset! g (+ d 3) (pref data (+ s 1))))))
+            ((= combo 28) (png_cvt 3 4 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data (+ s 1))) (pset! g (+ d 2) (pref data (+ s 2))) (pset! g (+ d 3) ff))))
+            ((= combo 25) (png_cvt 3 1 (pset! g d (convert (png_luma16 data) i16))))
+            ((= combo 26) (png_cvt 3 2 (begin (pset! g d (convert (png_luma16 data) i16)) (pset! g (+ d 1) ff))))
+            ((= combo 33) (png_cvt 4 1 (pset! g d (convert (png_luma16 data) i16))))
+            ((= combo 34) (png_cvt 4 2 (begin (pset! g d (convert (png_luma16 data) i16)) (pset! g (+ d 1) (pref data (+ s 3))))))
+            ((= combo 35) (png_cvt 4 3 (begin (pset! g d (pref data s)) (pset! g (+ d 1) (pref data (+ s 1))) (pset! g (+ d 2) (pref data (+ s 2))))))
+            (else
+             (png_fail "Unsupported format conversion")
+             (free (cast g i8*))
+             (set! g null)
+             void)))
+      (free (cast data i8*))
+      g)))
+
+(bind-func png_flip_rows
+  "flip the H rows of ROWBYTES bytes at IMAGE top to bottom, in place"
+  (lambda (image:i8* rowbytes:i64 h:i64)
+    (let ((tmp:i8* (malloc (+ rowbytes 1)))
+          (row 0) (r0:i8* null) (r1:i8* null))
+      (png_when (not (null? tmp))
+          (begin
+            (while (< row (/ h 2))
+              (set! r0 (pref-ptr image (* row rowbytes)))
+              (set! r1 (pref-ptr image (* (- h row 1) rowbytes)))
+              (memcpy tmp r0 rowbytes)
+              (memcpy r0 r1 rowbytes)
+              (memcpy r1 tmp rowbytes)
+              (set! row (+ row 1)))
+            (free tmp)
+            void))
+      void)))
+
+(bind-func png_load_main
+  "decode the PNG in BUF, with REQ channels (0 for as many as the file has) of 16 bits if WANT16 or 8 otherwise"
+  (lambda (buf:i8* len:i64 x:i32* y:i32* comp:i32* req:i64 want16:i1)
+    (let ((info:i64* (salloc 5))
+          (res:i8** (salloc 1))
+          (img:i8* null) (w 0) (h 0) (n 0) (depth 0) (img_out_n 0) (npix 0) (i 0)
+          (small:i8* null) (big:i16* null) (orig16:i16* null))
+      (if (or (< req 0) (> req 4))
+          (begin (png_fail "Internal error: bad req_comp") void)
+          (png_when (= (png_parse buf len 0 req info res) 1)
+              (begin
+                (set! img (pref res 0))
+                (set! w (pref info 0))
+                (set! h (pref info 1))
+                (set! n (pref info 2))
+                (set! depth (pref info 3))
+                (set! img_out_n (pref info 4))
+                (set! npix (* w h))
+                (png_when (and (> req 0) (<> req img_out_n))
+                    (begin
+                      (if (= depth 16)
+                          (begin (set! img (cast (png_convert16 (cast img i16*) img_out_n req npix) i8*)) void)
+                          (begin (set! img (png_convert8 img img_out_n req npix)) void))
+                      (set! img_out_n req)
+                      void))
+                (png_when (not (null? img))
+                    (begin
+                      (cond
+                        ((and (= depth 16) (not want16))
+                         (set! small (malloc (+ (* npix img_out_n) 8)))
+                         (set! orig16 (cast img i16*))
+                         (if (not (null? small))
+                             (dotimes (i (* npix img_out_n))
+                               (pset! small i (convert (>> (i16toui64 (pref orig16 i)) 8) i8)))
+                             (png_fail "Out of memory"))
+                         (free img)
+                         (set! img small) void)
+                        ((and (<> depth 16) want16)
+                         (set! big (cast (malloc (+ (* npix img_out_n 2) 8)) i16*))
+                         (if (not (null? big))
+                             (dotimes (i (* npix img_out_n))
+                               (pset! big i (convert (* (png_u8 img i) 257) i16)))
+                             (png_fail "Out of memory"))
+                         (free img)
+                         (set! img (cast big i8*)) void))
+                      (png_when (and (not (null? img)) (<> png_flip_on_load 0))
+                          (png_flip_rows img (* w img_out_n (if want16 2 1)) h))
+                      (png_when (not (null? img))
+                          (begin
+                            (png_when (not (null? x)) (pset! x 0 (convert w i32)))
+                            (png_when (not (null? y)) (pset! y 0 (convert h i32)))
+                            (png_when (not (null? comp)) (pset! comp 0 (convert n i32)))
+                            void))
+                      void))
+                void)))
+      img)))
+
+(bind-func png_slurp
+  "read the whole file at PATH into a malloc'd buffer, storing its length in LENPTR; null on failure"
+  (lambda (path:i8* lenptr:i64*)
+    (let ((fp (fopen path "rb"))
+          (len 0) (buf:i8* null))
+      (if (null? fp)
+          (begin (png_fail "Unable to open file") null)
+          (begin
+            (fseek fp 0 2)
+            (set! len (ftell fp))
+            (fseek fp 0 0)
+            (png_when (< len 0) (set! len 0))
+            (set! buf (malloc (+ len 1)))
+            (if (null? buf)
+                (png_fail "Out of memory")
+                (png_when (<> (fread buf 1 len fp) len)
+                    (begin
+                      (png_fail "Unable to read file")
+                      (free buf)
+                      (set! buf null)
+                      void)))
+            (fclose fp)
+            (pset! lenptr 0 len)
+            buf)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the stb_image reading functions ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func stbi_failure_reason
+  "a brief description of the last failure"
+  (lambda ()
+    png_failure))
+
+(bind-func stbi_image_free
+  "free an image returned by one of the load functions"
+  (lambda (data:i8*)
+    (png_when (not (null? data)) (free data))
+    void))
+
+(bind-func stbi_set_flip_vertically_on_load
+  "when FLAG is non-zero, images load bottom row first"
+  (lambda (flag:i32)
+    (set! png_flip_on_load flag)
+    void))
+
+(bind-func stbi_load_from_memory
+  "decode the PNG in the LEN bytes at BUFFER to 8 bits per channel
+
+X, Y and COMP receive the width, height and the number of channels in the file.
+DESIRED_CHANNELS (1 grey, 2 grey+alpha, 3 RGB, 4 RGBA, or 0 for the file's own)
+sets the number of channels in the result. Returns null on failure; see
+stbi_failure_reason."
+  (lambda (buffer:i8* len:i32 x:i32* y:i32* comp:i32* desired_channels:i32)
+    (png_load_main buffer (convert len i64) x y comp (convert desired_channels i64) #f)))
+
+(bind-func stbi_load
+  "decode the PNG file at FILENAME to 8 bits per channel; see stbi_load_from_memory"
+  (lambda (filename:i8* x:i32* y:i32* comp:i32* desired_channels:i32)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (png_slurp filename lenptr))
+          (img:i8* null))
+      (png_when (not (null? buf))
+          (begin
+            (set! img (png_load_main buf (pref lenptr 0) x y comp (convert desired_channels i64) #f))
+            (free buf)
+            void))
+      img)))
+
+(bind-func stbi_load_16_from_memory
+  "decode the PNG in the LEN bytes at BUFFER to 16 bits per channel; see stbi_load_from_memory"
+  (lambda (buffer:i8* len:i32 x:i32* y:i32* comp:i32* desired_channels:i32)
+    (cast (png_load_main buffer (convert len i64) x y comp (convert desired_channels i64) #t) i16*)))
+
+(bind-func stbi_load_16
+  "decode the PNG file at FILENAME to 16 bits per channel; see stbi_load_from_memory"
+  (lambda (filename:i8* x:i32* y:i32* comp:i32* desired_channels:i32)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (png_slurp filename lenptr))
+          (img:i8* null))
+      (png_when (not (null? buf))
+          (begin
+            (set! img (png_load_main buf (pref lenptr 0) x y comp (convert desired_channels i64) #t))
+            (free buf)
+            void))
+      (cast img i16*))))
+
+(bind-func stbi_info_from_memory
+  "read the width, height and channel count of the PNG at BUFFER without decoding it; 1 on success, 0 on failure"
+  (lambda (buffer:i8* len:i32 x:i32* y:i32* comp:i32*)
+    (let ((info:i64* (salloc 5))
+          (res:i8** (salloc 1)))
+      (if (= (png_parse buffer (convert len i64) 2 0 info res) 1)
+          (begin
+            (png_when (not (null? x)) (pset! x 0 (convert (pref info 0) i32)))
+            (png_when (not (null? y)) (pset! y 0 (convert (pref info 1) i32)))
+            (png_when (not (null? comp)) (pset! comp 0 (convert (pref info 2) i32)))
+            1:i32)
+          0:i32))))
+
+(bind-func stbi_info
+  "read the width, height and channel count of the PNG file at FILENAME; 1 on success, 0 on failure"
+  (lambda (filename:i8* x:i32* y:i32* comp:i32*)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (png_slurp filename lenptr))
+          (res 0:i32))
+      (png_when (not (null? buf))
+          (begin
+            (set! res (stbi_info_from_memory buf (convert (pref lenptr 0) i32) x y comp))
+            (free buf)
+            void))
+      res)))
+
+(bind-func stbi_is_16_bit_from_memory
+  "1 if the PNG at BUFFER has 16 bits per channel, else 0"
+  (lambda (buffer:i8* len:i32)
+    (let ((info:i64* (salloc 5))
+          (res:i8** (salloc 1)))
+      (if (and (= (png_parse buffer (convert len i64) 2 0 info res) 1)
+               (= (pref info 3) 16))
+          1:i32
+          0:i32))))
+
+(bind-func stbi_is_16_bit
+  "1 if the PNG file at FILENAME has 16 bits per channel, else 0"
+  (lambda (filename:i8*)
+    (let ((lenptr:i64* (salloc 1))
+          (buf (png_slurp filename lenptr))
+          (res 0:i32))
+      (png_when (not (null? buf))
+          (begin
+            (set! res (stbi_is_16_bit_from_memory buf (convert (pref lenptr 0) i32)))
+            (free buf)
+            void))
+      res)))
+
+(bind-func stbi_flip_vertically
+  "flip an image of HEIGHT rows of WIDTH pixels of NCOMP bytes top to bottom, in place"
+  (lambda (width:i32 height:i32 ncomp:i32 data:i8*)
+    (png_flip_rows data (* (convert width i64) (convert ncomp i64)) (convert height i64))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; the zlib decoder API ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func stbi_zlib_decode_malloc_guesssize_headerflag
+  "inflate LEN bytes of zlib data (raw deflate if PARSE_HEADER is 0) into a new malloc'd buffer, starting with INITIAL_SIZE bytes; null on failure"
+  (lambda (buffer:i8* len:i32 initial_size:i32 outlen:i32* parse_header:i32)
+    (let ((init (if (< initial_size 1) 1 (convert initial_size i64)))
+          (p (malloc init))
+          (res:i8** (salloc 1))
+          (olen:i64* (salloc 1))
+          (out:i8* null))
+      (if (null? p)
+          (png_fail "Out of memory")
+          (if (= (png_inflate buffer (convert len i64) p init #t (<> parse_header 0) res olen) 1)
+              (begin
+                (set! out (pref res 0))
+                (png_when (not (null? outlen)) (pset! outlen 0 (convert (pref olen 0) i32)))
+                void)
+              (begin (free (pref res 0)) void)))
+      out)))
+
+(bind-func stbi_zlib_decode_malloc_guesssize
+  (lambda (buffer:i8* len:i32 initial_size:i32 outlen:i32*)
+    (stbi_zlib_decode_malloc_guesssize_headerflag buffer len initial_size outlen 1)))
+
+(bind-func stbi_zlib_decode_malloc
+  (lambda (buffer:i8* len:i32 outlen:i32*)
+    (stbi_zlib_decode_malloc_guesssize_headerflag buffer len 16384 outlen 1)))
+
+(bind-func stbi_zlib_decode_noheader_malloc
+  (lambda (buffer:i8* len:i32 outlen:i32*)
+    (stbi_zlib_decode_malloc_guesssize_headerflag buffer len 16384 outlen 0)))
+
+(bind-func png_zlib_decode_buffer
+  (lambda (obuffer:i8* olen:i32 ibuffer:i8* ilen:i32 parse_header:i1)
+    (let ((res:i8** (salloc 1))
+          (olen64:i64* (salloc 1)))
+      (if (= (png_inflate ibuffer (convert ilen i64) obuffer (convert olen i64) #f parse_header res olen64) 1)
+          (convert (pref olen64 0) i32)
+          -1:i32))))
+
+(bind-func stbi_zlib_decode_buffer
+  "inflate ILEN bytes of zlib data into the OLEN bytes at OBUFFER, returning the number of bytes written or -1"
+  (lambda (obuffer:i8* olen:i32 ibuffer:i8* ilen:i32)
+    (png_zlib_decode_buffer obuffer olen ibuffer ilen #t)))
+
+(bind-func stbi_zlib_decode_noheader_buffer
+  "inflate ILEN bytes of raw deflate data into the OLEN bytes at OBUFFER, returning the number of bytes written or -1"
+  (lambda (obuffer:i8* olen:i32 ibuffer:i8* ilen:i32)
+    (png_zlib_decode_buffer obuffer olen ibuffer ilen #f)))
+
+;;;;;;;;;;;;;
+;; deflate ;;
+;;;;;;;;;;;;;
+
+(bind-macro
+  "append the NB-bit CODE to the deflate output"
+  (png_putbits code nb)
+  `(begin
+     (set! bitbuf (bor bitbuf (<< ,code bitcnt)))
+     (set! bitcnt (+ bitcnt ,nb))
+     (png_when (>= bitcnt 32)
+         (begin
+           (pset! (cast (pref-ptr out op) i32*) 0 (convert bitbuf i32))
+           (set! op (+ op 4))
+           (set! bitbuf (>> bitbuf 32))
+           (set! bitcnt (- bitcnt 32))
+           void))
+     void))
+
+(bind-macro
+  "hash the three bytes at DATA[P]"
+  (png_hash p)
+  `(& (>> (* (bor (bor (png_u8 data ,p) (<< (png_u8 data (+ ,p 1)) 8)) (<< (png_u8 data (+ ,p 2)) 16))
+             2654435761)
+          16)
+      32767))
+
+(bind-func png_adler32
+  (lambda (data:i8* n:i64)
+    (let ((s1 1) (s2 0) (i 0) (blk 0) (j 0))
+      (while (< i n)
+        (set! blk (if (< (- n i) 5552) (- n i) 5552))
+        (set! j 0)
+        (while (< j blk)
+          (set! s1 (+ s1 (png_u8 data (+ i j))))
+          (set! s2 (+ s2 s1))
+          (set! j (+ j 1)))
+        (set! s1 (% s1 65521))
+        (set! s2 (% s2 65521))
+        (set! i (+ i blk)))
+      (bor (<< s2 16) s1))))
+
+(bind-func png_deflate
+  "compress the N bytes at DATA into a new malloc'd zlib stream, storing its length in OUTLEN
+
+One block of fixed Huffman codes, with matches from hash chains."
+  (lambda (data:i8* n:i64 outlen:i64*)
+    (let ((cap (+ n (>> n 3) 64))
+          (out:i8* (malloc cap))
+          (head:i32* (cast (malloc (* 32768 4)) i32*))
+          (prev:i32* (cast (malloc (* 32768 4)) i32*))
+          (tabs png_tables)
+          (lbase tabs) (lextra (pref-ptr tabs 32))
+          (dbase (pref-ptr tabs 64)) (dextra (pref-ptr tabs 96))
+          (fixed (pref-ptr tabs 416)) (len2sym (pref-ptr tabs 704))
+          (dsmall (pref-ptr tabs 964)) (dlarge (pref-ptr tabs 1220)) (rev5 (pref-ptr tabs 1520))
+          (op 2) (bitbuf 0) (bitcnt 0)
+          (i 0) (h 0) (cand 0) (nxt 0) (chain 0) (best 0) (bestd 0) (maxlen 0) (l 0)
+          (e 0) (c 0) (p 0) (adler 0))
+      (if (or (null? out) (null? head) (null? prev))
+          (begin
+            (png_fail "Out of memory")
+            (png_when (not (null? out)) (free out))
+            (set! out null)
+            void)
+          (begin
+            (memset (cast head i8*) 255 (* 32768 4))
+            (pset! out 0 (convert #x78 i8))
+            (pset! out 1 (convert #x5e i8))
+            ;; final block, fixed codes
+            (png_putbits 3 3)
+            (while (< i n)
+              (set! best 0)
+              (set! bestd 0)
+              (png_when (<= (+ i 3) n)
+                  (begin
+                    (set! h (png_hash i))
+                    (set! cand (convert (pref head h) i64))
+                    (set! maxlen (if (< (- n i) 258) (- n i) 258))
+                    (set! chain 32)
+                    (while (and (>= cand 0) (> chain 0) (<= (- i cand) 32768))
+                      (png_when (= (pref data (+ cand best)) (pref data (+ i best)))
+                          (begin
+                            (set! l 0)
+                            (while (and (<= (+ l 8) maxlen)
+                                        (= (pref (cast (pref-ptr data (+ cand l)) i64*) 0)
+                                           (pref (cast (pref-ptr data (+ i l)) i64*) 0)))
+                              (set! l (+ l 8)))
+                            (while (and (< l maxlen) (= (pref data (+ cand l)) (pref data (+ i l))))
+                              (set! l (+ l 1)))
+                            (png_when (> l best)
+                                (begin
+                                  (set! best l)
+                                  (set! bestd (- i cand))
+                                  (png_when (>= l maxlen) (set! chain 0))
+                                  void))
+                            void))
+                      (set! nxt (convert (pref prev (& cand 32767)) i64))
+                      (set! cand (if (>= nxt cand) -1 nxt))
+                      (set! chain (- chain 1)))
+                    (pset! prev (& i 32767) (pref head h))
+                    (pset! head h (convert i i32))
+                    void))
+              (if (>= best 3)
+                  (begin
+                    ;; length
+                    (set! c (pref len2sym best))
+                    (set! e (pref fixed (+ 257 c)))
+                    (png_putbits (& e 65535) (>> e 16))
+                    (png_putbits (- best (pref lbase c)) (pref lextra c))
+                    ;; distance
+                    (set! c (if (<= bestd 256) (pref dsmall (- bestd 1)) (pref dlarge (>> (- bestd 1) 7))))
+                    (png_putbits (pref rev5 c) 5)
+                    (png_putbits (- bestd (pref dbase c)) (pref dextra c))
+                    ;; hash the positions the match covers
+                    (set! p (+ i 1))
+                    (set! i (+ i best))
+                    (while (and (< p i) (<= (+ p 3) n))
+                      (set! h (png_hash p))
+                      (pset! prev (& p 32767) (pref head h))
+                      (pset! head h (convert p i32))
+                      (set! p (+ p 1)))
+                    void)
+                  (begin
+                    (set! e (pref fixed (png_u8 data i)))
+                    (png_putbits (& e 65535) (>> e 16))
+                    (set! i (+ i 1))
+                    void)))
+            ;; end of block, then flush to a byte boundary
+            (set! e (pref fixed 256))
+            (png_putbits (& e 65535) (>> e 16))
+            (while (> bitcnt 0)
+              (pset! out op (convert (& bitbuf 255) i8))
+              (set! op (+ op 1))
+              (set! bitbuf (>> bitbuf 8))
+              (set! bitcnt (- bitcnt 8)))
+            (set! adler (png_adler32 data n))
+            (pset! out op (convert (>> adler 24) i8))
+            (pset! out (+ op 1) (convert (>> adler 16) i8))
+            (pset! out (+ op 2) (convert (>> adler 8) i8))
+            (pset! out (+ op 3) (convert adler i8))
+            (set! op (+ op 4))
+            (pset! outlen 0 op)
+            void))
+      (png_when (not (null? head)) (free (cast head i8*)))
+      (png_when (not (null? prev)) (free (cast prev i8*)))
+      out)))
+
+(bind-func stbi_zlib_compress
+  "compress DATA_LEN bytes at DATA into a new malloc'd zlib stream; QUALITY is ignored"
+  (lambda (data:i8* data_len:i32 out_len:i32* quality:i32)
+    (let ((olen:i64* (salloc 1))
+          (out (png_deflate data (convert data_len i64) olen)))
+      (png_when (and (not (null? out)) (not (null? out_len)))
+          (pset! out_len 0 (convert (pref olen 0) i32)))
+      out)))
+
+;;;;;;;;;;;;;;;;;;;
+;; writing a PNG ;;
+;;;;;;;;;;;;;;;;;;;
+
+(bind-func png_crc32
+  "the CRC-32 of the N bytes at P"
+  (lambda (p:i8* n:i64)
+    (let ((c #xFFFFFFFF) (i 0) (crc (pref-ptr png_tables 160)))
+      (while (< i n)
+        (set! c (^ (pref crc (& (^ c (png_u8 p i)) 255)) (>> c 8)))
+        (set! i (+ i 1)))
+      (^ c #xFFFFFFFF))))
+
+(bind-func png_encode_line
+  "filter row Y of the W x H image at PIXELS (N bytes a pixel, rows STRIDE bytes apart) with FTYPE into LINE"
+  (lambda (pixels:i8* stride:i64 w:i64 h:i64 y:i64 n:i64 ftype:i64 line:i8* flip:i1)
+    (let ((type ftype)
+          (z (pref-ptr pixels (* stride (if flip (- h 1 y) y))))
+          (up (pref-ptr z (if flip stride (- 0 stride))))
+          (wn (* w n))
+          (i 0) (a 0) (b 0) (c 0) (th 0) (lo 0) (hi 0) (t0 0))
+      ;; on row 0 there's no row above: up and paeth become none and sub
+      (png_when (= y 0)
+          (set! type (cond ((= ftype 2) 0) ((= ftype 3) 5) ((= ftype 4) 6) (else ftype))))
+      (cond
+        ((= type 0) (memcpy line z wn) void)
+        ((or (= type 1) (= type 6))
+         (memcpy line z n)
+         (set! i n)
+         (while (< i wn) (pset! line i (- (pref z i) (pref z (- i n)))) (set! i (+ i 1)))
+         void)
+        ((= type 2)
+         (while (< i wn) (pset! line i (- (pref z i) (pref up i))) (set! i (+ i 1)))
+         void)
+        ((= type 3)
+         (while (< i n)
+           (pset! line i (- (pref z i) (convert (>> (png_u8 up i) 1) i8)))
+           (set! i (+ i 1)))
+         (while (< i wn)
+           (pset! line i (- (pref z i) (convert (>> (+ (png_u8 z (- i n)) (png_u8 up i)) 1) i8)))
+           (set! i (+ i 1)))
+         void)
+        ((= type 4)
+         (while (< i n) (pset! line i (- (pref z i) (pref up i))) (set! i (+ i 1)))
+         (while (< i wn)
+           (set! a (png_u8 z (- i n)))
+           (set! b (png_u8 up i))
+           (set! c (png_u8 up (- i n)))
+           (set! th (- (* c 3) (+ a b)))
+           (set! lo (if (< a b) a b))
+           (set! hi (if (< a b) b a))
+           (set! t0 (if (<= hi th) lo c))
+           (pset! line i (- (pref z i) (convert (if (<= th lo) hi t0) i8)))
+           (set! i (+ i 1)))
+         void)
+        (else
+         ;; 5: average with no row above
+         (memcpy line z n)
+         (set! i n)
+         (while (< i wn)
+           (pset! line i (- (pref z i) (convert (>> (png_u8 z (- i n)) 1) i8)))
+           (set! i (+ i 1)))
+         void))
+      void)))
+
+(bind-func png_put_chunk
+  "write a chunk with tag TAG and the LEN bytes of DATA at O, returning the new offset"
+  (lambda (o:i8* off:i64 tag:i8* data:i8* len:i64)
+    (let ((crc 0) (i 0))
+      (dotimes (i 4) (pset! o (+ off i) (convert (>> len (* 8 (- 3 i))) i8)))
+      (memcpy (pref-ptr o (+ off 4)) tag 4)
+      (png_when (> len 0) (memcpy (pref-ptr o (+ off 8)) data len))
+      (set! crc (png_crc32 (pref-ptr o (+ off 4)) (+ len 4)))
+      (dotimes (i 4) (pset! o (+ off 8 len i) (convert (>> crc (* 8 (- 3 i))) i8)))
+      (+ off len 12))))
+
+(bind-func stbi_write_png_to_mem
+  "encode the X x Y image of N (1..4) 8-bit channels at PIXELS (rows STRIDE_BYTES apart, or packed if 0) as a PNG in a new malloc'd buffer, storing its length in OUT_LEN; null on failure"
+  (lambda (pixels:i8* stride_bytes:i32 x:i32 y:i32 n:i32 out_len:i32*)
+    (let ((w (convert x i64)) (h (convert y i64)) (nc (convert n i64))
+          (stride (convert stride_bytes i64))
+          (wn 0) (filt:i8* null) (line:i8* null) (zlib:i8* null) (out:i8* null)
+          (zlen:i64* (salloc 1)) (hdr:i8* (salloc 13))
+          (j 0) (ft 0) (best 0) (bestval 0) (est 0) (i 0) (sv 0) (off 0)
+          (flip (<> png_flip_on_write 0)))
+      (if (or (< nc 1) (> nc 4) (< w 1) (< h 1) (null? pixels))
+          (begin (png_fail "Bad image dimensions or channel count") null)
+          (begin
+            (set! wn (* w nc))
+            (png_when (= stride 0) (set! stride wn))
+            (set! filt (malloc (* (+ wn 1) h)))
+            (set! line (malloc wn))
+            (if (and (not (null? filt)) (not (null? line)))
+                (begin
+                  (while (< j h)
+                    ;; pick the filter whose output has the smallest sum of
+                    ;; absolute (signed) values
+                    (set! best 0)
+                    (set! bestval 9223372036854775807)
+                    (set! ft 0)
+                    (while (< ft 5)
+                      (png_encode_line pixels stride w h j nc ft line flip)
+                      (set! est 0)
+                      (set! i 0)
+                      (while (< i wn)
+                        (set! sv (convert (pref line i) i64))
+                        (set! est (+ est (if (< sv 0) (- 0 sv) sv)))
+                        (set! i (+ i 1)))
+                      (png_when (< est bestval)
+                          (begin (set! bestval est) (set! best ft) void))
+                      (set! ft (+ ft 1)))
+                    (png_when (<> best 4)
+                        (png_encode_line pixels stride w h j nc best line flip))
+                    (pset! filt (* j (+ wn 1)) (convert best i8))
+                    (memcpy (pref-ptr filt (+ (* j (+ wn 1)) 1)) line wn)
+                    (set! j (+ j 1)))
+                  (set! zlib (png_deflate filt (* (+ wn 1) h) zlen))
+                  void)
+                (png_fail "Out of memory"))
+            (png_when (not (null? filt)) (free filt))
+            (png_when (not (null? line)) (free line))
+            (png_when (not (null? zlib))
+                (begin
+                  (set! out (malloc (+ 8 12 13 12 (pref zlen 0) 12)))
+                  (if (null? out)
+                      (png_fail "Out of memory")
+                      (begin
+                        (pfill! out (convert 137 i8) (convert 80 i8) (convert 78 i8) (convert 71 i8)
+                                (convert 13 i8) (convert 10 i8) (convert 26 i8) (convert 10 i8))
+                        (dotimes (i 4)
+                          (pset! hdr i (convert (>> w (* 8 (- 3 i))) i8))
+                          (pset! hdr (+ 4 i) (convert (>> h (* 8 (- 3 i))) i8)))
+                        (pset! hdr 8 (convert 8 i8))
+                        (pset! hdr 9 (convert (cond ((= nc 1) 0) ((= nc 2) 4) ((= nc 3) 2) (else 6)) i8))
+                        (pset! hdr 10 (convert 0 i8))
+                        (pset! hdr 11 (convert 0 i8))
+                        (pset! hdr 12 (convert 0 i8))
+                        (set! off (png_put_chunk out 8 "IHDR" hdr 13))
+                        (set! off (png_put_chunk out off "IDAT" zlib (pref zlen 0)))
+                        (set! off (png_put_chunk out off "IEND" null 0))
+                        (png_when (not (null? out_len)) (pset! out_len 0 (convert off i32)))
+                        void))
+                  (free zlib)
+                  void))
+            out)))))
+
+(bind-func stbi_write_png
+  "write the X x Y image of COMP (1..4) 8-bit channels at DATA (rows STRIDE_BYTES apart, or packed if 0) to FILENAME as a PNG; 1 on success, 0 on failure"
+  (lambda (filename:i8* x:i32 y:i32 comp:i32 data:i8* stride_bytes:i32)
+    (let ((len:i32* (salloc 1))
+          (png (stbi_write_png_to_mem data stride_bytes x y comp len))
+          (fp:i8* null)
+          (res 0:i32))
+      (png_when (not (null? png))
+          (begin
+            (set! fp (fopen filename "wb"))
+            (if (null? fp)
+                (png_fail "Unable to open file for writing")
+                (begin
+                  (if (= (fwrite png 1 (convert (pref len 0) i64) fp) (convert (pref len 0) i64))
+                      (begin (set! res 1) void)
+                      (png_fail "Unable to write file"))
+                  (fclose fp)
+                  void))
+            (free png)
+            void))
+      res)))
+
+(bind-func stbi_flip_vertically_on_write
+  "when FLAG is non-zero, stbi_write_png writes the bottom row first"
+  (lambda (flag:i32)
+    (set! png_flip_on_write flag)
+    void))
+
+(xtc:aot:insert-footer "xtmpng")
+(define *xtmlib-png-loaded* #t)

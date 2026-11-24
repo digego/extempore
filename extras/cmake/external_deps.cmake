@@ -1,15 +1,13 @@
 # External shared library dependencies for Extempore
 # Requires: EXTERNAL_SHLIBS_AUDIO, EXTERNAL_SHLIBS_GRAPHICS options
-# Sets up: the library targets and the platform-shlibs copy targets. Libraries
-# with a CMake build of their own are ExternalProjects; stb_image is compiled
-# here straight into platform-shlibs.
+# Sets up: the library targets (ExternalProjects, or a prebuilt download for
+# wgpu-native) and the platform-shlibs copy targets.
 
 if(NOT (EXTERNAL_SHLIBS_AUDIO OR EXTERNAL_SHLIBS_GRAPHICS))
     return()
 endif()
 
 include(ExternalProject)
-include(FetchContent)
 
 set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
 set(EXT_DEPS_C_FLAGS "")
@@ -37,19 +35,6 @@ function(extempore_add_external name)
             ${EXT_DEPS_TOOLCHAIN_ARGS}
             ${ARG_CMAKE_ARGS})
     set_target_properties(${name} PROPERTIES FOLDER ${ARG_FOLDER})
-endfunction()
-
-# extempore_add_shlib(name sources...) compiles a shared library into
-# platform-shlibs, exporting every symbol on Windows as the other platforms do.
-# (The $<1:...> keeps multi-config generators from adding a config subdirectory.)
-function(extempore_add_shlib name)
-    add_library(${name} SHARED ${ARGN})
-    set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
-        RUNTIME_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
-        ARCHIVE_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
-        WINDOWS_EXPORT_ALL_SYMBOLS ON
-        FOLDER EXTERNAL_SHLIBS)
 endfunction()
 
 if(EXTERNAL_SHLIBS_AUDIO)
@@ -83,17 +68,6 @@ endif()
 ##########################
 
 if(EXTERNAL_SHLIBS_GRAPHICS)
-    FetchContent_Declare(stb
-        URL https://github.com/nothings/stb/archive/${DEP_STB_COMMIT}.tar.gz
-        URL_HASH SHA256=${DEP_STB_SHA256}
-        SOURCE_SUBDIR none)
-    FetchContent_MakeAvailable(stb)
-    extempore_add_shlib(stb_image ${CMAKE_CURRENT_SOURCE_DIR}/extras/stb/stb_image.c)
-    target_include_directories(stb_image PRIVATE ${stb_SOURCE_DIR})
-    if(UNIX)
-        target_link_libraries(stb_image PRIVATE m)
-    endif()
-
     extempore_add_external(glfw3
         URL https://github.com/glfw/glfw/releases/download/${DEP_GLFW_VERSION}/glfw-${DEP_GLFW_VERSION}.zip
         URL_SHA256 ${DEP_GLFW_SHA256}
@@ -176,7 +150,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     if(UNIX)
         add_custom_target(external_shlibs_graphics
             COMMENT "Copying WebGPU graphics shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS glfw3 stb_image wgpu_native_download xtmwebgpu
+            DEPENDS glfw3 wgpu_native_download xtmwebgpu
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy libglfw${CMAKE_SHARED_LIBRARY_SUFFIX} ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy ${_wgpu_dir}/lib/${_wgpu_lib_name} ${EXT_PLATFORM_SHLIBS_DIR}
@@ -185,7 +159,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     elseif(WIN32)
         add_custom_target(external_shlibs_graphics
             COMMENT "Copying WebGPU graphics shared libs to ${EXT_PLATFORM_SHLIBS_DIR}"
-            DEPENDS glfw3 stb_image wgpu_native_download xtmwebgpu
+            DEPENDS glfw3 wgpu_native_download xtmwebgpu
             COMMAND ${CMAKE_COMMAND} -E make_directory ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3.dll ${EXT_PLATFORM_SHLIBS_DIR}
             COMMAND ${CMAKE_COMMAND} -E copy lib/glfw3dll.lib ${EXT_PLATFORM_SHLIBS_DIR}/glfw3.lib
