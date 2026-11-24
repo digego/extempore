@@ -41,23 +41,12 @@
 (sys:load "libs/core/midi.xtm")
 (sys:load "libs/studio/api.xtm")
 
-;; ports opened by name stay open, and are found again by that name:
-;; ((name input? . port) ...)
-(define *studio:midi-ports* '())
-
+;; a port by name (opened once, however often it's asked for: see midi-out),
+;; or the port itself
 (define studio:midi-port
   (lambda (port input?)
     (if (string? port)
-        (let ((known (let loop ((lst *studio:midi-ports*))
-                       (cond ((null? lst) #f)
-                             ((and (string=? (caar lst) port) (eq? (cadar lst) input?)) (cddar lst))
-                             (else (loop (cdr lst)))))))
-          (or known
-              (let ((opened (if input? (midi-in port) (midi-out port))))
-                (if opened
-                    (set! *studio:midi-ports*
-                          (cons (cons port (cons input? opened)) *studio:midi-ports*)))
-                opened)))
+        (if input? (midi-in port) (midi-out port))
         port)))
 
 ;; (midi-track 'lead "mini")      channel 1

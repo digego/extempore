@@ -138,6 +138,34 @@
       accepted)))
 (xtmtest-result (midi_test_queue_full) 1024 "queue-refuses-when-full")
 
+;; midi_send_at: messages come out in the order of their frames, whatever
+;; order they went in, and those for one frame in the order they went in
+(bind-func midi_test_send_at
+  (lambda ()
+    (let ((port (midi_open_loopback))
+          (msg:MidiMsg* (salloc))
+          (digits:i64 0)
+          (i:i64 0))
+      (midi_send_at port (+ (now) (* 2 SR)) #x90 1 0)
+      (midi_send_at port (+ (now) SR) #x90 2 0)
+      (midi_send_at port (+ (now) SR) #x90 3 0)
+      (midi_send_at port (+ (now) (* 3 SR)) #x90 4 0)
+      (midi_send_at port (+ (now) SR) #x90 5 0)
+      ;; nothing is due yet
+      (if (midi_queue_pop port (clock_clock) msg) (set! digits 9))
+      (dotimes (i 5)
+        (if (midi_queue_pop port 1.0e18 msg)
+            (set! digits (+ (* digits 10) (convert (midi_msg_data1 msg) i64)))))
+      (if (<> (midi_queued port) 0) (set! digits -1))
+      (midi_close port)
+      digits)))
+(xtmtest-result (midi_test_send_at) 23514 "send-at-orders-by-frame")
+
+(bind-func midi_test_send_at_null
+  (lambda ()
+    (if (midi_send_at null (now) #x90 1 1) 1 0)))
+(xtmtest-result (midi_test_send_at_null) 0 "send-at-null-port")
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; the Scheme side  ;;
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -176,6 +204,35 @@
 (xtmtest-result (midi-test-next) (list 'sysex #f (byte-vector #xF0 #x7D 1 2 #xF7) #f) "scheme-sysex")
 (xtmtest-result (midi-test-next) #f "scheme-nothing-left")
 
+;; a port which couldn't be opened is #f: sending to it does nothing
+(xtmtest-result (midi-note #f 1 60 0.5 0.1) #f "scheme-send-to-no-port")
+(xtmtest-result (midi-sysex #f (byte-vector #xF0 #xF7)) #f "scheme-sysex-to-no-port")
+(xtmtest-result (midi-listen #f 'nothing) #f "scheme-listen-to-no-port")
+
+;; a listener can be a function's name, looked up when a message arrives
+(define midi-test-heard #f)
+(define midi-test-listener (lambda (msg) (set! midi-test-heard 'first)))
+(midi-listen midi-test-port 'midi-test-listener)
+(define midi-test-listener (lambda (msg) (set! midi-test-heard (vector-ref msg 0))))
+(midi-send midi-test-port #xFC)
+(midi:poll)
+(xtmtest-result midi-test-heard 'stop "scheme-listener-by-name-follows-redefinition")
+(midi-unlisten midi-test-port)
+
+;; the timed sends, and the old names built on them. A timed message to a
+;; loopback port stays in its queue.
+(define midi-test-queued (lambda () (midi_queued midi-test-port)))
+(midi-note-at (+ (now) 44100) midi-test-port 1 60 0.5 0.25)
+(xtmtest-result (midi-test-queued) 2 "scheme-note-at-queues-both-ends")
+(play-midi-note (+ (now) 44100) midi-test-port 60 80 4410 0)
+(send-midi-cc (+ (now) 44100) midi-test-port 7 100 0)
+(xtmtest-result (midi-test-queued) 5 "play-midi-note-and-send-midi-cc")
+(let ((beat (*metro* 'get-beat 1)))
+  (mplay midi-test-port 60 80 1 0)
+  (mplay 1/2 midi-test-port (list 60 64 67) 80 1 0)
+  (mcc midi-test-port 74 64 0))
+(xtmtest-result (midi-test-queued) 14 "mplay-and-mcc")
+
 ;; no port has this name, whatever the machine
 (xtmtest-result (midi-out "no port is called this, surely") #f "scheme-no-such-port")
 
@@ -195,6 +252,7 @@
            (in (midi-in name)))
       (xtmtest-result (and out in #t) #t "system-ports-open")
       (xtmtest-result (pair? (member (list name 'in) (midi-ports))) #t "system-virtual-port-listed")
+      (xtmtest-result (equal? (midi-in name) in) #t "system-port-opened-once")
       (set! midi-test-port in)
       (midi-note out 3 64 0.5)
       (midi-control out 3 1 1.0)

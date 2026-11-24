@@ -1,0 +1,64 @@
+;;; midi.xtm -- MIDI in and out
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Sending and receiving MIDI with libs/core/midi.xtm. To play a synth from
+;; the studio's tracks and patterns instead, see libs/studio/midi.xtm.
+
+;;; Code:
+
+(sys:load "libs/core/midi.xtm")
+
+;; what's plugged in: a list of (name in out)
+(println (midi-ports))
+
+;; Open an output by part of its name, in any case. With nothing to open this
+;; prints why and gives #f, and sending to #f does nothing, so the rest of the
+;; file is safe to evaluate either way.
+(define *syn* (midi-out "midi through"))
+
+;; nothing to play: stop here when this file is run as a test
+(if (not *syn*) (quit 0))
+
+;; a note now: channel (1 to 16), pitch, velocity (0 to 1), seconds
+(midi-note *syn* 1 60 0.8 0.5)
+
+;; a controller (0 to 1), pitch bend (-1 to 1) and a program change
+(midi-control *syn* 1 74 0.5)
+(midi-bend *syn* 1 0.0)
+(midi-program *syn* 1 5)
+
+;; raw bytes, for anything else, and sysex as a byte vector
+(midi-send *syn* #xFA)
+(midi-sysex *syn* (byte-vector #xF0 #x7D #x01 #xF7))
+
+;; In a temporal recursion, mplay takes what play does: pitch, velocity (0 to
+;; 127), a length in beats and a channel (0 to 15). Each note is sent at the
+;; frame of its beat, however early the callback runs.
+(define midi-loop
+  (lambda (beat dur)
+    (mplay *syn* (random (list 60 60 60 67 70 74 75)) (random 60 80) dur 0)
+    (callback (*metro* (+ beat (* .5 dur))) 'midi-loop (+ beat dur) dur)))
+
+(midi-loop (*metro* 'get-beat 4) 1/4)
+
+;; Input: a function which is called with each message, as #(type channel
+;; data1 data2 frame). Named like this, redefining on-midi is enough to change
+;; what happens.
+(define on-midi
+  (lambda (msg)
+    (println msg)))
+
+(define *keys* (midi-in "midi through"))
+(midi-listen *keys* 'on-midi)
+
+;; A port of our own, which other programs see and can connect to (not on
+;; Windows)
+(define *virtual* (midi-virtual-out "Extempore"))
+
+;; when you're finished
+;; (midi-unlisten *keys*)
+;; (midi-close *syn*)

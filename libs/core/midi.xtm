@@ -43,14 +43,16 @@
 ;;   (midi_close port)
 ;;   (midi_send port status data1 data2)       ;; now
 ;;   (midi_send_sysex port bytes n)
-;;   (midi_queue port frame status data1 data2);; from the audio thread
+;;   (midi_send_at port frame status data1 data2)  ;; when frame is heard
+;;   (midi_queue port frame status data1 data2);; the same, from the audio thread
 ;;   (midi_receive port msg)                   ;; i1: the oldest message, if any
 ;;   (midi_receive_sysex port buf max)         ;; i64: its bytes, after a sysex
 ;;
-;; Threads. The audio thread must not call the operating system, so it sends
-;; with midi_queue, which puts the message in the port's outgoing ring buffer
-;; with the time its frame will be heard; the backend's thread sends it then.
-;; Any other thread sends with midi_send, straight away. Input arrives in a
+;; Threads. midi_send sends straight away. midi_send_at and midi_queue put the
+;; message in a ring buffer of the port's with the time its frame will be
+;; heard, and the backend's thread sends it then: midi_queue for the audio
+;; thread, which must not call the operating system or wait for a lock, and
+;; midi_send_at for any other. Input arrives in a
 ;; ring buffer per port, written by the backend and read by whichever one
 ;; thread calls midi_receive on that port. No user code runs on a MIDI thread.
 ;;
@@ -128,12 +130,20 @@
 ;; status is MIDI_SYSEX and data1 is its length in bytes.
 (bind-type MidiMsg <double,i32,i32,i32> (printer? . #f))
 
+(bind-macro "when the message arrived or is due: seconds, as clock_clock" (midi_msg_time msg) `(tref ,msg 0))
+(bind-macro "the message's status byte" (midi_msg_status msg) `(tref ,msg 1))
+(bind-macro "the kind of message: its status byte without the channel (MIDI_NOTE_ON, ...)" (midi_msg_type msg) `(& (tref ,msg 1) #xF0))
+(bind-macro "the message's channel, 0 to 15" (midi_msg_channel msg) `(& (tref ,msg 1) #x0F))
+(bind-macro "the message's first data byte" (midi_msg_data1 msg) `(tref ,msg 2))
+(bind-macro "the message's second data byte" (midi_msg_data2 msg) `(tref ,msg 3))
+
 (bind-val MIDI_OUT i64 0)
 (bind-val MIDI_IN i64 1)
 (bind-val MIDI_LOOPBACK i64 2)
 
 (bind-val MIDI_RING_SIZE i64 1024)        ;; messages, each way
 (bind-val MIDI_SYSEX_RING_SIZE i64 65536) ;; bytes of incoming sysex
+(bind-val MIDI_WAITING_SIZE i64 8192)     ;; outgoing messages not yet due
 
 ;;  0 kind (MIDI_OUT, MIDI_IN or MIDI_LOOPBACK)
 ;;  1, 2, 3 the backend's own: two numbers and a pointer
@@ -143,7 +153,10 @@
 ;; 10 writer of 6: where the message being assembled started
 ;; 11 writer of 6: is a sysex message being assembled?
 ;; 12 reader of 6: bytes of the last sysex message not yet read
-(bind-type MidiPort <i64,i64,i64,i8*,MidiMsg*,i64*,i8*,i64*,MidiMsg*,i64*,i64,i1,i64> (printer? . #f))
+;; 13 outgoing messages from other threads (midi_send_at), 14 their positions
+;; 15 reader of 8 and 13: the messages taken from them and not yet due, in
+;;    the order they were taken, and 16 how many there are
+(bind-type MidiPort <i64,i64,i64,i8*,MidiMsg*,i64*,i8*,i64*,MidiMsg*,i64*,i64,i1,i64,MidiMsg*,i64*,MidiMsg*,i64> (printer? . #f))
 
 (bind-macro "the port's kind" (midi_port_kind port) `(tref ,port 0))
 (bind-macro "a number of the backend's own" (midi_port_a port) `(tref ,port 1))
@@ -162,12 +175,16 @@
     (let ((port:MidiPort* (halloc))
           (in:MidiMsg* (halloc MIDI_RING_SIZE))
           (sysex:i8* (halloc MIDI_SYSEX_RING_SIZE))
-          (out:MidiMsg* (halloc MIDI_RING_SIZE)))
+          (out:MidiMsg* (halloc MIDI_RING_SIZE))
+          (timed:MidiMsg* (halloc MIDI_RING_SIZE))
+          (waiting:MidiMsg* (halloc MIDI_WAITING_SIZE)))
       (tfill! port kind 0 0 null
               in (midi_alloc_positions)
               sysex (midi_alloc_positions)
               out (midi_alloc_positions)
-              0 #f 0)
+              0 #f 0
+              timed (midi_alloc_positions)
+              waiting 0)
       port)))
 
 (bind-func midi_port_free
@@ -178,6 +195,9 @@
     (free (cast (tref port 7) i8*))
     (free (cast (tref port 8) i8*))
     (free (cast (tref port 9) i8*))
+    (free (cast (tref port 13) i8*))
+    (free (cast (tref port 14) i8*))
+    (free (cast (tref port 15) i8*))
     (free (cast port i8*))
     void))
 
@@ -276,53 +296,110 @@ them) into buf. Returns how many."
       (midi_skip_sysex port)
       n)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; output from the audio thread  ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;
+;; timed output ;;
+;;;;;;;;;;;;;;;;;;
 
 ;; A frame is heard some time after the audio callback computes it: by default
 ;; one block, which is the least it can be.
 (bind-val midi_latency double (/ (convert FRAMES double) (convert SR double))
   "seconds between the audio callback starting on a block and the block being heard")
 
+;; (now) and audio_clock_now are the frame and the time at which the current
+;; block started. Another thread can read one before the audio callback moves
+;; them on and the other after, so it reads until (now) holds still.
 (bind-func midi_frame_time
-  "when the frame will be heard, in seconds as clock_clock. For the audio thread."
+  "when the frame will be heard, in seconds as clock_clock"
   (lambda (frame:i64)
-    (+ (audio_clock_now) (clock_offset) midi_latency
-       (/ (convert (- frame (now)) double) (convert SR double)))))
+    (let ((start (now))
+          (time (audio_clock_now))
+          (tries:i64 0))
+      (while (and (<> start (now)) (< tries 4))
+        (set! start (now))
+        (set! time (audio_clock_now))
+        (set! tries (+ tries 1)))
+      (+ time (clock_offset) midi_latency
+         (/ (convert (- frame start) double) (convert SR double))))))
 
-(bind-func midi_queue
-  "send a message when frame is heard. For the audio thread, and only one thread
-may queue to a port. Returns #f if the port's queue is full."
-  (lambda (port:MidiPort* frame:i64 status:i32 data1:i32 data2:i32)
-    (let ((pos (tref port 9))
-          (write (atomic_load_i64 pos)))
+(bind-func static midi_ring_push
+  (lambda (ring:MidiMsg* pos:i64* time:double status:i32 data1:i32 data2:i32)
+    (let ((write (atomic_load_i64 pos)))
       (if (< (- write (atomic_load_i64 (pref-ptr pos 1))) MIDI_RING_SIZE)
           (begin
-            (tfill! (pref-ptr (tref port 8) (% write MIDI_RING_SIZE))
-                    (midi_frame_time frame) status data1 data2)
+            (tfill! (pref-ptr ring (% write MIDI_RING_SIZE)) time status data1 data2)
             (atomic_store_i64 pos (+ write 1))
             #t)
           #f))))
 
+(bind-func midi_queue
+  "send a message when frame is heard. For the audio thread (any other sends with
+midi_send_at), and only one thread may queue to a port. Returns #f if the
+port's queue is full."
+  (lambda (port:MidiPort* frame:i64 status:i32 data1:i32 data2:i32)
+    (midi_ring_push (tref port 8) (tref port 9) (midi_frame_time frame) status data1 data2)))
+
+(bind-val midi_timed_lock i8* (mutex_create))
+
+(bind-func midi_send_at
+  "send a message when frame is heard: the frame can be seconds away, and
+messages needn't be sent in the order of their frames. Not for the audio
+thread (see midi_queue). Returns #f if the port is null or its queue is full."
+  (lambda (port:MidiPort* frame:i64 status:i32 data1:i32 data2:i32)
+    (if (null? port)
+        #f
+        (begin
+          (mutex_lock midi_timed_lock)
+          (let ((ok (midi_ring_push (tref port 13) (tref port 14) (midi_frame_time frame)
+                                    status data1 data2)))
+            (mutex_unlock midi_timed_lock)
+            ok)))))
+
 (bind-func midi_queued
-  "how many queued messages haven't been sent yet"
+  "how many timed messages haven't been sent yet"
   (lambda (port:MidiPort*)
-    (let ((pos (tref port 9)))
-      (- (atomic_load_i64 pos) (atomic_load_i64 (pref-ptr pos 1))))))
+    (+ (- (atomic_load_i64 (tref port 9)) (atomic_load_i64 (pref-ptr (tref port 9) 1)))
+       (- (atomic_load_i64 (tref port 14)) (atomic_load_i64 (pref-ptr (tref port 14) 1)))
+       (tref port 16))))
+
+(bind-func static midi_take_waiting
+  "move what a ring holds into the port's waiting messages, while there's room"
+  (lambda (port:MidiPort* ring:MidiMsg* pos:i64*)
+    (let ((read (atomic_load_i64 (pref-ptr pos 1)))
+          (write (atomic_load_i64 pos))
+          (m:MidiMsg* null))
+      (while (and (< read write) (< (tref port 16) MIDI_WAITING_SIZE))
+        (set! m (pref-ptr ring (% read MIDI_RING_SIZE)))
+        (tfill! (pref-ptr (tref port 15) (tref port 16)) (tref m 0) (tref m 1) (tref m 2) (tref m 3))
+        (tset! port 16 (+ (tref port 16) 1))
+        (set! read (+ read 1)))
+      (atomic_store_i64 (pref-ptr pos 1) read)
+      void)))
 
 (bind-func midi_queue_pop
-  "take the oldest queued message if it's due at time `now` (seconds, as
-clock_clock). For the one thread which sends the port's queued messages."
+  "take the timed message which is due first, if it's due at time `now` (seconds,
+as clock_clock). Of two due at once, the one sent first. For the one thread
+which sends the port's timed messages."
   (lambda (port:MidiPort* now:double msg:MidiMsg*)
-    (let ((pos (tref port 9))
-          (read (atomic_load_i64 (pref-ptr pos 1)))
-          (m:MidiMsg* (pref-ptr (tref port 8) (% read MIDI_RING_SIZE))))
-      (if (and (< read (atomic_load_i64 pos))
-               (> now (tref m 0)))
-          (begin
+    (let ((waiting (tref port 15))
+          (first:i64 -1)
+          (due:double 0.0)
+          (i:i64 0))
+      (midi_take_waiting port (tref port 8) (tref port 9))
+      (midi_take_waiting port (tref port 13) (tref port 14))
+      (dotimes (i (tref port 16))
+        (if (or (< first 0) (< (tref (pref-ptr waiting i) 0) due))
+            (begin (set! first i)
+                   (set! due (tref (pref-ptr waiting i) 0)))))
+      (if (and (> first -1) (> now due))
+          (let ((m (pref-ptr waiting first)))
             (tfill! msg (tref m 0) (tref m 1) (tref m 2) (tref m 3))
-            (atomic_store_i64 (pref-ptr pos 1) (+ read 1))
+            ;; close the gap, keeping the order of the rest
+            (set! i first)
+            (while (< (+ i 1) (tref port 16))
+              (set! m (pref-ptr waiting (+ i 1)))
+              (tfill! (pref-ptr waiting i) (tref m 0) (tref m 1) (tref m 2) (tref m 3))
+              (set! i (+ i 1)))
+            (tset! port 16 (- (tref port 16) 1))
             #t)
           #f))))
 
@@ -618,6 +695,10 @@ failure."
   (lambda (port:MidiPort* status:i64 data1:i64 data2:i64)
     (midi_send port (convert status i32) (convert data1 i32) (convert data2 i32))))
 
+(bind-func midi_scheme_send_at
+  (lambda (port:MidiPort* frame:i64 status:i64 data1:i64 data2:i64)
+    (midi_send_at port frame (convert status i32) (convert data1 i32) (convert data2 i32))))
+
 (bind-func midi_scheme_send_bytes
   (lambda (port:MidiPort* n:i64)
     (midi_send_sysex port midi_scheme_bytes n)))
@@ -662,19 +743,48 @@ failure."
                  i)
                 (else (loop (+ i 1)))))))))
 
+;; every port this library has open, and those opened by name:
+;; ((name input? . port) ...). Asking for a name again gives the same port, so
+;; (define syn (midi-out "mini")) can be evaluated as often as you like.
+(xtc:aot:do-or-emit (define *midi:ports* '()))
+(xtc:aot:do-or-emit (define *midi:named-ports* '()))
+
+(xtc:aot:do-or-emit
+  (define midi:port?
+    (lambda (x)
+      (and (member x *midi:ports*) #t))))
+
+(xtc:aot:do-or-emit
+  (define midi:remember
+    (lambda (port)
+      (set! *midi:ports* (cons port *midi:ports*))
+      port)))
+
+(xtc:aot:do-or-emit
+  (define midi:named-port
+    (lambda (name input?)
+      (let loop ((lst *midi:named-ports*))
+        (cond ((null? lst) #f)
+              ((and (string=? (caar lst) name) (eq? (cadar lst) input?)) (cddar lst))
+              (else (loop (cdr lst))))))))
+
 (xtc:aot:do-or-emit
   (define midi:open
     (lambda (name input?)
-      (let ((i (midi:find-port name input?)))
-        (if (not i)
-            (begin
-              (println "midi: no" (if input? "input" "output") "port has a name containing" name
-                       (if (midi:true? (midi_available)) "--- see (midi-ports)" "--- there is no MIDI on this machine"))
-              #f)
-            (let ((port (midi_scheme_open i (if input? 1 0))))
-              (if (midi:true? (midi_port_null port))
-                  (begin (println "midi: couldn't open" (cptr->string (midi_port_name i))) #f)
-                  port)))))))
+      (or (midi:named-port name input?)
+          (let ((i (midi:find-port name input?)))
+            (if (not i)
+                (begin
+                  (println "midi: no" (if input? "input" "output") "port has a name containing" name
+                           (if (midi:true? (midi_available)) "--- see (midi-ports)" "--- there is no MIDI on this machine"))
+                  #f)
+                (let ((port (midi_scheme_open i (if input? 1 0))))
+                  (if (midi:true? (midi_port_null port))
+                      (begin (println "midi: couldn't open" (cptr->string (midi_port_name i))) #f)
+                      (begin
+                        (set! *midi:named-ports*
+                              (cons (cons name (cons input? port)) *midi:named-ports*))
+                        (midi:remember port))))))))))
 
 (xtc:aot:do-or-emit
   (define midi-out (lambda (name) (midi:open name #f))))
@@ -688,7 +798,7 @@ failure."
       (let ((port (midi_scheme_open_virtual name (if input? 1 0))))
         (if (midi:true? (midi_port_null port))
             (begin (println "midi: couldn't make a virtual port") #f)
-            port)))))
+            (midi:remember port))))))
 
 (xtc:aot:do-or-emit
   (define midi-virtual-out (lambda (name) (midi:open-virtual name #f))))
@@ -697,7 +807,7 @@ failure."
   (define midi-virtual-in (lambda (name) (midi:open-virtual name #t))))
 
 (xtc:aot:do-or-emit
-  (define midi-loopback (lambda () (midi_open_loopback))))
+  (define midi-loopback (lambda () (midi:remember (midi_open_loopback)))))
 
 ;; a value from 0 to 1 as a data byte
 (xtc:aot:do-or-emit
@@ -711,64 +821,189 @@ failure."
     (lambda (channel)
       (max 0 (min 15 (- (real->integer channel) 1))))))
 
+;; Every send comes through here. time is a frame, as (now) counts, or #f for
+;; straight away. A port which couldn't be opened is #f, and sending to it
+;; does nothing: a missing synth shouldn't stop the music.
+(xtc:aot:do-or-emit
+  (define midi:send
+    (lambda (port time status a b)
+      (cond ((not port) #f)
+            (time (midi_scheme_send_at port (real->integer time) status a b))
+            (else (midi_scheme_send port status a b))))))
+
+;; (midi-send port #x90 60 100): raw bytes, now
 (xtc:aot:do-or-emit
   (define midi-send
     (lambda (port status . data)
-      (midi_scheme_send port status
-                        (if (pair? data) (car data) 0)
-                        (if (and (pair? data) (pair? (cdr data))) (cadr data) 0)))))
+      (midi:send port #f status
+                 (if (pair? data) (car data) 0)
+                 (if (and (pair? data) (pair? (cdr data))) (cadr data) 0)))))
+
+;; ...and at a frame
+(xtc:aot:do-or-emit
+  (define midi-send-at
+    (lambda (time port status . data)
+      (midi:send port time status
+                 (if (pair? data) (car data) 0)
+                 (if (and (pair? data) (pair? (cdr data))) (cadr data) 0)))))
 
 (xtc:aot:do-or-emit
   (define midi:note-off
     (lambda (port channel pitch)
-      (midi_scheme_send port (+ #x80 (midi:channel channel)) (real->integer pitch) 0))))
+      (midi:send port #f (+ #x80 (midi:channel channel)) (real->integer pitch) 0))))
 
 (xtc:aot:do-or-emit
   (define midi-note-off midi:note-off))
 
-;; (midi-note port channel pitch velocity)          held until midi-note-off
-;; (midi-note port channel pitch velocity seconds)
+;; (midi-note-at time port channel pitch velocity seconds): a note which starts
+;; at a frame, both ends sent on time
+(xtc:aot:do-or-emit
+  (define midi-note-at
+    (lambda (time port channel pitch velocity seconds)
+      (midi:send port time (+ #x90 (midi:channel channel)) (real->integer pitch)
+                 (max 1 (midi:byte velocity)))
+      (midi:send port (+ time (* seconds *samplerate*))
+                 (+ #x80 (midi:channel channel)) (real->integer pitch) 0))))
+
+;; (midi-note port channel pitch velocity)          now, held until midi-note-off
+;; (midi-note port channel pitch velocity seconds)  now, for so long
 (xtc:aot:do-or-emit
   (define midi-note
     (lambda (port channel pitch velocity . seconds)
-      (midi_scheme_send port (+ #x90 (midi:channel channel)) (real->integer pitch)
-                        (max 1 (midi:byte velocity)))
+      (midi:send port #f (+ #x90 (midi:channel channel)) (real->integer pitch)
+                 (max 1 (midi:byte velocity)))
       (if (pair? seconds)
-          (callback (+ (now) (* (car seconds) *samplerate*))
-                    'midi:note-off port channel pitch)))))
+          (midi:send port (+ (now) (* (car seconds) *samplerate*))
+                     (+ #x80 (midi:channel channel)) (real->integer pitch) 0)))))
+
+(xtc:aot:do-or-emit
+  (define midi-control-at
+    (lambda (time port channel controller value)
+      (midi:send port time (+ #xB0 (midi:channel channel)) (real->integer controller)
+                 (midi:byte value)))))
 
 (xtc:aot:do-or-emit
   (define midi-control
     (lambda (port channel controller value)
-      (midi_scheme_send port (+ #xB0 (midi:channel channel)) (real->integer controller)
-                        (midi:byte value)))))
+      (midi-control-at #f port channel controller value))))
 
 (xtc:aot:do-or-emit
   (define midi-program
     (lambda (port channel program)
-      (midi_scheme_send port (+ #xC0 (midi:channel channel)) (real->integer program) 0))))
+      (midi:send port #f (+ #xC0 (midi:channel channel)) (real->integer program) 0))))
 
 ;; bend is from -1 to 1: 14 bits, 8192 in the middle
 (xtc:aot:do-or-emit
   (define midi-bend
     (lambda (port channel bend)
       (let ((x (max 0 (min 16383 (real->integer (round (+ 8192 (* 8192 bend))))))))
-        (midi_scheme_send port (+ #xE0 (midi:channel channel))
-                          (modulo x 128) (quotient x 128))))))
+        (midi:send port #f (+ #xE0 (midi:channel channel)) (modulo x 128) (quotient x 128))))))
 
 (xtc:aot:do-or-emit
   (define midi-sysex
     (lambda (port bytes)
-      (let ((n (length bytes)))
-        (dotimes (i n)
-          (midi_scheme_set_byte i (bytes i)))
-        (midi_scheme_send_bytes port n)))))
+      (if port
+          (let ((n (length bytes)))
+            (dotimes (i n)
+              (midi_scheme_set_byte i (bytes i)))
+            (midi_scheme_send_bytes port n))
+          #f))))
 
 (xtc:aot:do-or-emit
   (define midi-close
     (lambda (port)
-      (midi-unlisten port)
-      (midi_close port))))
+      (if (midi:port? port)
+          (let ((without (lambda (lst same?)
+                           (let loop ((lst lst))
+                             (cond ((null? lst) '())
+                                   ((same? (car lst)) (loop (cdr lst)))
+                                   (else (cons (car lst) (loop (cdr lst)))))))))
+            (midi-unlisten port)
+            (set! *midi:ports* (without *midi:ports* (lambda (p) (equal? p port))))
+            (set! *midi:named-ports*
+                  (without *midi:named-ports* (lambda (entry) (equal? (cddr entry) port))))
+            (midi_close port)))
+      #t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; playing from a temporal recursion: mplay  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; These keep the arguments (and the conventions) they have always had, so that
+;; code written for libs/external/portmidi.xtm plays a port of this library's
+;; unchanged: velocity and controller values are 0 to 127, channels 0 to 15,
+;; and a duration is in frames (in beats for mplay). Each message is sent at
+;; its frame, however far ahead the temporal recursion runs.
+;;
+;;   (define loop
+;;     (lambda (beat dur)
+;;       (mplay syn (random '(60 67 72)) 80 dur 0)   ; pitch velocity beats channel
+;;       (callback (*metro* (+ beat (* .5 dur))) 'loop (+ beat dur) dur)))
+
+(xtc:aot:do-or-emit
+  (define play-midi-note
+    (lambda (time device pitch velocity duration channel)
+      (midi:send device time (+ *midi-note-on* channel) pitch velocity)
+      (midi:send device (+ time duration) (+ *midi-note-off* channel) pitch velocity))))
+
+(xtc:aot:do-or-emit
+  (define send-midi-cc
+    (lambda (time device cc val channel)
+      (midi:send device time (+ *midi-cc* channel) (real->integer cc) (real->integer val)))))
+
+;; homophonic playnote: a pitch which is still sounding isn't played again
+(xtc:aot:do-or-emit
+  (define homo-play-midi-note
+    (let ((notes (make-vector 127 0)))
+      (lambda (time device pitch velocity duration channel)
+        (if (> time (vector-ref notes pitch))
+            (let ((dur (- duration (* 2 *au:block-size*))))
+              (vector-set! notes pitch (+ time dur))
+              (play-midi-note time device pitch velocity duration channel)))))))
+
+;; frames to shift everything mplay and mcc send by
+(xtc:aot:do-or-emit
+  (define *midioffset* 0))
+
+;; (mplay device pitch velocity beats channel), or with an offset in beats
+;; first, in code where `beat` is the current beat. A list of pitches is a chord.
+(xtc:aot:do-or-emit
+  (define-macro (mplay . args)
+    (let* ((offset? (not (symbol? (car args))))
+           (when (if offset? `(*metro* (+ beat ,(car args))) '(*metro* beat)))
+           (rest (if offset? (cdr args) args))
+           (note (lambda (pitch)
+                   `(play-midi-note (+ ,when *midioffset*) ,(car rest)
+                                    (real->integer ,pitch)
+                                    (real->integer ,(caddr rest))
+                                    (*metro* 'dur ,(cadddr rest))
+                                    (real->integer ,(car (cddddr rest)))))))
+      `(if (list? ,(cadr rest))
+           (map (lambda (p) ,(note 'p)) ,(cadr rest))
+           ,(note (cadr rest))))))
+
+;; (mcc device controller value channel), or with an offset in beats first
+(xtc:aot:do-or-emit
+  (define-macro (mcc . args)
+    (let* ((offset? (not (symbol? (car args))))
+           (when (if offset? `(*metro* (+ beat ,(car args))) '(*metro* beat)))
+           (rest (if offset? (cdr args) args)))
+      `(send-midi-cc (+ ,when *midioffset*) ,(car rest)
+                     (real->integer ,(cadr rest))
+                     (real->integer ,(caddr rest))
+                     (real->integer ,(cadddr rest))))))
+
+(xtc:aot:do-or-emit
+  (define-macro (mplayob o b . args)
+    `(if (= 0 (modulo (+ ,o beat) ,b))
+         (mplay ,@args)
+         #f)))
+
+(xtc:aot:do-or-emit
+  (define-macro (mplayobs l b . args)
+    `(if (member (modulo beat ,b) ,l)
+         (mplay ,@args)
+         #f)))
 
 ;; listeners: ((port . function) ...), polled on the Scheme thread
 
@@ -823,7 +1058,8 @@ failure."
             (if (>= status 0)
                 (begin
                   (*s7-catch* #t
-                              (lambda () ((cdr entry) (midi:message status)))
+                              (lambda () ((if (symbol? (cdr entry)) (eval (cdr entry)) (cdr entry))
+                                          (midi:message status)))
                               (lambda args (println "midi: a listener failed:" args)))
                   (loop (midi_scheme_receive (car entry)))))))
         *midi:listeners*)
@@ -832,15 +1068,20 @@ failure."
           (set! *midi:listening* #f)))))
 
 ;; (midi-listen port (lambda (msg) ...)): call the function with each message
-;; which arrives, in place of any function the port had
+;; which arrives, in place of any function the port had. Give a function's name
+;; ((midi-listen port 'on-midi)) and redefining that function is enough.
 (xtc:aot:do-or-emit
   (define midi-listen
     (lambda (port fn)
-      (midi-unlisten port)
-      (set! *midi:listeners* (cons (cons port fn) *midi:listeners*))
-      (if (not *midi:listening*)
-          (begin (set! *midi:listening* #t)
-                 (midi:poll))))))
+      (if port
+          (begin
+            (midi-unlisten port)
+            (set! *midi:listeners* (cons (cons port fn) *midi:listeners*))
+            (if (not *midi:listening*)
+                (begin (set! *midi:listening* #t)
+                       (midi:poll)))
+            #t)
+          #f))))
 
 (xtc:aot:do-or-emit
   (define midi-unlisten

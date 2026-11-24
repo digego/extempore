@@ -5,15 +5,36 @@
 
 ;;; Commentary:
 
+;; A monophonic FM synth played from a MIDI keyboard, with controllers 21 to
+;; 28 on its parameters.
+;;
+;; The audio callback reads the MIDI port itself (midi_receive, in
+;; libs/core/midi.xtm), once a frame, so a note starts within a block of the
+;; key going down.
+
 ;;; Code:
 
 (sys:load "libs/core/audio_dsp.xtm")
-(sys:load "libs/external/midi-legacy.xtm")
-;; set your midi input device
-;; look at your log for available input devices
-(set_midi_in 3)
+(sys:load "libs/core/midi.xtm")
 
-;; audio stuff first
+;; your MIDI keyboard: part of its name (see (midi-ports))
+(define *keys* (midi-in "keystep"))
+
+;; the port, where xtlang can see it
+(bind-val midi_synth_port MidiPort* 0)
+(bind-func midi_synth_set_port
+  (lambda (port:MidiPort*)
+    (set! midi_synth_port port)
+    void))
+
+(if *keys* (midi_synth_set_port *keys*))
+
+;; what the audio callback calls to read the port. The handlers it will call
+;; set the synth's variables, so they come after the synth: this is redefined
+;; below, once they exist.
+(bind-func midi_synth_read
+  (lambda ()
+    void))
 
 (bind-func my_simple_fm_inst
   (lambda ()
@@ -48,6 +69,7 @@
 (bind-func dsp:DSP
   (let ((inst1 (my_simple_fm_inst)))
     (lambda (in time chan dat)
+      (if (= chan 0) (midi_synth_read))
       (inst1 chan))))
 
 (dsp:set! dsp)
@@ -84,3 +106,17 @@
           ((= controller 28) (dsp.inst1.release:float (* 2000.0 (/ (i32tof value) 127.0))))
           (else 1.0:f))
     void))  ;; nothing
+
+(bind-func midi_synth_read
+  (let ((msg:MidiMsg* (zalloc)))
+    (lambda ()
+      (if (not (null? midi_synth_port))
+          (while (midi_receive midi_synth_port msg)
+            (cond ((and (= (midi_msg_type msg) MIDI_NOTE_ON) (> (midi_msg_data2 msg) 0))
+                   (midi_note_on (midi_msg_data1 msg) (midi_msg_data2 msg) (midi_msg_channel msg)))
+                  ((or (= (midi_msg_type msg) MIDI_NOTE_ON) (= (midi_msg_type msg) MIDI_NOTE_OFF))
+                   (midi_note_off (midi_msg_data1 msg) (midi_msg_data2 msg) (midi_msg_channel msg)))
+                  ((= (midi_msg_type msg) MIDI_CONTROL_CHANGE)
+                   (midi_cc (midi_msg_data1 msg) (midi_msg_data2 msg) (midi_msg_channel msg)))
+                  (else void))))
+      void)))

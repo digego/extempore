@@ -15,8 +15,10 @@ download yet; without it they are silent.
 
 `libs/core/midi.xtm` is a new MIDI library which talks to the operating system
 directly: ports opened by name, virtual ports, sysex, input delivered to a
-function on the Scheme thread, and output from the audio thread sent at the time
-its frame is heard. Linux (the ALSA sequencer) is the only backend so far. The
+function on the Scheme thread (or read by the audio callback itself), and timed
+output, sent when its frame is heard. `mplay`, `mcc` and `play-midi-note` are in
+it with the arguments they always had, and on one of its ports they land within
+a millisecond of the beat, where a callback could be a whole audio block out. Linux (the ALSA sequencer) is the only backend so far. The
 old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so code
 which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is now
 `*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have moved

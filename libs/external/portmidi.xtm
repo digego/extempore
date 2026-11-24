@@ -813,86 +813,27 @@ output device(s)
 
 ;; scheme helper functions
 
+;; play-midi-note and send-midi-cc are libs/core/midi.xtm's, and so are mplay,
+;; mcc and the rest, which are built on them. Here they learn to play a
+;; PmStream as well as one of that library's ports. A PmStream's messages are
+;; sent by a callback at their time, as they always were.
 (xtc:aot:do-or-emit
   (define play-midi-note
-    (lambda (time device pitch velocity duration channel)
-      (callback time 'pm_send device *midi-note-on* channel pitch velocity)
-      (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity))))
-
-(xtc:aot:do-or-emit
-  (define send-midi-cc
-    (lambda (time device cc val channel)
-      (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))
-
-;; homophonic playnote
-(xtc:aot:do-or-emit
-  (define homo-play-midi-note
-    (let ((notes (make-vector 127 0)))
+    (let ((play-port play-midi-note))
       (lambda (time device pitch velocity duration channel)
-        (if (> time (vector-ref notes pitch))
-            (let ((dur (- duration (* 2 *au:block-size*))))
-              (vector-set! notes pitch (+ time dur))
+        (if (midi:port? device)
+            (play-port time device pitch velocity duration channel)
+            (begin
               (callback time 'pm_send device *midi-note-on* channel pitch velocity)
               (callback (+ time duration) 'pm_send device *midi-note-off* channel pitch velocity)))))))
 
-;; A midi-specific play macro
 (xtc:aot:do-or-emit
-  (define *midioffset* 0))
-
-(xtc:aot:do-or-emit
-  (define-macro (mplay . args)
-    (if (symbol? (car args))
-        `(if (list? ,(cadr args))
-          (map (lambda (p)
-                 (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
-                                 (real->integer p)
-                                 (real->integer ,(caddr args))
-                                 (*metro* 'dur ,(car (cdddr args)))
-                                 (real->integer , (car (cddddr args)))))
-               ,(cadr args))
-          (play-midi-note (+ (*metro* beat) *midioffset*) ,(car args)
-                          (real->integer ,(cadr args))
-                          (real->integer ,(caddr args))
-                          (*metro* 'dur ,(car (cdddr args)))
-                          (real->integer , (car (cddddr args)))))
-        `(if (list? ,(caddr args))
-          (map (lambda (p)
-                 (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-                                 (real->integer p)
-                                 (real->integer ,(car (cdddr args)))
-                                 (*metro* 'dur ,(cadr (cdddr args)))
-                                 (real->integer , (cadr (cddddr args)))))
-               ,(caddr args))
-          (play-midi-note (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-                          (real->integer ,(caddr args))
-                          (real->integer ,(car (cdddr args)))
-                          (*metro* 'dur ,(cadr (cdddr args)))
-                          (real->integer , (cadr (cddddr args))))))))
-
-(xtc:aot:do-or-emit
-  (define-macro (mcc . args)
-    (if (symbol? (car args))
-        `(send-midi-cc (+ (*metro* beat) *midioffset*) ,(car args)
-          (real->integer ,(cadr args))
-          (real->integer ,(caddr args))
-          (real->integer ,(car (cdddr args))))
-        `(send-midi-cc (+ (*metro* (+ beat ,(car args))) *midioffset*) ,(cadr args)
-          (real->integer ,(caddr args))
-          (real->integer ,(car (cdddr args)))
-          (real->integer ,(car (cddddr args)))))))
-
-
-(xtc:aot:do-or-emit
-  (define-macro (mplayob o b . args)
-    `(if (= 0 (modulo (+ ,o beat) ,b))
-      (mplay ,@args)
-      #f)))
-
-(xtc:aot:do-or-emit
-  (define-macro (mplayobs l b . args)
-    `(if (member (modulo beat ,b) ,l)
-      (mplay ,@args)
-      #f)))
+  (define send-midi-cc
+    (let ((send-port send-midi-cc))
+      (lambda (time device cc val channel)
+        (if (midi:port? device)
+            (send-port time device cc val channel)
+            (callback time 'pm_send device *midi-cc* channel (real->integer cc) (real->integer val)))))))
 
 (xtc:aot:insert-footer "xtmportmidi")
 (define *xtmlib-portmidi-loaded* #t)
