@@ -6,8 +6,9 @@
 ;;; Commentary:
 
 ;; MIDI over the operating system's own API, with no C library in between. The
-;; backend for this platform is in libs/core/midi/ (alsa.xtm on Linux; none.xtm,
-;; which finds no ports, where there isn't one yet).
+;; backend for this platform is in libs/core/midi/: alsa.xtm on Linux,
+;; coremidi.xtm on macOS and winmm.xtm on Windows (whose input side hasn't been
+;; run: see that file), and none.xtm, which finds no ports, anywhere else.
 ;;
 ;; From Scheme:
 ;;
@@ -308,9 +309,9 @@ them) into buf. Returns how many."
 ;; (now) and audio_clock_now are the frame and the time at which the current
 ;; block started. Another thread can read one before the audio callback moves
 ;; them on and the other after, so it reads until (now) holds still.
-(bind-func midi_frame_time
-  "when the frame will be heard, in seconds as clock_clock"
-  (lambda (frame:i64)
+(bind-func static midi_block_start
+  "the time at which frame 0 would have started, going by the current block alone"
+  (lambda ()
     (let ((start (now))
           (time (audio_clock_now))
           (tries:i64 0))
@@ -318,8 +319,42 @@ them) into buf. Returns how many."
         (set! start (now))
         (set! time (audio_clock_now))
         (set! tries (+ tries 1)))
-      (+ time (clock_offset) midi_latency
-         (/ (convert (- frame start) double) (convert SR double))))))
+      (- (+ time (clock_offset)) (/ (convert start double) (convert SR double))))))
+
+;; The audio callback isn't called at even intervals (on macOS it comes in
+;; bursts), so one block's start is a poor guide to when a frame is heard: it
+;; can be most of a block out. The backend's thread calls midi_clock_tick
+;; every millisecond, which follows the block starts with a filter about a
+;; second long, and midi_frame_time reads the result. Before the first tick
+;; (and with no backend) it goes by the current block.
+(bind-val midi_clock_origin double 0.0) ;; when frame 0 would have started, smoothed
+(bind-val midi_clock_frame i64 -1)      ;; the block last looked at
+
+(bind-func midi_clock_tick
+  "follow the audio clock. For a backend's thread, every millisecond or so."
+  (lambda ()
+    (let ((frame (now))
+          (origin:double 0.0))
+      (if (<> frame midi_clock_frame)
+          (begin
+            (set! origin (midi_block_start))
+            (if (or (< midi_clock_frame 0)
+                    (> (fabs (- origin midi_clock_origin)) 0.1))
+                ;; the first look, or the clock has jumped: start again from here
+                (set! midi_clock_origin origin)
+                (set! midi_clock_origin
+                      (+ midi_clock_origin
+                         (* (/ (convert (- frame midi_clock_frame) double) (convert SR double))
+                            (- origin midi_clock_origin)))))
+            (set! midi_clock_frame frame)))
+      void)))
+
+(bind-func midi_frame_time
+  "when the frame will be heard, in seconds as clock_clock"
+  (lambda (frame:i64)
+    (+ (if (< midi_clock_frame 0) (midi_block_start) midi_clock_origin)
+       midi_latency
+       (/ (convert frame double) (convert SR double)))))
 
 (bind-func static midi_ring_push
   (lambda (ring:MidiMsg* pos:i64* time:double status:i32 data1:i32 data2:i32)
@@ -508,6 +543,8 @@ to it, and two numbers by which the backend knows it. For a backend's scan."
 
 (sys:load (string-append "libs/core/midi/"
                          (cond ((string=? (sys:platform) "Linux") "alsa")
+                               ((string=? (sys:platform) "OSX") "coremidi")
+                               ((string=? (sys:platform) "Windows") "winmm")
                                (else "none"))
                          ".xtm"))
 

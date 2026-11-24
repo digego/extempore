@@ -246,7 +246,12 @@
     (thread_sleep 0 50000000)
     1))
 
-(if (midi:true? (midi_available))
+;; (where there is MIDI and it has virtual ports: Windows has none)
+(define midi-test-virtual
+  (and (midi:true? (midi_available))
+       (not (string=? (sys:platform) "Windows"))))
+
+(if midi-test-virtual
     (let* ((name "extempore-midi-test")
            (out (midi-virtual-out name))
            (in (midi-in name)))

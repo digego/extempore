@@ -1,0 +1,309 @@
+;;; coremidi.xtm -- the MIDI backend for macOS: CoreMIDI
+
+;; Loaded by libs/core/midi.xtm, which says what a backend defines.
+;;
+;; One CoreMIDI client, with an input port and an output port which every
+;; open MidiPort shares. An input is a source connected to the input port, an
+;; output is a destination sent to through the output port, and a virtual port
+;; is a source or destination of our own.
+;;
+;; Two threads. One creates the client and then runs a run loop for good:
+;; CoreMIDI tells a client about devices arriving and leaving through the run
+;; loop of the thread which created it, and without one the list of ports
+;; never changes. The other wakes every millisecond to send what is nearly due.
+;;
+;; CoreMIDI times a message itself: a packet carries the host time (as
+;; mach_absolute_time counts) at which to send it, or at which it arrived. So
+;; a timed message is handed over a few milliseconds early with its time, and
+;; how promptly our thread wakes doesn't matter; and a message which arrives is
+;; given the time CoreMIDI saw it, not the time its callback ran.
+;;
+;; Input arrives on a thread of CoreMIDI's, which calls midi_cm_read with a
+;; MIDIPacketList:
+;;
+;;   0 numPackets (4 bytes), then the packets, each
+;;   0 timeStamp (8)  8 length (2)  10 data
+;;
+;; with the next packet straight after the data, moved up to a multiple of
+;; four bytes on arm64 and not on x86_64 (MIDIPacketNext in MIDIServices.h).
+;;
+;; In a MidiPort, a is the endpoint and b is 1 for a virtual port.
+
+(bind-dylib libcorefoundation "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+(bind-dylib libcoremidi "/System/Library/Frameworks/CoreMIDI.framework/CoreMIDI")
+(bind-dylib libsystem "/usr/lib/libSystem.B.dylib")
+
+(bind-lib libsystem mach_absolute_time [i64]*)
+(bind-lib libsystem mach_timebase_info [i32,i32*]*)
+
+(bind-lib libcorefoundation CFStringCreateWithCString [i8*,i8*,i8*,i32]*)
+(bind-lib libcorefoundation CFStringGetCString [i8,i8*,i8*,i64,i32]*)
+(bind-lib libcorefoundation CFRelease [void,i8*]*)
+(bind-lib libcorefoundation CFRunLoopRun [void]*)
+
+(bind-lib libcoremidi MIDIClientCreate [i32,i8*,i8*,i8*,i32*]*)
+(bind-lib libcoremidi MIDIInputPortCreate [i32,i32,i8*,i8*,i8*,i32*]*)
+(bind-lib libcoremidi MIDIOutputPortCreate [i32,i32,i8*,i32*]*)
+(bind-lib libcoremidi MIDIGetNumberOfSources [i64]*)
+(bind-lib libcoremidi MIDIGetSource [i32,i64]*)
+(bind-lib libcoremidi MIDIGetNumberOfDestinations [i64]*)
+(bind-lib libcoremidi MIDIGetDestination [i32,i64]*)
+(bind-lib libcoremidi MIDIObjectGetStringProperty [i32,i32,i8*,i8**]*)
+(bind-lib libcoremidi MIDIPortConnectSource [i32,i32,i32,i8*]*)
+(bind-lib libcoremidi MIDIPortDisconnectSource [i32,i32,i32]*)
+(bind-lib libcoremidi MIDISourceCreate [i32,i32,i8*,i32*]*)
+(bind-lib libcoremidi MIDIDestinationCreate [i32,i32,i8*,i8*,i8*,i32*]*)
+(bind-lib libcoremidi MIDIEndpointDispose [i32,i32]*)
+(bind-lib libcoremidi MIDISend [i32,i32,i32,i8*]*)
+(bind-lib libcoremidi MIDIReceived [i32,i32,i8*]*)
+(bind-lib libcoremidi MIDIPacketListInit [i8*,i8*]*)
+(bind-lib libcoremidi MIDIPacketListAdd [i8*,i8*,i64,i8*,i64,i64,i8*]*)
+
+(bind-val MIDI_CM_UTF8 i32 #x08000100) ;; kCFStringEncodingUTF8
+
+;; 3 where a packet starts on a multiple of four bytes, 0 where it doesn't:
+;; decided when this is compiled, for the machine compiling it
+(eval `(bind-val MIDI_CM_ALIGN i64
+         ,(if (string-contains? (sys:command-output "uname -m") "arm64") 3 0))
+      (interaction-environment))
+
+(bind-val midi_cm_client i32 0)
+(bind-val midi_cm_in i32 0)
+(bind-val midi_cm_out i32 0)
+(bind-val midi_cm_ready i64 0) ;; 1 once the client and its ports exist, -1 if they can't
+(bind-val MIDI_CM_LIST_SIZE i64 66000)
+(bind-val midi_cm_list i8* 66000) ;; the packet list being sent (midi_send_lock guards it)
+
+;; host time: ticks of mach_absolute_time, so many to a second
+(bind-val midi_cm_ticks double 1000000000.0)
+(bind-val MIDI_CM_EARLY double 0.005) ;; seconds ahead of time a message is handed over
+
+(bind-func static midi_cm_host_time
+  "the host time at `time` (seconds, as clock_clock)"
+  (lambda (time:double)
+    (+ (mach_absolute_time)
+       (convert (* (- time (clock_clock)) midi_cm_ticks) i64))))
+
+(bind-func static midi_cm_clock_time
+  "the time (seconds, as clock_clock) at a host time; now, for a host time of 0"
+  (lambda (host:i64)
+    (if (= host 0)
+        (clock_clock)
+        (+ (clock_clock)
+           (/ (convert (- host (mach_absolute_time)) double) midi_cm_ticks)))))
+
+(bind-func static midi_cm_string
+  (lambda (s:i8*)
+    (CFStringCreateWithCString null s MIDI_CM_UTF8)))
+
+;; What arrives: any number of whole messages to a packet, or a piece of a
+;; sysex message, which carries on in the next packet. Real-time bytes can
+;; come in the middle of one.
+(bind-func static midi_cm_deliver
+  (lambda (port:MidiPort* data:i8* n:i64 time:double)
+    (let ((i:i64 0) (j:i64 0) (status:i32 0) (len:i64 0))
+      (while (< i n)
+        (set! status (& (convert (pref data i) i32) #xFF))
+        (cond ((> status #xF7)
+               ;; real time: one byte, whatever it interrupts
+               (midi_port_deliver port (pref-ptr data i) 1 time)
+               (set! i (+ i 1))
+               void)
+              ((or (= status #xF0) (< status #x80))
+               ;; sysex, from its start or carrying on: up to its F7, the next
+               ;; real-time byte, or the end of the packet
+               (set! j i)
+               (while (and (< j n)
+                           (<> (& (convert (pref data j) i32) #xFF) #xF7)
+                           (or (= j i) (< (& (convert (pref data j) i32) #xFF) #x80)))
+                 (set! j (+ j 1)))
+               (if (and (< j n) (= (& (convert (pref data j) i32) #xFF) #xF7))
+                   (set! j (+ j 1)))
+               (if (or (= status #xF0) (tref port 11))
+                   (midi_port_deliver port (pref-ptr data i) (- j i) time))
+               (set! i (if (> j i) j (+ i 1)))
+               void)
+              ((= status #xF7)
+               ;; the end of a sysex message, on its own
+               (if (tref port 11) (midi_port_deliver port (pref-ptr data i) 1 time))
+               (set! i (+ i 1))
+               void)
+              (else
+                (set! len (midi_msg_length status))
+                (if (<= (+ i len) n)
+                    (midi_port_deliver port (pref-ptr data i) len time))
+                (set! i (+ i len))
+                void)))
+      void)))
+
+;; CoreMIDI calls this on its own thread. For a source connected to our input
+;; port the MidiPort is conn (given to MIDIPortConnectSource), and for a
+;; virtual destination it is refcon (given to MIDIDestinationCreate).
+(bind-func midi_cm_read
+  (lambda (pktlist:i8* refcon:i8* conn:i8*)
+    (let ((port (cast (if (null? conn) refcon conn) MidiPort*))
+          (packets (convert (pref (cast pktlist i32*) 0) i64))
+          (offset:i64 4)
+          (len:i64 0)
+          (k:i64 0))
+      (if (not (null? port))
+          (dotimes (k packets)
+            (set! len (+ (& (convert (pref pktlist (+ offset 8)) i64) #xFF)
+                            (* 256 (& (convert (pref pktlist (+ offset 9)) i64) #xFF))))
+            (midi_cm_deliver port (pref-ptr pktlist (+ offset 10)) len
+                             (midi_cm_clock_time (pref (cast (pref-ptr pktlist offset) i64*) 0)))
+            (set! offset (+ offset 10 len))
+            (set! offset (- (+ offset MIDI_CM_ALIGN) (% (+ offset MIDI_CM_ALIGN) (+ MIDI_CM_ALIGN 1))))))
+      void)))
+
+(bind-func midi_cm_notify
+  (lambda (notification:i8* refcon:i8*)
+    void))
+
+(bind-func midi_cm_client_thread
+  (lambda (arg:i8*)
+    (let ((client:i32* (salloc))
+          (in:i32* (salloc))
+          (out:i32* (salloc))
+          (name (midi_cm_string "Extempore")))
+      (if (and (= (MIDIClientCreate name (cast (get_native_fptr midi_cm_notify) i8*) null client) 0)
+               (= (MIDIInputPortCreate (pref client 0) name (cast (get_native_fptr midi_cm_read) i8*) null in) 0)
+               (= (MIDIOutputPortCreate (pref client 0) name out) 0))
+          (begin
+            (set! midi_cm_client (pref client 0))
+            (set! midi_cm_in (pref in 0))
+            (set! midi_cm_out (pref out 0))
+            (set! midi_cm_ready 1)
+            (CFRunLoopRun)
+            void)
+          (begin
+            (set! midi_cm_ready -1)
+            void))
+      (cast null i8*))))
+
+(bind-func static midi_cm_send
+  "send the bytes as one packet at a host time. A destination takes 0 to mean
+now; a virtual source's listeners are told the time, so it has to be a real one."
+  (lambda (port:MidiPort* bytes:i8* n:i64 host:i64)
+    (let ((packet (MIDIPacketListInit midi_cm_list))
+          (virtual (= (midi_port_b port) 1)))
+      (set! packet (MIDIPacketListAdd midi_cm_list MIDI_CM_LIST_SIZE packet
+                                      (if (and virtual (= host 0)) (mach_absolute_time) host)
+                                      n bytes))
+      (and (not (null? packet))
+           (= (if virtual
+                  (MIDIReceived (convert (midi_port_a port) i32) midi_cm_list)
+                  (MIDISend midi_cm_out (convert (midi_port_a port) i32) midi_cm_list))
+              0)))))
+
+(bind-func midi_be_send
+  (lambda (port:MidiPort* bytes:i8* n:i64)
+    (midi_cm_send port bytes n 0)))
+
+(bind-func midi_cm_send_thread
+  (lambda (arg:i8*)
+    (let ((port:MidiPort* null)
+          (msg:MidiMsg* (halloc))
+          (bytes:i8* (halloc 4))
+          (running:i1 #t)
+          (i:i64 0))
+      (while running
+        (midi_clock_tick)
+        (mutex_lock midi_lock)
+        (dotimes (i MIDI_MAX_OPEN)
+          (set! port (midi_open_port i))
+          (if (and (not (null? port))
+                   (= (midi_port_kind port) MIDI_OUT)
+                   (> (midi_queued port) 0)
+                   (= (mutex_trylock midi_send_lock) 1))
+              (begin
+                (while (midi_queue_pop port (+ (clock_clock) MIDI_CM_EARLY) msg)
+                  (midi_cm_send port bytes (midi_msg_bytes msg bytes)
+                                (midi_cm_host_time (midi_msg_time msg))))
+                (mutex_unlock midi_send_lock)
+                void)))
+        (mutex_unlock midi_lock)
+        (thread_sleep 0 1000000))
+      (cast null i8*))))
+
+(bind-func midi_be_init
+  (lambda ()
+    (let ((waited:i64 0)
+          (timebase:i32* (salloc 2)))
+      ;; a tick is numer/denom nanoseconds
+      (if (and (= (mach_timebase_info timebase) 0) (> (pref timebase 0) 0))
+          (set! midi_cm_ticks (/ (* 1000000000.0 (convert (pref timebase 1) double))
+                                 (convert (pref timebase 0) double))))
+      (thread_fork (get_native_fptr midi_cm_client_thread) null)
+      ;; the client is made on its own thread: give it two seconds
+      (while (and (= midi_cm_ready 0) (< waited 2000))
+        (thread_sleep 0 1000000)
+        (set! waited (+ waited 1)))
+      (if (= midi_cm_ready 1)
+          (begin
+            (thread_fork (get_native_fptr midi_cm_send_thread) null)
+            #t)
+          (begin
+            (println "midi: can't create a CoreMIDI client")
+            #f)))))
+
+(bind-func static midi_cm_list_endpoint
+  (lambda (endpoint:i32 input:i1)
+    (let ((name_p:i8** (salloc))
+          (buf:i8* (salloc 256))
+          (property (midi_cm_string "displayName")))
+      (pset! name_p 0 null)
+      (pset! buf 0 0:i8)
+      (if (and (= (MIDIObjectGetStringProperty endpoint property name_p) 0)
+               (not (null? (pref name_p 0))))
+          (begin
+            (CFStringGetCString (pref name_p 0) buf 256 MIDI_CM_UTF8)
+            (CFRelease (pref name_p 0))))
+      (CFRelease property)
+      (midi_table_add buf input (not input) (convert endpoint i64) 0)
+      void)))
+
+;; a source is somewhere to read from, and a destination somewhere to write to
+(bind-func midi_be_scan
+  (lambda ()
+    (let ((i:i64 0))
+      (dotimes (i (MIDIGetNumberOfSources))
+        (midi_cm_list_endpoint (MIDIGetSource i) #t))
+      (dotimes (i (MIDIGetNumberOfDestinations))
+        (midi_cm_list_endpoint (MIDIGetDestination i) #f))
+      void)))
+
+(bind-func midi_be_open
+  (lambda (port:MidiPort* a:i64 b:i64 name:i8*)
+    (let ((input (= (midi_port_kind port) MIDI_IN))
+          (endpoint:i32* (salloc))
+          (cfname:i8* null)
+          (res:i32 0))
+      (cond ((null? name)
+             (tset! port 1 a)
+             (tset! port 2 0)
+             (if input
+                 (= (MIDIPortConnectSource midi_cm_in (convert a i32) (cast port i8*)) 0)
+                 #t))
+            (else
+              (set! cfname (midi_cm_string name))
+              (set! res (if input
+                            (MIDIDestinationCreate midi_cm_client cfname
+                                                   (cast (get_native_fptr midi_cm_read) i8*)
+                                                   (cast port i8*) endpoint)
+                            (MIDISourceCreate midi_cm_client cfname endpoint)))
+              (CFRelease cfname)
+              (tset! port 1 (convert (pref endpoint 0) i64))
+              (tset! port 2 1)
+              (= res 0))))))
+
+(bind-func midi_be_close
+  (lambda (port:MidiPort*)
+    (cond ((= (midi_port_b port) 1)
+           (MIDIEndpointDispose (convert (midi_port_a port) i32))
+           void)
+          ((= (midi_port_kind port) MIDI_IN)
+           (MIDIPortDisconnectSource midi_cm_in (convert (midi_port_a port) i32))
+           void)
+          (else void))
+    void))

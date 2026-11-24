@@ -1,0 +1,231 @@
+;;; winmm.xtm -- the MIDI backend for Windows: the multimedia API (winmm.dll)
+
+;; Loaded by libs/core/midi.xtm, which says what a backend defines.
+;;
+;; A system port is a device number: inputs and outputs are numbered
+;; separately, from 0. There are no virtual ports.
+;;
+;; Output goes straight to the device. Input arrives on a thread of the
+;; driver's, which calls midi_wm_input: a short message packed into a number
+;; (status, then data1 and data2 in the next two bytes), and sysex in buffers
+;; we lend the driver, which come back full, or when the message ends, and are
+;; lent again. One thread of ours wakes every millisecond to send what is due.
+;;
+;; The input side has not been run: there is no way to send MIDI to a Windows
+;; machine which has no MIDI device, as the CI runners haven't.
+;;
+;; The structures are packed (mmsystem.h is, to one byte). MIDIHDR, 112 bytes:
+;;
+;;   0 lpData  8 dwBufferLength  12 dwBytesRecorded  16 dwUser  24 dwFlags
+;;
+;; MIDIINCAPSA and MIDIOUTCAPSA have the device's name at 8, in 32 bytes.
+;;
+;; In a MidiPort, a is the device handle and ptr is an input's sysex buffers
+;; (MIDI_WM_BUFFERS headers, each followed by its MIDI_WM_BUFFER_SIZE bytes).
+;; b is 1 while an input is open, and 0 once it's closing and its buffers
+;; mustn't be lent again.
+
+(bind-dylib libwinmm "winmm.dll")
+
+(bind-lib libwinmm midiOutGetNumDevs [i32]*)
+(bind-lib libwinmm midiOutGetDevCapsA [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiOutOpen [i32,i64*,i32,i64,i64,i32]*)
+(bind-lib libwinmm midiOutClose [i32,i64]*)
+(bind-lib libwinmm midiOutReset [i32,i64]*)
+(bind-lib libwinmm midiOutShortMsg [i32,i64,i32]*)
+(bind-lib libwinmm midiOutPrepareHeader [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiOutUnprepareHeader [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiOutLongMsg [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiInGetNumDevs [i32]*)
+(bind-lib libwinmm midiInGetDevCapsA [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiInOpen [i32,i64*,i32,i8*,i8*,i32]*)
+(bind-lib libwinmm midiInClose [i32,i64]*)
+(bind-lib libwinmm midiInStart [i32,i64]*)
+(bind-lib libwinmm midiInStop [i32,i64]*)
+(bind-lib libwinmm midiInReset [i32,i64]*)
+(bind-lib libwinmm midiInPrepareHeader [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiInUnprepareHeader [i32,i64,i8*,i32]*)
+(bind-lib libwinmm midiInAddBuffer [i32,i64,i8*,i32]*)
+(bind-lib libwinmm timeBeginPeriod [i32,i32]*)
+
+(bind-val MIDI_WM_HDR_SIZE i64 112)
+(bind-val MIDI_WM_BUFFERS i64 4)
+(bind-val MIDI_WM_BUFFER_SIZE i64 4096)
+(bind-val MIDI_WM_CALLBACK_FUNCTION i32 #x30000)
+(bind-val MIDI_WM_MIM_DATA i32 #x3C3)
+(bind-val MIDI_WM_MIM_LONGDATA i32 #x3C4)
+(bind-val MIDI_WM_MHDR_DONE i32 1)
+
+;; a header's fields, which aren't where a tuple would put them
+(bind-func static midi_wm_hdr_set
+  (lambda (hdr:i8* data:i8* size:i64)
+    (memset hdr 0 MIDI_WM_HDR_SIZE)
+    (pset! (cast hdr i8**) 0 data)
+    (pset! (cast (pref-ptr hdr 8) i32*) 0 (convert size i32))
+    void))
+
+(bind-func static midi_wm_hdr_recorded
+  (lambda (hdr:i8*)
+    (convert (pref (cast (pref-ptr hdr 12) i32*) 0) i64)))
+
+(bind-func static midi_wm_hdr_flags
+  (lambda (hdr:i8*)
+    (pref (cast (pref-ptr hdr 24) i32*) 0)))
+
+;; The driver calls this on its own thread, with the MidiPort as instance.
+(bind-func midi_wm_input
+  (lambda (handle:i64 what:i32 instance:i8* param1:i64 param2:i64)
+    (let ((port (cast instance MidiPort*))
+          (bytes:i8* (salloc 4))
+          (hdr:i8* null)
+          (n:i64 0))
+      (cond ((= what MIDI_WM_MIM_DATA)
+             (pset! bytes 0 (convert (& param1 #xFF) i8))
+             (pset! bytes 1 (convert (& (>> param1 8) #xFF) i8))
+             (pset! bytes 2 (convert (& (>> param1 16) #xFF) i8))
+             (midi_port_deliver port bytes (midi_msg_length (convert (& param1 #xFF) i32)) (clock_clock))
+             void)
+            ((= what MIDI_WM_MIM_LONGDATA)
+             (set! hdr (i64toptr param1))
+             (set! n (midi_wm_hdr_recorded hdr))
+             (if (> n 0)
+                 (midi_port_deliver port (pref (cast hdr i8**) 0) n (clock_clock)))
+             ;; lend the buffer again, unless the port is closing (the driver
+             ;; hands every buffer back, empty, when it's reset)
+             (if (= (midi_port_b port) 1)
+                 (begin (midiInAddBuffer handle hdr (convert MIDI_WM_HDR_SIZE i32))
+                        void))
+             void)
+            (else void))
+      void)))
+
+(bind-func midi_be_send
+  (lambda (port:MidiPort* bytes:i8* n:i64)
+    (let ((handle (midi_port_a port))
+          (first (& (convert (pref bytes 0) i32) #xFF))
+          (hdr:i8* (salloc MIDI_WM_HDR_SIZE))
+          (size (convert MIDI_WM_HDR_SIZE i32))
+          (tries:i64 0)
+          (ok:i1 #f))
+      (if (<> first #xF0)
+          (= (midiOutShortMsg handle
+                              (bor first
+                                   (bor (if (> n 1) (<< (& (convert (pref bytes 1) i32) #xFF) 8) 0:i32)
+                                        (if (> n 2) (<< (& (convert (pref bytes 2) i32) #xFF) 16) 0:i32))))
+             0)
+          (begin
+            ;; sysex: lend the driver the bytes, and wait (a second at most)
+            ;; for it to say it has sent them
+            (midi_wm_hdr_set hdr bytes n)
+            (if (= (midiOutPrepareHeader handle hdr size) 0)
+                (begin
+                  (if (= (midiOutLongMsg handle hdr size) 0)
+                      (begin
+                        (while (and (= (& (midi_wm_hdr_flags hdr) MIDI_WM_MHDR_DONE) 0) (< tries 1000))
+                          (thread_sleep 0 1000000)
+                          (set! tries (+ tries 1)))
+                        (set! ok (< tries 1000))))
+                  (midiOutUnprepareHeader handle hdr size)))
+            ok)))))
+
+(bind-func midi_wm_thread
+  (lambda (arg:i8*)
+    (let ((port:MidiPort* null)
+          (msg:MidiMsg* (halloc))
+          (bytes:i8* (halloc 4))
+          (running:i1 #t)
+          (i:i64 0))
+      (while running
+        (midi_clock_tick)
+        (mutex_lock midi_lock)
+        (dotimes (i MIDI_MAX_OPEN)
+          (set! port (midi_open_port i))
+          (if (and (not (null? port))
+                   (= (midi_port_kind port) MIDI_OUT)
+                   (> (midi_queued port) 0)
+                   (= (mutex_trylock midi_send_lock) 1))
+              (begin
+                (while (midi_queue_pop port (clock_clock) msg)
+                  (midi_be_send port bytes (midi_msg_bytes msg bytes)))
+                (mutex_unlock midi_send_lock)
+                void)))
+        (mutex_unlock midi_lock)
+        (thread_sleep 0 1000000))
+      (cast null i8*))))
+
+(bind-func midi_be_init
+  (lambda ()
+    ;; a sleep of a millisecond is a millisecond, not the default tick of 15
+    (timeBeginPeriod 1)
+    (thread_fork (get_native_fptr midi_wm_thread) null)
+    #t))
+
+;; inputs first, then outputs: the order libportmidi lists them in
+(bind-func midi_be_scan
+  (lambda ()
+    (let ((caps:i8* (salloc 64))
+          (i:i64 0))
+      (dotimes (i (convert (midiInGetNumDevs) i64))
+        (memset caps 0 64)
+        (if (= (midiInGetDevCapsA i caps 44) 0)
+            (midi_table_add (pref-ptr caps 8) #t #f i 0)))
+      (dotimes (i (convert (midiOutGetNumDevs) i64))
+        (memset caps 0 64)
+        (if (= (midiOutGetDevCapsA i caps 52) 0)
+            (midi_table_add (pref-ptr caps 8) #f #t i 0)))
+      void)))
+
+(bind-func midi_be_open
+  (lambda (port:MidiPort* a:i64 b:i64 name:i8*)
+    (let ((handle:i64* (salloc))
+          (buffers:i8* null)
+          (hdr:i8* null)
+          (stride (+ MIDI_WM_HDR_SIZE MIDI_WM_BUFFER_SIZE))
+          (size (convert MIDI_WM_HDR_SIZE i32))
+          (i:i64 0))
+      (pset! handle 0 0)
+      (cond ((not (null? name)) #f) ;; no virtual ports
+            ((= (midi_port_kind port) MIDI_OUT)
+             (if (= (midiOutOpen handle (convert a i32) 0 0 0) 0)
+                 (begin (tset! port 1 (pref handle 0))
+                        #t)
+                 #f))
+            ((= (midiInOpen handle (convert a i32)
+                            (cast (get_native_fptr midi_wm_input) i8*)
+                            (cast port i8*) MIDI_WM_CALLBACK_FUNCTION)
+                0)
+             (set! buffers (halloc (* MIDI_WM_BUFFERS stride)))
+             (tset! port 1 (pref handle 0))
+             (tset! port 2 1)
+             (tset! port 3 buffers)
+             (dotimes (i MIDI_WM_BUFFERS)
+               (set! hdr (pref-ptr buffers (* i stride)))
+               (midi_wm_hdr_set hdr (pref-ptr hdr MIDI_WM_HDR_SIZE) MIDI_WM_BUFFER_SIZE)
+               (midiInPrepareHeader (pref handle 0) hdr size)
+               (midiInAddBuffer (pref handle 0) hdr size))
+             (midiInStart (pref handle 0))
+             #t)
+            (else #f)))))
+
+(bind-func midi_be_close
+  (lambda (port:MidiPort*)
+    (let ((handle (midi_port_a port))
+          (buffers (midi_port_ptr port))
+          (stride (+ MIDI_WM_HDR_SIZE MIDI_WM_BUFFER_SIZE))
+          (i:i64 0))
+      (if (= (midi_port_kind port) MIDI_OUT)
+          (begin
+            (midiOutReset handle)
+            (midiOutClose handle)
+            void)
+          (begin
+            (tset! port 2 0)
+            (midiInStop handle)
+            (midiInReset handle)
+            (dotimes (i MIDI_WM_BUFFERS)
+              (midiInUnprepareHeader handle (pref-ptr buffers (* i stride))
+                                     (convert MIDI_WM_HDR_SIZE i32)))
+            (midiInClose handle)
+            (free buffers)
+            void))
+      void)))
