@@ -58,13 +58,17 @@ if(EXTERNAL_SHLIBS_AUDIO)
         URL_SHA256 ${DEP_PORTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS)
 
+    set(_rtmidi_args -DRTMIDI_BUILD_TESTING=OFF)
+    if(WIN32)
+        list(APPEND _rtmidi_args
+            -DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}
+            -DCMAKE_INSTALL_BINDIR=${EXT_DEPS_INSTALL_DIR})
+    endif()
     extempore_add_external(rtmidi
         URL https://github.com/thestk/rtmidi/archive/${DEP_RTMIDI_VERSION}.zip
         URL_SHA256 ${DEP_RTMIDI_SHA256}
         FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS -DRTMIDI_BUILD_TESTING=OFF
-            $<$<BOOL:${WIN32}>:-DCMAKE_INSTALL_LIBDIR=${EXT_DEPS_INSTALL_DIR}>
-            $<$<BOOL:${WIN32}>:-DCMAKE_INSTALL_BINDIR=${EXT_DEPS_INSTALL_DIR}>)
+        CMAKE_ARGS ${_rtmidi_args})
 
     # SOURCE_SUBDIR names a directory without a CMakeLists.txt, so the
     # sources are fetched but kissfft's own build isn't added.
@@ -85,22 +89,27 @@ if(EXTERNAL_SHLIBS_AUDIO)
     endif()
 
     # No external codecs (FLAC, Vorbis, Opus, MPEG): each would be another
-    # shared library to ship.
+    # shared library to ship. libsndfile's cmake_minimum_required(3.1..3.18)
+    # is below the 3.5 that CMake 4 still accepts, hence the policy floor.
+    set(_sndfile_args
+        -DBUILD_SHARED_LIBS=ON
+        -DBUILD_PROGRAMS=OFF
+        -DBUILD_EXAMPLES=OFF
+        -DENABLE_EXTERNAL_LIBS=OFF
+        -DENABLE_MPEG=OFF
+        -DBUILD_TESTING=OFF
+        -DENABLE_CPACK=OFF
+        -DENABLE_PACKAGE_CONFIG=OFF
+        -DINSTALL_PKGCONFIG_MODULE=OFF
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5)
+    if(WIN32)
+        list(APPEND _sndfile_args -DENABLE_STATIC_RUNTIME=OFF)
+    endif()
     extempore_add_external(sndfile
         URL https://github.com/libsndfile/libsndfile/releases/download/${DEP_SNDFILE_VERSION}/libsndfile-${DEP_SNDFILE_VERSION}.tar.xz
         URL_SHA256 ${DEP_SNDFILE_SHA256}
         FOLDER EXTERNAL_SHLIBS
-        CMAKE_ARGS
-            -DBUILD_SHARED_LIBS=ON
-            -DBUILD_PROGRAMS=OFF
-            -DBUILD_EXAMPLES=OFF
-            -DENABLE_EXTERNAL_LIBS=OFF
-            -DENABLE_MPEG=OFF
-            -DBUILD_TESTING=OFF
-            -DENABLE_CPACK=OFF
-            -DENABLE_PACKAGE_CONFIG=OFF
-            -DINSTALL_PKGCONFIG_MODULE=OFF
-            $<$<BOOL:${WIN32}>:-DENABLE_STATIC_RUNTIME=OFF>)
+        CMAKE_ARGS ${_sndfile_args})
 
     if(UNIX)
         add_custom_target(external_shlibs_audio
