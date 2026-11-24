@@ -104,11 +104,18 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
     if (!wrapper)
         return;
+    if (wrapper->running_serial != 0 &&
+        wrapper->interrupt_serial.load(std::memory_order_relaxed) == wrapper->running_serial) {
+        wrapper->stop_reason = scheme::StopReason::Interrupted;
+        *val = true;
+        return;
+    }
     const uint64_t now = extemp::UNIV::TIME;
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
         // s7 abandons the evaluation without raising an error, so say so here.
         fprintf(stderr, "Error: evaluation stopped at its time limit (%.1f s over)\n",
                 double(now - wrapper->call_end_time) / extemp::UNIV::SAMPLE_RATE);
+        wrapper->stop_reason = scheme::StopReason::TimeLimit;
         *val = true;
     }
 }

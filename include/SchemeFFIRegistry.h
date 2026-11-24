@@ -63,6 +63,7 @@ std::span<const FFIEntry> clockDefs();
 std::span<const FFIEntry> ipcDefs();
 std::span<const FFIEntry> llvmDefs();
 std::span<const FFIEntry> miscDefs();
+std::span<const FFIEntry> nreplDefs();
 std::span<const FFIEntry> numberDefs();
 std::span<const FFIEntry> regexDefs();
 std::span<const FFIEntry> sysDefs();

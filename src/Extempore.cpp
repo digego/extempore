@@ -38,6 +38,7 @@
 #include "AudioDevice.h"
 #include "TaskScheduler.h"
 #include "HangReport.h"
+#include "NreplServer.h"
 #include "EXTLLVM.h"
 
 #include "ExtemporeVersion.h"
@@ -79,6 +80,7 @@
 BOOL CtrlHandler(DWORD fdwCtrlType) {
     switch (fdwCtrlType) {
     case CTRL_C_EVENT:
+        extemp::nrepl::removePortFile();
         TerminateProcess(GetCurrentProcess(), 1);
         return (TRUE);
     default:
@@ -98,11 +100,13 @@ void sig_handler(int Signo) {
         static const char msg[] = "\nextempore: SIGINT, exiting\n";
         const ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
         (void)r;
+        extemp::nrepl::removePortFile();
         _Exit(128 + SIGINT);
     } else if (Signo == SIGTERM) {
         static const char msg[] = "\nextempore: SIGTERM, exiting\n";
         const ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
         (void)r;
+        extemp::nrepl::removePortFile();
         _Exit(128 + SIGTERM);
     }
 }
@@ -132,6 +136,9 @@ enum class Opt : std::uint8_t {
     Eval,
     Batch,
     Port,
+    NreplPort,
+    NreplBind,
+    NoNrepl,
     Term,
     ShareDir,
     Runtime,
@@ -169,7 +176,7 @@ struct OptionSpec {
 };
 
 // The one table behind both parsing and --help; --help lists it in this order.
-constexpr std::array<OptionSpec, 31> kOptions{{
+constexpr std::array<OptionSpec, 34> kOptions{{
     {Opt::Help, "--help", Arg::None, "prints this menu"},
     {Opt::Version, "--version", Arg::None, "prints the Extempore version and exits"},
     {Opt::Run, "--run", Arg::Required, "path to a scheme file to load at startup"},
@@ -177,6 +184,11 @@ constexpr std::array<OptionSpec, 31> kOptions{{
     {Opt::Batch, "--batch", Arg::Required,
      "run in batch mode (no server, single process, no audio) with given expression"},
     {Opt::Port, "--port", Arg::Required, "port for primary process [7099]"},
+    {Opt::NreplPort, "--nrepl-port", Arg::Required,
+     "port for the nREPL server [7888]; 0 picks a free one and writes .nrepl-port"},
+    {Opt::NreplBind, "--nrepl-bind", Arg::Required,
+     "IPv4 address the nREPL server listens on [127.0.0.1]"},
+    {Opt::NoNrepl, "--no-nrepl", Arg::None, "don't start the nREPL server"},
     {Opt::Term, "--term", Arg::Required,
      "either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor"},
     {Opt::ShareDir, "--sharedir", Arg::Required,
@@ -284,6 +296,10 @@ std::string escape_backslashes(std::string str) {
 struct Settings {
     std::string initexpr;
     int primary_port = 7099;
+    bool nrepl = true;
+    std::uint16_t nrepl_port = extemp::nrepl::DEFAULT_PORT;
+    bool nrepl_port_given = false;
+    std::string nrepl_bind = "127.0.0.1";
     bool repl_mode = false;
     std::string sharedir;  // --sharedir, empty when not given
 };
@@ -355,6 +371,19 @@ ParseResult apply_option(const OptionSpec& spec, std::string_view value, Setting
             status = 1;
             return ParseResult::Exit;
         }
+        break;
+    case Opt::NreplPort:
+        if (!parse_integer(spec.name, value, settings.nrepl_port)) {
+            status = 1;
+            return ParseResult::Exit;
+        }
+        settings.nrepl_port_given = true;
+        break;
+    case Opt::NreplBind:
+        settings.nrepl_bind = std::string(value);
+        break;
+    case Opt::NoNrepl:
+        settings.nrepl = false;
         break;
     case Opt::Term:
         if (value == "cmd") {
@@ -630,6 +659,14 @@ EXPORT int extempore_init(int argc, char** argv) {
     }
     auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port,
                                               0, settings.initexpr);
+
+    // The default port being taken (usually by another extempore) costs only
+    // the nREPL server; a port asked for by name is worth stopping for.
+    if (settings.nrepl &&
+        !extemp::nrepl::start(settings.nrepl_bind, settings.nrepl_port) &&
+        settings.nrepl_port_given) {
+        exit(1);
+    }
 
 #ifndef _WIN32
     if (settings.repl_mode) {

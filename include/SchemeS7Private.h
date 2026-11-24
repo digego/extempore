@@ -5,6 +5,7 @@
 #include "EXTThread.h"
 #include "s7.h"
 
+#include <atomic>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -45,6 +46,19 @@ struct scheme {
     void* ext_data;
 
     s7_pointer output_port;
+
+    // Stopping an nREPL eval. The task thread numbers the request it runs in
+    // running_serial (0 when none); another thread asks for a stop by storing
+    // that number in interrupt_serial, which begin_hook checks, so a stop that
+    // arrives as one request ends can't land on the next. begin_hook records
+    // in stop_reason why it abandoned an evaluation.
+    std::atomic<uint64_t> interrupt_serial{0};
+    uint64_t running_serial = 0;
+    enum class StopReason : uint8_t { None, Interrupted, TimeLimit };
+    StopReason stop_reason = StopReason::None;
+
+    // The port an nREPL eval binds as the current output port (NreplServer).
+    s7_pointer nrepl_port = nullptr;
 };
 
 scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc);

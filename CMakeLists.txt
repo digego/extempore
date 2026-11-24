@@ -336,6 +336,7 @@ endif()
 set(EXTEMPORE_SOURCES
     src/Extempore.cpp
     src/AudioDevice.cpp
+    src/Bencode.cpp
     src/EXTZones.cpp
     src/EXTClosureAddressTable.cpp
     src/EXTLLVM.cpp
@@ -357,6 +358,7 @@ set(EXTEMPORE_SOURCES
     src/ffi/utility.cpp
     src/SchemeProcess.cpp
     src/SchemeREPL.cpp
+    src/NreplServer.cpp
     src/TaskScheduler.cpp
     src/UNIV.cpp
     src/LinenoiseREPL.cpp)

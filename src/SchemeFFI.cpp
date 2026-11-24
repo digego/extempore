@@ -63,7 +63,7 @@ void initSchemeFFI(scheme* sc) {
     // became separate translation units.
     const std::span<const FFIEntry> groups[] = {
         utilityDefs(), ipcDefs(),  numberDefs(), sysDefs(),  sysDspDefs(),
-        sysZoneDefs(), miscDefs(), regexDefs(),  llvmDefs(), clockDefs(),
+        sysZoneDefs(), miscDefs(), regexDefs(),  llvmDefs(), clockDefs(), nreplDefs(),
     };
     for (const auto& group : groups) {
         for (const auto& elem : group) {

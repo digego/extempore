@@ -1,0 +1,129 @@
+;; The Scheme half of the nREPL server (src/NreplServer.cpp; design in
+;; backlog/docs/doc-002). The server calls nrepl:handle on the task thread of
+;; the session's process with the request as an association list keyed by
+;; strings. Responses go back with (nrepl:send key value ...), whose values are
+;; strings, integers, lists of them, or nrepl:dict hash tables for
+;; dictionaries. The server sends each request's final done, and while
+;; nrepl:handle runs, the current output port copies everything printed to
+;; the client as out messages as well as to the console.
+
+(define (nrepl:get msg key . default)
+  (let ((entry (assoc key msg)))
+    (if entry (cdr entry) (if (pair? default) (car default) #f))))
+
+;; a dictionary for nrepl:send, from alternating keys and values; an entry
+;; whose value is #f is left out
+(define (nrepl:dict . kvs)
+  (let ((table (make-hash-table)))
+    (let loop ((kvs kvs))
+      (if (and (pair? kvs) (pair? (cdr kvs)))
+          (begin
+            (if (cadr kvs) (hash-table-set! table (car kvs) (cadr kvs)))
+            (loop (cddr kvs)))))
+    table))
+
+(define (nrepl:->string x)
+  (if (string? x) x (#_format #f "~A" x)))
+
+;;;;;;;;;;
+;; eval ;;
+;;;;;;;;;;
+
+;; Skip whitespace and line comments, so the port's line number is the line
+;; the next form starts on (s7 records no line on a pair read from a string).
+(define (nrepl:skip-blank port)
+  (let ((c (peek-char port)))
+    (cond ((eof-object? c) c)
+          ((char-whitespace? c) (read-char port) (nrepl:skip-blank port))
+          ((char=? c #\;) (read-line port) (nrepl:skip-blank port))
+          (else c))))
+
+(define (nrepl:location file line)
+  (if file
+      (#_format #f "~A, line ~A" file line)
+      (#_format #f "line ~A" line)))
+
+(define (nrepl:error-message tag info)
+  (*s7-catch* #t
+    (lambda ()
+      (if (and (pair? info) (string? (car info)))
+          (apply #_format #f info)
+          (#_format #f "~A" (if (null? info) tag info))))
+    (lambda (t i) (#_format #f "~S" info))))
+
+;; An error ends the request: its report on the console, as any eval's error
+;; would be, then err and eval-error to the client. An xtlang diagnostic has
+;; already printed its report on the console, and its message is that report.
+;;
+;; The handlers pass a copy of INFO: s7 can hand a catch handler an argument
+;; list it reuses for later calls, so the first call made while reporting
+;; would overwrite the original.
+(define (nrepl:report-error tag info form file line)
+  (let* ((location (nrepl:location file line))
+         (kind (nrepl:->string tag))
+         (message (nrepl:error-message tag info))
+         (console (sys:error-report-string tag info location)))
+    (xtc:diagnostics:to-console console)
+    (nrepl:send "err" (if (sys:xtlang-error? tag) (string-append message "\n") console))
+    (nrepl:send "ex" kind
+                "root-ex" kind
+                "status" '("eval-error")
+                "extempore/error"
+                (nrepl:dict "kind" kind
+                            "message" message
+                            "form" (and form (#_object->string form #t 200))
+                            "file" file
+                            "line" line))))
+
+(define nrepl:failed (list 'nrepl:failed))
+
+;; Read and evaluate CODE form by form, stopping at the first error. Each value
+;; goes to the client as it comes, or with LAST-ONLY just the last one.
+(define (nrepl:eval-code code file line last-only)
+  (let ((port (open-input-string code)))
+    (set! (port-line-number port) line)
+    (let loop ((last #f))
+      (if (eof-object? (nrepl:skip-blank port))
+          (begin
+            (close-input-port port)
+            (if (and last-only last) (nrepl:send "value" last)))
+          (let* ((start (port-line-number port))
+                 (form (*s7-catch* #t
+                         (lambda () (read port))
+                         (lambda (tag info)
+                           (nrepl:report-error tag (copy info) #f file start)
+                           nrepl:failed))))
+            (cond
+              ((eq? form nrepl:failed) (close-input-port port))
+              ((eof-object? form) (loop last))
+              (else
+                (let ((result (*s7-catch* #t
+                                (lambda () (list (eval form (rootlet))))
+                                (lambda (tag info)
+                                  (nrepl:report-error tag (copy info) form file start)
+                                  nrepl:failed))))
+                  (if (eq? result nrepl:failed)
+                      (close-input-port port)
+                      (let ((printed (#_object->string (if (pair? result) (car result) result))))
+                        (if (not last-only) (nrepl:send "value" printed))
+                        (loop printed)))))))))))
+
+(define (nrepl:line msg)
+  (let ((line (nrepl:get msg "line")))
+    (cond ((integer? line) line)
+          ((and (string? line) (string->number line)) (string->number line))
+          (else 1))))
+
+;;;;;;;;;;;;;;
+;; dispatch ;;
+;;;;;;;;;;;;;;
+
+(define (nrepl:handle msg)
+  (let ((op (nrepl:get msg "op")))
+    (cond
+      ((equal? op "eval")
+       (nrepl:eval-code (nrepl:get msg "code") (nrepl:get msg "file") (nrepl:line msg) #f))
+      ((equal? op "load-file")
+       (nrepl:eval-code (nrepl:get msg "file")
+                        (or (nrepl:get msg "file-path") (nrepl:get msg "file-name"))
+                        1 #t)))))

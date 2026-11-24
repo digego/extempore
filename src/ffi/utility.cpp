@@ -36,6 +36,7 @@
 #include "SchemeFFIRegistry.h"
 
 #include "AudioDevice.h"
+#include "NreplServer.h"
 #include "UNIV.h"
 
 #include <cstdio>
@@ -93,6 +94,7 @@ static pointer exit_extempore(scheme* Scheme, pointer Args) {
     // WAV before terminating.
     std::fflush(stdout);
     extemp::AudioDevice::stopFileDriver();
+    extemp::nrepl::removePortFile();
     std::_Exit(rc);
 }
 

@@ -40,6 +40,7 @@
 #include "OSC.h"
 #include "ExtemporeVersion.h"
 #include "AudioDevice.h"
+#include "NreplServer.h"
 
 #include <iosfwd>
 #include <iomanip>
@@ -151,6 +152,16 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
             break;
         }
     }
+}
+
+std::vector<std::string> SchemeProcess::liveNames() {
+    std::vector<std::string> names;
+    for (auto& slot : sm_live) {
+        if (SchemeProcess* process = slot.load()) {
+            names.push_back(process->m_name);
+        }
+    }
+    return names;
 }
 
 SchemeProcess* SchemeProcess::find(const std::string& Name) {
@@ -270,7 +281,7 @@ void* SchemeProcess::taskImpl() {
     loadFile("runtime/xtc-driver.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-bind.xtm", UNIV::SHARE_DIR);
     loadFile("runtime/xtc-codegen.xtm", UNIV::SHARE_DIR);
-    m_libsLoaded = true;
+    loadFile("runtime/nrepl.xtm", UNIV::SHARE_DIR);
     // only load extempore.xtm in primary process
     if (m_name == "primary") {
         const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
@@ -297,6 +308,7 @@ void* SchemeProcess::taskImpl() {
                                         SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
     }
+    m_libsLoaded = true;
     while (m_running) [[likely]] {
         {
             // Sleep until a producer pushes a task (or stop() is called); the
@@ -434,6 +446,10 @@ void* SchemeProcess::taskImpl() {
                 auto s(reinterpret_cast<_llvm_callback_struct_*>(task.getPtr()));
                 s->fptr(s->dat, s->zone);
             } break;
+            case SchemeTask::Type::NREPL:
+                nrepl::runRequest(m_scheme, static_cast<nrepl::Request*>(task.getPtr()),
+                                  task.getMaxDuration());
+                break;
             default:
                 std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;
             }
@@ -447,8 +463,8 @@ void* SchemeProcess::taskImpl() {
 #ifndef _WIN32
 void SchemeProcess::writeHangReports() {
     static const char* const typeNames[] = {
-        "REPL", "SCHEME_CALLBACK",      "DESTROY_ENV",       "CALLBACK_SYMBOL",
-        "?",    "LOCAL_PROCESS_STRING", "EXTEMPORE_CALLBACK"};
+        "REPL", "SCHEME_CALLBACK",      "DESTROY_ENV",        "CALLBACK_SYMBOL",
+        "?",    "LOCAL_PROCESS_STRING", "EXTEMPORE_CALLBACK", "NREPL"};
     for (auto& slot : sm_live) {
         SchemeProcess* process = slot.load();
         if (!process) {
@@ -461,7 +477,7 @@ void SchemeProcess::writeHangReports() {
             line << "idle";
         } else {
             const int type = process->m_taskType.load();
-            line << "evaluating a " << (type >= 0 && type <= 6 ? typeNames[type] : "?")
+            line << "evaluating a " << (type >= 0 && type <= 7 ? typeNames[type] : "?")
                  << " task for ";
             line.seconds(int64_t(UNIV::TIME) - int64_t(start));
             line << ", its time limit ";

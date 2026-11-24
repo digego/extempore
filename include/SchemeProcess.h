@@ -46,6 +46,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <queue>
+#include <vector>
 #include <map>
 #include <sstream>
 #include <assert.h>
@@ -64,7 +65,8 @@ class SchemeTask {
         DESTROY_ENV,
         CALLBACK_SYMBOL,
         LOCAL_PROCESS_STRING = 5,
-        EXTEMPORE_CALLBACK
+        EXTEMPORE_CALLBACK,
+        NREPL  // an nREPL request (nrepl::Request), see NreplServer.h
     };
 
   private:
@@ -112,9 +114,9 @@ class SchemeProcess {
     uint16_t m_serverPort;
     bool m_banner;
     std::string m_initExpr;
-    // Set once by the task thread after the runtime libs finish loading.
-    // Read by the server thread spin-waiting in serverImpl(); must be
-    // synchronised.
+    // Set once by the task thread after the runtime libs finish loading and
+    // the startup tasks are queued, so a request queued after it runs after
+    // them. Read by server threads spin-waiting for it; must be synchronised.
     std::atomic<bool> m_libsLoaded;
     std::recursive_mutex m_guardMutex;
     std::condition_variable_any m_guardCond;
@@ -192,6 +194,9 @@ class SchemeProcess {
     bool getRunning() const {
         return m_running;
     }
+    bool libsLoaded() const {
+        return m_libsLoaded;
+    }
     llvm_zone_t* getDefaultZone() {
         return m_defaultZone;
     }
@@ -233,6 +238,7 @@ class SchemeProcess {
         return sm_current;
     }
     static SchemeProcess* find(const std::string& Name);
+    static std::vector<std::string> liveNames();
 #ifndef _WIN32
     // For HangReport, from a signal handler: writes each process's state to
     // stderr.

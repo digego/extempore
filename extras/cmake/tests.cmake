@@ -199,6 +199,20 @@ else()
     message(STATUS "python3 not found --- skipping docs/verify-examples test")
 endif()
 
+# The nREPL server and its command-line client (backlog/docs/doc-002). Each
+# test file starts its own extempore processes on free ports.
+if(Python3_Interpreter_FOUND)
+    foreach(_t test_server test_client)
+        add_test(NAME nrepl/${_t}
+            COMMAND Python3::Interpreter -m unittest -v ${_t})
+        set_tests_properties(nrepl/${_t} PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/nrepl
+            ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
+            TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+            LABELS nrepl)
+    endforeach()
+endif()
+
 # Offline audio-rendering tests: render a DSP to a WAV with --audio-outfile,
 # then verify it contains a sine at the expected frequency. Free-run driver
 # means ~1s of audio renders in well under a second; 1.0s of content is
