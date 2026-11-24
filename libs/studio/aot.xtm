@@ -7,8 +7,8 @@
 
 ;; The studio's five xtlang libraries (engine, dsp, fx, hall and mixer) are
 ;; compiled ahead of time when Extempore is built, like the core libraries,
-;; into libs/aot-cache. Loading one from its cache is several times quicker
-;; than compiling it.
+;; into libs/aot-cache in the build directory. Loading one from its cache is
+;; several times quicker than compiling it.
 ;;
 ;; A core library's cache is loaded whatever has happened to its source since,
 ;; so an edit to the source does nothing until the cache is built again. The
@@ -58,7 +58,7 @@
 
 (define studio:aot:note-path
   (lambda (name)
-    (string-append (sys:share-dir) "/libs/aot-cache/" name ".sources")))
+    (sys:build-path (string-append "libs/aot-cache/" name ".sources"))))
 
 ;; the cache's note: a list of (path . checksum), or #f if there isn't one
 (define studio:aot:read-note
@@ -99,7 +99,7 @@
             (let ((note (and *xtc:globals:with-cache* (studio:aot:read-note name))))
               (cond ((not note) #f)
                     ((studio:aot:fresh? note sources)
-                     (sys:load (string-append "libs/aot-cache/" name ".xtm") 'quiet))
+                     (sys:load (sys:build-path (string-append "libs/aot-cache/" name ".xtm")) 'quiet))
                     (else
                       (print "The compiled cache of ")
                       (print-with-colors 'blue 'default #t (print name))

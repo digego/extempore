@@ -54,6 +54,20 @@ option(JACK "use the Jack Portaudio backend (see BUILDING.md)" OFF)
 option(EXTEMPORE_SYSTEM_LLVM "use an installed LLVM of the pinned minor version instead of building it" OFF)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# What the build generates for the runtime --- the AOT cache and the shared
+# libraries xtlang binds --- goes under libs/ beside the executable, where the
+# runtime looks for it (UNIV::BUILD_DIR). The source tree holds sources only.
+set(EXTEMPORE_AOT_CACHE_DIR ${CMAKE_BINARY_DIR}/libs/aot-cache)
+set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_BINARY_DIR}/libs/platform-shlibs)
+foreach(_stale libs/aot-cache libs/platform-shlibs)
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${_stale})
+        message(WARNING
+            "${CMAKE_CURRENT_SOURCE_DIR}/${_stale} is stale build output: builds write "
+            "it to ${CMAKE_BINARY_DIR}/${_stale}. Delete it, since code that loads "
+            "${_stale}/... by a relative path from the source tree would find it first.")
+    endif()
+endforeach()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 #########
@@ -361,6 +375,10 @@ set(EXTEMPORE_SOURCES
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
 
+# At the top of the build tree, beside libs/, for every generator: the generator
+# expression stops multi-config generators adding a per-config subdirectory.
+set_target_properties(extempore PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_BINARY_DIR}>)
+
 # Set per target, not with CMAKE_CXX_STANDARD, so LLVM builds at the standard it
 # chooses for itself.
 set_target_properties(extempore PROPERTIES
@@ -453,13 +471,10 @@ if(WIN32)
     target_compile_definitions(extempore PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
     target_compile_options(extempore PRIVATE /bigobj ${EXTEMPORE_WARNING_FLAGS})
     target_link_options(extempore PRIVATE "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/src/extempore.def")
+    # The import library, which AOT-compiled code links against
+    # (runtime/xtc-aot.xtm).
     set_target_properties(extempore PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
-        LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}
-        LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}
-        ARCHIVE_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs
-        ARCHIVE_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs)
+        ARCHIVE_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>)
 elseif(APPLE)
     set_source_files_properties(src/Extempore.cpp src/SchemeFFI.cpp src/UNIV.cpp
         PROPERTIES LANGUAGE OBJCXX)
@@ -517,18 +532,23 @@ endif()
 ###########
 
 # `cmake --install build --prefix <dir>` lays out a binary release: the
-# executable at the top of the prefix with runtime/, libs/ (AOT cache and
-# platform shlibs included) and examples/ beside it. That is the layout the
-# binary looks for beside itself (UNIV::resolve_share_dir), so an installed tree
-# is relocatable and runs from any working directory. `cpack --config
-# build/CPackConfig.cmake` zips it, which is how the release workflow builds its
-# archives.
+# executable at the top of the prefix with runtime/, libs/ and examples/ beside
+# it, the build's AOT cache and platform shlibs merged into libs/. There the
+# share dir and the build dir are one directory, which the binary finds beside
+# itself (UNIV::resolve_share_dir), so an installed tree is relocatable and runs
+# from any working directory. `cpack --config build/CPackConfig.cmake` zips it,
+# which is how the release workflow builds its archives.
 install(TARGETS extempore RUNTIME DESTINATION .)
 install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs
     ${CMAKE_CURRENT_SOURCE_DIR}/examples
     DESTINATION .)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libs DESTINATION .
+    PATTERN aot-cache EXCLUDE
+    PATTERN platform-shlibs EXCLUDE)
+install(DIRECTORY ${EXTEMPORE_AOT_CACHE_DIR} ${EXT_PLATFORM_SHLIBS_DIR}
+    DESTINATION libs
+    OPTIONAL)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets DESTINATION . OPTIONAL)
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
@@ -590,8 +610,8 @@ endfunction()
 
 function(aotcompile_lib_as _basename libfile group)
     set(_targetname aot_${_basename})
-    set(_ll_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/xtm${_basename}.ll)
-    set(_xtm_file ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/${_basename}.xtm)
+    set(_ll_file ${EXTEMPORE_AOT_CACHE_DIR}/xtm${_basename}.ll)
+    set(_xtm_file ${EXTEMPORE_AOT_CACHE_DIR}/${_basename}.xtm)
 
     if(TIMEOUT_CMD)
         set(_extempore_cmd ${TIMEOUT_CMD} --kill-after=10 ${AOT_TIMEOUT_SECONDS} $<TARGET_FILE:extempore>)
@@ -601,8 +621,8 @@ function(aotcompile_lib_as _basename libfile group)
 
     set(_dep_files "")
     foreach(_dep ${ARGN})
-        list(APPEND _dep_files ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/xtm${_dep}.ll)
-        list(APPEND _dep_files ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache/${_dep}.xtm)
+        list(APPEND _dep_files ${EXTEMPORE_AOT_CACHE_DIR}/xtm${_dep}.ll)
+        list(APPEND _dep_files ${EXTEMPORE_AOT_CACHE_DIR}/${_dep}.xtm)
     endforeach()
 
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
@@ -673,7 +693,7 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
 endif()
 
 add_custom_target(clean_aot
-    COMMAND ${CMAKE_COMMAND} -E rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/libs/aot-cache
+    COMMAND ${CMAKE_COMMAND} -E rm -rf ${EXTEMPORE_AOT_CACHE_DIR}
     COMMENT "Removing AOT-compiled libs")
 
 #########

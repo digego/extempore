@@ -129,6 +129,12 @@ it was built from, so run it from the build directory:
     ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
     ./extempore --batch "(begin (println 'hello) (quit 0))"
 
+What the build generates --- the AOT cache (`libs/aot-cache/`) and the shared
+libraries xtlang binds (`libs/platform-shlibs/`) --- goes in `libs/` beside the
+binary: `build/libs/` for an in-tree build, the same `libs/` as the sources in
+an installed tree. In xtlang, `(sys:build-dir)` names that directory, as
+`(sys:share-dir)` names the share directory.
+
 To use a share directory that isn't beside the binary --- an in-tree build run
 against an installed tree, say, or a binary you copied out of a release archive
 on its own --- name it explicitly:

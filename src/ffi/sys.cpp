@@ -85,6 +85,11 @@ static pointer getShareDir(scheme* Scheme, pointer Args)
     return mk_string(Scheme, UNIV::SHARE_DIR.c_str());
 }
 
+static pointer getBuildDir(scheme* Scheme, pointer Args)
+{
+    return mk_string(Scheme, UNIV::BUILD_DIR.c_str());
+}
+
 static pointer cmdarg(scheme* Scheme, pointer Args)
 {
     auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
@@ -100,7 +105,7 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args)
 #ifdef _WIN32
     // set up the DLL load path
     SetDllDirectory(""); // Plug "binary planting" security hole.
-    if (!SetDllDirectory((extemp::UNIV::SHARE_DIR + "/libs/aot-cache").c_str())) {
+    if (!SetDllDirectory((extemp::UNIV::BUILD_DIR + "/libs/aot-cache").c_str())) {
         std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
     }
     void* lib_handle = LoadLibraryA(libname);
@@ -164,12 +169,7 @@ static pointer slurpFile(scheme* Scheme, pointer Args)
 {
     std::string filename(argString(Scheme, Args, 1));
 
-    // check raw path first, then prepend SHARE_DIR
-    std::ifstream in(filename, std::ios::binary);
-    if (!in) {
-        in.clear();
-        in.open(UNIV::SHARE_DIR + "/" + filename, std::ios::binary);
-    }
+    std::ifstream in(UNIV::find_file(filename), std::ios::binary);
     if (!in) {
         return Scheme->F;
     }
@@ -333,6 +333,7 @@ std::span<const FFIEntry> sysDefs()
         FFI_DEF("sys:mcjit-enabled", mcjitEnabled, 0, 0, false),
         FFI_DEF("sys:platform", platform, 0, 0, false),
         FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
+        FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),
         FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
         FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false),
         FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false),

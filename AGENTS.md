@@ -67,12 +67,14 @@ NOTE: this project uses GitHub Actions (in particular the
 
 ## Common tasks
 
-`libs/aot-cache/` is generated AOT output: don't edit it.
+The build writes its AOT cache and the shared libraries xtlang binds into
+`build/libs/` (`aot-cache/`, `platform-shlibs/`), never the source tree; the
+runtime finds them beside the binary (`sys:build-dir`). Don't edit them.
 
 ```bash
 cmake --build build --target aot_core            # AOT compile the core stdlib
 cmake --build build --target aot_external_audio  # ... and the audio libs (default)
-cmake --build build --target clean_aot           # delete libs/aot-cache
+cmake --build build --target clean_aot           # delete build/libs/aot-cache
 cmake --build build --target xtmdoc              # generate docs
 build/extempore --noaudio                        # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)

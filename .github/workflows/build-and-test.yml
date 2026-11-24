@@ -52,7 +52,7 @@ jobs:
         id: cache-aot
         uses: actions/cache/restore@v6
         with:
-          path: libs/aot-cache
+          path: build/libs/aot-cache
           key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'libs/studio/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
 
       - name: Build extempore
@@ -64,7 +64,7 @@ jobs:
       - name: Refresh AOT cache timestamps
         if: steps.cache-aot.outputs.cache-hit == 'true'
         shell: bash
-        run: find libs/aot-cache -type f -exec touch {} +
+        run: find build/libs/aot-cache -type f -exec touch {} +
 
       # Parallelism is Ninja's default; the AOT compile is throttled by the
       # `aot` job pool declared in CMakeLists.txt, which keeps the memory-hungry
@@ -76,7 +76,7 @@ jobs:
         if: steps.cache-aot.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
-          path: libs/aot-cache
+          path: build/libs/aot-cache
           key: ${{ matrix.os }}-aot-llvm-${{ env.LLVM_VERSION }}-${{ hashFiles('libs/base/**/*.xtm', 'libs/core/**/*.xtm', 'libs/external/**/*.xtm', 'libs/studio/*.xtm', 'runtime/**/*.xtm', 'runtime/**/*.ll', 'src/**', 'include/**', 'CMakeLists.txt', 'extras/cmake/**') }}
 
       - name: Test

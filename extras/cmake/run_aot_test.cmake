@@ -7,7 +7,7 @@
 #   WORK_DIR         working directory (extempore source tree; for sys:load paths)
 #   LIB_XTM          relative path to the fixture library to AOT-compile (phase 1)
 #   TEST_XTM         relative path to the xtmtest test file to run (phase 2)
-#   CACHE_LL         relative path to the AOT artifact phase 1 must produce
+#   CACHE_LL         path to the AOT artifact phase 1 must produce
 #   COMPILE_TIMEOUT  seconds allowed for the AOT-compile phase
 #   TEST_TIMEOUT     seconds allowed for the test phase
 
@@ -19,7 +19,7 @@ endforeach()
 
 # Phase 1: AOT-compile the fixture (remove any stale artifact first so the
 # EXISTS check below actually proves this phase produced it)
-file(REMOVE "${WORK_DIR}/${CACHE_LL}")
+file(REMOVE "${CACHE_LL}")
 execute_process(
     COMMAND "${EXTEMPORE}" --nobase --term nocolor
         --batch "(xtc:aot:compile-xtm-file \"${LIB_XTM}\")"
@@ -31,7 +31,7 @@ if(NOT compile_rc EQUAL 0)
     message(FATAL_ERROR "AOT compile phase failed (rc=${compile_rc})")
 endif()
 
-if(NOT EXISTS "${WORK_DIR}/${CACHE_LL}")
+if(NOT EXISTS "${CACHE_LL}")
     message(FATAL_ERROR "AOT compile phase produced no cache at ${CACHE_LL}")
 endif()
 

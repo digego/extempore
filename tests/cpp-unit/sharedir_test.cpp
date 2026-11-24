@@ -80,3 +80,14 @@ TEST(HoldsRuntimeFiles, NeedsRuntimeInitXtm) {
     EXPECT_FALSE(extemp::share_dir::holds_runtime_files(without_runtime.path()));
     EXPECT_FALSE(extemp::share_dir::holds_runtime_files("/nonexistent"));
 }
+
+TEST(PickBuildDir, IsTheExecutablesDirectory) {
+    // A source build's binary sits in build/, beside the files the build made.
+    EXPECT_EQ(extemp::share_dir::pick_build_dir("/src/extempore/build", "/src/extempore"),
+              "/src/extempore/build");
+}
+
+TEST(PickBuildDir, FallsBackToTheShareDirWhenTheExecutablePathIsUnknown) {
+    EXPECT_EQ(extemp::share_dir::pick_build_dir(std::filesystem::path(), "/opt/extempore"),
+              "/opt/extempore");
+}

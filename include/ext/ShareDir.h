@@ -36,5 +36,15 @@ inline std::string pick(std::string_view explicit_dir, const std::filesystem::pa
     return std::string(compile_time_default);
 }
 
+// Choose the build dir --- the directory holding what a build generates:
+// libs/aot-cache/, libs/platform-shlibs/ and libs/builds/.  A build writes them
+// beside the executable, so it is the executable's directory: build/ for a
+// source build, and the prefix of an installed tree, where it is also the share
+// dir.  Without the executable's path, assume an installed tree.
+inline std::string pick_build_dir(const std::filesystem::path& exe_dir,
+                                  std::string_view share_dir) {
+    return exe_dir.empty() ? std::string(share_dir) : exe_dir.string();
+}
+
 }  // namespace share_dir
 }  // namespace extemp

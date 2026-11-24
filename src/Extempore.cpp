@@ -544,6 +544,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         return status;
     }
     extemp::UNIV::SHARE_DIR = extemp::UNIV::resolve_share_dir(settings.sharedir);
+    extemp::UNIV::BUILD_DIR = extemp::UNIV::resolve_build_dir(extemp::UNIV::SHARE_DIR);
     const int primary_port = settings.primary_port;
     const int utility_port = primary_port - 1;
     // --batch implies --noaudio only when --audio-outfile was not specified.

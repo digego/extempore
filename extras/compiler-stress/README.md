@@ -30,7 +30,7 @@ A change meant only to make the compiler faster should leave its output alone.
 To check:
 
 1. Before the change, `cmake --build build --target clean_aot`, then
-   `cmake --build build`, and copy `libs/aot-cache/`.
+   `cmake --build build`, and copy `build/libs/aot-cache/`.
 2. Dump the JIT-compiled IR of the studio instruments: set
    `*xtc:globals:print-raw-llvm*` to `#t`, load each instrument with
    `studio:load-instrument`, and save the output.

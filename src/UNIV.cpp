@@ -377,12 +377,7 @@ EXPORT const char* sys_sharedir() {
 }
 
 EXPORT char* sys_slurp_file(const char* fname) {
-    // Try the raw path first, then prepend SHARE_DIR.
-    if (char* buf = extemp::file_util::slurp_file(fname)) {
-        return buf;
-    }
-    std::string sharedir_filename(extemp::UNIV::SHARE_DIR + "/" + fname);
-    return extemp::file_util::slurp_file(sharedir_filename.c_str());
+    return extemp::file_util::slurp_file(extemp::UNIV::find_file(fname).c_str());
 }
 
 EXPORT int register_for_window_events() {
@@ -451,7 +446,28 @@ std::string resolve_share_dir(std::string_view explicit_dir) {
     return share_dir::pick(explicit_dir, exe.empty() ? exe : exe.parent_path(), EXT_SHARE_DIR);
 }
 
+std::string resolve_build_dir(std::string_view share_dir) {
+    auto exe = executable_path();
+    return share_dir::pick_build_dir(exe.empty() ? exe : exe.parent_path(), share_dir);
+}
+
+std::string find_file(const std::string& path) {
+    std::filesystem::path p(path);
+    std::error_code ec;
+    if (p.is_absolute() || std::filesystem::exists(p, ec)) {
+        return path;
+    }
+    for (const std::string* root : {&BUILD_DIR, &SHARE_DIR}) {
+        auto candidate = std::filesystem::path(*root) / p;
+        if (std::filesystem::exists(candidate, ec)) {
+            return candidate.string();
+        }
+    }
+    return path;
+}
+
 std::string SHARE_DIR = std::string(EXT_SHARE_DIR);
+std::string BUILD_DIR = std::string(EXT_SHARE_DIR);
 uint32_t NUM_FRAMES = 1024;
 uint32_t CHANNELS = 2;
 uint32_t IN_CHANNELS = 0;

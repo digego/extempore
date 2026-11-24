@@ -7,8 +7,11 @@
 ;; aborted compile can remove it
 (define *xtc:aot:current-output-path* #f)
 (define *xtc:aot:current-lib-name* "xtmdylib")
-(define *xtc:aot:win-link-libraries* '(".\\libs\\platform-shlibs\\extempore.lib"))
-(define *xtc:aot:win-link-libraries-exe* '(".\\libs\\platform-shlibs\\extempore.lib"))
+;; link.exe takes forward slashes, so this needs no sanitize-platform-path
+;; (which is defined further down)
+(define *xtc:aot:win-link-libraries*
+  (list (string-append "\"" (sys:build-path "libs/platform-shlibs/extempore.lib") "\"")))
+(define *xtc:aot:win-link-libraries-exe* *xtc:aot:win-link-libraries*)
 
 (define *xtc:aot:unix-link-libraries-exe* '("-lextempore -lm"))
 
@@ -255,7 +258,7 @@
     (let* ((platform (sys:platform))
            (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
            (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj")))
-           (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/builds/")))
+           (output-dir (sanitize-platform-path (sys:build-path "libs/builds/")))
            (output-exe-path (string-append output-dir module-name
                                            (cond ((string=? platform "Linux") (if asdll? ".so" ""))
                                                  ((string=? platform "OSX") "")
@@ -267,7 +270,7 @@
            (link-command
              (unix-or-Windows (string-append
                                 (cond ((string=? platform "Linux")
-                                       (string-append "gcc -Llibs/platform-shlibs "
+                                       (string-append "gcc -L\"" (sys:build-path "libs/platform-shlibs") "\" "
                                                       (if asdll? "-shared -fPIC " "")
                                                       (if optimize-compiles? "-O3 -g " "-g -O0 ")
                                                       ""))
@@ -314,7 +317,7 @@
     (let* ((platform (sys:platform))
            (tmp-dir (unix-or-Windows "/tmp/extempore/" (string-append (sys:command-output "echo %TEMP%") "\\extempore\\")))
            (asm-path (string-append tmp-dir module-name (unix-or-Windows ".o" ".obj")))
-           (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache/")))
+           (output-dir (sanitize-platform-path (sys:build-path "libs/aot-cache/")))
            (output-shlib-path (string-append output-dir module-name
                                              (cond ((string=? platform "Linux") ".so")
                                                    ((string=? platform "OSX") ".dylib")
@@ -399,7 +402,7 @@
     (if (and (output-port? *xtc:aot:current-output-port*)
              (not *xtc:aot:dll*))
         (begin
-          (write `(llvm:compile-ir (sys:slurp-file ,(string-append "libs/aot-cache/" libname ".ll")))
+          (write `(llvm:compile-ir (sys:slurp-file (sys:build-path ,(string-append "libs/aot-cache/" libname ".ll"))))
                  *xtc:aot:current-output-port*)
           (display (string-append ";; flush the JIT-compilation queue, so we only get this file's code in the module\n"
                                   "(xtc:codegen:flush-jit-compilation-queue)\n")
@@ -447,7 +450,7 @@
   (lambda ()
     (let ((path (sys:command-output "echo %PATH%")))
       (if (not (string-contains? path "libs/platform-shlibs"))
-          (sys:set-env "PATH" (string-append path ";" (sys:share-dir) "/libs/platform-shlibs"))))))
+          (sys:set-env "PATH" (string-append path ";" (sys:build-path "libs/platform-shlibs")))))))
 
 ;; do it!
 (if (string=? (sys:platform) "Windows")
@@ -534,7 +537,7 @@
                 (let* ((res (regex:matched m "declare cc 0.*@([^(]*).*nounwind"))
                        (result (eval `(llvm:bind-symbol ,(string->symbol libname) ,(cadr res)))))
                   (if (not result) (println "Error binding " res " to " libname " in declaration from " ll-file-path))))
-              (regex:match-all (sys:slurp-file (string-append "libs/aot-cache/" ll-file-path ".ll")) "declare cc 0.*@([^(]*).*nounwind"))
+              (regex:match-all (sys:slurp-file (sys:build-path (string-append "libs/aot-cache/" ll-file-path ".ll"))) "declare cc 0.*@([^(]*).*nounwind"))
     #t))
 
 ;; aot compile llvm bitcode (bc)
@@ -558,7 +561,7 @@
                               (sanitize-platform-path (filename-from-path lib-path))
                               (string-append (car cache-name) ".xtm")))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (output-dir (sanitize-platform-path (sys:build-path "libs/aot-cache")))
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
                  (ll-path (sanitize-platform-path (string-append output-dir "/" libname-no-extension ".ll"))))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
@@ -568,7 +571,7 @@
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
-                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
+                  (sys:command (string-append (unix-or-Windows "mkdir -p \"" "md \"") output-dir "\""))
                   ;; remove old AOT file if present
                   (if (file-exists? aot-compilation-file-path)
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))
@@ -624,7 +627,7 @@
           (let* ((res (close-port in-file-port))
                  (libname (sanitize-platform-path (filename-from-path lib-path)))
                  (libname-no-extension (string-append "xtm" (filename-strip-extension libname)))
-                 (output-dir (sanitize-platform-path (string-append (sys:share-dir) "/libs/aot-cache")))
+                 (output-dir (sanitize-platform-path (sys:build-path "libs/aot-cache")))
                  (aot-compilation-file-path (sanitize-platform-path (string-append output-dir "/" libname)))
                  (original-opt-level (llvm:optimization-level)))
             (if (not (sys:load-preload-check (string->symbol libname-no-extension)))
@@ -634,7 +637,7 @@
                 (begin
                   ;; if the preload check passes, create aot-cache dir
                   ;; if it doesn't exist
-                  (sys:command (string-append (unix-or-Windows "mkdir " "md ") output-dir))
+                  (sys:command (string-append (unix-or-Windows "mkdir -p \"" "md \"") output-dir "\""))
                   ;; remove old AOT file if present
                   (if (file-exists? aot-compilation-file-path)
                       (sys:command (string-append (unix-or-Windows "rm " "DEL ") aot-compilation-file-path)))

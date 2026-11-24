@@ -161,7 +161,7 @@ add_test(NAME tests/core/aot-compilation.xtm
         -DWORK_DIR=${CMAKE_CURRENT_SOURCE_DIR}
         -DLIB_XTM=tests/core/aot-compilation-lib.xtm
         -DTEST_XTM=tests/core/aot-compilation.xtm
-        -DCACHE_LL=libs/aot-cache/xtmaot-compilation-lib.ll
+        -DCACHE_LL=$<TARGET_FILE_DIR:extempore>/libs/aot-cache/xtmaot-compilation-lib.ll
         -DCOMPILE_TIMEOUT=120
         -DTEST_TIMEOUT=60
         -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_aot_test.cmake)

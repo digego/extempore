@@ -12,7 +12,6 @@ include(ExternalProject)
 include(FetchContent)
 
 set(EXT_DEPS_INSTALL_DIR ${CMAKE_BINARY_DIR}/deps-install)
-set(EXT_PLATFORM_SHLIBS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/platform-shlibs)
 set(EXT_DEPS_C_FLAGS "")
 set(EXT_DEPS_CXX_FLAGS "")
 
@@ -42,12 +41,13 @@ endfunction()
 
 # extempore_add_shlib(name sources...) compiles a shared library into
 # platform-shlibs, exporting every symbol on Windows as the other platforms do.
+# (The $<1:...> keeps multi-config generators from adding a config subdirectory.)
 function(extempore_add_shlib name)
     add_library(${name} SHARED ${ARGN})
     set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
-        RUNTIME_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
-        ARCHIVE_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
+        LIBRARY_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
+        RUNTIME_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
+        ARCHIVE_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         FOLDER EXTERNAL_SHLIBS)
 endfunction()
@@ -219,8 +219,8 @@ if(EXTERNAL_SHLIBS_GRAPHICS)
     endif()
 
     set_target_properties(xtmwebgpu PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
-        RUNTIME_OUTPUT_DIRECTORY ${EXT_PLATFORM_SHLIBS_DIR}
+        LIBRARY_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
+        RUNTIME_OUTPUT_DIRECTORY $<1:${EXT_PLATFORM_SHLIBS_DIR}>
         FOLDER EXTERNAL_SHLIBS)
 
     if(UNIX)
