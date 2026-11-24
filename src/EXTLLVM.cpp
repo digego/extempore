@@ -1044,6 +1044,11 @@ EXPORT double clock_clock() {
     return getRealTime() + extemp::UNIV::CLOCK_OFFSET;
 }
 
+// clock_clock() - clock_offset() is the clock audio_clock_now() reads
+EXPORT double clock_offset() {
+    return extemp::UNIV::CLOCK_OFFSET;
+}
+
 EXPORT double audio_clock_base() {
     return extemp::UNIV::AUDIO_CLOCK_BASE;
 }

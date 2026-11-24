@@ -145,6 +145,7 @@ declare i32 @mutex_trylock(i8*) nounwind
 
 ; Clock functions
 declare double @clock_clock() nounwind
+declare double @clock_offset() nounwind
 declare double @audio_clock_base() nounwind
 declare double @audio_clock_now() nounwind
 
