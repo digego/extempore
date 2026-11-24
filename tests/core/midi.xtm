@@ -1,0 +1,214 @@
+;;; tests/core/midi.xtm -- libs/core/midi.xtm
+
+;; Most of this uses loopback ports, which need no MIDI on the machine. The
+;; last section sends through the system (a virtual port of our own, read back
+;; through an input opened on it) and only runs where there is a backend which
+;; starts: on Linux, where /dev/snd/seq can be opened.
+
+(sys:load "libs/core/test.xtm")
+(sys:load "libs/core/midi.xtm")
+
+(bind-val midi_test_port MidiPort* (midi_open_loopback))
+(bind-val midi_test_msg MidiMsg* (halloc))
+
+;; status + 256 * data1 + 65536 * data2 of the next message, or -1
+(bind-func midi_test_next
+  (lambda (port:MidiPort*)
+    (if (midi_receive port midi_test_msg)
+        (convert (+ (tref midi_test_msg 1)
+                    (* 256 (tref midi_test_msg 2))
+                    (* 65536 (tref midi_test_msg 3)))
+                 i64)
+        -1)))
+
+(bind-func midi_test_short
+  (lambda (status:i32 data1:i32 data2:i32)
+    (midi_send midi_test_port status data1 data2)
+    (midi_test_next midi_test_port)))
+
+(bind-func midi_test_none
+  (lambda ()
+    (midi_test_next midi_test_port)))
+
+(xtmtest-result (midi_test_none) -1 "nothing-to-receive")
+(xtmtest-result (midi_test_short #x93 60 100) (+ #x93 (* 256 60) (* 65536 100)) "note-on")
+(xtmtest-result (midi_test_short #xE0 1 64) (+ #xE0 256 (* 65536 64)) "pitch-bend")
+;; two-byte and one-byte messages don't carry what's in the unused arguments
+(xtmtest-result (midi_test_short #xC2 17 99) (+ #xC2 (* 256 17)) "program-change-has-one-data-byte")
+(xtmtest-result (midi_test_short #xF8 5 6) #xF8 "clock-has-no-data-bytes")
+(xtmtest-result (midi_test_none) -1 "received-once")
+
+;; messages come out in the order they went in
+(bind-func midi_test_order
+  (lambda ()
+    (let ((i:i32 0) (ok:i1 #t))
+      (dotimes (i 100)
+        (midi_send midi_test_port #x90 i 1))
+      (dotimes (i 100)
+        (if (<> (midi_test_next midi_test_port) (convert (+ #x90 (* 256 i) 65536) i64))
+            (set! ok #f)))
+      (if ok 1 0))))
+(xtmtest-result (midi_test_order) 1 "order-kept")
+
+;; sysex: the message says how long it is, and its bytes follow. n >= 2.
+(bind-func midi_test_sysex
+  (lambda (n:i64 pieces:i64)
+    (let ((bytes:i8* (halloc n))
+          (back:i8* (halloc n))
+          (piece (/ n pieces))
+          (i:i64 0)
+          (sum:i64 0))
+      (dotimes (i n) (pset! bytes i (convert (% i 100) i8)))
+      (pset! bytes 0 (convert #xF0 i8))
+      (pset! bytes (- n 1) (convert #xF7 i8))
+      ;; sent in pieces, as a backend delivers a long message
+      (dotimes (i pieces)
+        (midi_send_sysex midi_test_port (pref-ptr bytes (* i piece))
+                         (if (= i (- pieces 1)) (- n (* i piece)) piece)))
+      (if (and (midi_receive midi_test_port midi_test_msg)
+               (= (tref midi_test_msg 1) MIDI_SYSEX)
+               (= (convert (tref midi_test_msg 2) i64) n)
+               (= (midi_receive_sysex midi_test_port back n) n))
+          (dotimes (i n)
+            (if (= (pref bytes i) (pref back i)) (set! sum (+ sum 1)))))
+      (free bytes)
+      (free back)
+      sum)))
+(xtmtest-result (midi_test_sysex 8 1) 8 "sysex-short")
+(xtmtest-result (midi_test_sysex 5000 7) 5000 "sysex-in-pieces")
+(xtmtest-result (midi_test_none) -1 "sysex-fully-read")
+
+;; a sysex message whose bytes nobody asks for doesn't get in the way of the next
+(bind-func midi_test_sysex_skipped
+  (lambda ()
+    (let ((bytes:i8* (salloc 4)))
+      (pfill! bytes (convert #xF0 i8) 1 2 (convert #xF7 i8))
+      (midi_send_sysex midi_test_port bytes 4)
+      (midi_send_sysex midi_test_port bytes 4)
+      (midi_receive midi_test_port midi_test_msg)
+      (midi_receive midi_test_port midi_test_msg)
+      (midi_receive_sysex midi_test_port bytes 4))))
+(xtmtest-result (midi_test_sysex_skipped) 4 "sysex-unread-bytes-skipped")
+
+;; more sysex than the port holds is dropped whole, and the port still works
+(bind-func midi_test_sysex_overflow
+  (lambda ()
+    (let ((n (+ MIDI_SYSEX_RING_SIZE 10))
+          (bytes:i8* (halloc n))
+          (i:i64 0))
+      (dotimes (i n) (pset! bytes i 1))
+      (pset! bytes 0 (convert #xF0 i8))
+      (pset! bytes (- n 1) (convert #xF7 i8))
+      (midi_send_sysex midi_test_port bytes n)
+      (free bytes)
+      (midi_test_next midi_test_port))))
+(xtmtest-result (midi_test_sysex_overflow) -1 "sysex-too-long-dropped")
+(xtmtest-result (midi_test_short #x90 1 2) (+ #x90 256 (* 65536 2)) "works-after-overflow")
+
+;; midi_queue: a message is handed over only once it's due, oldest first
+(bind-func midi_test_queue
+  (lambda ()
+    (let ((port (midi_open_loopback))
+          (msg:MidiMsg* (salloc))
+          (soon (+ (now) (* 10 SR)))
+          (res:i64 0))
+      (midi_queue port soon #x90 60 100)
+      (midi_queue port (+ soon SR) #x80 60 0)
+      (if (= (midi_queued port) 2) (set! res (+ res 1)))
+      ;; ten seconds off: not yet
+      (if (not (midi_queue_pop port (clock_clock) msg)) (set! res (+ res 10)))
+      ;; 10.5 seconds on, the first is due and the second isn't
+      (if (midi_queue_pop port (+ (clock_clock) 10.5 midi_latency) msg) (set! res (+ res 100)))
+      (if (= (tref msg 1) #x90) (set! res (+ res 1000)))
+      (if (not (midi_queue_pop port (+ (clock_clock) 10.5 midi_latency) msg)) (set! res (+ res 10000)))
+      (if (midi_queue_pop port (+ (clock_clock) 12.0 midi_latency) msg) (set! res (+ res 100000)))
+      (if (= (midi_queued port) 0) (set! res (+ res 1000000)))
+      (midi_close port)
+      res)))
+(xtmtest-result (midi_test_queue) 1111111 "queue-hands-over-when-due")
+
+(bind-func midi_test_queue_full
+  (lambda ()
+    (let ((port (midi_open_loopback))
+          (i:i64 0)
+          (accepted:i64 0))
+      (dotimes (i (+ MIDI_RING_SIZE 5))
+        (if (midi_queue port (now) #x90 1 1) (set! accepted (+ accepted 1))))
+      (midi_close port)
+      accepted)))
+(xtmtest-result (midi_test_queue_full) 1024 "queue-refuses-when-full")
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; the Scheme side  ;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+(define midi-test-port (midi-loopback))
+
+;; what a listener would get for the next message, less its frame
+(define midi-test-next
+  (lambda ()
+    (let ((status (midi_scheme_receive midi-test-port)))
+      (if (< status 0)
+          #f
+          (let ((msg (midi:message status)))
+            (list (vector-ref msg 0) (vector-ref msg 1) (vector-ref msg 2) (vector-ref msg 3)))))))
+
+(midi-note midi-test-port 1 60 1.0)
+(xtmtest-result (midi-test-next) '(note-on 1 60 1.0) "scheme-note")
+(midi-note-off midi-test-port 16 61)
+(xtmtest-result (midi-test-next) '(note-off 16 61 0.0) "scheme-note-off")
+;; the quietest note is still a note-on
+(midi-note midi-test-port 2 60 0.0)
+(xtmtest-result (car (midi-test-next)) 'note-on "scheme-note-velocity-floor")
+(midi-send midi-test-port #x90 60 0)
+(xtmtest-result (car (midi-test-next)) 'note-off "scheme-note-on-velocity-zero-is-note-off")
+(midi-control midi-test-port 3 74 1.0)
+(xtmtest-result (midi-test-next) '(control 3 74 1.0) "scheme-control")
+(midi-bend midi-test-port 4 0)
+(xtmtest-result (midi-test-next) '(bend 4 0.0 #f) "scheme-bend-centre")
+(midi-bend midi-test-port 4 -1)
+(xtmtest-result (midi-test-next) '(bend 4 -1.0 #f) "scheme-bend-down")
+(midi-program midi-test-port 5 9)
+(xtmtest-result (midi-test-next) '(program 5 9 #f) "scheme-program")
+(midi-send midi-test-port #xFA)
+(xtmtest-result (midi-test-next) '(start #f 0 0) "scheme-system-message")
+(midi-sysex midi-test-port (byte-vector #xF0 #x7D 1 2 #xF7))
+(xtmtest-result (midi-test-next) (list 'sysex #f (byte-vector #xF0 #x7D 1 2 #xF7) #f) "scheme-sysex")
+(xtmtest-result (midi-test-next) #f "scheme-nothing-left")
+
+;; no port has this name, whatever the machine
+(xtmtest-result (midi-out "no port is called this, surely") #f "scheme-no-such-port")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; through the system  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(bind-func midi_test_wait
+  "give the backend's thread time to carry something across"
+  (lambda ()
+    (thread_sleep 0 50000000)
+    1))
+
+(if (midi:true? (midi_available))
+    (let* ((name "extempore-midi-test")
+           (out (midi-virtual-out name))
+           (in (midi-in name)))
+      (xtmtest-result (and out in #t) #t "system-ports-open")
+      (xtmtest-result (pair? (member (list name 'in) (midi-ports))) #t "system-virtual-port-listed")
+      (set! midi-test-port in)
+      (midi-note out 3 64 0.5)
+      (midi-control out 3 1 1.0)
+      (midi_test_wait)
+      (xtmtest-result (car (midi-test-next)) 'note-on "system-note")
+      (xtmtest-result (midi-test-next) '(control 3 1 1.0) "system-control")
+      (midi-sysex out (apply byte-vector (append '(#xF0 #x7D) (make-list 20000 5) '(#xF7))))
+      (midi_test_wait)
+      (xtmtest-result (let ((msg (midi-test-next))) (and msg (length (caddr msg)))) 20003 "system-long-sysex")
+      ;; queued from here, sent by the backend's thread when due
+      (midi_queue out (now) #x99 36 100)
+      (midi_test_wait)
+      (midi_test_wait)
+      (xtmtest-result (midi-test-next) (list 'note-on 10 36 (/ 100 127.0)) "system-queued-message-sent")
+      (midi-close in)
+      (midi-close out)
+      (xtmtest-result (pair? (member (list name 'in) (midi-ports))) #f "system-virtual-port-gone")))

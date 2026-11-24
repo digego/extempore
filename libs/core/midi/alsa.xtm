@@ -1,0 +1,266 @@
+;;; alsa.xtm -- the MIDI backend for Linux: the ALSA sequencer
+
+;; Loaded by libs/core/midi.xtm, which says what a backend defines.
+;;
+;; Two sequencer clients: one for output, and a non-blocking one for input
+;; which only this backend's thread reads. Every open port is a port of ours
+;; on one of them, subscribed to the system port it was opened on, or (a
+;; virtual port) left for others to subscribe to. The thread wakes every
+;; millisecond to read what has arrived and send what is due.
+;;
+;; Bytes become sequencer events and back through ALSA's snd_midi_event codec
+;; (one per port), so only the header of snd_seq_event_t is touched here:
+;;
+;;   0 type  1 flags  2 tag  3 queue  4-11 time
+;;   12 source.client  13 source.port  14 dest.client  15 dest.port
+;;   16-27 data                                         (28 bytes in all)
+;;
+;; In a MidiPort, a is our port's number and ptr is its codec.
+
+(bind-dylib libasound "libasound.so.2")
+
+(bind-lib libasound snd_seq_open [i32,i8**,i8*,i32,i32]*)
+(bind-lib libasound snd_seq_set_client_name [i32,i8*,i8*]*)
+(bind-lib libasound snd_seq_client_info_malloc [i32,i8**]*)
+(bind-lib libasound snd_seq_client_info_free [void,i8*]*)
+(bind-lib libasound snd_seq_client_info_set_client [void,i8*,i32]*)
+(bind-lib libasound snd_seq_client_info_get_client [i32,i8*]*)
+(bind-lib libasound snd_seq_query_next_client [i32,i8*,i8*]*)
+(bind-lib libasound snd_seq_port_info_malloc [i32,i8**]*)
+(bind-lib libasound snd_seq_port_info_free [void,i8*]*)
+(bind-lib libasound snd_seq_port_info_set_client [void,i8*,i32]*)
+(bind-lib libasound snd_seq_port_info_set_port [void,i8*,i32]*)
+(bind-lib libasound snd_seq_port_info_get_client [i32,i8*]*)
+(bind-lib libasound snd_seq_port_info_get_port [i32,i8*]*)
+(bind-lib libasound snd_seq_port_info_get_capability [i32,i8*]*)
+(bind-lib libasound snd_seq_port_info_get_name [i8*,i8*]*)
+(bind-lib libasound snd_seq_query_next_port [i32,i8*,i8*]*)
+(bind-lib libasound snd_seq_create_simple_port [i32,i8*,i8*,i32,i32]*)
+(bind-lib libasound snd_seq_delete_simple_port [i32,i8*,i32]*)
+(bind-lib libasound snd_seq_connect_to [i32,i8*,i32,i32,i32]*)
+(bind-lib libasound snd_seq_connect_from [i32,i8*,i32,i32,i32]*)
+(bind-lib libasound snd_seq_event_output_direct [i32,i8*,i8*]*)
+(bind-lib libasound snd_seq_event_input [i32,i8*,i8**]*)
+(bind-lib libasound snd_seq_set_client_pool_input [i32,i8*,i64]*)
+(bind-lib libasound snd_midi_event_new [i32,i64,i8**]*)
+(bind-lib libasound snd_midi_event_free [void,i8*]*)
+(bind-lib libasound snd_midi_event_no_status [void,i8*,i32]*)
+(bind-lib libasound snd_midi_event_reset_encode [void,i8*]*)
+(bind-lib libasound snd_midi_event_encode [i64,i8*,i8*,i64,i8*]*)
+(bind-lib libasound snd_midi_event_decode [i64,i8*,i8*,i64,i8*]*)
+
+(bind-val SND_SEQ_OPEN_OUTPUT i32 1)
+(bind-val SND_SEQ_OPEN_INPUT i32 2)
+(bind-val SND_SEQ_NONBLOCK i32 1)
+(bind-val SND_SEQ_PORT_CAP_READ i32 1)
+(bind-val SND_SEQ_PORT_CAP_WRITE i32 2)
+(bind-val SND_SEQ_PORT_CAP_SUBS_READ i32 32)
+(bind-val SND_SEQ_PORT_CAP_SUBS_WRITE i32 64)
+(bind-val SND_SEQ_PORT_CAP_NO_EXPORT i32 128)
+(bind-val SND_SEQ_PORT_TYPE_MIDI_GENERIC_APPLICATION i32 #x100002)
+(bind-val SND_SEQ_EVENT_NONE i32 255)
+(bind-val SND_SEQ_ADDRESS_SUBSCRIBERS i32 254)
+(bind-val SND_SEQ_ADDRESS_UNKNOWN i32 253)
+(bind-val SND_SEQ_QUEUE_DIRECT i32 253)
+
+;; An output's codec cuts a long sysex message into events this size, as a
+;; hardware port's driver does. An input's has to hold the largest event
+;; another program might send.
+(bind-val MIDI_ALSA_CHUNK_SIZE i64 256)
+(bind-val MIDI_ALSA_EVENT_SIZE i64 65536)
+;; the kernel holds what we haven't read yet in a pool of 28-byte cells
+(bind-val MIDI_ALSA_POOL_CELLS i64 2000)
+
+(bind-val midi_alsa_out i8*)
+(bind-val midi_alsa_in i8*)
+(bind-val midi_alsa_buf i8* 65536) ;; the thread's, for decoding into
+
+(bind-func static midi_alsa_port_for
+  "the open input whose sequencer port is n, or null"
+  (lambda (n:i64)
+    (let ((found:MidiPort* null)
+          (port:MidiPort* null)
+          (i:i64 0))
+      (dotimes (i MIDI_MAX_OPEN)
+        (set! port (midi_open_port i))
+        (if (and (not (null? port))
+                 (= (midi_port_kind port) MIDI_IN)
+                 (= (midi_port_a port) n))
+            (set! found port)))
+      found)))
+
+(bind-func static midi_alsa_read
+  "deliver everything which has arrived to the ports it's for"
+  (lambda ()
+    (let ((ev_p:i8** (salloc))
+          (ev:i8* null)
+          (port:MidiPort* null)
+          (n:i64 0)
+          (more:i1 #t))
+      (while more
+        ;; fails with -EAGAIN when there is nothing left
+        (if (< (snd_seq_event_input midi_alsa_in ev_p) 0)
+            (begin (set! more #f) void)
+            (begin
+              (set! ev (pref ev_p 0))
+              (set! port (midi_alsa_port_for (& (convert (pref ev 15) i64) #xFF)))
+              (if (not (null? port))
+                  (begin
+                    ;; not MIDI (a port was subscribed, say): the codec says so
+                    (set! n (snd_midi_event_decode (midi_port_ptr port) midi_alsa_buf
+                                                   MIDI_ALSA_EVENT_SIZE ev))
+                    (if (> n 0)
+                        (midi_port_deliver port midi_alsa_buf n (clock_clock)))))
+              void)))
+      void)))
+
+;; The codec turns bytes into an event when it has a whole message, or, for a
+;; long sysex message, each time its buffer fills. A receiver which is slow to
+;; read fills its pool, and the kernel then says to try again: wait for it,
+;; for up to a second a chunk.
+(bind-func midi_be_send
+  (lambda (port:MidiPort* bytes:i8* n:i64)
+    (let ((ev:i8* (salloc 32))
+          (codec (midi_port_ptr port))
+          (pos:i64 0)
+          (used:i64 0)
+          (res:i32 0)
+          (tries:i64 0)
+          (ok:i1 #t))
+      (snd_midi_event_reset_encode codec)
+      (while (and ok (< pos n))
+        (memset ev 0 32)
+        (set! used (snd_midi_event_encode codec (pref-ptr bytes pos) (- n pos) ev))
+        (if (< used 1)
+            (set! ok #f)
+            (begin
+              (set! pos (+ pos used))
+              (if (<> (& (convert (pref ev 0) i32) #xFF) SND_SEQ_EVENT_NONE)
+                  (begin
+                    (pset! ev 3 (convert SND_SEQ_QUEUE_DIRECT i8))
+                    (pset! ev 13 (convert (midi_port_a port) i8))
+                    (pset! ev 14 (convert SND_SEQ_ADDRESS_SUBSCRIBERS i8))
+                    (pset! ev 15 (convert SND_SEQ_ADDRESS_UNKNOWN i8))
+                    (set! tries 0)
+                    (set! res (snd_seq_event_output_direct midi_alsa_out ev))
+                    (while (and (= res -11) (< tries 1000)) ;; -EAGAIN
+                      (thread_sleep 0 1000000)
+                      (set! tries (+ tries 1))
+                      (set! res (snd_seq_event_output_direct midi_alsa_out ev)))
+                    (if (< res 0)
+                        (set! ok #f)))))))
+      ok)))
+
+(bind-func midi_alsa_thread
+  (lambda (arg:i8*)
+    (let ((port:MidiPort* null)
+          (msg:MidiMsg* (halloc))
+          (bytes:i8* (halloc 4))
+          (running:i1 #t)
+          (i:i64 0))
+      (while running
+        (mutex_lock midi_lock)
+        (midi_alsa_read)
+        (dotimes (i MIDI_MAX_OPEN)
+          (set! port (midi_open_port i))
+          (if (and (not (null? port))
+                   (= (midi_port_kind port) MIDI_OUT)
+                   (> (midi_queued port) 0)
+                   (= (mutex_trylock midi_send_lock) 1))
+              (begin
+                (while (midi_queue_pop port (clock_clock) msg)
+                  (midi_be_send port bytes (midi_msg_bytes msg bytes)))
+                (mutex_unlock midi_send_lock)
+                void)))
+        (mutex_unlock midi_lock)
+        (thread_sleep 0 1000000))
+      (cast null i8*))))
+
+(bind-func midi_be_init
+  (lambda ()
+    (let ((seq_p:i8** (salloc)))
+      (if (< (snd_seq_open seq_p "default" SND_SEQ_OPEN_OUTPUT 0) 0)
+          (begin
+            (println "midi: can't open the ALSA sequencer (is /dev/snd/seq there, and readable?)")
+            #f)
+          (begin
+            (set! midi_alsa_out (pref seq_p 0))
+            (snd_seq_set_client_name midi_alsa_out "Extempore")
+            (if (< (snd_seq_open seq_p "default" SND_SEQ_OPEN_INPUT SND_SEQ_NONBLOCK) 0)
+                #f
+                (begin
+                  (set! midi_alsa_in (pref seq_p 0))
+                  (snd_seq_set_client_name midi_alsa_in "Extempore")
+                  (snd_seq_set_client_pool_input midi_alsa_in MIDI_ALSA_POOL_CELLS)
+                  (thread_fork (get_native_fptr midi_alsa_thread) null)
+                  #t)))))))
+
+;; a system port is listed if anyone may subscribe to it: as an input if it
+;; can be read from, as an output if it can be written to. Our own ports on
+;; system ports are NO_EXPORT, and the System client (0) is its timer and
+;; announcements.
+(bind-func midi_be_scan
+  (lambda ()
+    (let ((cinfo_p:i8** (salloc))
+          (pinfo_p:i8** (salloc)))
+      (snd_seq_client_info_malloc cinfo_p)
+      (snd_seq_port_info_malloc pinfo_p)
+      (let ((cinfo (pref cinfo_p 0))
+            (pinfo (pref pinfo_p 0))
+            (caps:i32 0))
+        (snd_seq_client_info_set_client cinfo -1)
+        (while (> (snd_seq_query_next_client midi_alsa_out cinfo) -1)
+          (snd_seq_port_info_set_client pinfo (snd_seq_client_info_get_client cinfo))
+          (snd_seq_port_info_set_port pinfo -1)
+          (while (> (snd_seq_query_next_port midi_alsa_out pinfo) -1)
+            (set! caps (snd_seq_port_info_get_capability pinfo))
+            (if (and (<> (snd_seq_port_info_get_client pinfo) 0)
+                     (= (& caps SND_SEQ_PORT_CAP_NO_EXPORT) 0)
+                     (<> (& caps (bor SND_SEQ_PORT_CAP_SUBS_READ SND_SEQ_PORT_CAP_SUBS_WRITE)) 0))
+                (midi_table_add (snd_seq_port_info_get_name pinfo)
+                                (<> (& caps SND_SEQ_PORT_CAP_SUBS_READ) 0)
+                                (<> (& caps SND_SEQ_PORT_CAP_SUBS_WRITE) 0)
+                                (convert (snd_seq_port_info_get_client pinfo) i64)
+                                (convert (snd_seq_port_info_get_port pinfo) i64)))))
+        (snd_seq_client_info_free cinfo)
+        (snd_seq_port_info_free pinfo)
+        void))))
+
+(bind-func midi_be_open
+  (lambda (port:MidiPort* a:i64 b:i64 name:i8*)
+    (let ((input (= (midi_port_kind port) MIDI_IN))
+          (virtual (not (null? name)))
+          (seq (if input midi_alsa_in midi_alsa_out))
+          (caps (+ (if input
+                       (bor SND_SEQ_PORT_CAP_WRITE SND_SEQ_PORT_CAP_SUBS_WRITE)
+                       (bor SND_SEQ_PORT_CAP_READ SND_SEQ_PORT_CAP_SUBS_READ))
+                   (if virtual 0:i32 SND_SEQ_PORT_CAP_NO_EXPORT)))
+          (n (snd_seq_create_simple_port seq
+                                         (if virtual name (if input "input" "output"))
+                                         caps SND_SEQ_PORT_TYPE_MIDI_GENERIC_APPLICATION))
+          (codec_p:i8** (salloc))
+          (connected:i32 0))
+      (if (< n 0)
+          #f
+          (begin
+            (if (not virtual)
+                (set! connected (if input
+                                    (snd_seq_connect_from seq n (convert a i32) (convert b i32))
+                                    (snd_seq_connect_to seq n (convert a i32) (convert b i32)))))
+            (if (or (< connected 0)
+                    (< (snd_midi_event_new (if input MIDI_ALSA_EVENT_SIZE MIDI_ALSA_CHUNK_SIZE) codec_p) 0))
+                (begin (snd_seq_delete_simple_port seq n)
+                       #f)
+                (begin
+                  ;; no running status in what the codec decodes
+                  (snd_midi_event_no_status (pref codec_p 0) 1)
+                  (tset! port 1 (convert n i64))
+                  (tset! port 3 (pref codec_p 0))
+                  #t)))))))
+
+(bind-func midi_be_close
+  (lambda (port:MidiPort*)
+    (snd_seq_delete_simple_port (if (= (midi_port_kind port) MIDI_IN) midi_alsa_in midi_alsa_out)
+                                (convert (midi_port_a port) i32))
+    (snd_midi_event_free (midi_port_ptr port))
+    void))

@@ -13,6 +13,16 @@ language. Start with `examples/studio` or the studio guide in the docs. Fourteen
 of the sampled instruments need `assets/studio`, which isn't in the assets
 download yet; without it they are silent.
 
+`libs/core/midi.xtm` is a new MIDI library which talks to the operating system
+directly: ports opened by name, virtual ports, sysex, input delivered to a
+function on the Scheme thread, and output from the audio thread sent at the time
+its frame is heard. Linux (the ALSA sequencer) is the only backend so far. The
+old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so code
+which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is now
+`*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have moved
+from `libs/external/portmidi.xtm` to the new library, which `portmidi.xtm`
+loads.
+
 The xtlang compiler is much faster on big functions: type solving was cubic in a
 function's size, and closures with many captured variables and deeply nested
 `let`s were quadratic. The generated IR is unchanged except for closure

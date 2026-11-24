@@ -588,7 +588,8 @@ file(GLOB AOT_RUNTIME_DEPS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.ll)
 
 # aotcompile_lib(libfile group deps...) names the cache after the library's
-# file. aotcompile_lib_as(name libfile group deps...) gives it another name,
+# file, and AOT_EXTRA_SOURCES_<name> lists any other files it loads into the
+# same cache. aotcompile_lib_as(name libfile group deps...) gives it another name,
 # for a library whose file name is too common for the cache's one flat
 # directory (libs/studio/dsp.xtm is cached as studio_dsp). The deps are cache
 # names.
@@ -617,7 +618,8 @@ function(aotcompile_lib_as _basename libfile group)
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
         COMMAND ${_extempore_cmd} --nobase
             --batch "(xtc:aot:compile-xtm-file \"${libfile}\" #f \"${_basename}\")"
-        DEPENDS ${libfile} ${_dep_files} $<TARGET_FILE:extempore> ${AOT_RUNTIME_DEPS}
+        DEPENDS ${libfile} ${AOT_EXTRA_SOURCES_${_basename}} ${_dep_files}
+            $<TARGET_FILE:extempore> ${AOT_RUNTIME_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         JOB_POOL aot
         VERBATIM)
@@ -649,6 +651,9 @@ aotcompile_lib(libs/core/audiofile.xtm core base)
 aotcompile_lib(libs/core/audiobuffer.xtm core base audiofile)
 aotcompile_lib(libs/core/fft.xtm core base math)
 aotcompile_lib(libs/core/png.xtm core base)
+file(GLOB AOT_EXTRA_SOURCES_midi CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/libs/core/midi/*.xtm)
+aotcompile_lib(libs/core/midi.xtm core base)
 aotcompile_lib(libs/core/audio_dsp.xtm core base rational audiobuffer)
 aotcompile_lib(libs/core/instruments.xtm core base audio_dsp)
 aotcompile_lib(libs/core/audio_dsp_ext.xtm core base fft audiofile)
@@ -670,7 +675,7 @@ if(EXTERNAL_SHLIBS_AUDIO)
     add_custom_target(aot_external_audio ALL)
     set_target_properties(aot_external_audio PROPERTIES FOLDER AOT)
     add_dependencies(aot_external_audio extempore external_shlibs_audio)
-    aotcompile_lib(libs/external/portmidi.xtm audio base)
+    aotcompile_lib(libs/external/portmidi.xtm audio base midi)
 endif()
 
 # External graphics libs (WebGPU)
