@@ -5,50 +5,40 @@ really bad at keeping a changelog. But hopefully we'll be better in the future.
 
 ## Unreleased
 
-Toolchain. Building Extempore now needs CMake 4 and a C++23 compiler: GCC 13 or
-later, a recent Clang or Apple Clang, or MSVC from Visual Studio 2022 or later.
-`mise.toml` pins CMake, Ninja, Python, uv and clang-tidy, and CI installs them
-through mise, so `mise install` gives a local build the versions CI uses. The
-C++ standard is set on Extempore's own targets, and LLVM builds at its own
-default, C++17. To build against an installed LLVM 22.1 instead of compiling it,
-configure with `-DEXTEMPORE_SYSTEM_LLVM=ON`.
+The studio is new: a second audio path in `libs/studio`, with fifteen
+synthesised instruments (among them a 303-style acid bass and ports of Mutable
+Instruments' Rings and Plaits), a sampler that reads SFZ files, a sixteen-track
+mixer with send effects and a master limiter, and a Tidal-style pattern
+language. Start with `examples/studio` or the studio guide in the docs. Fourteen
+of the sampled instruments need `assets/studio`, which isn't in the assets
+download yet; without it they are silent.
 
-Generated files go in the build tree. The AOT cache, the shared libraries xtlang
-binds and the output of `--compile` used to be written into the source tree
-(`libs/aot-cache/`, `libs/platform-shlibs/`). They now go in `libs/` beside the
-binary: `build/libs/` for a source build, and the install prefix for an
-installed tree, so a release archive has the same layout as before. Each build
-directory has its own AOT cache, which means a sanitizer build no longer
-overwrites the main build's. On Windows, `extempore.exe` is built into `build\`
-like on the other platforms, instead of the source root. `(sys:build-dir)` names
-the directory, as `(sys:share-dir)` names the share directory, and a relative
-path given to `sys:load` or `sys:slurp-file` is looked for in the working
-directory, then the build directory, then the share directory. If you are
-upgrading a source checkout, delete its `libs/aot-cache/` and
-`libs/platform-shlibs/`; configure warns while they are there.
+The xtlang compiler is much faster on big functions: type solving was cubic in a
+function's size, and closures with many captured variables and deeply nested
+`let`s were quadratic. The generated IR is unchanged except for closure
+environments, which are now addressed as arrays of pointers and take much less
+IR.
 
-Dependencies. libsndfile moves from a 2019 snapshot (1.0.29) to 1.2.2, which
-brings several years of security fixes. stb_image moves from v2.10 (2016) to
-v2.30 and kissfft to 131.2.0; both are now fetched from upstream and compiled
-in-tree, and the `extemporelang` forks are no longer used. LLVM moves to 22.1.8,
-PCRE2 to 10.49, GLFW to 3.5.1 and googletest to 1.18. rtmidi is no longer built:
-it was shipped on every platform, but no xtlang library bound it, and all MIDI
-goes through PortMidi. PortAudio is now built as part of the main build, so a
-host API's own libraries are linked with it, and it builds only ALSA (plus JACK
-with `-DJACK=ON`) on Linux whatever other development headers are installed.
+Struct sizes now come from the JIT's data layout. The compiler's own rules
+aligned an i64 to 4 bytes, so a struct with padding around an i64 was allocated
+short. `llvm:get-struct-size` is now `llvm:get-type-size`, with no alias. A
+`cond` of 550 or more clauses no longer compiles to nothing, tuple types of more
+than about 100 fields and `vref` with an i64 index compile, and the comb filters
+in `audio_dsp.xtm` no longer read and write one sample past their delay lines.
 
-Releases and CI. CPack builds the release archives from what `cmake --install`
-lays out, each archive carries a build-provenance attestation, and a release's
-notes are its section of this file. Running the Release workflow by hand builds
-and packages all four platforms without publishing anything. CI uses the
-`windows-2025` image, third-party actions are pinned by commit with Dependabot
-keeping them current, and clang-tidy 22 runs on every push and fails on any
-finding. Clearing its existing findings fixed three places that passed an
-`llvm::StringRef`'s `data()`, which need not be null-terminated, to C string
-functions. `CMakePresets.json` gained test and workflow presets
-(`cmake --workflow --preset default` configures, builds and runs the suites CI
-runs), and the sanitizer presets build into their own directories, `build-asan/`
-and so on.
+Building needs CMake 4 and a C++23 compiler, and `mise install` fetches the
+pinned CMake, Ninja and Python. Generated files (the AOT cache and the platform
+shared libraries) now go in `build/libs/` beside the binary instead of the
+source tree, and `(sys:build-dir)` names that directory. When upgrading a source
+checkout, delete its `libs/aot-cache/` and `libs/platform-shlibs/`. On Windows,
+`extempore.exe` is built into `build\` too. `-DEXTEMPORE_SYSTEM_LLVM=ON` builds
+against an installed LLVM 22.1.
+
+The stb_image (2.10 to 2.30) and kissfft libraries come from upstream instead of
+forks, libsndfile goes from 1.0.29 to 1.2.2, LLVM to 22.1.8 and PCRE2 to 10.49,
+and rtmidi is no longer built, since nothing used it. Release archives are
+packaged with CPack and carry build-provenance attestations, and clang-tidy runs
+on every push.
 
 ## v0.11.2
 
