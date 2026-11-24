@@ -1,0 +1,82 @@
+;;; profile.xtm -- time the xtlang compiler's phases on one top-level form
+
+;; Author: Ben Swift
+;; Keywords: extempore
+
+;;; Commentary:
+
+;; Run by stress.py, as
+;;
+;;   extempore --pre=PRE --timed=TIMED --label=LABEL [--wrap=a,b,...] \
+;;             --batch '(sys:load "extras/compiler-stress/profile.xtm")'
+;;
+;; PRE is loaded untimed (definitions the timed form needs). Then the
+;; compiler's phases are wrapped in timers, the forms in TIMED are evaluated,
+;; and one line is printed:
+;;
+;;   RESULT LABEL total= SECONDS name = SECONDS / CALLS ...
+;;
+;; or "RESULT LABEL COMPILE-FAILED" if stress_fn wasn't defined (a failed
+;; compile still finishes, and quickly). A timer counts only the outermost call
+;; of a recursive function. --wrap adds more Scheme functions to time. A C
+;; function can't be wrapped this way (set! only shadows it), so time a Scheme
+;; function which calls it.
+
+;;; Code:
+
+(define *stress:timers* '())
+(define *stress:depths* '())
+
+(define-macro (stress:wrap name)
+  `(let ((orig ,name))
+     (set! *stress:timers* (cons (list ',name 0.0 0) *stress:timers*))
+     (set! *stress:depths* (cons (cons ',name 0) *stress:depths*))
+     (set! ,name
+           (lambda args
+             (let* ((d (assq ',name *stress:depths*))
+                    (outer (= (cdr d) 0))
+                    (t0 (clock:clock)))
+               (set-cdr! d (+ (cdr d) 1))
+               (let ((r (apply orig args)))
+                 (set-cdr! d (- (cdr d) 1))
+                 (let ((e (assq ',name *stress:timers*)))
+                   (if outer (set-car! (cdr e) (+ (cadr e) (- (clock:clock) t0))))
+                   (set-car! (cddr e) (+ 1 (caddr e))))
+                 r))))))
+
+(sys:load (sys:cmdarg "pre"))
+
+(stress:wrap xtc:driver:run)
+(stress:wrap xtc:driver:syntactic-phase)
+(stress:wrap xtc:driver:annotation-phase)
+(stress:wrap xtc:driver:type-phase)
+(stress:wrap xtc:typecheck:coercion-run)
+(stress:wrap xtc:infer:check-function)
+(stress:wrap xtc:infer:collect)
+(stress:wrap xtc:solve:run)
+(stress:wrap xtc:desugar:type-normalize)
+(stress:wrap xtc:typecheck:closure:convert)
+(stress:wrap xtc:driver:semantic-phase)
+(stress:wrap xtc:codegen:compiler)
+(stress:wrap llvm:compile-ir)
+(if (sys:cmdarg "wrap")
+    (for-each (lambda (name)
+                (eval `(stress:wrap ,(string->symbol name)) (interaction-environment)))
+              (regex:split (sys:cmdarg "wrap") ",")))
+
+(define stress:port (open-input-file (sys:cmdarg "timed")))
+(define stress:start (clock:clock))
+(let loop ((form (read stress:port)))
+  (if (not (eof-object? form))
+      (begin (eval form (interaction-environment))
+             (loop (read stress:port)))))
+(define stress:total (- (clock:clock) stress:start))
+
+(if (not (defined? 'stress_fn))
+    (begin (print "RESULT " (sys:cmdarg "label") " COMPILE-FAILED\n")
+           (quit 1)))
+(print "RESULT " (sys:cmdarg "label") " total= " stress:total)
+(for-each (lambda (e) (print " " (car e) " = " (cadr e) " / " (caddr e)))
+          (reverse *stress:timers*))
+(print "\n")
+(quit 0)
