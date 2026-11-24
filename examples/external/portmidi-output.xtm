@@ -20,11 +20,14 @@
 ;; machine
 (pm_print_devices)
 
-;; if the midi output you want to use has device id 1, then we use
-;; that device id to create an output stream (which we will send our
-;; midi output from). If the device id is some number other than 1,
-;; change it here:
-(define *mout* (pm_create_output_stream 1))
+;; bail out if no MIDI output is available (e.g. in CI)
+(if (= (pm_default_out) -1)
+    (begin (println "no MIDI output found, exiting") (quit 0)))
+
+;; create an output stream (which we will send our midi output from) on the
+;; first output device. To use another, put its device id here in place of
+;; (pm_default_out):
+(define *mout* (pm_create_output_stream (pm_default_out)))
 
 ;; now, let's send a midi message with the usual arguments
 
