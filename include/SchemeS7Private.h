@@ -9,6 +9,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace extemp {
 class SchemeProcess;
@@ -62,6 +63,10 @@ struct scheme {
 
     // The port an nREPL eval binds as the current output port (NreplServer).
     s7_pointer nrepl_port = nullptr;
+
+    // One entry per open message scope (sys:as-message): whether entering it
+    // moved the current output port from stdout to stderr.
+    std::vector<bool> message_scopes;
 };
 
 scheme* scheme_wrapper_from_s7(s7_scheme* raw_sc);

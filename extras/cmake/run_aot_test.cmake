@@ -21,8 +21,7 @@ endforeach()
 # EXISTS check below actually proves this phase produced it)
 file(REMOVE "${CACHE_LL}")
 execute_process(
-    COMMAND "${EXTEMPORE}" --nobase --term nocolor
-        --batch "(xtc:aot:compile-xtm-file \"${LIB_XTM}\")"
+    COMMAND "${EXTEMPORE}" compile "${LIB_XTM}"
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE compile_rc
     TIMEOUT ${COMPILE_TIMEOUT})
@@ -36,10 +35,9 @@ if(NOT EXISTS "${CACHE_LL}")
 endif()
 
 # Phase 2: load the precompiled fixture in a fresh process and run the tests.
-# xtmtest-run-tests quits with a non-zero exit code if any assertion fails.
+# extempore test exits with a non-zero status if any assertion fails.
 execute_process(
-    COMMAND "${EXTEMPORE}" --term nocolor
-        --batch "(xtmtest-run-tests \"${TEST_XTM}\" #t #t)"
+    COMMAND "${EXTEMPORE}" test "${TEST_XTM}"
     WORKING_DIRECTORY "${WORK_DIR}"
     RESULT_VARIABLE test_rc
     TIMEOUT ${TEST_TIMEOUT})

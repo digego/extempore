@@ -305,7 +305,22 @@ EXPORT void llvm_print_f64(double num) {
 // these shouldn't ever be large, so it should be ok to cast to signed
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
-static thread_local std::minstd_rand sRandGen{std::random_device{}()};
+//
+// Each thread has its own generator. Under extempore render --seed they are
+// seeded from the seed and the thread's place in the order the threads were
+// made, so a render draws the same numbers every time.
+static std::minstd_rand makeRandGen() {
+    if (!extemp::UNIV::SEEDED) {
+        return std::minstd_rand{std::random_device{}()};
+    }
+    const extemp::EXTThread* thread = extemp::EXTThread::activeThread();
+    const uint64_t stream = thread ? thread->ordinal() + 1 : 0;  // 0: the render thread
+    std::seed_seq seq{uint32_t(extemp::UNIV::SEED), uint32_t(extemp::UNIV::SEED >> 32),
+                      uint32_t(stream), uint32_t(stream >> 32)};
+    return std::minstd_rand{seq};
+}
+
+static thread_local std::minstd_rand sRandGen{makeRandGen()};
 
 EXPORT double xtc_randd() {
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was
@@ -1334,24 +1349,26 @@ void initLLVM() {
     MainJD.addGenerator(std::move(*DLSGOrErr));
 
     // Print configuration.
-    ascii_normal();
-    std::cout << "ARCH           : " << std::flush;
-    ascii_info();
-    std::cout << triple << std::endl;
-
-    if (!cpu.empty()) {
+    if (!UNIV::QUIET_START) {
         ascii_normal();
-        std::cout << "CPU            : " << std::flush;
+        std::cout << "ARCH           : " << std::flush;
         ascii_info();
-        std::cout << cpu << std::endl;
-    }
+        std::cout << triple << std::endl;
 
-    ascii_normal();
-    std::cout << "LLVM           : " << std::flush;
-    ascii_info();
-    std::cout << LLVM_VERSION_STRING;
-    std::cout << " ORC JIT" << std::endl;
-    ascii_normal();
+        if (!cpu.empty()) {
+            ascii_normal();
+            std::cout << "CPU            : " << std::flush;
+            ascii_info();
+            std::cout << cpu << std::endl;
+        }
+
+        ascii_normal();
+        std::cout << "LLVM           : " << std::flush;
+        ascii_info();
+        std::cout << LLVM_VERSION_STRING;
+        std::cout << " ORC JIT" << std::endl;
+        ascii_normal();
+    }
 
     // Register the runtime entry points with the JIT.
     llvm::orc::SymbolMap runtimeSymbols;

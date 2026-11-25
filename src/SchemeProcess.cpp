@@ -37,6 +37,7 @@
 #include "SchemeProcess.h"
 #include "HangReport.h"
 #include "SchemeFFI.h"
+#include "SchemeFFIRegistry.h"
 #include "OSC.h"
 #include "ExtemporeVersion.h"
 #include "AudioDevice.h"
@@ -282,6 +283,14 @@ void SchemeProcess::wakeIdleWaiters() {
 }
 
 bool SchemeProcess::waitAllIdle(const std::atomic<bool>& Cancel) {
+    return waitAll(Cancel, false);
+}
+
+bool SchemeProcess::waitAllDone(const std::atomic<bool>& Cancel) {
+    return waitAll(Cancel, true);
+}
+
+bool SchemeProcess::waitAll(const std::atomic<bool>& Cancel, bool SchedulerToo) {
     while (!Cancel.load(std::memory_order_acquire)) {
         const uint64_t events = [] {
             const std::lock_guard<std::mutex> lock(sm_idleMutex);
@@ -303,10 +312,18 @@ bool SchemeProcess::waitAllIdle(const std::atomic<bool>& Cancel) {
                 }
             }
         }
+        // The scheduler is looked at after the processes: only a running task
+        // (or a thread outside the queues) can schedule another.
+        const bool waiting = idle && SchedulerToo && !TaskScheduler::I()->quiescent();
         // Each process was idle at some moment of the pass; with no push since
         // it began, none has been given work since, so all are idle now.
-        if (idle && sm_pushes.load() == pushes) {
+        if (idle && !waiting && sm_pushes.load() == pushes) {
             return true;
+        }
+        if (waiting) {
+            // a task is waiting for its time, which no event announces
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
         }
         if (idle) {
             continue;
@@ -361,10 +378,12 @@ void* SchemeProcess::taskImpl() {
                                 "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
         if (!m_initExpr.empty()) {
-            ascii_text_color(0, 5, 10);
-            printf("\nEvaluating expression: ");
-            ascii_normal();
-            printf("%s\n\n", m_initExpr.c_str());
+            if (!UNIV::QUIET_START) {
+                ascii_text_color(0, 5, 10);
+                printf("\nEvaluating expression: ");
+                ascii_normal();
+                printf("%s\n\n", m_initExpr.c_str());
+            }
             pushTask(SchemeTask(extemp::UNIV::TIME + 1000, startupBudget,
                                 new std::string(m_initExpr), "file_init",
                                 SchemeTask::Type::LOCAL_PROCESS_STRING));
@@ -391,6 +410,11 @@ void* SchemeProcess::taskImpl() {
             }();
             m_taskType.store(int(task.getType()));
             m_taskStart.store(std::max<uint64_t>(UNIV::TIME, 1));
+            // a scope left by a continuation rather than through its
+            // dynamic-wind would otherwise keep the port on stderr
+            while (!m_scheme->message_scopes.empty()) {
+                SchemeFFI::leaveMessageScope(m_scheme);
+            }
             switch (task.getType()) {
             case SchemeTask::Type::DESTROY_ENV:
                 m_scheme->imp_env.erase(reinterpret_cast<pointer>(task.getPtr()));
@@ -406,12 +430,18 @@ void* SchemeProcess::taskImpl() {
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
                         // Nothing else will ever end a batch run whose startup
-                        // expression failed before reaching its (quit).
-                        if (UNIV::BATCH_MODE && task.getLabel() == "file_init") {
-                            std::cout << "Error: uncaught error in the --batch expression, exiting"
-                                      << std::endl;
-                            AudioDevice::stopFileDriver();
-                            std::_Exit(1);
+                        // expression failed before reaching its (quit). (A
+                        // render ends at its duration, and carries on.)
+                        if (UNIV::BATCH_MODE && task.getLabel() == "file_init" &&
+                            !(UNIV::QUIET_START && UNIV::OFFLINE_RENDER)) {
+                            if (UNIV::QUIET_START) {
+                                std::cerr << "extempore: uncaught error, exiting" << std::endl;
+                            } else {
+                                std::cout
+                                    << "Error: uncaught error in the --batch expression, exiting"
+                                    << std::endl;
+                            }
+                            SchemeFFI::exitExtempore(1);
                         }
                     }
                 }

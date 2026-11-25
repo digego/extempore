@@ -87,9 +87,11 @@ void TaskScheduler::runDue(uint64_t Until) {
             m_queue.pop();
             due.push_back(task);
         }
+        m_dispatching.fetch_add(int(due.size()));
     }
     for (auto task : due) {
         run(task);
+        m_dispatching.fetch_sub(1);
     }
 }
 
@@ -108,8 +110,10 @@ void TaskScheduler::timeSlice() {
         auto task(m_queue.peek());
         while (task && task->getStartTime() < UNIV::TIME + frames) {
             m_queue.pop();
+            m_dispatching.fetch_add(1);
             m_queueMutex.unlock();
             run(task);
+            m_dispatching.fetch_sub(1);
             m_queueMutex.lock();
             task = m_queue.peek();
         }

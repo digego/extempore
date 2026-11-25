@@ -9,8 +9,6 @@ include(CTest)
 
 add_subdirectory(tests/cpp-unit)
 
-set(EXTEMPORE_TEST_PORT_COUNTER 17099 CACHE INTERNAL "")
-
 # Per-assertion JUnit XML reports are written here, one file per test file, so
 # ctest and CI can surface individual assertion failures (not just which .xtm
 # file failed). Safe to upload as a CI test-report artifact.
@@ -35,18 +33,11 @@ else()
     set(EXTEMPORE_TIMEOUT_SIGNAL TIMEOUT_SIGNAL_NAME SIGUSR1 TIMEOUT_SIGNAL_GRACE_PERIOD 5)
 endif()
 
-function(extempore_get_next_port OUT_VAR)
-    set(${OUT_VAR} ${EXTEMPORE_TEST_PORT_COUNTER} PARENT_SCOPE)
-    math(EXPR _new_port "${EXTEMPORE_TEST_PORT_COUNTER} - 2")
-    set(EXTEMPORE_TEST_PORT_COUNTER ${_new_port} CACHE INTERNAL "" FORCE)
-endfunction()
-
+# Runs one .xtm test file with `extempore test`, which exits 1 if an assertion
+# fails and writes the per-assertion report into the results directory.
 macro(extempore_add_test testfile label)
-    extempore_get_next_port(_port)
-    string(REPLACE "/" "_" _safe "${testfile}")
     add_test(NAME ${testfile}
-        COMMAND extempore --term nocolor --port=${_port}
-            --batch "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
+        COMMAND extempore test ${testfile} --junit ${EXTEMPORE_TEST_RESULTS_DIR})
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
@@ -54,12 +45,13 @@ macro(extempore_add_test testfile label)
         LABELS ${label})
 endmacro()
 
-macro(extempore_add_ipc_test testfile label)
-    extempore_get_next_port(_port)
+# A test which needs the eval servers runs in a session, and is the only kind
+# to take a port (and the one below it, for the utility process).
+macro(extempore_add_ipc_test testfile label port)
     string(REPLACE "/" "_" _safe "${testfile}")
     add_test(NAME ${testfile}
-        COMMAND extempore --noaudio --term nocolor --port=${_port}
-            --eval "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
+        COMMAND extempore --no-audio --no-nrepl --legacy-port=${port}
+            -e "(xtmtest-run-tests \"${testfile}\" #t #t \"${EXTEMPORE_TEST_RESULTS_DIR}/${_safe}.xml\")")
     set_tests_properties(${testfile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
@@ -67,11 +59,11 @@ macro(extempore_add_ipc_test testfile label)
         LABELS ${label})
 endmacro()
 
+# Loads an example, lets it run for `timeout` seconds and quits: status 1 if a
+# form in it raised an error.
 macro(extempore_add_example_as_test examplefile timeout label)
-    extempore_get_next_port(_port)
     add_test(NAME ${examplefile}
-        COMMAND extempore --term nocolor --port=${_port}
-            --batch "(sys:load-then-quit \"${examplefile}\" ${timeout})")
+        COMMAND extempore exec -e "(sys:load-then-quit \"${examplefile}\" ${timeout})")
     set_tests_properties(${examplefile} PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         TIMEOUT 300
@@ -79,20 +71,20 @@ macro(extempore_add_example_as_test examplefile timeout label)
         LABELS ${label})
 endmacro()
 
-# Render a DSP file offline via --audio-outfile, then assert on the output WAV
-# using libs/core/audiotest.xtm. assert_expr is any xtlang expression returning
-# i64 (0 pass, non-zero fail); use @WAV@ in the expression to reference the
-# rendered file path, e.g.:
+# Render a DSP file offline with `extempore render`, then assert on the output
+# WAV using libs/core/audiotest.xtm. assert_expr is any xtlang expression
+# returning i64 (0 pass, non-zero fail); use @WAV@ in the expression to
+# reference the rendered file path, e.g.:
 #
 #   (audiotest_assert_sine "@WAV@" 440.0)
 #   (audiotest_assert_stereo_sine "@WAV@" 330.0 550.0)
 #   (audiotest_assert_three_sines "@WAV@" 330.0 550.0 770.0)
 #
-# duration is the length of audio to render (seconds). Two-phase: implemented
-# as a cmake -P script so it works cross-platform.
+# duration is the length of audio to render (seconds). The file is rendered
+# twice and the two WAVs must match byte for byte. Two-phase: implemented as a
+# cmake -P script so it works cross-platform.
 # Any further arguments are passed to extempore for the render phase.
 macro(extempore_add_audio_offline_test testname renderfile duration assert_expr label)
-    extempore_get_next_port(_port)
     set(_wav "${CMAKE_CURRENT_BINARY_DIR}/audio_offline_${testname}.wav")
     add_test(NAME audio-offline/${testname}
         COMMAND ${CMAKE_COMMAND}
@@ -104,7 +96,6 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
             -DASSERT_EXPR=${assert_expr}
             -DRENDER_TIMEOUT=60
             -DVERIFY_TIMEOUT=60
-            -DPORT=${_port}
             "-DEXTRA_ARGS=${ARGN}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/run_audio_offline_test.cmake)
     set_tests_properties(audio-offline/${testname} PROPERTIES
@@ -113,8 +104,8 @@ macro(extempore_add_audio_offline_test testname renderfile duration assert_expr 
 endmacro()
 
 # Core, studio and compiler xtlang tests are auto-discovered: every
-# tests/core/*.xtm, tests/studio/*.xtm and tests/compiler/*.xtm runs as a batch
-# test, labelled by its directory. The
+# tests/core/*.xtm, tests/studio/*.xtm and tests/compiler/*.xtm runs under
+# `extempore test`, labelled by its directory. The
 # few that need a bespoke harness (or aren't standalone) are excluded here and
 # registered explicitly below. CONFIGURE_DEPENDS re-globs when a test file is
 # added or removed, so new tests are picked up without editing this file.
@@ -126,9 +117,9 @@ file(GLOB _compiler_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
 file(GLOB _studio_tests CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
      ${CMAKE_CURRENT_SOURCE_DIR}/tests/studio/*.xtm)
 
-# excluded from batch auto-registration (handled specially below, or fixtures)
+# excluded from auto-registration (handled specially below, or fixtures)
 set(_xtm_special_tests
-    tests/core/system.xtm              # IPC test, driven with --eval
+    tests/core/system.xtm              # IPC test, run in a session
     tests/core/aot-compilation.xtm     # two-phase AOT round-trip
     tests/core/aot-compilation-lib.xtm) # fixture library for the AOT test
 
@@ -146,17 +137,15 @@ foreach(_t ${_compiler_tests})
     endif()
 endforeach()
 
-# system.xtm exercises inter-process eval, so it needs --eval not --batch
-extempore_add_ipc_test(tests/core/system.xtm libs-core)
+# system.xtm exercises inter-process eval, so it needs a session's servers
+extempore_add_ipc_test(tests/core/system.xtm libs-core 17099)
 
 # failing.xtm is the quarantine for known-broken tests (see docs/reference/
 # testing.md). Registered as an EXPECTED failure: ctest stays green while the
 # bugs persist, and flips to failing the moment a fix makes the file pass --
 # the cue to move that test into its proper home.
-extempore_get_next_port(_failing_port)
 add_test(NAME tests/failing.xtm
-    COMMAND extempore --term nocolor --port=${_failing_port}
-        --batch "(xtmtest-run-tests \"tests/failing.xtm\" #t #t)")
+    COMMAND extempore test tests/failing.xtm)
 set_tests_properties(tests/failing.xtm PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     LABELS libs-core
@@ -181,7 +170,7 @@ set_tests_properties(tests/core/aot-compilation.xtm PROPERTIES
     LABELS compiler-unit)
 
 # Documentation example verifier: run every xtlang snippet in the docs through
-# extempore --batch and check its claimed output, so doc code that drifts from
+# extempore exec and check its claimed output, so doc code that drifts from
 # the compiler can be caught. Labelled `docs` (kept out of the libs-core
 # runs). This is a LOCAL tool, deliberately excluded from CI (the
 # build-and-test workflow's label-regex omits `docs`) --- run it on Linux with
@@ -213,7 +202,18 @@ if(Python3_Interpreter_FOUND)
     endforeach()
 endif()
 
-# Offline audio-rendering tests: render a DSP to a WAV with --audio-outfile,
+# The command line itself: what each subcommand prints where, and how it exits.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME cli/test_cli
+        COMMAND Python3::Interpreter -m unittest -v test_cli)
+    set_tests_properties(cli/test_cli PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli
+        ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
+        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        LABELS cli)
+endif()
+
+# Offline audio-rendering tests: render a DSP to a WAV with extempore render,
 # then verify it contains a sine at the expected frequency. 1.0s of content is
 # plenty for a reliable Goertzel check.
 extempore_add_audio_offline_test(hello-sine
@@ -237,13 +237,11 @@ extempore_add_audio_offline_test(hello-mt
     audio-offline)
 # The callback which changes the frequency is due at frame 44100, so it runs
 # before the block which holds that frame and the change is heard from that
-# block's first frame (44032). The file is rendered twice, and the two must
-# match byte for byte.
+# block's first frame (44032).
 extempore_add_audio_offline_test(hello-sweep
     examples/core/hello-sweep.xtm 2.0
     "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44032 0)"
     audio-offline)
-set_property(TEST audio-offline/hello-sweep APPEND PROPERTY ENVIRONMENT "EXTEMPORE_RENDER_TWICE=1")
 
 # The studio's synthesised instruments each have a demo score which plays
 # through their presets. Rendering the start of one compiles the instrument and
@@ -262,9 +260,10 @@ endforeach()
 # sys:make-cptr for a zero-byte buffer when a note carried no extra arguments,
 # got #f, and the xtlang wrapper refused the call without raising --- so
 # patterns ran in silence through two releases with the whole suite green.
-# Nothing here asserts the content: the analogue synth randomises oscillator
-# phase and slop, so no two renders match. The peak does not vary, sitting near
-# 0.95 when notes sound and at exactly 0.0 when they do not.
+# The peak sits near 0.95 when notes sound and at exactly 0.0 when they do not.
+# The analogue synth randomises oscillator phase and slop, and two patterns
+# fire on the same beats, so this is also the render which shows that seeded
+# random numbers and same-instant callbacks repeat.
 #
 # The pattern's first note lands 1-2s in.
 extempore_add_audio_offline_test(pattern-notes

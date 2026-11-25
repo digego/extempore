@@ -34,6 +34,7 @@
  */
 
 #include "SchemeFFIRegistry.h"
+#include "SchemeFFI.h"
 
 #include "AudioDevice.h"
 #include "NreplServer.h"
@@ -87,15 +88,18 @@ static pointer emit(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, ss.str().c_str());
 }
 
-static pointer exit_extempore(scheme* Scheme, pointer Args) {
-    const int rc = (Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0;
+void exitExtempore(int Status) {
     // std::_Exit bypasses destructors AND discards stdio buffers. Flush any
     // pending output (e.g. printf from xtlang tests) and finalize the offline
     // WAV before terminating.
     std::fflush(stdout);
     extemp::AudioDevice::stopFileDriver();
     extemp::nrepl::removePortFile();
-    std::_Exit(rc);
+    std::_Exit(Status);
+}
+
+static pointer exit_extempore(scheme* Scheme, pointer Args) {
+    exitExtempore((Args != Scheme->NIL) ? int(argInt(Scheme, Args, 1)) : 0);
 }
 
 std::span<const FFIEntry> utilityDefs() {

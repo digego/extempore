@@ -116,6 +116,15 @@ static void set_call_times(scheme* sc, uint64_t start_time, uint64_t end_time) {
     }
 }
 
+// An error nothing caught: printed where messages go, and remembered for the
+// exit status of a run that has one (extempore exec, extempore render).
+static void report_uncaught_error(const char* message) {
+    extemp::UNIV::FAILED.store(true);
+    FILE* out = extemp::UNIV::message_stream();
+    fputs(message, out);
+    fflush(out);
+}
+
 static void begin_hook(s7_scheme* raw_sc, bool* val) {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
     if (!wrapper)
@@ -165,6 +174,14 @@ scheme* scheme_init_new() {
     sc->call_default_time = uint64_t{44100} * 60;
     sc->call_start_time = 0;
     sc->call_end_time = 0;
+
+    if (extemp::UNIV::SEEDED) {
+        // s7's own generator (Scheme's random is xtlang's, see EXTLLVM.cpp),
+        // a different stream for each interpreter
+        static std::atomic<uint64_t> made{0};
+        s7_set_default_random_state(sc->sc, s7_int(extemp::UNIV::SEED + made.fetch_add(1)),
+                                    1675393560);
+    }
 
     s7_set_begin_hook(sc->sc, begin_hook);
 
@@ -343,8 +360,7 @@ static void eval_with_error_trap(scheme* sc, const char* str) {
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
         sc->retcode = 1;
-        printf("%s", errmsg);
-        fflush(stdout);
+        report_uncaught_error(errmsg);
     }
 
     s7_set_current_error_port(sc->sc, old_port);
@@ -384,8 +400,7 @@ void scheme_load_file(scheme* sc, FILE* fin) {
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
         sc->retcode = 1;
-        printf("%s", errmsg);
-        fflush(stdout);
+        report_uncaught_error(errmsg);
     }
 
     s7_set_current_error_port(sc->sc, old_port);
@@ -420,8 +435,7 @@ void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
     const char* errmsg = s7_get_output_string(sc->sc, err_port);
     if (errmsg && errmsg[0] != '\0') {
         sc->retcode = 1;
-        printf("%s", errmsg);
-        fflush(stdout);
+        report_uncaught_error(errmsg);
     }
 
     s7_set_current_error_port(sc->sc, old_port);

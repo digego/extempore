@@ -140,6 +140,24 @@ extern double AUDIO_OUTFILE_DURATION;
 // True for an offline render: the render thread owns the clock and advances
 // it only between blocks, so audio time stands still while a task runs.
 extern bool OFFLINE_RENDER;
+// Set by the subcommands which aren't a live session (exec, test, render,
+// compile): no banner or startup report.
+extern bool QUIET_START;
+// Set by exec and render, whose stdout is for what the code prints: load and
+// compiler messages and error reports go to stderr.
+extern bool MESSAGES_TO_STDERR;
+// An uncaught error was reported, or the code said it failed
+// (sys:note-failure): exec and render then exit with status 1.
+extern std::atomic<bool> FAILED;
+// extempore render --seed: every random number generator starts from SEED
+// rather than from the system's entropy.
+extern bool SEEDED;
+extern uint64_t SEED;
+// stderr when MESSAGES_TO_STDERR, else stdout.
+FILE* message_stream();
+bool is_terminal(FILE* Stream);
+// The running extempore's own path, or "" if the platform won't say.
+std::string executable_file();
 extern double CLOCK_OFFSET;
 extern std::unordered_map<std::string, std::string> CMDPARAMS;
 extern std::string ARCH;
@@ -220,7 +238,7 @@ inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background
         return;
     }
 #endif
-    fputs(ascii_color_code(Bold, Foreground, Background).c_str(), stdout);
+    fputs(ascii_color_code(Bold, Foreground, Background).c_str(), extemp::UNIV::message_stream());
 }
 
 inline void ascii_default() {

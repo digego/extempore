@@ -34,6 +34,11 @@
  */
 
 #include "UNIV.h"
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -441,6 +446,10 @@ namespace extemp {
 
 namespace UNIV {
 
+std::string executable_file() {
+    return executable_path().string();
+}
+
 std::string resolve_share_dir(std::string_view explicit_dir) {
     auto exe = executable_path();
     return share_dir::pick(explicit_dir, exe.empty() ? exe : exe.parent_path(), EXT_SHARE_DIR);
@@ -493,6 +502,21 @@ double AUDIO_OUTPUT_LATENCY = 0.0;
 std::string AUDIO_OUTFILE_PATH;
 double AUDIO_OUTFILE_DURATION = 0.0;
 bool OFFLINE_RENDER = false;
+bool QUIET_START = false;
+bool MESSAGES_TO_STDERR = false;
+std::atomic<bool> FAILED{false};
+bool SEEDED = false;
+uint64_t SEED = 0;
+FILE* message_stream() {
+    return MESSAGES_TO_STDERR ? stderr : stdout;
+}
+bool is_terminal(FILE* Stream) {
+#ifdef _WIN32
+    return _isatty(_fileno(Stream)) != 0;
+#else
+    return isatty(fileno(Stream)) != 0;
+#endif
+}
 double CLOCK_OFFSET = 0.0;
 std::unordered_map<std::string, std::string> CMDPARAMS;
 std::string ARCH;

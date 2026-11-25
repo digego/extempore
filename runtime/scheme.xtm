@@ -41,25 +41,39 @@
 ;; ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ;; POSSIBILITY OF SUCH DAMAGE.
 
+;; messages
+;;
+;; What extempore says about its own work (a library loading, a function
+;; compiled, an error report) is a message. Under extempore exec and extempore
+;; render, stdout is for what the user's code prints, and messages go to
+;; stderr: sys:as-message runs its body with the current output port set that
+;; way (enterMessageScope in include/SchemeFFIRegistry.h has the rule). In a
+;; live session it changes nothing.
+
+(define-macro (sys:as-message . body)
+  `(dynamic-wind sys:message-scope-enter (lambda () ,@body) sys:message-scope-leave))
+
 ;; pretty printing
 
+;; coloured text is always a message
 (define-macro (print-with-colors fg bg bold . body)
-  `(let ((colors '((black . 0)
-                   (red . 1)
-                   (green . 2)
-                   (yellow . 3)
-                   (blue . 4)
-                   (magenta . 5)
-                   (cyan . 6)
-                   (white . 7)
-                   (default . 9)
-                   (none . 9))))
-    (ascii-print-color (if ,bold 1 0)
-                       (cdr (assoc ,fg colors))
-                       (cdr (assoc ,bg colors)))
-    ,@body
-    ;; return colors to normal
-    (ascii-print-color 0 7 9)))
+  `(sys:as-message
+     (let ((colors '((black . 0)
+                     (red . 1)
+                     (green . 2)
+                     (yellow . 3)
+                     (blue . 4)
+                     (magenta . 5)
+                     (cyan . 6)
+                     (white . 7)
+                     (default . 9)
+                     (none . 9))))
+       (ascii-print-color (if ,bold 1 0)
+                          (cdr (assoc ,fg colors))
+                          (cdr (assoc ,bg colors)))
+       ,@body
+       ;; return colors to normal
+       (ascii-print-color 0 7 9))))
 
 (define log-info
   (lambda args
@@ -1073,7 +1087,7 @@
 ;; this for buffered version
 (define _dsp:set!
   (lambda (zerolatency? name . args)
-    (println 'zerolatency: zerolatency?)
+    (sys:as-message (println 'zerolatency: zerolatency?))
     (let* ((nn (if (symbol? name) (symbol->string name) name))
            (ft (xtc:cache:get-closure-arg-types nn))
            (ct (if ft
@@ -1605,9 +1619,10 @@
                            (sys:slurp-file (string-append (sys:share-dir) "/" path)))))
       (if (not file-string)
           (if (or (null? quiet?) (not (car quiet?)))
-              (begin (print-with-colors 'red 'default #t (print "File Error"))
-                (print " couldn't find file ")
-                (print-with-colors 'blue 'default #f (print path "\n"))
+              (begin (sys:as-message
+                       (print-with-colors 'red 'default #t (print "File Error"))
+                       (print " couldn't find file ")
+                       (print-with-colors 'blue 'default #f (print path "\n")))
                 #f)
               #f)
           (let ((input (open-input-string file-string))
@@ -1620,9 +1635,9 @@
                 ;; error is reported (with the file's path, which the string
                 ;; port doesn't carry) and loading carries on with the next
                 ;; form, but the load as a whole then returns #f. The report
-                ;; goes to stdout rather than the error port so it appears
-                ;; in sequence with the file's own output, and at all in a
-                ;; batch run that quits before the enclosing eval returns.
+                ;; is printed here rather than left to the error port so it
+                ;; appears in sequence with the file's own output, and at all
+                ;; in a batch run that quits before the enclosing eval returns.
                 ;; Under AOT compilation a failed form must instead abort
                 ;; the compile, so no cache is ever written from a partial
                 ;; load.
@@ -1642,10 +1657,11 @@
                                     (eval (car *global-sysload-evals*) (interaction-environment))
                                     #t)
                                   (lambda (tag info)
-                                    (#_display (sys:error-report-string
-                                                 tag info
-                                                 (string-append path ", line " (number->string line)))
-                                               (current-output-port))
+                                    (sys:as-message
+                                      (#_display (sys:error-report-string
+                                                   tag info
+                                                   (string-append path ", line " (number->string line)))
+                                                 (current-output-port)))
                                     (if (and (defined? 'xtc:aot:currently-compiling?)
                                              (xtc:aot:currently-compiling?))
                                         (begin
@@ -1656,7 +1672,8 @@
                           (loop (read input) (and form-ok ok))))))
                 (let ((words (regex:split msg " ")))
                   (if (or (null? quiet?) (not (car quiet?)))
-                      (begin (print-with-colors 'yellow 'default #t (print "sys:load notification "))
+                      (sys:as-message
+                        (print-with-colors 'yellow 'default #t (print "sys:load notification "))
                         (for-each (lambda (w) (print w "")) words)
                         (println)))
                   (close-port input)

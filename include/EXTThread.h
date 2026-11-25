@@ -67,14 +67,18 @@ class EXTThread {
     // that subsumed it; setPriority/getPriority need a handle in both cases.
     std::thread::native_handle_type m_nativeHandle{};
     bool m_started = false;
+    // Its place in the order the process's EXTThreads were made, which is the
+    // same from run to run where thread start-up order isn't.
+    uint64_t m_ordinal;
 
     static thread_local EXTThread* sm_current;
+    static std::atomic<uint64_t> sm_made;
 
     void* run();
 
   public:
     EXTThread(function_type EntryPoint, void* Arg, const std::string& Name = std::string())
-        : m_function(EntryPoint), m_arg(Arg), m_name(Name) {}
+        : m_function(EntryPoint), m_arg(Arg), m_name(Name), m_ordinal(sm_made.fetch_add(1)) {}
     ~EXTThread();
     EXTThread(const EXTThread&) = delete;
     EXTThread& operator=(const EXTThread&) = delete;
@@ -103,6 +107,9 @@ class EXTThread {
 
     static EXTThread* activeThread() {
         return sm_current;
+    }
+    uint64_t ordinal() const {
+        return m_ordinal;
     }
 };
 

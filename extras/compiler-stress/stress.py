@@ -512,13 +512,12 @@ def run_case(
     src = workdir / f"{family}-{n}.xtm"
     pre.write_text(setup + "\n")
     src.write_text(timed + "\n")
-    cmd = [str(REPO / "build/extempore")]
+    cmd = [str(REPO / "build/extempore"), "exec", str(PROFILE)]
     if share:
-        cmd.append(f"--sharedir={share}")
-    cmd += [f"--pre={pre}", f"--timed={src}", f"--label={family}-{n}"]
+        cmd.append(f"--share-dir={share}")
+    cmd += ["--", f"--pre={pre}", f"--timed={src}", f"--label={family}-{n}"]
     if wrap:
         cmd.append(f"--wrap={','.join(wrap)}")
-    cmd += ["--batch", f'(sys:load "{PROFILE}")']
     try:
         p = subprocess.run(
             cmd, cwd=REPO, capture_output=True, text=True, timeout=timeout
@@ -527,7 +526,7 @@ def run_case(
         return "", f"timed out after {timeout} s"
     line = next((l for l in p.stdout.splitlines() if l.startswith("RESULT")), None)
     if line is None:
-        errors = [l.strip() for l in p.stdout.splitlines() if "rror" in l][:2]
+        errors = [l.strip() for l in p.stderr.splitlines() if "rror" in l][:2]
         return p.stdout, "; ".join(errors) or f"exited with {p.returncode}"
     if "COMPILE-FAILED" in line:
         return p.stdout, "compile failed"

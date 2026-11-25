@@ -432,6 +432,8 @@ class FileAudioDriver {
 
   private:
     void run();
+    void showProgress();
+    void clearProgress();
     bool openWav(const std::string& path);
     void finalizeWav();
 
@@ -442,6 +444,10 @@ class FileAudioDriver {
     std::atomic<bool> m_running{false};
     uint64_t m_framesWritten = 0;
     uint64_t m_maxFrames = 0;  // 0 = unlimited
+    // extempore render with stderr on a terminal: a progress line, redrawn at
+    // most ten times a second
+    bool m_progress = false;
+    std::chrono::steady_clock::time_point m_progressDrawn{};
     std::vector<float> m_inBuf;
     std::vector<float> m_outBuf;
 };
@@ -537,9 +543,30 @@ bool FileAudioDriver::open(const std::string& path, double maxSeconds) {
     return true;
 }
 
+void FileAudioDriver::showProgress() {
+    if (!m_progress) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now - m_progressDrawn < std::chrono::milliseconds(100)) {
+        return;
+    }
+    m_progressDrawn = now;
+    fprintf(stderr, "\rrendering %.1f of %.1f s", double(m_framesWritten) / UNIV::SAMPLE_RATE,
+            double(m_maxFrames) / UNIV::SAMPLE_RATE);
+    std::fflush(stderr);
+}
+
+void FileAudioDriver::clearProgress() {
+    if (m_progress) {
+        fputs("\r\033[K", stderr);
+    }
+}
+
 void FileAudioDriver::start() {
     if (!m_file || m_running.load())
         return;
+    m_progress = UNIV::QUIET_START && m_maxFrames && UNIV::is_terminal(stderr);
     m_stop.store(false);
     m_running.store(true, std::memory_order_release);
     m_thread = std::thread([this] { this->run(); });
@@ -584,6 +611,7 @@ void FileAudioDriver::run() {
             break;
         }
         m_framesWritten += keep;
+        showProgress();
         UNIV::DEVICE_TIME += frames;
         UNIV::TIME.store(UNIV::DEVICE_TIME.load());
     }
@@ -596,6 +624,14 @@ void FileAudioDriver::run() {
         bool expected = true;
         if (m_running.compare_exchange_strong(expected, false)) {
             finalizeWav();
+            if (UNIV::QUIET_START) {  // extempore render
+                clearProgress();
+                fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
+                        double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
+                        unsigned(UNIV::SAMPLE_RATE));
+                std::fflush(stdout);
+                std::_Exit(UNIV::FAILED.load() ? 1 : 0);
+            }
             printf("[--audio-outfile: %llu frames written to %s]\n",
                    static_cast<unsigned long long>(m_framesWritten), m_path.c_str());
             fflush(stdout);
@@ -612,6 +648,7 @@ void FileAudioDriver::stop() {
     SchemeProcess::wakeIdleWaiters();
     if (m_thread.joinable())
         m_thread.join();
+    clearProgress();
     finalizeWav();
 }
 
@@ -729,12 +766,14 @@ void AudioDevice::start() {
             std::_Exit(1);
         }
         m_started = true;
-        ascii_normal();
-        std::cout << "Output Device  : " << std::flush;
-        ascii_info();
-        std::cout << "file://" << UNIV::AUDIO_OUTFILE_PATH << " (offline, " << UNIV::CHANNELS
-                  << "ch float32 @ " << UNIV::SAMPLE_RATE << " Hz)" << std::endl;
-        ascii_normal();
+        if (!UNIV::QUIET_START) {
+            ascii_normal();
+            std::cout << "Output Device  : " << std::flush;
+            ascii_info();
+            std::cout << "file://" << UNIV::AUDIO_OUTFILE_PATH << " (offline, " << UNIV::CHANNELS
+                      << "ch float32 @ " << UNIV::SAMPLE_RATE << " Hz)" << std::endl;
+            ascii_normal();
+        }
         return;
     }
     PaError err = Pa_Initialize();

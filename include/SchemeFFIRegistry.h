@@ -99,6 +99,32 @@ inline void schemeWriteColor(scheme* Scheme, bool Bold, unsigned Foreground, uns
     }
 }
 
+// A message scope (sys:as-message in runtime/scheme.xtm): under extempore
+// exec and extempore render, what is printed inside it goes to stderr, which
+// leaves stdout to the user's code. Only output bound for the console moves:
+// inside with-output-to-string, or a scope that has already moved it, the
+// port is left alone.
+inline void enterMessageScope(scheme* Scheme) {
+    s7_scheme* sc = Scheme->sc;
+    const bool move = UNIV::MESSAGES_TO_STDERR &&
+                      s7_current_output_port(sc) == s7_name_to_value(sc, "*stdout*");
+    if (move) {
+        s7_set_current_output_port(sc, s7_name_to_value(sc, "*stderr*"));
+    }
+    Scheme->message_scopes.push_back(move);
+}
+
+inline void leaveMessageScope(scheme* Scheme) {
+    if (Scheme->message_scopes.empty()) {
+        return;
+    }
+    const bool moved = Scheme->message_scopes.back();
+    Scheme->message_scopes.pop_back();
+    if (moved) {
+        s7_set_current_output_port(Scheme->sc, s7_name_to_value(Scheme->sc, "*stdout*"));
+    }
+}
+
 // Console complaint from a primitive that reports a bad argument by returning
 // #f rather than raising.  Message carries its own trailing newline; the
 // colour is reset after it, as the Scheme-side print-error does.

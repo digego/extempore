@@ -85,6 +85,29 @@ static pointer getBuildDir(scheme* Scheme, pointer Args) {
     return mk_string(Scheme, UNIV::BUILD_DIR.c_str());
 }
 
+// (sys:note-failure): the run didn't do what it was asked, so extempore exec
+// and extempore render exit with status 1 when they finish.
+static pointer noteFailure(scheme* Scheme, pointer Args) {
+    UNIV::FAILED.store(true);
+    return Scheme->T;
+}
+
+// (sys:messages-to-stderr?): see UNIV::MESSAGES_TO_STDERR and sys:as-message.
+static pointer messagesToStderr(scheme* Scheme, pointer Args) {
+    return UNIV::MESSAGES_TO_STDERR ? Scheme->T : Scheme->F;
+}
+
+// The two ends of sys:as-message's dynamic-wind.
+static pointer messageScopeEnter(scheme* Scheme, pointer Args) {
+    enterMessageScope(Scheme);
+    return Scheme->T;
+}
+
+static pointer messageScopeLeave(scheme* Scheme, pointer Args) {
+    leaveMessageScope(Scheme);
+    return Scheme->T;
+}
+
 static pointer cmdarg(scheme* Scheme, pointer Args) {
     auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
     if (iter == UNIV::CMDPARAMS.end()) {
@@ -315,6 +338,10 @@ std::span<const FFIEntry> sysDefs() {
         FFI_DEF("sys:share-dir", getShareDir, 0, 0, false),
         FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),
         FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
+        FFI_DEF("sys:note-failure", noteFailure, 0, 0, false),
+        FFI_DEF("sys:messages-to-stderr?", messagesToStderr, 0, 0, false),
+        FFI_DEF("sys:message-scope-enter", messageScopeEnter, 0, 0, false),
+        FFI_DEF("sys:message-scope-leave", messageScopeLeave, 0, 0, false),
         FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false),
         FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false),
         FFI_DEF("sys:symbol-cptr", symbol_pointer, 2, 0, false),

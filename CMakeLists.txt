@@ -335,6 +335,7 @@ endif()
 
 set(EXTEMPORE_SOURCES
     src/Extempore.cpp
+    src/CommandLine.cpp
     src/AudioDevice.cpp
     src/Bencode.cpp
     src/EXTZones.cpp
@@ -616,8 +617,7 @@ function(aotcompile_lib_as _basename libfile group)
     endforeach()
 
     add_custom_command(OUTPUT ${_ll_file} ${_xtm_file}
-        COMMAND ${_extempore_cmd} --nobase
-            --batch "(xtc:aot:compile-xtm-file \"${libfile}\" #f \"${_basename}\")"
+        COMMAND ${_extempore_cmd} compile ${libfile} --name ${_basename}
         DEPENDS ${libfile} ${AOT_EXTRA_SOURCES_${_basename}} ${_dep_files}
             $<TARGET_FILE:extempore> ${AOT_RUNTIME_DEPS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -699,8 +699,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/tests.cmake)
 ##########
 
 add_custom_target(xtmdoc
-    COMMAND extempore --port 17095
-        --eval "(begin (sys:load \"libs/core/audio_dsp.xtm\") (sys:load \"libs/core/instruments.xtm\") (sys:load \"libs/core/math.xtm\") (sys:load \"libs/base/base.xtm\") (sys:load \"libs/core/fft.xtm\") (sys:load \"libs/core/audiofile.xtm\") (sys:load \"libs/core/png.xtm\") (sys:load \"libs/external/glfw3.xtm\") (sys:load \"libs/core/instruments_ext.xtm\") (sys:load \"libs/external/webgpu.xtm\") (xtmdoc-export-caches-to-json \"/tmp/xtmdoc.json\" #f) (quit 0))"
+    COMMAND extempore exec extras/xtmdoc-export.xtm -- --out=/tmp/xtmdoc.json
     COMMENT "Generating xtmdoc output in /tmp/xtmdoc.json"
     VERBATIM)
 add_dependencies(xtmdoc extempore)

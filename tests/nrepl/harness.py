@@ -93,8 +93,8 @@ class Extempore:
 
     def _launch(self, args: tuple[str, ...], nrepl_port: int | None) -> None:
         self.eval_port = free_port_pair()
-        cmd = [str(BIN), "--noaudio", "--term", "nocolor", "--sharedir", str(REPO),
-               "--port", str(self.eval_port)]
+        cmd = [str(BIN), "--no-audio", "--color", "never", "--share-dir", str(REPO),
+               "--legacy-port", str(self.eval_port)]
         if nrepl_port is not None:
             cmd += ["--nrepl-port", str(nrepl_port)]
         cmd += list(args)

@@ -198,8 +198,9 @@
 
 (define xtc:diagnostics:to-console
   (lambda (text)
-    (#_display text *stdout*)
-    (flush-output-port *stdout*)))
+    (let ((console (if (sys:messages-to-stderr?) *stderr* *stdout*)))
+      (#_display text console)
+      (flush-output-port console))))
 
 (define xtc:diagnostics:strip-ansi
   (lambda (str)
@@ -569,7 +570,7 @@
 (define xtc:diagnostics:print-binding-details-to-log
   (lambda (lead-string symname type)
     (if (equal? *xtc:globals:message:level* 'high)
-        (begin
+        (sys:as-message
           (print lead-string " ")
           (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
@@ -579,7 +580,7 @@
 (define xtc:diagnostics:print-bind-func-details-to-log
   (lambda (lead-string symname type zone-size . args)
     (if (equal? *xtc:globals:message:level* 'high)
-        (begin
+        (sys:as-message
           (print lead-string " ")
           (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
@@ -593,7 +594,7 @@
     ;; don't write the header stuff for other AOT-compiled xtm libs -
     ;; assume a header file already exists in that case
     (if (equal? *xtc:globals:message:level* 'high)
-        (begin
+        (sys:as-message
           (print "LibBound:  ")
           (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
           (print " >>> ")
@@ -605,7 +606,7 @@
 (define xtc:diagnostics:print-polying-details-to-log
   (lambda (lead-string poly-name native-name type)
     (if (equal? *xtc:globals:message:level* 'high)
-        (begin
+        (sys:as-message
           (print lead-string " ")
           (print-with-colors *xtc:globals:pretty-print-name-color*
                              'default #t (print poly-name))
@@ -622,7 +623,7 @@
     (let* ((basename (car (reverse (regex:split dylib-path "[/\\\\]"))))
            (libname (car (regex:split basename "[.]"))))
       (if (equal? *xtc:globals:message:level* 'high)
-          (begin
+          (sys:as-message
             (print "Lib Load:  ")
             (print-with-colors *xtc:globals:pretty-print-name-color*
                                'default #t (print libname))

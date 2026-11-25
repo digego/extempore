@@ -53,6 +53,7 @@
 namespace extemp {
 
 thread_local EXTThread* EXTThread::sm_current = nullptr;
+std::atomic<uint64_t> EXTThread::sm_made{0};
 
 EXTThread::~EXTThread() {
     m_stopRequested.store(true, std::memory_order_release);

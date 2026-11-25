@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify that xtlang code in the docs produces the output the docs claim.
 
-Runs doc code snippets through `extempore --batch` and checks their claimed
+Runs doc code snippets through `extempore exec` and checks their claimed
 output against what the compiler actually emits. Two kinds of claim are checked:
 
   * error-pairs  -- each ```xtlang snippet is paired with the plain ``` block
@@ -13,10 +13,7 @@ output against what the compiler actually emits. Two kinds of claim are checked:
                     `Compiled:  NAME >>> SIG` line and every `;; prints "..."`
                     claim found in the file must appear in the output, and the
                     accumulated session must not raise an unexpected compiler
-                    error.  `--batch` echoes the snippet back before running it,
-                    so the echo is subtracted first (see `deecho`) and claims are
-                    matched only against genuine program output --- otherwise a
-                    `;; prints "..."` comment would vacuously match itself.
+                    error.
 
 This is a local-only tool: it is registered as the `docs` ctest label but kept
 out of CI (the GNU `timeout` it once needed isn't on the macOS/Windows runners,
@@ -58,10 +55,8 @@ DOCS = os.path.join(ROOT, "docs/src/content/docs")
 # the built extempore: $EXTEMPORE_BIN (set by the ctest target) or build/extempore
 BIN = os.environ.get("EXTEMPORE_BIN") or os.path.join(ROOT, "build/extempore")
 TIMEOUT = 90
-# a snippet that errors prints its message within a second or two and then, in
-# --batch, hangs awaiting input rather than exiting (see error-messages.md). For
-# the error/expect-error snippets we only need that message, so cap them short
-# instead of waiting out the full timeout on every one.
+# a snippet that errors prints its message within a second or two and exits, so
+# the error/expect-error snippets get a short cap
 ERROR_TIMEOUT = 20
 
 # filename (relative to DOCS) -> verification mode
@@ -79,7 +74,7 @@ CONFIG = {
 #   guides/note-level-music.md, guides/sampler.md, guides/pattern-language.md,
 #   guides/analogue-synth.md
 # These centre on `play-note`/pattern scheduling, which needs the audio clock to
-# actually advance --- nothing audible (or assertable) happens in --batch. They
+# actually advance --- nothing audible (or assertable) happens under exec. They
 # also load the sharedsystem (examples/sharedsystem/audiosetup.xtm): it *does*
 # load headless, but the `Compiled:  NAME >>> SIG` lines the guides quote come
 # from a cold compile, whereas a built tree serves those libs from the AOT cache
@@ -105,18 +100,16 @@ def norm(s):
 
 
 def run(code, timeout_s=TIMEOUT):
-    """Run xtlang `code` through --batch, return de-ANSI'd combined output.
+    """Run xtlang `code` through `extempore exec`, return its de-ANSI'd output
+    (stdout, then the messages and error reports from stderr).
 
-    A snippet that errors prints its message and then, in --batch, hangs awaiting
-    input rather than exiting; we rely on subprocess's own timeout to kill it.
-    (An earlier version wrapped the command in the GNU `timeout` binary, but that
-    isn't present on the macOS/Windows CI runners --- subprocess's timeout is
-    cross-platform and does the same job.)
+    The snippet ends with a (quit), so that one which starts a temporal
+    recursion stops there.
     """
     snippet = code if "(quit" in code else code + "\n(quit 0)\n"
     try:
         p = subprocess.run(
-            [BIN, "--batch", snippet],
+            [BIN, "exec", "-e", snippet],
             capture_output=True, text=True, cwd=ROOT, timeout=timeout_s,
         )
         out = p.stdout + p.stderr
@@ -280,38 +273,20 @@ def claims_in_blocks(bs):
     return claims
 
 
-def deecho(actual, source):
-    """Drop lines of `actual` that are just `source` echoed back.
-
-    --batch prints `Evaluating expression: <source>` before running it, so the
-    source (including the `;; prints "..."` / `;; Compiled: ...` comments the
-    claims are harvested from) appears verbatim in the output. Matching a claim
-    against that echo is vacuous --- it would pass even when the runtime printed
-    something else. Subtract any output line that exactly matches a source line
-    so claims are checked only against what the program actually emitted.
-    """
-    src_lines = {l.strip() for l in source.splitlines() if l.strip()}
-    kept = [l for l in actual.splitlines() if l.strip() not in src_lines]
-    return "\n".join(kept)
-
-
 def check_accumulate(bs):
     """Run all non-skip, non-expect-error xtlang blocks in one session."""
     runnable = [b["code"] for b in bs
                 if b["lang"] == "xtlang" and b["directive"] not in ("skip", "expect-error")]
     source = "\n".join(runnable)
     actual = run(source)
-    # claims live in the doc source as comments, which --batch echoes back; match
-    # them only against genuine program output, not the echoed source
-    emitted = deecho(actual, source)
     results = []
     claims = claims_in_blocks(bs)
     for c in claims:
         if isinstance(c, tuple):
-            ok = norm(c[1]) in norm(emitted)
+            ok = norm(c[1]) in norm(actual)
             label = f'prints "{c[1]}"'
         else:
-            ok = norm(c) in norm(emitted)
+            ok = norm(c) in norm(actual)
             label = c
         if not ok:
             results.append((label, ["<not found in output>"], ""))

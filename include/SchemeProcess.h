@@ -168,6 +168,7 @@ class SchemeProcess {
     void addCallback(TaskI* Task, SchemeTask::Type Type);
     void pushTask(SchemeTask Task);
     void setIdle();
+    static bool waitAll(const std::atomic<bool>& Cancel, bool SchedulerToo);
     void* serverImpl();
     void* taskImpl();
     // The task thread is the sole consumer of m_taskQueue, but producers (the
@@ -260,6 +261,10 @@ class SchemeProcess {
     // running) with nothing queued meanwhile, or until Cancel is set (after
     // which wakeIdleWaiters makes it return promptly). False if cancelled.
     static bool waitAllIdle(const std::atomic<bool>& Cancel);
+    // As waitAllIdle, and the scheduler has nothing waiting either: no code is
+    // running and none is due to. Work outside the task queues (a thread the
+    // code spawned, OSC or MIDI input) isn't counted.
+    static bool waitAllDone(const std::atomic<bool>& Cancel);
     static void wakeIdleWaiters();
     static std::vector<std::string> liveNames();
 #ifndef _WIN32

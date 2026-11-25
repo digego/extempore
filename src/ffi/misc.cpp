@@ -282,11 +282,14 @@ static pointer printFullNoQuotes(scheme* Scheme, pointer Args) {
 }
 
 // "LABEL:" in the label's colour, then the arguments in the normal one.
+// It is a message (see sys:as-message in runtime/scheme.xtm).
 static pointer printLabelled(scheme* Scheme, pointer Args, const char* Label, unsigned Colour) {
+    enterMessageScope(Scheme);
     schemeWriteColor(Scheme, true, Colour, 9);
     schemeWrite(Scheme, Label);
     schemeWriteColor(Scheme, false, 7, 9);
     schemeWrite(Scheme, " " + extractCell(Scheme, Args, true, false) + "\n");
+    leaveMessageScope(Scheme);
     return Scheme->T;
 }
 

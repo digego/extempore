@@ -60,6 +60,9 @@ class TaskScheduler {
     // steady_clock nanoseconds at the start of the latest pass, for the hang
     // report
     std::atomic<int64_t> m_lastPass{0};
+    // Tasks popped from the queue whose run() hasn't returned; raised under
+    // m_queueMutex, so quiescent() can't see the queue empty and miss one.
+    std::atomic<int> m_dispatching{0};
 
     static TaskScheduler sm_instance;
 
@@ -93,10 +96,11 @@ class TaskScheduler {
     // A task added while those run waits for the next call, so a task that
     // reschedules itself for the same instant can't hold the caller here.
     void runDue(uint64_t Until);
-    // True when no task is waiting for its time.
-    bool empty() {
+    // True when no task is waiting for its time and none is being handed to
+    // its process.
+    bool quiescent() {
         std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
-        return m_queue.peek() == nullptr;
+        return m_queue.peek() == nullptr && m_dispatching.load() == 0;
     }
 
     void add(TaskI* Task) {

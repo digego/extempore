@@ -45,6 +45,10 @@ namespace SchemeFFI {
 
 void initSchemeFFI(scheme* Scheme);
 
+// What (quit) does: flushes stdout, finalises an offline render's WAV, removes
+// the .nrepl-port file and ends the process without running destructors.
+[[noreturn]] void exitExtempore(int Status);
+
 }
 
 }  // namespace extemp

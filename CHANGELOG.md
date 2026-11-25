@@ -104,11 +104,42 @@ the `stbi_zlib_decode_*` functions and `stbi_write_png`), decodes every PngSuite
 image exactly as stb_image does, and runs about as fast. The HDR and float
 loaders and the BMP, TGA and HDR writers are gone.
 
-Offline rendering (`--audio-outfile`) is now deterministic. The render keeps
-the audio clock in step with the work: scheduled callbacks run before the block
-they fall in, however long they take, and the clock doesn't move while a file
-loads. Output starts at time 0 and ends exactly at `--duration`, and rendering
-the same file twice gives the same samples.
+The command line has subcommands. `extempore [FILE]` is the live session, as
+before, and beside it are:
+
+- `extempore exec FILE` (or `-e EXPR`): run a script with no audio and no
+  servers. It exits when the code has finished and nothing is left scheduled,
+  with status 1 if anything raised an error; `--wait` keeps it running until
+  `(quit)`
+- `extempore test FILE...`: run test files, each in its own process
+- `extempore render FILE -o OUT.wav --duration SECONDS`: render offline (below)
+- `extempore compile FILE`: compile a library ahead of time, or `--exe` an
+  executable
+- `extempore devices` and `extempore version`
+
+Outside a session there is no banner, and under `exec` and `render` messages
+and error reports go to stderr, which leaves stdout to what the code prints.
+Options are spelt with hyphens (`--sample-rate`, `--no-audio`, `--share-dir`),
+`--device` and `--in-device` take an index or a name, colour is `--color
+auto|always|never` (off through a pipe, and `NO_COLOR` is honoured), an unknown
+option is an error, and a script's own arguments go after `--`, where
+`sys:cmdarg` reads them. `extempore --help` and `extempore SUBCOMMAND --help`
+list it all.
+
+The old spellings still work and say what replaces them. `--run`, `--eval`,
+`--batch`, `--compile`, `--audio-outfile` and `--print-devices` are deprecated,
+as are the unhyphenated option names and `--term`; they will be removed two
+releases from now. `--timediv` and `--runtime` are gone.
+
+Offline rendering is now deterministic. The render keeps the audio clock in
+step with the work: scheduled callbacks run before the block they fall in,
+however long they take, and the clock doesn't move while a file loads. Output
+starts at time 0 and ends exactly at `--duration`. Under `extempore render` the
+random number generators are seeded (`--seed`, 0 by default), so rendering the
+same file twice gives the same samples.
+
+Callbacks scheduled for the same instant now run in the order they were
+scheduled; the order used to vary from run to run.
 
 ## v0.11.2
 

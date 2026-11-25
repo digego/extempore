@@ -7,7 +7,9 @@ add_executable(extempore_cpp_unit
     scheduler_test.cpp
     ir_preamble_test.cpp
     bencode_test.cpp
+    commandline_test.cpp
     ${CMAKE_SOURCE_DIR}/src/Bencode.cpp
+    ${CMAKE_SOURCE_DIR}/src/CommandLine.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTThread.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTZones.cpp)
 
