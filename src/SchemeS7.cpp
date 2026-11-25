@@ -141,8 +141,8 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
     }
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
         // s7 abandons the evaluation without raising an error, so say so here.
-        extemp::log::error("evaluation stopped at its time limit ({:.1f} s over)",
-                           double(now - wrapper->call_end_time) / extemp::UNIV::SAMPLE_RATE);
+        extemp::log::error("evaluation stopped at its time limit ({} ms over)",
+                           (now - wrapper->call_end_time) * 1000 / extemp::UNIV::SAMPLE_RATE);
         wrapper->stop_reason = scheme::StopReason::TimeLimit;
         *val = true;
     }

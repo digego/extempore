@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 4.0...4.5)
 
-# Read when project() picks the SDK, so it has to be set before it.
+# Read when project() picks the SDK, so it has to be set before it. 13.3 is
+# the first whose libc++ has std::format (src/Log.cpp).
 if(CMAKE_HOST_APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0 CACHE STRING "Minimum macOS version")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 13.3 CACHE STRING "Minimum macOS version")
 endif()
 
 project(Extempore LANGUAGES C CXX)
