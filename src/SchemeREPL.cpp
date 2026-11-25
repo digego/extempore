@@ -34,6 +34,7 @@
  */
 
 #include "SchemeREPL.h"
+#include "Log.h"
 #include "UNIV.h"
 #include "ext/NetCompat.h"
 #include "ext/NetUtil.h"
@@ -86,8 +87,9 @@ void SchemeREPL::writeString(std::string&& String) {
         const int lth = (length > 1024) ? 1024 : length;
         const long chars_written = net::send(m_serverSocket, b, size_t(lth));
         if (chars_written != lth) {
-            printf("There was an error sending this expression to the interpreter. Check for "
-                   "non-ascii characters in your code.\n");
+            extemp::log::error("could not send an expression to the {} process: check for "
+                               "non-ascii characters in your code",
+                               m_title);
         }
         length -= lth;
         if (length < 1) {
@@ -101,22 +103,12 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     if (m_connected) {
         return false;
     }
-    // this whole "trying to connect" print-out is just confusing to newcomers
-    // I'd delete it, but SB likes to leave these comments in :)
-
-    // printf("Trying to connect to ");
-    // printf("'%s'",hostname.c_str());
-    // printf(" on port ");
-    // printf("%d\n",port);
-
     /* Address resolution stage */
 
     net::ensureInitialised();
     const uint32_t resolved = extemp::net_util::resolve_ipv4(hostname.c_str());
     if (!resolved) {
-        ascii_error();
-        printf("Could not resolve host name\n");
-        ascii_default();
+        extemp::log::error("could not resolve host name {}", hostname);
         return false;
     }
     // wait for main server to start up first time out of the gates.
@@ -130,9 +122,8 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
     if (m_serverSocket == INVALID_SOCKET) {
-        ascii_error();
-        printf("Socket Connection Failed\n");
-        ascii_default();
+        extemp::log::error("could not open a socket to connect to the {} process: {}", m_title,
+                           net::lastError());
         return false;
     }
     int flag = 1;
@@ -142,12 +133,11 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
                                   (const char*)&flag, /* the cast is historical cruft */
                                   int(sizeof(int)));  /* length of option value */
     if (result < 0) {
-        printf("error turning off TCP Nagle ALGO\n");
+        extemp::log::warn("could not turn off TCP Nagle's algorithm for the {} process", m_title);
     }
     if (connect(m_serverSocket, (struct sockaddr*)&sa, int(sizeof(sa)))) {
-        ascii_error();
-        printf("Connection error:%d\n", net::lastError());
-        ascii_default();
+        extemp::log::error("could not connect to the {} process at {}:{}: error {}", m_title,
+                           hostname, port, net::lastError());
         return false;
     }
 
@@ -155,18 +145,12 @@ bool SchemeREPL::connectToProcessAtHostname(const std::string& hostname, int por
     const long rc = net::recv(m_serverSocket, m_buf, sizeof(m_buf));
     if (!rc) {
         this->closeREPL();
-        ascii_warning();
-        printf("WARN:");
-        ascii_default();
-        std::cout << " could not connect " << m_title << " process to port " << port
-                  << " (port is in use by another process)" << std::endl;
+        extemp::log::warn("could not connect {} process to port {} (port is in use by another "
+                          "process)",
+                          m_title, port);
         return false;
     }
-    ascii_info();
-    printf("INFO:");
-    ascii_default();
-    std::cout << " client: connected to server " << m_title << " process at " << hostname << ":"
-              << port << std::endl;
+    extemp::log::info("Connected to the {} process at {}:{}", m_title, hostname, port);
     m_connected = true;
     return true;
 }

@@ -1,5 +1,6 @@
 #include <EXTClosureAddressTable.h>
 #include <EXTLLVM.h>
+#include <Log.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -44,8 +45,8 @@ EXPORT bool check_address_type(uint64_t id, closure_address_table* table, const 
         }
         if (std::string_view(table->type) != type &&
             std::string_view("{i8*, i8*, void (i8*, i8*)*}**") != type) {
-            printf("Runtime Type Error: bad type %s for %s. Should be %s\n", type, table->name,
-                   table->type);
+            log::error("runtime type error: bad type {} for {}, should be {}", type, table->name,
+                       table->type);
             return false;
         }
         return true;

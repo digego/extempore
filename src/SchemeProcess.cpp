@@ -33,6 +33,7 @@
  *
  */
 
+#include "Log.h"
 #include "TaskScheduler.h"
 #include "SchemeProcess.h"
 #include "HangReport.h"
@@ -124,10 +125,8 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
                                   m_schemeOutportString + SCHEME_OUTPORT_STRING_LENGTH - 1);
     FILE* initscm = fopen((m_loadPath + "runtime/init.xtm").c_str(), "r");
     if (!initscm) {
-        ascii_error();
-        printf("ERROR:");
-        ascii_normal();
-        std::cout << " could not locate file init.xtm, exiting." << std::endl;
+        log::error("could not open {}runtime/init.xtm, exiting", m_loadPath);
+        log::flush();
         exit(1);
     }
     scheme_load_file(m_scheme, initscm);
@@ -135,11 +134,8 @@ SchemeProcess::SchemeProcess(const std::string& LoadPath, const std::string& Nam
     if (m_serverSocket == INVALID_SOCKET) {
         // Returning here would leave the callbacks and FFI uninitialised, so a
         // process that cannot get a socket is not worth keeping.
-        ascii_error();
-        printf("ERROR:");
-        ascii_normal();
-        std::cout << " could not open a TCP socket for the " << m_name << " process, exiting."
-                  << std::endl;
+        log::error(log::server, "could not open a TCP socket for the {} process, exiting", m_name);
+        log::flush();
         exit(1);
     }
     int flag = 1;
@@ -183,10 +179,7 @@ SchemeProcess* SchemeProcess::find(const std::string& Name) {
 bool SchemeProcess::start(bool subsume) {
     const bool serve = UNIV::MODE == UNIV::Mode::Session && UNIV::LEGACY_SERVER;
     if (serve) {
-        ascii_info();
-        printf("INFO:");
-        ascii_default();
-        std::cout << " starting " << m_name << " process..." << std::endl;
+        log::debug(log::server, "starting {} process", m_name);
         // set socket options
         int t_reuse = 1;
         setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char*>(&t_reuse),
@@ -197,28 +190,21 @@ bool SchemeProcess::start(bool subsume) {
         address.sin_port = htons(m_serverPort);
         address.sin_addr.s_addr = htonl(INADDR_ANY);  // set server's IP
         if (bind(m_serverSocket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
-            ascii_error();
-            printf("ERROR:");
-            ascii_normal();
-            std::cout << " server: could not bind server socket on port " << m_serverPort
-                      << std::endl;
+            log::error(log::server, "could not bind server socket on port {}: {}", m_serverPort,
+                       strerror(errno));
             m_running = false;
             return false;
         }
         if (listen(m_serverSocket, 5) < 0) {
-            ascii_error();
-            printf("ERROR:");
-            ascii_normal();
-            std::cout << " problem listening to extempore socket" << std::endl;
+            log::error(log::server, "could not listen on port {}: {}", m_serverPort,
+                       strerror(errno));
             m_running = false;
             return false;
         }
         // said once it is true: a client may connect the moment it reads this
         if (m_name == "primary") {
-            ascii_info();
-            std::cout << "Listening on TCP port " << m_serverPort
-                      << " --- connect your editor to send code." << std::endl;
-            ascii_default();
+            log::info(log::server, "Listening on TCP port {}: connect your editor to send code",
+                      m_serverPort);
         }
     }
     if (subsume) {
@@ -348,7 +334,7 @@ bool SchemeProcess::loadFile(const std::string& File, const std::string& Path) {
     auto fullPath((Path.empty() ? std::string() : (Path + "/")) + File);
     auto impscm(fopen(fullPath.c_str(), "r"));
     if (!impscm) {
-        std::cout << "ERROR: Unable to locate file: " << fullPath << std::endl;
+        log::error("could not open {}: {}", fullPath, strerror(errno));
         return false;
     }
     scheme_load_file(m_scheme, impscm);
@@ -387,10 +373,7 @@ void* SchemeProcess::taskImpl() {
         }
         if (!m_initExpr.empty()) {
             if (UNIV::MODE == UNIV::Mode::Session) {
-                ascii_text_color(0, 5, 10);
-                printf("\nEvaluating expression: ");
-                ascii_normal();
-                printf("%s\n\n", m_initExpr.c_str());
+                log::info("Evaluating {}", m_initExpr);
             }
             pushTask(SchemeTask(extemp::UNIV::TIME + 1000, startupBudget,
                                 new std::string(m_initExpr), "file_init",
@@ -508,8 +491,8 @@ void* SchemeProcess::taskImpl() {
                 } else {
                     std::stringstream ss;
                     UNIV::printSchemeCell(m_scheme, ss, pair);
-                    std::cerr << "Bad Closure ... " << ss.str() << " Ignoring callback request "
-                              << std::endl;
+                    log::error(log::scheme, "ignoring a callback request: {} is not callable",
+                               ss.str());
                 }
                 delete obj;
             } break;
@@ -531,8 +514,9 @@ void* SchemeProcess::taskImpl() {
                 } else {
                     std::stringstream ss;
                     extemp::UNIV::printSchemeCell(m_scheme, ss, func);
-                    std::cerr << "Bad Closure From Symbol ... " << ss.str()
-                              << " Ignoring callback request " << std::endl;
+                    log::error(log::scheme,
+                               "ignoring a callback request by symbol: {} is not callable",
+                               ss.str());
                 }
                 delete obj;
             } break;
@@ -545,7 +529,7 @@ void* SchemeProcess::taskImpl() {
                                   task.getMaxDuration());
                 break;
             default:
-                std::cerr << "ERROR: BAD SchemeTask type!!" << std::endl;
+                log::error(log::scheme, "ignoring a task of unknown type");
             }
             m_taskStart.store(0);
         }
@@ -555,7 +539,7 @@ void* SchemeProcess::taskImpl() {
         const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
         setIdle();
     }
-    std::cout << "Exiting task thread" << std::endl;
+    log::debug(log::scheme, "{} task thread exiting", m_name);
     return this;
 }
 
@@ -628,9 +612,7 @@ void* SchemeProcess::serverImpl() {
             if (poll_interrupted()) {
                 continue;
             }
-            ascii_error();
-            printf("%s SERVER ERROR: %s\n", m_name.c_str(), strerror(errno));
-            ascii_normal();
+            log::error(log::server, "{} server: {}", m_name, strerror(errno));
             // don't spin on a persistent failure
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
@@ -641,13 +623,10 @@ void* SchemeProcess::serverImpl() {
             auto sock(accept(m_serverSocket, reinterpret_cast<sockaddr*>(&client_address),
                              &clientAddressSize));
             if (sock == INVALID_SOCKET) [[unlikely]] {
-                std::cout << "Bad Accept in Server Socket Handling" << std::endl;
+                log::error(log::server, "could not accept a connection to the {} process: {}",
+                           m_name, strerror(errno));
             } else {
-                ascii_info();
-                printf("INFO:");
-                ascii_default();
-                std::cout << " server: accepted new connection to " << m_name << " process"
-                          << std::endl;
+                log::info(log::server, "Accepted a connection to the {} process", m_name);
                 clients.push_back({sock, std::string()});
                 std::string outString;
                 if (m_banner) {
@@ -687,11 +666,8 @@ void* SchemeProcess::serverImpl() {
                     disconnected = true;
 #else
                     if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
-                        ascii_error();
-                        printf("ERROR:");
-                        ascii_default();
-                        std::cout << " in socket read from extempore process " << strerror(errno)
-                                  << std::endl;
+                        log::error(log::server, "could not read from a client of the {} process: {}",
+                                   m_name, strerror(errno));
                         disconnected = true;
                     }
 #endif
@@ -711,22 +687,15 @@ void* SchemeProcess::serverImpl() {
                     }
                     client.buffer.erase(0, pos);
                     if (client.buffer.size() > MAX_PENDING) [[unlikely]] {
-                        ascii_error();
-                        printf("ERROR:");
-                        ascii_default();
-                        std::cout
-                            << " eval string too large (no terminator received before 10MB limit)"
-                            << std::endl;
-                        ascii_normal();
+                        log::error(log::server,
+                                   "eval string too large (no terminator received before the 10MB "
+                                   "limit)");
                         client.buffer.clear();
                     }
                 }
             }
             if (disconnected) {
-                ascii_info();
-                printf("INFO:");
-                ascii_default();
-                std::cout << " server: client disconnected" << std::endl;
+                log::info(log::server, "A client of the {} process disconnected", m_name);
                 closesocket(client.fd);
                 client.fd = INVALID_SOCKET;
             }
@@ -737,19 +706,19 @@ void* SchemeProcess::serverImpl() {
         closesocket(client.fd);
     }
     if (closesocket(m_serverSocket)) {
-        std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
-        perror(nullptr);
+        log::error(log::server, "could not close the {} server socket: {}", m_name,
+                   strerror(errno));
     }
     m_serverSocket = INVALID_SOCKET;
-    std::cout << "Exiting server thread" << std::endl;
+    log::debug(log::server, "{} server thread exiting", m_name);
     return this;
 }
 
 SchemeObj::SchemeObj(scheme* Scheme, pointer Values, pointer Env)
     : m_scheme(Scheme), m_values(Values), m_env(Env) {
     if (!Env) [[unlikely]] {
-        std::cout << "BANG CRASH SHEBANG" << std::endl;
-        fflush(stdout);
+        log::error(log::scheme, "created a SchemeObj without an environment, aborting");
+        log::flush();
         abort();
     }
     m_gcLoc = s7_gc_protect(m_scheme->sc, Env);

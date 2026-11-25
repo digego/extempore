@@ -34,6 +34,7 @@
  */
 
 #include "TaskScheduler.h"
+#include "Log.h"
 #include "AudioDevice.h"
 #include "HangReport.h"
 #include <cmath>
@@ -72,7 +73,7 @@ void TaskScheduler::run(TaskI* Task) {
             Task->execute();
         }
     } catch (std::exception& e) {
-        std::cout << "Error executing scheduled task! " << e.what() << std::endl;
+        log::error("error executing scheduled task: {}", e.what());
     }
     delete Task;
 }

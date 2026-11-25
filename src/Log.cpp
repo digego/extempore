@@ -353,8 +353,12 @@ void start() {
     });
 }
 
-void flush() {
-    drain();
+void flush() noexcept {
+    try {
+        drain();
+    } catch (...) {
+        std::fputs("extempore: out of memory while writing queued messages\n", stderr);
+    }
     std::fflush(stderr);
 }
 
@@ -404,7 +408,7 @@ bool enabled(Level L, std::string_view Component) {
     return L != Level::Off && std::uint8_t(L) <= std::uint8_t(level(Component));
 }
 
-void emit(Level L, std::string_view Component, std::string_view Message) {
+void emit(Level L, std::string_view Component, std::string_view Message) noexcept {
     if (!enabled(L, Component)) {
         detail::filtered(L);
         return;
@@ -416,13 +420,19 @@ void emit(Level L, std::string_view Component, std::string_view Message) {
     if (L == Level::Error) {
         sErrors.fetch_add(1, std::memory_order_relaxed);
     }
-    write_line(L, Component, Message, now_millis());
-    if (tForward) {
-        tForward(tForwardContext, L, strip_escapes(format_line(L, Component, Message, "", false)));
+    try {
+        write_line(L, Component, Message, now_millis());
+        if (tForward) {
+            tForward(tForwardContext, L,
+                     strip_escapes(format_line(L, Component, Message, "", false)));
+        }
+    } catch (...) {
+        // out of memory: say so without allocating
+        std::fputs("extempore: out of memory while logging a message\n", stderr);
     }
 }
 
-void detail::emit_realtime(Level L, std::string_view Component, std::string_view Message) {
+void detail::emit_realtime(Level L, std::string_view Component, std::string_view Message) noexcept {
     if (L == Level::Error) {
         sErrors.fetch_add(1, std::memory_order_relaxed);
     }
@@ -431,7 +441,7 @@ void detail::emit_realtime(Level L, std::string_view Component, std::string_view
     }
 }
 
-void detail::filtered(Level L) {
+void detail::filtered(Level L) noexcept {
     if (L == Level::Error) {
         sErrors.fetch_add(1, std::memory_order_relaxed);
     }

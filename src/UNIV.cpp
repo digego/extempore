@@ -137,7 +137,6 @@ EXPORT char* cname_encode(char* data, size_t input_length, size_t* output_length
         encoded_data[*output_length - 1 - i] = 0;  //'$';
     }
 
-    // printf("ENCODE: %d:%s\n",*output_length,encoded_data);
     return encoded_data;
 }
 

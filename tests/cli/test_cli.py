@@ -211,6 +211,29 @@ class Exec(Scratch):
             p.stdout.close()
 
 
+class Session(Scratch):
+    QUIET_SESSION = ("--no-audio", "--no-nrepl", "--no-legacy-server")
+
+    def test_messages_on_stderr_and_the_code_on_stdout(self) -> None:
+        p = run(*self.QUIET_SESSION, "-e", "(begin (println 'ready) (quit 0))")
+        self.assertEqual((p.returncode, p.stdout), (0, "ready\n"))
+        # stderr isn't a terminal here, so each line has the time
+        self.assertRegex(p.stderr, r"^\d\d:\d\d:\d\d\.\d{3} Extempore v")
+        self.assertIn("Loaded xtmbase", p.stderr)
+        p = run(*self.QUIET_SESSION, "-q", "-e", "(begin (println 'ready) (quit 0))")
+        self.assertEqual((p.returncode, p.stdout, p.stderr), (0, "ready\n", ""))
+
+    def test_timestamps_can_be_turned_off(self) -> None:
+        p = run(*self.QUIET_SESSION, "--timestamps", "never", "-e", "(quit 0)")
+        self.assertTrue(p.stderr.startswith("Extempore v"), p.stderr)
+
+
+class Devices(Scratch):
+    def test_no_colour_through_a_pipe(self) -> None:
+        p = run("devices")
+        self.assertNotIn("\x1b[", p.stdout + p.stderr)
+
+
 class Usage(Scratch):
     def assert_usage_error(self, *args: str, mentions: str) -> None:
         p = run(*args)

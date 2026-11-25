@@ -2,6 +2,7 @@
 
 #include "Bencode.h"
 #include "ExtemporeVersion.h"
+#include "Log.h"
 #include "SchemeFFIRegistry.h"
 #include "SchemeProcess.h"
 #include "UNIV.h"
@@ -799,11 +800,7 @@ pointer nreplSend(scheme* Scheme, pointer Args) {
 bool start(const std::string& Host, std::uint16_t Port) {
     auto* server = new Server();
     if (!server->listen(Host, Port)) {
-        ascii_error();
-        std::printf("ERROR:");
-        ascii_normal();
-        std::cout << " nREPL server: could not listen on " << Host << ":" << Port << " ("
-                  << server->error() << ")" << std::endl;
+        log::error(log::nrepl, "could not listen on {}:{} ({})", Host, Port, server->error());
         delete server;
         return false;
     }
@@ -818,9 +815,8 @@ bool start(const std::string& Host, std::uint16_t Port) {
             std::snprintf(s_portFile, sizeof(s_portFile), "%s", path.string().c_str());
         }
     }
-    std::cout << "nREPL server started on port " << server->port() << " on host "
-              << server->host() << " - nrepl://" << server->host() << ":" << server->port()
-              << std::endl;
+    log::info(log::nrepl, "nREPL server started on port {} on host {} - nrepl://{}:{}",
+              server->port(), server->host(), server->host(), server->port());
     // Runs for the life of the process, like the other server threads.
     std::thread([server] { server->run(); }).detach();
     return true;

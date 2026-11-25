@@ -62,7 +62,7 @@ static bool sendExpr(const std::string& Name, std::string&& Expr) {
         repl->writeString(std::move(Expr));
         return true;
     }
-    std::cout << "Error: unknown scheme process '" << Name << "'" << std::endl;
+    log::error("unknown scheme process '{}'", Name);
     return false;
 }
 
@@ -113,8 +113,8 @@ static bool appendArg(scheme* Scheme, std::stringstream& Stream, pointer Value) 
     } else if (is_string(Value) || is_number(Value) || is_symbol(Value)) {
         UNIV::printSchemeCell(Scheme, Stream, Value, true);
     } else {
-        ffiPrintError("Extempore's IPC mechanism cannot serialise this type - this maybe related "
-                      "to the return type as well as the arguments.\n");
+        ffiPrintError("extempore's IPC mechanism cannot serialise this type (this may also be "
+                      "the return type, not just the arguments)");
         return false;
     }
     return true;
@@ -152,7 +152,7 @@ static pointer ipcEval(scheme* Scheme, pointer Args) {
 static SchemeProcess* findLocalProcess(const std::string& Name) {
     auto* process = SchemeProcess::find(Name);
     if (!process) [[unlikely]] {
-        std::cout << "Error: no scheme process '" << Name << "' in this extempore" << std::endl;
+        log::error("no scheme process '{}' in this extempore", Name);
     }
     return process;
 }

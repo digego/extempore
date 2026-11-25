@@ -75,7 +75,7 @@ void configure(const Settings& S);
 // Start the thread which writes out what realtime threads log.
 void start();
 // Write out whatever realtime threads have queued: before the process exits.
-void flush();
+void flush() noexcept;
 
 // Whether stderr, where messages go, gets escape sequences.
 bool colour();
@@ -87,7 +87,7 @@ Level level(std::string_view Component = {});
 
 bool enabled(Level L, std::string_view Component = {});
 // Write a message which is already formatted. Message may hold several lines.
-void emit(Level L, std::string_view Component, std::string_view Message);
+void emit(Level L, std::string_view Component, std::string_view Message) noexcept;
 
 // This thread runs audio: from now on its messages are queued, never written
 // directly.
@@ -117,62 +117,70 @@ private:
 inline constexpr std::size_t kRealtimeMessage = 240;
 
 namespace detail {
-void emit_realtime(Level L, std::string_view Component, std::string_view Message);
+void emit_realtime(Level L, std::string_view Component, std::string_view Message) noexcept;
 // A message below the threshold: an error is still counted.
-void filtered(Level L);
+void filtered(Level L) noexcept;
 
+// Logging never throws: a message which can't be formatted (std::format can
+// only fail to allocate, the format strings being checked at compile time) is
+// replaced by a note that it couldn't be.
 template <class... Args>
-void log(Level L, std::string_view Component, std::format_string<Args...> Fmt, Args&&... A) {
+void log(Level L, std::string_view Component, std::format_string<Args...> Fmt,
+         Args&&... A) noexcept {
     if (!enabled(L, Component)) {
         filtered(L);
         return;
     }
-    if (realtime_thread()) [[unlikely]] {
-        char buffer[kRealtimeMessage];
-        const auto result =
-            std::format_to_n(buffer, sizeof(buffer), Fmt, std::forward<Args>(A)...);
-        const auto size = std::min<std::size_t>(std::size_t(result.size), sizeof(buffer));
-        emit_realtime(L, Component, std::string_view(buffer, size));
-        return;
+    try {
+        if (realtime_thread()) [[unlikely]] {
+            char buffer[kRealtimeMessage];
+            const auto result =
+                std::format_to_n(buffer, sizeof(buffer), Fmt, std::forward<Args>(A)...);
+            const auto size = std::min<std::size_t>(std::size_t(result.size), sizeof(buffer));
+            emit_realtime(L, Component, std::string_view(buffer, size));
+            return;
+        }
+        emit(L, Component, std::format(Fmt, std::forward<Args>(A)...));
+    } catch (...) {
+        emit(L, Component, "(a message which couldn't be formatted)");
     }
-    emit(L, Component, std::format(Fmt, std::forward<Args>(A)...));
 }
 }  // namespace detail
 
 template <class... Args>
-void error(std::format_string<Args...> Fmt, Args&&... A) {
+void error(std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Error, {}, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void error(Component C, std::format_string<Args...> Fmt, Args&&... A) {
+void error(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Error, C.name, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void warn(std::format_string<Args...> Fmt, Args&&... A) {
+void warn(std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Warning, {}, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void warn(Component C, std::format_string<Args...> Fmt, Args&&... A) {
+void warn(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Warning, C.name, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void info(std::format_string<Args...> Fmt, Args&&... A) {
+void info(std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Info, {}, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void info(Component C, std::format_string<Args...> Fmt, Args&&... A) {
+void info(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Info, C.name, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void debug(std::format_string<Args...> Fmt, Args&&... A) {
+void debug(std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Debug, {}, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void debug(Component C, std::format_string<Args...> Fmt, Args&&... A) {
+void debug(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Debug, C.name, Fmt, std::forward<Args>(A)...);
 }
 template <class... Args>
-void trace(Component C, std::format_string<Args...> Fmt, Args&&... A) {
+void trace(Component C, std::format_string<Args...> Fmt, Args&&... A) noexcept {
     detail::log(Level::Trace, C.name, Fmt, std::forward<Args>(A)...);
 }
 

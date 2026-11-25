@@ -1,4 +1,5 @@
 #include <EXTZones.h>
+#include <Log.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -78,8 +79,9 @@ llvm_zone_t* llvm_zone_create(uint64_t size) {
 
 EXPORT void llvm_zone_destroy(llvm_zone_t* Zone) {
     if constexpr (DEBUG_ZONE_ALLOC) {
-        printf("DestroyZone: %p:%p:%" PRIu64 ":%" PRIu64 "\n", static_cast<void*>(Zone),
-               Zone->memory, Zone->offset, Zone->size);
+        log::trace(log::zone, "destroying zone {:p}: memory {:p}, offset {}, size {}",
+                   static_cast<const void*>(Zone), static_cast<const void*>(Zone->memory),
+                   Zone->offset, Zone->size);
     }
     if (Zone->memories) {
         llvm_zone_destroy(Zone->memories);
@@ -110,8 +112,8 @@ llvm_zone_t* llvm_zone_reset(llvm_zone_t* Zone) {
 static uint64_t zone_footprint(uint64_t size) {
     // Refuse sizes that would wrap when the header and padding are added.
     if (size > UINT64_MAX - LLVM_ZONE_ALIGN - LLVM_ZONE_ALIGNPAD) [[unlikely]] {
-        fprintf(stderr,
-                "\nZone allocation of %" PRIu64 " bytes is not representable ... exiting!\n", size);
+        log::error(log::zone, "zone allocation of {} bytes is not representable", size);
+        log::flush();
         fflush(nullptr);
         abort();
     }
@@ -125,8 +127,9 @@ static void zone_extend(llvm_zone_t* zone, uint64_t footprint) {
     const bool iszero = !zone->size;
     uint64_t new_size = zone->size > footprint ? zone->size : footprint;
     if (new_size > UINT64_MAX / 2) [[unlikely]] {
-        fprintf(stderr, "\nZone:%p cannot grow to hold %" PRIu64 " bytes ... exiting!\n",
-                static_cast<void*>(zone), footprint);
+        log::error(log::zone, "zone {:p} cannot grow to hold {} bytes",
+                   static_cast<const void*>(zone), footprint);
+        log::flush();
         fflush(nullptr);
         abort();
     }
@@ -137,8 +140,9 @@ static void zone_extend(llvm_zone_t* zone, uint64_t footprint) {
     llvm_zone_t* newzone = llvm_zone_create(new_size);
     if (!newzone->memory) [[unlikely]] {
         free(newzone);
-        fprintf(stderr, "\nZone:%p out of memory growing to %" PRIu64 " bytes ... exiting!\n",
-                static_cast<void*>(zone), new_size);
+        log::error(log::zone, "zone {:p} is out of memory growing to {} bytes",
+                   static_cast<const void*>(zone), new_size);
+        log::flush();
         fflush(nullptr);
         abort();
     }
@@ -159,8 +163,9 @@ static void zone_extend(llvm_zone_t* zone, uint64_t footprint) {
 
 EXPORT void* llvm_zone_malloc(llvm_zone_t* zone, uint64_t size) {
     if constexpr (DEBUG_ZONE_ALLOC) {
-        printf("MallocZone: %p:%p:%" PRIu64 ":%" PRIu64 ":%" PRIu64 "\n", static_cast<void*>(zone),
-               zone->memory, zone->offset, zone->size, size);
+        log::trace(log::zone, "allocating {} bytes in zone {:p}: memory {:p}, offset {}, size {}",
+                   size, static_cast<const void*>(zone), static_cast<const void*>(zone->memory),
+                   zone->offset, zone->size);
     }
     const uint64_t footprint = zone_footprint(size);
     if (zone->offset + footprint >= zone->size) [[unlikely]] {
@@ -196,21 +201,21 @@ llvm_zone_t* llvm_peek_zone_stack() {
     llvm_zone_stack* stack = llvm_threads_get_zone_stack();
     if (!stack) [[unlikely]] {  // for the moment create a "DEFAULT" zone if stack is nullptr
         if constexpr (DEBUG_ZONE_STACK) {
-            printf("TRYING TO PEEK AT A nullptr ZONE STACK\n");
+            log::trace(log::zone, "peeking at a null zone stack");
         }
         llvm_zone_t* z = llvm_zone_create(uint64_t{1024} * 1024);  // default root zone is 1M
         llvm_push_zone_stack(z);
         if constexpr (DEBUG_ZONE_STACK) {
-            printf("Creating new 1M default zone %p:%" PRIu64 " on ZStack:%p\n",
-                   static_cast<void*>(z), z->size,
-                   static_cast<void*>(llvm_threads_get_zone_stack()));
+            log::trace(log::zone, "created a 1M default zone {:p} ({} bytes) on zone stack {:p}",
+                       static_cast<const void*>(z), z->size,
+                       static_cast<const void*>(llvm_threads_get_zone_stack()));
         }
         return z;
     }
     llvm_zone_t* z = stack->head;
     if constexpr (DEBUG_ZONE_STACK) {
-        printf("%p: peeking at zone %p:%" PRIu64 "\n", static_cast<void*>(stack),
-               static_cast<void*>(z), z->size);
+        log::trace(log::zone, "zone stack {:p}: peeking at zone {:p} ({} bytes)",
+                   static_cast<const void*>(stack), static_cast<const void*>(z), z->size);
     }
     return z;
 }
@@ -219,7 +224,7 @@ EXPORT llvm_zone_t* llvm_pop_zone_stack() {
     auto stack(llvm_threads_get_zone_stack());
     if (!stack) [[unlikely]] {
         if constexpr (DEBUG_ZONE_STACK) {
-            printf("TRYING TO POP A ZONE FROM AN EMPTY ZONE STACK\n");
+            log::trace(log::zone, "popping from an empty zone stack");
         }
         return nullptr;
     }
@@ -227,12 +232,14 @@ EXPORT llvm_zone_t* llvm_pop_zone_stack() {
     llvm_zone_stack* tail = stack->tail;
     if constexpr (DEBUG_ZONE_STACK) {
         if (!tail) {
-            printf("%p: popping zone %p:%" PRIu64 " from stack with no tail\n",
-                   static_cast<void*>(stack), static_cast<void*>(head), head->size);
+            log::trace(log::zone, "zone stack {:p}: popping zone {:p} ({} bytes), stack now empty",
+                       static_cast<const void*>(stack), static_cast<const void*>(head),
+                       head->size);
         } else {
-            printf("%p: popping new zone %p:%" PRIu64 " back to old zone %p:%" PRIu64 "\n",
-                   static_cast<void*>(stack), static_cast<void*>(head), head->size,
-                   static_cast<void*>(tail->head), tail->head->size);
+            log::trace(log::zone,
+                       "zone stack {:p}: popping zone {:p} ({} bytes) back to zone {:p} ({} bytes)",
+                       static_cast<const void*>(stack), static_cast<const void*>(head), head->size,
+                       static_cast<const void*>(tail->head), tail->head->size);
         }
     }
     free(stack);

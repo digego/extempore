@@ -33,6 +33,7 @@
  *
  */
 
+#include "Log.h"
 #include "OSC.h"
 #include "SchemeProcess.h"
 #include "ext/NetUtil.h"
@@ -120,8 +121,6 @@ uint32_t unswap32i(uint32_t a) {
 }
 
 ///////////////////////////////////////////////////////////////
-
-// #define _OSC_DEBUG_
 
 namespace extemp {
 
@@ -345,7 +344,7 @@ int parse_osc_slip_data(std::vector<char>* data, char* buf, int res, bool active
                 else if (*buf == SLIP_ESC_END)
                     data->push_back(SLIP_END);
                 else {
-                    fprintf(stderr, "Error in SLIP packet: bad escape type.\n");
+                    log::debug(log::osc, "bad escape type in a SLIP packet");
                     return -1;  // bad packet
                 }
                 continue;
@@ -377,9 +376,7 @@ void* tcp_osc_server_thread(void* obj_p) {
     const int socket_fd = osc->getTcpSocketFD();
 
     if (socket_fd < 0) {
-        ascii_error();
-        printf("Bad TCP-OSC socket: %s\n", strerror(errno));
-        ascii_normal();
+        log::error(log::osc, "bad TCP-OSC socket: {}", strerror(errno));
         return obj_p;
     }
 
@@ -392,10 +389,8 @@ void* tcp_osc_server_thread(void* obj_p) {
     std::map<int, bool> data_packet;
     std::map<int, bool> data_active_escape;
     FD_ZERO(&rfd);  // zero out open sockets
-    // printf("SERVER SOCKET FD_SET: %d\n",socket_fd);
     FD_SET(socket_fd, &rfd);  // add server socket to open sockets list
     int highest_fd = socket_fd + 1;
-    // printf("FD SIZE=%d  and %d\n",highest_fd,FD_SETSIZE);
     static constexpr int BUFLEN = 1024;
     char buf[BUFLEN];
     while (scm->getRunning()) {
@@ -419,16 +414,14 @@ void* tcp_osc_server_thread(void* obj_p) {
                 }
                 pos++;
             }
-            ascii_error();
-            printf("%s SERVER ERROR: %s\n", scm->getName().c_str(), strerror(errno));
-            ascii_normal();
+            log::error(log::osc, "{} TCP-OSC server: {}", scm->getName(), strerror(errno));
             continue;
         }
         if (FD_ISSET(socket_fd, &c_rfd)) {  // check if we have any new accpets on our server socket
             res = accept(socket_fd, (struct sockaddr*)&client_address,
                          (socklen_t*)&client_address_size);
             if (res < 0) {
-                std::cout << "Bad Accept in Server Socket Handling" << std::endl;
+                log::error(log::osc, "could not accept a TCP-OSC connection: {}", strerror(errno));
                 continue;  // continue on error
             }
             if (res >= highest_fd)
@@ -452,16 +445,13 @@ void* tcp_osc_server_thread(void* obj_p) {
                     if (res == 0) {  // close the socket
                         FD_CLR(sock, &rfd);
                         data_map.erase(sock);
-                        ascii_warning();
-                        std::cout << "Closed TCP-OSC Socket" << std::endl;
-                        ascii_normal();
+                        log::debug(log::osc, "TCP-OSC client disconnected");
                         pos = client_sockets.erase(pos);
                         close(sock);
                         break;
                     } else if (res < 0) {
-                        ascii_error();
-                        printf("Error with socket read for TCP OSC socket: %s", strerror(errno));
-                        ascii_normal();
+                        log::error(log::osc, "could not read from a TCP-OSC socket: {}",
+                                   strerror(errno));
                         pos++;
                         break;
                     }
@@ -493,16 +483,13 @@ void* tcp_osc_server_thread(void* obj_p) {
                         parse_osc_slip_data(&data_map[sock], bufptr, res, data_active_escape[sock]);
 
                     if (result == 2) {  // complete osc packet
-                        // printf("full osc packet\n");
                         process_osc_data(scm, osc, client_address, data_map[sock].data(),
                                          data_map[sock].size());
                         data_map[sock].clear();
                         data_active_escape[sock] = false;
                         data_packet[sock] = false;
                     } else if (result == -1) {  // bad osc packet
-                        ascii_error();
-                        printf("Bad SLIP OSC Packet!!!!!\n");
-                        ascii_normal();
+                        log::error(log::osc, "dropped a bad SLIP OSC packet");
                         data_map[sock].clear();
                         data_active_escape[sock] = false;
                         data_packet[sock] = false;
@@ -512,9 +499,8 @@ void* tcp_osc_server_thread(void* obj_p) {
                         else
                             data_active_escape[sock] = true;
                     } else {
-                        ascii_error();
-                        printf("Unknown return type from parse_osc_slip_data!!!!!\n");
-                        ascii_normal();
+                        log::error(log::osc, "dropped a SLIP OSC packet: unexpected parse result {}",
+                                   result);
                         data_map[sock].clear();
                         data_active_escape[sock] = false;
                         data_packet[sock] = false;
@@ -537,28 +523,25 @@ void* tcp_osc_server_thread(void* obj_p) {
             }
         }
     }
-    // std::cout << "Close any client sockets" << std::endl;
     std::vector<int>::iterator pos = client_sockets.begin();
     while (pos != client_sockets.end()) {  // check through all fd's for matches against FD_ISSET
         const int sock = *pos;
         if (sock < 0) {
-            std::cout << "BAD FILE DESCRIPTOR!" << std::endl;
+            log::debug(log::osc, "dropping an invalid TCP-OSC client socket");
             pos = client_sockets.erase(pos);  // erase returns next pos
             continue;
         }
         FD_CLR(sock, &rfd);
         data_map.erase(sock);
-        std::cout << "CLOSE CLIENT-SOCKET" << std::endl;
+        log::debug(log::osc, "closing TCP-OSC client socket {}", sock);
         close(sock);
-        std::cout << "DONE-CLOSING_CLIENT" << std::endl;
         pos = client_sockets.erase(pos);  // erase returns next pos
     }
     if (close(socket_fd)) {
-        std::cerr << "SchemeProcess Error: Error closing server socket" << std::endl;
-        perror(nullptr);
+        log::error(log::osc, "could not close the TCP-OSC server socket: {}", strerror(errno));
     }
     delete sop;
-    std::cout << "Exiting server thread" << std::endl;
+    log::debug(log::osc, "TCP-OSC server thread exiting");
     return nullptr;
 }
 #endif
@@ -587,9 +570,6 @@ void OSC::schemeInit(SchemeProcess* scm) {
 // the datagram can carry, not by a fixed scratch buffer.
 void OSC::processArgs(pointer arg, osc::Writer& out, std::string& typetags, scheme* _sc,
                       char realType) {
-#ifdef _OSC_DEBUG_
-    printf("PROCESS ARGS\n");
-#endif
     const int items = list_length(_sc, arg);
     for (int i = 0; i < items; ++i) {
         if (is_string(pair_car(arg))) {
@@ -627,16 +607,14 @@ void OSC::sendOSC(TaskI* task) {
     // missing server has to be reported rather than thrown.
     OSC* osc = OSC::I(_sc);
     if (!osc) {
-        printf("OSC Error: no OSC server for this interpreter\n");
+        log::error(log::osc, "no OSC server for this interpreter");
         delete t->getArg();
         return;
     }
 
     const char* host = string_value(pair_car(args));
     const int port = ivalue(pair_cadr(args));
-#ifdef _OSC_DEBUG_
-    std::cout << "SENDTO: " << host << "  ON PORT: " << port << std::endl;
-#endif
+    log::trace(log::osc, "sending a message to {}:{}", host, port);
 
     std::string typetags(",");
     osc::Writer argbytes;
@@ -647,13 +625,11 @@ void OSC::sendOSC(TaskI* task) {
     message.string(typetags);
     message.append(argbytes);
 
-#ifdef _OSC_DEBUG_
-    std::cout << "SENDING MSG of size: " << message.size() << std::endl;
-#endif
+    log::trace(log::osc, "message is {} bytes", message.size());
 
     const uint32_t resolved = extemp::net_util::resolve_ipv4(host);
     if (!resolved) {
-        printf("OSC Error: could not resolve host name: %s\n", host);
+        log::error(log::osc, "could not resolve host name {}", host);
         delete t->getArg();
         return;
     }
@@ -670,7 +646,7 @@ void OSC::sendOSC(TaskI* task) {
     UdpSocket* sendSocket = &osc->getSocket();
     if (!sendSocket->isOpen()) {
         if (!fallback.open()) {
-            printf("OSC Error: could not open a socket to send from\n");
+            log::error(log::osc, "could not open a socket to send from");
             delete t->getArg();
             return;
         }
@@ -682,10 +658,10 @@ void OSC::sendOSC(TaskI* task) {
     if (sendSocket->sendTo(message.data(), message.size(), destination) < 0) {
         const int error = UdpSocket::lastError();
         if (UdpSocket::messageTooBig(error)) {
-            printf("Error: OSC message of %zu bytes is too large for one UDP datagram\n",
-                   message.size());
+            log::error(log::osc, "message of {} bytes is too large for one UDP datagram",
+                       message.size());
         } else {
-            printf("Error: problem sending OSC message: %s\n", UdpSocket::errorText(error).c_str());
+            log::error(log::osc, "could not send message: {}", UdpSocket::errorText(error));
         }
     }
 
@@ -774,15 +750,13 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
 
         if (!osc->getSocket().isOpen()) {
             if (!osc->getSocket().bindAny(port)) {
-                ascii_error();
-                printf("Error opening OSC socket on port %d: %s\n", port,
-                       UdpSocket::errorText(UdpSocket::lastError()).c_str());
-                ascii_normal();
+                log::error(log::osc, "could not open OSC socket on port {}: {}", port,
+                           UdpSocket::errorText(UdpSocket::lastError()));
                 return _sc->F;
             }
-            printf("Starting OSC server on port: %d calling back to %s\n", port, name);
+            log::info(log::osc, "Starting OSC server on port {}, calling back to {}", port, name);
         } else {
-            printf("OSC server on port %d now calling back to %s\n", port, name);
+            log::info(log::osc, "OSC server on port {} now calls back to {}", port, name);
         }
 
         if (!osc->getStarted()) {
@@ -805,7 +779,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
 #ifndef _WIN32
         const int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (socket_fd == -1) {
-            std::cout << "Error opening TCP-OSC socket" << std::endl;
+            log::error(log::osc, "could not open TCP-OSC socket: {}", strerror(errno));
             return _sc->F;
         }
         int t_reuse = 1;
@@ -818,7 +792,7 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
         result += setsockopt(socket_fd, SOL_SOCKET, SO_BROADCAST, (char*)&t_reuse, sizeof(t_reuse));
 
         if (result < 0) {
-            std::cout << "Error opening TCP-OSC socket" << std::endl;
+            log::error(log::osc, "could not set options on TCP-OSC socket: {}", strerror(errno));
             return _sc->F;
         }
         // Bind Server Socket
@@ -833,19 +807,18 @@ pointer OSC::registerScheme(scheme* _sc, pointer args) {
         server_address.sin_addr.s_addr = htonl(INADDR_ANY);  // set server's IP
 
         if (bind(socket_fd, (struct sockaddr*)&server_address, server_address_size) == -1) {
-            std::cout << "Error binding TCP-OSC server address to socket" << std::endl;
+            log::error(log::osc, "could not bind TCP-OSC server to port {}: {}", port,
+                       strerror(errno));
             return _sc->F;
         }
         if (listen(socket_fd, 5) == -1) {
-            std::cout << "Problem listening on TCP-OSC socket." << std::endl;
+            log::error(log::osc, "could not listen on TCP-OSC port {}: {}", port, strerror(errno));
             return _sc->F;
         }
 
         osc->setTcpSocketFD(socket_fd);
 
-        ascii_warning();
-        printf("Started TCP-OSC server on port %d\n", port);
-        ascii_normal();
+        log::info(log::osc, "Started TCP-OSC server on port {}", port);
 
 #endif
         if (!osc->getStarted()) {

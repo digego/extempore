@@ -72,14 +72,14 @@ static pointer emit(scheme* Scheme, pointer Args) {
 
     std::stringstream ss;
     if (!is_string(io)) {
-        ffiPrintError("Emit accepts only string arguments!\n");
+        ffiPrintError("emit accepts only string arguments");
         return Scheme->F;
     }
     ss << string_value(io);
     for (int i = 0; i < lgth - 1; ++i) {
         pointer arg = pair_car(Args);
         if (!is_string(arg)) {
-            ffiPrintError("Emit accepts only string arguments!\n");
+            ffiPrintError("emit accepts only string arguments");
             return Scheme->F;
         }
         ss << string_value(arg);

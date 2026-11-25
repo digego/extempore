@@ -213,14 +213,14 @@ static pointer stringJoin(scheme* Scheme, pointer Args) {
 
 static pointer callCPPAtTime(scheme* Scheme, pointer Args) {
     if (unlikely(!is_cptr(argAt(Scheme, Args, 3)))) {
-        printf("Bad task needs valid CM ptr");
+        log::error("task needs a valid CM pointer");
         return Scheme->F;
     }
     auto task_type = argInt(Scheme, Args, 2);
     // is_render_thread_type are for tasks that must be called in the render thread
     // primarily for midi calls to an AU that must occur on the audio thread
     if (task_type == 1) {
-        std::cout << "NO RENDER THREAD AVAILABLE FOR CALLBACKS" << std::endl;
+        log::error("no render thread available for callbacks");
     } else {
         const bool is_callback = (task_type == 2);
         auto obj(new SchemeObj(Scheme, argAt(Scheme, Args, 4), argAt(Scheme, Args, 5)));

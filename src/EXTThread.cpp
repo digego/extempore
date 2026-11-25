@@ -134,7 +134,7 @@ int EXTThread::setPriority(int Priority, bool Realtime) {
     }
     const int result = pthread_setschedparam(m_nativeHandle, policy, &param);
     if (result) {
-        printf("Error: failed to set thread priority: %s\n", strerror(result));
+        log::warn("failed to set thread priority: {}", strerror(result));
         return 0;
     }
     return 1;
@@ -150,12 +150,12 @@ int EXTThread::setPriority(int Priority, bool Realtime) {
         thread_policy_set(pthread_mach_thread_np(m_nativeHandle), THREAD_TIME_CONSTRAINT_POLICY,
                           (thread_policy_t)&ttcpolicy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
     if (result != KERN_SUCCESS) {
-        printf("Error: failed to set thread priority: %s\n", strerror(result));
+        log::warn("failed to set thread priority: {}", strerror(result));
         return 0;
     }
     return 1;
 #else
-    printf("Error: cannot set thread priority on Windows\n");
+    log::warn("cannot set thread priority on Windows");
     return 0;
 #endif
 }

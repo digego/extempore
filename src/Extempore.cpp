@@ -287,7 +287,7 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
     return status;
 }
 
-// Which messages show (src/Log.h): a session says what it is doing, the
+// Which messages show (include/Log.h): a session says what it is doing, the
 // subcommands only what goes wrong; then EXTEMPORE_LOG, then -q and -v.
 void configure_logging(const extemp::cli::Invocation& Inv) {
     using namespace extemp;

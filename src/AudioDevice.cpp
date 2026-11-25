@@ -41,6 +41,7 @@
 #include <regex>
 
 #include "AudioDevice.h"
+#include "Log.h"
 #include "TaskScheduler.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
@@ -56,6 +57,9 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#elif !defined(__APPLE__)
+#include <alsa/asoundlib.h>
+#include <cstdarg>
 #endif
 
 #ifdef __APPLE__
@@ -92,7 +96,8 @@ int set_thread_realtime(thread_port_t threadport, float period, float computatio
     if ((ret = thread_policy_set(threadport, THREAD_TIME_CONSTRAINT_POLICY,
                                  (thread_policy_t)&ttcpolicy,
                                  THREAD_TIME_CONSTRAINT_POLICY_COUNT)) != KERN_SUCCESS) {
-        fprintf(stderr, "set_thread_realtime() failed.\n");
+        extemp::log::warn(extemp::log::audio,
+                          "could not set realtime priority for the audio thread");
         return 0;
     }
     return 1;
@@ -108,7 +113,8 @@ int set_thread_realtime(pthread_t thread, int policy, int priority) {
     // policy should be SCHED_RR or SCHED_FIFO
     const int res = pthread_setschedparam(thread, policy, &param);
     if (res) {
-        printf("Failed to set realtime priority for Audio thread: %s\n", strerror(res));
+        extemp::log::warn(extemp::log::audio,
+                          "could not set realtime priority for the audio thread: {}", strerror(res));
     }
     return 1;
 }
@@ -186,8 +192,35 @@ std::counting_semaphore<> sMtWorkComplete{0};
 
 }  // anonymous namespace
 
+#if !defined(_WIN32) && !defined(__APPLE__)
+// ALSA writes a line to stderr for every configuration PortAudio probes and it
+// can't open: dozens on a machine without a card 0. Those are debug messages.
+static void alsaError(const char* /*File*/, int /*Line*/, const char* /*Function*/, int Err,
+                      const char* Fmt, ...) {
+    if (!log::enabled(log::Level::Debug, log::audio.name)) {
+        return;
+    }
+    char text[512];
+    va_list args;
+    va_start(args, Fmt);
+    std::vsnprintf(text, sizeof(text), Fmt, args);
+    va_end(args);
+    log::debug(log::audio, "ALSA: {}{}{}", text, Err != 0 ? ": " : "",
+               Err != 0 ? snd_strerror(Err) : "");
+}
+#endif
+
+// Initialise PortAudio, with what its host APIs print going to the logger.
+static PaError initialisePortAudio() {
+#if !defined(_WIN32) && !defined(__APPLE__)
+    snd_lib_error_set_handler(alsaError);
+#endif
+    return Pa_Initialize();
+}
+
 void* audioCallbackMT(void* Args) {
     flush_denormals_to_zero();
+    log::mark_realtime_thread();
 #ifdef __APPLE__
     Float64 clockFrequency = AudioGetHostClockFrequency();
     // set_thread_realtime(pthread_mach_thread_np(pthread_self()),
@@ -215,7 +248,7 @@ void* audioCallbackMT(void* Args) {
     std::vector<SAMPLE> indata(UNIV::IN_CHANNELS);
     const bool zerolatency = device->getDspState()->zeroLatency;
     bool toggle = false;
-    printf("Starting RT Audio MT worker %u\n", idx);
+    log::debug(log::audio, "starting multi-threaded audio worker {}", idx);
     while (true) {
         sMtWorkers[idx].work.acquire();
         SAMPLE* outbuf = outbufs[toggle];
@@ -486,10 +519,10 @@ void FileAudioDriver::finalizeWav() {
     uint32_t dataBytes = static_cast<uint32_t>(dataBytes64);
     if (dataBytes64 > 0xFFFFFFF0ull - 36) {
         dataBytes = 0xFFFFFFF0u - 36;
-        fprintf(stderr,
-                "extempore: the render exceeds the 4 GB WAV limit; the header describes the "
-                "first %u bytes only\n",
-                dataBytes);
+        log::warn(log::audio,
+                  "the render exceeds the 4 GB WAV limit; the header describes the first {} "
+                  "bytes only",
+                  dataBytes);
     }
     const uint32_t riffSize = 36 + dataBytes;
 
@@ -516,8 +549,8 @@ void FileAudioDriver::finalizeWav() {
     std::fflush(m_file);
     if (std::fseek(m_file, 0, SEEK_SET) != 0 ||
         std::fwrite(hdr, 1, sizeof(hdr), m_file) != sizeof(hdr)) {
-        fprintf(stderr, "extempore: could not finalise the WAV header for %s (%s)\n",
-                m_path.c_str(), std::strerror(errno));
+        log::error(log::audio, "could not finalise the WAV header for {}: {}", m_path,
+                   std::strerror(errno));
     }
     std::fflush(m_file);
     std::fclose(m_file);
@@ -528,7 +561,7 @@ bool FileAudioDriver::open(const std::string& path, double maxSeconds) {
     if (m_file)
         return false;
     if (!openWav(path)) {
-        fprintf(stderr, "extempore: can't write %s (%s)\n", path.c_str(), std::strerror(errno));
+        log::error(log::audio, "can't write {}: {}", path, std::strerror(errno));
         return false;
     }
     m_path = path;
@@ -599,8 +632,8 @@ void FileAudioDriver::run() {
         const uint64_t keep = std::min<uint64_t>(frames, m_maxFrames - m_framesWritten);
         const size_t samples = size_t(keep) * UNIV::CHANNELS;
         if (std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file) != samples) {
-            fprintf(stderr, "extempore: can't write %s (%s); stopping the render\n", m_path.c_str(),
-                    std::strerror(errno));
+            log::error(log::audio, "can't write {}: {}; stopping the render", m_path,
+                       std::strerror(errno));
             break;
         }
         m_framesWritten += keep;
@@ -622,9 +655,10 @@ void FileAudioDriver::run() {
                 log::warn(log::audio, "no DSP was set (dsp:set!), so the render is silent");
             }
             log::flush();
-            fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
-                    double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
-                    unsigned(UNIV::SAMPLE_RATE));
+            // what extempore render made: the command's own summary, always shown
+            std::fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
+                         double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
+                         unsigned(UNIV::SAMPLE_RATE));
             std::fflush(stdout);
             std::_Exit(UNIV::failed() ? 1 : 0);
         }
@@ -660,10 +694,11 @@ void AudioDevice::stopFileDriver() {
 static int audioCallback(const void* InputBuffer, void* OutputBuffer, unsigned long FramesPerBuffer,
                          const PaStreamCallbackTimeInfo* /*TimeInfo*/,
                          PaStreamCallbackFlags StatusFlags, void* UserData) {
+    // every call: PortAudio may call from a new thread after a restart
+    log::mark_realtime_thread();
     if (unlikely(StatusFlags & (paOutputUnderflow | paOutputOverflow))) {
-        // Nothing may block or allocate on the audio thread, printf included:
-        // count the xruns and let the Scheme side read them back with
-        // (sys:audio-xruns).
+        // Nothing may block or allocate on the audio thread: count the xruns
+        // and let the Scheme side read them back with (sys:audio-xruns).
         if (StatusFlags & paOutputUnderflow) {
             AudioDevice::I()->countUnderflow();
         }
@@ -695,15 +730,15 @@ AudioDevice::~AudioDevice() {
         PaError err;
         err = Pa_StopStream(stream);
         if (err != paNoError) {
-            std::cout << Pa_GetErrorText(err) << std::endl;
+            log::warn(log::audio, "could not stop the audio stream: {}", Pa_GetErrorText(err));
         }
         err = Pa_CloseStream(stream);
         if (err != paNoError) {
-            std::cout << Pa_GetErrorText(err) << std::endl;
+            log::warn(log::audio, "could not close the audio stream: {}", Pa_GetErrorText(err));
         }
         err = Pa_Terminate();
         if (err != paNoError) {
-            std::cout << Pa_GetErrorText(err) << std::endl;
+            log::warn(log::audio, "could not terminate PortAudio: {}", Pa_GetErrorText(err));
         }
     }
 }
@@ -717,10 +752,8 @@ static int findDevice(const std::string& Name) {
     try {
         pattern = std::regex(Name);
     } catch (const std::regex_error& e) {
-        ascii_warning();
-        printf("Warning: '%s' is not a valid regex (%s); matching it as plain text\n", Name.c_str(),
-               e.what());
-        ascii_normal();
+        log::warn(log::audio, "'{}' is not a valid regex ({}); matching it as plain text", Name,
+                  e.what());
         usePattern = false;
     }
     const int numDevices(Pa_GetDeviceCount());
@@ -735,10 +768,9 @@ static int findDevice(const std::string& Name) {
             return i;
         }
     }
-    ascii_error();
-    printf("\n*** Can't find device matching: %s\n", Name.c_str());
-    ascii_normal();
-    fflush(stdout);
+    log::error(log::audio, "can't find an audio device matching '{}'; see `extempore devices`",
+               Name);
+    log::flush();
     std::_Exit(1);
 }
 
@@ -747,23 +779,21 @@ void AudioDevice::start() {
         return;
     }
     if (UNIV::AUDIO_NONE) {
-        ascii_error();
-        fprintf(stderr, "Error: cannot set the audio device in --noaudio mode\n");
-        ascii_normal();
+        log::error(log::audio, "cannot set the audio device in --noaudio mode");
         return;
     }
     if (UNIV::MODE == UNIV::Mode::Render) {
         if (!sFileDriver.open(UNIV::AUDIO_OUTFILE_PATH, UNIV::AUDIO_OUTFILE_DURATION)) {
+            log::flush();
             std::_Exit(1);
         }
         m_started = true;
         return;
     }
-    PaError err = Pa_Initialize();
+    PaError err = initialisePortAudio();
     if (err != paNoError) {
-        ascii_error();
-        std::cout << "Could not initialise PortAudio: " << Pa_GetErrorText(err) << std::endl;
-        ascii_normal();
+        log::error(log::audio, "could not initialise PortAudio: {}", Pa_GetErrorText(err));
+        log::flush();
         std::_Exit(1);
     }
     const int numDevices = Pa_GetDeviceCount();
@@ -774,29 +804,25 @@ void AudioDevice::start() {
         UNIV::AUDIO_IN_DEVICE = findDevice(UNIV::AUDIO_IN_DEVICE_NAME);
     }
     if (numDevices < 0) {
-        printf("No audio devices found!\n");
-        printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
+        log::error(log::audio, "no audio devices found (Pa_GetDeviceCount returned {})",
+                   numDevices);
+        log::flush();
         std::_Exit(1);
     }
     if (int(UNIV::AUDIO_DEVICE) < -1 || int(UNIV::AUDIO_DEVICE) >= numDevices) {
-        ascii_error();
-        printf("Output device not valid! %d\n", int(UNIV::AUDIO_DEVICE));
-        ascii_normal();
-        printf("\n");
+        log::error(log::audio, "output device {} is not valid; see `extempore devices`",
+                   int(UNIV::AUDIO_DEVICE));
+        log::flush();
         std::_Exit(1);
     }
     if (int(UNIV::AUDIO_IN_DEVICE) < -1 || int(UNIV::AUDIO_IN_DEVICE) >= numDevices) {
-        ascii_error();
-        printf("Input device not valid! %d\n", (int)UNIV::AUDIO_IN_DEVICE);
-        ascii_normal();
-        printf("\n");
+        log::error(log::audio, "input device {} is not valid; see `extempore devices`",
+                   int(UNIV::AUDIO_IN_DEVICE));
+        log::flush();
         std::_Exit(1);
     }
     if (UNIV::IN_CHANNELS != UNIV::CHANNELS && UNIV::IN_CHANNELS != 1 && UNIV::IN_CHANNELS > 0) {
-        ascii_warning();
-        printf("Warning: dsp input will be 0.0, use data* for channel data\n");
-        ascii_normal();
-        printf("\n");
+        log::warn(log::audio, "dsp input will be 0.0, use data* for channel data");
     }
     int inputDevice = Pa_GetDefaultInputDevice();
     const PaDeviceInfo* deviceInfo;
@@ -828,20 +854,18 @@ void AudioDevice::start() {
     err = Pa_OpenStream(&stream, painptr, paoutptr, UNIV::SAMPLE_RATE, UNIV::NUM_FRAMES, paNoFlag,
                         audioCallback, TaskScheduler::I());
     if (err != paNoError) {
-        ascii_error();
-        std::cout << "Initialization Error: " << Pa_GetErrorText(err) << std::endl;
-        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
-        ascii_normal();
+        log::error(log::audio, "could not open the audio stream on '{}': {}",
+                   Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name, Pa_GetErrorText(err));
+        log::flush();
         std::_Exit(1);
     }
 
     err = Pa_StartStream(stream);
 
     if (err != paNoError) {
-        ascii_error();
-        std::cout << "ERROR: " << Pa_GetErrorText(err) << std::endl;
-        std::cout << "AudioDevice: " << (Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE))->name << std::endl;
-        ascii_normal();
+        log::error(log::audio, "could not start the audio stream on '{}': {}",
+                   Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name, Pa_GetErrorText(err));
+        log::flush();
         std::_Exit(1);
     }
 
@@ -869,7 +893,7 @@ void AudioDevice::stop() {
     }
     const PaError err = Pa_StopStream(stream);
     if (err != paNoError) {
-        std::cout << "PA Error: " << Pa_GetErrorText(err) << std::endl;
+        log::warn(log::audio, "could not stop the audio stream: {}", Pa_GetErrorText(err));
     }
     m_started = false;
 }
@@ -933,36 +957,30 @@ double AudioDevice::getCPULoad() {
 }
 
 void AudioDevice::printDevices() {
-    const PaError err = Pa_Initialize();
+    const PaError err = initialisePortAudio();
     if (err != paNoError) {
-        ascii_error();
-        printf("Error: could not initialise PortAudio: %s\n", Pa_GetErrorText(err));
-        ascii_normal();
+        log::error(log::audio, "could not initialise PortAudio: {}", Pa_GetErrorText(err));
+        log::flush();
         std::_Exit(1);
     }
 
     const int numDevices = Pa_GetDeviceCount();
     if (numDevices <= 0) {
-        printf("Error: no audio devices found! Exiting...\n");
+        log::error(log::audio, "no audio devices found");
+        log::flush();
         std::_Exit(1);
     }
-    ascii_normal();
-    printf("\n-----Available Audio Devices-----------------------------\n");
-    ascii_default();
-
-    const PaDeviceInfo* deviceInfo;
-    const PaHostApiInfo* apiInfo;
-
+    // one per line: the index (or a regex on the name) is what --device takes
+    const PaDeviceIndex defaultOutput = Pa_GetDefaultOutputDevice();
+    const PaDeviceIndex defaultInput = Pa_GetDefaultInputDevice();
     for (int i = 0; i < numDevices; i++) {
-        deviceInfo = Pa_GetDeviceInfo(i);
-        apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
-        printf("audio device[%d]:%s api[%d]:%s inchan[%d] outchan[%d]\n", i, deviceInfo->name,
-               deviceInfo->hostApi, apiInfo->name, deviceInfo->maxInputChannels,
-               deviceInfo->maxOutputChannels);
+        const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(i);
+        const PaHostApiInfo* apiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+        printf("%d: %s (%s, %d in, %d out)%s%s\n", i, deviceInfo->name, apiInfo->name,
+               deviceInfo->maxInputChannels, deviceInfo->maxOutputChannels,
+               i == defaultOutput ? " [default output]" : "",
+               i == defaultInput ? " [default input]" : "");
     }
-    ascii_normal();
-    printf("----------------------------------------------------------\n\n");
-    ascii_default();
 #ifdef _WIN32
     Pa_Terminate();
 #else

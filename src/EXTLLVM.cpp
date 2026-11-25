@@ -51,6 +51,8 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -192,20 +194,17 @@ EXPORT double fp80_to_double_portable(const unsigned char* bytes) {
 
 // LLVM RUNTIME ERROR
 EXPORT void llvm_runtime_error(int error, void* arg) {
-    ascii_error();
     switch (error) {
     case 1:
-        printf("LLVM zptr_copy - invalid zptr! %p\n", arg);
+        extemp::log::error(extemp::log::jit, "zptr_copy: invalid zptr {}", arg);
         break;
     default:
         break;
     }
-    ascii_normal();
     return;
 }
 
 EXPORT void llvm_schedule_callback(long long time, void* dat) {
-    // printf("scheduled callback %lld\n",time);
     extemp::SchemeProcess* proc =
         extemp::SchemeProcess::I();  // extemp::SchemeProcess::I()->extemporeCallback(time,dat);
 
@@ -232,7 +231,7 @@ EXPORT char* extitoa(int64_t val) {
 EXPORT void llvm_send_udp(char* host, int port, void* message, int message_length) {
     const uint32_t resolved = extemp::net_util::resolve_ipv4(host);
     if (!resolved) {
-        printf("OSC Error: Could not resolve host name\n");
+        extemp::log::error(extemp::log::osc, "could not resolve host name");
         return;
     }
 
@@ -244,17 +243,17 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
 
     extemp::UdpSocket sock;
     if (!sock.open()) {
-        printf("Error: could not open UDP socket: %s\n",
-               extemp::UdpSocket::errorText(extemp::UdpSocket::lastError()).c_str());
+        extemp::log::error(extemp::log::osc, "could not open UDP socket: {}",
+                           extemp::UdpSocket::errorText(extemp::UdpSocket::lastError()));
         return;
     }
     if (sock.sendTo(message, size_t(message_length), sa) < 0) {
         const int err = extemp::UdpSocket::lastError();
         if (extemp::UdpSocket::messageTooBig(err)) {
-            printf("Error: OSC message too large: UDP 8k message MAX\n");
+            extemp::log::error(extemp::log::osc, "message too large: UDP messages are 8k at most");
         } else {
-            printf("Error: problem sending OSC message: %s\n",
-                   extemp::UdpSocket::errorText(err).c_str());
+            extemp::log::error(extemp::log::osc, "problem sending message: {}",
+                               extemp::UdpSocket::errorText(err));
         }
     }
 }
@@ -276,6 +275,23 @@ EXPORT void llvm_send_udp(char* host, int port, void* message, int message_lengt
 //   proc->getContext(); return ctx;
 // }
 ///////////////////////////////////////////////////
+
+// xtlang's side of the logger (src/Log.h): safe from the audio thread
+EXPORT void log_error(const char* Message) {
+    extemp::log::emit(extemp::log::Level::Error, {}, Message);
+}
+
+EXPORT void log_warn(const char* Message) {
+    extemp::log::emit(extemp::log::Level::Warning, {}, Message);
+}
+
+EXPORT void log_info(const char* Message) {
+    extemp::log::emit(extemp::log::Level::Info, {}, Message);
+}
+
+EXPORT void log_debug(const char* Message) {
+    extemp::log::emit(extemp::log::Level::Debug, {}, Message);
+}
 
 // these are helpers for runtime debugging in llvm
 EXPORT void llvm_print_pointer(void* ptr) {
@@ -377,10 +393,39 @@ namespace EXTLLVM {
 std::unique_ptr<llvm::orc::LLJIT> JIT = nullptr;
 std::unique_ptr<llvm::orc::ThreadSafeContext> TSC = nullptr;
 
+// A context whose diagnostics (LLVM's warnings, remarks and errors, which it
+// would otherwise print to stderr itself) go to the logger.
+static std::unique_ptr<llvm::LLVMContext> makeContext() {
+    auto context = std::make_unique<llvm::LLVMContext>();
+    context->setDiagnosticHandlerCallBack(
+        [](const llvm::DiagnosticInfo* Info, void* /*Context*/) {
+            std::string text;
+            llvm::raw_string_ostream stream(text);
+            llvm::DiagnosticPrinterRawOStream printer(stream);
+            Info->print(printer);
+            switch (Info->getSeverity()) {
+            case llvm::DS_Error:
+                // as LLVM's own handler does: the module can't be trusted
+                log::error(log::jit, "{}", text);
+                log::flush();
+                std::exit(1);
+            case llvm::DS_Warning:
+                log::warn(log::jit, "{}", text);
+                break;
+            case llvm::DS_Remark:
+            case llvm::DS_Note:
+                log::debug(log::jit, "{}", text);
+                break;
+            }
+        },
+        nullptr);
+    return context;
+}
+
 llvm::orc::ThreadSafeContext& getThreadSafeContext() {
     // Ensure the thread-safe context exists before returning a reference
     if (!TSC) {
-        TSC = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
+        TSC = std::make_unique<llvm::orc::ThreadSafeContext>(makeContext());
     }
     return *TSC;
 }
@@ -552,8 +597,8 @@ class GraceJITLinkMemoryManager final : public llvm::jitlink::JITLinkMemoryManag
         for (auto& allocs : expired) {
             m_inner->deallocate(std::move(allocs), [](llvm::Error Err) {
                 if (Err) {
-                    std::cerr << "LLVM: error releasing JIT memory: "
-                              << llvm::toString(std::move(Err)) << std::endl;
+                    log::error(log::jit, "error releasing JIT memory: {}",
+                               llvm::toString(std::move(Err)));
                 }
             });
         }
@@ -605,7 +650,7 @@ class GraceMemoryMapper final : public llvm::SectionMemoryManager::MemoryMapper,
         }
         for (auto& block : expired) {
             if (auto ec = llvm::sys::Memory::releaseMappedMemory(block)) {
-                std::cerr << "LLVM: error releasing JIT memory: " << ec.message() << std::endl;
+                log::error(log::jit, "error releasing JIT memory: {}", ec.message());
             }
         }
     }
@@ -651,8 +696,7 @@ void unlinkSymbol(const std::string& Name) {
         llvm::handleAllErrors(
             std::move(err), [](const llvm::orc::SymbolsNotFound&) {},  // already gone
             [&](const llvm::ErrorInfoBase& e) {
-                std::cerr << "LLVM: could not remove symbol " << Name << ": " << e.message()
-                          << std::endl;
+                log::error(log::jit, "could not remove symbol {}: {}", Name, e.message());
             });
     }
 }
@@ -666,8 +710,7 @@ bool unreferenced(const TrackedModule& M) {
 // this one referenced become orphans.
 void removeModule(TrackedModule* M) {
     if (auto err = M->tracker->remove()) {
-        std::cerr << "LLVM: could not remove module: " << llvm::toString(std::move(err))
-                  << std::endl;
+        log::error(log::jit, "could not remove module: {}", llvm::toString(std::move(err)));
     }
     for (const auto& name : M->imports) {
         auto it = sImportRefs.find(name);
@@ -848,8 +891,7 @@ llvm::Expected<llvm::orc::ResourceTrackerSP> addTransientModule(llvm::orc::Threa
 // NOLINTNEXTLINE(performance-unnecessary-value-param): a sink, the caller hands the tracker over
 void removeTransientModule(llvm::orc::ResourceTrackerSP RT) {
     if (auto err = RT->remove()) {
-        std::cerr << "LLVM: could not remove module: " << llvm::toString(std::move(err))
-                  << std::endl;
+        log::error(log::jit, "could not remove module: {}", llvm::toString(std::move(err)));
     }
 }
 
@@ -872,8 +914,7 @@ bool removeSymbol(const std::string& name) {
         llvm::handleAllErrors(
             std::move(err), [](const llvm::orc::SymbolsNotFound&) {},
             [&](const llvm::ErrorInfoBase& e) {
-                std::cerr << "LLVM: could not remove symbol " << name << ": " << e.message()
-                          << std::endl;
+                log::error(log::jit, "could not remove symbol {}: {}", name, e.message());
             });
         return removed;
     }
@@ -1056,7 +1097,9 @@ static long long llvm_get_next_prime(long long start)
 #endif
 
 EXPORT void ascii_text_color_extern(int32_t Bold, int32_t Foreground, int32_t Background) {
-    ascii_text_color(Bold, Foreground, Background);
+    fputs(extemp::log::colour_code(stdout, Bold != 0, unsigned(Foreground), unsigned(Background))
+              .c_str(),
+          stdout);
 }
 
 // CATEGORY: clock
@@ -1262,7 +1305,7 @@ void initLLVM() {
     }
 
     // Create thread-safe context
-    TSC = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
+    TSC = std::make_unique<llvm::orc::ThreadSafeContext>(makeContext());
 
     // Build LLJIT
     auto JITBuilder = llvm::orc::LLJITBuilder();
@@ -1337,19 +1380,24 @@ void initLLVM() {
     // Create the JIT.
     auto JITResult = JITBuilder.create();
     if (!JITResult) {
-        std::cerr << "ERROR: Failed to create LLJIT: " << llvm::toString(JITResult.takeError())
-                  << std::endl;
+        log::error(log::jit, "failed to create LLJIT: {}", llvm::toString(JITResult.takeError()));
+        log::flush();
         exit(1);
     }
     JIT = std::move(*JITResult);
+    // ORC would print these to stderr itself (an unresolved symbol, say)
+    JIT->getExecutionSession().setErrorReporter([](llvm::Error Err) {
+        log::error(log::jit, "{}", llvm::toString(std::move(Err)));
+    });
 
     // Add DynamicLibrarySearchGenerator to make all process symbols available.
     auto& MainJD = JIT->getMainJITDylib();
     auto DLSGOrErr = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
         JIT->getDataLayout().getGlobalPrefix());
     if (!DLSGOrErr) {
-        std::cerr << "ERROR: Failed to create DynamicLibrarySearchGenerator: "
-                  << llvm::toString(DLSGOrErr.takeError()) << std::endl;
+        log::error(log::jit, "failed to create DynamicLibrarySearchGenerator: {}",
+                   llvm::toString(DLSGOrErr.takeError()));
+        log::flush();
         exit(1);
     }
     MainJD.addGenerator(std::move(*DLSGOrErr));
@@ -1366,8 +1414,9 @@ void initLLVM() {
                                                       llvm::JITSymbolFlags::Exported};
     }
     if (auto err = MainJD.define(llvm::orc::absoluteSymbols(std::move(runtimeSymbols)))) {
-        std::cerr << "ERROR: Failed to register runtime symbols with the JIT: "
-                  << llvm::toString(std::move(err)) << std::endl;
+        log::error(log::jit, "failed to register runtime symbols with the JIT: {}",
+                   llvm::toString(std::move(err)));
+        log::flush();
         exit(1);
     }
 

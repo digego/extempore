@@ -382,7 +382,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
     // Get the llvm::Function* from the cptr argument
     auto func = reinterpret_cast<llvm::Function*>(cptr_value(pair_car(Args)));
     if (unlikely(!func)) {
-        printf("No such function\n");
+        log::error(log::jit, "call-compiled: no such function");
         return Scheme->F;
     }
 
@@ -391,12 +391,12 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
 
     unsigned lgth = list_length(Scheme, Args);
     if (unlikely(lgth != funcType->getNumParams())) {
-        printf("Wrong number of arguments for function!\n");
+        log::error(log::jit, "call-compiled: wrong number of arguments for function");
         return Scheme->F;
     }
 
     if (!extemp::EXTLLVM::JIT) {
-        printf("LLVM JIT not initialized\n");
+        log::error(log::jit, "call-compiled: the JIT is not initialised");
         return Scheme->F;
     }
 
@@ -432,7 +432,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
         switch (argTy->getTypeID()) {
         case llvm::Type::IntegerTyID: {
             if (unlikely(!is_integer(p))) {
-                printf("Bad argument type %u\n", i);
+                log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
             argValues.push_back(
@@ -441,7 +441,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
         }
         case llvm::Type::FloatTyID: {
             if (unlikely(!is_real(p))) {
-                printf("Bad argument type %u\n", i);
+                log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
             const float f = static_cast<float>(rvalue(p));
@@ -450,7 +450,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
         }
         case llvm::Type::DoubleTyID: {
             if (unlikely(!is_real(p))) {
-                printf("Bad argument type %u\n", i);
+                log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
             argValues.push_back({ArgValue::Double, argTy, 0u, rvalue(p), 0.0f, nullptr});
@@ -463,14 +463,14 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
             } else if (is_cptr(p)) {
                 rawPtr = cptr_value(p);
             } else {
-                printf("Bad argument type %u\n", i);
+                log::error(log::jit, "call-compiled: bad argument type at index {}", i);
                 return Scheme->F;
             }
             argValues.push_back({ArgValue::Ptr, argTy, 0u, 0.0, 0.0f, rawPtr});
             break;
         }
         default:
-            printf("Unsupported argument type at index %u\n", i);
+            log::error(log::jit, "call-compiled: unsupported argument type at index {}", i);
             return Scheme->F;
         }
     }
@@ -541,15 +541,15 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
         llvm::orc::ThreadSafeModule(std::move(module), extemp::EXTLLVM::getThreadSafeContext());
     auto stubTracker = extemp::EXTLLVM::addTransientModule(std::move(TSM));
     if (!stubTracker) {
-        std::cerr << "Failed to JIT call stub: " << llvm::toString(stubTracker.takeError())
-                  << std::endl;
+        log::error(log::jit, "failed to JIT call stub: {}",
+                   llvm::toString(stubTracker.takeError()));
         return Scheme->F;
     }
 
     pointer result = Scheme->F;
     auto stubAddr = EXTLLVM::getFunctionAddress(stubName);
     if (!stubAddr) {
-        printf("Failed to resolve call stub\n");
+        log::error(log::jit, "failed to resolve call stub");
     } else {
         // Call the stub and marshal the result back to Scheme.
         auto retTy = funcType->getReturnType();
@@ -589,7 +589,7 @@ static pointer call_compiled(scheme* Scheme, pointer Args) {
             break;
         }
         default:
-            printf("Unsupported return type for compiled call\n");
+            log::error(log::jit, "call-compiled: unsupported return type");
         }
     }
     extemp::EXTLLVM::removeTransientModule(std::move(*stubTracker));
@@ -729,8 +729,7 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args) {
     const int lgth = list_length(Scheme, Args);
     int syntax = (lgth > 1) ? int(argInt(Scheme, Args, 2)) : 1;
     if (syntax > 1) {
-        std::cout << "Syntax argument must be either 0: at&t or 1: intel" << std::endl;
-        std::cout << "The default is 1: intel" << std::endl;
+        log::warn(log::jit, "disassembly syntax must be 0 (at&t) or 1 (intel); using 1 (intel)");
         syntax = 1;
     }
     pointer name(llvm_closure_last_name(Scheme, Args));
@@ -755,8 +754,7 @@ static pointer llvm_disasm(scheme* Scheme, pointer Args) {
 // earlier mapping. Reports failure to the console and returns false.
 static bool defineJITSymbol(const char* name, void* addr) {
     if (auto err = EXTLLVM::defineAbsoluteSymbol(name, addr)) {
-        std::cerr << "Error: could not bind symbol " << name << ": "
-                  << llvm::toString(std::move(err)) << std::endl;
+        log::error(log::jit, "could not bind symbol {}: {}", name, llvm::toString(std::move(err)));
         return false;
     }
     return true;
@@ -888,7 +886,7 @@ static pointer export_llvmmodule_bitcode(scheme* Scheme, pointer Args) {
     std::error_code errcode;
     llvm::raw_fd_ostream ss(filename, errcode, llvm::sys::fs::OF_None);
     if (errcode) {
-        std::cout << errcode.message() << std::endl;
+        log::error(log::jit, "could not write bitcode to {}: {}", filename, errcode.message());
         return Scheme->F;
     }
     llvm::WriteBitcodeToFile(*m, ss);
@@ -914,7 +912,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
     const llvm::Triple tripleObj(triple);
     auto target = llvm::TargetRegistry::lookupTarget(tripleObj, error);
     if (!target) {
-        std::cerr << "llvm:emit-object-file: " << error << std::endl;
+        log::error(log::jit, "llvm:emit-object-file: {}", error);
         return Scheme->F;
     }
 
@@ -939,7 +937,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
                                     std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
     if (!targetMachine) {
-        std::cerr << "llvm:emit-object-file: failed to create target machine" << std::endl;
+        log::error(log::jit, "llvm:emit-object-file: failed to create target machine");
         return Scheme->F;
     }
 
@@ -950,7 +948,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
     std::error_code ec;
     llvm::raw_fd_ostream dest(filename, ec, llvm::sys::fs::OF_None);
     if (ec) {
-        std::cerr << "llvm:emit-object-file: " << ec.message() << std::endl;
+        log::error(log::jit, "llvm:emit-object-file: {}", ec.message());
         return Scheme->F;
     }
 
@@ -958,7 +956,7 @@ static pointer emitModuleToObjectFile(scheme* Scheme, pointer Args) {
     llvm::legacy::PassManager pass;
     if (targetMachine->addPassesToEmitFile(pass, dest, nullptr,
                                            llvm::CodeGenFileType::ObjectFile)) {
-        std::cerr << "llvm:emit-object-file: target machine can't emit object files" << std::endl;
+        log::error(log::jit, "llvm:emit-object-file: target machine can't emit object files");
         return Scheme->F;
     }
 
@@ -1030,7 +1028,7 @@ static bool loadRuntimeHelpersLockless(llvm::LLVMContext& ctx) {
 
     llvm::SMDiagnostic diag;
     if (!llvm::parseAssemblyString(text, diag, ctx)) {
-        std::cerr << "Failed to parse bitcode.ll: " << diag.getMessage().str() << std::endl;
+        log::error(log::jit, "failed to parse bitcode.ll: {}", diag.getMessage().str());
         return false;
     }
 
@@ -1039,6 +1037,14 @@ static bool loadRuntimeHelpersLockless(llvm::LLVMContext& ctx) {
     IRPreamble::captureDeclaresAndDefines(sPreamble, text);
     sRuntimeHelpersLoaded = true;
     return true;
+}
+
+// LLVM's diagnostic text ends in a newline, which a log message doesn't carry.
+static std::string trimTrailingNewlines(std::string Text) {
+    while (!Text.empty() && (Text.back() == '\n' || Text.back() == '\r')) {
+        Text.pop_back();
+    }
+    return Text;
 }
 
 static llvm::Module* jitCompile(const std::string& irString) {
@@ -1073,7 +1079,7 @@ static llvm::Module* jitCompile(const std::string& irString) {
             std::string errstr;
             raw_string_ostream ss(errstr);
             diag.print("LLVM IR", ss);
-            printf("%s\n", ss.str().c_str());
+            log::error(log::jit, "invalid LLVM IR: {}", trimTrailingNewlines(ss.str()));
             return;
         }
         // Verify now, so malformed IR is a diagnostic rather than something the
@@ -1082,8 +1088,8 @@ static llvm::Module* jitCompile(const std::string& irString) {
             std::string verifyErrors;
             raw_string_ostream verifyStream(verifyErrors);
             if (verifyModule(*mod, &verifyStream)) {
-                std::cerr << "Invalid LLVM IR for " << modname << ":\n"
-                          << verifyErrors << std::endl;
+                log::error(log::jit, "invalid LLVM IR for {}:\n{}", modname,
+                           trimTrailingNewlines(verifyErrors));
                 return;
             }
         }
@@ -1207,8 +1213,8 @@ static llvm::Module* jitCompile(const std::string& irString) {
                                              std::move(metadataModule));
 
         if (err) {
-            std::cerr << "Failed to add module " << modname
-                      << " to JIT: " << toString(std::move(err)) << std::endl;
+            log::error(log::jit, "failed to add module {} to JIT: {}", modname,
+                       toString(std::move(err)));
             modulePtr = nullptr;
         } else {
             modulePtr = metadata;

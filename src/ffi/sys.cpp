@@ -106,19 +106,19 @@ static pointer openDynamicLib(scheme* Scheme, pointer Args) {
     // set up the DLL load path
     SetDllDirectory("");  // Plug "binary planting" security hole.
     if (!SetDllDirectory((extemp::UNIV::BUILD_DIR + "/libs/aot-cache").c_str())) {
-        std::cout << "Warning: couldn't add libs/aot-cache/ to DLL search path" << std::endl;
+        log::warn("couldn't add libs/aot-cache/ to the DLL search path");
     }
     void* lib_handle = LoadLibraryA(libname);
 #else
     void* lib_handle = dlopen(libname, RTLD_LAZY | RTLD_GLOBAL);  // TODO: RTLD_NOW
 #endif
     if (!lib_handle) {
-        // if an optional second argument is non-nil, print the error
+        // if an optional second argument is non-nil, log the error
         if (pair_cdr(Args) != Scheme->NIL && pair_cadr(Args) != Scheme->F) {
 #ifdef _WIN32
-            std::cout << "LoadLibraryA() error:" << GetLastError() << std::endl;
+            log::warn("LoadLibraryA() failed for {}: error {}", libname, GetLastError());
 #else
-            printf("dlopen() error: %s\n", dlerror());
+            log::warn("dlopen() failed for {}: {}", libname, dlerror());
 #endif
         }
         return Scheme->F;

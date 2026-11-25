@@ -186,26 +186,4 @@ extern "C" inline double getRealTime() {
         .count();
 }
 
-// Colour the messages written straight to stderr (src/Log.cpp decides whether
-// stderr is coloured).
-inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
-    fputs(extemp::log::colour_code(stderr, Bold, Foreground, Background).c_str(), stderr);
-}
-
-inline void ascii_default() {
-    ascii_text_color(false, 9, 9);
-}
-inline void ascii_normal() {
-    ascii_text_color(false, 9, 9);
-}
-inline void ascii_error() {
-    ascii_text_color(true, 1, 9);
-}
-inline void ascii_warning() {
-    ascii_text_color(true, 3, 9);
-}
-inline void ascii_info() {
-    ascii_text_color(true, 6, 9);
-}
-
 #endif
