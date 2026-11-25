@@ -5,11 +5,46 @@
 // talk to a running extempore's nREPL server (include/NreplServer.h) and start
 // no runtime of their own.
 
+#include "Bencode.h"
+#include "ext/NetCompat.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
 
 namespace extemp::nrepl::client {
+
+// One connection to a server. Requests get ids; read() returns the next
+// message, whichever request it answers. One thread may send while another
+// reads.
+class Connection {
+  public:
+    Connection() = default;
+    Connection(const Connection&) = delete;
+    Connection& operator=(const Connection&) = delete;
+    ~Connection();
+
+    // Empty on success, else why not.
+    std::string open(const std::string& Host, std::uint16_t Port);
+    // Sends Msg under a fresh id, which it returns ("" if the send failed).
+    std::string send(bencode::Dict Msg);
+
+    enum class Read : std::uint8_t { Message, Timeout, Closed };
+    // The next message. TimeoutMs < 0 waits for as long as it takes.
+    Read read(bencode::Dict& Out, int TimeoutMs = -1);
+    // The reply to a request which gets exactly one (describe, clone, close).
+    bool request(bencode::Dict Msg, bencode::Dict& Reply);
+    // Ends a read() in progress on another thread, which then returns Closed.
+    void shutdown();
+
+  private:
+    SOCKET m_socket = INVALID_SOCKET;
+    std::string m_buffer;
+    int m_ids = 0;
+};
+
+// True if Msg's status list has Status in it.
+bool hasStatus(const bencode::Dict& Msg, std::string_view Status);
 
 // Which server, and which of its Scheme processes.
 struct Target {

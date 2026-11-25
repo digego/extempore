@@ -23,6 +23,7 @@ enum class Command : std::uint8_t {
     Compile,
     Send,
     Repl,
+    Lsp,
     Status,
     Devices,
     Version,

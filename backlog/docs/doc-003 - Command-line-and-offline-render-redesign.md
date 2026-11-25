@@ -158,9 +158,9 @@ after `--`.
   `describe`): the first thing to run when an editor isn't getting through.
 - **lsp** is a language server (below).
 
-`send` has no editor-specific options. Today's `extras/nrepl/extempore-nrepl`
-has two for helix (`--editor`, `--wait-for-save`); they aren't carried over, and
-helix moves to the language server, which needs neither.
+`send` has no editor-specific options. The Python client it replaces
+(`extras/nrepl/extempore-nrepl`, never released) had two for helix, `--editor`
+and `--wait-for-save`; helix uses the language server, which needs neither.
 
 ### The legacy eval server
 
@@ -336,13 +336,19 @@ Without a running extempore it offers what a parser can: syntax errors
 interrupt, and completion and hover from nREPL's `completions` and `lookup`
 (doc-002 phase 3).
 
+Syntax errors are looked for when a file is opened or saved. Once shown they
+follow each edit until they are fixed, but a form which is unbalanced only
+because it is being typed isn't reported.
+
 ### Eval
 
 Three commands, through `workspace/executeCommand`:
 
 - `extempore.eval` takes `{uri, range}`, an LSP `Location`: 0-based, in the
-  position encoding agreed at `initialize`. An empty range evaluates the
-  top-level form at that position; a non-empty one evaluates the text it covers.
+  position encoding agreed at `initialize` (UTF-16 unless the client offers
+  UTF-8). A range of more than one character evaluates the text it covers.
+  An empty range evaluates the top-level form at that position, and so does a
+  range of one character, which is what a cursor is in helix and kakoune.
 - `extempore.evalBuffer` takes `{uri}`.
 - `extempore.interrupt` takes nothing.
 
@@ -357,11 +363,12 @@ first. An eval reports in three places:
 - values and the first line of output go to `window/showMessage`
 - the whole output goes to `window/logMessage`
 - an error becomes a diagnostic on the first line of its form, the only
-  position nREPL reports
+  position nREPL reports, with the message from `extempore/error`
 
 A diagnostic belongs to the form's text. It moves with the form as lines above
 it change, and goes when the form evaluates cleanly, when its text is edited or
-when the document closes.
+when the document closes. The server clears its diagnostics at `shutdown`,
+since helix keeps a stopped server's on show.
 
 ### Configuration
 
@@ -372,32 +379,39 @@ running answers with a message saying where it looked.
 
 ### What helix does (tested 2026-11-25)
 
-Tested against a stub server in helix `92ba4c07` and read in upstream
-`1a3fdfda`:
+Tested in helix 25.07.1 (`92ba4c07`) against `extempore lsp`, and read in
+upstream `1a3fdfda`:
 
 - `:lsp-workspace-command NAME ARGS` parses `ARGS` as a stream of JSON values
-  after expanding `%{...}`, so one key can send a command with the cursor's
-  place. A binding passing `"%{file_path_absolute}" %{cursor_line}
-  %{cursor_column}` reached the server as `[path, 18, 3]`, and edits made
-  without saving reached it (`didChange`) before the command did.
+  after expanding `%{...}` and `%sh{...}`, so one key sends the command with
+  the cursor's place:
+
+  ```toml
+  [keys.normal.","]
+  e = ':lsp-workspace-command extempore.eval {"uri":"file://%{file_path_absolute}","range":{"start":{"line":%sh{echo $((%{cursor_line}-1))},"character":0},"end":{"line":%sh{echo $((%{cursor_line}-1))},"character":0}}}'
+  b = ':lsp-workspace-command extempore.evalBuffer {"uri":"file://%{file_path_absolute}"}'
+  i = ':lsp-workspace-command extempore.interrupt'
+  ```
+
+  helix gives a path and a 1-based line where the command takes a URI and a
+  0-based one; the binding converts them, and the server knows nothing of it.
+  Edits made without saving reach the server (`didChange`) before the command
+  does.
 - helix ignores a command's result, so the server reports through
   `window/showMessage` (the status line, one line: newlines are dropped) and
-  `textDocument/publishDiagnostics`, which helix shows inline under the line
-  with the multi-line message intact.
+  `textDocument/publishDiagnostics`, which helix shows inline beside the line,
+  and in full under it when the cursor is there.
 - helix declares no inlay-hint refresh, so the server can't put `=> 144` beside
   the form when an eval finishes.
-- A code action ("Evaluate top-level form") also works, and carries the
-  document's URI, but takes three keys (`space a`, Enter).
+- The code actions work with no configuration but the server's: `space a`
+  lists "Evaluate top-level form" and "Evaluate buffer". A cursor arrives as a
+  range of one character.
 - A Windows path in `%{file_path_absolute}` isn't valid JSON (`\U` is a bad
-  escape).
+  escape), so the code action is the way there. A path with a space in it is
+  untested in the binding.
 - Servers configured in the user's `languages.toml` start without a trust
   prompt (helix's default `workspace-trust` level is `servers`); only a
   project's own `.helix/languages.toml` needs `:workspace-trust`.
-
-helix's variables give a path and a 1-based line where `extempore.eval` takes a
-URI and a 0-based one. Converting them is the helix binding's job, not the
-server's, and is still to be tested (`%sh{...}` can do the arithmetic). The
-code action needs no conversion and is the fallback, including on Windows.
 
 ### Other editors
 
@@ -406,6 +420,8 @@ VS Code (`vscode-languageclient`), Neovim (`vim.lsp`) and Emacs (eglot) send
 is the argument as specified. Vim and Sublime have language clients as
 packages. None is tested yet. The VS Code extension and the Emacs mode
 can then drop their own TCP clients, which is what lets the legacy server go.
+
+`tests/lsp` drives the server as a client would, over stdin and stdout.
 
 ## Order of work
 

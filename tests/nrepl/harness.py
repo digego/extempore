@@ -1,40 +1,24 @@
-"""Shared fixtures for the nREPL tests: the client module, and an extempore
-process to talk to.
-
-The client is extras/nrepl/extempore-nrepl, loaded as a module. EXTEMPORE_BIN
-names the binary (ctest sets it); the default is build/extempore.
+"""Shared fixtures for the nREPL tests: an extempore process to talk to, and
+the tests' own client (bencode_client.py). EXTEMPORE_BIN names the binary
+(ctest sets it); the default is build/extempore.
 """
 
 from __future__ import annotations
 
-import importlib.machinery
-import importlib.util
 import os
 import random
 import re
 import socket
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
 
+import bencode_client as client
+
 REPO = Path(__file__).resolve().parents[2]
 BIN = Path(os.environ.get("EXTEMPORE_BIN", REPO / "build" / "extempore")).resolve()
-
-
-def _load_client():
-    path = REPO / "extras" / "nrepl" / "extempore-nrepl"
-    loader = importlib.machinery.SourceFileLoader("extempore_nrepl", str(path))
-    spec = importlib.util.spec_from_loader("extempore_nrepl", loader)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["extempore_nrepl"] = module
-    loader.exec_module(module)
-    return module
-
-
-client = _load_client()
 Client = client.Client
 
 

@@ -150,6 +150,12 @@ const std::vector<Subcommand>& subcommands() {
              {"process", Kind::Text, "NAME", "the Scheme process to evaluate in [primary]"},
          }),
          0, 0},
+        {Command::Lsp, "lsp", "lsp",
+         "a language server on stdin and stdout, for an editor to start",
+         client({
+             {"process", Kind::Text, "NAME", "the Scheme process to evaluate in [primary]"},
+         }),
+         0, 0},
         {Command::Status, "status", "status",
          "show the running extempore: its version, processes and nREPL ops", client({}), 0, 0},
         {Command::Devices, "devices", "devices", "list the audio devices", with({}, false), 0, 0},
@@ -465,6 +471,7 @@ Invocation parse(std::span<const std::string_view> Args) {
         }
         break;
     case Command::Repl:
+    case Command::Lsp:
     case Command::Status:
     case Command::Test:
     case Command::Devices:

@@ -1,10 +1,8 @@
 #include "NreplClient.h"
 
-#include "Bencode.h"
 #include "FormFinder.h"
 #include "NreplServer.h"
 #include "UNIV.h"
-#include "ext/NetCompat.h"
 
 #include <atomic>
 #include <charconv>
@@ -24,128 +22,112 @@
 
 namespace extemp::nrepl::client {
 
-namespace {
-
 using bencode::Dict;
 using bencode::Value;
 
-// One connection to a server. Requests get ids; read() returns the next
-// message, whichever request it answers.
-class Connection {
-  public:
-    Connection() = default;
-    Connection(const Connection&) = delete;
-    Connection& operator=(const Connection&) = delete;
-    ~Connection() {
-        if (m_socket != INVALID_SOCKET) {
-            closesocket(m_socket);
-        }
+Connection::~Connection() {
+    if (m_socket != INVALID_SOCKET) {
+        closesocket(m_socket);
     }
+}
 
-    // Empty on success, else why not.
-    std::string open(const std::string& Host, std::uint16_t Port) {
-        net::ensureInitialised();
-        const uint32_t address = net_util::resolve_ipv4(Host.c_str());
-        if (address == 0 && Host != "0.0.0.0") {
-            return "unknown host";
-        }
-        m_socket = socket(AF_INET, SOCK_STREAM, 0);
-        if (m_socket == INVALID_SOCKET) {
-            return net::errorText(net::lastError());
-        }
-        sockaddr_in sa{};
-        sa.sin_family = AF_INET;
-        sa.sin_port = htons(Port);
-        sa.sin_addr.s_addr = address;
-        if (connect(m_socket, reinterpret_cast<sockaddr*>(&sa), sizeof(sa)) != 0) {
-            std::string why = net::errorText(net::lastError());
-            closesocket(m_socket);
-            m_socket = INVALID_SOCKET;
-            return why;
-        }
-        int flag = 1;
-        setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag),
-                   sizeof(flag));
-        return {};
+std::string Connection::open(const std::string& Host, std::uint16_t Port) {
+    net::ensureInitialised();
+    const uint32_t address = net_util::resolve_ipv4(Host.c_str());
+    if (address == 0 && Host != "0.0.0.0") {
+        return "unknown host";
     }
-
-    // Sends Msg under a fresh id, which it returns ("" if the send failed).
-    std::string send(Dict Msg) {
-        std::string id = "c" + std::to_string(++m_ids);
-        Msg["id"] = Value(id);
-        const std::string bytes = bencode::encode(Value(std::move(Msg)));
-        std::size_t sent = 0;
-        while (sent < bytes.size()) {
-            const long n = net::send(m_socket, bytes.data() + sent, bytes.size() - sent);
-            if (n <= 0) {
-                if (n < 0 && net::interrupted(net::lastError())) {
-                    continue;
-                }
-                return {};
-            }
-            sent += std::size_t(n);
-        }
-        return id;
+    m_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (m_socket == INVALID_SOCKET) {
+        return net::errorText(net::lastError());
     }
+    sockaddr_in sa{};
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(Port);
+    sa.sin_addr.s_addr = address;
+    if (connect(m_socket, reinterpret_cast<sockaddr*>(&sa), sizeof(sa)) != 0) {
+        std::string why = net::errorText(net::lastError());
+        closesocket(m_socket);
+        m_socket = INVALID_SOCKET;
+        return why;
+    }
+    int flag = 1;
+    setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(flag));
+    return {};
+}
 
-    enum class Read : std::uint8_t { Message, Timeout, Closed };
-
-    // The next message. TimeoutMs < 0 waits for as long as it takes.
-    Read read(Dict& Out, int TimeoutMs = -1) {
-        for (;;) {
-            auto decoded = bencode::decode(m_buffer);
-            if (decoded.status == bencode::Decoded::Status::Complete) {
-                m_buffer.erase(0, decoded.consumed);
-                if (!decoded.value.isDict()) {
-                    continue;
-                }
-                Out = std::move(decoded.value.dict);
-                return Read::Message;
-            }
-            if (decoded.status == bencode::Decoded::Status::Error) {
-                return Read::Closed;
-            }
-            if (TimeoutMs >= 0) {
-                std::vector<pollfd> fds{{m_socket, POLLIN, 0}};
-                const int ready = net::poll(fds, TimeoutMs);
-                if (ready == 0 || (ready < 0 && net::interrupted(net::lastError()))) {
-                    return Read::Timeout;
-                }
-            }
-            char chunk[65536];
-            const long n = net::recv(m_socket, chunk, sizeof(chunk));
+std::string Connection::send(Dict Msg) {
+    std::string id = "c" + std::to_string(++m_ids);
+    Msg["id"] = Value(id);
+    const std::string bytes = bencode::encode(Value(std::move(Msg)));
+    std::size_t sent = 0;
+    while (sent < bytes.size()) {
+        const long n = net::send(m_socket, bytes.data() + sent, bytes.size() - sent);
+        if (n <= 0) {
             if (n < 0 && net::interrupted(net::lastError())) {
-                if (TimeoutMs >= 0) {
-                    return Read::Timeout;
-                }
                 continue;
             }
-            if (n <= 0) {
-                return Read::Closed;
-            }
-            m_buffer.append(chunk, std::size_t(n));
+            return {};
         }
+        sent += std::size_t(n);
     }
+    return id;
+}
 
-    // The reply to a request which gets exactly one (describe, clone, close).
-    bool request(Dict Msg, Dict& Reply) {
-        const std::string id = send(std::move(Msg));
-        if (id.empty()) {
-            return false;
+Connection::Read Connection::read(Dict& Out, int TimeoutMs) {
+    for (;;) {
+        auto decoded = bencode::decode(m_buffer);
+        if (decoded.status == bencode::Decoded::Status::Complete) {
+            m_buffer.erase(0, decoded.consumed);
+            if (!decoded.value.isDict()) {
+                continue;
+            }
+            Out = std::move(decoded.value.dict);
+            return Read::Message;
         }
-        while (read(Reply) == Read::Message) {
-            if (bencode::findString(Reply, "id") == id) {
-                return true;
+        if (decoded.status == bencode::Decoded::Status::Error) {
+            return Read::Closed;
+        }
+        if (TimeoutMs >= 0) {
+            std::vector<pollfd> fds{{m_socket, POLLIN, 0}};
+            const int ready = net::poll(fds, TimeoutMs);
+            if (ready == 0 || (ready < 0 && net::interrupted(net::lastError()))) {
+                return Read::Timeout;
             }
         }
+        char chunk[65536];
+        const long n = net::recv(m_socket, chunk, sizeof(chunk));
+        if (n < 0 && net::interrupted(net::lastError())) {
+            if (TimeoutMs >= 0) {
+                return Read::Timeout;
+            }
+            continue;
+        }
+        if (n <= 0) {
+            return Read::Closed;
+        }
+        m_buffer.append(chunk, std::size_t(n));
+    }
+}
+
+bool Connection::request(Dict Msg, Dict& Reply) {
+    const std::string id = send(std::move(Msg));
+    if (id.empty()) {
         return false;
     }
+    while (read(Reply) == Read::Message) {
+        if (bencode::findString(Reply, "id") == id) {
+            return true;
+        }
+    }
+    return false;
+}
 
-  private:
-    SOCKET m_socket = INVALID_SOCKET;
-    std::string m_buffer;
-    int m_ids = 0;
-};
+void Connection::shutdown() {
+    if (m_socket != INVALID_SOCKET) {
+        ::shutdown(m_socket, SHUT_RDWR);
+    }
+}
 
 bool hasStatus(const Dict& Msg, std::string_view Status) {
     const Value* statuses = bencode::find(Msg, "status");
@@ -159,6 +141,8 @@ bool hasStatus(const Dict& Msg, std::string_view Status) {
     }
     return false;
 }
+
+namespace {
 
 std::string address(const Target& To, std::uint16_t Port) {
     return To.host + ":" + std::to_string(Port);

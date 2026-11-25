@@ -191,7 +191,7 @@ endif()
 # The nREPL server and its command-line client (backlog/docs/doc-002). Each
 # test file starts its own extempore processes on free ports.
 if(Python3_Interpreter_FOUND)
-    foreach(_t test_server test_client test_send)
+    foreach(_t test_server test_send)
         add_test(NAME nrepl/${_t}
             COMMAND Python3::Interpreter -m unittest -v ${_t})
         set_tests_properties(nrepl/${_t} PROPERTIES
@@ -200,6 +200,17 @@ if(Python3_Interpreter_FOUND)
             TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
             LABELS nrepl)
     endforeach()
+endif()
+
+# The language server, driven as an editor drives it.
+if(Python3_Interpreter_FOUND)
+    add_test(NAME lsp/test_lsp
+        COMMAND Python3::Interpreter -m unittest -v test_lsp)
+    set_tests_properties(lsp/test_lsp PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/lsp
+        ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
+        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        LABELS lsp)
 endif()
 
 # The command line itself: what each subcommand prints where, and how it exits.

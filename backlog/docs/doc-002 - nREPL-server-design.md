@@ -25,13 +25,14 @@ follows [proof](https://github.com/nrepl/proof)'s `doc/spec-changes.md`.
 
 ## Clients
 
-- **helix, and editors that can run a shell command:**
-  `extras/nrepl/extempore-nrepl` now, a language server later
+- **editors with a language client** (helix, Neovim, Emacs, VS Code): the
+  language server, `extempore lsp` (doc-003)
+- **editors that can only run a shell command:** `extempore send`
 - **VS Code:** its extension can speak nREPL over TCP directly (as Calva does
   for Clojure) or use the language server
-- **coding agents:** `extempore-nrepl` through their shell tool. It prints
-  values, output and errors as text and exits 1 on an error. An MCP wrapper
-  would only help once agents need sessions or interrupt
+- **coding agents:** `extempore send` through their shell tool. It prints
+  values and output on stdout, errors on stderr, and exits 1 on an error. An
+  MCP wrapper would only help once agents need sessions or interrupt
 
 The language server is for editors. Testing the helix binding showed the limits
 of shell-command integration: the result sits in a popup until Esc, errors

@@ -40,6 +40,7 @@
 #include "HangReport.h"
 #include "NreplServer.h"
 #include "NreplClient.h"
+#include "LanguageServer.h"
 #include "EXTLLVM.h"
 #include "CommandLine.h"
 #include "SchemeFFI.h"
@@ -653,6 +654,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         return ParseResult::Exit;
     case Command::Send:
     case Command::Repl:
+    case Command::Lsp:
     case Command::Status: {
         // clients of a running extempore: nothing of the runtime starts here
         nrepl::client::Target target;
@@ -670,6 +672,8 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         target.process = std::string(Inv.get("process").value_or(""));
         if (Inv.command == Command::Status) {
             status = nrepl::client::status(target);
+        } else if (Inv.command == Command::Lsp) {
+            status = lsp::run(target);
         } else if (Inv.command == Command::Repl) {
             status = nrepl::client::repl(target, false);
         } else {
@@ -860,6 +864,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         break;
     case Command::Send:
     case Command::Repl:
+    case Command::Lsp:
     case Command::Status:
     case Command::Devices:
     case Command::Version:

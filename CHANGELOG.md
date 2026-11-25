@@ -117,6 +117,7 @@ before, and beside it are:
   executable
 - `extempore send CODE`, `extempore repl` and `extempore status`: clients of a
   running extempore's nREPL server (below)
+- `extempore lsp`: a language server (below)
 - `extempore devices` and `extempore version`
 
 Outside a session there is no banner, and under `exec` and `render` messages
@@ -141,6 +142,13 @@ F --line L` for the form at a position), `extempore repl` (which `extempore
 --repl` now runs, so Ctrl-C stops a runaway evaluation) and `extempore status`.
 `--no-legacy-server` starts a session without the 7099 server. The nREPL guide
 in the docs has the details.
+
+`extempore lsp` is a language server, so any editor with a language client
+works with Extempore from configuration alone: evaluate the form at the cursor,
+a selection or the whole buffer (as it stands, saved or not), with values in
+the status line and errors marked on their forms; interrupt an evaluation; and,
+with nothing running, unbalanced parentheses, an outline and folding. The
+editor support guide has the Helix setup.
 
 Offline rendering is now deterministic. The render keeps the audio clock in
 step with the work: scheduled callbacks run before the block they fall in,

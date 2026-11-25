@@ -10,6 +10,7 @@ namespace {
 // string or a block comment.
 struct Scan {
     std::vector<Form> forms;
+    std::vector<Problem> problems;
     bool insideAtom = false;
 };
 
@@ -31,6 +32,7 @@ Scan scan(std::string_view Text) {
             }
             i = newline - 1;  // the newline is counted on the next pass
         } else if (c == '"') {
+            const std::size_t opened = i;
             for (++i; i < n && Text[i] != '"'; ++i) {
                 if (Text[i] == '\\') {
                     ++i;
@@ -41,13 +43,16 @@ Scan scan(std::string_view Text) {
             }
             if (i >= n) {
                 result.insideAtom = true;
+                result.problems.push_back({opened, "this string never ends"});
             }
         } else if (c == '#' && i + 1 < n && Text[i + 1] == '|') {
+            const std::size_t opened = i;
             const auto close = Text.find("|#", i + 2);
             const auto end = close == std::string_view::npos ? n : close + 2;
             line += std::size_t(std::count(Text.begin() + i, Text.begin() + end, '\n'));
             if (close == std::string_view::npos) {
                 result.insideAtom = true;
+                result.problems.push_back({opened, "this block comment never ends"});
                 break;
             }
             i = close + 1;
@@ -62,14 +67,17 @@ Scan scan(std::string_view Text) {
                 startLine = line;
             }
             ++depth;
-        } else if (c == ')' && depth > 0) {
-            if (--depth == 0) {
+        } else if (c == ')') {
+            if (depth == 0) {
+                result.problems.push_back({i, "this closing parenthesis has nothing to close"});
+            } else if (--depth == 0) {
                 result.forms.push_back({start, i + 1, startLine, true});
             }
         }
     }
     if (depth > 0) {
         result.forms.push_back({start, n, startLine, false});
+        result.problems.push_back({start, "this form never ends: a closing parenthesis is missing"});
     }
     return result;
 }
@@ -120,6 +128,59 @@ std::optional<Form> at(std::string_view Text, std::size_t Offset) {
 bool complete(std::string_view Text) {
     const auto result = scan(Text);
     return !result.insideAtom && (result.forms.empty() || result.forms.back().closed);
+}
+
+std::vector<Problem> problems(std::string_view Text) {
+    return scan(Text).problems;
+}
+
+std::vector<Definition> definitions(std::string_view Text) {
+    const auto isSpace = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    std::vector<Definition> found;
+    for (const auto& form : topLevel(Text)) {
+        std::size_t i = form.begin + 1;
+        // the next token of the form from i: [begin, end)
+        const auto token = [&](std::size_t& Begin, std::size_t& End) {
+            while (i < form.end && isSpace(Text[i])) {
+                ++i;
+            }
+            Begin = i;
+            while (i < form.end && !isSpace(Text[i]) && Text[i] != '(' && Text[i] != ')') {
+                ++i;
+            }
+            End = i;
+            return End > Begin;
+        };
+        std::size_t begin = 0;
+        std::size_t end = 0;
+        if (!token(begin, end)) {
+            continue;
+        }
+        const std::string_view head = Text.substr(begin, end - begin);
+        if (!head.starts_with("bind-") && !head.starts_with("define")) {
+            continue;
+        }
+        // (bind-lib library name ...) and its kin name the library first
+        if (head.starts_with("bind-lib") && !token(begin, end)) {
+            continue;
+        }
+        while (i < form.end && isSpace(Text[i])) {
+            ++i;
+        }
+        if (i < form.end && Text[i] == '(') {
+            ++i;  // (define (name args) ...)
+        }
+        if (!token(begin, end)) {
+            continue;
+        }
+        std::string_view name = Text.substr(begin, end - begin);
+        name = name.substr(0, name.find(':'));
+        if (name.empty() || name.front() == '"') {
+            continue;
+        }
+        found.push_back({form, head, name, begin});
+    }
+    return found;
 }
 
 }  // namespace extemp::forms

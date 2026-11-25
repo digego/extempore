@@ -134,6 +134,7 @@ TEST(CommandLine, SendTakesCodeOrAFile) {
 }
 
 TEST(CommandLine, ReplAndStatusTakeNoArguments) {
+    EXPECT_EQ(parse({"lsp", "--port", "7900"}).command, Command::Lsp);
     EXPECT_EQ(parse({"repl", "--process", "utility"}).command, Command::Repl);
     EXPECT_EQ(parse({"status", "--host", "10.0.0.2"}).command, Command::Status);
     EXPECT_FALSE(parse({"status", "now"}).error.empty());

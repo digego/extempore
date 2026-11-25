@@ -35,4 +35,22 @@ std::optional<Form> at(std::string_view Text, std::size_t Offset);
 // reads another line.
 bool complete(std::string_view Text);
 
+// Something a reader would trip on: a closing parenthesis with nothing open,
+// or a list, string or block comment which never ends.
+struct Problem {
+    std::size_t offset = 0;  // where it is (for an unterminated thing, where it starts)
+    std::string_view message;
+};
+std::vector<Problem> problems(std::string_view Text);
+
+// A top-level form which names something: (bind-func name ...), (define name
+// ...), (define (name args) ...), (bind-lib library name ...) and the like.
+struct Definition {
+    Form form;
+    std::string_view head;   // "bind-func", "define", ...
+    std::string_view name;   // without any :type which follows it
+    std::size_t nameOffset = 0;
+};
+std::vector<Definition> definitions(std::string_view Text);
+
 }  // namespace extemp::forms

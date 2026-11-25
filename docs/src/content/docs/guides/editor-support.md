@@ -30,22 +30,69 @@ already, so you should head over there and get started.
 
 ## Helix {#helix}
 
-[Helix](https://helix-editor.com) has no plugins, so it talks to Extempore
-through the [nREPL server](/guides/nrepl/)'s command-line client. With
-`extempore-nrepl` on your `PATH`, this binding in `~/.config/helix/config.toml`
-evaluates the top-level form under the cursor with <kbd>,</kbd> <kbd>e</kbd>:
+[Helix](https://helix-editor.com) talks to Extempore through its
+[language server](#language-server), which is part of the `extempore` binary.
+In `~/.config/helix/languages.toml`:
+
+```toml
+[language-server.extempore]
+command = "extempore"
+args = ["lsp"]
+
+[[language]]
+name = "extempore"
+scope = "source.extempore"
+file-types = ["xtm"]
+comment-token = ";"
+language-servers = ["extempore"]
+```
+
+Then <kbd>Space</kbd> <kbd>a</kbd> offers "Evaluate top-level form" and
+"Evaluate buffer". For one key each, add this to `config.toml`:
 
 ```toml
 [keys.normal.","]
-e = [":write", ":sh extempore-nrepl eval --editor --wait-for-save --file %{file_path_absolute} --line %{cursor_line} --column %{cursor_column}"]
+e = ':lsp-workspace-command extempore.eval {"uri":"file://%{file_path_absolute}","range":{"start":{"line":%sh{echo $((%{cursor_line}-1))},"character":0},"end":{"line":%sh{echo $((%{cursor_line}-1))},"character":0}}}'
+b = ':lsp-workspace-command extempore.evalBuffer {"uri":"file://%{file_path_absolute}"}'
+i = ':lsp-workspace-command extempore.interrupt'
 ```
 
-The output, value or error appears in a popup, which <kbd>Esc</kbd> closes. The
-client reads the form from disk, so the binding saves first, and
-`--wait-for-save` waits for Helix to finish that save. The binding takes over
-Helix's <kbd>,</kbd> (keep primary selection); pick another prefix if you use
-it. Any editor that can run a shell command with the file and cursor position
-can use the same command.
+<kbd>,</kbd> <kbd>e</kbd> evaluates the top-level form the cursor's line is in
+(the server counts lines from 0 and Helix from 1, which is what the `%sh{}` is
+for), <kbd>,</kbd> <kbd>b</kbd> the whole buffer and <kbd>,</kbd> <kbd>i</kbd>
+interrupts an evaluation. The buffer is evaluated as it stands, saved or not.
+Values and the first line of output appear in the status line, and an error is
+marked on its form until the form is edited or evaluates cleanly. The bindings
+take over Helix's <kbd>,</kbd> (keep primary selection); pick another prefix if
+you use it. On Windows the path in `%{file_path_absolute}` isn't valid inside
+the JSON, so use the <kbd>Space</kbd> <kbd>a</kbd> menu there.
+
+## Any editor with a language client {#language-server}
+
+`extempore lsp` is a [language server](https://microsoft.github.io/language-server-protocol/):
+point your editor's language client at that command for `.xtm` files. It is a
+client of a running extempore's [nREPL server](/guides/nrepl/), which it finds
+as `extempore send` does (`.nrepl-port`, or 7888); the `initializationOptions`
+`host`, `port` and `process` say otherwise.
+
+Without a running extempore it reports unbalanced parentheses (when a file is
+opened or saved), and gives an outline of the definitions in a file and folding
+ranges. With one, it adds three commands, which are also offered as code
+actions:
+
+| command                | argument       | what it does                                                         |
+| ---------------------- | -------------- | -------------------------------------------------------------------- |
+| `extempore.eval`       | `{uri, range}` | evaluates the selection, or with none the top-level form at the cursor |
+| `extempore.evalBuffer` | `{uri}`        | evaluates the whole buffer                                           |
+| `extempore.interrupt`  |                | stops the evaluation which is running                                |
+
+The range is an LSP range: lines and characters from 0. Values and the first
+line of output come back as `window/showMessage`, the whole output as
+`window/logMessage`, and an error as a diagnostic on the first line of its form.
+
+An editor which can only run a shell command can use
+[`extempore send`](/guides/nrepl/#from-the-command-line): pipe the selection to
+it, or give it `--file` and `--line`.
 
 ## Emacs {#emacs}
 

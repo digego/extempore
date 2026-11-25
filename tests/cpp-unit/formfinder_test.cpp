@@ -102,3 +102,40 @@ TEST(FormFinder, CompleteMeansNothingIsLeftOpen) {
     EXPECT_FALSE(complete("#| half a comment"));
     EXPECT_TRUE(complete("(println \"(\")"));
 }
+
+TEST(FormFinder, ProblemsAReaderWouldTripOn) {
+    EXPECT_TRUE(problems(kSong).empty());
+    const auto stray = problems("(a))\n(b)");
+    ASSERT_EQ(stray.size(), 1u);
+    EXPECT_EQ(stray[0].offset, 3u);
+    const auto open = problems("(a)\n(b (c)");
+    ASSERT_EQ(open.size(), 1u);
+    EXPECT_EQ(open[0].offset, 4u);
+    EXPECT_EQ(problems("(println \"half").size(), 2u);  // the string, and the form around it
+    EXPECT_EQ(problems("#| half").size(), 1u);
+}
+
+TEST(FormFinder, DefinitionsAreNamed) {
+    const std::string_view text = R"xtm((bind-func osc:[double,double]*
+  (lambda (freq) (* 0.1 (sin freq))))
+(define tempo 120)
+(define (play beat) beat)
+(bind-type Pair <i64,i64>)
+(bind-lib libc printf [i32,i8*]*)
+(define-macro (twice x) `(begin ,x ,x))
+(println 'not-a-definition)
+(bind-val gain SAMPLE 0.5)
+)xtm";
+    const auto defs = definitions(text);
+    ASSERT_EQ(defs.size(), 7u);
+    const char* names[] = {"osc", "tempo", "play", "Pair", "printf", "twice", "gain"};
+    const char* heads[] = {"bind-func", "define",       "define",  "bind-type",
+                           "bind-lib",  "define-macro", "bind-val"};
+    for (std::size_t i = 0; i < defs.size(); ++i) {
+        EXPECT_EQ(defs[i].name, names[i]);
+        EXPECT_EQ(defs[i].head, heads[i]);
+        EXPECT_EQ(text.substr(defs[i].nameOffset, defs[i].name.size()), names[i]);
+    }
+    EXPECT_EQ(defs[2].form.line, 4u);
+}
+

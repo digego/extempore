@@ -53,6 +53,7 @@ ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
 ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
 ctest --test-dir build -L cli               # the command line: output, exit statuses
 ctest --test-dir build -L nrepl -j2         # the nREPL server and its clients
+ctest --test-dir build -L lsp               # the language server (extempore lsp)
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
