@@ -141,6 +141,11 @@ same file twice gives the same samples.
 Callbacks scheduled for the same instant now run in the order they were
 scheduled; the order used to vary from run to run.
 
+`sys:sleep` and the synchronous IPC calls (`ipc:call` and friends) no longer
+leave a process waiting on stdin. They return through a continuation which had
+the interpreter read from stdin on the way: harmless when stdin was closed, and
+a hang when it was open with nothing to read.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to

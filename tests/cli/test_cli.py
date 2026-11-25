@@ -106,6 +106,26 @@ class Exec(Scratch):
         self.assertEqual(p.stdout, "")
         self.assertIn("Type Error", p.stderr)
 
+    def test_sys_sleep_resumes_whatever_stdin_is(self) -> None:
+        # sys:sleep escapes through a continuation which once left s7 reading
+        # its next form from stdin: at once from a closed stdin, never from an
+        # idle pipe or a terminal
+        p = subprocess.Popen(
+            [str(BIN), "exec", "--no-base", "-e", "(begin (sys:sleep 4410) (println 'woke))"],
+            cwd=REPO, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True,
+        )
+        try:
+            # stdin stays open and silent for as long as it runs
+            self.assertEqual(p.wait(timeout=60), 0)
+            self.assertEqual(p.stdout.read(), "woke\n")
+        finally:
+            p.stdin.close()
+            p.stdout.close()
+            if p.poll() is None:
+                p.kill()
+                p.wait()
+
     def test_quit_sets_the_status(self) -> None:
         self.assertEqual(run("exec", "--no-base", "-e", "(quit 7)").returncode, 7)
 

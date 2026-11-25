@@ -175,6 +175,17 @@ scheme* scheme_init_new() {
     sc->call_start_time = 0;
     sc->call_end_time = 0;
 
+    // The current input port is an empty one, not stdin. Nothing in Extempore
+    // reads code from stdin, but *sys:toplevel-continuation* (which sys:sleep
+    // and the IPC calls escape through) was captured while runtime/scheme.xtm
+    // was loading, so invoking it has s7 read that load's next form from the
+    // current input port. From stdin that returns at once when stdin is at its
+    // end and blocks for ever when it is a terminal or an idle pipe.
+    // (*stdin* itself is still there for code which asks for it by name.)
+    s7_pointer no_input = s7_open_input_string(sc->sc, "");
+    s7_gc_protect(sc->sc, no_input);
+    s7_set_current_input_port(sc->sc, no_input);
+
     if (extemp::UNIV::SEEDED) {
         // s7's own generator (Scheme's random is xtlang's, see EXTLLVM.cpp),
         // a different stream for each interpreter
