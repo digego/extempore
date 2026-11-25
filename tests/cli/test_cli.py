@@ -165,7 +165,8 @@ class Usage(Scratch):
     def test_version_and_help(self) -> None:
         p = run("version")
         self.assertEqual(p.returncode, 0)
-        self.assertRegex(p.stdout, r"^Extempore v?\d")
+        # a tag and what follows it, or in a checkout without tags a bare hash
+        self.assertRegex(p.stdout, r"^Extempore \S+\n$")
         p = run("--help")
         self.assertEqual(p.returncode, 0)
         for subcommand in ("exec", "test", "render", "compile", "devices"):
