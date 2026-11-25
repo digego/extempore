@@ -35,6 +35,8 @@ extempore [FILE]                    live session: audio, eval servers, nREPL
 extempore exec FILE | -e EXPR       script: no audio, no servers
 extempore render FILE -o OUT.wav    offline render (below)
 extempore compile FILE              AOT-compile FILE to a native executable
+extempore send [CODE]               evaluate code in a running extempore (nREPL)
+extempore repl                      interactive REPL on a running extempore
 extempore devices                   list audio devices
 extempore version
 ```
@@ -44,15 +46,30 @@ extempore version
   pass them: `--port`, `--device`, `--device-name`, `--indevice`,
   `--indevice-name`, `--samplerate`, `--frames`, `--channels`, `--inchannels`,
   `--latency`, `--nrepl-port`, `--nrepl-bind`, `--no-nrepl`, `--no-audio`.
-  `--repl` stays a session option.
 - **exec** evaluates the file or expression and exits when it finishes: status
   0, or 1 on an uncaught error (as `--batch` does now). Scheduled callbacks
-  still pending at that point are dropped; a script that wants to wait for
-  them calls `(quit)` itself, as today. This replaces `--batch` and the
-  `sys:load-then-quit` wrapper.
+  still pending then are dropped, since a temporal recursion would otherwise
+  keep it running forever. `--wait` keeps it running until `(quit)`, which is
+  today's `--batch` behaviour, for scripts that schedule work (the scheduler
+  and topclock tests). It has to be a flag: callbacks run on the script's own
+  task thread, so the script can't block waiting for them. This replaces
+  `--batch` and the `sys:load-then-quit` wrapper.
 - **render** takes `--duration SECONDS` (required) plus the audio-format
   options (`--samplerate`, `--channels`, `--frames`).
 - **compile** owns `--arch`, `--cpu` and `--attr`.
+- **send** is the nREPL client, built into the binary with the server's C++
+  bencode codec: code from an argument or stdin, or `--file F --line L --column
+C` for the top-level form at a position, with `--editor`, `--wait-for-save`
+  and the port lookup of today's `extras/nrepl/extempore-nrepl`. It replaces
+  that Python script, so editors need nothing but extempore (no Python on
+  Windows, no symlink or wrapper), and the client is versioned with the server.
+  It dispatches before LLVM, audio or Scheme start, so each call costs a
+  process start and nothing more.
+- **repl** is an interactive client of a running extempore's nREPL server,
+  replacing `--repl` (a line-editing client of the 7099 server started inside
+  the session). It shows output, values and errors apart, and Ctrl-C
+  interrupts the running eval, which 7099 can't do. Linux and macOS only, as
+  now (linenoise).
 - **devices** replaces `--print-devices`.
 
 Options for every subcommand: `--sharedir`, `--no-base`, `--opt-level`,
@@ -74,6 +91,8 @@ One release where the old forms still work and print the new spelling once:
 | `--audio-outfile F --duration S --run X` | `extempore render X -o F --duration S` |
 | `--compile F`                            | `extempore compile F`                  |
 | `--print-devices`                        | `extempore devices`                    |
+| `--repl`                                 | `extempore repl` (second terminal)     |
+| `extras/nrepl/extempore-nrepl`           | `extempore send`                       |
 | `--noaudio`, `--nobase`                  | `--no-audio`, `--no-base`              |
 
 The next release removes them. The repo's own callers (`extras/cmake`,
@@ -153,14 +172,11 @@ point can then be asserted to the block.
 
 1. The lockstep render behind the existing `--audio-outfile` flag, so the
    audio-offline tests stop flaking before any interface changes.
-2. The subcommands, with the old flags as deprecated aliases; move the repo's
-   callers over.
+2. The subcommands, including `send` and `repl`, with the old flags as
+   deprecated aliases; move the repo's callers over. `extras/nrepl/extempore-nrepl`
+   goes, and the bencode client and form finder it holds move into
+   `tests/nrepl`: protocol tests need to send what no real client would
+   (malformed bencode, a message a byte at a time, replies never read), which
+   is easiest from Python. The helix binding in the docs (and on benswift.me)
+   changes to `extempore send`.
 3. Remove the aliases in the following release.
-
-## Open questions
-
-- whether `exec` should wait for pending callbacks when a flag asks it to
-  (`--wait`), for scripts that schedule work and want it done
-- whether `--repl` becomes a client of the nREPL server, and whether the
-  Python `extempore-nrepl` moves into the binary as `extempore send`, which
-  would drop the Python dependency on Windows
