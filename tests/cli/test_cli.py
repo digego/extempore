@@ -159,7 +159,7 @@ class Exec(Scratch):
         p = run("exec", "-e", '(bind-func bad (lambda (x:i64) (+ x "s")))')
         self.assertEqual(p.returncode, 1)
         self.assertEqual(p.stdout, "")
-        self.assertIn("Type Error", p.stderr)
+        self.assertIn("error: couldn't resolve the type of bad\n    ", p.stderr)
 
     def test_sys_sleep_resumes_whatever_stdin_is(self) -> None:
         # sys:sleep escapes through a continuation which once left s7 reading

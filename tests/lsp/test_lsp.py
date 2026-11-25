@@ -387,7 +387,7 @@ class WithExtempore(unittest.TestCase):
         self.assertEqual(kind, ERROR)
         (found,) = self.editor.diagnostics()
         self.assertEqual(found["range"]["start"], {"line": 0, "character": 0})
-        self.assertIn("Type Error", found["message"])
+        self.assertIn("couldn't resolve the type of lsp_bad", found["message"])
 
     def test_eval_buffer(self) -> None:
         self.open('(define lsp-a 20)\n(println "loading")\n(+ lsp-a 22)\n')

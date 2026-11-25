@@ -121,11 +121,12 @@ class Protocol(unittest.TestCase):
         self.assertEqual(error["status"], ["eval-error"])
         err = "".join(r["err"] for r in rs if "err" in r)
         self.assertIn("no overload matches the argument types [i64,double]", err)
-        self.assertIn("couldn't resolve type: nrepl_bad_fn", err)
+        self.assertTrue(err.startswith("error: couldn't resolve the type of nrepl_bad_fn\n"), err)
+        self.assertEqual(err.count("couldn't resolve"), 1)
         self.assertNotIn("\x1b", err)
         # the report reaches the client once, as err, not as out too
-        self.assertNotIn("couldn't resolve type", out(rs))
-        self.xtm.wait_for("couldn't resolve type: nrepl_bad_fn")
+        self.assertNotIn("couldn't resolve", out(rs))
+        self.xtm.wait_for("couldn't resolve the type of nrepl_bad_fn")
 
     def test_xtlang_compiles_and_runs(self) -> None:
         rs = self.eval(

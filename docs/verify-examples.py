@@ -87,7 +87,7 @@ CONFIG = {
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 DIRECTIVE = re.compile(r"<!--\s*verify:\s*(expect-error|skip)\s*-->")
 # strong markers that a compile genuinely failed (not just prose mentioning them)
-ERROR_MARKER = re.compile(r"Compiler Error|Type Error|Could not resolve types")
+ERROR_MARKER = re.compile(r"^error: ", re.MULTILINE)
 
 
 def norm(s):

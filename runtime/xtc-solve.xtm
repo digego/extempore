@@ -212,7 +212,7 @@
               (loop (cdr cs) subst2)
               (xtc:diagnostics:note
                (string-append
-                "Type Error: type mismatch --- "
+                "type mismatch: "
                 (xtc:type:to-pretty (xtc:type:apply-subst t1 subst) intern)
                 " is not compatible with "
                 (xtc:type:to-pretty (xtc:type:apply-subst t2 subst) intern)
@@ -221,19 +221,24 @@
 
 (define xtc:solve:print-no-overload
   (lambda (c intern subst)
-    (xtc:diagnostics:note
-     (string-append
-      "Type Error: no overload matches the argument types "
-      (xtc:solve:pretty-sig (caddr c) intern subst)
-      " --- candidates are "
-      (string-join
-       (map (lambda (sig)
-              (if (symbol? sig)
-                  (symbol->string sig)
-                  (xtc:solve:pretty-sig sig intern subst)))
-            (cadddr c))
-       " ")
-      "\n"))))
+    (let ((cands
+           ;; each signature once (a numeric width can be offered by several
+           ;; type names), and a structural marker as the rule it stands for
+           (let loop ((sigs (cadddr c)) (seen '()))
+             (if (null? sigs)
+                 (reverse seen)
+                 (let* ((sig (car sigs))
+                        (text (cond ((eq? sig 'vecmath) "vectors")
+                                    ((eq? sig 'ptrcmp) "pointers of one type")
+                                    ((symbol? sig) (symbol->string sig))
+                                    (else (xtc:solve:pretty-sig sig intern subst)))))
+                   (loop (cdr sigs) (if (member text seen) seen (cons text seen))))))))
+      (xtc:diagnostics:note
+       (string-append
+        "no overload matches the argument types "
+        (xtc:solve:pretty-sig (caddr c) intern subst)
+        "; the candidates are "
+        (string-join cands ", "))))))
 
 (define xtc:solve:unify-equalities
   (lambda (constraints intern)
@@ -641,7 +646,7 @@
                            (lambda (ground)
                              (xtc:diagnostics:note
                               (string-append
-                               "Type Error: " what " is "
+                               what " is "
                                (xtc:type:to-pretty decided intern)
                                ", but its use requires "
                                (xtc:solve:pretty-key (cadr c) intern (ground subst))
@@ -662,7 +667,7 @@
                            (lambda (ground)
                              (xtc:diagnostics:note
                               (string-append
-                               "Type Error: a closure of type "
+                               "a closure of type "
                                (xtc:solve:pretty-key (caddr c) intern (ground subst))
                                " is called with no arguments\n"))))
                           (decide decided
@@ -790,7 +795,7 @@
                             (let ((why *xtc:solve:conflict-why*))
                               (xtc:solve:conflict!
                                (lambda (ground)
-                                 (xtc:diagnostics:note "Type Error: no choice of overload candidates satisfies every use; the last attempt failed because\n")
+                                 (xtc:diagnostics:note "no choice of overload candidates satisfies every use; the last attempt failed because")
                                  (if why (why ground)))))
                             (loop (car r) '() (cdr r)))))))
                (else
