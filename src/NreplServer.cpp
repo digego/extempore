@@ -60,17 +60,16 @@ long sendNoSignal(SOCKET Fd, const char* Data, std::size_t Length) {
 }
 
 void configureClientSocket(SOCKET Fd) {
+    int on = 1;
 #ifdef _WIN32
     u_long nonBlocking = 1;
     ioctlsocket(Fd, FIONBIO, &nonBlocking);
 #else
     fcntl(Fd, F_SETFL, fcntl(Fd, F_GETFL, 0) | O_NONBLOCK);
 #ifdef SO_NOSIGPIPE
-    int on = 1;
     setsockopt(Fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif
 #endif
-    int on = 1;
     setsockopt(Fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&on), sizeof(on));
 }
 
