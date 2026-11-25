@@ -151,16 +151,19 @@
                                          file))
                                     ((pair? location) (car location))
                                     (else #f))))
-                  (string-append
-                   (sys:error-message tag info)
-                   ;; an xtlang diagnostic's form is the compiler's own raise,
-                   ;; and a callback's is the procedure
-                   (if (or (sys:xtlang-error? tag)
-                           (procedure? code)
-                           (not code))
-                       ""
-                       (#_format #f "~%    ~A" (#_object->string code #f 40)))
-                   (if where (#_format #f "~%    at ~A" where) ""))))
+                  (let ((message (sys:error-message tag info))
+                        (form (and code (#_object->string code #f 40))))
+                    (string-append
+                     message
+                     ;; an xtlang diagnostic's form is the compiler's own raise,
+                     ;; a callback's is the procedure, and some messages quote it
+                     (if (or (sys:xtlang-error? tag)
+                             (procedure? code)
+                             (not form)
+                             (string-position form message))
+                         ""
+                         (#_format #f "~%    ~A" form))
+                     (if where (#_format #f "~%    at ~A" where) "")))))
               ;; the reporter must never itself throw
               (lambda (t i) (#_format #f "~S ~S" tag info))))
 
