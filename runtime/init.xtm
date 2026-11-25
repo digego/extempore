@@ -117,10 +117,10 @@
 ;; ("file.xtm:12", "callback tick") stands in for s7's own when s7 has none, as
 ;; for a form read from a string.
 ;;
-;; sys:report-error writes that report to the error port, which the C++ eval
-;; trap (eval_with_error_trap in SchemeS7.cpp) captures and logs once the whole
-;; eval returns. A catch handler passes it a copy of INFO: s7 can reuse the
-;; handler's argument list for later calls, the reporter's own among them.
+;; sys:report-error logs that report straight away (a (quit) later in the same
+;; eval would otherwise end the run before it was seen) and marks the eval as
+;; failed. A catch handler passes it a copy of INFO: s7 can reuse the handler's
+;; argument list for later calls, the reporter's own among them.
 
 (define (sys:xtlang-error? tag)
   (and (symbol? tag)
@@ -165,7 +165,7 @@
               (lambda (t i) (#_format #f "~S ~S" tag info))))
 
 (define (sys:report-error tag info . location)
-  (#_display (apply sys:error-report-string tag info location) (current-error-port)))
+  (sys:log-uncaught-error (apply sys:error-report-string tag info location)))
 
 (define (sys:eval-top-level form)
   (*s7-catch* #t

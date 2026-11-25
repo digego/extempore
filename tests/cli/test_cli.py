@@ -155,6 +155,10 @@ class Exec(Scratch):
         self.assertEqual(p.stdout, "2\n")
         self.assertLess(time.monotonic() - start, 6)
 
+    def test_an_error_is_reported_even_when_the_code_then_quits(self) -> None:
+        p = run("exec", "-e", "(bind-func u (lambda (f) (f)))\n(quit 0)")
+        self.assertIn("error: couldn't resolve the type of u", p.stderr)
+
     def test_an_xtlang_compile_error_is_status_1(self) -> None:
         p = run("exec", "-e", '(bind-func bad (lambda (x:i64) (+ x "s")))')
         self.assertEqual(p.returncode, 1)

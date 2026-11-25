@@ -27,13 +27,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers
 
-;; capture what sys:eval-string writes to the error port for one eval
+;; the report THUNK logs as an uncaught error ("" if none)
+(define (test-report-of thunk)
+  (let ((report "")
+        (log-it sys:log-uncaught-error))
+    (set! sys:log-uncaught-error (lambda (text) (set! report text)))
+    (thunk)
+    (set! sys:log-uncaught-error log-it)
+    report))
+
+;; the report one sys:eval-string logs
 (define (test-eval-capture str)
-  (let* ((sp (open-output-string))
-         (old (set-current-error-port sp)))
-    (sys:eval-string str)
-    (set-current-error-port old)
-    (get-output-string sp)))
+  (test-report-of (lambda () (sys:eval-string str))))
 
 ;; #t iff every line of s after the first is blank or indented: the report is
 ;; the message, then the form and the location, each indented. The accumulating
@@ -116,7 +121,7 @@
                 #t
                 "report-has-no-stacktrace")
 
-;; a successful eval writes nothing to the error port
+;; a successful eval reports nothing
 (xtmtest-result (string=? "" (test-eval-capture "(+ 1 2)"))
                 #t
                 "success-is-silent")
@@ -150,10 +155,6 @@
 
 ;; the callback error report is the same terse form, with no stacktrace
 (xtmtest-result
- (let* ((sp (open-output-string))
-        (old (set-current-error-port sp)))
-   (sys:apply-top-level car '(5))
-   (set-current-error-port old)
-   (test-terse-report? (get-output-string sp)))
+ (test-terse-report? (test-report-of (lambda () (sys:apply-top-level car '(5)))))
  #t
  "apply-report-has-no-stacktrace")

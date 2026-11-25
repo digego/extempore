@@ -92,6 +92,15 @@ static pointer noteFailure(scheme* Scheme, pointer Args) {
     return Scheme->T;
 }
 
+// (sys:log-uncaught-error report): an error nothing caught, logged now rather
+// than when the eval returns (which a (quit) later in it would prevent), and
+// the eval marked as failed.
+static pointer logUncaughtError(scheme* Scheme, pointer Args) {
+    log::emit(log::Level::Error, {}, argString(Scheme, Args, 1));
+    Scheme->retcode = 1;
+    return Scheme->T;
+}
+
 static pointer cmdarg(scheme* Scheme, pointer Args) {
     auto iter(UNIV::CMDPARAMS.find(argString(Scheme, Args, 1)));
     if (iter == UNIV::CMDPARAMS.end()) {
@@ -323,6 +332,7 @@ std::span<const FFIEntry> sysDefs() {
         FFI_DEF("sys:build-dir", getBuildDir, 0, 0, false),
         FFI_DEF("sys:cmdarg", cmdarg, 1, 0, false),
         FFI_DEF("sys:note-failure", noteFailure, 0, 0, false),
+        FFI_DEF("sys:log-uncaught-error", logUncaughtError, 1, 0, false),
         FFI_DEF("sys:open-dylib", openDynamicLib, 1, 1, false),
         FFI_DEF("sys:close-dylib", closeDynamicLib, 1, 0, false),
         FFI_DEF("sys:symbol-cptr", symbol_pointer, 2, 0, false),
