@@ -357,7 +357,6 @@ int parse_osc_slip_data(std::vector<char>* data, char* buf, int res, bool active
 
 int process_osc_data(SchemeProcess* scm, OSC* osc, struct sockaddr_in client_address, char* args,
                      long length) {
-    // printf("Processing osc data %lld:%p\n",length,args);
     if (length > 0 && args != nullptr) {
         // process the OSC data (should be its own method)
         osc_dispatch_packet(osc, scm, args, static_cast<int>(length), false, std::string(), 0);
