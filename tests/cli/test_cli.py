@@ -78,8 +78,14 @@ class Exec(Scratch):
         self.assertEqual(p.stdout, "ticks 4\nlater\n")
 
     def test_arguments_after_the_double_dash_reach_the_code(self) -> None:
-        p = run("exec", "--no-base", "-e", '(println (sys:cmdarg "label") (sys:cmdarg "missing"))',
-                "--", "--label=one two")
+        p = run(
+            "exec",
+            "--no-base",
+            "-e",
+            '(println (sys:cmdarg "label") (sys:cmdarg "missing"))',
+            "--",
+            "--label=one two",
+        )
         self.assertEqual(p.returncode, 0)
         self.assertEqual(p.stdout, '"one two" #f\n')
 
@@ -98,7 +104,9 @@ class Exec(Scratch):
         self.assertIn("car argument", p.stderr)
 
     def test_an_error_in_a_callback_is_status_1(self) -> None:
-        p = run("exec", "--no-base", "-e", "(callback (+ (now) 1000) (lambda () (car 5)))")
+        p = run(
+            "exec", "--no-base", "-e", "(callback (+ (now) 1000) (lambda () (car 5)))"
+        )
         self.assertEqual(p.returncode, 1)
         self.assertIn("car argument", p.stderr)
 
@@ -113,9 +121,18 @@ class Exec(Scratch):
         # its next form from stdin: at once from a closed stdin, never from an
         # idle pipe or a terminal
         p = subprocess.Popen(
-            [str(BIN), "exec", "--no-base", "-e", "(begin (sys:sleep 4410) (println 'woke))"],
-            cwd=REPO, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, text=True,
+            [
+                str(BIN),
+                "exec",
+                "--no-base",
+                "-e",
+                "(begin (sys:sleep 4410) (println 'woke))",
+            ],
+            cwd=REPO,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
         )
         try:
             # stdin stays open and silent for as long as it runs
@@ -134,7 +151,10 @@ class Exec(Scratch):
     def test_wait_keeps_running_until_quit(self) -> None:
         p = subprocess.Popen(
             [str(BIN), "exec", "--no-base", "--wait", "-e", "(println 'ready)"],
-            cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            cwd=REPO,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
         )
         try:
             self.assertEqual(p.stdout.readline(), "ready\n")
@@ -154,10 +174,14 @@ class Usage(Scratch):
         self.assertIn(mentions, p.stderr)
 
     def test_usage_errors_are_status_2(self) -> None:
-        self.assert_usage_error("--sampelrate", "48000", mentions="unknown option --sampelrate")
+        self.assert_usage_error(
+            "--sampelrate", "48000", mentions="unknown option --sampelrate"
+        )
         self.assert_usage_error("exec", mentions="a file or -e")
         self.assert_usage_error("exec", "nosuch.xtm", mentions="can't find nosuch.xtm")
-        self.assert_usage_error("render", "examples/core/hello-sine.xtm", mentions="-o OUT.wav")
+        self.assert_usage_error(
+            "render", "examples/core/hello-sine.xtm", mentions="-o OUT.wav"
+        )
         self.assert_usage_error("--sample-rate", "fast", mentions="whole number")
         self.assert_usage_error("--timediv", "4", mentions="is gone")
         self.assert_usage_error("--runtime", "/x", mentions="--share-dir")
@@ -186,23 +210,45 @@ class OldGrammar(Scratch):
     """Command lines with the old mode options keep their old behaviour."""
 
     def test_batch_runs_until_quit_and_says_what_replaces_it(self) -> None:
-        p = run("--term", "nocolor", "--nobase", "--batch", "(begin (println 'hello) (quit 3))")
+        p = run(
+            "--term",
+            "nocolor",
+            "--nobase",
+            "--batch",
+            "(begin (println 'hello) (quit 3))",
+        )
         self.assertEqual(p.returncode, 3)
         self.assertIn("hello\n", p.stdout)
-        self.assertIn("Evaluating expression", p.stdout)  # the old output, banner and all
+        self.assertIn(
+            "Evaluating expression", p.stdout
+        )  # the old output, banner and all
         self.assertIn("--batch is deprecated", p.stderr)
         self.assertIn("extempore exec", p.stderr)
 
     def test_unknown_options_are_still_kept_for_the_code(self) -> None:
-        p = run("--term", "nocolor", "--nobase", "--label=x", "--batch",
-                '(begin (println (sys:cmdarg "label")) (quit 0))')
+        p = run(
+            "--term",
+            "nocolor",
+            "--nobase",
+            "--label=x",
+            "--batch",
+            '(begin (println (sys:cmdarg "label")) (quit 0))',
+        )
         self.assertEqual(p.returncode, 0)
         self.assertIn('"x"\n', p.stdout)
 
     def test_audio_outfile_renders_until_the_duration(self) -> None:
         wav = self.dir / "old.wav"
-        p = run("--term", "nocolor", "--batch", '(sys:load "examples/core/hello-sine.xtm")',
-                "--audio-outfile", str(wav), "--duration", "0.5")
+        p = run(
+            "--term",
+            "nocolor",
+            "--batch",
+            '(sys:load "examples/core/hello-sine.xtm")',
+            "--audio-outfile",
+            str(wav),
+            "--duration",
+            "0.5",
+        )
         self.assertEqual(p.returncode, 0)
         self.assertEqual(wav.stat().st_size, 44 + 22050 * 2 * 4)
         self.assertIn("--audio-outfile is deprecated", p.stderr)
@@ -220,7 +266,9 @@ NOISE = """(bind-val amp SAMPLE 0.1)
 
 
 class Render(Scratch):
-    def render(self, file: str, out: str, *args: str) -> subprocess.CompletedProcess[str]:
+    def render(
+        self, file: str, out: str, *args: str
+    ) -> subprocess.CompletedProcess[str]:
         return run("render", file, "-o", str(self.dir / out), "--duration", "1", *args)
 
     def test_writes_exactly_the_duration_and_nothing_on_stdout(self) -> None:
@@ -233,7 +281,8 @@ class Render(Scratch):
 
     def test_with_no_dsp_the_clock_still_runs_and_the_file_is_silence(self) -> None:
         file = self.write(
-            "nodsp.xtm", "(callback (+ (now) 22050) (lambda () (println 'at (now))))\n")
+            "nodsp.xtm", "(callback (+ (now) 22050) (lambda () (println 'at (now))))\n"
+        )
         p = self.render(file, "silence.wav")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(p.stdout, "at 21504\n")  # the block which holds frame 22050
@@ -262,7 +311,9 @@ class Render(Scratch):
         p = self.render(file, "short.wav")
         self.assertEqual(p.returncode, 0)
         size = (self.dir / "short.wav").stat().st_size
-        self.assertEqual(size, 44 + 10240 * 2 * 4)  # the ten blocks before the one with the quit
+        self.assertEqual(
+            size, 44 + 10240 * 2 * 4
+        )  # the ten blocks before the one with the quit
 
 
 class Test(Scratch):
@@ -270,14 +321,21 @@ class Test(Scratch):
     FAILING = "(xtmtest-result (+ 1 1) 3)\n"
 
     def test_status_follows_the_assertions(self) -> None:
-        self.assertEqual(run("test", self.write("pass.xtm", self.PASSING)).returncode, 0)
-        self.assertEqual(run("test", self.write("fail.xtm", self.FAILING)).returncode, 1)
+        self.assertEqual(
+            run("test", self.write("pass.xtm", self.PASSING)).returncode, 0
+        )
+        self.assertEqual(
+            run("test", self.write("fail.xtm", self.FAILING)).returncode, 1
+        )
 
     def test_several_files_each_run_and_are_summed_up(self) -> None:
-        files = [self.write("a.xtm", self.PASSING), self.write("b.xtm", self.FAILING),
-                 self.write("c.xtm", "(define from-c 1)\n" + self.PASSING),
-                 # a definition from the file before isn't there: its own process
-                 self.write("d.xtm", "(xtmtest-result (defined? 'from-c) #f)\n")]
+        files = [
+            self.write("a.xtm", self.PASSING),
+            self.write("b.xtm", self.FAILING),
+            self.write("c.xtm", "(define from-c 1)\n" + self.PASSING),
+            # a definition from the file before isn't there: its own process
+            self.write("d.xtm", "(xtmtest-result (defined? 'from-c) #f)\n"),
+        ]
         junit = self.dir / "reports"
         p = run("test", *files, "--junit", str(junit))
         self.assertEqual(p.returncode, 1)
