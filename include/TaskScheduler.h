@@ -66,6 +66,7 @@ class TaskScheduler {
   private:
     void* queueThreadImpl();
     void timeSlice();
+    static void run(TaskI* Task);
 
     static void* queueThread(void* Arg) {
         return reinterpret_cast<TaskScheduler*>(Arg)->queueThreadImpl();
@@ -85,6 +86,17 @@ class TaskScheduler {
     // side, so it is safe to call from the real-time thread.
     void tick() {
         m_tick.release();
+    }
+
+    // For an offline render, which runs no scheduler thread: runs, on the
+    // calling thread, every task now in the queue that starts before Until.
+    // A task added while those run waits for the next call, so a task that
+    // reschedules itself for the same instant can't hold the caller here.
+    void runDue(uint64_t Until);
+    // True when no task is waiting for its time.
+    bool empty() {
+        std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
+        return m_queue.peek() == nullptr;
     }
 
     void add(TaskI* Task) {

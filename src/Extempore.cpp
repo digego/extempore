@@ -585,7 +585,8 @@ EXPORT int extempore_init(int argc, char** argv) {
     if (extemp::UNIV::BATCH_MODE && extemp::UNIV::AUDIO_OUTFILE_PATH.empty()) {
         extemp::UNIV::AUDIO_NONE = true;
     }
-    if (!extemp::UNIV::AUDIO_OUTFILE_PATH.empty() && extemp::UNIV::AUDIO_NONE) {
+    extemp::UNIV::OFFLINE_RENDER = !extemp::UNIV::AUDIO_OUTFILE_PATH.empty();
+    if (extemp::UNIV::OFFLINE_RENDER && extemp::UNIV::AUDIO_NONE) {
         ascii_error();
         std::cout << "Error: --audio-outfile cannot be combined with --noaudio" << std::endl;
         ascii_normal();
@@ -614,7 +615,10 @@ EXPORT int extempore_init(int argc, char** argv) {
         }
         extemp::TaskScheduler::I()->setFrames(extemp::UNIV::NUM_FRAMES);
     }
-    extemp::TaskScheduler::I()->start();
+    // an offline render runs the scheduler itself, from its render thread
+    if (!extemp::UNIV::OFFLINE_RENDER) {
+        extemp::TaskScheduler::I()->start();
+    }
     extemp::EXTLLVM::initLLVM();
 #ifdef __APPLE__
     // we need to instantiate NSApp before potentially
@@ -643,6 +647,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         // Batch mode: single process, no server, no utility process
         auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name,
                                                   primary_port, 0, settings.initexpr);
+        extemp::AudioDevice::startFileDriver();
         primary->start(true);  // this will not return
         return 0;
     }
@@ -686,6 +691,7 @@ EXPORT int extempore_init(int argc, char** argv) {
               << " --- connect your editor to send code." << std::endl;
     ascii_default();
 
+    extemp::AudioDevice::startFileDriver();
     // the primary process runs on this thread (process thread 0)
     primary->start(true);  // this will not return
     return 0;

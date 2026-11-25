@@ -18,7 +18,9 @@
 #                   collide under `ctest --parallel`. The verify phase gets
 #                   PORT-1, which the caller leaves free for it.
 #
-# Optional: EXTRA_ARGS, a list of further arguments for the render phase.
+# Optional: EXTRA_ARGS, a list of further arguments for the render phase. With
+# EXTEMPORE_RENDER_TWICE set in the environment the file is rendered a second
+# time and the two WAVs must be identical.
 
 foreach(var EXTEMPORE WORK_DIR RENDER_XTM WAV_PATH DURATION ASSERT_EXPR RENDER_TIMEOUT VERIFY_TIMEOUT PORT)
     if(NOT DEFINED ${var})
@@ -46,6 +48,29 @@ endif()
 
 if(NOT EXISTS "${WAV_PATH}")
     message(FATAL_ERROR "render phase produced no WAV at ${WAV_PATH}")
+endif()
+
+if(DEFINED ENV{EXTEMPORE_RENDER_TWICE})
+    set(_again "${WAV_PATH}.again.wav")
+    file(REMOVE "${_again}")
+    execute_process(
+        COMMAND "${EXTEMPORE}" --term nocolor --port=${PORT}
+            --batch "(sys:load \"${RENDER_XTM}\")"
+            --audio-outfile "${_again}"
+            --duration ${DURATION}
+            ${EXTRA_ARGS}
+        WORKING_DIRECTORY "${WORK_DIR}"
+        RESULT_VARIABLE again_rc
+        TIMEOUT ${RENDER_TIMEOUT})
+    if(NOT again_rc EQUAL 0)
+        message(FATAL_ERROR "second render failed (rc=${again_rc})")
+    endif()
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E compare_files "${WAV_PATH}" "${_again}"
+        RESULT_VARIABLE same_rc)
+    if(NOT same_rc EQUAL 0)
+        message(FATAL_ERROR "two renders of ${RENDER_XTM} differ")
+    endif()
 endif()
 
 # Phase 2: verify

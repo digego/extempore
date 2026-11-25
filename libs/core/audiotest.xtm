@@ -250,10 +250,9 @@
 
 ;; Verify a two-segment sweep: freq_a should dominate samples
 ;; [0, split_frame - guard) and freq_b should dominate
-;; [split_frame + guard, end). The ±guard window around split_frame is
-;; skipped to tolerate scheduler-callback timing jitter in offline free-run
-;; rendering (callbacks may fire several thousand samples late on busy CI).
-;; guard is expressed in samples; a typical value is 8000 (~180ms at 44.1k).
+;; [split_frame + guard, end). An offline render puts a scheduled change at
+;; the first frame of the block its time falls in, so guard can be 0 there; a
+;; recording of a live session needs a guard of a few blocks.
 (bind-func audiotest_assert_sweep
   (lambda (path:i8* freq_a:double freq_b:double split_frame:i64 guard:i64)
     (let ((ab (AudioBuffer path)))

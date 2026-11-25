@@ -135,12 +135,28 @@ class SchemeProcess {
     // while idle) and its type.
     std::atomic<uint64_t> m_taskStart{0};
     std::atomic<int> m_taskType{0};
+    // False only while the task thread is waiting on an empty queue; true from
+    // construction, so a process still loading its runtime counts as busy.
+    // Guarded by m_guardMutex.
+    bool m_busy = true;
 
     static const char* sm_banner;
     static thread_local SchemeProcess* sm_current;
     // Every live process, for the hang report (which can't take a lock) and
     // for IPC to reach a process in this address space by name.
     static std::array<std::atomic<SchemeProcess*>, 16> sm_live;
+    // Held by waitAllIdle while it looks at the live processes and by the
+    // destructor while it leaves sm_live, so a process isn't destroyed under
+    // the waiter.
+    static std::mutex sm_liveMutex;
+    // Every push to any process's queue, so waitAllIdle can tell that nothing
+    // was queued while it looked.
+    static std::atomic<uint64_t> sm_pushes;
+    // Counts task threads going idle (and wakeIdleWaiters calls), guarded by
+    // sm_idleMutex, so a waiter can't miss one between looking and sleeping.
+    static std::mutex sm_idleMutex;
+    static std::condition_variable sm_idleCond;
+    static uint64_t sm_idleEvents;
 
   private:
     void schemeCallback(TaskI* Task) {
@@ -150,6 +166,8 @@ class SchemeProcess {
         addCallback(Task, SchemeTask::Type::EXTEMPORE_CALLBACK);
     }
     void addCallback(TaskI* Task, SchemeTask::Type Type);
+    void pushTask(SchemeTask Task);
+    void setIdle();
     void* serverImpl();
     void* taskImpl();
     // The task thread is the sole consumer of m_taskQueue, but producers (the
@@ -238,6 +256,11 @@ class SchemeProcess {
         return sm_current;
     }
     static SchemeProcess* find(const std::string& Name);
+    // Blocks until every live process is idle (its queue empty and no task
+    // running) with nothing queued meanwhile, or until Cancel is set (after
+    // which wakeIdleWaiters makes it return promptly). False if cancelled.
+    static bool waitAllIdle(const std::atomic<bool>& Cancel);
+    static void wakeIdleWaiters();
     static std::vector<std::string> liveNames();
 #ifndef _WIN32
     // For HangReport, from a signal handler: writes each process's state to

@@ -44,6 +44,7 @@
 #include "TaskScheduler.h"
 #include "EXTLLVM.h"
 #include "SchemeFFI.h"
+#include "SchemeProcess.h"
 #include "BranchPrediction.h"
 
 #include <chrono>
@@ -264,7 +265,6 @@ void* audioCallbackMT(void* Args) {
 
 void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
                                 uint64_t FramesPerBuffer, void* UserData) {
-    flush_denormals_to_zero();
     auto sched(reinterpret_cast<TaskScheduler*>(UserData));
     UNIV::DEVICE_TIME += FramesPerBuffer;
     if (likely(UNIV::TIME_DIVISION == 1)) {
@@ -278,6 +278,12 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
     UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
     sched->setFrames(FramesPerBuffer);
     sched->tick();
+    renderFrames(InputBuffer, OutputBuffer, FramesPerBuffer);
+}
+
+void AudioDevice::renderFrames(const float* InputBuffer, float* OutputBuffer,
+                               uint64_t FramesPerBuffer) {
+    flush_denormals_to_zero();
     // One acquire load per block. Every field below comes from that snapshot,
     // so a dsp:set! landing mid-callback is either wholly visible or not at
     // all -- there is no ordering contract between the setters to get wrong.
@@ -401,10 +407,15 @@ void AudioDevice::processFrames(const float* InputBuffer, float* OutputBuffer,
 //  FILE AUDIO DRIVER
 //-----------------------------------
 //
-// Alternative backend to PortAudio: renders DSP output to a float32 WAV file,
-// driven by a dedicated thread that free-runs as fast as processFrames() can
-// execute. Used when --audio-outfile is specified. Intended for offline tests
-// and best-effort headless rendering, NOT realtime playback.
+// Alternative backend to PortAudio: renders DSP output to a float32 WAV file
+// on its own thread, as fast as the work allows. Used when --audio-outfile is
+// specified.
+//
+// The render thread owns the audio clock and keeps it in lockstep with the
+// work. No scheduler thread runs; before each block the render thread runs the
+// scheduler itself for the tasks due in that block, then waits for every
+// Scheme process to finish them. So a callback always lands in the block it
+// was scheduled for, however long it takes, and a render is repeatable.
 //
 // The WAV header is rewritten on stop() with the final sample count, so quit()
 // (which calls std::_Exit and skips destructors) must invoke stop() first.
@@ -412,7 +423,8 @@ namespace {
 
 class FileAudioDriver {
   public:
-    bool start(const std::string& path, double maxSeconds);
+    bool open(const std::string& path, double maxSeconds);
+    void start();
     void stop();
     bool isRunning() const {
         return m_running.load(std::memory_order_acquire);
@@ -508,8 +520,8 @@ void FileAudioDriver::finalizeWav() {
     m_file = nullptr;
 }
 
-bool FileAudioDriver::start(const std::string& path, double maxSeconds) {
-    if (m_running.load())
+bool FileAudioDriver::open(const std::string& path, double maxSeconds) {
+    if (m_file)
         return false;
     if (!openWav(path)) {
         ascii_error();
@@ -522,47 +534,47 @@ bool FileAudioDriver::start(const std::string& path, double maxSeconds) {
     m_maxFrames = (maxSeconds > 0.0) ? static_cast<uint64_t>(maxSeconds * UNIV::SAMPLE_RATE) : 0;
     m_inBuf.assign(size_t{UNIV::IN_CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
     m_outBuf.assign(size_t{UNIV::CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
-    m_stop.store(false);
-    m_running.store(true, std::memory_order_release);
-    m_thread = std::thread([this] { this->run(); });
     return true;
 }
 
+void FileAudioDriver::start() {
+    if (!m_file || m_running.load())
+        return;
+    m_stop.store(false);
+    m_running.store(true, std::memory_order_release);
+    m_thread = std::thread([this] { this->run(); });
+}
+
 void FileAudioDriver::run() {
-    // Offline free-run: pump processFrames as fast as we can, writing each
-    // buffer to disk. UNIV::DEVICE_TIME / UNIV::TIME advance inside
-    // processFrames, so scheduled xtlang callbacks still fire at the correct
-    // sample times (just faster than wall-clock).
-    //
-    // Free-run will typically outrun the Scheme compile/setup path, so we
-    // don't start counting toward --duration until a DSP closure is registered.
-    // Before that, we still tick processFrames (to advance the scheduler and
-    // let the main thread progress) but we do NOT write output and we do NOT
-    // advance m_framesWritten. This keeps the recorded output aligned with the
-    // first sample after dsp:set! takes effect.
     const uint32_t frames = UNIV::NUM_FRAMES;
-    bool dspSeen = false;
+    TaskScheduler::I()->setFrames(frames);
+    AudioDevice::CLOCKBASE = getRealTime();
+    UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     bool reachedDuration = false;
     while (!m_stop.load(std::memory_order_acquire)) {
-        if (dspSeen && m_maxFrames && m_framesWritten >= m_maxFrames) {
+        if (m_maxFrames && m_framesWritten >= m_maxFrames) {
             reachedDuration = true;
             break;
         }
-
-        const bool haveDSP = (AudioDevice::I()->getDspState()->closure != nullptr);
-        std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
-        AudioDevice::I()->processFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
-                                        frames, TaskScheduler::I());
-        if (!dspSeen) {
-            if (haveDSP) {
-                dspSeen = true;
-            } else {
-                // Yield so the main thread can make progress compiling DSP.
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                continue;
-            }
+        // The block [TIME, TIME + frames). Whatever is already running comes
+        // first: before the first block that is the startup file, which so
+        // loads at time 0 however long it takes to compile.
+        if (!SchemeProcess::waitAllIdle(m_stop)) {
+            break;
         }
-        const size_t samples = m_outBuf.size();
+        TaskScheduler::I()->runDue(UNIV::TIME + frames);
+        if (!SchemeProcess::waitAllIdle(m_stop)) {
+            break;
+        }
+        AudioDevice::REALTIME = getRealTime();
+        UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
+        std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
+        AudioDevice::I()->renderFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
+                                       frames);
+        // the last block is cut at --duration, so the file is exactly that long
+        const uint64_t keep =
+            m_maxFrames ? std::min<uint64_t>(frames, m_maxFrames - m_framesWritten) : frames;
+        const size_t samples = size_t(keep) * UNIV::CHANNELS;
         if (std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file) != samples) {
             ascii_error();
             printf("Error: could not write to --audio-outfile (%s); stopping the render\n",
@@ -571,21 +583,15 @@ void FileAudioDriver::run() {
             fflush(stdout);
             break;
         }
-        m_framesWritten += frames;
-        // Sleep briefly so the task scheduler thread actually gets CPU between
-        // our per-buffer signal() calls. The scheduler uses a plain condvar
-        // wait with no predicate loop, so signals that arrive before it
-        // re-enters wait() are lost; without this throttle the driver runs
-        // so tight that scheduled Scheme callbacks can miss the entire render
-        // window. 100us * ~86 buffers/sec = <10ms overhead per render second,
-        // still >>100x realtime.
-        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        m_framesWritten += keep;
+        UNIV::DEVICE_TIME += frames;
+        UNIV::TIME.store(UNIV::DEVICE_TIME.load());
     }
 
     // If we stopped because --duration was reached (rather than an external
-    // stop() call), finalize and terminate the process here. The main thread
-    // may still be in a loop waiting for us; _Exit bypasses destructors
-    // (matching how Scheme's (quit) behaves).
+    // stop() call), finalize and terminate the process here. Every process is
+    // idle at this point; _Exit bypasses destructors (matching how Scheme's
+    // (quit) behaves).
     if (reachedDuration) {
         bool expected = true;
         if (m_running.compare_exchange_strong(expected, false)) {
@@ -598,10 +604,12 @@ void FileAudioDriver::run() {
     }
 }
 
+// Called by (quit), from a task the render thread may be waiting on.
 void FileAudioDriver::stop() {
     if (!m_running.exchange(false))
         return;
     m_stop.store(true, std::memory_order_release);
+    SchemeProcess::wakeIdleWaiters();
     if (m_thread.joinable())
         m_thread.join();
     finalizeWav();
@@ -611,6 +619,10 @@ void FileAudioDriver::stop() {
 
 bool AudioDevice::fileDriverRunning() {
     return sFileDriver.isRunning();
+}
+
+void AudioDevice::startFileDriver() {
+    sFileDriver.start();
 }
 
 void AudioDevice::stopFileDriver() {
@@ -713,7 +725,7 @@ void AudioDevice::start() {
         return;
     }
     if (!UNIV::AUDIO_OUTFILE_PATH.empty()) {
-        if (!sFileDriver.start(UNIV::AUDIO_OUTFILE_PATH, UNIV::AUDIO_OUTFILE_DURATION)) {
+        if (!sFileDriver.open(UNIV::AUDIO_OUTFILE_PATH, UNIV::AUDIO_OUTFILE_DURATION)) {
             std::_Exit(1);
         }
         m_started = true;

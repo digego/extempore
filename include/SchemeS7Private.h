@@ -38,6 +38,9 @@ struct scheme {
     uint64_t call_start_time;
     uint64_t call_end_time;
     uint64_t call_default_time;
+    // steady_clock nanoseconds when the call began, for the time limit in an
+    // offline render (see begin_hook)
+    int64_t call_wall_start = 0;
 
     // Used by find_slot_in_env in EXTLLVM.cpp
     pointer envir;

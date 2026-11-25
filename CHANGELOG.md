@@ -104,6 +104,12 @@ the `stbi_zlib_decode_*` functions and `stbi_write_png`), decodes every PngSuite
 image exactly as stb_image does, and runs about as fast. The HDR and float
 loaders and the BMP, TGA and HDR writers are gone.
 
+Offline rendering (`--audio-outfile`) is now deterministic. The render keeps
+the audio clock in step with the work: scheduled callbacks run before the block
+they fall in, however long they take, and the clock doesn't move while a file
+loads. Output starts at time 0 and ends exactly at `--duration`, and rendering
+the same file twice gives the same samples.
+
 ## v0.11.2
 
 A one-bug patch release, for a bug that made v0.11.0 and v0.11.1 close to

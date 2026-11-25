@@ -14,11 +14,6 @@
 ;; sample when driven by the offline --audio-outfile renderer. In realtime
 ;; mode the same code produces a one-second 330 Hz tone that jumps up to
 ;; 770 Hz for the second second.
-;;
-;; NB: all bind-func compilation and Scheme defines must finish BEFORE
-;; dsp:set! --- once dsp:set! is called the offline driver starts counting
-;; toward --duration and can self-exit while the main thread is still
-;; JIT-compiling later forms.
 
 ;;; Code:
 
@@ -39,7 +34,5 @@
   (lambda (f)
     (set_dsp_freq f)))
 
-;; Everything above is compiled up front so that dsp:set! + callback can
-;; happen as an atomic pair before the offline driver finalizes.
 (dsp:set! dsp)
 (callback (+ (now) 44100) 'sweep-change-freq 770.0)

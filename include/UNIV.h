@@ -137,6 +137,9 @@ extern std::string AUDIO_OUTFILE_PATH;
 // --duration <seconds>: optional hard cap on offline render length. 0 means
 // render until (quit) is called.
 extern double AUDIO_OUTFILE_DURATION;
+// True for an offline render: the render thread owns the clock and advances
+// it only between blocks, so audio time stands still while a task runs.
+extern bool OFFLINE_RENDER;
 extern double CLOCK_OFFSET;
 extern std::unordered_map<std::string, std::string> CMDPARAMS;
 extern std::string ARCH;

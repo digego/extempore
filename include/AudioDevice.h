@@ -95,12 +95,14 @@ class AudioDevice {
     void start();
     void stop();
 
-    // Core DSP dispatch: called by the PortAudio callback in realtime mode,
-    // and by the offline file driver when --audio-outfile is active. Advances
-    // UNIV::DEVICE_TIME/TIME, signals the task scheduler, and invokes the
-    // registered DSP wrapper (sample-by-sample or MT-sum).
+    // The PortAudio callback's work: advances UNIV::DEVICE_TIME/TIME, signals
+    // the task scheduler, and renders the block.
     void processFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer,
                        void* UserData);
+    // Invokes the registered DSP wrapper (sample-by-sample or MT-sum) for the
+    // block which starts at UNIV::DEVICE_TIME. Also called by the offline file
+    // driver, which keeps the clock itself.
+    void renderFrames(const float* InputBuffer, float* OutputBuffer, uint64_t FramesPerBuffer);
 
     // The published DSP state. Never null.
     const DspState* getDspState() const {
@@ -188,10 +190,13 @@ class AudioDevice {
     }
 
     // FileAudioDriver hooks (offline --audio-outfile mode). These are no-ops
-    // unless the driver has been started via start() with UNIV::AUDIO_OUTFILE_PATH
-    // set. stopFileDriver() finalizes the WAV header; must be called before
+    // unless start() opened the file named by UNIV::AUDIO_OUTFILE_PATH.
+    // startFileDriver() begins rendering, and is called once the primary
+    // process exists, since the render waits for it to load before the first
+    // block. stopFileDriver() finalizes the WAV header; must be called before
     // any std::_Exit() that would otherwise skip destructors.
     static bool fileDriverRunning();
+    static void startFileDriver();
     static void stopFileDriver();
 
     static std::atomic<double> CLOCKBASE;

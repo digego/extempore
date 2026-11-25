@@ -82,6 +82,11 @@ namespace extemp {
 
 thread_local SchemeProcess* SchemeProcess::sm_current = nullptr;
 std::array<std::atomic<SchemeProcess*>, 16> SchemeProcess::sm_live{};
+std::mutex SchemeProcess::sm_liveMutex;
+std::atomic<uint64_t> SchemeProcess::sm_pushes{0};
+std::mutex SchemeProcess::sm_idleMutex;
+std::condition_variable SchemeProcess::sm_idleCond;
+uint64_t SchemeProcess::sm_idleEvents = 0;
 const char* SchemeProcess::sm_banner = "\n"
                                        "##########################################\n"
                                        "##                                      ##\n"
@@ -227,9 +232,12 @@ void SchemeProcess::stop() {
 }
 
 SchemeProcess::~SchemeProcess() {
-    for (auto& slot : sm_live) {
-        SchemeProcess* self = this;
-        slot.compare_exchange_strong(self, nullptr);
+    {
+        const std::lock_guard<std::mutex> lock(sm_liveMutex);
+        for (auto& slot : sm_live) {
+            SchemeProcess* self = this;
+            slot.compare_exchange_strong(self, nullptr);
+        }
     }
     stop();
     m_threadTask.join();
@@ -242,19 +250,73 @@ SchemeProcess::~SchemeProcess() {
     delete m_extemporeCallback;
 }
 
-void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type) {
+void SchemeProcess::pushTask(SchemeTask Task) {
     const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
-    auto currentTime(TaskAdd->getStartTime());
-    auto duration(TaskAdd->getDuration());
-    auto task(static_cast<Task<SchemeObj*>*>(TaskAdd));
-    m_taskQueue.push(SchemeTask(currentTime, duration, task->getArg(), "tmp_label", Type));
+    m_taskQueue.push(std::move(Task));
+    sm_pushes.fetch_add(1);
     m_guardCond.notify_one();
 }
 
+void SchemeProcess::addCallback(TaskI* TaskAdd, SchemeTask::Type Type) {
+    auto task(static_cast<Task<SchemeObj*>*>(TaskAdd));
+    pushTask(SchemeTask(TaskAdd->getStartTime(), TaskAdd->getDuration(), task->getArg(),
+                        "tmp_label", Type));
+}
+
 void SchemeProcess::createSchemeTask(void* Arg, const std::string& Label, SchemeTask::Type Type) {
-    const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
-    m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, Arg, Label, Type));
-    m_guardCond.notify_one();
+    pushTask(SchemeTask(extemp::UNIV::TIME, m_maxDuration, Arg, Label, Type));
+}
+
+// Called by the task thread, holding m_guardMutex, as it finds its queue empty.
+void SchemeProcess::setIdle() {
+    m_busy = false;
+    wakeIdleWaiters();
+}
+
+void SchemeProcess::wakeIdleWaiters() {
+    {
+        const std::lock_guard<std::mutex> lock(sm_idleMutex);
+        ++sm_idleEvents;
+    }
+    sm_idleCond.notify_all();
+}
+
+bool SchemeProcess::waitAllIdle(const std::atomic<bool>& Cancel) {
+    while (!Cancel.load(std::memory_order_acquire)) {
+        const uint64_t events = [] {
+            const std::lock_guard<std::mutex> lock(sm_idleMutex);
+            return sm_idleEvents;
+        }();
+        const uint64_t pushes = sm_pushes.load();
+        bool idle = true;
+        {
+            const std::lock_guard<std::mutex> live(sm_liveMutex);
+            for (auto& slot : sm_live) {
+                SchemeProcess* process = slot.load();
+                if (!process) {
+                    continue;
+                }
+                const std::lock_guard<std::recursive_mutex> lock(process->m_guardMutex);
+                if (process->m_busy || !process->m_taskQueue.empty()) {
+                    idle = false;
+                    break;
+                }
+            }
+        }
+        // Each process was idle at some moment of the pass; with no push since
+        // it began, none has been given work since, so all are idle now.
+        if (idle && sm_pushes.load() == pushes) {
+            return true;
+        }
+        if (idle) {
+            continue;
+        }
+        std::unique_lock<std::mutex> lock(sm_idleMutex);
+        sm_idleCond.wait(lock, [&] {
+            return sm_idleEvents != events || Cancel.load(std::memory_order_acquire);
+        });
+    }
+    return false;
 }
 
 bool SchemeProcess::loadFile(const std::string& File, const std::string& Path) {
@@ -289,23 +351,23 @@ void* SchemeProcess::taskImpl() {
         // render (--audio-outfile) runs many times faster than the wall
         // clock, so they get an hour rather than the default timeout.
         const uint64_t startupBudget = uint64_t{60} * 60 * UNIV::SECOND();
-        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, startupBudget,
-                                    new std::string("(sys:compile-init-ll)"), "file_init",
-                                    SchemeTask::Type::LOCAL_PROCESS_STRING));
+        pushTask(SchemeTask(extemp::UNIV::TIME, startupBudget,
+                            new std::string("(sys:compile-init-ll)"), "file_init",
+                            SchemeTask::Type::LOCAL_PROCESS_STRING));
 
         if (extemp::UNIV::EXT_LOADBASE) {
-            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, startupBudget,
-                                        new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"),
-                                        "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
+            pushTask(SchemeTask(extemp::UNIV::TIME, startupBudget,
+                                new std::string("(sys:load \"libs/base/base.xtm\" 'quiet)"),
+                                "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
         if (!m_initExpr.empty()) {
             ascii_text_color(0, 5, 10);
             printf("\nEvaluating expression: ");
             ascii_normal();
             printf("%s\n\n", m_initExpr.c_str());
-            m_taskQueue.push(SchemeTask(extemp::UNIV::TIME + 1000, startupBudget,
-                                        new std::string(m_initExpr), "file_init",
-                                        SchemeTask::Type::LOCAL_PROCESS_STRING));
+            pushTask(SchemeTask(extemp::UNIV::TIME + 1000, startupBudget,
+                                new std::string(m_initExpr), "file_init",
+                                SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
     }
     m_libsLoaded = true;
@@ -314,7 +376,11 @@ void* SchemeProcess::taskImpl() {
             // Sleep until a producer pushes a task (or stop() is called); the
             // predicate is checked under m_guardMutex so no notify is missed.
             std::unique_lock<std::recursive_mutex> lock(m_guardMutex);
+            if (m_taskQueue.empty()) {
+                setIdle();
+            }
             m_guardCond.wait(lock, [this] { return !m_taskQueue.empty() || !m_running; });
+            m_busy = true;
         }
         while (!taskQueueEmpty() && m_running) [[likely]] {
             const SchemeTask task = [&]() {
@@ -455,6 +521,11 @@ void* SchemeProcess::taskImpl() {
             }
             m_taskStart.store(0);
         }
+    }
+    {
+        // a stopped process has no more work to wait for
+        const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
+        setIdle();
     }
     std::cout << "Exiting task thread" << std::endl;
     return this;
@@ -604,13 +675,11 @@ void* SchemeProcess::serverImpl() {
                     std::string::size_type pos = 0;
                     for (auto end = client.buffer.find("\r\n", pos); end != std::string::npos;
                          pos = end + 2, end = client.buffer.find("\r\n", pos)) {
-                        const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
                         char c[24];
                         snprintf(c, sizeof(c), "%lld", static_cast<long long>(client.fd));
                         auto* s = new std::string(client.buffer.substr(pos, end - pos + 1));
-                        m_taskQueue.push(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c,
-                                                    SchemeTask::Type::REPL));
-                        m_guardCond.notify_one();
+                        pushTask(SchemeTask(extemp::UNIV::TIME, m_maxDuration, s, c,
+                                            SchemeTask::Type::REPL));
                     }
                     client.buffer.erase(0, pos);
                     if (client.buffer.size() > MAX_PENDING) [[unlikely]] {

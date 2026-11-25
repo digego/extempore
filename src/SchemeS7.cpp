@@ -1,6 +1,7 @@
 #include "SchemeS7Private.h"
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -100,6 +101,21 @@ static s7_pointer lenient_string_ref(s7_scheme* sc, s7_pointer args) {
     return s7_make_character(sc, static_cast<uint8_t>(s7_string(s)[idx]));
 }
 
+static int64_t steady_nanoseconds() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
+// Every evaluation's time limit starts here.
+static void set_call_times(scheme* sc, uint64_t start_time, uint64_t end_time) {
+    sc->call_start_time = start_time;
+    sc->call_end_time = end_time;
+    if (extemp::UNIV::OFFLINE_RENDER) [[unlikely]] {
+        sc->call_wall_start = steady_nanoseconds();
+    }
+}
+
 static void begin_hook(s7_scheme* raw_sc, bool* val) {
     scheme* wrapper = scheme_wrapper_from_s7(raw_sc);
     if (!wrapper)
@@ -110,7 +126,13 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
         *val = true;
         return;
     }
-    const uint64_t now = extemp::UNIV::TIME;
+    uint64_t now = extemp::UNIV::TIME;
+    if (extemp::UNIV::OFFLINE_RENDER) [[unlikely]] {
+        // An offline render holds audio time still while a task runs, so the
+        // limit is counted in wall time from the start of the call.
+        const double elapsed = double(steady_nanoseconds() - wrapper->call_wall_start) / 1e9;
+        now = wrapper->call_start_time + uint64_t(elapsed * extemp::UNIV::SAMPLE_RATE);
+    }
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
         // s7 abandons the evaluation without raising an error, so say so here.
         fprintf(stderr, "Error: evaluation stopped at its time limit (%.1f s over)\n",
@@ -344,8 +366,7 @@ void scheme_load_file(scheme* sc, FILE* fin) {
     fclose(fin);
 
     const uint64_t now = extemp::UNIV::TIME;
-    sc->call_start_time = now;
-    sc->call_end_time = now + sc->call_default_time * 10;
+    set_call_times(sc, now, now + sc->call_default_time * 10);
 
     sc->retcode = 0;
     s7_pointer old_port = s7_current_error_port(sc->sc);
@@ -374,8 +395,7 @@ void scheme_load_file(scheme* sc, FILE* fin) {
 }
 
 void scheme_load_string(scheme* sc, const char* cmd, uint64_t start_time, uint64_t end_time) {
-    sc->call_start_time = start_time;
-    sc->call_end_time = end_time;
+    set_call_times(sc, start_time, end_time);
 
     eval_with_error_trap(sc, cmd);
 }
@@ -387,8 +407,7 @@ void scheme_apply0(scheme* sc, const char* name) {
 
 void scheme_call(scheme* sc, pointer func, pointer args, uint64_t start_time,
                  uint64_t call_duration) {
-    sc->call_start_time = start_time;
-    sc->call_end_time = start_time + call_duration;
+    set_call_times(sc, start_time, start_time + call_duration);
     sc->retcode = 0;
 
     s7_pointer old_port = s7_current_error_port(sc->sc);

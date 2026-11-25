@@ -214,16 +214,14 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 # Offline audio-rendering tests: render a DSP to a WAV with --audio-outfile,
-# then verify it contains a sine at the expected frequency. Free-run driver
-# means ~1s of audio renders in well under a second; 1.0s of content is
+# then verify it contains a sine at the expected frequency. 1.0s of content is
 # plenty for a reliable Goertzel check.
 extempore_add_audio_offline_test(hello-sine
     examples/core/hello-sine.xtm 1.0
     "(audiotest_assert_sine \"@WAV@\" 440.0)"
     audio-offline)
-# With big buffers the free-running clock races through audio time while the
-# base library is still loading at startup, so this catches a startup task
-# that's held to an audio-time deadline.
+# A block of 16384 frames is a third of a second: a render which let the clock
+# run while the base library loads would be past the end before the file began.
 extempore_add_audio_offline_test(hello-sine-big-buffers
     examples/core/hello-sine.xtm 1.0
     "(audiotest_assert_sine \"@WAV@\" 440.0)"
@@ -237,10 +235,15 @@ extempore_add_audio_offline_test(hello-mt
     examples/core/hello-mt.xtm 1.0
     "(audiotest_assert_three_sines \"@WAV@\" 330.0 550.0 770.0)"
     audio-offline)
+# The callback which changes the frequency is due at frame 44100, so it runs
+# before the block which holds that frame and the change is heard from that
+# block's first frame (44032). The file is rendered twice, and the two must
+# match byte for byte.
 extempore_add_audio_offline_test(hello-sweep
     examples/core/hello-sweep.xtm 2.0
-    "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44100 8000)"
+    "(audiotest_assert_sweep \"@WAV@\" 330.0 770.0 44032 0)"
     audio-offline)
+set_property(TEST audio-offline/hello-sweep APPEND PROPERTY ENVIRONMENT "EXTEMPORE_RENDER_TWICE=1")
 
 # The studio's synthesised instruments each have a demo score which plays
 # through their presets. Rendering the start of one compiles the instrument and
@@ -263,11 +266,9 @@ endforeach()
 # phase and slop, so no two renders match. The peak does not vary, sitting near
 # 0.95 when notes sound and at exactly 0.0 when they do not.
 #
-# 20s of audio for a pattern whose first note lands 1-2s in. The margin is for
-# the render starting at (dsp:set!) while the rest of the file is still
-# compiling, which is wall-clock work and slower on a loaded machine.
+# The pattern's first note lands 1-2s in.
 extempore_add_audio_offline_test(pattern-notes
-    examples/core/synth.xtm 20.0
+    examples/core/synth.xtm 5.0
     "(audiotest_assert_not_silent \"@WAV@\" 0.05)"
     audio-offline)
 
