@@ -336,6 +336,8 @@ endif()
 set(EXTEMPORE_SOURCES
     src/Extempore.cpp
     src/CommandLine.cpp
+    src/FormFinder.cpp
+    src/NreplClient.cpp
     src/AudioDevice.cpp
     src/Bencode.cpp
     src/EXTZones.cpp
@@ -361,8 +363,7 @@ set(EXTEMPORE_SOURCES
     src/SchemeREPL.cpp
     src/NreplServer.cpp
     src/TaskScheduler.cpp
-    src/UNIV.cpp
-    src/LinenoiseREPL.cpp)
+    src/UNIV.cpp)
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
 

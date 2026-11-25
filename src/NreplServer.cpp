@@ -765,6 +765,10 @@ bool start(const std::string& Host, std::uint16_t Port) {
     return true;
 }
 
+std::uint16_t boundPort() {
+    return s_server ? s_server->port() : std::uint16_t{0};
+}
+
 void removePortFile() {
     if (s_portFile[0] != '\0') {
 #ifdef _WIN32

@@ -103,7 +103,8 @@ class Extempore:
         self.console: list[str] = []
         self._lines = threading.Condition()
         self._exited = threading.Event()
-        threading.Thread(target=self._pump, daemon=True).start()
+        self._pumping = threading.Thread(target=self._pump, daemon=True)
+        self._pumping.start()
 
     def _wait_until_listening(self, timeout: float) -> None:
         """The primary eval server binds just after the nREPL banner."""
@@ -154,6 +155,9 @@ class Extempore:
         if self.proc.poll() is None:
             self.proc.kill()
         self.proc.wait(timeout=30)
+        self._pumping.join(timeout=30)
+        if self.proc.stdout:
+            self.proc.stdout.close()
 
     def __enter__(self) -> Extempore:
         return self

@@ -39,6 +39,7 @@
 #include "TaskScheduler.h"
 #include "HangReport.h"
 #include "NreplServer.h"
+#include "NreplClient.h"
 #include "EXTLLVM.h"
 #include "CommandLine.h"
 #include "SchemeFFI.h"
@@ -66,7 +67,6 @@
 #include <vector>
 
 #ifndef _WIN32
-#include "LinenoiseREPL.h"
 #include <signal.h>
 #include <unistd.h>
 #else
@@ -102,6 +102,10 @@ BOOL CtrlHandler(DWORD fdwCtrlType) {
 // render interrupted by a signal is left with a provisional header; (quit)
 // is the clean way to end one.
 void sig_handler(int Signo) {
+    // a REPL which is waiting on an evaluation takes Ctrl-C as "stop that"
+    if (Signo == SIGINT && extemp::nrepl::client::interruptFromSignal()) {
+        return;
+    }
     if (Signo == SIGINT) {
         static const char msg[] = "\nextempore: SIGINT, exiting\n";
         const ssize_t r = ::write(STDERR_FILENO, msg, sizeof(msg) - 1);
@@ -647,6 +651,41 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
     case Command::Devices:
         AudioDevice::printDevices();
         return ParseResult::Exit;
+    case Command::Send:
+    case Command::Repl:
+    case Command::Status: {
+        // clients of a running extempore: nothing of the runtime starts here
+        nrepl::client::Target target;
+        if (const auto host = Inv.get("host")) {
+            target.host = std::string(*host);
+        }
+        std::uint16_t port = 0;
+        if (Inv.has("port")) {
+            if (!set_whole(Inv, "port", port)) {
+                status = 2;
+                return ParseResult::Exit;
+            }
+            target.port = port;
+        }
+        target.process = std::string(Inv.get("process").value_or(""));
+        if (Inv.command == Command::Status) {
+            status = nrepl::client::status(target);
+        } else if (Inv.command == Command::Repl) {
+            status = nrepl::client::repl(target, false);
+        } else {
+            nrepl::client::SendOptions options;
+            if (!Inv.files.empty()) {
+                options.code = Inv.files.front();
+            }
+            options.file = std::string(Inv.get("file").value_or(""));
+            if (!set_whole(Inv, "line", options.line) || !set_whole(Inv, "column", options.column)) {
+                status = 2;
+                return ParseResult::Exit;
+            }
+            status = nrepl::client::send(target, options);
+        }
+        return ParseResult::Exit;
+    }
     case Command::Test:
         if (Inv.files.size() > 1) {
             status = run_test_files(Inv);
@@ -752,6 +791,9 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         if (Inv.has("no-nrepl")) {
             settings.nrepl = false;
         }
+        if (Inv.has("no-legacy-server")) {
+            UNIV::LEGACY_SERVER = false;
+        }
     } break;
     case Command::Exec:
         UNIV::AUDIO_NONE = true;
@@ -816,6 +858,9 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
             settings.initexpr = "(xtc:aot:compile-xtm-file " + scheme_string(file) + ")";
         }
         break;
+    case Command::Send:
+    case Command::Repl:
+    case Command::Status:
     case Command::Devices:
     case Command::Version:
         break;
@@ -995,30 +1040,37 @@ EXPORT int extempore_init(int argc, char** argv) {
                                               0, settings.initexpr);
 
     // The default port being taken (usually by another extempore) costs only
-    // the nREPL server; a port asked for by name is worth stopping for. The
-    // utility process's threads are already running, so end the process as
-    // (quit) does: exit() would run static destructors under them.
-    if (settings.nrepl &&
-        !extemp::nrepl::start(settings.nrepl_bind, settings.nrepl_port) &&
-        settings.nrepl_port_given) {
+    // the nREPL server; a port asked for by name is worth stopping for, and so
+    // is a --repl with no server to talk to. The utility process's threads are
+    // already running, so end the process as (quit) does: exit() would run
+    // static destructors under them.
+    const bool serving =
+        settings.nrepl && extemp::nrepl::start(settings.nrepl_bind, settings.nrepl_port);
+    if (settings.nrepl && !serving && (settings.nrepl_port_given || settings.repl_mode)) {
+        if (settings.repl_mode && !settings.nrepl_port_given) {
+            std::cout << "--repl needs the nREPL server: give it a free port with --nrepl-port"
+                      << std::endl;
+        }
         std::fflush(stdout);
         std::_Exit(1);
     }
 
-#ifndef _WIN32
     if (settings.repl_mode) {
         // Runs for the life of the process and needs none of EXTThread's
-        // scheduling features, so a detached std::thread does.
-        std::thread([args = linenoise_repl_args{host, primary_port}]() mutable {
-            linenoise_repl(&args);
-        }).detach();
+        // scheduling features, so a detached std::thread does. It talks to
+        // this session's own server, whichever port that got.
+        extemp::nrepl::client::Target target;
+        target.host = settings.nrepl_bind == "0.0.0.0" ? "127.0.0.1" : settings.nrepl_bind;
+        target.port = extemp::nrepl::boundPort();
+        std::thread([target] { extemp::nrepl::client::repl(target, true); }).detach();
     }
-#endif
 
-    ascii_info();
-    std::cout << "Listening on TCP port " << primary_port
-              << " --- connect your editor to send code." << std::endl;
-    ascii_default();
+    if (extemp::UNIV::LEGACY_SERVER) {
+        ascii_info();
+        std::cout << "Listening on TCP port " << primary_port
+                  << " --- connect your editor to send code." << std::endl;
+        ascii_default();
+    }
 
     extemp::AudioDevice::startFileDriver();
     // the primary process runs on this thread (process thread 0)

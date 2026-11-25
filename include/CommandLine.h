@@ -21,6 +21,9 @@ enum class Command : std::uint8_t {
     Test,
     Render,
     Compile,
+    Send,
+    Repl,
+    Status,
     Devices,
     Version,
 };

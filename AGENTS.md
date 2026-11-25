@@ -52,7 +52,7 @@ ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
 ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
 ctest --test-dir build -L cli               # the command line: output, exit statuses
-ctest --test-dir build -L nrepl -j2         # the nREPL server and its client
+ctest --test-dir build -L nrepl -j2         # the nREPL server and its clients
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
@@ -128,7 +128,8 @@ audio offline, and renders the same samples every time.
 `build/extempore --help` lists the subcommands.
 
 To iterate against a running instance instead, start `build/extempore --no-audio
---nrepl-port 0` from a scratch directory and send code with
-`extras/nrepl/extempore-nrepl --port $(cat .nrepl-port) eval '...'`: it prints
-values and output, exits 1 on an error, and libraries stay loaded between evals.
+--nrepl-port 0` from a scratch directory and send code from there with
+`build/extempore send '...'` (or `--file F`, or `--file F --line N` for one
+form): it prints values and output, exits 1 on an error, and libraries stay
+loaded between evals. `build/extempore status` says whether it is reachable.
 `docs/src/content/docs/guides/nrepl.md` describes the server.

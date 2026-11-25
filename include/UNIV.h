@@ -143,6 +143,9 @@ extern bool OFFLINE_RENDER;
 // Set by the subcommands which aren't a live session (exec, test, render,
 // compile): no banner or startup report.
 extern bool QUIET_START;
+// False under --no-legacy-server: the processes open no eval-server sockets
+// (7099 and below); nREPL is then the only way in.
+extern bool LEGACY_SERVER;
 // Set by exec and render, whose stdout is for what the code prints: load and
 // compiler messages and error reports go to stderr.
 extern bool MESSAGES_TO_STDERR;

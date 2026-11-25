@@ -115,6 +115,8 @@ before, and beside it are:
 - `extempore render FILE -o OUT.wav --duration SECONDS`: render offline (below)
 - `extempore compile FILE`: compile a library ahead of time, or `--exe` an
   executable
+- `extempore send CODE`, `extempore repl` and `extempore status`: clients of a
+  running extempore's nREPL server (below)
 - `extempore devices` and `extempore version`
 
 Outside a session there is no banner, and under `exec` and `render` messages
@@ -130,6 +132,15 @@ The old spellings still work and say what replaces them. `--run`, `--eval`,
 `--batch`, `--compile`, `--audio-outfile` and `--print-devices` are deprecated,
 as are the unhyphenated option names and `--term`; they will be removed two
 releases from now. `--timediv` and `--runtime` are gone.
+
+Extempore runs an [nREPL](https://nrepl.org) server, on `127.0.0.1:7888`,
+beside the eval server on 7099: clients get each form's value, the output it
+printed, errors with their kind and line, and can interrupt an evaluation. The
+binary is its own client: `extempore send '(+ 1 2)'` (or `--file F`, or `--file
+F --line L` for the form at a position), `extempore repl` (which `extempore
+--repl` now runs, so Ctrl-C stops a runaway evaluation) and `extempore status`.
+`--no-legacy-server` starts a session without the 7099 server. The nREPL guide
+in the docs has the details.
 
 Offline rendering is now deterministic. The render keeps the audio clock in
 step with the work: scheduled callbacks run before the block they fall in,

@@ -503,6 +503,7 @@ std::string AUDIO_OUTFILE_PATH;
 double AUDIO_OUTFILE_DURATION = 0.0;
 bool OFFLINE_RENDER = false;
 bool QUIET_START = false;
+bool LEGACY_SERVER = true;
 bool MESSAGES_TO_STDERR = false;
 std::atomic<bool> FAILED{false};
 bool SEEDED = false;

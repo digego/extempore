@@ -23,6 +23,9 @@ inline constexpr std::uint16_t DEFAULT_PORT = 7888;
 // or the reason it couldn't bind, and returns whether it is serving.
 bool start(const std::string& Host, std::uint16_t Port);
 
+// The port the server is listening on, or 0 if it isn't.
+std::uint16_t boundPort();
+
 // Delete .nrepl-port if start wrote one. Async-signal-safe, for the signal
 // handlers and (quit), which end the process without running destructors.
 void removePortFile();

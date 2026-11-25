@@ -49,6 +49,13 @@ const std::array<Option, 2> kCommonOptions{{
     {"help", Kind::Flag, "", "print this help"},
 }};
 
+// Options of every client of a running extempore's nREPL server.
+const std::array<Option, 2> kClientOptions{{
+    {"host", Kind::Text, "HOST", "where the extempore is running [127.0.0.1]"},
+    {"port", Kind::Whole, "N",
+     "its nREPL port [$EXTEMPORE_NREPL_PORT, else a .nrepl-port file here or above, else 7888]"},
+}};
+
 const std::array<Option, 3> kFormatOptions{{
     {"sample-rate", Kind::Whole, "HZ", "audio sample rate"},
     {"channels", Kind::Whole, "N", "number of output channels"},
@@ -61,6 +68,11 @@ std::vector<Option> with(std::vector<Option> Own, bool Runtime) {
     }
     Own.insert(Own.end(), kCommonOptions.begin(), kCommonOptions.end());
     return Own;
+}
+
+std::vector<Option> client(std::vector<Option> Own) {
+    Own.insert(Own.end(), kClientOptions.begin(), kClientOptions.end());
+    return with(std::move(Own), false);
 }
 
 std::vector<Option> withFormat(std::vector<Option> Own) {
@@ -85,6 +97,7 @@ const std::vector<Subcommand>& subcommands() {
              {"nrepl-bind", Kind::Text, "ADDR", "IPv4 address the nREPL server listens on [127.0.0.1]"},
              {"no-nrepl", Kind::Flag, "", "don't start the nREPL server"},
              {"legacy-port", Kind::Whole, "N", "port for the legacy eval server [7099]; the utility process takes N-1"},
+             {"no-legacy-server", Kind::Flag, "", "don't start the legacy eval server"},
          }),
          0, 1},
         {Command::Exec, "exec", "exec FILE | -e EXPR [-- --NAME[=VALUE]...]",
@@ -123,6 +136,22 @@ const std::vector<Subcommand>& subcommands() {
               },
               true),
          1, 1},
+        {Command::Send, "send", "send [CODE]",
+         "evaluate code in a running extempore: CODE, or stdin, or --file",
+         client({
+             {"file", Kind::Text, "FILE", "load FILE; with --line, evaluate one form of it"},
+             {"line", Kind::Whole, "N", "with --file: the top-level form at line N (from 1)"},
+             {"column", Kind::Whole, "N", "with --line: the column (from 1) [1]"},
+             {"process", Kind::Text, "NAME", "the Scheme process to evaluate in [primary]"},
+         }),
+         0, 1},
+        {Command::Repl, "repl", "repl", "an interactive REPL on a running extempore",
+         client({
+             {"process", Kind::Text, "NAME", "the Scheme process to evaluate in [primary]"},
+         }),
+         0, 0},
+        {Command::Status, "status", "status",
+         "show the running extempore: its version, processes and nREPL ops", client({}), 0, 0},
         {Command::Devices, "devices", "devices", "list the audio devices", with({}, false), 0, 0},
         {Command::Version, "version", "version", "print the version", with({}, false), 0, 0},
     };
@@ -376,6 +405,10 @@ Invocation parse(std::span<const std::string_view> Args) {
     }
     const std::string who = sub.name.empty() ? "extempore" : "extempore " + std::string(sub.name);
     if (inv.files.size() > sub.maxFiles) {
+        if (inv.command == Command::Send) {
+            return fail("extempore send takes the code as one argument (quote it), got " +
+                        std::to_string(inv.files.size()));
+        }
         return fail(sub.maxFiles == 0 ? who + " takes no arguments, got \"" + inv.files.front() + "\""
                                       : who + " takes one file, got \"" + inv.files[0] + "\" and \"" +
                                             inv.files[1] + "\"");
@@ -412,7 +445,27 @@ Invocation parse(std::span<const std::string_view> Args) {
             return fail("--link needs --exe");
         }
         break;
+    case Command::Send:
+        if (inv.has("file") && !inv.files.empty()) {
+            return fail("extempore send takes code or --file (one of them)");
+        }
+        if ((inv.has("line") || inv.has("column")) && !inv.has("file")) {
+            return fail("--line and --column need --file");
+        }
+        if (inv.has("column") && !inv.has("line")) {
+            return fail("--column needs --line");
+        }
+        if (inv.get("line") == "0" || inv.get("column") == "0") {
+            return fail("--line and --column count from 1");
+        }
+        break;
     case Command::Session:
+        if (inv.has("repl") && inv.has("no-nrepl")) {
+            return fail("--repl talks to the nREPL server, so not with --no-nrepl");
+        }
+        break;
+    case Command::Repl:
+    case Command::Status:
     case Command::Test:
     case Command::Devices:
     case Command::Version:

@@ -118,6 +118,28 @@ TEST(CommandLine, CompileOptions) {
     EXPECT_FALSE(parse({"compile", "--exe", "a.xtm", "--name", "b"}).error.empty());
 }
 
+TEST(CommandLine, SendTakesCodeOrAFile) {
+    EXPECT_TRUE(parse({"send", "(+ 1 2)", "--port", "7900", "--process", "utility"}).error.empty());
+    EXPECT_TRUE(parse({"send"}).error.empty());  // the code is on stdin
+    EXPECT_TRUE(parse({"send", "--file", "a.xtm", "--line", "3", "--column", "2"}).error.empty());
+    EXPECT_FALSE(parse({"send", "(+ 1 2)", "--file", "a.xtm"}).error.empty());
+    EXPECT_FALSE(parse({"send", "--line", "3"}).error.empty());
+    EXPECT_FALSE(parse({"send", "--file", "a.xtm", "--column", "3"}).error.empty());
+    EXPECT_FALSE(parse({"send", "--file", "a.xtm", "--line", "0"}).error.empty());
+    EXPECT_FALSE(parse({"send", "(+", "1", "2)"}).error.empty());
+    // here --port is the server to talk to, not a session's legacy port
+    const auto inv = parse({"send", "1", "--port", "7900"});
+    EXPECT_EQ(inv.get("port"), "7900");
+    EXPECT_TRUE(inv.notices.empty());
+}
+
+TEST(CommandLine, ReplAndStatusTakeNoArguments) {
+    EXPECT_EQ(parse({"repl", "--process", "utility"}).command, Command::Repl);
+    EXPECT_EQ(parse({"status", "--host", "10.0.0.2"}).command, Command::Status);
+    EXPECT_FALSE(parse({"status", "now"}).error.empty());
+    EXPECT_FALSE(parse({"--repl", "--no-nrepl"}).error.empty());
+}
+
 TEST(CommandLine, RenamedOptionsAreAcceptedWithANotice) {
     const auto inv = parse({"--noaudio", "--samplerate", "48000", "--device-name", "USB", "--port", "7200"});
     EXPECT_TRUE(inv.error.empty()) << inv.error;

@@ -191,7 +191,7 @@ endif()
 # The nREPL server and its command-line client (backlog/docs/doc-002). Each
 # test file starts its own extempore processes on free ports.
 if(Python3_Interpreter_FOUND)
-    foreach(_t test_server test_client)
+    foreach(_t test_server test_client test_send)
         add_test(NAME nrepl/${_t}
             COMMAND Python3::Interpreter -m unittest -v ${_t})
         set_tests_properties(nrepl/${_t} PROPERTIES

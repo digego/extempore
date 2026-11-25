@@ -21,29 +21,43 @@ nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
 If 7888 is taken (by a second extempore, say), extempore prints a warning and
 runs without the server. A taken `--nrepl-port` is an error.
 
+`--no-legacy-server` starts a session without the eval server on 7099, for when
+everything which talks to it speaks nREPL.
+
 ## From the command line
 
-`extras/nrepl/extempore-nrepl` is a client that needs only Python 3. Put it on
-your `PATH`, then:
+The `extempore` binary is its own client:
 
 ```sh
-extempore-nrepl eval '(+ 1 2)'
-echo '(println "hello")' | extempore-nrepl eval
-extempore-nrepl eval --file song.xtm --line 12 --column 3
-extempore-nrepl describe
+extempore send '(+ 1 2)'
+echo '(println "hello")' | extempore send
+extempore send --file song.xtm                       # load the whole file
+extempore send --file song.xtm --line 12 --column 3  # one form of it
+extempore send --process utility '(ipc:get-process-name)'
+extempore repl
+extempore status
 ```
 
-`--file F --line L --column C` evaluates the top-level form enclosing that
-position, or the nearest one before it. Values go to stdout and errors to
-stderr, with exit status 1 if evaluation failed. `--editor` puts everything on
-stdout and always exits 0, for an editor's shell-command integration.
+`send` prints what the code printed and each form's value on stdout, and errors
+on stderr. Its exit status is 0, 1 if the evaluation failed, or 2 if there was
+nothing to send or no extempore to send it to. `--file F --line L --column C`
+evaluates the top-level form enclosing that position, or the nearest one before
+it.
 
-The port comes from `--port`, then `$EXTEMPORE_NREPL_PORT`, then a `.nrepl-port`
-file in the file's directory or above it, then 7888.
+`repl` is an interactive REPL (Linux and macOS). Ctrl-C stops the evaluation
+which is running and Ctrl-D leaves. `extempore --repl` starts a session with one
+in its own terminal.
+
+`status` prints the running extempore's version, its processes and the server's
+ops: the first thing to try when an editor isn't getting through.
+
+All three take `--host` and `--port`. Without `--port` the port is
+`$EXTEMPORE_NREPL_PORT`, then the one in a `.nrepl-port` file in the working
+directory (for `send --file`, the file's directory) or above it, then 7888.
 
 For a script or coding agent, start `extempore --no-audio --nrepl-port 0` in a
-scratch directory and send it code with `extempore-nrepl eval`. Libraries stay
-loaded between evals.
+scratch directory and send it code with `extempore send` from there. Libraries
+stay loaded between evals.
 
 ## The protocol
 

@@ -181,7 +181,8 @@ SchemeProcess* SchemeProcess::find(const std::string& Name) {
 }
 
 bool SchemeProcess::start(bool subsume) {
-    if (!UNIV::BATCH_MODE) {
+    const bool serve = !UNIV::BATCH_MODE && UNIV::LEGACY_SERVER;
+    if (serve) {
         ascii_info();
         printf("INFO:");
         ascii_default();
@@ -216,7 +217,7 @@ bool SchemeProcess::start(bool subsume) {
     if (subsume) {
         m_threadTask.setSubsume();
     }
-    if (!UNIV::BATCH_MODE) {
+    if (serve) {
         m_threadServer.start();
     }
     m_threadTask.start();
