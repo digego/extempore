@@ -174,20 +174,24 @@ release. The utility process itself stays; only its port goes.
 ### Compatibility
 
 A command line that uses any of the old mode options (`--run`, `--eval`,
-`--batch`, `--compile`, `--audio-outfile`, `--print-devices`) is parsed whole by
-today's rules, which are kept as they are: the last startup expression wins,
-unknown options are stored for `sys:cmdarg`, and `--audio-outfile` without
-`--duration` renders until `(quit)`. It prints the new form once, on stderr.
-Old and new forms can't be mixed.
+`--batch`, `--compile`, `--audio-outfile`, `--print-devices`) is rewritten as
+the subcommand which replaces it and then parsed like any other, so there is
+one grammar and one set of rules. It prints the new form once, on stderr.
 
-| old                                | new                                      |
-| ---------------------------------- | ---------------------------------------- |
-| `--run FILE`                       | `extempore FILE`                         |
-| `--eval EXPR`                      | `extempore -e EXPR`                      |
-| `--batch EXPR`                     | `extempore exec --wait -e EXPR`          |
-| `--audio-outfile F [--duration S]` | `extempore render ... -o F --duration S` |
-| `--compile F`                      | `extempore compile --exe F`              |
-| `--print-devices`                  | `extempore devices`                      |
+| old                                         | new                                       |
+| ------------------------------------------- | ----------------------------------------- |
+| `--run FILE`                                | `extempore FILE`                          |
+| `--eval EXPR`                               | `extempore -e EXPR`                       |
+| `--batch EXPR`                              | `extempore exec --wait -e EXPR`           |
+| `--run FILE --audio-outfile F --duration S` | `extempore render FILE -o F --duration S` |
+| `--compile F`                               | `extempore compile --exe F`               |
+| `--print-devices`                           | `extempore devices`                       |
+
+What an old line could do and no subcommand does is an error: an unknown
+option (once stored for `sys:cmdarg`, whose arguments now go after `--`),
+`--audio-outfile` with an expression or without `--duration`, and more than one
+of `--run`, `--eval`, `--batch` and `--compile` (the last one used to win).
+`--noaudio` beside `--batch` or `--compile` is dropped, since they imply it.
 
 Renamed options are accepted in the new grammar too, with the same notice:
 
@@ -201,9 +205,9 @@ Renamed options are accepted in the new grammar too, with the same notice:
 | `--port`                             | `--legacy-port`                   |
 | `--term nocolor`, `--term` otherwise | `--color never`, `--color always` |
 
-Both are a deprecation, with an end: the old parser and the renamed options
-work for two minor releases after the one that introduces the subcommands, and
-are then deleted together.
+Both are a deprecation, with an end: the old mode options and the renamed
+options work for two minor releases after the one that introduces the
+subcommands, and are then deleted together.
 
 Two options go outright, with an error naming the reason: `--timediv` (no users
 in the repo, and no documentation) and `--runtime` (deprecated already, for
@@ -441,7 +445,7 @@ connection again a few seconds later.
    audio-offline tests stop flaking before any interface changes.
 2. The new grammar and the runtime subcommands (`exec`, `test`, `render`,
    `compile`, `devices`), with the output and exit-status rules, `--seed`, and
-   the old parser kept for old command lines. Move the repo's callers over.
+   the old mode options rewritten into it. Move the repo's callers over.
 3. `send`, `repl` and `status`, and the legacy server's two options. AGENTS.md
    and the nREPL tests' client calls move to `send`.
 4. `extempore lsp` with the parser features and eval. The helix binding (in the

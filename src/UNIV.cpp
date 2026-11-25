@@ -493,7 +493,7 @@ std::atomic<double> AUDIO_CLOCK_NOW = 0.0;
 std::atomic<double> AUDIO_CLOCK_BASE = 0.0;
 uint64_t TIME_DIVISION = 1;
 bool AUDIO_NONE = false;
-bool BATCH_MODE = false;
+Mode MODE = Mode::Session;
 uint32_t AUDIO_DEVICE = -1;
 uint32_t AUDIO_IN_DEVICE = -1;
 std::string AUDIO_DEVICE_NAME;
@@ -501,15 +501,12 @@ std::string AUDIO_IN_DEVICE_NAME;
 double AUDIO_OUTPUT_LATENCY = 0.0;
 std::string AUDIO_OUTFILE_PATH;
 double AUDIO_OUTFILE_DURATION = 0.0;
-bool OFFLINE_RENDER = false;
-bool QUIET_START = false;
 bool LEGACY_SERVER = true;
-bool MESSAGES_TO_STDERR = false;
 std::atomic<bool> FAILED{false};
 bool SEEDED = false;
 uint64_t SEED = 0;
 FILE* message_stream() {
-    return MESSAGES_TO_STDERR ? stderr : stdout;
+    return messages_to_stderr() ? stderr : stdout;
 }
 bool is_terminal(FILE* Stream) {
 #ifdef _WIN32

@@ -4,6 +4,10 @@
 // which drives both its parser and its --help. Parsing is pure (arguments in,
 // an Invocation out) so that it can be unit-tested; src/Extempore.cpp acts on
 // the result. backlog/docs/doc-003 is the design.
+//
+// A command line with one of the old mode options (--run, --eval, --batch,
+// --compile, --audio-outfile, --print-devices) is rewritten as the subcommand
+// which replaces it and then parsed like any other, with a notice.
 
 #include <cstdint>
 #include <optional>
@@ -49,13 +53,11 @@ struct Invocation {
     std::vector<std::string_view> all(std::string_view Name) const;
 };
 
-// True for a command line which uses one of the old mode options (--run,
-// --eval, --batch, --compile, --audio-outfile, --print-devices). Such a line
-// is parsed whole by the old rules, which Extempore.cpp keeps as they were.
-bool usesOldGrammar(std::span<const std::string_view> Args);
-
 // Args excludes the program name.
 Invocation parse(std::span<const std::string_view> Args);
+
+// Inv's options as arguments again, for another extempore to parse.
+std::vector<std::string> optionArguments(const Invocation& Inv);
 
 // The --help text for a command; Session's lists the subcommands too.
 std::string help(Command Cmd);

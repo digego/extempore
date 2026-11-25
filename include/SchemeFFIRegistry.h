@@ -106,7 +106,7 @@ inline void schemeWriteColor(scheme* Scheme, bool Bold, unsigned Foreground, uns
 // port is left alone.
 inline void enterMessageScope(scheme* Scheme) {
     s7_scheme* sc = Scheme->sc;
-    const bool move = UNIV::MESSAGES_TO_STDERR &&
+    const bool move = UNIV::messages_to_stderr() &&
                       s7_current_output_port(sc) == s7_name_to_value(sc, "*stdout*");
     if (move) {
         s7_set_current_output_port(sc, s7_name_to_value(sc, "*stderr*"));

@@ -1354,7 +1354,7 @@ void initLLVM() {
     MainJD.addGenerator(std::move(*DLSGOrErr));
 
     // Print configuration.
-    if (!UNIV::QUIET_START) {
+    if (UNIV::MODE == UNIV::Mode::Session) {
         ascii_normal();
         std::cout << "ARCH           : " << std::flush;
         ascii_info();

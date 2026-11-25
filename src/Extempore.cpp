@@ -98,8 +98,8 @@ BOOL CtrlHandler(DWORD fdwCtrlType) {
 #else  // !_WIN32
 
 // Only async-signal-safe calls here: write(2) and _Exit are on the POSIX safe
-// list, printf/exit are not. AudioDevice::stop() (which finalises a WAV
-// written by --audio-outfile) is not safe to call from a handler either, so a
+// list, printf/exit are not. AudioDevice::stop() (which finalises the WAV
+// extempore render writes) is not safe to call from a handler either, so a
 // render interrupted by a signal is left with a provisional header; (quit)
 // is the clean way to end one.
 void sig_handler(int Signo) {
@@ -140,166 +140,6 @@ static void install_signal_handlers() {
 
 namespace {
 
-enum class Opt : std::uint8_t {
-    Help,
-    Version,
-    Run,
-    Eval,
-    Batch,
-    Port,
-    NreplPort,
-    NreplBind,
-    NoNrepl,
-    Term,
-    ShareDir,
-    NoBase,
-    OptLevel,
-    SampleRate,
-    Frames,
-    Channels,
-    InChannels,
-    NoAudio,
-    Device,
-    InDevice,
-    DeviceName,
-    InDeviceName,
-    Latency,
-    Realtime,
-    Arch,
-    Cpu,
-    Attr,
-    Compile,
-    Repl,
-    PrintDevices,
-    AudioOutfile,
-    Duration,
-};
-
-enum class Arg : std::uint8_t { None, Required };
-
-struct OptionSpec {
-    Opt id;
-    std::string_view name;  // including the leading "--"
-    Arg arg;
-    std::string_view help;
-};
-
-// The old grammar: one flat table of options, used for a command line with one
-// of the old mode options (cli::usesOldGrammar). It is kept as it was, and goes
-// when the old options do; src/CommandLine.cpp is the grammar in use.
-constexpr std::array<OptionSpec, 32> kOptions{{
-    {Opt::Help, "--help", Arg::None, "prints this menu"},
-    {Opt::Version, "--version", Arg::None, "prints the Extempore version and exits"},
-    {Opt::Run, "--run", Arg::Required, "path to a scheme file to load at startup"},
-    {Opt::Eval, "--eval", Arg::Required, "scheme expression to evaluate at startup"},
-    {Opt::Batch, "--batch", Arg::Required,
-     "run in batch mode (no server, single process, no audio) with given expression"},
-    {Opt::Port, "--port", Arg::Required, "port for primary process [7099]"},
-    {Opt::NreplPort, "--nrepl-port", Arg::Required,
-     "port for the nREPL server [7888]; 0 picks a free one and writes .nrepl-port"},
-    {Opt::NreplBind, "--nrepl-bind", Arg::Required,
-     "IPv4 address the nREPL server listens on [127.0.0.1]"},
-    {Opt::NoNrepl, "--no-nrepl", Arg::None, "don't start the nREPL server"},
-    {Opt::Term, "--term", Arg::Required,
-     "either ansi, cmd (windows), basic (for simpler ansi terms), or nocolor"},
-    {Opt::ShareDir, "--sharedir", Arg::Required,
-     "location of the Extempore share dir (which contains runtime/, libs/, examples/, etc.)"},
-    {Opt::NoBase, "--nobase", Arg::None, "don't load base lib on startup"},
-    {Opt::OptLevel, "--opt-level", Arg::Required, "LLVM optimization level 0-3"},
-    {Opt::SampleRate, "--samplerate", Arg::Required, "audio samplerate"},
-    {Opt::Frames, "--frames", Arg::Required, "attempts to force frames [1024]"},
-    {Opt::Channels, "--channels", Arg::Required, "attempts to force num of output audio channels"},
-    {Opt::InChannels, "--inchannels", Arg::Required,
-     "attempts to force num of input audio channels"},
-    {Opt::NoAudio, "--noaudio", Arg::None,
-     "no audio output: use a \"dummy\" device (overrides --device option)"},
-    {Opt::Device, "--device", Arg::Required,
-     "the index of the audio device to use (output or duplex)"},
-    {Opt::InDevice, "--indevice", Arg::Required, "the index of the audio input device to use"},
-    {Opt::DeviceName, "--device-name", Arg::Required,
-     "a regex to match the name of the audio device to use (output or duplex) (overrides "
-     "index)"},
-    {Opt::InDeviceName, "--indevice-name", Arg::Required,
-     "a regex to match the name of the audio input device to use (overrides index)"},
-    {Opt::Latency, "--latency", Arg::Required, "attempts to force audio output latency"},
-    {Opt::Realtime, "--realtime", Arg::None, "use realtime process priority (Windows only)"},
-    {Opt::Arch, "--arch", Arg::Required, "the target architecture [current host]"},
-    {Opt::Cpu, "--cpu", Arg::Required, "the target cpu [current host]"},
-    {Opt::Attr, "--attr", Arg::Required, "additional target attributes (allows multiple)"},
-    {Opt::Compile, "--compile", Arg::Required, "compiles xtm file to native executable"},
-    {Opt::Repl, "--repl", Arg::None, "start an interactive REPL (Linux/macOS only)"},
-    {Opt::PrintDevices, "--print-devices", Arg::None,
-     "print the available audio devices to console"},
-    {Opt::AudioOutfile, "--audio-outfile", Arg::Required,
-     "render DSP output to the given WAV file (float32) instead of an audio device"},
-    {Opt::Duration, "--duration", Arg::Required,
-     "hard cap on --audio-outfile render length (seconds); 0 = render until (quit)"},
-}};
-
-const OptionSpec* find_option(std::string_view name) {
-    for (const auto& spec : kOptions) {
-        if (spec.name == name) {
-            return &spec;
-        }
-    }
-    return nullptr;
-}
-
-void print_help() {
-    size_t width = 0;
-    for (const auto& spec : kOptions) {
-        width = std::max(width, spec.name.size());
-    }
-    std::cout << "Extempore's command line options: " << std::endl;
-    for (const auto& spec : kOptions) {
-        std::cout << std::string(width + 4 - spec.name.size(), ' ') << spec.name << ": "
-                  << spec.help << std::endl;
-    }
-}
-
-// Whole-string integer parse; false (with a message) on anything else, so
-// "--samplerate abc" is an error rather than a sample rate of zero.
-template <typename T> bool parse_integer(std::string_view option, std::string_view text, T& out) {
-    T value{};
-    auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
-    if (ec != std::errc() || end != text.data() + text.size()) {
-        std::cout << "Error: " << option << " expects a whole number, got \"" << text << "\""
-                  << std::endl;
-        return false;
-    }
-    out = value;
-    return true;
-}
-
-// strtod rather than from_chars: libc++ only gained floating-point from_chars
-// recently and macOS ships older versions.
-bool parse_real(std::string_view option, std::string_view text, double& out) {
-    const std::string copy(text);
-    char* end = nullptr;
-    errno = 0;
-    const double value = strtod(copy.c_str(), &end);
-    if (copy.empty() || end != copy.c_str() + copy.size() || errno == ERANGE) {
-        std::cout << "Error: " << option << " expects a number, got \"" << text << "\""
-                  << std::endl;
-        return false;
-    }
-    out = value;
-    return true;
-}
-
-// Double every backslash in a string, so Windows paths survive embedding in a
-// Scheme string literal.
-std::string escape_backslashes(std::string str) {
-    size_t start_pos = 0;
-    const std::string from("\\");
-    const std::string to("\\\\");
-    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-        str.replace(start_pos, from.length(), to);
-        start_pos += to.length();
-    }
-    return str;
-}
-
 struct Settings {
     std::string initexpr;
     int primary_port = 7099;
@@ -309,255 +149,14 @@ struct Settings {
     std::string nrepl_bind = "127.0.0.1";
     bool repl_mode = false;
     std::string sharedir;  // --share-dir, empty when not given
-    // exec, test and compile: exit once the code has finished, nothing is
-    // scheduled and every process is idle
+    // exec (without --wait) and compile: exit once the code has finished,
+    // nothing is scheduled and every process is idle
     bool exit_when_done = false;
     // the file a subcommand was given, looked for before anything starts
     std::string file;
 };
 
 enum class ParseResult : std::uint8_t { Continue, Exit };
-
-// Apply one parsed option. `value` is set for Arg::Required options.
-// Returns Exit (with status) when the option ends the run (--help, --version,
-// --print-devices, or an invalid value).
-ParseResult apply_option(const OptionSpec& spec, std::string_view value, Settings& settings,
-                         int& status) {
-    using namespace extemp;
-    status = 0;
-    switch (spec.id) {
-    case Opt::Compile:
-        UNIV::EXT_LOADBASE = false;  // never load base when compiling
-        settings.initexpr =
-            "(xtc:aot:compile-xtm-exe \"" + escape_backslashes(std::string(value)) + "\")";
-        break;
-    case Opt::ShareDir:
-        settings.sharedir = std::string(value);
-        break;
-    case Opt::SampleRate:
-        if (!parse_integer(spec.name, value, UNIV::SAMPLE_RATE)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        if (UNIV::SAMPLE_RATE == 0) {
-            std::cout << "Error: --samplerate must be a positive number" << std::endl;
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::Frames:
-        if (!parse_integer(spec.name, value, UNIV::NUM_FRAMES)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::Channels:
-        if (!parse_integer(spec.name, value, UNIV::CHANNELS)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::InChannels:
-        if (!parse_integer(spec.name, value, UNIV::IN_CHANNELS)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::Eval:
-        settings.initexpr = std::string(value);
-        break;
-    case Opt::Batch:
-        settings.initexpr = std::string(value);
-        UNIV::BATCH_MODE = true;
-        // AUDIO_NONE is set after parsing, only if --audio-outfile wasn't passed
-        break;
-    case Opt::Run:
-        settings.initexpr = "(sys:load \"" + escape_backslashes(std::string(value)) + "\")";
-        break;
-    case Opt::NoBase:
-        UNIV::EXT_LOADBASE = false;
-        break;
-    case Opt::Port:
-        if (!parse_integer(spec.name, value, settings.primary_port)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::NreplPort:
-        if (!parse_integer(spec.name, value, settings.nrepl_port)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        settings.nrepl_port_given = true;
-        break;
-    case Opt::NreplBind:
-        settings.nrepl_bind = std::string(value);
-        break;
-    case Opt::NoNrepl:
-        settings.nrepl = false;
-        break;
-    case Opt::Term:
-        if (value == "cmd") {
-            UNIV::EXT_TERM = UNIV::TerminalMode::Cmd;
-        } else if (value == "basic") {
-            UNIV::EXT_TERM = UNIV::TerminalMode::Basic;
-        } else if (value == "nocolor") {
-            UNIV::EXT_TERM = UNIV::TerminalMode::NoColor;
-        } else if (value == "ansi") {
-            UNIV::EXT_TERM = UNIV::TerminalMode::Ansi;
-        } else {
-#ifdef _WIN32
-            UNIV::EXT_TERM = UNIV::TerminalMode::Cmd;
-#else
-            UNIV::EXT_TERM = UNIV::TerminalMode::Ansi;
-#endif
-        }
-        break;
-    case Opt::NoAudio:
-        UNIV::AUDIO_NONE = true;
-        break;
-    case Opt::Device:
-        if (!parse_integer(spec.name, value, UNIV::AUDIO_DEVICE)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::InDevice:
-        if (!parse_integer(spec.name, value, UNIV::AUDIO_IN_DEVICE)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::DeviceName:
-        UNIV::AUDIO_DEVICE_NAME = std::string(value);
-        break;
-    case Opt::InDeviceName:
-        UNIV::AUDIO_IN_DEVICE_NAME = std::string(value);
-        break;
-    case Opt::Latency: {
-        int ms = 0;
-        if (!parse_integer(spec.name, value, ms)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        UNIV::AUDIO_OUTPUT_LATENCY = ms / 1000.0;
-    } break;
-    case Opt::PrintDevices:
-        AudioDevice::printDevices();
-        return ParseResult::Exit;
-    case Opt::Realtime:
-#ifdef _WIN32
-        SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
-#else
-        std::cout << "Realtime priority setting not available on your platform" << std::endl;
-#endif
-        break;
-    case Opt::Arch:
-        UNIV::ARCH = std::string(value);
-        break;
-    case Opt::Cpu:
-        UNIV::CPU = std::string(value);
-        break;
-    case Opt::Attr:
-        UNIV::ATTRS.push_back(std::string(value));
-        break;
-    case Opt::OptLevel:
-        if (!parse_integer(spec.name, value, EXTLLVM::OPTIMIZATION_LEVEL)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::AudioOutfile:
-        UNIV::AUDIO_OUTFILE_PATH = std::string(value);
-        break;
-    case Opt::Duration:
-        if (!parse_real(spec.name, value, UNIV::AUDIO_OUTFILE_DURATION)) {
-            status = 1;
-            return ParseResult::Exit;
-        }
-        break;
-    case Opt::Repl:
-#ifndef _WIN32
-        settings.repl_mode = true;
-#else
-        std::cout << "--repl is not supported on Windows" << std::endl;
-        status = 1;
-        return ParseResult::Exit;
-#endif
-        break;
-    case Opt::Version:
-        std::cout << "Extempore " << EXTEMPORE_VERSION << std::endl;
-        return ParseResult::Exit;
-    case Opt::Help:
-        print_help();
-        return ParseResult::Exit;
-    }
-    return ParseResult::Continue;
-}
-
-// Parse the command line: known options take a value as "--x v" or "--x=v";
-// an unknown "--name[=value]" is recorded in UNIV::CMDPARAMS for Scheme code
-// to read (with a warning); a single-dash argument is an error.
-ParseResult parse_args(std::span<char*> args, Settings& settings, int& status) {
-    status = 0;
-    for (size_t i = 0; i < args.size(); ++i) {
-        const std::string_view arg(args[i]);
-        if (!arg.starts_with("--")) {
-            if (arg.starts_with("-")) {
-                std::cout << "Poorly formed argument: " << arg << std::endl;
-                status = 1;
-                return ParseResult::Exit;
-            }
-            std::cout << "Warning: ignoring stray argument: " << arg << std::endl;
-            continue;
-        }
-        std::string_view name = arg;
-        std::optional<std::string_view> inline_value;
-        if (auto eq = arg.find('='); eq != std::string_view::npos) {
-            name = arg.substr(0, eq);
-            inline_value = arg.substr(eq + 1);
-        }
-        if (name == "--timediv" || name == "--runtime") {
-            std::cerr << "extempore: " << name << " is gone"
-                      << (name == "--runtime" ? ": use --share-dir" : "") << std::endl;
-            status = 2;
-            return ParseResult::Exit;
-        }
-        const auto* spec = find_option(name);
-        if (!spec) {
-            extemp::UNIV::CMDPARAMS[std::string(name.substr(2))] =
-                std::string(inline_value.value_or(""));
-            ascii_warning();
-            std::cout << "**** WARNING: Setting non-standard option: " << name.substr(2);
-            if (inline_value) {
-                std::cout << " to " << *inline_value;
-            }
-            std::cout << std::endl << std::flush;
-            ascii_default();
-            continue;
-        }
-        std::string_view value;
-        if (spec->arg == Arg::Required) {
-            if (inline_value) {
-                value = *inline_value;
-            } else if (i + 1 < args.size()) {
-                value = args[++i];
-            } else {
-                std::cout << "Error: option " << spec->name << " requires a value" << std::endl;
-                status = 1;
-                return ParseResult::Exit;
-            }
-        } else if (inline_value) {
-            std::cout << "Error: option " << spec->name << " does not take a value" << std::endl;
-            status = 1;
-            return ParseResult::Exit;
-        }
-        if (apply_option(*spec, value, settings, status) == ParseResult::Exit) {
-            return ParseResult::Exit;
-        }
-    }
-    return ParseResult::Continue;
-}
 
 // A Scheme string literal for Text.
 std::string scheme_string(std::string_view Text) {
@@ -601,13 +200,8 @@ int run_test_files(const extemp::cli::Invocation& Inv) {
     std::vector<std::string> failed;
     for (const auto& file : Inv.files) {
         std::vector<std::string> args{self, "test", file};
-        for (const auto& [name, value] : Inv.options) {
-            args.push_back("--" + name);
-            if (!value.empty() || name == "junit" || name == "share-dir" || name == "color" ||
-                name == "opt-level") {
-                args.push_back(value);
-            }
-        }
+        const auto options = extemp::cli::optionArguments(Inv);
+        args.insert(args.end(), options.begin(), options.end());
         const std::vector<llvm::StringRef> argv(args.begin(), args.end());
         std::cout << "\n=== " << file << std::endl;
         std::string error;
@@ -627,8 +221,8 @@ int run_test_files(const extemp::cli::Invocation& Inv) {
     return failed.empty() ? 0 : 1;
 }
 
-// Act on a command line in the current grammar (src/CommandLine.cpp). Returns
-// Exit, with the process's exit status, when there is no runtime to start.
+// Act on a parsed command line (src/CommandLine.cpp). Returns Exit, with the
+// process's exit status, when there is no runtime to start.
 ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& settings, int& status) {
     using namespace extemp;
     using cli::Command;
@@ -727,11 +321,6 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
     }
     const std::string file = Inv.files.empty() ? std::string() : Inv.files.front();
     settings.file = file;
-    // every subcommand but the session: one process, no servers, no banner
-    if (Inv.command != Command::Session) {
-        UNIV::BATCH_MODE = true;
-        UNIV::QUIET_START = true;
-    }
     // loads File, and has the run exit with status 1 if a form in it failed
     const auto load = [](const std::string& File) {
         return "(if (not (sys:load " + scheme_string(File) + ")) (sys:note-failure))";
@@ -760,12 +349,12 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         device("device", UNIV::AUDIO_DEVICE, UNIV::AUDIO_DEVICE_NAME);
         device("in-device", UNIV::AUDIO_IN_DEVICE, UNIV::AUDIO_IN_DEVICE_NAME);
         int latency = 0;
-        if (Inv.has("latency") && set_whole(Inv, "latency", latency)) {
-            UNIV::AUDIO_OUTPUT_LATENCY = latency / 1000.0;
+        if (!set_whole(Inv, "latency", latency)) {
+            status = 2;
+            return ParseResult::Exit;
         }
-        if (Inv.has("no-audio")) {
-            UNIV::AUDIO_NONE = true;
-        }
+        UNIV::AUDIO_OUTPUT_LATENCY = latency / 1000.0;
+        UNIV::AUDIO_NONE = Inv.has("no-audio");
         if (Inv.has("realtime")) {
 #ifdef _WIN32
             SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
@@ -801,13 +390,12 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         }
     } break;
     case Command::Exec:
-        UNIV::AUDIO_NONE = true;
-        UNIV::MESSAGES_TO_STDERR = true;
+        UNIV::MODE = UNIV::Mode::Exec;
         settings.exit_when_done = !Inv.has("wait");
         settings.initexpr = file.empty() ? std::string(Inv.get("e").value_or("")) : load(file);
         break;
     case Command::Test: {
-        UNIV::AUDIO_NONE = true;
+        UNIV::MODE = UNIV::Mode::Test;
         std::string report;
         if (const auto dir = Inv.get("junit")) {
             std::error_code ec;
@@ -823,7 +411,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         settings.initexpr = "(xtmtest-run-tests " + scheme_string(file) + " #t #t" + report + ")";
     } break;
     case Command::Render: {
-        UNIV::MESSAGES_TO_STDERR = true;
+        UNIV::MODE = UNIV::Mode::Render;
         UNIV::AUDIO_OUTFILE_PATH = std::string(Inv.get("o").value_or(""));
         UNIV::AUDIO_OUTFILE_DURATION =
             std::strtod(std::string(Inv.get("duration").value_or("0")).c_str(), nullptr);
@@ -835,7 +423,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         settings.initexpr = load(file);
     } break;
     case Command::Compile:
-        UNIV::AUDIO_NONE = true;
+        UNIV::MODE = UNIV::Mode::Compile;
         UNIV::EXT_LOADBASE = false;  // a library loads what it needs; an executable never has base
         settings.exit_when_done = true;
         if (const auto arch = Inv.get("arch")) {
@@ -874,36 +462,16 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
         break;
     }
 
+    // only a session and a render have an audio device (the render's is a file)
+    if (UNIV::MODE != UNIV::Mode::Session && UNIV::MODE != UNIV::Mode::Render) {
+        UNIV::AUDIO_NONE = true;
+    }
     const std::string_view color = Inv.get("color").value_or("auto");
     if (color == "never" || (color == "auto" && (!UNIV::is_terminal(UNIV::message_stream()) ||
                                                  std::getenv("NO_COLOR") != nullptr))) {
         UNIV::EXT_TERM = UNIV::TerminalMode::NoColor;
     }
     return ParseResult::Continue;
-}
-
-// What to type instead of each old mode option, for the deprecation notice.
-void print_old_grammar_notice(std::span<const std::string_view> Args) {
-    struct Replacement {
-        std::string_view option;
-        std::string_view now;
-    };
-    static constexpr std::array<Replacement, 6> replacements{{
-        {"--run", "extempore FILE"},
-        {"--eval", "extempore -e EXPR"},
-        {"--batch", "extempore exec -e EXPR (add --wait if the code ends by calling (quit))"},
-        {"--audio-outfile", "extempore render FILE -o OUT.wav --duration SECONDS"},
-        {"--compile", "extempore compile --exe FILE"},
-        {"--print-devices", "extempore devices"},
-    }};
-    for (const auto& [option, now] : replacements) {
-        const bool used = std::ranges::any_of(
-            Args, [&](std::string_view arg) { return arg.substr(0, arg.find('=')) == option; });
-        if (used) {
-            std::cerr << "extempore: " << option << " is deprecated and will be removed: use "
-                      << now << std::endl;
-        }
-    }
 }
 
 }  // namespace
@@ -925,14 +493,7 @@ EXPORT int extempore_init(int argc, char** argv) {
     Settings settings;
     int status = 0;
     const std::vector<std::string_view> args(argv + (argc > 0 ? 1 : 0), argv + argc);
-    ParseResult parsed;
-    if (extemp::cli::usesOldGrammar(args)) {
-        print_old_grammar_notice(args);
-        parsed = parse_args(std::span<char*>(argv + 1, size_t(argc - 1)), settings, status);
-    } else {
-        parsed = apply_invocation(extemp::cli::parse(args), settings, status);
-    }
-    if (parsed == ParseResult::Exit) {
+    if (apply_invocation(extemp::cli::parse(args), settings, status) == ParseResult::Exit) {
         return status;
     }
     extemp::UNIV::SHARE_DIR = extemp::UNIV::resolve_share_dir(settings.sharedir);
@@ -949,20 +510,8 @@ EXPORT int extempore_init(int argc, char** argv) {
     }
     const int primary_port = settings.primary_port;
     const int utility_port = primary_port - 1;
-    // --batch implies --noaudio only when --audio-outfile was not specified.
-    // --audio-outfile lets batch runs render DSP to a file via the offline driver.
-    if (extemp::UNIV::BATCH_MODE && extemp::UNIV::AUDIO_OUTFILE_PATH.empty()) {
-        extemp::UNIV::AUDIO_NONE = true;
-    }
-    extemp::UNIV::OFFLINE_RENDER = !extemp::UNIV::AUDIO_OUTFILE_PATH.empty();
-    if (extemp::UNIV::OFFLINE_RENDER && extemp::UNIV::AUDIO_NONE) {
-        ascii_error();
-        std::cout << "Error: --audio-outfile cannot be combined with --noaudio" << std::endl;
-        ascii_normal();
-        return 1;
-    }
-    const bool banner = !extemp::UNIV::QUIET_START;
-    if (banner) {
+    const bool session = extemp::UNIV::MODE == extemp::UNIV::Mode::Session;
+    if (session) {
         ascii_normal();
         std::cout << std::endl;
         std::cout << "------------- Extempore -------------- " << std::endl;
@@ -988,7 +537,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         extemp::TaskScheduler::I()->setFrames(extemp::UNIV::NUM_FRAMES);
     }
     // an offline render runs the scheduler itself, from its render thread
-    if (!extemp::UNIV::OFFLINE_RENDER) {
+    if (extemp::UNIV::MODE != extemp::UNIV::Mode::Render) {
         extemp::TaskScheduler::I()->start();
     }
     extemp::EXTLLVM::initLLVM();
@@ -1004,7 +553,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
     }
-    if (banner) {
+    if (session) {
         ascii_normal();
         std::cout << "Primary        : ";
         ascii_info();
@@ -1017,8 +566,8 @@ EXPORT int extempore_init(int argc, char** argv) {
     // The processes below live for the whole run and are never
     // destroyed: primary->start(true) subsumes this thread and (quit) ends the
     // process with _Exit, so they are deliberately leaked rather than owned.
-    if (extemp::UNIV::BATCH_MODE) {
-        // Batch mode: single process, no server, no utility process
+    if (!session) {
+        // every subcommand: a single process, no servers, no utility process
         auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name,
                                                   primary_port, 0, settings.initexpr);
         extemp::AudioDevice::startFileDriver();
@@ -1033,7 +582,7 @@ EXPORT int extempore_init(int argc, char** argv) {
         return 0;
     }
 
-    // Normal mode: utility + primary processes with server threads
+    // a session: utility + primary processes with server threads
     auto* utility =
         new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
     if (!utility->start()) {

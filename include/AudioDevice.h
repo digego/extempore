@@ -189,7 +189,7 @@ class AudioDevice {
         m_overflows.fetch_add(1, std::memory_order_relaxed);
     }
 
-    // FileAudioDriver hooks (offline --audio-outfile mode). These are no-ops
+    // FileAudioDriver hooks (extempore render). These are no-ops
     // unless start() opened the file named by UNIV::AUDIO_OUTFILE_PATH.
     // startFileDriver() begins rendering, and is called once the primary
     // process exists, since the render waits for it to load before the first

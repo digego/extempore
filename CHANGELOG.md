@@ -129,10 +129,14 @@ unknown option is an error, and a script's own arguments go after `--`, where
 `sys:cmdarg` reads them. `extempore --help` and `extempore SUBCOMMAND --help`
 list it all.
 
-The old spellings still work and say what replaces them. `--run`, `--eval`,
-`--batch`, `--compile`, `--audio-outfile` and `--print-devices` are deprecated,
-as are the unhyphenated option names and `--term`; they will be removed two
-releases from now. `--timediv` and `--runtime` are gone.
+The old spellings still work and say what replaces them. A command line with
+`--run`, `--eval`, `--batch`, `--compile`, `--audio-outfile` or
+`--print-devices` runs as the subcommand which replaces it (`--batch EXPR` as
+`extempore exec --wait -e EXPR`, `--run FILE --audio-outfile OUT.wav` as
+`extempore render`), with that subcommand's output and rules: an unknown option
+is an error there too, and a render takes a file and a `--duration`. These
+options are deprecated, as are the unhyphenated option names and `--term`; they
+will be removed two releases from now. `--timediv` and `--runtime` are gone.
 
 Extempore runs an [nREPL](https://nrepl.org) server, on `127.0.0.1:7888`, beside
 the eval server on 7099: clients get each form's value, the output it printed,

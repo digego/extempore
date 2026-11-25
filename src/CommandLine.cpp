@@ -196,6 +196,7 @@ const Option* findOption(const Subcommand& Sub, std::string_view Name) {
 struct Renamed {
     std::string_view oldName;
     std::string_view newName;
+    std::string_view note = "";  // added to the notice
 };
 constexpr std::array<Renamed, 9> kRenamed{{
     {"noaudio", "no-audio"},
@@ -206,7 +207,8 @@ constexpr std::array<Renamed, 9> kRenamed{{
     {"device-name", "device"},
     {"indevice-name", "in-device"},
     {"sharedir", "share-dir"},
-    {"port", "legacy-port"},
+    // the clients' --port is the nREPL server's
+    {"port", "legacy-port", " (the eval server's port; the nREPL server's is --nrepl-port)"},
 }};
 
 // Options which are gone, and why.
@@ -219,8 +221,21 @@ constexpr std::array<Removed, 2> kRemoved{{
     {"runtime", "use --share-dir"},
 }};
 
-constexpr std::array<std::string_view, 6> kOldModeOptions{
-    "--run", "--eval", "--batch", "--compile", "--audio-outfile", "--print-devices"};
+// The old mode options, and what to type instead of each.
+struct OldMode {
+    std::string_view option;
+    std::string_view now;
+    bool takesValue = true;
+};
+enum : std::uint8_t { kRun, kEval, kBatch, kCompile, kOutfile, kDevices };
+constexpr std::array<OldMode, 6> kOldModes{{
+    {"--run", "extempore FILE"},
+    {"--eval", "extempore -e EXPR"},
+    {"--batch", "extempore exec -e EXPR (add --wait if the code ends by calling (quit))"},
+    {"--compile", "extempore compile --exe FILE"},
+    {"--audio-outfile", "extempore render FILE -o OUT.wav --duration SECONDS"},
+    {"--print-devices", "extempore devices", false},
+}};
 
 bool isWhole(std::string_view Text) {
     return !Text.empty() && std::ranges::all_of(Text, [](char c) { return c >= '0' && c <= '9'; });
@@ -288,20 +303,92 @@ std::vector<std::string_view> Invocation::all(std::string_view Name) const {
     return values;
 }
 
-bool usesOldGrammar(std::span<const std::string_view> Args) {
-    for (const auto arg : Args) {
-        if (arg == "--") {
-            break;
+namespace {
+
+// A command line which uses the old mode options, as the subcommand which
+// replaces them.
+struct Rewritten {
+    std::vector<std::string> args;
+    std::vector<std::string> notices;
+    std::string error;
+};
+
+// Empty if Args uses none of the old mode options.
+std::optional<Rewritten> rewriteOldModes(std::span<const std::string_view> Args) {
+    std::array<std::optional<std::string>, kOldModes.size()> given;
+    Rewritten result;
+    std::vector<std::string> rest;
+    std::size_t i = 0;
+    for (; i < Args.size() && Args[i] != "--"; ++i) {
+        const std::string_view arg = Args[i];
+        const auto eq = arg.find('=');
+        const auto mode = std::ranges::find(kOldModes, arg.substr(0, eq), &OldMode::option);
+        if (mode == kOldModes.end()) {
+            rest.emplace_back(arg);
+            continue;
         }
-        const auto name = arg.substr(0, arg.find('='));
-        if (std::ranges::find(kOldModeOptions, name) != kOldModeOptions.end()) {
-            return true;
+        auto& value = given[std::size_t(mode - kOldModes.begin())];
+        if (!value) {
+            result.notices.push_back(std::string(mode->option) +
+                                     " is deprecated and will be removed: use " +
+                                     std::string(mode->now));
+        }
+        if (!mode->takesValue) {
+            value = "";
+        } else if (eq != std::string_view::npos) {
+            value = std::string(arg.substr(eq + 1));
+        } else if (i + 1 < Args.size()) {
+            value = std::string(Args[++i]);
+        } else {
+            result.error = std::string(mode->option) + " requires a value";
         }
     }
-    return false;
+    if (result.notices.empty()) {
+        return std::nullopt;
+    }
+    if (!result.error.empty()) {
+        return result;
+    }
+    const auto& run = given[kRun];
+    const auto& eval = given[kEval];
+    const auto& batch = given[kBatch];
+    const auto& compile = given[kCompile];
+    const auto& outfile = given[kOutfile];
+    bool session = false;
+    if (int(run.has_value()) + int(eval.has_value()) + int(batch.has_value()) +
+            int(compile.has_value()) >
+        1) {
+        result.error = "give one of --run, --eval, --batch and --compile";
+    } else if (given[kDevices]) {
+        result.args = {"devices"};
+    } else if (compile) {
+        result.args = {"compile", "--exe", *compile};
+    } else if (outfile && run) {
+        result.args = {"render", *run, "-o", *outfile};
+    } else if (outfile) {
+        result.error = "--audio-outfile needs a file to render (--run FILE)";
+    } else if (batch) {
+        result.args = {"exec", "--wait", "-e", *batch};
+    } else if (run) {
+        session = true;
+        result.args = {*run};
+    } else if (eval) {
+        session = true;
+        result.args = {"-e", *eval};
+    }
+    // --batch meant no audio, and command lines often said so as well
+    for (auto& arg : rest) {
+        if (session || arg != "--noaudio") {
+            result.args.push_back(std::move(arg));
+        }
+    }
+    for (; i < Args.size(); ++i) {
+        result.args.emplace_back(Args[i]);
+    }
+    return result;
 }
 
-Invocation parse(std::span<const std::string_view> Args) {
+Invocation parseCurrent(std::span<const std::string_view> Args) {
     Invocation inv;
     std::size_t i = 0;
     if (!Args.empty()) {
@@ -381,7 +468,7 @@ Invocation parse(std::span<const std::string_view> Args) {
         if (const auto renamed = std::ranges::find(kRenamed, name, &Renamed::oldName);
             renamed != kRenamed.end() && findOption(sub, renamed->newName)) {
             inv.notices.push_back("--" + std::string(name) + " is now --" +
-                                  std::string(renamed->newName));
+                                  std::string(renamed->newName) + std::string(renamed->note));
             name = renamed->newName;
         }
         const Option* option = findOption(sub, name);
@@ -491,6 +578,36 @@ Invocation parse(std::span<const std::string_view> Args) {
         break;
     }
     return inv;
+}
+
+}  // namespace
+
+Invocation parse(std::span<const std::string_view> Args) {
+    auto rewritten = rewriteOldModes(Args);
+    if (!rewritten) {
+        return parseCurrent(Args);
+    }
+    Invocation inv;
+    if (rewritten->error.empty()) {
+        const std::vector<std::string_view> args(rewritten->args.begin(), rewritten->args.end());
+        inv = parseCurrent(args);
+    } else {
+        inv.error = std::move(rewritten->error);
+    }
+    inv.notices.insert(inv.notices.begin(), rewritten->notices.begin(), rewritten->notices.end());
+    return inv;
+}
+
+std::vector<std::string> optionArguments(const Invocation& Inv) {
+    const Subcommand& sub = subcommand(Inv.command);
+    std::vector<std::string> args;
+    for (const auto& [name, value] : Inv.options) {
+        args.push_back(dashed(name));
+        if (findOption(sub, name)->kind != Kind::Flag) {
+            args.push_back(value);
+        }
+    }
+    return args;
 }
 
 std::string help(Command Cmd) {

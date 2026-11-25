@@ -183,6 +183,7 @@ class Usage(Scratch):
             "render", "examples/core/hello-sine.xtm", mentions="-o OUT.wav"
         )
         self.assert_usage_error("--sample-rate", "fast", mentions="whole number")
+        self.assert_usage_error("--latency", "99999999999", mentions="too large")
         self.assert_usage_error("--timediv", "4", mentions="is gone")
         self.assert_usage_error("--runtime", "/x", mentions="--share-dir")
 
@@ -206,50 +207,33 @@ class Usage(Scratch):
         self.assertIn("--nobase is now --no-base", p.stderr)
 
 
-class OldGrammar(Scratch):
-    """Command lines with the old mode options keep their old behaviour."""
+class OldModeOptions(Scratch):
+    """A command line with an old mode option runs as the subcommand which
+    replaces it, and says so."""
 
-    def test_batch_runs_until_quit_and_says_what_replaces_it(self) -> None:
-        p = run(
-            "--term",
-            "nocolor",
-            "--nobase",
-            "--batch",
-            "(begin (println 'hello) (quit 3))",
-        )
+    def test_batch_is_exec_wait(self) -> None:
+        p = run("--nobase", "--batch", "(begin (println 'hello) (quit 3))")
         self.assertEqual(p.returncode, 3)
-        self.assertIn("hello\n", p.stdout)
-        self.assertIn(
-            "Evaluating expression", p.stdout
-        )  # the old output, banner and all
+        self.assertEqual(p.stdout, "hello\n")
         self.assertIn("--batch is deprecated", p.stderr)
         self.assertIn("extempore exec", p.stderr)
 
-    def test_unknown_options_are_still_kept_for_the_code(self) -> None:
-        p = run(
-            "--term",
-            "nocolor",
-            "--nobase",
-            "--label=x",
-            "--batch",
-            '(begin (println (sys:cmdarg "label")) (quit 0))',
-        )
-        self.assertEqual(p.returncode, 0)
-        self.assertIn('"x"\n', p.stdout)
+    def test_an_unknown_option_is_an_error_there_too(self) -> None:
+        p = run("--nobase", "--label=x", "--batch", "(quit 0)")
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("unknown option --label", p.stderr)
 
-    def test_audio_outfile_renders_until_the_duration(self) -> None:
+    def test_audio_outfile_is_render(self) -> None:
         wav = self.dir / "old.wav"
         p = run(
-            "--term",
-            "nocolor",
-            "--batch",
-            '(sys:load "examples/core/hello-sine.xtm")',
+            "--run",
+            "examples/core/hello-sine.xtm",
             "--audio-outfile",
             str(wav),
             "--duration",
             "0.5",
         )
-        self.assertEqual(p.returncode, 0)
+        self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(wav.stat().st_size, 44 + 22050 * 2 * 4)
         self.assertIn("--audio-outfile is deprecated", p.stderr)
 

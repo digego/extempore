@@ -125,30 +125,30 @@ enum class TerminalMode : uint32_t {
 extern TerminalMode EXT_TERM;
 extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;
-extern bool BATCH_MODE;
+// What this extempore was started to do: a live session, or one of the
+// subcommands which start a runtime (src/CommandLine.cpp). Only a session has
+// a banner, a utility process and servers. In a render the render thread owns
+// the clock and advances it only between blocks, so audio time stands still
+// while a task runs.
+enum class Mode : uint8_t { Session, Exec, Test, Render, Compile };
+extern Mode MODE;
+// exec and render keep stdout for what the code prints: load and compiler
+// messages and error reports go to stderr.
+inline bool messages_to_stderr() {
+    return MODE == Mode::Exec || MODE == Mode::Render;
+}
 extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern std::string AUDIO_DEVICE_NAME;
 extern std::string AUDIO_IN_DEVICE_NAME;
 extern double AUDIO_OUTPUT_LATENCY;
-// --audio-outfile <path>: if non-empty, DSP output is written to a WAV file
-// via the offline FileAudioDriver instead of opening a PortAudio stream.
+// extempore render: the WAV file the offline FileAudioDriver writes, and the
+// length of audio to render, in seconds.
 extern std::string AUDIO_OUTFILE_PATH;
-// --duration <seconds>: optional hard cap on offline render length. 0 means
-// render until (quit) is called.
 extern double AUDIO_OUTFILE_DURATION;
-// True for an offline render: the render thread owns the clock and advances
-// it only between blocks, so audio time stands still while a task runs.
-extern bool OFFLINE_RENDER;
-// Set by the subcommands which aren't a live session (exec, test, render,
-// compile): no banner or startup report.
-extern bool QUIET_START;
 // False under --no-legacy-server: the processes open no eval-server sockets
 // (7099 and below); nREPL is then the only way in.
 extern bool LEGACY_SERVER;
-// Set by exec and render, whose stdout is for what the code prints: load and
-// compiler messages and error reports go to stderr.
-extern bool MESSAGES_TO_STDERR;
 // An uncaught error was reported, or the code said it failed
 // (sys:note-failure): exec and render then exit with status 1.
 extern std::atomic<bool> FAILED;
@@ -156,7 +156,7 @@ extern std::atomic<bool> FAILED;
 // rather than from the system's entropy.
 extern bool SEEDED;
 extern uint64_t SEED;
-// stderr when MESSAGES_TO_STDERR, else stdout.
+// stderr when messages_to_stderr(), else stdout.
 FILE* message_stream();
 bool is_terminal(FILE* Stream);
 // The running extempore's own path, or "" if the platform won't say.

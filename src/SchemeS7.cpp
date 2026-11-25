@@ -111,7 +111,7 @@ static int64_t steady_nanoseconds() {
 static void set_call_times(scheme* sc, uint64_t start_time, uint64_t end_time) {
     sc->call_start_time = start_time;
     sc->call_end_time = end_time;
-    if (extemp::UNIV::OFFLINE_RENDER) [[unlikely]] {
+    if (extemp::UNIV::MODE == extemp::UNIV::Mode::Render) [[unlikely]] {
         sc->call_wall_start = steady_nanoseconds();
     }
 }
@@ -136,7 +136,7 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
         return;
     }
     uint64_t now = extemp::UNIV::TIME;
-    if (extemp::UNIV::OFFLINE_RENDER) [[unlikely]] {
+    if (extemp::UNIV::MODE == extemp::UNIV::Mode::Render) [[unlikely]] {
         // An offline render holds audio time still while a task runs, so the
         // limit is counted in wall time from the start of the call.
         const double elapsed = double(steady_nanoseconds() - wrapper->call_wall_start) / 1e9;

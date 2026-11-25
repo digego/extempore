@@ -408,8 +408,8 @@ void AudioDevice::renderFrames(const float* InputBuffer, float* OutputBuffer,
 //-----------------------------------
 //
 // Alternative backend to PortAudio: renders DSP output to a float32 WAV file
-// on its own thread, as fast as the work allows. Used when --audio-outfile is
-// specified.
+// on its own thread, as fast as the work allows. Used by extempore render,
+// where stdout is for what the code prints, so its own messages go to stderr.
 //
 // The render thread owns the audio clock and keeps it in lockstep with the
 // work. No scheduler thread runs; before each block the render thread runs the
@@ -443,8 +443,8 @@ class FileAudioDriver {
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_running{false};
     uint64_t m_framesWritten = 0;
-    uint64_t m_maxFrames = 0;  // 0 = unlimited
-    // extempore render with stderr on a terminal: a progress line, redrawn at
+    uint64_t m_maxFrames = 0;  // --duration, in frames
+    // with stderr on a terminal: a progress line, redrawn at
     // most ten times a second
     bool m_progress = false;
     std::chrono::steady_clock::time_point m_progressDrawn{};
@@ -485,11 +485,10 @@ void FileAudioDriver::finalizeWav() {
     uint32_t dataBytes = static_cast<uint32_t>(dataBytes64);
     if (dataBytes64 > 0xFFFFFFF0ull - 36) {
         dataBytes = 0xFFFFFFF0u - 36;
-        ascii_warning();
-        printf("Warning: render exceeds the 4 GB WAV limit; the header describes the first "
-               "%u bytes only\n",
-               dataBytes);
-        ascii_normal();
+        fprintf(stderr,
+                "extempore: the render exceeds the 4 GB WAV limit; the header describes the "
+                "first %u bytes only\n",
+                dataBytes);
     }
     const uint32_t riffSize = 36 + dataBytes;
 
@@ -516,10 +515,8 @@ void FileAudioDriver::finalizeWav() {
     std::fflush(m_file);
     if (std::fseek(m_file, 0, SEEK_SET) != 0 ||
         std::fwrite(hdr, 1, sizeof(hdr), m_file) != sizeof(hdr)) {
-        ascii_error();
-        printf("Error: could not finalise the WAV header for %s (%s)\n", m_path.c_str(),
-               std::strerror(errno));
-        ascii_normal();
+        fprintf(stderr, "extempore: could not finalise the WAV header for %s (%s)\n",
+                m_path.c_str(), std::strerror(errno));
     }
     std::fflush(m_file);
     std::fclose(m_file);
@@ -530,14 +527,12 @@ bool FileAudioDriver::open(const std::string& path, double maxSeconds) {
     if (m_file)
         return false;
     if (!openWav(path)) {
-        ascii_error();
-        printf("Error: could not open --audio-outfile path for writing: %s\n", path.c_str());
-        ascii_normal();
+        fprintf(stderr, "extempore: can't write %s (%s)\n", path.c_str(), std::strerror(errno));
         return false;
     }
     m_path = path;
     m_framesWritten = 0;
-    m_maxFrames = (maxSeconds > 0.0) ? static_cast<uint64_t>(maxSeconds * UNIV::SAMPLE_RATE) : 0;
+    m_maxFrames = static_cast<uint64_t>(maxSeconds * UNIV::SAMPLE_RATE);
     m_inBuf.assign(size_t{UNIV::IN_CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
     m_outBuf.assign(size_t{UNIV::CHANNELS} * UNIV::NUM_FRAMES, 0.0f);
     return true;
@@ -566,7 +561,7 @@ void FileAudioDriver::clearProgress() {
 void FileAudioDriver::start() {
     if (!m_file || m_running.load())
         return;
-    m_progress = UNIV::QUIET_START && m_maxFrames && UNIV::is_terminal(stderr);
+    m_progress = UNIV::is_terminal(stderr);
     m_stop.store(false);
     m_running.store(true, std::memory_order_release);
     m_thread = std::thread([this] { this->run(); });
@@ -579,7 +574,7 @@ void FileAudioDriver::run() {
     UNIV::AUDIO_CLOCK_BASE.store(AudioDevice::CLOCKBASE.load());
     bool reachedDuration = false;
     while (!m_stop.load(std::memory_order_acquire)) {
-        if (m_maxFrames && m_framesWritten >= m_maxFrames) {
+        if (m_framesWritten >= m_maxFrames) {
             reachedDuration = true;
             break;
         }
@@ -599,15 +594,11 @@ void FileAudioDriver::run() {
         AudioDevice::I()->renderFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
                                        frames);
         // the last block is cut at --duration, so the file is exactly that long
-        const uint64_t keep =
-            m_maxFrames ? std::min<uint64_t>(frames, m_maxFrames - m_framesWritten) : frames;
+        const uint64_t keep = std::min<uint64_t>(frames, m_maxFrames - m_framesWritten);
         const size_t samples = size_t(keep) * UNIV::CHANNELS;
         if (std::fwrite(m_outBuf.data(), sizeof(float), samples, m_file) != samples) {
-            ascii_error();
-            printf("Error: could not write to --audio-outfile (%s); stopping the render\n",
-                   std::strerror(errno));
-            ascii_normal();
-            fflush(stdout);
+            fprintf(stderr, "extempore: can't write %s (%s); stopping the render\n", m_path.c_str(),
+                    std::strerror(errno));
             break;
         }
         m_framesWritten += keep;
@@ -624,18 +615,12 @@ void FileAudioDriver::run() {
         bool expected = true;
         if (m_running.compare_exchange_strong(expected, false)) {
             finalizeWav();
-            if (UNIV::QUIET_START) {  // extempore render
-                clearProgress();
-                fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
-                        double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
-                        unsigned(UNIV::SAMPLE_RATE));
-                std::fflush(stdout);
-                std::_Exit(UNIV::FAILED.load() ? 1 : 0);
-            }
-            printf("[--audio-outfile: %llu frames written to %s]\n",
-                   static_cast<unsigned long long>(m_framesWritten), m_path.c_str());
-            fflush(stdout);
-            std::_Exit(0);
+            clearProgress();
+            fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
+                    double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
+                    unsigned(UNIV::SAMPLE_RATE));
+            std::fflush(stdout);
+            std::_Exit(UNIV::FAILED.load() ? 1 : 0);
         }
     }
 }
@@ -761,19 +746,11 @@ void AudioDevice::start() {
         ascii_normal();
         return;
     }
-    if (!UNIV::AUDIO_OUTFILE_PATH.empty()) {
+    if (UNIV::MODE == UNIV::Mode::Render) {
         if (!sFileDriver.open(UNIV::AUDIO_OUTFILE_PATH, UNIV::AUDIO_OUTFILE_DURATION)) {
             std::_Exit(1);
         }
         m_started = true;
-        if (!UNIV::QUIET_START) {
-            ascii_normal();
-            std::cout << "Output Device  : " << std::flush;
-            ascii_info();
-            std::cout << "file://" << UNIV::AUDIO_OUTFILE_PATH << " (offline, " << UNIV::CHANNELS
-                      << "ch float32 @ " << UNIV::SAMPLE_RATE << " Hz)" << std::endl;
-            ascii_normal();
-        }
         return;
     }
     PaError err = Pa_Initialize();

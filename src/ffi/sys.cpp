@@ -92,9 +92,9 @@ static pointer noteFailure(scheme* Scheme, pointer Args) {
     return Scheme->T;
 }
 
-// (sys:messages-to-stderr?): see UNIV::MESSAGES_TO_STDERR and sys:as-message.
+// (sys:messages-to-stderr?): see UNIV::messages_to_stderr and sys:as-message.
 static pointer messagesToStderr(scheme* Scheme, pointer Args) {
-    return UNIV::MESSAGES_TO_STDERR ? Scheme->T : Scheme->F;
+    return UNIV::messages_to_stderr() ? Scheme->T : Scheme->F;
 }
 
 // The two ends of sys:as-message's dynamic-wind.

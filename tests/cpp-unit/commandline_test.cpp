@@ -19,11 +19,6 @@ Invocation parse(std::initializer_list<std::string_view> Args) {
     return extemp::cli::parse(args);
 }
 
-bool oldGrammar(std::initializer_list<std::string_view> Args) {
-    const std::vector<std::string_view> args(Args);
-    return extemp::cli::usesOldGrammar(args);
-}
-
 }  // namespace
 
 TEST(CommandLine, NoArgumentsIsASession) {
@@ -175,12 +170,69 @@ TEST(CommandLine, HelpIsForTheSubcommandGiven) {
     EXPECT_EQ(extemp::cli::help(Command::Exec).find("--device"), std::string::npos);
 }
 
-TEST(CommandLine, OldModeOptionsSelectTheOldGrammar) {
-    EXPECT_TRUE(oldGrammar({"--batch", "(quit 0)"}));
-    EXPECT_TRUE(oldGrammar({"--noaudio", "--eval=(println 1)"}));
-    EXPECT_TRUE(oldGrammar({"--audio-outfile", "a.wav", "--run", "a.xtm"}));
-    EXPECT_TRUE(oldGrammar({"--print-devices"}));
-    EXPECT_FALSE(oldGrammar({"--noaudio", "--port", "7200"}));
-    EXPECT_FALSE(oldGrammar({"exec", "a.xtm", "--", "--batch"}));
-    EXPECT_FALSE(oldGrammar({}));
+TEST(CommandLine, OldModeOptionsBecomeTheSubcommandWhichReplacesThem) {
+    auto inv = parse({"--nobase", "--batch", "(quit 0)"});
+    EXPECT_TRUE(inv.error.empty()) << inv.error;
+    EXPECT_EQ(inv.command, Command::Exec);
+    EXPECT_EQ(inv.get("e"), "(quit 0)");
+    EXPECT_TRUE(inv.has("wait"));
+    EXPECT_TRUE(inv.has("no-base"));
+    ASSERT_EQ(inv.notices.size(), 2u);
+    EXPECT_NE(inv.notices[0].find("--batch is deprecated"), std::string::npos);
+    EXPECT_NE(inv.notices[0].find("extempore exec"), std::string::npos);
+
+    // --batch meant no audio, so saying it as well is still allowed
+    EXPECT_TRUE(parse({"--noaudio", "--batch=(quit 0)"}).error.empty());
+
+    inv = parse({"--run", "a.xtm", "--samplerate", "48000"});
+    EXPECT_TRUE(inv.error.empty()) << inv.error;
+    EXPECT_EQ(inv.command, Command::Session);
+    EXPECT_EQ(inv.files, std::vector<std::string>{"a.xtm"});
+    EXPECT_EQ(inv.get("sample-rate"), "48000");
+
+    inv = parse({"--noaudio", "--eval=(println 1)"});
+    EXPECT_EQ(inv.command, Command::Session);
+    EXPECT_EQ(inv.get("e"), "(println 1)");
+    EXPECT_TRUE(inv.has("no-audio"));
+
+    inv = parse({"--audio-outfile", "a.wav", "--run", "a.xtm", "--duration", "2"});
+    EXPECT_TRUE(inv.error.empty()) << inv.error;
+    EXPECT_EQ(inv.command, Command::Render);
+    EXPECT_EQ(inv.files, std::vector<std::string>{"a.xtm"});
+    EXPECT_EQ(inv.get("o"), "a.wav");
+
+    inv = parse({"--compile", "app.xtm"});
+    EXPECT_EQ(inv.command, Command::Compile);
+    EXPECT_TRUE(inv.has("exe"));
+
+    EXPECT_EQ(parse({"--print-devices"}).command, Command::Devices);
+}
+
+TEST(CommandLine, OldModeOptionsWithNoReplacementAreErrors) {
+    // a render takes a file and a duration
+    EXPECT_FALSE(
+        parse({"--batch", "(f)", "--audio-outfile", "a.wav", "--duration", "2"}).error.empty());
+    EXPECT_FALSE(parse({"--run", "a.xtm", "--audio-outfile", "a.wav"}).error.empty());
+    EXPECT_FALSE(parse({"--run", "a.xtm", "--eval", "(f)"}).error.empty());
+    EXPECT_FALSE(parse({"--batch"}).error.empty());
+    // an unknown option was once kept for sys:cmdarg
+    const auto inv = parse({"--label=x", "--batch", "(quit 0)"});
+    EXPECT_NE(inv.error.find("unknown option --label"), std::string::npos);
+    EXPECT_EQ(inv.notices.size(), 1u);  // which still says what replaces --batch
+}
+
+TEST(CommandLine, OldModeOptionsAfterTheSeparatorBelongToTheScript) {
+    const auto inv = parse({"exec", "a.xtm", "--", "--batch"});
+    EXPECT_TRUE(inv.error.empty()) << inv.error;
+    EXPECT_TRUE(inv.notices.empty());
+    EXPECT_TRUE(parse({"--noaudio", "--port", "7200"}).error.empty());
+}
+
+TEST(CommandLine, OptionsGoBackToArguments) {
+    using Args = std::vector<std::string>;
+    EXPECT_EQ(extemp::cli::optionArguments(
+                  parse({"test", "a.xtm", "b.xtm", "--no-base", "--junit=", "--opt-level", "2"})),
+              (Args{"--no-base", "--junit", "", "--opt-level", "2"}));
+    EXPECT_EQ(extemp::cli::optionArguments(parse({"exec", "-e", "(f)", "--nobase"})),
+              (Args{"-e", "(f)", "--no-base"}));
 }

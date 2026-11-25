@@ -181,7 +181,7 @@ SchemeProcess* SchemeProcess::find(const std::string& Name) {
 }
 
 bool SchemeProcess::start(bool subsume) {
-    const bool serve = !UNIV::BATCH_MODE && UNIV::LEGACY_SERVER;
+    const bool serve = UNIV::MODE == UNIV::Mode::Session && UNIV::LEGACY_SERVER;
     if (serve) {
         ascii_info();
         printf("INFO:");
@@ -373,8 +373,8 @@ void* SchemeProcess::taskImpl() {
     if (m_name == "primary") {
         const std::lock_guard<std::recursive_mutex> lock(m_guardMutex);
         // The startup tasks' deadlines are in audio time, which an offline
-        // render (--audio-outfile) runs many times faster than the wall
-        // clock, so they get an hour rather than the default timeout.
+        // render runs many times faster than the wall clock, so they get an
+        // hour rather than the default timeout.
         const uint64_t startupBudget = uint64_t{60} * 60 * UNIV::SECOND();
         pushTask(SchemeTask(extemp::UNIV::TIME, startupBudget,
                             new std::string("(sys:compile-init-ll)"), "file_init",
@@ -386,7 +386,7 @@ void* SchemeProcess::taskImpl() {
                                 "file_init", SchemeTask::Type::LOCAL_PROCESS_STRING));
         }
         if (!m_initExpr.empty()) {
-            if (!UNIV::QUIET_START) {
+            if (UNIV::MODE == UNIV::Mode::Session) {
                 ascii_text_color(0, 5, 10);
                 printf("\nEvaluating expression: ");
                 ascii_normal();
@@ -437,18 +437,13 @@ void* SchemeProcess::taskImpl() {
                                        now + task.getMaxDuration());
                     if (m_scheme->retcode) [[unlikely]] {  // scheme error
                         resetOutportString();
-                        // Nothing else will ever end a batch run whose startup
-                        // expression failed before reaching its (quit). (A
-                        // render ends at its duration, and carries on.)
-                        if (UNIV::BATCH_MODE && task.getLabel() == "file_init" &&
-                            !(UNIV::QUIET_START && UNIV::OFFLINE_RENDER)) {
-                            if (UNIV::QUIET_START) {
-                                std::cerr << "extempore: uncaught error, exiting" << std::endl;
-                            } else {
-                                std::cout
-                                    << "Error: uncaught error in the --batch expression, exiting"
-                                    << std::endl;
-                            }
+                        // Nothing else will ever end a run whose startup
+                        // expression failed before reaching its (quit). A
+                        // session carries on, and so does a render, which
+                        // ends at its duration.
+                        if (UNIV::MODE != UNIV::Mode::Session && UNIV::MODE != UNIV::Mode::Render &&
+                            task.getLabel() == "file_init") {
+                            std::cerr << "extempore: uncaught error, exiting" << std::endl;
                             SchemeFFI::exitExtempore(1);
                         }
                     }
