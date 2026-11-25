@@ -14,28 +14,27 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Version --- the git tag is the single source of truth. CI passes the tag
 # explicitly (-DEXTEMPORE_VERSION=${github.ref_name}) since its checkout is
-# shallow; local dev builds derive it from `git describe`; a git-less source
-# build falls back to "unknown". Captured at configure time into a generated
-# header (reconfigure to refresh).
+# shallow; otherwise extras/cmake/ExtemporeVersion.cmake asks `git describe`,
+# at every build (target extempore_version), and writes the generated header.
+set(EXTEMPORE_VERSION_GIVEN "${EXTEMPORE_VERSION}")
+set(EXTEMPORE_VERSION_ARGS
+    -DVERSION=${EXTEMPORE_VERSION_GIVEN}
+    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+    -DIN=${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/ExtemporeVersion.h.in
+    -DOUT=${CMAKE_BINARY_DIR}/generated/ExtemporeVersion.h)
+execute_process(COMMAND ${CMAKE_COMMAND} ${EXTEMPORE_VERSION_ARGS}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/ExtemporeVersion.cmake)
+add_custom_target(extempore_version
+    COMMAND ${CMAKE_COMMAND} ${EXTEMPORE_VERSION_ARGS}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/ExtemporeVersion.cmake
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/ExtemporeVersion.h
+    COMMENT "Checking the Extempore version")
 if(NOT EXTEMPORE_VERSION)
-    find_package(Git QUIET)
-    if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
-        execute_process(
-            COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            OUTPUT_VARIABLE EXTEMPORE_VERSION
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_QUIET)
-    endif()
-endif()
-if(NOT EXTEMPORE_VERSION)
-    set(EXTEMPORE_VERSION "unknown")
+    file(STRINGS ${CMAKE_BINARY_DIR}/generated/ExtemporeVersion.h _version_line
+         REGEX "define EXTEMPORE_VERSION")
+    string(REGEX REPLACE ".*\"(.*)\".*" "\\1" EXTEMPORE_VERSION "${_version_line}")
 endif()
 message(STATUS "Extempore version: ${EXTEMPORE_VERSION}")
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/extras/cmake/ExtemporeVersion.h.in
-    ${CMAKE_BINARY_DIR}/generated/ExtemporeVersion.h
-    @ONLY)
 
 option(ASSETS "download multimedia assets (approx 250MB)" OFF)
 option(BUILD_TESTS "build test targets (including examples)" ON)
@@ -368,6 +367,7 @@ set(EXTEMPORE_SOURCES
     src/UNIV.cpp)
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
+add_dependencies(extempore extempore_version)
 
 # At the top of the build tree, beside libs/, for every generator: the generator
 # expression stops multi-config generators adding a per-config subdirectory.
