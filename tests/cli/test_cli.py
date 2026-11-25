@@ -112,8 +112,10 @@ class Exec(Scratch):
 
     def test_a_replaced_closure_does_not_hold_the_run_open(self) -> None:
         # the old closure's zone is freed ten seconds later, by a task which
-        # nothing waits for
-        code = "(begin (bind-func f (lambda () 1)) (bind-func f (lambda () 2)) (println (f)))"
+        # nothing waits for; the callback is still waited for
+        code = """(begin (bind-func f (lambda () 1))
+                         (bind-func f (lambda () 2))
+                         (callback (+ (now) 22050) (lambda () (println (f)))))"""
         start = time.monotonic()
         p = run("exec", "--no-base", "-e", code)
         self.assertEqual(p.returncode, 0, p.stderr)
