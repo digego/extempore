@@ -39,6 +39,7 @@ extempore compile FILE              AOT-compile a library, or --exe an executabl
 extempore doc -o OUT.json [FILE...] export docstrings and types (xtmdoc)
 extempore send [CODE]               evaluate code in a running extempore (nREPL)
 extempore repl                      interactive REPL on a running extempore
+extempore lsp                       language server over stdio (below)
 extempore devices                   list audio devices
 extempore version
 ```
@@ -85,6 +86,7 @@ C` for the top-level form at a position, with `--editor`, `--wait-for-save`
   shows output, values and errors apart, and Ctrl-C interrupts the running
   eval, which the 7099 server can't do. The session's `--repl` runs the same
   client in the session's terminal. Linux and macOS only, as now (linenoise).
+- **lsp** is a language server (below).
 - **devices** replaces `--print-devices`.
 
 Options for every subcommand: `--sharedir`, `--no-base`, `--opt-level`,
@@ -187,6 +189,64 @@ The audio-offline tests move to `extempore render`. A new test renders the same
 file twice and compares the WAVs sample for sample, and `hello-sweep`'s switch
 point can then be asserted to the block.
 
+## Language server
+
+`extempore lsp` speaks LSP on stdio, so an editor is configured with
+`command = "extempore", args = ["lsp"]` and nothing else to install. It is a
+client of a running extempore's nREPL server, sharing `send`'s nREPL client and
+form finder, and uses the JSON code in LLVM's Support library (which clangd
+uses) for the protocol. Like `send`, it starts before the JIT, audio or Scheme.
+
+Without a running extempore it offers what a parser can: syntax errors
+(unbalanced parentheses), an outline of top-level definitions (`bind-func`,
+`define`, `bind-type` and so on) and folding. Connected, it adds:
+
+- **eval** of the top-level form at a position, from the editor's buffer as it
+  stands, so nothing is saved first. Errors become diagnostics on the form, a
+  later successful eval of that form clears them, and output and values go to
+  the status line
+- **completion and hover**, from nREPL's `completions` and `lookup` (doc-002
+  phase 3, which has to come first)
+- **interrupt**, as a command
+
+The server owns the connection: it finds the port as `send` does and
+reconnects when extempore restarts.
+
+### What helix does (tested 2026-11-25)
+
+Tested against a stub server in helix `92ba4c07` and read in upstream
+`1a3fdfda`:
+
+- `:lsp-workspace-command NAME ARGS` parses `ARGS` as a stream of JSON values
+  after expanding `%{...}`, so one key evaluates the form at the cursor:
+
+  ```toml
+  [keys.normal.","]
+  e = ':lsp-workspace-command extempore.eval "%{file_path_absolute}" %{cursor_line} %{cursor_column}'
+  ```
+
+  The server received `[path, 18, 3]`, and edits made without saving reached it
+  (`didChange`) before the command did.
+
+- helix ignores a command's result, so the server reports through
+  `window/showMessage` (the status line, one line: newlines are dropped) and
+  `textDocument/publishDiagnostics`, which helix shows inline under the line
+  with the multi-line message intact. Values and short output suit the status
+  line; error reports suit diagnostics.
+- helix declares no inlay-hint refresh, so the server can't put `=> 144` beside
+  the form when an eval finishes.
+- A code action ("Evaluate top-level form") also works, and carries the
+  document's URI, but takes three keys (`space a`, Enter). Windows needs it:
+  a Windows path in `%{file_path_absolute}` isn't valid JSON (`\U` is a bad
+  escape), so the one-key binding fails there.
+- Servers configured in the user's `languages.toml` start without a trust
+  prompt (helix's default `workspace-trust` level is `servers`); only a
+  project's own `.helix/languages.toml` needs `:workspace-trust`.
+
+VS Code (`vscode-languageclient`), Neovim (`vim.lsp`) and Emacs (eglot) can all
+send `extempore.eval` with the document and position directly. The VS Code
+extension can drop its own TCP client.
+
 ## Order of work
 
 1. The lockstep render behind the existing `--audio-outfile` flag, so the
@@ -198,3 +258,6 @@ point can then be asserted to the block.
    (malformed bencode, a message a byte at a time, replies never read), which
    is easiest from Python. The helix binding in the docs (and on benswift.me)
    changes to `extempore send`.
+3. nREPL `completions` and `lookup` (doc-002 phase 3).
+4. `extempore lsp`. The helix binding moves to `:lsp-workspace-command`, and
+   `send`'s `--wait-for-save` stays for editors without a language client.
