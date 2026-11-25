@@ -160,7 +160,8 @@ with the work: scheduled callbacks run before the block they fall in, however
 long they take, and the clock doesn't move while a file loads. Output starts at
 time 0 and ends exactly at `--duration`. Under `extempore render` the random
 number generators are seeded (`--seed`, 0 by default), so rendering the same
-file twice gives the same samples.
+file twice gives the same samples. A render in which no DSP was ever set
+(`dsp:set!`) warns that the file is silent.
 
 Callbacks scheduled for the same instant now run in the order they were
 scheduled; the order used to vary from run to run.

@@ -272,8 +272,9 @@ class Render(Scratch):
         self.assertEqual(p.stdout, "")
         self.assertEqual((self.dir / "a.wav").stat().st_size, 44 + 44100 * 2 * 4)
         self.assertIn("wrote", p.stderr)
+        self.assertNotIn("warning", p.stderr)
 
-    def test_with_no_dsp_the_clock_still_runs_and_the_file_is_silence(self) -> None:
+    def test_with_no_dsp_the_clock_still_runs_and_it_warns_of_silence(self) -> None:
         file = self.write(
             "nodsp.xtm", "(callback (+ (now) 22050) (lambda () (println 'at (now))))\n"
         )
@@ -283,6 +284,7 @@ class Render(Scratch):
         data = (self.dir / "silence.wav").read_bytes()
         self.assertEqual(len(data), 44 + 44100 * 2 * 4)
         self.assertFalse(any(data[44:]))
+        self.assertIn("no DSP was set", p.stderr)
 
     def test_the_same_seed_gives_the_same_samples(self) -> None:
         file = self.write("noise.xtm", NOISE)

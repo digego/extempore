@@ -443,6 +443,7 @@ class FileAudioDriver {
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_running{false};
     uint64_t m_framesWritten = 0;
+    bool m_dspSeen = false;    // a block was rendered with a DSP closure set
     uint64_t m_maxFrames = 0;  // --duration, in frames
     // with stderr on a terminal: a progress line, redrawn at
     // most ten times a second
@@ -591,6 +592,7 @@ void FileAudioDriver::run() {
         AudioDevice::REALTIME = getRealTime();
         UNIV::AUDIO_CLOCK_NOW.store(AudioDevice::REALTIME.load());
         std::fill(m_outBuf.begin(), m_outBuf.end(), 0.0f);
+        m_dspSeen = m_dspSeen || AudioDevice::I()->getDspState()->closure != nullptr;
         AudioDevice::I()->renderFrames(m_inBuf.empty() ? nullptr : m_inBuf.data(), m_outBuf.data(),
                                        frames);
         // the last block is cut at --duration, so the file is exactly that long
@@ -616,6 +618,10 @@ void FileAudioDriver::run() {
         if (m_running.compare_exchange_strong(expected, false)) {
             finalizeWav();
             clearProgress();
+            if (!m_dspSeen) {
+                fputs("extempore: warning: no DSP was set (dsp:set!), so the render is silent\n",
+                      stderr);
+            }
             fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
                     double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
                     unsigned(UNIV::SAMPLE_RATE));
