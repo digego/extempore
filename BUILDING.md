@@ -121,9 +121,9 @@ sits in `build/` with no `runtime/` next to it --- falls back to the source tree
 it was built from, so run it from the build directory:
 
     ./extempore                 # audio + Scheme interpreter, listens on port 7099
-    ./extempore --noaudio       # same, without audio
+    ./extempore --no-audio      # same, without audio
     ./extempore --repl          # interactive linenoise REPL (Linux/macOS only)
-    ./extempore --batch "(begin (println 'hello) (quit 0))"
+    ./extempore exec -e "(println 'hello)"   # run code and exit
 
 What the build generates --- the AOT cache (`libs/aot-cache/`) and the shared
 libraries xtlang binds (`libs/platform-shlibs/`) --- goes in `libs/` beside the
@@ -135,7 +135,7 @@ To use a share directory that isn't beside the binary --- an in-tree build run
 against an installed tree, say, or a binary you copied out of a release archive
 on its own --- name it explicitly:
 
-    ./extempore --sharedir /path/to/extempore
+    ./extempore --share-dir /path/to/extempore
 
 ## Platform-specific notes
 

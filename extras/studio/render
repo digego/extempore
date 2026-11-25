@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # Render an .xtm file to a WAV file, offline, and describe the result.
 #
-#   extras/studio/render <file.xtm> <out.wav> <seconds> [port]
+#   extras/studio/render <file.xtm> <out.wav> <seconds>
 #
-# The file should queue its notes as a score (score-begin ... score-end, see
-# libs/studio/api.xtm). Rendering stops <seconds> after the audio starts.
-# Give each concurrent render its own port (extempore also takes port - 1).
-# Also writes <out>.png (a spectrogram) and <out>.mp3.
+# Also writes <out>.png (a spectrogram), <out>.mp3 and <out>.log (what
+# extempore said). The exit status is 1 if anything in the file raised an error.
 set -euo pipefail
 
 if [ $# -lt 3 ]; then
-    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 fi
 
@@ -18,37 +16,18 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 file=$(realpath "$1")
 wav=$(realpath -m "$2")
 seconds=$3
-port=${4:-7099}
 log="${wav%.wav}.log"
 
 cd "$root"
-build/extempore --term nocolor --port "$port" \
-    --audio-outfile "$wav" --duration "$seconds" --run "$file" >"$log" 2>&1 &
-pid=$!
-# The render's clock starts when the score starts the audio (score-end). If
-# the score fails before then, extempore would wait for ever: give up if the
-# audio hasn't started after three minutes, or finished after ten.
-waited=0
-while kill -0 "$pid" 2>/dev/null; do
-    sleep 1
-    waited=$((waited + 1))
-    if { [ "$waited" -ge 180 ] && ! grep -q "^zerolatency" "$log"; } || [ "$waited" -ge 600 ]; then
-        kill "$pid" 2>/dev/null
-        echo "PROBLEM: the render never started (or never finished) --- see $log"
-        grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
-        exit 1
-    fi
-done
-if ! wait "$pid"; then
-    echo "PROBLEM: the render failed --- see $log"
-    grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
-    exit 1
+status=0
+build/extempore render "$file" -o "$wav" --duration "$seconds" >"$log" 2>&1 || status=$?
+if [ "$status" -ne 0 ]; then
+    echo "PROBLEM: the render had errors --- see $log"
+    # xtlang compile errors say "Error"; Scheme errors are lines which start
+    # with a semicolon
+    grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60 || true
 fi
-# xtlang compile errors say "Error"; Scheme errors are lines which start with a
-# semicolon
-if grep -q -i -E "error|^;" "$log"; then
-    echo "PROBLEM: the render finished, but the log has errors --- see $log"
-    grep -n -i -E -B2 -A6 "error|^;" "$log" | head -60
-fi
+[ -f "$wav" ] || exit 1
 ffmpeg -loglevel error -y -i "$wav" -codec:a libmp3lame -q:a 4 "${wav%.wav}.mp3"
 "$root/extras/studio/analyse.py" "$wav" --png "${wav%.wav}.png"
+exit "$status"

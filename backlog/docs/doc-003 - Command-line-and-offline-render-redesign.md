@@ -77,11 +77,15 @@ from the 87 MB binary).
   each `--name[=value]` there is what `sys:cmdarg` reads.
 - Each subcommand has its own option table, which drives both its parser and
   its `--help`.
-- Outside a session, stdout carries only what the code prints (for `send`, its
-  output and values). There is no banner, and load messages, compiler messages,
-  warnings and errors go to stderr. A session prints what it does today.
-- `--color auto|always|never`. `auto`, the default, is colour when stdout is a
-  terminal and `NO_COLOR` isn't set.
+- Outside a session there is no banner. Under `exec` and `render`, stdout
+  carries only what the code prints, and messages (library loads, compiler
+  output, warnings, error reports) go to stderr; `test` and `compile` print
+  their reports on stdout, since the report is what they are run for. A
+  session prints what it does today. In the runtime a message is whatever is
+  printed inside `sys:as-message`, which the compiler driver, the diagnostics
+  and `print-with-colors` all use.
+- `--color auto|always|never`. `auto`, the default, is colour when the stream
+  messages go to is a terminal and `NO_COLOR` isn't set.
 
 Exit status:
 
@@ -112,7 +116,9 @@ they were given (or the working directory) or above it, then 7888.
   temporal recursion runs until it calls `(quit)`, as written. `--wait` keeps
   it running until `(quit)` regardless, for scripts waiting on something
   outside the task queues (OSC, MIDI, IPC, a thread they spawned). Status 1 if
-  the code or a callback raised an uncaught error.
+  the code or a callback raised an uncaught error. A file carries on after a
+  form which fails, as `sys:load` does everywhere; an `-e` expression which
+  fails ends the run there.
 - **test** runs each file through `xtmtest-run-tests` (`libs/core/test.xtm`),
   each in its own process, so a result doesn't depend on which files ran
   before. It prints a summary and exits 1 if any assertion failed. `--junit DIR`
@@ -126,7 +132,8 @@ they were given (or the working directory) or above it, then 7888.
 - **compile** AOT-compiles a library into the cache (`xtc:aot:compile-xtm-file`,
   today reached only through `--batch` from CMake), or with `--exe` builds an
   executable (`xtc:aot:compile-xtm-exe`, today's `--compile`). It owns
-  `--arch`, `--cpu`, `--attr`, `--link` and `--dll`.
+  `--arch`, `--cpu`, `--attr`, `--link`, `--dll` and `--name` (the cache
+  entry's name, where that isn't the file's).
 
 There is no docstring-export subcommand. The `xtmdoc` target's 600-character
 `--eval` becomes a script in `extras/` that `exec` runs, taking its output path
@@ -288,6 +295,9 @@ the host CPU).
   random state is seeded from the clock; neither can be set today. Both take
   their seed from `--seed`, each thread's generator from the seed and the order
   the threads were made.
+- The scheduler's queue ordered tasks due at the same time by their address,
+  which varies from run to run. They now run in the order they were scheduled,
+  live as well as in a render.
 - A wall-clock time limit for callbacks. The existing limit (`begin_hook`
   against `call_end_time`) counts audio time, which stands still during a task,
   so a callback that loops forever would stall the render instead of being

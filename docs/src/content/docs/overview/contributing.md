@@ -48,20 +48,16 @@ npm run preview   # preview the production build
 
 The xtlang code in the reference pages (and some of the guides) is checked
 against the real compiler by `docs/verify-examples.py`, which runs each snippet
-through `extempore --batch` and compares the output to what the docs claim (a
+through `extempore exec` and compares the output to what the docs claim (a
 `Compiled:  NAME >>> SIG` line, a `;; prints "..."` comment, or---for
 `error-messages.md`---the error block that follows the snippet). A claim is only
 checked when a block that actually runs would produce it: a
 `Compiled:`/`;; prints` line inside a runnable block, or in the output block
 right after one. Claims in prose, or after a skipped block, are
-ignored---they're illustration, not output. (`--batch` echoes each snippet back
-before running it, so the verifier subtracts that echo first and matches claims
-only against what the program actually printed---otherwise a `;; prints "..."`
-comment would match itself.)
+ignored---they're illustration, not output.
 
 It's a **local tool**, not part of CI: it needs a built `extempore` and a real
-run takes a few minutes (snippets that deliberately error don't exit under
-`--batch`, so each waits out a short timeout). Run it on Linux against your
+run takes a few minutes. Run it on Linux against your
 build before changing the docs:
 
 ```sh

@@ -50,30 +50,30 @@ impc:compiler:flush-jit-compilation-queue
 
 ## Key flags
 
-- `--nobase`: Skip loading base library (useful for debugging JIT in isolation)
-- `--noaudio`: Disable audio (required for headless/CI testing)
-- `--batch "expr"`: Batch mode (no server, single process); `AGENTS.md` covers
-  exiting and `timeout`. Implies `--noaudio` **unless `--audio-outfile` is also
-  given** — in that case the offline file driver handles audio output.
-- `--eval "expr"`: Evaluate expression at startup but keep full server running
-  (utility + primary processes, TCP server on port 7099).
-- `--audio-outfile <path>`: render DSP output to a float32 WAV file via an
-  offline driver (see below). Combines with `--batch` for headless CI runs.
-- `--duration <seconds>`: cap on `--audio-outfile` render length. When reached,
-  the driver finalizes the WAV and self-exits with status 0. 0/unset = render
-  until `(quit)`.
+- `--no-base`: Skip loading base library (useful for debugging JIT in isolation)
+- `--no-audio`: Disable audio in a live session
+- `extempore exec FILE | -e EXPR`: run code with no audio and no servers (single
+  process). Exits when the code has finished and nothing is scheduled, with
+  status 1 on an uncaught error; `--wait` keeps it running until `(quit)`.
+  `AGENTS.md` covers `timeout`. stdout carries only what the code prints;
+  messages and error reports go to stderr.
+- `extempore -e EXPR`: a live session that evaluates the expression at startup
+  and keeps the servers up (utility + primary processes, legacy eval server on
+  port 7099).
+- `extempore render FILE -o OUT.wav --duration SECONDS [--seed N]`: render DSP
+  output to a float32 WAV file, offline and repeatably (see below).
+- `extempore test FILE...`: run `.xtm` test files, each in its own process.
 
-### --batch vs --eval differences
+### exec vs a session
 
-`--batch` creates a single SchemeProcess with no TCP server. `--eval` starts the
-full two-process setup (utility + primary) with TCP server, then evaluates the
-expression as a `LOCAL_PROCESS_STRING` task.
+`exec` creates a single SchemeProcess with no TCP server. A session starts the
+full two-process setup (utility + primary) with the legacy eval server.
 
-**Bugs may reproduce in one mode but not the other.** The xtlang compiler's type
-inference state can differ because `--eval` has a utility process that also
+**Bugs may reproduce in one but not the other.** The xtlang compiler's type
+inference state can differ because a session has a utility process that also
 loads the base library into shared C++ statics (`sTypeDefinitions`,
-`sGlobalMap`). Always try both modes when investigating user-reported bugs,
-since users typically work interactively (equivalent to `--eval` / TCP eval).
+`sGlobalMap`). Always try both when investigating user-reported bugs, since
+users typically work interactively (equivalent to `-e` / TCP eval).
 
 ## Symbol tracking
 
@@ -99,8 +99,8 @@ fullIR = sTypeDefinitions + userIR
 
 This is parsed via `parseAssemblyInto()` into a cloned template module (from
 `bitcode.ll`). If `sTypeDefinitions` contains a declaration that conflicts with
-something already defined in the template module, the parse fails silently
-(stderr is /dev/null) and the Scheme layer sees `#f` from
+something already defined in the template module, the parse fails and the
+Scheme layer sees `#f` from
 `llvm:jit-compile-ir-string`, producing "FLUSH FAILED".
 
 ## Adhoc polymorphism names
@@ -136,11 +136,11 @@ Check that:
 2. `EXTLLVM::addModule()` was called with the metadata clone
 3. Symbol name matches exactly (including mangling like `_adhoc_`, `_poly_`)
 
-### Bug doesn't reproduce in --batch mode
+### Bug doesn't reproduce under exec
 
-Compiler bugs can appear in one mode but not the other (see "--batch vs --eval
-differences" above). For a bug reported from interactive use, try `--batch`, then
-`--eval` with the same expression, then a normal start with the expression sent
+Compiler bugs can appear in one mode but not the other (see "exec vs a session"
+above). For a bug reported from interactive use, try `exec -e`, then a session
+`-e` with the same expression, then a normal start with the expression sent
 via TCP (`printf '(expr)\r\n' | nc -w 10 localhost 7099`). For redefinition or
 accumulated-state bugs, send several expressions sequentially over TCP.
 
@@ -152,22 +152,9 @@ A top-level `bind-func` makes the function name callable from the Scheme
 interaction environment. `(bind-func foo ...)` → `(foo arg1 arg2)` works. Return
 values flow back (i64 → Scheme integer, double → real, etc.).
 
-### `--batch` evaluates a single expression
-
-`--batch "<expr>"` reads one Scheme form. Multiple top-level expressions won't
-all run — wrap them in `(begin ...)`:
-
-```bash
-# WRONG: only the first form runs
---batch '(sys:load "foo.xtm") (foo_test)'
-
-# RIGHT
---batch '(begin (sys:load "foo.xtm") (foo_test))'
-```
-
 ### `(quit rc)` and stdio flushing
 
-`exit_extempore` in `src/ffi/utility.cpp` calls `std::_Exit(rc)`, which bypasses
+`exitExtempore` in `src/ffi/utility.cpp` calls `std::_Exit(rc)`, which bypasses
 destructors **and discards stdio buffers**. It explicitly `fflush(stdout)`
 before `_Exit` so xtlang `printf` output isn't lost. If you add another pre-exit
 cleanup step there, keep it short — `_Exit` runs right after.
@@ -206,12 +193,12 @@ errors. Fixes: add explicit `void` branches, or wrap in `begin`:
 ## Sending expressions via TCP
 
 Extempore's TCP protocol requires `\r\n` (CRLF) termination. Expressions are
-read until `\r\n` is found (`src/SchemeProcess.cpp:541`). Without CRLF, the
+read until `\r\n` is found (`SchemeProcess::serverImpl`). Without CRLF, the
 expression is buffered but never evaluated.
 
 ```bash
 # Start extempore with a specific port
-./build/extempore --noaudio --port 17099 > /tmp/xtm_output.log 2>&1 &
+./build/extempore --no-audio --legacy-port 17099 > /tmp/xtm_output.log 2>&1 &
 sleep 8  # wait for base library to load
 
 # Send an expression (printf for CRLF, nc for TCP)
@@ -227,7 +214,7 @@ the result of `ipc:` calls.
 
 TCP eval dispatches expressions as `SchemeTask::Type::REPL` tasks, which is the
 closest to how editors (VS Code, Emacs) send code interactively. This can
-produce different results from `--batch` because the evaluation context and
+produce different results from `exec` because the evaluation context and
 process topology differ.
 
 ## Monkey-patching Scheme compiler functions
@@ -263,23 +250,17 @@ Key runtime functions to instrument:
 
 ```bash
 # Skip base library to test JIT directly
-./extempore --nobase --batch "(begin (llvm:jit-compile-ir-string \"define i64 @test() { ret i64 42 }\") (println (llvm:get-function \"test\")) (quit 0))"
+./extempore exec --no-base -e "(begin (llvm:jit-compile-ir-string \"define i64 @test() { ret i64 42 }\") (println (llvm:get-function \"test\")))"
 
 # Test AOT cache loading
-./extempore --nobase --batch "(begin (llvm:compile-ir (sys:slurp-file \"libs/aot-cache/xtmbase.ll\")) (quit 0))"
+./extempore exec --no-base -e "(llvm:compile-ir (sys:slurp-file \"libs/aot-cache/xtmbase.ll\"))"
 ```
 
 ## C++ debug output
 
-**stderr is unconditionally redirected to /dev/null** at startup
-(`src/Extempore.cpp:174`: `freopen("/dev/null", "w", stderr)`). Neither
-`std::cerr`, `fprintf(stderr, ...)`, nor any amount of flushing will produce
-visible output. Options:
-
-- Write to a file:
-  `FILE* f = fopen("/tmp/xtm_debug.log", "a"); fprintf(f, ...); fflush(f);`
-- Write to stdout: `printf(...); fflush(stdout);` (mixes with Scheme output)
-- Temporarily comment out the `freopen` line for a debug build
+Print debug output to stderr (`fprintf(stderr, ...)`, `std::cerr`). Under
+`exec` and `render`, stdout is the code's own output and stderr carries
+extempore's messages, so a debug line on stderr sits beside them in order.
 
 ## Building and testing
 
@@ -290,7 +271,7 @@ The build and the core test labels are in `AGENTS.md`.
 cd build && ctest -L examples-audio --output-on-failure
 
 # quick smoke test of a specific file
-timeout 120 ./build/extempore --noaudio --batch \
+timeout 120 ./build/extempore exec -e \
   '(sys:load-then-quit "examples/core/fmsynth.xtm" 10)'
 ```
 
@@ -298,47 +279,42 @@ Test labels: `libs-core`, `libs-studio`, `examples-audio`, `examples-core`,
 `examples-graphics`, `audio-offline`. Defined in `extras/cmake/tests.cmake`.
 
 The `audio-offline` label covers two-phase tests that render a DSP file to a WAV
-via `--audio-outfile` and then assert on it with `libs/core/audiotest.xtm`.
+via `extempore render` and then assert on it with `libs/core/audiotest.xtm`.
 Register via
 `extempore_add_audio_offline_test(name render_xtm duration freq label)`.
 
 ### Examples as tests
 
 Examples are registered as tests via the `extempore_add_example_as_test` macro
-in `extras/cmake/tests.cmake`. They run with `--batch` (which implies
-`--noaudio`) using `sys:load-then-quit`.
+in `extras/cmake/tests.cmake`. They run under `exec` using
+`sys:load-then-quit`.
 
-Note: because `--batch` implies `--noaudio`, example tests verify that the code
-**compiles** but do not exercise the audio callback path. An example can pass as
-a test but fail interactively if the issue is audio-specific (e.g. `dsp:set!`
-registration, hot-swap). To test with audio enabled, use `--eval` instead of
-`--batch`.
+`exec` starts no audio, so example tests verify that the code **compiles** but
+do not exercise the audio callback path. An example can pass as a test but fail
+interactively if the issue is audio-specific (e.g. `dsp:set!` registration,
+hot-swap). To test with audio enabled, use a session `-e` instead of `exec`.
 
 ## Capturing audio output to a file (headless/SSH/CI)
 
-### Offline rendering with `--audio-outfile` (preferred)
+### Offline rendering with `extempore render` (preferred)
 
-The offline file driver renders DSP output directly to a float32 WAV without any
-OS audio subsystem. Works in `--batch` mode, so it's suitable for CI:
+`render` writes DSP output directly to a float32 WAV without any OS audio
+subsystem, so it is suitable for CI:
 
 ```bash
-./build/extempore --batch '(sys:load "examples/core/hello-sine.xtm")' \
-  --audio-outfile /tmp/out.wav --duration 1.0
+./build/extempore render examples/core/hello-sine.xtm -o /tmp/out.wav --duration 1.0
 ```
 
-The driver free-runs faster than realtime (~100× on typical hardware for a
-simple sine). Key semantics:
+Key semantics:
 
-- Counts toward `--duration` only after `dsp:set!` registers a closure, so
-  compile-path latency doesn't eat the render window.
-- On `--duration` reached, the driver finalizes the WAV header and calls
-  `std::_Exit(0)`. User script doesn't need to quit itself.
+- The audio clock is kept in lockstep with the work: scheduled callbacks land at
+  their exact time, and anything can be scheduled on the fly.
+- Output starts at time 0 and ends exactly at `--duration`. The same file and
+  `--seed` give the same samples.
 - On user `(quit rc)`, `exit_extempore` calls `stopFileDriver()` before `_Exit`,
-  so the WAV is finalized in either path.
-- Not realtime — anything that uses wall-clock (`clock:clock`, MIDI I/O,
-  network) will drift because `getRealTime()` is still real time while
-  `UNIV::TIME` free-runs. DSP that depends only on the `time` sample counter
-  renders identically to realtime.
+  so the WAV is finalized.
+- Anything that uses wall-clock (`clock:clock`, MIDI I/O, network) is not
+  deterministic.
 
 ### Asserting on offline output
 
@@ -348,7 +324,7 @@ function name directly; pipe the return through `(quit ...)` so the process exit
 code matches the assertion outcome:
 
 ```bash
-./build/extempore --batch '(begin (sys:load "libs/core/audiotest.xtm")
+./build/extempore exec -e '(begin (sys:load "libs/core/audiotest.xtm")
                                   (quit (audiotest_assert_sine "/tmp/out.wav" 440.0)))'
 ```
 

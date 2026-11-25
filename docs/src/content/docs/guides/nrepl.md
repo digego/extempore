@@ -41,7 +41,7 @@ stdout and always exits 0, for an editor's shell-command integration.
 The port comes from `--port`, then `$EXTEMPORE_NREPL_PORT`, then a `.nrepl-port`
 file in the file's directory or above it, then 7888.
 
-For a script or coding agent, start `extempore --noaudio --nrepl-port 0` in a
+For a script or coding agent, start `extempore --no-audio --nrepl-port 0` in a
 scratch directory and send it code with `extempore-nrepl eval`. Libraries stay
 loaded between evals.
 

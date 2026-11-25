@@ -590,11 +590,11 @@ values and see how the note changes.
 **Troubleshooting** if this _didn't_ work, there are a few possible causes:
 
 - is your audio interface configured properly? Running the
-  `./extempore --print-devices` at the command line will print a list of all the
+  `./extempore devices` at the command line will print a list of all the
   audio devices the system knows about. Make sure that you're using the right
   one---you can specify which device Extempore should use with the `--device`
   argument e.g. `./extempore --device 2`, where `2` is the index (in the output
-  of `--print-devices`) of the device you want to use.
+  of `devices`) of the device you want to use.
 - did the `organ`, `organ_note_c` and `organ_fx` closures all compile properly?
   Check the log output to find out. If the compiler can't find the definition of
   some functions (e.g. `osc_c`) then you might not have loaded all the libraries

@@ -301,8 +301,9 @@ before something slow of your own: `(studio:play-ahead 5)`.
 ## Rendering to a file
 
 Extempore can write its audio to a WAV file instead of a sound card, much faster
-than real time, with `--audio-outfile`. Time runs too fast then to schedule
-anything on the fly, so queue the whole piece first as a _score_.
+than real time, with `extempore render`. Scheduled callbacks land at their exact
+time and the same file gives the same samples, so a piece can be scheduled on
+the fly or laid out first as a _score_, as below.
 
 ```extempore
 (sys:load "libs/studio/studio.xtm")
@@ -318,7 +319,7 @@ anything on the fly, so queue the whole piece first as a _score_.
 ```
 
 ```bash
-extempore --audio-outfile song.wav --duration 20 --run song.xtm
+extempore render song.xtm -o song.wav --duration 20
 ```
 
 The same file plays in real time in a live session.

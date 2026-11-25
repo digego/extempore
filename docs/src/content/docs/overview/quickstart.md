@@ -269,8 +269,8 @@ always. So if you're not getting any sound, it could be because Extempore is
 sending sound output to the wrong audio device.
 
 To print the list of audio devices that Extempore can "see", open a terminal and
-type the command `./extempore --print-devices` (or
-`./extempore.exe --print-devices` if you're on Windows) and hit
+type the command `./extempore devices` (or
+`./extempore.exe devices` if you're on Windows) and hit
 <kbd>return</kbd>. On my machine right now it says this, but yours will (almost
 certainly) be different.
 
@@ -290,7 +290,7 @@ work (again, remember to use `./extempore.exe` if you're on Windows):
 
 ```plaintext
 ./extempore --device 5
-./extempore --device-name "MacBook Pro Speakers"
+./extempore --device "MacBook Pro Speakers"
 ```
 
 :::note
@@ -298,7 +298,7 @@ work (again, remember to use `./extempore.exe` if you're on Windows):
 The order of your audio devices can change at any time, especially when you're
 plugging and unplugging devices. So the device number (i.e. the `5` in the
 example above) won't always correspond to the _MacBook Pro Speakers_. In a gig
-situation it's always safer to use `--device-name` to be sure that you're using
+situation it's always safer to use the device name to be sure that you're using
 the correct audio device.
 
 :::

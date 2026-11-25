@@ -51,12 +51,14 @@ ctest --preset default                       # the suites CI runs
 ctest --test-dir build -L libs-core -j4      # core library tests
 ctest --test-dir build -L libs-studio -j4    # the studio (libs/studio)
 ctest --test-dir build -L audio-offline -j4  # render audio offline, check the WAVs
+ctest --test-dir build -L cli               # the command line: output, exit statuses
 ctest --test-dir build -L nrepl -j2         # the nREPL server and its client
 ```
 
 Tests are `.xtm` files in `tests/`; `libs/core/test.xtm` is the harness
-(`xtmtest-run-tests`, `is?` macro). They run in `--batch` mode (which implies
-`--noaudio`), except for `system.xtm` which uses `--eval` for IPC testing.
+(`xtmtest-result`, `is?` macro). `build/extempore test tests/core/adt.xtm` runs
+one (or several, each in its own process). `tests/cli` tests the command line
+itself, and `tests/core/system.xtm` runs in a session, since it tests IPC.
 
 In addition, building the `aot_core` target (part of the default build) is a
 pretty good sign that things are working.
@@ -76,7 +78,7 @@ cmake --build build --target aot_core            # AOT compile the core stdlib
 cmake --build build --target clean_aot           # delete build/libs/aot-cache
 cmake --build build --target xtmdoc              # generate docs
 cmake --build build --target tidy                # clang-tidy; CI fails on any finding
-build/extempore --noaudio                        # run without audio
+build/extempore --no-audio                       # run without audio
 build/extempore --repl                           # interactive REPL (Linux/macOS only)
 ```
 
@@ -108,21 +110,25 @@ against `build/extempore` (local only).
 For users, extempore is designed to be run interactively (start it, then connect
 an editor to port 7099 and send s-expressions for evaluation).
 
-There is also a "batch mode" useful for debugging/testing, e.g.
+To run code and exit, for debugging or testing, use `exec`:
 
 ```bash
-./extempore --batch "(begin (println 'hello) (quit 0))"
+build/extempore exec -e "(println 'hello)"
+build/extempore exec script.xtm -- --name=value   # the script reads (sys:cmdarg "name")
 ```
 
-Note: `--batch` implies `--noaudio`, so there's no need to specify both.
+It starts no audio and no servers, and exits when the code has finished and
+nothing is left scheduled: status 0, or 1 if anything raised an error. Its
+stdout is what the code prints; load and compiler messages and error reports
+are on stderr. Code which schedules itself forever (a temporal recursion) runs
+until it calls `(quit)`, so give untested code a `timeout`.
 
-To iterate against a running instance instead, start `build/extempore --noaudio
+`build/extempore render FILE -o OUT.wav --duration SECONDS` renders a file's
+audio offline, and renders the same samples every time.
+`build/extempore --help` lists the subcommands.
+
+To iterate against a running instance instead, start `build/extempore --no-audio
 --nrepl-port 0` from a scratch directory and send code with
 `extras/nrepl/extempore-nrepl --port $(cat .nrepl-port) eval '...'`: it prints
 values and output, exits 1 on an error, and libraries stay loaded between evals.
 `docs/src/content/docs/guides/nrepl.md` describes the server.
-
-If the final `quit` isn't present, then extempore won't exit. An uncaught error
-in the `--batch` expression exits with status 1, but code that hangs or never
-reaches `quit` still runs forever, so for scripted debugging use `timeout` with
-a short value (e.g. 10s) as well.

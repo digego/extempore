@@ -1,7 +1,7 @@
 ### Live capture from a real audio output (pw-record fallback)
 
 When you need to verify the _realtime_ path (not offline), use PipeWire's
-`pw-record` with `--eval` (which keeps audio enabled).
+`pw-record` with a session `-e` (which keeps audio enabled).
 
 ### Prerequisites
 
@@ -25,7 +25,7 @@ sleep 0.5
 
 # 2. run extempore with audio enabled
 timeout 20s ./build/extempore \
-  --eval '(sys:load-then-quit "my_dsp_script.xtm" 15)'
+  -e '(sys:load-then-quit "my_dsp_script.xtm" 15)'
 
 # 3. stop recording
 kill $PW_PID

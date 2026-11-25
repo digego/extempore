@@ -239,8 +239,9 @@ check that a new preset sits level with the others.
 extras/studio/render examples/studio/demos/acid.xtm /tmp/acid.wav 12
 ```
 
-Time runs fast in an offline render, so nothing can be scheduled on the fly.
-Queue the whole piece first as a _score_:
+A render plays whatever the file plays, patterns included, and the same file
+renders to the same samples every time. To lay a piece out against the clock,
+write it as a _score_:
 
 ```scheme
 (sys:load "libs/studio/studio.xtm")

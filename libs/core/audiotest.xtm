@@ -5,17 +5,17 @@
 
 ;;; Commentary:
 
-;; Companion to --audio-outfile. After rendering a DSP to a float32 WAV, load
-;; this file in a second --batch process to sanity-check the output:
+;; Companion to `extempore render`. After rendering a DSP to a float32 WAV, load
+;; this file in a second `extempore exec` process to sanity-check the output:
 ;;
-;;   extempore --batch '(sys:load "libs/core/audiotest.xtm")
+;;   extempore exec -e '(sys:load "libs/core/audiotest.xtm")
 ;;                      (audiotest_assert_sine "/tmp/x.wav" 440.0)'
 ;;
 ;; Each assertion prints a one-line PASS/FAIL and calls (quit <status>) so
 ;; that CTest sees a clean exit code. The helpers are intentionally coarse:
 ;; they verify "a sine of roughly the expected frequency is present", not
 ;; sample-accurate reproduction. This matches the offline driver's free-run
-;; semantics (see --audio-outfile docs).
+;; semantics.
 
 ;;; Code:
 
@@ -284,5 +284,5 @@
 ;; pass returns 0, a fail returns 1, producing the corresponding process
 ;; exit code. Example:
 ;;
-;;   extempore --batch '(begin (sys:load "libs/core/audiotest.xtm")
+;;   extempore exec -e '(begin (sys:load "libs/core/audiotest.xtm")
 ;;                             (quit (audiotest_assert_sine "/tmp/x.wav" 440.0)))'

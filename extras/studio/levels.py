@@ -11,7 +11,7 @@ instrument's presets should sit within a few dB of each other, and of the other
 instruments: around -12 dBFS peak for one note at a velocity of 0.8.
 
     extras/studio/levels.py polysynth
-    extras/studio/levels.py kit808 --port 7310
+    extras/studio/levels.py kit808
     extras/studio/levels.py epiano --pitch 48 --chord
 """
 
@@ -70,7 +70,6 @@ def main() -> None:
     parser.add_argument("--pitch", type=int, default=60, help="MIDI note to play (default 60)")
     parser.add_argument("--chord", action="store_true", help="play a four-note chord instead of one note")
     parser.add_argument("--velocity", type=float, default=0.8)
-    parser.add_argument("--port", type=int, default=7099)
     args = parser.parse_args()
 
     source = (ROOT / "libs/studio/instruments" / f"{args.instrument}.xtm").read_text()
@@ -102,8 +101,8 @@ def main() -> None:
         score.write_text("\n".join(lines) + "\n")
         with log.open("w") as out:
             subprocess.run(
-                ["build/extempore", "--term", "nocolor", "--port", str(args.port), "--audio-outfile", str(wav),
-                 "--duration", str(len(tests) * SLOT), "--run", str(score)],
+                ["build/extempore", "render", str(score), "-o", str(wav),
+                 "--duration", str(len(tests) * SLOT)],
                 cwd=ROOT, stdout=out, stderr=subprocess.STDOUT, timeout=900, check=False)
         errors = [line for line in log.read_text().splitlines() if "rror" in line or line.startswith(";")]
         if errors:

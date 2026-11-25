@@ -21,7 +21,7 @@ everything here in more depth.
 
 :::note[Code snippets are verified]
 
-Every snippet in this tutorial is run through `./extempore --batch` and the
+Every snippet in this tutorial is run through `./extempore exec -e` and the
 output shown is what it actually prints. If something here doesn't work, that's
 a bug---please [open an issue](https://github.com/digego/extempore/issues).
 

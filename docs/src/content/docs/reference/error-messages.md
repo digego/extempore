@@ -8,7 +8,7 @@ the snippet that produces them, and how to fix them.
 :::note[All errors here are reproduced]
 
 Each entry was produced by running the minimal snippet shown through
-`./extempore --batch`. The error blocks are the real output, except that
+`./extempore exec -e`. The error blocks are the real output, except that
 internal names whose numbers vary run to run (an `_adhoc_N` suffix, a solver
 `(var N)`) are written with `N` rather than a specific value. If you see a
 genuinely different message from the same code, please
@@ -343,14 +343,14 @@ see it whenever the forms you send don't parse as complete s-expressions. The
 report shows the unbalanced text and the frame that read it.
 
 **Fix.** Close the paren. In an interactive session your editor's paren-matching
-will usually catch this; in `--batch` or file loads it's easier to miss.
+will usually catch this; in `exec` or file loads it's easier to miss.
 
-:::note[Batch mode exits on an uncaught error]
+:::note[exec exits on an uncaught error]
 
-When the `--batch` expression raises an error it doesn't catch, read errors
-included, extempore prints the report and exits with status 1. A script that
-loops forever or never reaches `(quit)` still runs until it's killed, so use
-`timeout` (e.g. `timeout 10 ./extempore --batch "..."`) for untested scripts.
+When code run by `extempore exec` raises an error it doesn't catch, read errors
+included, extempore prints the report to stderr and exits with status 1. A
+script that schedules work forever still runs until it's killed, so use
+`timeout` (e.g. `timeout 10 ./extempore exec -e "..."`) for untested scripts.
 
 :::
 
