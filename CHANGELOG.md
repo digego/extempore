@@ -29,10 +29,10 @@ devices in the same order, so code which uses it needn't change. The
 `EXTERNAL_SHLIBS_AUDIO` build option and the `aot_external_audio` target are
 gone, there being no external audio library left.
 
-The old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so
-code which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is
-now `*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have
-moved from `portmidi.xtm` to the new library, which `portmidi.xtm` loads.
+The old `libs/external/midi.xtm` is now `libs/external/midi-legacy.xtm`, so code
+which loads it needs the new path, and its `*xtmlib-midi-loaded*` flag is now
+`*xtmlib-midi-legacy-loaded*`. The `MIDI_NOTE_ON`-style constants have moved
+from `portmidi.xtm` to the new library, which `portmidi.xtm` loads.
 
 The studio plays MIDI: `(midi-track 'lead "mini" 1)` makes a track which plays
 an external synth with the same `note-on`, `ctl` and patterns as any other, and
@@ -120,12 +120,12 @@ before, and beside it are:
 - `extempore lsp`: a language server (below)
 - `extempore devices` and `extempore version`
 
-Outside a session there is no banner, and under `exec` and `render` messages
-and error reports go to stderr, which leaves stdout to what the code prints.
-Options are spelt with hyphens (`--sample-rate`, `--no-audio`, `--share-dir`),
-`--device` and `--in-device` take an index or a name, colour is `--color
-auto|always|never` (off through a pipe, and `NO_COLOR` is honoured), an unknown
-option is an error, and a script's own arguments go after `--`, where
+Outside a session there is no banner, and under `exec` and `render` messages and
+error reports go to stderr, which leaves stdout to what the code prints. Options
+are spelt with hyphens (`--sample-rate`, `--no-audio`, `--share-dir`),
+`--device` and `--in-device` take an index or a name, colour is
+`--color auto|always|never` (off through a pipe, and `NO_COLOR` is honoured), an
+unknown option is an error, and a script's own arguments go after `--`, where
 `sys:cmdarg` reads them. `extempore --help` and `extempore SUBCOMMAND --help`
 list it all.
 
@@ -134,30 +134,29 @@ The old spellings still work and say what replaces them. `--run`, `--eval`,
 as are the unhyphenated option names and `--term`; they will be removed two
 releases from now. `--timediv` and `--runtime` are gone.
 
-Extempore runs an [nREPL](https://nrepl.org) server, on `127.0.0.1:7888`,
-beside the eval server on 7099: clients get each form's value, the output it
-printed, errors with their kind and line, completions and a symbol's
-documentation, and can interrupt an evaluation. The
-binary is its own client: `extempore send '(+ 1 2)'` (or `--file F`, or `--file
-F --line L` for the form at a position), `extempore repl` (which `extempore
---repl` now runs, so Ctrl-C stops a runaway evaluation) and `extempore status`.
-`--no-legacy-server` starts a session without the 7099 server. The nREPL guide
-in the docs has the details.
+Extempore runs an [nREPL](https://nrepl.org) server, on `127.0.0.1:7888`, beside
+the eval server on 7099: clients get each form's value, the output it printed,
+errors with their kind and line, completions and a symbol's documentation, and
+can interrupt an evaluation. The binary is its own client:
+`extempore send '(+ 1 2)'` (or `--file F`, or `--file F --line L` for the form
+at a position), `extempore repl` (which `extempore --repl` now runs, so Ctrl-C
+stops a runaway evaluation) and `extempore status`. `--no-legacy-server` starts
+a session without the 7099 server. The nREPL guide in the docs has the details.
 
-`extempore lsp` is a language server, so any editor with a language client
-works with Extempore from configuration alone: evaluate the form at the cursor,
-a selection or the whole buffer (as it stands, saved or not), with values in
-the status line and errors marked on their forms; interrupt an evaluation;
-complete names and show a function's arguments, type and docstring on hover;
-and, with nothing running, unbalanced parentheses, an outline and folding. The
-editor support guide has the Helix setup.
+`extempore lsp` is a language server, so any editor with a language client works
+with Extempore from configuration alone: evaluate the form at the cursor, a
+selection or the whole buffer (as it stands, saved or not), with values in the
+status line and errors marked on their forms; interrupt an evaluation; complete
+names and show a function's arguments, type and docstring on hover; and, with
+nothing running, unbalanced parentheses, an outline and folding. The editor
+support guide has the Helix setup.
 
-Offline rendering is now deterministic. The render keeps the audio clock in
-step with the work: scheduled callbacks run before the block they fall in,
-however long they take, and the clock doesn't move while a file loads. Output
-starts at time 0 and ends exactly at `--duration`. Under `extempore render` the
-random number generators are seeded (`--seed`, 0 by default), so rendering the
-same file twice gives the same samples.
+Offline rendering is now deterministic. The render keeps the audio clock in step
+with the work: scheduled callbacks run before the block they fall in, however
+long they take, and the clock doesn't move while a file loads. Output starts at
+time 0 and ends exactly at `--duration`. Under `extempore render` the random
+number generators are seeded (`--seed`, 0 by default), so rendering the same
+file twice gives the same samples.
 
 Callbacks scheduled for the same instant now run in the order they were
 scheduled; the order used to vary from run to run.
