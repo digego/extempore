@@ -63,12 +63,18 @@ class TaskScheduler {
     // Tasks popped from the queue whose run() hasn't returned; raised under
     // m_queueMutex, so quiescent() can't see the queue empty and miss one.
     std::atomic<int> m_dispatching{0};
+    // How many of the queued tasks are housekeeping (TaskI::isHousekeeping);
+    // guarded by m_queueMutex.
+    size_t m_housekeeping = 0;
 
     static TaskScheduler sm_instance;
 
   private:
     void* queueThreadImpl();
     void timeSlice();
+    // The next task if it starts before Before, taken from the queue and
+    // counted in m_dispatching, else null. The caller holds m_queueMutex.
+    TaskI* take(uint64_t Before);
     static void run(TaskI* Task);
 
     static void* queueThread(void* Arg) {
@@ -96,16 +102,21 @@ class TaskScheduler {
     // A task added while those run waits for the next call, so a task that
     // reschedules itself for the same instant can't hold the caller here.
     void runDue(uint64_t Until);
-    // True when no task is waiting for its time and none is being handed to
-    // its process.
+    // True when no task is waiting for its time, housekeeping aside, and none
+    // is being handed to its process.
     bool quiescent() {
         std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
-        return m_queue.peek() == nullptr && m_dispatching.load() == 0;
+        return m_queue.size() == m_housekeeping && m_dispatching.load() == 0;
     }
 
     void add(TaskI* Task) {
         std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
         m_queue.add(Task);
+        m_housekeeping += Task->isHousekeeping();
+    }
+    void addHousekeeping(TaskI* Task) {
+        Task->markHousekeeping();
+        add(Task);
     }
     template <typename T>
     static void addTask(uint64_t StartTime, uint64_t Duration, CM* ClassMember, const T& Arg,

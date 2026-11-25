@@ -69,6 +69,7 @@ class TaskI {
     uint64_t m_duration;
     CM* m_classMember;
     int m_tag;
+    bool m_housekeeping = false;
 
   protected:
     // Callback is accepted for the callers that pass it and otherwise unused.
@@ -87,6 +88,15 @@ class TaskI {
     }
     int getTag() const {
         return m_tag;
+    }
+    // A task which tidies up after the code (a zone freed some seconds after
+    // its closure was replaced) rather than running any: nothing waits for it,
+    // so extempore exec exits with these still queued.
+    bool isHousekeeping() const {
+        return m_housekeeping;
+    }
+    void markHousekeeping() {
+        m_housekeeping = true;
     }
     void execute() {
         m_classMember->execute(this);

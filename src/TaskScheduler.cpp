@@ -77,17 +77,25 @@ void TaskScheduler::run(TaskI* Task) {
     delete Task;
 }
 
+TaskI* TaskScheduler::take(uint64_t Before) {
+    TaskI* task = m_queue.peek();
+    if (!task || task->getStartTime() >= Before) {
+        return nullptr;
+    }
+    m_queue.pop();
+    m_housekeeping -= task->isHousekeeping();
+    m_dispatching.fetch_add(1);
+    return task;
+}
+
 void TaskScheduler::runDue(uint64_t Until) {
     m_lastPass.store(steadyNanoseconds());
     std::vector<TaskI*> due;
     {
         const std::lock_guard<std::recursive_mutex> lock(m_queueMutex);
-        for (auto task = m_queue.peek(); task && task->getStartTime() < Until;
-             task = m_queue.peek()) {
-            m_queue.pop();
+        while (TaskI* task = take(Until)) {
             due.push_back(task);
         }
-        m_dispatching.fetch_add(int(due.size()));
     }
     for (auto task : due) {
         run(task);
@@ -107,15 +115,11 @@ void TaskScheduler::timeSlice() {
     do {
         m_lastPass.store(steadyNanoseconds());
         m_queueMutex.lock();
-        auto task(m_queue.peek());
-        while (task && task->getStartTime() < UNIV::TIME + frames) {
-            m_queue.pop();
-            m_dispatching.fetch_add(1);
+        while (TaskI* task = take(UNIV::TIME + frames)) {
             m_queueMutex.unlock();
             run(task);
             m_dispatching.fetch_sub(1);
             m_queueMutex.lock();
-            task = m_queue.peek();
         }
         m_queueMutex.unlock();
         if (UNIV::TIME_DIVISION == 1) [[likely]] {

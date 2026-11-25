@@ -110,6 +110,16 @@ class Exec(Scratch):
         self.assertEqual(p.returncode, 1)
         self.assertIn("car argument", p.stderr)
 
+    def test_a_replaced_closure_does_not_hold_the_run_open(self) -> None:
+        # the old closure's zone is freed ten seconds later, by a task which
+        # nothing waits for
+        code = "(begin (bind-func f (lambda () 1)) (bind-func f (lambda () 2)) (println (f)))"
+        start = time.monotonic()
+        p = run("exec", "--no-base", "-e", code)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout, "2\n")
+        self.assertLess(time.monotonic() - start, 6)
+
     def test_an_xtlang_compile_error_is_status_1(self) -> None:
         p = run("exec", "-e", '(bind-func bad (lambda (x:i64) (+ x "s")))')
         self.assertEqual(p.returncode, 1)

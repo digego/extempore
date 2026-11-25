@@ -1007,7 +1007,7 @@ static extemp::CM DestroyMallocZoneWithDelayCM([](extemp::TaskI* Task) {
 });
 
 EXPORT void llvm_destroy_zone_after_delay(llvm_zone_t* Zone, uint64_t Delay) {
-    extemp::TaskScheduler::I()->add(new extemp::Task<llvm_zone_t*>(
+    extemp::TaskScheduler::I()->addHousekeeping(new extemp::Task<llvm_zone_t*>(
         extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(), &DestroyMallocZoneWithDelayCM, Zone));
 }
 
@@ -1016,7 +1016,7 @@ static extemp::CM FreeWithDelayCM([](extemp::TaskI* Task) {
 });
 
 EXPORT void free_after_delay(char* Data, double Delay) {
-    extemp::TaskScheduler::I()->add(new extemp::Task<char*>(
+    extemp::TaskScheduler::I()->addHousekeeping(new extemp::Task<char*>(
         extemp::UNIV::TIME + Delay, extemp::UNIV::SECOND(), &FreeWithDelayCM, Data));
 }
 
