@@ -38,10 +38,15 @@ struct Subcommand {
 constexpr std::size_t kAnyNumber = std::size_t(-1);
 
 // Options of every subcommand which starts a runtime.
-const std::array<Option, 3> kRuntimeOptions{{
+const std::array<Option, 6> kRuntimeOptions{{
     {"share-dir", Kind::Text, "DIR", "the share directory (runtime/, libs/, examples/)"},
     {"no-base", Kind::Flag, "", "don't load the base library at startup"},
     {"opt-level", Kind::Whole, "N", "LLVM optimisation level, 0 to 3"},
+    {"q", Kind::Flag, "", "quiet: only errors"},
+    {"v", Kind::Flag, "", "more messages: -v, -vv and -vvv each say more", true},
+    {"timestamps", Kind::Color, "WHEN",
+     "start each message with the time: auto (a session whose stderr isn't a terminal), "
+     "always or never"},
 }};
 
 const std::array<Option, 2> kCommonOptions{{
@@ -276,7 +281,8 @@ std::string checkValue(const Option& Opt, std::string_view Value) {
         break;
     case Kind::Color:
         if (Value != "auto" && Value != "always" && Value != "never") {
-            return "--color expects auto, always or never, got \"" + std::string(Value) + "\"";
+            return dashed(Opt.name) + " expects auto, always or never, got \"" + std::string(Value) +
+                   "\"";
         }
         break;
     case Kind::Flag:
@@ -447,6 +453,17 @@ Invocation parseCurrent(std::span<const std::string_view> Args) {
             }
         } else {
             name = arg.substr(1);
+            // -vv: a repeating flag, given that many times
+            if (name.size() > 1 &&
+                std::ranges::all_of(name, [&](char c) { return c == name.front(); })) {
+                const Option* flag = findOption(sub, name.substr(0, 1));
+                if (flag && flag->repeats && flag->kind == Kind::Flag) {
+                    for (std::size_t n = 0; n < name.size(); ++n) {
+                        inv.options.emplace_back(flag->name, "");
+                    }
+                    continue;
+                }
+            }
             if (name.size() != 1) {
                 return fail("unknown option " + std::string(arg) +
                             " (long options take two dashes)");
@@ -659,6 +676,10 @@ std::string help(Command Cmd) {
     }
     if (Cmd == Command::Session || Cmd == Command::Exec || Cmd == Command::Render) {
         text += "\nArguments after -- belong to the code, which reads them with sys:cmdarg.\n";
+    }
+    if (findOption(sub, "v")) {
+        text += "\nMessages go to stderr. EXTEMPORE_LOG sets which: a level (error, warning, info,\n"
+                "debug, trace) and COMPONENT=LEVEL filters, e.g. EXTEMPORE_LOG=debug,compiler=warning.\n";
     }
     return text;
 }

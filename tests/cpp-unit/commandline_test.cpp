@@ -236,3 +236,19 @@ TEST(CommandLine, OptionsGoBackToArguments) {
     EXPECT_EQ(extemp::cli::optionArguments(parse({"exec", "-e", "(f)", "--nobase"})),
               (Args{"-e", "(f)", "--no-base"}));
 }
+
+TEST(CommandLine, VerbosityRepeatsAndBundles) {
+    EXPECT_EQ(parse({"exec", "-e", "1", "-v"}).all("v").size(), 1u);
+    EXPECT_EQ(parse({"exec", "-e", "1", "-vv"}).all("v").size(), 2u);
+    EXPECT_EQ(parse({"-v", "-vv"}).all("v").size(), 3u);
+    EXPECT_TRUE(parse({"exec", "-e", "1", "-q"}).has("q"));
+    EXPECT_NE(parse({"exec", "-e", "1", "-qq"}).error.find("unknown option -qq"),
+              std::string::npos);
+    EXPECT_NE(parse({"exec", "-e", "1", "-vq"}).error.find("unknown option -vq"),
+              std::string::npos);
+    EXPECT_TRUE(parse({"exec", "-e", "1", "--timestamps", "always"}).error.empty());
+    EXPECT_NE(parse({"exec", "-e", "1", "--timestamps", "often"}).error.find("--timestamps expects"),
+              std::string::npos);
+    EXPECT_EQ(extemp::cli::optionArguments(parse({"test", "a.xtm", "b.xtm", "-vv"})),
+              (std::vector<std::string>{"-v", "-v"}));
+}

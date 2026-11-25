@@ -116,13 +116,10 @@ static void set_call_times(scheme* sc, uint64_t start_time, uint64_t end_time) {
     }
 }
 
-// An error nothing caught: printed where messages go, and remembered for the
-// exit status of a run that has one (extempore exec, extempore render).
+// An error nothing caught: logged, which also gives a run that has an exit
+// status (extempore exec, extempore render) status 1.
 static void report_uncaught_error(const char* message) {
-    extemp::UNIV::FAILED.store(true);
-    FILE* out = extemp::UNIV::message_stream();
-    fputs(message, out);
-    fflush(out);
+    extemp::log::emit(extemp::log::Level::Error, {}, message);
 }
 
 static void begin_hook(s7_scheme* raw_sc, bool* val) {
@@ -144,8 +141,8 @@ static void begin_hook(s7_scheme* raw_sc, bool* val) {
     }
     if (wrapper->call_end_time > 0 && now > wrapper->call_end_time) {
         // s7 abandons the evaluation without raising an error, so say so here.
-        fprintf(stderr, "Error: evaluation stopped at its time limit (%.1f s over)\n",
-                double(now - wrapper->call_end_time) / extemp::UNIV::SAMPLE_RATE);
+        extemp::log::error("evaluation stopped at its time limit ({:.1f} s over)",
+                           double(now - wrapper->call_end_time) / extemp::UNIV::SAMPLE_RATE);
         wrapper->stop_reason = scheme::StopReason::TimeLimit;
         *val = true;
     }

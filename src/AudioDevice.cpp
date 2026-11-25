@@ -619,14 +619,14 @@ void FileAudioDriver::run() {
             finalizeWav();
             clearProgress();
             if (!m_dspSeen) {
-                fputs("extempore: warning: no DSP was set (dsp:set!), so the render is silent\n",
-                      stderr);
+                log::warn(log::audio, "no DSP was set (dsp:set!), so the render is silent");
             }
+            log::flush();
             fprintf(stderr, "extempore: wrote %s (%.2f s, %u ch, %u Hz)\n", m_path.c_str(),
                     double(m_framesWritten) / UNIV::SAMPLE_RATE, unsigned(UNIV::CHANNELS),
                     unsigned(UNIV::SAMPLE_RATE));
             std::fflush(stdout);
-            std::_Exit(UNIV::FAILED.load() ? 1 : 0);
+            std::_Exit(UNIV::failed() ? 1 : 0);
         }
     }
 }
@@ -847,40 +847,15 @@ void AudioDevice::start() {
 
     m_started = true;
 
-    auto info(Pa_GetStreamInfo(stream));
-    ascii_normal();
-    std::cout << "Output Device  : " << std::flush;
-    ascii_info();
-    std::cout << Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name << std::endl;
-    ascii_normal();
-    std::cout << "Input Device   : " << std::flush;
-    ascii_info();
+    const PaStreamInfo* info = Pa_GetStreamInfo(stream);
+    std::string input;
     if (UNIV::AUDIO_IN_DEVICE != unsigned(-1)) {
-        std::cout << Pa_GetDeviceInfo(inputDevice)->name << std::endl;
-    } else {
-        std::cout << std::endl;
+        input = std::format(", input {} ({} ch)", Pa_GetDeviceInfo(inputDevice)->name,
+                            UNIV::IN_CHANNELS);
     }
-    ascii_normal();
-    std::cout << "SampleRate     : " << std::flush;
-    ascii_info();
-    std::cout << UNIV::SAMPLE_RATE << std::endl << std::flush;
-    ascii_normal();
-    std::cout << "Channels Out   : " << std::flush;
-    ascii_info();
-    std::cout << UNIV::CHANNELS << std::endl << std::flush;
-    ascii_normal();
-    std::cout << "Channels In    : " << std::flush;
-    ascii_info();
-    std::cout << UNIV::IN_CHANNELS << std::endl << std::flush;
-    ascii_normal();
-    std::cout << "Frames         : " << std::flush;
-    ascii_info();
-    std::cout << UNIV::NUM_FRAMES << std::endl << std::flush;
-    ascii_normal();
-    std::cout << "Latency        : " << std::flush;
-    ascii_info();
-    std::cout << info->outputLatency << std::flush;
-    std::cout << " sec" << std::endl << std::flush;
+    log::info(log::audio, "Audio: {} ({} ch){}, {} Hz, {} frames, {:.0f} ms latency",
+              Pa_GetDeviceInfo(UNIV::AUDIO_DEVICE)->name, UNIV::CHANNELS, input,
+              UNIV::SAMPLE_RATE, UNIV::NUM_FRAMES, info->outputLatency * 1000.0);
 }
 
 void AudioDevice::stop() {

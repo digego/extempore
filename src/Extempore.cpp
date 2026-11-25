@@ -131,10 +131,10 @@ static void install_signal_handlers() {
     sa.sa_handler = sig_handler;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &sa, nullptr) != 0) {
-        printf("\nWarning: can't catch SIGINT.\n");
+        extemp::log::warn("can't catch SIGINT");
     }
     if (sigaction(SIGTERM, &sa, nullptr) != 0) {
-        printf("\nWarning: can't catch SIGTERM.\n");
+        extemp::log::warn("can't catch SIGTERM");
     }
     extemp::HangReport::install();
 }
@@ -287,12 +287,39 @@ int run_fmt(const extemp::cli::Invocation& Inv) {
     return status;
 }
 
+// Which messages show (src/Log.h): a session says what it is doing, the
+// subcommands only what goes wrong; then EXTEMPORE_LOG, then -q and -v.
+void configure_logging(const extemp::cli::Invocation& Inv) {
+    using namespace extemp;
+    const bool session = UNIV::MODE == UNIV::Mode::Session;
+    log::Settings logging;
+    logging.filter.base = session ? log::Level::Info : log::Level::Warning;
+    if (const char* spec = std::getenv("EXTEMPORE_LOG")) {
+        if (const auto bad = log::parse_filter(spec, logging.filter); !bad.empty()) {
+            std::cerr << "extempore: EXTEMPORE_LOG: can't read \"" << bad
+                      << "\" (a level, or COMPONENT=LEVEL)" << std::endl;
+        }
+    }
+    if (Inv.has("q")) {
+        logging.filter.base = log::Level::Error;
+    }
+    const auto more = Inv.all("v").size();
+    logging.filter.base = log::Level(std::min<std::size_t>(
+        std::size_t(logging.filter.base) + more, std::size_t(log::Level::Trace)));
+    const std::string_view when = Inv.get("timestamps").value_or("auto");
+    logging.timestamps =
+        when == "always" || (when == "auto" && session && !UNIV::is_terminal(stderr));
+    log::configure(logging);
+    log::start();
+}
+
 // Act on a parsed command line (src/CommandLine.cpp). Returns Exit, with the
 // process's exit status, when there is no runtime to start.
 ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& settings, int& status) {
     using namespace extemp;
     using cli::Command;
     status = 0;
+    log::decide_colour(Inv.get("color").value_or("auto"));
     for (const auto& notice : Inv.notices) {
         std::cerr << "extempore: " << notice << std::endl;
     }
@@ -536,11 +563,7 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
     if (UNIV::MODE != UNIV::Mode::Session && UNIV::MODE != UNIV::Mode::Render) {
         UNIV::AUDIO_NONE = true;
     }
-    const std::string_view color = Inv.get("color").value_or("auto");
-    if (color == "never" || (color == "auto" && (!UNIV::is_terminal(UNIV::message_stream()) ||
-                                                 std::getenv("NO_COLOR") != nullptr))) {
-        UNIV::EXT_TERM = UNIV::TerminalMode::NoColor;
-    }
+    configure_logging(Inv);
     return ParseResult::Continue;
 }
 
@@ -581,17 +604,6 @@ EXPORT int extempore_init(int argc, char** argv) {
     const int primary_port = settings.primary_port;
     const int utility_port = primary_port - 1;
     const bool session = extemp::UNIV::MODE == extemp::UNIV::Mode::Session;
-    if (session) {
-        ascii_normal();
-        std::cout << std::endl;
-        std::cout << "------------- Extempore -------------- " << std::endl;
-        ascii_default();
-        std::cout << EXTEMPORE_VERSION << std::endl;
-        std::cout << "(c) Andrew Sorensen, Ben Swift" << std::endl;
-        std::cout << "ben@benswift.me" << std::endl;
-        std::cout << std::endl;
-        ascii_default();
-    }
 #ifdef _WIN32
     // on Windows with MCJIT we need to add "-elf" to the target triple, see
     // http://lists.cs.uiuc.edu/pipermail/llvmdev/2013-December/068407.html
@@ -623,15 +635,6 @@ EXPORT int extempore_init(int argc, char** argv) {
         extemp::AudioDevice* dev = extemp::AudioDevice::I();
         dev->start();
     }
-    if (session) {
-        ascii_normal();
-        std::cout << "Primary        : ";
-        ascii_info();
-        std::cout << "thread 0" << std::endl;
-        ascii_default();
-        std::cout << "---------------------------------------" << std::endl;
-        ascii_default();
-    }
 
     // The processes below live for the whole run and are never
     // destroyed: primary->start(true) subsumes this thread and (quit) ends the
@@ -645,7 +648,7 @@ EXPORT int extempore_init(int argc, char** argv) {
             std::thread([] {
                 const std::atomic<bool> never{false};
                 extemp::SchemeProcess::waitAllDone(never);
-                extemp::SchemeFFI::exitExtempore(extemp::UNIV::FAILED.load() ? 1 : 0);
+                extemp::SchemeFFI::exitExtempore(extemp::UNIV::failed() ? 1 : 0);
             }).detach();
         }
         primary->start(true);  // this will not return
@@ -656,10 +659,8 @@ EXPORT int extempore_init(int argc, char** argv) {
     auto* utility =
         new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, utility_name, utility_port, 0);
     if (!utility->start()) {
-        ascii_error();
-        printf("ERROR:");
-        ascii_default();
-        std::cout << " one or more processes failed to start, exiting." << std::endl;
+        extemp::log::error("the utility process failed to start");
+        extemp::log::flush();
         exit(1);
     }
     auto* primary = new extemp::SchemeProcess(extemp::UNIV::SHARE_DIR, primary_name, primary_port,
@@ -674,10 +675,10 @@ EXPORT int extempore_init(int argc, char** argv) {
         settings.nrepl && extemp::nrepl::start(settings.nrepl_bind, settings.nrepl_port);
     if (settings.nrepl && !serving && (settings.nrepl_port_given || settings.repl_mode)) {
         if (settings.repl_mode && !settings.nrepl_port_given) {
-            std::cout << "--repl needs the nREPL server: give it a free port with --nrepl-port"
-                      << std::endl;
+            extemp::log::error(
+                "--repl needs the nREPL server: give it a free port with --nrepl-port");
         }
-        std::fflush(stdout);
+        extemp::log::flush();
         std::_Exit(1);
     }
 
@@ -698,5 +699,11 @@ EXPORT int extempore_init(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    return extempore_init(argc, argv);
+    // nothing is expected to throw, but an allocation can fail anywhere
+    try {
+        return extempore_init(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "extempore: %s\n", e.what());
+        return 1;
+    }
 }

@@ -418,11 +418,6 @@ void* SchemeProcess::taskImpl() {
             }();
             m_taskType.store(int(task.getType()));
             m_taskStart.store(std::max<uint64_t>(UNIV::TIME, 1));
-            // a scope left by a continuation rather than through its
-            // dynamic-wind would otherwise keep the port on stderr
-            while (!m_scheme->message_scopes.empty()) {
-                SchemeFFI::leaveMessageScope(m_scheme);
-            }
             switch (task.getType()) {
             case SchemeTask::Type::DESTROY_ENV:
                 m_scheme->imp_env.erase(reinterpret_cast<pointer>(task.getPtr()));
@@ -443,7 +438,7 @@ void* SchemeProcess::taskImpl() {
                         // ends at its duration.
                         if (UNIV::MODE != UNIV::Mode::Session && UNIV::MODE != UNIV::Mode::Render &&
                             task.getLabel() == "file_init") {
-                            std::cerr << "extempore: uncaught error, exiting" << std::endl;
+                            log::debug("the startup expression failed, so exiting");
                             SchemeFFI::exitExtempore(1);
                         }
                     }

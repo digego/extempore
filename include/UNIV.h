@@ -45,6 +45,8 @@
 #include <vector>
 #include <unordered_map>
 
+#include "Log.h"
+
 #ifdef _WIN32
 #include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
@@ -116,13 +118,6 @@ inline uint32_t HOUR() {
     return MINUTE() * 60;
 }
 EXPORT uint32_t NUM_FRAMES;
-enum class TerminalMode : uint32_t {
-    Ansi = 0,
-    Cmd = 1,
-    Basic = 2,
-    NoColor = 3,
-};
-extern TerminalMode EXT_TERM;
 extern bool EXT_LOADBASE;
 extern bool AUDIO_NONE;
 // What this extempore was started to do: a live session, or one of the
@@ -132,11 +127,6 @@ extern bool AUDIO_NONE;
 // while a task runs.
 enum class Mode : uint8_t { Session, Exec, Test, Render, Compile };
 extern Mode MODE;
-// exec and render keep stdout for what the code prints: load and compiler
-// messages and error reports go to stderr.
-inline bool messages_to_stderr() {
-    return MODE == Mode::Exec || MODE == Mode::Render;
-}
 extern uint32_t AUDIO_DEVICE;
 extern uint32_t AUDIO_IN_DEVICE;
 extern std::string AUDIO_DEVICE_NAME;
@@ -149,15 +139,16 @@ extern double AUDIO_OUTFILE_DURATION;
 // False under --no-legacy-server: the processes open no eval-server sockets
 // (7099 and below); nREPL is then the only way in.
 extern bool LEGACY_SERVER;
-// An uncaught error was reported, or the code said it failed
-// (sys:note-failure): exec and render then exit with status 1.
+// The code said it failed (sys:note-failure); a run also fails when an error
+// was logged. exec and render then exit with status 1.
 extern std::atomic<bool> FAILED;
+inline bool failed() {
+    return FAILED.load() || log::errors() > 0;
+}
 // extempore render --seed: every random number generator starts from SEED
 // rather than from the system's entropy.
 extern bool SEEDED;
 extern uint64_t SEED;
-// stderr when messages_to_stderr(), else stdout.
-FILE* message_stream();
 bool is_terminal(FILE* Stream);
 // The running extempore's own path, or "" if the platform won't say.
 std::string executable_file();
@@ -195,60 +186,17 @@ extern "C" inline double getRealTime() {
         .count();
 }
 
-// The ANSI escape sequence for a colour, or "" when the terminal mode has no
-// escape sequences (nocolor, or a Windows console set through the console API).
-inline std::string ascii_color_code(bool Bold, unsigned Foreground, unsigned Background) {
-    using extemp::UNIV::TerminalMode;
-    if (extemp::UNIV::EXT_TERM == TerminalMode::NoColor ||
-        extemp::UNIV::EXT_TERM == TerminalMode::Cmd) [[unlikely]] {
-        return {};
-    }
-    // if simple term (that doesn't support defaults)
-    // then default to black background and white text
-    Foreground = (Foreground > 9 || Foreground == 8) ? 9 : Foreground;
-    Background = (Background > 9 || Background == 8) ? 9 : Background;
-    if (extemp::UNIV::EXT_TERM == TerminalMode::Basic) [[unlikely]] {
-        if (Background == 9) [[unlikely]] {
-            Background = 0;
-        }
-        if (Foreground == 9) [[unlikely]] {
-            Foreground = 7;
-        }
-    }
-    char code[32];
-    snprintf(code, sizeof(code), "\x1b[%u;%u;%um", unsigned(Bold), Foreground + 30,
-             Background + 40);
-    return code;
-}
-
+// Colour the messages written straight to stderr (src/Log.cpp decides whether
+// stderr is coloured).
 inline void ascii_text_color(bool Bold, unsigned Foreground, unsigned Background) {
-    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::NoColor) [[unlikely]] {
-        return;
-    }
-#ifdef _WIN32
-    extern int WINDOWS_COLORS[];
-    extern int WINDOWS_BGCOLORS[];
-    if (extemp::UNIV::EXT_TERM == extemp::UNIV::TerminalMode::Cmd) [[unlikely]] {
-        Foreground = (Foreground > 7) ? 7 : Foreground;
-        Background = (Background > 7) ? 0 : Background;
-        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-        if (Background > 0) {
-            SetConsoleTextAttribute(console,
-                                    WINDOWS_COLORS[Foreground] | WINDOWS_BGCOLORS[Background]);
-        } else {
-            SetConsoleTextAttribute(console, WINDOWS_COLORS[Foreground]);
-        }
-        return;
-    }
-#endif
-    fputs(ascii_color_code(Bold, Foreground, Background).c_str(), extemp::UNIV::message_stream());
+    fputs(extemp::log::colour_code(stderr, Bold, Foreground, Background).c_str(), stderr);
 }
 
 inline void ascii_default() {
     ascii_text_color(false, 9, 9);
 }
 inline void ascii_normal() {
-    ascii_text_color(false, 7, 9);
+    ascii_text_color(false, 9, 9);
 }
 inline void ascii_error() {
     ascii_text_color(true, 1, 9);

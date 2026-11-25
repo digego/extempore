@@ -90,18 +90,29 @@ class Protocol(unittest.TestCase):
 
     def test_out_arrives_before_done_without_colour_codes(self) -> None:
         rs = self.eval(
-            '(println \'hello) (print-with-colors \'red \'default #t (print "in red")) (print-error "oops") 42'
+            '(println \'hello) (print-with-colors \'red \'default #t (print "in red")) 42'
         )
         text = out(rs)
         self.assertIn("hello\n", text)
         self.assertIn("in red", text)
-        self.assertIn("ERROR: oops\n", text)
         self.assertNotIn("\x1b", text)
         self.assertEqual(values(rs)[-1], "42")
         last_out = max(i for i, r in enumerate(rs) if "out" in r)
         self.assertLess(last_out, len(rs) - 1)
         # the console still shows it
         self.xtm.wait_for("hello")
+
+    def test_messages_an_eval_logs_reach_its_client(self) -> None:
+        rs = self.eval(
+            '(log:warn "careful" 1) (log:info "noted" (log:styled \'red #t "x")) 42'
+        )
+        err = "".join(r["err"] for r in rs if "err" in r)
+        self.assertEqual(err, "warning: careful 1\n")
+        self.assertIn("noted x\n", out(rs))
+        self.assertNotIn("\x1b", out(rs))
+        self.assertEqual(values(rs)[-1], "42")
+        # and the console shows them, on stderr
+        self.xtm.wait_for("warning: careful 1")
 
     def test_xtlang_compile_error(self) -> None:
         rs = self.eval("(bind-func nrepl_bad_fn (lambda (x:i64) (+ x 1.0)))")
@@ -136,7 +147,7 @@ class Protocol(unittest.TestCase):
         self.assertEqual(error["extempore/error"]["line"], 13)
         self.assertEqual(error["extempore/error"]["file"], "/music/song.xtm")
         err = "".join(r["err"] for r in rs if "err" in r)
-        self.assertIn("/music/song.xtm, line 13", err)
+        self.assertIn("/music/song.xtm:13", err)
 
     def test_read_error(self) -> None:
         rs = self.eval("(+ 1 2)\n\n(car (list 1)", file="song.xtm", line=1)
@@ -164,7 +175,7 @@ class Protocol(unittest.TestCase):
                 **{"file-path": "lib/thing.xtm"},
             )
         err = "".join(r["err"] for r in rs if "err" in r)
-        self.assertIn("lib/thing.xtm, line 3", err)
+        self.assertIn("lib/thing.xtm:3", err)
         self.assertEqual(values(rs), [])
 
     # --- sessions -------------------------------------------------------

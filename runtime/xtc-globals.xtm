@@ -183,24 +183,14 @@
 
 ;; Compiler diagnostics
 ;;
-;; Each xtc:diagnostics:print-*-error function prints a coloured report to the
-;; console and raises an error whose type names its kind (xtlang-type-error,
-;; xtlang-syntax-error, xtlang-generics-error, xtlang-compile-error,
-;; xtlang-error) and whose message is the report as plain text. Under AOT
-;; compilation it aborts the build instead.
-;;
-;; The report goes to the console only, never to the current output port, so a
-;; client that captures an eval's output (an nREPL eval) gets it once, as the
-;; error. Notes are the solver's explanation of a type conflict, printed just
-;; before the report; they join the next report's message.
+;; Each xtc:diagnostics:print-*-error function raises an error whose type names
+;; its kind (xtlang-type-error, xtlang-syntax-error, xtlang-generics-error,
+;; xtlang-compile-error, xtlang-error) and whose message is the report as plain
+;; text; whoever reports the uncaught error prints it, once. Under AOT
+;; compilation the report is logged and the build aborted instead. Notes are
+;; the solver's explanation of a type conflict; they join the next report.
 
 (define *xtc:diagnostics:notes* '())
-
-(define xtc:diagnostics:to-console
-  (lambda (text)
-    (let ((console (if (sys:messages-to-stderr?) *stderr* *stdout*)))
-      (#_display text console)
-      (flush-output-port console))))
 
 (define xtc:diagnostics:strip-ansi
   (lambda (str)
@@ -226,20 +216,19 @@
 (define xtc:diagnostics:note
   (lambda args
     (let ((text (with-output-to-string (lambda () (apply print args)))))
-      (xtc:diagnostics:to-console text)
       (set! *xtc:diagnostics:notes* (cons text *xtc:diagnostics:notes*)))))
 
 (define xtc:diagnostics:raise
   (lambda (kind print-report)
-    (let ((report (with-output-to-string print-report))
-          (notes (apply string-append (reverse *xtc:diagnostics:notes*))))
+    (let* ((report (with-output-to-string print-report))
+           (notes (apply string-append (reverse *xtc:diagnostics:notes*)))
+           (message (xtc:diagnostics:trim-end
+                     (xtc:diagnostics:strip-ansi (string-append notes report)))))
       (set! *xtc:diagnostics:notes* '())
-      (xtc:diagnostics:to-console report)
       (if (xtc:aot:currently-compiling?)
-          (xtc:aot:abort-compilation)
-          (error kind "~A"
-                 (xtc:diagnostics:trim-end
-                  (xtc:diagnostics:strip-ansi (string-append notes report))))))))
+          (begin (log:error message)
+                 (xtc:aot:abort-compilation))
+          (error kind "~A" message)))))
 
 (define xtc:diagnostics:print-error-header
   (lambda (label)
@@ -567,79 +556,59 @@
                                                            (print (car ast)))))
                              (println)))))
 
+;; The compiler's account of what it bound: info messages from the compiler
+;; component, while *xtc:globals:message:level* is high (it is low while an
+;; AOT-compiled library loads).
+(define xtc:diagnostics:compiler-messages?
+  (lambda ()
+    (and (equal? *xtc:globals:message:level* 'high)
+         (log:enabled? 'info 'compiler))))
+
+(define xtc:diagnostics:name
+  (lambda (name) (log:styled *xtc:globals:pretty-print-name-color* #t name)))
+
+(define xtc:diagnostics:type
+  (lambda (type) (log:styled *xtc:globals:pretty-print-type-color* #f type)))
+
+(define xtc:diagnostics:code
+  (lambda (code) (log:styled *xtc:globals:pretty-print-code-color* #f code)))
+
 (define xtc:diagnostics:print-binding-details-to-log
   (lambda (lead-string symname type)
-    (if (equal? *xtc:globals:message:level* 'high)
-        (sys:as-message
-         (print lead-string " ")
-         (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
-         (print " >>> ")
-         (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f  (print type))
-         (println)))))
+    (if (xtc:diagnostics:compiler-messages?)
+        (log:emit 'info 'compiler lead-string (xtc:diagnostics:name symname)
+                  ">>>" (xtc:diagnostics:type type)))))
 
 (define xtc:diagnostics:print-bind-func-details-to-log
   (lambda (lead-string symname type zone-size . args)
-    (if (equal? *xtc:globals:message:level* 'high)
-        (sys:as-message
-         (print lead-string " ")
-         (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
-         (print " >>> ")
-         (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f  (print type))
-         (if (= (length args) 1)
-             (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f (print " " (car args))))
-         (println)))))
+    (if (xtc:diagnostics:compiler-messages?)
+        (apply log:emit 'info 'compiler lead-string (xtc:diagnostics:name symname)
+               ">>>" (xtc:diagnostics:type type)
+               (if (= (length args) 1) (list (xtc:diagnostics:code (car args))) '())))))
 
 (define xtc:diagnostics:print-lib-binding-details-to-log
   (lambda (libname symname type)
-    ;; don't write the header stuff for other AOT-compiled xtm libs -
-    ;; assume a header file already exists in that case
-    (if (equal? *xtc:globals:message:level* 'high)
-        (sys:as-message
-         (print "LibBound:  ")
-         (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname))
-         (print " >>> ")
-         (print-with-colors *xtc:globals:pretty-print-type-color* 'default #f  (print type))
-         (print  " bound from ")
-         (print-with-colors *xtc:globals:pretty-print-code-color* 'default #f  (print libname))
-         (println)))))
+    (if (xtc:diagnostics:compiler-messages?)
+        (log:emit 'info 'compiler "LibBound:" (xtc:diagnostics:name symname)
+                  ">>>" (xtc:diagnostics:type type) "bound from" (xtc:diagnostics:code libname)))))
 
 (define xtc:diagnostics:print-polying-details-to-log
   (lambda (lead-string poly-name native-name type)
-    (if (equal? *xtc:globals:message:level* 'high)
-        (sys:as-message
-         (print lead-string " ")
-         (print-with-colors *xtc:globals:pretty-print-name-color*
-                            'default #t (print poly-name))
-         (print " with ")
-         (print-with-colors *xtc:globals:pretty-print-name-color*
-                            'default #t (print native-name))
-         (print " >>> ")
-         (print-with-colors *xtc:globals:pretty-print-type-color*
-                            'default #f  (print type))
-         (println)))))
+    (if (xtc:diagnostics:compiler-messages?)
+        (log:emit 'info 'compiler lead-string (xtc:diagnostics:name poly-name)
+                  "with" (xtc:diagnostics:name native-name) ">>>" (xtc:diagnostics:type type)))))
 
 (define xtc:diagnostics:print-dylib-loading-details-to-log
   (lambda (dylib-path)
     (let* ((basename (car (reverse (regex:split dylib-path "[/\\\\]"))))
            (libname (car (regex:split basename "[.]"))))
-      (if (equal? *xtc:globals:message:level* 'high)
-          (sys:as-message
-           (print "Lib Load:  ")
-           (print-with-colors *xtc:globals:pretty-print-name-color*
-                              'default #t (print libname))
-           (print " dynamic library loaded from ")
-           (print-with-colors *xtc:globals:pretty-print-code-color*
-                              'default #t (print dylib-path))
-           (println))))))
+      (if (xtc:diagnostics:compiler-messages?)
+          (log:emit 'info 'compiler "Lib Load:" (xtc:diagnostics:name libname)
+                    "dynamic library loaded from" (xtc:diagnostics:code dylib-path))))))
 
 (define xtc:diagnostics:print-no-scheme-stub-notification
   (lambda (symname)
-    (if #f ;;(equal? *xtc:globals:message:level* 'high)
-        (begin
-          (print "There is no ")
-          (print-with-colors 'cyan 'default #t (print  "scheme stub"))
-          (print " available for ")
-          (print-with-colors *xtc:globals:pretty-print-name-color* 'default #t (print symname "\n"))))))
+    (log:emit 'debug 'compiler "no Scheme stub for" symname)))
 
 (define string-split-on
   (lambda (s delim)

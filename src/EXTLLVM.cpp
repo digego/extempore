@@ -93,6 +93,7 @@
 #include <ctime>
 
 #include <EXTLLVM.h>
+#include <ExtemporeVersion.h>
 #include <ext/NetUtil.h>
 #include <ext/UdpSocket.h>
 #include <EXTClosureAddressTable.h>
@@ -1353,26 +1354,9 @@ void initLLVM() {
     }
     MainJD.addGenerator(std::move(*DLSGOrErr));
 
-    // Print configuration.
     if (UNIV::MODE == UNIV::Mode::Session) {
-        ascii_normal();
-        std::cout << "ARCH           : " << std::flush;
-        ascii_info();
-        std::cout << triple << std::endl;
-
-        if (!cpu.empty()) {
-            ascii_normal();
-            std::cout << "CPU            : " << std::flush;
-            ascii_info();
-            std::cout << cpu << std::endl;
-        }
-
-        ascii_normal();
-        std::cout << "LLVM           : " << std::flush;
-        ascii_info();
-        std::cout << LLVM_VERSION_STRING;
-        std::cout << " ORC JIT" << std::endl;
-        ascii_normal();
+        log::info("Extempore {} ({}{}{}, LLVM {})", EXTEMPORE_VERSION, triple,
+                  cpu.empty() ? "" : ", ", cpu, LLVM_VERSION_STRING);
     }
 
     // Register the runtime entry points with the JIT.

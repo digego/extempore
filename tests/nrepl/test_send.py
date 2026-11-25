@@ -72,7 +72,7 @@ class Send(Clients):
             p = self.run_client("send", "--file", str(song), "--line", "4")
         self.assertEqual(p.returncode, 1)
         self.assertIn("car argument, 1, is an integer but should be a pair", p.stderr)
-        self.assertIn("song.xtm, line 4", p.stderr)
+        self.assertIn("song.xtm:4", p.stderr)
 
     def test_a_file_alone_is_loaded_whole(self) -> None:
         with tempfile.TemporaryDirectory() as d:

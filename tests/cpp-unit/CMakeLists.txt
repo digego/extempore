@@ -8,6 +8,7 @@ add_executable(extempore_cpp_unit
     ir_preamble_test.cpp
     bencode_test.cpp
     commandline_test.cpp
+    log_test.cpp
     formfinder_test.cpp
     formatter_test.cpp
     ${CMAKE_SOURCE_DIR}/src/Bencode.cpp
@@ -15,7 +16,8 @@ add_executable(extempore_cpp_unit
     ${CMAKE_SOURCE_DIR}/src/FormFinder.cpp
     ${CMAKE_SOURCE_DIR}/src/Formatter.cpp
     ${CMAKE_SOURCE_DIR}/src/EXTThread.cpp
-    ${CMAKE_SOURCE_DIR}/src/EXTZones.cpp)
+    ${CMAKE_SOURCE_DIR}/src/EXTZones.cpp
+    ${CMAKE_SOURCE_DIR}/src/Log.cpp)
 
 target_link_libraries(extempore_cpp_unit PRIVATE
     gtest_main)

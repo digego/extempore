@@ -109,7 +109,7 @@ def run(code, timeout_s=TIMEOUT):
     snippet = code if "(quit" in code else code + "\n(quit 0)\n"
     try:
         p = subprocess.run(
-            [BIN, "exec", "-e", snippet],
+            [BIN, "exec", "-v", "-e", snippet],
             capture_output=True, text=True, cwd=ROOT, timeout=timeout_s,
         )
         out = p.stdout + p.stderr

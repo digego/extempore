@@ -18,9 +18,11 @@ REPO = Path(__file__).resolve().parents[2]
 BIN = Path(os.environ.get("EXTEMPORE_BIN", REPO / "build" / "extempore")).resolve()
 
 
-def run(*args: str, timeout: float = 120) -> subprocess.CompletedProcess[str]:
+def run(
+    *args: str, timeout: float = 120, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(BIN), *args], cwd=REPO, capture_output=True, text=True, timeout=timeout
+        [str(BIN), *args], cwd=REPO, capture_output=True, text=True, timeout=timeout, env=env
     )
 
 
@@ -41,25 +43,56 @@ class Scratch(unittest.TestCase):
 class Exec(Scratch):
     def test_stdout_is_what_the_code_prints(self) -> None:
         p = run("exec", "-e", "(println (+ 1 2))")
-        self.assertEqual(p.returncode, 0)
+        self.assertEqual((p.returncode, p.stdout, p.stderr), (0, "3\n", ""))
+        p = run("exec", "-v", "-e", "(println (+ 1 2))")
         self.assertEqual(p.stdout, "3\n")
-        self.assertIn("xtmbase", p.stderr)  # the load message is a message
+        self.assertIn("Loaded xtmbase", p.stderr)  # the load message is a message
 
-    def test_compiler_messages_go_to_stderr(self) -> None:
+    def test_compiler_messages_go_to_stderr_with_v(self) -> None:
         file = self.write(
             "sq.xtm",
             "(bind-func sq (lambda (x:i64) (* x x)))\n(println 'square (sq 12))\n",
         )
-        p = run("exec", file)
+        p = run("exec", "-v", file)
         self.assertEqual(p.returncode, 0)
         self.assertEqual(p.stdout, "square 144\n")
-        self.assertIn("Compiled:  sq >>> [i64,i64]*", p.stderr)
+        self.assertIn("Compiled: sq >>> [i64,i64]*", p.stderr)
+
+    def test_levels_and_filters_choose_the_messages(self) -> None:
+        code = (
+            "(bind-func cube (lambda (x:i64) (* x x x)))"
+            '(log:warn "careful") (log:emit (quote debug) (quote midi) "deep")'
+        )
+        p = run("exec", "-e", code)
+        self.assertEqual(p.stderr, "warning: careful\n")
+        self.assertEqual(run("exec", "-q", "-e", code).stderr, "")
+        verbose = run("exec", "-vv", "-e", code).stderr
+        self.assertIn("Compiled: cube", verbose)
+        self.assertIn("debug: midi: deep\n", verbose)
+        env = {**os.environ, "EXTEMPORE_LOG": "info,compiler=warning,midi=debug"}
+        filtered = run("exec", "-e", code, env=env).stderr
+        self.assertNotIn("Compiled", filtered)
+        self.assertIn("Loaded xtmbase", filtered)
+        self.assertIn("debug: midi: deep\n", filtered)
+        bad = run("exec", "-e", "(+ 1 1)", env={**os.environ, "EXTEMPORE_LOG": "loud"})
+        self.assertEqual(bad.returncode, 0)
+        self.assertIn('EXTEMPORE_LOG: can\'t read "loud"', bad.stderr)
+
+    def test_timestamps_when_asked(self) -> None:
+        p = run("exec", "--timestamps", "always", "-e", '(log:warn "now")')
+        self.assertRegex(p.stderr, r"^\d\d:\d\d:\d\d\.\d\d\d warning: now\n$")
 
     def test_no_colour_through_a_pipe_unless_asked(self) -> None:
-        code = "(bind-func cube (lambda (x:i64) (* x x x)))"
+        code = '(log:warn "careful")'
         self.assertNotIn("\x1b[", run("exec", "-e", code).stderr)
-        if sys.platform != "win32":  # whose console is coloured through its own API
-            self.assertIn("\x1b[", run("exec", "--color", "always", "-e", code).stderr)
+        self.assertIn("\x1b[", run("exec", "--color", "always", "-e", code).stderr)
+        p = run("exec", "--color", "always", "-e", '(print-with-colors (quote red) (quote default) #t (print "red"))')
+        self.assertIn("\x1b[", p.stdout)
+
+    def test_a_missing_file_is_status_1(self) -> None:
+        p = run("exec", "-e", '(sys:load "no-such-file.xtm") (println (quote after))')
+        self.assertEqual((p.returncode, p.stdout), (1, "after\n"))
+        self.assertIn("error: sys:load: can't find no-such-file.xtm", p.stderr)
 
     def test_scheduled_work_finishes_before_it_exits(self) -> None:
         file = self.write(
@@ -95,7 +128,7 @@ class Exec(Scratch):
         self.assertEqual(p.returncode, 1)
         self.assertEqual(p.stdout, "1\n2\n")
         self.assertIn("car argument", p.stderr)
-        self.assertIn("err.xtm, line 2", p.stderr)
+        self.assertIn("at " + file + ":2", p.stderr)
 
     def test_an_error_in_an_expression_is_status_1(self) -> None:
         p = run("exec", "--no-base", "-e", "(car 5)")

@@ -94,6 +94,7 @@ void exitExtempore(int Status) {
     // WAV before terminating.
     std::fflush(stdout);
     extemp::AudioDevice::stopFileDriver();
+    log::flush();
     extemp::nrepl::removePortFile();
     std::_Exit(Status);
 }

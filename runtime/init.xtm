@@ -109,61 +109,68 @@
 ;; every subsequent error's stacktrace, so errors appear to pile up across a
 ;; session (and the stack slowly grows). Catching per form avoids both.
 ;;
-;; sys:error-report-string reproduces s7's own ";message / offending-form /
-;; location" report (minus the accumulating stacktrace). It uses the unshadowed
-;; built-ins #_format and #_object->string because scheme.xtm redefines format
-;; and init.xtm redefines catch. The optional LOCATION replaces s7's own, which
-;; for a form read from a string port (sys:load) is no file and line 0.
+;; sys:error-report-string formats the report of an error: its message, the
+;; offending form (truncated) and where it was, each on its own line, without
+;; the accumulating stacktrace. Whoever reports it logs it as an error. It uses
+;; the unshadowed built-ins #_format and #_object->string because scheme.xtm
+;; redefines format and init.xtm redefines catch. The optional LOCATION
+;; ("file.xtm:12", "callback tick") stands in for s7's own when s7 has none, as
+;; for a form read from a string.
 ;;
 ;; sys:report-error writes that report to the error port, which the C++ eval
-;; trap (eval_with_error_trap in SchemeS7.cpp) captures and relays as the
-;; editor's reply once the whole eval returns.
+;; trap (eval_with_error_trap in SchemeS7.cpp) captures and logs once the whole
+;; eval returns. A catch handler passes it a copy of INFO: s7 can reuse the
+;; handler's argument list for later calls, the reporter's own among them.
 
-;; An xtlang compiler diagnostic (xtc:diagnostics:raise) has already printed
-;; its report, and the form s7 blames is the compiler's own raise, so its
-;; report is just the kind and any location the caller supplies.
 (define (sys:xtlang-error? tag)
   (and (symbol? tag)
        (let ((name (symbol->string tag)))
          (and (> (string-length name) 7)
               (string=? (substring name 0 7) "xtlang-")))))
 
+(define (sys:error-message tag info)
+  (*s7-catch* #t
+              (lambda ()
+                (if (and (pair? info) (string? (car info)))
+                    (apply #_format #f info)
+                    (#_format #f "~A ~S" tag info)))
+              (lambda (t i) (#_format #f "~S ~S" tag info))))
+
 (define (sys:error-report-string tag info . location)
   (*s7-catch* #t
               (lambda ()
-                (if (sys:xtlang-error? tag)
-                    (#_format #f ";~A~A~%" tag
-                              (if (pair? location) (#_format #f "~%;    ~A" (car location)) ""))
-                    (let* ((ow (owlet))
-                           (msg (if (and (pair? info) (string? (car info)))
-                                    (apply #_format #f info)
-                                    (#_format #f "~S ~S" tag info)))
-                           (file (let-ref ow 'error-file)))
-                      ;; the message, the offending form (truncated to keep one-line error
-                      ;; reports readable --- (*s7* 'print-length) is deliberately raised at
-                      ;; startup so `write` round-trips, so it can't serve as the limit here),
-                      ;; then the source location. A form read from a bare string port has no
-                      ;; filename, so coerce #f to "" --- matching what s7's loader prints
-                      ;; for editor evals.
-                      (#_format #f "~%;~A~%;    ~A~%;    ~A~%"
-                                msg
-                                (#_object->string (let-ref ow 'error-code) #f 40)
-                                (if (pair? location)
-                                    (car location)
-                                    (#_format #f "~A, line ~A, position: ~A"
-                                              (if (string? file) file "")
-                                              (let-ref ow 'error-line)
-                                              (let-ref ow 'error-position)))))))
+                (let* ((ow (owlet))
+                       (file (let-ref ow 'error-file))
+                       (line (let-ref ow 'error-line))
+                       (code (let-ref ow 'error-code))
+                       (where (cond ((and (string? file) (> (string-length file) 0)
+                                          ;; not a port's name (*stdout*)
+                                          (not (char=? (string-ref file 0) #\*)))
+                                     (if (and (integer? line) (> line 0))
+                                         (#_format #f "~A:~A" file line)
+                                         file))
+                                    ((pair? location) (car location))
+                                    (else #f))))
+                  (string-append
+                   (sys:error-message tag info)
+                   ;; an xtlang diagnostic's form is the compiler's own raise,
+                   ;; and a callback's is the procedure
+                   (if (or (sys:xtlang-error? tag)
+                           (procedure? code)
+                           (not code))
+                       ""
+                       (#_format #f "~%    ~A" (#_object->string code #f 40)))
+                   (if where (#_format #f "~%    at ~A" where) ""))))
               ;; the reporter must never itself throw
-              (lambda (t i) (#_format #f "~%;~S ~S~%" tag info))))
+              (lambda (t i) (#_format #f "~S ~S" tag info))))
 
-(define (sys:report-error tag info)
-  (#_display (sys:error-report-string tag info) (current-error-port)))
+(define (sys:report-error tag info . location)
+  (#_display (apply sys:error-report-string tag info location) (current-error-port)))
 
 (define (sys:eval-top-level form)
   (*s7-catch* #t
               (lambda () (eval form (rootlet)))
-              (lambda (tag info) (sys:report-error tag info) tag)))
+              (lambda (tag info) (sys:report-error tag (copy info)) tag)))
 
 ;; sys:apply-top-level is the same idea for a scheduled callback (temporal
 ;; recursion, OSC handlers): scheme_call applies a closure whose error would
@@ -172,14 +179,17 @@
 (define (sys:apply-top-level func args)
   (*s7-catch* #t
               (lambda () (apply func args))
-              (lambda (tag info) (sys:report-error tag info) tag)))
+              (lambda (tag info)
+                (sys:report-error tag (copy info)
+                                  (#_format #f "callback ~A" (#_object->string func #f 40)))
+                tag)))
 
 (define (sys:eval-string str)
   (let ((port (open-input-string str)))
     (let loop ((last (if #f #f)))
       (let ((form (*s7-catch* #t
                               (lambda () (read port))
-                              (lambda (tag info) (sys:report-error tag info) 'sys:read-error))))
+                              (lambda (tag info) (sys:report-error tag (copy info)) 'sys:read-error))))
         (if (or (eof-object? form) (eq? form 'sys:read-error))
             (begin (close-input-port port) last)
             (loop (sys:eval-top-level form)))))))

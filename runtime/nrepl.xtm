@@ -40,31 +40,19 @@
 
 (define (nrepl:location file line)
   (if file
-      (#_format #f "~A, line ~A" file line)
+      (#_format #f "~A:~A" file line)
       (#_format #f "line ~A" line)))
 
-(define (nrepl:error-message tag info)
-  (*s7-catch* #t
-              (lambda ()
-                (if (and (pair? info) (string? (car info)))
-                    (apply #_format #f info)
-                    (#_format #f "~A" (if (null? info) tag info))))
-              (lambda (t i) (#_format #f "~S" info))))
-
-;; An error ends the request: its report on the console, as any eval's error
-;; would be, then err and eval-error to the client. An xtlang diagnostic has
-;; already printed its report on the console, and its message is that report.
+;; An error ends the request: its report is logged, which reaches the console
+;; and, as err, the client; then eval-error to the client.
 ;;
 ;; The handlers pass a copy of INFO: s7 can hand a catch handler an argument
 ;; list it reuses for later calls, so the first call made while reporting
 ;; would overwrite the original.
 (define (nrepl:report-error tag info form file line)
-  (let* ((location (nrepl:location file line))
-         (kind (nrepl:->string tag))
-         (message (nrepl:error-message tag info))
-         (console (sys:error-report-string tag info location)))
-    (xtc:diagnostics:to-console console)
-    (nrepl:send "err" (if (sys:xtlang-error? tag) (string-append message "\n") console))
+  (let ((kind (nrepl:->string tag))
+        (message (sys:error-message tag info)))
+    (log:emit 'error #f (sys:error-report-string tag info (nrepl:location file line)))
     (nrepl:send "ex" kind
                 "root-ex" kind
                 "status" '("eval-error")

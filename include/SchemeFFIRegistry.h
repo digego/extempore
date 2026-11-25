@@ -81,57 +81,19 @@ inline void schemeWrite(scheme* Scheme, std::string_view Text) {
     std::fflush(stdout);
 }
 
-// Switch the text colour of whatever the current output port feeds. The
-// escape sequence travels through the port like any other text; a Windows
-// console in cmd mode is coloured through the console API instead, which only
-// makes sense while the port is the console.
+// Switch the text colour of what is written to the current output port: what
+// the user's code prints, which is coloured when stdout is.
 inline void schemeWriteColor(scheme* Scheme, bool Bold, unsigned Foreground, unsigned Background) {
-    if (UNIV::EXT_TERM == UNIV::TerminalMode::Cmd) [[unlikely]] {
-        s7_scheme* sc = Scheme->sc;
-        if (s7_current_output_port(sc) == s7_name_to_value(sc, "*stdout*")) {
-            ascii_text_color(Bold, Foreground, Background);
-        }
-        return;
-    }
-    const std::string code = ascii_color_code(Bold, Foreground, Background);
+    const std::string code = log::colour_code(stdout, Bold, Foreground, Background);
     if (!code.empty()) {
         schemeWrite(Scheme, code);
     }
 }
 
-// A message scope (sys:as-message in runtime/scheme.xtm): under extempore
-// exec and extempore render, what is printed inside it goes to stderr, which
-// leaves stdout to the user's code. Only output bound for the console moves:
-// inside with-output-to-string, or a scope that has already moved it, the
-// port is left alone.
-inline void enterMessageScope(scheme* Scheme) {
-    s7_scheme* sc = Scheme->sc;
-    const bool move = UNIV::messages_to_stderr() &&
-                      s7_current_output_port(sc) == s7_name_to_value(sc, "*stdout*");
-    if (move) {
-        s7_set_current_output_port(sc, s7_name_to_value(sc, "*stderr*"));
-    }
-    Scheme->message_scopes.push_back(move);
-}
-
-inline void leaveMessageScope(scheme* Scheme) {
-    if (Scheme->message_scopes.empty()) {
-        return;
-    }
-    const bool moved = Scheme->message_scopes.back();
-    Scheme->message_scopes.pop_back();
-    if (moved) {
-        s7_set_current_output_port(Scheme->sc, s7_name_to_value(Scheme->sc, "*stdout*"));
-    }
-}
-
-// Console complaint from a primitive that reports a bad argument by returning
-// #f rather than raising.  Message carries its own trailing newline; the
-// colour is reset after it, as the Scheme-side print-error does.
-inline void ffiPrintError(const char* Message) {
-    ascii_error();
-    std::fputs(Message, stdout);
-    ascii_normal();
+// A complaint from a primitive which reports a bad argument by returning #f
+// rather than raising.
+inline void ffiPrintError(std::string_view Message) {
+    log::emit(log::Level::Error, "scheme", Message);
 }
 
 }  // namespace SchemeFFI

@@ -742,6 +742,20 @@ Value fromScheme(s7_scheme* S7, s7_pointer P) {
     return value;
 }
 
+// A message logged during the request's eval: a warning or an error goes to
+// the client as err, anything else as out.
+void forwardLog(void* Context, log::Level L, std::string_view Line) {
+    auto* req = static_cast<Request*>(Context);
+    if (L == log::Level::Error || L == log::Level::Warning) {
+        req->reply(Dict{{"err", Value(std::string(Line) + "\n")}});
+        return;
+    }
+    for (const char c : Line) {
+        req->tee(c);
+    }
+    req->tee('\n');
+}
+
 void teeChar(s7_scheme* /*S7*/, uint8_t C, s7_pointer /*Port*/) {
     std::fputc(C, stdout);
     if (t_request) {
@@ -837,6 +851,7 @@ void runRequest(scheme* Scheme, Request* Req, std::uint64_t MaxDuration) {
         return;
     }
     t_request = req.get();
+    const log::ScopedForward forward(forwardLog, req.get());
     Scheme->stop_reason = scheme::StopReason::None;
     Scheme->running_serial = req->serial;
 
@@ -861,7 +876,6 @@ void runRequest(scheme* Scheme, Request* Req, std::uint64_t MaxDuration) {
         req->reply(Dict{{"status", Value(statuses({"interrupted"}))}});
         break;
     case scheme::StopReason::TimeLimit:
-        req->reply(Dict{{"err", Value("evaluation stopped at its time limit\n")}});
         req->reply(Dict{{"ex", Value("time-limit")},
                         {"root-ex", Value("time-limit")},
                         {"status", Value(statuses({"eval-error"}))}});

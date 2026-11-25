@@ -44,6 +44,8 @@
 #include "TaskScheduler.h"
 #include "UNIV.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -281,28 +283,107 @@ static pointer printFullNoQuotes(scheme* Scheme, pointer Args) {
     return Scheme->T;
 }
 
-// "LABEL:" in the label's colour, then the arguments in the normal one.
-// It is a message (see sys:as-message in runtime/scheme.xtm).
-static pointer printLabelled(scheme* Scheme, pointer Args, const char* Label, unsigned Colour) {
-    enterMessageScope(Scheme);
-    schemeWriteColor(Scheme, true, Colour, 9);
-    schemeWrite(Scheme, Label);
-    schemeWriteColor(Scheme, false, 7, 9);
-    schemeWrite(Scheme, " " + extractCell(Scheme, Args, true, false) + "\n");
-    leaveMessageScope(Scheme);
+// The log family (log:emit and the rest): Scheme's side of src/Log.cpp.
+
+// A message's text: its arguments displayed, separated by spaces.
+static std::string messageText(scheme* Scheme, pointer Args) {
+    if (Args == Scheme->NIL) {
+        return {};
+    }
+    return extractCell(Scheme, Args, true, false);
+}
+
+static std::string_view nameOf(pointer P) {
+    if (s7_is_symbol(P)) {
+        return s7_symbol_name(P);
+    }
+    if (s7_is_string(P)) {
+        return s7_string(P);
+    }
+    return {};
+}
+
+static log::Level levelOf(scheme* Scheme, pointer P) {
+    const auto level = log::parse_level(nameOf(P));
+    if (!level) {
+        s7_error(Scheme->sc, s7_make_symbol(Scheme->sc, "wrong-type-arg"),
+                 s7_list(Scheme->sc, 2,
+                         s7_make_string(Scheme->sc,
+                                        "a log level is error, warning, info, debug, trace or off, "
+                                        "not ~S"),
+                         P));
+    }
+    return level.value_or(log::Level::Info);
+}
+
+// (log:emit level component arg ...): component is a symbol, or #f for none.
+static pointer logEmit(scheme* Scheme, pointer Args) {
+    const log::Level level = levelOf(Scheme, pair_car(Args));
+    const std::string_view component = nameOf(pair_cadr(Args));
+    if (log::enabled(level, component)) {
+        log::emit(level, component, messageText(Scheme, pair_cddr(Args)));
+    } else {
+        log::detail::filtered(level);
+    }
     return Scheme->T;
 }
 
+// (log:enabled? level [component])
+static pointer logEnabled(scheme* Scheme, pointer Args) {
+    const log::Level level = levelOf(Scheme, pair_car(Args));
+    const std::string_view component =
+        pair_cdr(Args) == Scheme->NIL ? std::string_view() : nameOf(pair_cadr(Args));
+    return log::enabled(level, component) ? Scheme->T : Scheme->F;
+}
+
+// (log:set-level! level) or (log:set-level! component level)
+static pointer logSetLevel(scheme* Scheme, pointer Args) {
+    if (pair_cdr(Args) == Scheme->NIL) {
+        log::set_level(levelOf(Scheme, pair_car(Args)));
+    } else {
+        log::set_level(nameOf(pair_car(Args)), levelOf(Scheme, pair_cadr(Args)));
+    }
+    return Scheme->T;
+}
+
+// (log:level [component]): the threshold, as a symbol.
+static pointer logLevel(scheme* Scheme, pointer Args) {
+    const std::string_view component =
+        Args == Scheme->NIL ? std::string_view() : nameOf(pair_car(Args));
+    return mk_symbol(Scheme, std::string(log::level_name(log::level(component))).c_str());
+}
+
+// (log:styled colour bold? obj): obj displayed, in colour when messages are.
+static pointer logStyled(scheme* Scheme, pointer Args) {
+    static constexpr std::array<std::string_view, 8> names{"black",   "red",  "green", "yellow",
+                                                           "blue",    "magenta", "cyan", "white"};
+    const std::string_view colour = nameOf(pair_car(Args));
+    const bool bold = pair_cadr(Args) != Scheme->F;
+    pointer obj = pair_caddr(Args);
+    std::string text = s7_is_string(obj) ? std::string(s7_string(obj))
+                                         : extractCell(Scheme, s7_list(Scheme->sc, 1, obj), true,
+                                                       false);
+    const auto found = std::ranges::find(names, colour);
+    if (log::colour() && (found != names.end() || bold)) {
+        const unsigned fg = found == names.end() ? 9 : unsigned(found - names.begin());
+        text = log::colour_code(stderr, bold, fg, 9) + text + "\x1b[0m";
+    }
+    return mk_string(Scheme, text.c_str());
+}
+
 static pointer printError(scheme* Scheme, pointer Args) {
-    return printLabelled(Scheme, Args, "ERROR:", 1);
+    log::emit(log::Level::Error, {}, messageText(Scheme, Args));
+    return Scheme->T;
 }
 
 static pointer printInfo(scheme* Scheme, pointer Args) {
-    return printLabelled(Scheme, Args, "INFO:", 6);
+    log::emit(log::Level::Info, {}, messageText(Scheme, Args));
+    return Scheme->T;
 }
 
 static pointer printWarn(scheme* Scheme, pointer Args) {
-    return printLabelled(Scheme, Args, "WARN:", 3);
+    log::emit(log::Level::Warning, {}, messageText(Scheme, Args));
+    return Scheme->T;
 }
 
 static pointer getClosureEnv(scheme* Scheme, pointer Args) {
@@ -391,6 +472,11 @@ std::span<const FFIEntry> miscDefs() {
         FFI_DEF("print-error", printError, 0, 0, true),
         FFI_DEF("print-info", printInfo, 0, 0, true),
         FFI_DEF("print-warn", printWarn, 0, 0, true),
+        FFI_DEF("log:emit", logEmit, 2, 0, true),
+        FFI_DEF("log:enabled?", logEnabled, 1, 1, false),
+        FFI_DEF("log:set-level!", logSetLevel, 1, 1, false),
+        FFI_DEF("log:level", logLevel, 0, 1, false),
+        FFI_DEF("log:styled", logStyled, 3, 0, false),
         FFI_DEF("get-closure-env", getClosureEnv, 1, 0, false),
         FFI_DEF("mk-ff", scmAddForeignFunc, 2, 0, false),
         FFI_DEF("xtc:codegen:getname", impcirGetName, 1, 0, false),

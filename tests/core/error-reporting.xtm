@@ -20,7 +20,7 @@
 ;; These tests pin the fix: repeated errors don't grow the stack, an error in
 ;; one form doesn't derail the surrounding session, ordinary top-level semantics
 ;; (global defines, returned values) are preserved, and the report itself is the
-;; terse s7-style message with no trailing stacktrace.
+;; terse message with no trailing stacktrace.
 
 ;;; Code:
 
@@ -35,20 +35,21 @@
     (set-current-error-port old)
     (get-output-string sp)))
 
-;; #t iff every non-blank line of s begins with a semicolon. The accumulating
-;; stacktrace is exactly the lines that DON'T -- so this is what tells a clean
-;; s7-style report apart from one with a stacktrace stapled on.
-(define (test-all-comment-lines? s)
+;; #t iff every line of s after the first is blank or indented: the report is
+;; the message, then the form and the location, each indented. The accumulating
+;; stacktrace is lines which aren't, so this tells a terse report apart from
+;; one with a stacktrace stapled on.
+(define (test-terse-report? s)
   (call-with-exit
    (lambda (return)
-     (let ((at-line-start #t))
+     (let ((at-line-start #f))
        (do ((i 0 (+ i 1)))
            ((= i (string-length s)) #t)
          (let ((c (string-ref s i)))
            (cond ((char=? c #\newline) (set! at-line-start #t))
                  (at-line-start
                   (set! at-line-start #f)
-                  (if (not (char=? c #\;)) (return #f))))))))))
+                  (if (not (char=? c #\space)) (return #f))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; stack hygiene -- the core of the fix
@@ -93,7 +94,7 @@
                 "handles-scheme-error")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; report shape -- terse s7-style message, no stacktrace
+;; report shape -- terse message, no stacktrace
 
 ;; the report names the offending call and its argument
 (xtmtest-result (let ((out (test-eval-capture "(car 5)")))
@@ -103,15 +104,15 @@
                 #t
                 "report-has-message")
 
-;; the offending form is echoed on its own ;-comment line
+;; the offending form is echoed on its own line
 (xtmtest-result (and (string-position "(car 5)" (test-eval-capture "(car 5)")) #t)
                 #t
                 "report-echoes-form")
 
-;; and there is NO trailing stacktrace: every non-blank line is a ;-comment.
+;; and there is NO trailing stacktrace: every line after the message is indented.
 ;; This is the regression that would fire if the raw s7 handler (with its
 ;; history-walking stacktrace) came back.
-(xtmtest-result (test-all-comment-lines? (test-eval-capture "(car 5)"))
+(xtmtest-result (test-terse-report? (test-eval-capture "(car 5)"))
                 #t
                 "report-has-no-stacktrace")
 
@@ -153,6 +154,6 @@
         (old (set-current-error-port sp)))
    (sys:apply-top-level car '(5))
    (set-current-error-port old)
-   (test-all-comment-lines? (get-output-string sp)))
+   (test-terse-report? (get-output-string sp)))
  #t
  "apply-report-has-no-stacktrace")

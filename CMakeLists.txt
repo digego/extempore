@@ -364,7 +364,8 @@ set(EXTEMPORE_SOURCES
     src/SchemeREPL.cpp
     src/NreplServer.cpp
     src/TaskScheduler.cpp
-    src/UNIV.cpp)
+    src/UNIV.cpp
+    src/Log.cpp)
 
 add_executable(extempore ${EXTEMPORE_SOURCES})
 add_dependencies(extempore extempore_version)

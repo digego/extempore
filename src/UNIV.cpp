@@ -67,30 +67,6 @@
 #include <malloc.h>
 #include <Windows.h>
 
-enum Windows_Color_Convert {
-    Black = 0,
-    Red = FOREGROUND_RED,
-    Green = FOREGROUND_GREEN,
-    Yellow = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
-    Blue = FOREGROUND_BLUE | FOREGROUND_INTENSITY,
-    Magenta = FOREGROUND_RED | FOREGROUND_BLUE,
-    Cyan = FOREGROUND_GREEN | FOREGROUND_BLUE,
-    White = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY
-};
-
-enum Windows_BGColor_convert {
-    BGBlack = 0,
-    BGRed = BACKGROUND_RED,
-    BGGreen = BACKGROUND_GREEN,
-    BGYellow = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY,
-    BGBlue = BACKGROUND_BLUE,
-    BGMagenta = BACKGROUND_RED | BACKGROUND_BLUE,
-    BGCyan = BACKGROUND_GREEN | BACKGROUND_BLUE,
-    BGWhite = BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY,
-};
-
-int WINDOWS_COLORS[] = {Black, Red, Green, Yellow, Blue, Magenta, Cyan, White};
-int WINDOWS_BGCOLORS[] = {BGBlack, BGRed, BGGreen, BGYellow, BGBlue, BGMagenta, BGCyan, BGWhite};
 
 #endif
 
@@ -505,9 +481,6 @@ bool LEGACY_SERVER = true;
 std::atomic<bool> FAILED{false};
 bool SEEDED = false;
 uint64_t SEED = 0;
-FILE* message_stream() {
-    return messages_to_stderr() ? stderr : stdout;
-}
 bool is_terminal(FILE* Stream) {
 #ifdef _WIN32
     return _isatty(_fileno(Stream)) != 0;
@@ -521,11 +494,6 @@ std::string ARCH;
 std::string CPU;
 std::vector<std::string> ATTRS;
 
-#ifdef _WIN32
-TerminalMode EXT_TERM = TerminalMode::Cmd;
-#else
-TerminalMode EXT_TERM = TerminalMode::Ansi;
-#endif
 bool EXT_LOADBASE = true;
 
 double midi2frq(double pitch) {
