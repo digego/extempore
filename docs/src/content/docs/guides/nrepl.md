@@ -92,6 +92,8 @@ and beside them `extempore/type` (an xtlang type, or each overload's) and
 queue behind whatever the process is evaluating.
 
 `interrupt` stops a session's running eval the next time control is in Scheme
-code; compiled xtlang, and LLVM compiling it, run to completion first. Evals
+code; compiled xtlang, and LLVM compiling it, run to completion first. An eval
+which is still waiting its turn is cancelled, and answers `interrupted` without
+running. Evals
 also stop at the process's time limit (`sys:set-default-timeout`, 60 seconds by
 default).

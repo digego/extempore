@@ -306,23 +306,28 @@ EXPORT void llvm_print_f64(double num) {
 // int for returning into xtlang (which prefers signed ints). I hope
 // this doesn't come back to bite me one day.
 //
-// Each thread has its own generator. Under extempore render --seed they are
+// Each thread has its own generator. Under extempore render --seed each is
 // seeded from the seed and the thread's place in the order the threads were
-// made, so a render draws the same numbers every time.
-static std::minstd_rand makeRandGen() {
-    if (!extemp::UNIV::SEEDED) {
-        return std::minstd_rand{std::random_device{}()};
-    }
+// made, so a render draws the same numbers every time. That happens at a
+// thread's first draw, not where the thread_local is initialised: MSVC does
+// that as the thread starts, which for the main thread is before the command
+// line is read.
+static thread_local std::minstd_rand sRandGen{std::random_device{}()};
+static thread_local bool sRandSeeded = false;
+
+static void seedRandGen() {
     const extemp::EXTThread* thread = extemp::EXTThread::activeThread();
     const uint64_t stream = thread ? thread->ordinal() + 1 : 0;  // 0: the render thread
     std::seed_seq seq{uint32_t(extemp::UNIV::SEED), uint32_t(extemp::UNIV::SEED >> 32),
                       uint32_t(stream), uint32_t(stream >> 32)};
-    return std::minstd_rand{seq};
+    sRandGen.seed(seq);
+    sRandSeeded = true;
 }
 
-static thread_local std::minstd_rand sRandGen{makeRandGen()};
-
 EXPORT double xtc_randd() {
+    if (extemp::UNIV::SEEDED && !sRandSeeded) [[unlikely]] {
+        seedRandGen();
+    }
     // The existing implementation *COULD* (p = 1 / RAND_MAX) return 1!, but I don't think that was
     // intended
     return std::uniform_real_distribution<double>()(sRandGen);

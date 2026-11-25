@@ -324,6 +324,24 @@ class Protocol(unittest.TestCase):
             c.request(op="interrupt", session=session)
             self.assertIn("interrupted", statuses(list(c.responses(eval_id))))
 
+    def test_interrupt_an_eval_which_is_still_waiting_its_turn(self) -> None:
+        with self.xtm.client() as c:
+            session = c.request(op="clone")[0]["new-session"]
+            c.request(op="eval", code="(define nrepl-spin 0) (define nrepl-ran #f)",
+                      session=session)
+            running = c.send(op="eval", code=self.LONG_LOOP, session=session)
+            waiting = c.send(op="eval", code="(set! nrepl-ran #t)", session=session)
+            time.sleep(0.5)
+            (ack,) = c.request(op="interrupt", session=session, **{"interrupt-id": waiting})
+            self.assertEqual(ack["status"], ["done"])
+            c.request(op="interrupt", session=session, **{"interrupt-id": running})
+            self.assertIn("interrupted", statuses(list(c.responses(running))))
+            # its turn comes, and it says it was interrupted without running
+            self.assertEqual(statuses(list(c.responses(waiting))), ["interrupted", "done"])
+            self.assertEqual(
+                values(c.request(op="eval", code="nrepl-ran", session=session)), ["#f"]
+            )
+
     def test_interrupt_replies(self) -> None:
         with self.xtm.client() as c:
             session = c.request(op="clone")[0]["new-session"]

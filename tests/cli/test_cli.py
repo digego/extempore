@@ -230,6 +230,16 @@ class Render(Scratch):
         self.assertEqual((self.dir / "a.wav").stat().st_size, 44 + 44100 * 2 * 4)
         self.assertIn("wrote", p.stderr)
 
+    def test_with_no_dsp_the_clock_still_runs_and_the_file_is_silence(self) -> None:
+        file = self.write(
+            "nodsp.xtm", "(callback (+ (now) 22050) (lambda () (println 'at (now))))\n")
+        p = self.render(file, "silence.wav")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(p.stdout, "at 21504\n")  # the block which holds frame 22050
+        data = (self.dir / "silence.wav").read_bytes()
+        self.assertEqual(len(data), 44 + 44100 * 2 * 4)
+        self.assertFalse(any(data[44:]))
+
     def test_the_same_seed_gives_the_same_samples(self) -> None:
         file = self.write("noise.xtm", NOISE)
         for out, seed in (("a.wav", "0"), ("b.wav", "0"), ("c.wav", "9")):

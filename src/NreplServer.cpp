@@ -182,6 +182,13 @@ struct Running {
     scheme* sc;
 };
 
+// A request which is waiting its turn on its process's task queue.
+struct Queued {
+    std::string session;
+    std::string id;
+    bool cancelled = false;  // interrupted before it began
+};
+
 std::string idString(const Dict& Msg) {
     const Value* id = bencode::find(Msg, "id");
     if (!id) {
@@ -398,9 +405,20 @@ class Server {
         }
     }
 
-    void setRunning(const std::string& Process, Running R) {
+    // A request's turn has come. False if it was interrupted while it waited,
+    // in which case it isn't to run.
+    bool setRunning(const std::string& Process, Running R) {
         const std::lock_guard<std::mutex> lock(m_mutex);
+        const auto queued = m_queued.find(R.serial);
+        const bool cancelled = queued != m_queued.end() && queued->second.cancelled;
+        if (queued != m_queued.end()) {
+            m_queued.erase(queued);
+        }
+        if (cancelled) {
+            return false;
+        }
         m_running.insert_or_assign(Process, std::move(R));
+        return true;
     }
 
     void clearRunning(const std::string& Process) {
@@ -414,9 +432,10 @@ class Server {
     std::uint16_t m_port = 0;
     std::string m_error;
 
-    std::mutex m_mutex;  // guards the two tables below
+    std::mutex m_mutex;  // guards the three tables below
     std::unordered_map<std::string, Session> m_sessions;
     std::unordered_map<std::string, Running> m_running;  // by process name
+    std::unordered_map<std::uint64_t, Queued> m_queued;  // by request serial
 
     void receive(const std::shared_ptr<Connection>& Conn, std::vector<char>& Buf) {
         const long n = net::recv(Conn->fd(), Buf.data(), Buf.size());
@@ -574,6 +593,10 @@ class Server {
               Session);
     }
 
+    // Stops the session's eval: the one named by interrupt-id, or without an
+    // id whatever of the session's is running or waiting. A request still
+    // waiting its turn (behind another eval, or the libraries loading at
+    // startup) is cancelled, and answers interrupted when its turn comes.
     void interrupt(const std::shared_ptr<Connection>& Conn, const Dict& Msg,
                    const std::string& Session) {
         const std::lock_guard<std::mutex> lock(m_mutex);
@@ -582,19 +605,28 @@ class Server {
             replyStatus(Conn, Msg, {"error", "unknown-session", "done"}, Session);
             return;
         }
-        auto running = m_running.find(session->second.process);
-        if (running == m_running.end() || running->second.session != Session) {
-            replyStatus(Conn, Msg, {"session-idle", "done"}, Session);
-            return;
-        }
         const std::string_view wanted = bencode::findString(Msg, "interrupt-id");
-        if (!wanted.empty() && wanted != running->second.id) {
-            replyStatus(Conn, Msg, {"error", "interrupt-id-mismatch", "done"}, Session);
-            return;
+        bool stopped = false;
+        for (auto& entry : m_queued) {
+            if (entry.second.session == Session && (wanted.empty() || wanted == entry.second.id)) {
+                entry.second.cancelled = true;
+                stopped = true;
+            }
         }
-        running->second.sc->interrupt_serial.store(running->second.serial,
-                                                   std::memory_order_relaxed);
-        replyStatus(Conn, Msg, {"done"}, Session);
+        auto running = m_running.find(session->second.process);
+        const bool ours = running != m_running.end() && running->second.session == Session;
+        if (ours && (wanted.empty() || wanted == running->second.id)) {
+            running->second.sc->interrupt_serial.store(running->second.serial,
+                                                       std::memory_order_relaxed);
+            stopped = true;
+        }
+        if (stopped) {
+            replyStatus(Conn, Msg, {"done"}, Session);
+        } else if (ours) {
+            replyStatus(Conn, Msg, {"error", "interrupt-id-mismatch", "done"}, Session);
+        } else {
+            replyStatus(Conn, Msg, {"session-idle", "done"}, Session);
+        }
     }
 
     void dispatch(const std::shared_ptr<Connection>& Conn, Dict Msg, const std::string& Op,
@@ -631,6 +663,10 @@ class Server {
         }
         auto* req = new Request{Conn, std::move(Msg), std::move(Session), process,
                                 s_nextSerial.fetch_add(1)};
+        {
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            m_queued.emplace(req->serial, Queued{req->session, idString(req->msg)});
+        }
         target->createSchemeTask(req, "nrepl", SchemeTask::Type::NREPL);
     }
 };
@@ -793,8 +829,13 @@ void removePortFile() {
 void runRequest(scheme* Scheme, Request* Req, std::uint64_t MaxDuration) {
     std::unique_ptr<Request> req(Req);
     s7_scheme* s7 = Scheme->sc;
-    s_server->setRunning(req->process,
-                         Running{req->serial, req->session, idString(req->msg), Scheme});
+    if (!s_server->setRunning(req->process,
+                              Running{req->serial, req->session, idString(req->msg), Scheme})) {
+        // interrupted while it waited its turn
+        req->reply(Dict{{"status", Value(statuses({"interrupted"}))}});
+        req->reply(Dict{{"status", Value(statuses({"done"}))}});
+        return;
+    }
     t_request = req.get();
     Scheme->stop_reason = scheme::StopReason::None;
     Scheme->running_serial = req->serial;

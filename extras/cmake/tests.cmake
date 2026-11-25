@@ -21,8 +21,12 @@ file(MAKE_DIRECTORY ${EXTEMPORE_TEST_RESULTS_DIR})
 # budget to match.
 if(EXTEMPORE_SANITIZE)
     set(EXTEMPORE_TEST_TIMEOUT 900)
+    set(EXTEMPORE_PYTHON_TEST_TIMEOUT 1800)
 else()
     set(EXTEMPORE_TEST_TIMEOUT 120)
+    # A Python test file starts extempore dozens of times; the slower CI
+    # runners take two minutes over what takes one here.
+    set(EXTEMPORE_PYTHON_TEST_TIMEOUT 600)
 endif()
 
 # On a timeout ctest first sends SIGUSR1, and extempore writes a hang report
@@ -197,7 +201,7 @@ if(Python3_Interpreter_FOUND)
         set_tests_properties(nrepl/${_t} PROPERTIES
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/nrepl
             ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
-            TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+            TIMEOUT ${EXTEMPORE_PYTHON_TEST_TIMEOUT}
             LABELS nrepl)
     endforeach()
 endif()
@@ -209,7 +213,7 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(lsp/test_lsp PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/lsp
         ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
-        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        TIMEOUT ${EXTEMPORE_PYTHON_TEST_TIMEOUT}
         LABELS lsp)
 endif()
 
@@ -220,7 +224,7 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(cli/test_cli PROPERTIES
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli
         ENVIRONMENT "EXTEMPORE_BIN=$<TARGET_FILE:extempore>"
-        TIMEOUT ${EXTEMPORE_TEST_TIMEOUT}
+        TIMEOUT ${EXTEMPORE_PYTHON_TEST_TIMEOUT}
         LABELS cli)
 endif()
 
