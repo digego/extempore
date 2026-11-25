@@ -409,7 +409,7 @@ noting that when we compile `xt_add` the log view prints the closure's type
 signature:
 
 ```
-Compiled:  xt_add >>> [i64,i64,i64]*
+Compiled: xt_add >>> [i64,i64,i64]*
 ```
 
 `bind-func` is xtlang's equivalent to Scheme's `define`, although with the
@@ -472,7 +472,7 @@ we take out just one of these type annotations?
   (lambda (a:i64 b)
     (+ a b)))
 
-;; log shows "Compiled:  xt_add2 >>> [i64,i64,i64]*"
+;; log shows "Compiled: xt_add2 >>> [i64,i64,i64]*"
 
 (xt_add2 2 4) ;; returns 6
 ```
@@ -495,7 +495,7 @@ How about if we try removing the `a` type annotation as well?
   (lambda (a b)
     (+ a b)))
 
-;; log shows "Compiled:  xt_add3 >>> [double,double,double]*"
+;; log shows "Compiled: xt_add3 >>> [double,double,double]*"
 ```
 
 This still compiles. With nothing to pin the types down, the inferencer falls
@@ -503,7 +503,7 @@ back to its default for an unconstrained numeric---`double`---so `xt_add3` comes
 out as `[double,double,double]*`. The compiler only gives up when there is
 genuinely no way to choose a type (for example a closure argument that you call
 but never give a concrete type), and then you'll see a
-[`Type Error couldn't resolve type`](/reference/error-messages/#could-not-resolve-types),
+[`couldn't resolve the type`](/reference/error-messages/#could-not-resolve-types),
 which you fix by adding an annotation.
 
 If you want `xt_add3` to use a particular type rather than the default, you can
@@ -635,8 +635,8 @@ Now, what happens if we change this testing example to make `top_right` and
 Now, instead of compiling nicely, we get the compiler error:
 
 ```
-Type Error: no overload matches the argument types [<double,double>*,<double,double>*] --- candidates are [double,point*,point*]
-Type Error couldn't resolve type: test_unit_square_diagonal_2_adhoc_N
+error: couldn't resolve the type of test_unit_square_diagonal_2
+    no overload matches the argument types [<double,double>*,<double,double>*]; the candidates are [double,point*,point*]
 ```
 
 Even though `point` _is_ just a `<double,double>` (check the `bind-type`

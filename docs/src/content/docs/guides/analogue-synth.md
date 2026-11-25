@@ -35,10 +35,10 @@ Depending on your machine it might take a little while, but hang tight---you'll
 get there in the end. When you see something like this then you're ready to go.
 
 ```
-Compiled:  active_notes >>> [i32,i8*]*
-Compiled:  dsp_load >>> [void]*
-Compiled:  main_reverb >>> [void,i64,float]*
-Compiled:  main_gain >>> [float,float]*
+Compiled: active_notes >>> [i32,i8*]*
+Compiled: dsp_load >>> [void]*
+Compiled: main_reverb >>> [void,i64,float]*
+Compiled: main_gain >>> [float,float]*
 sharedsystem audio setup complete
 ```
 

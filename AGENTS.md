@@ -124,10 +124,12 @@ build/extempore exec script.xtm -- --name=value   # the script reads (sys:cmdarg
 ```
 
 It starts no audio and no servers, and exits when the code has finished and
-nothing is left scheduled: status 0, or 1 if anything raised an error. Its
-stdout is what the code prints; load and compiler messages and error reports
-are on stderr. Code which schedules itself forever (a temporal recursion) runs
-until it calls `(quit)`, so give untested code a `timeout`.
+nothing is left scheduled: status 0, or 1 if an error was raised or logged. Its
+stdout is what the code prints, and stderr has the warnings and errors; `-v`
+adds the load and `Compiled:` messages, `-vv` debug ones (`EXTEMPORE_LOG`
+filters by component, see `extempore exec --help`). Code which schedules itself
+forever (a temporal recursion) runs until it calls `(quit)`, so give untested
+code a `timeout`.
 
 `build/extempore render FILE -o OUT.wav --duration SECONDS` renders a file's
 audio offline, and renders the same samples every time.

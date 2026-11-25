@@ -49,7 +49,7 @@ npm run preview   # preview the production build
 The xtlang code in the reference pages (and some of the guides) is checked
 against the real compiler by `docs/verify-examples.py`, which runs each snippet
 through `extempore exec` and compares the output to what the docs claim (a
-`Compiled:  NAME >>> SIG` line, a `;; prints "..."` comment, or---for
+`Compiled: NAME >>> SIG` line, a `;; prints "..."` comment, or---for
 `error-messages.md`---the error block that follows the snippet). A claim is only
 checked when a block that actually runs would produce it: a
 `Compiled:`/`;; prints` line inside a runnable block, or in the output block

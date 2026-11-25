@@ -44,7 +44,7 @@ Two things happen when you evaluate this. First, the compiler reports what it
 built:
 
 ```
-Compiled:  xt_add >>> [i64,i64,i64]*
+Compiled: xt_add >>> [i64,i64,i64]*
 ```
 
 The `[i64,i64,i64]*` is the type signature of `xt_add`. Read it right-to-left
@@ -87,7 +87,7 @@ work them out from context:
 ```
 
 ```
-Compiled:  xt_add_partial >>> [i64,i64,i64]*
+Compiled: xt_add_partial >>> [i64,i64,i64]*
 9
 ```
 
@@ -104,7 +104,7 @@ unconstrained number becomes a `double`:
 ```
 
 ```
-Compiled:  xt_add_bad >>> [double,double,double]*
+Compiled: xt_add_bad >>> [double,double,double]*
 ```
 
 That compiles, but as a `double` adder---probably not what you wanted if you
@@ -128,8 +128,8 @@ If you give the compiler conflicting information, it will tell you so:
 ```
 
 ```
-Type Error: no overload matches the argument types [double,double] --- candidates are [i64,i64,i64]
-Type Error couldn't resolve type: type_mismatch_adhoc_N
+error: couldn't resolve the type of type_mismatch
+    no overload matches the argument types [double,double]; the candidates are [i64,i64,i64]
 ```
 
 `xt_add` wants `i64` arguments (its only candidate is `[i64,i64,i64]`); `3.0` is
@@ -176,7 +176,7 @@ Here's a function that averages three doubles:
 ```
 
 ```
-Compiled:  my_mean >>> [double]*
+Compiled: my_mean >>> [double]*
 5.233333
 ```
 
@@ -213,8 +213,8 @@ And because type signatures can get long, `bind-type` lets you give them a name:
 
 ```
 DataType:  point2d >>> <double,double>
-Compiled:  make_point >>> [point2d*,double,double]*
-Compiled:  distance_from_origin >>> [double,point2d*]*
+Compiled: make_point >>> [point2d*,double,double]*
+Compiled: distance_from_origin >>> [double,point2d*]*
 5.000000
 ```
 
@@ -251,8 +251,8 @@ A classic example: a function that returns another function.
 ```
 
 ```
-Compiled:  make_adder >>> [[i64,i64]*,i64]*
-Compiled:  try_adder >>> [i64]*
+Compiled: make_adder >>> [[i64,i64]*,i64]*
+Compiled: try_adder >>> [i64]*
 12
 ```
 
@@ -281,7 +281,7 @@ lives in that zone---and it survives across calls to the closure.
 ```
 
 ```
-Compiled:  counter_closure >>> [i64]*
+Compiled: counter_closure >>> [i64]*
 1
 2
 3
@@ -328,7 +328,7 @@ inside the body comes out of the new zone, and the whole zone is freed when the
 ```
 
 ```
-Compiled:  fill_and_sum >>> [i64,i64]*
+Compiled: fill_and_sum >>> [i64,i64]*
 4950
 ```
 
@@ -358,8 +358,8 @@ allocation) for a value we want to return?
 ```
 
 ```
-Compiled:  make_pair_bad >>> [<i64,i64>*,i64]*
-Compiled:  clobber_demo >>> [i32]*
+Compiled: make_pair_bad >>> [<i64,i64>*,i64]*
+Compiled: clobber_demo >>> [i32]*
 p = <2,127154307723709>
 ```
 
@@ -387,8 +387,8 @@ safest choice (heap, lives until explicitly freed):
 ```
 
 ```
-Compiled:  make_pair >>> [<i64,i64>*,i64]*
-Compiled:  stable_demo >>> [i32]*
+Compiled: make_pair >>> [<i64,i64>*,i64]*
+Compiled: stable_demo >>> [i32]*
 p = <6,12>
 ```
 

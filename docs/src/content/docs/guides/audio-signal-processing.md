@@ -84,7 +84,7 @@ closure a `_c` suffix.
 The type message printed by the compiler when we evaluate `osc_c` is:
 
 ```
-    Compiled:  osc_c >>> [[float,float,float]*,float]*
+    Compiled: osc_c >>> [[float,float,float]*,float]*
 ```
 
 See that the return type of the `osc_c` function is `[float,float,float]*`: a
@@ -184,7 +184,7 @@ tuples either---you can't just go
     (let ((tup:<i64,i64> <a,a>))
       tup)))
 
-;; Compiler Error cannot find symbol <a,a>
+;; error: cannot find symbol <a,a>
 ```
 
 Instead, this time in the `let` we get a pointer to a tuple through a call to
@@ -209,7 +209,7 @@ Notice the `tset!` function, which takes three arguments: a pointer to a tuple
 must be of the appropriate type, otherwise you'll get a type error).
 
 This new version of `tuple_maker` compiles---hooray! The type signature printed
-by the compiler is `Compiled:  tuple_maker >>> [<i64,i64>*,i64]*` and the type
+by the compiler is `Compiled: tuple_maker >>> [<i64,i64>*,i64]*` and the type
 of `tuple_maker` is a pointer (denoted by the `*`) to a closure (denoted by the
 `[]`) which takes one `i64` argument and returns a pointer to a tuple of two
 `i64` values.
@@ -423,7 +423,7 @@ note, so that's where we put our code to generate the saw wave.
               0.0))))))
 
 ;; when we evaluate saw_synth_note, the compiler prints:
-;; Compiled:  saw_synth_note >>> [[[float,i64,i64]*,NoteData*,i64,float*]*]*
+;; Compiled: saw_synth_note >>> [[[float,i64,i64]*,NoteData*,i64,float*]*]*
 ```
 
 Notice that the saw
@@ -498,7 +498,7 @@ input through untouched:
         in))))
 
 ;; when we evaluate saw_synth_fx, the compiler prints:
-;; Compiled:  saw_synth_fx >>> [[float,float,i64,i64,float*]*]*
+;; Compiled: saw_synth_fx >>> [[float,float,i64,i64,float*]*]*
 ```
 
 Let's add a stereo delay to make things a bit more interesting

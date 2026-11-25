@@ -30,10 +30,10 @@ Depending on your machine it might take a little while, but hang tight---you'll
 get there in the end. When you see something like this then you're ready to go.
 
 ```
-Compiled:  active_notes >>> [i32,i8*]*
-Compiled:  dsp_load >>> [void]*
-Compiled:  main_reverb >>> [void,i64,float]*
-Compiled:  main_gain >>> [float,float]*
+Compiled: active_notes >>> [i32,i8*]*
+Compiled: dsp_load >>> [void]*
+Compiled: main_reverb >>> [void,i64,float]*
+Compiled: main_gain >>> [float,float]*
 sharedsystem audio setup complete
 ```
 
@@ -224,9 +224,8 @@ the `_` character isn't the name of a variable (which should be evaluated to a
 value). Try running the above pattern without the `'` and you'll get an error:
 
 ```
-pattern starting  pat-2
-eval: unbound variable: _
-Trace: pat-2
+Pattern starting pat-2
+error: unbound variable _ in (list 67 67 67 _ 63 65)
 ```
 
 There's some subtlety here (especially because even though `_` is a weird name
@@ -844,8 +843,7 @@ that you've bound `beat` to a sensible value for your purposes. Otherwise,
 you'll get an error message like:
 
 ```
-stack-catch: ()
-eval: unbound variable: beat
+error: unbound variable beat in (* TWOPI beat 1/2)
 ```
 
 As to why there's a trailing `r` on all of the macro names, that knowledge has

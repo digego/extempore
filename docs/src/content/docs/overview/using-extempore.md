@@ -142,7 +142,7 @@ representing the radius of a circle and returns the area of that circle (another
 The closure compiled successfully, and the compiler prints
 
 ```
-    Compiled:  circle_area >>> [double,double]*
+    Compiled: circle_area >>> [double,double]*
 ```
 
 to the log. If there was a problem with the compilation, then the compiler would
@@ -200,6 +200,54 @@ meaning that they were both highlighted in the editor before giving the
 evaluation command. The results of this evaluation indicate that the two parts
 of the code were both evaluated successfully: the `doughnut_area` closure
 compiled successfully, and the result `58.904862` was returned to the editor.
+
+## The log {#the-log}
+
+Everything Extempore says about its own work (starting up, a library loading, a
+function compiled, a warning, an error) is a message, and messages go to stderr.
+stdout is left to what your code prints with `println` or xtlang's `printf`, so
+`extempore exec song.xtm > out.txt` captures only that. The messages an nREPL
+eval causes also go to the editor that sent it: warnings and errors as `err`,
+the rest as `out`.
+
+Each message has a level. Info messages are plain text, and the others are
+labelled:
+
+```
+Compiled: circle_area >>> [double,double]*
+warning: midi: no MIDI output device configured
+error: car argument, 5, is an integer but should be a pair
+    (car 5)
+    at song.xtm:12
+```
+
+A session shows info and above, and the subcommands (`exec`, `test`, `render`,
+`compile`) only warnings and errors. `-q` shows only errors, and each `-v` adds
+a level: `-v` for info, `-vv` for debug, `-vvv` for trace. For finer control,
+`EXTEMPORE_LOG` takes a level and levels for components:
+
+```bash
+EXTEMPORE_LOG=debug,compiler=warning extempore exec song.xtm
+```
+
+The components are `audio`, `compiler`, `llvm`, `midi`, `nrepl`, `osc`,
+`scheme`, `server` and `zone`, and libraries add their own (`studio`, `pattern`,
+`sampler`). A component's level replaces the base level for its messages, in
+either direction. In a running session, `(log:set-level! 'compiler 'warning)`
+quietens the compiler's `Compiled:` lines, and `(log:set-level! 'debug)` changes
+the base level.
+
+Your own code can log too. In Scheme, `log:error`, `log:warn`, `log:info` and
+`log:debug` display their arguments separated by spaces, and
+`(log:emit 'warning 'mylib "text" ...)` names a component. In xtlang,
+`log_error`, `log_warn`, `log_info` and `log_debug` each take one string; they
+are safe to call from the audio thread, which queues its messages for another
+thread to write out. An `exec` or `render` which logs an error exits with
+status 1.
+
+When a session's stderr isn't a terminal (under a service manager, or redirected
+to a file), each line starts with the time; `--timestamps always` or `never`
+decides that for any run. Colour follows `--color` and `NO_COLOR`.
 
 ## The power (and danger) of CaaS {#the-power-and-danger-of-caas}
 

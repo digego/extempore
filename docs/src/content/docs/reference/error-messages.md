@@ -9,8 +9,8 @@ the snippet that produces them, and how to fix them.
 
 Each entry was produced by running the minimal snippet shown through
 `./extempore exec -e`. The error blocks are the real output, except that
-internal names whose numbers vary run to run (an `_adhoc_N` suffix, a solver
-`(var N)`) are written with `N` rather than a specific value. If you see a
+internal names whose numbers vary run to run (a solver variable such as
+`!infer_N`) are written with `N` rather than a specific value. If you see a
 genuinely different message from the same code, please
 [open an issue](https://github.com/digego/extempore/issues).
 
@@ -20,23 +20,22 @@ genuinely different message from the same code, please
 
 :::note[How type errors are reported]
 
-In the v0.10.0 compiler, inference runs through a single constraint solver, and
-when the constraints can't be satisfied most type errors surface the same way: a
-`Type Error:` line saying what couldn't be reconciled, followed by
+Inference runs through a single constraint solver, and when the constraints
+can't be satisfied most type errors surface the same way: an error whose first
+line says what failed,
 
 ```
-Type Error couldn't resolve type: NAME_adhoc_N
+error: couldn't resolve the type of NAME
 ```
 
-where `NAME` is the function being compiled and `_adhoc_N` is an internal suffix
-whose number varies run to run. The first line is the useful one---it either
-names the clashing types directly
-(`type mismatch --- T is not compatible with U`) or, for a call, the argument
-types and the candidate signatures that didn't match
-(`no overload matches the argument types [...] --- candidates are [...]`). The
-second line just says which definition failed. A handful of errors (literal
-mismatches, unbound names, parse errors) have their own specific messages,
-covered below.
+where `NAME` is the function being compiled, followed by indented notes from
+the solver saying why. The notes are the useful part---they either name the
+clashing types directly (`type mismatch: T is not compatible with U`) or, for a
+call, the argument types and the candidate signatures that didn't match
+(`no overload matches the argument types [...]; the candidates are [...]`). When
+the code comes from a file, a last line gives its location (`at FILE:LINE`). A
+handful of errors (literal mismatches, unbound names, parse errors) have their
+own specific first lines, covered below.
 
 Code that catches a compiler error sees its kind as the error type
 (`xtlang-type-error`, `xtlang-syntax-error`, `xtlang-generics-error`,
@@ -58,7 +57,7 @@ message.
 **Error**
 
 ```
-Type Error couldn't resolve type: unresolved_example_adhoc_8
+error: couldn't resolve the type of unresolved_example
 ```
 
 **What it means.** The inferencer couldn't pin down a type. Here `f` is called
@@ -81,8 +80,8 @@ are necessary and when they're redundant.
 ### `couldn't resolve type` (a conflict) {#type-conflict}
 
 Passing the wrong type to a function, mixing up pointer types, or calling with
-the wrong number of arguments all produce a `Type Error:` line saying what
-clashed and then `couldn't resolve type`.
+the wrong number of arguments all produce an error that says it couldn't
+resolve the type of the function, with a note on what clashed.
 
 **Wrong argument type** --- here `takes_i64` wants an `i64` but gets the float
 literal `3.0` (xtlang never silently coerces):
@@ -98,9 +97,9 @@ literal `3.0` (xtlang never silently coerces):
 ```
 
 ```
-Compiled:  takes_i64 >>> [i64,i64]*
-Type Error: no overload matches the argument types [double] --- candidates are [i64,i64]
-Type Error couldn't resolve type: caller_bad_numeric_adhoc_N
+Compiled: takes_i64 >>> [i64,i64]*
+error: couldn't resolve the type of caller_bad_numeric
+    no overload matches the argument types [double]; the candidates are [i64,i64]
 ```
 
 No overload of the called function matched the argument types you supplied: you
@@ -126,8 +125,8 @@ treats named types as distinct:
 ```
 
 ```
-Type Error: no overload matches the argument types [coord2d*] --- candidates are [double,coord3d*]
-Type Error couldn't resolve type: pass_wrong_type_adhoc_N
+error: couldn't resolve the type of pass_wrong_type
+    no overload matches the argument types [coord2d*]; the candidates are [double,coord3d*]
 ```
 
 The message names both sides: the argument is a `coord2d*`, while the only
@@ -145,14 +144,14 @@ between the value's type and the pointer the solver needed:
 ```
 
 ```
-Type Error: type mismatch --- i64 is not compatible with !infer_N*
-Type Error couldn't resolve type: pref_non_pointer_adhoc_N
+error: couldn't resolve the type of pref_non_pointer
+    type mismatch: i64 is not compatible with !infer_N*
 ```
 
 Here `x`'s type (`i64`) clashes with the pointer the dereference required (the
 `!infer_N*` is the solver's name for "a pointer to something").
 
-**Fix.** Read the `Type Error:` line for the clashing types, then make them
+**Fix.** Read the indented note for the clashing types, then make them
 agree: pass the right type, allocate the right pointer type, or `zalloc` a
 pointer before dereferencing it.
 
@@ -169,7 +168,7 @@ gets its own specific message:
 ```
 
 ```
-Type Error bad numeric value 3.500000, should be i64
+error: bad numeric value 3.500000, should be i64
 ```
 
 **Fix.** Change the literal (`3`, not `3.5`), change the annotation (`:double`
@@ -190,7 +189,7 @@ instead of `:i64`), or convert explicitly with `dtoi64` / `i64tod`.
 **Error**
 
 ```
-Compiler Error cannot find symbol undefined_function
+error: cannot find symbol undefined_function
 ```
 
 **What it means.** The compiler can't find a `bind-func`, `bind-val`, or
@@ -214,7 +213,7 @@ The forward-reference case is a classic trap:
 ```
 
 ```
-Compiler Error cannot find symbol defined_later
+error: cannot find symbol defined_later
 ```
 
 The first `bind-func` fails because `defined_later` doesn't exist yet. Reorder
@@ -236,7 +235,7 @@ site; reorder `bind-func` forms so dependencies come first.
 **Error**
 
 ```
-Compiler Error cannot find symbol nope
+error: cannot find symbol nope
 ```
 
 **What it means.** `set!` tried to mutate a variable that isn't in scope. In
@@ -251,9 +250,9 @@ function arguments---it won't create a new binding.
 ### Wrong number of arguments
 
 Calling a function with too few or too many arguments is, like a type mismatch,
-reported through the overload solver: a `CONFLICT-OVERLOAD` line (whose `cands`
-clause shows the arities the compiler knows about) followed by
-`couldn't resolve type`.
+reported through the overload solver: a `couldn't resolve the type` error whose
+note lists the candidate signatures, and so the arities the compiler knows
+about.
 
 **Too few arguments:**
 
@@ -268,11 +267,11 @@ clause shows the arities the compiler knows about) followed by
 ```
 
 ```
-Type Error: no overload matches the argument types [i64] --- candidates are [i64,i64,i64]
-Type Error couldn't resolve type: call_too_few_adhoc_N
+error: couldn't resolve the type of call_too_few
+    no overload matches the argument types [i64]; the candidates are [i64,i64,i64]
 ```
 
-The `candidates are` clause shows the signature you missed: `[i64,i64,i64]` is a
+The list of candidates shows the signature you missed: `[i64,i64,i64]` is a
 two-argument function (return type first, then the two `i64` parameters), but
 you supplied one argument. **Too many arguments** produces the same shape of
 error.
@@ -282,7 +281,7 @@ with the same name and different signatures---so when a call matches none of
 them by arity or type, the solver reports it as an unmatched overload rather
 than a specific "wrong arity" message.
 
-**Fix.** Check the function's type signature (the `Compiled:  NAME >>> ...` log
+**Fix.** Check the function's type signature (the `Compiled: NAME >>> ...` log
 line) and match the argument count and types, or define another `bind-func`
 variant with the signature you want.
 
@@ -303,7 +302,7 @@ variant with the signature you want.
 bounds:
 
 ```
-Syntax Error tuple index out of bounds: 5
+error: tuple index out of bounds: 5
 ```
 
 The index must be a literal (you can't `tref` a tuple with a runtime variable),
@@ -330,17 +329,15 @@ corruption or a segfault at runtime.
 **Error**
 
 ```
-;missing close paren:
+error: missing close paren:
   (lambda (a:i64)
     (+ a 1))
-(quit 0)
-;    sys:eval-string
 ```
 
 **What it means.** The reader hit end-of-input before all parentheses were
 balanced. This is a Scheme-level read error, not an xtlang type error--- you'll
 see it whenever the forms you send don't parse as complete s-expressions. The
-report shows the unbalanced text and the frame that read it.
+report shows some of the unbalanced text.
 
 **Fix.** Close the paren. In an interactive session your editor's paren-matching
 will usually catch this; in `exec` or file loads it's easier to miss.

@@ -79,20 +79,11 @@ open up a terminal, `cd` into your extempore folder, and start the Extempore
 running. If you see something like this, everything's working---nice one.
 
 ```
-------------- Extempore --------------
-0.10.0
-(c) Andrew Sorensen, Ben Swift
-ben@benswift.me
-
-ARCH           : arm64-apple-darwin23.6.0
-CPU            : apple-m1
-SampleRate     : 44100
-Channels Out   : 2
-Frames         : 1024
----------------------------------------
-INFO: starting primary process...
-INFO: server: accepted new connection to primary process
-Loading xtmbase library... done in 1.633086 seconds
+Extempore v0.11.2 (arm64-apple-darwin23.6.0, apple-m1, LLVM 22.1.8)
+Audio: MacBook Pro Speakers (2 ch), 44100 Hz, 1024 frames, 23 ms latency
+nREPL server started on port 7888 on host 127.0.0.1 - nrepl://127.0.0.1:7888
+Listening on TCP port 7099: connect your editor to send code
+Loaded xtmbase in 1.63 s
 ```
 
 :::note
@@ -127,7 +118,7 @@ If everything's gone to plan, you'll see one more message at the very bottom of
 the terminal:
 
 ```
-INFO: server: accepted new connection to primary process
+Accepted a connection to the primary process
 ```
 
 Congrats, you're connected... and almost there.
@@ -159,8 +150,8 @@ If you can see `"Hello, World!"` at the bottom of the terminal, then you've just
 evaluated your first Extempore code! 🙌 🎉 🥳 🙌
 
 ```
-Loading xtmbase library... done in 1.633086 seconds
-INFO: server: accepted new connection to primary process
+Loaded xtmbase in 1.63 s
+Accepted a connection to the primary process
 "Hello, World!"
 ```
 
@@ -275,12 +266,10 @@ type the command `./extempore devices` (or
 certainly) be different.
 
 ```
------Available Audio Devices-----------------------------
-audio device[0]:DisplayPort api[0]:Core Audio inchan[0] outchan[2]
-audio device[1]:Studio 24 api[0]:Core Audio inchan[2] outchan[2]
-audio device[2]:MacBook Pro Microphone api[0]:Core Audio inchan[1] outchan[0]
-audio device[3]:MacBook Pro Speakers api[0]:Core Audio inchan[0] outchan[2]
-----------------------------------------------------------
+0: DisplayPort (Core Audio, 0 in, 2 out)
+1: Studio 24 (Core Audio, 2 in, 2 out)
+2: MacBook Pro Microphone (Core Audio, 1 in, 0 out) [default input]
+3: MacBook Pro Speakers (Core Audio, 0 in, 2 out) [default output]
 ```
 
 If you do want Extempore to use a particular audio device, you can pass either
@@ -289,14 +278,14 @@ if you want Extempore to use the _MacBook Pro Speakers_, either of these would
 work (again, remember to use `./extempore.exe` if you're on Windows):
 
 ```plaintext
-./extempore --device 5
+./extempore --device 3
 ./extempore --device "MacBook Pro Speakers"
 ```
 
 :::note
 
 The order of your audio devices can change at any time, especially when you're
-plugging and unplugging devices. So the device number (i.e. the `5` in the
+plugging and unplugging devices. So the device number (i.e. the `3` in the
 example above) won't always correspond to the _MacBook Pro Speakers_. In a gig
 situation it's always safer to use the device name to be sure that you're using
 the correct audio device.

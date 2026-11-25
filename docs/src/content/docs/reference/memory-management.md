@@ -511,7 +511,7 @@ When I call `(fill_massive_buffer)` on my computer (with 8GB of RAM), disaster
 strikes.
 
 ```
-Compiled:  fill_massive_buffer >>> [i32]*
+Compiled: fill_massive_buffer >>> [i32]*
 
 Process extempore segmentation fault: 11
 ```
