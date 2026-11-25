@@ -682,7 +682,8 @@ ParseResult apply_invocation(const extemp::cli::Invocation& Inv, Settings& setti
                 options.code = Inv.files.front();
             }
             options.file = std::string(Inv.get("file").value_or(""));
-            if (!set_whole(Inv, "line", options.line) || !set_whole(Inv, "column", options.column)) {
+            if (!set_whole(Inv, "line", options.line) ||
+                !set_whole(Inv, "column", options.column)) {
                 status = 2;
                 return ParseResult::Exit;
             }

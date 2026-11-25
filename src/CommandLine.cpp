@@ -45,7 +45,8 @@ const std::array<Option, 3> kRuntimeOptions{{
 }};
 
 const std::array<Option, 2> kCommonOptions{{
-    {"color", Kind::Color, "WHEN", "auto (the default: on a terminal, unless NO_COLOR), always or never"},
+    {"color", Kind::Color, "WHEN",
+     "auto (the default: on a terminal, unless NO_COLOR), always or never"},
     {"help", Kind::Flag, "", "print this help"},
 }};
 
@@ -86,34 +87,41 @@ const std::vector<Subcommand>& subcommands() {
          "live session: audio, nREPL and the legacy eval server",
          withFormat({
              {"e", Kind::Text, "EXPR", "evaluate EXPR at startup, after FILE"},
-             {"device", Kind::Text, "DEVICE", "output (or duplex) audio device: an index, or a regex on its name"},
-             {"in-device", Kind::Text, "DEVICE", "input audio device: an index, or a regex on its name"},
+             {"device", Kind::Text, "DEVICE",
+              "output (or duplex) audio device: an index, or a regex on its name"},
+             {"in-device", Kind::Text, "DEVICE",
+              "input audio device: an index, or a regex on its name"},
              {"in-channels", Kind::Whole, "N", "number of input channels"},
              {"latency", Kind::Whole, "MS", "audio output latency to ask for"},
              {"realtime", Kind::Flag, "", "realtime process priority (Windows only)"},
              {"no-audio", Kind::Flag, "", "run without an audio device"},
              {"repl", Kind::Flag, "", "an interactive REPL in this terminal (Linux and macOS)"},
-             {"nrepl-port", Kind::Whole, "N", "port for the nREPL server [7888]; 0 picks one and writes .nrepl-port"},
-             {"nrepl-bind", Kind::Text, "ADDR", "IPv4 address the nREPL server listens on [127.0.0.1]"},
+             {"nrepl-port", Kind::Whole, "N",
+              "port for the nREPL server [7888]; 0 picks one and writes .nrepl-port"},
+             {"nrepl-bind", Kind::Text, "ADDR",
+              "IPv4 address the nREPL server listens on [127.0.0.1]"},
              {"no-nrepl", Kind::Flag, "", "don't start the nREPL server"},
-             {"legacy-port", Kind::Whole, "N", "port for the legacy eval server [7099]; the utility process takes N-1"},
+             {"legacy-port", Kind::Whole, "N",
+              "port for the legacy eval server [7099]; the utility process takes N-1"},
              {"no-legacy-server", Kind::Flag, "", "don't start the legacy eval server"},
          }),
          0, 1},
         {Command::Exec, "exec", "exec FILE | -e EXPR [-- --NAME[=VALUE]...]",
          "run a script: no audio, no servers; exits when its work is done",
-         with({
-                  {"e", Kind::Text, "EXPR", "evaluate EXPR instead of a file"},
-                  {"wait", Kind::Flag, "", "keep running until the code calls (quit)"},
-              },
-              true),
+         with(
+             {
+                 {"e", Kind::Text, "EXPR", "evaluate EXPR instead of a file"},
+                 {"wait", Kind::Flag, "", "keep running until the code calls (quit)"},
+             },
+             true),
          0, 1},
         {Command::Test, "test", "test FILE... [--junit DIR]",
          "run .xtm test files, each in its own process",
-         with({
-                  {"junit", Kind::Text, "DIR", "write a JUnit XML report per file into DIR"},
-              },
-              true),
+         with(
+             {
+                 {"junit", Kind::Text, "DIR", "write a JUnit XML report per file into DIR"},
+             },
+             true),
          1, kAnyNumber},
         {Command::Render, "render", "render FILE -o OUT.wav --duration SECONDS",
          "render FILE's audio to a WAV file, offline and repeatably",
@@ -125,16 +133,18 @@ const std::vector<Subcommand>& subcommands() {
          1, 1},
         {Command::Compile, "compile", "compile FILE [--exe]",
          "compile a library ahead of time into the cache, or --exe an executable",
-         with({
-                  {"exe", Kind::Flag, "", "build a native executable"},
-                  {"name", Kind::Text, "NAME", "name the cache entry NAME, not after the file"},
-                  {"dll", Kind::Flag, "", "build a shared library"},
-                  {"link", Kind::Text, "LIBS", "with --exe: extra arguments for the linker"},
-                  {"arch", Kind::Text, "ARCH", "target architecture [this host's]"},
-                  {"cpu", Kind::Text, "CPU", "target CPU [this host's]"},
-                  {"attr", Kind::Text, "ATTR", "a target attribute; may be given more than once", true},
-              },
-              true),
+         with(
+             {
+                 {"exe", Kind::Flag, "", "build a native executable"},
+                 {"name", Kind::Text, "NAME", "name the cache entry NAME, not after the file"},
+                 {"dll", Kind::Flag, "", "build a shared library"},
+                 {"link", Kind::Text, "LIBS", "with --exe: extra arguments for the linker"},
+                 {"arch", Kind::Text, "ARCH", "target architecture [this host's]"},
+                 {"cpu", Kind::Text, "CPU", "target CPU [this host's]"},
+                 {"attr", Kind::Text, "ATTR", "a target attribute; may be given more than once",
+                  true},
+             },
+             true),
          1, 1},
         {Command::Send, "send", "send [CODE]",
          "evaluate code in a running extempore: CODE, or stdin, or --file",
@@ -342,7 +352,8 @@ Invocation parse(std::span<const std::string_view> Args) {
         } else {
             name = arg.substr(1);
             if (name.size() != 1) {
-                return fail("unknown option " + std::string(arg) + " (long options take two dashes)");
+                return fail("unknown option " + std::string(arg) +
+                            " (long options take two dashes)");
             }
             if (name == "h") {
                 name = "help";
@@ -415,9 +426,10 @@ Invocation parse(std::span<const std::string_view> Args) {
             return fail("extempore send takes the code as one argument (quote it), got " +
                         std::to_string(inv.files.size()));
         }
-        return fail(sub.maxFiles == 0 ? who + " takes no arguments, got \"" + inv.files.front() + "\""
-                                      : who + " takes one file, got \"" + inv.files[0] + "\" and \"" +
-                                            inv.files[1] + "\"");
+        return fail(sub.maxFiles == 0
+                        ? who + " takes no arguments, got \"" + inv.files.front() + "\""
+                        : who + " takes one file, got \"" + inv.files[0] + "\" and \"" +
+                              inv.files[1] + "\"");
     }
     if (inv.files.size() < sub.minFiles) {
         return fail(who + " needs a file");
@@ -496,8 +508,8 @@ std::string help(Command Cmd) {
                 continue;
             }
             text += "  " + std::string(other.synopsis) +
-                    std::string(width + 2 - other.synopsis.size(), ' ') + std::string(other.summary) +
-                    "\n";
+                    std::string(width + 2 - other.synopsis.size(), ' ') +
+                    std::string(other.summary) + "\n";
         }
     }
     std::vector<std::string> left;

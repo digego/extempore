@@ -34,7 +34,8 @@ TEST(CommandLine, NoArgumentsIsASession) {
 }
 
 TEST(CommandLine, SessionTakesAFileAndAnExpression) {
-    const auto inv = parse({"song.xtm", "-e", "(println 1)", "--sample-rate", "48000", "--no-audio"});
+    const auto inv =
+        parse({"song.xtm", "-e", "(println 1)", "--sample-rate", "48000", "--no-audio"});
     EXPECT_EQ(inv.command, Command::Session);
     EXPECT_TRUE(inv.error.empty()) << inv.error;
     ASSERT_EQ(inv.files.size(), 1u);
@@ -142,7 +143,8 @@ TEST(CommandLine, ReplAndStatusTakeNoArguments) {
 }
 
 TEST(CommandLine, RenamedOptionsAreAcceptedWithANotice) {
-    const auto inv = parse({"--noaudio", "--samplerate", "48000", "--device-name", "USB", "--port", "7200"});
+    const auto inv =
+        parse({"--noaudio", "--samplerate", "48000", "--device-name", "USB", "--port", "7200"});
     EXPECT_TRUE(inv.error.empty()) << inv.error;
     EXPECT_TRUE(inv.has("no-audio"));
     EXPECT_EQ(inv.get("sample-rate"), "48000");
