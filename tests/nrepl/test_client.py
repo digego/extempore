@@ -122,12 +122,12 @@ class Cli(unittest.TestCase):
     def test_errors_carry_the_files_line(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             song = Path(d) / "song.xtm"
-            song.write_text("(define x 1)\n\n\n(car x)\n")
+            song.write_text("(define x 1)\n\n\n(car 1)\n")
             rc, text = self.run_cli(
                 "eval", "--editor", "--file", str(song), "--line", "4", "--column", "2"
             )
         self.assertEqual(rc, 0)
-        self.assertIn("x is unbound in (car x)", text)
+        self.assertIn("car argument, 1, is an integer but should be a pair", text)
         self.assertIn("song.xtm, line 4", text)
 
     def test_exit_status_without_editor(self) -> None:

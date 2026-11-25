@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import os
+import random
 import re
 import socket
 import subprocess
@@ -37,23 +38,23 @@ client = _load_client()
 Client = client.Client
 
 
-def free_port() -> int:
+def _free(port: int) -> bool:
     with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+        try:
+            s.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
 
 
 def free_port_pair() -> int:
-    """A port P with P - 1 free too, for extempore's primary and utility
-    eval servers."""
-    for _ in range(50):
-        p = free_port()
-        try:
-            with socket.socket() as s:
-                s.bind(("127.0.0.1", p - 1))
+    """A port P with P - 1 free too, for extempore's primary and utility eval
+    servers. Random rather than the OS's pick: macOS hands out ports in
+    sequence, so tests starting together would choose overlapping pairs."""
+    for _ in range(100):
+        p = random.randrange(20000, 60000)
+        if _free(p) and _free(p - 1):
             return p
-        except OSError:
-            continue
     raise RuntimeError("no free port pair")
 
 
@@ -62,7 +63,11 @@ BANNER = re.compile(r"nREPL server started on port (\d+) on host ([\d.]+)")
 
 class Extempore:
     """An extempore process with its nREPL server on a free port. The console
-    output is collected in `console` (a list of lines)."""
+    output is collected in `console` (a list of lines).
+
+    Another process can take the eval ports between choosing them and
+    extempore binding them, so a start that dies before it is listening is
+    retried with fresh ports."""
 
     def __init__(
         self,
@@ -73,34 +78,45 @@ class Extempore:
         timeout: float = 120,
     ):
         self.cwd = cwd or Path(tempfile.mkdtemp(prefix="xtm-nrepl-"))
+        self.port = 0
+        for attempt in range(3):
+            self._launch(args, nrepl_port)
+            if not wait_for_banner:
+                return
+            try:
+                self.port = int(self.wait_for(BANNER, timeout).group(1))
+                self._wait_until_listening(timeout)
+                return
+            except RuntimeError:
+                if attempt == 2:
+                    raise
+
+    def _launch(self, args: tuple[str, ...], nrepl_port: int | None) -> None:
         self.eval_port = free_port_pair()
-        cmd = [
-            str(BIN),
-            "--noaudio",
-            "--term",
-            "nocolor",
-            "--sharedir",
-            str(REPO),
-            "--port",
-            str(self.eval_port),
-        ]
+        cmd = [str(BIN), "--noaudio", "--term", "nocolor", "--sharedir", str(REPO),
+               "--port", str(self.eval_port)]
         if nrepl_port is not None:
             cmd += ["--nrepl-port", str(nrepl_port)]
         cmd += list(args)
-        self.proc = subprocess.Popen(
-            cmd,
-            cwd=self.cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
-        )
+        self.proc = subprocess.Popen(cmd, cwd=self.cwd, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
         self.console: list[str] = []
         self._lines = threading.Condition()
+        self._exited = threading.Event()
         threading.Thread(target=self._pump, daemon=True).start()
-        self.port = 0
-        if wait_for_banner:
-            m = self.wait_for(BANNER, timeout)
-            self.port = int(m.group(1))
+
+    def _wait_until_listening(self, timeout: float) -> None:
+        """The primary eval server binds just after the nREPL banner."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._exited.is_set():
+                raise RuntimeError("extempore exited:\n" + self.console_text())
+            try:
+                socket.create_connection(("127.0.0.1", self.eval_port), timeout=1).close()
+                return
+            except OSError:
+                time.sleep(0.05)
+        raise TimeoutError("extempore never listened:\n" + self.console_text())
 
     def _pump(self) -> None:
         assert self.proc.stdout
@@ -109,6 +125,7 @@ class Extempore:
                 self.console.append(raw.decode(errors="replace"))
                 self._lines.notify_all()
         with self._lines:
+            self._exited.set()
             self._lines.notify_all()
 
     def console_text(self) -> str:
@@ -123,20 +140,12 @@ class Extempore:
                 m = pattern.search("".join(self.console))
                 if m:
                     return m
-                if self.proc.poll() is not None and not self._pump_alive():
-                    raise RuntimeError(
-                        f"extempore exited ({self.proc.returncode}):\n"
-                        + "".join(self.console)
-                    )
+                if self._exited.is_set():
+                    raise RuntimeError(f"extempore exited:\n" + "".join(self.console))
                 left = deadline - time.monotonic()
                 if left <= 0:
-                    raise TimeoutError(
-                        f"no {pattern.pattern!r} in console:\n" + "".join(self.console)
-                    )
+                    raise TimeoutError(f"no {pattern.pattern!r} in console:\n" + "".join(self.console))
                 self._lines.wait(min(left, 0.5))
-
-    def _pump_alive(self) -> bool:
-        return self.proc.stdout is not None and not self.proc.stdout.closed
 
     def client(self, timeout: float = 60) -> client.Client:
         return Client("127.0.0.1", self.port, timeout=timeout)
